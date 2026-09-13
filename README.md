@@ -57,14 +57,22 @@ your **personal** `~/.config/hypr/hyprland.lua` (window rules aren't part of
 the theme itself):
 
 ```lua
-o.window("org.omarchy.about", { size = { 1586, 750 } })
+o.window("org.omarchy.about", { size = { 1100, 750 } })
 ```
 
-If you customize `branding/about.txt` or `~/.config/fastfetch/config.jsonc`
-further, re-measure: `sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' branding/about.txt |
-LC_ALL=C.UTF-8 wc -L` for the true logo width (`wc -l` for height), and
-`fastfetch --logo none | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'` piped the same
-way for the modules block — then resize/reshoot until nothing clips.
+Measuring this by hand is easy to get wrong in a way that isn't obvious until
+you look closely — a naive character-grid × cell-size calculation
+(`sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' branding/about.txt | LC_ALL=C.UTF-8 wc -L`
+for the true logo width, `wc -l` for height, same sed trick on
+`fastfetch --logo none` for the modules block) overshot to 1586px here —
+wider than a 1440px-tall-scaled monitor — which centers the window partly
+*off-screen*: the logo's left edge gets clipped by the physical screen edge
+while the right side of the window sits on empty space, which reads as "the
+content is cut off and there's a pile of whitespace" rather than "the window
+is simply too wide." If you customize the logo or fastfetch config, resize in
+small steps and screenshot after each one rather than trusting a formula —
+confirm both edges of every box are visible *and* the window fits inside your
+monitor's logical resolution (`hyprctl monitors -j`, width ÷ scale).
 
 ![About window, fixed](preview-about.png)
 
