@@ -37,6 +37,14 @@ wordmark everywhere Omarchy shows branding:
 
   ![Lock screen preview](preview-unlock.png)
 
+## Floating windows
+
+TUIs and popped-out terminals (`btop`, `cava`, file dialogs, etc.) float
+centered per Omarchy's default window rules, picking up the theme's border
+gradient, gaps, and terminal colors:
+
+![Floating terminal preview](preview-terminal.png)
+
 ## Beyond the terminal
 
 Omarchy templates most terminal- and app-color config straight from
@@ -47,8 +55,13 @@ this theme ships them directly:
 
 - **GTK3/GTK4 + libadwaita apps** (Nautilus, file pickers, etc.) — `gtk.css`
   remaps the Adwaita accent/surface/dialog colors to the palette above.
+
+  ![GTK preview](preview-gtk.png)
+
 - **`cava`** audio visualizer — `cava-theme` gives it a mint → violet gradient
   matching the logo.
+
+  ![Cava preview](preview-cava.png)
 - **`conky`** system monitor — `conky.conf` draws CPU/load, memory, swap,
   disk, network, CPU+GPU temps, top processes, and battery in the same
   palette, as a native Wayland layer-shell surface pinned to the top-right
