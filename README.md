@@ -40,6 +40,29 @@ wordmark everywhere Omarchy shows branding:
 
   ![Lock screen preview](preview-unlock.png)
 
+## Beyond the terminal
+
+Omarchy templates most terminal- and app-color config straight from
+`colors.toml` (Alacritty, Foot, Ghostty, Kitty, btop, the Omarchy shell's bar
+and notifications, Hyprland's active/inactive border gradient, even RGB
+keyboard backlight). Two surfaces aren't covered by that templating, so this
+theme ships them directly:
+
+- **GTK3/GTK4 + libadwaita apps** (Nautilus, file pickers, etc.) — `gtk.css`
+  remaps the Adwaita accent/surface/dialog colors to the palette above.
+- **`cava`** audio visualizer — `cava-theme` gives it a mint → violet gradient
+  matching the logo.
+
+Neither is wired up by Omarchy automatically; symlink them in so they keep
+following the theme on every `omarchy theme set`:
+
+```bash
+mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava
+ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
+ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
+ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
+```
+
 ## Install
 
 ```bash

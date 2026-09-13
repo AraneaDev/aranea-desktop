@@ -1,0 +1,105 @@
+/* Aranea — GTK3/GTK4/Adwaita color overrides, matching colors.toml */
+
+@define-color background #08090b;
+@define-color dark_background #050609;
+@define-color darker_background #030405;
+@define-color lighter_background #141821;
+
+@define-color foreground #e7ecf3;
+@define-color dark_foreground #8b96a6;
+@define-color light_foreground #c7d0db;
+
+@define-color accent #3bff9e;
+@define-color accent2 #7a5cff;
+@define-color selection #1c2b22;
+
+@define-color red #ff5f56;
+@define-color yellow #ffbd2e;
+@define-color green #3bff9e;
+
+/* Adwaita accent + surfaces */
+@define-color accent_bg_color @accent;
+@define-color accent_fg_color @background;
+@define-color accent_color @accent;
+
+@define-color window_bg_color @background;
+@define-color window_fg_color @foreground;
+
+@define-color view_bg_color @darker_background;
+@define-color view_fg_color @foreground;
+
+@define-color sidebar_bg_color @dark_background;
+@define-color sidebar_fg_color @foreground;
+@define-color sidebar_backdrop_color @dark_background;
+@define-color sidebar_shade_color @darker_background;
+
+@define-color headerbar_bg_color @background;
+@define-color headerbar_fg_color @foreground;
+@define-color headerbar_backdrop_color @dark_background;
+@define-color headerbar_shade_color @darker_background;
+
+@define-color card_bg_color @lighter_background;
+@define-color card_fg_color @foreground;
+
+@define-color popover_bg_color @dark_background;
+@define-color popover_fg_color @foreground;
+
+@define-color dialog_bg_color @background;
+@define-color dialog_fg_color @foreground;
+
+@define-color destructive_bg_color @red;
+@define-color destructive_fg_color @foreground;
+@define-color success_bg_color @green;
+@define-color success_fg_color @background;
+@define-color warning_bg_color @yellow;
+@define-color warning_fg_color @background;
+@define-color error_bg_color @red;
+@define-color error_fg_color @foreground;
+
+@define-color borders alpha(@foreground, 0.1);
+@define-color unfocused_borders alpha(@foreground, 0.06);
+
+/* GTK3 legacy variables, for apps that haven't moved to libadwaita tokens */
+@define-color theme_fg_color @foreground;
+@define-color theme_text_color @foreground;
+@define-color theme_bg_color @background;
+@define-color theme_base_color @darker_background;
+@define-color theme_selected_bg_color @selection;
+@define-color theme_selected_fg_color @accent;
+@define-color theme_unfocused_fg_color @dark_foreground;
+@define-color theme_unfocused_bg_color @background;
+@define-color theme_unfocused_base_color @darker_background;
+@define-color theme_unfocused_selected_bg_color @selection;
+@define-color theme_unfocused_selected_fg_color @accent;
+@define-color insensitive_fg_color @dark_foreground;
+@define-color insensitive_bg_color @background;
+@define-color insensitive_base_color @darker_background;
+
+messagedialog, alertdialog.background {
+  background-color: @dialog_bg_color;
+  color: @dialog_fg_color;
+}
+
+alertdialog .titlebar,
+messagedialog .titlebar {
+  background-color: @headerbar_bg_color;
+  color: @headerbar_fg_color;
+}
+
+toast {
+  background-color: @dark_background;
+  color: @foreground;
+  border: 1px solid @accent;
+}
+
+popover.emoji-picker,
+popover.emoji-picker > contents,
+popover.emoji-picker > contents > box {
+  border: none;
+  box-shadow: none;
+}
+
+/* Sharp corners, matching the theme's Hyprland border style */
+* {
+  border-radius: 0;
+}
