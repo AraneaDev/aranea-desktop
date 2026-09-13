@@ -19,12 +19,9 @@ fastfetch, idle screensaver, lock screen, and Plymouth boot screen.
 
 ## Wallpaper
 
-`backgrounds/background-4k.png` is the default: a true 4K (3840×2160) render
-of the site's hero gradient — mint/violet aurora glow, dot-grid constellation
-lines, film grain — with the AraneaDev logo centered.
-
-`backgrounds/hero.jpg` is the plain hero gradient without the logo, kept as a
-second option (`omarchy theme bg next` cycles between the two).
+`backgrounds/background-4k.png` — a true 4K (3840×2160) render of the site's
+hero gradient — mint/violet aurora glow, dot-grid constellation lines, film
+grain — with the AraneaDev logo centered.
 
 ## Branding
 
