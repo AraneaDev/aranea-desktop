@@ -17,6 +17,10 @@ fastfetch, idle screensaver, lock screen, and Plymouth boot screen.
 | Foreground          | `#e7ecf3` |
 | Muted foreground    | `#8b96a6` |
 
+Both accents show up across the terminal/GTK/conky theming; the fastfetch
+logo itself is single-color (see Branding below) so its auto-fit sizing
+keeps working natively.
+
 ## Wallpaper
 
 `backgrounds/background-4k.png` — a true 4K (3840×2160) render of the site's
@@ -28,8 +32,16 @@ grain — with the AraneaDev logo centered.
 The AraneaDev spider mark replaces the theme's previous gothic-blackletter
 wordmark everywhere Omarchy shows branding:
 
-- **Fastfetch logo** (`omarchy branding about`) — `branding/about.txt`, full
-  24-bit gradient ANSI art.
+- **Fastfetch logo** (`omarchy branding about`) — `branding/about.txt`,
+  plain block-character art (no embedded ANSI codes), colored by fastfetch's
+  own `color` config key like Omarchy's stock logos. An earlier version used
+  per-character 24-bit gradient codes, which looked nicer but broke
+  `omarchy-launch-about`'s auto-fit sizing two ways: any custom
+  `~/.config/fastfetch/config.jsonc` (needed for a second gradient color)
+  makes it skip sizing entirely, and separately its width check (`wc -L`)
+  can't see through raw ANSI codes and wildly miscounts the logo's width.
+  Plain text avoids both — no custom config, no manual window-size rule, no
+  clipping — matching how Omarchy's own default logo works.
 - **Idle screensaver** (`omarchy branding screensaver`) — `branding/screensaver.txt`,
   plain block-character art, so `ttfx`'s own effects/coloring apply cleanly on top.
 - **Lock screen + Plymouth boot logo** — `unlock.png`, trimmed and transparent,
@@ -37,44 +49,26 @@ wordmark everywhere Omarchy shows branding:
 
   ![Lock screen preview](preview-unlock.png)
 
-### Fixing the About window (fastfetch) with this logo
+### The About window (fastfetch) just works
 
-`omarchy-launch-about` auto-sizes its window to fit fastfetch's content, but
-that breaks with this theme's logo:
+Because the logo is plain text and there's no `~/.config/fastfetch/config.jsonc`,
+`omarchy-launch-about` auto-fits its window to the content natively — no
+window-size override needed:
 
-- It skips sizing entirely whenever `~/.config/fastfetch/config.jsonc`
-  exists (ours does, to add the logo's second gradient color), falling back
-  to a static 920×480 that's too narrow for this layout — text gets clipped
-  on the right.
-- Even without a custom config, its width measurement (`wc -L` on the raw
-  logo file) doesn't strip the 24-bit ANSI color codes in `branding/about.txt`,
-  so it counts escape sequences as visible characters and wildly overshoots
-  (measured 956 columns instead of the real 81), blowing the window up to
-  thousands of pixels.
+![About window](preview-about.png)
 
-The fix is a static size override, measured for this exact logo + config, in
-your **personal** `~/.config/hypr/hyprland.lua` (window rules aren't part of
-the theme itself):
-
-```lua
-o.window("org.omarchy.about", { size = { 1100, 750 } })
-```
-
-Measuring this by hand is easy to get wrong in a way that isn't obvious until
-you look closely — a naive character-grid × cell-size calculation
-(`sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' branding/about.txt | LC_ALL=C.UTF-8 wc -L`
-for the true logo width, `wc -l` for height, same sed trick on
-`fastfetch --logo none` for the modules block) overshot to 1586px here —
-wider than a 1440px-tall-scaled monitor — which centers the window partly
-*off-screen*: the logo's left edge gets clipped by the physical screen edge
-while the right side of the window sits on empty space, which reads as "the
-content is cut off and there's a pile of whitespace" rather than "the window
-is simply too wide." If you customize the logo or fastfetch config, resize in
-small steps and screenshot after each one rather than trusting a formula —
-confirm both edges of every box are visible *and* the window fits inside your
-monitor's logical resolution (`hyprctl monitors -j`, width ÷ scale).
-
-![About window, fixed](preview-about.png)
+If you fork this theme and add a custom fastfetch config or a raw-ANSI logo,
+know that you're trading this away: any file at `~/.config/fastfetch/config.jsonc`
+makes Omarchy skip auto-sizing entirely, and its width check (`wc -L`) can't
+see through embedded ANSI codes, so it badly miscounts a colored logo's width.
+Either breaks the About window in a way that needs a hand-measured static
+`o.window("org.omarchy.about", { size = { W, H } })` rule in your personal
+`~/.config/hypr/hyprland.lua` to fix — and measure that by resizing and
+screenshotting in small steps, not by trusting a formula: a naive
+character-grid × cell-size calculation can produce a window wider than your
+monitor's logical resolution, which centers it partly off-screen (clipping
+one edge while leaving empty space on the other, which looks like "content
+missing" rather than "window too wide").
 
 ## Floating windows
 
