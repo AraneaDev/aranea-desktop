@@ -42,22 +42,36 @@ wordmark everywhere Omarchy shows branding:
 Omarchy templates most terminal- and app-color config straight from
 `colors.toml` (Alacritty, Foot, Ghostty, Kitty, btop, the Omarchy shell's bar
 and notifications, Hyprland's active/inactive border gradient, even RGB
-keyboard backlight). Two surfaces aren't covered by that templating, so this
-theme ships them directly:
+keyboard backlight). A few surfaces aren't covered by that templating, so
+this theme ships them directly:
 
 - **GTK3/GTK4 + libadwaita apps** (Nautilus, file pickers, etc.) — `gtk.css`
   remaps the Adwaita accent/surface/dialog colors to the palette above.
 - **`cava`** audio visualizer — `cava-theme` gives it a mint → violet gradient
   matching the logo.
+- **`conky`** system monitor — `conky.conf` draws CPU/load, memory, swap,
+  disk, network, CPU+GPU temps, top processes, and battery in the same
+  palette, as a native Wayland layer-shell surface pinned to the top-right
+  corner (always below every app window — never a floating XWayland window
+  fighting for stacking order). Requires a conky build with real
+  `wlr-layer-shell` support (`out_to_wayland = true`); the stock Arch `conky`
+  package doesn't compile that in — see `conky-cairo-wayland-git` on the AUR.
 
-Neither is wired up by Omarchy automatically; symlink them in so they keep
-following the theme on every `omarchy theme set`:
+None of these are wired up by Omarchy automatically; symlink them in so they
+keep following the theme on every `omarchy theme set`:
 
 ```bash
-mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava
+mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/conky
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
+ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
+```
+
+Autostart conky itself from `~/.config/hypr/autostart.lua`:
+
+```lua
+o.launch_on_start("conky -c ~/.config/conky/conky.conf")
 ```
 
 ## Install
