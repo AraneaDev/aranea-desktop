@@ -57,6 +57,8 @@ this theme ships them directly:
   `wlr-layer-shell` support (`out_to_wayland = true`); the stock Arch `conky`
   package doesn't compile that in — see `conky-cairo-wayland-git` on the AUR.
 
+  ![Conky preview](preview-conky.png)
+
 None of these are wired up by Omarchy automatically; symlink them in so they
 keep following the theme on every `omarchy theme set`:
 
