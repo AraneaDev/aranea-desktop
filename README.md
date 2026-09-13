@@ -37,6 +37,37 @@ wordmark everywhere Omarchy shows branding:
 
   ![Lock screen preview](preview-unlock.png)
 
+### Fixing the About window (fastfetch) with this logo
+
+`omarchy-launch-about` auto-sizes its window to fit fastfetch's content, but
+that breaks with this theme's logo:
+
+- It skips sizing entirely whenever `~/.config/fastfetch/config.jsonc`
+  exists (ours does, to add the logo's second gradient color), falling back
+  to a static 920×480 that's too narrow for this layout — text gets clipped
+  on the right.
+- Even without a custom config, its width measurement (`wc -L` on the raw
+  logo file) doesn't strip the 24-bit ANSI color codes in `branding/about.txt`,
+  so it counts escape sequences as visible characters and wildly overshoots
+  (measured 956 columns instead of the real 81), blowing the window up to
+  thousands of pixels.
+
+The fix is a static size override, measured for this exact logo + config, in
+your **personal** `~/.config/hypr/hyprland.lua` (window rules aren't part of
+the theme itself):
+
+```lua
+o.window("org.omarchy.about", { size = { 1586, 750 } })
+```
+
+If you customize `branding/about.txt` or `~/.config/fastfetch/config.jsonc`
+further, re-measure: `sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' branding/about.txt |
+LC_ALL=C.UTF-8 wc -L` for the true logo width (`wc -l` for height), and
+`fastfetch --logo none | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g'` piped the same
+way for the modules block — then resize/reshoot until nothing clips.
+
+![About window, fixed](preview-about.png)
+
 ## Floating windows
 
 TUIs and popped-out terminals (`btop`, `cava`, file dialogs, etc.) float
