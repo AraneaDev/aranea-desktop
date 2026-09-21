@@ -96,6 +96,8 @@ shipping one preview image for every application:
 
 ![Desktop, bar, wallpaper, and border system](screenshots/desktop.png)
 
+![Aranea command menu](screenshots/menu.png)
+
 ![Finite, high-visibility critical notification treatment](screenshots/notifications.png)
 
 ![Optional on-demand diagnostics layer](screenshots/diagnostics.png)

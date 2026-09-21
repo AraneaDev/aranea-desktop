@@ -23,7 +23,6 @@ BarWidget {
 
     Image {
       anchors.centerIn: parent
-      anchors.verticalCenterOffset: -3
       width: 16
       height: 16
       source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/unlock.png"
