@@ -5,7 +5,7 @@ recolored to match [tim-schipper.nl](https://tim-schipper.nl)'s exact palette,
 with the **AraneaDev** spider-and-wordmark logo carried through the wallpaper,
 fastfetch, idle screensaver, lock screen, and Plymouth boot screen.
 
-![Desktop preview](preview.png)
+![Desktop screenshot](screenshots/desktop.png)
 
 ## Palette
 
@@ -52,17 +52,14 @@ wordmark everywhere Omarchy shows branding:
 - **Idle screensaver** (`omarchy branding screensaver`) — `branding/screensaver.txt`,
   plain block-character art, so `ttfx`'s own effects/coloring apply cleanly on top.
 - **Lock screen + Plymouth boot logo** — `unlock.png`, trimmed and transparent,
-  gradient-colored:
-
-  ![Lock screen preview](preview-unlock.png)
+  gradient-colored. The current lock surface is shown in
+  [`screenshots/boot.png`](screenshots/boot.png).
 
 ### The About window (fastfetch) just works
 
 Because the logo is plain text and there's no `~/.config/fastfetch/config.jsonc`,
 `omarchy-launch-about` auto-fits its window to the content natively — no
-window-size override needed:
-
-![About window](preview-about.png)
+window-size override needed.
 
 If you fork this theme and add a custom fastfetch config or a raw-ANSI logo,
 know that you're trading this away: any file at `~/.config/fastfetch/config.jsonc`
@@ -81,9 +78,20 @@ missing" rather than "window too wide").
 
 TUIs and popped-out terminals (`btop`, `cava`, file dialogs, etc.) float
 centered per Omarchy's default window rules, picking up the theme's border
-gradient, gaps, and terminal colors:
+gradient, gaps, and terminal colors.
 
-![Floating terminal preview](preview-terminal.png)
+## Screenshots
+
+The repository keeps a small, focused set of current captures instead of
+shipping one preview image for every application:
+
+- [`screenshots/desktop.png`](screenshots/desktop.png) — desktop, bar, wallpaper,
+  and border system.
+- [`screenshots/notifications.png`](screenshots/notifications.png) — finite,
+  high-visibility critical notification treatment.
+- [`screenshots/diagnostics.png`](screenshots/diagnostics.png) — the optional
+  on-demand diagnostics layer.
+- [`screenshots/boot.png`](screenshots/boot.png) — lock/Plymouth identity.
 
 ## Beyond the terminal
 
@@ -96,12 +104,8 @@ this theme ships them directly:
 - **GTK3/GTK4 + libadwaita apps** (Nautilus, file pickers, etc.) — `gtk.css`
   remaps the Adwaita accent/surface/dialog colors to the palette above.
 
-  ![GTK preview](preview-gtk.png)
-
 - **`cava`** audio visualizer — `cava-theme` gives it a mint → violet gradient
   matching the logo.
-
-  ![Cava preview](preview-cava.png)
 - **`conky`** system monitor — `conky.conf` draws CPU/load, memory, swap,
   disk, network, CPU+GPU temps, top processes, and battery in the same
   palette, as a native Wayland layer-shell surface pinned to the top-right
@@ -109,8 +113,6 @@ this theme ships them directly:
   fighting for stacking order). Requires a conky build with real
   `wlr-layer-shell` support (`out_to_wayland = true`); the stock Arch `conky`
   package doesn't compile that in — see `conky-cairo-wayland-git` on the AUR.
-
-  ![Conky preview](preview-conky.png)
 
 None of these are wired up by Omarchy automatically. This repo ships two
 hooks (see `hooks/`) that symlink them in and install an on-demand diagnostics
