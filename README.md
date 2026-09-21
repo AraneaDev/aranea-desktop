@@ -5,8 +5,6 @@ recolored to match [tim-schipper.nl](https://tim-schipper.nl)'s exact palette,
 with the **AraneaDev** spider-and-wordmark logo carried through the wallpaper,
 fastfetch, idle screensaver, lock screen, and Plymouth boot screen.
 
-![AraneaDev hero wallpaper](backgrounds/background-4k.png)
-
 ![Empty Aranea desktop](screenshots/desktop.png)
 
 ## Palette
@@ -32,9 +30,6 @@ The theme ships a coordinated ambient pair for the desktop:
 - `backgrounds/background-night.png` — a quieter obsidian/violet variant with
   the same composition and lower visual energy.
 
-`backgrounds/background-4k.png` remains the branded hero wallpaper: a true 4K
-(3840×2160) render of the site's mint/violet aurora, dot-grid constellation
-lines, film grain, and centered AraneaDev logo.
 
 ## Branding
 
