@@ -122,6 +122,44 @@ Autostart conky itself from `~/.config/hypr/autostart.lua`:
 o.launch_on_start("conky -c ~/.config/conky/conky.conf")
 ```
 
+## Notifications
+
+`plugins/araneadev.notifications/` is a clone of Omarchy's built-in
+notifications service with one behavior change: critical-urgency toasts now
+auto-dismiss after 60 seconds instead of staying on screen forever.
+
+Omarchy's stock `durationFor()` treats `NotificationUrgency.Critical` as
+"never expire" (`return 0`), on the assumption that critical means a human
+needs to act on it. In practice, browsers (Chrome/Brave/etc.) mark any web
+notification sent with `requireInteraction: true` as critical — including
+routine ones, like YouTube's upload/live alerts — so those pile up as toasts
+that sit in the corner until manually dismissed. This clone keeps normal and
+low urgency untouched (capped at 30s, per Omarchy defaults) and gives
+critical toasts a generous but finite 60s lifetime instead:
+
+```qml
+// Service.qml
+readonly property int criticalPopupDuration: 60000
+
+function durationFor(urgency, expireTimeout) {
+  switch (urgency) {
+  case NotificationUrgency.Critical:
+    return criticalPopupDuration
+  ...
+```
+
+Right-click still dismisses any toast immediately, and
+`omarchy-shell notifications dismissAll` clears every toast on screen at once.
+
+Install it alongside the theme (this isn't staged automatically — it's a
+shell plugin, not theme-templated config):
+
+```bash
+cp -r plugins/araneadev.notifications ~/.config/omarchy/plugins/
+omarchy plugin enable araneadev.notifications
+omarchy plugin disable omarchy.notifications
+```
+
 ## Install
 
 ```bash
