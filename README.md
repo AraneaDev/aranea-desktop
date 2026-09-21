@@ -23,9 +23,16 @@ keeps working natively.
 
 ## Wallpaper
 
-`backgrounds/background-4k.png` — a true 4K (3840×2160) render of the site's
-hero gradient — mint/violet aurora glow, dot-grid constellation lines, film
-grain — with the AraneaDev logo centered.
+The theme ships a coordinated ambient pair for the desktop:
+
+- `backgrounds/background-day.png` — a lighter mint-atmosphere variant with
+  sparse perimeter topology and generous center negative space.
+- `backgrounds/background-night.png` — a quieter obsidian/violet variant with
+  the same composition and lower visual energy.
+
+`backgrounds/background-4k.png` remains the branded hero wallpaper: a true 4K
+(3840×2160) render of the site's mint/violet aurora, dot-grid constellation
+lines, film grain, and centered AraneaDev logo.
 
 ## Branding
 
