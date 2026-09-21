@@ -5,7 +5,9 @@ recolored to match [tim-schipper.nl](https://tim-schipper.nl)'s exact palette,
 with the **AraneaDev** spider-and-wordmark logo carried through the wallpaper,
 fastfetch, idle screensaver, lock screen, and Plymouth boot screen.
 
-![Desktop screenshot](screenshots/desktop.png)
+![AraneaDev hero wallpaper](backgrounds/background-4k.png)
+
+![Empty Aranea desktop](screenshots/desktop.png)
 
 ## Palette
 
@@ -85,13 +87,13 @@ gradient, gaps, and terminal colors.
 The repository keeps a small, focused set of current captures instead of
 shipping one preview image for every application:
 
-- [`screenshots/desktop.png`](screenshots/desktop.png) — desktop, bar, wallpaper,
-  and border system.
-- [`screenshots/notifications.png`](screenshots/notifications.png) — finite,
-  high-visibility critical notification treatment.
-- [`screenshots/diagnostics.png`](screenshots/diagnostics.png) — the optional
-  on-demand diagnostics layer.
-- [`screenshots/boot.png`](screenshots/boot.png) — lock/Plymouth identity.
+![Desktop, bar, wallpaper, and border system](screenshots/desktop.png)
+
+![Finite, high-visibility critical notification treatment](screenshots/notifications.png)
+
+![Optional on-demand diagnostics layer](screenshots/diagnostics.png)
+
+![Lock and Plymouth identity](screenshots/boot.png)
 
 ## Beyond the terminal
 
