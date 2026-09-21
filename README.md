@@ -77,6 +77,14 @@ TUIs and popped-out terminals (`btop`, `cava`, file dialogs, etc.) float
 centered per Omarchy's default window rules, picking up the theme's border
 gradient, gaps, and terminal colors.
 
+## Shell bar
+
+`shell.toml` gives the Omarchy bar its Aranea treatment: a deeper obsidian
+surface, taller breathing room, tighter controls, and mint/violet focus states.
+The recommended layout keeps the clock centered, workspaces/menu on the left,
+and system controls on the right. Set that layout in
+`~/.config/omarchy/shell.json`, then run `omarchy restart shell` to apply it.
+
 ## Screenshots
 
 The repository keeps a small, focused set of current captures instead of

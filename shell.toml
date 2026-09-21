@@ -1,0 +1,140 @@
+# Aranea shell surfaces: a quiet, high-contrast instrument panel.
+
+[bar]
+background       = "#050609"
+background-alpha = 0.96
+text             = "#e7ecf3"
+active           = "#3bff9e"
+scale-with-font  = true
+size-horizontal  = 32
+size-vertical    = 32
+
+[hyprland]
+active-border            = "rgba(3bff9eee) rgba(7a5cffee) 45deg"
+active-border-foreground = "rgba(3bff9eee) rgba(7a5cffee) 45deg"
+
+[controls]
+normal-color        = "#e7ecf3"
+normal-fill-alpha   = 0.025
+normal-border       = "#e7ecf3"
+normal-border-width = 1
+normal-border-alpha = 0.22
+hover-cursor-color        = "#e7ecf3"
+hover-cursor-fill-alpha   = 0.08
+hover-cursor-border       = "#3bff9e"
+hover-cursor-border-width = 1
+hover-cursor-border-alpha = 0.55
+focus-color        = "#e7ecf3"
+focus-fill-alpha   = 0.08
+focus-border       = "#3bff9e"
+focus-border-width = 1
+focus-border-alpha = 0.55
+selected-color        = "#e7ecf3"
+selected-fill-alpha   = 0.16
+selected-border       = "#3bff9e"
+selected-border-width = 0
+selected-border-alpha = 1.0
+pressed-fill-alpha   = 0.22
+selection-fill-alpha = 0.35
+
+[spacing]
+scale = 1.0
+scale-with-font = true
+control-gap = 6
+control-padding-x = 8
+control-padding-y = 5
+row-gap = 6
+label-gap = 4
+
+[font]
+base-size = 12
+caption = 10
+body-small = 11
+body = 12
+subtitle = 13
+title = 14
+icon = 14
+icon-large = 18
+
+[popups]
+background       = "#08090b"
+background-alpha = 0.98
+text             = "#e7ecf3"
+border           = "hyprland.active-border"
+border-alpha     = 1.0
+
+[tooltip]
+background       = "#08090b"
+background-alpha = 0.97
+text             = "#e7ecf3"
+border           = "hyprland.active-border-foreground"
+border-alpha     = 1.0
+
+[notifications]
+background       = "#08090b"
+background-alpha = 1.0
+text             = "#e7ecf3"
+border           = "hyprland.active-border"
+border-alpha     = 1.0
+countdown        = "#3bff9e"
+
+[launcher]
+background                = "#08090b"
+background-alpha          = 0.98
+text                      = "#e7ecf3"
+border                    = "hyprland.active-border-foreground"
+border-alpha              = 1.0
+scrim                     = "#08090b"
+scrim-alpha               = 0.5
+selected-background       = "#e7ecf3"
+selected-background-alpha = 0.08
+selected-text             = "#3bff9e"
+selected-border           = "hyprland.active-border-foreground"
+selected-border-alpha     = 0.25
+
+[menu]
+background                = "#08090b"
+background-alpha          = 0.98
+text                      = "#e7ecf3"
+border                    = "hyprland.active-border-foreground"
+border-alpha              = 1.0
+scrim                     = "#08090b"
+scrim-alpha               = 0.5
+selected-background       = "#e7ecf3"
+selected-background-alpha = 0.08
+selected-text             = "#3bff9e"
+selected-border           = "hyprland.active-border-foreground"
+selected-border-alpha     = 0.25
+
+[polkit]
+background       = "#08090b"
+background-alpha = 1.0
+text             = "#e7ecf3"
+text-error       = "#ff5f56"
+border           = "hyprland.active-border"
+border-error     = "#ff5f56"
+border-alpha     = 1.0
+scrim            = "#08090b"
+scrim-alpha      = 0.5
+
+[lock]
+background       = "#08090b"
+background-alpha = 0.8
+text             = "#e7ecf3"
+placeholder      = "#8b96a6"
+text-error       = "#ff5f56"
+border           = "hyprland.active-border"
+border-active    = "hyprland.active-border"
+border-error     = "#ff5f56"
+border-alpha     = 1.0
+selection        = "#3bff9e"
+selection-alpha  = 0.45
+
+[image-picker]
+scrim                   = "#08090b"
+scrim-alpha             = 0.5
+text                    = "#e7ecf3"
+selected-border         = "#3bff9e"
+selected-border-alpha   = 1.0
+unselected-border       = "#e7ecf3"
+unselected-border-alpha = 0.28
