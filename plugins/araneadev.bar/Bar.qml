@@ -1272,10 +1272,12 @@ Item {
       visible: !root.vertical && !root.transparent
       anchors.left: parent.left
       anchors.right: parent.right
+      anchors.leftMargin: Style.space(8)
+      anchors.rightMargin: Style.space(8)
       anchors.bottom: parent.bottom
       height: 1
       color: Color.accent
-      opacity: 0.72
+      opacity: 0.22
     }
 
     Loader {
@@ -1366,40 +1368,40 @@ Item {
         BorderSurface {
           id: leftSurface
           anchors.left: parent.left
-          anchors.leftMargin: Style.space(6)
+          anchors.leftMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
           width: leftModules.width + Style.space(12)
-          height: root.barSize - Style.space(6)
-          color: Color.bar.background
-          borderSpec: Border.flat(Color.accent, 1)
+          height: root.barSize - Style.space(8)
+          color: Color.background
+          borderSpec: Border.none()
           radius: height / 2
-          opacity: 0.94
+          opacity: 0.62
         }
 
         LeftModules {
           id: leftModules
           anchors.left: leftSurface.left
-          anchors.leftMargin: Style.space(6)
+          anchors.leftMargin: Style.space(7)
           anchors.verticalCenter: parent.verticalCenter
         }
 
         BorderSurface {
           id: rightSurface
           anchors.right: parent.right
-          anchors.rightMargin: Style.space(6)
+          anchors.rightMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
           width: rightModules.width + Style.space(12)
-          height: root.barSize - Style.space(6)
-          color: Color.bar.background
-          borderSpec: Border.flat(Color.accent, 1)
+          height: root.barSize - Style.space(8)
+          color: Color.background
+          borderSpec: Border.none()
           radius: height / 2
-          opacity: 0.94
+          opacity: 0.62
         }
 
         RightModules {
           id: rightModules
           anchors.right: rightSurface.right
-          anchors.rightMargin: Style.space(6)
+          anchors.rightMargin: Style.space(7)
           anchors.verticalCenter: parent.verticalCenter
         }
 
@@ -1407,11 +1409,11 @@ Item {
           id: centerSurface
           anchors.centerIn: parent
           width: Style.space(190)
-          height: root.barSize - Style.space(6)
-          color: Color.bar.background
-          borderSpec: Border.flat(Color.accent, 1)
+          height: root.barSize - Style.space(8)
+          color: Color.background
+          borderSpec: Border.none()
           radius: height / 2
-          opacity: 0.94
+          opacity: 0.62
         }
 
         Item {
