@@ -105,22 +105,20 @@ this theme ships them directly:
 
   ![Conky preview](preview-conky.png)
 
-None of these are wired up by Omarchy automatically; symlink them in so they
-keep following the theme on every `omarchy theme set`:
+None of these are wired up by Omarchy automatically. This repo ships two
+hooks (see `hooks/`) that symlink them in, restart conky on every theme
+change, and auto-start conky at login -- all gated to only act while Aranea
+is the active theme, so they're harmless to install even if you switch
+between themes:
 
 ```bash
-mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/conky
-ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
-ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
-ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
-ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
+omarchy hook install theme-set hooks/theme-set
+omarchy hook install post-boot hooks/post-boot
 ```
 
-Autostart conky itself from `~/.config/hypr/autostart.lua`:
-
-```lua
-o.launch_on_start("conky -c ~/.config/conky/conky.conf")
-```
+Re-run `omarchy theme set aranea` once after installing the hooks to apply
+the symlinks immediately, rather than waiting for the next login or theme
+change.
 
 ## Notifications
 

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Aranea theme: auto-start conky at login when Aranea is the active theme.
+# Omarchy runs post-boot hooks a couple seconds after the desktop starts.
+#
+# Install with:
+#   omarchy hook install post-boot hooks/post-boot
+
+[[ $(omarchy theme current 2>/dev/null) == "Aranea" ]] || exit 0
+
+mkdir -p ~/.config/conky
+ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
+
+pgrep -x conky >/dev/null || setsid conky -c ~/.config/conky/conky.conf >/dev/null 2>&1 &

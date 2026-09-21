@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Aranea theme: keep conky, GTK, and cava following the theme, and restart
+# conky so it picks up the new colors/config. Omarchy calls theme-set hooks
+# on every theme change, snake-cased slug in $1 -- only act when Aranea is
+# the one being applied.
+#
+# Install with:
+#   omarchy hook install theme-set hooks/theme-set
+
+[[ $1 == "aranea" ]] || exit 0
+
+mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/conky
+ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
+ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
+ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
+ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
+
+pkill -x conky 2>/dev/null
+setsid conky -c ~/.config/conky/conky.conf >/dev/null 2>&1 &
