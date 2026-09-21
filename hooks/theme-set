@@ -15,6 +15,7 @@ fi
 
 theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
 lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
+menu_plugin="$HOME/.config/omarchy/plugins/araneadev.menu"
 
 mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/conky ~/.local/bin
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
@@ -27,7 +28,14 @@ mkdir -p "$lock_plugin"
 install -Dm644 "$theme_root/plugins/araneadev.lock/manifest.json" "$lock_plugin/manifest.json"
 install -Dm644 "$theme_root/plugins/araneadev.lock/Service.qml" "$lock_plugin/Service.qml"
 install -Dm644 "$theme_root/plugins/araneadev.lock/LockView.qml" "$lock_plugin/LockView.qml"
+mkdir -p "$menu_plugin"
+install -Dm644 "$theme_root/plugins/araneadev.menu/manifest.json" "$menu_plugin/manifest.json"
+install -Dm644 "$theme_root/plugins/araneadev.menu/BarWidget.qml" "$menu_plugin/BarWidget.qml"
+install -Dm644 "$theme_root/plugins/araneadev.menu/Menu.qml" "$menu_plugin/Menu.qml"
+install -Dm644 "$theme_root/plugins/araneadev.menu/MenuModel.js" "$menu_plugin/MenuModel.js"
 omarchy plugin disable tim.lock >/dev/null 2>&1 || true
 omarchy plugin enable araneadev.lock >/dev/null 2>&1 || true
+omarchy plugin disable tim.menu >/dev/null 2>&1 || true
+omarchy plugin enable araneadev.menu >/dev/null 2>&1 || true
 
 pkill -x conky 2>/dev/null

@@ -81,6 +81,9 @@ gradient, gaps, and terminal colors.
 
 `shell.toml` gives the Omarchy bar its Aranea treatment: a deeper obsidian
 surface, taller breathing room, tighter controls, and mint/violet focus states.
+The `araneadev.menu` plugin replaces the stock menu glyph with the Aranea
+spider mark while retaining the normal left-click menu and right-click terminal
+actions.
 The recommended layout keeps the clock centered, workspaces/menu on the left,
 and system controls on the right. Set that layout in
 `~/.config/omarchy/shell.json`, then run `omarchy restart shell` to apply it.
