@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.lock",
+  "name": "Aranea Lock Screen",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Aranea premium lock surface with native password and fingerprint authentication.",
+  "omarchy": {
+    "capabilities": [
+      "authentication"
+    ],
+    "clonedFrom": "omarchy.lock"
+  },
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

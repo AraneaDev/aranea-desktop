@@ -8,7 +8,13 @@
 # Install with:
 #   omarchy hook install theme-set hooks/theme-set
 
-[[ $1 == "aranea" ]] || exit 0
+if [[ $1 != "aranea" ]]; then
+  omarchy plugin disable araneadev.lock >/dev/null 2>&1 || true
+  exit 0
+fi
+
+theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
 
 mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/conky ~/.local/bin
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
@@ -16,5 +22,12 @@ ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
 ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
 install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
+
+mkdir -p "$lock_plugin"
+install -Dm644 "$theme_root/plugins/araneadev.lock/manifest.json" "$lock_plugin/manifest.json"
+install -Dm644 "$theme_root/plugins/araneadev.lock/Service.qml" "$lock_plugin/Service.qml"
+install -Dm644 "$theme_root/plugins/araneadev.lock/LockView.qml" "$lock_plugin/LockView.qml"
+omarchy plugin disable tim.lock >/dev/null 2>&1 || true
+omarchy plugin enable araneadev.lock >/dev/null 2>&1 || true
 
 pkill -x conky 2>/dev/null
