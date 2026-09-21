@@ -257,6 +257,7 @@ Item {
         width: Math.min(260, parent.parent.width * 0.2)
         height: width
         anchors.horizontalCenter: parent.horizontalCenter
+        anchors.horizontalCenterOffset: -2
         source: root.fileUrl(root.themeAssetRoot + "/unlock.png")
         fillMode: Image.PreserveAspectFit
         asynchronous: true
