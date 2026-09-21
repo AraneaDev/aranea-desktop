@@ -1,6 +1,8 @@
 mode = "dark"
 
 accent = "#3bff9e"
+accent_secondary = "#7a5cff"
+ceremony = "#e6c98a"
 selection = "#1c2b22"
 muted = "#3a4250"
 

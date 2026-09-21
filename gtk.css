@@ -11,6 +11,7 @@
 
 @define-color accent #3bff9e;
 @define-color accent2 #7a5cff;
+@define-color ceremony #e6c98a;
 @define-color selection #1c2b22;
 
 @define-color red #ff5f56;
@@ -75,6 +76,11 @@
 @define-color insensitive_bg_color @background;
 @define-color insensitive_base_color @darker_background;
 
+/* Premium semantic states: ceremony is intentionally rare and never a
+ * substitute for warning/error colors. */
+@define-color link_color @accent2;
+@define-color visited_link_color @accent2;
+
 messagedialog, alertdialog.background {
   background-color: @dialog_bg_color;
   color: @dialog_fg_color;
@@ -89,7 +95,48 @@ messagedialog .titlebar {
 toast {
   background-color: @dark_background;
   color: @foreground;
-  border: 1px solid @accent;
+  border: 1px solid alpha(@foreground, 0.16);
+  box-shadow: 0 8px 24px alpha(#000000, 0.34);
+}
+
+/* Keep controls crisp and opaque. Accent is reserved for focus/active state,
+ * so a full window does not glow merely because it contains a button. */
+button,
+togglebutton,
+spinbutton,
+entry,
+dropdown,
+combobox button,
+scale trough {
+  border-radius: 2px;
+}
+
+button:hover,
+togglebutton:hover,
+entry:focus,
+spinbutton:focus,
+dropdown:focus,
+combobox button:focus {
+  outline: 1px solid alpha(@accent, 0.58);
+  outline-offset: -1px;
+}
+
+button.suggested-action,
+button:checked,
+togglebutton:checked {
+  background-color: @accent;
+  color: @background;
+}
+
+button.destructive-action {
+  background-color: alpha(@red, 0.18);
+  color: @bright_red;
+}
+
+selection,
+*:selected {
+  background-color: @selection;
+  color: @accent;
 }
 
 popover.emoji-picker,

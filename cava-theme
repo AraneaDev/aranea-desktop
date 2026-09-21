@@ -33,11 +33,11 @@ background = '#08090b'
 foreground = '#e7ecf3'
 gradient = 1
 gradient_color_1 = '#3bff9e'
-gradient_color_2 = '#7dffc0'
-gradient_color_3 = '#5ce0c6'
-gradient_color_4 = '#8ff5df'
-gradient_color_5 = '#5b8cff'
-gradient_color_6 = '#7a5cff'
+gradient_color_2 = '#5ce0c6'
+gradient_color_3 = '#7dffc0'
+gradient_color_4 = '#8fb4ff'
+gradient_color_5 = '#7a5cff'
+gradient_color_6 = '#e6c98a'
 
 [smoothing]
 monstercat = 0
