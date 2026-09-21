@@ -79,8 +79,9 @@ gradient, gaps, and terminal colors.
 
 ## Shell bar
 
-`shell.toml` gives the Omarchy bar its Aranea treatment: a deeper obsidian
-surface, taller breathing room, tighter controls, and mint/violet focus states.
+`araneadev.bar` replaces the stock Omarchy bar composition while retaining its
+widget and popup behavior. It gives the bar three Aranea capsules, a deeper
+obsidian surface, a mint accent baseline, and mint/violet focus states.
 The `araneadev.menu` plugin replaces the stock menu glyph with the Aranea
 spider mark while retaining the normal left-click menu and right-click terminal
 actions.

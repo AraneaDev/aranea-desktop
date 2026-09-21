@@ -16,6 +16,7 @@ install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-t
 theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
 lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
 menu_plugin="$HOME/.config/omarchy/plugins/araneadev.menu"
+bar_plugin="$HOME/.config/omarchy/plugins/araneadev.bar"
 mkdir -p "$lock_plugin"
 install -Dm644 "$theme_root/plugins/araneadev.lock/manifest.json" "$lock_plugin/manifest.json"
 install -Dm644 "$theme_root/plugins/araneadev.lock/Service.qml" "$lock_plugin/Service.qml"
@@ -25,7 +26,15 @@ install -Dm644 "$theme_root/plugins/araneadev.menu/manifest.json" "$menu_plugin/
 install -Dm644 "$theme_root/plugins/araneadev.menu/BarWidget.qml" "$menu_plugin/BarWidget.qml"
 install -Dm644 "$theme_root/plugins/araneadev.menu/Menu.qml" "$menu_plugin/Menu.qml"
 install -Dm644 "$theme_root/plugins/araneadev.menu/MenuModel.js" "$menu_plugin/MenuModel.js"
+mkdir -p "$bar_plugin"
+install -Dm644 "$theme_root/plugins/araneadev.bar/manifest.json" "$bar_plugin/manifest.json"
+install -Dm644 "$theme_root/plugins/araneadev.bar/Bar.qml" "$bar_plugin/Bar.qml"
+install -Dm644 "$theme_root/plugins/araneadev.bar/BarModel.js" "$bar_plugin/BarModel.js"
+install -Dm644 "$theme_root/plugins/araneadev.bar/README.md" "$bar_plugin/README.md"
 omarchy plugin disable tim.lock >/dev/null 2>&1 || true
 omarchy plugin enable araneadev.lock >/dev/null 2>&1 || true
 omarchy plugin disable tim.menu >/dev/null 2>&1 || true
 omarchy plugin enable araneadev.menu >/dev/null 2>&1 || true
+omarchy plugin disable tim.bar >/dev/null 2>&1 || true
+omarchy plugin disable omarchy.bar >/dev/null 2>&1 || true
+omarchy plugin enable araneadev.bar >/dev/null 2>&1 || true

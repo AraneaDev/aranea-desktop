@@ -15,7 +15,7 @@ BarWidget {
     bar: root.bar
     text: " "
     labelVisible: false
-    fixedWidth: 42
+    fixedWidth: 34
     fixedHeight: root.bar ? root.bar.barSize : 32
     horizontalMargin: 0
     verticalPadding: 0
@@ -23,8 +23,8 @@ BarWidget {
 
     Image {
       anchors.centerIn: parent
-      width: 30
-      height: 30
+      width: 20
+      height: 20
       source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/unlock.png"
       sourceClipRect: Qt.rect(56, 56, 144, 144)
       fillMode: Image.PreserveAspectFit

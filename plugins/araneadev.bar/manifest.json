@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.bar",
+  "name": "Aranea Bar",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Aranea composition for the Omarchy status bar",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.bar"
+  }
+}
