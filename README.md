@@ -106,10 +106,10 @@ this theme ships them directly:
   ![Conky preview](preview-conky.png)
 
 None of these are wired up by Omarchy automatically. This repo ships two
-hooks (see `hooks/`) that symlink them in, restart conky on every theme
-change, and auto-start conky at login -- all gated to only act while Aranea
-is the active theme, so they're harmless to install even if you switch
-between themes:
+hooks (see `hooks/`) that symlink them in and install an on-demand diagnostics
+toggle -- all gated to only act while Aranea is the active theme, so they're
+harmless to install even if you switch between themes. Conky is intentionally
+not started automatically; run `aranea-diagnostics-toggle` to show or hide it.
 
 ```bash
 omarchy hook install theme-set hooks/theme-set
@@ -119,6 +119,10 @@ omarchy hook install post-boot hooks/post-boot
 Re-run `omarchy theme set aranea` once after installing the hooks to apply
 the symlinks immediately, rather than waiting for the next login or theme
 change.
+
+The personal Hyprland binding used by this setup is `SUPER + CTRL + SHIFT + D`.
+It toggles the diagnostics panel without competing with Omarchy's existing
+`SUPER + SHIFT + D` Docker binding.
 
 ## Notifications
 

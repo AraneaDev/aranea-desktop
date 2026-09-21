@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+conky_config="${XDG_CONFIG_HOME:-$HOME/.config}/conky/conky.conf"
+
+if pgrep -x conky >/dev/null 2>&1; then
+  pkill -x conky
+  exit 0
+fi
+
+if [[ ! -r "$conky_config" ]]; then
+  notify-send -u critical "Aranea diagnostics" "Conky configuration is unavailable"
+  exit 1
+fi
+
+setsid conky -c "$conky_config" >/dev/null 2>&1 &

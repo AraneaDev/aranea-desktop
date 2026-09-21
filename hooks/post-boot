@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Aranea theme: auto-start conky at login when Aranea is the active theme.
+# Aranea theme: prepare the optional diagnostics toggle at login when Aranea
+# is the active theme. Conky remains off until explicitly summoned.
 # Omarchy runs post-boot hooks a couple seconds after the desktop starts.
 #
 # Install with:
@@ -8,7 +9,6 @@
 
 [[ $(omarchy theme current 2>/dev/null) == "Aranea" ]] || exit 0
 
-mkdir -p ~/.config/conky
+mkdir -p ~/.config/conky ~/.local/bin
 ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
-
-pgrep -x conky >/dev/null || setsid conky -c ~/.config/conky/conky.conf >/dev/null 2>&1 &
+install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
