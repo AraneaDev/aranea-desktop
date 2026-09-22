@@ -1180,20 +1180,10 @@ Item {
     onFileChanged: barHiddenProbe.running = true
   }
 
-  // The directory watch can permanently stop delivering events after flag
-  // changes land in quick succession, stranding the bar off screen until the
-  // shell restarts. `omarchy-toggle-bar` nudges this after flipping the flag
-  // so the probe re-reads it even when the watch has gone quiet.
-  IpcHandler {
-    target: "omarchy.bar"
-
-    // Start rather than restart: a probe already in flight was launched by the
-    // directory watch after the flag flipped, so its answer is current, and
-    // killing it here can swallow the result entirely.
-    function syncHidden(): void {
-      barHiddenProbe.running = true
-    }
-  }
+  // The active bar deliberately does not register the stock `omarchy.bar` IPC
+  // target: the shell instantiates the built-in bar while loading config, so
+  // registering the same target here creates a duplicate-handler warning.
+  // FileView remains the source of truth for the toggle and avoids that race.
 
   Variants {
     model: Quickshell.screens

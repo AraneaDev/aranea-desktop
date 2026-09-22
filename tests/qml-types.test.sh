@@ -28,5 +28,22 @@ if ! command -v qmllint >/dev/null 2>&1; then
   exit 0
 fi
 
-qmllint --ignore-settings "${qml_files[@]}"
-echo "QML type validation passed"
+shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
+import_root=""
+cleanup() {
+  if [[ -n "$import_root" ]]; then rm -rf "$import_root"; fi
+}
+trap cleanup EXIT
+
+qml_args=(--ignore-settings)
+if [[ -d "$shell_dir/Commons" && -f "$shell_dir/Commons/qmldir" \
+   && -d "$shell_dir/Ui" && -f "$shell_dir/Ui/qmldir" ]]; then
+  import_root="$(mktemp -d)"
+  mkdir "$import_root/qs"
+  ln -s "$shell_dir/Commons" "$import_root/qs/Commons"
+  ln -s "$shell_dir/Ui" "$import_root/qs/Ui"
+  qml_args+=(-I "$import_root")
+fi
+
+qmllint "${qml_args[@]}" "${qml_files[@]}"
+echo "QML type validation passed ($(qmllint --version); import root: ${import_root:-default})"

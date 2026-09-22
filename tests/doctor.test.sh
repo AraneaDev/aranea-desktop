@@ -16,6 +16,10 @@ output="$(
   ARANEA_DOCTOR_HOOK_ROOT="$hook_root" \
   ARANEA_OWNERSHIP_ROOT="$ownership_root" \
   ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped \
+  ARANEA_DOCTOR_RUNTIME_STATUS=skipped \
+  ARANEA_DOCTOR_QMLLINT_STATUS=ok \
   "$repo_root/scripts/aranea-doctor" --json
 )"
 
@@ -24,6 +28,10 @@ grep -Fq '"id":"hooks","status":"ok"' <<<"$output"
 grep -Fq '"id":"manifest","status":"ok"' <<<"$output"
 grep -Fq '"id":"fonts","status":"ok"' <<<"$output"
 grep -Fq '"id":"ownership","status":"ok"' <<<"$output"
+grep -Fq '"id":"shell","status":"skipped"' <<<"$output"
+grep -Fq '"id":"plugins","status":"skipped"' <<<"$output"
+grep -Fq '"id":"runtime","status":"skipped"' <<<"$output"
+grep -Fq '"id":"qmllint","status":"ok"' <<<"$output"
 grep -Fq '"status":"skipped"' <<<"$output"
 
 while IFS= read -r line; do

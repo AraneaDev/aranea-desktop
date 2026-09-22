@@ -17,6 +17,16 @@ emit() {
   fi
 }
 
+emit_override() {
+  local id="$1" variable="$2"
+  local value="${!variable:-}"
+  if [[ -n "$value" ]]; then
+    emit "$id" "$value" "check overridden by $variable"
+    return 0
+  fi
+  return 1
+}
+
 theme="${ARANEA_DOCTOR_THEME:-}"
 if [[ -z "$theme" ]] && command -v omarchy >/dev/null 2>&1; then
   theme="$(omarchy theme current 2>/dev/null || true)"
@@ -78,6 +88,56 @@ if (( ownership_ok )); then
   emit ownership ok "${ownership_count} managed targets are present"
 else
   emit ownership repair 'one or more managed targets are missing or stale'
+fi
+
+if ! emit_override shell ARANEA_DOCTOR_SHELL_STATUS; then
+  if command -v omarchy-shell >/dev/null 2>&1; then
+    if omarchy-shell shell ping >/dev/null 2>&1; then
+      emit shell ok 'omarchy-shell IPC is reachable'
+    else
+      emit shell repair 'omarchy-shell is installed but IPC did not respond'
+    fi
+  else
+    emit shell skipped 'omarchy-shell is not installed'
+  fi
+fi
+
+if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
+  if command -v omarchy-shell >/dev/null 2>&1; then
+    plugin_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
+    if jq -e '
+      ([.[] | select(.id == "araneadev.bar") | .enabled] | any) and
+      ([.[] | select(.id == "araneadev.lock") | .enabled] | any) and
+      ([.[] | select(.id == "araneadev.menu") | .enabled] | any) and
+      ([.[] | select(.id == "araneadev.notifications") | .enabled] | any)
+    ' <<<"$plugin_json" >/dev/null 2>&1; then
+      emit plugins ok 'Aranea plugins are enabled'
+    else
+      emit plugins repair 'one or more Aranea plugins are disabled or missing'
+    fi
+  else
+    emit plugins skipped 'plugin state requires omarchy-shell'
+  fi
+fi
+
+if ! emit_override runtime ARANEA_DOCTOR_RUNTIME_STATUS; then
+  log_root="${XDG_RUNTIME_DIR:-/run/user/$UID}/quickshell/by-id"
+  log_file="$(find "$log_root" -type f -name log.log -printf '%T@ %p\n' 2>/dev/null | sort -nr | sed -n '1s/^[^ ]* //p')"
+  if [[ -z "$log_file" ]]; then
+    emit runtime skipped 'no QuickShell runtime log is available'
+  elif rg -qi 'TypeError|ReferenceError|duplicate.*target|coerced to void' "$log_file"; then
+    emit runtime repair "recent QuickShell runtime warnings found in $log_file"
+  else
+    emit runtime ok 'recent QuickShell log has no Aranea runtime errors'
+  fi
+fi
+
+if ! emit_override qmllint ARANEA_DOCTOR_QMLLINT_STATUS; then
+  if command -v qmllint >/dev/null 2>&1; then
+    emit qmllint ok "$(qmllint --version) is available"
+  else
+    emit qmllint skipped 'qmllint is not installed'
+  fi
 fi
 
 for optional in conky alacritty kitty foot starship tmux btop lazygit kvantummanager; do
