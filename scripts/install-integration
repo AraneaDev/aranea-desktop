@@ -92,6 +92,13 @@ case "$integration" in
   session)
     install_one "$repo_root/integrations/session/omarchy.css" "$config_root/omarchy/session/aranea.css"
     ;;
+  cursor)
+    cursor_root="$config_root/icons/Aranea"
+    install_one "$repo_root/integrations/cursor/index.theme" "$cursor_root/index.theme"
+    for cursor_asset in left_ptr.svg hand2.svg watch.svg crosshair.svg; do
+      install_one "$repo_root/integrations/cursor/cursors/$cursor_asset" "$cursor_root/cursors/$cursor_asset"
+    done
+    ;;
   media)
     if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
       install_one "$repo_root/integrations/media/pavucontrol.css" "$config_root/aranea/media/pavucontrol.css"

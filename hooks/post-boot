@@ -17,6 +17,7 @@ theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
 
 if [[ -x "$theme_root/scripts/install-integration" ]]; then
   "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
+  "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
   "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
   "$theme_root/scripts/install-integration" browser --yes >/dev/null 2>&1 || true
   "$theme_root/scripts/install-integration" session --yes >/dev/null 2>&1 || true

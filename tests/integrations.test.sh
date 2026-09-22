@@ -25,4 +25,8 @@ if command -v nvim >/dev/null 2>&1; then
   grep -Fq 'nvim/lua/plugins/aranea-theme.lua' <<<"$developer_output"
 fi
 
+cursor_output="$($repo_root/scripts/install-integration cursor --dry-run)"
+grep -Fq 'cursor/index.theme' <<<"$cursor_output"
+grep -Fq 'cursor/cursors/left_ptr.svg' <<<"$cursor_output"
+
 echo "integration contract passed"

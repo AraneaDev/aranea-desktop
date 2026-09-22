@@ -29,6 +29,7 @@ install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-t
 # Missing applications are skipped and existing configs are backed up.
 if [[ -x "$theme_root/scripts/install-integration" ]]; then
   "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
+  "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
   "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
   "$theme_root/scripts/install-integration" browser --yes >/dev/null 2>&1 || true
   "$theme_root/scripts/install-integration" session --yes >/dev/null 2>&1 || true

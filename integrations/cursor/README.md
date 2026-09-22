@@ -9,3 +9,7 @@ pretending to be binary Xcursor files.
 The intended visual roles are mint for the default/active pointer, violet for
 busy or focus transitions, and red for error feedback. No cursor integration
 may replace the user's existing theme without an ownership backup.
+
+The managed source theme is installed at `~/.config/icons/Aranea`. Because the
+included sources are SVG, a desktop that requires compiled Xcursor files can
+convert them in place; unsupported hosts safely retain the active cursor.
