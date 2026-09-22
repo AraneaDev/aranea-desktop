@@ -28,7 +28,7 @@ function profileAllows(profile, id) {
   return [
     "omarchy.indicators", "omarchy.idle", "omarchy.clock",
     "omarchy.keyboard-layout", "omarchy.workspaces", "omarchy.tray",
-    "omarchy.network", "omarchy.audio", "omarchy.monitor", "omarchy.power",
+    "omarchy.network", "omarchy.audio", "omarchy.microphone", "omarchy.monitor", "omarchy.power",
     "araneadev.menu"
   ].indexOf(moduleId) !== -1
 }
