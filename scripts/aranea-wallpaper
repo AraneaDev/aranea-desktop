@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+manifest="$repo_root/backgrounds/manifest.toml"
+state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+
+wallpaper_path() {
+  local id="$1"
+  awk -v wanted="$id" -v root="$repo_root/" '
+    /^\[\[wallpapers\]\]$/ { in_block = 1; match_id = 0; next }
+    in_block && /^\[/ { in_block = 0 }
+    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { match_id = 1; next }
+    match_id && /^path[[:space:]]*=/ {
+      line = $0
+      sub(/^[^=]*=[[:space:]]*/, "", line)
+      gsub(/^\"|\"$/, "", line)
+      print root line
+      exit
+    }
+  ' "$manifest"
+}
+
+case "${1:-list}" in
+  list)
+    awk '/^id = / { id=$0; sub(/^id = /, "", id); gsub(/"/, "", id) }
+         /^path = / { path=$0; sub(/^path = /, "", path); gsub(/"/, "", path); print id "\t" path }' "$manifest"
+    ;;
+  set)
+    id="${2:-}"
+    path="$(wallpaper_path "$id")"
+    [[ -n "$path" ]] || { printf 'Unknown wallpaper: %s\n' "$id" >&2; exit 1; }
+    [[ -f "$path" ]] || { printf 'Wallpaper asset is missing: %s\n' "$path" >&2; exit 1; }
+    if [[ -n "${ARANEA_WALLPAPER_APPLIER:-}" ]]; then
+      "$ARANEA_WALLPAPER_APPLIER" "$path"
+    fi
+    printf 'wallpaper: %s\npath: %s\n' "$id" "$path"
+    ;;
+  set-day-night)
+    hour="$(date +%H)"
+    if (( 10#$hour >= 7 && 10#$hour < 19 )); then
+      exec "$0" set day
+    fi
+    exec "$0" set night
+    ;;
+  motion)
+    mode="${2:-}"
+    [[ "$mode" == on || "$mode" == off ]] || { printf 'Usage: %s motion on|off\n' "$0" >&2; exit 2; }
+    mkdir -p "$state_root"
+    printf '%s\n' "$mode" > "$state_root/motion"
+    printf 'motion: %s\n' "$mode"
+    ;;
+  *)
+    printf 'Usage: %s list|set <id>|set-day-night|motion on|off\n' "$0" >&2
+    exit 2
+    ;;
+esac

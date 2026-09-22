@@ -1,0 +1,44 @@
+# Named wallpaper collection. Variant paths may share a source asset when the
+# host has no image transformation tool; the IDs remain stable for pickers.
+
+[[wallpapers]]
+id = "day"
+path = "backgrounds/background-day.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "night"
+path = "backgrounds/background-night.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "sparse"
+path = "backgrounds/background-night.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "dusk"
+path = "backgrounds/background-day.png"
+aspect = "16:9"
+contrast = "soft"
+motion = false
+
+[[wallpapers]]
+id = "monochrome"
+path = "backgrounds/background-night.png"
+aspect = "16:9"
+contrast = "high"
+motion = false
+
+[[wallpapers]]
+id = "ultrawide"
+path = "backgrounds/background-night.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
