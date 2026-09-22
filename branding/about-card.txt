@@ -1,0 +1,11 @@
+ARANEA
+=======
+
+Theme: Aranea
+Palette: obsidian / mint / violet
+Activity: #3bff9e
+Focus: #7a5cff
+Ceremony: #e6c98a
+
+Use `aranea-doctor --json` for active integration health.
+Use `aranea-wallpaper list` for named wallpaper surfaces.

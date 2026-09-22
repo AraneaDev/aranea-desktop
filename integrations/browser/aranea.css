@@ -1,0 +1,10 @@
+/* Shared browser/new-tab surface fragment. */
+:root {
+  color-scheme: dark;
+  --aranea-background: #08090b;
+  --aranea-surface: #141821;
+  --aranea-foreground: #e7ecf3;
+  --aranea-muted: #8b96a6;
+  --aranea-accent: #3bff9e;
+  --aranea-focus: #7a5cff;
+}
