@@ -110,6 +110,21 @@ ambient network wallpaper.
 
 ![Aranea desktop with transparent bar](screenshots/desktop.png)
 
+### Wallpaper variants
+
+The named wallpaper collection is included in the repository and can be
+previewed directly:
+
+![Sparse wallpaper](backgrounds/variants/sparse.png)
+![Dense wallpaper](backgrounds/variants/dense.png)
+![Dusk wallpaper](backgrounds/variants/dusk.png)
+![Monochrome wallpaper](backgrounds/variants/monochrome.png)
+![Ultrawide wallpaper](backgrounds/variants/ultrawide.png)
+
+The day/night pair remains available as `backgrounds/background-day.png` and
+`backgrounds/background-night.png`; use `./scripts/aranea-wallpaper list` to
+select any declared variant.
+
 ### Command menu
 
 The spider opens the familiar Omarchy command surface without leaving the
@@ -194,6 +209,20 @@ the editor.
 The theme ships a matching [`cava-theme`](cava-theme) and activates it through
 the theme hook. Cava is audio-driven, so it is intentionally not represented by
 a static capture: with no active playback it correctly renders an empty canvas.
+
+### Cursor, browser, and session artwork
+
+The optional pointer sources are inspectable SVG artwork:
+
+![Aranea default cursor](integrations/cursor/cursors/left_ptr.svg)
+![Aranea hand cursor](integrations/cursor/cursors/hand2.svg)
+![Aranea busy cursor](integrations/cursor/cursors/watch.svg)
+![Aranea error cursor](integrations/cursor/cursors/crosshair.svg)
+
+Browser new-tab artwork is available at
+[`integrations/browser/chromium/new-tab/index.html`](integrations/browser/chromium/new-tab/index.html),
+with Firefox chrome/content styles beside it. Session and media palette
+fragments are documented in their respective integration directories.
 
 ## Palette
 
