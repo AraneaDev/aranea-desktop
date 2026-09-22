@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes shellcheck libxml2-utils imagemagick
+
+      - name: Validate shell syntax
+        run: |
+          find scripts hooks tests -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+
+      - name: Run contract tests
+        run: |
+          for test in tests/*.test.sh; do
+            bash "$test"
+          done
+
+      - name: Exercise installer profiles
+        env:
+          OMARCHY_INSTALLER_TEST: '1'
+        run: |
+          for profile in minimal full no_apps; do
+            PATH="$GITHUB_WORKSPACE/tests/fake-bin:$PATH" \
+              scripts/install.sh --dry-run --yes --profile "$profile"
+          done
+
+      - name: Validate SVG artwork
+        run: |
+          find integrations -type f -name '*.svg' -print0 | xargs -0 -n1 xmllint --noout
+
+      - name: Validate raster artwork
+        run: |
+          find backgrounds screenshots -type f \( -name '*.png' -o -name '*.jpg' \) -print0 | xargs -0 -n1 identify
+
+      - name: Run ShellCheck
+        run: shellcheck scripts/*.sh hooks/* tests/*.test.sh
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-diagnostics
+          if-no-files-found: ignore
+          path: |
+            tests/.*-error
+            /tmp/aranea-*.log
