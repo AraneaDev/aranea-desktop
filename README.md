@@ -112,7 +112,7 @@ prompt.
 
 ![Aranea lock screen](screenshots/lock.png)
 
-### Plymouth boot screen
+### Plymouth boot splash
 
 Apply the Aranea Plymouth bootscreen separately; this rebuilds the initramfs and
 requires `sudo`:
@@ -121,7 +121,9 @@ requires `sudo`:
 omarchy plymouth set-by-theme aranea
 ```
 
-The bootscreen uses the same `unlock.png` spider asset as the lock surface.
+The boot splash is logo-only; the password field belongs to the separate lock
+screen above. Plymouth uses the same `unlock.png` spider asset as its centered
+logo.
 
 ![Aranea Plymouth boot screen](screenshots/plymouth.png)
 
