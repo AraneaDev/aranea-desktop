@@ -18,7 +18,7 @@ output="$(
   ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
   ARANEA_DOCTOR_SHELL_STATUS=skipped \
   ARANEA_DOCTOR_PLUGINS_STATUS=skipped \
-  ARANEA_DOCTOR_RUNTIME_STATUS=skipped \
+  ARANEA_DOCTOR_RUNTIME_ROOT="$hook_root/no-runtime" \
   ARANEA_DOCTOR_QMLLINT_STATUS=ok \
   "$repo_root/scripts/aranea-doctor" --json
 )"

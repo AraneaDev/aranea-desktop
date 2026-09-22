@@ -121,8 +121,8 @@ if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
 fi
 
 if ! emit_override runtime ARANEA_DOCTOR_RUNTIME_STATUS; then
-  log_root="${XDG_RUNTIME_DIR:-/run/user/$UID}/quickshell/by-id"
-  log_file="$(find "$log_root" -type f -name log.log -printf '%T@ %p\n' 2>/dev/null | sort -nr | sed -n '1s/^[^ ]* //p')"
+  log_root="${ARANEA_DOCTOR_RUNTIME_ROOT:-${XDG_RUNTIME_DIR:-/run/user/$UID}/quickshell/by-id}"
+  log_file="$(find "$log_root" -type f -name log.log -printf '%T@ %p\n' 2>/dev/null | sort -nr | sed -n '1s/^[^ ]* //p' || true)"
   if [[ -z "$log_file" ]]; then
     emit runtime skipped 'no QuickShell runtime log is available'
   elif rg -qi 'TypeError|ReferenceError|duplicate.*target|coerced to void' "$log_file"; then
