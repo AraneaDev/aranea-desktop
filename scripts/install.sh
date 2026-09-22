@@ -89,9 +89,13 @@ fi
 fi
 
 if (( dry_run )); then
+  say "would persist profile: $profile"
   say "would install theme hooks"
   say "would set theme to aranea"
 else
+  profile_state="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
+  install -Dm644 /dev/null "$profile_state"
+  printf '%s\n' "$profile" > "$profile_state"
   run omarchy theme install "$theme_repo_url"
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"

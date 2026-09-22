@@ -12,6 +12,7 @@ PATH="$repo_root/tests/fake-bin:$PATH" \
 grep -Fq "would install conky-cairo-wayland-git with paru" "$output"
 grep -Fq "would install theme hooks" "$output"
 grep -Fq "would set theme to aranea" "$output"
+grep -Fq "would persist profile: full" "$output"
 
 minimal_output="$(mktemp)"
 trap 'rm -f "$output" "$minimal_output"' EXIT
@@ -21,6 +22,10 @@ PATH="$repo_root/tests/fake-bin:$PATH" \
 
 grep -Fq "profile: no_apps" "$minimal_output"
 grep -Fq "would install theme hooks" "$minimal_output"
+grep -Fq "would persist profile: no_apps" "$minimal_output"
 ! grep -Fq "conky-cairo-wayland-git" "$minimal_output"
+
+grep -Fq 'profile_file=' "$repo_root/hooks/theme-set"
+grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
 
 echo "installer dry-run contract passed"

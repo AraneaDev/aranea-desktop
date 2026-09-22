@@ -14,14 +14,24 @@ ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.co
 install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
 
 theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+profile_file="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
+profile="${ARANEA_INSTALL_PROFILE:-}"
+if [[ -z "$profile" && -f "$profile_file" ]]; then
+  profile="$(<"$profile_file")"
+fi
+profile="${profile:-full}"
 
 if [[ -x "$theme_root/scripts/install-integration" ]]; then
-  "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
-  "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
-  "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
-  "$theme_root/scripts/install-integration" browser --yes >/dev/null 2>&1 || true
-  "$theme_root/scripts/install-integration" session --yes >/dev/null 2>&1 || true
-  "$theme_root/scripts/install-integration" media --yes >/dev/null 2>&1 || true
+  if [[ "$profile" == full ]]; then
+    "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" browser --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" session --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" media --yes >/dev/null 2>&1 || true
+  elif [[ "$profile" == no_apps ]]; then
+    "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
+  fi
 fi
 
 if [[ -f /usr/share/omarchy/shell/plugins/bar/widgets/Microphone.manifest.json ]]; then

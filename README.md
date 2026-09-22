@@ -46,7 +46,11 @@ to omit the optional diagnostics dependency:
 ./scripts/install.sh --skip-conky
 ```
 
-Installation profiles are available when you want to audit scope first:
+Installation profiles control which optional integrations the hooks activate.
+`minimal` installs only core/GTK behavior, `full` activates all supported
+integrations, and `no_apps` keeps core/GTK plus cursor/wallpaper/branding
+assets without application integrations. The selected profile is persisted in
+`~/.local/state/aranea/profile`:
 
 ```bash
 ./scripts/install.sh --dry-run --profile minimal --yes
