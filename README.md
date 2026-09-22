@@ -30,32 +30,31 @@ Aranea carries one visual language from boot to desktop:
 
 ## Install
 
-Install the theme through Omarchy, then select it:
-
-```bash
-omarchy theme install https://github.com/AraneaDev/omarchy-aranea-theme.git
-omarchy theme set aranea
-```
-
-Install the theme hooks so the shell plugins, GTK links, and diagnostics helper
-follow theme changes:
-
-```bash
-omarchy hook install theme-set hooks/theme-set
-omarchy hook install post-boot hooks/post-boot
-omarchy theme set aranea
-```
-
-Or run the bundled installer from a checkout. It installs the theme and hooks,
-offers the optional Wayland-compatible Conky package when `paru` or `yay` is
-available, and never starts Conky automatically:
+The recommended path is the bundled installer. From a checkout:
 
 ```bash
 ./scripts/install.sh
 ```
 
-Use `./scripts/install.sh --yes` for a non-interactive install or
-`./scripts/install.sh --skip-conky` to omit the optional diagnostics dependency.
+It installs the theme, registers both hooks, and offers to install
+`conky-cairo-wayland-git` when `paru` or `yay` is available. Conky is never
+started automatically. Use `--yes` for a non-interactive run or `--skip-conky`
+to omit the optional diagnostics dependency:
+
+```bash
+./scripts/install.sh --yes
+./scripts/install.sh --skip-conky
+```
+
+Preview the actions without changing the system:
+
+```bash
+./scripts/install.sh --dry-run --yes
+```
+
+To install a fork or a local mirror, set `ARANEA_THEME_REPO_URL` before running
+the installer. Without `paru` or `yay`, the theme still installs and the
+optional Conky step is reported as skipped.
 
 The shell layout lives in `~/.config/omarchy/shell.json`. The supplied setup
 keeps the spider menu and workspaces on the left, the clock and indicators in
