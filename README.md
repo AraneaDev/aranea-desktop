@@ -20,8 +20,9 @@ Aranea carries one visual language from boot to desktop:
 
 - **Obsidian surfaces** — low-noise dark backgrounds with readable muted text.
 - **Mint and violet signal** — mint for activity, violet for focus and depth.
-- **Spider identity** — the AraneaDev mark appears in the wallpaper, bar,
-  lock screen, idle branding, fastfetch, and Plymouth.
+- **Spider identity** — the AraneaDev mark appears in the bar, lock screen,
+  idle branding, fastfetch, and Plymouth. The wallpaper is intentionally mark-free:
+  its network topology keeps the desktop calm behind the UI.
 - **Transparent shell bar** — the wallpaper remains visible behind the bar;
   widgets stay compact and interactive.
 - **Useful motion, little noise** — notifications, panels, and diagnostics are
@@ -44,6 +45,17 @@ omarchy hook install theme-set hooks/theme-set
 omarchy hook install post-boot hooks/post-boot
 omarchy theme set aranea
 ```
+
+Or run the bundled installer from a checkout. It installs the theme and hooks,
+offers the optional Wayland-compatible Conky package when `paru` or `yay` is
+available, and never starts Conky automatically:
+
+```bash
+./scripts/install.sh
+```
+
+Use `./scripts/install.sh --yes` for a non-interactive install or
+`./scripts/install.sh --skip-conky` to omit the optional diagnostics dependency.
 
 The shell layout lives in `~/.config/omarchy/shell.json`. The supplied setup
 keeps the spider menu and workspaces on the left, the clock and indicators in
@@ -129,7 +141,8 @@ layer requires a Conky build with real Wayland layer-shell support, such as
 
 ## Branding and files
 
-- `backgrounds/` — coordinated day and night wallpapers.
+- `backgrounds/` — coordinated day and night wallpapers; the topology is
+  deliberately free of the spider mark.
 - `branding/` — fastfetch and idle screensaver marks.
 - `unlock.png` — shared spider asset for the bar, lock screen, and boot flow.
 - `plugins/araneadev.bar/` — transparent interactive bar composition.
