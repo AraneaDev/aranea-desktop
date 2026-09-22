@@ -81,7 +81,7 @@ Item {
     if (inputEnabled) Qt.callLater(forcePasswordFocus)
   }
 
-  function updateClock() {
+  function updateClock(): void {
     clockText = Qt.formatDateTime(new Date(), "HH:mm")
   }
 

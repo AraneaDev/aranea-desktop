@@ -118,7 +118,7 @@ Item {
     PluginBarApi { }
   }
 
-  function publicLayoutConfig() {
+  function publicLayoutConfig(): var {
     return JSON.parse(JSON.stringify(root.layoutConfig || {}))
   }
 
@@ -201,7 +201,7 @@ Item {
     return out
   }
 
-  function syncAllPluginBarApiObjects() {
+  function syncAllPluginBarApiObjects(): void {
     for (var id in pluginBarApis) root.syncPluginBarApiObjects(pluginBarApis[id])
   }
 
@@ -279,7 +279,7 @@ Item {
     return api
   }
 
-  function pluginBarApiUsed(pluginId) {
+  function pluginBarApiUsed(pluginId: string): bool {
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
       if (slot && slot.pluginApiId === pluginId) return true
@@ -300,7 +300,7 @@ Item {
     })
   }
 
-  function prunePluginBarApis() {
+  function prunePluginBarApis(): void {
     var next = ({})
     for (var id in pluginBarApis) {
       var api = pluginBarApis[id]
@@ -401,7 +401,7 @@ Item {
     return !!target && target.visible !== false && target.opacity !== 0 && target.tooltipHovered === true
   }
 
-  function clearTooltip() {
+  function clearTooltip(): void {
     tooltipTimer.stop()
     pendingTooltipTarget = null
     pendingTooltipText = ""
@@ -410,7 +410,7 @@ Item {
     tooltipShown = false
   }
 
-  function clearBarDrag() {
+  function clearBarDrag(): void {
     barDragSource = null
     barDragWindow = null
     barDragScreen = null
@@ -497,7 +497,7 @@ Item {
     barMoveCandidate = nearestScreenEdge(screenPoint, barMoveScreen)
   }
 
-  function clearBarMove() {
+  function clearBarMove(): void {
     barMoveActive = false
     barMoveCandidate = ""
     barMoveWindow = null
@@ -579,7 +579,7 @@ Item {
     return BarModel.pinTrayToInner(entries, section)
   }
 
-  function applyBarConfig() {
+  function applyBarConfig(): void {
     var config = Util.isPlainObject(barConfig) ? barConfig : fallbackBarConfig
 
     position = normalizePosition(config.position)
@@ -695,7 +695,7 @@ Item {
 
   // Every live instance of a widget id. A bar surface is built per monitor, so
   // a widget that appears once in the layout is still live once per screen.
-  function moduleWidgets(pluginId) {
+  function moduleWidgets(pluginId: string): var {
     var id = String(pluginId || "")
     var items = []
     if (!id) return items
@@ -707,7 +707,7 @@ Item {
     return items
   }
 
-  function slotScreenName(slot) {
+  function slotScreenName(slot): string {
     var window = slotWindow(slot)
     return window && window.screen ? String(window.screen.name || "") : ""
   }
@@ -715,7 +715,7 @@ Item {
   // The output Hyprland has focused, which is where a keyboard-summoned panel
   // belongs. Empty until Hyprland reports one, which leaves panel routing on
   // its per-monitor fallback rather than guessing at an output.
-  function focusedScreenName() {
+  function focusedScreenName(): string {
     var monitor = Hyprland.focusedMonitor
     return monitor ? String(monitor.name || "") : ""
   }
@@ -757,7 +757,7 @@ Item {
     return true
   }
 
-  function isBarWidgetOpen(pluginId) {
+  function isBarWidgetOpen(pluginId: string): bool {
     var item = findPanelWidget(pluginId)
     return !!item && item.opened === true
   }
@@ -790,7 +790,7 @@ Item {
     return Util.canonicalWidgetId(name)
   }
 
-  function expandPath(path) {
+  function expandPath(path: string): string {
     return BarModel.expandPath(path, home)
   }
 
@@ -840,13 +840,13 @@ Item {
     onTriggered: if (!root.centerSectionHovered && !root.barHovered) root.centerSectionRevealHeld = false
   }
 
-  function run(command) {
+  function run(command: string): void {
     if (!command) return
 
     Util.execDetached(command)
   }
 
-  function toggleTransparency() {
+  function toggleTransparency(): void {
     var nextTransparent = !(root.requestedTransparent === true)
     if (root.shell && typeof root.shell.mutateShellConfig === "function") {
       root.shell.mutateShellConfig(function(config) {
@@ -1031,7 +1031,7 @@ Item {
     return "#" + hexChannel(c.r) + hexChannel(c.g) + hexChannel(c.b)
   }
 
-  function setRequestedTransparency(value) {
+  function setRequestedTransparency(value: real): void {
     var nextTransparent = value === true
     requestedTransparent = nextTransparent
     if (!nextTransparent) {
@@ -1045,7 +1045,7 @@ Item {
     scheduleTransparentForegroundRefresh()
   }
 
-  function restoreForegroundAnimation() {
+  function restoreForegroundAnimation(): void {
     Qt.callLater(function() {
       Qt.callLater(function() { root.foregroundAnimationEnabled = true })
     })
@@ -1059,7 +1059,7 @@ Item {
     transparentForegroundTimer.restart()
   }
 
-  function refreshTransparentForeground() {
+  function refreshTransparentForeground(): void {
     if (!requestedTransparent || transparentForegroundProc.running) return
 
     transparentForegroundProc.command = [
