@@ -1269,7 +1269,7 @@ Item {
     WlrLayershell.layer: WlrLayer.Top
 
     Rectangle {
-      visible: !root.vertical && !root.transparent
+      visible: false
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.leftMargin: Style.space(8)
@@ -1367,6 +1367,7 @@ Item {
 
         BorderSurface {
           id: leftSurface
+          visible: !root.requestedTransparent
           anchors.left: parent.left
           anchors.leftMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
@@ -1387,6 +1388,7 @@ Item {
 
         BorderSurface {
           id: rightSurface
+          visible: !root.requestedTransparent
           anchors.right: parent.right
           anchors.rightMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
@@ -1407,6 +1409,7 @@ Item {
 
         BorderSurface {
           id: centerSurface
+          visible: !root.requestedTransparent
           anchors.centerIn: parent
           width: Style.space(190)
           height: root.barSize - Style.space(8)
@@ -1418,7 +1421,9 @@ Item {
 
         Item {
           id: centerModules
-          anchors.fill: parent
+          anchors.centerIn: parent
+          width: centerSurface.width
+          height: centerSurface.height
           CenterModules { anchors.fill: parent }
         }
       }
