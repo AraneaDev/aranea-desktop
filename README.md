@@ -1,203 +1,144 @@
+<div align="center">
+
 # Aranea
 
-An [Omarchy](https://omarchy.org) theme forked from the stock `hackerman` theme,
-recolored to match [tim-schipper.nl](https://tim-schipper.nl)'s exact palette,
-with the **AraneaDev** spider-and-wordmark logo carried through the wallpaper,
-fastfetch, idle screensaver, lock screen, and Plymouth boot screen.
+**A quiet, obsidian Omarchy desktop with a living spider mark.**
 
-![Empty Aranea desktop](screenshots/desktop.png)
+An Omarchy theme by [AraneaDev](https://aranea-development.nl), built around
+deep black surfaces, mint light, violet focus states, and a restrained network
+wallpaper.
 
-## Palette
+[Omarchy](https://omarchy.org) · [AraneaDev](https://aranea-development.nl)
 
-| Role               | Hex       |
-|--------------------|-----------|
-| Background         | `#08090b` |
-| Accent (mint)       | `#3bff9e` |
-| Accent 2 (violet)   | `#7a5cff` |
-| Foreground          | `#e7ecf3` |
-| Muted foreground    | `#8b96a6` |
+</div>
 
-Both accents show up across the terminal/GTK/conky theming; the fastfetch
-logo itself is single-color (see Branding below) so its auto-fit sizing
-keeps working natively.
+![Aranea desktop](screenshots/desktop.png)
 
-## Wallpaper
+## The experience
 
-The theme ships a coordinated ambient pair for the desktop:
+Aranea carries one visual language from boot to desktop:
 
-- `backgrounds/background-day.png` — a lighter mint-atmosphere variant with
-  sparse perimeter topology and generous center negative space.
-- `backgrounds/background-night.png` — a quieter obsidian/violet variant with
-  the same composition and lower visual energy.
+- **Obsidian surfaces** — low-noise dark backgrounds with readable muted text.
+- **Mint and violet signal** — mint for activity, violet for focus and depth.
+- **Spider identity** — the AraneaDev mark appears in the wallpaper, bar,
+  lock screen, idle branding, fastfetch, and Plymouth.
+- **Transparent shell bar** — the wallpaper remains visible behind the bar;
+  widgets stay compact and interactive.
+- **Useful motion, little noise** — notifications, panels, and diagnostics are
+  available when needed and stay out of the way when they are not.
 
+## Install
 
-## Branding
+Install the theme through Omarchy, then select it:
 
-The AraneaDev spider mark replaces the theme's previous gothic-blackletter
-wordmark everywhere Omarchy shows branding:
+```bash
+omarchy theme install https://github.com/AraneaDev/omarchy-aranea-theme.git
+omarchy theme set aranea
+```
 
-- **Fastfetch logo** (`omarchy branding about`) — `branding/about.txt`,
-  plain block-character art (no embedded ANSI codes), colored by fastfetch's
-  own `color` config key like Omarchy's stock logos. An earlier version used
-  per-character 24-bit gradient codes, which looked nicer but broke
-  `omarchy-launch-about`'s auto-fit sizing two ways: any custom
-  `~/.config/fastfetch/config.jsonc` (needed for a second gradient color)
-  makes it skip sizing entirely, and separately its width check (`wc -L`)
-  can't see through raw ANSI codes and wildly miscounts the logo's width.
-  Plain text avoids both — no custom config, no manual window-size rule, no
-  clipping — matching how Omarchy's own default logo works.
-- **Idle screensaver** (`omarchy branding screensaver`) — `branding/screensaver.txt`,
-  plain block-character art, so `ttfx`'s own effects/coloring apply cleanly on top.
-- **Lock screen + Plymouth boot logo** — `unlock.png`, trimmed and transparent,
-  gradient-colored. The current lock surface is shown in
-  [`screenshots/boot.png`](screenshots/boot.png).
-
-### The About window (fastfetch) just works
-
-Because the logo is plain text and there's no `~/.config/fastfetch/config.jsonc`,
-`omarchy-launch-about` auto-fits its window to the content natively — no
-window-size override needed.
-
-If you fork this theme and add a custom fastfetch config or a raw-ANSI logo,
-know that you're trading this away: any file at `~/.config/fastfetch/config.jsonc`
-makes Omarchy skip auto-sizing entirely, and its width check (`wc -L`) can't
-see through embedded ANSI codes, so it badly miscounts a colored logo's width.
-Either breaks the About window in a way that needs a hand-measured static
-`o.window("org.omarchy.about", { size = { W, H } })` rule in your personal
-`~/.config/hypr/hyprland.lua` to fix — and measure that by resizing and
-screenshotting in small steps, not by trusting a formula: a naive
-character-grid × cell-size calculation can produce a window wider than your
-monitor's logical resolution, which centers it partly off-screen (clipping
-one edge while leaving empty space on the other, which looks like "content
-missing" rather than "window too wide").
-
-## Floating windows
-
-TUIs and popped-out terminals (`btop`, `cava`, file dialogs, etc.) float
-centered per Omarchy's default window rules, picking up the theme's border
-gradient, gaps, and terminal colors.
-
-## Shell bar
-
-`araneadev.bar` replaces the stock Omarchy bar composition while retaining its
-widget and popup behavior. It gives the bar three Aranea capsules, a deeper
-obsidian surface, a mint accent baseline, and mint/violet focus states.
-The `araneadev.menu` plugin replaces the stock menu glyph with the Aranea
-spider mark while retaining the normal left-click menu and right-click terminal
-actions.
-The recommended layout keeps the clock centered, workspaces/menu on the left,
-and system controls on the right. Set that layout in
-`~/.config/omarchy/shell.json`, then run `omarchy restart shell` to apply it.
-
-## Screenshots
-
-The repository keeps a small, focused set of current captures instead of
-shipping one preview image for every application:
-
-![Desktop, bar, wallpaper, and border system](screenshots/desktop.png)
-
-![Aranea command menu](screenshots/menu.png)
-
-![Finite, high-visibility critical notification treatment](screenshots/notifications.png)
-
-![Optional on-demand diagnostics layer](screenshots/diagnostics.png)
-
-![Lock and Plymouth identity](screenshots/boot.png)
-
-## Beyond the terminal
-
-Omarchy templates most terminal- and app-color config straight from
-`colors.toml` (Alacritty, Foot, Ghostty, Kitty, btop, the Omarchy shell's bar
-and notifications, Hyprland's active/inactive border gradient, even RGB
-keyboard backlight). A few surfaces aren't covered by that templating, so
-this theme ships them directly:
-
-- **GTK3/GTK4 + libadwaita apps** (Nautilus, file pickers, etc.) — `gtk.css`
-  remaps the Adwaita accent/surface/dialog colors to the palette above.
-
-- **`cava`** audio visualizer — `cava-theme` gives it a mint → violet gradient
-  matching the logo.
-- **`conky`** system monitor — `conky.conf` draws CPU/load, memory, swap,
-  disk, network, CPU+GPU temps, top processes, and battery in the same
-  palette, as a native Wayland layer-shell surface pinned to the top-right
-  corner (always below every app window — never a floating XWayland window
-  fighting for stacking order). Requires a conky build with real
-  `wlr-layer-shell` support (`out_to_wayland = true`); the stock Arch `conky`
-  package doesn't compile that in — see `conky-cairo-wayland-git` on the AUR.
-
-None of these are wired up by Omarchy automatically. This repo ships two
-hooks (see `hooks/`) that symlink them in and install an on-demand diagnostics
-toggle -- all gated to only act while Aranea is the active theme, so they're
-harmless to install even if you switch between themes. Conky is intentionally
-not started automatically; run `aranea-diagnostics-toggle` to show or hide it.
+Install the theme hooks so the shell plugins, GTK links, and diagnostics helper
+follow theme changes:
 
 ```bash
 omarchy hook install theme-set hooks/theme-set
 omarchy hook install post-boot hooks/post-boot
-```
-
-Re-run `omarchy theme set aranea` once after installing the hooks to apply
-the symlinks immediately, rather than waiting for the next login or theme
-change.
-
-The personal Hyprland binding used by this setup is `SUPER + CTRL + SHIFT + D`.
-It toggles the diagnostics panel without competing with Omarchy's existing
-`SUPER + SHIFT + D` Docker binding.
-
-## Notifications
-
-`plugins/araneadev.notifications/` is a clone of Omarchy's built-in
-notifications service with one behavior change: critical-urgency toasts now
-auto-dismiss after 60 seconds instead of staying on screen forever.
-
-Omarchy's stock `durationFor()` treats `NotificationUrgency.Critical` as
-"never expire" (`return 0`), on the assumption that critical means a human
-needs to act on it. In practice, browsers (Chrome/Brave/etc.) mark any web
-notification sent with `requireInteraction: true` as critical — including
-routine ones, like YouTube's upload/live alerts — so those pile up as toasts
-that sit in the corner until manually dismissed. This clone keeps normal and
-low urgency untouched (capped at 30s, per Omarchy defaults) and gives
-critical toasts a generous but finite 60s lifetime instead:
-
-```qml
-// Service.qml
-readonly property int criticalPopupDuration: 60000
-
-function durationFor(urgency, expireTimeout) {
-  switch (urgency) {
-  case NotificationUrgency.Critical:
-    return criticalPopupDuration
-  ...
-```
-
-Right-click still dismisses any toast immediately, and
-`omarchy-shell notifications dismissAll` clears every toast on screen at once.
-
-Install it alongside the theme (this isn't staged automatically — it's a
-shell plugin, not theme-templated config):
-
-```bash
-cp -r plugins/araneadev.notifications ~/.config/omarchy/plugins/
-omarchy plugin enable araneadev.notifications
-omarchy plugin disable omarchy.notifications
-```
-
-## Install
-
-```bash
-omarchy theme install <this-repo-url>
 omarchy theme set aranea
 ```
 
-To also use the AraneaDev mark as your fastfetch logo and idle screensaver
-(these are global Omarchy branding, not staged automatically with the theme):
+The shell layout lives in `~/.config/omarchy/shell.json`. The supplied setup
+keeps the spider menu and workspaces on the left, the clock and indicators in
+the center, and system controls on the right.
+
+## Interactive shell
+
+The bar is transparent and remains fully interactive:
+
+- Click the **spider** to open the Omarchy command menu.
+- Right-click the spider to open a terminal.
+- Click workspaces to switch sessions.
+- Click the center indicators for idle/screensaver and status controls.
+- Click the network, audio, Bluetooth, monitor, power, tray, and agent widgets
+  to open their native panels.
+
+The custom bar preserves Omarchy's normal widget and popup behavior while
+adding Aranea's layout, spider menu mark, and visual restraint.
+
+## Screens
+
+The screenshots below are fresh captures from the installed theme.
+
+### Desktop
+
+Transparent bar, centered indicators, workspaces, system controls, and the
+ambient network wallpaper.
+
+![Aranea desktop with transparent bar](screenshots/desktop.png)
+
+### Command menu
+
+The spider opens the familiar Omarchy command surface without leaving the
+Aranea visual system.
+
+![Aranea command menu](screenshots/menu.png)
+
+### Notifications
+
+Critical notifications use a finite, high-visibility treatment so routine web
+alerts do not remain on screen forever.
+
+![Aranea notification](screenshots/notifications.png)
+
+### Diagnostics
+
+The optional Conky layer is available on demand for a clean system overview.
+
+![Aranea diagnostics panel](screenshots/diagnostics.png)
+
+### Lock screen and boot identity
+
+The lock surface centers the corrected spider mark above the secure-session
+prompt, with the same identity carried into Plymouth.
+
+![Aranea lock screen](screenshots/boot.png)
+
+## Palette
+
+| Role | Value |
+| --- | --- |
+| Background | `#08090b` |
+| Mint accent | `#3bff9e` |
+| Violet accent | `#7a5cff` |
+| Foreground | `#e7ecf3` |
+| Muted foreground | `#8b96a6` |
+
+The source palette is in [`colors.toml`](colors.toml); shell-specific surface
+tokens are in [`shell.toml`](shell.toml).
+
+## Optional diagnostics
+
+Conky is intentionally not started during login. Toggle it when you want the
+system panel:
 
 ```bash
-cp branding/about.txt branding/screensaver.txt ~/.config/omarchy/branding/
+aranea-diagnostics-toggle
 ```
 
-And to set it as your Plymouth boot screen (rebuilds your kernel image, needs sudo):
+The supplied Hyprland binding is `SUPER + CTRL + SHIFT + D`. The diagnostics
+layer requires a Conky build with real Wayland layer-shell support, such as
+`conky-cairo-wayland-git` from the AUR.
 
-```bash
-omarchy plymouth set-by-theme aranea
-```
+## Branding and files
+
+- `backgrounds/` — coordinated day and night wallpapers.
+- `branding/` — fastfetch and idle screensaver marks.
+- `unlock.png` — shared spider asset for the bar, lock screen, and boot flow.
+- `plugins/araneadev.bar/` — transparent interactive bar composition.
+- `plugins/araneadev.menu/` — spider menu widget and command menu.
+- `plugins/araneadev.lock/` — Aranea lock surface with native PAM handling.
+- `plugins/araneadev.notifications/` — finite critical notification treatment.
+- `hooks/` — theme-set and post-boot integration.
+
+## License
+
+See the repository's upstream project and asset licenses before redistributing
+modified branding or wallpapers.
