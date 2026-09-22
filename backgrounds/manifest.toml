@@ -46,6 +46,6 @@ motion = false
 [[wallpapers]]
 id = "ultrawide"
 path = "backgrounds/variants/ultrawide.png"
-aspect = "16:9"
+aspect = "3:1"
 contrast = "standard"
 motion = false

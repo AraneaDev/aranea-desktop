@@ -2,11 +2,10 @@
 
 # Aranea
 
-**A quiet, obsidian Omarchy desktop with a living spider mark.**
+**A quiet, obsidian Omarchy desktop with a living network of light.**
 
-An Omarchy theme by [AraneaDev](https://aranea-development.nl), built around
-deep black surfaces, mint light, violet focus states, and a restrained network
-wallpaper.
+Deep black surfaces, mint activity, violet focus, atmospheric wallpapers, and
+the AraneaDev mark carried consistently from boot to desktop.
 
 [Omarchy](https://omarchy.org) · [AraneaDev](https://aranea-development.nl)
 
@@ -14,215 +13,149 @@ wallpaper.
 
 ![Aranea desktop](screenshots/desktop.png)
 
-## The experience
+## What it feels like
 
-Aranea carries one visual language from boot to desktop:
+Aranea is designed as one calm visual system rather than a collection of
+unrelated tweaks:
 
-- **Obsidian surfaces** — low-noise dark backgrounds with readable muted text.
-- **Mint and violet signal** — mint for activity, violet for focus and depth.
-- **Spider identity** — the AraneaDev mark appears in the bar, lock screen,
-  idle branding, fastfetch, and Plymouth. The wallpaper is intentionally mark-free:
-  its network topology keeps the desktop calm behind the UI.
-- **Transparent shell bar** — the wallpaper remains visible behind the bar;
-  widgets stay compact and interactive.
-- **Useful motion, little noise** — notifications, panels, and diagnostics are
-  available when needed and stay out of the way when they are not.
+- transparent, interactive shell bar with spider menu and native controls;
+- obsidian surfaces with mint activity states and violet focus states;
+- day, night, and atmospheric wallpaper variants built around edge topology;
+- matching lock, idle, boot, terminal, editor, browser, cursor, and media art;
+- optional diagnostics and application integrations that stay out of the way.
+
+The wallpaper is intentionally mark-free. The spider identity belongs to the
+bar, menus, lock screen, boot splash, idle branding, and fastfetch surfaces.
 
 ## Install
 
-The recommended path is the bundled installer. From a checkout:
+From a checkout:
 
 ```bash
 ./scripts/install.sh
 ```
 
-It installs the theme, registers both hooks, and offers to install
-`conky-cairo-wayland-git` when `paru` or `yay` is available. Conky is never
-started automatically. Use `--yes` for a non-interactive run or `--skip-conky`
-to omit the optional diagnostics dependency:
+For a non-interactive full install:
 
 ```bash
 ./scripts/install.sh --yes
-./scripts/install.sh --skip-conky
 ```
 
-Installation profiles control which optional integrations the hooks activate.
-`minimal` installs only core/GTK behavior, `full` activates all supported
-integrations, and `no_apps` keeps core/GTK plus cursor/wallpaper/branding
-assets without application integrations. The selected profile is persisted in
-`~/.local/state/aranea/profile`:
+The installer installs Aranea, registers the theme hooks, installs the managed
+integrations, and offers the optional Wayland Conky package when `paru` or
+`yay` is available. It does not start Conky automatically.
+
+Choose an installation profile when needed:
 
 ```bash
-./scripts/install.sh --dry-run --profile minimal --yes
-./scripts/install.sh --dry-run --profile full --yes
-./scripts/install.sh --dry-run --profile no_apps --yes
+./scripts/install.sh --profile minimal --yes
+./scripts/install.sh --profile full --yes
+./scripts/install.sh --profile no_apps --yes
 ```
 
-Optional integrations can be checked and installed independently:
+`minimal` keeps the core and GTK experience, `full` enables every supported
+application integration, and `no_apps` keeps the theme, cursor, wallpaper, and
+branding assets without application integrations. The selected profile is
+stored in `~/.local/state/aranea/profile`.
 
-```bash
-./scripts/aranea-doctor --json
-./scripts/install-integration terminal --dry-run
-./scripts/aranea-wallpaper list
-./scripts/aranea-showcase list
-./scripts/aranea-about
-```
-
-Managed optional links can be restored with `scripts/uninstall.sh --dry-run`
-followed by `scripts/uninstall.sh --yes`.
-
-Preview the actions without changing the system:
+Preview or diagnose without changing the system:
 
 ```bash
 ./scripts/install.sh --dry-run --yes
+./scripts/aranea-doctor --json
 ```
 
-To install a fork or a local mirror, set `ARANEA_THEME_REPO_URL` before running
-the installer. Without `paru` or `yay`, the theme still installs and the
-optional Conky step is reported as skipped.
+## Activate
 
-The shell layout lives in `~/.config/omarchy/shell.json`. The supplied setup
-keeps the spider menu and workspaces on the left, the clock and indicators in
-the center, and system controls on the right.
+After installation, select the theme and a wallpaper with Omarchy:
 
-## Interactive shell
+```bash
+omarchy theme set aranea
+./scripts/aranea-wallpaper list
+./scripts/aranea-wallpaper set day
+```
 
-The bar is transparent and remains fully interactive:
+The wallpaper picker also exposes `night`, `sparse`, `dense`, `dusk`,
+`monochrome`, and `ultrawide`. The bar remains transparent so the network art
+can breathe behind it.
 
-- Click the **spider** to open the Omarchy command menu.
-- Right-click the spider to open a terminal.
-- Click workspaces to switch sessions.
-- Click the center indicators for idle/screensaver and status controls.
-- Click the network, audio, Bluetooth, monitor, power, tray, and agent widgets
-  to open their native panels.
+## Artwork
 
-The custom bar preserves Omarchy's normal widget and popup behavior while
-adding Aranea's layout, spider menu mark, and visual restraint.
+### Desktop and shell
 
-## Screens
-
-The screenshots below are fresh captures from the installed theme.
-
-### Desktop
-
-Transparent bar, centered indicators, workspaces, system controls, and the
-ambient network wallpaper.
-
-![Aranea desktop with transparent bar](screenshots/desktop.png)
-
-### Wallpaper variants
-
-The named wallpaper collection is included in the repository and can be
-previewed directly:
-
-![Sparse wallpaper](backgrounds/variants/sparse.png)
-![Dense wallpaper](backgrounds/variants/dense.png)
-![Dusk wallpaper](backgrounds/variants/dusk.png)
-![Monochrome wallpaper](backgrounds/variants/monochrome.png)
-![Ultrawide wallpaper](backgrounds/variants/ultrawide.png)
-![Day wallpaper](backgrounds/background-day.png)
-![Night wallpaper](backgrounds/background-night.png)
-
-Use `./scripts/aranea-wallpaper list` to select any declared variant.
-
-### Command menu
-
-The spider opens the familiar Omarchy command surface without leaving the
-Aranea visual system.
+![Aranea desktop](screenshots/desktop.png)
 
 ![Aranea command menu](screenshots/menu.png)
 
-### Notifications
+![Aranea notifications](screenshots/notifications.png)
 
-Critical notifications use a finite, high-visibility treatment so routine web
-alerts do not remain on screen forever.
+![Aranea diagnostics](screenshots/diagnostics.png)
 
-![Aranea notification](screenshots/notifications.png)
+### Wallpaper collection
 
-### Diagnostics
+The original day/night pair is the visual anchor for the collection. The
+variants keep its smoky nebula texture, luminous nodes, edge-weighted topology,
+and readable center while changing density, color, contrast, or aspect ratio.
 
-The optional Conky layer is available on demand for a clean system overview.
+![Sparse wallpaper](backgrounds/variants/sparse.png)
 
-![Aranea diagnostics panel](screenshots/diagnostics.png)
+![Dense wallpaper](backgrounds/variants/dense.png)
 
-### Lock screen
+![Dusk wallpaper](backgrounds/variants/dusk.png)
 
-The lock surface centers the corrected spider mark above the secure-session
-prompt.
+![Monochrome wallpaper](backgrounds/variants/monochrome.png)
+
+![Ultrawide wallpaper](backgrounds/variants/ultrawide.png)
+
+![Day wallpaper](backgrounds/background-day.png)
+
+![Night wallpaper](backgrounds/background-night.png)
+
+### Secure and boot surfaces
 
 ![Aranea lock screen](screenshots/lock.png)
 
-### Plymouth boot splash
+![Aranea Plymouth boot screen](screenshots/plymouth.png)
 
-Apply the Aranea Plymouth bootscreen separately; this rebuilds the initramfs and
-requires `sudo`:
+Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
 
 ```bash
 omarchy plymouth set-by-theme aranea
 ```
 
-The boot splash is logo-only; the password field belongs to the separate lock
-screen above. Plymouth uses the same `unlock.png` spider asset as its centered
-logo.
-
-![Aranea Plymouth boot screen](screenshots/plymouth.png)
-
-### Branding and idle surfaces
-
-The theme also carries the Aranea mark into the Omarchy About/fastfetch view
-and the idle screensaver. Those are terminal-rendered surfaces rather than
-static desktop panels, so their source artwork is kept directly inspectable:
-
-- [`branding/about.txt`](branding/about.txt) — fastfetch/About logo.
-- [`branding/screensaver.txt`](branding/screensaver.txt) — idle screensaver logo.
-
-Together with the bar, menu, notifications, diagnostics, lock screen, and
-Plymouth captures above, these files cover every user-facing customization
-shipped by the theme.
-
-## Applications
-
-Aranea also carries its visual language into the applications that make up the
-working desktop:
-
-### About / fastfetch
-
-The About view uses the Aranea mark and the mint/violet terminal palette.
+### Application surfaces
 
 ![Aranea fastfetch](screenshots/fastfetch.png)
 
-### File manager
-
-GTK theming keeps the file manager aligned with the dark desktop surfaces.
-
 ![Aranea file manager](screenshots/file-manager.png)
-
-### Neovim
-
-The supplied Neovim integration brings the same contrast and accent colors into
-the editor.
 
 ![Aranea Neovim](screenshots/neovim.png)
 
-### Cava
-
-The theme ships a matching [`cava-theme`](cava-theme) and activates it through
-the theme hook. Cava is audio-driven, so it is intentionally not represented by
-a static capture: with no active playback it correctly renders an empty canvas.
-
-### Cursor, browser, and session artwork
-
-The optional pointer sources are inspectable SVG artwork:
+The repository also ships matching Cava, browser/session, Qt, icon, and cursor
+integrations. The cursor artwork is inspectable directly:
 
 ![Aranea default cursor](integrations/cursor/cursors/left_ptr.svg)
 ![Aranea hand cursor](integrations/cursor/cursors/hand2.svg)
 ![Aranea busy cursor](integrations/cursor/cursors/watch.svg)
 ![Aranea error cursor](integrations/cursor/cursors/crosshair.svg)
 
-Browser new-tab artwork is available at
-[`integrations/browser/chromium/new-tab/index.html`](integrations/browser/chromium/new-tab/index.html),
-with Firefox chrome/content styles beside it. Session and media palette
-fragments are documented in their respective integration directories.
+## Interaction
+
+- Click the spider to open the Omarchy command menu.
+- Right-click the spider to open a terminal.
+- Click workspaces to switch sessions.
+- Use the center indicators for idle and status controls.
+- Use the right-side widgets for network, audio, Bluetooth, displays, power,
+  tray, and agent controls.
+
+The optional diagnostics layer can be toggled with:
+
+```bash
+aranea-diagnostics-toggle
+```
+
+The supplied Hyprland binding is `SUPER + CTRL + SHIFT + D`. It requires a
+Wayland layer-shell Conky build such as `conky-cairo-wayland-git`.
 
 ## Palette
 
@@ -234,42 +167,20 @@ fragments are documented in their respective integration directories.
 | Foreground | `#e7ecf3` |
 | Muted foreground | `#8b96a6` |
 
-The integration contract also defines `motion_enabled = true` with a static
-`reduced_motion_fallback`. Optional integrations are grouped into three
-installer profiles: `minimal`, `full`, and `no_apps`; the base install remains
-usable with Omarchy alone.
+The source tokens are in [`colors.toml`](colors.toml) and
+[`shell.toml`](shell.toml). Wallpaper metadata and stable picker IDs are in
+[`backgrounds/manifest.toml`](backgrounds/manifest.toml).
 
-The source palette is in [`colors.toml`](colors.toml); shell-specific surface
-tokens are in [`shell.toml`](shell.toml).
+## Repository map
 
-## Optional diagnostics
-
-Conky is intentionally not started during login. Toggle it when you want the
-system panel:
-
-```bash
-aranea-diagnostics-toggle
-```
-
-The supplied Hyprland binding is `SUPER + CTRL + SHIFT + D`. The diagnostics
-layer requires a Conky build with real Wayland layer-shell support, such as
-`conky-cairo-wayland-git` from the AUR.
-
-## Branding and files
-
-- `backgrounds/` — coordinated day and night wallpapers; the topology is
-  deliberately free of the spider mark.
-- `backgrounds/manifest.toml` — stable wallpaper IDs, contrast metadata, and
-  motion capabilities.
-- `integrations/` — optional terminal, developer-tool, cursor, Qt, browser,
-  session, media, and icon integrations with explicit fallbacks.
+- `backgrounds/` — day/night artwork and the named wallpaper collection.
 - `branding/` — fastfetch and idle screensaver marks.
-- `unlock.png` — shared spider asset for the bar, lock screen, and boot flow.
-- `plugins/araneadev.bar/` — transparent interactive bar composition.
-- `plugins/araneadev.menu/` — spider menu widget and command menu.
-- `plugins/araneadev.lock/` — Aranea lock surface with native PAM handling.
-- `plugins/araneadev.notifications/` — finite critical notification treatment.
-- `hooks/` — theme-set and post-boot integration.
+- `integrations/` — terminal, editor, browser, cursor, Qt, media, session, and
+  icon integrations.
+- `plugins/` — the Aranea bar, menu, lock, and notification surfaces.
+- `hooks/` — theme activation and post-boot integration hooks.
+- `scripts/` — installer, diagnostics, wallpaper, showcase, and health tools.
+- `screenshots/` — representative captures used throughout this README.
 
 ## License
 
