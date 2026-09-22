@@ -26,7 +26,14 @@ grep -Fq 'native' "$repo_root/integrations/media/README.md"
 grep -Fq 'Aranea' "$repo_root/integrations/browser/chromium/new-tab/index.html"
 grep -Fq '#3bff9e' "$repo_root/integrations/session/omarchy.css"
 grep -Fq '#7a5cff' "$repo_root/integrations/media/pavucontrol.css"
-about_output="$("$repo_root/scripts/aranea-about")"
+if about_output="$("$repo_root/scripts/aranea-about" 2>&1)"; then
+  :
+else
+  status=$?
+  printf '%s\n' "$about_output" >&2
+  echo "aranea-about failed with status $status" >&2
+  exit 1
+fi
 printf '%s\n' "$about_output"
 grep -Fq 'Theme version:' <<<"$about_output"
 grep -Fq 'Bar profile:' <<<"$about_output"
