@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_dir=${1:?source plugin directory is required}
+target_dir=${2:?target plugin directory is required}
+
+[[ -d "$source_dir" ]] || {
+  echo "plugin source directory does not exist: $source_dir" >&2
+  exit 1
+}
+
+if [[ -d "$target_dir" ]] && diff -qr "$source_dir" "$target_dir" >/dev/null; then
+  exit 0
+fi
+
+parent_dir=$(dirname "$target_dir")
+target_name=$(basename "$target_dir")
+mkdir -p "$parent_dir"
+
+stage_dir=$(mktemp -d "$parent_dir/.${target_name}.stage.XXXXXX")
+old_dir="$parent_dir/.${target_name}.old.$$"
+restore_needed=0
+
+cleanup() {
+  rm -rf "$stage_dir"
+  if (( restore_needed )) && [[ -d "$old_dir" && ! -e "$target_dir" ]]; then
+    mv "$old_dir" "$target_dir"
+  fi
+  rm -rf "$old_dir"
+}
+trap cleanup EXIT
+
+cp -a "$source_dir"/. "$stage_dir"/
+
+if [[ -e "$target_dir" ]]; then
+  mv "$target_dir" "$old_dir"
+  restore_needed=1
+fi
+
+mv "$stage_dir" "$target_dir"
+stage_dir=""
+restore_needed=0
+
+# The old directory is the exact managed plugin target that was just replaced.
+# Removing it after the swap keeps the watcher from observing a half-written
+# plugin and leaves only one complete directory transition to reload.
+rm -rf "$old_dir"
+old_dir=""
