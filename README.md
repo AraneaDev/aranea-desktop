@@ -105,12 +105,23 @@ The optional Conky layer is available on demand for a clean system overview.
 
 ![Aranea diagnostics panel](screenshots/diagnostics.png)
 
-### Lock screen and boot identity
+### Lock screen
 
 The lock surface centers the corrected spider mark above the secure-session
-prompt, with the same identity carried into Plymouth.
+prompt.
 
 ![Aranea lock screen](screenshots/boot.png)
+
+### Plymouth boot screen
+
+Apply the Aranea Plymouth bootscreen separately; this rebuilds the initramfs and
+requires `sudo`:
+
+```bash
+omarchy plymouth set-by-theme aranea
+```
+
+The bootscreen uses the same `unlock.png` spider asset as the lock surface.
 
 ## Palette
 
