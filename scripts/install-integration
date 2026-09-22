@@ -56,6 +56,19 @@ install_one() {
   fi
 }
 
+install_generated() {
+  local source="$1" target="$2"
+  if (( dry_run )); then
+    printf 'would copy %s -> %s\n' "$source" "$target"
+  else
+    backup_target "$target"
+    mkdir -p "$(dirname "$target")"
+    install -m644 "$source" "$target"
+    record_managed_file "$target"
+    printf 'copied %s -> %s\n' "$source" "$target"
+  fi
+}
+
 case "$integration" in
   terminal)
     if command -v alacritty >/dev/null 2>&1; then
@@ -96,6 +109,24 @@ case "$integration" in
     cursor_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Aranea"
     install_one "$repo_root/integrations/cursor/index.theme" "$cursor_root/index.theme"
     install_one "$repo_root/integrations/cursor/uwsm-env" "$config_root/uwsm/env.d/aranea-cursor"
+    if [[ -d "$repo_root/integrations/cursor/hyprcursor" ]]; then
+      if (( dry_run )); then
+        printf 'would link %s -> %s\n' "$repo_root/integrations/cursor/hyprcursor" "$cursor_root"
+      else
+        hyprcursor_tmp="$(mktemp -d)"
+        trap 'rm -rf -- "$hyprcursor_tmp"' RETURN
+        mkdir -p "$hyprcursor_tmp/out"
+        if command -v hyprcursor-util >/dev/null 2>&1; then
+          hyprcursor-util --create "$repo_root/integrations/cursor/hyprcursor" \
+            --output "$hyprcursor_tmp/out" >/dev/null
+          compiled_root="$hyprcursor_tmp/out/theme_Aranea"
+          install_generated "$compiled_root/manifest.hl" "$cursor_root/manifest.hl"
+          for compiled_cursor in "$compiled_root"/hyprcursors/*.hlc; do
+            install_generated "$compiled_cursor" "$cursor_root/hyprcursors/$(basename "$compiled_cursor")"
+          done
+        fi
+      fi
+    fi
     for cursor_asset in left_ptr.svg hand2.svg watch.svg crosshair.svg; do
       install_one "$repo_root/integrations/cursor/cursors/$cursor_asset" "$cursor_root/cursors/$cursor_asset"
     done

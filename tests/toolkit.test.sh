@@ -10,6 +10,10 @@ grep -Fq 'setcursor Aranea' "$repo_root/scripts/install-integration"
 grep -Fq 'uwsm/env.d/aranea-cursor' "$repo_root/scripts/install-integration"
 grep -Fq 'local/share}/icons/Aranea' "$repo_root/scripts/install-integration"
 grep -Fq 'XCURSOR_THEME=Aranea' "$repo_root/integrations/cursor/uwsm-env"
+grep -Fq 'HYPRCURSOR_THEME=Aranea' "$repo_root/integrations/cursor/uwsm-env"
+grep -Fq 'hyprcursor-util --create' "$repo_root/scripts/install-integration"
+test -f "$repo_root/integrations/cursor/hyprcursor/manifest.hl"
+test -f "$repo_root/integrations/cursor/hyprcursor/hyprcursors/left_ptr/meta.hl"
 for cursor in left_ptr.svg hand2.svg watch.svg crosshair.svg; do
   test -f "$repo_root/integrations/cursor/cursors/$cursor"
 done

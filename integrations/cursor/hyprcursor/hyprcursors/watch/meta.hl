@@ -1,0 +1,7 @@
+resize_algorithm = bilinear
+hotspot_x = 0.5
+hotspot_y = 0.5
+define_override = wait
+define_override = progress
+define_override = watch
+define_size = 32, watch.svg
