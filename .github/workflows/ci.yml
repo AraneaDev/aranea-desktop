@@ -50,7 +50,7 @@ jobs:
           find backgrounds screenshots -type f \( -name '*.png' -o -name '*.jpg' \) -print0 | xargs -0 -n1 identify
 
       - name: Run ShellCheck
-        run: shellcheck scripts/*.sh hooks/* tests/*.test.sh
+        run: shellcheck -x scripts/*.sh hooks/* tests/*.test.sh
 
       - name: Upload diagnostics on failure
         if: failure()

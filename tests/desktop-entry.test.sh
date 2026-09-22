@@ -21,7 +21,7 @@ EOF
 
 grep -Fq 'Name=Microsoft Teams for Linux' "$target_file"
 grep -Fq 'Exec=teams-for-linux --gtk-version=3 %U' "$target_file"
-! grep -Fq 'Version=' "$target_file"
-! grep -Fq 'Application;' "$target_file"
+grep -Fq 'Version=' "$target_file" && exit 1
+grep -Fq 'Application;' "$target_file" && exit 1
 
 echo "desktop entry repair contract passed"

@@ -10,7 +10,7 @@ for asset in sparse.png dense.png dusk.png monochrome.png ultrawide.png; do
   test -f "$repo_root/backgrounds/variants/$asset"
 done
 
-list_output="$($repo_root/scripts/aranea-wallpaper list)"
+list_output="$("$repo_root/scripts/aranea-wallpaper" list)"
 grep -Fq 'day' <<<"$list_output"
 grep -Fq 'monochrome' <<<"$list_output"
 

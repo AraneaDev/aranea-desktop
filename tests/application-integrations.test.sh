@@ -26,12 +26,12 @@ grep -Fq 'native' "$repo_root/integrations/media/README.md"
 grep -Fq 'Aranea' "$repo_root/integrations/browser/chromium/new-tab/index.html"
 grep -Fq '#3bff9e' "$repo_root/integrations/session/omarchy.css"
 grep -Fq '#7a5cff' "$repo_root/integrations/media/pavucontrol.css"
-about_output="$($repo_root/scripts/aranea-about)"
+about_output="$("$repo_root/scripts/aranea-about")"
 grep -Fq 'Theme version:' <<<"$about_output"
 grep -Fq 'Bar profile:' <<<"$about_output"
 grep -Fq 'Health:' <<<"$about_output"
 
-browser_output="$($repo_root/scripts/install-integration browser --dry-run)"
+browser_output="$("$repo_root/scripts/install-integration" browser --dry-run)"
 if command -v firefox >/dev/null 2>&1; then
   grep -Fq 'browser/firefox/userChrome.css' <<<"$browser_output"
 fi
@@ -39,11 +39,11 @@ if command -v chromium >/dev/null 2>&1; then
   grep -Fq 'browser/chromium/new-tab/index.html' <<<"$browser_output"
 fi
 
-session_output="$($repo_root/scripts/install-integration session --dry-run)"
+session_output="$("$repo_root/scripts/install-integration" session --dry-run)"
 grep -Fq 'session/omarchy.css' <<<"$session_output"
 
 if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
-  media_output="$($repo_root/scripts/install-integration media --dry-run)"
+  media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
   grep -Fq 'media/pavucontrol.css' <<<"$media_output"
 fi
 
