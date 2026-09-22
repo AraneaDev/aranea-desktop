@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_file="${ARANEA_SHELL_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json}"
+profile="${2:-}"
+
+usage() {
+  printf 'Usage: %s current|list|set <minimal|diagnostic|ceremony>\n' "$0" >&2
+}
+
+case "${1:-current}" in
+  list)
+    printf '%s\n' minimal diagnostic ceremony
+    ;;
+  current)
+    if [[ -f "$config_file" ]] && command -v jq >/dev/null 2>&1; then
+      jq -r '.bar.profile // "minimal"' "$config_file"
+    else
+      printf '%s\n' minimal
+    fi
+    ;;
+  set)
+    [[ "$profile" =~ ^(minimal|diagnostic|ceremony)$ ]] || { usage; exit 2; }
+    [[ -f "$config_file" ]] || { printf 'Shell config not found: %s\n' "$config_file" >&2; exit 1; }
+    command -v jq >/dev/null 2>&1 || { printf 'jq is required to set the bar profile\n' >&2; exit 1; }
+
+    config_dir="$(dirname "$config_file")"
+    tmp_file="$(mktemp "$config_dir/.shell.json.aranea-profile.XXXXXX")"
+    backup_file="$config_file.aranea-profile.bak"
+    cleanup() { rm -f "$tmp_file"; }
+    trap cleanup EXIT
+    jq --arg profile "$profile" '.bar = ((.bar // {}) + {profile: $profile})' "$config_file" > "$tmp_file"
+    if cmp -s "$config_file" "$tmp_file"; then
+      printf 'bar profile already: %s\n' "$profile"
+      exit 0
+    fi
+    if [[ ! -e "$backup_file" ]]; then cp -p "$config_file" "$backup_file"; fi
+    chmod --reference="$config_file" "$tmp_file"
+    mv -f "$tmp_file" "$config_file"
+    printf 'bar profile: %s\n' "$profile"
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac

@@ -18,6 +18,12 @@ Aranea adds a profile filter on top of this host layout. Set
 such as weather, update, agent, and Bluetooth modules; the other profiles keep
 the complete configured layout.
 
+Use `scripts/aranea-bar-profile list` to see the choices and
+`scripts/aranea-bar-profile set diagnostic` to change the profile safely. The
+helper preserves the previous shell configuration as
+`shell.json.aranea-profile.bak`; `scripts/aranea-doctor --json` reports the
+runtime and QML health checks alongside the active shell/plugin state.
+
 ## Customizing
 
 The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
