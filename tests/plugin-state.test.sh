@@ -121,6 +121,8 @@ requiresSignature(menuQml, 'function applyDmenuSelection(value: string): void', 
 requiresSignature(menuQml, 'function resolveRoute(input: string): string', 'menu resolveRoute')
 requiresSignature(menuQml, 'function toggleFavoriteApp(appId: string): void', 'menu favorite toggle')
 requiresSignature(menuQml, 'function recordRecentApp(appId: string): void', 'menu recent history')
+requiresSignature(menuQml, 'id: localAppLibrary', 'menu local app-library fallback')
+requiresSignature(menuQml, 'DesktopEntries.applications.values', 'menu DesktopEntries fallback')
 requiresSignature(menuQml, 'function openRoute(initialMenu: string): void', 'menu openRoute')
 requiresSignature(menuQml, 'function goBack(): void', 'menu goBack')
 requiresSignature(menuQml, 'function rebuildDisplay(): void', 'menu rebuildDisplay')
