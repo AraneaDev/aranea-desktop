@@ -12,4 +12,6 @@ may replace the user's existing theme without an ownership backup.
 
 The managed theme is installed at `~/.config/icons/Aranea`. Hosts without
 `xcursorgen` safely retain the active cursor theme; install `xorg-xcursorgen`
-to enable the native cursor activation path.
+to enable the native cursor activation path. The installer also writes
+`~/.config/uwsm/env.d/aranea-cursor`, so UWSM selects Aranea again on the next
+login instead of reverting to `default`.

@@ -1,0 +1,2 @@
+# Keep the Aranea Xcursor theme selected when UWSM starts Hyprland.
+export XCURSOR_THEME=Aranea

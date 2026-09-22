@@ -95,6 +95,7 @@ case "$integration" in
   cursor)
     cursor_root="$config_root/icons/Aranea"
     install_one "$repo_root/integrations/cursor/index.theme" "$cursor_root/index.theme"
+    install_one "$repo_root/integrations/cursor/uwsm-env" "$config_root/uwsm/env.d/aranea-cursor"
     for cursor_asset in left_ptr.svg hand2.svg watch.svg crosshair.svg; do
       install_one "$repo_root/integrations/cursor/cursors/$cursor_asset" "$cursor_root/cursors/$cursor_asset"
     done
