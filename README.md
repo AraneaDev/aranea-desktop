@@ -110,7 +110,7 @@ The optional Conky layer is available on demand for a clean system overview.
 The lock surface centers the corrected spider mark above the secure-session
 prompt.
 
-![Aranea lock screen](screenshots/boot.png)
+![Aranea lock screen](screenshots/lock.png)
 
 ### Plymouth boot screen
 
@@ -122,6 +122,21 @@ omarchy plymouth set-by-theme aranea
 ```
 
 The bootscreen uses the same `unlock.png` spider asset as the lock surface.
+
+![Aranea Plymouth boot screen](screenshots/plymouth.png)
+
+### Branding and idle surfaces
+
+The theme also carries the Aranea mark into the Omarchy About/fastfetch view
+and the idle screensaver. Those are terminal-rendered surfaces rather than
+static desktop panels, so their source artwork is kept directly inspectable:
+
+- [`branding/about.txt`](branding/about.txt) — fastfetch/About logo.
+- [`branding/screensaver.txt`](branding/screensaver.txt) — idle screensaver logo.
+
+Together with the bar, menu, notifications, diagnostics, lock screen, and
+Plymouth captures above, these files cover every user-facing customization
+shipped by the theme.
 
 ## Palette
 
