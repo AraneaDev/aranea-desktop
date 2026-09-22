@@ -18,7 +18,7 @@ Item {
   // `omarchy-shell shell summon omarchy.menu ...` and close() when hidden.
   property string pendingInitialMenu: "root"
 
-  function open(payloadJson) {
+  function open(payloadJson: string): void {
     var payload = ({})
     try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
 
@@ -31,7 +31,7 @@ Item {
     }
   }
 
-  function close() {
+  function close(): void {
     root.cancel()
   }
 
@@ -134,7 +134,7 @@ Item {
     resultProc.running = true
   }
 
-  function runAction(action) {
+  function runAction(action: string): void {
     var command = String(action || "")
     if (!command) return
 
@@ -178,7 +178,7 @@ Item {
     return totals[full - 1] + root.rowSpacing + peek
   }
 
-  function rowListHeight(_serial, _count, _filter, _divider) {
+  function rowListHeight(_serial: int, _count: int, _filter: string, _divider: bool): int {
     if (displayModel.count === 0) return root.baseRowHeight
 
     var totals = []
@@ -197,7 +197,7 @@ Item {
     return foldedListHeight(totals, availableRowsHeight())
   }
 
-  function dmenuRowListHeight(_serial, _count, _filter) {
+  function dmenuRowListHeight(_serial: int, _count: int, _filter: string): int {
     if (root.mode === "input") return 0
     if (displayModel.count === 0) return root.baseRowHeight
 
@@ -243,7 +243,7 @@ Item {
   // Merge defaults + user extension. Later entries override earlier ones
   // on a per-key basis (so the user can tweak label/icon/action without
   // re-declaring the whole row).
-  function rebuildItemsFromSources() {
+  function rebuildItemsFromSources(): void {
     var mergedMenu = MenuModel.mergeMenuSources(root.defaultMenuItems, root.userMenuItems)
     root.providerRevision += 1
     root.providersLoaded = ({})
@@ -391,7 +391,7 @@ Item {
     if (root.opened) root.rebuildDisplay()
   }
 
-  function startNextProvider() {
+  function startNextProvider(): void {
     if (providerProc.running) return
 
     while (root.providerQueue.length > 0) {
@@ -443,63 +443,63 @@ Item {
     }
   }
 
-  function depthFor(id) {
+  function depthFor(id: string): int {
     return MenuModel.depthFor(root.items, id)
   }
 
-  function pathFor(id) {
+  function pathFor(id: string): string {
     return MenuModel.pathFor(root.items, id)
   }
 
-  function parentPathFor(id) {
+  function parentPathFor(id: string): string {
     return MenuModel.parentPathFor(root.items, id)
   }
 
-  function isDescendantOf(id, ancestorId) {
+  function isDescendantOf(id: string, ancestorId: string): bool {
     return MenuModel.isDescendantOf(root.items, id, ancestorId)
   }
 
-  function childCount(id) {
+  function childCount(id: string): int {
     return MenuModel.childCount(root.items, root.itemOrder, id)
   }
 
   // Guarded items are hidden when their `when:` evaluates false. Static
   // submenus are also hidden when none of their descendants are visible;
   // provider-backed menus stay visible because their rows load on demand.
-  function isVisible(entry) {
+  function isVisible(entry): bool {
     return MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry)
   }
 
   // Label with the ✓ marker baked in when `checked:` evaluated truthy.
-  function labelFor(entry) {
+  function labelFor(entry): string {
     return MenuModel.labelFor(entry, root.checkedResults)
   }
 
-  function searchableToken(value) {
+  function searchableToken(value: string): string {
     return MenuModel.searchableToken(value)
   }
 
-  function leafIdFor(id) {
+  function leafIdFor(id: string): string {
     return MenuModel.leafIdFor(id)
   }
 
-  function nameSearchText(entry) {
+  function nameSearchText(entry): string {
     return MenuModel.nameSearchText(entry)
   }
 
-  function termInSearchWords(term, text) {
+  function termInSearchWords(term: string, text: string): bool {
     return MenuModel.termInSearchWords(term, text)
   }
 
-  function descriptionTextMatches(query, text) {
+  function descriptionTextMatches(query: string, text: string): bool {
     return MenuModel.descriptionTextMatches(query, text)
   }
 
-  function matchesQuery(entry, query) {
+  function matchesQuery(entry, query: string): bool {
     return MenuModel.matchesQuery(entry, query, root.isVisible(entry))
   }
 
-  function searchScore(entry, query) {
+  function searchScore(entry, query: string): real {
     return MenuModel.searchScore(root.items, entry, query)
   }
 
@@ -507,7 +507,7 @@ Item {
     return MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, entry, detail, score, section)
   }
 
-  function rebuildDmenuDisplay() {
+  function rebuildDmenuDisplay(): void {
     displayModel.clear()
     root.searchDivider = false
 
@@ -558,7 +558,7 @@ Item {
     })
   }
 
-  function rebuildDisplay() {
+  function rebuildDisplay(): void {
     if (root.dmenuActive) {
       root.rebuildDmenuDisplay()
       return
@@ -642,7 +642,7 @@ Item {
   // Contain alone parks the cursor row flush with the viewport edge, hiding
   // the neighbor entirely and losing the fold affordance. Keep the next
   // hidden row peeking past the cursor in the direction of travel.
-  function revealCursor() {
+  function revealCursor(): void {
     if (displayModel.count === 0) return
     resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
 
@@ -661,7 +661,7 @@ Item {
     }
   }
 
-  function select(delta) {
+  function select(delta: int): void {
     if (displayModel.count === 0) return
 
     root.disarmPointer()
@@ -674,7 +674,7 @@ Item {
     revealCursor()
   }
 
-  function setFilter(nextFilter) {
+  function setFilter(nextFilter: string): void {
     panel.freezeCardTop()
     root.filterText = nextFilter
     root.selectedIndex = 0
@@ -684,7 +684,7 @@ Item {
     root.rebuildDisplay()
   }
 
-  function setActiveMenu(id, pushHistory, fromPointer) {
+  function setActiveMenu(id: string, pushHistory: bool, fromPointer: bool): void {
     panel.freezeCardTop()
     if (!root.item(id)) id = "root"
     if (pushHistory && id !== root.activeMenu) root.navStack = root.navStack.concat([root.activeMenu])
@@ -699,7 +699,7 @@ Item {
     root.loadProviderForMenu(id)
   }
 
-  function goBack() {
+  function goBack(): void {
     if (root.activeMenu === "root") return false
 
     if (root.navStack.length > 0) {
@@ -714,7 +714,7 @@ Item {
     return true
   }
 
-  function activateIndex(index, fromPointer) {
+  function activateIndex(index: int, fromPointer: bool): void {
     if (root.deleteConfirmOpen) return
     if (root.dmenuActive) {
       if (root.mode === "input") {
@@ -770,7 +770,7 @@ Item {
     if (root.appLibrary) root.appLibrary.remove(target.appId, target.label)
   }
 
-  function applyDmenuSelection(value) {
+  function applyDmenuSelection(value: string): void {
     applySerial = requestSerial
     opened = false
     filterText = ""
@@ -786,7 +786,7 @@ Item {
     root.runAction(action)
   }
 
-  function cancel() {
+  function cancel(): void {
     if (root.dmenuActive) root.finishRequest(null)
     opened = false
     filterText = ""
@@ -846,11 +846,11 @@ Item {
   // Callers may pass a real id (`system`, `setup.power`) or an alias declared
   // in JSONC (`power`, `reminder-set`). Unknown strings fall through to the
   // id-as-route behavior so misspellings still attempt to open the literal id.
-  function resolveRoute(input) {
+  function resolveRoute(input: string): string {
     return MenuModel.resolveRoute(root.items, root.itemOrder, input)
   }
 
-  function openRoute(initialMenu) {
+  function openRoute(initialMenu: string): void {
     var id = root.resolveRoute(initialMenu)
     var entry = root.items[id]
     // If the resolved id is an action (i.e. the user invoked an alias for
@@ -859,13 +859,12 @@ Item {
     if (entry && entry.kind === "action" && entry.action) {
       root.cancel()
       root.runAction(entry.action)
-      return "ok"
+      return
     }
     // If it's a link (a redirect to another menu), follow the link.
     if (entry && entry.kind === "link" && entry.target) id = entry.target
     root.pendingInitialMenu = id
     root.openExistingMenu(id)
-    return "ok"
   }
 
   function disarmPointer() {

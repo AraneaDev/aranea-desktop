@@ -53,14 +53,14 @@ Item {
     return realScreenCount() > 0
   }
 
-  function queueSessionLock() {
+  function queueSessionLock(): void {
     pendingSessionLock = true
     if (!sessionLockStabilizeTimer.running) logEvent("lock-pending: screen-stabilizing")
     sessionLockStabilizeTimer.restart()
     if (!pendingSessionLockTimer.running) pendingSessionLockTimer.start()
   }
 
-  function requestSessionLock() {
+  function requestSessionLock(): void {
     if (!lockRequested || sessionLock.locked || sessionLock.secure) return
     if (sessionLockStabilizeTimer.running) return
 
@@ -79,7 +79,7 @@ Item {
   // ext-session-lock outlives its client, and a restart carries no lock over, so
   // a session locked this early is an orphan behind Hyprland's failsafe. Outputs
   // are often still absent here, so ask until the answer means something.
-  function checkStrandedLock() {
+  function checkStrandedLock(): void {
     if (strandedLockResolved || strandedLockCheckProc.running) return
 
     // A lock this shell took is nobody's orphan.
@@ -91,7 +91,7 @@ Item {
     strandedLockCheckProc.running = true
   }
 
-  function recoverStrandedLock() {
+  function recoverStrandedLock(): void {
     if (!strandedLock || locked || !passwordPamConfigured) return
 
     strandedLock = false
@@ -99,21 +99,21 @@ Item {
     beginLock()
   }
 
-  function refreshBackground() {
+  function refreshBackground(): void {
     if (!readlinkProc.running) readlinkProc.running = true
   }
 
-  function refreshFingerprintStatus() {
+  function refreshFingerprintStatus(): void {
     if (!fingerprintCheckProc.running) fingerprintCheckProc.running = true
   }
 
-  function logEvent(event) {
+  function logEvent(event: string): void {
     lastEvent = event
     lastEventAt = new Date().toISOString()
     console.log("omarchy lock " + lastEventAt + " " + event)
   }
 
-  function resetAuthenticationState() {
+  function resetAuthenticationState(): void {
     enteredPassword = ""
     pendingPassword = ""
     failureMessage = ""
@@ -145,7 +145,7 @@ Item {
     return true
   }
 
-  function finishUnlock() {
+  function finishUnlock(): void {
     if (!root.locked && !lockRequested) return
 
     lockRequested = false
@@ -159,21 +159,21 @@ Item {
     runWake()
   }
 
-  function armBlankTimer() {
+  function armBlankTimer(): void {
     idleBlankTimer.armedAt = Date.now()
     idleBlankTimer.restart()
   }
 
-  function runWake() {
+  function runWake(): void {
     if (!wakeProcess.running) wakeProcess.running = true
     if (lockRequested) armBlankTimer()
   }
 
-  function runBlank() {
+  function runBlank(): void {
     if (!blankProcess.running) blankProcess.running = true
   }
 
-  function submitPassword(value) {
+  function submitPassword(value: string): void {
     var password = String(value || "")
     if (!lockRequested || authenticatingPassword || password.length === 0) return
 
@@ -190,7 +190,7 @@ Item {
     Qt.callLater(respondToPasswordPrompt)
   }
 
-  function respondToPasswordPrompt() {
+  function respondToPasswordPrompt(): void {
     if (!authenticatingPassword || !passwordPam.active || !passwordPam.responseRequired) return
     passwordPam.respond(pendingPassword)
   }

@@ -92,7 +92,7 @@ Item {
     onTriggered: service.quietHoursTick++
   }
 
-  function setDoNotDisturb(value) {
+  function setDoNotDisturb(value: bool): void {
     persisted.doNotDisturb = !!value
   }
 
@@ -162,7 +162,7 @@ Item {
   // Their toasts still land in history like any other once they've been on
   // screen; the distinction only decides whether a DND-silenced one is worth
   // recording at all.
-  function isEphemeral(notification) {
+  function isEphemeral(notification): bool {
     var transient = false
     try {
       transient = !!(notification.hints && notification.hints["transient"])
@@ -327,15 +327,15 @@ Item {
     }
   }
 
-  function dismissPopup(index) {
+  function dismissPopup(index: int): void {
     removePopup(index, "dismiss")
   }
 
-  function expirePopup(index) {
+  function expirePopup(index: int): void {
     removePopup(index, "expire")
   }
 
-  function removePopup(index, reason) {
+  function removePopup(index: int, reason: string): void {
     if (index < 0 || index >= popupModel.count) return
     var entry = popupModel.get(index)
     var originalId = entry ? entry.originalId : -1
@@ -365,7 +365,7 @@ Item {
     }
   }
 
-  function clearPopups() {
+  function clearPopups(): void {
     while (popupModel.count > 0) dismissPopup(0)
   }
 
@@ -462,12 +462,12 @@ Item {
     runNextPopupFileJob()
   }
 
-  function enqueueHistoryRead() {
+  function enqueueHistoryRead(): void {
     popupFileQueue = popupFileQueue.concat([{ read: true }])
     runNextPopupFileJob()
   }
 
-  function runNextPopupFileJob() {
+  function runNextPopupFileJob(): void {
     if (readHistoryProc.running || popupFileProc.running) return
     if (popupFileQueue.length === 0) return
 
@@ -602,7 +602,7 @@ Item {
     enqueuePopupFileJob(command, done)
   }
 
-  function clearHistory() {
+  function clearHistory(): void {
     enqueuePopupFileJob(["bash", "-c",
       "for f in \"$1\"/*.json; do\n" +
       "  [[ -e $f ]] || continue\n" +
@@ -614,7 +614,7 @@ Item {
   // A restart can kill a queued job between its cp and its JSON write,
   // leaving copies no JSON-derived cleanup can name. Swept at startup,
   // through the queue so in-flight copies aren't mistaken for orphans.
-  function sweepOrphanImages() {
+  function sweepOrphanImages(): void {
     enqueuePopupFileJob(["bash", "-c",
       "for img in \"$3\"/*; do\n" +
       "  [[ -e $img ]] || continue\n" +
@@ -649,7 +649,7 @@ Item {
   // Re-show what's in historyDir as toasts. The read goes through the file
   // queue and its own subprocess, so the replay lands in replayHistory once
   // the work queued ahead of it has finished.
-  function showRecentHistory() {
+  function showRecentHistory(): void {
     if (readHistoryProc.running || service.historyReadQueued) return "ok"
     service.replayCarryOver = liveRowsForReplay()
     service.historyReadQueued = true
@@ -657,7 +657,7 @@ Item {
     return "ok"
   }
 
-  function startHistoryRead() {
+  function startHistoryRead(): void {
     service.historyReadQueued = false
     readHistoryProc.command = ["bash", "-c",
       "awk 1 \"$1\"/*.json 2>/dev/null || true", "--", historyDir]
@@ -669,7 +669,7 @@ Item {
   // left behind rather than replayed as one. The replay dismisses these
   // notifications, and senders delete their images on close — so the carried
   // rows point at the persisted copies, like the archived files they join.
-  function liveRowsForReplay() {
+  function liveRowsForReplay(): var {
     var rows = []
     for (var i = 0; i < popupModel.count; i++) {
       var row = popupModel.get(i)
@@ -691,7 +691,7 @@ Item {
     return rows
   }
 
-  function replayHistory(raw) {
+  function replayHistory(raw: string): void {
     var rows = NotificationLogic.historyRows(
       raw, service.replayCarryOver, NotificationUrgency.Normal, service.historyLimit)
     service.replayCarryOver = []
@@ -816,14 +816,14 @@ Item {
     onTriggered: service.flushSettings()
   }
 
-  function scheduleSettingsSave() {
+  function scheduleSettingsSave(): void {
     if (!service.settingsLoaded) return
     settingsSaveTimer.restart()
   }
 
   property bool settingsLoaded: false
 
-  function loadSettings(raw) {
+  function loadSettings(raw: string): void {
     // FileView can fire onLoaded more than once during startup — the implicit
     // preload when `path` resolves, plus the explicit `settingsFile.reload()`
     // in Component.onCompleted can both end up calling here.
@@ -845,7 +845,7 @@ Item {
     if (parsed.legacy) service.scheduleSettingsSave()
   }
 
-  function flushSettings() {
+  function flushSettings(): void {
     settingsFile.setText(JSON.stringify({ version: 3, dnd: persisted.doNotDisturb }, null, 2) + "\n")
   }
 
