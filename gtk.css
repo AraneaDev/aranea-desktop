@@ -139,6 +139,21 @@ selection,
   color: @accent;
 }
 
+/* File-manager states: keep navigation quiet and make destructive actions
+ * unmistakable without turning every row into an accent surface. */
+row:selected,
+.view:selected,
+treeview.view:selected {
+  background-color: @selection;
+  color: @accent;
+}
+
+button.destructive-action:hover,
+button.destructive-action:focus {
+  background-color: alpha(@red, 0.28);
+  outline-color: @red;
+}
+
 popover.emoji-picker,
 popover.emoji-picker > contents,
 popover.emoji-picker > contents > box {
