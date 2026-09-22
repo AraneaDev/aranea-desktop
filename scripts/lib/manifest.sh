@@ -26,3 +26,30 @@ manifest_profile_integrations() {
     }
   ' "$manifest_file"
 }
+
+manifest_integration_exists() {
+  local integration="$1"
+  awk -v wanted="$integration" '
+    /^\[\[integrations\]\]$/ { in_block = 1; found = 0; next }
+    in_block && /^\[/ { in_block = 0 }
+    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { found = 1 }
+    END { exit(found ? 0 : 1) }
+  ' "$manifest_file"
+}
+
+manifest_integration_field() {
+  local integration="$1"
+  local field="$2"
+  awk -v wanted="$integration" -v wanted_field="$field" '
+    /^\[\[integrations\]\]$/ { in_block = 1; found = 0; next }
+    in_block && /^\[/ { in_block = 0 }
+    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { found = 1; next }
+    found && $0 ~ "^" wanted_field "[[:space:]]*=" {
+      line = $0
+      sub(/^[^=]*=[[:space:]]*/, "", line)
+      gsub(/^\"|\"$/, "", line)
+      print line
+      exit
+    }
+  ' "$manifest_file"
+}

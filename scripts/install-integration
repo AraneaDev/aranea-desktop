@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/scripts/lib/manifest.sh"
+source "$repo_root/scripts/lib/ownership.sh"
+
+dry_run=0
+assume_yes=0
+integration=""
+
+while (($#)); do
+  case "$1" in
+    --dry-run) dry_run=1 ;;
+    --yes) assume_yes=1 ;;
+    -h|--help)
+      printf '%s\n' 'Usage: scripts/install-integration [--dry-run] [--yes] <integration-id>'
+      exit 0
+      ;;
+    -*) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+    *) integration="$1" ;;
+  esac
+  shift
+done
+
+if [[ -z "$integration" ]]; then
+  printf '%s\n' 'An integration ID is required.' >&2
+  exit 2
+fi
+if ! manifest_integration_exists "$integration"; then
+  printf 'Unknown integration: %s\n' "$integration" >&2
+  exit 1
+fi
+
+optional_command="$(manifest_integration_field "$integration" optional_command || true)"
+if [[ -n "$optional_command" ]]; then
+  available=0
+  IFS='|' read -r -a commands <<<"$optional_command"
+  for command_name in "${commands[@]}"; do
+    if command -v "$command_name" >/dev/null 2>&1; then available=1; break; fi
+  done
+  if (( ! available )); then
+    printf 'Skipping %s: optional command is not installed.\n' "$integration"
+    exit 0
+  fi
+fi
+
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+install_one() {
+  local source="$1" target="$2"
+  if (( dry_run )); then
+    printf 'would link %s -> %s\n' "$source" "$target"
+  else
+    link_managed_file "$target" "$source"
+    printf 'linked %s -> %s\n' "$source" "$target"
+  fi
+}
+
+case "$integration" in
+  terminal)
+    if command -v alacritty >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/terminal/alacritty.toml" "$config_root/alacritty/themes/aranea.toml"
+    elif command -v kitty >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/terminal/kitty.conf" "$config_root/kitty/themes/aranea.conf"
+    elif command -v foot >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/terminal/foot.ini" "$config_root/foot/themes/aranea.ini"
+    fi
+    ;;
+  developer)
+    command -v starship >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/starship.toml" "$config_root/starship.toml"
+    command -v tmux >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/tmux.conf" "$config_root/tmux/themes/aranea.conf"
+    command -v btop >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"
+    command -v lazygit >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/lazygit.yml" "$config_root/lazygit/themes/aranea.yml"
+    ;;
+  *)
+    printf 'Integration %s has no file targets in this phase.\n' "$integration"
+    ;;
+esac

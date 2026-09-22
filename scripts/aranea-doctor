@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/scripts/lib/manifest.sh"
+
+json=0
+[[ "${1:-}" == "--json" ]] && json=1
+
+emit() {
+  local id="$1" status="$2" message="$3"
+  if (( json )); then
+    printf '{"id":"%s","status":"%s","message":"%s"}\n' "$id" "$status" "$message"
+  else
+    printf '%-14s %-8s %s\n' "$id" "$status" "$message"
+  fi
+}
+
+theme="${ARANEA_DOCTOR_THEME:-}"
+if [[ -z "$theme" ]] && command -v omarchy >/dev/null 2>&1; then
+  theme="$(omarchy theme current 2>/dev/null || true)"
+fi
+if [[ "$theme" == "Aranea" || "$theme" == "aranea" ]]; then
+  emit theme ok 'Aranea is the active theme'
+else
+  emit theme repair 'Aranea is not the active theme'
+fi
+
+hooks="${ARANEA_DOCTOR_HOOKS:-unknown}"
+if [[ "$hooks" == ok ]]; then
+  emit hooks ok 'theme-set and post-boot hooks reported healthy'
+else
+  emit hooks repair 'inspect installed Omarchy hooks'
+fi
+
+if [[ -f "$manifest_file" ]]; then
+  emit manifest ok 'integration manifest is present'
+else
+  emit manifest repair 'theme-manifest.toml is missing'
+fi
+
+for optional in conky alacritty kitty foot starship tmux btop lazygit kvantummanager; do
+  if command -v "$optional" >/dev/null 2>&1; then
+    emit "$optional" ok 'optional command is available'
+  else
+    emit "$optional" skipped 'optional command is not installed'
+  fi
+done
