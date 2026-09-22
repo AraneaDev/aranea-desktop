@@ -47,12 +47,6 @@ if [[ -f /usr/share/applications/teams-for-linux.desktop && -x "$theme_root/scri
     "$HOME/.local/share/applications/teams-for-linux.desktop" >/dev/null 2>&1 || true
 fi
 
-lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
-menu_plugin="$HOME/.config/omarchy/plugins/araneadev.menu"
-bar_plugin="$HOME/.config/omarchy/plugins/araneadev.bar"
-deploy_plugin="$theme_root/scripts/deploy-plugin"
-if [[ -x "$deploy_plugin" ]]; then
-  "$deploy_plugin" "$theme_root/plugins/araneadev.lock" "$lock_plugin"
-  "$deploy_plugin" "$theme_root/plugins/araneadev.menu" "$menu_plugin"
-  "$deploy_plugin" "$theme_root/plugins/araneadev.bar" "$bar_plugin"
+if [[ -x "$theme_root/scripts/deploy-plugins-safely" ]]; then
+  "$theme_root/scripts/deploy-plugins-safely" "$theme_root"
 fi

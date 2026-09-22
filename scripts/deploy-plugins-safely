@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+theme_root=${1:?theme root is required}
+target_root=${2:-$HOME/.config/omarchy/plugins}
+deploy_plugin="$theme_root/scripts/deploy-plugin"
+
+[[ -x "$deploy_plugin" ]] || {
+  echo "plugin deployment helper is missing: $deploy_plugin" >&2
+  exit 1
+}
+
+plugin_ids=(araneadev.lock araneadev.menu araneadev.bar)
+needs_deploy=0
+for plugin_id in "${plugin_ids[@]}"; do
+  source_dir="$theme_root/plugins/$plugin_id"
+  target_dir="$target_root/$plugin_id"
+  [[ -d "$source_dir" ]] || {
+    echo "plugin source directory is missing: $source_dir" >&2
+    exit 1
+  }
+  if [[ ! -d "$target_dir" ]] || ! diff -qr "$source_dir" "$target_dir" >/dev/null; then
+    needs_deploy=1
+  fi
+done
+
+(( needs_deploy )) || exit 0
+
+# A live directory swap makes QuickShell reload plugins. Stop it first so its
+# stock panels never observe the short interval between plugin generations.
+if command -v omarchy-hyprland-session-locked >/dev/null 2>&1 \
+    && omarchy-hyprland-session-locked; then
+  echo "Skipping plugin deployment while the session is locked." >&2
+  exit 0
+fi
+
+shell_was_running=0
+if omarchy-shell shell ping >/dev/null 2>&1; then
+  shell_was_running=1
+  quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null
+fi
+
+restart_needed=$shell_was_running
+finish() {
+  if (( restart_needed )); then
+    restart_needed=0
+    omarchy restart shell >/dev/null 2>&1 || true
+  fi
+}
+trap finish EXIT
+
+for plugin_id in "${plugin_ids[@]}"; do
+  "$deploy_plugin" "$theme_root/plugins/$plugin_id" "$target_root/$plugin_id"
+done
