@@ -17,15 +17,15 @@ grep -Fq 'integrations/terminal/alacritty.toml' "$repo_root/alacritty.toml"
 grep -Fq 'integrations/terminal/kitty.conf' "$repo_root/kitty.conf"
 grep -Fq 'integrations/terminal/foot.ini' "$repo_root/foot.ini"
 
-qt_output="$($repo_root/scripts/install-integration qt --dry-run)"
+qt_output="$("$repo_root/scripts/install-integration" qt --dry-run)"
 grep -Eq 'Skipping qt:|would link .*Aranea\.kvconfig' <<<"$qt_output"
 
 if command -v nvim >/dev/null 2>&1; then
-  developer_output="$($repo_root/scripts/install-integration developer --dry-run)"
+  developer_output="$("$repo_root/scripts/install-integration" developer --dry-run)"
   grep -Fq 'nvim/lua/plugins/aranea-theme.lua' <<<"$developer_output"
 fi
 
-cursor_output="$($repo_root/scripts/install-integration cursor --dry-run)"
+cursor_output="$("$repo_root/scripts/install-integration" cursor --dry-run)"
 grep -Fq 'cursor/index.theme' <<<"$cursor_output"
 grep -Fq 'cursor/cursors/left_ptr.svg' <<<"$cursor_output"
 

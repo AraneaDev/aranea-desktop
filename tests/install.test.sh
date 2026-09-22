@@ -23,7 +23,7 @@ PATH="$repo_root/tests/fake-bin:$PATH" \
 grep -Fq "profile: no_apps" "$minimal_output"
 grep -Fq "would install theme hooks" "$minimal_output"
 grep -Fq "would persist profile: no_apps" "$minimal_output"
-! grep -Fq "conky-cairo-wayland-git" "$minimal_output"
+grep -Fq "conky-cairo-wayland-git" "$minimal_output" && exit 1
 
 grep -Fq 'profile_file=' "$repo_root/hooks/theme-set"
 grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
