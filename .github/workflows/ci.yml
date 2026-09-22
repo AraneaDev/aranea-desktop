@@ -32,7 +32,16 @@ jobs:
       - name: Run contract tests
         run: |
           for test in tests/*.test.sh; do
-            bash "$test"
+            echo "::group::${test}"
+            if output="$(bash "$test" 2>&1)"; then
+              printf '%s\n' "$output"
+              echo "::endgroup::"
+            else
+              status=$?
+              printf '%s\n' "$output"
+              echo "contract test failed: ${test} (status ${status})" >&2
+              exit 1
+            fi
           done
 
       - name: Exercise installer profiles

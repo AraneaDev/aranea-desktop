@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
 theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/omarchy-aranea-theme.git}"
+theme_source="${ARANEA_THEME_SOURCE:-$theme_repo_url}"
 dry_run=0
 assume_yes=0
 skip_conky=0
@@ -11,7 +12,7 @@ profile="full"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/install.sh [--profile minimal|full|no_apps] [--dry-run] [--yes] [--skip-conky]
+Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes] [--skip-conky]
 
 Installs the Aranea theme, its Omarchy hooks, and optionally the Wayland Conky build.
 EOF
@@ -40,6 +41,11 @@ while (($#)); do
     --dry-run) dry_run=1 ;;
     --yes) assume_yes=1 ;;
     --skip-conky) skip_conky=1 ;;
+    --source)
+      (($# >= 2)) || { say "--source requires a path or URL" >&2; exit 2; }
+      theme_source="$2"
+      shift
+      ;;
     --profile)
       (($# >= 2)) || { say "--profile requires a value" >&2; exit 2; }
       profile="$2"
@@ -55,6 +61,11 @@ if ! manifest_profile_exists "$profile"; then
   say "Unknown profile: $profile" >&2
   usage >&2
   exit 2
+fi
+
+if [[ "$theme_source" == /* && ! -d "$theme_source" ]]; then
+  say "Aranea installer: local theme source does not exist: $theme_source" >&2
+  exit 1
 fi
 
 say "profile: $profile"
@@ -90,13 +101,27 @@ fi
 
 if (( dry_run )); then
   say "would persist profile: $profile"
+  say "would install theme from: $theme_source"
   say "would install theme hooks"
   say "would set theme to aranea"
 else
+  previous_theme="$(omarchy theme current 2>/dev/null || true)"
+  install_failure_handler() {
+    local status=$?
+    if (( status != 0 )); then
+      if [[ -n "$previous_theme" ]]; then
+        say "Aranea install failed. Restore the previous theme with: omarchy theme set $previous_theme" >&2
+      else
+        say "Aranea install failed before a previous theme could be detected." >&2
+      fi
+    fi
+    return "$status"
+  }
+  trap install_failure_handler EXIT
   profile_state="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
   install -Dm644 /dev/null "$profile_state"
   printf '%s\n' "$profile" > "$profile_state"
-  run omarchy theme install "$theme_repo_url"
+  run omarchy theme install "$theme_source"
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"
   run omarchy theme set aranea

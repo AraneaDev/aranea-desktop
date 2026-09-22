@@ -74,13 +74,89 @@ Item {
   property var providersLoaded: ({})
   property var providerQueue: []
   property int providerRevision: 0
+  readonly property int favoriteAppLimit: 12
+  readonly property int recentAppLimit: 12
+  property var favoriteAppIds: []
+  property var recentAppIds: []
+
+  PersistentProperties {
+    id: persisted
+    reloadableId: "araneadev-menu"
+    property string favoriteAppIdsJson: "[]"
+    property string recentAppIdsJson: "[]"
+  }
 
   // Shared application engine (entries, hidden filters, icons, launch,
   // removal), owned by the shell and also used by the standalone launcher.
-  readonly property var appLibrary: root.shell ? root.shell.appLibrary : null
+  readonly property var appLibrary: root.shell && root.shell.appLibrary ? root.shell.appLibrary : localAppLibrary
+
+  // Older Omarchy shells inject a scoped shell object without its AppLibrary
+  // capability. Keep the menu usable on those hosts by reading the same
+  // DesktopEntries source locally instead of turning Apps into an empty page.
+  QtObject {
+    id: localAppLibrary
+    signal appsChanged()
+
+    function entryName(entry) { return String((entry && entry.name) || (entry && entry.id) || "") }
+    function entrySubtext(entry) { return String((entry && entry.genericName) || "") }
+    function sortedEntries(query) {
+      var needle = String(query || "").trim().toLowerCase()
+      var values = DesktopEntries.applications.values || []
+      var rows = []
+      for (var i = 0; i < values.length; i++) {
+        var entry = values[i]
+        if (!entry || entry.noDisplay || !entryName(entry)) continue
+        var text = [entryName(entry), entrySubtext(entry), entry.comment, entry.id].join(" ").toLowerCase()
+        if (needle && text.indexOf(needle) < 0) continue
+        rows.push({ entry: entry, score: needle ? 1 : 0, key: entryName(entry).toLowerCase(), name: entryName(entry).toLowerCase() })
+      }
+      rows.sort(function(a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0) })
+      return rows
+    }
+    function iconSource(icon) {
+      var value = String(icon || "")
+      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
+      if (value.charAt(0) === "/") return Util.fileUrl(value)
+      return Quickshell.iconPath(value || "application-x-executable", true)
+    }
+    function refreshIcons() {}
+    function launch(desktopId, name) {
+      var id = String(desktopId || "")
+      if (id) Util.execDetached("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
+    }
+    function remove(desktopId, name) {
+      var id = String(desktopId || "")
+      if (id) Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
+    }
+  }
   property bool deleteConfirmOpen: false
   property var deleteTarget: null
   onOpenedChanged: if (!opened) { deleteConfirmOpen = false; deleteTarget = null }
+  Component.onCompleted: root.loadAppHistory()
+
+  function loadAppHistory(): void {
+    try { root.favoriteAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.favoriteAppIdsJson), root.favoriteAppLimit) }
+    catch (e) { root.favoriteAppIds = [] }
+    try { root.recentAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.recentAppIdsJson), root.recentAppLimit) }
+    catch (e) { root.recentAppIds = [] }
+  }
+
+  function saveAppHistory(): void {
+    persisted.favoriteAppIdsJson = JSON.stringify(MenuModel.normalizeAppIds(root.favoriteAppIds, root.favoriteAppLimit))
+    persisted.recentAppIdsJson = JSON.stringify(MenuModel.normalizeAppIds(root.recentAppIds, root.recentAppLimit))
+  }
+
+  function toggleFavoriteApp(appId: string): void {
+    root.favoriteAppIds = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit)
+    root.saveAppHistory()
+    root.mergeAppRows()
+  }
+
+  function recordRecentApp(appId: string): void {
+    root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)
+    root.saveAppHistory()
+    root.mergeAppRows()
+  }
   // Bound to the central [menu] section in shell.toml via Color.qml.
   // Each color already includes its alpha companion (composed in the
   // singleton), so consumers can drop them straight into a Rectangle.
@@ -319,6 +395,16 @@ Item {
         checked: "",
         order: 0
       })
+    }
+    var favoriteRows = MenuModel.appRowsForIds(appRows, root.favoriteAppIds, "apps.favorites", "apps.favorites")
+    var recentRows = MenuModel.appRowsForIds(appRows, root.recentAppIds, "apps.recent", "apps.recent")
+    if (favoriteRows.length > 0) {
+      appRows.unshift({ id: "apps.favorites", parent: "apps", kind: "menu", icon: "", appIcon: "", appId: "", label: "Favorites", title: "", target: "", description: "Pinned applications", action: "", provider: "", aliases: ["favorite", "favorites", "pinned"], when: "", checked: "", order: 0 })
+      appRows = appRows.slice(0, 1).concat(favoriteRows, appRows.slice(1))
+    }
+    if (recentRows.length > 0) {
+      appRows.unshift({ id: "apps.recent", parent: "apps", kind: "menu", icon: "󰋚", appIcon: "", appId: "", label: "Recent", title: "", target: "", description: "Recently launched applications", action: "", provider: "", aliases: ["recent", "history"], when: "", checked: "", order: 0 })
+      appRows = appRows.slice(0, 1).concat(recentRows, appRows.slice(1))
     }
 
     var merged = MenuModel.mergeAppRows(root.items, root.itemOrder, appRows)
@@ -735,6 +821,7 @@ Item {
     } else if (row.kind === "app") {
       var appId = row.appId
       var label = row.label
+      root.recordRecentApp(appId)
       applySerial = requestSerial
       opened = false
       filterText = ""
@@ -906,6 +993,11 @@ Item {
   PointerMoveGate {
     id: pointerGate
     referenceItem: card
+  }
+
+  Connections {
+    target: DesktopEntries.applications
+    function onValuesChanged() { localAppLibrary.appsChanged() }
   }
 
   Connections {
@@ -1335,6 +1427,7 @@ Item {
                 id: mouseArea
                 anchors.fill: parent
                 hoverEnabled: true
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 cursorShape: Qt.PointingHandCursor
                 onEntered: root.selectFromPointer(row.index, row, {
                   x: mouseArea.mouseX,
@@ -1343,9 +1436,13 @@ Item {
                 onPositionChanged: function(mouse) {
                   root.selectFromPointer(row.index, row, mouse)
                 }
-                onClicked: {
+                onClicked: function(mouse) {
                   root.cursorActive = true
                   root.selectedIndex = row.index
+                  if (mouse.button === Qt.RightButton && row.isApp) {
+                    root.toggleFavoriteApp(row.appId)
+                    return
+                  }
                   root.activateIndex(row.index, true)
                 }
               }

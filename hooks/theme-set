@@ -9,6 +9,10 @@
 #   omarchy hook install theme-set hooks/theme-set
 
 if [[ $1 != "aranea" ]]; then
+  systemctl --user disable --now aranea-wallpaper-day-night.timer >/dev/null 2>&1 || true
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  rm -f "$HOME/.config/systemd/user/aranea-wallpaper-day-night.timer" \
+    "$HOME/.config/systemd/user/aranea-wallpaper-day-night.service"
   omarchy plugin disable araneadev.lock >/dev/null 2>&1 || true
   exit 0
 fi

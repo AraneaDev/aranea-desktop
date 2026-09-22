@@ -67,6 +67,21 @@ if (normalizedItem.parent !== '42' || normalizedItem.label !== '7' || normalized
 if (normalizedItem.aliases.length !== 2 || normalizedItem.aliases[1] !== '12') throw new Error('menu aliases were not normalized')
 if (menu.normalizeItem('bad', []).label !== 'bad') throw new Error('invalid menu item did not get a stable fallback')
 
+const favoriteIds = menu.normalizeAppIds(['org.alpha', 'org.alpha', 7, null, ''], 3)
+if (favoriteIds.length !== 2 || favoriteIds[1] !== '7') throw new Error('favorite app ids were not normalized')
+if (menu.toggleFavoriteApp(favoriteIds, 'org.beta', 3).join(',') !== 'org.beta,org.alpha,7') throw new Error('favorite app was not added at the front')
+if (menu.toggleFavoriteApp(['org.alpha', 'org.beta'], 'org.alpha', 3).join(',') !== 'org.beta') throw new Error('favorite app was not removed')
+if (menu.recordRecentApp(['org.alpha', 'org.beta'], 'org.alpha', 3).join(',') !== 'org.alpha,org.beta') throw new Error('recent app was not moved to the front')
+if (menu.recordRecentApp(['a', 'b', 'c'], 'd', 3).join(',') !== 'd,a,b') throw new Error('recent app history was not bounded')
+const appRows = [
+  { id: 'apps.alpha', appId: 'org.alpha', parent: 'apps', kind: 'app', label: 'Alpha' },
+  { id: 'apps.beta', appId: 'org.beta', parent: 'apps', kind: 'app', label: 'Beta' }
+]
+const favoriteRows = menu.appRowsForIds(appRows, ['org.beta', 'missing'], 'apps.favorites', 'apps.favorites')
+if (favoriteRows.length !== 1 || favoriteRows[0].id !== 'apps.favorites.org.beta' || favoriteRows[0].parent !== 'apps.favorites') {
+  throw new Error('favorite app rows were not projected into their submenu')
+}
+
 const bounded = notifications.limitHistory([{ id: 1 }, { id: 2 }, { id: 3 }], 2)
 if (bounded.length !== 2 || bounded[0].id !== 1) throw new Error('history was not bounded')
 
@@ -104,6 +119,14 @@ requiresSignature(menuQml, 'function setActiveMenu(id: string, pushHistory: bool
 requiresSignature(menuQml, 'function activateIndex(index: int, fromPointer: bool): void', 'menu activateIndex')
 requiresSignature(menuQml, 'function applyDmenuSelection(value: string): void', 'menu applyDmenuSelection')
 requiresSignature(menuQml, 'function resolveRoute(input: string): string', 'menu resolveRoute')
+requiresSignature(menuQml, 'function toggleFavoriteApp(appId: string): void', 'menu favorite toggle')
+requiresSignature(menuQml, 'function recordRecentApp(appId: string): void', 'menu recent history')
+requiresSignature(menuQml, 'function recordRecentApp(appId: string): void {\n    root.recentAppIds', 'menu recent history implementation')
+if (!menuQml.includes('root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)\n    root.saveAppHistory()\n    root.mergeAppRows()')) {
+  throw new Error('recent app history must refresh visible rows immediately')
+}
+requiresSignature(menuQml, 'id: localAppLibrary', 'menu local app-library fallback')
+requiresSignature(menuQml, 'DesktopEntries.applications.values', 'menu DesktopEntries fallback')
 requiresSignature(menuQml, 'function openRoute(initialMenu: string): void', 'menu openRoute')
 requiresSignature(menuQml, 'function goBack(): void', 'menu goBack')
 requiresSignature(menuQml, 'function rebuildDisplay(): void', 'menu rebuildDisplay')

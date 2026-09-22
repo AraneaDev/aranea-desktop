@@ -4,6 +4,37 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 manifest="$repo_root/backgrounds/manifest.toml"
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+systemd_user_dir="${ARANEA_SYSTEMD_USER_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
+timer_unit="aranea-wallpaper-day-night.timer"
+service_unit="aranea-wallpaper-day-night.service"
+
+systemctl_user() {
+  "${ARANEA_SYSTEMCTL:-systemctl}" --user "$@"
+}
+
+write_schedule_units() {
+  mkdir -p "$systemd_user_dir"
+  cat > "$systemd_user_dir/$service_unit" <<'UNIT'
+[Unit]
+Description=Apply the Aranea day/night wallpaper
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/omarchy/themes/aranea/scripts/aranea-wallpaper set-day-night
+UNIT
+  cat > "$systemd_user_dir/$timer_unit" <<'UNIT'
+[Unit]
+Description=Schedule the Aranea day/night wallpaper
+
+[Timer]
+OnCalendar=*-*-* 07:00:00
+OnCalendar=*-*-* 19:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+}
 
 wallpaper_path() {
   local id="$1"
@@ -45,6 +76,32 @@ case "${1:-list}" in
     fi
     exec "$0" set night
     ;;
+  schedule)
+    mode="${2:-}"
+    [[ "$mode" == on || "$mode" == off || "$mode" == status ]] || { printf 'Usage: %s schedule on|off|status\n' "$0" >&2; exit 2; }
+    mkdir -p "$state_root"
+    if [[ "$mode" == status ]]; then
+      if [[ -f "$state_root/wallpaper-schedule" ]]; then
+        printf 'wallpaper schedule: %s\n' "$(<"$state_root/wallpaper-schedule")"
+      else
+        printf 'wallpaper schedule: off\n'
+      fi
+      exit 0
+    fi
+    if [[ "$mode" == on ]]; then
+      write_schedule_units
+      systemctl_user daemon-reload
+      systemctl_user enable --now "$timer_unit"
+      printf '%s\n' on > "$state_root/wallpaper-schedule"
+      printf 'wallpaper schedule: on\n'
+    else
+      systemctl_user disable --now "$timer_unit" >/dev/null 2>&1 || true
+      systemctl_user daemon-reload >/dev/null 2>&1 || true
+      rm -f "$systemd_user_dir/$timer_unit" "$systemd_user_dir/$service_unit"
+      printf '%s\n' off > "$state_root/wallpaper-schedule"
+      printf 'wallpaper schedule: off\n'
+    fi
+    ;;
   motion)
     mode="${2:-}"
     [[ "$mode" == on || "$mode" == off ]] || { printf 'Usage: %s motion on|off\n' "$0" >&2; exit 2; }
@@ -53,7 +110,7 @@ case "${1:-list}" in
     printf 'motion: %s\n' "$mode"
     ;;
   *)
-    printf 'Usage: %s list|set <id>|set-day-night|motion on|off\n' "$0" >&2
+    printf 'Usage: %s list|set <id>|set-day-night|schedule on|off|status|motion on|off\n' "$0" >&2
     exit 2
     ;;
 esac

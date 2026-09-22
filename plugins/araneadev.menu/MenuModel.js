@@ -15,6 +15,61 @@ function textValue(value, fallback) {
   return String(value)
 }
 
+function normalizeAppIds(values, limit) {
+  var max = Number(limit)
+  if (!isFinite(max) || max < 0) max = 12
+  var rows = Array.isArray(values) ? values : []
+  var out = []
+  for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
+    var id = String(rows[i] || "").trim()
+    if (id && out.indexOf(id) === -1) out.push(id)
+  }
+  return out
+}
+
+function toggleFavoriteApp(values, appId, limit) {
+  var id = String(appId || "").trim()
+  var current = normalizeAppIds(values, limit)
+  if (!id) return current
+  var index = current.indexOf(id)
+  if (index >= 0) {
+    current.splice(index, 1)
+    return current
+  }
+  return normalizeAppIds([id].concat(current), limit)
+}
+
+function recordRecentApp(values, appId, limit) {
+  var id = String(appId || "").trim()
+  if (!id) return normalizeAppIds(values, limit)
+  return normalizeAppIds([id].concat(Array.isArray(values) ? values : []), limit)
+}
+
+function appRowsForIds(appRows, ids, parent, prefix) {
+  var source = Array.isArray(appRows) ? appRows : []
+  var wanted = normalizeAppIds(ids, source.length)
+  var byId = ({})
+  for (var i = 0; i < source.length; i++) {
+    var row = source[i]
+    if (row && row.appId) byId[String(row.appId)] = row
+  }
+
+  var out = []
+  var targetParent = String(parent || "root")
+  var targetPrefix = String(prefix || targetParent)
+  for (var j = 0; j < wanted.length; j++) {
+    var sourceRow = byId[wanted[j]]
+    if (!sourceRow) continue
+    var copy = ({})
+    for (var key in sourceRow) copy[key] = sourceRow[key]
+    copy.id = targetPrefix + "." + sourceRow.appId
+    copy.parent = targetParent
+    copy.order = out.length
+    out.push(copy)
+  }
+  return out
+}
+
 function normalizeItem(id, raw) {
   var value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
   var itemId = textValue(id, "")
@@ -488,6 +543,10 @@ if (typeof module !== "undefined") {
     guardScript: guardScript,
     stripJsonc: stripJsonc,
     normalizeAliases: normalizeAliases,
+    normalizeAppIds: normalizeAppIds,
+    toggleFavoriteApp: toggleFavoriteApp,
+    recordRecentApp: recordRecentApp,
+    appRowsForIds: appRowsForIds,
     normalizeItem: normalizeItem,
     parseMenuJsonc: parseMenuJsonc,
     mergeMenuSources: mergeMenuSources,

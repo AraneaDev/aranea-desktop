@@ -53,6 +53,16 @@ Choose an installation profile when needed:
 ./scripts/install.sh --profile no_apps --yes
 ```
 
+To install the exact checkout you are testing instead of fetching the default
+remote repository, pass a local source explicitly:
+
+```bash
+./scripts/install.sh --source "$PWD" --yes --skip-conky
+```
+
+If installation fails after a previous theme was detected, the installer prints
+the exact `omarchy theme set ...` command needed to restore it.
+
 `minimal` keeps the core and GTK experience, `full` enables every supported
 application integration, and `no_apps` keeps the theme, cursor, wallpaper, and
 branding assets without application integrations. The selected profile is
