@@ -14,7 +14,8 @@ for file in \
   "$repo_root/integrations/media/README.md" \
   "$repo_root/integrations/media/pavucontrol.css" \
   "$repo_root/integrations/developer/neovim.lua" \
-  "$repo_root/branding/about-card.txt"; do
+  "$repo_root/branding/about-card.txt" \
+  "$repo_root/branding/glyphs/theme-change.txt"; do
   test -f "$file"
 done
 

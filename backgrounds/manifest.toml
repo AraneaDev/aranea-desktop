@@ -17,7 +17,14 @@ motion = false
 
 [[wallpapers]]
 id = "sparse"
-path = "backgrounds/background-night.png"
+path = "backgrounds/variants/sparse.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "dense"
+path = "backgrounds/variants/dense.png"
 aspect = "16:9"
 contrast = "standard"
 motion = false

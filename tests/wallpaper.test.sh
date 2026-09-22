@@ -6,7 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 grep -Fq 'id = "day"' "$repo_root/backgrounds/manifest.toml"
 grep -Fq 'id = "night"' "$repo_root/backgrounds/manifest.toml"
 grep -Fq 'id = "monochrome"' "$repo_root/backgrounds/manifest.toml"
-for asset in dusk.png monochrome.png ultrawide.png; do
+for asset in sparse.png dense.png dusk.png monochrome.png ultrawide.png; do
   test -f "$repo_root/backgrounds/variants/$asset"
 done
 
