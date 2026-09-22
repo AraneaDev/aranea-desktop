@@ -20,4 +20,9 @@ grep -Fq 'integrations/terminal/foot.ini' "$repo_root/foot.ini"
 qt_output="$($repo_root/scripts/install-integration qt --dry-run)"
 grep -Eq 'Skipping qt:|would link .*Aranea\.kvconfig' <<<"$qt_output"
 
+if command -v nvim >/dev/null 2>&1; then
+  developer_output="$($repo_root/scripts/install-integration developer --dry-run)"
+  grep -Fq 'nvim/lua/plugins/aranea-theme.lua' <<<"$developer_output"
+fi
+
 echo "integration contract passed"

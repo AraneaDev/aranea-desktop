@@ -67,6 +67,7 @@ case "$integration" in
     fi
     ;;
   developer)
+    command -v nvim >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/neovim.lua" "$config_root/nvim/lua/plugins/aranea-theme.lua"
     command -v starship >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/starship.toml" "$config_root/starship.toml"
     command -v tmux >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/tmux.conf" "$config_root/tmux/themes/aranea.conf"
     command -v btop >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"

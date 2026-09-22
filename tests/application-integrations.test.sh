@@ -7,6 +7,7 @@ for file in \
   "$repo_root/integrations/browser/README.md" \
   "$repo_root/integrations/session/README.md" \
   "$repo_root/integrations/media/README.md" \
+  "$repo_root/integrations/developer/neovim.lua" \
   "$repo_root/branding/about-card.txt"; do
   test -f "$file"
 done
