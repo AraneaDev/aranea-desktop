@@ -13,6 +13,12 @@ for (const state of ['healthy', 'focus', 'attention', 'warning', 'error', 'muted
   if (!bar.semanticColor(state)) throw new Error(`missing semantic state: ${state}`)
 }
 if (bar.semanticColor('unknown') !== 'dark_foreground') throw new Error('unknown state must be muted')
+if (bar.normalizeProfile('diagnostic') !== 'diagnostic') throw new Error('diagnostic profile missing')
+if (bar.normalizeProfile('invalid') !== 'minimal') throw new Error('invalid profile must fall back to minimal')
+if (!bar.profileAllows('minimal', 'omarchy.clock')) throw new Error('minimal profile hid the clock')
+if (bar.profileAllows('minimal', 'omarchy.weather')) throw new Error('minimal profile kept weather telemetry')
+if (!bar.profileAllows('diagnostic', 'omarchy.weather')) throw new Error('diagnostic profile hid weather telemetry')
+if (bar.filterProfile([{ id: 'omarchy.clock' }, { id: 'omarchy.weather' }], 'minimal').length !== 1) throw new Error('profile filter failed')
 
 const grouped = notifications.groupNotifications([
   { app: 'browser', summary: 'One' },

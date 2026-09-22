@@ -1,0 +1,7 @@
+/* Optional GTK mixer fragment. GTK's main Aranea theme is the primary path;
+ * use this only with a mixer that exposes a user stylesheet hook. */
+window, .background { background-color: #08090b; color: #e7ecf3; }
+button:checked, scale highlight { background-color: #3bff9e; color: #08090b; }
+button:hover { border-color: #7a5cff; }
+levelbar trough { background-color: #141821; }
+levelbar block.filled { background-color: #3bff9e; }

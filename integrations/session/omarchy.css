@@ -1,0 +1,11 @@
+/* Session/greeter palette fragment. Apply only through the host session's
+ * supported theme mechanism; the normal Aranea hook never edits greeter data. */
+:root {
+  --aranea-background: #08090b;
+  --aranea-surface: #141821;
+  --aranea-foreground: #e7ecf3;
+  --aranea-muted: #8b96a6;
+  --aranea-accent: #3bff9e;
+  --aranea-focus: #7a5cff;
+  --aranea-error: #ff5f56;
+}

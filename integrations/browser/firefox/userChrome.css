@@ -1,0 +1,24 @@
+/* Aranea Firefox chrome fragment. Copy into a profile's chrome directory
+ * only when toolkit.legacyUserProfileCustomizations.stylesheets is enabled. */
+:root {
+  --aranea-background: #08090b;
+  --aranea-surface: #141821;
+  --aranea-foreground: #e7ecf3;
+  --aranea-muted: #8b96a6;
+  --aranea-accent: #3bff9e;
+  --aranea-focus: #7a5cff;
+}
+
+#navigator-toolbox,
+#TabsToolbar,
+#nav-bar {
+  background-color: var(--aranea-background) !important;
+  color: var(--aranea-foreground) !important;
+  border-color: color-mix(in srgb, var(--aranea-focus) 55%, transparent) !important;
+}
+
+#urlbar-background,
+#searchbar {
+  background-color: var(--aranea-surface) !important;
+  border-color: color-mix(in srgb, var(--aranea-accent) 45%, transparent) !important;
+}

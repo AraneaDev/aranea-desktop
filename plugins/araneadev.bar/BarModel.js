@@ -16,6 +16,33 @@ function semanticColor(state) {
   return colors[String(state || "")] || colors.muted
 }
 
+function normalizeProfile(value) {
+  var profile = String(value || "").trim().toLowerCase()
+  return /^(minimal|diagnostic|ceremony)$/.test(profile) ? profile : "minimal"
+}
+
+function profileAllows(profile, id) {
+  var selected = normalizeProfile(profile)
+  var moduleId = String(id || "")
+  if (selected !== "minimal") return true
+  return [
+    "omarchy.indicators", "omarchy.idle", "omarchy.clock",
+    "omarchy.keyboard-layout", "omarchy.workspaces", "omarchy.tray",
+    "omarchy.network", "omarchy.audio", "omarchy.monitor", "omarchy.power",
+    "araneadev.menu"
+  ].indexOf(moduleId) !== -1
+}
+
+function filterProfile(entries, profile) {
+  var values = Array.isArray(entries) ? entries : []
+  var selected = normalizeProfile(profile)
+  if (selected !== "minimal") return values.slice()
+  return values.filter(function(entry) {
+    var id = typeof entry === "string" ? entry : entry && entry.id
+    return profileAllows(selected, id)
+  })
+}
+
 function normalizePosition(value) {
   var next = String(value || "").trim()
   return /^(top|bottom|left|right)$/.test(next) ? next : "top"
@@ -242,5 +269,8 @@ if (typeof module !== "undefined") {
     customModuleType: customModuleType,
     customModulePath: customModulePath,
     semanticColor: semanticColor
+    ,normalizeProfile: normalizeProfile
+    ,profileAllows: profileAllows
+    ,filterProfile: filterProfile
   }
 }

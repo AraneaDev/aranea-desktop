@@ -12,6 +12,12 @@ the shell for its whole session.
 - The bar receives its config from the host shell as a `barConfig` property; the host loads it from `~/.config/omarchy/shell.json` (or `config/omarchy/shell.json` when the user has no file).
 - `omarchy bar position` updates only the user shell.json file.
 
+Aranea adds a profile filter on top of this host layout. Set
+`ARANEA_BAR_PROFILE=minimal|diagnostic|ceremony`, or add `"profile"` under
+`bar` in shell.json. `minimal` is the default and removes secondary telemetry
+such as weather, update, agent, and Bluetooth modules; the other profiles keep
+the complete configured layout.
+
 ## Customizing
 
 The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.

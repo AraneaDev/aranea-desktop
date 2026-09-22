@@ -79,6 +79,24 @@ case "$integration" in
       install_one "$repo_root/integrations/qt/kvantum/Aranea/Aranea.svg" "$config_root/Kvantum/Aranea/Aranea.svg"
     fi
     ;;
+  browser)
+    if command -v firefox >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/browser/firefox/userChrome.css" "$config_root/aranea/browser/firefox/userChrome.css"
+      install_one "$repo_root/integrations/browser/firefox/userContent.css" "$config_root/aranea/browser/firefox/userContent.css"
+    fi
+    if command -v chromium >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/browser/chromium/new-tab/index.html" "$config_root/aranea/browser/chromium/new-tab/index.html"
+      install_one "$repo_root/integrations/browser/chromium/new-tab/style.css" "$config_root/aranea/browser/chromium/new-tab/style.css"
+    fi
+    ;;
+  session)
+    install_one "$repo_root/integrations/session/omarchy.css" "$config_root/omarchy/session/aranea.css"
+    ;;
+  media)
+    if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/media/pavucontrol.css" "$config_root/aranea/media/pavucontrol.css"
+    fi
+    ;;
   *)
     printf 'Integration %s has no file targets in this phase.\n' "$integration"
     ;;

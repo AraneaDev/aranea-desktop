@@ -61,6 +61,7 @@ Optional integrations can be checked and installed independently:
 ./scripts/install-integration terminal --dry-run
 ./scripts/aranea-wallpaper list
 ./scripts/aranea-showcase list
+./scripts/aranea-about
 ```
 
 Managed optional links can be restored with `scripts/uninstall.sh --dry-run`

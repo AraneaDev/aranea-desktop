@@ -23,6 +23,7 @@ Item {
   // the bar just renders whatever it's handed. The bar font follows the
   // OS-level fontconfig monospace binding — it is not stored in shell.json.
   property var barConfig: ({})
+  property string profile: "minimal"
   // Injected by the host shell. Used for shell-wide actions such as opening
   // settings and persisting inline widget state.
   property var shell: null
@@ -582,6 +583,7 @@ Item {
     var config = Util.isPlainObject(barConfig) ? barConfig : fallbackBarConfig
 
     position = normalizePosition(config.position)
+    profile = BarModel.normalizeProfile(config.profile || Quickshell.env("ARANEA_BAR_PROFILE"))
     setRequestedTransparency(config.transparent === true)
     centerAnchor = Util.canonicalWidgetId(config.centerAnchor || "")
 
@@ -618,7 +620,7 @@ Item {
   function layoutEntries(region) {
     var serial = barConfigSerial
     var entries = layoutConfig ? layoutConfig[region] : null
-    return Array.isArray(entries) ? entries : []
+    return BarModel.filterProfile(entries, profile)
   }
 
   // Tab order for the panels in one bar region. Scoped to a single bar surface

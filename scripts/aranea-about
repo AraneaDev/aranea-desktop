@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+theme_version="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$repo_root/theme-manifest.toml" | head -1)"
+profile="${ARANEA_BAR_PROFILE:-minimal}"
+theme="${ARANEA_ABOUT_THEME:-}"
+if [[ -z "$theme" ]] && command -v omarchy >/dev/null 2>&1; then
+  theme="$(omarchy theme current 2>/dev/null || true)"
+fi
+theme="${theme:-Aranea}"
+
+printf '%s\n' 'ARANEA' '=======' "Theme version: ${theme_version:-contract}" "Active theme: $theme" "Bar profile: $profile"
+printf '%s\n' 'Modules: core, gtk, terminal, developer, cursor, qt, browser, session, media, wallpapers, branding'
+printf '%s\n' 'Health:'
+if [[ -x "$repo_root/scripts/aranea-doctor" ]]; then
+  "$repo_root/scripts/aranea-doctor" | sed 's/^/  /'
+fi
