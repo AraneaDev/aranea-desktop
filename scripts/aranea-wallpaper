@@ -20,7 +20,7 @@ Description=Apply the Aranea day/night wallpaper
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/state/omarchy/current/theme/scripts/aranea-wallpaper set-day-night
+ExecStart=%h/.config/omarchy/themes/aranea/scripts/aranea-wallpaper set-day-night
 UNIT
   cat > "$systemd_user_dir/$timer_unit" <<'UNIT'
 [Unit]

@@ -155,6 +155,7 @@ Item {
   function recordRecentApp(appId: string): void {
     root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)
     root.saveAppHistory()
+    root.mergeAppRows()
   }
   // Bound to the central [menu] section in shell.toml via Color.qml.
   // Each color already includes its alpha companion (composed in the

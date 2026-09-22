@@ -24,6 +24,7 @@ jq -e '.bar.position == "top" and .unrelated.keep == true' "$config" >/dev/null
 
 grep -Fq 'repair-shell-config' "$repo_root/hooks/theme-set"
 grep -Fq 'repair-shell-config' "$repo_root/hooks/post-boot"
+grep -Fq 'disable --now aranea-wallpaper-day-night.timer' "$repo_root/hooks/theme-set"
 if grep -Fq 'target: "omarchy.bar"' "$repo_root/plugins/araneadev.bar/Bar.qml"; then
   echo "Aranea bar must not register the stock omarchy.bar IPC target" >&2
   exit 1

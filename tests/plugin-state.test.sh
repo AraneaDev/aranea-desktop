@@ -121,6 +121,10 @@ requiresSignature(menuQml, 'function applyDmenuSelection(value: string): void', 
 requiresSignature(menuQml, 'function resolveRoute(input: string): string', 'menu resolveRoute')
 requiresSignature(menuQml, 'function toggleFavoriteApp(appId: string): void', 'menu favorite toggle')
 requiresSignature(menuQml, 'function recordRecentApp(appId: string): void', 'menu recent history')
+requiresSignature(menuQml, 'function recordRecentApp(appId: string): void {\n    root.recentAppIds', 'menu recent history implementation')
+if (!menuQml.includes('root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)\n    root.saveAppHistory()\n    root.mergeAppRows()')) {
+  throw new Error('recent app history must refresh visible rows immediately')
+}
 requiresSignature(menuQml, 'id: localAppLibrary', 'menu local app-library fallback')
 requiresSignature(menuQml, 'DesktopEntries.applications.values', 'menu DesktopEntries fallback')
 requiresSignature(menuQml, 'function openRoute(initialMenu: string): void', 'menu openRoute')
