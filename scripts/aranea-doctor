@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
+source "$repo_root/scripts/lib/ownership.sh"
 
 json=0
 [[ "${1:-}" == "--json" ]] && json=1
@@ -50,6 +51,33 @@ if [[ -f "$manifest_file" ]]; then
   emit manifest ok 'integration manifest is present'
 else
   emit manifest repair 'theme-manifest.toml is missing'
+fi
+
+font_name="${ARANEA_DOCTOR_FONT:-monospace}"
+if command -v fc-match >/dev/null 2>&1 && [[ -n "$(fc-match -f '%{family}\n' "$font_name" 2>/dev/null | head -1)" ]]; then
+  emit fonts ok "fontconfig resolves $font_name"
+else
+  emit fonts repair "fontconfig cannot resolve $font_name"
+fi
+
+ownership_record_file="$(ownership_record)"
+ownership_ok=1
+ownership_count=0
+if [[ -f "$ownership_record_file" ]]; then
+  while IFS= read -r managed_target; do
+    [[ -n "$managed_target" ]] || continue
+    ownership_count=$((ownership_count + 1))
+    if [[ ! -e "$managed_target" && ! -L "$managed_target" ]]; then
+      ownership_ok=0
+    elif [[ -L "$managed_target" && ! -e "$(readlink -f "$managed_target")" ]]; then
+      ownership_ok=0
+    fi
+  done < "$ownership_record_file"
+fi
+if (( ownership_ok )); then
+  emit ownership ok "${ownership_count} managed targets are present"
+else
+  emit ownership repair 'one or more managed targets are missing or stale'
 fi
 
 for optional in conky alacritty kitty foot starship tmux btop lazygit kvantummanager; do
