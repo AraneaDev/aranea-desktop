@@ -556,13 +556,13 @@ Item {
   readonly property bool vertical: position === "left" || position === "right"
   readonly property int barSize: vertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
 
-  function normalizePosition(value) {
+  function normalizePosition(value): string {
     return BarModel.normalizePosition(value)
   }
 
   // Apply tray-pinning on top of the shared layout normalization so the
   // bar host and scriptable config helpers can't drift on entry shape.
-  function normalizeLayout(layout) {
+  function normalizeLayout(layout): var {
     var normalized = Util.normalizeLayout(Util.isPlainObject(layout) ? layout : fallbackBarConfig.layout)
     return {
       left:   pinTrayToInner(normalized.left,   "left"),
@@ -766,11 +766,11 @@ Item {
     return BarModel.entrySettings(entry)
   }
 
-  function entryId(entry) {
+  function entryId(entry): string {
     return BarModel.entryId(entry)
   }
 
-  function moduleString(entry, key, fallback) {
+  function moduleString(entry, key, fallback): string {
     return BarModel.moduleString(entry, key, fallback)
   }
 
@@ -786,7 +786,7 @@ Item {
     return BarModel.entriesAfter(entries, name)
   }
 
-  function canonicalWidgetId(name) {
+  function canonicalWidgetId(name): string {
     return Util.canonicalWidgetId(name)
   }
 
@@ -794,15 +794,15 @@ Item {
     return BarModel.expandPath(path, home)
   }
 
-  function customModuleSafeName(name) {
+  function customModuleSafeName(name): bool {
     return BarModel.customModuleSafeName(name)
   }
 
-  function customModuleType(entry) {
+  function customModuleType(entry): string {
     return BarModel.customModuleType(entry)
   }
 
-  function customModuleSource(entry) {
+  function customModuleSource(entry): string {
     var source = BarModel.customModulePath(entry, home, omarchyConfigDir)
     return source ? Util.fileUrl(source) : ""
   }

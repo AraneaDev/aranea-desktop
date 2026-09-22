@@ -26,6 +26,9 @@ jobs:
         run: |
           find scripts hooks tests -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
 
+      - name: Validate QML types
+        run: bash tests/qml-types.test.sh
+
       - name: Run contract tests
         run: |
           for test in tests/*.test.sh; do

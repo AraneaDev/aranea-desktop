@@ -7,6 +7,7 @@ node - "$repo_root" <<'NODE'
 const root = process.argv[2]
 const bar = require(`${root}/plugins/araneadev.bar/BarModel.js`)
 const notifications = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+const menu = require(`${root}/plugins/araneadev.menu/MenuModel.js`)
 const fs = require('fs')
 
 for (const state of ['healthy', 'focus', 'attention', 'warning', 'error', 'muted', 'charging', 'privacy']) {
@@ -15,6 +16,12 @@ for (const state of ['healthy', 'focus', 'attention', 'warning', 'error', 'muted
 if (bar.semanticColor('unknown') !== 'dark_foreground') throw new Error('unknown state must be muted')
 if (bar.normalizeProfile('diagnostic') !== 'diagnostic') throw new Error('diagnostic profile missing')
 if (bar.normalizeProfile('invalid') !== 'minimal') throw new Error('invalid profile must fall back to minimal')
+if (bar.normalizePosition('left') !== 'left') throw new Error('bar position normalization failed')
+if (bar.normalizePosition('diagonal') !== 'top') throw new Error('invalid bar position must fall back to top')
+const normalizedLayout = bar.normalizeLayout({ left: [{ id: 'omarchy.clock' }], center: 'invalid' })
+if (!Array.isArray(normalizedLayout.left) || normalizedLayout.left.length !== 1) throw new Error('left layout normalization failed')
+if (!Array.isArray(normalizedLayout.center) || normalizedLayout.center.length !== 0) throw new Error('center layout fallback failed')
+if (!Array.isArray(normalizedLayout.right) || normalizedLayout.right.length !== 0) throw new Error('right layout fallback failed')
 if (!bar.profileAllows('minimal', 'omarchy.clock')) throw new Error('minimal profile hid the clock')
 if (!bar.profileAllows('minimal', 'omarchy.microphone')) throw new Error('minimal profile hid microphone state')
 if (bar.profileAllows('minimal', 'omarchy.weather')) throw new Error('minimal profile kept weather telemetry')
@@ -30,6 +37,35 @@ if (grouped.length !== 2 || grouped[0].count !== 2) throw new Error('notificatio
 
 const collapsed = notifications.collapseQuietHours([{ id: 1 }, { id: 2 }], true)
 if (collapsed.visible.length !== 0 || collapsed.count !== 2) throw new Error('quiet-hours collapse failed')
+
+const normalized = notifications.normalizeNotification({
+  id: 'not-a-number',
+  appName: null,
+  summary: 42,
+  body: null,
+  urgency: 99,
+  expireTimeout: 'not-a-number',
+  hints: null
+})
+if (normalized.id !== 0 || normalized.appName !== '' || normalized.summary !== '42') throw new Error('notification fields were not normalized')
+if (normalized.urgency !== 1 || normalized.expireTimeout !== 0) throw new Error('invalid notification values were not defaulted')
+if (!normalized.hints || typeof normalized.hints !== 'object') throw new Error('notification hints were not normalized')
+
+const malformedSnapshot = notifications.snapshotOf({ urgency: -1, hints: null }, 'invalid')
+if (malformedSnapshot.urgency !== 1 || typeof malformedSnapshot.timestamp !== 'number' || !Number.isFinite(malformedSnapshot.timestamp)) {
+  throw new Error('malformed notification snapshot was not stabilized')
+}
+
+const normalizedItem = menu.normalizeItem('tools.editor', {
+  parent: 42,
+  label: 7,
+  aliases: ['edit', 12, null],
+  target: 9,
+  description: null
+})
+if (normalizedItem.parent !== '42' || normalizedItem.label !== '7' || normalizedItem.target !== '9') throw new Error('menu item fields were not normalized')
+if (normalizedItem.aliases.length !== 2 || normalizedItem.aliases[1] !== '12') throw new Error('menu aliases were not normalized')
+if (menu.normalizeItem('bad', []).label !== 'bad') throw new Error('invalid menu item did not get a stable fallback')
 
 const bounded = notifications.limitHistory([{ id: 1 }, { id: 2 }, { id: 3 }], 2)
 if (bounded.length !== 2 || bounded[0].id !== 1) throw new Error('history was not bounded')

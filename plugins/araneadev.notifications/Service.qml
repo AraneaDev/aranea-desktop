@@ -116,7 +116,7 @@ Item {
   // just capped so they can't sit there indefinitely.
   readonly property int criticalPopupDuration: 60000
 
-  function durationFor(urgency, expireTimeout) {
+  function durationFor(urgency: int, expireTimeout: int): int {
     switch (urgency) {
     case NotificationUrgency.Critical:
       return criticalPopupDuration
@@ -127,7 +127,7 @@ Item {
     }
   }
 
-  function requestedDuration(expireTimeout) {
+  function requestedDuration(expireTimeout: int): int {
     // FreeDesktop notification spec (and Quickshell) report expireTimeout in
     // milliseconds, so pass it through directly.
     var ms = Number(expireTimeout || 0)
@@ -144,11 +144,11 @@ Item {
   //     Trusted because it's almost always omarchy or system shell scripts —
   //     chat apps set app_name to their brand (Discord/Slack/Vesktop), which
   //     falls outside this rule.
-  function shouldBypassDnd(notification) {
+  function shouldBypassDnd(notification): bool {
     return NotificationLogic.shouldBypassDnd(notification, NotificationUrgency.Critical)
   }
 
-  function snapshotOf(notification) {
+  function snapshotOf(notification): var {
     return NotificationLogic.snapshotOf(notification, Date.now())
   }
 

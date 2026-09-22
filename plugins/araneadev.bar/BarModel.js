@@ -48,6 +48,15 @@ function normalizePosition(value) {
   return /^(top|bottom|left|right)$/.test(next) ? next : "top"
 }
 
+function normalizeLayout(value) {
+  var layout = isPlainObject(value) ? value : {}
+  return {
+    left: Array.isArray(layout.left) ? layout.left.slice() : [],
+    center: Array.isArray(layout.center) ? layout.center.slice() : [],
+    right: Array.isArray(layout.right) ? layout.right.slice() : []
+  }
+}
+
 function entrySettings(entry) {
   if (!isPlainObject(entry)) return {}
   var copy = {}
@@ -272,5 +281,6 @@ if (typeof module !== "undefined") {
     ,normalizeProfile: normalizeProfile
     ,profileAllows: profileAllows
     ,filterProfile: filterProfile
+    ,normalizeLayout: normalizeLayout
   }
 }

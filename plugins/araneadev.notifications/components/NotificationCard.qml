@@ -52,11 +52,11 @@ BorderSurface {
   readonly property color railColor: urgency === 2 ? Color.urgent : (urgency === 0 ? Color.notifications.border : Color.notifications.countdown)
   readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(2)))
 
-  function sanitizeBody(s) {
+  function sanitizeBody(s: string): string {
     return NotificationLogic.sanitizeBody(s, app, appIcon)
   }
 
-  function iconSource(icon) {
+  function iconSource(icon: string): string {
     var value = String(icon || "")
     if (value.length === 0) return ""
     if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
