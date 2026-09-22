@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_file="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json}"
+
+if [[ ! -f "$config_file" ]]; then
+  printf 'Shell config not found: %s\n' "$config_file" >&2
+  exit 0
+fi
+command -v jq >/dev/null 2>&1 || {
+  printf 'jq is required to repair shell config: %s\n' "$config_file" >&2
+  exit 1
+}
+
+config_dir="$(dirname "$config_file")"
+tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
+backup_file="$config_file.aranea.bak"
+cleanup() { rm -f "$tmp_file"; }
+trap cleanup EXIT
+
+jq '
+  .bar = ((.bar // {}) + {id: "araneadev.bar"})
+  | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
+      {id: "araneadev.lock"},
+      {id: "araneadev.notifications"}
+    ] | unique_by(.id))
+  | .disabledPlugins = (((.disabledPlugins // []) + [
+      "omarchy.bar",
+      "tim.bar",
+      "tim.menu",
+      "tim.lock"
+    ]) | unique | sort)
+' "$config_file" > "$tmp_file"
+
+if cmp -s "$config_file" "$tmp_file"; then
+  printf 'shell config already repaired: %s\n' "$config_file"
+  exit 0
+fi
+
+if [[ ! -e "$backup_file" ]]; then
+  cp -p "$config_file" "$backup_file"
+fi
+chmod --reference="$config_file" "$tmp_file"
+mv -f "$tmp_file" "$config_file"
+printf 'repaired shell config: %s\n' "$config_file"

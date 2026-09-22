@@ -21,6 +21,13 @@ if [[ -z "$profile" && -f "$profile_file" ]]; then
 fi
 profile="${profile:-full}"
 
+# Persist the selected bar and competing-plugin state before using shell IPC.
+# This still repairs a crashed/stopped shell, where `omarchy plugin ...` cannot
+# connect and the best-effort commands below would otherwise be skipped.
+if [[ -x "$theme_root/scripts/repair-shell-config" ]]; then
+  "$theme_root/scripts/repair-shell-config" "$HOME/.config/omarchy/shell.json" >/dev/null 2>&1 || true
+fi
+
 if [[ -x "$theme_root/scripts/install-integration" ]]; then
   if [[ "$profile" == full ]]; then
     "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
@@ -34,10 +41,6 @@ if [[ -x "$theme_root/scripts/install-integration" ]]; then
   fi
 fi
 
-if [[ -f /usr/share/omarchy/shell/plugins/bar/widgets/Microphone.manifest.json ]]; then
-  omarchy plugin enable omarchy.microphone --section right >/dev/null 2>&1 || true
-fi
-
 if [[ -f /usr/share/applications/teams-for-linux.desktop && -x "$theme_root/scripts/repair-desktop-entry" ]]; then
   "$theme_root/scripts/repair-desktop-entry" \
     /usr/share/applications/teams-for-linux.desktop \
@@ -47,24 +50,9 @@ fi
 lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
 menu_plugin="$HOME/.config/omarchy/plugins/araneadev.menu"
 bar_plugin="$HOME/.config/omarchy/plugins/araneadev.bar"
-mkdir -p "$lock_plugin"
-install -Dm644 "$theme_root/plugins/araneadev.lock/manifest.json" "$lock_plugin/manifest.json"
-install -Dm644 "$theme_root/plugins/araneadev.lock/Service.qml" "$lock_plugin/Service.qml"
-install -Dm644 "$theme_root/plugins/araneadev.lock/LockView.qml" "$lock_plugin/LockView.qml"
-mkdir -p "$menu_plugin"
-install -Dm644 "$theme_root/plugins/araneadev.menu/manifest.json" "$menu_plugin/manifest.json"
-install -Dm644 "$theme_root/plugins/araneadev.menu/BarWidget.qml" "$menu_plugin/BarWidget.qml"
-install -Dm644 "$theme_root/plugins/araneadev.menu/Menu.qml" "$menu_plugin/Menu.qml"
-install -Dm644 "$theme_root/plugins/araneadev.menu/MenuModel.js" "$menu_plugin/MenuModel.js"
-mkdir -p "$bar_plugin"
-install -Dm644 "$theme_root/plugins/araneadev.bar/manifest.json" "$bar_plugin/manifest.json"
-install -Dm644 "$theme_root/plugins/araneadev.bar/Bar.qml" "$bar_plugin/Bar.qml"
-install -Dm644 "$theme_root/plugins/araneadev.bar/BarModel.js" "$bar_plugin/BarModel.js"
-install -Dm644 "$theme_root/plugins/araneadev.bar/README.md" "$bar_plugin/README.md"
-omarchy plugin disable tim.lock >/dev/null 2>&1 || true
-omarchy plugin enable araneadev.lock >/dev/null 2>&1 || true
-omarchy plugin disable tim.menu >/dev/null 2>&1 || true
-omarchy plugin enable araneadev.menu >/dev/null 2>&1 || true
-omarchy plugin disable tim.bar >/dev/null 2>&1 || true
-omarchy plugin disable omarchy.bar >/dev/null 2>&1 || true
-omarchy plugin enable araneadev.bar >/dev/null 2>&1 || true
+deploy_plugin="$theme_root/scripts/deploy-plugin"
+if [[ -x "$deploy_plugin" ]]; then
+  "$deploy_plugin" "$theme_root/plugins/araneadev.lock" "$lock_plugin"
+  "$deploy_plugin" "$theme_root/plugins/araneadev.menu" "$menu_plugin"
+  "$deploy_plugin" "$theme_root/plugins/araneadev.bar" "$bar_plugin"
+fi
