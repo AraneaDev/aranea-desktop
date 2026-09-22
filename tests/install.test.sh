@@ -14,6 +14,12 @@ grep -Fq "would install theme hooks" "$output"
 grep -Fq "would set theme to aranea" "$output"
 grep -Fq "would persist profile: full" "$output"
 
+grep -Fq "would install theme from: $repo_root" <(PATH="$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 "$repo_root/scripts/install.sh" --dry-run --yes --source "$repo_root")
+if PATH="$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 "$repo_root/scripts/install.sh" --dry-run --yes --source "$repo_root/tests/missing-local-source" >/dev/null 2>&1; then
+  echo "installer accepted a missing local source" >&2
+  exit 1
+fi
+
 minimal_output="$(mktemp)"
 trap 'rm -f "$output" "$minimal_output"' EXIT
 PATH="$repo_root/tests/fake-bin:$PATH" \
