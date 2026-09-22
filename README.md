@@ -140,6 +140,36 @@ Together with the bar, menu, notifications, diagnostics, lock screen, and
 Plymouth captures above, these files cover every user-facing customization
 shipped by the theme.
 
+## Applications
+
+Aranea also carries its visual language into the applications that make up the
+working desktop:
+
+### About / fastfetch
+
+The About view uses the Aranea mark and the mint/violet terminal palette.
+
+![Aranea fastfetch](screenshots/fastfetch.png)
+
+### File manager
+
+GTK theming keeps the file manager aligned with the dark desktop surfaces.
+
+![Aranea file manager](screenshots/file-manager.png)
+
+### Neovim
+
+The supplied Neovim integration brings the same contrast and accent colors into
+the editor.
+
+![Aranea Neovim](screenshots/neovim.png)
+
+### Cava
+
+The theme ships a matching [`cava-theme`](cava-theme) and activates it through
+the theme hook. Cava is audio-driven, so it is intentionally not represented by
+a static capture: with no active playback it correctly renders an empty canvas.
+
 ## Palette
 
 | Role | Value |
