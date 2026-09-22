@@ -93,7 +93,7 @@ case "$integration" in
     install_one "$repo_root/integrations/session/omarchy.css" "$config_root/omarchy/session/aranea.css"
     ;;
   cursor)
-    cursor_root="$config_root/icons/Aranea"
+    cursor_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Aranea"
     install_one "$repo_root/integrations/cursor/index.theme" "$cursor_root/index.theme"
     install_one "$repo_root/integrations/cursor/uwsm-env" "$config_root/uwsm/env.d/aranea-cursor"
     for cursor_asset in left_ptr.svg hand2.svg watch.svg crosshair.svg; do

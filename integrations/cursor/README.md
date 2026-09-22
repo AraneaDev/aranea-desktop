@@ -10,7 +10,8 @@ The intended visual roles are mint for the default/active pointer, violet for
 busy or focus transitions, and red for error feedback. No cursor integration
 may replace the user's existing theme without an ownership backup.
 
-The managed theme is installed at `~/.config/icons/Aranea`. Hosts without
+The managed theme is installed at `~/.local/share/icons/Aranea`, a standard
+Xcursor search path. Hosts without
 `xcursorgen` safely retain the active cursor theme; install `xorg-xcursorgen`
 to enable the native cursor activation path. The installer also writes
 `~/.config/uwsm/env.d/aranea-cursor`, so UWSM selects Aranea again on the next

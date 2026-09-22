@@ -8,6 +8,7 @@ grep -Fq 'Inherits=' "$repo_root/integrations/cursor/index.theme"
 grep -Fq 'xcursorgen' "$repo_root/scripts/install-integration"
 grep -Fq 'setcursor Aranea' "$repo_root/scripts/install-integration"
 grep -Fq 'uwsm/env.d/aranea-cursor' "$repo_root/scripts/install-integration"
+grep -Fq 'local/share}/icons/Aranea' "$repo_root/scripts/install-integration"
 grep -Fq 'XCURSOR_THEME=Aranea' "$repo_root/integrations/cursor/uwsm-env"
 for cursor in left_ptr.svg hand2.svg watch.svg crosshair.svg; do
   test -f "$repo_root/integrations/cursor/cursors/$cursor"
