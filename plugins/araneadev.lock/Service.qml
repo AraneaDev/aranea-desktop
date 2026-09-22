@@ -37,7 +37,7 @@ Item {
   readonly property bool locked: lockRequested || sessionLock.locked || sessionLock.secure
   readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating
 
-  function realScreenCount() {
+  function realScreenCount(): int {
     var screens = Quickshell.screens || []
     var count = 0
 
@@ -49,7 +49,7 @@ Item {
     return count
   }
 
-  function hasRealScreen() {
+  function hasRealScreen(): bool {
     return realScreenCount() > 0
   }
 
@@ -125,7 +125,7 @@ Item {
     if (fingerprintPam.active) fingerprintPam.abort()
   }
 
-  function beginLock() {
+  function beginLock(): bool {
     if (!passwordPamConfigured) {
       logEvent("lock-denied: missing-pam")
       return false

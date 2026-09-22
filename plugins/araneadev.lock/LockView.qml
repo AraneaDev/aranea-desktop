@@ -50,7 +50,7 @@ Item {
   // Cache-busts the lock background by appending `?v=`. Adding a query
   // string keeps Image's loader happy while forcing it to reload when the
   // user picks a new background mid-session.
-  function fileUrl(path) {
+  function fileUrl(path: string): string {
     if (!path) return ""
     var encoded = String(path).split("/").map(encodeURIComponent).join("/")
     return "file://" + encoded + "?v=" + backgroundVersion

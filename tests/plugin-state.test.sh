@@ -37,6 +37,24 @@ if (grouped.length !== 2 || grouped[0].count !== 2) throw new Error('notificatio
 const collapsed = notifications.collapseQuietHours([{ id: 1 }, { id: 2 }], true)
 if (collapsed.visible.length !== 0 || collapsed.count !== 2) throw new Error('quiet-hours collapse failed')
 
+const normalized = notifications.normalizeNotification({
+  id: 'not-a-number',
+  appName: null,
+  summary: 42,
+  body: null,
+  urgency: 99,
+  expireTimeout: 'not-a-number',
+  hints: null
+})
+if (normalized.id !== 0 || normalized.appName !== '' || normalized.summary !== '42') throw new Error('notification fields were not normalized')
+if (normalized.urgency !== 1 || normalized.expireTimeout !== 0) throw new Error('invalid notification values were not defaulted')
+if (!normalized.hints || typeof normalized.hints !== 'object') throw new Error('notification hints were not normalized')
+
+const malformedSnapshot = notifications.snapshotOf({ urgency: -1, hints: null }, 'invalid')
+if (malformedSnapshot.urgency !== 1 || typeof malformedSnapshot.timestamp !== 'number' || !Number.isFinite(malformedSnapshot.timestamp)) {
+  throw new Error('malformed notification snapshot was not stabilized')
+}
+
 const bounded = notifications.limitHistory([{ id: 1 }, { id: 2 }, { id: 3 }], 2)
 if (bounded.length !== 2 || bounded[0].id !== 1) throw new Error('history was not bounded')
 

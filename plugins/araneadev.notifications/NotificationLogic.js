@@ -180,24 +180,59 @@ function shouldRenderCompactGlyph(glyph, iconSource, singleLineToast) {
   return String(glyph || "").length > 0 && String(iconSource || "").length === 0 && !!singleLineToast
 }
 
+function finiteNumber(value, fallback) {
+  var number = Number(value)
+  return isFinite(number) ? number : fallback
+}
+
+function normalizedUrgency(value) {
+  var urgency = finiteNumber(value, 1)
+  return urgency === 0 || urgency === 2 ? urgency : 1
+}
+
+function normalizedHints(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {}
+}
+
+// Normalize the dynamic D-Bus notification object once, before it reaches
+// the QML model and card delegates. The protocol is intentionally dynamic;
+// the rest of the UI should not have to defend every optional field again.
+function normalizeNotification(notification) {
+  var source = notification && typeof notification === "object" ? notification : {}
+  var expireTimeout = finiteNumber(source.expireTimeout, 0)
+  if (expireTimeout < 0) expireTimeout = 0
+
+  return {
+    id: finiteNumber(source.id, 0),
+    appName: String(source.appName || ""),
+    appIcon: String(source.appIcon || ""),
+    summary: String(source.summary || ""),
+    body: String(source.body || ""),
+    image: String(source.image || ""),
+    urgency: normalizedUrgency(source.urgency),
+    expireTimeout: Math.round(expireTimeout),
+    hints: normalizedHints(source.hints),
+    tracked: !!source.tracked
+  }
+}
+
 function snapshotOf(notification, timestamp) {
-  var n = notification || {}
-  var id = n.id || 0
-  var expireTimeout = Number(n.expireTimeout || 0)
-  if (!isFinite(expireTimeout) || expireTimeout < 0) expireTimeout = 0
+  var n = normalizeNotification(notification)
+  var id = n.id
+  var normalizedTimestamp = finiteNumber(timestamp, Date.now())
   return {
     id: id,
     originalId: id,
-    app: n.appName || "",
-    appIcon: n.appIcon || "",
-    summary: String(n.summary || ""),
-    body: n.body || "",
-    image: n.image || "",
+    app: n.appName,
+    appIcon: n.appIcon,
+    summary: n.summary,
+    body: n.body,
+    image: n.image,
     glyph: glyphFromHints(n.hints),
     execArgv: execArgvFromHints(n.hints),
     urgency: n.urgency,
-    expireTimeout: expireTimeout,
-    timestamp: timestamp === undefined ? Date.now() : timestamp
+    expireTimeout: n.expireTimeout,
+    timestamp: normalizedTimestamp
   }
 }
 
@@ -509,6 +544,7 @@ if (typeof module !== "undefined") {
     execArgvFromHints: execArgvFromHints,
     parseExecArgv: parseExecArgv,
     shouldRenderCompactGlyph: shouldRenderCompactGlyph,
+    normalizeNotification: normalizeNotification,
     snapshotOf: snapshotOf,
     popupRoles: popupRoles,
     popupRowChanged: popupRowChanged,
