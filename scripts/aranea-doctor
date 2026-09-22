@@ -26,11 +26,24 @@ else
   emit theme repair 'Aranea is not the active theme'
 fi
 
-hooks="${ARANEA_DOCTOR_HOOKS:-unknown}"
-if [[ "$hooks" == ok ]]; then
+hook_root="${ARANEA_DOCTOR_HOOK_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/hooks}"
+theme_hook="$hook_root/theme-set.d/theme-set"
+post_boot_hook="$hook_root/post-boot.d/post-boot"
+
+if [[ "${ARANEA_DOCTOR_HOOKS:-}" == ok ]]; then
+  hooks_ok=1
+elif [[ -f "$theme_hook" && -f "$post_boot_hook" ]] \
+  && cmp -s "$repo_root/hooks/theme-set" "$theme_hook" \
+  && cmp -s "$repo_root/hooks/post-boot" "$post_boot_hook"; then
+  hooks_ok=1
+else
+  hooks_ok=0
+fi
+
+if (( hooks_ok )); then
   emit hooks ok 'theme-set and post-boot hooks reported healthy'
 else
-  emit hooks repair 'inspect installed Omarchy hooks'
+  emit hooks repair 'theme-set or post-boot hook is missing or stale'
 fi
 
 if [[ -f "$manifest_file" ]]; then
