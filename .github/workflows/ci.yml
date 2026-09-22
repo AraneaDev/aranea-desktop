@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   validate:
-    name: validate
+    # Keep this exact context aligned with the protected master branch rule.
+    name: CI / validate
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
