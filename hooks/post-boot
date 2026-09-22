@@ -17,6 +17,7 @@ theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
 
 if [[ -x "$theme_root/scripts/install-integration" ]]; then
   "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
+  "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
 fi
 
 lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"

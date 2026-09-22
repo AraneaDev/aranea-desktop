@@ -32,7 +32,7 @@ manifest_integration_exists() {
   awk -v wanted="$integration" '
     /^\[\[integrations\]\]$/ { in_block = 1; found = 0; next }
     in_block && /^\[/ { in_block = 0 }
-    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { found = 1 }
+    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { found = 1; exit }
     END { exit(found ? 0 : 1) }
   ' "$manifest_file"
 }

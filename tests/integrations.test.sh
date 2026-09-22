@@ -17,4 +17,7 @@ grep -Fq 'integrations/terminal/alacritty.toml' "$repo_root/alacritty.toml"
 grep -Fq 'integrations/terminal/kitty.conf' "$repo_root/kitty.conf"
 grep -Fq 'integrations/terminal/foot.ini' "$repo_root/foot.ini"
 
+qt_output="$($repo_root/scripts/install-integration qt --dry-run)"
+grep -Eq 'Skipping qt:|would link .*Aranea\.kvconfig' <<<"$qt_output"
+
 echo "integration contract passed"

@@ -72,6 +72,12 @@ case "$integration" in
     command -v btop >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"
     command -v lazygit >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/lazygit.yml" "$config_root/lazygit/themes/aranea.yml"
     ;;
+  qt)
+    if command -v kvantummanager >/dev/null 2>&1; then
+      install_one "$repo_root/integrations/qt/kvantum/Aranea/Aranea.kvconfig" "$config_root/Kvantum/Aranea/Aranea.kvconfig"
+      install_one "$repo_root/integrations/qt/kvantum/Aranea/Aranea.svg" "$config_root/Kvantum/Aranea/Aranea.svg"
+    fi
+    ;;
   *)
     printf 'Integration %s has no file targets in this phase.\n' "$integration"
     ;;
