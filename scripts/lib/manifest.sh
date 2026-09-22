@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+manifest_file="${ARANEA_MANIFEST_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/theme-manifest.toml}"
+
+manifest_profile_exists() {
+  local profile="$1"
+  grep -Eq "^\[profiles\.${profile//./\.}\]$" "$manifest_file"
+}
+
+manifest_profile_integrations() {
+  local profile="$1"
+  awk -v section="[profiles.$profile]" '
+    $0 == section { inside = 1; next }
+    inside && /^\[/ { exit }
+    inside && /^integrations[[:space:]]*=/ {
+      line = $0
+      sub(/^[^=]*=[[:space:]]*\[/, "", line)
+      sub(/\][[:space:]]*$/, "", line)
+      gsub(/"/, "", line)
+      gsub(/[[:space:]]/, "", line)
+      n = split(line, values, ",")
+      for (i = 1; i <= n; i++) if (values[i] != "") print values[i]
+      exit
+    }
+  ' "$manifest_file"
+}
