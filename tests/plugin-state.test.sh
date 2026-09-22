@@ -7,6 +7,7 @@ node - "$repo_root" <<'NODE'
 const root = process.argv[2]
 const bar = require(`${root}/plugins/araneadev.bar/BarModel.js`)
 const notifications = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+const menu = require(`${root}/plugins/araneadev.menu/MenuModel.js`)
 const fs = require('fs')
 
 for (const state of ['healthy', 'focus', 'attention', 'warning', 'error', 'muted', 'charging', 'privacy']) {
@@ -54,6 +55,17 @@ const malformedSnapshot = notifications.snapshotOf({ urgency: -1, hints: null },
 if (malformedSnapshot.urgency !== 1 || typeof malformedSnapshot.timestamp !== 'number' || !Number.isFinite(malformedSnapshot.timestamp)) {
   throw new Error('malformed notification snapshot was not stabilized')
 }
+
+const normalizedItem = menu.normalizeItem('tools.editor', {
+  parent: 42,
+  label: 7,
+  aliases: ['edit', 12, null],
+  target: 9,
+  description: null
+})
+if (normalizedItem.parent !== '42' || normalizedItem.label !== '7' || normalizedItem.target !== '9') throw new Error('menu item fields were not normalized')
+if (normalizedItem.aliases.length !== 2 || normalizedItem.aliases[1] !== '12') throw new Error('menu aliases were not normalized')
+if (menu.normalizeItem('bad', []).label !== 'bad') throw new Error('invalid menu item did not get a stable fallback')
 
 const bounded = notifications.limitHistory([{ id: 1 }, { id: 2 }, { id: 3 }], 2)
 if (bounded.length !== 2 || bounded[0].id !== 1) throw new Error('history was not bounded')

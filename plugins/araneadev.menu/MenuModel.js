@@ -5,36 +5,41 @@ function stripJsonc(raw) {
 }
 
 function normalizeAliases(value) {
-  if (Array.isArray(value)) return value.filter(function(v) { return v })
+  if (Array.isArray(value)) return value.map(function(v) { return String(v || "") }).filter(function(v) { return v })
   if (typeof value === "string" && value) return [value]
   return []
 }
 
+function textValue(value, fallback) {
+  if (value === undefined || value === null) return fallback
+  return String(value)
+}
+
 function normalizeItem(id, raw) {
-  var value = raw || {}
+  var value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
+  var itemId = textValue(id, "")
   var aliases = normalizeAliases(value.aliases)
-  var parent = value.parent
-  if (parent === undefined)
-    parent = id.indexOf(".") >= 0 ? id.split(".").slice(0, -1).join(".") : "root"
-  if (id === "root") parent = ""
+  var parent = textValue(value.parent, "")
+  if (!parent) parent = itemId.indexOf(".") >= 0 ? itemId.split(".").slice(0, -1).join(".") : "root"
+  if (itemId === "root") parent = ""
 
   var kind = value.action ? "action" : (value.target ? "link" : "menu")
 
   return {
-    id: id,
+    id: itemId,
     parent: parent,
     kind: kind,
-    icon: value.icon || "",
-    iconFont: value.iconFont || "",
-    label: value.label || id,
-    title: value.title || "",
-    target: value.target || "",
-    description: value.description || "",
-    action: value.action || "",
-    provider: value.provider || "",
+    icon: textValue(value.icon, ""),
+    iconFont: textValue(value.iconFont, ""),
+    label: textValue(value.label, itemId),
+    title: textValue(value.title, ""),
+    target: textValue(value.target, ""),
+    description: textValue(value.description, ""),
+    action: textValue(value.action, ""),
+    provider: textValue(value.provider, ""),
     aliases: aliases,
-    when: value.when || "",
-    checked: value.checked || ""
+    when: textValue(value.when, ""),
+    checked: textValue(value.checked, "")
   }
 }
 

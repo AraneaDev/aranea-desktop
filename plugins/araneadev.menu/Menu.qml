@@ -35,13 +35,13 @@ Item {
     root.cancel()
   }
 
-  function refresh() {
+  function refresh(): string {
     defaultMenuFile.reload()
     userMenuFile.reload()
     return "ok"
   }
 
-  function ping() { return "ok" }
+  function ping(): string { return "ok" }
 
   property string fontFamily: Style.font.menuFamily
   // JSONC menu definitions. The shell parses both at startup and merges
@@ -143,7 +143,7 @@ Item {
 
   // Menu rows only surface their detail while a search is narrowing them;
   // dmenu rows carry caller-supplied subtext that must always be visible.
-  function rowHeightForDetail(detail) {
+  function rowHeightForDetail(detail: string): int {
     return (root.filterText || root.dmenuActive) && detail ? root.detailRowHeight : root.baseRowHeight
   }
 
@@ -151,7 +151,7 @@ Item {
   // past the frozen top edge once a search has pinned the card in place.
   // Uses panel.cardTop rather than effectiveCardTop: the centered top is
   // derived from the card height, which this value feeds.
-  function availableRowsHeight() {
+  function availableRowsHeight(): int {
     var top = panel.cardTop >= 0 ? panel.cardTop : Style.gapsOut
     var available = panel.height - top - Style.gapsOut - root.contentMargin * 2 - root.headerHeight - root.contentSpacing
     // The starting menu sets the ceiling along with the offset: drilling into
@@ -164,7 +164,7 @@ Item {
   // When every row fits, the list gets its full height. When they don't,
   // the card must end mid-row: a clipped row is what tells the eye there is
   // more below the fold, so never come out even on a row boundary.
-  function foldedListHeight(totals, available) {
+  function foldedListHeight(totals: var, available: int): int {
     var count = totals.length
     if (count === 0) return root.baseRowHeight
     if (totals[count - 1] <= available) return totals[count - 1]
@@ -215,7 +215,7 @@ Item {
     return foldedListHeight(totals, available)
   }
 
-  function item(id) {
+  function item(id: string): var {
     return root.items[id] || null
   }
 
@@ -224,7 +224,7 @@ Item {
   // the on-disk authoring format stays untouched.
   // ------------------------------------------------------------------
 
-  function stripJsonc(raw) {
+  function stripJsonc(raw: string): string {
     return MenuModel.stripJsonc(raw)
   }
 
@@ -232,11 +232,11 @@ Item {
     return MenuModel.normalizeAliases(value)
   }
 
-  function normalizeItem(id, raw) {
+  function normalizeItem(id: string, raw): var {
     return MenuModel.normalizeItem(id, raw)
   }
 
-  function parseMenuJsonc(raw) {
+  function parseMenuJsonc(raw: string): var {
     return MenuModel.parseMenuJsonc(raw)
   }
 
@@ -280,7 +280,7 @@ Item {
     }
   })
 
-  function slugify(value) {
+  function slugify(value: string): string {
     return MenuModel.slugify(value)
   }
 
