@@ -23,4 +23,7 @@ trap 'rm -rf "$state_root"' EXIT
 motion_output="$(ARANEA_STATE_ROOT="$state_root" "$repo_root/scripts/aranea-wallpaper" motion off)"
 grep -Fq 'motion: off' <<<"$motion_output"
 
+applied_output="$(ARANEA_WALLPAPER_APPLIER=/bin/echo "$repo_root/scripts/aranea-wallpaper" set day)"
+grep -Fq 'backgrounds/background-day.png' <<<"$applied_output"
+
 echo "wallpaper contract passed"

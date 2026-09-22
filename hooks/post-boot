@@ -14,6 +14,11 @@ ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.co
 install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
 
 theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+
+if [[ -x "$theme_root/scripts/install-integration" ]]; then
+  "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
+fi
+
 lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
 menu_plugin="$HOME/.config/omarchy/plugins/araneadev.menu"
 bar_plugin="$HOME/.config/omarchy/plugins/araneadev.bar"

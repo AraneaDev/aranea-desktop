@@ -47,7 +47,7 @@ manifest_integration_field() {
     found && $0 ~ "^" wanted_field "[[:space:]]*=" {
       line = $0
       sub(/^[^=]*=[[:space:]]*/, "", line)
-      gsub(/^\"|\"$/, "", line)
+      gsub(/^"|"$/, "", line)
       print line
       exit
     }

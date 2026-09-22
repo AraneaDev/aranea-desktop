@@ -25,6 +25,12 @@ ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
 ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
 install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
 
+# Apply optional developer integrations through the ownership-aware linker.
+# Missing applications are skipped and existing configs are backed up.
+if [[ -x "$theme_root/scripts/install-integration" ]]; then
+  "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
+fi
+
 mkdir -p "$lock_plugin"
 install -Dm644 "$theme_root/plugins/araneadev.lock/manifest.json" "$lock_plugin/manifest.json"
 install -Dm644 "$theme_root/plugins/araneadev.lock/Service.qml" "$lock_plugin/Service.qml"
