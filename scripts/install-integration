@@ -139,20 +139,34 @@ case "$integration" in
       cursor_tmp="$(mktemp -d)"
       trap 'rm -rf -- "$cursor_tmp"' RETURN
       for cursor_spec in \
-        "left_ptr 4 4" \
-        "hand2 8 4" \
-        "watch 12 12" \
-        "crosshair 12 12"; do
+        "left_ptr 2 2" \
+        "hand2 16 16" \
+        "watch 16 16" \
+        "crosshair 16 16"; do
         read -r cursor_name hotspot_x hotspot_y <<<"$cursor_spec"
-        source_svg="$repo_root/integrations/cursor/cursors/$cursor_name.svg"
-        raster_png="$cursor_tmp/$cursor_name.png"
         cursor_cfg="$cursor_tmp/$cursor_name.cfg"
-        if command -v magick >/dev/null 2>&1; then
-          magick -background none "$source_svg" -resize 32x32 "$raster_png"
+        : >"$cursor_cfg"
+        if [[ "$cursor_name" == watch ]]; then
+          for frame in 01 02 03 04 05 06 07 08; do
+            source_svg="$repo_root/integrations/cursor/cursors/watch-$frame.svg"
+            raster_png="$cursor_tmp/watch-$frame.png"
+            if command -v magick >/dev/null 2>&1; then
+              magick -background none "$source_svg" -resize 32x32 "$raster_png"
+            else
+              convert -background none "$source_svg" -resize 32x32 "$raster_png"
+            fi
+            printf '32 %s %s %s 140\n' "$hotspot_x" "$hotspot_y" "$raster_png" >>"$cursor_cfg"
+          done
         else
-          convert -background none "$source_svg" -resize 32x32 "$raster_png"
+          source_svg="$repo_root/integrations/cursor/cursors/$cursor_name.svg"
+          raster_png="$cursor_tmp/$cursor_name.png"
+          if command -v magick >/dev/null 2>&1; then
+            magick -background none "$source_svg" -resize 32x32 "$raster_png"
+          else
+            convert -background none "$source_svg" -resize 32x32 "$raster_png"
+          fi
+          printf '32 %s %s %s\n' "$hotspot_x" "$hotspot_y" "$raster_png" >>"$cursor_cfg"
         fi
-        printf '32 %s %s %s\n' "$hotspot_x" "$hotspot_y" "$raster_png" >"$cursor_cfg"
         xcursorgen "$cursor_cfg" "$cursor_root/cursors/$cursor_name"
       done
       if command -v gsettings >/dev/null 2>&1; then
