@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+surfaces=(desktop menu notifications diagnostics lock boot about file-manager editor)
+
+case "${1:-list}" in
+  list)
+    printf '%s\n' "${surfaces[@]}"
+    ;;
+  surface)
+    requested="${2:-}"
+    for surface in "${surfaces[@]}"; do
+      if [[ "$surface" == "$requested" ]]; then
+        printf 'surface: %s\n' "$surface"
+        printf 'documentation: %s\n' "$repo_root/README.md"
+        exit 0
+      fi
+    done
+    printf 'Unknown surface: %s\n' "$requested" >&2
+    exit 1
+    ;;
+  *)
+    printf 'Usage: %s list|surface <name>\n' "$0" >&2
+    exit 2
+    ;;
+esac

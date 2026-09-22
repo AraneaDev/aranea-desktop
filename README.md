@@ -46,6 +46,26 @@ to omit the optional diagnostics dependency:
 ./scripts/install.sh --skip-conky
 ```
 
+Installation profiles are available when you want to audit scope first:
+
+```bash
+./scripts/install.sh --dry-run --profile minimal --yes
+./scripts/install.sh --dry-run --profile full --yes
+./scripts/install.sh --dry-run --profile no_apps --yes
+```
+
+Optional integrations can be checked and installed independently:
+
+```bash
+./scripts/aranea-doctor --json
+./scripts/install-integration terminal --dry-run
+./scripts/aranea-wallpaper list
+./scripts/aranea-showcase list
+```
+
+Managed optional links can be restored with `scripts/uninstall.sh --dry-run`
+followed by `scripts/uninstall.sh --yes`.
+
 Preview the actions without changing the system:
 
 ```bash
@@ -205,6 +225,10 @@ layer requires a Conky build with real Wayland layer-shell support, such as
 
 - `backgrounds/` — coordinated day and night wallpapers; the topology is
   deliberately free of the spider mark.
+- `backgrounds/manifest.toml` — stable wallpaper IDs, contrast metadata, and
+  motion capabilities.
+- `integrations/` — optional terminal, developer-tool, cursor, Qt, browser,
+  session, media, and icon integrations with explicit fallbacks.
 - `branding/` — fastfetch and idle screensaver marks.
 - `unlock.png` — shared spider asset for the bar, lock screen, and boot flow.
 - `plugins/araneadev.bar/` — transparent interactive bar composition.

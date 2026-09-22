@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+surface=""
+output=""
+
+while (($#)); do
+  case "$1" in
+    --surface) (($# >= 2)) || { echo '--surface requires a value' >&2; exit 2; }; surface="$2"; shift ;;
+    --output) (($# >= 2)) || { echo '--output requires a directory' >&2; exit 2; }; output="$2"; shift ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
+[[ -n "$surface" && -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --surface <name> --output <dir>' >&2; exit 2; }
+"$repo_root/scripts/aranea-showcase" surface "$surface" >/dev/null
+mkdir -p "$output"
+
+if [[ -n "${ARANEA_SCREENSHOT_COMMAND:-}" ]]; then
+  "$ARANEA_SCREENSHOT_COMMAND" "$output/$surface.png"
+  printf 'captured: %s\n' "$output/$surface.png"
+  exit 0
+fi
+
+printf 'No screenshot provider configured for %s. Set ARANEA_SCREENSHOT_COMMAND to a capture command.\n' "$surface" >&2
+exit 3
