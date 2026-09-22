@@ -2,6 +2,20 @@ function isPlainObject(value) {
   return !!value && typeof value === "object" && !Array.isArray(value)
 }
 
+function semanticColor(state) {
+  var colors = {
+    healthy: "accent",
+    focus: "accent_secondary",
+    attention: "ceremony",
+    warning: "yellow",
+    error: "red",
+    muted: "dark_foreground",
+    charging: "accent",
+    privacy: "accent_secondary"
+  }
+  return colors[String(state || "")] || colors.muted
+}
+
 function normalizePosition(value) {
   var next = String(value || "").trim()
   return /^(top|bottom|left|right)$/.test(next) ? next : "top"
@@ -226,6 +240,7 @@ if (typeof module !== "undefined") {
     expandPath: expandPath,
     customModuleSafeName: customModuleSafeName,
     customModuleType: customModuleType,
-    customModulePath: customModulePath
+    customModulePath: customModulePath,
+    semanticColor: semanticColor
   }
 }

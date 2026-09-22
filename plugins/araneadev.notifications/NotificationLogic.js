@@ -446,6 +446,38 @@ function historyRows(raw, liveRows, normalUrgency, limit) {
   return out.slice(0, max)
 }
 
+function groupNotifications(entries) {
+  var groups = []
+  var indexes = {}
+  var rows = Array.isArray(entries) ? entries : []
+  for (var i = 0; i < rows.length; i++) {
+    var entry = rows[i] || {}
+    var key = String(entry.app || "unknown")
+    if (indexes[key] === undefined) {
+      indexes[key] = groups.length
+      groups.push({ app: key, count: 0, entries: [] })
+    }
+    var group = groups[indexes[key]]
+    group.entries.push(entry)
+    group.count++
+  }
+  return groups
+}
+
+function collapseQuietHours(entries, quietHours) {
+  var rows = Array.isArray(entries) ? entries : []
+  return quietHours
+    ? { visible: [], count: rows.length }
+    : { visible: rows.slice(), count: 0 }
+}
+
+function limitHistory(entries, limit) {
+  var rows = Array.isArray(entries) ? entries : []
+  var max = Number(limit)
+  if (!isFinite(max) || max < 0) max = 10
+  return rows.slice(0, Math.floor(max))
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     isChromiumDerived: isChromiumDerived,
@@ -474,6 +506,9 @@ if (typeof module !== "undefined") {
     serializePopup: serializePopup,
     parsePopupFiles: parsePopupFiles,
     popupExpired: popupExpired,
-    popupPlacement: popupPlacement
+    popupPlacement: popupPlacement,
+    groupNotifications: groupNotifications,
+    collapseQuietHours: collapseQuietHours,
+    limitHistory: limitHistory
   }
 }
