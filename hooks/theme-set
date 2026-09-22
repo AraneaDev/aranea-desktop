@@ -32,6 +32,15 @@ if [[ -x "$theme_root/scripts/install-integration" ]]; then
   "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
 fi
 
+# Some distro Teams packages ship desktop metadata that strict launchers skip.
+# Shadow it with a repaired user entry while preserving the package's command
+# and icon. The helper is a no-op when Teams is not installed.
+if [[ -f /usr/share/applications/teams-for-linux.desktop && -x "$theme_root/scripts/repair-desktop-entry" ]]; then
+  "$theme_root/scripts/repair-desktop-entry" \
+    /usr/share/applications/teams-for-linux.desktop \
+    "$HOME/.local/share/applications/teams-for-linux.desktop" >/dev/null 2>&1 || true
+fi
+
 mkdir -p "$lock_plugin"
 install -Dm644 "$theme_root/plugins/araneadev.lock/manifest.json" "$lock_plugin/manifest.json"
 install -Dm644 "$theme_root/plugins/araneadev.lock/Service.qml" "$lock_plugin/Service.qml"

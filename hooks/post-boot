@@ -20,6 +20,12 @@ if [[ -x "$theme_root/scripts/install-integration" ]]; then
   "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
 fi
 
+if [[ -f /usr/share/applications/teams-for-linux.desktop && -x "$theme_root/scripts/repair-desktop-entry" ]]; then
+  "$theme_root/scripts/repair-desktop-entry" \
+    /usr/share/applications/teams-for-linux.desktop \
+    "$HOME/.local/share/applications/teams-for-linux.desktop" >/dev/null 2>&1 || true
+fi
+
 lock_plugin="$HOME/.config/omarchy/plugins/araneadev.lock"
 menu_plugin="$HOME/.config/omarchy/plugins/araneadev.menu"
 bar_plugin="$HOME/.config/omarchy/plugins/araneadev.bar"

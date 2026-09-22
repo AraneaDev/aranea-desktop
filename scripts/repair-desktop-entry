@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_file="${1:-}"
+target_file="${2:-}"
+
+if [[ -z "$source_file" || -z "$target_file" ]]; then
+  printf 'Usage: scripts/repair-desktop-entry <source.desktop> <target.desktop>\n' >&2
+  exit 2
+fi
+if [[ ! -f "$source_file" ]]; then
+  printf 'Desktop entry not found: %s\n' "$source_file" >&2
+  exit 1
+fi
+
+tmp_file="$(mktemp)"
+trap 'rm -f "$tmp_file"' EXIT
+
+awk '
+  /^Version=/ { next }
+  /^Categories=/ {
+    value = $0
+    sub(/^Categories=/, "", value)
+    gsub(/(^|;)Application(;|$)/, ";", value)
+    gsub(/;;+/, ";", value)
+    sub(/^;/, "", value)
+    sub(/;$/, "", value)
+    print "Categories=" value ";"
+    next
+  }
+  { print }
+' "$source_file" > "$tmp_file"
+
+install -Dm644 "$tmp_file" "$target_file"
+printf 'repaired: %s\n' "$target_file"
