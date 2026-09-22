@@ -50,3 +50,6 @@ fi
 if [[ -x "$theme_root/scripts/deploy-plugins-safely" ]]; then
   "$theme_root/scripts/deploy-plugins-safely" "$theme_root"
 fi
+if [[ -x "$theme_root/scripts/ensure-shell-running" ]]; then
+  "$theme_root/scripts/ensure-shell-running"
+fi
