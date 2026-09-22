@@ -120,10 +120,10 @@ previewed directly:
 ![Dusk wallpaper](backgrounds/variants/dusk.png)
 ![Monochrome wallpaper](backgrounds/variants/monochrome.png)
 ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png)
+![Day wallpaper](backgrounds/background-day.png)
+![Night wallpaper](backgrounds/background-night.png)
 
-The day/night pair remains available as `backgrounds/background-day.png` and
-`backgrounds/background-night.png`; use `./scripts/aranea-wallpaper list` to
-select any declared variant.
+Use `./scripts/aranea-wallpaper list` to select any declared variant.
 
 ### Command menu
 
