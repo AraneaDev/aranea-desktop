@@ -1,0 +1,88 @@
+# Aranea integration contract. The installer treats the base theme as core and
+# every listed integration as optional unless a profile explicitly selects it.
+
+[profiles.minimal]
+integrations = ["core", "gtk"]
+
+[profiles.full]
+integrations = ["core", "gtk", "terminal", "developer", "cursor", "qt", "browser", "session", "media", "wallpapers", "branding", "showcase"]
+
+[profiles.no_apps]
+integrations = ["core", "gtk", "cursor", "wallpapers", "branding"]
+
+[[integrations]]
+id = "core"
+profile = "minimal,full,no_apps"
+target_kind = "omarchy"
+fallback = "core theme and hooks remain installed"
+
+[[integrations]]
+id = "gtk"
+profile = "minimal,full,no_apps"
+target_kind = "config-link"
+fallback = "skip GTK links when GTK is unavailable"
+
+[[integrations]]
+id = "terminal"
+profile = "full"
+optional_command = "alacritty|kitty|foot"
+target_kind = "config-link"
+fallback = "skip terminals that are not installed"
+
+[[integrations]]
+id = "developer"
+profile = "full"
+optional_command = "tmux|starship|btop|lazygit"
+target_kind = "config-link"
+fallback = "skip each absent developer tool"
+
+[[integrations]]
+id = "cursor"
+profile = "full,no_apps"
+target_kind = "theme-directory"
+fallback = "retain the host cursor theme"
+
+[[integrations]]
+id = "qt"
+profile = "full"
+optional_command = "kvantummanager"
+target_kind = "config-directory"
+fallback = "use the native Qt palette"
+
+[[integrations]]
+id = "browser"
+profile = "full"
+optional_command = "firefox|chromium|google-chrome"
+target_kind = "application-assets"
+fallback = "skip browser assets"
+
+[[integrations]]
+id = "session"
+profile = "full"
+target_kind = "session-assets"
+fallback = "document the detected session stack"
+
+[[integrations]]
+id = "media"
+profile = "full"
+optional_command = "pavucontrol|pwvucontrol"
+target_kind = "application-assets"
+fallback = "skip optional media controls"
+
+[[integrations]]
+id = "wallpapers"
+profile = "full,no_apps"
+target_kind = "wallpaper-collection"
+fallback = "use the default Aranea wallpaper"
+
+[[integrations]]
+id = "branding"
+profile = "full,no_apps"
+target_kind = "branding-assets"
+fallback = "retain the compact built-in branding"
+
+[[integrations]]
+id = "showcase"
+profile = "full"
+target_kind = "verification-tools"
+fallback = "use README screenshots"

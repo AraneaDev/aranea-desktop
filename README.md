@@ -180,6 +180,11 @@ a static capture: with no active playback it correctly renders an empty canvas.
 | Foreground | `#e7ecf3` |
 | Muted foreground | `#8b96a6` |
 
+The integration contract also defines `motion_enabled = true` with a static
+`reduced_motion_fallback`. Optional integrations are grouped into three
+installer profiles: `minimal`, `full`, and `no_apps`; the base install remains
+usable with Omarchy alone.
+
 The source palette is in [`colors.toml`](colors.toml); shell-specific surface
 tokens are in [`shell.toml`](shell.toml).
 
