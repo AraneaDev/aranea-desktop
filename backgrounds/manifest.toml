@@ -24,21 +24,21 @@ motion = false
 
 [[wallpapers]]
 id = "dusk"
-path = "backgrounds/background-day.png"
+path = "backgrounds/variants/dusk.png"
 aspect = "16:9"
 contrast = "soft"
 motion = false
 
 [[wallpapers]]
 id = "monochrome"
-path = "backgrounds/background-night.png"
+path = "backgrounds/variants/monochrome.png"
 aspect = "16:9"
 contrast = "high"
 motion = false
 
 [[wallpapers]]
 id = "ultrawide"
-path = "backgrounds/background-night.png"
+path = "backgrounds/variants/ultrawide.png"
 aspect = "16:9"
 contrast = "standard"
 motion = false

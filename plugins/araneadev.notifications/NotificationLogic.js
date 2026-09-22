@@ -478,6 +478,24 @@ function limitHistory(entries, limit) {
   return rows.slice(0, Math.floor(max))
 }
 
+function isWithinQuietHours(window, date) {
+  var match = /^(\d{2}):(\d{2})-(\d{2}):(\d{2})$/.exec(String(window || "").trim())
+  if (!match) return false
+  var startHour = Number(match[1])
+  var startMinute = Number(match[2])
+  var endHour = Number(match[3])
+  var endMinute = Number(match[4])
+  if ([startHour, endHour].some(function(v) { return v > 23 }) ||
+      [startMinute, endMinute].some(function(v) { return v > 59 })) return false
+
+  var start = startHour * 60 + startMinute
+  var end = endHour * 60 + endMinute
+  var now = date instanceof Date ? date : new Date()
+  var current = now.getHours() * 60 + now.getMinutes()
+  if (start === end) return false
+  return start < end ? current >= start && current < end : current >= start || current < end
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     isChromiumDerived: isChromiumDerived,
@@ -509,6 +527,7 @@ if (typeof module !== "undefined") {
     popupPlacement: popupPlacement,
     groupNotifications: groupNotifications,
     collapseQuietHours: collapseQuietHours,
-    limitHistory: limitHistory
+    limitHistory: limitHistory,
+    isWithinQuietHours: isWithinQuietHours
   }
 }

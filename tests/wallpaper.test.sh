@@ -6,6 +6,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 grep -Fq 'id = "day"' "$repo_root/backgrounds/manifest.toml"
 grep -Fq 'id = "night"' "$repo_root/backgrounds/manifest.toml"
 grep -Fq 'id = "monochrome"' "$repo_root/backgrounds/manifest.toml"
+for asset in dusk.png monochrome.png ultrawide.png; do
+  test -f "$repo_root/backgrounds/variants/$asset"
+done
 
 list_output="$($repo_root/scripts/aranea-wallpaper list)"
 grep -Fq 'day' <<<"$list_output"

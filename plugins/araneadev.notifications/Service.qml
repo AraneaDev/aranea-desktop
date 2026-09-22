@@ -78,6 +78,19 @@ Item {
   property bool _hydrating: false
 
   readonly property alias doNotDisturb: persisted.doNotDisturb
+  // Optional quiet-hours window, for example `22:00-07:00`. Suppressed
+  // notifications still enter history through the same path as DND, while
+  // critical CLI alerts retain the existing explicit bypass rule.
+  readonly property string quietHoursWindow: Quickshell.env("ARANEA_QUIET_HOURS")
+  property int quietHoursTick: 0
+  readonly property bool quietHours: quietHoursTick >= 0 && NotificationLogic.isWithinQuietHours(quietHoursWindow, new Date())
+
+  Timer {
+    interval: 60000
+    repeat: true
+    running: service.quietHoursWindow.length > 0
+    onTriggered: service.quietHoursTick++
+  }
 
   function setDoNotDisturb(value) {
     persisted.doNotDisturb = !!value
@@ -174,7 +187,7 @@ Item {
     // DND bypass rules: chat apps abuse urgency=critical to force
     // visibility, so critical alone isn't enough — we also require the
     // sender to be CLI-style. See shouldBypassDnd().
-    if (service.doNotDisturb && !shouldBypassDnd(notification)) {
+    if ((service.doNotDisturb || service.quietHours) && !shouldBypassDnd(notification)) {
       // The toast never shows, so the only record a silenced notification
       // can leave is a history entry. Write it straight into history —
       // "what did I miss while silenced" is exactly what history is for.
@@ -879,6 +892,15 @@ Item {
 
     function isDnd(): string {
       return dndState()
+    }
+
+    function quietState(): string {
+      if (!service.quietHoursWindow) return "off"
+      return service.quietHours ? "on" : "scheduled"
+    }
+
+    function quietWindow(): string {
+      return service.quietHoursWindow || "off"
     }
 
     // Replay the notifications that have been moved into the history dir.
