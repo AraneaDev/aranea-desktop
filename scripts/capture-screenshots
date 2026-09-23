@@ -72,6 +72,21 @@ capture_menu_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+capture_terminal_surface() {
+  local title="$1"
+  local command_name="$2"
+  command -v kitty >/dev/null 2>&1 || { echo "kitty is required to capture $surface" >&2; exit 3; }
+  command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required to capture $surface" >&2; exit 3; }
+
+  kitty --class "aranea-screenshot-$surface" --title "$title" -e "$command_name" &
+  local child_pid=$!
+  sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
+  grim "$output/$surface.png"
+  kill "$child_pid" >/dev/null 2>&1 || true
+  wait "$child_pid" >/dev/null 2>&1 || true
+  printf 'captured: %s\n' "$output/$surface.png"
+}
+
 case "$surface" in
   menu|menu-submenu|menu-search|menu-input)
     capture_menu_surface
@@ -95,6 +110,25 @@ case "$surface" in
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
     aranea-diagnostics-toggle >/dev/null 2>&1 || true
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  fastfetch)
+    capture_terminal_surface "Aranea Fastfetch" fastfetch
+    exit 0
+    ;;
+  neovim)
+    capture_terminal_surface "Aranea Neovim" nvim
+    exit 0
+    ;;
+  file-manager)
+    command -v nautilus >/dev/null 2>&1 || { echo 'nautilus is required to capture file-manager' >&2; exit 3; }
+    nautilus --new-window "$repo_root" >/dev/null 2>&1 &
+    child_pid=$!
+    sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
+    grim "$output/$surface.png"
+    kill "$child_pid" >/dev/null 2>&1 || true
+    wait "$child_pid" >/dev/null 2>&1 || true
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
