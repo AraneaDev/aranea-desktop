@@ -27,8 +27,9 @@ function profileAllows(profile, id) {
   if (selected !== "minimal") return true
   return [
     "omarchy.indicators", "omarchy.idle", "omarchy.clock",
-    "omarchy.keyboard-layout", "omarchy.workspaces", "omarchy.tray",
+    "omarchy.keyboard-layout", "omarchy.system-update", "omarchy.workspaces", "omarchy.tray",
     "omarchy.network", "omarchy.audio", "omarchy.microphone", "omarchy.monitor", "omarchy.power",
+    "omarchy.bluetooth", "omarchy.agents",
     "araneadev.menu"
   ].indexOf(moduleId) !== -1
 }

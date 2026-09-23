@@ -66,6 +66,8 @@ Item {
   property int dmenuWidth: 300
   property int dmenuMaxHeight: 0
   property bool requestActive: false
+  property bool providerLoading: false
+  property bool providerError: false
   property bool rowsLoaded: false
   property string activeMenu: "root"
   property string filterText: ""
@@ -213,7 +215,9 @@ Item {
   property int rootContextHeight: Style.space(20)
   property int footerHeight: Style.space(26)
   property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
-  property bool motionEnabled: true
+  // Keep the polished default, while allowing a session-wide reduced-motion
+  // override for accessibility and deterministic testing.
+  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
   property bool headerMarkSettled: false
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
   readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
@@ -227,6 +231,7 @@ Item {
   property int contentSpacing: Style.space(14)
   property int compactContentSpacing: Style.space(10)
   property int baseRowHeight: Math.max(Style.space(40), root.menuFontSize(Style.font.bodySmall) + Style.space(6) * 2)
+  property int emptyStateHeight: Style.space(112)
   property int detailRowHeight: Math.max(Style.space(58), root.menuFontSize(Style.font.bodySmall) + root.menuFontSize(Style.font.caption) + Style.space(7) * 2)
   // How much of the first hidden row stays visible at the fold — enough to
   // read as a cut-off row rather than a bottom border.
@@ -338,7 +343,7 @@ Item {
   }
 
   function rowListHeight(_serial: int, _count: int, _filter: string, _divider: bool): int {
-    if (displayModel.count === 0) return root.baseRowHeight
+    if (displayModel.count === 0) return root.emptyStateHeight
 
     var totals = []
     var total = 0
@@ -481,14 +486,13 @@ Item {
     }
     var favoriteRows = MenuModel.appRowsForIds(appRows, root.favoriteAppIds, "apps.favorites", "apps.favorites")
     var recentRows = MenuModel.appRowsForIds(appRows, root.recentAppIds, "apps.recent", "apps.recent")
-    if (favoriteRows.length > 0) {
-      appRows.unshift({ id: "apps.favorites", parent: "apps", kind: "menu", icon: "", appIcon: "", appId: "", label: "Favorites", title: "", target: "", description: "Pinned applications", action: "", provider: "", aliases: ["favorite", "favorites", "pinned"], when: "", checked: "", order: 0 })
-      appRows = appRows.slice(0, 1).concat(favoriteRows, appRows.slice(1))
-    }
-    if (recentRows.length > 0) {
-      appRows.unshift({ id: "apps.recent", parent: "apps", kind: "menu", icon: "󰋚", appIcon: "", appId: "", label: "Recent", title: "", target: "", description: "Recently launched applications", action: "", provider: "", aliases: ["recent", "history"], when: "", checked: "", order: 0 })
-      appRows = appRows.slice(0, 1).concat(recentRows, appRows.slice(1))
-    }
+    // Keep both generated destinations present even when they are empty. This
+    // gives direct routes and screenshots a deliberate empty state, and lets
+    // the sections become useful immediately after the first pin or launch.
+    appRows.unshift({ id: "apps.favorites", parent: "apps", kind: "menu", icon: "", appIcon: "", appId: "", label: "Favorites", title: "", target: "", description: "Pinned applications", action: "", provider: "", aliases: ["favorite", "favorites", "pinned"], when: "", checked: "", order: 0 })
+    appRows = appRows.slice(0, 1).concat(favoriteRows, appRows.slice(1))
+    appRows.unshift({ id: "apps.recent", parent: "apps", kind: "menu", icon: "󰋚", appIcon: "", appId: "", label: "Recent", title: "", target: "", description: "Recently launched applications", action: "", provider: "", aliases: ["recent", "history"], when: "", checked: "", order: 0 })
+    appRows = appRows.slice(0, 1).concat(recentRows, appRows.slice(1))
 
     root.appRows = appRows
     var merged = MenuModel.mergeAppRows(root.items, root.itemOrder, appRows)
@@ -509,6 +513,8 @@ Item {
     if (!spec) return
 
     root.providersLoaded[id] = true
+    root.providerLoading = true
+    root.providerError = false
     providerProc.menuId = id
     providerProc.providerKey = entry.provider
     providerProc.revision = root.providerRevision
@@ -1022,6 +1028,13 @@ Item {
   }
 
   function openRoute(initialMenu: string): void {
+    // Favorites and Recent are injected by the Apps provider, so resolve
+    // them after that provider has merged its generated submenu entries.
+    if (initialMenu === "apps.favorites" || initialMenu === "apps.recent") {
+      root.startProviderForMenu("apps")
+      root.openGeneratedAppsMenu(initialMenu, 0)
+      return
+    }
     var id = root.resolveRoute(initialMenu)
     var entry = root.items[id]
     // If the resolved id is an action (i.e. the user invoked an alias for
@@ -1036,6 +1049,22 @@ Item {
     if (entry && entry.kind === "link" && entry.target) id = entry.target
     root.pendingInitialMenu = id
     root.openExistingMenu(id)
+  }
+
+  function openGeneratedAppsMenu(initialMenu: string, attempt: int): void {
+    // AppLibrary can finish its first desktop-entry refresh after the summon
+    // request. Retry briefly so direct screenshot/shortcut routes never fall
+    // back to the generic Apps list just because the generated node arrived a
+    // frame later.
+    if (root.item(initialMenu)) {
+      root.openExistingMenu(initialMenu)
+      return
+    }
+    if (attempt < 12) {
+      Qt.callLater(function() { root.openGeneratedAppsMenu(initialMenu, attempt + 1) })
+      return
+    }
+    root.openExistingMenu("apps")
   }
 
   function disarmPointer() {
@@ -1057,7 +1086,9 @@ Item {
     stdout: SplitParser {
       onRead: function(data) { providerProc.collected += data + "\n" }
     }
-    onExited: {
+    onExited: function(exitCode, exitStatus) {
+      root.providerLoading = false
+      root.providerError = exitCode !== 0
       if (providerProc.revision === root.providerRevision) {
         root.mergeProviderRows(providerProc.collected, providerProc.menuId, providerProc.providerKey)
         if (root.filterText.trim()) root.loadProvidersForSearch()
@@ -1663,15 +1694,24 @@ Item {
               color: row.hasCursor ? root.selectedBackground : "transparent"
               borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
 
+              Behavior on color {
+                ColorAnimation { duration: 140; easing.type: Easing.OutCubic }
+              }
+
               Rectangle {
-                visible: false
-                width: Style.space(4)
-                height: parent.height - Style.space(18)
-                radius: Math.min(root.cornerRadius, Style.space(4))
-                color: root.selectedBackground
+                visible: row.hasCursor
+                width: Style.space(2)
+                height: parent.height - Style.space(14)
+                radius: Style.space(1)
+                color: root.selectedText
+                opacity: 0.9
                 anchors.left: parent.left
-                anchors.leftMargin: root.rowReservedBorderLeft + Style.space(8)
+                anchors.leftMargin: root.rowReservedBorderLeft + Style.space(4)
                 anchors.verticalCenter: parent.verticalCenter
+
+                Behavior on opacity {
+                  NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                }
               }
 
               Text {
@@ -1734,13 +1774,17 @@ Item {
                   width: parent.width
                   text: row.detail
                   visible: (root.fullRootHeader || root.filterText || row.kind === "dmenu") && row.detail.length > 0
-                  color: root.foreground
-                  opacity: 0.52
+                  color: row.hasCursor ? root.selectedText : root.foreground
+                  opacity: row.hasCursor ? 0.7 : 0.52
                   font.family: root.fontFamily
                   font.pixelSize: root.menuFontSize(Style.font.caption)
                   font.weight: Font.Medium
                   font.letterSpacing: root.menuLetterSpacing
                   elide: Text.ElideRight
+
+                  Behavior on opacity {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                  }
                 }
               }
 
@@ -1840,11 +1884,11 @@ Item {
 
           Column {
             anchors.centerIn: parent
-            spacing: Style.space(8)
+            spacing: Style.space(12)
             visible: displayModel.count === 0 && root.mode !== "input"
 
             Text {
-              text: "󰈉"
+              text: root.providerLoading ? "󰑐" : (root.providerError ? "󰀦" : "󰈉")
               color: root.selectedText
               opacity: 0.8
               font.family: root.fontFamily
@@ -1855,7 +1899,11 @@ Item {
 
             Text {
               textFormat: Text.PlainText
-              text: root.filterText ? "No matches for “" + root.filterText + "”" : "Nothing here yet"
+              text: root.providerLoading
+                ? "Loading…"
+                : (root.providerError
+                  ? "Couldn’t load this list"
+                  : (root.filterText ? "No matches for “" + root.filterText + "”" : "Nothing here yet"))
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily

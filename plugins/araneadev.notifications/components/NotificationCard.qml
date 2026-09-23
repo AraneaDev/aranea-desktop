@@ -51,6 +51,9 @@ BorderSurface {
   readonly property color bodyColor: Qt.darker(Color.notifications.text, 1.15)
   readonly property color accentColor: urgency === 2 ? Color.urgent : (urgency === 0 ? dimColor : Color.notifications.countdown)
   readonly property color railColor: urgency === 2 ? Color.urgent : (urgency === 0 ? Color.notifications.border : Color.notifications.countdown)
+  readonly property color cardBackground: urgency === 2
+    ? Util.alpha(Color.urgent, 0.08)
+    : (hovered ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
   readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(2)))
 
   function sanitizeBody(s: string): string {
@@ -70,7 +73,7 @@ BorderSurface {
   // doesn't push content under the bottom edge.
   implicitHeight: mainColumn.implicitHeight + borderTop + borderBottom
   radius: cornerRadius
-  color: Color.notifications.background
+  color: root.cardBackground
   borderSpec: cardBorderSpec
   clip: true
 

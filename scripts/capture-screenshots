@@ -5,7 +5,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
 capture_all=0
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications)
+# These are the surfaces currently summonable on this installation. The
+# first-party Bluetooth, keyboard-layout, and system-update ids are retained
+# in aranea-showcase for direct diagnostics, but their shell API returns
+# "unknown" here and they must not poison a complete batch with blank PNGs.
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor wifiqr apps favorites recent)
 
 while (($#)); do
   case "$1" in
@@ -60,6 +64,9 @@ capture_menu_surface() {
   case "$surface" in
     menu) payload='{"menu":"root"}' ;;
     menu-submenu) payload='{"menu":"apps"}' ;;
+    apps) payload='{"menu":"apps"}' ;;
+    favorites) payload='{"menu":"apps.favorites"}' ;;
+    recent) payload='{"menu":"apps.recent"}' ;;
     menu-search) payload='{"mode":"select","prompt":"Search","options":["Files","Terminal","Workspace"]}' ;;
     menu-input) payload='{"mode":"input","prompt":"Name"}' ;;
     *) return 1 ;;
@@ -101,8 +108,47 @@ capture_terminal_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+capture_popup_surface() {
+  local target="$1"
+  command -v omarchy-shell >/dev/null 2>&1 || { echo "omarchy-shell is required to capture $surface" >&2; exit 3; }
+  command -v grim >/dev/null 2>&1 || { echo "grim is required to capture $surface" >&2; exit 3; }
+
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  local summon_result
+  summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+  if [[ "$summon_result" != "ok" ]]; then
+    echo "Unable to summon popup $target: $summon_result" >&2
+    exit 3
+  fi
+  sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  grim "$output/$surface.png"
+  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  printf 'captured: %s\n' "$output/$surface.png"
+}
+
+redact_wifi_qr() {
+  local image="$1"
+  local width height center_x center_y half mark_size
+  read -r width height < <(magick identify -format '%w %h\n' "$image")
+  center_x=$((width / 2))
+  center_y=$((height / 2))
+  half=$((width / 13))
+  mark_size=$((half * 3 / 2))
+  local masked="${image}.masked.$$"
+  magick "$image" \
+    -fill '#08090b' \
+    -draw "rectangle $((center_x - half)),$((center_y - half)) $((center_x + half)),$((center_y + half))" \
+    "$masked"
+  magick "$repo_root/branding/marks/aranea-glyph.svg" -background none -resize "${mark_size}x${mark_size}" /tmp/aranea-qr-mark.png
+  magick "$masked" /tmp/aranea-qr-mark.png \
+    -geometry "+$((center_x - mark_size / 2))+$((center_y - mark_size / 2))" \
+    -composite "$image"
+  rm -f "$masked"
+}
+
 case "$surface" in
-  menu|menu-submenu|menu-search|menu-input)
+  menu|menu-submenu|menu-search|menu-input|apps|favorites|recent)
     capture_menu_surface
     exit 0
     ;;
@@ -147,6 +193,43 @@ case "$surface" in
     hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Neovim" nvim
     omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
+    exit 0
+    ;;
+  network)
+    capture_popup_surface omarchy.network
+    exit 0
+    ;;
+  audio)
+    capture_popup_surface omarchy.audio
+    exit 0
+    ;;
+  bluetooth)
+    capture_popup_surface omarchy.bluetooth
+    exit 0
+    ;;
+  agents)
+    capture_popup_surface omarchy.agents
+    exit 0
+    ;;
+  power)
+    capture_popup_surface omarchy.power
+    exit 0
+    ;;
+  monitor)
+    capture_popup_surface omarchy.monitor
+    exit 0
+    ;;
+  keyboard-layout)
+    capture_popup_surface omarchy.keyboard-layout
+    exit 0
+    ;;
+  system-update)
+    capture_popup_surface omarchy.system-update
+    exit 0
+    ;;
+  wifiqr)
+    capture_popup_surface omarchy.wifiqr
+    redact_wifi_qr "$output/$surface.png"
     exit 0
     ;;
   file-manager)

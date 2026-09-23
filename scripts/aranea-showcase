@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-surfaces=(desktop menu menu-submenu menu-search menu-input ceremony notifications diagnostics lock boot about file-manager editor)
+surfaces=(desktop menu menu-submenu menu-search menu-input ceremony notifications diagnostics lock boot about file-manager editor network audio bluetooth agents power monitor keyboard-layout system-update wifiqr apps favorites recent)
 
 case "${1:-list}" in
   list)

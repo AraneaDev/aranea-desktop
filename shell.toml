@@ -58,17 +58,17 @@ icon-large = 18
 
 [popups]
 background       = "#08090b"
-background-alpha = 0.98
+background-alpha = 0.94
 text             = "#e7ecf3"
 border           = "hyprland.active-border"
-border-alpha     = 1.0
+border-alpha     = 0.58
 
 [tooltip]
 background       = "#08090b"
 background-alpha = 0.97
 text             = "#e7ecf3"
 border           = "hyprland.active-border-foreground"
-border-alpha     = 1.0
+border-alpha     = 0.62
 
 [notifications]
 background       = "#08090b"
@@ -80,10 +80,10 @@ countdown        = "#3bff9e"
 
 [launcher]
 background                = "#08090b"
-background-alpha          = 0.98
+background-alpha          = 0.94
 text                      = "#e7ecf3"
 border                    = "hyprland.active-border-foreground"
-border-alpha              = 1.0
+border-alpha              = 0.62
 scrim                     = "#08090b"
 scrim-alpha               = 0.5
 selected-background       = "#e7ecf3"

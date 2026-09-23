@@ -116,6 +116,22 @@ state glyphs and the menu’s network, node, and edge motifs live under
 
 ![Aranea diagnostics](screenshots/diagnostics.png)
 
+### System popups
+
+![Aranea network popup](screenshots/network.png)
+
+![Aranea audio popup](screenshots/audio.png)
+
+![Aranea Bluetooth popup](screenshots/bluetooth.png)
+
+![Aranea agent popup](screenshots/agents.png)
+
+![Aranea power popup](screenshots/power.png)
+
+![Aranea display popup](screenshots/monitor.png)
+
+![Aranea Wi-Fi QR popup](screenshots/wifiqr.png)
+
 ### Wallpaper collection
 
 The original day/night pair is the visual anchor for the collection. The
@@ -155,6 +171,12 @@ omarchy plymouth set-by-theme aranea
 ![Aranea file manager](screenshots/file-manager.png)
 
 ![Aranea Neovim](screenshots/neovim.png)
+
+![Aranea Apps](screenshots/apps.png)
+
+![Aranea Favorites](screenshots/favorites.png)
+
+![Aranea Recent](screenshots/recent.png)
 
 Refresh the complete README capture set in one pass. Menu, desktop,
 notification, diagnostics, and application surfaces are captured from the
