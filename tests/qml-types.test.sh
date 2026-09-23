@@ -23,7 +23,11 @@ for qml_file in "${qml_files[@]}"; do
   }
 done
 
-command -v qmllint >/dev/null 2>&1 || {
+qmllint_bin="$(command -v qmllint 2>/dev/null || true)"
+if [[ -z "$qmllint_bin" && -x /usr/lib/qt6/bin/qmllint ]]; then
+  qmllint_bin=/usr/lib/qt6/bin/qmllint
+fi
+[[ -n "$qmllint_bin" ]] || {
   echo 'qmllint is required for QML validation' >&2
   exit 1
 }
@@ -45,5 +49,5 @@ if [[ -d "$shell_dir/Commons" && -f "$shell_dir/Commons/qmldir" \
   qml_args+=(-I "$import_root")
 fi
 
-qmllint "${qml_args[@]}" "${qml_files[@]}"
-echo "QML type validation passed ($(qmllint --version); import root: ${import_root:-default})"
+"$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}"
+echo "QML type validation passed ($("$qmllint_bin" --version); import root: ${import_root:-default})"
