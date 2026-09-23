@@ -164,6 +164,10 @@ surfaces use the configured `ARANEA_SCREENSHOT_COMMAND` provider:
 ./scripts/capture-screenshots --all --output screenshots
 ```
 
+Lock and Plymouth captures require explicit providers via
+`ARANEA_LOCK_SCREENSHOT_COMMAND` and `ARANEA_PLYMOUTH_SCREENSHOT_COMMAND`;
+the workflow never locks or reboots the active session implicitly.
+
 The repository also ships matching Cava, browser/session, Qt, icon, and cursor
 integrations. The cursor artwork is inspectable directly:
 

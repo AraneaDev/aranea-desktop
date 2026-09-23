@@ -132,6 +132,24 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
+  lock)
+    [[ -n "${ARANEA_LOCK_SCREENSHOT_COMMAND:-}" ]] || {
+      echo 'Lock capture requires ARANEA_LOCK_SCREENSHOT_COMMAND; refusing to lock the active session implicitly' >&2
+      exit 3
+    }
+    ARANEA_LOCK_SCREENSHOT_COMMAND="$ARANEA_LOCK_SCREENSHOT_COMMAND" "$ARANEA_LOCK_SCREENSHOT_COMMAND" "$output/$surface.png"
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  plymouth)
+    [[ -n "${ARANEA_PLYMOUTH_SCREENSHOT_COMMAND:-}" ]] || {
+      echo 'Plymouth capture requires ARANEA_PLYMOUTH_SCREENSHOT_COMMAND; it cannot be captured from a live session safely' >&2
+      exit 3
+    }
+    "$ARANEA_PLYMOUTH_SCREENSHOT_COMMAND" "$output/$surface.png"
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
 esac
 
 if [[ -n "${ARANEA_SCREENSHOT_COMMAND:-}" ]]; then
