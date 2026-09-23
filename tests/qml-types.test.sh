@@ -23,10 +23,10 @@ for qml_file in "${qml_files[@]}"; do
   }
 done
 
-if ! command -v qmllint >/dev/null 2>&1; then
-  echo "qmllint unavailable; skipped optional QML validation"
-  exit 0
-fi
+command -v qmllint >/dev/null 2>&1 || {
+  echo 'qmllint is required for QML validation' >&2
+  exit 1
+}
 
 shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
 import_root=""

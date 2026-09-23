@@ -31,6 +31,12 @@ grep -Fq 'define_size = 32, watch-08.svg' "$repo_root/integrations/cursor/hyprcu
 for frame in 01 02 03 04 05 06 07 08; do
   test -f "$repo_root/integrations/cursor/cursors/watch-$frame.svg"
   test -f "$repo_root/integrations/cursor/hyprcursor/hyprcursors/watch/watch-$frame.svg"
+  cmp -s "$repo_root/integrations/cursor/cursors/watch-$frame.svg" \
+    "$repo_root/integrations/cursor/hyprcursor/hyprcursors/watch/watch-$frame.svg"
+done
+for cursor in left_ptr hand2 watch crosshair; do
+  cmp -s "$repo_root/integrations/cursor/cursors/$cursor.svg" \
+    "$repo_root/integrations/cursor/hyprcursor/hyprcursors/$cursor/$cursor.svg"
 done
 grep -Fq 'BackgroundNormal=' "$repo_root/integrations/qt/kvantum/Aranea/Aranea.kvconfig"
 grep -Fq 'selection' "$repo_root/gtk.css"
