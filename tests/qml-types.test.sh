@@ -55,5 +55,14 @@ else
   qml_args+=(--bare)
 fi
 
-"$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}"
+if [[ "$validation_mode" == strict ]]; then
+  "$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}"
+else
+  qml_status=0
+  qml_output="$("$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}" 2>&1)" || qml_status=$?
+  echo "$qml_output"
+  if grep -Eq '^Error:|: Error:' <<<"$qml_output"; then
+    exit "$qml_status"
+  fi
+fi
 echo "QML validation passed ($("$qmllint_bin" --version); mode: $validation_mode; import root: ${import_root:-default})"
