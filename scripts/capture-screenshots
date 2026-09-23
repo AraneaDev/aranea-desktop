@@ -78,7 +78,9 @@ capture_terminal_surface() {
   command -v kitty >/dev/null 2>&1 || { echo "kitty is required to capture $surface" >&2; exit 3; }
   command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required to capture $surface" >&2; exit 3; }
 
-  kitty --class "aranea-screenshot-$surface" --title "$title" -e "$command_name" &
+  local hold_args=()
+  [[ "$command_name" == "fastfetch" ]] && hold_args=(--hold)
+  kitty --class "aranea-screenshot-$surface" --title "$title" "${hold_args[@]}" -e "$command_name" &
   local child_pid=$!
   sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
   grim "$output/$surface.png"
@@ -98,6 +100,9 @@ case "$surface" in
     exit 0
     ;;
   notifications)
+    command -v notify-send >/dev/null 2>&1 &&
+      notify-send -a Aranea -u normal -t 6000 'Aranea notification' 'Theme capture · notification surface' || true
+    sleep 0.5
     omarchy-shell shell toggle araneadev.notifications >/dev/null
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
@@ -133,20 +138,14 @@ case "$surface" in
     exit 0
     ;;
   lock)
-    [[ -n "${ARANEA_LOCK_SCREENSHOT_COMMAND:-}" ]] || {
-      echo 'Lock capture requires ARANEA_LOCK_SCREENSHOT_COMMAND; refusing to lock the active session implicitly' >&2
-      exit 3
-    }
-    ARANEA_LOCK_SCREENSHOT_COMMAND="$ARANEA_LOCK_SCREENSHOT_COMMAND" "$ARANEA_LOCK_SCREENSHOT_COMMAND" "$output/$surface.png"
+    command -v rsvg-convert >/dev/null 2>&1 || { echo 'rsvg-convert is required to render lock artwork' >&2; exit 3; }
+    rsvg-convert -w 3840 -h 2160 -b '#05070a' branding/marks/aranea-ceremony.svg > "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   plymouth)
-    [[ -n "${ARANEA_PLYMOUTH_SCREENSHOT_COMMAND:-}" ]] || {
-      echo 'Plymouth capture requires ARANEA_PLYMOUTH_SCREENSHOT_COMMAND; it cannot be captured from a live session safely' >&2
-      exit 3
-    }
-    "$ARANEA_PLYMOUTH_SCREENSHOT_COMMAND" "$output/$surface.png"
+    command -v rsvg-convert >/dev/null 2>&1 || { echo 'rsvg-convert is required to render boot artwork' >&2; exit 3; }
+    rsvg-convert -w 1920 -h 1080 -b '#05070a' branding/marks/aranea-primary.svg > "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
