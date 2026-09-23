@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
 capture_all=0
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics notifications lock plymouth fastfetch file-manager neovim)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications)
 
 while (($#)); do
   case "$1" in
@@ -29,6 +29,7 @@ if (( capture_all )); then
     echo "Refusing --all capture on workspace $active_workspace; switch to workspace 2 first" >&2
     exit 3
   }
+  trap 'hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
   for all_surface in "${all_surfaces[@]}"; do
     "$0" --surface "$all_surface" --output "$output"
   done
@@ -75,15 +76,26 @@ capture_menu_surface() {
 capture_terminal_surface() {
   local title="$1"
   local command_name="$2"
-  command -v kitty >/dev/null 2>&1 || { echo "kitty is required to capture $surface" >&2; exit 3; }
+  local terminal_bin=kitty
+  [[ "$surface" == "fastfetch" ]] && terminal_bin=ghostty
+  command -v "$terminal_bin" >/dev/null 2>&1 || { echo "$terminal_bin is required to capture $surface" >&2; exit 3; }
   command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required to capture $surface" >&2; exit 3; }
 
-  local hold_args=()
-  [[ "$command_name" == "fastfetch" ]] && hold_args=(--hold)
-  kitty --class "aranea-screenshot-$surface" --title "$title" "${hold_args[@]}" -e "$command_name" &
+  if [[ "$surface" == "fastfetch" ]]; then
+    ghostty +new-window --title="${title// /-}" -e bash -lc 'fastfetch; exec bash' &
+  else
+    kitty --config "$repo_root/integrations/terminal/kitty.conf" \
+      --class "aranea-screenshot-$surface" --title "$title" \
+      --override initial_window_width=104c --override initial_window_height=34c \
+      -e "$command_name" &
+  fi
   local child_pid=$!
+  sleep 1
+  hyprctl dismissnotify >/dev/null 2>&1 || true
   sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
   grim "$output/$surface.png"
+  # Close the capture window immediately so the next surface cannot inherit it.
+  hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
   kill "$child_pid" >/dev/null 2>&1 || true
   wait "$child_pid" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
@@ -124,19 +136,28 @@ case "$surface" in
     exit 0
     ;;
   fastfetch)
+    omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
+    hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Fastfetch" fastfetch
+    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
   neovim)
+    omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
+    hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Neovim" nvim
+    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
   file-manager)
     command -v nautilus >/dev/null 2>&1 || { echo 'nautilus is required to capture file-manager' >&2; exit 3; }
     nautilus --new-window "$repo_root" >/dev/null 2>&1 &
     child_pid=$!
+    sleep 1
+    hyprctl dismissnotify >/dev/null 2>&1 || true
     sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
     grim "$output/$surface.png"
+    hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
     kill "$child_pid" >/dev/null 2>&1 || true
     wait "$child_pid" >/dev/null 2>&1 || true
     printf 'captured: %s\n' "$output/$surface.png"
