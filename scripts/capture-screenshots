@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor wifiqr apps favorites recent)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
 
 while (($#)); do
   case "$1" in
@@ -127,26 +127,6 @@ capture_popup_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
-redact_wifi_qr() {
-  local image="$1"
-  local width height center_x center_y half mark_size
-  read -r width height < <(magick identify -format '%w %h\n' "$image")
-  center_x=$((width / 2))
-  center_y=$((height / 2))
-  half=$((width / 13))
-  mark_size=$((half * 3 / 2))
-  local masked="${image}.masked.$$"
-  magick "$image" \
-    -fill '#08090b' \
-    -draw "rectangle $((center_x - half)),$((center_y - half)) $((center_x + half)),$((center_y + half))" \
-    "$masked"
-  magick "$repo_root/branding/marks/aranea-glyph.svg" -background none -resize "${mark_size}x${mark_size}" /tmp/aranea-qr-mark.png
-  magick "$masked" /tmp/aranea-qr-mark.png \
-    -geometry "+$((center_x - mark_size / 2))+$((center_y - mark_size / 2))" \
-    -composite "$image"
-  rm -f "$masked"
-}
-
 case "$surface" in
   menu|menu-submenu|menu-search|menu-input|apps|favorites|recent)
     capture_menu_surface
@@ -225,11 +205,6 @@ case "$surface" in
     ;;
   system-update)
     capture_popup_surface omarchy.system-update
-    exit 0
-    ;;
-  wifiqr)
-    capture_popup_surface omarchy.wifiqr
-    redact_wifi_qr "$output/$surface.png"
     exit 0
     ;;
   file-manager)

@@ -130,8 +130,6 @@ state glyphs and the menu’s network, node, and edge motifs live under
 
 ![Aranea display popup](screenshots/monitor.png)
 
-![Aranea Wi-Fi QR popup](screenshots/wifiqr.png)
-
 ### Wallpaper collection
 
 The original day/night pair is the visual anchor for the collection. The
