@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 16" fill="none">
+  <title>Aranea node divider</title>
+  <path d="M0 8h256" stroke="#7A5CFF" stroke-opacity=".35"/>
+  <circle cx="32" cy="8" r="2.5" fill="#3BFF9E"/>
+  <circle cx="224" cy="8" r="2.5" fill="#7A5CFF"/>
+  <circle cx="128" cy="8" r="2" fill="#E7ECF3" fill-opacity=".5"/>
+</svg>

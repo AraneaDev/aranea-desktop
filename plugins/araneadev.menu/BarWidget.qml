@@ -8,6 +8,7 @@ BarWidget {
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
+  readonly property string brandingMarksPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/"
 
   WidgetButton {
     id: button
@@ -25,9 +26,10 @@ BarWidget {
       anchors.centerIn: parent
       width: 16
       height: 16
-      source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/unlock.png"
-      sourceClipRect: Qt.rect(96, 85, 128, 144)
+      source: "file://" + root.brandingMarksPath + "aranea-glyph.svg"
       fillMode: Image.PreserveAspectFit
+      sourceSize.width: width * Screen.devicePixelRatio
+      sourceSize.height: height * Screen.devicePixelRatio
       smooth: true
       mipmap: true
       enabled: false

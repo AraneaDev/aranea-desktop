@@ -258,7 +258,7 @@ Item {
         height: width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: -2
-        source: root.fileUrl(root.themeAssetRoot + "/unlock.png")
+        source: root.fileUrl(root.themeAssetRoot + "/branding/marks/aranea-ceremony.svg")
         fillMode: Image.PreserveAspectFit
         asynchronous: true
         smooth: true

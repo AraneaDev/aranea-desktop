@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Aranea warning state glyph</title>
+  <path d="M16 3 29 16 16 29 3 16 16 3Z" stroke="#E6C98A" stroke-width="1.5"/>
+  <path d="M16 9v9M16 22v1" stroke="#E6C98A" stroke-width="2" stroke-linecap="round"/>
+</svg>

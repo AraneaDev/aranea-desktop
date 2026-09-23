@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Aranea sleep state glyph</title>
+  <path d="M22 5a11 11 0 1 0 5 19 10 10 0 1 1-5-19Z" stroke="#7A5CFF" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M22 8h6l-5 5h5" stroke="#7A5CFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -16,6 +16,25 @@ done < <(rg -o '\]\([^)]*\)' "$repo_root/README.md" | sed 's/^](//; s/)$//' | rg
 find "$repo_root/integrations" -type f -name '*.svg' -print0 |
   xargs -0 -n1 xmllint --noout
 
+for path in \
+  branding/marks/aranea-primary.svg \
+  branding/marks/aranea-glyph.svg \
+  branding/marks/aranea-ceremony.svg \
+  branding/glyphs/ready.svg \
+  branding/glyphs/active.svg \
+  branding/glyphs/attention.svg \
+  branding/glyphs/warning.svg \
+  branding/glyphs/error.svg \
+  branding/glyphs/sleep.svg \
+  branding/glyphs/power.svg \
+  branding/motifs/node-divider.svg \
+  branding/motifs/edge-trace.svg \
+  branding/motifs/menu-network.svg \
+  branding/motifs/node-halo.svg; do
+  test -f "$repo_root/$path"
+  xmllint --noout "$repo_root/$path"
+done
+
 find "$repo_root/backgrounds" "$repo_root/screenshots" -type f \( -name '*.png' -o -name '*.jpg' \) -print0 |
   xargs -0 -n1 identify >/dev/null
 

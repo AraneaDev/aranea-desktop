@@ -70,6 +70,63 @@ function appRowsForIds(appRows, ids, parent, prefix) {
   return out
 }
 
+function dynamicTileForAppRows(appRows, favoriteIds, recentIds, workspaceId) {
+  var source = Array.isArray(appRows) ? appRows : []
+  var byId = ({})
+  for (var i = 0; i < source.length; i++) {
+    var row = source[i]
+    if (row && row.appId) byId[String(row.appId)] = row
+  }
+
+  var candidates = [
+    { ids: favoriteIds, source: "pinned", detail: "PINNED" },
+    { ids: recentIds, source: "recent", detail: "RECENT" }
+  ]
+  for (var c = 0; c < candidates.length; c++) {
+    var ids = normalizeAppIds(candidates[c].ids, source.length || 1)
+    for (var j = 0; j < ids.length; j++) {
+      var match = byId[ids[j]]
+      if (!match) continue
+      return {
+        id: "tile." + String(match.appId),
+        appId: String(match.appId),
+        label: textValue(match.label, String(match.appId)),
+        detail: candidates[c].detail,
+        source: candidates[c].source,
+        icon: textValue(match.icon, ""),
+        appIcon: textValue(match.appIcon, "")
+      }
+    }
+  }
+
+  var workspace = String(workspaceId || "").trim()
+  return {
+    id: "tile.workspace",
+    appId: "",
+    label: workspace ? "Workspace " + workspace : "Workspace",
+    detail: "WORKSPACE",
+    source: "workspace",
+    icon: "",
+    appIcon: ""
+  }
+}
+
+function semanticDetail(entry, detail) {
+  var value = entry && typeof entry === "object" ? entry : {}
+  if (String(value.parent || "") !== "root") return textValue(detail, "")
+
+  var labels = {
+    Apps: "FIND // LAUNCH // MANAGE",
+    Learn: "DOCUMENTATION // GUIDES // IDEAS",
+    Trigger: "AUTOMATE // SCRIPTS // WORKFLOWS",
+    Style: "APPEARANCE // THEMES // BEHAVIOR",
+    Setup: "SYSTEM // DEVICES // PREFERENCES",
+    Power: "SLEEP // RESTART // SHUTDOWN"
+  }
+  var label = textValue(value.label, "")
+  return labels[label] || textValue(detail, "")
+}
+
 function normalizeItem(id, raw) {
   var value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
   var itemId = textValue(id, "")
@@ -422,7 +479,7 @@ function displayRow(items, itemOrder, checkedResults, entry, detail, score, sect
     appId: entry.appId || "",
     label: labelFor(entry, checkedResults),
     target: target,
-    detail: detail || "",
+    detail: semanticDetail(entry, detail),
     path: pathFor(items, entry.id),
     childCount: (entry.kind === "menu" || entry.kind === "link") ? childCount(items, itemOrder, target) : 0,
     action: entry.action || "",
@@ -547,6 +604,8 @@ if (typeof module !== "undefined") {
     toggleFavoriteApp: toggleFavoriteApp,
     recordRecentApp: recordRecentApp,
     appRowsForIds: appRowsForIds,
+    dynamicTileForAppRows: dynamicTileForAppRows,
+    semanticDetail: semanticDetail,
     normalizeItem: normalizeItem,
     parseMenuJsonc: parseMenuJsonc,
     mergeMenuSources: mergeMenuSources,

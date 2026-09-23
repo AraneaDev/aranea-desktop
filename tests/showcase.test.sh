@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 list_output="$("$repo_root/scripts/aranea-showcase" list)"
-for surface in desktop menu notifications diagnostics lock boot about file-manager editor; do
+for surface in desktop menu menu-submenu menu-search menu-input ceremony notifications diagnostics lock boot about file-manager editor; do
   grep -Fq "$surface" <<<"$list_output"
 done
 

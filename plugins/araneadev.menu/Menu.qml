@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
@@ -21,6 +22,7 @@ Item {
   function open(payloadJson: string): void {
     var payload = ({})
     try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
+    root.clockContext = Qt.formatDateTime(new Date(), "HH:mm")
 
     if (payload.fontFamily) root.fontFamily = payload.fontFamily
 
@@ -44,6 +46,9 @@ Item {
   function ping(): string { return "ok" }
 
   property string fontFamily: Style.font.menuFamily
+  readonly property string brandingMarksPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/"
+  readonly property string brandingMotifsPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/motifs/"
+  readonly property string brandingGlyphsPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/glyphs/"
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.
@@ -78,6 +83,7 @@ Item {
   readonly property int recentAppLimit: 12
   property var favoriteAppIds: []
   property var recentAppIds: []
+  property var appRows: []
 
   PersistentProperties {
     id: persisted
@@ -131,7 +137,17 @@ Item {
   }
   property bool deleteConfirmOpen: false
   property var deleteTarget: null
-  onOpenedChanged: if (!opened) { deleteConfirmOpen = false; deleteTarget = null }
+  onOpenedChanged: {
+    if (!opened) {
+      deleteConfirmOpen = false
+      deleteTarget = null
+      headerMarkSettled = false
+    } else if (!motionEnabled) {
+      headerMarkSettled = true
+    } else {
+      Qt.callLater(function() { headerMarkSettled = true })
+    }
+  }
   Component.onCompleted: root.loadAppHistory()
 
   function loadAppHistory(): void {
@@ -165,6 +181,14 @@ Item {
   property color border: Color.menu.border
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
   property color scrim: Color.menu.scrim
+  // Keep the new ornamentation derived from the stable shell palette.  The
+  // shell's menu parser intentionally exposes only the established surface
+  // tokens, so these are composited here instead of reaching for ad-hoc
+  // Color.menu members that older shells do not publish.
+  property color contextText: Util.alpha(foreground, 0.58)
+  property color tileBackground: Util.alpha(foreground, 0.045)
+  property color footerText: Util.alpha(foreground, 0.58)
+  property real nodeAlpha: 0.35
   property color selectedBackground: Color.menu.selectedBackground
   property color selectedText: Color.menu.selectedText
   property color selectedBorder: Color.menu.selectedBorder
@@ -172,23 +196,52 @@ Item {
   readonly property real rowReservedBorderLeft: Border.left(selectedBorderSpec)
   readonly property real rowReservedBorderRight: Border.right(selectedBorderSpec)
   readonly property int cornerRadius: Style.cornerRadius
+  readonly property real menuFontScale: 1.25
+  readonly property real menuLetterSpacing: 0.35
+  function menuFontSize(size: real): int { return Math.max(1, Math.round(size * root.menuFontScale)) }
   property int contentMargin: Style.spacing.panelPadding
-  property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
-  property int contentSpacing: Style.spacing.md
-  property int baseRowHeight: Math.max(Style.space(50), Style.font.body + Style.spacing.rowPaddingX * 2)
-  property int detailRowHeight: Math.max(Style.space(58), Style.font.body + Style.font.caption + Style.spacing.rowPaddingX * 2)
+  property int headerHeight: Math.max(Style.space(46), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  property int compactHeaderHeight: Math.max(Style.space(64), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  property int rootHeaderHeight: Math.max(Style.space(68), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  property int rootTileHeight: Style.space(104)
+  property int rootContextHeight: Style.space(20)
+  property int footerHeight: Style.space(26)
+  property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
+  property bool motionEnabled: true
+  property bool headerMarkSettled: false
+  readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
+  readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
+  property string clockContext: Qt.formatDateTime(new Date(), "HH:mm")
+  readonly property var dynamicTile: MenuModel.dynamicTileForAppRows(root.appRows, root.favoriteAppIds, root.recentAppIds, Hyprland.focusedWorkspace ? String(Hyprland.focusedWorkspace.id) : "")
+  readonly property var rootTiles: [
+    ({ id: "tile.files", label: "Files", detail: "BROWSE", icon: "󰉋", source: "fixed" }),
+    ({ id: "tile.terminal", label: "Terminal", detail: "EXECUTE", icon: "", source: "fixed" }),
+    root.dynamicTile
+  ]
+
+  property int contentSpacing: Style.space(14)
+  property int compactContentSpacing: Style.space(10)
+  property int baseRowHeight: Math.max(Style.space(40), root.menuFontSize(Style.font.bodySmall) + Style.space(6) * 2)
+  property int detailRowHeight: Math.max(Style.space(58), root.menuFontSize(Style.font.bodySmall) + root.menuFontSize(Style.font.caption) + Style.space(7) * 2)
   // How much of the first hidden row stays visible at the fold — enough to
   // read as a cut-off row rather than a bottom border.
   property int rowPeek: Math.round(baseRowHeight * 0.55)
-  property int rowSpacing: Style.spacing.xs
-  property int dividerHeight: Style.space(17)
+  property int rowSpacing: Style.space(4)
+  property int dividerHeight: Style.space(20)
   property bool searchDivider: false
   property int layoutSerial: 0
-  property int cardWidth: Math.min(root.dmenuActive ? Style.space(root.dmenuWidth) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(520) : Style.space(300)), panel.width - Style.gapsOut * 2)
+  property int cardWidth: Math.min(
+    root.dmenuActive
+      ? Math.max(Style.space(root.dmenuWidth), Style.space(420))
+      : root.fullRootHeader
+        ? Style.space(640)
+        : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)),
+    panel.width - Style.gapsOut * 2
+  )
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   property int cardHeight: root.dmenuActive
     ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), panel.height - Style.gapsOut * 2)
-    : Math.min(contentMargin * 2 + headerHeight + contentSpacing + visibleRowsHeight, panel.height - Style.gapsOut * 2)
+    : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, panel.height - Style.gapsOut * 2)
 
   function finishRequest(selection) {
     if (!root.requestActive || !root.doneFile) {
@@ -217,10 +270,25 @@ Item {
     Util.execDetached(command)
   }
 
+  function activateTile(tile): void {
+    if (!tile) return
+    if (tile.id === "tile.files") {
+      root.runAction("xdg-open " + Util.shellQuote(Quickshell.env("HOME")))
+      return
+    }
+    if (tile.id === "tile.terminal") {
+      root.runAction("xdg-terminal-exec")
+      return
+    }
+    if (tile.appId && root.appLibrary && typeof root.appLibrary.launch === "function") {
+      root.appLibrary.launch(tile.appId, tile.label)
+    }
+  }
+
   // Menu rows only surface their detail while a search is narrowing them;
   // dmenu rows carry caller-supplied subtext that must always be visible.
   function rowHeightForDetail(detail: string): int {
-    return (root.filterText || root.dmenuActive) && detail ? root.detailRowHeight : root.baseRowHeight
+    return (root.fullRootHeader || root.filterText || root.dmenuActive) && detail ? root.detailRowHeight : root.baseRowHeight
   }
 
   // Height the card can devote to rows before running off the screen — or
@@ -229,12 +297,16 @@ Item {
   // derived from the card height, which this value feeds.
   function availableRowsHeight(): int {
     var top = panel.cardTop >= 0 ? panel.cardTop : Style.gapsOut
-    var available = panel.height - top - Style.gapsOut - root.contentMargin * 2 - root.headerHeight - root.contentSpacing
+    var headerHeight = root.fullRootHeader ? root.rootHeaderHeight : root.headerHeight
+    var available = panel.height - top - Style.gapsOut - root.contentMargin * 2 - headerHeight - root.contentSpacing - root.rootExtrasHeight
     // The starting menu sets the ceiling along with the offset: drilling into
     // a longer submenu scrolls behind the fold instead of growing the card.
     if (panel.maxRowsHeight >= 0) available = Math.min(available, panel.maxRowsHeight)
-    // A card that swallows the whole screen reads as a page, not a menu.
-    return Math.min(available, Math.round(panel.height * 0.7))
+    // The root surface is intentionally a shorter command viewport: the
+    // header, context band, tiles, and footer need to read as one composition
+    // instead of allowing the command list to turn the card into a page.
+    var menuCeiling = root.fullRootHeader ? Style.space(250) : Math.round(panel.height * 0.7)
+    return Math.min(available, menuCeiling)
   }
 
   // When every row fits, the list gets its full height. When they don't,
@@ -407,6 +479,7 @@ Item {
       appRows = appRows.slice(0, 1).concat(recentRows, appRows.slice(1))
     }
 
+    root.appRows = appRows
     var merged = MenuModel.mergeAppRows(root.items, root.itemOrder, appRows)
     root.items = merged.items
     root.itemOrder = merged.itemOrder
@@ -1233,27 +1306,271 @@ Item {
         anchors.rightMargin: card.contentRightInset
         anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
-        spacing: root.contentSpacing
+        spacing: root.fullRootHeader ? root.contentSpacing : root.compactContentSpacing
 
         Rectangle {
           width: parent.width
-          height: root.headerHeight
+          height: root.fullRootHeader ? root.rootHeaderHeight : root.headerHeight
           radius: root.cornerRadius
           color: "transparent"
 
-          Text {
-            textFormat: Text.PlainText
+          Image {
+            opacity: root.fullRootHeader ? (root.headerMarkSettled ? 1 : 0) : 1
             anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: root.fullRootHeader ? Style.space(48) : Style.space(28)
+            height: width
+            source: "file://" + root.brandingMarksPath + (root.fullRootHeader ? "aranea-primary.svg" : "aranea-glyph.svg")
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: width * Screen.devicePixelRatio
+            sourceSize.height: height * Screen.devicePixelRatio
+            smooth: true
+            mipmap: true
+            Behavior on opacity {
+              enabled: root.motionEnabled
+              NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
+          }
+
+          Image {
+            visible: root.fullRootHeader
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            text: root.filterText || (root.dmenuActive ? (root.dmenuPrompt + "…") : ((root.item(root.activeMenu) ? (root.item(root.activeMenu).title || root.item(root.activeMenu).label) : "Go") + "…"))
-            color: root.foreground
-            opacity: root.filterText ? 1 : 0.58
+            width: Style.space(220)
+            height: Style.space(68)
+            source: "file://" + root.brandingMotifsPath + "menu-network.svg"
+            fillMode: Image.PreserveAspectFit
+            opacity: 0.24
+            sourceSize.width: width * Screen.devicePixelRatio
+            sourceSize.height: height * Screen.devicePixelRatio
+            smooth: true
+            mipmap: true
+          }
+
+          Column {
+            anchors.left: parent.left
+            anchors.leftMargin: root.fullRootHeader ? Style.space(62) : Style.space(38)
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(4)
+
+            Text {
+              textFormat: Text.PlainText
+              width: parent.width
+              text: root.fullRootHeader
+                ? "ARANEA"
+                : root.dmenuActive
+                  ? root.dmenuPrompt
+                  : "ARANEA / " + (root.item(root.activeMenu) ? (root.item(root.activeMenu).title || root.item(root.activeMenu).label) : "GO")
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: root.fullRootHeader ? root.menuFontSize(Style.font.title) : root.menuFontSize(Style.font.body)
+              font.weight: Font.Medium
+              font.letterSpacing: root.menuLetterSpacing
+              elide: Text.ElideRight
+            }
+
+            Text {
+              visible: true
+              textFormat: Text.PlainText
+              width: parent.width
+              text: root.fullRootHeader
+                ? "SYSTEM // READY"
+                : root.dmenuActive
+                  ? (root.mode === "input" ? "TYPE TO FILTER  ·  ESC CANCEL" : displayModel.count + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL")
+                  : "ESC BACK  ·  ENTER OPEN"
+              color: root.contextText
+              font.family: root.fontFamily
+              font.pixelSize: root.menuFontSize(Style.font.caption)
+              font.weight: Font.Medium
+              font.letterSpacing: root.menuLetterSpacing
+              elide: Text.ElideRight
+            }
+          }
+
+          Image {
+            visible: root.fullRootHeader
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: Style.space(64)
+            height: Style.space(12)
+            source: "file://" + root.brandingMotifsPath + "edge-trace.svg"
+            fillMode: Image.PreserveAspectFit
+            opacity: 0.55
+            sourceSize.width: width * Screen.devicePixelRatio
+            sourceSize.height: height * Screen.devicePixelRatio
+            smooth: true
+            mipmap: true
+          }
+        }
+
+          Row {
+            visible: root.fullRootHeader
+            width: parent.width
+            height: root.rootContextHeight
+            spacing: Style.spacing.md
+
+            Image {
+              width: root.menuFontSize(Style.font.caption)
+              height: width
+              source: "file://" + root.brandingGlyphsPath + "ready.svg"
+              fillMode: Image.PreserveAspectFit
+              sourceSize.width: width * Screen.devicePixelRatio
+              sourceSize.height: height * Screen.devicePixelRatio
+              smooth: true
+              mipmap: true
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Text {
+              text: root.workspaceContext
+              color: root.contextText
+              font.family: root.fontFamily
+              font.pixelSize: root.menuFontSize(Style.font.caption)
+              font.weight: Font.Medium
+              font.letterSpacing: root.menuLetterSpacing
+              verticalAlignment: Text.AlignVCenter
+            }
+
+            Text {
+              text: "SYSTEM READY"
+              color: root.contextText
+              font.family: root.fontFamily
+              font.pixelSize: root.menuFontSize(Style.font.caption)
+              font.weight: Font.Medium
+              font.letterSpacing: root.menuLetterSpacing
+              verticalAlignment: Text.AlignVCenter
+            }
+
+            Text {
+              text: root.clockContext
+              color: root.contextText
+              font.family: root.fontFamily
+              font.pixelSize: root.menuFontSize(Style.font.caption)
+              font.weight: Font.Medium
+              font.letterSpacing: root.menuLetterSpacing
+              verticalAlignment: Text.AlignVCenter
+            }
+          }
+
+          Row {
+          visible: root.fullRootHeader
+          width: parent.width
+          height: root.rootTileHeight
+          spacing: Style.spacing.xs
+
+          Repeater {
+            model: root.rootTiles
+
+            delegate: BorderSurface {
+              required property var modelData
+
+              opacity: root.fullRootHeader ? 1 : 0
+              width: (parent.width - Style.spacing.xs * 2) / 3
+              height: root.rootTileHeight
+              radius: root.cornerRadius
+              color: root.tileBackground
+              borderSpec: Border.surfaceSpec("menu", "tile", root.border, Style.space(1))
+
+              Behavior on opacity {
+                enabled: root.motionEnabled
+                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+              }
+
+              Column {
+              width: parent.width - Style.space(28)
+              anchors.centerIn: parent
+              spacing: Style.space(11)
+
+                Text {
+                  width: parent.width
+                  text: modelData.icon
+                  color: root.selectedText
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.iconLarge
+                  horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                  width: parent.width
+                  text: modelData.label
+                  color: root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: root.menuFontSize(Style.font.bodySmall)
+                  font.letterSpacing: root.menuLetterSpacing
+                  horizontalAlignment: Text.AlignHCenter
+                  elide: Text.ElideRight
+                }
+
+                Text {
+                  width: parent.width
+                  text: modelData.detail
+                  color: root.contextText
+                  font.family: root.fontFamily
+                  font.pixelSize: root.menuFontSize(Style.font.caption)
+                  font.weight: Font.Medium
+                  font.letterSpacing: root.menuLetterSpacing
+                  horizontalAlignment: Text.AlignHCenter
+                  elide: Text.ElideRight
+                }
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.activateTile(modelData)
+              }
+            }
+          }
+          }
+
+        Rectangle {
+          visible: root.fullRootHeader
+          width: parent.width
+          height: root.footerHeight
+          color: "transparent"
+
+          Image {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Style.space(8)
+            source: "file://" + root.brandingMotifsPath + "node-divider.svg"
+            fillMode: Image.PreserveAspectFit
+            opacity: root.nodeAlpha
+            sourceSize.width: width * Screen.devicePixelRatio
+            sourceSize.height: height * Screen.devicePixelRatio
+            smooth: true
+            mipmap: true
+          }
+
+          Text {
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            textFormat: Text.PlainText
+            text: "COMMANDS  ·  QUICK ACCESS  ·  ENTER TO OPEN"
+            color: root.footerText
+            opacity: 0.9
             font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
+            font.pixelSize: root.menuFontSize(Style.font.bodySmall)
+            font.weight: Font.Medium
+            font.letterSpacing: root.menuLetterSpacing
             elide: Text.ElideRight
           }
 
+          Text {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            textFormat: Text.PlainText
+            text: "ARANEA"
+            color: root.selectedText
+            opacity: 0.7
+            font.family: root.fontFamily
+            font.pixelSize: root.menuFontSize(Style.font.caption)
+            font.weight: Font.Medium
+            font.letterSpacing: root.menuLetterSpacing
+          }
         }
 
         Item {
@@ -1365,7 +1682,7 @@ Item {
                 anchors.right: trail.left
                 anchors.rightMargin: Style.space(6)
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(3)
+                spacing: Style.space(4)
 
                 Text {
                   id: labelText
@@ -1373,21 +1690,24 @@ Item {
                   width: parent.width
                   text: row.label
                   color: row.hasCursor ? root.selectedText : root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.heading
-                  font.weight: Font.Medium
-                  elide: Text.ElideRight
+                font.family: root.fontFamily
+                font.pixelSize: root.menuFontSize(Style.font.bodySmall)
+                font.weight: Font.Medium
+                font.letterSpacing: root.menuLetterSpacing
+                elide: Text.ElideRight
                 }
 
                 Text {
                   textFormat: Text.PlainText
                   width: parent.width
                   text: row.detail
-                  visible: (root.filterText || row.kind === "dmenu") && row.detail.length > 0
+                  visible: (root.fullRootHeader || root.filterText || row.kind === "dmenu") && row.detail.length > 0
                   color: root.foreground
                   opacity: 0.52
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
+                  font.pixelSize: root.menuFontSize(Style.font.caption)
+                  font.weight: Font.Medium
+                  font.letterSpacing: root.menuLetterSpacing
                   elide: Text.ElideRight
                 }
               }
@@ -1407,7 +1727,7 @@ Item {
                   color: root.foreground
                   opacity: 0.45
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
+                  font.pixelSize: root.menuFontSize(Style.font.body)
                   anchors.verticalCenter: parent.verticalCenter
                 }
 
@@ -1417,8 +1737,9 @@ Item {
                   color: row.hasCursor ? root.selectedText : root.foreground
                   opacity: row.kind === "menu" || row.kind === "link" ? 0.36 : 0
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.heading
+                  font.pixelSize: root.menuFontSize(Style.font.body)
                   font.weight: Font.Normal
+                  font.letterSpacing: root.menuLetterSpacing
                   anchors.verticalCenter: parent.verticalCenter
                 }
               }
@@ -1495,7 +1816,7 @@ Item {
               color: root.selectedText
               opacity: 0.8
               font.family: root.fontFamily
-              font.pixelSize: Style.font.displayLarge
+              font.pixelSize: root.menuFontSize(Style.font.displayLarge)
               horizontalAlignment: Text.AlignHCenter
               width: Style.space(320)
             }
@@ -1506,7 +1827,7 @@ Item {
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
-              font.pixelSize: Style.font.title
+              font.pixelSize: root.menuFontSize(Style.font.title)
               horizontalAlignment: Text.AlignHCenter
               width: Style.space(320)
             }

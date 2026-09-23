@@ -89,6 +89,15 @@ The wallpaper picker also exposes `night`, `sparse`, `dense`, `dusk`,
 `monochrome`, and `ultrawide`. The bar remains transparent so the network art
 can breathe behind it.
 
+The command menu uses a hybrid command-center layout: the root view adds
+Aranea identity, fixed Files and Terminal tiles, and a favorite/recent action;
+submenus retain a compact mark and breadcrumb. The primary, reduced, and
+ceremony marks live under [`branding/marks`](branding/marks/aranea-primary.svg)
+alongside their reduced and ceremony variants. Shared ready/active/attention
+state glyphs and the menu’s network, node, and edge motifs live under
+[`branding/glyphs`](branding/glyphs/ready.svg) and
+[`branding/motifs`](branding/motifs/menu-network.svg).
+
 ## Artwork
 
 ### Desktop and shell
@@ -96,6 +105,12 @@ can breathe behind it.
 ![Aranea desktop](screenshots/desktop.png)
 
 ![Aranea command menu](screenshots/menu.png)
+
+![Aranea command menu — compact submenu](screenshots/menu-submenu.png)
+
+![Aranea command menu — search](screenshots/menu-search.png)
+
+![Aranea command menu — input](screenshots/menu-input.png)
 
 ![Aranea notifications](screenshots/notifications.png)
 

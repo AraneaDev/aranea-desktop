@@ -6,6 +6,7 @@ Palette: obsidian / mint / violet
 Activity: #3bff9e
 Focus: #7a5cff
 Ceremony: #e6c98a
+Identity: primary technical spider, reduced glyph, and ceremony mark
 
 Use `aranea-doctor --json` for active integration health.
 Use `aranea-wallpaper list` for named wallpaper surfaces.

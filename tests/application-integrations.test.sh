@@ -15,7 +15,11 @@ for file in \
   "$repo_root/integrations/media/pavucontrol.css" \
   "$repo_root/integrations/developer/neovim.lua" \
   "$repo_root/branding/about-card.txt" \
-  "$repo_root/branding/glyphs/theme-change.txt"; do
+  "$repo_root/branding/glyphs/theme-change.txt" \
+  "$repo_root/branding/marks/aranea-primary.svg" \
+  "$repo_root/branding/marks/aranea-glyph.svg" \
+  "$repo_root/branding/marks/aranea-ceremony.svg" \
+  "$repo_root/integrations/qt/kvantum/Aranea/Aranea.svg"; do
   test -f "$file"
 done
 
@@ -24,6 +28,9 @@ grep -Fq 'fall back' "$repo_root/integrations/browser/README.md"
 grep -Fq 'unsupported' "$repo_root/integrations/session/README.md"
 grep -Fq 'native' "$repo_root/integrations/media/README.md"
 grep -Fq 'Aranea' "$repo_root/integrations/browser/chromium/new-tab/index.html"
+grep -Fq 'aranea-primary.svg' "$repo_root/integrations/session/omarchy.css"
+grep -Fq 'aranea-glyph.svg' "$repo_root/integrations/browser/aranea.css"
+grep -Fq 'CEREMONY' "$repo_root/branding/glyphs/theme-change.txt"
 grep -Fq '#3bff9e' "$repo_root/integrations/session/omarchy.css"
 grep -Fq '#7a5cff' "$repo_root/integrations/media/pavucontrol.css"
 if about_output="$("$repo_root/scripts/aranea-about" 2>&1)"; then

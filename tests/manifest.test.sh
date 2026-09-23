@@ -22,4 +22,8 @@ for token in motion_enabled reduced_motion_fallback; do
   grep -Eq "^${token}[[:space:]]*=" "$repo_root/colors.toml"
 done
 
+for token in context-text tile-background footer-text node-alpha; do
+  grep -Eq "^${token}[[:space:]]*=" "$repo_root/shell.toml"
+done
+
 echo "manifest contract passed"

@@ -81,6 +81,24 @@ const favoriteRows = menu.appRowsForIds(appRows, ['org.beta', 'missing'], 'apps.
 if (favoriteRows.length !== 1 || favoriteRows[0].id !== 'apps.favorites.org.beta' || favoriteRows[0].parent !== 'apps.favorites') {
   throw new Error('favorite app rows were not projected into their submenu')
 }
+const pinnedTile = menu.dynamicTileForAppRows(appRows, ['org.beta'], ['org.alpha'], 'workspace-1')
+if (pinnedTile.source !== 'pinned' || pinnedTile.label !== 'Beta' || pinnedTile.detail !== 'PINNED') {
+  throw new Error('favorite app did not win dynamic tile resolution')
+}
+const recentTile = menu.dynamicTileForAppRows(appRows, [], ['org.alpha'], 'workspace-1')
+if (recentTile.source !== 'recent' || recentTile.label !== 'Alpha' || recentTile.detail !== 'RECENT') {
+  throw new Error('recent app did not resolve dynamic tile')
+}
+const fallbackTile = menu.dynamicTileForAppRows([], [], [], 'workspace-1')
+if (fallbackTile.source !== 'workspace' || fallbackTile.detail !== 'WORKSPACE' || !fallbackTile.label) {
+  throw new Error('dynamic tile fallback was not stable')
+}
+if (menu.semanticDetail({ parent: 'root', label: 'Apps' }, 'Applications') !== 'FIND // LAUNCH // MANAGE') {
+  throw new Error('root Apps semantic subtitle was not normalized')
+}
+if (menu.semanticDetail({ parent: 'apps', label: 'Apps' }, 'Applications') !== 'Applications') {
+  throw new Error('submenu detail was unexpectedly rewritten')
+}
 
 const bounded = notifications.limitHistory([{ id: 1 }, { id: 2 }, { id: 3 }], 2)
 if (bounded.length !== 2 || bounded[0].id !== 1) throw new Error('history was not bounded')
@@ -101,6 +119,11 @@ const lockQml = fs.readFileSync(`${root}/plugins/araneadev.lock/Service.qml`, 'u
 const lockViewQml = fs.readFileSync(`${root}/plugins/araneadev.lock/LockView.qml`, 'utf8')
 const notificationsQml = service
 const barQml = fs.readFileSync(`${root}/plugins/araneadev.bar/Bar.qml`, 'utf8')
+const menuBarWidgetQml = fs.readFileSync(`${root}/plugins/araneadev.menu/BarWidget.qml`, 'utf8')
+const notificationCardQml = fs.readFileSync(`${root}/plugins/araneadev.notifications/components/NotificationCard.qml`, 'utf8')
+if (!menuBarWidgetQml.includes('aranea-glyph.svg')) throw new Error('bar menu trigger is missing reduced Aranea glyph')
+if (!notificationCardQml.includes('aranea-glyph.svg')) throw new Error('notification card is missing reduced Aranea glyph')
+if (!lockViewQml.includes('aranea-ceremony.svg')) throw new Error('lock surface is missing ceremony Aranea mark')
 function requiresSignature(source, signature, name) {
   if (!source.includes(signature)) throw new Error(`missing typed scalar contract: ${name}`)
 }

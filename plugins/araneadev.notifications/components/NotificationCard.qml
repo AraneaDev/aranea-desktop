@@ -37,6 +37,7 @@ BorderSurface {
   // Prefer per-notification media/avatar data, then fall back to the app icon.
   // The `check` flag avoids Qt's missing-texture placeholder for unknown names.
   readonly property string smallIconSource: image.length > 0 ? image : iconSource(appIcon)
+  readonly property string araneaGlyphSource: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/aranea-glyph.svg"
   readonly property bool hasGlyph: glyph.length > 0
   readonly property bool compactGlyph: NotificationLogic.shouldRenderCompactGlyph(glyph, smallIconSource, singleLineToast)
   readonly property bool hasSmallIcon: smallIconSource.length > 0
@@ -128,7 +129,18 @@ BorderSurface {
         // Hide the slot when the icon failed to resolve (themed-icon name
         // not in the user's icon theme) AND we don't have a glyph fallback
         // — prevents rendering Qt's pink broken-image placeholder.
-        visible: !root.collapseRedundantIcon && !root.compactGlyph && (root.hasSmallIcon || root.hasGlyph) && (root.hasGlyph || smallIconImage.status !== Image.Error)
+        visible: !root.collapseRedundantIcon && !root.compactGlyph && (root.hasSmallIcon || root.hasGlyph || (!root.hasSmallIcon && !root.hasGlyph)) && (root.hasGlyph || !root.hasSmallIcon || smallIconImage.status !== Image.Error)
+
+        Image {
+          anchors.fill: parent
+          source: root.araneaGlyphSource
+          sourceSize.width: smallIconSlot.width * Screen.devicePixelRatio
+          sourceSize.height: smallIconSlot.height * Screen.devicePixelRatio
+          fillMode: Image.PreserveAspectFit
+          smooth: true
+          mipmap: true
+          visible: !root.hasSmallIcon && !root.hasGlyph
+        }
 
         Image {
           id: smallIconImage

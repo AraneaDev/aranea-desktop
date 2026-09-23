@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Aranea error state glyph</title>
+  <circle cx="16" cy="16" r="12" stroke="#FF6B7A" stroke-width="1.5"/>
+  <path d="m11 11 10 10M21 11 11 21" stroke="#FF6B7A" stroke-width="2" stroke-linecap="round"/>
+</svg>

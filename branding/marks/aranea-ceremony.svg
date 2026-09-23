@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <title>Aranea ceremony technical spider mark</title>
+  <g stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="#3BFF9E" d="M101 105 72 77 48 77 27 51M96 119 59 108 34 119 12 105M96 137 58 148 34 137 12 151M101 151 72 179 48 179 27 205"/>
+    <path stroke="#7A5CFF" d="M155 105 184 77 208 77 229 51M160 119 197 108 222 119 244 105M160 137 198 148 222 137 244 151M155 151 184 179 208 179 229 205"/>
+  </g>
+  <g fill="#E6C98A">
+    <circle cx="27" cy="51" r="4"/><circle cx="12" cy="105" r="4"/><circle cx="12" cy="151" r="4"/><circle cx="27" cy="205" r="4"/>
+    <circle cx="229" cy="51" r="4"/><circle cx="244" cy="105" r="4"/><circle cx="244" cy="151" r="4"/><circle cx="229" cy="205" r="4"/>
+  </g>
+  <g stroke="#E6C98A" stroke-width="5">
+    <ellipse cx="128" cy="129" rx="27" ry="42"/>
+    <ellipse cx="128" cy="92" rx="16" ry="14"/>
+  </g>
+  <circle cx="128" cy="129" r="8" fill="#E6C98A"/>
+</svg>
