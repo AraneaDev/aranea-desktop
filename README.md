@@ -156,6 +156,14 @@ omarchy plymouth set-by-theme aranea
 
 ![Aranea Neovim](screenshots/neovim.png)
 
+Refresh the README capture set in one pass. The menu states are captured
+directly through the running shell; desktop, lock, application, and boot
+surfaces use the configured `ARANEA_SCREENSHOT_COMMAND` provider:
+
+```bash
+./scripts/capture-screenshots --all --output screenshots
+```
+
 The repository also ships matching Cava, browser/session, Qt, icon, and cursor
 integrations. The cursor artwork is inspectable directly:
 

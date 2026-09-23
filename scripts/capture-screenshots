@@ -4,18 +4,35 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
+capture_all=0
+all_surfaces=(menu menu-submenu menu-search menu-input desktop notifications diagnostics lock plymouth fastfetch file-manager neovim)
 
 while (($#)); do
   case "$1" in
     --surface) (($# >= 2)) || { echo '--surface requires a value' >&2; exit 2; }; surface="$2"; shift ;;
     --output) (($# >= 2)) || { echo '--output requires a directory' >&2; exit 2; }; output="$2"; shift ;;
+    --all) capture_all=1 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
 done
 
+if (( capture_all )); then
+  [[ -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --all --output <dir>' >&2; exit 2; }
+  for all_surface in "${all_surfaces[@]}"; do
+    "$0" --surface "$all_surface" --output "$output"
+  done
+  exit 0
+fi
+
 [[ -n "$surface" && -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --surface <name> --output <dir>' >&2; exit 2; }
-"$repo_root/scripts/aranea-showcase" surface "$surface" >/dev/null
+showcase_surface="$surface"
+case "$surface" in
+  plymouth) showcase_surface=boot ;;
+  fastfetch) showcase_surface=about ;;
+  neovim) showcase_surface=editor ;;
+esac
+"$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
 
 capture_menu_surface() {
