@@ -162,6 +162,24 @@ Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
 omarchy plymouth set-by-theme aranea
 ```
 
+### Cursor artwork
+
+![Aranea pointer cursor](integrations/cursor/cursors/left_ptr.svg)
+![Aranea spider hand cursor](integrations/cursor/cursors/hand2.svg)
+![Aranea web activity cursor](integrations/cursor/cursors/watch.svg)
+![Aranea crosshair cursor](integrations/cursor/cursors/crosshair.svg)
+
+The busy cursor animation is shipped as eight matching SVG frames:
+
+[`watch-01.svg`](integrations/cursor/cursors/watch-01.svg) ·
+[`watch-02.svg`](integrations/cursor/cursors/watch-02.svg) ·
+[`watch-03.svg`](integrations/cursor/cursors/watch-03.svg) ·
+[`watch-04.svg`](integrations/cursor/cursors/watch-04.svg) ·
+[`watch-05.svg`](integrations/cursor/cursors/watch-05.svg) ·
+[`watch-06.svg`](integrations/cursor/cursors/watch-06.svg) ·
+[`watch-07.svg`](integrations/cursor/cursors/watch-07.svg) ·
+[`watch-08.svg`](integrations/cursor/cursors/watch-08.svg)
+
 ### Application surfaces
 
 ![Aranea fastfetch](screenshots/fastfetch.png)
@@ -188,12 +206,7 @@ Lock and Plymouth entries use the canonical ceremony and primary artwork,
 rendered into the README capture set without locking or rebooting the session.
 
 The repository also ships matching Cava, browser/session, Qt, icon, and cursor
-integrations. The cursor artwork is inspectable directly:
-
-![Aranea default cursor](integrations/cursor/cursors/left_ptr.svg)
-![Aranea hand cursor](integrations/cursor/cursors/hand2.svg)
-![Aranea busy cursor](integrations/cursor/cursors/watch.svg)
-![Aranea error cursor](integrations/cursor/cursors/crosshair.svg)
+integrations.
 
 ## Interaction
 
