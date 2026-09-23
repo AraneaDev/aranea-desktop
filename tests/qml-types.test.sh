@@ -49,10 +49,10 @@ if [[ -d "$shell_dir/Commons" && -f "$shell_dir/Commons/qmldir" \
   ln -s "$shell_dir/Ui" "$import_root/qs/Ui"
   qml_args+=(-I "$import_root")
 else
-  # CI does not ship Omarchy/Quickshell modules. Keep qmllint mandatory while
-  # downgrading only environment-owned import/type diagnostics.
+  # CI does not ship Omarchy/Quickshell modules. Keep qmllint mandatory and
+  # parse every file without pretending external types are available.
   validation_mode=syntax-and-local-types
-  qml_args+=(--import info --missing-type info --missing-property info --unresolved-type info --unqualified info --max-warnings -1)
+  qml_args+=(--bare)
 fi
 
 "$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}"
