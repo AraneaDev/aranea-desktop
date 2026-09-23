@@ -187,6 +187,12 @@ Item {
   // Color.menu members that older shells do not publish.
   property color contextText: Util.alpha(foreground, 0.58)
   property color tileBackground: Util.alpha(foreground, 0.045)
+  function hoveredTileBackground(hovered: bool): color {
+    return hovered ? Util.alpha(selectedText, 0.10) : Util.alpha(foreground, 0.028)
+  }
+  function hoveredTileBorder(hovered: bool): color {
+    return hovered ? Util.alpha(selectedText, 0.72) : Util.alpha(foreground, 0.16)
+  }
   property color footerText: Util.alpha(foreground, 0.58)
   property real nodeAlpha: 0.35
   property color selectedBackground: Color.menu.selectedBackground
@@ -212,11 +218,10 @@ Item {
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
   readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
   property string clockContext: Qt.formatDateTime(new Date(), "HH:mm")
-  readonly property var dynamicTile: MenuModel.dynamicTileForAppRows(root.appRows, root.favoriteAppIds, root.recentAppIds, Hyprland.focusedWorkspace ? String(Hyprland.focusedWorkspace.id) : "")
   readonly property var rootTiles: [
     ({ id: "tile.files", label: "Files", detail: "BROWSE", icon: "󰉋", source: "fixed" }),
     ({ id: "tile.terminal", label: "Terminal", detail: "EXECUTE", icon: "", source: "fixed" }),
-    root.dynamicTile
+    ({ id: "tile.setup", label: "Setup", detail: "CONFIGURE", icon: "", source: "fixed" })
   ]
 
   property int contentSpacing: Style.space(14)
@@ -274,10 +279,16 @@ Item {
     if (!tile) return
     if (tile.id === "tile.files") {
       root.runAction("xdg-open " + Util.shellQuote(Quickshell.env("HOME")))
+      root.cancel()
       return
     }
     if (tile.id === "tile.terminal") {
       root.runAction("xdg-terminal-exec")
+      root.cancel()
+      return
+    }
+    if (tile.id === "tile.setup") {
+      root.openRoute("setup")
       return
     }
     if (tile.appId && root.appLibrary && typeof root.appLibrary.launch === "function") {
@@ -1464,13 +1475,32 @@ Item {
 
             delegate: BorderSurface {
               required property var modelData
+              property bool hovered: false
 
               opacity: root.fullRootHeader ? 1 : 0
               width: (parent.width - Style.spacing.xs * 2) / 3
               height: root.rootTileHeight
-              radius: root.cornerRadius
-              color: root.tileBackground
-              borderSpec: Border.surfaceSpec("menu", "tile", root.border, Style.space(1))
+              radius: Style.space(5)
+              color: root.hoveredTileBackground(hovered)
+              borderSpec: Border.none()
+
+              Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                width: Style.space(18)
+                height: Style.space(2)
+                color: root.selectedText
+                opacity: hovered ? 0.9 : 0.25
+              }
+
+              Rectangle {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: Style.space(18)
+                height: Style.space(2)
+                color: root.selectedText
+                opacity: hovered ? 0.9 : 0.25
+              }
 
               Behavior on opacity {
                 enabled: root.motionEnabled
@@ -1520,6 +1550,8 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.activateTile(modelData)
+                onEntered: parent.hovered = true
+                onExited: parent.hovered = false
               }
             }
           }
