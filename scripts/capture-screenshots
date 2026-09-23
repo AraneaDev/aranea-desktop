@@ -19,6 +19,16 @@ done
 
 if (( capture_all )); then
   [[ -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --all --output <dir>' >&2; exit 2; }
+  command -v hyprctl >/dev/null 2>&1 || { echo '--all requires hyprctl so captures cannot silently run on the wrong workspace' >&2; exit 3; }
+  active_workspace="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id' 2>/dev/null || true)"
+  [[ -n "$active_workspace" && "$active_workspace" != "null" ]] || {
+    echo 'Unable to verify the active workspace; refusing --all capture' >&2
+    exit 3
+  }
+  [[ "$active_workspace" == "2" ]] || {
+    echo "Refusing --all capture on workspace $active_workspace; switch to workspace 2 first" >&2
+    exit 3
+  }
   for all_surface in "${all_surfaces[@]}"; do
     "$0" --surface "$all_surface" --output "$output"
   done
