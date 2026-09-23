@@ -21,7 +21,11 @@ if rg -n '#ff5f56|#e6c98a' "$repo_root/integrations/cursor"; then
   echo 'cursor palette contains non-Aranea colors' >&2
   exit 1
 fi
-grep -Fq '<title>Aranea spider cursor</title>' "$repo_root/integrations/cursor/cursors/hand2.svg"
+grep -Fq '<title>Aranea spider hand cursor</title>' "$repo_root/integrations/cursor/cursors/hand2.svg"
+if rg -n 'circle cx="15"|circle cx="17"' "$repo_root/integrations/cursor"; then
+  echo 'cursor hand artwork still contains eye dots' >&2
+  exit 1
+fi
 grep -Fq 'M6 4' "$repo_root/integrations/cursor/cursors/left_ptr.svg"
 grep -Fq 'define_size = 32, watch-08.svg' "$repo_root/integrations/cursor/hyprcursor/hyprcursors/watch/meta.hl"
 for frame in 01 02 03 04 05 06 07 08; do
