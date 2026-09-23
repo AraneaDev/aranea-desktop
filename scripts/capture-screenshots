@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
 capture_all=0
-all_surfaces=(menu menu-submenu menu-search menu-input desktop notifications diagnostics lock plymouth fastfetch file-manager neovim)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics notifications lock plymouth fastfetch file-manager neovim)
 
 while (($#)); do
   case "$1" in
@@ -101,20 +101,25 @@ case "$surface" in
     ;;
   notifications)
     command -v notify-send >/dev/null 2>&1 &&
-      notify-send -a Aranea -u normal -t 6000 'Aranea notification' 'Theme capture · notification surface' || true
+      notify-send -a Aranea -u normal -t 2500 'Aranea notification' 'Theme capture · notification surface' || true
     sleep 0.5
     omarchy-shell shell toggle araneadev.notifications >/dev/null
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
     omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
+    # Let the capture-only toast expire before the next all-surface capture.
+    sleep 2
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   diagnostics)
+    # Keep the diagnostics capture free of unrelated toast notifications.
+    omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     aranea-diagnostics-toggle >/dev/null
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
     aranea-diagnostics-toggle >/dev/null 2>&1 || true
+    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
@@ -138,14 +143,12 @@ case "$surface" in
     exit 0
     ;;
   lock)
-    command -v rsvg-convert >/dev/null 2>&1 || { echo 'rsvg-convert is required to render lock artwork' >&2; exit 3; }
-    rsvg-convert -w 3840 -h 2160 -b '#05070a' branding/marks/aranea-ceremony.svg > "$output/$surface.png"
+    cp "$repo_root/branding/screens/lock.png" "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   plymouth)
-    command -v rsvg-convert >/dev/null 2>&1 || { echo 'rsvg-convert is required to render boot artwork' >&2; exit 3; }
-    rsvg-convert -w 1920 -h 1080 -b '#05070a' branding/marks/aranea-primary.svg > "$output/$surface.png"
+    cp "$repo_root/branding/screens/plymouth.png" "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
