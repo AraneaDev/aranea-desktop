@@ -1672,12 +1672,12 @@ Item {
           visible: centerRoot.hasAnchor
           entries: root.entriesBefore(centerRoot.entries, root.centerAnchor)
           region: "center"
-          anchors.bottom: centerAnchorModule.top
-          anchors.horizontalCenter: centerAnchorModule.horizontalCenter
+          anchors.bottom: verticalCenterAnchorModule.top
+          anchors.horizontalCenter: verticalCenterAnchorModule.horizontalCenter
         }
 
         ModuleSlot {
-          id: centerAnchorModule
+          id: verticalCenterAnchorModule
           visible: centerRoot.hasAnchor
           entry: centerRoot.anchorEntry
           region: "center"
@@ -1688,8 +1688,8 @@ Item {
           visible: centerRoot.hasAnchor
           entries: root.entriesAfter(centerRoot.entries, root.centerAnchor)
           region: "center"
-          anchors.top: centerAnchorModule.bottom
-          anchors.horizontalCenter: centerAnchorModule.horizontalCenter
+          anchors.top: verticalCenterAnchorModule.bottom
+          anchors.horizontalCenter: verticalCenterAnchorModule.horizontalCenter
         }
       }
     }
