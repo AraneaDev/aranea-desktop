@@ -45,7 +45,7 @@ Item {
   property string omarchyConfigDir: home + "/.config/omarchy"
   property var fallbackBarConfig: ({
     position: "top",
-    transparent: false,
+    transparent: true,
     centerAnchor: "omarchy.clock",
     layout: { left: [], center: [], right: [] }
   })
@@ -584,7 +584,10 @@ Item {
 
     position = normalizePosition(config.position)
     profile = BarModel.normalizeProfile(config.profile || Quickshell.env("ARANEA_BAR_PROFILE"))
-    setRequestedTransparency(config.transparent === true)
+    // Custom theme bars default to the transparent treatment; an explicit
+    // false remains available for bars that intentionally need a slab.
+    // Aranea uses a fully glass bar, including the module regions.
+    setRequestedTransparency(true)
     centerAnchor = Util.canonicalWidgetId(config.centerAnchor || "")
 
     // layoutEntries feeds plain JS arrays to the module Repeaters, and QML
@@ -1042,6 +1045,10 @@ Item {
       restoreForegroundAnimation()
       return
     }
+    // The surface must become transparent immediately.  The contrast-color
+    // probe is asynchronous and should only refine the foreground color; it
+    // must not leave an opaque bar behind while it runs or if it is delayed.
+    transparent = true
     scheduleTransparentForegroundRefresh()
   }
 
@@ -1255,7 +1262,9 @@ Item {
 
     implicitWidth: root.vertical ? root.barSize : 0
     implicitHeight: root.vertical ? 0 : root.barSize
-    color: root.transparent ? "transparent" : root.background
+    // This theme's bar is a glass layer. Keep the layer itself transparent;
+    // the widget groups provide their own surfaces when requested.
+    color: "transparent"
     surfaceFormat.opaque: false
     WlrLayershell.namespace: "omarchy-bar"
     WlrLayershell.layer: WlrLayer.Top
@@ -1359,7 +1368,7 @@ Item {
 
         BorderSurface {
           id: leftSurface
-          visible: !root.requestedTransparent
+          visible: false
           anchors.left: parent.left
           anchors.leftMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
@@ -1380,7 +1389,7 @@ Item {
 
         BorderSurface {
           id: rightSurface
-          visible: !root.requestedTransparent
+          visible: false
           anchors.right: parent.right
           anchors.rightMargin: Style.space(8)
           anchors.verticalCenter: parent.verticalCenter
@@ -1401,7 +1410,7 @@ Item {
 
         BorderSurface {
           id: centerSurface
-          visible: !root.requestedTransparent
+          visible: false
           anchors.centerIn: parent
           width: Style.space(190)
           height: root.barSize - Style.space(8)
