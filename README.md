@@ -11,7 +11,9 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 </div>
 
-![Aranea desktop](screenshots/desktop.png)
+![Aranea desktop showcase](screenshots/hero-showcase.gif)
+
+Static fallback: [Aranea desktop](screenshots/desktop.png)
 
 ## What it feels like
 
