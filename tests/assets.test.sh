@@ -11,7 +11,7 @@ done < <(sed -n 's/^path = "\(.*\)"$/\1/p' "$repo_root/backgrounds/manifest.toml
 test -f "$repo_root/screenshots/hero-showcase.gif"
 hero_dimensions="$(identify -format '%wx%h' "$repo_root/screenshots/hero-showcase.gif[0]")"
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
-[[ "$hero_dimensions" == '1280x720' && "$hero_frames" -eq 21 ]] || {
+[[ "$hero_dimensions" == '1280x720' && "$hero_frames" -eq 20 ]] || {
   hero_info="$hero_dimensions $hero_frames"
   echo "unexpected hero showcase metadata: $hero_info" >&2
   exit 1

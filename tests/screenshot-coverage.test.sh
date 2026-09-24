@@ -14,7 +14,7 @@ expected_surfaces=(
   power monitor apps favorites recent
 )
 expected_hero_frames=(
-  plymouth lock desktop menu menu-submenu menu-search menu-input apps favorites
+  lock desktop menu menu-submenu menu-search menu-input apps favorites
   recent notifications network audio bluetooth agents power monitor diagnostics
   btop file-manager neovim
 )
