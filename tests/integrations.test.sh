@@ -16,7 +16,7 @@ done
 
 terminal_output="$($repo_root/scripts/install-integration terminal --dry-run)"
 printf '%s\n' "$terminal_output"
-grep -Eq 'terminal/(alacritty|kitty|foot)' <<<"$terminal_output"
+grep -Eq 'Skipping terminal:|terminal/(alacritty|kitty|foot)' <<<"$terminal_output"
 
 qt_output="$("$repo_root/scripts/install-integration" qt --dry-run)"
 grep -Eq 'Skipping qt:|would link .*Aranea\.kvconfig' <<<"$qt_output"

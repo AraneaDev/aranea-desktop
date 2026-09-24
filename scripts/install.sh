@@ -106,7 +106,9 @@ if (( dry_run )); then
   say "would set theme to aranea"
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
     say "would install cursor integration"
-    [[ "$profile" == full ]] && say "would install terminal integration"
+    if [[ "$profile" == full ]]; then
+      say "would install terminal integration"
+    fi
   fi
 else
   previous_theme="$(omarchy theme current 2>/dev/null || true)"
