@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.1...v1.1.2) (2026-09-24)
+
+
+### Fixes
+
+* refresh remaining screenshots with the unified spider mark ([#15](https://github.com/AraneaDev/aranea-desktop/issues/15)) ([46bd334](https://github.com/AraneaDev/aranea-desktop/commit/46bd33480d477b316344c9b6f09fd266aa06a22a))
+
 ## [1.1.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.0...v1.1.1) (2026-09-24)
 
 
