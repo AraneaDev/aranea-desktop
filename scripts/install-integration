@@ -177,6 +177,29 @@ case "$integration" in
       fi
     fi
     ;;
+  icons)
+    # Aranea does not ship a full icon set. Instead, point the desktop at a
+    # muted, accent-toned variant already carried by the yaru-icon-theme
+    # package Omarchy installs, and shrink Nautilus's oversized default grid
+    # icons so they stop dominating the dark, low-contrast surfaces.
+    icon_theme=Yaru-prussiangreen-dark
+    icon_theme_root="/usr/share/icons/$icon_theme"
+    if [[ ! -f "$icon_theme_root/index.theme" ]]; then
+      printf 'Skipping icons: %s is not installed.\n' "$icon_theme"
+      exit 0
+    fi
+    if command -v gsettings >/dev/null 2>&1; then
+      if (( dry_run )); then
+        printf 'would set desktop icon theme to %s\n' "$icon_theme"
+        printf 'would set Nautilus icon/list zoom to small\n'
+      else
+        gsettings set org.gnome.desktop.interface icon-theme "$icon_theme" >/dev/null 2>&1 || true
+        gsettings set org.gnome.nautilus.icon-view default-zoom-level small >/dev/null 2>&1 || true
+        gsettings set org.gnome.nautilus.list-view default-zoom-level small >/dev/null 2>&1 || true
+        printf 'set desktop icon theme to %s\n' "$icon_theme"
+      fi
+    fi
+    ;;
   media)
     if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
       install_one "$repo_root/integrations/media/pavucontrol.css" "$config_root/aranea/media/pavucontrol.css"

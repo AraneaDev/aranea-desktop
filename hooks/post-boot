@@ -34,12 +34,14 @@ if [[ -x "$theme_root/scripts/install-integration" ]]; then
     "$theme_root/scripts/install-integration" terminal --yes >/dev/null 2>&1 || true
     "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
     "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" icons --yes >/dev/null 2>&1 || true
     "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
     "$theme_root/scripts/install-integration" browser --yes >/dev/null 2>&1 || true
     "$theme_root/scripts/install-integration" session --yes >/dev/null 2>&1 || true
     "$theme_root/scripts/install-integration" media --yes >/dev/null 2>&1 || true
   elif [[ "$profile" == no_apps ]]; then
     "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
+    "$theme_root/scripts/install-integration" icons --yes >/dev/null 2>&1 || true
   fi
 fi
 

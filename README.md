@@ -73,8 +73,8 @@ If installation fails after a previous theme was detected, the installer prints
 the exact `omarchy theme set ...` command needed to restore it.
 
 `minimal` keeps the core and GTK experience, `full` enables every supported
-application integration, and `no_apps` keeps the theme, cursor, wallpaper, and
-branding assets without application integrations. The selected profile is
+application integration, and `no_apps` keeps the theme, cursor, icon, wallpaper,
+and branding assets without application integrations. The selected profile is
 stored in `~/.local/state/aranea/profile`.
 
 Preview or diagnose without changing the system:
@@ -200,8 +200,8 @@ running session, while lock and Plymouth use canonical artwork renders:
 Lock and Plymouth entries use canonical artwork renders, so refreshing the
 capture set does not lock or reboot the session.
 
-The repository also ships matching Cava, browser/session, Qt, media, and cursor
-integrations.
+The repository also ships matching Cava, browser/session, Qt, media, cursor,
+and icon integrations.
 
 ## Interaction
 

@@ -106,6 +106,7 @@ if (( dry_run )); then
   say "would set theme to aranea"
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
     say "would install cursor integration"
+    say "would install icons integration"
     if [[ "$profile" == full ]]; then
       say "would install terminal integration"
     fi
@@ -134,6 +135,7 @@ else
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
     theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
     run "$theme_root/scripts/install-integration" cursor --yes
+    run "$theme_root/scripts/install-integration" icons --yes
     if [[ "$profile" == full ]]; then
       # Terminal configs live under integrations/terminal. Omarchy ignores
       # root-level alacritty.toml, kitty.conf, and foot.ini files when a theme

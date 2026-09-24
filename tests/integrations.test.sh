@@ -30,4 +30,7 @@ cursor_output="$("$repo_root/scripts/install-integration" cursor --dry-run)"
 grep -Fq 'cursor/index.theme' <<<"$cursor_output"
 grep -Fq 'cursor/cursors/left_ptr.svg' <<<"$cursor_output"
 
+icons_output="$("$repo_root/scripts/install-integration" icons --dry-run)"
+grep -Eq 'Skipping icons:|would set desktop icon theme' <<<"$icons_output"
+
 echo "integration contract passed"

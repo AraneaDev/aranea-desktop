@@ -13,6 +13,7 @@ grep -Fq "would install conky-cairo-wayland-git with paru" "$output"
 grep -Fq "would install theme hooks" "$output"
 grep -Fq "would set theme to aranea" "$output"
 grep -Fq "would install cursor integration" "$output"
+grep -Fq "would install icons integration" "$output"
 grep -Fq "would install terminal integration" "$output"
 grep -Fq "would persist profile: full" "$output"
 

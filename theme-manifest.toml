@@ -45,6 +45,12 @@ target_kind = "theme-directory"
 fallback = "retain the host cursor theme"
 
 [[integrations]]
+id = "icons"
+profile = "full,no_apps"
+target_kind = "desktop-preference"
+fallback = "retain the host icon theme"
+
+[[integrations]]
 id = "qt"
 profile = "full"
 optional_command = "kvantummanager"
