@@ -7,6 +7,13 @@
 Deep black surfaces, mint activity, violet focus, atmospheric wallpapers, and
 the AraneaDev mark carried consistently from boot to desktop.
 
+[![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-19%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
+[![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
+[![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
+[![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
+
 [Omarchy](https://omarchy.org) · [AraneaDev](https://aranea-development.nl)
 
 </div>
