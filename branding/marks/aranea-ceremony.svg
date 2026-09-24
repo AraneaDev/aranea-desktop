@@ -1,17 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
-  <title>Aranea ceremony spider mark</title>
-  <g stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-    <path stroke="#3BFF9E" d="M101 105 72 77 48 77 27 51M96 119 59 108 34 119 12 105M96 137 58 148 34 137 12 151M101 151 72 179 48 179 27 205"/>
-    <path stroke="#7A5CFF" d="M155 105 184 77 208 77 229 51M160 119 197 108 222 119 244 105M160 137 198 148 222 137 244 151M155 151 184 179 208 179 229 205"/>
-  </g>
-  <g fill="#E6C98A">
-    <circle cx="27" cy="51" r="4"/><circle cx="12" cy="105" r="4"/><circle cx="12" cy="151" r="4"/><circle cx="27" cy="205" r="4"/>
-    <circle cx="229" cy="51" r="4"/><circle cx="244" cy="105" r="4"/><circle cx="244" cy="151" r="4"/><circle cx="229" cy="205" r="4"/>
-  </g>
-  <g fill="#211B12" stroke="#E6C98A" stroke-width="5">
-    <ellipse cx="128" cy="129" rx="27" ry="42"/>
-    <ellipse cx="128" cy="92" rx="16" ry="14"/>
-  </g>
-  <path d="M128 111v36M115 129h26" stroke="#E6C98A" stroke-width="3" stroke-linecap="round" opacity=".9"/>
-  <circle cx="128" cy="129" r="7" fill="#E6C98A"/>
+  <title>Aranea ceremony lock-screen spider</title>
+  <defs><linearGradient id="a" x1="40" y1="40" x2="216" y2="216" gradientUnits="userSpaceOnUse"><stop stop-color="#E6C98A"/><stop offset="1" stop-color="#3BFF9E"/></linearGradient></defs>
+  <g stroke="url(#a)" stroke-width="7" stroke-linecap="square" stroke-linejoin="miter"><path d="M99 91 76 68 65 43 73 23M93 112 64 98 43 76 38 51M93 132 64 145 43 168 38 193M99 153 76 176 65 201 73 233"/><path d="M157 91 180 68 191 43 183 23M163 112 192 98 213 76 218 51M163 132 192 145 213 168 218 193M157 153 180 176 191 201 183 233"/></g>
+  <path d="M128 78 111 100 128 120 145 100Z" fill="url(#a)"/><path d="m111 100 17-22 17 22-17 20Z" fill="#211B12"/><path d="M128 111 101 145 128 202 155 145Z" fill="url(#a)"/>
 </svg>
