@@ -10,5 +10,4 @@ and ultrawide has a dedicated panoramic composition.
 The six 16:9 wallpapers are exported at 3840×2160; ultrawide is 3840×1280.
 These are resampled delivery sizes, not native generated resolution. Original
 generator outputs, full prompts, and export instructions are documented in
-[../ARTWORK.md](../ARTWORK.md). The SVGs in this directory are preserved legacy
-vector studies, not sources for the current PNG collection.
+[../ARTWORK.md](../ARTWORK.md).

@@ -13,6 +13,7 @@ grep -Fq "would install conky-cairo-wayland-git with paru" "$output"
 grep -Fq "would install theme hooks" "$output"
 grep -Fq "would set theme to aranea" "$output"
 grep -Fq "would install cursor integration" "$output"
+grep -Fq "would install terminal integration" "$output"
 grep -Fq "would persist profile: full" "$output"
 
 grep -Fq "would install theme from: $repo_root" <(PATH="$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 "$repo_root/scripts/install.sh" --dry-run --yes --source "$repo_root")

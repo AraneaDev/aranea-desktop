@@ -13,7 +13,7 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 ![Aranea desktop showcase](screenshots/hero-showcase.gif)
 
-Static fallback: [Aranea desktop](screenshots/desktop.png)
+Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GIF](screenshots/hero-showcase.gif)
 
 ## What it feels like
 
@@ -48,9 +48,11 @@ For a non-interactive full install:
 ./scripts/install.sh --yes
 ```
 
-The installer installs Aranea Desktop, registers the `aranea` theme hooks, installs the managed
-integrations, and offers the optional Wayland Conky package when `paru` or
-`yay` is available. It does not start Conky automatically.
+The installer installs Aranea Desktop, registers the `aranea` theme hooks, and
+installs the managed integrations. On a full profile it also installs the
+selected terminal integration (Alacritty, Kitty, or Foot) and offers the
+optional Wayland Conky package when `paru` or `yay` is available. It does not
+start Conky automatically.
 
 Choose an installation profile when needed:
 
@@ -116,53 +118,37 @@ state glyphs and the menu’s network, node, and edge motifs live under
 
 ### Desktop and shell
 
-![Aranea desktop](screenshots/desktop.png)
+The hero above is the primary desktop view; the capture set below focuses on
+interaction states rather than repeating the same wallpaper.
 
-![Aranea command menu](screenshots/menu.png)
-
-![Aranea command menu — compact submenu](screenshots/menu-submenu.png)
-
-![Aranea command menu — search](screenshots/menu-search.png)
-
-![Aranea command menu — input](screenshots/menu-input.png)
-
-![Aranea notifications](screenshots/notifications.png)
-
-![Aranea diagnostics](screenshots/diagnostics.png)
+| Command center | Menu states | Shell telemetry |
+| --- | --- | --- |
+| ![Aranea command menu](screenshots/menu.png) | ![Aranea command menu — compact submenu](screenshots/menu-submenu.png) | ![Aranea diagnostics](screenshots/diagnostics.png) |
+| ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) | ![Aranea notifications](screenshots/notifications.png) |
 
 ### System popups
 
-![Aranea network popup](screenshots/network.png)
+| Network | Audio | Bluetooth |
+| --- | --- | --- |
+| ![Aranea network popup](screenshots/network.png) | ![Aranea audio popup](screenshots/audio.png) | ![Aranea Bluetooth popup](screenshots/bluetooth.png) |
 
-![Aranea audio popup](screenshots/audio.png)
-
-![Aranea Bluetooth popup](screenshots/bluetooth.png)
-
-![Aranea agent popup](screenshots/agents.png)
-
-![Aranea power popup](screenshots/power.png)
-
-![Aranea display popup](screenshots/monitor.png)
+| Agents | Power | Displays |
+| --- | --- | --- |
+| ![Aranea agent popup](screenshots/agents.png) | ![Aranea power popup](screenshots/power.png) | ![Aranea display popup](screenshots/monitor.png) |
 
 ### Wallpaper collection
 
-The original day/night pair is the visual anchor for the collection. The
-variants keep its smoky nebula texture, luminous nodes, edge-weighted topology,
-and readable center while changing density, color, contrast, or aspect ratio.
+The day/night pair anchors the collection. The variants keep the same fine silk
+topology, edge-weighted composition, and quiet center while changing density,
+color, contrast, or aspect ratio.
 
-![Sparse wallpaper](backgrounds/variants/sparse.png)
+| Sparse | Dense | Dusk |
+| --- | --- | --- |
+| ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
 
-![Dense wallpaper](backgrounds/variants/dense.png)
-
-![Dusk wallpaper](backgrounds/variants/dusk.png)
-
-![Monochrome wallpaper](backgrounds/variants/monochrome.png)
-
-![Ultrawide wallpaper](backgrounds/variants/ultrawide.png)
-
-![Day wallpaper](backgrounds/background-day.png)
-
-![Night wallpaper](backgrounds/background-night.png)
+| Monochrome | Ultrawide | Day / Night |
+| --- | --- | --- |
+| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | [Day](backgrounds/background-day.png) · [Night](backgrounds/background-night.png) |
 
 ### Secure and boot surfaces
 
@@ -178,10 +164,9 @@ omarchy plymouth set-by-theme aranea
 
 ### Cursor artwork
 
-![Aranea pointer cursor](integrations/cursor/cursors/left_ptr.svg)
-![Aranea spider hand cursor](integrations/cursor/cursors/hand2.svg)
-![Aranea web activity cursor](integrations/cursor/cursors/watch.svg)
-![Aranea crosshair cursor](integrations/cursor/cursors/crosshair.svg)
+| Pointer | Hand | Activity | Crosshair |
+| --- | --- | --- | --- |
+| ![Aranea pointer cursor](integrations/cursor/cursors/left_ptr.svg) | ![Aranea spider hand cursor](integrations/cursor/cursors/hand2.svg) | ![Aranea web activity cursor](integrations/cursor/cursors/watch.svg) | ![Aranea crosshair cursor](integrations/cursor/cursors/crosshair.svg) |
 
 The busy cursor animation is shipped as eight matching SVG frames:
 
@@ -196,17 +181,13 @@ The busy cursor animation is shipped as eight matching SVG frames:
 
 ### Application surfaces
 
-![Aranea fastfetch](screenshots/fastfetch.png)
+| Fastfetch | File manager | Neovim |
+| --- | --- | --- |
+| ![Aranea fastfetch](screenshots/fastfetch.png) | ![Aranea file manager](screenshots/file-manager.png) | ![Aranea Neovim](screenshots/neovim.png) |
 
-![Aranea file manager](screenshots/file-manager.png)
-
-![Aranea Neovim](screenshots/neovim.png)
-
-![Aranea Apps](screenshots/apps.png)
-
-![Aranea Favorites](screenshots/favorites.png)
-
-![Aranea Recent](screenshots/recent.png)
+| Apps | Favorites | Recent |
+| --- | --- | --- |
+| ![Aranea Apps](screenshots/apps.png) | ![Aranea Favorites](screenshots/favorites.png) | ![Aranea Recent](screenshots/recent.png) |
 
 Refresh the complete README capture set in one pass. Menu, desktop,
 notification, diagnostics, and application surfaces are captured from the
@@ -216,10 +197,10 @@ running session; lock and Plymouth use canonical artwork renders:
 ./scripts/capture-screenshots --all --output screenshots
 ```
 
-Lock and Plymouth entries use the canonical ceremony and primary artwork,
-rendered into the README capture set without locking or rebooting the session.
+Lock and Plymouth entries use canonical artwork renders, so refreshing the
+capture set does not lock or reboot the session.
 
-The repository also ships matching Cava, browser/session, Qt, icon, and cursor
+The repository also ships matching Cava, browser/session, Qt, media, and cursor
 integrations.
 
 ## Interaction

@@ -106,6 +106,7 @@ if (( dry_run )); then
   say "would set theme to aranea"
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
     say "would install cursor integration"
+    [[ "$profile" == full ]] && say "would install terminal integration"
   fi
 else
   previous_theme="$(omarchy theme current 2>/dev/null || true)"
@@ -131,6 +132,12 @@ else
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
     theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
     run "$theme_root/scripts/install-integration" cursor --yes
+    if [[ "$profile" == full ]]; then
+      # Terminal configs live under integrations/terminal. Omarchy ignores
+      # root-level alacritty.toml, kitty.conf, and foot.ini files when a theme
+      # is installed from Git, so install the selected terminal explicitly.
+      run "$theme_root/scripts/install-integration" terminal --yes
+    fi
   fi
   say "Aranea installed. Conky remains off until you run aranea-diagnostics-toggle."
 fi

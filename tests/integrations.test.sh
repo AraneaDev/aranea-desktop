@@ -10,12 +10,13 @@ fi
 grep -Fq 'Unknown integration' "$repo_root/tests/.integration-error"
 rm -f "$repo_root/tests/.integration-error"
 
-for file in alacritty.toml kitty.conf foot.ini; do
+for file in integrations/terminal/alacritty.toml integrations/terminal/kitty.conf integrations/terminal/foot.ini; do
   test -f "$repo_root/$file"
 done
-grep -Fq 'integrations/terminal/alacritty.toml' "$repo_root/alacritty.toml"
-grep -Fq 'integrations/terminal/kitty.conf' "$repo_root/kitty.conf"
-grep -Fq 'integrations/terminal/foot.ini' "$repo_root/foot.ini"
+
+terminal_output="$($repo_root/scripts/install-integration terminal --dry-run)"
+printf '%s\n' "$terminal_output"
+grep -Eq 'terminal/(alacritty|kitty|foot)' <<<"$terminal_output"
 
 qt_output="$("$repo_root/scripts/install-integration" qt --dry-run)"
 grep -Eq 'Skipping qt:|would link .*Aranea\.kvconfig' <<<"$qt_output"

@@ -1,3 +1,0 @@
-# Omarchy imports this file from the active theme. Keep the palette in the
-# integration directory so it remains inspectable and reusable.
-general.import = ["~/.local/state/omarchy/current/theme/integrations/terminal/alacritty.toml"]
