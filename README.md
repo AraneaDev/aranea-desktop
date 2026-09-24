@@ -246,6 +246,11 @@ The source tokens are in [`colors.toml`](colors.toml) and
 - `scripts/` — installer, diagnostics, wallpaper, showcase, and health tools.
 - `screenshots/` — representative captures used throughout this README.
 
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local git hooks, the test suite,
+commit message conventions, and how releases are cut.
+
 ## License
 
 See the repository's upstream project and asset licenses before redistributing

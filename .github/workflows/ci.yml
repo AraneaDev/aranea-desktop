@@ -24,7 +24,9 @@ jobs:
 
       - name: Validate shell syntax
         run: |
-          find scripts hooks tests -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          find scripts hooks tests tools .githooks -type f \
+            \( -name '*.sh' -o -path '*/.githooks/*' \) -print0 |
+            xargs -0 -n1 bash -n
 
       - name: Validate QML types
         run: bash tests/qml-types.test.sh
@@ -62,7 +64,7 @@ jobs:
           find backgrounds screenshots -type f \( -name '*.png' -o -name '*.jpg' \) -print0 | xargs -0 -n1 identify
 
       - name: Run ShellCheck
-        run: shellcheck -x scripts/*.sh hooks/* tests/*.test.sh
+        run: shellcheck -x scripts/*.sh hooks/* tests/*.test.sh tools/*.sh .githooks/*
 
       - name: Upload diagnostics on failure
         if: failure()
