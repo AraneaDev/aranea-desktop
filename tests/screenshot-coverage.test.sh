@@ -10,13 +10,13 @@ mapfile -t surfaces < <(
 )
 expected_surfaces=(
   menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth
-  fastfetch file-manager neovim notifications network audio bluetooth agents
+  btop file-manager neovim notifications network audio bluetooth agents
   power monitor apps favorites recent
 )
 expected_hero_frames=(
   plymouth lock desktop menu menu-submenu menu-search menu-input apps favorites
   recent notifications network audio bluetooth agents power monitor diagnostics
-  fastfetch file-manager neovim
+  btop file-manager neovim
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
 

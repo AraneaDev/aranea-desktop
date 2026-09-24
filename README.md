@@ -181,9 +181,9 @@ The busy cursor animation is shipped as eight matching SVG frames:
 
 ### Application surfaces
 
-| Fastfetch | File manager | Neovim |
+| Btop | File manager | Neovim |
 | --- | --- | --- |
-| ![Aranea fastfetch](screenshots/fastfetch.png) | ![Aranea file manager](screenshots/file-manager.png) | ![Aranea Neovim](screenshots/neovim.png) |
+| ![Aranea btop](screenshots/btop.png) | ![Aranea file manager](screenshots/file-manager.png) | ![Aranea Neovim](screenshots/neovim.png) |
 
 | Apps | Favorites | Recent |
 | --- | --- | --- |

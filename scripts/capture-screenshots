@@ -9,14 +9,14 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(plymouth lock desktop menu menu-submenu menu-search menu-input apps favorites recent notifications network audio bluetooth agents power monitor diagnostics fastfetch file-manager neovim)
+  local frames=(plymouth lock desktop menu menu-submenu menu-search menu-input apps favorites recent notifications network audio bluetooth agents power monitor diagnostics btop file-manager neovim)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -67,7 +67,7 @@ fi
 showcase_surface="$surface"
 case "$surface" in
   plymouth) showcase_surface=boot ;;
-  fastfetch) showcase_surface=about ;;
+  btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
 esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
@@ -106,19 +106,13 @@ capture_menu_surface() {
 capture_terminal_surface() {
   local title="$1"
   local command_name="$2"
-  local terminal_bin=kitty
-  [[ "$surface" == "fastfetch" ]] && terminal_bin=ghostty
-  command -v "$terminal_bin" >/dev/null 2>&1 || { echo "$terminal_bin is required to capture $surface" >&2; exit 3; }
+  command -v kitty >/dev/null 2>&1 || { echo "kitty is required to capture $surface" >&2; exit 3; }
   command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required to capture $surface" >&2; exit 3; }
 
-  if [[ "$surface" == "fastfetch" ]]; then
-    ghostty +new-window --title="${title// /-}" -e bash -lc 'fastfetch; exec bash' &
-  else
-    kitty --config "$repo_root/integrations/terminal/kitty.conf" \
-      --class "aranea-screenshot-$surface" --title "$title" \
-      --override initial_window_width=104c --override initial_window_height=34c \
-      -e "$command_name" &
-  fi
+  kitty --config "$repo_root/integrations/terminal/kitty.conf" \
+    --class "aranea-screenshot-$surface" --title "$title" \
+    --override initial_window_width=104c --override initial_window_height=34c \
+    -e "$command_name" &
   local child_pid=$!
   sleep 1
   hyprctl dismissnotify >/dev/null 2>&1 || true
@@ -184,10 +178,10 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  fastfetch)
+  btop)
     omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     hyprctl dismissnotify >/dev/null 2>&1 || true
-    capture_terminal_surface "Aranea Fastfetch" fastfetch
+    capture_terminal_surface "Aranea Btop" btop
     omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
