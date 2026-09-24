@@ -8,8 +8,14 @@
 <metadata>
 Created by potrace 1.16, written by Peter Selinger 2001-2019
 </metadata>
+<defs>
+<linearGradient id="g" x1="0" y1="1" x2="1" y2="0">
+<stop stop-color="#7DFFC0"/>
+<stop offset="1" stop-color="#10F0D0"/>
+</linearGradient>
+</defs>
 <g transform="translate(0.000000,320.000000) scale(0.100000,-0.100000)"
-fill="#3BFF9E" stroke="none">
+fill="url(#g)" stroke="none">
 <path d="M1861 2247 c-8 -10 -3 -29 21 -78 18 -35 38 -69 44 -76 7 -7 31 -47
 54 -90 24 -43 46 -80 50 -83 3 -3 12 -45 19 -95 7 -49 17 -115 22 -146 l9 -56
 -22 -42 c-12 -23 -30 -50 -40 -61 -10 -10 -18 -23 -18 -29 0 -5 -3 -11 -8 -13
