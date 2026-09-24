@@ -258,7 +258,8 @@ Item {
         height: width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: -2
-        source: root.fileUrl(root.themeAssetRoot + "/branding/marks/aranea-ceremony.svg")
+        // Use the canonical Plymouth/lock spider so both surfaces cannot drift.
+        source: root.fileUrl(root.themeAssetRoot + "/unlock.png")
         fillMode: Image.PreserveAspectFit
         asynchronous: true
         smooth: true

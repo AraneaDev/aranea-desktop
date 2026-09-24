@@ -123,7 +123,7 @@ const menuBarWidgetQml = fs.readFileSync(`${root}/plugins/araneadev.menu/BarWidg
 const notificationCardQml = fs.readFileSync(`${root}/plugins/araneadev.notifications/components/NotificationCard.qml`, 'utf8')
 if (!menuBarWidgetQml.includes('aranea-glyph.svg')) throw new Error('bar menu trigger is missing reduced Aranea glyph')
 if (!notificationCardQml.includes('aranea-glyph.svg')) throw new Error('notification card is missing reduced Aranea glyph')
-if (!lockViewQml.includes('aranea-ceremony.svg')) throw new Error('lock surface is missing ceremony Aranea mark')
+if (!lockViewQml.includes('unlock.png')) throw new Error('lock surface is missing canonical Aranea spider')
 function requiresSignature(source, signature, name) {
   if (!source.includes(signature)) throw new Error(`missing typed scalar contract: ${name}`)
 }
