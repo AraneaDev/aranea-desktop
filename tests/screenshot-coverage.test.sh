@@ -16,5 +16,6 @@ done
 test -f "$repo_root/screenshots/hero-showcase.gif"
 grep -Fq 'screenshots/hero-showcase.gif' "$readme"
 grep -Fq 'build_hero_showcase' "$capture_script"
+grep -Fq 'omarchy-launch-screensaver force' "$capture_script"
 
 echo "screenshot coverage contract passed (${#surfaces[@]} surfaces)"

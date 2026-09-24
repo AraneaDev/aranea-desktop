@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent idle)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
@@ -221,6 +221,26 @@ case "$surface" in
     ;;
   monitor)
     capture_popup_surface omarchy.monitor
+    exit 0
+    ;;
+  idle)
+    command -v omarchy-launch-screensaver >/dev/null 2>&1 || {
+      echo 'omarchy-launch-screensaver is required to capture idle' >&2
+      exit 3
+    }
+    command -v grim >/dev/null 2>&1 || {
+      echo 'grim is required to capture idle' >&2
+      exit 3
+    }
+    omarchy-launch-screensaver force >/dev/null 2>&1 &
+    screensaver_launcher_pid=$!
+    sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
+    grim "$output/$surface.png"
+    kill "$screensaver_launcher_pid" >/dev/null 2>&1 || true
+    wait "$screensaver_launcher_pid" >/dev/null 2>&1 || true
+    pkill -x ttfx >/dev/null 2>&1 || true
+    pkill -f '[o]rg.omarchy.screensaver' >/dev/null 2>&1 || true
+    printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   keyboard-layout)

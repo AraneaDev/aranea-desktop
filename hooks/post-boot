@@ -9,8 +9,9 @@
 
 [[ $(omarchy theme current 2>/dev/null) == "Aranea" ]] || exit 0
 
-mkdir -p ~/.config/conky ~/.local/bin
+mkdir -p ~/.config/conky ~/.config/omarchy/branding ~/.local/bin
 ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
+ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
 install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
 
 theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"

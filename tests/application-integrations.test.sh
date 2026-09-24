@@ -15,6 +15,7 @@ for file in \
   "$repo_root/integrations/media/pavucontrol.css" \
   "$repo_root/integrations/developer/neovim.lua" \
   "$repo_root/branding/about-card.txt" \
+  "$repo_root/branding/screensaver.txt" \
   "$repo_root/branding/glyphs/theme-change.txt" \
   "$repo_root/branding/marks/aranea-primary.svg" \
   "$repo_root/branding/marks/aranea-glyph.svg" \
@@ -24,6 +25,9 @@ for file in \
 done
 
 grep -Fq 'Aranea' "$repo_root/branding/about-card.txt"
+grep -Fq 'A R A N E A' "$repo_root/branding/screensaver.txt"
+grep -Fq 'branding/screensaver.txt' "$repo_root/hooks/theme-set"
+grep -Fq 'branding/screensaver.txt' "$repo_root/hooks/post-boot"
 grep -Fq 'fall back' "$repo_root/integrations/browser/README.md"
 grep -Fq 'unsupported' "$repo_root/integrations/session/README.md"
 grep -Fq 'native' "$repo_root/integrations/media/README.md"
