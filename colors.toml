@@ -3,20 +3,24 @@ mode = "dark"
 accent = "#3bff9e"
 accent_secondary = "#7a5cff"
 ceremony = "#e6c98a"
-selection = "#1c2b22"
+selection = "#163326"
 muted = "#3a4250"
 
 background = "#08090b"
 dark_background = "#050609"
 darker_background = "#030405"
-lighter_background = "#141821"
+lighter_background = "#10151b"
+surface = "#0d1116"
+surface_raised = "#151c24"
+surface_glass = "#0b1016"
+surface_highlight = "#24323b"
 
-foreground = "#e7ecf3"
+foreground = "#edf3f6"
 dark_foreground = "#8b96a6"
 light_foreground = "#c7d0db"
 bright_foreground = "#ffffff"
 
-hyprland_active_border = "rgba(3bff9eee) rgba(7a5cffee) 45deg"
+hyprland_active_border = "rgba(3bff9ed0) rgba(7a5cffb0) 45deg"
 
 red = "#ff5f56"
 yellow = "#ffbd2e"
@@ -29,6 +33,11 @@ brown = "#4a4038"
 
 motion_enabled = true
 reduced_motion_fallback = "static"
+
+surface_border = "#33424b"
+surface_border_alpha = 0.48
+surface_shadow_alpha = 0.42
+corner_radius = 10
 
 bright_red = "#ff8a80"
 bright_yellow = "#ffd166"

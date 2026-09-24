@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 112" fill="none">
   <title>Aranea menu network motif</title>
   <g stroke-linecap="round" stroke-linejoin="round">
-    <path d="M4 82h76l28-28h68l28-28h152" stroke="#3BFF9E" stroke-opacity=".55" stroke-width="1"/>
-    <path d="M58 8 108 54l54 0 42 42h102" stroke="#7A5CFF" stroke-opacity=".42" stroke-width="1"/>
+    <path d="M4 82h76l28-28h68l28-28h152" stroke="#3BFF9E" stroke-opacity=".38" stroke-width="1"/>
+    <path d="M58 8 108 54l54 0 42 42h102" stroke="#7A5CFF" stroke-opacity=".28" stroke-width="1"/>
     <path d="M172 4v50M252 26v70" stroke="#E7ECF3" stroke-opacity=".16" stroke-width="1"/>
   </g>
   <g>
-    <circle cx="80" cy="82" r="3" fill="#3BFF9E" fill-opacity=".75"/>
-    <circle cx="108" cy="54" r="4" fill="#E7ECF3" fill-opacity=".35"/>
-    <circle cx="176" cy="54" r="3" fill="#7A5CFF" fill-opacity=".75"/>
-    <circle cx="204" cy="26" r="3" fill="#3BFF9E" fill-opacity=".55"/>
-    <circle cx="252" cy="96" r="4" fill="#7A5CFF" fill-opacity=".55"/>
+    <circle cx="80" cy="82" r="1.5" fill="#3BFF9E" fill-opacity=".65"/>
+    <circle cx="108" cy="54" r="2" fill="#EDF3F6" fill-opacity=".4"/>
+    <circle cx="176" cy="54" r="1.5" fill="#7A5CFF" fill-opacity=".65"/>
+    <circle cx="204" cy="26" r="1.5" fill="#3BFF9E" fill-opacity=".5"/>
+    <circle cx="252" cy="96" r="2" fill="#7A5CFF" fill-opacity=".45"/>
   </g>
 </svg>

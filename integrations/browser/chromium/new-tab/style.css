@@ -15,12 +15,13 @@ body {
   margin: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 50% 36%, #141821 0%, var(--background) 52%);
+  background: radial-gradient(circle at 50% 36%, #151c24 0%, #0b1016 32%, var(--background) 68%);
   color: var(--foreground);
-  font: 16px/1.5 system-ui, sans-serif;
+  font: 16px/1.5 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: .01em;
 }
 
 main { text-align: center; }
-.mark { color: var(--accent); font-size: 3rem; text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 50%, transparent); }
-h1 { margin: .2rem 0; letter-spacing: .12em; }
-p { color: var(--muted); }
+.mark { color: var(--accent); font-size: 3rem; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 34%, transparent)); }
+h1 { margin: .2rem 0; letter-spacing: .18em; font-weight: 600; }
+p { color: var(--muted); letter-spacing: .06em; }

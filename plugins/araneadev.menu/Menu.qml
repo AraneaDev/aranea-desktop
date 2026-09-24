@@ -181,7 +181,7 @@ Item {
   property color background: Color.menu.background
   property color foreground: Color.menu.text
   property color border: Color.menu.border
-  property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
+  property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(1)))
   property color scrim: Color.menu.scrim
   // Keep the new ornamentation derived from the stable shell palette.  The
   // shell's menu parser intentionally exposes only the established surface
@@ -203,15 +203,15 @@ Item {
   property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", selectedBorder, 0)
   readonly property real rowReservedBorderLeft: Border.left(selectedBorderSpec)
   readonly property real rowReservedBorderRight: Border.right(selectedBorderSpec)
-  readonly property int cornerRadius: Style.cornerRadius
-  readonly property real menuFontScale: 1.25
-  readonly property real menuLetterSpacing: 0.35
+  readonly property int cornerRadius: Math.max(8, Style.space(8))
+  readonly property real menuFontScale: 1.10
+  readonly property real menuLetterSpacing: 0.20
   function menuFontSize(size: real): int { return Math.max(1, Math.round(size * root.menuFontScale)) }
   property int contentMargin: Style.spacing.panelPadding
   property int headerHeight: Math.max(Style.space(46), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   property int compactHeaderHeight: Math.max(Style.space(64), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   property int rootHeaderHeight: Math.max(Style.space(68), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
-  property int rootTileHeight: Style.space(104)
+  property int rootTileHeight: Style.space(96)
   property int rootContextHeight: Style.space(20)
   property int footerHeight: Style.space(26)
   property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
@@ -228,8 +228,8 @@ Item {
     ({ id: "tile.setup", label: "Setup", detail: "CONFIGURE", icon: "", source: "fixed" })
   ]
 
-  property int contentSpacing: Style.space(14)
-  property int compactContentSpacing: Style.space(10)
+  property int contentSpacing: Style.space(12)
+  property int compactContentSpacing: Style.space(8)
   property int baseRowHeight: Math.max(Style.space(40), root.menuFontSize(Style.font.bodySmall) + Style.space(6) * 2)
   property int emptyStateHeight: Style.space(112)
   property int detailRowHeight: Math.max(Style.space(58), root.menuFontSize(Style.font.bodySmall) + root.menuFontSize(Style.font.caption) + Style.space(7) * 2)

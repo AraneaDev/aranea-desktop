@@ -54,7 +54,7 @@ BorderSurface {
   readonly property color cardBackground: urgency === 2
     ? Util.alpha(Color.urgent, 0.08)
     : (hovered ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
-  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(2)))
+  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1)))
 
   function sanitizeBody(s: string): string {
     return NotificationLogic.sanitizeBody(s, app, appIcon)
@@ -194,7 +194,7 @@ BorderSurface {
           Layout.fillWidth: true
           visible: root.summary.length > 0
           text: root.summary
-          font.family: "Liberation Sans"
+          font.family: root.fontFamily.length > 0 ? root.fontFamily : Style.font.family
           color: Color.notifications.text
           font.pixelSize: Style.font.title
           font.bold: true
@@ -209,7 +209,7 @@ BorderSurface {
           visible: root.sanitizedBody.length > 0
           text: root.styledBody
           textFormat: Text.StyledText
-          font.family: "Liberation Sans"
+          font.family: root.fontFamily.length > 0 ? root.fontFamily : Style.font.family
           color: root.bodyColor
           font.pixelSize: Style.font.title
           wrapMode: Text.WordWrap

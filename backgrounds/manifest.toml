@@ -1,5 +1,5 @@
-# Named wallpaper collection. Variant paths may share a source asset when the
-# host has no image transformation tool; the IDs remain stable for pickers.
+# Named static wallpaper collection. Each ID has a distinct generated image.
+# See ARTWORK.md for original sources, prompts, and reproducible export commands.
 
 [[wallpapers]]
 id = "day"

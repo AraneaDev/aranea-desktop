@@ -3,16 +3,19 @@
 @define-color background #08090b;
 @define-color dark_background #050609;
 @define-color darker_background #030405;
-@define-color lighter_background #141821;
+@define-color lighter_background #10151b;
+@define-color surface #0d1116;
+@define-color surface_raised #151c24;
+@define-color surface_highlight #24323b;
 
-@define-color foreground #e7ecf3;
+@define-color foreground #edf3f6;
 @define-color dark_foreground #8b96a6;
 @define-color light_foreground #c7d0db;
 
 @define-color accent #3bff9e;
 @define-color accent2 #7a5cff;
 @define-color ceremony #e6c98a;
-@define-color selection #1c2b22;
+@define-color selection #163326;
 
 @define-color red #ff5f56;
 @define-color yellow #ffbd2e;
@@ -57,7 +60,7 @@
 @define-color error_bg_color @red;
 @define-color error_fg_color @foreground;
 
-@define-color borders alpha(@foreground, 0.1);
+@define-color borders alpha(@surface_highlight, 0.72);
 @define-color unfocused_borders alpha(@foreground, 0.06);
 
 /* GTK3 legacy variables, for apps that haven't moved to libadwaita tokens */
@@ -108,7 +111,7 @@ entry,
 dropdown,
 combobox button,
 scale trough {
-  border-radius: 2px;
+  border-radius: 8px;
 }
 
 button:hover,

@@ -130,15 +130,15 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      color: "#80050609"
+      color: "#a006090d"
     }
 
     Rectangle {
       anchors.fill: parent
       gradient: Gradient {
-        GradientStop { position: 0.0; color: "#33050609" }
-        GradientStop { position: 0.48; color: "#11050609" }
-        GradientStop { position: 1.0; color: "#55050609" }
+        GradientStop { position: 0.0; color: "#4406090d" }
+        GradientStop { position: 0.48; color: "#1806090d" }
+        GradientStop { position: 1.0; color: "#7006090d" }
       }
     }
 
@@ -157,7 +157,7 @@ Item {
       anchors.verticalCenterOffset: Math.min(130, parent.height * 0.12)
       color: Color.lock.background
       borderSpec: root.inputBorderSpec
-      radius: Style.cornerRadius
+      radius: Math.max(10, Style.space(10))
       clip: true
 
       TextInput {

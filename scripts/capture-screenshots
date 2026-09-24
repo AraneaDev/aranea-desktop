@@ -54,7 +54,9 @@ if (( capture_all )); then
     echo "Refusing --all capture on workspace $active_workspace; switch to workspace 2 first" >&2
     exit 3
   }
-  trap 'hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
+  # Leave the finished capture set visible on the intentionally empty
+  # workspace long enough for visual inspection before returning focus.
+  trap 'sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
   for all_surface in "${all_surfaces[@]}"; do
     "$0" --surface "$all_surface" --output "$output"
   done

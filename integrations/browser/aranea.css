@@ -2,8 +2,9 @@
 :root {
   color-scheme: dark;
   --aranea-background: #08090b;
-  --aranea-surface: #141821;
-  --aranea-foreground: #e7ecf3;
+  --aranea-surface: #10151b;
+  --aranea-surface-raised: #151c24;
+  --aranea-foreground: #edf3f6;
   --aranea-muted: #8b96a6;
   --aranea-accent: #3bff9e;
   --aranea-focus: #7a5cff;

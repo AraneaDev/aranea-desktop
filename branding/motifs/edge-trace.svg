@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 24" fill="none">
   <title>Aranea edge trace</title>
-  <path d="M1 12h48l10-10h68" stroke="#3BFF9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="1" cy="12" r="2.5" fill="#3BFF9E"/>
-  <circle cx="127" cy="2" r="2.5" fill="#7A5CFF"/>
+  <path d="M3 16h43l12-12h67" stroke="#EDF3F6" stroke-opacity=".24" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M46 16 58 4h24" stroke="#3BFF9E" stroke-opacity=".55" stroke-width="1" stroke-linecap="round"/>
+  <circle cx="3" cy="16" r="1.5" fill="#3BFF9E" fill-opacity=".72"/>
+  <circle cx="125" cy="4" r="1.5" fill="#7A5CFF" fill-opacity=".65"/>
 </svg>
