@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Aranea-icons
+Comment=Aranea folder accents over a neutral fallback icon set
+Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor
+Directories=scalable/places
+
+[scalable/places]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Places

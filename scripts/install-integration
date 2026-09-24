@@ -178,16 +178,19 @@ case "$integration" in
     fi
     ;;
   icons)
-    # Aranea does not ship a full icon set. Instead, point the desktop at a
-    # muted, accent-toned variant already carried by the yaru-icon-theme
-    # package Omarchy installs, and shrink Nautilus's oversized default grid
-    # icons so they stop dominating the dark, low-contrast surfaces.
-    icon_theme=Yaru-prussiangreen-dark
-    icon_theme_root="/usr/share/icons/$icon_theme"
-    if [[ ! -f "$icon_theme_root/index.theme" ]]; then
-      printf 'Skipping icons: %s is not installed.\n' "$icon_theme"
-      exit 0
-    fi
+    # Aranea does not ship a full icon set. Instead it overrides just the
+    # folder glyphs with accent-colored artwork and falls back to a muted,
+    # accent-toned host variant (from the yaru-icon-theme package Omarchy
+    # installs) for everything else, and shrinks Nautilus's oversized
+    # default grid icons so they stop dominating the dark, low-contrast
+    # surfaces.
+    icon_theme=Aranea-icons
+    icon_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/$icon_theme"
+    install_one "$repo_root/integrations/icons/aranea/index.theme" "$icon_root/index.theme"
+    for icon_asset in folder.svg folder-open.svg; do
+      install_one "$repo_root/integrations/icons/aranea/scalable/places/$icon_asset" \
+        "$icon_root/scalable/places/$icon_asset"
+    done
     if command -v gsettings >/dev/null 2>&1; then
       if (( dry_run )); then
         printf 'would set desktop icon theme to %s\n' "$icon_theme"

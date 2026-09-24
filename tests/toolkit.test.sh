@@ -44,4 +44,13 @@ grep -Fq 'selection' "$repo_root/gtk.css"
 grep -Fq 'destructive-action' "$repo_root/gtk.css"
 grep -Fq 'does not replace' "$repo_root/integrations/icons/README.md"
 
+grep -Fq 'Name=Aranea-icons' "$repo_root/integrations/icons/aranea/index.theme"
+grep -Fq 'Inherits=' "$repo_root/integrations/icons/aranea/index.theme"
+grep -Fq 'Directories=scalable/places' "$repo_root/integrations/icons/aranea/index.theme"
+for icon in folder.svg folder-open.svg; do
+  test -f "$repo_root/integrations/icons/aranea/scalable/places/$icon"
+done
+grep -Fq 'icon-theme "$icon_theme"' "$repo_root/scripts/install-integration"
+grep -Fq 'nautilus.icon-view default-zoom-level small' "$repo_root/scripts/install-integration"
+
 echo "toolkit contract passed"
