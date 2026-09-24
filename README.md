@@ -1,8 +1,8 @@
 <div align="center">
 
-# Aranea
+# Aranea Desktop
 
-**A quiet, obsidian Omarchy desktop with a living network of light.**
+**A quiet, obsidian Omarchy desktop experience with a living network of light.**
 
 Deep black surfaces, mint activity, violet focus, atmospheric wallpapers, and
 the AraneaDev mark carried consistently from boot to desktop.
@@ -17,14 +17,19 @@ Static fallback: [Aranea desktop](screenshots/desktop.png)
 
 ## What it feels like
 
-Aranea is designed as one calm visual system rather than a collection of
-unrelated tweaks:
+Aranea Desktop is designed as one calm visual system rather than a collection
+of unrelated tweaks:
 
 - transparent, interactive shell bar with spider menu and native controls;
 - obsidian surfaces with mint activity states and violet focus states;
 - day, night, and atmospheric wallpaper variants built around edge topology;
 - matching lock, idle, boot, terminal, editor, browser, cursor, and media art;
 - optional diagnostics and application integrations that stay out of the way.
+
+Aranea is still installed by Omarchy as the `aranea` theme, but the project is
+larger than a theme: it combines the shell surface, custom plugins, artwork,
+desktop integrations, cursors, Plymouth, installer, diagnostics, and showcase
+tooling into one cohesive desktop experience.
 
 The wallpaper is intentionally mark-free. The spider identity belongs to the
 bar, menus, lock screen, boot splash, idle branding, and fastfetch surfaces.
@@ -43,7 +48,7 @@ For a non-interactive full install:
 ./scripts/install.sh --yes
 ```
 
-The installer installs Aranea, registers the theme hooks, installs the managed
+The installer installs Aranea Desktop, registers the `aranea` theme hooks, installs the managed
 integrations, and offers the optional Wayland Conky package when `paru` or
 `yay` is available. It does not start Conky automatically.
 
@@ -90,6 +95,13 @@ omarchy theme set aranea
 The wallpaper picker also exposes `night`, `sparse`, `dense`, `dusk`,
 `monochrome`, and `ultrawide`. The bar remains transparent so the network art
 can breathe behind it.
+
+### Project layers
+
+- **Theme layer:** Omarchy colors, wallpapers, GTK, terminal, cursor, lock, and Plymouth assets.
+- **Shell layer:** Aranea bar, menu, lock, and notification plugins.
+- **Integration layer:** browser, media, developer, Qt, session, and application styling.
+- **Tooling layer:** installer, diagnostics, deployment helpers, screenshot capture, and validation.
 
 The command menu uses a hybrid command-center layout: the root view adds
 Aranea identity, fixed Files and Terminal tiles, and a favorite/recent action;
@@ -245,7 +257,7 @@ The source tokens are in [`colors.toml`](colors.toml) and
 ## Repository map
 
 - `backgrounds/` — day/night artwork and the named wallpaper collection.
-- `branding/` — fastfetch and idle screensaver marks.
+- `branding/` — identity marks, semantic glyphs, motifs, fastfetch, and idle artwork.
 - `integrations/` — terminal, editor, browser, cursor, Qt, media, session, and
   icon integrations.
 - `plugins/` — the Aranea bar, menu, lock, and notification surfaces.

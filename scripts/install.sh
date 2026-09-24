@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
-theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/omarchy-aranea-theme.git}"
+theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/aranea-desktop.git}"
 theme_source="${ARANEA_THEME_SOURCE:-$theme_repo_url}"
 dry_run=0
 assume_yes=0
@@ -14,7 +14,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes] [--skip-conky]
 
-Installs the Aranea theme, its Omarchy hooks, and optionally the Wayland Conky build.
+Installs Aranea Desktop, its Omarchy theme/hooks, and optionally the Wayland Conky build.
 EOF
 }
 

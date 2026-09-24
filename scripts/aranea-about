@@ -10,7 +10,8 @@ if [[ -z "$theme" ]] && command -v omarchy >/dev/null 2>&1; then
 fi
 theme="${theme:-Aranea}"
 
-printf '%s\n' 'ARANEA' '=======' "Theme version: ${theme_version:-contract}" "Active theme: $theme" "Bar profile: $profile"
+printf '%s\n' 'ARANEA DESKTOP' '===============' "Theme version: ${theme_version:-contract}" "Active theme: $theme" "Bar profile: $profile"
+printf '%s\n' 'Product: Aranea Desktop'
 printf '%s\n' 'Modules: core, gtk, terminal, developer, cursor, qt, browser, session, media, wallpapers, branding'
 printf '%s\n' 'Health:'
 if [[ -x "$repo_root/scripts/aranea-doctor" ]]; then
