@@ -14,7 +14,7 @@ for file in integrations/terminal/alacritty.toml integrations/terminal/kitty.con
   test -f "$repo_root/$file"
 done
 
-terminal_output="$($repo_root/scripts/install-integration terminal --dry-run)"
+terminal_output="$("$repo_root"/scripts/install-integration terminal --dry-run)"
 printf '%s\n' "$terminal_output"
 grep -Eq 'Skipping terminal:|terminal/(alacritty|kitty|foot)' <<<"$terminal_output"
 
