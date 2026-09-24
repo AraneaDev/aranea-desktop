@@ -50,7 +50,8 @@ grep -Fq 'Directories=scalable/places' "$repo_root/integrations/icons/aranea/ind
 for icon in folder.svg folder-open.svg; do
   test -f "$repo_root/integrations/icons/aranea/scalable/places/$icon"
 done
-grep -Fq 'icon-theme "$icon_theme"' "$repo_root/scripts/install-integration"
+grep -Fq 'icon_theme=Aranea-icons' "$repo_root/scripts/install-integration"
+grep -Fq 'org.gnome.desktop.interface icon-theme' "$repo_root/scripts/install-integration"
 grep -Fq 'nautilus.icon-view default-zoom-level small' "$repo_root/scripts/install-integration"
 
 echo "toolkit contract passed"
