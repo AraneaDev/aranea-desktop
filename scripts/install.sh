@@ -104,6 +104,9 @@ if (( dry_run )); then
   say "would install theme from: $theme_source"
   say "would install theme hooks"
   say "would set theme to aranea"
+  if [[ "$profile" == full || "$profile" == no_apps ]]; then
+    say "would install cursor integration"
+  fi
 else
   previous_theme="$(omarchy theme current 2>/dev/null || true)"
   install_failure_handler() {
@@ -125,5 +128,9 @@ else
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"
   run omarchy theme set aranea
+  if [[ "$profile" == full || "$profile" == no_apps ]]; then
+    theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+    run "$theme_root/scripts/install-integration" cursor --yes
+  fi
   say "Aranea installed. Conky remains off until you run aranea-diagnostics-toggle."
 fi

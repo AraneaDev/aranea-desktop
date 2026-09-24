@@ -26,7 +26,8 @@ if rg -n 'circle cx="15"|circle cx="17"' "$repo_root/integrations/cursor"; then
   echo 'cursor hand artwork still contains eye dots' >&2
   exit 1
 fi
-grep -Fq 'M6 4' "$repo_root/integrations/cursor/cursors/left_ptr.svg"
+grep -Fq '<title>Aranea spider pointer cursor</title>' "$repo_root/integrations/cursor/cursors/left_ptr.svg"
+grep -Fq 'M5 4' "$repo_root/integrations/cursor/cursors/left_ptr.svg"
 grep -Fq 'define_size = 32, watch-08.svg' "$repo_root/integrations/cursor/hyprcursor/hyprcursors/watch/meta.hl"
 for frame in 01 02 03 04 05 06 07 08; do
   test -f "$repo_root/integrations/cursor/cursors/watch-$frame.svg"
