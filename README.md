@@ -154,8 +154,6 @@ color, contrast, or aspect ratio.
 
 ![Aranea lock screen](screenshots/lock.png)
 
-![Aranea idle screensaver](screenshots/idle.png)
-
 ![Aranea Plymouth boot screen](screenshots/plymouth.png)
 
 Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
@@ -193,8 +191,7 @@ The busy cursor animation is shipped as eight matching SVG frames:
 
 Refresh the complete README capture set in one pass. Menu, desktop,
 notification, diagnostics, and application surfaces are captured from the
-running session; idle is captured through the live screensaver launcher, while
-lock and Plymouth use canonical artwork renders:
+running session, while lock and Plymouth use canonical artwork renders:
 
 ```bash
 ./scripts/capture-screenshots --all --output screenshots

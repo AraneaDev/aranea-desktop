@@ -9,25 +9,24 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent idle)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth fastfetch file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(desktop menu menu-submenu diagnostics fastfetch neovim lock plymouth)
+  local frames=(plymouth lock desktop menu menu-submenu menu-search menu-input apps favorites recent notifications network audio bluetooth agents power monitor diagnostics fastfetch file-manager neovim)
   local frame
+  local frame_paths=()
   for frame in "${frames[@]}"; do
     [[ -f "$output/$frame.png" ]] || {
       echo "Cannot build hero showcase: missing $output/$frame.png" >&2
       exit 3
     }
+    frame_paths+=("$output/$frame.png")
   done
-  magick -delay 100 -loop 0 \
-    "$output/desktop.png" "$output/menu.png" "$output/menu-submenu.png" \
-    "$output/diagnostics.png" "$output/fastfetch.png" "$output/neovim.png" \
-    "$output/lock.png" "$output/plymouth.png" \
+  magick -delay 100 -loop 0 "${frame_paths[@]}" \
     -resize 1280x -colors 128 -layers Optimize "$output/hero-showcase.gif"
   printf 'built: %s\n' "$output/hero-showcase.gif"
 }
@@ -221,30 +220,6 @@ case "$surface" in
     ;;
   monitor)
     capture_popup_surface omarchy.monitor
-    exit 0
-    ;;
-  idle)
-    command -v omarchy-launch-screensaver >/dev/null 2>&1 || {
-      echo 'omarchy-launch-screensaver is required to capture idle' >&2
-      exit 3
-    }
-    command -v grim >/dev/null 2>&1 || {
-      echo 'grim is required to capture idle' >&2
-      exit 3
-    }
-    omarchy-launch-screensaver force >/dev/null 2>&1 &
-    screensaver_launcher_pid=$!
-    sleep 1
-    # The launcher may inherit a tiled geometry; make the idle frame a true
-    # full-canvas capture before the animation settles.
-    hyprctl dispatch fullscreen 1 >/dev/null 2>&1 || true
-    sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
-    grim "$output/$surface.png"
-    kill "$screensaver_launcher_pid" >/dev/null 2>&1 || true
-    wait "$screensaver_launcher_pid" >/dev/null 2>&1 || true
-    pkill -x ttfx >/dev/null 2>&1 || true
-    pkill -f '[o]rg.omarchy.screensaver' >/dev/null 2>&1 || true
-    printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   keyboard-layout)
