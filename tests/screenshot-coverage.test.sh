@@ -35,16 +35,23 @@ hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 
 hero_tmp="$(mktemp -d)"
 trap 'rm -rf "$hero_tmp"' EXIT
-magick "$repo_root/screenshots/hero-showcase.gif" -coalesce -resize '160x90!' \
-  "$hero_tmp/frame-%02d.png"
+# Use the classic convert/compare binaries rather than the unified `magick`
+# wrapper: CI's apt-get imagemagick package is ImageMagick 6, which has no
+# `magick` command at all, while `convert`/`compare` work on both IM6 and
+# IM7 (as a deprecated but functional compatibility shim).
+convert "$repo_root/screenshots/hero-showcase.gif" -coalesce -resize '160x90!' \
+  "$hero_tmp/frame-%02d.png" 2>/dev/null
 for index in "${!expected_hero_frames[@]}"; do
-  magick "$repo_root/screenshots/${expected_hero_frames[$index]}.png" \
-    -resize '160x90!' "$hero_tmp/expected.png"
+  convert "$repo_root/screenshots/${expected_hero_frames[$index]}.png" \
+    -resize '160x90!' "$hero_tmp/expected.png" 2>/dev/null
   metric="$(
-    magick compare -metric RMSE \
+    compare -metric RMSE \
       "$hero_tmp/frame-$(printf '%02d' "$index").png" \
       "$hero_tmp/expected.png" null: 2>&1 || true
   )"
+  # IM7's compare shim prints its own deprecation notice on the same stream
+  # as the RMSE result; drop it before parsing the "N (n.nnn)" metric line.
+  metric="$(grep -v '^WARNING:' <<<"$metric" || true)"
   normalized_metric="${metric##*(}"
   normalized_metric="${normalized_metric%)}"
   awk -v metric="$normalized_metric" 'BEGIN { exit !(metric < 0.03) }'
