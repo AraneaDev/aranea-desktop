@@ -234,6 +234,10 @@ case "$surface" in
     }
     omarchy-launch-screensaver force >/dev/null 2>&1 &
     screensaver_launcher_pid=$!
+    sleep 1
+    # The launcher may inherit a tiled geometry; make the idle frame a true
+    # full-canvas capture before the animation settles.
+    hyprctl dispatch fullscreen 1 >/dev/null 2>&1 || true
     sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
     grim "$output/$surface.png"
     kill "$screensaver_launcher_pid" >/dev/null 2>&1 || true
