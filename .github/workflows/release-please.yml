@@ -68,7 +68,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes shellcheck libxml2-utils imagemagick ripgrep jq
+          sudo apt-get install --no-install-recommends --yes shellcheck libxml2-utils imagemagick ripgrep qt6-declarative-dev qt6-declarative-dev-tools
 
       - name: Run contract tests
         if: ${{ steps.release.outputs.release_created }}
