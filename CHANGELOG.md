@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.0...v1.1.1) (2026-09-24)
+
+
+### Fixes
+
+* unify the spider mark's artwork across every surface ([#13](https://github.com/AraneaDev/aranea-desktop/issues/13)) ([6c834f0](https://github.com/AraneaDev/aranea-desktop/commit/6c834f0120f320fab27c9854b11fe3dc55d85dfc))
+
 ## [1.1.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.0.0...v1.1.0) (2026-09-24)
 
 
