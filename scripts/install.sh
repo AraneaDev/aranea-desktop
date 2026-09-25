@@ -9,6 +9,7 @@ dry_run=0
 assume_yes=0
 skip_conky=0
 profile="full"
+profile_explicit=0
 
 usage() {
   cat <<'EOF'
@@ -36,6 +37,14 @@ aur_helper() {
   fi
 }
 
+# gum is already an Omarchy-ecosystem dependency (omarchy-theme-install uses
+# it too), so an interactive terminal running this installer is likely to
+# have it. Prompts fall back to plain read/output when it doesn't, so gum is
+# a nicer default rather than a hard requirement.
+has_gum() {
+  command -v gum >/dev/null 2>&1
+}
+
 while (($#)); do
   case "$1" in
     --dry-run) dry_run=1 ;;
@@ -49,6 +58,7 @@ while (($#)); do
     --profile)
       (($# >= 2)) || { say "--profile requires a value" >&2; exit 2; }
       profile="$2"
+      profile_explicit=1
       shift
       ;;
     -h|--help) usage; exit 0 ;;
@@ -56,6 +66,21 @@ while (($#)); do
   esac
   shift
 done
+
+# An explicit --profile, --yes, or no interactive terminal all keep the
+# "full" default silent, exactly as before gum was ever in the picture.
+if (( ! profile_explicit )) && (( ! assume_yes )) && [[ -t 0 ]] && has_gum; then
+  if profile_choice="$(gum choose \
+    --header 'Choose an installation profile:' \
+    'full       Every supported application integration' \
+    'minimal    Core and GTK experience only' \
+    'no_apps    Theme, cursor, icons, wallpaper, and branding, without application integrations')"; then
+    profile="${profile_choice%% *}"
+  else
+    say "Aranea installer: profile selection cancelled." >&2
+    exit 1
+  fi
+fi
 
 if ! manifest_profile_exists "$profile"; then
   say "Unknown profile: $profile" >&2
@@ -82,6 +107,10 @@ if [[ "$profile" != "no_apps" && "$profile" != "minimal" && $skip_conky -eq 0 ]]
       say "would install conky-cairo-wayland-git with $helper"
     elif (( assume_yes )); then
       run "$helper" -S --needed conky-cairo-wayland-git
+    elif [[ -t 0 ]] && has_gum; then
+      if gum confirm --default "Install optional conky-cairo-wayland-git for Aranea diagnostics?"; then
+        run "$helper" -S --needed conky-cairo-wayland-git
+      fi
     elif [[ -t 0 ]]; then
       read -r -p "Install optional conky-cairo-wayland-git for Aranea diagnostics? [Y/n] " answer
       if [[ ! "$answer" =~ ^[Nn]$ ]]; then

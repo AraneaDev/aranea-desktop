@@ -69,6 +69,11 @@ Choose an installation profile when needed:
 ./scripts/install.sh --profile no_apps --yes
 ```
 
+Omit `--profile` in an interactive terminal and the installer prompts for one
+with [`gum`](https://github.com/charmbracelet/gum) when it's available
+(already an Omarchy-ecosystem dependency), falling back to the `full`
+default otherwise, same as `--yes` or a non-interactive shell.
+
 To install the exact checkout you are testing instead of fetching the default
 remote repository, pass a local source explicitly:
 
