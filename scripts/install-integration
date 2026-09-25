@@ -23,6 +23,11 @@ while (($#)); do
   shift
 done
 
+# --yes is accepted for CLI parity with install.sh, which passes it to
+# every install-integration call uniformly; nothing here ever prompts, so
+# the value itself has nothing to gate.
+: "$assume_yes"
+
 if [[ -z "$integration" ]]; then
   printf '%s\n' 'An integration ID is required.' >&2
   exit 2

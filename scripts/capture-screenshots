@@ -174,8 +174,9 @@ case "$surface" in
     # state afterward. Standalone runs never disabled it, so re-enabling is
     # a no-op there and it's left enabled afterward, its normal default.
     omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
-    command -v notify-send >/dev/null 2>&1 &&
+    if command -v notify-send >/dev/null 2>&1; then
       notify-send -a Aranea -u normal -t 2500 'Aranea notification' 'Theme capture · notification surface' || true
+    fi
     sleep 0.5
     omarchy-shell shell toggle araneadev.notifications >/dev/null
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
@@ -183,7 +184,9 @@ case "$surface" in
     omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
     # Let the capture-only toast expire before the next all-surface capture.
     sleep 2
-    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] && omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
+    if [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]]; then
+      omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
+    fi
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
