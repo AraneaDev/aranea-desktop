@@ -171,6 +171,10 @@ The day/night pair anchors the collection. The variants keep the same fine silk
 topology, edge-weighted composition, and quiet center while changing density,
 color, contrast, or aspect ratio.
 
+| Day | Night |
+| --- | --- |
+| ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) |
+
 | Sparse | Dense | Dusk |
 | --- | --- | --- |
 | ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |

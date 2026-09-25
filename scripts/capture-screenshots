@@ -16,7 +16,7 @@ build_hero_showcase() {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(menu menu-submenu menu-search menu-input desktop diagnostics lock btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent osd)
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications diagnostics network audio bluetooth agents power monitor btop file-manager neovim lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
