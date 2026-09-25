@@ -39,9 +39,11 @@ case "$command_name" in
     known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
     available "$id" || { printf 'Integration unavailable: %s\n' "$id" >&2; exit 1; }
     mkdir -p "$state_root"; before="$(mktemp)"; trap 'rm -f "$before" "$after"' EXIT
-    ownership_record > /dev/null; [[ -f "$(ownership_record)" ]] && cp "$(ownership_record)" "$before" || :
+    ownership_record > /dev/null
+    if [[ -f "$(ownership_record)" ]]; then cp "$(ownership_record)" "$before"; fi
     "$repo_root/scripts/install-integration" "$id" --yes
-    after="$(mktemp)"; [[ -f "$(ownership_record)" ]] && cp "$(ownership_record)" "$after" || :
+    after="$(mktemp)"
+    if [[ -f "$(ownership_record)" ]]; then cp "$(ownership_record)" "$after"; fi
     comm -13 <(sort -u "$before") <(sort -u "$after") > "$state_root/$id.files"
     printf active > "$state_root/$id"; printf 'integration: %s active\n' "$id"
     ;;
