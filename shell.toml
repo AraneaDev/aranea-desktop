@@ -60,8 +60,8 @@ icon-large = 18
 background       = "#0b1016"
 background-alpha = 0.97
 text             = "#edf3f6"
-border           = "#33424b"
-border-alpha     = 0.82
+border           = "hyprland.active-border"
+border-alpha     = 1.0
 
 [tooltip]
 background       = "#0b1016"
