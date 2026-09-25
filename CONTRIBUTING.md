@@ -81,7 +81,13 @@ update a "release please" pull request with the next version and a
 `CHANGELOG.md` entry. Merging that pull request tags the release and bumps
 `version` in `theme-manifest.toml` to match.
 
-That pull request is opened with the workflow's own token, so GitHub does not
-start checks on it automatically. Close it and reopen it once to trigger
-`validate` and `conventional-title` before merging; branch protection requires
-both to pass like any other pull request.
+That pull request is opened using the `RELEASE_PLEASE_TOKEN` secret (see
+`.github/workflows/release-please.yml`), a personal access token that raises
+the event as a real account, so GitHub starts `validate` and
+`conventional-title` on it automatically, same as any other pull request.
+
+Without that secret configured, the pull request is opened with the
+workflow's own built-in token instead, and GitHub does not start checks for
+events raised by that token. Close the pull request and reopen it once to
+trigger `validate` and `conventional-title` before merging; branch
+protection requires both to pass either way.
