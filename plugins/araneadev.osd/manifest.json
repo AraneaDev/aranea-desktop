@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.osd",
+  "name": "Aranea filament OSD",
+  "version": "1.0.0",
+  "description": "Aranea on-screen display with a responsive filament gauge.",
+  "kinds": ["panel"],
+  "keepLoaded": true,
+  "entryPoints": { "panel": "Osd.qml" }
+}

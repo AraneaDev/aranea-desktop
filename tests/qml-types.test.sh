@@ -10,6 +10,7 @@ qml_files=(
   "$repo_root/plugins/araneadev.lock/LockView.qml"
   "$repo_root/plugins/araneadev.menu/Menu.qml"
   "$repo_root/plugins/araneadev.menu/BarWidget.qml"
+  "$repo_root/plugins/araneadev.osd/Osd.qml"
 )
 
 for qml_file in "${qml_files[@]}"; do

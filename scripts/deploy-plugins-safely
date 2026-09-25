@@ -10,7 +10,7 @@ deploy_plugin="$theme_root/scripts/deploy-plugin"
   exit 1
 }
 
-plugin_ids=(araneadev.lock araneadev.menu araneadev.bar)
+plugin_ids=(araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.osd)
 needs_deploy=0
 for plugin_id in "${plugin_ids[@]}"; do
   source_dir="$theme_root/plugins/$plugin_id"
