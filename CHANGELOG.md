@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.5...v1.2.0) (2026-09-25)
+
+
+### Features
+
+* prompt for the install profile and Conky opt-in with gum ([#24](https://github.com/AraneaDev/aranea-desktop/issues/24)) ([b57dbae](https://github.com/AraneaDev/aranea-desktop/commit/b57dbaeaf62cf14798b7de8599248606ec7a7897))
+
 ## [1.1.5](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.4...v1.1.5) (2026-09-25)
 
 
