@@ -33,7 +33,7 @@ theme="${ARANEA_DOCTOR_THEME:-}"
 if [[ -z "$theme" ]] && command -v omarchy >/dev/null 2>&1; then
   theme="$(omarchy theme current 2>/dev/null || true)"
 fi
-if [[ "$theme" == "Aranea" || "$theme" == "aranea" ]]; then
+if [[ "$theme" == "Aranea" || "$theme" == "Aranea Pulse" || "$theme" == "aranea" || "$theme" == "aranea-pulse" ]]; then
   emit theme ok 'Aranea is the active theme'
 else
   emit theme repair 'Aranea is not the active theme'
@@ -64,6 +64,22 @@ if [[ -f "$manifest_file" ]]; then
   emit manifest ok 'integration manifest is present'
 else
   emit manifest repair 'theme-manifest.toml is missing'
+fi
+
+icon_root="${ARANEA_DOCTOR_ICON_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/icons/Aranea-icons}"
+expected_icon_count="$(find "$repo_root/integrations/icons/aranea/scalable" -type f -name '*.svg' 2>/dev/null | wc -l)"
+installed_icon_count=0
+broken_icon_count=0
+linked_icon_count=0
+if [[ -d "$icon_root/scalable" ]]; then
+  installed_icon_count="$(find "$icon_root/scalable" -type f -name '*.svg' -print 2>/dev/null | wc -l)"
+  broken_icon_count="$(find "$icon_root/scalable" -xtype l -name '*.svg' -print 2>/dev/null | wc -l)"
+  linked_icon_count="$(find "$icon_root/scalable" -type l -name '*.svg' -print 2>/dev/null | wc -l)"
+fi
+if [[ -f "$icon_root/index.theme" ]] && (( installed_icon_count == expected_icon_count )) && (( broken_icon_count == 0 )) && (( linked_icon_count == 0 )); then
+  emit icons ok "Aranea-icons has $installed_icon_count standalone SVGs"
+else
+  emit icons repair "Aranea-icons is incomplete or linked to a missing checkout; run scripts/install-integration --yes icons"
 fi
 
 font_name="${ARANEA_DOCTOR_FONT:-monospace}"

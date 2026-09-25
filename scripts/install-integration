@@ -188,10 +188,10 @@ case "$integration" in
     # recursive so new contexts do not require another installer branch.
     icon_theme=Aranea-icons
     icon_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/$icon_theme"
-    install_one "$repo_root/integrations/icons/aranea/index.theme" "$icon_root/index.theme"
+    install_generated "$repo_root/integrations/icons/aranea/index.theme" "$icon_root/index.theme"
     while IFS= read -r icon_source; do
       icon_relative="${icon_source#"$repo_root/integrations/icons/aranea/"}"
-      install_one "$icon_source" "$icon_root/$icon_relative"
+      install_generated "$icon_source" "$icon_root/$icon_relative"
     done < <(find "$repo_root/integrations/icons/aranea/scalable" -type f -name '*.svg' -print | sort)
     if command -v gtk-update-icon-cache >/dev/null 2>&1; then
       if (( dry_run )); then
