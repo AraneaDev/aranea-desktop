@@ -9,7 +9,7 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-19%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
+[![Tests](https://img.shields.io/badge/tests-23%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
@@ -106,9 +106,22 @@ omarchy theme set aranea
 ./scripts/aranea-wallpaper set day
 ```
 
-The wallpaper picker also exposes `night`, `sparse`, `dense`, `dusk`,
+The wallpaper picker also exposes `night`, `dawn`, `sparse`, `dense`, `dusk`,
 `monochrome`, and `ultrawide`. The bar remains transparent so the network art
 can breathe behind it.
+
+Aranea Pulse adds an opt-in four-phase wallpaper schedule and a filament OSD:
+
+```bash
+scripts/aranea-wallpaper schedule configure 06:00 08:00 18:00 20:00
+scripts/aranea-wallpaper schedule on
+scripts/aranea-integrations status --json
+```
+
+Integrations can be activated and rolled back individually with
+`scripts/aranea-integrations activate <id> --yes` and
+`scripts/aranea-integrations deactivate <id>`; managed files are backed up in
+the Aranea state directory before changes are made.
 
 ### Project layers
 
@@ -133,10 +146,21 @@ state glyphs and the menu’s network, node, and edge motifs live under
 The hero above is the primary desktop view; the capture set below focuses on
 interaction states rather than repeating the same wallpaper.
 
-| Command center | Menu states | Shell telemetry |
+| Command center |
+| --- |
+| ![Aranea command menu](screenshots/menu.png) |
+
+| System submenu | Menu search | Menu input |
 | --- | --- | --- |
-| ![Aranea command menu](screenshots/menu.png) | ![Aranea command menu — compact submenu](screenshots/menu-submenu.png) | ![Aranea diagnostics](screenshots/diagnostics.png) |
-| ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) | ![Aranea notifications](screenshots/notifications.png) |
+| ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) |
+
+| Diagnostics | OSD |
+| --- | --- |
+| ![Aranea diagnostics](screenshots/diagnostics.png) | ![Aranea filament OSD](screenshots/osd.png) |
+
+| Notifications |
+| --- |
+| ![Aranea notifications](screenshots/notifications.png) |
 
 ### System popups
 
@@ -154,19 +178,27 @@ The day/night pair anchors the collection. The variants keep the same fine silk
 topology, edge-weighted composition, and quiet center while changing density,
 color, contrast, or aspect ratio.
 
+| Day | Night |
+| --- | --- |
+| ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) |
+
 | Sparse | Dense | Dusk |
 | --- | --- | --- |
 | ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
 
-| Monochrome | Ultrawide | Day / Night |
+| Monochrome | Ultrawide | Dawn |
 | --- | --- | --- |
-| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | [Day](backgrounds/background-day.png) · [Night](backgrounds/background-night.png) |
+| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Dawn wallpaper](backgrounds/variants/dawn.png) |
+
+The canonical OSD reference is captured at [screenshots/osd.png](screenshots/osd.png).
+On a live Omarchy session, set `ARANEA_OSD_CAPTURE_COMMAND` to a compositor
+capture command to replace the static reference with a live frame.
 
 ### Secure and boot surfaces
 
-![Aranea lock screen](screenshots/lock.png)
-
-![Aranea Plymouth boot screen](screenshots/plymouth.png)
+| Lock screen | Plymouth boot screen |
+| --- | --- |
+| ![Aranea lock screen](screenshots/lock.png) | ![Aranea Plymouth boot screen](screenshots/plymouth.png) |
 
 Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
 
@@ -199,7 +231,7 @@ The busy cursor animation is shipped as eight matching SVG frames:
 
 | Apps | Favorites | Recent |
 | --- | --- | --- |
-| ![Aranea Apps](screenshots/apps.png) | ![Aranea Favorites](screenshots/favorites.png) | ![Aranea Recent](screenshots/recent.png) |
+| ![Aranea Apps launcher](screenshots/apps.png) | ![Aranea Favorites](screenshots/favorites.png) | ![Aranea Recent](screenshots/recent.png) |
 
 Refresh the complete README capture set in one pass. Menu, desktop,
 notification, diagnostics, and application surfaces are captured from the

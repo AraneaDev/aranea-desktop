@@ -22,10 +22,12 @@ jq '
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
       {id: "araneadev.lock"},
-      {id: "araneadev.notifications"}
+      {id: "araneadev.notifications"},
+      {id: "araneadev.osd"}
     ] | unique_by(.id))
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
+      "omarchy.osd",
       "tim.bar",
       "tim.menu",
       "tim.lock"

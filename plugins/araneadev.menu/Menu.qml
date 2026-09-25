@@ -218,6 +218,7 @@ Item {
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
   property bool headerMarkSettled: false
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
   readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
@@ -1125,6 +1126,16 @@ Item {
   // The JSONC sources are watched so live edits to the default file (or the
   // user extension at ~/.config/omarchy/extensions/omarchy-menu.jsonc) take
   // effect without restarting the shell.
+  FileView {
+    id: motionStateFile
+    path: root.motionStatePath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.motionEnabled = String(text || "").trim() !== "off"
+    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+    onFileChanged: reload()
+  }
+
   FileView {
     id: defaultMenuFile
     path: root.defaultMenuPath

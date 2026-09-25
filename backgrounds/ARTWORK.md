@@ -1,6 +1,6 @@
 # Cinematic Precision artwork
 
-Seven independently generated static wallpapers share an obsidian field,
+Eight independently generated static wallpapers share an obsidian field,
 asymmetric peripheral spider-silk topology, fine mint/violet filaments, and
 quiet central and upper regions. The recognizable Aranea spider remains in
 the native SVG mark system; the wallpapers evoke it through silk rather than
@@ -27,6 +27,7 @@ the source is normalized to the exact delivery aspect ratio.
 | sparse | `sources/sparse.png` | `variants/sparse.png` | Small lower-left cluster, almost empty field |
 | dense | `sources/dense.png` | `variants/dense.png` | Richer right-edge strands and dimensional junctions |
 | dusk | `sources/dusk.png` | `variants/dusk.png` | Soft violet atmosphere and left-edge silk |
+| dawn | generated source retained with the release artifact | `variants/dawn.png` | Quiet mint dawn light, dew-lit silk and a dark working center |
 | monochrome | `sources/monochrome.png` | `variants/monochrome.png` | Silver silk on black, right-edge weight |
 | ultrawide | `sources/ultrawide.png` | `variants/ultrawide.png` | Dedicated 3:1 composition, mint left/violet right |
 
@@ -72,6 +73,10 @@ Use case: stylized-concept. Asset type: production Aranea Linux wallpaper, DENSE
 ### Dusk
 
 Use case: stylized-concept. Asset type: production Aranea Linux desktop wallpaper, DUSK variant. One full-bleed 3840x2160 16:9 image. Deep obsidian-purple (#0d0c16), soft dim violet twilight atmospheric depth hugging the lower-left edge only. Beautiful hair-thin spider-silk filaments with quiet lavender junctions and extremely restrained mint flecks, delicate asymmetric topology at far left and lower perimeter, a small faint answering strand at far right. Soft low-contrast filaments create a calming cinematic wallpaper. Center 65% and top 10% remain dark and empty for windows and bar. No bright nebula, no star field, no large rings or discs, no broad neon beams, no literal spider. No text, logos, watermark, UI, border or labels. Premium quiet abstract material study with fine depth and sparse precise nodes. Exact 3840x2160 requested.
+
+### Dawn
+
+Use case: stylized-concept. Asset type: production Aranea Linux desktop wallpaper, DAWN variant. One full-bleed 16:9 image with a near-black blue-charcoal field, quiet mint dawn atmosphere, and delicate dew-lit spider-silk topology weighted to the left and lower perimeter. Restrained lavender notes may appear only in the distant horizon. Keep the central working area and top bar region dark and calm. No literal spider, logo, text, watermark, UI, frame, stars or broad neon beams. Premium cinematic macro material detail with fine filaments and sparse luminous nodes. This is final artwork, not a mockup.
 
 ### Monochrome
 

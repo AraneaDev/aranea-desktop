@@ -37,6 +37,13 @@ contrast = "soft"
 motion = false
 
 [[wallpapers]]
+id = "dawn"
+path = "backgrounds/variants/dawn.png"
+aspect = "16:9"
+contrast = "soft"
+motion = false
+
+[[wallpapers]]
 id = "monochrome"
 path = "backgrounds/variants/monochrome.png"
 aspect = "16:9"

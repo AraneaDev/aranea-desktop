@@ -9,14 +9,14 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(lock desktop menu menu-submenu menu-search menu-input apps favorites recent notifications network audio bluetooth agents power monitor diagnostics btop file-manager neovim)
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications diagnostics network audio bluetooth agents power monitor btop file-manager neovim lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -66,8 +66,15 @@ if (( capture_all )); then
   # Leave the finished capture set visible on the intentionally empty
   # workspace long enough for visual inspection before returning focus.
   trap 'omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true; sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
+  capture_one() {
+    local all_surface="$1"
+    if ! "$0" --surface "$all_surface" --output "$output"; then
+      printf 'capture warning: %s failed; continuing batch\n' "$all_surface" >&2
+      [[ -f "$output/$all_surface.png" ]] || return 1
+    fi
+  }
   for all_surface in "${all_surfaces[@]}"; do
-    "$0" --surface "$all_surface" --output "$output"
+    capture_one "$all_surface"
   done
   build_hero_showcase
   exit 0
@@ -96,7 +103,7 @@ capture_menu_surface() {
   local payload
   case "$surface" in
     menu) payload='{"menu":"root"}' ;;
-    menu-submenu) payload='{"menu":"apps"}' ;;
+    menu-submenu) payload='{"menu":"system"}' ;;
     apps) payload='{"menu":"apps"}' ;;
     favorites) payload='{"menu":"apps.favorites"}' ;;
     recent) payload='{"menu":"apps.recent"}' ;;
@@ -109,7 +116,11 @@ capture_menu_surface() {
   omarchy-shell shell toggle araneadev.menu "$payload"
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
+  # Terminal applications can exit non-zero after the compositor frame is
+  # already captured (Neovim emits a harmless terminal escape warning on some
+  # builds). Keep the frame and continue the batch when the file exists.
+  local capture_status=0
+  grim "$output/$surface.png" || capture_status=$?
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
@@ -133,6 +144,9 @@ capture_terminal_surface() {
   hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
   kill "$child_pid" >/dev/null 2>&1 || true
   wait "$child_pid" >/dev/null 2>&1 || true
+  if [[ ! -f "$output/$surface.png" ]]; then
+    return "$capture_status"
+  fi
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
@@ -154,6 +168,28 @@ capture_popup_surface() {
   grim "$output/$surface.png"
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
+}
+
+capture_osd_surface() {
+  command -v omarchy-shell >/dev/null 2>&1 || { echo 'omarchy-shell is required to capture osd' >&2; exit 3; }
+  command -v grim >/dev/null 2>&1 || { echo 'grim is required to capture osd' >&2; exit 3; }
+
+  # OSD captures must always be taken on the clean showcase workspace.  This
+  # avoids terminal/chat text leaking into the reference frame.
+  hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || true
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
+  local summon_result
+  summon_result="$(omarchy-shell shell summon araneadev.osd '{"icon":"volume","message":"","value":71,"max":100,"duration":5000}' 2>&1)"
+  if [[ "$summon_result" != "ok" ]]; then
+    echo "Unable to summon OSD: $summon_result" >&2
+    exit 3
+  fi
+  sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  grim "$output/$surface.png"
+  omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
+  printf 'captured: %s (workspace 2 live OSD)\n' "$output/$surface.png"
 }
 
 case "$surface" in
@@ -268,6 +304,20 @@ case "$surface" in
   lock)
     cp "$repo_root/branding/screens/lock.png" "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  dawn)
+    cp "$repo_root/backgrounds/variants/dawn.png" "$output/$surface.png"
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  osd)
+    if [[ -n "${ARANEA_OSD_CAPTURE_COMMAND:-}" ]]; then
+      "$ARANEA_OSD_CAPTURE_COMMAND" "$output/$surface.png"
+      printf 'captured: %s\n' "$output/$surface.png"
+      exit 0
+    fi
+    capture_osd_surface
     exit 0
     ;;
   plymouth)

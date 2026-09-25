@@ -10,7 +10,11 @@ qml_files=(
   "$repo_root/plugins/araneadev.lock/LockView.qml"
   "$repo_root/plugins/araneadev.menu/Menu.qml"
   "$repo_root/plugins/araneadev.menu/BarWidget.qml"
+  "$repo_root/plugins/araneadev.osd/Osd.qml"
 )
+
+grep -Fq 'color: "transparent"' "$repo_root/plugins/araneadev.bar/Bar.qml"
+grep -Fq 'surfaceFormat.opaque: false' "$repo_root/plugins/araneadev.bar/Bar.qml"
 
 for qml_file in "${qml_files[@]}"; do
   [[ -f "$qml_file" ]] || {

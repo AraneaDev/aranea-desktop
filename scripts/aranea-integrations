@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/manifest.sh"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/ownership.sh"
+state_root="${ARANEA_INTEGRATION_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea/integrations}"
+
+usage() { printf '%s\n' "Usage: $0 status [--json] | activate <id> [--yes] | deactivate <id>"; }
+known_ids() { awk -F'"' '/^id = / { print $2 }' "$repo_root/theme-manifest.toml"; }
+known() { manifest_integration_exists "$1"; }
+available() {
+  local optional command_name
+  optional="$(manifest_integration_field "$1" optional_command || true)"
+  [[ -z "$optional" ]] && return 0
+  IFS='|' read -r -a commands <<<"$optional"
+  for command_name in "${commands[@]}"; do command -v "$command_name" >/dev/null 2>&1 && return 0; done
+  return 1
+}
+emit_status() {
+  local id="$1" state=inactive availability=unavailable
+  [[ -f "$state_root/$id" ]] && state="$(<"$state_root/$id")"
+  available "$id" && availability=available
+  if (( json )); then printf '{"id":"%s","status":"%s","availability":"%s"}\n' "$id" "$state" "$availability"
+  else printf '%-14s %-10s %s\n' "$id" "$state" "$availability"; fi
+}
+
+json=0
+command_name="${1:-}"
+case "$command_name" in
+  status)
+    [[ "${2:-}" == --json ]] && json=1
+    while read -r id; do [[ -n "$id" ]] && emit_status "$id"; done < <(known_ids)
+    ;;
+  activate)
+    id="${2:-}"; [[ "${3:-}" == --yes || -z "${3:-}" ]] || { usage >&2; exit 2; }
+    known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
+    available "$id" || { printf 'Integration unavailable: %s\n' "$id" >&2; exit 1; }
+    mkdir -p "$state_root"; before="$(mktemp)"; trap 'rm -f "$before" "$after"' EXIT
+    ownership_record > /dev/null
+    if [[ -f "$(ownership_record)" ]]; then cp "$(ownership_record)" "$before"; fi
+    "$repo_root/scripts/install-integration" "$id" --yes
+    after="$(mktemp)"
+    if [[ -f "$(ownership_record)" ]]; then cp "$(ownership_record)" "$after"; fi
+    comm -13 <(sort -u "$before") <(sort -u "$after") > "$state_root/$id.files"
+    printf active > "$state_root/$id"; printf 'integration: %s active\n' "$id"
+    ;;
+  deactivate)
+    id="${2:-}"; known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
+    files="$state_root/$id.files"; if [[ -f "$files" ]]; then while IFS= read -r target; do [[ -n "$target" ]] || continue; backup="$(backup_path "$target")"; rm -f -- "$target"; if [[ -e "$backup" || -L "$backup" ]]; then mkdir -p "$(dirname "$target")"; cp -a "$backup" "$target"; fi; done < "$files"; fi
+    rm -f "$state_root/$id" "$files"; printf 'integration: %s inactive\n' "$id"
+    ;;
+  *) usage >&2; exit 2 ;;
+esac

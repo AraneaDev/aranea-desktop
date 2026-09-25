@@ -12,18 +12,27 @@ expected_surfaces=(
   menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth
   btop file-manager neovim notifications network audio bluetooth agents
   power monitor apps favorites recent
+  dawn osd
 )
 expected_hero_frames=(
-  lock desktop menu menu-submenu menu-search menu-input apps favorites
-  recent notifications network audio bluetooth agents power monitor diagnostics
-  btop file-manager neovim
+  desktop menu menu-submenu menu-search menu-input apps favorites recent
+  notifications diagnostics network audio bluetooth agents power monitor btop
+  file-manager neovim lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
 
 for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"
-  grep -Fq "screenshots/$surface.png" "$readme"
+  if [[ "$surface" == dawn ]]; then
+    grep -Eq 'screenshots/dawn\.png|backgrounds/variants/dawn\.png' "$readme"
+  else
+    grep -Fq "screenshots/$surface.png" "$readme"
+  fi
 done
+
+test -f "$repo_root/screenshots/dawn.png"
+test -f "$repo_root/screenshots/osd.png"
+grep -Fq 'ARANEA_OSD_CAPTURE_COMMAND' "$capture_script"
 
 test ! -e "$repo_root/screenshots/idle.png"
 test -f "$repo_root/screenshots/hero-showcase.gif"
