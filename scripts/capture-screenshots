@@ -170,6 +170,28 @@ capture_popup_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+capture_osd_surface() {
+  command -v omarchy-shell >/dev/null 2>&1 || { echo 'omarchy-shell is required to capture osd' >&2; exit 3; }
+  command -v grim >/dev/null 2>&1 || { echo 'grim is required to capture osd' >&2; exit 3; }
+
+  # OSD captures must always be taken on the clean showcase workspace.  This
+  # avoids terminal/chat text leaking into the reference frame.
+  hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || true
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
+  local summon_result
+  summon_result="$(omarchy-shell shell summon araneadev.osd '{"icon":"volume","message":"","value":71,"max":100,"duration":5000}' 2>&1)"
+  if [[ "$summon_result" != "ok" ]]; then
+    echo "Unable to summon OSD: $summon_result" >&2
+    exit 3
+  fi
+  sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  grim "$output/$surface.png"
+  omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
+  printf 'captured: %s (workspace 2 live OSD)\n' "$output/$surface.png"
+}
+
 case "$surface" in
   menu|menu-submenu|menu-search|menu-input|apps|favorites|recent)
     capture_menu_surface
@@ -295,8 +317,7 @@ case "$surface" in
       printf 'captured: %s\n' "$output/$surface.png"
       exit 0
     fi
-    cp "$repo_root/screenshots/osd.png" "$output/$surface.png"
-    printf 'captured: %s (static filament reference; set ARANEA_OSD_CAPTURE_COMMAND for live capture)\n' "$output/$surface.png"
+    capture_osd_surface
     exit 0
     ;;
   plymouth)
