@@ -109,7 +109,8 @@ if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
       ([.[] | select(.id == "araneadev.bar") | .enabled] | any) and
       ([.[] | select(.id == "araneadev.lock") | .enabled] | any) and
       ([.[] | select(.id == "araneadev.menu") | .enabled] | any) and
-      ([.[] | select(.id == "araneadev.notifications") | .enabled] | any)
+      ([.[] | select(.id == "araneadev.notifications") | .enabled] | any) and
+      ([.[] | select(.id == "araneadev.osd") | .enabled] | any)
     ' <<<"$plugin_json" >/dev/null 2>&1; then
       emit plugins ok 'Aranea plugins are enabled'
     else
