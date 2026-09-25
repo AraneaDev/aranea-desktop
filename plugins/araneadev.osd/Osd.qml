@@ -21,11 +21,14 @@ Item {
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
   readonly property real fraction: OsdModel.progressFraction({ hasProgress: root.hasProgress, value: root.value, maxValue: root.maxValue })
   readonly property bool mediaOsd: root.iconKey.indexOf("media") === 0 || root.iconKey.indexOf("player") === 0
-  readonly property int pad: Style.space(12)
+  readonly property int pad: Style.space(14)
   readonly property int gap: Style.space(12)
-  readonly property int strandWidth: root.hasProgress ? Style.space(168) : Style.space(64)
-  readonly property int iconWidth: Style.space(24)
-  readonly property int valueWidth: Style.space(42)
+  readonly property int strandWidth: root.hasProgress ? Style.space(180) : Style.space(80)
+  readonly property int iconWidth: Style.space(28)
+  // Keep the percentage/message slot wide enough for the largest normal
+  // value at the active font size; a fixed 42px slot clipped `71%` to `7...`
+  // on 4K captures.
+  readonly property int valueWidth: Math.max(Style.space(56), messageMetrics.advanceWidth + Style.space(8))
   readonly property int messageWidth: Math.min(Style.space(220), messageMetrics.advanceWidth)
   readonly property int contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
 
@@ -179,9 +182,10 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           horizontalAlignment: Text.AlignRight
           text: root.message
+          elide: Text.ElideNone
           color: Color.popups.text
           font.family: Style.font.family
-          font.pixelSize: Style.font.body
+          font.pixelSize: Style.font.title
         }
         Text {
           visible: !root.hasProgress && root.message.length > 0
