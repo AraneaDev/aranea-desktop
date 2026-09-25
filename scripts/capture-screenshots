@@ -188,6 +188,9 @@ capture_osd_surface() {
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
+  if [[ "$(cd "$output" && pwd)" == "$repo_root/screenshots" ]]; then
+    cp "$output/$surface.png" "$output/osd-workspace2.png"
+  fi
   omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
   printf 'captured: %s (workspace 2 live OSD)\n' "$output/$surface.png"
 }
