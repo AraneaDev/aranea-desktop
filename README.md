@@ -150,7 +150,10 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- | --- |
 | ![Aranea command menu](screenshots/menu.png) | ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea diagnostics](screenshots/diagnostics.png) |
 | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) | ![Aranea notifications](screenshots/notifications.png) |
-| ![Aranea filament OSD](screenshots/osd.png) |  |  |
+
+| OSD |
+| --- |
+| ![Aranea filament OSD](screenshots/osd.png) |
 
 ### System popups
 
@@ -182,9 +185,9 @@ capture command to replace the static reference with a live frame.
 
 ### Secure and boot surfaces
 
-![Aranea lock screen](screenshots/lock.png)
-
-![Aranea Plymouth boot screen](screenshots/plymouth.png)
+| Lock screen | Plymouth boot screen |
+| --- | --- |
+| ![Aranea lock screen](screenshots/lock.png) | ![Aranea Plymouth boot screen](screenshots/plymouth.png) |
 
 Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
 
