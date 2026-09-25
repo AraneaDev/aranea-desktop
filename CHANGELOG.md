@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.3...v1.1.4) (2026-09-25)
+
+
+### Fixes
+
+* give conky a real mint-violet gradient border ([#19](https://github.com/AraneaDev/aranea-desktop/issues/19)) ([4cd14eb](https://github.com/AraneaDev/aranea-desktop/commit/4cd14eb361f09ad4e8eb02ee640bfc56f0d8e396))
+
 ## [1.1.3](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.2...v1.1.3) (2026-09-25)
 
 
