@@ -103,7 +103,7 @@ capture_menu_surface() {
   local payload
   case "$surface" in
     menu) payload='{"menu":"root"}' ;;
-    menu-submenu) payload='{"menu":"apps"}' ;;
+    menu-submenu) payload='{"menu":"system"}' ;;
     apps) payload='{"menu":"apps"}' ;;
     favorites) payload='{"menu":"apps.favorites"}' ;;
     recent) payload='{"menu":"apps.recent"}' ;;

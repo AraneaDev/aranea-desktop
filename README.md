@@ -150,8 +150,7 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- | --- |
 | ![Aranea command menu](screenshots/menu.png) | ![Aranea command menu — compact submenu](screenshots/menu-submenu.png) | ![Aranea diagnostics](screenshots/diagnostics.png) |
 | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) | ![Aranea notifications](screenshots/notifications.png) |
-
-The live filament OSD capture is [shown here](screenshots/osd.png).
+| ![Aranea filament OSD](screenshots/osd.png) |  |  |
 
 ### System popups
 
