@@ -37,6 +37,7 @@ ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
 ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
+~/.local/state/omarchy/current/theme/scripts/write-conky-gradient-border || true
 ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
 install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
 
