@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.4...v1.1.5) (2026-09-25)
+
+
+### Fixes
+
+* keep stray notifications out of theme-capture screenshots ([#21](https://github.com/AraneaDev/aranea-desktop/issues/21)) ([4e76872](https://github.com/AraneaDev/aranea-desktop/commit/4e76872dae78a0c4d0e29ce8154712e107e7c65f))
+
 ## [1.1.4](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.3...v1.1.4) (2026-09-25)
 
 
