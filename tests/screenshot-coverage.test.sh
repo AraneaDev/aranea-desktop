@@ -15,9 +15,9 @@ expected_surfaces=(
   dawn osd
 )
 expected_hero_frames=(
-  lock desktop menu menu-submenu menu-search menu-input apps favorites
-  recent notifications network audio bluetooth agents power monitor diagnostics
-  btop file-manager neovim
+  menu menu-submenu menu-search menu-input desktop diagnostics lock btop
+  file-manager neovim notifications network audio bluetooth agents power monitor
+  apps favorites recent osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
 
