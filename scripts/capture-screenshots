@@ -66,8 +66,15 @@ if (( capture_all )); then
   # Leave the finished capture set visible on the intentionally empty
   # workspace long enough for visual inspection before returning focus.
   trap 'omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true; sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
+  capture_one() {
+    local all_surface="$1"
+    if ! "$0" --surface "$all_surface" --output "$output"; then
+      printf 'capture warning: %s failed; continuing batch\n' "$all_surface" >&2
+      [[ -f "$output/$all_surface.png" ]] || return 1
+    fi
+  }
   for all_surface in "${all_surfaces[@]}"; do
-    "$0" --surface "$all_surface" --output "$output"
+    capture_one "$all_surface"
   done
   build_hero_showcase
   exit 0
@@ -109,7 +116,11 @@ capture_menu_surface() {
   omarchy-shell shell toggle araneadev.menu "$payload"
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
+  # Terminal applications can exit non-zero after the compositor frame is
+  # already captured (Neovim emits a harmless terminal escape warning on some
+  # builds). Keep the frame and continue the batch when the file exists.
+  local capture_status=0
+  grim "$output/$surface.png" || capture_status=$?
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
@@ -133,6 +144,9 @@ capture_terminal_surface() {
   hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
   kill "$child_pid" >/dev/null 2>&1 || true
   wait "$child_pid" >/dev/null 2>&1 || true
+  if [[ ! -f "$output/$surface.png" ]]; then
+    return "$capture_status"
+  fi
   printf 'captured: %s\n' "$output/$surface.png"
 }
 

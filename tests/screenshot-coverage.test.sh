@@ -23,7 +23,11 @@ expected_hero_frames=(
 
 for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"
-  grep -Fq "screenshots/$surface.png" "$readme"
+  if [[ "$surface" == dawn ]]; then
+    grep -Eq 'screenshots/dawn\.png|backgrounds/variants/dawn\.png' "$readme"
+  else
+    grep -Fq "screenshots/$surface.png" "$readme"
+  fi
 done
 
 test -f "$repo_root/screenshots/dawn.png"

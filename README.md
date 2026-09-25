@@ -151,6 +151,8 @@ interaction states rather than repeating the same wallpaper.
 | ![Aranea command menu](screenshots/menu.png) | ![Aranea command menu — compact submenu](screenshots/menu-submenu.png) | ![Aranea diagnostics](screenshots/diagnostics.png) |
 | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) | ![Aranea notifications](screenshots/notifications.png) |
 
+The live filament OSD capture is [shown here](screenshots/osd.png).
+
 ### System popups
 
 | Network | Audio | Bluetooth |
@@ -173,7 +175,7 @@ color, contrast, or aspect ratio.
 
 | Monochrome | Ultrawide | Dawn |
 | --- | --- | --- |
-| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Dawn wallpaper](screenshots/dawn.png) |
+| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Dawn wallpaper](backgrounds/variants/dawn.png) |
 
 The canonical OSD reference is captured at [screenshots/osd.png](screenshots/osd.png).
 On a live Omarchy session, set `ARANEA_OSD_CAPTURE_COMMAND` to a compositor
