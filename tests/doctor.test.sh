@@ -7,12 +7,15 @@ hook_root="$(mktemp -d)"
 ownership_root="$(mktemp -d)"
 trap 'rm -rf "$hook_root" "$ownership_root"' EXIT
 mkdir -p "$hook_root/theme-set.d" "$hook_root/post-boot.d"
+mkdir -p "$ownership_root/icons/scalable/places"
+ln -s "$ownership_root/icons/missing/folder.svg" "$ownership_root/icons/scalable/places/folder.svg"
 cp "$repo_root/hooks/theme-set" "$hook_root/theme-set.d/theme-set"
 cp "$repo_root/hooks/post-boot" "$hook_root/post-boot.d/post-boot"
 printf '%s\n' "$repo_root/README.md" > "$ownership_root/managed-files"
 
 output="$(
-  ARANEA_DOCTOR_THEME=Aranea \
+  ARANEA_DOCTOR_THEME='Aranea Pulse' \
+  ARANEA_DOCTOR_ICON_ROOT="$ownership_root/icons" \
   ARANEA_DOCTOR_HOOK_ROOT="$hook_root" \
   ARANEA_OWNERSHIP_ROOT="$ownership_root" \
   ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
@@ -26,6 +29,7 @@ output="$(
 grep -Fq '"id":"theme","status":"ok"' <<<"$output"
 grep -Fq '"id":"hooks","status":"ok"' <<<"$output"
 grep -Fq '"id":"manifest","status":"ok"' <<<"$output"
+grep -Fq '"id":"icons","status":"repair"' <<<"$output"
 grep -Fq '"id":"fonts","status":"ok"' <<<"$output"
 grep -Fq '"id":"ownership","status":"ok"' <<<"$output"
 grep -Fq '"id":"shell","status":"skipped"' <<<"$output"

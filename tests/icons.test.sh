@@ -82,8 +82,9 @@ dry_run_output="$(bash "$repo_root/scripts/install-integration" --dry-run icons)
 grep -Fq 'scalable/devices/drive-harddisk.svg' <<<"$dry_run_output"
 grep -Fq 'scalable/mimetypes/application-pdf.svg' <<<"$dry_run_output"
 grep -Fq 'scalable/apps/utilities-terminal.svg' <<<"$dry_run_output"
+grep -Eq 'would copy .*scalable/places/folder\.svg ->' <<<"$dry_run_output"
 expected_svg_count="$(find "$theme_root/scalable" -type f -name '*.svg' | wc -l)"
-installed_svg_count="$(grep -cE 'would link .*scalable/.+\.svg ->' <<<"$dry_run_output")"
+installed_svg_count="$(grep -cE 'would copy .*scalable/.+\.svg ->' <<<"$dry_run_output")"
 test "$installed_svg_count" -eq "$expected_svg_count"
 
 echo "icon theme contract passed (${#contexts[@]} contexts)"
