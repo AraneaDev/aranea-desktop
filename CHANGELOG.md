@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.2.0...v1.3.0) (2026-09-25)
+
+
+### Features
+
+* deliver Aranea Pulse theme showcase ([#27](https://github.com/AraneaDev/aranea-desktop/issues/27)) ([4cdca96](https://github.com/AraneaDev/aranea-desktop/commit/4cdca96dd3a82a44a496af5a519a38d47f7611a9))
+
 ## [1.2.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.5...v1.2.0) (2026-09-25)
 
 
