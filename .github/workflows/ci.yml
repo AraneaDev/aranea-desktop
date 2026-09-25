@@ -24,27 +24,15 @@ jobs:
 
       - name: Validate shell syntax
         run: |
-          find scripts hooks tests tools .githooks -type f \
-            \( -name '*.sh' -o -path '*/.githooks/*' \) -print0 |
-            xargs -0 -n1 bash -n
+          find scripts hooks tests tools .githooks -type f -print0 |
+            xargs -0 grep -lI '^#!.*sh' |
+            xargs -r -n1 bash -n
 
       - name: Validate QML types
         run: bash tests/qml-types.test.sh
 
       - name: Run contract tests
-        run: |
-          for test in tests/*.test.sh; do
-            echo "::group::${test}"
-            if output="$(bash "$test" 2>&1)"; then
-              printf '%s\n' "$output"
-              echo "::endgroup::"
-            else
-              status=$?
-              printf '%s\n' "$output"
-              echo "contract test failed: ${test} (status ${status})" >&2
-              exit 1
-            fi
-          done
+        run: ./tests/run
 
       - name: Exercise installer profiles
         env:
@@ -64,7 +52,10 @@ jobs:
           find backgrounds screenshots -type f \( -name '*.png' -o -name '*.jpg' \) -print0 | xargs -0 -n1 identify
 
       - name: Run ShellCheck
-        run: shellcheck -x scripts/*.sh hooks/* tests/*.test.sh tools/*.sh .githooks/*
+        run: |
+          find scripts hooks tests tools .githooks -type f -print0 |
+            xargs -0 grep -lI '^#!.*sh' |
+            xargs -r shellcheck -x
 
       - name: Upload diagnostics on failure
         if: failure()

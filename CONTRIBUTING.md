@@ -21,15 +21,23 @@ Branch protection enforces the same rule server-side regardless.
 ## Checks
 
 ```bash
-for test in tests/*.test.sh; do bash "$test"; done
-shellcheck -x scripts/*.sh hooks/* tests/*.test.sh
+tests/run
+find scripts hooks tests tools .githooks -type f -print0 |
+  xargs -0 grep -lI '^#!.*sh' | xargs shellcheck -x
 find integrations -type f -name '*.svg' -print0 | xargs -0 -n1 xmllint --noout
 find backgrounds screenshots -type f \( -name '*.png' -o -name '*.jpg' \) -print0 | xargs -0 -n1 identify
 ```
 
+`tests/run` runs every `tests/*.test.sh` file and prints a pass/fail summary
+with timing; a failing test always shows its captured output, a passing one
+only with `-v`/`--verbose`. Pass one or more bare names (`tests/run ownership
+manifest`) to run a subset. The ShellCheck invocation finds every script by
+its shebang rather than by extension or directory, since several scripts
+(`scripts/aranea-*`, `hooks/*`, `.githooks/*`, `tests/run` itself) have none.
+
 CI (`.github/workflows/ci.yml`) runs all of the above on every push and pull
-request to `master`, plus a syntax pass over every shell script and QML type
-validation for the Quickshell plugins.
+request to `master`, plus a syntax pass over every shell script (the same
+shebang-based search) and QML type validation for the Quickshell plugins.
 
 ## Working on it
 

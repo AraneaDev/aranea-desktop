@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -uo pipefail
+# No 'set -e': a failing test must not stop the runner from reporting the
+# rest, and the runner controls its own exit status at the end instead.
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root" || exit 1
+
+usage() {
+  cat <<'EOF'
+Usage: tests/run [-v|--verbose] [name...]
+
+Runs every tests/*.test.sh file and prints a pass/fail summary. Pass one or
+more bare names (e.g. `tests/run ownership manifest`) to run only those.
+Output from a passing test is hidden by default; -v/--verbose always shows
+it. A failing test always shows its output. Set NO_COLOR to disable color.
+Under GitHub Actions (GITHUB_ACTIONS=true), each test runs in its own
+collapsible log group and always shows its output, failure or not.
+EOF
+}
+
+verbose=0
+names=()
+for arg in "$@"; do
+  case "$arg" in
+    -v|--verbose) verbose=1 ;;
+    -h|--help) usage; exit 0 ;;
+    -*) printf 'Unknown option: %s\n' "$arg" >&2; usage >&2; exit 2 ;;
+    *) names+=("$arg") ;;
+  esac
+done
+
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  green=$'\033[32m'; red=$'\033[31m'; dim=$'\033[2m'; reset=$'\033[0m'
+else
+  green=''; red=''; dim=''; reset=''
+fi
+
+tests=()
+if (( ${#names[@]} == 0 )); then
+  for f in tests/*.test.sh; do tests+=("$f"); done
+else
+  for name in "${names[@]}"; do
+    f="tests/${name%.test.sh}.test.sh"
+    if [[ -f "$f" ]]; then
+      tests+=("$f")
+    else
+      printf '%sUnknown test: %s%s\n' "$red" "$name" "$reset" >&2
+      exit 2
+    fi
+  done
+fi
+
+# Under GitHub Actions, wrap each test in a collapsible ::group:: and raise
+# an ::error:: annotation on failure so it surfaces in the run summary, not
+# just buried in the log.
+in_actions=0
+[[ "${GITHUB_ACTIONS:-}" == "true" ]] && in_actions=1
+
+pass=0
+fail=0
+failed_names=()
+start_all=$(date +%s.%N)
+
+for t in "${tests[@]}"; do
+  name="$(basename "$t" .test.sh)"
+  (( in_actions )) && printf '::group::%s\n' "$name"
+  out="$(mktemp)"
+  start=$(date +%s.%N)
+  if bash "$t" >"$out" 2>&1; then
+    status=0
+  else
+    status=$?
+  fi
+  elapsed=$(awk -v s="$start" -v e="$(date +%s.%N)" 'BEGIN { printf "%.2f", e - s }')
+
+  if (( status == 0 )); then
+    pass=$((pass + 1))
+    printf '%s✓%s %-32s %s(%ss)%s\n' "$green" "$reset" "$name" "$dim" "$elapsed" "$reset"
+    (( verbose || in_actions )) && sed 's/^/    /' "$out"
+  else
+    fail=$((fail + 1))
+    failed_names+=("$name")
+    printf '%s✗%s %-32s %s(%ss, exit %d)%s\n' "$red" "$reset" "$name" "$dim" "$elapsed" "$status" "$reset"
+    sed 's/^/    /' "$out"
+  fi
+  (( in_actions )) && printf '::endgroup::\n'
+  (( in_actions && status != 0 )) && printf '::error::%s failed (exit %d)\n' "$name" "$status"
+  rm -f "$out"
+done
+
+total=$(awk -v s="$start_all" -v e="$(date +%s.%N)" 'BEGIN { printf "%.2f", e - s }')
+
+printf '\n'
+if (( fail == 0 )); then
+  printf '%s%d passed%s in %ss\n' "$green" "$pass" "$reset" "$total"
+else
+  printf '%s%d passed, %d failed%s in %ss\n' "$red" "$pass" "$fail" "$reset" "$total"
+  printf 'Failed: %s\n' "${failed_names[*]}"
+fi
+
+exit $(( fail > 0 ))
