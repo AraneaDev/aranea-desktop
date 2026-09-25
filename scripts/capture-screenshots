@@ -53,9 +53,19 @@ if (( capture_all )); then
     echo "Refusing --all capture on workspace $active_workspace; switch to workspace 2 first" >&2
     exit 3
   }
+  # A stray toast (an unrelated app, or Claude Code itself narrating this
+  # very capture run) renders through araneadev.notifications, not the
+  # compositor's own notify layer, so hyprctl dismissnotify never touches
+  # it -- only disabling the plugin for the whole batch does. Individual
+  # surfaces re-enable it themselves when run standalone (see
+  # ARANEA_CAPTURE_BATCH below), so this has to be the only place that
+  # flips it back on for a full --all run, or an early surface's own
+  # cleanup would silently reopen the window for every surface after it.
+  omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
+  export ARANEA_CAPTURE_BATCH=1
   # Leave the finished capture set visible on the intentionally empty
   # workspace long enough for visual inspection before returning focus.
-  trap 'sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
+  trap 'omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true; sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
   for all_surface in "${all_surfaces[@]}"; do
     "$0" --surface "$all_surface" --output "$output"
   done
@@ -98,6 +108,7 @@ capture_menu_surface() {
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
   omarchy-shell shell toggle araneadev.menu "$payload"
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
@@ -139,6 +150,7 @@ capture_popup_surface() {
     exit 3
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
@@ -150,11 +162,18 @@ case "$surface" in
     exit 0
     ;;
   desktop)
+    hyprctl dismissnotify >/dev/null 2>&1 || true
     grim "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   notifications)
+    # This is the one surface that *wants* araneadev.notifications on -- a
+    # batch run disables it for every other surface (see the --all block
+    # above), so re-enable it here first and restore batch mode's "off"
+    # state afterward. Standalone runs never disabled it, so re-enabling is
+    # a no-op there and it's left enabled afterward, its normal default.
+    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     command -v notify-send >/dev/null 2>&1 &&
       notify-send -a Aranea -u normal -t 2500 'Aranea notification' 'Theme capture · notification surface' || true
     sleep 0.5
@@ -164,6 +183,7 @@ case "$surface" in
     omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
     # Let the capture-only toast expire before the next all-surface capture.
     sleep 2
+    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] && omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
@@ -172,9 +192,13 @@ case "$surface" in
     omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     aranea-diagnostics-toggle >/dev/null
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+    hyprctl dismissnotify >/dev/null 2>&1 || true
     grim "$output/$surface.png"
     aranea-diagnostics-toggle >/dev/null 2>&1 || true
-    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
+    # A parent --all run owns re-enabling for the whole batch; re-enabling
+    # here too would reopen the window for every surface captured after
+    # this one.
+    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] || omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
@@ -182,14 +206,14 @@ case "$surface" in
     omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Btop" btop
-    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
+    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] || omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
   neovim)
     omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Neovim" nvim
-    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
+    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] || omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
   network)
