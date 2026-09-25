@@ -146,14 +146,21 @@ state glyphs and the menu’s network, node, and edge motifs live under
 The hero above is the primary desktop view; the capture set below focuses on
 interaction states rather than repeating the same wallpaper.
 
-| Command center | Menu states | Shell telemetry |
-| --- | --- | --- |
-| ![Aranea command menu](screenshots/menu.png) | ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea diagnostics](screenshots/diagnostics.png) |
-| ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) | ![Aranea notifications](screenshots/notifications.png) |
-
-| OSD |
+| Command center |
 | --- |
-| ![Aranea filament OSD](screenshots/osd.png) |
+| ![Aranea command menu](screenshots/menu.png) |
+
+| System submenu | Menu search | Menu input |
+| --- | --- | --- |
+| ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) |
+
+| Diagnostics | OSD |
+| --- | --- |
+| ![Aranea diagnostics](screenshots/diagnostics.png) | ![Aranea filament OSD](screenshots/osd.png) |
+
+| Notifications |
+| --- |
+| ![Aranea notifications](screenshots/notifications.png) |
 
 ### System popups
 
