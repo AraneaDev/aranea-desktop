@@ -78,12 +78,14 @@ Item {
   property color foreground: themeForeground
   property color barForeground: useTransparentForeground ? transparentForeground : themeForeground
   property bool foregroundAnimationEnabled: true
+  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
   property color background: Color.bar.background
   property color urgent: Color.bar.active
 
-  Behavior on barForeground { enabled: root.foregroundAnimationEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-  Behavior on background { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-  Behavior on urgent { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+  Behavior on barForeground { enabled: root.motionEnabled && root.foregroundAnimationEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+  Behavior on background { enabled: root.motionEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+  Behavior on urgent { enabled: root.motionEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
   property var tooltipTarget: null
   property var pendingTooltipTarget: null
   property string tooltipText: ""
@@ -1107,6 +1109,16 @@ Item {
         root.restoreForegroundAnimation()
       }
     }
+  }
+
+  FileView {
+    id: motionStateFile
+    path: root.motionStatePath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.motionEnabled = String(text || "").trim() !== "off"
+    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+    onFileChanged: reload()
   }
 
   FileView {

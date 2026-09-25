@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+state_file="$state_root/motion"
+
+motion_status() {
+  if [[ -f "$state_file" && "$(<"$state_file")" == off ]]; then
+    printf '%s\n' off
+  else
+    printf '%s\n' on
+  fi
+}
+
+apply_motion() {
+  local mode hyprctl_bin
+  mode="$(motion_status)"
+  hyprctl_bin="${ARANEA_HYPRCTL:-hyprctl}"
+  if ! command -v "$hyprctl_bin" >/dev/null 2>&1; then
+    printf 'motion: %s (Hyprland apply deferred)\n' "$mode"
+    return 0
+  fi
+
+  if [[ "$mode" == off ]]; then
+    "$hyprctl_bin" keyword animations:enabled false >/dev/null
+  else
+    "$hyprctl_bin" --batch 'keyword animations:enabled true; keyword animation windowsIn, 1, 2.2, easeOutQuint, popin 94%; keyword animation windowsOut, 1, 1.4, linear, popin 96%; keyword animation workspaces, 1, 2.4, easeInOutCubic, slidefade 12%; keyword animation specialWorkspace, 1, 2.6, easeInOutCubic, slidefadevert 10%' >/dev/null
+  fi
+  printf 'motion: %s\n' "$mode"
+}
+
+case "${1:-status}" in
+  status)
+    printf 'motion: %s\n' "$(motion_status)"
+    ;;
+  set)
+    mode="${2:-}"
+    [[ "$mode" == on || "$mode" == off ]] || {
+      printf 'Usage: %s set on|off\n' "$0" >&2
+      exit 2
+    }
+    mkdir -p "$state_root"
+    printf '%s\n' "$mode" > "$state_file"
+    apply_motion
+    ;;
+  toggle)
+    if [[ "$(motion_status)" == on ]]; then
+      "$0" set off
+    else
+      "$0" set on
+    fi
+    ;;
+  apply)
+    apply_motion
+    ;;
+  *)
+    printf 'Usage: %s status|set on|off|toggle|apply\n' "$0" >&2
+    exit 2
+    ;;
+esac

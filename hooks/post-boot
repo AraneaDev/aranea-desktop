@@ -58,3 +58,6 @@ fi
 if [[ -x "$theme_root/scripts/ensure-shell-running" ]]; then
   "$theme_root/scripts/ensure-shell-running"
 fi
+if [[ -x "$theme_root/scripts/aranea-motion" ]]; then
+  "$theme_root/scripts/aranea-motion" apply >/dev/null 2>&1 || true
+fi

@@ -105,9 +105,7 @@ case "${1:-list}" in
   motion)
     mode="${2:-}"
     [[ "$mode" == on || "$mode" == off ]] || { printf 'Usage: %s motion on|off\n' "$0" >&2; exit 2; }
-    mkdir -p "$state_root"
-    printf '%s\n' "$mode" > "$state_root/motion"
-    printf 'motion: %s\n' "$mode"
+    exec "$repo_root/scripts/aranea-motion" set "$mode"
     ;;
   *)
     printf 'Usage: %s list|set <id>|set-day-night|schedule on|off|status|motion on|off\n' "$0" >&2
