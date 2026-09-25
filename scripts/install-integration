@@ -183,19 +183,23 @@ case "$integration" in
     fi
     ;;
   icons)
-    # Aranea does not ship a full icon set. Instead it overrides just the
-    # folder glyphs with accent-colored artwork and falls back to a muted,
-    # accent-toned host variant (from the yaru-icon-theme package Omarchy
-    # installs) for everything else, and shrinks Nautilus's oversized
-    # default grid icons so they stop dominating the dark, low-contrast
-    # surfaces.
+    # Aranea overrides the Wave 1 file-manager core and falls back to a muted,
+    # accent-toned host variant for every unsupported name. Keep the install
+    # recursive so new contexts do not require another installer branch.
     icon_theme=Aranea-icons
     icon_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/$icon_theme"
     install_one "$repo_root/integrations/icons/aranea/index.theme" "$icon_root/index.theme"
-    for icon_asset in folder.svg folder-open.svg; do
-      install_one "$repo_root/integrations/icons/aranea/scalable/places/$icon_asset" \
-        "$icon_root/scalable/places/$icon_asset"
-    done
+    while IFS= read -r icon_source; do
+      icon_relative="${icon_source#"$repo_root/integrations/icons/aranea/"}"
+      install_one "$icon_source" "$icon_root/$icon_relative"
+    done < <(find "$repo_root/integrations/icons/aranea/scalable" -type f -name '*.svg' -print | sort)
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+      if (( dry_run )); then
+        printf 'would refresh GTK icon cache at %s\n' "$icon_root"
+      else
+        gtk-update-icon-cache -f -t "$icon_root" >/dev/null 2>&1 || true
+      fi
+    fi
     if command -v gsettings >/dev/null 2>&1; then
       if (( dry_run )); then
         printf 'would set desktop icon theme to %s\n' "$icon_theme"

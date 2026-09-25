@@ -2,7 +2,7 @@
 Name=Aranea-icons
 Comment=Aranea folder accents over a neutral fallback icon set
 Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor
-Directories=scalable/places
+Directories=scalable/places,scalable/devices,scalable/status,scalable/actions,scalable/mimetypes,scalable/apps
 
 [scalable/places]
 Size=48
@@ -10,3 +10,38 @@ MinSize=8
 MaxSize=512
 Type=Scalable
 Context=Places
+
+[scalable/devices]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Devices
+
+[scalable/status]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Status
+
+[scalable/actions]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Actions
+
+[scalable/mimetypes]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=MimeTypes
+
+[scalable/apps]
+Size=48
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Applications
