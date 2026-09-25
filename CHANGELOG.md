@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.4.0...v1.4.1) (2026-09-25)
+
+
+### Fixes
+
+* make icon installation durable ([ad1b7c1](https://github.com/AraneaDev/aranea-desktop/commit/ad1b7c18e96228cb63def4d6e09c8545f7d8b32c))
+
 ## [1.4.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.3.0...v1.4.0) (2026-09-25)
 
 
