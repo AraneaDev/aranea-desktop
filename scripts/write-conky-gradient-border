@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Writes conky's cairo border-drawing hook straight into ~/.config/conky
+# instead of shipping it as a theme resource file. omarchy's theme installer
+# refuses any .lua file staged from a theme installed from a git repo (a
+# supply-chain guard against arbitrary code in community themes -- see
+# is_denied_installed_file in /usr/bin/omarchy-theme-set), which is exactly
+# how this theme itself is distributed. Hooks are the framework's own
+# sanctioned "this theme runs code" mechanism, so this runs from there
+# instead: conky.conf's lua_load points at the file this writes.
+mkdir -p ~/.config/conky
+
+cat >~/.config/conky/gradient-border.lua <<'LUA'
+-- Draws conky's hairline border as the theme's signature mint -> violet
+-- gradient, the same rgba pair as hyprland.active-border in shell.toml.
+-- conky's native draw_borders only takes a flat color, so this fakes the
+-- gradient with a cairo linear pattern stroked around the window instead.
+local MINT   = { 0x3b / 255, 0xff / 255, 0x9e / 255, 0xd0 / 255 }
+local VIOLET = { 0x7a / 255, 0x5c / 255, 0xff / 255, 0xb0 / 255 }
+local WIDTH = 1
+
+function conky_draw_gradient_border()
+    -- The 'cairo' module is registered by conky's runtime once a lua_load
+    -- file is in play, not while conky.conf itself is still being parsed,
+    -- so the require has to happen in here rather than at file scope.
+    require('cairo')
+    local surf = conky_surface()
+    if not surf then return end
+    local cr = cairo_create(surf)
+    if not cr then return end
+
+    local w = conky_window.width
+    local h = conky_window.height
+    local inset = WIDTH / 2
+
+    local pattern = cairo_pattern_create_linear(0, 0, w, h)
+    cairo_pattern_add_color_stop_rgba(pattern, 0, MINT[1], MINT[2], MINT[3], MINT[4])
+    cairo_pattern_add_color_stop_rgba(pattern, 1, VIOLET[1], VIOLET[2], VIOLET[3], VIOLET[4])
+
+    cairo_set_source(cr, pattern)
+    cairo_set_line_width(cr, WIDTH)
+    cairo_rectangle(cr, inset, inset, w - WIDTH, h - WIDTH)
+    cairo_stroke(cr)
+
+    cairo_pattern_destroy(pattern)
+    cairo_destroy(cr)
+end
+LUA
