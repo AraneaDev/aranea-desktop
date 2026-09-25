@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.3.0...v1.4.0) (2026-09-25)
+
+
+### Features
+
+* add Aranea icon theme ([6b52685](https://github.com/AraneaDev/aranea-desktop/commit/6b52685565863e59187ce6cdfadee803f57b587d))
+
+
+### Fixes
+
+* refresh complete screenshot set ([c02c154](https://github.com/AraneaDev/aranea-desktop/commit/c02c154597ca838cbaefed98209cea61829efda5))
+
 ## [1.3.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.2.0...v1.3.0) (2026-09-25)
 
 
