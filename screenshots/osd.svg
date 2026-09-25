@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="220" viewBox="0 0 960 220">
+  <rect width="960" height="220" rx="22" fill="#090d12"/>
+  <rect x="2" y="2" width="956" height="216" rx="20" fill="none" stroke="#29323b" stroke-width="4"/>
+  <text x="68" y="128" fill="#d9e8e3" font-family="sans-serif" font-size="58"></text>
+  <line x1="190" y1="110" x2="700" y2="110" stroke="#647078" stroke-width="3"/>
+  <line x1="190" y1="110" x2="552" y2="110" stroke="#79efc3" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="552" cy="110" r="13" fill="#79efc3"/>
+  <text x="744" y="130" fill="#d9e8e3" font-family="sans-serif" font-size="48">71%</text>
+</svg>

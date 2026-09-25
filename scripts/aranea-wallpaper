@@ -13,7 +13,10 @@ service_unit="aranea-wallpaper-day-night.service"
 systemctl_user() { "${ARANEA_SYSTEMCTL:-systemctl}" --user "$@"; }
 load_schedule() {
   dawn=06:00; day=08:00; dusk=18:00; night=20:00
-  if [[ -f "$schedule_config" ]]; then source "$schedule_config"; fi
+  if [[ -f "$schedule_config" ]]; then
+    # shellcheck disable=SC1090
+    source "$schedule_config"
+  fi
 }
 valid_time() { [[ "$1" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; }
 validate_schedule() {

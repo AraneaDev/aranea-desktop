@@ -12,6 +12,7 @@ expected_surfaces=(
   menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth
   btop file-manager neovim notifications network audio bluetooth agents
   power monitor apps favorites recent
+  dawn osd
 )
 expected_hero_frames=(
   lock desktop menu menu-submenu menu-search menu-input apps favorites
@@ -24,6 +25,10 @@ for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"
   grep -Fq "screenshots/$surface.png" "$readme"
 done
+
+test -f "$repo_root/screenshots/dawn.png"
+test -f "$repo_root/screenshots/osd.png"
+grep -Fq 'ARANEA_OSD_CAPTURE_COMMAND' "$capture_script"
 
 test ! -e "$repo_root/screenshots/idle.png"
 test -f "$repo_root/screenshots/hero-showcase.gif"

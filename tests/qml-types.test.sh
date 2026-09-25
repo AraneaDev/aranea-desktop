@@ -13,6 +13,9 @@ qml_files=(
   "$repo_root/plugins/araneadev.osd/Osd.qml"
 )
 
+grep -Fq 'color: "transparent"' "$repo_root/plugins/araneadev.bar/Bar.qml"
+grep -Fq 'surfaceFormat.opaque: false' "$repo_root/plugins/araneadev.bar/Bar.qml"
+
 for qml_file in "${qml_files[@]}"; do
   [[ -f "$qml_file" ]] || {
     echo "missing QML entry point: $qml_file" >&2

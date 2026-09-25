@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
@@ -268,6 +268,21 @@ case "$surface" in
   lock)
     cp "$repo_root/branding/screens/lock.png" "$output/$surface.png"
     printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  dawn)
+    cp "$repo_root/backgrounds/variants/dawn.png" "$output/$surface.png"
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  osd)
+    if [[ -n "${ARANEA_OSD_CAPTURE_COMMAND:-}" ]]; then
+      "$ARANEA_OSD_CAPTURE_COMMAND" "$output/$surface.png"
+      printf 'captured: %s\n' "$output/$surface.png"
+      exit 0
+    fi
+    cp "$repo_root/screenshots/osd.png" "$output/$surface.png"
+    printf 'captured: %s (static filament reference; set ARANEA_OSD_CAPTURE_COMMAND for live capture)\n' "$output/$surface.png"
     exit 0
     ;;
   plymouth)

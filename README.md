@@ -9,7 +9,7 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-22%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
+[![Tests](https://img.shields.io/badge/tests-23%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
@@ -171,9 +171,13 @@ color, contrast, or aspect ratio.
 | --- | --- | --- |
 | ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
 
-| Monochrome | Ultrawide | Day / Night |
+| Monochrome | Ultrawide | Dawn |
 | --- | --- | --- |
-| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | [Day](backgrounds/background-day.png) · [Night](backgrounds/background-night.png) |
+| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Dawn wallpaper](screenshots/dawn.png) |
+
+The canonical OSD reference is captured at [screenshots/osd.png](screenshots/osd.png).
+On a live Omarchy session, set `ARANEA_OSD_CAPTURE_COMMAND` to a compositor
+capture command to replace the static reference with a live frame.
 
 ### Secure and boot surfaces
 
