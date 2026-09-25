@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.2...v1.1.3) (2026-09-25)
+
+
+### Fixes
+
+* use the mint-violet gradient for popup and menu borders ([#17](https://github.com/AraneaDev/aranea-desktop/issues/17)) ([cf9acc9](https://github.com/AraneaDev/aranea-desktop/commit/cf9acc911db8de2c34ad35a5d7e9b038fb0c43df))
+
 ## [1.1.2](https://github.com/AraneaDev/aranea-desktop/compare/v1.1.1...v1.1.2) (2026-09-24)
 
 
