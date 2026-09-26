@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea pictures folder</title><path d="M4 7h6l2 2h8v10H4z" fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linejoin="round"/><path d="m8 16 2.5-3 2 2 1.5-1.5 2 2.5M16 11.5h.1" fill="none" stroke="#626879" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center places/folder-pictures glyph</title>
+<metadata>Source glyph U+F03E from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M52 744 c-12 -8 -22 -21 -22 -28 0 -8 -7 -19 -15 -26 -22 -19 -22
+-571 0 -590 8 -7 15 -18 15 -26 0 -7 10 -20 22 -28 19 -14 73 -16 389 -16 355
+0 367 1 393 21 l26 20 0 324 c0 321 0 324 -22 345 -21 19 -33 20 -393 20 -319
+0 -374 -2 -393 -16z m750 -41 c17 -15 18 -37 18 -293 0 -337 0 -337 -87 -228
+-32 40 -87 113 -123 160 -36 48 -73 87 -82 88 -10 0 -49 -40 -92 -94 -41 -52
+-79 -97 -85 -100 -5 -4 -24 14 -41 39 -17 25 -39 45 -48 45 -10 -1 -46 -42
+-87 -101 -38 -56 -74 -103 -78 -106 -4 -2 -14 1 -22 7 -13 10 -15 58 -15 283
+0 264 1 271 22 294 l21 23 340 0 c303 0 342 -2 359 -17z M220 587 c-31 -16
+-40 -76 -15 -101 21 -20 69 -21 89 0 19 18 21 77 4 92 -24 18 -53 22 -78 9z"/>
+</g>
+</svg>

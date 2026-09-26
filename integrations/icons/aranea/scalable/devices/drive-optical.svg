@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea optical drive</title><circle cx="12" cy="12" r="8" fill="none" stroke="#86ad9b" stroke-width="0.75"/><circle cx="12" cy="12" r="2" fill="none" stroke="#626879" stroke-width="0.75"/><path d="m17.5 6.5-4 4" stroke="#626879" stroke-width="0.75" stroke-linecap="round"/><circle cx="17.5" cy="6.5" r="1" fill="#86ad9b"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center devices/drive-optical glyph</title>
+<metadata>Source glyph U+F1C0 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M300 877 c-8 -8 -48 -19 -89 -25 -142 -23 -210 -71 -211 -148 0 -71
+73 -117 235 -145 91 -16 311 -6 385 16 74 23 130 53 130 69 0 7 7 19 15 26 24
+20 18 59 -15 100 -34 44 -115 76 -212 87 -32 3 -63 12 -69 19 -15 19 -149 19
+-169 1z M0 468 c1 -82 17 -111 77 -142 86 -43 300 -66 438 -47 127 18 199 46
+235 91 27 33 30 45 30 104 0 36 -2 66 -5 66 -3 0 -27 -11 -53 -24 -81 -40
+-183 -58 -332 -58 -175 0 -261 18 -382 80 -5 2 -8 -29 -8 -70z M0 206 c1 -68
+20 -101 77 -130 39 -19 146 -46 189 -46 17 0 37 -7 44 -15 17 -20 142 -21 159
+-1 6 7 37 16 69 19 158 17 242 78 242 176 0 28 -2 51 -4 51 -2 0 -28 -11 -57
+-24 -92 -40 -186 -56 -331 -56 -153 0 -247 17 -330 58 l-58 29 0 -61z"/>
+</g>
+</svg>

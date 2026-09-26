@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+icon_root="$repo_root/integrations/icons/aranea/scalable"
+font="${ARANEA_ICON_FONT:-/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf}"
+point_size="${ARANEA_ICON_POINT_SIZE:-96}"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+[[ -f "$font" ]] || { printf 'Font not found: %s\n' "$font" >&2; exit 1; }
+command -v magick >/dev/null 2>&1 || { echo 'magick is required' >&2; exit 1; }
+command -v potrace >/dev/null 2>&1 || { echo 'potrace is required' >&2; exit 1; }
+
+render_group() {
+  local codepoint="$1"
+  shift
+  local relative output glyph viewbox label
+  glyph="$(printf '%b' "\\U$codepoint")"
+  magick -background black -fill white -font "$font" -pointsize "$point_size" \
+    label:"$glyph" -trim +repage -morphology Erode Disk:2 -negate -threshold 50% "$tmp_dir/source.pbm"
+  potrace --svg --flat --turdsize 2 --output "$tmp_dir/raw.svg" "$tmp_dir/source.pbm"
+  viewbox="$(sed -n 's/.*viewBox="\([^"]*\)".*/\1/p' "$tmp_dir/raw.svg" | head -1)"
+  for relative in "$@"; do
+    output="$icon_root/$relative"
+    mkdir -p "$(dirname "$output")"
+    label="${relative%.svg}"
+    {
+      printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s" preserveAspectRatio="xMidYMid meet">\n' "$viewbox"
+      printf '<title>Aranea Command Center %s glyph</title>\n' "$label"
+      printf '<metadata>Source glyph U+%s from JetBrainsMono Nerd Font</metadata>\n' "$codepoint"
+      sed -n '/<g transform=/,/<\/g>/p' "$tmp_dir/raw.svg" \
+        | sed 's/fill="#000000" stroke="none"/fill="#3bff9e"/'
+      printf '</svg>\n'
+    } > "$output"
+  done
+}
+
+# Repeated codepoints are intentional aliases: related names share one visual
+# language, while every path still comes from the Nerd Font source glyph.
+find "$icon_root" -type f -name '*.svg' -delete
+
+render_group F024B \
+  places/folder.svg places/folder-symbolic.svg places/folder-documents.svg
+render_group F01DA places/folder-download.svg places/folder-download-symbolic.svg
+render_group F03E places/folder-pictures.svg places/folder-pictures-symbolic.svg
+render_group F03D places/folder-videos.svg places/folder-videos-symbolic.svg
+render_group F001 places/folder-music.svg mimetypes/audio-x-generic.svg
+render_group F0770 places/folder-open.svg
+render_group F0752 places/folder-new.svg
+render_group F0238 places/folder-root.svg
+render_group F02DC places/user-home.svg places/user-home-symbolic.svg places/go-home.svg
+render_group F1F8 places/user-trash.svg places/user-trash-symbolic.svg places/user-trash-full.svg
+render_group F0F6 mimetypes/text-x-generic.svg mimetypes/text-plain.svg mimetypes/text-markdown.svg \
+  mimetypes/application-json.svg mimetypes/application-schema+json.svg mimetypes/application-toml.svg \
+  mimetypes/x-office-document.svg mimetypes/application-x-desktop.svg
+render_group F15B actions/document-new.svg mimetypes/text-x-generic.svg
+render_group F489 apps/utilities-terminal.svg
+render_group E615 apps/preferences-system.svg
+render_group F002 actions/edit-find.svg
+render_group F03A actions/view-list.svg
+render_group F00A actions/view-grid.svg
+render_group F021 actions/view-refresh.svg actions/document-open-recent-symbolic.svg
+render_group F060 actions/go-previous.svg
+render_group F061 actions/go-next.svg
+render_group F062 actions/go-up.svg
+render_group F0C5 actions/edit-copy.svg
+render_group F0C4 actions/edit-cut.svg
+render_group F1F8 actions/edit-delete.svg
+render_group F2F5 actions/application-exit.svg
+render_group F15C actions/document-open.svg
+render_group F0C7 actions/document-save.svg
+render_group F005 actions/starred-symbolic.svg
+render_group F044 apps/accessories-text-editor.svg
+render_group F07B apps/system-file-manager.svg
+render_group F0AC apps/web-browser.svg
+render_group F108 devices/computer-desktop.svg
+render_group F109 devices/computer-laptop.svg
+render_group F0C2 devices/computer.svg
+render_group F0A0 devices/drive-harddisk.svg devices/drive-harddisk-system.svg
+render_group F1C0 devices/drive-optical.svg
+render_group F1B3 devices/drive-removable-media.svg
+render_group F1C6 devices/media-flash.svg devices/media-sd.svg mimetypes/application-x-tar.svg
+render_group F233 devices/network-server.svg places/network-workgroup-symbolic.svg
+render_group F1EB devices/network-wireless.svg
+render_group F1C1 mimetypes/application-pdf.svg
+render_group F410 mimetypes/application-zip.svg
+render_group F13B mimetypes/text-html.svg
+render_group F121 mimetypes/text-x-script.svg mimetypes/application-x-executable.svg
+render_group F00C status/emblem-mounted.svg
+render_group F023A status/emblem-readonly.svg
+render_group F1E0 status/emblem-shared.svg
+render_group F03E mimetypes/image-x-generic.svg
+render_group F03D mimetypes/video-x-generic.svg
+
+printf 'generated %s font-derived icons\n' "$(find "$icon_root" -type f -name '*.svg' | wc -l)"

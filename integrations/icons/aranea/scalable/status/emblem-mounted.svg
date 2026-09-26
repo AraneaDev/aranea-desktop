@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea mounted volume</title><circle cx="12" cy="11" r="6" fill="none" stroke="#86ad9b" stroke-width="0.9"/><path d="M12 8v6M9 11h6M8 19h8" stroke="#626879" stroke-width="0.75" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 57.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center status/emblem-mounted glyph</title>
+<metadata>Source glyph U+F00C from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,57.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M490 335 c-113 -113 -209 -205 -215 -205 -6 0 -53 43 -105 95 -98 98
+-123 111 -153 77 -15 -17 -9 -25 111 -145 93 -93 134 -127 152 -127 18 0 78
+54 243 217 120 120 222 227 226 238 13 32 1 55 -28 55 -21 0 -68 -42 -231
+-205z"/>
+</g>
+</svg>

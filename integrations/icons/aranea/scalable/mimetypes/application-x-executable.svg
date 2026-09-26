@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea application-x-executable</title><path d="M7 6h10v12H7zM10 10h4M10 13h4" fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/><g fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h8v8H8zM10 12h4"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 111.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center mimetypes/application-x-executable glyph</title>
+<metadata>Source glyph U+F121 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M648 866 c-15 -11 -238 -770 -238 -811 0 -11 9 -26 19 -32 15 -10 22
+-9 34 5 14 16 237 780 237 812 0 24 -33 40 -52 26z M118 571 c-60 -60 -108
+-114 -108 -120 0 -7 48 -62 107 -122 86 -88 112 -109 135 -109 28 0 34 10 28
+50 -1 8 -38 52 -83 98 l-82 82 83 83 c61 61 82 89 82 109 0 24 -16 38 -43 38
+-6 0 -60 -49 -119 -109z M832 668 c-22 -22 -12 -41 75 -129 l87 -89 -87 -89
+c-48 -49 -87 -93 -87 -99 0 -26 14 -42 38 -42 21 0 52 26 135 110 l109 109
+-20 28 c-33 47 -208 213 -224 213 -8 0 -19 -5 -26 -12z"/>
+</g>
+</svg>

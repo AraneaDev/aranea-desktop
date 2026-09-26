@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea edit-find</title><circle cx="11" cy="11" r="3"/><path d="m14 14 4 4" fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/><g fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="4"/><path d="m14 14 4 4"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/edit-find glyph</title>
+<metadata>Source glyph U+F002 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M320 875 c-7 -8 -22 -15 -34 -15 -35 0 -139 -55 -172 -91 -38 -41
+-72 -102 -80 -146 -3 -18 -12 -37 -20 -44 -19 -15 -18 -83 1 -99 8 -7 15 -21
+15 -32 0 -37 51 -126 96 -168 73 -67 122 -85 234 -85 87 0 100 3 155 31 l60
+31 128 -126 128 -126 20 24 c10 13 19 28 19 34 0 5 -54 65 -120 131 l-119 121
+19 29 c31 49 53 148 47 215 -6 71 -46 163 -90 210 -35 36 -139 91 -173 91 -12
+0 -27 7 -34 15 -7 8 -25 15 -40 15 -15 0 -33 -7 -40 -15z m149 -105 c51 -25
+113 -88 135 -135 47 -98 26 -204 -57 -289 -113 -115 -261 -115 -373 0 -100
+102 -111 218 -31 331 79 111 215 150 326 93z"/>
+</g>
+</svg>

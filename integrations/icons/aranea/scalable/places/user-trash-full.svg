@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea full trash</title><path d="M6.5 8h11l-1 12h-9zM5 6h14M9 6V4h6v2" fill="none" stroke="#86ad9b" stroke-width="0.75" stroke-linejoin="round" stroke-linecap="round"/><path d="M8 13c1.4-2 2.8-2 4 0s2.6 2 4 0" fill="none" stroke="#626879" stroke-width="0.75" stroke-linecap="round"/><circle cx="10" cy="16" r="1" fill="#86ad9b"/><circle cx="14" cy="16" r="1" fill="#86ad9b"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center places/user-trash-full glyph</title>
+<metadata>Source glyph U+F1F8 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M254 850 l-39 -40 -91 0 c-76 0 -94 -3 -108 -18 -15 -18 -15 -20 2
+-35 17 -15 56 -17 370 -17 315 0 352 2 360 16 5 9 7 25 5 35 -5 17 -16 19
+-102 19 l-98 0 -32 40 -32 40 -98 0 -98 0 -39 -40z M80 603 c0 -21 7 -135 15
+-253 8 -118 15 -232 15 -253 0 -30 7 -44 32 -68 l32 -29 216 0 c294 0 269 -29
+290 340 6 102 13 211 16 243 l6 57 -311 0 -311 0 0 -37z"/>
+</g>
+</svg>

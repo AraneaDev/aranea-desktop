@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea read only</title><rect x="4" y="5" width="14" height="14" rx="2" fill="none" stroke="#86ad9b" stroke-width="0.75"/><path d="M18 11V8a3 3 0 0 0-6 0v3M10 11h10v8H10z" fill="none" stroke="#626879" stroke-width="0.75" stroke-linejoin="round"/><circle cx="15" cy="15" r="1" fill="#86ad9b"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80.000000 61.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center status/emblem-readonly glyph</title>
+<metadata>Source glyph U+F023A from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,61.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M331 549 c31 -63 32 -85 2 -95 -62 -22 -125 -56 -149 -83 -26 -29
+-28 -30 -46 -14 -10 9 -18 22 -18 29 0 7 -9 18 -19 24 -34 17 -40 13 -30 -22
+12 -43 12 -130 -1 -164 -6 -15 -8 -29 -6 -32 9 -8 56 27 56 42 0 7 7 19 15 26
+13 11 21 8 48 -18 42 -41 128 -79 194 -88 66 -8 75 -18 61 -72 -6 -24 -8 -45
+-5 -48 12 -12 67 29 101 75 31 41 46 52 89 65 70 21 121 54 151 98 21 31 22
+39 10 49 -8 6 -14 17 -14 25 0 19 -61 63 -122 86 -60 22 -84 41 -105 81 -16
+33 -82 66 -129 67 -17 0 -37 7 -44 15 -7 8 -25 15 -41 15 l-29 0 31 -61z m303
+-180 c14 -11 26 -28 26 -37 0 -20 -39 -62 -59 -62 -21 0 -61 40 -61 61 0 16
+43 59 60 59 4 0 19 -9 34 -21z"/>
+</g>
+</svg>

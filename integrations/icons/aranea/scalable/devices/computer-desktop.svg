@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea desktop computer</title><rect x="4" y="4" width="13" height="10" rx="1" fill="none" stroke="#86ad9b" stroke-width="0.9"/><path d="M10.5 14v4M7 19h7M19 8v11h-3" fill="none" stroke="#626879" stroke-width="0.9" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center devices/computer-desktop glyph</title>
+<metadata>Source glyph U+F108 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M75 867 c-17 -12 -40 -36 -53 -55 -21 -32 -22 -41 -22 -286 0 -213 2
+-256 15 -266 8 -7 15 -18 15 -25 0 -33 32 -40 208 -45 195 -6 207 -10 181 -66
+-14 -28 -17 -29 -91 -32 -67 -2 -78 -5 -83 -23 -4 -11 0 -30 9 -44 l16 -25
+225 0 224 0 19 25 c11 14 18 34 15 45 -4 17 -16 20 -82 22 -76 3 -76 3 -93 37
+-29 58 -19 61 176 61 94 0 176 4 183 8 6 4 23 24 37 45 l26 38 0 249 c0 240
+-1 250 -22 282 -12 18 -38 44 -56 56 -33 22 -36 22 -425 21 -382 -1 -393 -1
+-422 -22z m823 -79 c17 -17 17 -389 0 -406 -17 -17 -779 -17 -796 0 -17 17
+-17 389 0 406 17 17 779 17 796 0z"/>
+</g>
+</svg>

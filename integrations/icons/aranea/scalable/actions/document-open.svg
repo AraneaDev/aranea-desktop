@@ -1,1 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea document-open</title><path d="M7 6h10v12H7zM10 10h4M10 13h4" fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 67.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/document-open glyph</title>
+<metadata>Source glyph U+F15C from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M101 876 c-7 -8 -22 -17 -34 -20 -12 -3 -32 -22 -44 -42 -23 -35 -23
+-40 -23 -371 l0 -335 31 -39 c17 -21 37 -39 44 -39 7 0 18 -7 25 -15 19 -22
+441 -22 460 0 7 8 19 15 26 15 8 0 23 9 34 20 19 19 20 33 20 280 l0 260 -108
+0 c-106 0 -109 1 -135 28 -26 27 -27 31 -27 150 l0 122 -129 0 c-98 0 -131 -3
+-140 -14z m404 -436 c17 -18 17 -21 1 -45 -16 -25 -17 -25 -168 -25 -127 0
+-154 3 -170 17 -10 9 -18 24 -18 33 0 35 20 40 180 40 144 0 158 -2 175 -20z
+m0 -110 c17 -18 17 -21 1 -45 -16 -25 -17 -25 -168 -25 -127 0 -154 3 -170 17
+-10 9 -18 24 -18 33 0 35 20 40 180 40 144 0 158 -2 175 -20z m0 -110 c18 -20
+18 -21 -5 -45 -23 -24 -27 -25 -168 -25 -121 0 -148 3 -164 17 -22 20 -23 31
+-1 55 14 16 34 18 168 18 139 0 153 -2 170 -20z M460 772 l0 -82 77 0 76 0
+-58 63 c-32 34 -67 71 -77 82 -18 19 -18 17 -18 -63z"/>
+</g>
+</svg>

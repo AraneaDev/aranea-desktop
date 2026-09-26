@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea save document</title><path d="M5 4h12l2 2v14H5z" fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linejoin="round"/><path d="M8 4v6h8V4M8 16h8" fill="none" stroke="#626879" stroke-width="0.75"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/document-save glyph</title>
+<metadata>Source glyph U+F0C7 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M52 744 c-12 -8 -22 -21 -22 -28 0 -8 -7 -19 -15 -26 -22 -19 -22
+-571 0 -590 8 -7 15 -18 15 -26 0 -7 10 -20 22 -28 19 -14 68 -16 334 -16 300
+0 312 1 338 21 l26 20 0 261 0 260 -83 84 -83 84 -255 0 c-214 0 -258 -2 -277
+-16z m96 -36 c8 -8 12 -47 12 -110 l0 -98 185 0 185 0 0 93 c0 132 7 135 102
+40 l78 -78 0 -224 c0 -195 -2 -227 -17 -243 -15 -17 -38 -18 -301 -18 -280 0
+-286 0 -309 22 -23 21 -23 22 -23 302 0 273 0 280 22 303 24 25 48 29 66 11z
+m330 0 c16 -16 16 -140 0 -156 -17 -17 -249 -17 -266 0 -16 16 -16 140 0 156
+17 17 249 17 266 0z M322 347 c-29 -31 -30 -99 -2 -127 44 -44 128 -33 150 20
+16 39 5 95 -23 115 -34 24 -99 19 -125 -8z"/>
+</g>
+</svg>

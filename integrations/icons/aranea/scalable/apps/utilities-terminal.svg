@@ -1,1 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea utilities-terminal</title><path d="M7 6h10v12H7zM10 10h4M10 13h4" fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"/><g fill="none" stroke="#86ad9b" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round"><path d="m8 9 3 3-3 3M13 15h4"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96.000000 85.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center apps/utilities-terminal glyph</title>
+<metadata>Source glyph U+F489 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,85.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M95 839 c-4 -5 -18 -14 -31 -19 -13 -5 -29 -21 -34 -34 -5 -13 -14
+-27 -19 -31 -8 -4 -11 -112 -11 -329 l0 -322 34 -37 34 -37 412 0 412 0 34 37
+34 37 0 322 c0 217 -3 325 -11 329 -5 4 -14 18 -19 31 -5 13 -21 29 -34 34
+-13 5 -27 14 -31 19 -9 15 -761 15 -770 0z m777 -76 c17 -15 18 -39 18 -338 0
+-236 -3 -324 -12 -333 -17 -17 -779 -17 -796 0 -9 9 -12 96 -12 332 0 283 2
+321 17 338 15 17 41 18 391 18 335 0 377 -2 394 -17z M237 583 c-17 -16 -3
+-41 50 -95 l57 -57 -57 -60 c-61 -64 -74 -101 -34 -101 33 0 157 127 157 161
+0 19 -19 44 -69 92 -65 63 -88 76 -104 60z M507 314 c-4 -4 -7 -16 -7 -26 0
+-16 10 -18 116 -18 114 0 115 0 112 23 -3 21 -8 22 -109 25 -58 1 -108 -1
+-112 -4z"/>
+</g>
+</svg>

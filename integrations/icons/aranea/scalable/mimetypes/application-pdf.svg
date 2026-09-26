@@ -1,1 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea PDF document</title><path d="M6 3.5h8l4 4V20H6z" fill="none" stroke="#86ad9b" stroke-width="0.75" stroke-linejoin="round"/><path d="M14 3.5v4h4" fill="none" stroke="#626879" stroke-width="0.75"/><path d="M8.5 16.5h7" stroke="#626879" stroke-width="0.75"/><text x="8.3" y="13.5" font-family="sans-serif" font-size="4.2" font-weight="700" fill="#86ad9b">PDF</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 86.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center mimetypes/application-pdf glyph</title>
+<metadata>Source glyph U+F1C1 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M75 867 c-17 -12 -40 -36 -53 -55 -22 -33 -22 -39 -22 -367 0 -328 0
+-334 22 -367 29 -43 82 -78 119 -78 26 0 29 3 29 30 0 26 -3 30 -29 30 -15 0
+-40 9 -55 21 l-26 20 0 343 0 343 23 21 c22 20 33 22 159 22 166 0 168 -1 168
+-112 0 -88 0 -88 99 -88 39 0 72 -5 79 -12 8 -8 12 -50 12 -125 0 -106 1 -113
+20 -113 19 0 20 7 20 145 l0 145 -77 81 c-42 44 -96 93 -120 110 -44 29 -44
+29 -191 28 -133 -1 -150 -3 -177 -22z M297 253 c-11 -10 -8 -216 3 -233 7 -11
+10 -6 10 21 0 42 9 51 66 67 31 9 45 20 53 41 15 35 5 77 -22 96 -22 15 -98
+21 -110 8z m100 -35 c29 -27 29 -45 1 -75 -41 -44 -88 -25 -88 37 0 61 43 80
+87 38z M522 133 l3 -128 30 -3 c21 -2 38 5 58 23 26 24 27 31 27 115 0 105 -9
+120 -76 120 l-45 0 3 -127z m90 90 c14 -12 18 -31 18 -81 0 -72 -16 -102 -55
+-102 -36 0 -45 20 -45 100 0 46 5 81 12 88 17 17 48 15 70 -5z M740 133 c0
+-87 3 -123 10 -113 5 8 10 31 10 51 0 40 15 59 46 59 13 0 26 5 29 10 4 6 -6
+10 -22 10 -34 0 -53 16 -53 45 0 29 19 45 52 45 15 0 28 5 28 10 0 6 -22 10
+-50 10 l-50 0 0 -127z"/>
+</g>
+</svg>
