@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea go-up</title><path d="m12 3 8 8-2 2-4-4v12h-4V9l-4 4-2-2z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 67.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/go-up glyph</title>
+<metadata>Source glyph U+F062 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M152 627 c-155 -156 -169 -178 -136 -211 34 -35 64 -21 166 81 l98
+98 0 -277 c0 -238 2 -279 16 -292 21 -21 57 -20 77 2 15 16 17 52 17 293 l0
+274 98 -98 c75 -75 104 -97 124 -97 36 0 62 38 49 71 -5 13 -74 88 -153 167
+-121 118 -149 142 -174 142 -25 0 -54 -24 -182 -153z"/>
+</g>
+</svg>

@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea edit-copy</title><path d="M8 6h11v15H8z"/><path d="M5 3h11v3H8v12H5z" fill="#061015"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/edit-copy glyph</title>
+<metadata>Source glyph U+F0C5 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M278 874 c-54 -29 -58 -50 -58 -319 0 -351 -12 -338 291 -333 l201 3
+29 33 29 32 0 217 0 217 -83 83 -83 83 -150 0 c-112 -1 -156 -4 -176 -16z
+m355 -122 l57 -58 0 -185 c0 -131 -4 -189 -12 -197 -8 -8 -63 -12 -179 -12
+-139 0 -170 3 -183 16 -14 13 -16 49 -16 235 0 133 4 228 10 240 10 17 22 19
+138 19 l128 0 57 -58z M58 654 c-54 -29 -58 -50 -58 -319 0 -351 -12 -338 291
+-333 l201 3 29 33 c24 26 29 41 29 82 l0 50 -40 0 c-39 0 -40 -1 -40 -33 0
+-18 -5 -38 -12 -45 -15 -15 -330 -17 -359 -2 -18 10 -19 24 -19 243 0 168 3
+236 12 245 7 7 27 12 45 12 32 0 33 1 33 40 l0 40 -42 0 c-24 -1 -55 -7 -70
+-16z"/>
+</g>
+</svg>

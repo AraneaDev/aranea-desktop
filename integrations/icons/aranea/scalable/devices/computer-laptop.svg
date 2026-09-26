@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea computer-laptop</title><path d="M5 5h14v11H5zM2 18h20l-2 3H4z"/><path fill="#061015" d="M7 7h10v7H7z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 111.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center devices/computer-laptop glyph</title>
+<metadata>Source glyph U+F109 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M148 751 l-33 -29 -3 -246 -3 -246 56 0 55 0 0 220 0 220 335 0 335
+0 0 -220 0 -220 55 0 55 0 0 225 c0 251 -6 282 -59 309 -26 14 -83 16 -395 16
+l-366 0 -32 -29z M15 167 c-14 -11 -16 -21 -11 -49 9 -49 40 -85 84 -98 25 -8
+186 -10 489 -8 l451 3 27 25 c30 28 55 71 55 94 0 8 -7 22 -16 30 -14 14 -76
+16 -538 16 -421 0 -526 -3 -541 -13z"/>
+</g>
+</svg>

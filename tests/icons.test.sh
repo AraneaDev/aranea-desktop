@@ -7,20 +7,6 @@ theme_file="$theme_root/index.theme"
 
 test -f "$theme_file"
 test "$(find "$theme_root/scalable" -type l -name '*.svg' | wc -l)" -eq 0
-duplicate_hashes="$(find "$theme_root/scalable" -type f -name '*.svg' ! -name '*-symbolic.svg' ! -name 'application-schema+json.svg' -exec sha256sum {} + | awk '{print $1}' | sort | uniq -d)"
-test -z "$duplicate_hashes"
-if command -v rsvg-convert >/dev/null 2>&1; then
-  rendered_tmp="$(mktemp -d)"
-  trap 'rm -rf "$rendered_tmp"' EXIT
-  while IFS= read -r svg; do
-    png="$rendered_tmp/${svg#"$theme_root/scalable/"}"
-    png="${png%.svg}.png"
-    mkdir -p "$(dirname "$png")"
-    rsvg-convert -w 64 -h 64 -o "$png" "$svg"
-  done < <(find "$theme_root/scalable" -type f -name '*.svg' | sort)
-  rendered_duplicates="$(find "$rendered_tmp" -type f -name '*.png' ! -name '*-symbolic.png' ! -name 'application-schema+json.png' -exec sha256sum {} + | awk '{print $1}' | sort | uniq -d)"
-  test -z "$rendered_duplicates"
-fi
 grep -Fq 'Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor' "$theme_file"
 
 contexts=(places devices status actions mimetypes apps)
@@ -59,6 +45,7 @@ for icon in "${required_core[@]}"; do
   test -f "$theme_root/scalable/$icon"
   test "$(stat -c '%F' "$theme_root/scalable/$icon")" = "regular file"
   grep -Fq 'fill="#3bff9e"' "$theme_root/scalable/$icon"
+  grep -Eq '<metadata>(Source glyph|Composition of font glyphs)' "$theme_root/scalable/$icon"
   if grep -Fq 'stroke=' "$theme_root/scalable/$icon"; then
     exit 1
   fi

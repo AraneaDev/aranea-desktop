@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea edit-delete</title><path d="M6 7h12l-1 14H7zM5 4h14v3H5zM9 2h6v2H9z"/><path fill="#061015" d="m9 10 1.5-1.5 5.5 5.5-1.5 1.5zm0 4 1.5 1.5 5.5-5.5-1.5-1.5z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/edit-delete glyph</title>
+<metadata>Source glyph U+F1F8 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M240 860 c-27 -29 -31 -30 -117 -30 -74 0 -93 -3 -106 -18 -22 -24
+-21 -55 1 -75 17 -15 57 -17 368 -17 379 0 387 1 387 53 0 50 -16 57 -124 57
+-59 0 -99 4 -99 10 0 6 -9 19 -20 30 -18 18 -33 20 -141 20 l-121 0 -28 -30z
+M60 613 c0 -27 7 -145 15 -263 8 -118 15 -232 15 -253 0 -29 7 -46 29 -68 l29
+-29 242 0 c240 0 241 0 265 24 27 27 30 47 45 311 6 99 13 213 16 253 l6 72
+-331 0 -331 0 0 -47z"/>
+</g>
+</svg>

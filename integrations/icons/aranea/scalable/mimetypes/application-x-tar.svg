@@ -1,1 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea application-x-tar</title><path d="M5 3h9l5 5v13H5z"/><path fill="#061015" d="M13 4v5h5zM8 12h8v2H8zm0 4h8v2H8zM10 8h4v2h-4z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 67.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center mimetypes/application-x-tar glyph</title>
+<metadata>Source glyph U+F1C6 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M58 874 c-57 -30 -58 -40 -58 -429 0 -392 1 -400 61 -430 25 -14 69
+-16 285 -13 l256 3 29 33 29 32 0 291 c0 193 -4 298 -11 312 -16 32 -169 186
+-201 203 -39 20 -352 19 -390 -2z m138 -79 c8 -21 87 -20 104 1 9 10 26 14 49
+12 l36 -3 3 -80 c3 -104 14 -115 118 -115 l74 0 0 -253 c0 -183 -3 -256 -12
+-265 -16 -16 -440 -17 -469 -2 -18 10 -19 25 -19 353 0 254 3 346 12 355 18
+18 97 15 104 -3z M198 708 c-10 -28 4 -38 54 -38 46 0 49 2 46 23 -3 19 -10
+22 -49 25 -31 2 -48 -1 -51 -10z M201 597 c-25 -31 48 -63 87 -38 8 5 12 17
+10 27 -4 25 -79 32 -97 11z M196 478 c-18 -30 -56 -169 -56 -209 0 -48 56 -99
+108 -99 51 0 99 37 107 84 7 36 -28 187 -51 224 -11 17 -24 22 -54 22 -30 0
+-43 -5 -54 -22z m92 -177 c8 -5 12 -17 10 -27 -4 -25 -79 -32 -98 -9 -27 32
+47 63 88 36z"/>
+</g>
+</svg>

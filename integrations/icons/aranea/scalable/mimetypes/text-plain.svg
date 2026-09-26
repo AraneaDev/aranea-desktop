@@ -1,11 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 65.000000 81.000000" preserveAspectRatio="xMidYMid meet">
-<title>Aranea Command Center Plain glyph</title>
-<metadata>Source glyph U+F0224 from JetBrainsMono Nerd Font</metadata>
-<g transform="translate(0.000000,81.000000) scale(0.100000,-0.100000)"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 67.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center mimetypes/text-plain glyph</title>
+<metadata>Source glyph U+F0F6 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
 fill="#3bff9e">
-<path d="M31 784 l-31 -26 0 -349 0 -350 25 -24 24 -25 271 0 271 0 24 25 25
-24 0 253 0 253 -123 123 -122 122 -167 0 c-165 0 -167 0 -197 -26z m329 -154
-l0 -100 100 0 100 0 0 -220 0 -220 -240 0 -240 0 0 320 0 320 140 0 140 0 0
--100z"/>
+<path d="M58 874 c-57 -30 -58 -40 -58 -429 0 -392 1 -400 61 -430 25 -14 69
+-16 285 -13 l256 3 29 33 29 32 0 291 c0 193 -4 298 -11 312 -16 32 -169 186
+-201 203 -39 20 -352 19 -390 -2z m330 -149 c3 -104 14 -115 118 -115 l74 0 0
+-253 c0 -183 -3 -256 -12 -265 -16 -16 -440 -17 -469 -2 -18 10 -19 25 -19
+353 0 258 3 346 12 355 9 9 52 12 153 10 l140 -3 3 -80z M177 433 c-11 -11 -8
+-48 5 -61 8 -8 56 -12 149 -12 112 0 141 3 153 16 19 19 20 36 4 52 -13 13
+-299 18 -311 5z M180 266 c-6 -8 -10 -25 -8 -38 3 -23 5 -23 154 -26 127 -2
+153 0 164 13 10 12 10 21 2 40 -12 25 -12 25 -156 25 -113 0 -146 -3 -156 -14z"/>
 </g>
 </svg>

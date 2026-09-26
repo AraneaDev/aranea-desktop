@@ -1,10 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72.000000 49.000000" preserveAspectRatio="xMidYMid meet">
-<title>Aranea Command Center folder-videos symbolic glyph</title>
-<metadata>Aranea symbolic alias of integrations/icons/aranea/scalable/places/folder-videos.svg</metadata>
-<g transform="translate(0.000000,49.000000) scale(0.100000,-0.100000)"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100.000000 67.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center places/folder-videos-symbolic glyph</title>
+<metadata>Source glyph U+F03D from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,67.000000) scale(0.100000,-0.100000)"
 fill="#3bff9e">
-<path d="M12 478 c-17 -17 -17 -439 0 -456 17 -17 519 -17 536 0 7 7 12 42 12
-87 l0 76 80 -80 80 -80 0 220 0 220 -80 -80 -80 -80 0 82 c0 71 -3 84 -19 93
--29 15 -513 14 -529 -2z"/>
+<path d="M58 655 c-54 -30 -58 -51 -58 -326 l0 -251 34 -34 34 -34 267 0 267
+0 29 29 29 29 0 266 0 266 -29 32 -29 33 -259 2 c-215 2 -263 0 -285 -12z
+M818 543 l-98 -66 0 -141 0 -141 103 -67 c57 -38 111 -68 120 -68 9 0 26 9 37
+20 19 19 20 33 20 253 0 194 -3 236 -16 255 -25 36 -60 26 -166 -45z"/>
 </g>
 </svg>

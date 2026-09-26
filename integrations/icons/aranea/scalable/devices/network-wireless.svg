@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea network-wireless</title><path d="M3 9a13 13 0 0 1 18 0l-2 2a10 10 0 0 0-14 0zM7 13a7 7 0 0 1 10 0l-2 2a4 4 0 0 0-6 0z"/><circle cx="12" cy="19" r="2"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 111.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center devices/network-wireless glyph</title>
+<metadata>Source glyph U+F1EB from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M374 762 c-120 -31 -260 -105 -341 -181 -35 -32 -41 -56 -20 -85 22
+-31 59 -22 129 31 252 192 584 190 831 -4 63 -49 102 -58 124 -27 22 31 15 51
+-39 99 -67 60 -172 118 -273 151 -108 36 -304 43 -411 16z M444 495 c-117 -25
+-234 -103 -234 -154 0 -56 51 -68 107 -25 142 108 335 107 479 -2 84 -64 149
+17 68 84 -58 48 -128 82 -201 97 -82 18 -138 18 -219 0z M498 213 c-43 -27
+-63 -77 -49 -124 36 -120 210 -97 211 28 0 85 -94 140 -162 96z"/>
+</g>
+</svg>

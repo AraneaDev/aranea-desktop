@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea emblem-readonly</title><circle cx="12" cy="12" r="9"/><path fill="#061015" d="M9 10h6v7H9zM10 10V8a2 2 0 0 1 4 0v2h-1.5V8a.5.5 0 0 0-1 0v2z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80.000000 61.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center status/emblem-readonly glyph</title>
+<metadata>Source glyph U+F023A from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,61.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M309 552 c34 -67 37 -82 19 -82 -27 0 -121 -52 -149 -81 l-29 -31 -9
+26 c-12 30 -43 51 -89 61 l-34 7 18 -27 c27 -42 31 -170 6 -218 l-20 -37 25 0
+c37 0 82 28 89 55 8 32 15 31 45 -1 33 -37 131 -82 195 -90 30 -3 54 -7 54 -8
+0 0 -7 -26 -15 -56 -8 -30 -15 -56 -15 -57 0 -2 10 -3 23 -3 34 0 82 34 119
+84 26 36 43 48 83 60 114 34 183 104 171 172 -9 44 -72 98 -148 126 -46 16
+-64 30 -86 62 -37 57 -96 84 -200 92 l-84 7 31 -61z m315 -195 c21 -16 18 -45
+-6 -61 -38 -23 -78 35 -42 61 10 7 21 13 24 13 3 0 14 -6 24 -13z"/>
+</g>
+</svg>

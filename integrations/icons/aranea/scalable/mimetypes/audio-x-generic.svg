@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea audio-x-generic</title><path d="M5 3h9l5 5v13H5z"/><path fill="#061015" d="M13 4v5h5zM13 11v5.5a2 2 0 1 1-1.5-1.9V10l5-1v5a2 2 0 1 1-1.5-1.9V11z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89.000000 89.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center mimetypes/audio-x-generic glyph</title>
+<metadata>Source glyph U+F001 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,89.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M535 803 c-154 -46 -288 -92 -297 -100 -16 -14 -18 -39 -18 -222 l0
+-206 -58 0 c-158 -1 -220 -160 -95 -245 72 -49 206 -25 246 43 8 15 14 91 17
+226 l5 203 215 64 c118 35 218 64 222 64 4 0 8 -56 8 -124 l0 -124 -40 5 c-52
+7 -122 -19 -155 -58 -50 -60 -24 -158 51 -194 80 -38 179 -17 228 48 20 27 21
+41 24 347 3 310 2 320 -18 340 -11 11 -28 20 -37 19 -10 -1 -144 -39 -298 -86z"/>
+</g>
+</svg>

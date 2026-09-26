@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea go-previous</title><path d="m11 4 2 2-4 4h11v4H9l4 4-2 2-8-8z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 78.000000 67.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/go-previous glyph</title>
+<metadata>Source glyph U+F060 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,67.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M158 513 c-103 -103 -158 -164 -158 -178 0 -25 308 -335 333 -335 22
+0 57 35 57 57 0 10 -46 64 -102 120 l-103 103 276 0 c300 0 312 2 312 55 0 53
+-12 55 -312 55 l-276 0 103 103 c56 56 102 110 102 120 0 22 -35 57 -57 57 -9
+0 -88 -71 -175 -157z"/>
+</g>
+</svg>

@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea go-home</title><path d="m3 11 9-8 9 8v9h-5v-6h-8v6H3z"/><path fill="#061015" d="M9 20v-6h6v6z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80.000000 69.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center places/go-home glyph</title>
+<metadata>Source glyph U+F02DC from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,69.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M202 508 l-193 -173 56 -3 55 -3 0 -159 0 -160 100 0 100 0 0 120 0
+120 80 0 80 0 0 -120 0 -120 100 0 100 0 0 160 0 159 55 3 55 3 -190 170
+c-104 93 -193 171 -198 173 -4 1 -94 -75 -200 -170z"/>
+</g>
+</svg>

@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea application-exit</title><path d="M5 3h9v3H8v12h6v3H5z"/><path d="m13 8 2-2 6 6-6 6-2-2 2.5-2.5H9v-3h6.5z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/application-exit glyph</title>
+<metadata>Source glyph U+F2F5 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M94 766 c-17 -8 -44 -31 -60 -52 l-29 -37 -3 -269 c-3 -301 -1 -315
+66 -366 31 -24 46 -27 128 -30 107 -4 134 5 134 48 0 48 -22 60 -109 60 -116
+0 -111 -12 -111 277 0 286 -5 273 113 273 55 0 80 4 91 16 23 22 20 71 -3 84
+-28 15 -180 12 -217 -4z M576 654 c-11 -11 -16 -35 -16 -80 l0 -64 -118 0
+c-156 0 -162 -4 -162 -109 0 -110 0 -110 150 -113 l125 -3 5 -73 c5 -76 15
+-92 55 -92 12 0 71 49 148 123 106 103 127 128 127 152 0 25 -19 49 -127 153
+-130 125 -155 139 -187 106z"/>
+</g>
+</svg>

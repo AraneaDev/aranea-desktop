@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea drive-harddisk</title><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="4" fill="#061015"/><circle cx="12" cy="12" r="1.5"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center devices/drive-harddisk glyph</title>
+<metadata>Source glyph U+F0A0 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M38 751 l-33 -29 0 -327 0 -327 33 -29 32 -29 366 0 c380 0 392 1
+426 44 16 19 18 53 18 344 l0 324 -31 29 -31 29 -374 0 -374 0 -32 -29z m760
+-208 l3 -153 -361 0 -360 0 0 143 c0 99 4 147 12 155 9 9 97 12 358 10 l345
+-3 3 -152z m-3 -343 l0 -105 -344 -3 c-245 -2 -348 1 -357 9 -18 15 -20 179
+-2 197 9 9 97 12 358 10 l345 -3 0 -105z M497 233 c-11 -11 -8 -48 5 -61 32
+-32 87 18 58 53 -13 15 -51 20 -63 8z M661 226 c-16 -19 -11 -46 12 -60 25
+-16 52 4 52 40 0 24 -5 30 -26 32 -14 2 -31 -4 -38 -12z"/>
+</g>
+</svg>

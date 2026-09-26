@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea view-refresh</title><path d="M19 8V4l-2 2a8 8 0 1 0 1 9h-3a5 5 0 1 1-1-6l-2 2z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84.000000 79.000000" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center actions/view-refresh glyph</title>
+<metadata>Source glyph U+F021 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,79.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M303 766 c-96 -31 -188 -109 -232 -195 -25 -48 -27 -84 -5 -105 34
+-35 67 -17 106 57 51 94 133 145 238 146 78 1 121 -14 182 -62 l53 -42 -45 -5
+c-59 -7 -70 -15 -70 -50 0 -52 19 -60 149 -60 154 0 151 -3 151 151 0 128 -8
+152 -55 152 -36 0 -55 -26 -55 -76 l0 -40 -46 43 c-70 65 -142 93 -244 97 -53
+2 -101 -2 -127 -11z M17 322 c-14 -15 -17 -41 -17 -135 0 -128 8 -147 60 -147
+35 0 50 23 50 76 l0 37 46 -43 c25 -23 71 -54 102 -68 50 -24 70 -27 157 -27
+87 0 107 3 157 27 71 33 141 97 179 163 32 56 37 96 13 119 -32 33 -68 17 -99
+-44 -88 -175 -296 -212 -445 -81 l-35 30 38 1 c54 0 77 15 77 50 0 52 -19 60
+-149 60 -102 0 -120 -3 -134 -18z"/>
+</g>
+</svg>
