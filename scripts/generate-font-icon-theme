@@ -17,8 +17,8 @@ render_group() {
   shift
   local relative output glyph viewbox label
   glyph="$(printf '%b' "\\U$codepoint")"
-  magick -background white -fill black -font "$font" -pointsize "$point_size" \
-    label:"$glyph" -trim +repage -threshold 50% "$tmp_dir/source.pbm"
+  magick -background black -fill white -font "$font" -pointsize "$point_size" \
+    label:"$glyph" -trim +repage -morphology Erode Disk:1 -negate -threshold 50% "$tmp_dir/source.pbm"
   potrace --svg --flat --turdsize 2 --output "$tmp_dir/raw.svg" "$tmp_dir/source.pbm"
   viewbox="$(sed -n 's/.*viewBox="\([^"]*\)".*/\1/p' "$tmp_dir/raw.svg" | head -1)"
   for relative in "$@"; do

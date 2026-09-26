@@ -4,8 +4,10 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 theme_root="$repo_root/integrations/icons/aranea"
 theme_file="$theme_root/index.theme"
+generator="$repo_root/scripts/generate-font-icon-theme"
 
 test -f "$theme_file"
+grep -Fq 'morphology Erode Disk:1' "$generator"
 test "$(find "$theme_root/scalable" -type l -name '*.svg' | wc -l)" -eq 0
 grep -Fq 'Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor' "$theme_file"
 
