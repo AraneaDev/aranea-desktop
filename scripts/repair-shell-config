@@ -27,6 +27,7 @@ jq '
     ] | unique_by(.id))
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
+      "omarchy.lock",
       "omarchy.osd",
       "tim.bar",
       "tim.menu",

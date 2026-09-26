@@ -54,7 +54,9 @@ for icon in "${required_core[@]}"; do
   test -f "$theme_root/scalable/$icon"
   test "$(stat -c '%F' "$theme_root/scalable/$icon")" = "regular file"
   grep -Fq 'fill="#3bff9e"' "$theme_root/scalable/$icon"
-  ! grep -Fq 'stroke=' "$theme_root/scalable/$icon"
+  if grep -Fq 'stroke=' "$theme_root/scalable/$icon"; then
+    exit 1
+  fi
 done
 
 declare -A command_center_sources=(

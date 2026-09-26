@@ -249,9 +249,9 @@ Item {
 
     Column {
       anchors.horizontalCenter: parent.horizontalCenter
-      anchors.bottom: inputField.top
-      anchors.bottomMargin: 42
+      y: Math.max(32, inputField.y - height - 42)
       spacing: 14
+      z: 1
 
       Image {
         width: Math.min(260, parent.parent.width * 0.2)
@@ -287,9 +287,9 @@ Item {
 
     Column {
       anchors.horizontalCenter: parent.horizontalCenter
-      anchors.top: inputField.bottom
-      anchors.topMargin: 28
+      y: inputField.y + inputField.height + 28
       spacing: 5
+      z: 1
 
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -312,13 +312,13 @@ Item {
 
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
-      anchors.bottom: parent.bottom
-      anchors.bottomMargin: 34
+      y: parent.height - height - 34
       text: root.fingerprintConfigured ? "TOUCH SENSOR OR ENTER PASSWORD" : "ENTER PASSWORD TO CONTINUE"
       color: Color.lock.placeholder
       font.family: Style.font.family
       font.pixelSize: Style.font.bodySmall
       font.letterSpacing: 1.5
+      z: 1
     }
   }
 }

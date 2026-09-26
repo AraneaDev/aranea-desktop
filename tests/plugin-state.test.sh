@@ -124,6 +124,9 @@ const notificationCardQml = fs.readFileSync(`${root}/plugins/araneadev.notificat
 if (!menuBarWidgetQml.includes('aranea-glyph.svg')) throw new Error('bar menu trigger is missing reduced Aranea glyph')
 if (!notificationCardQml.includes('aranea-glyph.svg')) throw new Error('notification card is missing reduced Aranea glyph')
 if (!lockViewQml.includes('unlock.png')) throw new Error('lock surface is missing canonical Aranea spider')
+if (!lockViewQml.includes('y: Math.max(32, inputField.y - height - 42)')) throw new Error('lock branding is not anchored to the live field')
+if (!lockViewQml.includes('y: inputField.y + inputField.height + 28')) throw new Error('lock clock is not anchored to the live field')
+if (!lockViewQml.includes('y: parent.height - height - 34')) throw new Error('lock footer is not anchored to the live viewport')
 function requiresSignature(source, signature, name) {
   if (!source.includes(signature)) throw new Error(`missing typed scalar contract: ${name}`)
 }
