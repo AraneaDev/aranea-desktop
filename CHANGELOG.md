@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.5.0...v1.5.1) (2026-09-26)
+
+
+### Fixes
+
+* self-heal plugin registration and prune stale ownership entries ([#36](https://github.com/AraneaDev/aranea-desktop/issues/36)) ([2ed8ee1](https://github.com/AraneaDev/aranea-desktop/commit/2ed8ee1a3f9ae0bbb4a3595b9f1d99e29519c098))
+
 ## [1.5.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.4.1...v1.5.0) (2026-09-26)
 
 
