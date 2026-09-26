@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.6.1...v1.7.0) (2026-09-26)
+
+
+### Features
+
+* system health in the notification center ([#42](https://github.com/AraneaDev/aranea-desktop/issues/42)) ([dea85a0](https://github.com/AraneaDev/aranea-desktop/commit/dea85a097542f71a46c8ac60d501ee895b75cbcb))
+
 ## [1.6.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.6.0...v1.6.1) (2026-09-26)
 
 
