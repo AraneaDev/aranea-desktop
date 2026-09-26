@@ -48,9 +48,17 @@ Item {
     function status(): string {
       return service.status
     }
+    // Rerun the checks now instead of waiting for their timers.
+    function refresh(): string {
+      service.monitor.checkUnits()
+      service.monitor.checkDisk()
+      service.monitor.checkReboot()
+      return "ok"
+    }
     function metrics(): string {
       return JSON.stringify({ cpu: service.metrics.cpu, mem: service.metrics.mem, iface: service.metrics.iface,
-        rates: service.metrics.rates, uptime: service.metrics.uptime, hostname: service.metrics.hostname })
+        rates: service.metrics.rates, uptime: service.metrics.uptime, hostname: service.metrics.hostname,
+        samples: service.metrics.cpuHistory.length })
     }
   }
 }

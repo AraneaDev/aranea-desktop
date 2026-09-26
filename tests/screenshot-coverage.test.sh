@@ -40,6 +40,15 @@ test -f "$repo_root/screenshots/hero-showcase.gif"
 grep -Fq 'screenshots/hero-showcase.gif' "$readme"
 grep -Fq 'build_hero_showcase' "$capture_script"
 grep -Fq 'trap cleanup_health_probe EXIT' "$capture_script"
+# The bell belongs in every capture: never disable the notifications plugin
+# (the host rewrites a disabled clone's bar entry). The real inbox is parked
+# for the batch instead, so badges show capture data only.
+if grep -Eq 'plugin (disable|enable) araneadev.notifications' "$capture_script"; then echo "capture must not toggle the notifications plugin" >&2; exit 1; fi
+grep -Fq 'batch_inbox_backup' "$capture_script"
+# The health probe is cleared before the next surface is captured.
+grep -Fq 'omarchy-shell health refresh' "$capture_script"
+# The health shot waits for enough CPU history to draw a real sparkline.
+grep -Fq '.samples' "$capture_script"
 grep -Fq 'omarchy-shell health status' "$capture_script"
 
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
