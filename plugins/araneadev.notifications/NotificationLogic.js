@@ -326,6 +326,9 @@ function popupEntry(value, normalUrgency) {
   // restored rows match the roles of freshly received ones.
   var deadline = Number((value || {}).deadline || 0)
   if (isFinite(deadline) && deadline > 0) entry.deadline = deadline
+  // Inbox files record whether their toast is still on screen. Files written
+  // before the inbox existed have no flag; the loader treats them as live.
+  if (value && typeof value.onScreen === "boolean") entry.onScreen = value.onScreen
   return entry
 }
 
@@ -448,39 +451,6 @@ function popupPlacement(barPosition, barClearance, gapsOut) {
   }
 }
 
-// The archived files are the history. They are read back exactly like the
-// live popup files, then normalized into history rows: replaying a toast
-// must not inherit the original's expire timeout or restore deadline, so it
-// gets the standard on-screen lifetime for its urgency instead.
-//
-// liveRows are the toasts still on screen when the replay was asked for.
-// They belong in it — they're the newest notifications there are — but the
-// directory read races their archival, so they're carried across by hand and
-// keyed by file name (timestamp + id) to drop the copy the read already saw.
-function historyRows(raw, liveRows, normalUrgency, limit) {
-  var max = limit === undefined || limit === null ? 10 : Number(limit)
-  if (isNaN(max)) max = 10
-  max = Math.max(0, max)
-
-  var out = []
-  var seen = {}
-  function collect(rows) {
-    for (var i = 0; i < rows.length; i++) {
-      var entry = rows[i]
-      if (!entry) continue
-      var key = popupFileName(entry)
-      if (seen[key]) continue
-      seen[key] = true
-      out.push(historyEntry(entry, normalUrgency))
-    }
-  }
-
-  collect(Array.isArray(liveRows) ? liveRows : [])
-  collect(parsePopupFiles(raw, normalUrgency))
-  out.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0) })
-  return out.slice(0, max)
-}
-
 function groupNotifications(entries) {
   var groups = []
   var indexes = {}
@@ -551,7 +521,6 @@ if (typeof module !== "undefined") {
     replacementSnapshot: replacementSnapshot,
     historyEntry: historyEntry,
     parseSettings: parseSettings,
-    historyRows: historyRows,
     popupEntry: popupEntry,
     popupFileName: popupFileName,
     imageStem: imageStem,

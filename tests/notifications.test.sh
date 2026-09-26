@@ -92,7 +92,25 @@ assert(inbox.relativeTime(now - 2 * 60000, now) === '2m', 'minutes')
 assert(inbox.relativeTime(now - 3 * 3600000, now) === '3h', 'hours')
 assert(inbox.relativeTime(now - 2 * DAY, now) === '2d', 'days')
 
+// --- onScreen round-trip through the persisted format (Review Focus 1, 3)
+const logic = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+const live = logic.popupEntry({ id: 3, originalId: 3, app: 'Slack', timestamp: 5, onScreen: true, deadline: 99 }, 1)
+assert(live.onScreen === true && live.deadline === 99, 'onScreen and deadline must survive popupEntry')
+const parsed = logic.parsePopupFiles(logic.serializePopup({ id: 4, originalId: 4, timestamp: 6, onScreen: false }, 1), 1)
+assert(parsed.length === 1 && parsed[0].onScreen === false, 'onScreen=false must survive serialize/parse')
+const legacy = logic.popupEntry({ id: 5, originalId: 5, timestamp: 7 }, 1)
+assert(legacy.onScreen === undefined, 'legacy entries carry no onScreen; Inbox.qml treats them as on screen')
+assert(typeof logic.historyRows === 'undefined', 'history replay helper must be gone')
+
 console.log('inbox logic contract passed')
 NODE
+
+test -f "$plugin/Inbox.qml"
+grep -Fq 'inbox/' "$plugin/Inbox.qml"
+if grep -Eq 'historyDir|showRecentHistory|replayHistory' "$plugin/Service.qml"; then
+  echo "history replay must be removed from Service.qml" >&2
+  exit 1
+fi
+grep -Fq 'Inbox {' "$plugin/Service.qml"
 
 echo "notifications contract passed"
