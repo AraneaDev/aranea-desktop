@@ -199,4 +199,8 @@ test ! -e "$repo_root/plugins/araneadev.notifications/Health.qml"
 # Only a loaded inbox can tell which items already exist (restart duplicates).
 grep -Fq 'next.inbox.loadedOnce' "$plugin/Monitor.qml"
 
+grep -Fq 'MetricsLogic.cpuPercent' "$plugin/Metrics.qml"
+grep -Fq 'running: metrics.topActive' "$plugin/Metrics.qml"
+grep -Fq 'Metrics {' "$plugin/Service.qml"
+
 echo "health contract passed"

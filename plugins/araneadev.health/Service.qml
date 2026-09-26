@@ -15,6 +15,12 @@ Item {
   property alias monitor: monitor
   Monitor { id: monitor }
 
+  property alias metrics: metrics
+  Metrics {
+    id: metrics
+    diskRows: monitor.diskRows
+  }
+
   readonly property var problems: monitor.openProblems
   readonly property string status: HealthLogic.statusFor(monitor.openProblems)
 
@@ -34,6 +40,10 @@ Item {
     }
     function status(): string {
       return service.status
+    }
+    function metrics(): string {
+      return JSON.stringify({ cpu: service.metrics.cpu, mem: service.metrics.mem, iface: service.metrics.iface,
+        rates: service.metrics.rates, uptime: service.metrics.uptime, hostname: service.metrics.hostname })
     }
   }
 }

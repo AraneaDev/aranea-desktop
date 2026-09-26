@@ -120,6 +120,7 @@ const lockViewQml = fs.readFileSync(`${root}/plugins/araneadev.lock/LockView.qml
 const notificationsQml = service
 const inboxQml = fs.readFileSync(`${root}/plugins/araneadev.notifications/Inbox.qml`, 'utf8')
 const healthQml = fs.readFileSync(`${root}/plugins/araneadev.health/Monitor.qml`, 'utf8')
+const metricsQml = fs.readFileSync(`${root}/plugins/araneadev.health/Metrics.qml`, 'utf8')
 const barQml = fs.readFileSync(`${root}/plugins/araneadev.bar/Bar.qml`, 'utf8')
 const menuBarWidgetQml = fs.readFileSync(`${root}/plugins/araneadev.menu/BarWidget.qml`, 'utf8')
 const notificationCardQml = fs.readFileSync(`${root}/plugins/araneadev.notifications/components/NotificationCard.qml`, 'utf8')
@@ -193,6 +194,8 @@ requiresSignature(notificationsQml, 'function clearInbox(): void', 'notification
 requiresSignature(notificationsQml, 'function upsertSourceItem(key: string, fields: var): void', 'notification upsertSourceItem')
 requiresSignature(notificationsQml, 'function resolveSourceItem(key: string): void', 'notification resolveSourceItem')
 requiresSignature(notificationsQml, 'function sourceItemKeys(): var', 'notification sourceItemKeys')
+requiresSignature(metricsQml, 'function sample(): void', 'metrics sample')
+requiresSignature(metricsQml, 'function refreshSlow(): void', 'metrics refreshSlow')
 requiresSignature(healthQml, 'function reconcileNow(): void', 'health reconcileNow')
 requiresSignature(healthQml, 'function checkUnits(): void', 'health checkUnits')
 requiresSignature(healthQml, 'function checkDisk(): void', 'health checkDisk')

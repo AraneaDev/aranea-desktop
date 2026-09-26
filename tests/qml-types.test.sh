@@ -8,6 +8,7 @@ qml_files=(
   "$repo_root/plugins/araneadev.notifications/Inbox.qml"
   "$repo_root/plugins/araneadev.health/Monitor.qml"
   "$repo_root/plugins/araneadev.health/Service.qml"
+  "$repo_root/plugins/araneadev.health/Metrics.qml"
   "$repo_root/plugins/araneadev.notifications/Panel.qml"
   "$repo_root/plugins/araneadev.notifications/components/NotificationCard.qml"
   "$repo_root/plugins/araneadev.lock/Service.qml"
