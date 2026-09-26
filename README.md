@@ -31,11 +31,11 @@ of unrelated tweaks:
 - obsidian surfaces with mint activity states and violet focus states;
 - day, night, and atmospheric wallpaper variants built around edge topology;
 - matching lock, idle, boot, terminal, editor, browser, cursor, and media art;
-- optional diagnostics and application integrations that stay out of the way.
+- live system health in the bar and application integrations that stay out of the way.
 
 Aranea is still installed by Omarchy as the `aranea` theme, but the project is
 larger than a theme: it combines the shell surface, custom plugins, artwork,
-desktop integrations, cursors, Plymouth, installer, diagnostics, and showcase
+desktop integrations, cursors, Plymouth, installer, system health, and showcase
 tooling into one cohesive desktop experience.
 
 The wallpaper is intentionally mark-free. The spider identity belongs to the
@@ -57,9 +57,7 @@ For a non-interactive full install:
 
 The installer installs Aranea Desktop, registers the `aranea` theme hooks, and
 installs the managed integrations. On a full profile it also installs the
-selected terminal integration (Alacritty, Kitty, or Foot) and offers the
-optional Wayland Conky package when `paru` or `yay` is available. It does not
-start Conky automatically.
+selected terminal integration (Alacritty, Kitty, or Foot).
 
 Choose an installation profile when needed:
 
@@ -78,7 +76,7 @@ To install the exact checkout you are testing instead of fetching the default
 remote repository, pass a local source explicitly:
 
 ```bash
-./scripts/install.sh --source "$PWD" --yes --skip-conky
+./scripts/install.sh --source "$PWD" --yes
 ```
 
 If installation fails after a previous theme was detected, the installer prints
@@ -134,7 +132,7 @@ the Aranea state directory before changes are made.
 - **Theme layer:** Omarchy colors, wallpapers, GTK, terminal, cursor, lock, and Plymouth assets.
 - **Shell layer:** Aranea bar, menu, lock, and notification plugins.
 - **Integration layer:** browser, media, developer, Qt, session, and application styling.
-- **Tooling layer:** installer, diagnostics, deployment helpers, screenshot capture, and validation.
+- **Tooling layer:** installer, doctor, deployment helpers, screenshot capture, and validation.
 
 The command menu uses a hybrid command-center layout: the root view adds
 Aranea identity, fixed Files and Terminal tiles, and a favorite/recent action;
@@ -160,9 +158,9 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- | --- |
 | ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) |
 
-| Diagnostics | OSD |
+| Health | OSD |
 | --- | --- |
-| ![Aranea diagnostics](screenshots/diagnostics.png) | ![Aranea filament OSD](screenshots/osd.png) |
+| ![Aranea health dropdown](screenshots/health.png) | ![Aranea filament OSD](screenshots/osd.png) |
 
 | Notification center | All caught up |
 | --- | --- |
@@ -240,7 +238,7 @@ The busy cursor animation is shipped as eight matching SVG frames:
 | ![Aranea Apps launcher](screenshots/apps.png) | ![Aranea Favorites](screenshots/favorites.png) | ![Aranea Recent](screenshots/recent.png) |
 
 Refresh the complete README capture set in one pass. Menu, desktop,
-notification, diagnostics, and application surfaces are captured from the
+notification, health, and application surfaces are captured from the
 running session, while lock and Plymouth use canonical artwork renders:
 
 ```bash
@@ -290,7 +288,11 @@ and takes the bell out of the bar; switching back to Aranea restores both
 
 #### System health
 
-The center also watches the system and keeps one live item per problem:
+The heart icon next to the bell shows the system's state — mint when
+healthy, amber when something needs attention, red when something is
+critical. Click it for live metrics (CPU with a two-minute history, memory,
+disk, network, top processes, uptime) and the open problems; right-click
+opens btop. Health problems never go to the notification center.
 
 - **Failed services** (system or user) — critical; click opens its journal.
 - **Disk almost full** — from 90 %, critical from 97 %; clears below 88 %.
@@ -298,19 +300,8 @@ The center also watches the system and keeps one live item per problem:
 - **Containers exiting** — a non-zero exit, or critical when a container keeps
   restarting (3 exits in 5 minutes).
 
-Items update in place and disappear when the problem clears. Dismiss one to
-mute that problem until it clears; `aranea-doctor` lists which checks are on.
-
-### Diagnostics
-
-The optional diagnostics layer can be toggled with:
-
-```bash
-aranea-diagnostics-toggle
-```
-
-The supplied Hyprland binding is `SUPER + CTRL + SHIFT + D`. It requires a
-Wayland layer-shell Conky build such as `conky-cairo-wayland-git`.
+Problems appear and clear with the condition itself; `aranea-doctor` lists
+which checks are on.
 
 ## Palette
 
@@ -334,7 +325,7 @@ The source tokens are in [`colors.toml`](colors.toml) and
   icon integrations.
 - `plugins/` — the Aranea bar, menu, lock, and notification surfaces.
 - `hooks/` — theme activation and post-boot integration hooks.
-- `scripts/` — installer, diagnostics, wallpaper, showcase, and health tools.
+- `scripts/` — installer, doctor, wallpaper, showcase, and health tools.
 - `screenshots/` — representative captures used throughout this README.
 
 ## Contributing
