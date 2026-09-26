@@ -35,11 +35,25 @@ Panel {
   readonly property int count: available ? service.inbox.count : 0
   readonly property bool dnd: service ? !!service.doNotDisturb : false
   readonly property bool quiet: service ? !!service.quietHours : false
+  readonly property int criticalCount: {
+    if (!available) return 0
+    var revision = service.inbox.revision   // re-evaluate on every inbox change
+    var n = 0
+    var model = service.inbox.model
+    for (var i = 0; i < model.count; i++) if (model.get(i).urgency === 2) n++
+    return n
+  }
+  // Red with the critical count when anything critical waits; otherwise mint
+  // with the total; DND hides the non-critical badge.
+  readonly property var badge: InboxLogic.badgeState(count, criticalCount, dnd || quiet)
   // Violet focus accent (colors.toml accent_secondary) for scheduled quiet hours.
   readonly property color focusAccent: "#7a5cff"
 
   property var expanded: ({})
-  property int cursor: -1
+  // The keyboard cursor follows its item (InboxLogic.rowKey), so an arrival
+  // that shifts the list never redirects Enter/Delete to another entry.
+  property string cursorKey: ""
+  readonly property int cursor: cursorKey ? InboxLogic.indexOfKey(rows, cursorKey) : -1
   property bool confirmingClear: false
   property real now: Date.now()
 
@@ -49,7 +63,7 @@ Panel {
     var entries = []
     var model = service.inbox.model
     for (var i = 0; i < model.count; i++) entries.push(model.get(i))
-    return InboxLogic.flattenGroups(InboxLogic.groupView(entries, root.expanded))
+    return InboxLogic.flattenGroups(InboxLogic.groupView(InboxLogic.sortForCenter(entries), root.expanded))
   }
 
   function selectable(index: int): bool {
@@ -62,7 +76,7 @@ Panel {
     var i = root.cursor
     for (var step = 0; step < rows.length; step++) {
       i = i < 0 ? (delta > 0 ? 0 : rows.length - 1) : (i + delta + rows.length) % rows.length
-      if (selectable(i)) { root.cursor = i; list.positionViewAtIndex(i, ListView.Contain); return }
+      if (selectable(i)) { root.cursorKey = InboxLogic.rowKey(rows[i]); list.positionViewAtIndex(i, ListView.Contain); return }
     }
   }
 
@@ -99,15 +113,15 @@ Panel {
   }
 
   onOpenedChanged: {
-    if (service) service.centerOpen = opened
     if (opened) {
       root.now = Date.now()
-      root.cursor = -1
+      root.cursorKey = ""
       root.confirmingClear = false
     }
   }
 
-  onRowsChanged: if (root.cursor >= rows.length) root.cursor = rows.length - 1
+  // The item under the cursor was dismissed: drop the cursor.
+  onRowsChanged: if (root.cursorKey && root.cursor < 0) root.cursorKey = ""
 
   Timer { id: confirmTimer; interval: 4000; onTriggered: root.confirmingClear = false }
   Timer { interval: 30000; repeat: true; running: root.opened; onTriggered: root.now = Date.now() }
@@ -122,7 +136,7 @@ Panel {
     text: InboxLogic.bellGlyph(root.dnd || root.quiet)
     foreground: root.quiet ? root.focusAccent : root.barForeground
     dimmed: !root.available || root.count === 0
-    tooltipText: root.available ? InboxLogic.tooltipText(root.count, root.dnd, root.quiet) : "Notifications unavailable"
+    tooltipText: root.available ? InboxLogic.tooltipText(root.count, root.criticalCount, root.dnd, root.quiet) : "Notifications unavailable"
     onPressed: function(b) {
       if (!root.available) return
       if (b === Qt.RightButton) root.service.setDoNotDisturb(!root.dnd)
@@ -131,7 +145,7 @@ Panel {
     }
 
     Rectangle {
-      visible: root.available && root.count > 0
+      visible: root.available && root.badge.tone !== "none"
       anchors.top: parent.top
       anchors.right: parent.right
       anchors.topMargin: Style.space(4)
@@ -139,12 +153,12 @@ Panel {
       height: Style.space(12)
       width: Math.max(height, badgeText.implicitWidth + Style.space(6))
       radius: height / 2
-      color: Color.notifications.countdown
+      color: root.badge.tone === "critical" ? Color.urgent : Color.notifications.countdown
 
       Text {
         id: badgeText
         anchors.centerIn: parent
-        text: InboxLogic.badgeLabel(root.count)
+        text: root.badge.label
         color: Color.background
         font.family: Style.font.family
         font.pixelSize: Style.font.caption

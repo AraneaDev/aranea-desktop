@@ -174,4 +174,9 @@ grep -Fq 'inboxRefs' "$plugin/Service.qml"
 if grep -Eq 'setOnScreen|onScreen' "$plugin/Inbox.qml"; then echo "onScreen must be gone from Inbox.qml" >&2; exit 1; fi
 grep -Fq 'merge' "$plugin/Inbox.qml"
 
+grep -Fq 'InboxLogic.badgeState' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.sortForCenter' "$plugin/Panel.qml"
+grep -Fq 'cursorKey' "$plugin/Panel.qml"
+if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then echo "centerOpen must be gone from Panel.qml" >&2; exit 1; fi
+
 echo "notifications contract passed"
