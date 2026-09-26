@@ -36,16 +36,6 @@ Item {
     normalUrgency: NotificationUrgency.Normal
   }
 
-  // System health items (failed services, disk, reboot, containers). The
-  // monitor waits for the inbox to load so restart reconciliation sees the
-  // items that are already there.
-  Loader {
-    active: inbox.loadedOnce
-    sourceComponent: Health {}
-    // Assigned here rather than as a binding on Health: inside Health the
-    // name `service` is its own property and would bind to itself.
-    onLoaded: item.service = service
-  }
 
   // Corner radius is shared with the menu and shell panels.
   // It mirrors Hyprland's current decoration:rounding value.
@@ -473,8 +463,11 @@ Item {
   }
 
   function resolveSourceItem(key: string): void {
-    var fileName = sourceFileName(key)
-    if (fileName) inbox.remove(fileName)
+    // Every entry with this key goes, so a stray duplicate cannot linger.
+    for (var i = inbox.model.count - 1; i >= 0; i--) {
+      var row = inbox.model.get(i)
+      if (row.sourceKey === key) inbox.remove(row.fileName)
+    }
   }
 
   function sourceItemKeys(): var {

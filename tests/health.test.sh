@@ -176,7 +176,7 @@ NODE
 
 # Every check command is bounded: a hung df/systemctl/docker must become
 # "unknown", not freeze the check (review Important #4).
-health_qml="$repo_root/plugins/araneadev.notifications/Health.qml"
+health_qml="$repo_root/plugins/araneadev.health/Monitor.qml"
 for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker", "info"' '"docker", "ps"'; do
   grep -F "command: [\"timeout\", \"10\", $cmd" "$health_qml" >/dev/null || { echo "unbounded check command: $cmd" >&2; exit 1; }
 done
@@ -187,5 +187,16 @@ grep -Fq 'FileViewError.FileNotFound' "$health_qml"
 grep -Fq 'HealthLogic.seedDiskLevels' "$health_qml"
 grep -Fq 'HealthLogic.pruneDockerHistory' "$health_qml"
 grep -Fq '"which", "xdg-terminal-exec"' "$health_qml"
+if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$health_qml"; then echo "Monitor.qml must not run shell strings" >&2; exit 1; fi
+plugin="$repo_root/plugins/araneadev.health"
+jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml" and .id == "araneadev.health"' "$plugin/manifest.json" >/dev/null
+grep -Fq '.pragma library' "$plugin/HealthBridge.js"
+grep -Fq 'HealthBridge.publish(service)' "$plugin/Service.qml"
+grep -Fq '../araneadev.notifications/ServiceBridge.js' "$plugin/Monitor.qml"
+grep -Fq 'HealthLogic.annotateProblems' "$plugin/Monitor.qml"
+test ! -e "$repo_root/plugins/araneadev.notifications/Health.qml"
+
+# Only a loaded inbox can tell which items already exist (restart duplicates).
+grep -Fq 'next.inbox.loadedOnce' "$plugin/Monitor.qml"
 
 echo "health contract passed"

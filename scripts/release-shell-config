@@ -40,7 +40,7 @@ jq '
     .bar.layout |= with_entries(
       .value |= (if type == "array" then map(select(entry_id != "araneadev.notifications")) else . end))
   else . end
-  | if (.plugins | type) == "array" then .plugins |= map(select(entry_id != "araneadev.notifications")) else . end
+  | if (.plugins | type) == "array" then .plugins |= map(select(entry_id != "araneadev.notifications" and entry_id != "araneadev.health")) else . end
   | if (.disabledPlugins | type) == "array" then .disabledPlugins |= map(select(. != "omarchy.notifications")) else . end
   | if (.cloneSourceRestores | type) == "array" then
       .cloneSourceRestores |= map(select(. != "araneadev.notifications"))

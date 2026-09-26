@@ -1,0 +1,39 @@
+// Health service: runs the checks (Monitor) and, from Task 5, the metrics
+// sampler; the bar widget (Panel.qml) reads it through HealthBridge.js.
+
+import QtQuick
+import Quickshell.Io
+import "HealthLogic.js" as HealthLogic
+import "HealthBridge.js" as HealthBridge
+
+Item {
+  id: service
+
+  // Injected by omarchy-shell.
+  property var shell: null
+
+  property alias monitor: monitor
+  Monitor { id: monitor }
+
+  readonly property var problems: monitor.openProblems
+  readonly property string status: HealthLogic.statusFor(monitor.openProblems)
+
+  function toggle(): void {
+    if (service.shell && typeof service.shell.toggle === "function")
+      service.shell.toggle("araneadev.health")
+  }
+
+  Component.onCompleted: HealthBridge.publish(service)
+  Component.onDestruction: HealthBridge.retract(service)
+
+  IpcHandler {
+    target: "health"
+    function toggle(): string {
+      service.toggle()
+      return "ok"
+    }
+    function status(): string {
+      return service.status
+    }
+  }
+}
