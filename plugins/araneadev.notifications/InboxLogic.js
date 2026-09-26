@@ -4,7 +4,6 @@
 
 var MAX_ITEMS = 100
 var MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
-var MAX_VISIBLE_TOASTS = 3
 var COLLAPSE_AT = 3
 var CONFIRM_CLEAR_ABOVE = 20
 var SWIPE_DISTANCE_RATIO = 0.35
@@ -68,21 +67,6 @@ function pruneInbox(entries, now) {
   return { keep: keep, drop: drop }
 }
 
-// rows are newest-first (index 0 is the top of the stack).
-function stackSplit(rows, maxVisible) {
-  var list = Array.isArray(rows) ? rows : []
-  var max = Math.max(0, Number(maxVisible) || 0)
-  var chosen = []
-  for (var i = 0; i < list.length && chosen.length < max; i++) {
-    if (list[i] && Number(list[i].urgency) === CRITICAL) chosen.push(i)
-  }
-  for (var j = 0; j < list.length && chosen.length < max; j++) {
-    if (chosen.indexOf(j) < 0) chosen.push(j)
-  }
-  chosen.sort(function(a, b) { return a - b })
-  return { visible: chosen, overflow: Math.max(0, list.length - chosen.length) }
-}
-
 function swipeOutcome(dx, width, velocity) {
   var d = Number(dx) || 0
   if (d <= 0) return "restore"
@@ -140,11 +124,47 @@ function badgeLabel(count) {
   return n > 9 ? "9+" : String(n)
 }
 
-function tooltipText(count, dnd, quiet) {
+function tooltipText(count, critical, dnd, quiet) {
   var n = Math.max(0, Math.floor(Number(count) || 0))
+  var c = Math.max(0, Math.floor(Number(critical) || 0))
   var noun = n === 1 ? "notification" : "notifications"
   var state = quiet ? "Quiet hours" : (dnd ? "DND on" : "DND off")
-  return n + " " + noun + " · " + state
+  return n + " " + noun + (c > 0 ? " · " + c + " critical" : "") + " · " + state
+}
+
+// Critical entries colour the bell red and show their own count, even under
+// DND; otherwise the badge counts everything, and DND hides it.
+function badgeState(total, critical, dnd) {
+  var c = Math.max(0, Math.floor(Number(critical) || 0))
+  if (c > 0) return { label: badgeLabel(c), tone: "critical" }
+  if (dnd || !(Number(total) > 0)) return { label: "", tone: "none" }
+  return { label: badgeLabel(total), tone: "normal" }
+}
+
+// Critical first, then newest first. Returns a new array.
+function sortForCenter(entries) {
+  var rows = (Array.isArray(entries) ? entries : []).slice()
+  rows.sort(function(a, b) {
+    var ca = Number(a.urgency) === CRITICAL ? 1 : 0
+    var cb = Number(b.urgency) === CRITICAL ? 1 : 0
+    if (ca !== cb) return cb - ca
+    return newestFirst(a, b)
+  })
+  return rows
+}
+
+// Stable identity for a center row, so the keyboard cursor follows its item
+// when arrivals shift the list.
+function rowKey(row) {
+  if (!row) return ""
+  if (row.kind === "entry") return "e:" + (row.entry ? row.entry.fileName : "")
+  return (row.kind === "more" ? "m:" : "g:") + row.app
+}
+
+function indexOfKey(rows, key) {
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) if (rowKey(list[i]) === key) return i
+  return -1
 }
 
 // nf-md-bell (U+F009A) and nf-md-bell_off (U+F009B), as surrogate pairs so
@@ -176,7 +196,6 @@ if (typeof module !== "undefined") {
   module.exports = {
     MAX_ITEMS: MAX_ITEMS,
     MAX_AGE_MS: MAX_AGE_MS,
-    MAX_VISIBLE_TOASTS: MAX_VISIBLE_TOASTS,
     COLLAPSE_AT: COLLAPSE_AT,
     CONFIRM_CLEAR_ABOVE: CONFIRM_CLEAR_ABOVE,
     SWIPE_DISTANCE_RATIO: SWIPE_DISTANCE_RATIO,
@@ -186,13 +205,16 @@ if (typeof module !== "undefined") {
     removesFromInbox: removesFromInbox,
     upsertOrder: upsertOrder,
     pruneInbox: pruneInbox,
-    stackSplit: stackSplit,
     swipeOutcome: swipeOutcome,
     suppressesClick: suppressesClick,
     groupView: groupView,
     flattenGroups: flattenGroups,
     badgeLabel: badgeLabel,
     tooltipText: tooltipText,
+    badgeState: badgeState,
+    sortForCenter: sortForCenter,
+    rowKey: rowKey,
+    indexOfKey: indexOfKey,
     bellGlyph: bellGlyph,
     needsClearConfirm: needsClearConfirm,
     quietUntil: quietUntil,
