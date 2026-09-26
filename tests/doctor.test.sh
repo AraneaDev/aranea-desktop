@@ -36,6 +36,7 @@ grep -Fq '"id":"shell","status":"skipped"' <<<"$output"
 grep -Fq '"id":"plugins","status":"skipped"' <<<"$output"
 grep -Fq '"id":"runtime","status":"skipped"' <<<"$output"
 grep -Fq '"id":"qmllint","status":"ok"' <<<"$output"
+grep -Eq '"id":"health","status":"ok","message":"units (on|off), disk (on|off), reboot (on|off), docker (on|off[^"]*)"' <<<"$output"
 grep -Fq '"status":"skipped"' <<<"$output"
 
 while IFS= read -r line; do
