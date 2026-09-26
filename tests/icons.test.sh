@@ -7,7 +7,7 @@ theme_file="$theme_root/index.theme"
 generator="$repo_root/scripts/generate-font-icon-theme"
 
 test -f "$theme_file"
-grep -Fq 'morphology Erode Disk:1' "$generator"
+grep -Fq 'morphology Erode Disk:2' "$generator"
 test "$(find "$theme_root/scalable" -type l -name '*.svg' | wc -l)" -eq 0
 grep -Fq 'Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor' "$theme_file"
 
