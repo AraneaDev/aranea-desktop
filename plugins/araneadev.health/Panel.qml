@@ -1,5 +1,4 @@
-// Health bar icon + dropdown: open problems (also in the notification
-// center) and live metrics. State lives in the health service (Service.qml),
+// Health bar icon + dropdown: open problems and live metrics. State lives in the health service (Service.qml),
 // read through HealthBridge.js because the Aranea bar gives widgets a
 // service-less facade.
 
@@ -168,8 +167,8 @@ Panel {
                 Label { text: modelData.glyph }
                 Label { text: modelData.summary; elide: Text.ElideRight; Layout.fillWidth: true }
                 Label {
-                  text: modelData.muted ? "muted (bell)" : (modelData.urgency === 2 ? "critical" : "attention")
-                  color: modelData.muted ? Qt.darker(Color.popups.text, 1.4) : (modelData.urgency === 2 ? Color.urgent : root.amber)
+                  text: modelData.urgency === 2 ? "critical" : "attention"
+                  color: modelData.urgency === 2 ? Color.urgent : root.amber
                   font.pixelSize: Style.font.caption
                 }
               }

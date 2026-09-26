@@ -284,7 +284,7 @@ function historyEntry(value, normalUrgency) {
     urgency: typeof e.urgency === "number" ? e.urgency : normalUrgency,
     expireTimeout: 0,
     timestamp: e.timestamp || 0,
-    // Set on live items owned by a monitor (System health); "" otherwise.
+    // Only set on legacy 1.7.0 health items, which Inbox.qml deletes on load.
     sourceKey: typeof e.sourceKey === "string" ? e.sourceKey : ""
   }
 }

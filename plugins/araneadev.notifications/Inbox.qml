@@ -211,6 +211,12 @@ Item {
     for (var i = 0; i < entries.length; i++) {
       var row = modelRow(entries[i])
       seen[row.fileName] = true
+      // A legacy health item (1.7.0 posted system-health problems here with
+      // a sourceKey); health now lives in its own dropdown.
+      if (row.sourceKey) {
+        remove(row.fileName)
+        continue
+      }
       rows.push(row)
     }
     for (var j = 0; j < inboxModel.count; j++) {

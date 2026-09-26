@@ -1,5 +1,5 @@
-// Pure rules for the System health monitor (Health.qml): parse command
-// output, derive open problems, word them, and reconcile them with the inbox.
+// Pure rules for the System health monitor (Monitor.qml): parse command
+// output, derive open problems and word them for the health dropdown.
 // No QML, no I/O; tests/health.test.sh runs this under Node.
 
 var DISK_ALERT = 90
@@ -76,17 +76,6 @@ function diskLevel(previous, percent) {
   if (p >= DISK_ALERT) return "normal"
   if (previous !== "ok" && previous !== undefined && p >= DISK_CLEAR) return "normal"
   return "ok"
-}
-
-// Disk items already in the inbox (from before a shell restart) resume at
-// "normal", so the 88% clear point still applies to them.
-function seedDiskLevels(keys) {
-  var levels = {}
-  for (var i = 0; i < (keys || []).length; i++) {
-    var key = String(keys[i])
-    if (key.indexOf("disk:") === 0) levels[key.slice(5)] = "normal"
-  }
-  return levels
 }
 
 function diskProblems(rows, levels) {
@@ -244,70 +233,7 @@ function itemFor(p, tools) {
     urgency: 1, glyph: GLYPH_CONTAINER, execArgv: logs }
 }
 
-function toSet(list) {
-  var s = {}
-  for (var i = 0; i < (list || []).length; i++) s[list[i]] = true
-  return s
-}
-
-// open: problems from checks whose last result is known (the caller keeps the
-// last known problems of a check that is currently unknown).
-// knownChecks: checks that have completed at least once and whose last result
-// was readable; only their items may be resolved and their mutes lifted.
-function reconcile(open, knownChecks, previousExpected, presentKeys, muted) {
-  var known = toSet(knownChecks)
-  var present = toSet(presentKeys)
-  var openByKey = {}
-  for (var i = 0; i < (open || []).length; i++) openByKey[open[i].key] = open[i]
-
-  var mutedSet = {}
-  for (var m = 0; m < (muted || []).length; m++) {
-    var key = muted[m]
-    // A mute lasts while its problem is open (or its check cannot tell).
-    if (openByKey[key] || !known[checkOf(key)]) mutedSet[key] = true
-  }
-  for (var e = 0; e < (previousExpected || []).length; e++) {
-    var exp = previousExpected[e]
-    // Removed by the user while open -- or before its check has reported,
-    // in which case the mute is provisional and lifts on the first known
-    // round if the problem turns out cleared.
-    if (!present[exp] && (openByKey[exp] || !known[checkOf(exp)])) mutedSet[exp] = true
-  }
-
-  var upsert = []
-  var expected = []
-  for (var k in openByKey) {
-    if (mutedSet[k]) continue
-    upsert.push(openByKey[k])
-    expected.push(k)
-  }
-  var resolve = []
-  for (var p in present) {
-    if (!known[checkOf(p)]) {
-      if (!mutedSet[p]) expected.push(p)
-      continue
-    }
-    if (!openByKey[p] || mutedSet[p]) resolve.push(p)
-  }
-  var unique = expected.filter(function(key, index) { return expected.indexOf(key) === index })
-  return { upsert: upsert, resolve: resolve, muted: Object.keys(mutedSet).sort(), expected: unique }
-}
-
-function parseMuteFile(text) {
-  try {
-    var parsed = JSON.parse(String(text || ""))
-    return parsed && Array.isArray(parsed.muted) ? parsed.muted.filter(function(k) { return typeof k === "string" }) : []
-  } catch (e) {
-    return []
-  }
-}
-
-function serializeMuteFile(muted) {
-  return JSON.stringify({ version: 1, muted: (muted || []).slice().sort() }, null, 2) + "\n"
-}
-
-// The dropdown's status icon: any open problem counts, muted or not (muting
-// only quiets the bell; the dropdown shows live state).
+// The status icon: any open problem counts.
 function statusFor(open) {
   var status = "healthy"
   for (var i = 0; i < (open || []).length; i++) {
@@ -319,13 +245,12 @@ function statusFor(open) {
   return status
 }
 
-// Rows for the dropdown's problem list: the center copy plus a muted flag.
-function annotateProblems(open, muted, tools) {
-  var mutedSet = toSet(muted)
+// Rows for the dropdown's problem list (copy, urgency, click action).
+function annotateProblems(open, tools) {
   var rows = (open || []).map(function(p) {
     var item = itemFor(p, tools)
     return { key: p.key, check: p.check, summary: item.summary, body: item.body, urgency: item.urgency,
-      glyph: item.glyph, execArgv: item.execArgv, muted: !!mutedSet[p.key] }
+      glyph: item.glyph, execArgv: item.execArgv }
   })
   rows.sort(function(a, b) { return (b.urgency - a.urgency) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0) })
   return rows
@@ -343,14 +268,10 @@ if (typeof module !== "undefined") {
     recordDockerEvent: recordDockerEvent,
     containerProblems: containerProblems,
     pruneDockerHistory: pruneDockerHistory,
-    seedDiskLevels: seedDiskLevels,
     parseDockerPs: parseDockerPs,
     seedDockerHistory: seedDockerHistory,
     humanBytes: humanBytes,
     itemFor: itemFor,
-    reconcile: reconcile,
-    parseMuteFile: parseMuteFile,
-    serializeMuteFile: serializeMuteFile,
     statusFor: statusFor,
     annotateProblems: annotateProblems
   }

@@ -71,29 +71,10 @@ assert(diskItem.summary === '/ is 91% full' && diskItem.body === '86 GB free of 
 assert(h.itemFor(h.rebootProblem(false, '7.2.5')[0]).body === 'Running 7.2.5; its modules were removed', 'reboot copy')
 assert(loop[0] && h.itemFor(loop[0]).summary === 'Container pg keeps restarting' && h.itemFor(loop[0]).urgency === 2, 'loop copy')
 
-// --- reconcile (Review Focus 1-3)
-const P = key => ({ key: key, check: h.checkOf(key) })
-let r = h.reconcile([P('disk:/')], ['disk', 'unit'], [], [], [])
-assert(r.upsert.length === 1 && r.resolve.length === 0 && r.expected.join() === 'disk:/', 'new problem is upserted')
-r = h.reconcile([], ['disk'], ['disk:/'], ['disk:/'], [])
-assert(r.resolve.join() === 'disk:/' && r.expected.length === 0, 'cleared problem resolves')
-r = h.reconcile([], ['unit'], ['disk:/'], ['disk:/'], [])
-assert(r.resolve.length === 0 && r.expected.join() === 'disk:/', 'unknown check never resolves its items')
-r = h.reconcile([P('disk:/')], ['disk'], ['disk:/'], [], [])
-assert(r.muted.join() === 'disk:/' && r.upsert.length === 0, 'item removed by the user while open becomes muted')
-r = h.reconcile([P('disk:/')], ['disk'], [], [], ['disk:/'])
-assert(r.upsert.length === 0 && r.muted.join() === 'disk:/', 'muted problem stays hidden')
-r = h.reconcile([], ['disk'], [], [], ['disk:/'])
-assert(r.muted.length === 0, 'mute lifts when the problem clears')
-r = h.reconcile([], ['disk', 'unit', 'reboot', 'container'], [], ['unit:system:gone.service'], [])
-assert(r.resolve.join() === 'unit:system:gone.service', 'restart: stale items resolve on first known check')
-r = h.reconcile([P('reboot')], ['reboot'], [], ['reboot'], [])
-assert(r.upsert.length === 1 && r.muted.length === 0, 'restart: present item is reused, not muted')
-
-// --- mute file
-assert(h.parseMuteFile('{"version":1,"muted":["disk:/"]}').join() === 'disk:/', 'mute file parsed')
-assert(h.parseMuteFile('{broken').length === 0, 'corrupt mute file is empty')
-assert(JSON.parse(h.serializeMuteFile(['b', 'a'])).muted.join() === 'a,b', 'mute file sorted')
+// --- Revision 1: health lives only in the dropdown (no center items, no mutes)
+for (const gone of ['reconcile', 'parseMuteFile', 'serializeMuteFile', 'seedDiskLevels']) {
+  assert(typeof h[gone] === 'undefined', gone + ' must be gone: health no longer posts to the center')
+}
 
 // --- review fixes: container state survives restarts and stream gaps
 const ps = [
@@ -135,21 +116,6 @@ const dfSpaces = [
 const spaced = h.parseDf(dfSpaces)
 assert(spaced.length === 1 && spaced[0].target === '/run/media/tim/My Drive' && spaced[0].percent === 95, 'mount point with spaces is monitored')
 
-// disk items already in the inbox resume at "normal", keeping hysteresis across restarts
-const levels = h.seedDiskLevels(['disk:/', 'unit:user:x.service', 'disk:/run/media/tim/My Drive'])
-assert(levels['/'] === 'normal' && levels['/run/media/tim/My Drive'] === 'normal' && Object.keys(levels).length === 2, 'disk levels seeded from existing items')
-assert(h.diskProblems([{ source: 'a', target: '/', size: 100, used: 89, avail: 11, percent: 89 }], levels).problems.length === 1, 'an 89% disk that was alerting keeps alerting after a restart')
-
-// a dismissal before the first check of that kind completes is not lost
-let early = h.reconcile([], [], ['disk:/'], [], [])
-assert(early.muted.join() === 'disk:/', 'removed before its check ran: muted provisionally')
-early = h.reconcile([], ['disk'], [], [], early.muted)
-assert(early.muted.length === 0, 'provisional mute lifts if the problem turns out cleared')
-
-// expected never holds duplicates
-const dup = h.reconcile([{ key: 'disk:/', check: 'disk' }], [], [], ['disk:/'], [])
-assert(dup.expected.length === 1, 'expected keys are unique')
-
 // cleanly exited or running containers with no recent exits are forgotten
 const stale = { old: { image: 'a', exits: [], last: 'die', lastExit: 0 }, up: { image: 'b', exits: [], last: 'start', lastExit: 0 },
   bad: { image: 'c', exits: [], last: 'die', lastExit: 1 }, busy: { image: 'd', exits: [990], last: 'start', lastExit: 0 } }
@@ -167,9 +133,9 @@ const diskP = { key: 'disk:/', check: 'disk', target: '/', percent: 92, size: 10
 assert(h.statusFor([]) === 'healthy', 'no problems is healthy')
 assert(h.statusFor([diskP]) === 'attention', 'a normal problem is attention')
 assert(h.statusFor([diskP, unitP]) === 'critical', 'a critical problem is critical')
-const rowsA = h.annotateProblems([diskP, unitP], ['disk:/'], { terminal: true })
-assert(rowsA[0].key === 'unit:system:a.service' && rowsA[0].muted === false && rowsA[0].urgency === 2, 'critical rows first')
-assert(rowsA[1].key === 'disk:/' && rowsA[1].muted === true && rowsA[1].summary === '/ is 92% full', 'muted flag and copy')
+const rowsA = h.annotateProblems([diskP, unitP], { terminal: true })
+assert(rowsA[0].key === 'unit:system:a.service' && rowsA[0].urgency === 2 && rowsA[0].muted === undefined, 'critical rows first, no mute state')
+assert(rowsA[1].key === 'disk:/' && rowsA[1].summary === '/ is 92% full', 'row copy')
 
 console.log('health logic contract passed')
 NODE
@@ -182,9 +148,6 @@ for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker",
 done
 grep -Fq '"-l"' "$health_qml"
 grep -Fq '"--since"' "$health_qml"
-# a transient mute-file read error must not silently mean "no mutes"
-grep -Fq 'FileViewError.FileNotFound' "$health_qml"
-grep -Fq 'HealthLogic.seedDiskLevels' "$health_qml"
 grep -Fq 'HealthLogic.pruneDockerHistory' "$health_qml"
 grep -Fq '"which", "xdg-terminal-exec"' "$health_qml"
 if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$health_qml"; then echo "Monitor.qml must not run shell strings" >&2; exit 1; fi
@@ -192,12 +155,9 @@ plugin="$repo_root/plugins/araneadev.health"
 jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml" and .id == "araneadev.health"' "$plugin/manifest.json" >/dev/null
 grep -Fq '.pragma library' "$plugin/HealthBridge.js"
 grep -Fq 'HealthBridge.publish(service)' "$plugin/Service.qml"
-grep -Fq '../araneadev.notifications/ServiceBridge.js' "$plugin/Monitor.qml"
+if grep -Eq 'ServiceBridge|NotificationsBridge|FileViewError|upsertSourceItem' "$plugin/Monitor.qml"; then echo "health must not post to the notification center" >&2; exit 1; fi
 grep -Fq 'HealthLogic.annotateProblems' "$plugin/Monitor.qml"
 test ! -e "$repo_root/plugins/araneadev.notifications/Health.qml"
-
-# Only a loaded inbox can tell which items already exist (restart duplicates).
-grep -Fq 'next.inbox.loadedOnce' "$plugin/Monitor.qml"
 
 grep -Fq 'MetricsLogic.cpuPercent' "$plugin/Metrics.qml"
 grep -Fq 'running: metrics.topActive' "$plugin/Metrics.qml"

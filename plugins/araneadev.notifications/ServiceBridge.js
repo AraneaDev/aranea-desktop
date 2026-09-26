@@ -2,8 +2,8 @@
 // One instance per QML engine, shared by every file of this plugin that
 // imports it. The Aranea bar is a replacement bar, so the host hands its
 // widgets a facade without service lookup; Service.qml publishes itself here
-// and Panel.qml (the bar widget) reads it back. The health plugin
-// (araneadev.health/Monitor.qml) imports it too, to post its items.
+// and Panel.qml (the bar widget) reads it back. Nothing outside this plugin
+// imports this module.
 
 var service = null
 

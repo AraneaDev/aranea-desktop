@@ -140,16 +140,9 @@ assert(typeof inbox.stackSplit === 'undefined', 'toast stack rules are gone')
 const keyed = logic.parsePopupFiles(logic.serializePopup({ id: 0, originalId: 0, timestamp: 9, sourceKey: 'disk:/' }, 1), 1)
 assert(keyed.length === 1 && keyed[0].sourceKey === 'disk:/', 'sourceKey must survive serialize/parse')
 assert(logic.popupEntry({ id: 1, timestamp: 1 }, 1).sourceKey === '', 'ordinary entries carry an empty sourceKey')
-const agedSource = inbox.pruneInbox([{ fileName: 'h', timestamp: now - 30 * DAY, urgency: 1, sourceKey: 'reboot' }], now)
-assert(agedSource.drop.length === 0, 'health items are never age-pruned')
-const capped = []
-for (let i = 0; i < 100; i++) capped.push({ fileName: 'o' + i, timestamp: now - i, urgency: 1, sourceKey: '' })
-capped.push({ fileName: 'src', timestamp: now - 500, urgency: 1, sourceKey: 'disk:/' })
-const cappedResult = inbox.pruneInbox(capped, now)
-assert(cappedResult.drop.length === 1 && cappedResult.drop[0].fileName === 'o99', 'cap drops ordinary entries before health items')
-const manySources = []
-for (let i = 0; i < 101; i++) manySources.push({ fileName: 's' + i, timestamp: now - i, urgency: 1, sourceKey: 'disk:/m' + i })
-assert(inbox.pruneInbox(manySources, now).drop.length === 0, 'health items are never pruned (pruning would read as a dismissal)')
+// Health items no longer exist in the center: pruning treats every entry alike.
+const oldHealth = inbox.pruneInbox([{ fileName: 'h', timestamp: now - 30 * DAY, urgency: 1, sourceKey: 'reboot' }], now)
+assert(oldHealth.drop.length === 1, 'no pruning exemption for leftover health items')
 
 console.log('inbox logic contract passed')
 NODE
@@ -197,11 +190,12 @@ if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then echo "centerOpen must be gone
 
 grep -Fq 'sourceKey' "$plugin/Inbox.qml"
 
-grep -Fq 'NotificationLogic.popupRowChanged(prior, next)' "$plugin/Service.qml"
 
 if grep -Fq 'Health' "$plugin/Service.qml"; then echo "health moved out of the notifications plugin" >&2; exit 1; fi
 
-# Resolving a key removes every entry carrying it, never just the first.
-grep -Fq 'for (var i = inbox.model.count - 1; i >= 0; i--)' "$plugin/Service.qml"
+# Revision 1: health lives only in its dropdown. The keyed source API is gone
+# and leftover 1.7.0 health items are deleted when the inbox loads.
+if grep -Eq 'upsertSourceItem|resolveSourceItem|sourceItemKeys|sourceFileName' "$plugin/Service.qml"; then echo "source-item API must be gone" >&2; exit 1; fi
+grep -Fq 'legacy health item' "$plugin/Inbox.qml"
 
 echo "notifications contract passed"
