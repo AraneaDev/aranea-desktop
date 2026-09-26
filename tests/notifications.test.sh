@@ -149,10 +149,8 @@ grep -Fq 'Inbox {' "$plugin/Service.qml"
 grep -Fq 'DragHandler' "$plugin/components/NotificationCard.qml"
 grep -Fq 'InboxLogic.swipeOutcome' "$plugin/components/NotificationCard.qml"
 grep -Fq 'InboxLogic.suppressesClick' "$plugin/components/NotificationCard.qml"
-grep -Fq 'InboxLogic.stackSplit' "$plugin/Service.qml"
-grep -Fq 'more · Clear all' "$plugin/Service.qml"
 
-for fn in 'function dismissInbox' 'function dismissGroup' 'function invokeInbox' 'function popupIndexFor' 'function center(): string' 'function count(): string'; do
+for fn in 'function dismissInbox' 'function dismissGroup' 'function invokeInbox' 'function center(): string' 'function count(): string'; do
   grep -Fq "$fn" "$plugin/Service.qml" || { echo "missing in Service.qml: $fn" >&2; exit 1; }
 done
 
@@ -167,5 +165,13 @@ grep -Fq 'ServiceBridge.current()' "$plugin/Panel.qml"
 grep -Fq 'ServiceBridge.publish(service)' "$plugin/Service.qml"
 grep -Fq 'ServiceBridge.retract(service)' "$plugin/Service.qml"
 grep -Fq 'property bool compact' "$plugin/components/NotificationCard.qml"
+
+if grep -Eq 'stackLayout|overflowPill|centerOpen|writeSilenced|restorePopups' "$plugin/Service.qml"; then
+  echo "toast-era code must be gone from Service.qml" >&2; exit 1
+fi
+grep -Fq 'function refreshInbox' "$plugin/Service.qml"
+grep -Fq 'inboxRefs' "$plugin/Service.qml"
+if grep -Eq 'setOnScreen|onScreen' "$plugin/Inbox.qml"; then echo "onScreen must be gone from Inbox.qml" >&2; exit 1; fi
+grep -Fq 'merge' "$plugin/Inbox.qml"
 
 echo "notifications contract passed"

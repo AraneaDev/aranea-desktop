@@ -1,8 +1,6 @@
 // The notification inbox: one JSON file per stored notification under
 // inbox/, mirrored into a newest-first ListModel. A file lives until the user
-// dismisses or acts on its notification (see InboxLogic.removesFromInbox);
-// `onScreen` records whether its toast is still showing so a shell restart
-// can bring the toast back.
+// dismisses or acts on it from the center.
 //
 // Every write, delete and read goes through one serialized Process queue: a
 // burst of replaces_id updates must not race a reused Process, and a delete
@@ -49,24 +47,24 @@ Item {
       fileName: row.fileName, id: row.id, originalId: row.originalId, app: row.app,
       appIcon: row.appIcon, summary: row.summary, body: row.body, image: row.image,
       glyph: row.glyph, execArgv: row.execArgv, urgency: row.urgency,
-      expireTimeout: row.expireTimeout, timestamp: row.timestamp, onScreen: row.onScreen
+      expireTimeout: row.expireTimeout, timestamp: row.timestamp
     }
   }
 
-  function modelRow(entry, onScreen) {
+  function modelRow(entry) {
     var e = NotificationLogic.popupEntry(entry, normalUrgency)
     return {
       fileName: NotificationLogic.popupFileName(e),
       id: e.id, originalId: e.originalId, app: e.app, appIcon: e.appIcon,
       summary: e.summary, body: e.body, image: e.image, glyph: e.glyph,
       execArgv: e.execArgv, urgency: e.urgency, expireTimeout: e.expireTimeout,
-      timestamp: e.timestamp, onScreen: !!onScreen
+      timestamp: e.timestamp
     }
   }
 
-  function upsert(entry: var, onScreen: bool, deadline: real): void {
+  function upsert(entry: var): void {
     if (!entry) return
-    var row = modelRow(entry, onScreen)
+    var row = modelRow(entry)
     var i = indexOf(row.fileName)
     if (i >= 0) {
       for (var key in row) inboxModel.setProperty(i, key, row[key])
@@ -74,17 +72,8 @@ Item {
       inboxModel.insert(0, row)
     }
     revision++
-    writeFile(entry, onScreen, deadline)
+    writeFile(entry)
     prune()
-  }
-
-  function setOnScreen(fileName: string, onScreen: bool): void {
-    var i = indexOf(fileName)
-    if (i < 0) return
-    if (inboxModel.get(i).onScreen === onScreen) return
-    inboxModel.setProperty(i, "onScreen", onScreen)
-    revision++
-    writeFile(get(fileName), onScreen, 0)
   }
 
   function remove(fileName: string): void {
@@ -112,7 +101,7 @@ Item {
     var rows = []
     for (var i = 0; i < inboxModel.count; i++) {
       var r = inboxModel.get(i)
-      rows.push({ fileName: r.fileName, timestamp: r.timestamp, urgency: r.urgency, onScreen: r.onScreen })
+      rows.push({ fileName: r.fileName, timestamp: r.timestamp, urgency: r.urgency })
     }
     var result = InboxLogic.pruneInbox(rows, Date.now())
     for (var d = 0; d < result.drop.length; d++) remove(result.drop[d].fileName)
@@ -133,13 +122,10 @@ Item {
 
   // The JSON travels as an argument, never through shell interpolation.
   // Image copies run before the JSON that references them.
-  function writeFile(entry, onScreen, deadline, done) {
+  function writeFile(entry, done) {
     if (!entry) { if (done) done(); return }
     var persistable = NotificationLogic.persistablePopup(entry, imagesDir)
     var record = persistable.entry
-    record.onScreen = !!onScreen
-    if (deadline > 0) record.deadline = deadline
-    else delete record.deadline
     var command = ["bash", "-c",
       "mkdir -p \"$1\" \"$2\" || exit 0\n" +
       "dir=\"$1\" json=\"$3\" name=\"$4\"\n" +
@@ -152,18 +138,6 @@ Item {
     for (var i = 0; i < persistable.copies.length; i++)
       command.push(persistable.copies[i].from, persistable.copies[i].to)
     enqueue(command, done)
-  }
-
-  // Record without touching the model — used by the DND path, which needs a
-  // callback once the file (and its image copies) are on disk.
-  function writeSilenced(entry, done) {
-    var row = modelRow(entry, false)
-    var i = indexOf(row.fileName)
-    if (i >= 0) { for (var key in row) inboxModel.setProperty(i, key, row[key]) }
-    else inboxModel.insert(0, row)
-    revision++
-    writeFile(entry, false, 0, done)
-    prune()
   }
 
   // ---------------------------------------------------- queue
@@ -203,8 +177,7 @@ Item {
   property var loadDone: null
 
   // Popup files from before the inbox (top-level *.json in stateDir) are
-  // moved into inbox/ untouched; lacking an onScreen flag they load as live
-  // toasts, which is what they were. history/ is left alone on purpose.
+  // moved into inbox/ untouched. history/ is left alone on purpose.
   function load(done): void {
     loadDone = done || null
     enqueue(["bash", "-c",
@@ -226,14 +199,25 @@ Item {
     }
   }
 
+  // Rows upserted while the directory was being read are not on disk yet (their
+  // writes are queued behind the read), so merge them with what the read
+  // returned instead of replacing the model.
   function finishLoad(raw: string): void {
     var entries = NotificationLogic.parsePopupFiles(raw, normalUrgency)
-    inboxModel.clear()
+    var rows = []
+    var seen = {}
     for (var i = 0; i < entries.length; i++) {
-      var e = entries[i]
-      if (e.onScreen === undefined) e.onScreen = true
-      inboxModel.append(modelRow(e, e.onScreen))
+      var row = modelRow(entries[i])
+      seen[row.fileName] = true
+      rows.push(row)
     }
+    for (var j = 0; j < inboxModel.count; j++) {
+      var live = inboxModel.get(j)
+      if (!seen[live.fileName]) rows.push(get(live.fileName))
+    }
+    rows.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0) })
+    inboxModel.clear()
+    for (var k = 0; k < rows.length; k++) inboxModel.append(rows[k])
     revision++
     prune()
     sweepOrphanImages()

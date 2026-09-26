@@ -7,7 +7,6 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.Commons
-import qs.Ui
 
 import "components"
 import "NotificationLogic.js" as NotificationLogic
@@ -58,6 +57,13 @@ Item {
   // map only holds a wrapper, which degrades to a catchable error instead.
   property var liveRefs: ({})
 
+  // Live Notification objects of inbox entries, by inbox file name. A stored
+  // notification stays tracked while it waits in the center, so a sender's
+  // replaces_id update lands on the same entry and a click can still run the
+  // sender's own action. Empty after a shell restart: those entries fall back
+  // to execArgv / focusing the app.
+  property var inboxRefs: ({})
+
   // Popups restored from a previous shell process, keyed by their file
   // name (timestamp-originalId) since ids alone repeat across server
   // generations. The replaces_id handling and liveRefs lookups must not
@@ -89,9 +95,6 @@ Item {
   // critical CLI alerts retain the existing explicit bypass rule.
   readonly property string quietHoursWindow: Quickshell.env("ARANEA_QUIET_HOURS")
   property int quietHoursTick: 0
-  // True while the notification center is open (set by Panel.qml); new
-  // arrivals then go straight to the inbox instead of toasting.
-  property bool centerOpen: false
   readonly property bool quietHours: quietHoursTick >= 0 && NotificationLogic.isWithinQuietHours(quietHoursWindow, new Date())
 
   Timer {
@@ -112,14 +115,6 @@ Item {
   // to it. QML ids aren't visible to external consumers without the alias.
   property alias popupModel: popupModel
   ListModel { id: popupModel }
-
-  // Which toasts are drawn: the newest MAX_VISIBLE_TOASTS, criticals first.
-  // Recomputed whenever the model's row count changes.
-  readonly property var stackLayout: {
-    var rows = []
-    for (var i = 0; i < popupModel.count; i++) rows.push({ urgency: popupModel.get(i).urgency })
-    return InboxLogic.stackSplit(rows, InboxLogic.MAX_VISIBLE_TOASTS)
-  }
 
   // Aranea motion preference, shared with the OSD: `off` in the state file
   // (or ARANEA_REDUCED_MOTION=1) removes the swipe slide animation.
@@ -198,6 +193,21 @@ Item {
     // captured for the popup card.
     notification.tracked = true
     var snapshot = snapshotOf(notification)
+
+    // Everything worth keeping goes to the center, never to a toast.
+    if (shouldStore(notification, snapshot)) {
+      storeInInbox(notification, snapshot)
+      return
+    }
+
+    // What is left is Omarchy's own action feedback (and `transient`
+    // notifications): a brief toast, never stored. DND drops it unless it
+    // is the kind shouldBypassDnd trusts.
+    if ((service.doNotDisturb || service.quietHours) && !shouldBypassDnd(notification)) {
+      notification.tracked = false
+      return
+    }
+
     liveRefs[snapshot.originalId] = notification
     // Guard the delete: a newer notification may have reused this originalId
     // (freedesktop replaces_id) and taken over the map slot.
@@ -205,25 +215,6 @@ Item {
       if (service.liveRefs[snapshot.originalId] === notification)
         delete service.liveRefs[snapshot.originalId]
     })
-
-    // DND bypass rules: chat apps abuse urgency=critical to force
-    // visibility, so critical alone isn't enough — we also require the
-    // sender to be CLI-style. See shouldBypassDnd().
-    var store = shouldStore(notification, snapshot)
-    // Silenced (DND/quiet hours) or the center is already open: no toast, the
-    // notification goes straight to the inbox.
-    var silenced = (service.doNotDisturb || service.quietHours) && !shouldBypassDnd(notification)
-    if (silenced || (service.centerOpen && store)) {
-      if (store) {
-        writeSilenced(notification, snapshot)
-        return
-      }
-      delete liveRefs[snapshot.originalId]
-      notification.tracked = false
-      return
-    }
-
-    if (store) inbox.upsert(snapshot, true, 0)
     watchForUpdates(notification, snapshot)
     // Qt.callLater avoids "QV4::Object::insertMember" crashes when a
     // Repeater is mid-incubation while we mutate its model.
@@ -237,36 +228,35 @@ Item {
     })
   }
 
-  // Persist a silenced notification, held tracked until its content is
-  // stable: untracking tells the sender its notification closed (Chromium
-  // then deletes its avatar file), and a replaces_id update lands on this
-  // object without a second onNotification — releasing on a stale snapshot
-  // would drop it. Each catch-up write reuses the original file identity.
-  function writeSilenced(notification, written) {
-    inbox.writeSilenced(written, function() {
-      var updated = null
-      try {
-        updated = NotificationLogic.replacementSnapshot(notification, written.originalId, written.timestamp)
-      } catch (e) {
-        // Torn down by the server while the write was queued.
-      }
-      if (updated && NotificationLogic.popupRowChanged(written, updated)) {
-        service.writeSilenced(notification, updated)
-        return
-      }
-      service.releaseSilenced(notification, written.originalId)
+  function storeInInbox(notification, snapshot) {
+    var fileName = NotificationLogic.popupFileName(snapshot)
+    inboxRefs[fileName] = notification
+    // The sender closing its notification (it was read elsewhere, the app
+    // quit) only ends the live link; the entry waits until the user clears it.
+    notification.closed.connect(function() {
+      if (service.inboxRefs[fileName] === notification) delete service.inboxRefs[fileName]
     })
+    inbox.upsert(snapshot)
+    var refresh = function() { service.refreshInbox(notification, fileName, snapshot.originalId, snapshot.timestamp) }
+    for (var i = 0; i < updateSignals.length; i++) {
+      var signal = notification[updateSignals[i]]
+      if (signal && typeof signal.connect === "function") signal.connect(refresh)
+    }
   }
 
-  // Let go of a DND-silenced notification once its history write has run.
-  // The id may have been reused and the object torn down meanwhile.
-  function releaseSilenced(notification, originalId) {
-    if (liveRefs[originalId] === notification) delete liveRefs[originalId]
+  // A replaces_id update rewrites the tracked object; copy it into the same
+  // inbox entry (same file name), as long as the user has not cleared it.
+  function refreshInbox(notification, fileName, originalId, timestamp) {
+    if (service.inboxRefs[fileName] !== notification || !inbox.has(fileName)) return
+    var updated
     try {
-      notification.tracked = false
+      updated = NotificationLogic.replacementSnapshot(notification, originalId, timestamp)
     } catch (e) {
-      // Object already destroyed by the server — nothing left to release.
+      return
     }
+    var current = inbox.get(fileName)
+    if (current && !NotificationLogic.popupRowChanged(current, updated)) return
+    inbox.upsert(updated)
   }
 
   // Everything the card draws. A change to any of these is a client updating
@@ -312,10 +302,6 @@ Item {
       if (!row || row.originalId !== originalId || row.timestamp !== timestamp) continue
       if (!NotificationLogic.popupRowChanged(row, updated)) return
       for (var r = 0; r < roles.length; r++) popupModel.setProperty(i, roles[r], updated[roles[r]])
-      // The file name is the timestamp and id this popup was persisted under,
-      // so the rewrite lands on the same inbox file.
-      var fileName = NotificationLogic.popupFileName(updated)
-      if (inbox.has(fileName)) inbox.upsert(updated, true, 0)
       return
     }
   }
@@ -345,7 +331,6 @@ Item {
       // Not a replaces_id match — see isRestoredRow. Removing it here
       // would silently kill a restored critical alert on an unrelated ping.
       if (isRestoredRow(row)) continue
-      if (NotificationLogic.popupFileName(row) !== keepFileName) inbox.remove(NotificationLogic.popupFileName(row))
       popupModel.remove(i)
     }
   }
@@ -367,14 +352,7 @@ Item {
     // id would dismiss that unrelated notification at the server.
     var restored = isRestoredRow(entry)
     var ref = !restored && originalId >= 0 ? liveRefs[originalId] : null
-    // The popup is leaving the screen. An expiry keeps its inbox entry (now
-    // off screen); any deliberate dismissal removes it.
-    if (entry) {
-      var fileName = NotificationLogic.popupFileName(entry)
-      if (InboxLogic.removesFromInbox(reason)) inbox.remove(fileName)
-      else inbox.setOnScreen(fileName, false)
-      if (restored) delete restoredPopups[fileName]
-    }
+    if (entry && restored) delete restoredPopups[NotificationLogic.popupFileName(entry)]
     popupModel.remove(index)
     if (ref) {
       try {
@@ -397,24 +375,31 @@ Item {
       service.shell.toggle("araneadev.notifications")
   }
 
+  function openCenter(): void {
+    if (service.shell && typeof service.shell.summon === "function")
+      service.shell.summon("araneadev.notifications", "")
+  }
+
+  // Tell a still-live sender its notification is gone, then forget it.
+  function releaseInboxRef(fileName: string): void {
+    var ref = inboxRefs[fileName]
+    delete inboxRefs[fileName]
+    if (!ref) return
+    try {
+      if (ref.tracked) ref.dismiss()
+    } catch (e) {
+      // Already torn down by the server.
+    }
+  }
+
   function clearInbox(): void {
-    clearPopups()
+    for (var i = 0; i < inbox.model.count; i++) releaseInboxRef(inbox.model.get(i).fileName)
     inbox.clear()
   }
 
-  function popupIndexFor(fileName: string): int {
-    for (var i = 0; i < popupModel.count; i++) {
-      if (NotificationLogic.popupFileName(popupModel.get(i)) === fileName) return i
-    }
-    return -1
-  }
-
-  // Dismissing from the center also takes the toast off screen when it is
-  // still showing, through the same path as a toast dismissal.
   function dismissInbox(fileName: string): void {
-    var index = popupIndexFor(fileName)
-    if (index >= 0) removePopup(index, "dismiss")
-    else inbox.remove(fileName)
+    releaseInboxRef(fileName)
+    inbox.remove(fileName)
   }
 
   function dismissGroup(app: string): void {
@@ -426,20 +411,37 @@ Item {
     for (var j = 0; j < names.length; j++) dismissInbox(names[j])
   }
 
-  // An inbox entry off screen has no live action to call on (its sender has
-  // been told it closed), so it runs its execArgv or focuses the sending app.
+  // Omarchy's argv first, then the sender's own default action while it is
+  // still live, then focusing the sending app.
   function invokeInbox(fileName: string): void {
-    var index = popupIndexFor(fileName)
-    if (index >= 0) {
-      invokePopupDefault(index)
-      return
-    }
     var entry = inbox.get(fileName)
     if (!entry) return
     var argv = NotificationLogic.parseExecArgv(entry.execArgv)
     if (argv) Util.execArgv(argv)
-    else focusApp(entry)
-    inbox.remove(fileName)
+    else if (!invokeDefaultAction(inboxRefs[fileName])) focusApp(entry)
+    dismissInbox(fileName)
+  }
+
+  function newestInboxFile(): string {
+    return inbox.model.count > 0 ? inbox.model.get(0).fileName : ""
+  }
+
+  function invokeDefaultAction(ref): bool {
+    try {
+      if (ref && ref.actions) {
+        for (var i = 0; i < ref.actions.length; i++) {
+          var action = ref.actions[i]
+          if (action && action.identifier === "default") {
+            action.invoke()
+            return true
+          }
+        }
+      }
+    } catch (e) {
+      // Notification already torn down by the server.
+      console.warn("invoke default failed:", e)
+    }
+    return false
   }
 
   // Run the popup's click action, then dismiss. Omarchy's own toasts carry the
@@ -462,22 +464,7 @@ Item {
     // Restored rows have no live actions, and looking up liveRefs by their
     // old-generation id could fire an unrelated fresh notification's action.
     var ref = entry && !isRestoredRow(entry) ? liveRefs[entry.originalId] : null
-    var invoked = false
-    try {
-      if (ref && ref.actions) {
-        for (var i = 0; i < ref.actions.length; i++) {
-          var action = ref.actions[i]
-          if (action && action.identifier === "default") {
-            action.invoke()
-            invoked = true
-            break
-          }
-        }
-      }
-    } catch (e) {
-      // Notification already torn down by the server — fall through to focus.
-      console.warn("invoke default failed:", e)
-    }
+    var invoked = invokeDefaultAction(ref)
     // Chat apps (Slack, Discord, Vesktop, etc.) rarely register a "default"
     // libnotify action — they just expect clicking the notification to
     // focus their window. Fall back to focusing the sending app by class so
@@ -498,63 +485,6 @@ Item {
   }
 
   Process { id: focusAppProc; running: false }
-
-  function restorePopups(entries) {
-    var now = Date.now()
-    var live = []
-    for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i]
-      if (!entry.onScreen) continue
-      var fileName = NotificationLogic.popupFileName(entry)
-      var duration = durationFor(entry.urgency, entry.expireTimeout)
-      if (NotificationLogic.popupExpired(entry, duration, now)) {
-        // It would have expired on screen had the shell kept running: it
-        // stays in the inbox, off screen, exactly like a live expiry.
-        inbox.setOnScreen(fileName, false)
-        continue
-      }
-      // Survivors restart with a full lifetime on purpose: shell restarts
-      // are rare, and a full look after the restart flicker beats resuming
-      // a toast with a second left on its clock. The reset is persisted as
-      // an absolute deadline so a second restart while the toast is still
-      // on screen judges it by the reset clock, not the original timestamp.
-      if (duration > 0) inbox.upsert(entry, true, now + duration)
-      // deadline/onScreen are persistence metadata, not model roles — fresh
-      // rows never carry them, and ListModel roles must stay consistent.
-      delete entry.deadline
-      delete entry.onScreen
-      live.push(entry)
-    }
-    if (live.length === 0) return
-
-    Qt.callLater(function() {
-      for (var j = 0; j < live.length; j++) {
-        var restored = live[j]
-        // A notification received while the restore was reading the dir can
-        // already occupy this originalId with the same timestamp — then it
-        // IS this entry, live with its own file, and must be left alone. A
-        // different timestamp is indistinguishable between a genuine
-        // cross-restart replaces_id and a new-generation id coincidence, so
-        // show both: a briefly duplicated toast beats silently dropping a
-        // restored critical alert.
-        var duplicate = false
-        for (var k = 0; k < popupModel.count; k++) {
-          var row = popupModel.get(k)
-          if (row && row.originalId === restored.originalId && row.timestamp === restored.timestamp) {
-            duplicate = true
-            break
-          }
-        }
-        if (duplicate) continue
-        // Append (entries are newest-first) so restored toasts stack in
-        // their original order below anything that just arrived. Restored
-        // popups have no liveRefs entry — the server object died with the
-        // old shell — so dismissal and action fallbacks degrade gracefully.
-        service.restoredPopups[NotificationLogic.popupFileName(restored)] = true
-        popupModel.append(restored)
-      }
-    })
-  }
 
   // ---------------------------------------------------- settings persistence
 
@@ -619,9 +549,8 @@ Item {
     ServiceBridge.publish(service)
     Qt.callLater(function() {
       settingsFile.reload()
-      // Load the inbox (migrating pre-inbox popup files), then bring back the
-      // toasts that were on screen when the previous shell died.
-      inbox.load(function(entries) { service.restorePopups(entries) })
+      // Load the inbox, migrating pre-inbox popup files into it.
+      inbox.load(null)
     })
   }
 
@@ -680,23 +609,31 @@ Item {
       return String(service.inbox.count)
     }
 
+    // Omarchy's SUPER+SHIFT+comma: clear feedback toasts and open the center.
+    // Never bulk-deletes the inbox from a single keypress.
     function dismissAll(): string {
       service.clearPopups()
+      service.openCenter()
       return "ok"
     }
 
-    // Dismiss the most recent popup.
+    // Dismiss the feedback toast on screen, else the newest inbox entry.
     function dismissOne(): string {
-      var visible = service.stackLayout.visible
-      if (visible.length === 0) return "none"
-      service.dismissPopup(visible[0])
+      if (popupModel.count > 0) {
+        service.dismissPopup(0)
+        return "ok"
+      }
+      var fileName = service.newestInboxFile()
+      if (!fileName) return "none"
+      service.dismissInbox(fileName)
       return "ok"
     }
 
-    // Fire the default action on the most recent popup, then dismiss it.
+    // Open the newest inbox entry (its action or its app).
     function invokeLast(): string {
-      if (popupModel.count === 0) return "none"
-      service.invokePopupDefault(0)
+      var fileName = service.newestInboxFile()
+      if (!fileName) return "none"
+      service.invokeInbox(fileName)
       return "ok"
     }
 
@@ -805,10 +742,7 @@ Item {
 
             readonly property real lifetime: service.durationFor(cardSlot.urgency, cardSlot.expireTimeout)
             property real remainingLifetime: 1.0
-            readonly property bool shown: service.stackLayout.visible.indexOf(cardSlot.index) >= 0
-            visible: cardSlot.shown
-            // Overflow toasts are not on screen, so their clock does not run.
-            readonly property bool ticking: cardSlot.lifetime > 0 && cardSlot.shown && !card.hovered && !card.dragging
+            readonly property bool ticking: cardSlot.lifetime > 0 && !card.hovered && !card.dragging
 
             // A client updating this notification in place rewrites the row
             // under the card (see refreshPopup). New text deserves a full look,
@@ -853,61 +787,6 @@ Item {
               onCloseRequested: service.dismissPopup(cardSlot.index)
               onSwipeDismissed: service.dismissPopup(cardSlot.index)
               onCardClicked: service.invokePopupDefault(cardSlot.index)
-            }
-          }
-        }
-
-        // Overflow pill: everything past the visible stack, one click away.
-        // Pill copy: "+N more · Clear all".
-        BorderSurface {
-          id: overflowPill
-          readonly property int overflow: service.stackLayout.overflow
-          visible: overflow > 0
-          Layout.alignment: Qt.AlignRight
-          implicitWidth: pillRow.implicitWidth + Style.space(24)
-          implicitHeight: pillRow.implicitHeight + Style.space(12)
-          radius: implicitHeight / 2
-          color: Color.notifications.background
-          borderSpec: Border.surfaceSpec("notifications", "border",
-            (moreArea.containsMouse || clearArea.containsMouse) ? Color.notifications.countdown : Color.notifications.border,
-            Math.max(1, Style.space(1)))
-
-          Row {
-            id: pillRow
-            anchors.centerIn: parent
-            spacing: Style.space(4)
-
-            Text {
-              text: "+" + overflowPill.overflow + " more"
-              color: moreArea.containsMouse ? Color.notifications.countdown : Color.notifications.text
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              MouseArea {
-                id: moreArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: service.toggleCenter()
-              }
-            }
-            Text {
-              text: "·"
-              color: Qt.darker(Color.notifications.text, 1.4)
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-            }
-            Text {
-              text: "Clear all"
-              color: clearArea.containsMouse ? Color.notifications.countdown : Color.notifications.text
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              MouseArea {
-                id: clearArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: service.clearPopups()
-              }
             }
           }
         }
