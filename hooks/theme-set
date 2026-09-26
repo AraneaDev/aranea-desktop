@@ -15,6 +15,13 @@ if [[ $1 != "aranea" ]]; then
     "$HOME/.config/systemd/user/aranea-wallpaper-day-night.service"
   omarchy plugin disable araneadev.lock >/dev/null 2>&1 || true
   omarchy plugin disable araneadev.osd >/dev/null 2>&1 || true
+  # Hand notifications back to Omarchy's own daemon (toasts) and take the
+  # bell out of the bar; repair-shell-config restores both on return.
+  # current/theme already holds the new theme here; use the installed copy.
+  theme_scripts="$HOME/.config/omarchy/themes/aranea/scripts"
+  if [[ -x "$theme_scripts/release-shell-config" ]]; then
+    "$theme_scripts/release-shell-config" "$HOME/.config/omarchy/shell.json" >/dev/null 2>&1 || true
+  fi
   hyprctl reload >/dev/null 2>&1 || true
   exit 0
 fi

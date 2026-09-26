@@ -18,7 +18,7 @@ EOF
 "$repo_root/scripts/repair-shell-config" "$config"
 
 jq -e '.bar.id == "araneadev.bar"' "$config" >/dev/null
-jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.lock", "omarchy.menu", "omarchy.osd", "tim.bar", "tim.lock", "tim.menu"] | sort)' "$config" >/dev/null
+jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd", "tim.bar", "tim.lock", "tim.menu"] | sort)' "$config" >/dev/null
 jq -e '([.plugins[].id] | sort) == (["araneadev.lock", "araneadev.notifications", "araneadev.osd"] | sort)' "$config" >/dev/null
 jq -e '.bar.position == "top" and .unrelated.keep == true' "$config" >/dev/null
 
@@ -88,5 +88,37 @@ cat > "$config" <<'EOF'
 EOF
 "$repo_root/scripts/repair-shell-config" "$config"
 jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end) | select(. == "araneadev.notifications")] | length == 1' "$config" >/dev/null
+
+# --- leaving Aranea hands notifications back to Omarchy; returning restores the bell
+parked="$state_root/notifications-widget-parked"
+rm -f "$marker" "$parked"
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '(.disabledPlugins | index("omarchy.notifications")) != null' "$config" >/dev/null
+jq '.cloneSourceRestores = ["araneadev.menu", "araneadev.notifications"]' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.notifications") == null' "$config" >/dev/null
+jq -e '[.plugins[]?.id] | index("araneadev.notifications") == null' "$config" >/dev/null
+jq -e '(.disabledPlugins | index("omarchy.notifications")) == null' "$config" >/dev/null
+jq -e '.cloneSourceRestores == ["araneadev.menu"]' "$config" >/dev/null
+test -f "$parked"
+
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] == ["araneadev.notifications", "omarchy.tray"]' "$config" >/dev/null
+jq -e '(.disabledPlugins | index("omarchy.notifications")) != null' "$config" >/dev/null
+jq -e '(.cloneSourceRestores | index("araneadev.notifications")) != null' "$config" >/dev/null
+test ! -e "$parked"
+
+# Removed by the user while on Aranea: leaving parks nothing, returning adds nothing.
+jq '.bar.layout.right |= map(select(.id != "araneadev.notifications"))' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+"$repo_root/scripts/release-shell-config" "$config"
+test ! -e "$parked"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] == ["omarchy.tray"]' "$config" >/dev/null
+
+grep -Fq 'release-shell-config' "$repo_root/hooks/theme-set"
 
 echo "shell config contract passed"

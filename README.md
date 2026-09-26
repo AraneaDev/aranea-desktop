@@ -284,6 +284,10 @@ center behind the bell in the bar.
 A notification an app updates in place stays one entry. The center keeps at
 most 100 items for up to 7 days.
 
+Switching to another theme hands notifications back to Omarchy's own toasts
+and takes the bell out of the bar; switching back to Aranea restores both
+(unless you had removed the bell yourself).
+
 ### Diagnostics
 
 The optional diagnostics layer can be toggled with:

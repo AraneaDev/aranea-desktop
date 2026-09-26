@@ -17,8 +17,11 @@ tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 backup_file="$config_file.aranea.bak"
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 bell_marker="$state_root/notifications-widget-placed"
+# Written by release-shell-config when another theme took the bell out of the
+# bar; it overrides the once-only marker so returning to Aranea restores it.
+parked_marker="$state_root/notifications-widget-parked"
 place_bell=true
-[[ -e "$bell_marker" ]] && place_bell=false
+[[ -e "$bell_marker" && ! -e "$parked_marker" ]] && place_bell=false
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
@@ -32,11 +35,16 @@ jq --argjson place "$place_bell" '
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
       "omarchy.lock",
+      "omarchy.notifications",
       "omarchy.osd",
       "tim.bar",
       "tim.menu",
       "tim.lock"
     ]) | unique | sort)
+  # Tell the host to re-enable the Omarchy daemon if the user ever disables
+  # the Aranea notifications by hand (host bookkeeping for cloned plugins).
+  | .cloneSourceRestores = ((if (.cloneSourceRestores | type) == "array" then .cloneSourceRestores else [] end)
+      + ["araneadev.notifications"] | unique)
   # Place the notification bell once. Layout entries may be plain id strings
   # or {id: ...} objects; both count. Only a layout the user already owns is
   # touched: writing a partial layout would replace the host defaults.
@@ -53,6 +61,7 @@ jq --argjson place "$place_bell" '
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
   : > "$bell_marker"
+  rm -f "$parked_marker"
 fi
 
 if cmp -s "$config_file" "$tmp_file"; then

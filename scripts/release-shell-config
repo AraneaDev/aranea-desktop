@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# The inverse of repair-shell-config for the notification center, run by the
+# theme-set hook when another theme is applied: Aranea's bell-only
+# notifications step aside and Omarchy's own notification daemon (with its
+# toasts) takes over again. When the bell was in the bar, a "parked" marker
+# asks repair-shell-config to put it back on the next return to Aranea; a
+# bell the user removed parks nothing and stays removed.
+#
+# `omarchy plugin disable` is not used here: for a cloned plugin it rewrites
+# the bell's bar entry into an entry for the clone's source.
+
+config_file="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json}"
+
+if [[ ! -f "$config_file" ]]; then
+  exit 0
+fi
+command -v jq >/dev/null 2>&1 || {
+  printf 'jq is required to release shell config: %s\n' "$config_file" >&2
+  exit 1
+}
+
+state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+parked_marker="$state_root/notifications-widget-parked"
+config_dir="$(dirname "$config_file")"
+tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
+cleanup() { rm -f "$tmp_file"; }
+trap cleanup EXIT
+
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' \
+    "$config_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : > "$parked_marker"
+fi
+
+jq '
+  def entry_id: if type == "string" then . else .id? end;
+  if (.bar.layout | type) == "object" then
+    .bar.layout |= with_entries(
+      .value |= (if type == "array" then map(select(entry_id != "araneadev.notifications")) else . end))
+  else . end
+  | if (.plugins | type) == "array" then .plugins |= map(select(entry_id != "araneadev.notifications")) else . end
+  | if (.disabledPlugins | type) == "array" then .disabledPlugins |= map(select(. != "omarchy.notifications")) else . end
+  | if (.cloneSourceRestores | type) == "array" then
+      .cloneSourceRestores |= map(select(. != "araneadev.notifications"))
+      | if (.cloneSourceRestores | length) == 0 then del(.cloneSourceRestores) else . end
+    else . end
+' "$config_file" > "$tmp_file"
+
+if cmp -s "$config_file" "$tmp_file"; then
+  exit 0
+fi
+chmod --reference="$config_file" "$tmp_file"
+mv -f "$tmp_file" "$config_file"
+printf 'released notification center from shell config: %s\n' "$config_file"
