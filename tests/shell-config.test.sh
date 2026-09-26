@@ -30,4 +30,49 @@ if grep -Fq 'target: "omarchy.bar"' "$repo_root/plugins/araneadev.bar/Bar.qml"; 
   exit 1
 fi
 
+# --- notification bell placement
+state_root="$test_root/state"
+export ARANEA_STATE_ROOT="$state_root"
+marker="$state_root/notifications-widget-placed"
+
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"left": [], "center": [], "right": [{"id": "omarchy.microphone"}, {"id": "omarchy.tray"}, {"id": "omarchy.network"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] == ["omarchy.microphone", "araneadev.notifications", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+test -f "$marker"
+
+# Idempotent: a second run adds nothing.
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id | select(. == "araneadev.notifications")] | length == 1' "$config" >/dev/null
+
+# Removal is respected once the marker exists (Review Focus 5).
+jq '.bar.layout.right |= map(select(.id != "araneadev.notifications"))' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] | index("araneadev.notifications") == null' "$config" >/dev/null
+
+# No tray: prepend. No layout: untouched, no marker.
+rm -f "$marker"
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.network"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right[0].id == "araneadev.notifications"' "$config" >/dev/null
+
+rm -f "$marker"
+cat > "$config" <<'EOF'
+{"bar": {"position": "top"}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout == null' "$config" >/dev/null
+test ! -e "$marker"
+
+# Already placed by the user in another section: not duplicated, marker written.
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"center": [{"id": "araneadev.notifications"}], "right": [{"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] == ["omarchy.tray"]' "$config" >/dev/null
+test -f "$marker"
+
 echo "shell config contract passed"

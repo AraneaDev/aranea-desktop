@@ -15,10 +15,14 @@ command -v jq >/dev/null 2>&1 || {
 config_dir="$(dirname "$config_file")"
 tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 backup_file="$config_file.aranea.bak"
+state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+bell_marker="$state_root/notifications-widget-placed"
+place_bell=true
+[[ -e "$bell_marker" ]] && place_bell=false
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
-jq '
+jq --argjson place "$place_bell" '
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
       {id: "araneadev.lock"},
@@ -33,7 +37,22 @@ jq '
       "tim.menu",
       "tim.lock"
     ]) | unique | sort)
+  # Place the notification bell once. Only a layout the user already owns is
+  # touched: writing a partial layout would replace the host defaults.
+  | if $place
+       and ((.bar.layout.right | type) == "array")
+       and ([.bar.layout[]? | arrays | .[] | objects | .id] | index("araneadev.notifications") == null)
+    then .bar.layout.right |= (
+      (map(.id) | index("omarchy.tray")) as $tray
+      | if $tray == null then [{id: "araneadev.notifications"}] + .
+        else .[:$tray] + [{id: "araneadev.notifications"}] + .[$tray:] end)
+    else . end
 ' "$config_file" > "$tmp_file"
+
+if jq -e '[.bar.layout[]? | arrays | .[] | objects | .id] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : > "$bell_marker"
+fi
 
 if cmp -s "$config_file" "$tmp_file"; then
   printf 'shell config already repaired: %s\n' "$config_file"
