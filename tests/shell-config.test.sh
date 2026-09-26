@@ -18,7 +18,7 @@ EOF
 "$repo_root/scripts/repair-shell-config" "$config"
 
 jq -e '.bar.id == "araneadev.bar"' "$config" >/dev/null
-jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd", "tim.bar", "tim.lock", "tim.menu"] | sort)' "$config" >/dev/null
+jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd"] | sort)' "$config" >/dev/null
 jq -e '([.plugins[].id] | sort) == (["araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd"] | sort)' "$config" >/dev/null
 grep -Fq 'araneadev.health' "$repo_root/scripts/deploy-plugins-safely"
 jq -e '.bar.position == "top" and .unrelated.keep == true' "$config" >/dev/null

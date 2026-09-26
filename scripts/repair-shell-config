@@ -41,10 +41,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       "omarchy.bar",
       "omarchy.lock",
       "omarchy.notifications",
-      "omarchy.osd",
-      "tim.bar",
-      "tim.menu",
-      "tim.lock"
+      "omarchy.osd"
     ]) | unique | sort)
   # Tell the host to re-enable the Omarchy daemon if the user ever disables
   # the Aranea notifications by hand (host bookkeeping for cloned plugins).
