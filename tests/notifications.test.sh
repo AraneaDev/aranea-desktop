@@ -119,4 +119,8 @@ grep -Fq 'InboxLogic.suppressesClick' "$plugin/components/NotificationCard.qml"
 grep -Fq 'InboxLogic.stackSplit' "$plugin/Service.qml"
 grep -Fq 'more · Clear all' "$plugin/Service.qml"
 
+for fn in 'function dismissInbox' 'function dismissGroup' 'function invokeInbox' 'function popupIndexFor' 'function center(): string' 'function count(): string'; do
+  grep -Fq "$fn" "$plugin/Service.qml" || { echo "missing in Service.qml: $fn" >&2; exit 1; }
+done
+
 echo "notifications contract passed"

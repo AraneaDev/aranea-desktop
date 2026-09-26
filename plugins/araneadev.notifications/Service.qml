@@ -401,6 +401,46 @@ Item {
     inbox.clear()
   }
 
+  function popupIndexFor(fileName: string): int {
+    for (var i = 0; i < popupModel.count; i++) {
+      if (NotificationLogic.popupFileName(popupModel.get(i)) === fileName) return i
+    }
+    return -1
+  }
+
+  // Dismissing from the center also takes the toast off screen when it is
+  // still showing, through the same path as a toast dismissal.
+  function dismissInbox(fileName: string): void {
+    var index = popupIndexFor(fileName)
+    if (index >= 0) removePopup(index, "dismiss")
+    else inbox.remove(fileName)
+  }
+
+  function dismissGroup(app: string): void {
+    var names = []
+    for (var i = 0; i < inbox.model.count; i++) {
+      var row = inbox.model.get(i)
+      if (String(row.app || "unknown") === app) names.push(row.fileName)
+    }
+    for (var j = 0; j < names.length; j++) dismissInbox(names[j])
+  }
+
+  // An inbox entry off screen has no live action to call on (its sender has
+  // been told it closed), so it runs its execArgv or focuses the sending app.
+  function invokeInbox(fileName: string): void {
+    var index = popupIndexFor(fileName)
+    if (index >= 0) {
+      invokePopupDefault(index)
+      return
+    }
+    var entry = inbox.get(fileName)
+    if (!entry) return
+    var argv = NotificationLogic.parseExecArgv(entry.execArgv)
+    if (argv) Util.execArgv(argv)
+    else focusApp(entry)
+    inbox.remove(fileName)
+  }
+
   // Run the popup's click action, then dismiss. Omarchy's own toasts carry the
   // action as an argv vector in the `execArgv` role (see execArgvFromHints),
   // which the persistence files preserve, so restored toasts stay clickable.
@@ -624,6 +664,15 @@ Item {
     function clear(): string {
       service.clearInbox()
       return "ok"
+    }
+
+    function center(): string {
+      service.toggleCenter()
+      return "ok"
+    }
+
+    function count(): string {
+      return String(service.inbox.count)
     }
 
     function dismissAll(): string {
