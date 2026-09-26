@@ -8,7 +8,13 @@ source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
 
 json=0
-[[ "${1:-}" == "--json" ]] && json=1
+fix=0
+for arg in "$@"; do
+  case "$arg" in
+    --json) json=1 ;;
+    --fix) fix=1 ;;
+  esac
+done
 
 emit() {
   local id="$1" status="$2" message="$3"
@@ -42,6 +48,16 @@ fi
 hook_root="${ARANEA_DOCTOR_HOOK_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/hooks}"
 theme_hook="$hook_root/theme-set.d/theme-set"
 post_boot_hook="$hook_root/post-boot.d/post-boot"
+
+# A stale or missing hook is what lets everything downstream of it (plugin
+# registration in shell.json, integration re-linking) silently drift after an
+# update: theme-set/post-boot never fire, so nothing re-runs
+# repair-shell-config. Reinstalling the hook files directly is safe to redo
+# unconditionally.
+if (( fix )) && [[ -z "${ARANEA_DOCTOR_HOOKS:-}" ]]; then
+  install -Dm755 "$repo_root/hooks/theme-set" "$theme_hook" 2>/dev/null || true
+  install -Dm755 "$repo_root/hooks/post-boot" "$post_boot_hook" 2>/dev/null || true
+fi
 
 if [[ "${ARANEA_DOCTOR_HOOKS:-}" == ok ]]; then
   hooks_ok=1
@@ -122,6 +138,13 @@ if ! emit_override shell ARANEA_DOCTOR_SHELL_STATUS; then
 fi
 
 if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
+  # deploy-plugins-safely reconciles shell.json against whatever plugin
+  # directories actually exist on disk even when no plugin file changed, so
+  # it also repairs the "deployed but never enabled" drift this doctor check
+  # exists to catch.
+  if (( fix )) && command -v omarchy-shell >/dev/null 2>&1 && [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]; then
+    "$repo_root/scripts/deploy-plugins-safely" "$repo_root" >/dev/null 2>&1 || true
+  fi
   if command -v omarchy-shell >/dev/null 2>&1; then
     plugin_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
     if jq -e '

@@ -90,6 +90,13 @@ XDG_DATA_HOME="$install_tmp" ARANEA_OWNERSHIP_ROOT="$state_tmp" PATH="$fake_bin:
   bash "$repo_root/scripts/install-integration" --yes icons >/dev/null
 test ! -e "$stale_icon"
 test -e "$unmanaged_icon"
+# Removing a stale icon from disk must also drop it from the ownership
+# ledger, or aranea-doctor reports a permanent false "repair" for a target
+# that was intentionally retired.
+if grep -Fqx -- "$stale_icon" "$state_tmp/managed-files"; then
+  echo "stale icon was removed from disk but left in the ownership ledger" >&2
+  exit 1
+fi
 rm -rf "$install_tmp" "$state_tmp"
 
 echo "icon theme contract passed (${#contexts[@]} contexts)"

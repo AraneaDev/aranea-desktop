@@ -200,6 +200,7 @@ case "$integration" in
         elif [[ -e "$managed_icon" || -L "$managed_icon" ]]; then
           backup_target "$managed_icon"
           rm -f -- "$managed_icon"
+          forget_managed_file "$managed_icon"
           printf 'removed stale managed icon %s\n' "$managed_icon"
         fi
       done <"$ownership_file"

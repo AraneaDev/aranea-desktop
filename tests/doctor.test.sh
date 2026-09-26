@@ -42,4 +42,27 @@ while IFS= read -r line; do
   [[ "${line:0:1}" == '{' && "${line: -1}" == '}' ]]
 done <<<"$output"
 
+# --fix must reinstall a stale/missing hook in place so plugin registration
+# (and everything else theme-set/post-boot drive) stops silently drifting
+# after an update. Start from an empty hook_root: neither file exists yet.
+fix_hook_root="$(mktemp -d)"
+trap 'rm -rf "$hook_root" "$ownership_root" "$fix_hook_root"' EXIT
+
+fix_output="$(
+  ARANEA_DOCTOR_THEME='Aranea Pulse' \
+  ARANEA_DOCTOR_ICON_ROOT="$ownership_root/icons" \
+  ARANEA_DOCTOR_HOOK_ROOT="$fix_hook_root" \
+  ARANEA_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped \
+  ARANEA_DOCTOR_RUNTIME_ROOT="$fix_hook_root/no-runtime" \
+  ARANEA_DOCTOR_QMLLINT_STATUS=ok \
+  "$repo_root/scripts/aranea-doctor" --json --fix
+)"
+
+grep -Fq '"id":"hooks","status":"ok"' <<<"$fix_output"
+cmp -s "$repo_root/hooks/theme-set" "$fix_hook_root/theme-set.d/theme-set"
+cmp -s "$repo_root/hooks/post-boot" "$fix_hook_root/post-boot.d/post-boot"
+
 echo "doctor contract passed"

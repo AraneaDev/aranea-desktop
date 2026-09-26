@@ -25,4 +25,21 @@ restore_managed_files
 test ! -L "$target"
 grep -Fq 'user setting' "$target"
 
+# forget_managed_file is the inverse of record_managed_file: it must drop the
+# exact entry without disturbing the others, and be a no-op for an entry that
+# isn't present.
+other_target="$test_root/config/other.conf"
+mkdir -p "$(dirname "$other_target")"
+: > "$other_target"
+record_managed_file "$other_target"
+grep -Fqx -- "$target" "$test_root/state/managed-files"
+grep -Fqx -- "$other_target" "$test_root/state/managed-files"
+
+forget_managed_file "$target"
+grep -Fqx -- "$target" "$test_root/state/managed-files" && exit 1
+grep -Fqx -- "$other_target" "$test_root/state/managed-files"
+
+forget_managed_file "$test_root/config/never-recorded.conf"
+grep -Fqx -- "$other_target" "$test_root/state/managed-files"
+
 echo "ownership contract passed"

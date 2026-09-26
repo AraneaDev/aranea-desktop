@@ -96,6 +96,12 @@ Preview or diagnose without changing the system:
 ./scripts/aranea-doctor --json
 ```
 
+If a check reports `repair` for `hooks` or `plugins` (for example after an
+update that landed a new plugin like the OSD but never re-ran theme-set), run
+`./scripts/aranea-doctor --fix` to reinstall the theme-set/post-boot hooks and
+re-run plugin deployment, which also re-registers any plugin in
+`shell.json` that exists on disk but was never enabled.
+
 ## Activate
 
 After installation, select the theme and a wallpaper with Omarchy:
