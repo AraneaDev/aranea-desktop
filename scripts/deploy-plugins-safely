@@ -24,13 +24,30 @@ for plugin_id in "${plugin_ids[@]}"; do
   fi
 done
 
-(( needs_deploy )) || exit 0
+# Reconcile shell.json against whatever plugins actually exist on disk on
+# every run, deploy or not. A plugin can land here without ever being
+# registered (a manual deploy, an update that skipped the theme-set/post-boot
+# hooks) and would otherwise stay silently disabled until something else
+# happens to repair the config.
+repair_shell_config() {
+  local config_dir
+  config_dir="$(dirname "$target_root")"
+  if [[ -x "$theme_root/scripts/repair-shell-config" ]]; then
+    "$theme_root/scripts/repair-shell-config" "$config_dir/shell.json" >/dev/null 2>&1 || true
+  fi
+}
+
+if (( ! needs_deploy )); then
+  repair_shell_config
+  exit 0
+fi
 
 # A live directory swap makes QuickShell reload plugins. Stop it first so its
 # stock panels never observe the short interval between plugin generations.
 if command -v omarchy-hyprland-session-locked >/dev/null 2>&1 \
     && omarchy-hyprland-session-locked; then
   echo "Skipping plugin deployment while the session is locked." >&2
+  repair_shell_config
   exit 0
 fi
 
@@ -52,3 +69,5 @@ trap finish EXIT
 for plugin_id in "${plugin_ids[@]}"; do
   "$deploy_plugin" "$theme_root/plugins/$plugin_id" "$target_root/$plugin_id"
 done
+
+repair_shell_config

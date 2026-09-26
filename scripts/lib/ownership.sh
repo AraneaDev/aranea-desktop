@@ -34,6 +34,22 @@ record_managed_file() {
   grep -Fqx -- "$target" "$record" || printf '%s\n' "$target" >> "$record"
 }
 
+# The inverse of record_managed_file, for a caller that has just removed a
+# target it no longer manages (e.g. an icon dropped by an icon-set rebuild).
+# Without this, the ledger only ever grows, and aranea-doctor's ownership
+# check reports a permanent false "repair" for every entry an integration
+# update intentionally removed.
+forget_managed_file() {
+  local target="$1"
+  local record
+  record="$(ownership_record)"
+  [[ -f "$record" ]] || return 0
+  local tmp
+  tmp="$(mktemp "$(dirname "$record")/.managed-files.XXXXXX")"
+  grep -Fvx -- "$target" "$record" > "$tmp" || true
+  mv "$tmp" "$record"
+}
+
 link_managed_file() {
   local target="$1"
   local source="$2"
