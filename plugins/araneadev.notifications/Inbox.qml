@@ -23,6 +23,8 @@ Item {
   property alias model: inboxModel
   readonly property int count: inboxModel.count
   property int revision: 0
+  // True once the first directory read has been merged in.
+  property bool loadedOnce: false
 
   signal loaded()
 
@@ -224,6 +226,7 @@ Item {
     var done = loadDone
     loadDone = null
     if (done) done(entries)
+    loadedOnce = true
     loaded()
   }
 

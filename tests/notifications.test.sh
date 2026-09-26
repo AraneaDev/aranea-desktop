@@ -195,4 +195,12 @@ grep -Fq 'sourceKey' "$plugin/Inbox.qml"
 
 grep -Fq 'NotificationLogic.popupRowChanged(prior, next)' "$plugin/Service.qml"
 
+test -f "$plugin/Health.qml"
+grep -Fq 'onLoaded: item.service = service' "$plugin/Service.qml"
+# Inside Health { }, `service` names Health's own property: binding it there
+# would bind the property to itself and leave the monitor without a service.
+if grep -Fq 'Health { service: service }' "$plugin/Service.qml"; then echo "Health must get the service via onLoaded" >&2; exit 1; fi
+grep -Fq 'HealthLogic.reconcile' "$plugin/Health.qml"
+if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$plugin/Health.qml"; then echo "Health.qml must not run shell strings" >&2; exit 1; fi
+
 echo "notifications contract passed"

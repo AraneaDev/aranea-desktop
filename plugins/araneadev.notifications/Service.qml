@@ -36,6 +36,17 @@ Item {
     normalUrgency: NotificationUrgency.Normal
   }
 
+  // System health items (failed services, disk, reboot, containers). The
+  // monitor waits for the inbox to load so restart reconciliation sees the
+  // items that are already there.
+  Loader {
+    active: inbox.loadedOnce
+    sourceComponent: Health {}
+    // Assigned here rather than as a binding on Health: inside Health the
+    // name `service` is its own property and would bind to itself.
+    onLoaded: item.service = service
+  }
+
   // Corner radius is shared with the menu and shell panels.
   // It mirrors Hyprland's current decoration:rounding value.
   readonly property int cornerRadius: Style.cornerRadius
