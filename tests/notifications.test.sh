@@ -193,4 +193,6 @@ if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then echo "centerOpen must be gone
 
 grep -Fq 'sourceKey' "$plugin/Inbox.qml"
 
+grep -Fq 'NotificationLogic.popupRowChanged(prior, next)' "$plugin/Service.qml"
+
 echo "notifications contract passed"

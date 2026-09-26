@@ -426,6 +426,55 @@ Item {
     return inbox.model.count > 0 ? inbox.model.get(0).fileName : ""
   }
 
+  // ---------------------------------------------------- source items
+  //
+  // Live items owned by a monitor (System health), keyed by a stable
+  // sourceKey instead of a notification id. The monitor creates, updates and
+  // resolves them; the user can still dismiss them like any entry.
+
+  function sourceFileName(key: string): string {
+    for (var i = 0; i < inbox.model.count; i++) {
+      var row = inbox.model.get(i)
+      if (row.sourceKey === key) return row.fileName
+    }
+    return ""
+  }
+
+  function upsertSourceItem(key: string, fields: var): void {
+    var existing = sourceFileName(key)
+    var prior = existing ? inbox.get(existing) : null
+    var timestamp = prior ? prior.timestamp : Date.now()
+    if (!prior) {
+      // File names are timestamp-id; keep them unique for same-ms items.
+      while (inbox.has(timestamp + "-0.json")) timestamp++
+    }
+    var next = {
+      id: 0, originalId: 0, app: "System health", appIcon: "",
+      summary: String(fields.summary || ""), body: String(fields.body || ""),
+      image: "", glyph: String(fields.glyph || ""),
+      execArgv: fields.execArgv && fields.execArgv.length ? JSON.stringify(fields.execArgv) : "",
+      urgency: Number(fields.urgency) === 2 ? 2 : 1, expireTimeout: 0,
+      timestamp: timestamp, sourceKey: key
+    }
+    // Checks repeat every 30-60 s; an unchanged problem must not rewrite its file.
+    if (prior && !NotificationLogic.popupRowChanged(prior, next)) return
+    inbox.upsert(next)
+  }
+
+  function resolveSourceItem(key: string): void {
+    var fileName = sourceFileName(key)
+    if (fileName) inbox.remove(fileName)
+  }
+
+  function sourceItemKeys(): var {
+    var keys = []
+    for (var i = 0; i < inbox.model.count; i++) {
+      var key = inbox.model.get(i).sourceKey
+      if (key) keys.push(key)
+    }
+    return keys
+  }
+
   function invokeDefaultAction(ref): bool {
     try {
       if (ref && ref.actions) {
