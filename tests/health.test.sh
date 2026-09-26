@@ -95,7 +95,47 @@ assert(h.parseMuteFile('{"version":1,"muted":["disk:/"]}').join() === 'disk:/', 
 assert(h.parseMuteFile('{broken').length === 0, 'corrupt mute file is empty')
 assert(JSON.parse(h.serializeMuteFile(['b', 'a'])).muted.join() === 'a,b', 'mute file sorted')
 
+// --- review fixes: container state survives restarts and stream gaps
+const ps = [
+  JSON.stringify({ Names: 'pg', Image: 'postgres:16', State: 'exited', Status: 'Exited (1) 3 minutes ago' }),
+  JSON.stringify({ Names: 'web', Image: 'nginx', State: 'running', Status: 'Up 2 hours' }),
+  JSON.stringify({ Names: 'job', Image: 'alpine', State: 'exited', Status: 'Exited (0) 1 hour ago' })
+].join('\n')
+const seen = h.parseDockerPs(ps)
+assert(seen.length === 3 && seen[0].exitCode === 1 && seen[1].running === true && seen[2].exitCode === 0, 'docker ps parsed')
+assert(h.parseDockerPs('') !== null && h.parseDockerPs('').length === 0, 'no containers is a known empty list')
+let seeded = h.seedDockerHistory({}, seen, 1000)
+let seededProblems = h.containerProblems(seeded, 1000)
+assert(seededProblems.length === 1 && seededProblems[0].key === 'container:pg' && seededProblems[0].exitCode === 1, 'restart: a stopped failed container keeps its problem')
+const loopHist = { web: { image: 'nginx', exits: [900, 950, 990], last: 'die', lastExit: 1 } }
+seeded = h.seedDockerHistory(loopHist, seen, 1000)
+assert(h.containerProblems(seeded, 1000).some(p => p.key === 'container:web' && p.loop), 'reconnect keeps exits counted before the gap')
+seeded = h.seedDockerHistory({ gone: { image: 'x', exits: [], last: 'die', lastExit: 2 } }, seen, 1000)
+assert(!seeded.gone, 'containers removed during the gap are forgotten')
+seeded = h.seedDockerHistory({ pg: { image: 'postgres:16', exits: [], last: 'die', lastExit: 143 } }, [{ name: 'pg', image: 'postgres:16', running: true, exitCode: 0 }], 1000)
+assert(h.containerProblems(seeded, 1000).length === 0, 'a container that came back during the gap clears')
+
+// --- review fixes: pseudo and read-only filesystems never alert
+const dfPseudo = [
+  'Filesystem Mounted on Type 1B-blocks Used Avail Use%',
+  '/dev/sda1 / ext4 1000 500 500 50%',
+  'MyApp /tmp/.mount_MyApp fuse.MyApp 100 100 0 100%',
+  '/dev/loop0 /mnt/iso iso9660 700 700 0 100%',
+  '/dev/sdb1 /run/media/tim/NTFS fuseblk 1000 950 50 95%'
+].join('\n')
+const pseudoRows = h.parseDf(dfPseudo)
+assert(pseudoRows.map(r => r.target).join() === '/,/run/media/tim/NTFS', 'fuse.* and iso9660 skipped, fuseblk kept')
+
 console.log('health logic contract passed')
 NODE
+
+# Every check command is bounded: a hung df/systemctl/docker must become
+# "unknown", not freeze the check (review Important #4).
+health_qml="$repo_root/plugins/araneadev.notifications/Health.qml"
+for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker", "info"' '"docker", "ps"'; do
+  grep -F "command: [\"timeout\", \"10\", $cmd" "$health_qml" >/dev/null || { echo "unbounded check command: $cmd" >&2; exit 1; }
+done
+grep -Fq '"-l"' "$health_qml"
+grep -Fq '"--since"' "$health_qml"
 
 echo "health contract passed"

@@ -98,18 +98,20 @@ Item {
     setProblems("unit", parts.system.concat(parts.user))
   }
 
+  // Every one-shot check runs under `timeout 10`: a hung command then ends
+  // with empty output, which parses as unknown.
   // Results are handled in onStreamFinished: Quickshell does not order it
   // against onExited, and a failed command's empty output already parses as
   // unknown (null).
   Process {
     id: systemUnits
-    command: ["systemctl", "list-units", "--failed", "--output=json", "--no-pager"]
+    command: ["timeout", "10", "systemctl", "list-units", "--failed", "--output=json", "--no-pager"]
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: health.unitResult("system", text) }
   }
 
   Process {
     id: userUnits
-    command: ["systemctl", "--user", "list-units", "--failed", "--output=json", "--no-pager"]
+    command: ["timeout", "10", "systemctl", "--user", "list-units", "--failed", "--output=json", "--no-pager"]
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: health.unitResult("user", text) }
   }
 
@@ -121,7 +123,10 @@ Item {
 
   Process {
     id: dfProc
-    command: ["df", "--output=source,target,fstype,size,used,avail,pcent", "-B1",
+    // -l: local filesystems only (a stale network mount cannot hang df, and
+    // sshfs/NFS usage is not this machine's disk). timeout: a hang becomes
+    // "unknown" instead of freezing the check.
+    command: ["timeout", "10", "df", "-l", "--output=source,target,fstype,size,used,avail,pcent", "-B1",
       "-x", "tmpfs", "-x", "devtmpfs", "-x", "efivarfs", "-x", "squashfs", "-x", "overlay"]
     stdout: StdioCollector {
       waitForEnd: true
@@ -176,18 +181,15 @@ Item {
   // ---------------------------------------------------- containers
 
   function startDocker(): void {
-    if (!dockerInfo.running && !dockerEvents.running) dockerInfo.running = true
+    if (!dockerInfo.running && !dockerPs.running && !dockerEvents.running) dockerInfo.running = true
   }
 
   Process {
     id: dockerInfo
-    command: ["docker", "info", "--format", "{{.ServerVersion}}"]
+    command: ["timeout", "10", "docker", "info", "--format", "{{.ServerVersion}}"]
     onExited: function(code) {
       if (code === 0) {
-        dockerEvents.running = true
-        // A fresh stream starts from a clean slate: exits it never saw are
-        // not guessed at, so the check is known from here on.
-        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, Date.now()))
+        dockerPs.running = true
       } else {
         health.markUnknown("container", "docker not running")
         dockerRetry.restart()
@@ -195,11 +197,35 @@ Item {
     }
   }
 
+  // On every (re)connect the current container states are the truth: they
+  // cover a shell restart (empty history) and events missed while the stream
+  // was down. The stream then continues from the snapshot time.
+  Process {
+    id: dockerPs
+    command: ["timeout", "10", "docker", "ps", "-a", "--format", "{{json .}}"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var containers = HealthLogic.parseDockerPs(text)
+        if (containers === null) {
+          health.markUnknown("container", "docker ps failed")
+          dockerRetry.restart()
+          return
+        }
+        var now = Date.now()
+        health.dockerHistory = HealthLogic.seedDockerHistory(health.dockerHistory, containers, now)
+        dockerEvents.command = ["docker", "events", "--since", String(Math.floor(now / 1000)),
+          "--filter", "type=container",
+          "--filter", "event=die", "--filter", "event=start", "--filter", "event=destroy",
+          "--format", "{{json .}}"]
+        dockerEvents.running = true
+        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, now))
+      }
+    }
+  }
+
   Process {
     id: dockerEvents
-    command: ["docker", "events", "--filter", "type=container",
-      "--filter", "event=die", "--filter", "event=start", "--filter", "event=destroy",
-      "--format", "{{json .}}"]
     stdout: SplitParser {
       onRead: function(line) {
         var event = HealthLogic.parseDockerEvent(line)

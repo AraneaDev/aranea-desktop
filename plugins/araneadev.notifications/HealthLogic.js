@@ -49,12 +49,22 @@ function parseDf(text) {
       avail: Number(f[5]), percent: parseInt(f[6], 10)
     }
     if (!isFinite(row.size) || !isFinite(row.percent)) continue
+    if (!alertableFsType(f[2])) continue
     var seen = bySource[row.source]
     if (!seen) { bySource[row.source] = row; order.push(row.source) }
     else if (row.target.length < seen.target.length) bySource[row.source] = row
   }
   if (order.length === 0) return null
   return order.map(function(s) { return bySource[s] })
+}
+
+// Read-only images (ISO/UDF) and FUSE app mounts (AppImages) are always
+// "100% full" by design. fuseblk (NTFS/exFAT disks) is real storage.
+function alertableFsType(fstype) {
+  var t = String(fstype || "")
+  if (t === "iso9660" || t === "udf") return false
+  if (t.indexOf("fuse.") === 0) return false
+  return true
 }
 
 function diskLevel(previous, percent) {
@@ -117,6 +127,42 @@ function recordDockerEvent(history, event, now) {
   next[event.name] = {
     image: event.image || prev.image, exits: exits, last: event.action,
     lastExit: event.action === "die" ? event.exitCode : prev.lastExit
+  }
+  return next
+}
+
+// `docker ps -a --format '{{json .}}'`, one object per line.
+function parseDockerPs(text) {
+  var out = []
+  var lines = String(text || "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    if (!lines[i].trim()) continue
+    var c
+    try {
+      c = JSON.parse(lines[i])
+    } catch (e) {
+      return null
+    }
+    var code = /Exited \((-?\d+)\)/.exec(String(c.Status || ""))
+    out.push({ name: String(c.Names || ""), image: String(c.Image || ""),
+      running: String(c.State || "") === "running", exitCode: code ? parseInt(code[1], 10) : 0 })
+  }
+  return out
+}
+
+// Rebuild container state from a `docker ps -a` snapshot, taken when the
+// events stream (re)connects: after a shell restart or a stream gap the
+// snapshot is the truth. Exit timestamps already counted are kept so a
+// restart loop spanning the gap is still recognised.
+function seedDockerHistory(history, containers, now) {
+  var next = {}
+  for (var i = 0; i < (containers || []).length; i++) {
+    var c = containers[i]
+    if (!c.name) continue
+    var prev = (history || {})[c.name]
+    var exits = prev ? prev.exits.filter(function(t) { return now - t <= LOOP_WINDOW_MS }) : []
+    next[c.name] = { image: c.image || (prev && prev.image) || "", exits: exits,
+      last: c.running ? "start" : "die", lastExit: c.running ? 0 : c.exitCode }
   }
   return next
 }
@@ -238,6 +284,8 @@ if (typeof module !== "undefined") {
     parseDockerEvent: parseDockerEvent,
     recordDockerEvent: recordDockerEvent,
     containerProblems: containerProblems,
+    parseDockerPs: parseDockerPs,
+    seedDockerHistory: seedDockerHistory,
     humanBytes: humanBytes,
     itemFor: itemFor,
     reconcile: reconcile,
