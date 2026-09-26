@@ -35,6 +35,9 @@ fi
 state_root="$test_root/state"
 export ARANEA_STATE_ROOT="$state_root"
 marker="$state_root/notifications-widget-placed"
+# The bell sections below assert exact layouts; keep the health icon out of
+# them (its own section at the end clears this marker).
+mkdir -p "$state_root" && touch "$state_root/health-widget-placed"
 
 cat > "$config" <<'EOF'
 {"bar": {"layout": {"left": [], "center": [], "right": [{"id": "omarchy.microphone"}, {"id": "omarchy.tray"}, {"id": "omarchy.network"}]}}}
@@ -121,5 +124,39 @@ test ! -e "$parked"
 jq -e '[.bar.layout.right[].id] == ["omarchy.tray"]' "$config" >/dev/null
 
 grep -Fq 'release-shell-config' "$repo_root/hooks/theme-set"
+
+# --- health icon placement
+hmarker="$state_root/health-widget-placed"; hparked="$state_root/health-widget-parked"
+rm -f "$marker" "$parked" "$hmarker" "$hparked"
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.tray"}, {"id": "omarchy.network"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] == ["araneadev.notifications", "araneadev.health", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+test -f "$hmarker"
+# Bell removed by hand, health kept: nothing moves, nothing re-added (Review Focus 4)
+jq '.bar.layout.right |= map(select(.id != "araneadev.notifications"))' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] == ["araneadev.health", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+# Health removed by hand stays removed
+jq '.bar.layout.right |= map(select(.id != "araneadev.health"))' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[].id] | index("araneadev.health") == null' "$config" >/dev/null
+# No bell: placed before the tray
+rm -f "$hmarker"
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.clock", {"id": "omarchy.tray"}]}}}
+EOF
+touch "$marker"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.clock", "araneadev.health", "omarchy.tray"]' "$config" >/dev/null
+# Leave and return
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.health") == null' "$config" >/dev/null
+jq -e '[.plugins[]?.id] | index("araneadev.health") == null' "$config" >/dev/null
+test -f "$hparked"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.health") != null' "$config" >/dev/null
+test ! -e "$hparked"
 
 echo "shell config contract passed"

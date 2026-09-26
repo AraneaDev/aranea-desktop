@@ -22,10 +22,14 @@ bell_marker="$state_root/notifications-widget-placed"
 parked_marker="$state_root/notifications-widget-parked"
 place_bell=true
 [[ -e "$bell_marker" && ! -e "$parked_marker" ]] && place_bell=false
+health_marker="$state_root/health-widget-placed"
+health_parked="$state_root/health-widget-parked"
+place_health=true
+[[ -e "$health_marker" && ! -e "$health_parked" ]] && place_health=false
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
-jq --argjson place "$place_bell" '
+jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
       {id: "araneadev.lock"},
@@ -57,12 +61,30 @@ jq --argjson place "$place_bell" '
       | if $tray == null then [{id: "araneadev.notifications"}] + .
         else .[:$tray] + [{id: "araneadev.notifications"}] + .[$tray:] end)
     else . end
+  # Place the health icon once: after the bell when the bell is in the right
+  # section, else before the tray, else first.
+  | if $placeHealth
+       and ((.bar.layout.right | type) == "array")
+       and ([.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") == null)
+    then .bar.layout.right |= (
+      (map(if type == "string" then . else .id? end)) as $ids
+      | ($ids | index("araneadev.notifications")) as $bell
+      | ($ids | index("omarchy.tray")) as $tray
+      | if $bell != null then .[:$bell + 1] + [{id: "araneadev.health"}] + .[$bell + 1:]
+        elif $tray != null then .[:$tray] + [{id: "araneadev.health"}] + .[$tray:]
+        else [{id: "araneadev.health"}] + . end)
+    else . end
 ' "$config_file" > "$tmp_file"
 
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
   : > "$bell_marker"
   rm -f "$parked_marker"
+fi
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") != null' "$tmp_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : > "$health_marker"
+  rm -f "$health_parked"
 fi
 
 if cmp -s "$config_file" "$tmp_file"; then

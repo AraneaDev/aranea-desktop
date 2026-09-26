@@ -23,6 +23,7 @@ command -v jq >/dev/null 2>&1 || {
 
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 parked_marker="$state_root/notifications-widget-parked"
+health_parked="$state_root/health-widget-parked"
 config_dir="$(dirname "$config_file")"
 tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 cleanup() { rm -f "$tmp_file"; }
@@ -33,12 +34,17 @@ if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id?
   mkdir -p "$state_root"
   : > "$parked_marker"
 fi
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") != null' \
+    "$config_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : > "$health_parked"
+fi
 
 jq '
   def entry_id: if type == "string" then . else .id? end;
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(
-      .value |= (if type == "array" then map(select(entry_id != "araneadev.notifications")) else . end))
+      .value |= (if type == "array" then map(select(entry_id != "araneadev.notifications" and entry_id != "araneadev.health")) else . end))
   else . end
   | if (.plugins | type) == "array" then .plugins |= map(select(entry_id != "araneadev.notifications" and entry_id != "araneadev.health")) else . end
   | if (.disabledPlugins | type) == "array" then .disabledPlugins |= map(select(. != "omarchy.notifications")) else . end
