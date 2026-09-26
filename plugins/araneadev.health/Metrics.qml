@@ -76,7 +76,8 @@ Item {
   Timer { interval: 2000; repeat: true; running: true; triggeredOnStart: true; onTriggered: metrics.sample() }
   Timer { interval: 60000; repeat: true; running: true; triggeredOnStart: true; onTriggered: metrics.refreshSlow() }
 
-  // Top processes: two ps samples, CPU from the cputime delta.
+  // Top processes: two dumps of /proc/<pid>/stat, CPU from the tick delta
+  // (ps only reports whole CPU seconds, too coarse for a 2 s window).
   Timer {
     interval: 2000; repeat: true; running: metrics.topActive; triggeredOnStart: true
     onTriggered: if (!psProc.running) psProc.running = true
@@ -90,17 +91,18 @@ Item {
 
   Process {
     id: psProc
-    command: ["timeout", "5", "ps", "-eo", "pid=,rss=,cputimes=,comm="]
+    // The glob needs a shell; the command is a constant string.
+    command: ["timeout", "5", "sh", "-c", "cat /proc/[0-9]*/stat 2>/dev/null; true"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var list = MetricsLogic.parsePs(text)
+        var list = MetricsLogic.parseProcStat(text, 4096)
         var now = Date.now()
         if (!list || list.length === 0) {
           metrics.topProcs = ({ cpu: [], mem: [] })
           return
         }
-        if (metrics.lastPs) metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3)
+        if (metrics.lastPs) metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, 100)
         metrics.lastPs = list
         metrics.lastPsAt = now
       }

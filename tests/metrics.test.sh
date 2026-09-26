@@ -38,13 +38,29 @@ assert(rates.down === 174000 && rates.up === 12000, 'rates per second')
 assert(m.netRates(n2, n1, 2000).down === 0, 'counter reset is 0')
 assert(m.parseNetDev(dev1, 'eth9') === null, 'missing interface is unknown')
 
-const ps1 = '  94371 472200     590 claude\n 259390 393580       7 quickshell\n  61409 324316     296 chromium\n'
-const ps2 = '  94371 472300     594 claude\n 259390 393580       7 quickshell\n  61409 330000     297 chromium\n  70000 1000 50 newbie\n'
-const top = m.topProcesses(m.parsePs(ps1), m.parsePs(ps2), 2000, 3)
-assert(top.cpu[0].comm === 'claude' && top.cpu[0].percent === 200 && top.cpu[1].comm === 'chromium' && top.cpu[1].percent === 50, 'cpu from cputime deltas (100% = one core)')
+// /proc/<pid>/stat: comm may contain spaces and parens; utime+stime in ticks
+const st1 = [
+  '94371 (claude) S 1 2 3 0 -1 0 0 0 0 0 5000 900 0 0 20 0 1 0 1 1 115283 0 0',
+  '259390 (quickshell) S 1 2 3 0 -1 0 0 0 0 0 700 10 0 0 20 0 1 0 1 1 96089 0 0',
+  '61409 (Web Content) S 1 2 3 0 -1 0 0 0 0 0 29000 600 0 0 20 0 1 0 1 1 79179 0 0',
+  '5 (weird) name) S 1 2 3 0 -1 0 0 0 0 0 10 0 0 0 20 0 1 0 1 1 10 0 0'
+].join('\n')
+const st2 = [
+  '94371 (claude) S 1 2 3 0 -1 0 0 0 0 0 5300 1000 0 0 20 0 1 0 1 1 115300 0 0',
+  '259390 (quickshell) S 1 2 3 0 -1 0 0 0 0 0 700 10 0 0 20 0 1 0 1 1 96089 0 0',
+  '61409 (Web Content) S 1 2 3 0 -1 0 0 0 0 0 29050 600 0 0 20 0 1 0 1 1 80000 0 0',
+  '5 (weird) name) S 1 2 3 0 -1 0 0 0 0 0 10 0 0 0 20 0 1 0 1 1 10 0 0',
+  '70000 (newbie) R 1 2 3 0 -1 0 0 0 0 0 99 0 0 0 20 0 1 0 1 1 250 0 0'
+].join('\n')
+const p1 = m.parseProcStat(st1), p2 = m.parseProcStat(st2)
+assert(p1.length === 4 && p1[2].comm === 'Web Content' && p1[3].comm === 'weird) name', 'comm with spaces and parens')
+assert(p1[0].ticks === 5900 && p1[0].rss === 115283 * 4096, 'ticks = utime+stime, rss in pages -> bytes')
+const top = m.topProcesses(p1, p2, 2000, 3, 100)
+assert(top.cpu.length === 2, 'idle processes (0%) are left out')
+assert(top.cpu[0].comm === 'claude' && top.cpu[0].percent === 200 && top.cpu[1].comm === 'Web Content' && top.cpu[1].percent === 25, 'cpu from tick deltas (100% = one core)')
 assert(!top.cpu.some(p => p.comm === 'newbie'), 'processes seen once have no cpu figure yet')
-assert(top.mem[0].comm === 'claude' && top.mem[0].rss === 472300 * 1024, 'memory by rss')
-assert(m.parsePs('') !== null && m.parsePs('').length === 0, 'empty ps is an empty list')
+assert(top.mem[0].comm === 'claude' && top.mem[0].rss === 115300 * 4096, 'memory by rss')
+assert(m.parseProcStat('').length === 0, 'empty stat dump is an empty list')
 
 assert(m.formatUptime(46583) === 'up 12h 56m', 'hours and minutes')
 assert(m.formatUptime(3 * 86400 + 4 * 3600 + 5) === 'up 3d 4h', 'days and hours')

@@ -203,4 +203,10 @@ grep -Fq 'MetricsLogic.cpuPercent' "$plugin/Metrics.qml"
 grep -Fq 'running: metrics.topActive' "$plugin/Metrics.qml"
 grep -Fq 'Metrics {' "$plugin/Service.qml"
 
+jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" and .barWidget.defaultSection == "right"' "$plugin/manifest.json" >/dev/null
+grep -Fq 'HealthBridge.current()' "$plugin/Panel.qml"
+grep -Fq 'All systems healthy' "$plugin/Panel.qml"
+grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"
+grep -Fq '󰗶' "$plugin/Panel.qml"
+
 echo "health contract passed"

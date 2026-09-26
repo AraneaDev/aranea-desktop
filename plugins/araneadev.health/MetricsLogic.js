@@ -84,22 +84,33 @@ function netRates(prev, next, elapsedMs) {
   }
 }
 
-// `ps -eo pid=,rss=,cputimes=,comm=`: rss in KiB, cputimes in seconds.
-function parsePs(text) {
+// A dump of /proc/<pid>/stat lines. comm sits in parentheses and may itself
+// contain spaces or ')', so split on the last ')'. After it: state (field 3)
+// ... utime (14), stime (15), rss in pages (24).
+function parseProcStat(text, pageSize) {
+  var page = pageSize || 4096
   var out = []
   var lines = String(text || "").split("\n")
   for (var i = 0; i < lines.length; i++) {
-    var m = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(lines[i])
-    if (!m) continue
-    out.push({ pid: Number(m[1]), rss: Number(m[2]) * 1024, cpu: Number(m[3]), comm: m[4] })
+    var line = lines[i]
+    var open = line.indexOf(" (")
+    var close = line.lastIndexOf(")")
+    if (open < 0 || close < open) continue
+    var rest = line.slice(close + 2).split(" ")
+    if (rest.length < 22) continue
+    out.push({
+      pid: Number(line.slice(0, open)), comm: line.slice(open + 2, close),
+      ticks: Number(rest[11]) + Number(rest[12]), rss: Number(rest[21]) * page
+    })
   }
   return out
 }
 
-// CPU % = cputime delta over wall time (100 % = one core); only processes
-// present in both samples get a figure.
-function topProcesses(prev, next, elapsedMs, count) {
+// CPU % = tick delta over wall time (100 % = one core); only processes
+// present in both samples, and busy ones, get a CPU row.
+function topProcesses(prev, next, elapsedMs, count, ticksPerSecond) {
   var n = count || 3
+  var hz = ticksPerSecond || 100
   var before = {}
   for (var i = 0; i < (prev || []).length; i++) before[prev[i].pid] = prev[i]
   var cpu = []
@@ -108,7 +119,8 @@ function topProcesses(prev, next, elapsedMs, count) {
     var p = next[j]
     var old = before[p.pid]
     if (!old || !(s > 0)) continue
-    cpu.push({ comm: p.comm, percent: Math.max(0, Math.round((p.cpu - old.cpu) * 100 / s)) })
+    var percent = Math.round((p.ticks - old.ticks) * 100 / hz / s)
+    if (percent > 0) cpu.push({ comm: p.comm, percent: percent })
   }
   cpu.sort(function(a, b) { return b.percent - a.percent })
   var mem = (next || []).map(function(p) { return { comm: p.comm, rss: p.rss } })
@@ -148,7 +160,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     parseCpuStat: parseCpuStat, cpuPercent: cpuPercent, pushHistory: pushHistory,
     parseLoadavg: parseLoadavg, parseMeminfo: parseMeminfo, defaultInterface: defaultInterface,
-    parseNetDev: parseNetDev, netRates: netRates, parsePs: parsePs, topProcesses: topProcesses,
+    parseNetDev: parseNetDev, netRates: netRates, parseProcStat: parseProcStat, topProcesses: topProcesses,
     formatUptime: formatUptime, usageLevel: usageLevel, humanBytes: humanBytes, formatRate: formatRate
   }
 }
