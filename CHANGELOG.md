@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.5.1...v1.6.0) (2026-09-26)
+
+
+### Features
+
+* bell-only notification center ([#38](https://github.com/AraneaDev/aranea-desktop/issues/38)) ([1d5aa3e](https://github.com/AraneaDev/aranea-desktop/commit/1d5aa3e8dfb7a364724cc652985a372de79b0d42))
+
 ## [1.5.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.5.0...v1.5.1) (2026-09-26)
 
 
