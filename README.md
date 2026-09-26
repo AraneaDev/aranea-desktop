@@ -288,6 +288,19 @@ Switching to another theme hands notifications back to Omarchy's own toasts
 and takes the bell out of the bar; switching back to Aranea restores both
 (unless you had removed the bell yourself).
 
+#### System health
+
+The center also watches the system and keeps one live item per problem:
+
+- **Failed services** (system or user) — critical; click opens its journal.
+- **Disk almost full** — from 90 %, critical from 97 %; clears below 88 %.
+- **Reboot needed** — after a kernel update removed the running kernel's modules.
+- **Containers exiting** — a non-zero exit, or critical when a container keeps
+  restarting (3 exits in 5 minutes).
+
+Items update in place and disappear when the problem clears. Dismiss one to
+mute that problem until it clears; `aranea-doctor` lists which checks are on.
+
 ### Diagnostics
 
 The optional diagnostics layer can be toggled with:
