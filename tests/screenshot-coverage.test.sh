@@ -9,7 +9,7 @@ mapfile -t surfaces < <(
   sed -n 's/^all_surfaces=(\(.*\))$/\1/p' "$capture_script" | tr ' ' '\n'
 )
 expected_surfaces=(
-  menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth
+  menu menu-submenu menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty
   network audio bluetooth agents
   power monitor apps favorites recent
@@ -17,7 +17,7 @@ expected_surfaces=(
 )
 expected_hero_frames=(
   desktop menu menu-submenu menu-search menu-input apps favorites recent
-  notifications diagnostics network audio bluetooth agents power monitor btop
+  notifications health network audio bluetooth agents power monitor btop
   file-manager neovim lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]

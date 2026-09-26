@@ -9,7 +9,6 @@ PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
   "$repo_root/scripts/install.sh" --dry-run --yes >"$output"
 
-grep -Fq "would install conky-cairo-wayland-git with paru" "$output"
 grep -Fq "would install theme hooks" "$output"
 grep -Fq "would set theme to aranea" "$output"
 grep -Fq "would install cursor integration" "$output"
@@ -32,7 +31,6 @@ PATH="$repo_root/tests/fake-bin:$PATH" \
 grep -Fq "profile: no_apps" "$minimal_output"
 grep -Fq "would install theme hooks" "$minimal_output"
 grep -Fq "would persist profile: no_apps" "$minimal_output"
-grep -Fq "conky-cairo-wayland-git" "$minimal_output" && exit 1
 
 grep -Fq 'profile_file=' "$repo_root/hooks/theme-set"
 grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
@@ -60,7 +58,7 @@ chmod +x "$name_root/bin/omarchy"
 
 HOME="$name_root/home" XDG_STATE_HOME="$name_root/home/.local/state" \
   PATH="$name_root/bin:$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 \
-  "$repo_root/scripts/install.sh" --yes --skip-conky --profile minimal \
+  "$repo_root/scripts/install.sh" --yes --profile minimal \
   --source "https://example.invalid/AraneaDev/aranea-desktop.git" >/dev/null
 
 themes="$name_root/home/.config/omarchy/themes"
