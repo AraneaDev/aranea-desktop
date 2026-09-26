@@ -7,7 +7,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "HealthLogic.js" as HealthLogic
+import "../araneadev.health/HealthLogic.js" as HealthLogic
 
 Item {
   id: health

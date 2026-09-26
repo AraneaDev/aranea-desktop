@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 node - "$repo_root" <<'NODE'
 const root = process.argv[2]
-const h = require(`${root}/plugins/araneadev.notifications/HealthLogic.js`)
+const h = require(`${root}/plugins/araneadev.health/HealthLogic.js`)
 const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
 
 // --- failed units
@@ -160,6 +160,16 @@ assert(Object.keys(pruned).sort().join() === 'bad,busy', 'history keeps only pro
 const noTerm = h.itemFor({ key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }, { terminal: false })
 assert(noTerm.execArgv.length === 0, 'no terminal: no journal action')
 assert(h.itemFor({ key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }).execArgv[0] === 'xdg-terminal-exec', 'terminal assumed by default')
+
+// --- dropdown status and rows
+const unitP = { key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }
+const diskP = { key: 'disk:/', check: 'disk', target: '/', percent: 92, size: 100, avail: 8, level: 'normal' }
+assert(h.statusFor([]) === 'healthy', 'no problems is healthy')
+assert(h.statusFor([diskP]) === 'attention', 'a normal problem is attention')
+assert(h.statusFor([diskP, unitP]) === 'critical', 'a critical problem is critical')
+const rowsA = h.annotateProblems([diskP, unitP], ['disk:/'], { terminal: true })
+assert(rowsA[0].key === 'unit:system:a.service' && rowsA[0].muted === false && rowsA[0].urgency === 2, 'critical rows first')
+assert(rowsA[1].key === 'disk:/' && rowsA[1].muted === true && rowsA[1].summary === '/ is 92% full', 'muted flag and copy')
 
 console.log('health logic contract passed')
 NODE

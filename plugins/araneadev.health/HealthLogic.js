@@ -306,6 +306,31 @@ function serializeMuteFile(muted) {
   return JSON.stringify({ version: 1, muted: (muted || []).slice().sort() }, null, 2) + "\n"
 }
 
+// The dropdown's status icon: any open problem counts, muted or not (muting
+// only quiets the bell; the dropdown shows live state).
+function statusFor(open) {
+  var status = "healthy"
+  for (var i = 0; i < (open || []).length; i++) {
+    // Accepts raw problems and annotated rows (which carry urgency already).
+    var u = typeof open[i].urgency === "number" ? open[i].urgency : itemFor(open[i]).urgency
+    if (u === 2) return "critical"
+    status = "attention"
+  }
+  return status
+}
+
+// Rows for the dropdown's problem list: the center copy plus a muted flag.
+function annotateProblems(open, muted, tools) {
+  var mutedSet = toSet(muted)
+  var rows = (open || []).map(function(p) {
+    var item = itemFor(p, tools)
+    return { key: p.key, check: p.check, summary: item.summary, body: item.body, urgency: item.urgency,
+      glyph: item.glyph, execArgv: item.execArgv, muted: !!mutedSet[p.key] }
+  })
+  rows.sort(function(a, b) { return (b.urgency - a.urgency) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0) })
+  return rows
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     checkOf: checkOf,
@@ -325,6 +350,8 @@ if (typeof module !== "undefined") {
     itemFor: itemFor,
     reconcile: reconcile,
     parseMuteFile: parseMuteFile,
-    serializeMuteFile: serializeMuteFile
+    serializeMuteFile: serializeMuteFile,
+    statusFor: statusFor,
+    annotateProblems: annotateProblems
   }
 }
