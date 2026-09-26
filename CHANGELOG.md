@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.6.0...v1.6.1) (2026-09-26)
+
+
+### Fixes
+
+* install the theme as aranea whatever the source is named ([#40](https://github.com/AraneaDev/aranea-desktop/issues/40)) ([ec5ff85](https://github.com/AraneaDev/aranea-desktop/commit/ec5ff850ac8a61408f7f1a2549ee3edb737bd7ee))
+
 ## [1.6.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.5.1...v1.6.0) (2026-09-26)
 
 
