@@ -9,7 +9,7 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-23%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
+[![Tests](https://img.shields.io/badge/tests-25%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
@@ -164,9 +164,9 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- |
 | ![Aranea diagnostics](screenshots/diagnostics.png) | ![Aranea filament OSD](screenshots/osd.png) |
 
-| Notifications |
-| --- |
-| ![Aranea notifications](screenshots/notifications.png) |
+| Notification center | All caught up |
+| --- | --- |
+| ![Aranea notification center](screenshots/notifications.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
 
 ### System popups
 
@@ -261,6 +261,34 @@ and icon integrations.
 - Use the center indicators for idle and status controls.
 - Use the right-side widgets for network, audio, Bluetooth, displays, power,
   tray, and agent controls.
+
+### Notifications
+
+Notifications never pop up: every one goes straight to the notification
+center behind the bell in the bar.
+
+- **Bell:** a mint badge counts what's waiting. A **red** badge counts the
+  critical notifications (alarms, low battery, failed jobs) whenever any are
+  waiting. Left-click opens the center, middle-click clears it, right-click
+  toggles Do Not Disturb, which hides the mint badge (critical still shows red).
+- **Center:** critical first, then grouped by app, newest first. Click an item
+  to open it (the app's own action when it is still running), ✕ dismisses an
+  item or a whole group, swipe right to dismiss. Arrow keys, Enter, Delete and
+  Shift+Delete work while it is open.
+- **Feedback toasts:** Omarchy's short confirmations for things you just did
+  ("Screenshot saved", "Copied") still appear briefly and are not kept.
+- **Keys (Omarchy defaults):** `Super+,` dismiss the newest item,
+  `Super+Shift+,` open the center, `Super+Alt+,` open the newest item,
+  `Super+Shift+Alt+,` toggle the center.
+
+A notification an app updates in place stays one entry. The center keeps at
+most 100 items for up to 7 days.
+
+Switching to another theme hands notifications back to Omarchy's own toasts
+and takes the bell out of the bar; switching back to Aranea restores both
+(unless you had removed the bell yourself).
+
+### Diagnostics
 
 The optional diagnostics layer can be toggled with:
 

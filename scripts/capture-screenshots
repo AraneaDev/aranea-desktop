@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications network audio bluetooth agents power monitor apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications notifications-empty network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
@@ -86,6 +86,7 @@ case "$surface" in
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
+  notifications-empty) showcase_surface=notifications ;;
 esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
@@ -203,23 +204,41 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  notifications)
-    # This is the one surface that *wants* araneadev.notifications on -- a
-    # batch run disables it for every other surface (see the --all block
-    # above), so re-enable it here first and restore batch mode's "off"
-    # state afterward. Standalone runs never disabled it, so re-enabling is
-    # a no-op there and it's left enabled afterward, its normal default.
+  notifications|notifications-empty)
+    # These surfaces *want* araneadev.notifications on; batch mode disables it
+    # for every other surface, so re-enable here and restore afterwards.
     omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
-    if command -v notify-send >/dev/null 2>&1; then
-      notify-send -a Aranea -u normal -t 2500 'Aranea notification' 'Theme capture · notification surface' || true
-    fi
-    sleep 0.5
-    omarchy-shell shell toggle araneadev.notifications >/dev/null
+    inbox_backup="$(mktemp -d)"
+    inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
+    # Sanitized fixtures: park the real inbox, show only capture notifications.
+    mkdir -p "$inbox_dir"
+    find "$inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_backup" {} + 2>/dev/null || true
+    omarchy restart shell >/dev/null 2>&1 || true
+    sleep 2
+    case "$surface" in
+      notifications)
+        # Notifications go straight to the center (no toasts); one critical
+        # entry shows the red bell badge.
+        for app in Slack Slack Slack Build; do
+          notify-send -a "$app" "$app update" 'Theme capture · notification center' || true
+        done
+        notify-send -a Alarm -u critical 'Battery low' 'Theme capture · critical notification' || true
+        sleep 1
+        omarchy-shell shell toggle araneadev.notifications >/dev/null
+        ;;
+      notifications-empty)
+        omarchy-shell shell toggle araneadev.notifications >/dev/null
+        ;;
+    esac
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
     omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
-    # Let the capture-only toast expire before the next all-surface capture.
-    sleep 2
+    omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
+    omarchy-shell notifications clear >/dev/null 2>&1 || true
+    sleep 1
+    find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
+    rmdir "$inbox_backup" 2>/dev/null || true
+    omarchy restart shell >/dev/null 2>&1 || true
     if [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]]; then
       omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     fi

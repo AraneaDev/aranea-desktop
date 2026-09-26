@@ -2,15 +2,24 @@
   "schemaVersion": 1,
   "id": "araneadev.notifications",
   "name": "Notifications",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "AraneaDev",
-  "description": "Notification daemon, popups, DND, and history",
+  "description": "Notification daemon, popups, DND, inbox and notification center",
   "kinds": [
-    "service"
+    "service",
+    "bar-widget"
   ],
   "keepLoaded": true,
   "entryPoints": {
-    "service": "Service.qml"
+    "service": "Service.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Notifications",
+    "description": "Notification bell with unread count and notification center",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
   },
   "omarchy": {
     "clonedFrom": "omarchy.notifications"

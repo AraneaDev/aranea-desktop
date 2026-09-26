@@ -65,4 +65,40 @@ grep -Fq '"id":"hooks","status":"ok"' <<<"$fix_output"
 cmp -s "$repo_root/hooks/theme-set" "$fix_hook_root/theme-set.d/theme-set"
 cmp -s "$repo_root/hooks/post-boot" "$fix_hook_root/post-boot.d/post-boot"
 
+# --- notification inbox health
+inbox_root="$(mktemp -d)"
+trap 'rm -rf "$hook_root" "$ownership_root" "$fix_hook_root" "$inbox_root"' EXIT
+printf '%s\n' '{"id":1,"originalId":1,"app":"A","timestamp":1,"onScreen":false}' > "$inbox_root/1-1.json"
+printf '%s\n' '{"id":2,' > "$inbox_root/2-2.json"
+inbox_output="$(
+  ARANEA_DOCTOR_THEME='Aranea Pulse' \
+  ARANEA_DOCTOR_ICON_ROOT="$ownership_root/icons" \
+  ARANEA_DOCTOR_HOOK_ROOT="$hook_root" \
+  ARANEA_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped \
+  ARANEA_DOCTOR_RUNTIME_ROOT="$hook_root/no-runtime" \
+  ARANEA_DOCTOR_QMLLINT_STATUS=ok \
+  ARANEA_DOCTOR_INBOX_ROOT="$inbox_root" \
+  "$repo_root/scripts/aranea-doctor" --json
+)"
+grep -Fq '"id":"notifications","status":"repair","message":"inbox holds 2 entries, 1 unreadable"' <<<"$inbox_output"
+
+rm -f "$inbox_root/2-2.json"
+inbox_output="$(
+  ARANEA_DOCTOR_THEME='Aranea Pulse' \
+  ARANEA_DOCTOR_ICON_ROOT="$ownership_root/icons" \
+  ARANEA_DOCTOR_HOOK_ROOT="$hook_root" \
+  ARANEA_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped \
+  ARANEA_DOCTOR_RUNTIME_ROOT="$hook_root/no-runtime" \
+  ARANEA_DOCTOR_QMLLINT_STATUS=ok \
+  ARANEA_DOCTOR_INBOX_ROOT="$inbox_root" \
+  "$repo_root/scripts/aranea-doctor" --json
+)"
+grep -Fq '"id":"notifications","status":"ok","message":"inbox holds 1 entries"' <<<"$inbox_output"
+
 echo "doctor contract passed"
