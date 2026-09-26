@@ -29,6 +29,31 @@ run() {
   fi
 }
 
+# The directory `omarchy theme install` clones a source into: the basename
+# without .git, an omarchy- prefix or a -theme suffix, lowercased. Mirrors
+# omarchy-theme-install so the two cannot disagree about where Aranea landed.
+installed_theme_name() {
+  local source="${1%/}"
+  if [[ "$source" != *"://"* && "$source" == *:* && "${source%%:*}" != */* ]]; then
+    source="${source#*:}"
+  fi
+  basename -- "$source" .git | sed -E 's/^omarchy-//; s/-theme$//' | tr '[:upper:]' '[:lower:]'
+}
+
+# Aranea is always applied as the `aranea` theme (the hooks key on that name),
+# but the default source (aranea-desktop.git) clones as "aranea-desktop". Move
+# the fresh clone into place so `omarchy theme set aranea` never activates an
+# older copy left from a previous install.
+adopt_installed_theme() {
+  local name themes_dir
+  name="$(installed_theme_name "$1")"
+  [[ "$name" == aranea ]] && return 0
+  themes_dir="$HOME/.config/omarchy/themes"
+  [[ -d "$themes_dir/$name" ]] || { say "installed theme not found: $themes_dir/$name" >&2; return 1; }
+  rm -rf "$themes_dir/aranea"
+  mv "$themes_dir/$name" "$themes_dir/aranea"
+}
+
 aur_helper() {
   if command -v paru >/dev/null 2>&1; then
     printf 'paru'
@@ -158,6 +183,7 @@ else
   install -Dm644 /dev/null "$profile_state"
   printf '%s\n' "$profile" > "$profile_state"
   run omarchy theme install "$theme_source"
+  adopt_installed_theme "$theme_source"
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"
   run omarchy theme set aranea
