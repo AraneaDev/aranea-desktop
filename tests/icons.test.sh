@@ -29,54 +29,36 @@ for context in "${contexts[@]}"; do
   grep -Fq "scalable/$context" "$theme_file"
 done
 
-required_wave2_3=(
-  actions/system-shutdown.svg actions/system-reboot.svg actions/system-log-out.svg
-  status/battery.svg status/battery-low.svg status/battery-charging.svg
-  status/audio-volume-high.svg status/audio-volume-muted.svg status/video-display.svg
-  status/input-keyboard.svg status/bluetooth.svg status/network-wired.svg
-  status/notification.svg status/system-lock-screen.svg status/emblem-synchronized.svg
-  apps/utilities-terminal.svg apps/accessories-text-editor.svg apps/web-browser.svg
-  apps/preferences-system.svg apps/applications-multimedia.svg apps/applications-development.svg
-)
-for icon in "${required_wave2_3[@]}"; do
-  test -f "$theme_root/scalable/$icon"
-done
-
-required_distinct=(
-  places/folder-new.svg places/folder-visiting.svg places/folder-documents.svg places/folder-download.svg places/folder-music.svg
-  places/folder-pictures.svg places/folder-videos.svg places/folder-publicshare.svg
-  devices/drive-multidisk.svg devices/drive-nvme.svg devices/media-memory.svg
-  devices/computer-desktop.svg devices/network-workgroup.svg
-  status/battery-full.svg status/battery-medium.svg status/battery-caution.svg
-  status/audio-volume-medium.svg status/audio-volume-low.svg status/input-mouse.svg
-  status/input-touchpad.svg status/video-projector.svg status/display-brightness.svg
-  status/network-wireless.svg status/network-vpn.svg
-  mimetypes/x-office-document.svg mimetypes/application-vnd.ms-excel.svg
-  mimetypes/application-vnd.ms-powerpoint.svg apps/system-file-manager.svg
-  actions/media-record.svg actions/media-eject.svg
-)
-for icon in "${required_distinct[@]}"; do
-  test -f "$theme_root/scalable/$icon"
-  test "$(stat -c '%F' "$theme_root/scalable/$icon")" = "regular file"
-done
-
-required_wave1=(
+required_core=(
   places/folder.svg places/folder-open.svg places/user-home.svg places/folder-root.svg
+  places/folder-documents.svg places/folder-download.svg places/folder-music.svg
+  places/folder-pictures.svg places/folder-videos.svg places/folder-new.svg
+  places/go-home.svg places/user-trash.svg places/user-trash-full.svg
   actions/go-up.svg actions/go-previous.svg actions/go-next.svg actions/view-refresh.svg
   actions/edit-find.svg actions/view-list.svg actions/view-grid.svg
-  places/user-trash.svg places/user-trash-full.svg
-  devices/drive-harddisk.svg devices/drive-harddisk-system.svg devices/drive-removable-media.svg
+  actions/document-new.svg actions/document-open.svg actions/document-save.svg
+  actions/edit-copy.svg actions/edit-cut.svg actions/edit-delete.svg actions/application-exit.svg
+  devices/computer-desktop.svg devices/drive-harddisk.svg devices/drive-harddisk-system.svg devices/drive-removable-media.svg
   devices/drive-optical.svg devices/media-flash.svg devices/media-sd.svg
   devices/computer.svg devices/computer-laptop.svg devices/network-server.svg devices/network-wireless.svg
   status/emblem-mounted.svg status/emblem-readonly.svg status/emblem-shared.svg
+  mimetypes/text-plain.svg
   mimetypes/text-x-generic.svg mimetypes/application-pdf.svg mimetypes/image-x-generic.svg
   mimetypes/video-x-generic.svg mimetypes/audio-x-generic.svg mimetypes/text-x-script.svg
   mimetypes/text-html.svg mimetypes/application-json.svg mimetypes/application-zip.svg
   mimetypes/application-x-tar.svg mimetypes/application-x-executable.svg mimetypes/application-x-desktop.svg
+  apps/accessories-text-editor.svg apps/preferences-system.svg apps/system-file-manager.svg
+  apps/utilities-terminal.svg apps/web-browser.svg
 )
-for icon in "${required_wave1[@]}"; do
+for icon in "${required_core[@]}"; do
   test -f "$theme_root/scalable/$icon"
+  test "$(stat -c '%F' "$theme_root/scalable/$icon")" = "regular file"
+  grep -Fq 'fill="#3bff9e"' "$theme_root/scalable/$icon"
+  ! grep -Fq 'stroke=' "$theme_root/scalable/$icon"
 done
+
+actual_svg_count="$(find "$theme_root/scalable" -type f -name '*.svg' | wc -l)"
+test "$actual_svg_count" -eq "${#required_core[@]}"
 
 dry_run_output="$(bash "$repo_root/scripts/install-integration" --dry-run icons)"
 grep -Fq 'scalable/devices/drive-harddisk.svg' <<<"$dry_run_output"
@@ -86,5 +68,23 @@ grep -Eq 'would copy .*scalable/places/folder\.svg ->' <<<"$dry_run_output"
 expected_svg_count="$(find "$theme_root/scalable" -type f -name '*.svg' | wc -l)"
 installed_svg_count="$(grep -cE 'would copy .*scalable/.+\.svg ->' <<<"$dry_run_output")"
 test "$installed_svg_count" -eq "$expected_svg_count"
+
+install_tmp="$(mktemp -d)"
+state_tmp="$(mktemp -d)"
+fake_bin="$install_tmp/bin"
+mkdir -p "$fake_bin"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$fake_bin/gsettings"
+chmod +x "$fake_bin/gsettings"
+stale_icon="$install_tmp/icons/Aranea-icons/scalable/legacy/old.svg"
+unmanaged_icon="$install_tmp/icons/Aranea-icons/scalable/legacy/user.svg"
+mkdir -p "$(dirname "$stale_icon")"
+printf '%s\n' stale >"$stale_icon"
+printf '%s\n' unmanaged >"$unmanaged_icon"
+printf '%s\n' "$stale_icon" >"$state_tmp/managed-files"
+XDG_DATA_HOME="$install_tmp" ARANEA_OWNERSHIP_ROOT="$state_tmp" PATH="$fake_bin:$PATH" \
+  bash "$repo_root/scripts/install-integration" --yes icons >/dev/null
+test ! -e "$stale_icon"
+test -e "$unmanaged_icon"
+rm -rf "$install_tmp" "$state_tmp"
 
 echo "icon theme contract passed (${#contexts[@]} contexts)"

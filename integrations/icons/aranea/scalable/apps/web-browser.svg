@@ -1,1 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>Aranea web browser</title><circle cx="12" cy="12" r="8" fill="none" stroke="#86ad9b" stroke-width="0.9"/><path d="M4.5 10h15M12 4a12 12 0 0 1 0 16M12 4a12 12 0 0 0 0 16" fill="none" stroke="#626879" stroke-width="0.75"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea web-browser</title><circle cx="12" cy="12" r="9"/><path fill="#061015" d="M4 10h16v2H4zm7-6h2v16h-2z"/><circle cx="12" cy="12" r="3" fill="#061015"/></svg>

@@ -183,11 +183,27 @@ case "$integration" in
     fi
     ;;
   icons)
-    # Aranea overrides the Wave 1 file-manager core and falls back to a muted,
-    # accent-toned host variant for every unsupported name. Keep the install
-    # recursive so new contexts do not require another installer branch.
+    # Aranea overrides the compact file-manager core and falls back to a
+    # muted, accent-toned host variant for every unsupported name. Keep the
+    # install recursive so new contexts do not require another installer branch.
     icon_theme=Aranea-icons
     icon_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/$icon_theme"
+    ownership_file="$(ownership_record)"
+    if [[ -f "$ownership_file" ]]; then
+      while IFS= read -r managed_icon; do
+        [[ -n "$managed_icon" && "$managed_icon" == "$icon_root/"* ]] || continue
+        icon_relative="${managed_icon#"$icon_root/"}"
+        [[ "$icon_relative" == scalable/*.svg ]] || continue
+        [[ -f "$repo_root/integrations/icons/aranea/$icon_relative" ]] && continue
+        if (( dry_run )); then
+          printf 'would remove stale managed icon %s\n' "$managed_icon"
+        elif [[ -e "$managed_icon" || -L "$managed_icon" ]]; then
+          backup_target "$managed_icon"
+          rm -f -- "$managed_icon"
+          printf 'removed stale managed icon %s\n' "$managed_icon"
+        fi
+      done <"$ownership_file"
+    fi
     install_generated "$repo_root/integrations/icons/aranea/index.theme" "$icon_root/index.theme"
     while IFS= read -r icon_source; do
       icon_relative="${icon_source#"$repo_root/integrations/icons/aranea/"}"

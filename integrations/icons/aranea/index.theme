@@ -1,6 +1,6 @@
 [Icon Theme]
 Name=Aranea-icons
-Comment=Aranea folder accents over a neutral fallback icon set
+Comment=Aranea command-center glyphs over a neutral fallback icon set
 Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor
 Directories=scalable/places,scalable/devices,scalable/status,scalable/actions,scalable/mimetypes,scalable/apps
 
