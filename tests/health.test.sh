@@ -166,7 +166,13 @@ grep -Fq 'Metrics {' "$plugin/Service.qml"
 jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" and .barWidget.defaultSection == "right"' "$plugin/manifest.json" >/dev/null
 grep -Fq 'HealthBridge.current()' "$plugin/Panel.qml"
 grep -Fq 'All systems healthy' "$plugin/Panel.qml"
-grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"
 grep -Fq '󰗶' "$plugin/Panel.qml"
+
+# One dropdown per monitor: top-process sampling follows an open-panel count,
+# never a shared boolean one bar can switch off for another (review Important #1).
+grep -Fq 'topActive: service.openPanels > 0' "$plugin/Service.qml"
+grep -Fq 'service.panelOpened()' "$plugin/Panel.qml"
+grep -Fq 'Component.onDestruction' "$plugin/Panel.qml"
+if grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"; then echo "Panel must not set topActive directly" >&2; exit 1; fi
 
 echo "health contract passed"

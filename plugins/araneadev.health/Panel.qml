@@ -41,8 +41,22 @@ Panel {
     if (row && row.execArgv && row.execArgv.length) Util.execArgv(row.execArgv)
   }
 
+  // Counted per panel, so switching the dropdown between monitors (the host
+  // closes one as it opens the other) never leaves sampling off.
+  property var countedService: null
+  function releaseCount(): void {
+    if (countedService) countedService.panelClosed()
+    countedService = null
+  }
+  Component.onDestruction: releaseCount()
+
   onOpenedChanged: {
-    if (service && service.metrics) service.metrics.topActive = opened
+    if (opened && service && !countedService) {
+      countedService = service
+      service.panelOpened()
+    } else if (!opened) {
+      releaseCount()
+    }
     if (opened && service) {
       service.metrics.refreshSlow()
       service.monitor.checkDisk()

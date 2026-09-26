@@ -16,9 +16,16 @@ Item {
   Monitor { id: monitor }
 
   property alias metrics: metrics
+  // Dropdowns currently open (one bar per monitor can each have one). Top
+  // processes are sampled only while at least one is open.
+  property int openPanels: 0
+  function panelOpened(): void { openPanels++ }
+  function panelClosed(): void { openPanels = Math.max(0, openPanels - 1) }
+
   Metrics {
     id: metrics
     diskRows: monitor.diskRows
+    topActive: service.openPanels > 0
   }
 
   readonly property var problems: monitor.openProblems
