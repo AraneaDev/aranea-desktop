@@ -52,7 +52,9 @@ function pruneInbox(entries, now) {
   for (var i = 0; i < rows.length; i++) {
     var e = rows[i]
     var aged = (Number(e.timestamp) || 0) < cutoff
-    if (aged && !e.onScreen && Number(e.urgency) !== CRITICAL) drop.push(e)
+    // Health items (sourceKey) are live state: they leave when the problem
+    // clears, never by age.
+    if (aged && !e.onScreen && !e.sourceKey && Number(e.urgency) !== CRITICAL) drop.push(e)
     else keep.push(e)
   }
   keep.sort(newestFirst)
@@ -62,7 +64,8 @@ function pruneInbox(entries, now) {
       if (!keep[j].onScreen && predicate(keep[j])) drop.push(keep.splice(j, 1)[0])
     }
   }
-  dropOldest(function(x) { return Number(x.urgency) !== CRITICAL })
+  dropOldest(function(x) { return !x.sourceKey && Number(x.urgency) !== CRITICAL })
+  dropOldest(function(x) { return !x.sourceKey })
   dropOldest(function() { return true })
   return { keep: keep, drop: drop }
 }

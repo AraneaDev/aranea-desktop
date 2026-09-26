@@ -47,7 +47,7 @@ Item {
       fileName: row.fileName, id: row.id, originalId: row.originalId, app: row.app,
       appIcon: row.appIcon, summary: row.summary, body: row.body, image: row.image,
       glyph: row.glyph, execArgv: row.execArgv, urgency: row.urgency,
-      expireTimeout: row.expireTimeout, timestamp: row.timestamp
+      expireTimeout: row.expireTimeout, timestamp: row.timestamp, sourceKey: row.sourceKey
     }
   }
 
@@ -58,7 +58,7 @@ Item {
       id: e.id, originalId: e.originalId, app: e.app, appIcon: e.appIcon,
       summary: e.summary, body: e.body, image: e.image, glyph: e.glyph,
       execArgv: e.execArgv, urgency: e.urgency, expireTimeout: e.expireTimeout,
-      timestamp: e.timestamp
+      timestamp: e.timestamp, sourceKey: e.sourceKey
     }
   }
 
@@ -101,7 +101,7 @@ Item {
     var rows = []
     for (var i = 0; i < inboxModel.count; i++) {
       var r = inboxModel.get(i)
-      rows.push({ fileName: r.fileName, timestamp: r.timestamp, urgency: r.urgency })
+      rows.push({ fileName: r.fileName, timestamp: r.timestamp, urgency: r.urgency, sourceKey: r.sourceKey })
     }
     var result = InboxLogic.pruneInbox(rows, Date.now())
     for (var d = 0; d < result.drop.length; d++) remove(result.drop[d].fileName)

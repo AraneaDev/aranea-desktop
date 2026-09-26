@@ -283,7 +283,9 @@ function historyEntry(value, normalUrgency) {
     execArgv: e.execArgv || "",
     urgency: typeof e.urgency === "number" ? e.urgency : normalUrgency,
     expireTimeout: 0,
-    timestamp: e.timestamp || 0
+    timestamp: e.timestamp || 0,
+    // Set on live items owned by a monitor (System health); "" otherwise.
+    sourceKey: typeof e.sourceKey === "string" ? e.sourceKey : ""
   }
 }
 
