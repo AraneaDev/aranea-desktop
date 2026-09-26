@@ -36,7 +36,7 @@ grep -Fqx -- "$target" "$test_root/state/managed-files"
 grep -Fqx -- "$other_target" "$test_root/state/managed-files"
 
 forget_managed_file "$target"
-! grep -Fqx -- "$target" "$test_root/state/managed-files"
+grep -Fqx -- "$target" "$test_root/state/managed-files" && exit 1
 grep -Fqx -- "$other_target" "$test_root/state/managed-files"
 
 forget_managed_file "$test_root/config/never-recorded.conf"
