@@ -33,4 +33,8 @@ printf '%s\n' '-- my own lua' > "$home/.config/conky/gradient-border.lua"
 HOME="$home" XDG_STATE_HOME="$home/state" "$repo_root/scripts/remove-legacy-diagnostics"
 test -f "$home/.config/conky/conky.conf" && test -f "$home/.config/conky/gradient-border.lua"
 
+# A Conky started by the old toggle (config = Aranea's symlink) is stopped;
+# the match is on that exact config path, so a user's own Conky survives.
+grep -Fq 'pkill -f -- "conky -c $conky_dir/conky.conf"' "$repo_root/scripts/remove-legacy-diagnostics"
+
 echo "no-conky contract passed"

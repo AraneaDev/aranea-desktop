@@ -175,4 +175,20 @@ grep -Fq 'service.panelOpened()' "$plugin/Panel.qml"
 grep -Fq 'Component.onDestruction' "$plugin/Panel.qml"
 if grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"; then echo "Panel must not set topActive directly" >&2; exit 1; fi
 
+# --- final-review minors
+# 1: a sample still in flight when the dropdown closes is dropped
+grep -Fq 'if (!metrics.topActive) return' "$plugin/Metrics.qml"
+# 2: page size and clock tick come from getconf, not constants
+grep -Fq '"getconf", "PAGESIZE"' "$plugin/Metrics.qml"
+grep -Fq '"getconf", "CLK_TCK"' "$plugin/Metrics.qml"
+if grep -Eq 'parseProcStat\(text, 4096\)|, 3, 100\)' "$plugin/Metrics.qml"; then echo "page size / clock tick must not be hard-coded" >&2; exit 1; fi
+# 3: TOP rows survive the service disappearing mid-reload
+if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then echo "TOP rows must guard root.m" >&2; exit 1; fi
+# 4: the sparkline repaints only while the dropdown is open
+grep -Fq 'onValuesChanged: if (root.opened) requestPaint()' "$plugin/Panel.qml"
+# 5: opening without a service closes again instead of sticking open
+grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
+# 9: branding paths honour XDG_STATE_HOME everywhere
+if grep -rFq 'Quickshell.env("HOME") + "/.local/state/omarchy' "$repo_root/plugins"; then echo "branding paths must honour XDG_STATE_HOME" >&2; exit 1; fi
+
 echo "health contract passed"

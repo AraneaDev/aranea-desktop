@@ -26,6 +26,10 @@ Item {
   property var lastNet: null
   property real lastNetAt: 0
   property var lastPs: null
+  // Kernel page size and clock tick rate, read once (x86_64 defaults until
+  // getconf answers; 16K pages on some arm64 systems).
+  property int pageSize: 4096
+  property int clockTicks: 100
   property real lastPsAt: 0
 
   FileView { id: statFile; path: "/proc/stat"; blockLoading: true; printErrors: false }
@@ -96,15 +100,42 @@ Item {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var list = MetricsLogic.parseProcStat(text, 4096)
+        // A dump still in flight when the dropdown closed belongs to no
+        // sampling window; keeping it would skew the first figures on reopen.
+        if (!metrics.topActive) return
+        var list = MetricsLogic.parseProcStat(text, metrics.pageSize)
         var now = Date.now()
         if (!list || list.length === 0) {
           metrics.topProcs = ({ cpu: [], mem: [] })
           return
         }
-        if (metrics.lastPs) metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, 100)
+        if (metrics.lastPs) metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, metrics.clockTicks)
         metrics.lastPs = list
         metrics.lastPsAt = now
+      }
+    }
+  }
+
+  Process {
+    command: ["getconf", "PAGESIZE"]
+    running: true
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var n = parseInt(text, 10)
+        if (n > 0) metrics.pageSize = n
+      }
+    }
+  }
+
+  Process {
+    command: ["getconf", "CLK_TCK"]
+    running: true
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var n = parseInt(text, 10)
+        if (n > 0) metrics.clockTicks = n
       }
     }
   }

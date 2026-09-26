@@ -46,9 +46,9 @@ Item {
   function ping(): string { return "ok" }
 
   property string fontFamily: Style.font.menuFamily
-  readonly property string brandingMarksPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/"
-  readonly property string brandingMotifsPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/motifs/"
-  readonly property string brandingGlyphsPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/glyphs/"
+  readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
+  readonly property string brandingMotifsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/motifs/"
+  readonly property string brandingGlyphsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/glyphs/"
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.

@@ -8,6 +8,9 @@ state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 conky_dir="$HOME/.config/conky"
 
 if [[ -L "$conky_dir/conky.conf" ]] && [[ "$(readlink "$conky_dir/conky.conf")" == */omarchy/current/theme/* ]]; then
+  # The old toggle started it as `conky -c <this path>`; with the config being
+  # Aranea's own symlink, a process on that exact path is Aranea's overlay.
+  pkill -f -- "conky -c $conky_dir/conky.conf" 2>/dev/null || true
   rm -f "$conky_dir/conky.conf"
 fi
 if [[ -f "$conky_dir/gradient-border.lua" ]] \

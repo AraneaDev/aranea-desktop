@@ -39,6 +39,8 @@ test ! -e "$repo_root/screenshots/idle.png"
 test -f "$repo_root/screenshots/hero-showcase.gif"
 grep -Fq 'screenshots/hero-showcase.gif' "$readme"
 grep -Fq 'build_hero_showcase' "$capture_script"
+grep -Fq 'trap cleanup_health_probe EXIT' "$capture_script"
+grep -Fq 'omarchy-shell health status' "$capture_script"
 
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]

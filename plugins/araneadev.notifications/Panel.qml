@@ -266,7 +266,7 @@ Panel {
               anchors.horizontalCenter: parent.horizontalCenter
               width: Style.space(28)
               height: Style.space(28)
-              source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+              source: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
               sourceSize.width: width * Screen.devicePixelRatio
               sourceSize.height: height * Screen.devicePixelRatio
               fillMode: Image.PreserveAspectFit

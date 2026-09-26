@@ -51,6 +51,12 @@ Panel {
   Component.onDestruction: releaseCount()
 
   onOpenedChanged: {
+    // Summoned (IPC/keybind) while the service is missing: the card cannot
+    // show, so do not stay "open" and swallow the next click.
+    if (opened && !root.available) {
+      root.close()
+      return
+    }
     if (opened && service && !countedService) {
       countedService = service
       service.panelOpened()
@@ -149,7 +155,7 @@ Panel {
           spacing: Style.space(8)
           Image {
             Layout.preferredWidth: Style.space(16); Layout.preferredHeight: Style.space(16)
-            source: "file://" + Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+            source: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
             sourceSize: Qt.size(32, 32)
           }
           Label { text: "All systems healthy"; color: Color.notifications.countdown }
@@ -210,7 +216,12 @@ Panel {
             Layout.fillWidth: true
             Layout.preferredHeight: Style.space(28)
             property var values: root.m ? root.m.cpuHistory : []
-            onValuesChanged: requestPaint()
+            // History changes every 2 s; only draw it while it can be seen.
+            onValuesChanged: if (root.opened) requestPaint()
+            Connections {
+              target: root
+              function onOpenedChanged() { if (root.opened) spark.requestPaint() }
+            }
             onPaint: {
               var ctx = getContext("2d")
               ctx.reset()
@@ -299,8 +310,10 @@ Panel {
             delegate: RowLayout {
               required property int index
               Layout.fillWidth: true
-              readonly property var c: root.m.topProcs.cpu[index]
-              readonly property var mm: root.m.topProcs.mem[index]
+              // The service can vanish during a plugin reload before the
+              // Repeater's model drops to 0; read defensively.
+              readonly property var c: root.m && root.m.topProcs ? root.m.topProcs.cpu[index] : null
+              readonly property var mm: root.m && root.m.topProcs ? root.m.topProcs.mem[index] : null
               Label { text: c ? c.comm : ""; Layout.preferredWidth: Style.space(110); elide: Text.ElideRight }
               Label { text: c ? c.percent + "%" : ""; Layout.preferredWidth: Style.space(50); horizontalAlignment: Text.AlignRight }
               Item { Layout.preferredWidth: Style.space(16) }

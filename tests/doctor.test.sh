@@ -112,4 +112,7 @@ inbox_output="$(
 )"
 grep -Fq '"id":"notifications","status":"ok","message":"inbox holds 1 entries"' <<<"$inbox_output"
 
+# A deliberately disabled health plugin is not a broken install.
+if grep -Fq 'select(.id == "araneadev.health")' "$repo_root/scripts/aranea-doctor"; then echo "health plugin must be optional in the plugins check" >&2; exit 1; fi
+
 echo "doctor contract passed"

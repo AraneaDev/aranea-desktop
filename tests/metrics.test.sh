@@ -61,6 +61,8 @@ assert(top.cpu[0].comm === 'claude' && top.cpu[0].percent === 200 && top.cpu[1].
 assert(!top.cpu.some(p => p.comm === 'newbie'), 'processes seen once have no cpu figure yet')
 assert(top.mem[0].comm === 'claude' && top.mem[0].rss === 115300 * 4096, 'memory by rss')
 assert(m.parseProcStat('').length === 0, 'empty stat dump is an empty list')
+assert(m.parseProcStat(st1, 16384)[0].rss === 115283 * 16384, '16K-page systems scale RSS by their page size')
+assert(m.topProcesses(p1, p2, 2000, 3, 250).cpu[0].percent === 80, 'clock tick rate is a parameter')
 
 assert(m.formatUptime(46583) === 'up 12h 56m', 'hours and minutes')
 assert(m.formatUptime(3 * 86400 + 4 * 3600 + 5) === 'up 3d 4h', 'days and hours')
