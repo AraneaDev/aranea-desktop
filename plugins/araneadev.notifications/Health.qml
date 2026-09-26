@@ -28,6 +28,9 @@ Item {
   property string release: ""
   property bool muteLoaded: false
   property bool expectedSeeded: false
+  property bool checksStarted: false
+  // Tools the item actions need; assume present until `which` says otherwise.
+  property var tools: ({ terminal: true })
 
   onServiceChanged: reconcileNow()
 
@@ -53,9 +56,20 @@ Item {
     if (!muteLoaded || !service) return
     if (!expectedSeeded) {
       // Items already in the inbox (from before a restart) are expected:
-      // their absence later means the user removed them.
-      expected = service.sourceItemKeys()
+      // their absence later means the user removed them. Disk items resume
+      // at "normal" so the 88% clear point still applies to them.
+      var existing = service.sourceItemKeys()
+      expected = existing
+      diskLevels = HealthLogic.seedDiskLevels(existing)
       expectedSeeded = true
+    }
+    // Checks start only now, so their first results see the seeded state.
+    if (!checksStarted) {
+      checksStarted = true
+      checkUnits()
+      checkDisk()
+      checkReboot()
+      startDocker()
     }
     var open = []
     var knownChecks = []
@@ -67,7 +81,7 @@ Item {
     for (var i = 0; i < result.resolve.length; i++) service.resolveSourceItem(result.resolve[i])
     for (var j = 0; j < result.upsert.length; j++) {
       var p = result.upsert[j]
-      service.upsertSourceItem(p.key, HealthLogic.itemFor(p))
+      service.upsertSourceItem(p.key, HealthLogic.itemFor(p, tools))
     }
     expected = result.expected
     if (JSON.stringify(result.muted) !== JSON.stringify(muted)) {
@@ -250,8 +264,11 @@ Item {
     onTriggered: {
       health.checkUnits()
       // Restart-loop windows drain with time, not only with events.
-      if (health.known.container === true)
-        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, Date.now()))
+      if (health.known.container === true) {
+        var now = Date.now()
+        health.dockerHistory = HealthLogic.pruneDockerHistory(health.dockerHistory, now)
+        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, now))
+      }
     }
   }
   Timer { interval: 60000; repeat: true; running: true; onTriggered: health.checkDisk() }
@@ -265,8 +282,19 @@ Item {
     printErrors: false
     atomicWrites: true
     onLoaded: health.finishMuteLoad(text())
-    onLoadFailed: health.finishMuteLoad("")
+    // Only a missing file means "no mutes"; any other read error is retried,
+    // so a transient failure never brings back dismissed problems.
+    onLoadFailed: function(error) {
+      if (error === FileViewError.FileNotFound) {
+        health.finishMuteLoad("")
+        return
+      }
+      console.warn("health: cannot read " + health.muteFilePath + ": " + FileViewError.toString(error))
+      muteRetry.restart()
+    }
   }
+
+  Timer { id: muteRetry; interval: 5000; onTriggered: muteFile.reload() }
 
   function finishMuteLoad(raw: string): void {
     if (muteLoaded) return
@@ -284,10 +312,16 @@ Item {
     command: ["mkdir", "-p", health.stateRoot]
     onExited: {
       muteFile.reload()
-      health.checkUnits()
-      health.checkDisk()
-      health.checkReboot()
-      health.startDocker()
+      terminalProbe.running = true
+    }
+  }
+
+  Process {
+    id: terminalProbe
+    command: ["which", "xdg-terminal-exec"]
+    onExited: function(code) {
+      health.tools = ({ terminal: code === 0 })
+      health.reconcileNow()
     }
   }
 }

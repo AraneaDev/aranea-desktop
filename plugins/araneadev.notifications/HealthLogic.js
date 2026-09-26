@@ -42,14 +42,17 @@ function parseDf(text) {
   var bySource = {}
   var order = []
   for (var i = 1; i < lines.length; i++) {
+    // Read the fixed-width tail (fstype size used avail pcent) from the end,
+    // so a mount point with spaces keeps its whole name.
     var f = lines[i].trim().split(/\s+/)
     if (f.length < 7) continue
+    var n = f.length
     var row = {
-      source: f[0], target: f[1], size: Number(f[3]), used: Number(f[4]),
-      avail: Number(f[5]), percent: parseInt(f[6], 10)
+      source: f[0], target: f.slice(1, n - 5).join(" "), size: Number(f[n - 4]), used: Number(f[n - 3]),
+      avail: Number(f[n - 2]), percent: parseInt(f[n - 1], 10)
     }
     if (!isFinite(row.size) || !isFinite(row.percent)) continue
-    if (!alertableFsType(f[2])) continue
+    if (!alertableFsType(f[n - 5])) continue
     var seen = bySource[row.source]
     if (!seen) { bySource[row.source] = row; order.push(row.source) }
     else if (row.target.length < seen.target.length) bySource[row.source] = row
@@ -73,6 +76,17 @@ function diskLevel(previous, percent) {
   if (p >= DISK_ALERT) return "normal"
   if (previous !== "ok" && previous !== undefined && p >= DISK_CLEAR) return "normal"
   return "ok"
+}
+
+// Disk items already in the inbox (from before a shell restart) resume at
+// "normal", so the 88% clear point still applies to them.
+function seedDiskLevels(keys) {
+  var levels = {}
+  for (var i = 0; i < (keys || []).length; i++) {
+    var key = String(keys[i])
+    if (key.indexOf("disk:") === 0) levels[key.slice(5)] = "normal"
+  }
+  return levels
 }
 
 function diskProblems(rows, levels) {
@@ -167,6 +181,18 @@ function seedDockerHistory(history, containers, now) {
   return next
 }
 
+// Forget containers that are neither a problem nor counting recent exits;
+// their next event starts a fresh entry.
+function pruneDockerHistory(history, now) {
+  var next = {}
+  for (var name in (history || {})) {
+    var h = history[name]
+    var recent = h.exits.filter(function(t) { return now - t <= LOOP_WINDOW_MS }).length
+    if (recent > 0 || (h.last === "die" && h.lastExit !== 0)) next[name] = h
+  }
+  return next
+}
+
 function containerProblems(history, now) {
   var out = []
   for (var name in (history || {})) {
@@ -189,12 +215,15 @@ function humanBytes(n) {
   return text + " " + units[i]
 }
 
-function itemFor(p) {
+// tools.terminal: whether xdg-terminal-exec exists (default true). Without it
+// the journal/log actions are left out; clicking then just focuses/dismisses.
+function itemFor(p, tools) {
+  var terminal = !tools || tools.terminal !== false
   if (p.check === "unit") {
     var journal = ["xdg-terminal-exec", "journalctl"]
     if (p.scope === "user") journal.push("--user")
     return { summary: p.unit + " failed", body: p.scope === "user" ? "User service" : "System service",
-      urgency: 2, glyph: GLYPH_UNIT, execArgv: journal.concat(["-u", p.unit, "-e"]) }
+      urgency: 2, glyph: GLYPH_UNIT, execArgv: terminal ? journal.concat(["-u", p.unit, "-e"]) : [] }
   }
   if (p.check === "disk") {
     return { summary: p.target + " is " + p.percent + "% full",
@@ -206,7 +235,7 @@ function itemFor(p) {
       body: "Running " + p.release + "; its modules were removed",
       urgency: 1, glyph: GLYPH_REBOOT, execArgv: ["omarchy-menu", "toggle", "system"] }
   }
-  var logs = ["xdg-terminal-exec", "docker", "logs", "--tail", "200", "-f", p.name]
+  var logs = terminal ? ["xdg-terminal-exec", "docker", "logs", "--tail", "200", "-f", p.name] : []
   if (p.loop) {
     return { summary: "Container " + p.name + " keeps restarting", body: p.exits + " exits in 5 minutes",
       urgency: 2, glyph: GLYPH_CONTAINER, execArgv: logs }
@@ -239,7 +268,10 @@ function reconcile(open, knownChecks, previousExpected, presentKeys, muted) {
   }
   for (var e = 0; e < (previousExpected || []).length; e++) {
     var exp = previousExpected[e]
-    if (!present[exp] && openByKey[exp]) mutedSet[exp] = true
+    // Removed by the user while open -- or before its check has reported,
+    // in which case the mute is provisional and lifts on the first known
+    // round if the problem turns out cleared.
+    if (!present[exp] && (openByKey[exp] || !known[checkOf(exp)])) mutedSet[exp] = true
   }
 
   var upsert = []
@@ -257,7 +289,8 @@ function reconcile(open, knownChecks, previousExpected, presentKeys, muted) {
     }
     if (!openByKey[p] || mutedSet[p]) resolve.push(p)
   }
-  return { upsert: upsert, resolve: resolve, muted: Object.keys(mutedSet).sort(), expected: expected }
+  var unique = expected.filter(function(key, index) { return expected.indexOf(key) === index })
+  return { upsert: upsert, resolve: resolve, muted: Object.keys(mutedSet).sort(), expected: unique }
 }
 
 function parseMuteFile(text) {
@@ -284,6 +317,8 @@ if (typeof module !== "undefined") {
     parseDockerEvent: parseDockerEvent,
     recordDockerEvent: recordDockerEvent,
     containerProblems: containerProblems,
+    pruneDockerHistory: pruneDockerHistory,
+    seedDiskLevels: seedDiskLevels,
     parseDockerPs: parseDockerPs,
     seedDockerHistory: seedDockerHistory,
     humanBytes: humanBytes,

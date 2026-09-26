@@ -195,7 +195,15 @@ if ! emit_override health ARANEA_DOCTOR_HEALTH_STATUS; then
       health_docker='off (daemon not running)'
     fi
   fi
-  emit health ok "units $health_units, disk $health_disk, reboot $health_reboot, docker $health_docker"
+  terminal_bin="${ARANEA_DOCTOR_TERMINAL_BIN:-xdg-terminal-exec}"
+  health_actions=on
+  command -v "$terminal_bin" >/dev/null 2>&1 || health_actions="off ($terminal_bin missing)"
+  # Docker is optional; the core checks and the click actions are not.
+  health_status=ok
+  if [[ "$health_units" != on || "$health_disk" != on || "$health_actions" != on ]]; then
+    health_status=repair
+  fi
+  emit health "$health_status" "units $health_units, disk $health_disk, reboot $health_reboot, docker $health_docker, actions $health_actions"
 fi
 
 if ! emit_override runtime ARANEA_DOCTOR_RUNTIME_STATUS; then

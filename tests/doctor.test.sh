@@ -36,7 +36,17 @@ grep -Fq '"id":"shell","status":"skipped"' <<<"$output"
 grep -Fq '"id":"plugins","status":"skipped"' <<<"$output"
 grep -Fq '"id":"runtime","status":"skipped"' <<<"$output"
 grep -Fq '"id":"qmllint","status":"ok"' <<<"$output"
-grep -Eq '"id":"health","status":"ok","message":"units (on|off), disk (on|off), reboot (on|off), docker (on|off[^"]*)"' <<<"$output"
+grep -Eq '"id":"health","status":"(ok|repair)","message":"units (on|off), disk (on|off), reboot (on|off), docker (on|off[^"]*), actions (on|off[^"]*)"' <<<"$output"
+# Without a terminal launcher the journal/log actions are off: repair, not ok.
+no_term_output="$(
+  ARANEA_DOCTOR_THEME='Aranea Pulse' ARANEA_DOCTOR_ICON_ROOT="$ownership_root/icons" \
+  ARANEA_DOCTOR_HOOK_ROOT="$hook_root" ARANEA_OWNERSHIP_ROOT="$ownership_root" \
+  ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped ARANEA_DOCTOR_RUNTIME_ROOT="$hook_root/no-runtime" \
+  ARANEA_DOCTOR_QMLLINT_STATUS=ok ARANEA_DOCTOR_TERMINAL_BIN=aranea-no-such-terminal \
+  "$repo_root/scripts/aranea-doctor" --json
+)"
+grep -Eq '"id":"health","status":"repair","message":"[^"]*actions off \(aranea-no-such-terminal missing\)"' <<<"$no_term_output"
 grep -Fq '"status":"skipped"' <<<"$output"
 
 while IFS= read -r line; do

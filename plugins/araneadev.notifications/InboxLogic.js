@@ -65,8 +65,9 @@ function pruneInbox(entries, now) {
     }
   }
   dropOldest(function(x) { return !x.sourceKey && Number(x.urgency) !== CRITICAL })
+  // Health items (sourceKey) are never pruned: the monitor would read a
+  // pruned item as a user dismissal. They are bounded by open problems.
   dropOldest(function(x) { return !x.sourceKey })
-  dropOldest(function() { return true })
   return { keep: keep, drop: drop }
 }
 

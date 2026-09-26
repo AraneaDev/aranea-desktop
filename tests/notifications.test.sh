@@ -146,6 +146,9 @@ for (let i = 0; i < 100; i++) capped.push({ fileName: 'o' + i, timestamp: now - 
 capped.push({ fileName: 'src', timestamp: now - 500, urgency: 1, sourceKey: 'disk:/' })
 const cappedResult = inbox.pruneInbox(capped, now)
 assert(cappedResult.drop.length === 1 && cappedResult.drop[0].fileName === 'o99', 'cap drops ordinary entries before health items')
+const manySources = []
+for (let i = 0; i < 101; i++) manySources.push({ fileName: 's' + i, timestamp: now - i, urgency: 1, sourceKey: 'disk:/m' + i })
+assert(inbox.pruneInbox(manySources, now).drop.length === 0, 'health items are never pruned (pruning would read as a dismissal)')
 
 console.log('inbox logic contract passed')
 NODE

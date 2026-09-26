@@ -126,6 +126,41 @@ const dfPseudo = [
 const pseudoRows = h.parseDf(dfPseudo)
 assert(pseudoRows.map(r => r.target).join() === '/,/run/media/tim/NTFS', 'fuse.* and iso9660 skipped, fuseblk kept')
 
+// --- minor fixes
+// mount points with spaces are parsed from the numeric columns at the end
+const dfSpaces = [
+  'Filesystem Mounted on Type 1B-blocks Used Avail Use%',
+  '/dev/sdc1 /run/media/tim/My Drive ext4 1000 950 50 95%'
+].join('\n')
+const spaced = h.parseDf(dfSpaces)
+assert(spaced.length === 1 && spaced[0].target === '/run/media/tim/My Drive' && spaced[0].percent === 95, 'mount point with spaces is monitored')
+
+// disk items already in the inbox resume at "normal", keeping hysteresis across restarts
+const levels = h.seedDiskLevels(['disk:/', 'unit:user:x.service', 'disk:/run/media/tim/My Drive'])
+assert(levels['/'] === 'normal' && levels['/run/media/tim/My Drive'] === 'normal' && Object.keys(levels).length === 2, 'disk levels seeded from existing items')
+assert(h.diskProblems([{ source: 'a', target: '/', size: 100, used: 89, avail: 11, percent: 89 }], levels).problems.length === 1, 'an 89% disk that was alerting keeps alerting after a restart')
+
+// a dismissal before the first check of that kind completes is not lost
+let early = h.reconcile([], [], ['disk:/'], [], [])
+assert(early.muted.join() === 'disk:/', 'removed before its check ran: muted provisionally')
+early = h.reconcile([], ['disk'], [], [], early.muted)
+assert(early.muted.length === 0, 'provisional mute lifts if the problem turns out cleared')
+
+// expected never holds duplicates
+const dup = h.reconcile([{ key: 'disk:/', check: 'disk' }], [], [], ['disk:/'], [])
+assert(dup.expected.length === 1, 'expected keys are unique')
+
+// cleanly exited or running containers with no recent exits are forgotten
+const stale = { old: { image: 'a', exits: [], last: 'die', lastExit: 0 }, up: { image: 'b', exits: [], last: 'start', lastExit: 0 },
+  bad: { image: 'c', exits: [], last: 'die', lastExit: 1 }, busy: { image: 'd', exits: [990], last: 'start', lastExit: 0 } }
+const pruned = h.pruneDockerHistory(stale, 1000)
+assert(Object.keys(pruned).sort().join() === 'bad,busy', 'history keeps only problems and recent exits')
+
+// actions that need a terminal are left out when xdg-terminal-exec is missing
+const noTerm = h.itemFor({ key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }, { terminal: false })
+assert(noTerm.execArgv.length === 0, 'no terminal: no journal action')
+assert(h.itemFor({ key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }).execArgv[0] === 'xdg-terminal-exec', 'terminal assumed by default')
+
 console.log('health logic contract passed')
 NODE
 
@@ -137,5 +172,10 @@ for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker",
 done
 grep -Fq '"-l"' "$health_qml"
 grep -Fq '"--since"' "$health_qml"
+# a transient mute-file read error must not silently mean "no mutes"
+grep -Fq 'FileViewError.FileNotFound' "$health_qml"
+grep -Fq 'HealthLogic.seedDiskLevels' "$health_qml"
+grep -Fq 'HealthLogic.pruneDockerHistory' "$health_qml"
+grep -Fq '"which", "xdg-terminal-exec"' "$health_qml"
 
 echo "health contract passed"
