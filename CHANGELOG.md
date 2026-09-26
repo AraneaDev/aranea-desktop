@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.4.1...v1.5.0) (2026-09-26)
+
+
+### Features
+
+* rebuild icon core ([#34](https://github.com/AraneaDev/aranea-desktop/issues/34)) ([686fc53](https://github.com/AraneaDev/aranea-desktop/commit/686fc5335ba0aff70e163869f7e12630b2a73a56))
+
 ## [1.4.1](https://github.com/AraneaDev/aranea-desktop/compare/v1.4.0...v1.4.1) (2026-09-25)
 
 
