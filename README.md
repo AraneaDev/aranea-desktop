@@ -9,7 +9,7 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-23%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
+[![Tests](https://img.shields.io/badge/tests-25%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
@@ -164,9 +164,9 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- |
 | ![Aranea diagnostics](screenshots/diagnostics.png) | ![Aranea filament OSD](screenshots/osd.png) |
 
-| Notifications |
-| --- |
-| ![Aranea notifications](screenshots/notifications.png) |
+| Notification center | Toast stack | All caught up |
+| --- | --- | --- |
+| ![Aranea notification center](screenshots/notifications.png) | ![Aranea toast stack with overflow pill](screenshots/notifications-stack.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
 
 ### System popups
 
@@ -261,6 +261,26 @@ and icon integrations.
 - Use the center indicators for idle and status controls.
 - Use the right-side widgets for network, audio, Bluetooth, displays, power,
   tray, and agent controls.
+
+### Notifications
+
+Every notification you don't act on waits in the notification center behind
+the bell in the bar. The badge counts what's waiting.
+
+- **Bell:** left-click opens the center, middle-click clears it, right-click
+  toggles Do Not Disturb.
+- **Toasts:** at most three at a time; the rest collapse into a
+  `+N more · Clear all` pill. Swipe a toast right to dismiss it, right-click
+  to dismiss, click to open.
+- **Center:** grouped by app. ✕ dismisses an item or a whole group; arrow keys,
+  Enter, Delete and Shift+Delete work while it is open.
+- **Keys (Omarchy defaults):** `Super+,` dismiss newest, `Super+Shift+,`
+  dismiss all, `Super+Alt+,` open newest, `Super+Shift+Alt+,` toggle the center.
+
+Expired toasts stay in the center; anything you dismiss or open is gone. The
+inbox keeps at most 100 items for up to 7 days.
+
+### Diagnostics
 
 The optional diagnostics layer can be toggled with:
 
