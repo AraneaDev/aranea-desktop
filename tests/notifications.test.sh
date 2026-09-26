@@ -113,4 +113,10 @@ if grep -Eq 'historyDir|showRecentHistory|replayHistory' "$plugin/Service.qml"; 
 fi
 grep -Fq 'Inbox {' "$plugin/Service.qml"
 
+grep -Fq 'DragHandler' "$plugin/components/NotificationCard.qml"
+grep -Fq 'InboxLogic.swipeOutcome' "$plugin/components/NotificationCard.qml"
+grep -Fq 'InboxLogic.suppressesClick' "$plugin/components/NotificationCard.qml"
+grep -Fq 'InboxLogic.stackSplit' "$plugin/Service.qml"
+grep -Fq 'more · Clear all' "$plugin/Service.qml"
+
 echo "notifications contract passed"

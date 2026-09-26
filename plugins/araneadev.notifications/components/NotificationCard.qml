@@ -8,6 +8,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "../NotificationLogic.js" as NotificationLogic
+import "../InboxLogic.js" as InboxLogic
 
 BorderSurface {
   id: root
@@ -34,6 +35,16 @@ BorderSurface {
 
   signal closeRequested()
   signal cardClicked()
+  signal swipeDismissed()
+  // Off when Aranea motion is disabled: the card leaves without sliding.
+  property bool motionEnabled: true
+  property bool swipeEnabled: true
+  readonly property bool dragging: swipeHandler.active || settleAnimation.running
+  property real dragOffset: 0
+  property bool dragMoved: false
+
+  transform: Translate { x: root.dragOffset }
+  opacity: 1 - Math.min(0.85, Math.max(0, root.dragOffset) / Math.max(1, root.width))
   // Prefer per-notification media/avatar data, then fall back to the app icon.
   // The `check` flag avoids Qt's missing-texture placeholder for unknown names.
   readonly property string smallIconSource: image.length > 0 ? image : iconSource(appIcon)
@@ -94,12 +105,57 @@ BorderSurface {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
+    onPressed: root.dragMoved = false
     onClicked: function(mouse) {
-      if (mouse.button === Qt.RightButton) {
-        root.closeRequested()
-      } else {
-        root.cardClicked()
-      }
+      // A swipe that started on the card must never count as a click.
+      if (root.dragMoved) return
+      if (mouse.button === Qt.RightButton) root.closeRequested()
+      else root.cardClicked()
+    }
+  }
+
+  DragHandler {
+    id: swipeHandler
+    enabled: root.swipeEnabled
+    target: null
+    xAxis.enabled: true
+    yAxis.enabled: false
+    dragThreshold: InboxLogic.CLICK_SUPPRESS_PX
+    acceptedButtons: Qt.LeftButton
+    onActiveTranslationChanged: {
+      if (!active) return
+      if (InboxLogic.suppressesClick(activeTranslation.x)) root.dragMoved = true
+      root.dragOffset = Math.max(0, activeTranslation.x)
+    }
+    onActiveChanged: {
+      if (active) return
+      var outcome = InboxLogic.swipeOutcome(root.dragOffset, root.width, centroid.velocity.x)
+      root.settle(outcome === "dismiss")
+    }
+  }
+
+  function settle(dismiss: bool): void {
+    if (!root.motionEnabled) {
+      root.dragOffset = 0
+      if (dismiss) root.swipeDismissed()
+      return
+    }
+    settleAnimation.to = dismiss ? root.width + Style.space(24) : 0
+    settleAnimation.duration = dismiss ? 180 : 120
+    settleAnimation.dismissing = dismiss
+    settleAnimation.restart()
+  }
+
+  NumberAnimation {
+    id: settleAnimation
+    property bool dismissing: false
+    target: root
+    property: "dragOffset"
+    easing.type: Easing.OutCubic
+    onFinished: {
+      if (!dismissing) return
+      root.dragOffset = 0
+      root.swipeDismissed()
     }
   }
 

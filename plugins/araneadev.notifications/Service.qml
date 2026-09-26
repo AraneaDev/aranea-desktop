@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.Commons
+import qs.Ui
 
 import "components"
 import "NotificationLogic.js" as NotificationLogic
@@ -110,6 +111,28 @@ Item {
   // to it. QML ids aren't visible to external consumers without the alias.
   property alias popupModel: popupModel
   ListModel { id: popupModel }
+
+  // Which toasts are drawn: the newest MAX_VISIBLE_TOASTS, criticals first.
+  // Recomputed whenever the model's row count changes.
+  readonly property var stackLayout: {
+    var rows = []
+    for (var i = 0; i < popupModel.count; i++) rows.push({ urgency: popupModel.get(i).urgency })
+    return InboxLogic.stackSplit(rows, InboxLogic.MAX_VISIBLE_TOASTS)
+  }
+
+  // Aranea motion preference, shared with the OSD: `off` in the state file
+  // (or ARANEA_REDUCED_MOTION=1) removes the swipe slide animation.
+  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")) + "/aranea/motion"
+
+  FileView {
+    path: service.motionStatePath
+    watchChanges: true
+    printErrors: false
+    onLoaded: service.motionEnabled = String(text || "").trim() !== "off"
+    onLoadFailed: service.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+    onFileChanged: reload()
+  }
 
   readonly property int lowPopupDuration: 5000
   readonly property int normalPopupDuration: 8000
@@ -610,8 +633,9 @@ Item {
 
     // Dismiss the most recent popup.
     function dismissOne(): string {
-      if (popupModel.count === 0) return "none"
-      service.dismissPopup(0)
+      var visible = service.stackLayout.visible
+      if (visible.length === 0) return "none"
+      service.dismissPopup(visible[0])
       return "ok"
     }
 
@@ -727,7 +751,10 @@ Item {
 
             readonly property real lifetime: service.durationFor(cardSlot.urgency, cardSlot.expireTimeout)
             property real remainingLifetime: 1.0
-            readonly property bool ticking: cardSlot.lifetime > 0 && !card.hovered
+            readonly property bool shown: service.stackLayout.visible.indexOf(cardSlot.index) >= 0
+            visible: cardSlot.shown
+            // Overflow toasts are not on screen, so their clock does not run.
+            readonly property bool ticking: cardSlot.lifetime > 0 && cardSlot.shown && !card.hovered && !card.dragging
 
             // A client updating this notification in place rewrites the row
             // under the card (see refreshPopup). New text deserves a full look,
@@ -767,8 +794,66 @@ Item {
               fontFamily: service.shell && service.shell.bar ? service.shell.bar.fontFamily : ""
               glyph: cardSlot.glyph
 
+              motionEnabled: service.motionEnabled
+
               onCloseRequested: service.dismissPopup(cardSlot.index)
+              onSwipeDismissed: service.dismissPopup(cardSlot.index)
               onCardClicked: service.invokePopupDefault(cardSlot.index)
+            }
+          }
+        }
+
+        // Overflow pill: everything past the visible stack, one click away.
+        // Pill copy: "+N more · Clear all".
+        BorderSurface {
+          id: overflowPill
+          readonly property int overflow: service.stackLayout.overflow
+          visible: overflow > 0
+          Layout.alignment: Qt.AlignRight
+          implicitWidth: pillRow.implicitWidth + Style.space(24)
+          implicitHeight: pillRow.implicitHeight + Style.space(12)
+          radius: implicitHeight / 2
+          color: Color.notifications.background
+          borderSpec: Border.surfaceSpec("notifications", "border",
+            (moreArea.containsMouse || clearArea.containsMouse) ? Color.notifications.countdown : Color.notifications.border,
+            Math.max(1, Style.space(1)))
+
+          Row {
+            id: pillRow
+            anchors.centerIn: parent
+            spacing: Style.space(4)
+
+            Text {
+              text: "+" + overflowPill.overflow + " more"
+              color: moreArea.containsMouse ? Color.notifications.countdown : Color.notifications.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              MouseArea {
+                id: moreArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: service.toggleCenter()
+              }
+            }
+            Text {
+              text: "·"
+              color: Qt.darker(Color.notifications.text, 1.4)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+            Text {
+              text: "Clear all"
+              color: clearArea.containsMouse ? Color.notifications.countdown : Color.notifications.text
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              MouseArea {
+                id: clearArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: service.clearPopups()
+              }
             }
           }
         }
