@@ -9,7 +9,7 @@ the AraneaDev mark carried consistently from boot to desktop.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-25%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
+[![Tests](https://img.shields.io/badge/tests-26%20passing-2b8a3e)](tests/screenshot-coverage.test.sh)
 [![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
 [![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
 [![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
@@ -287,6 +287,19 @@ most 100 items for up to 7 days.
 Switching to another theme hands notifications back to Omarchy's own toasts
 and takes the bell out of the bar; switching back to Aranea restores both
 (unless you had removed the bell yourself).
+
+#### System health
+
+The center also watches the system and keeps one live item per problem:
+
+- **Failed services** (system or user) — critical; click opens its journal.
+- **Disk almost full** — from 90 %, critical from 97 %; clears below 88 %.
+- **Reboot needed** — after a kernel update removed the running kernel's modules.
+- **Containers exiting** — a non-zero exit, or critical when a container keeps
+  restarting (3 exits in 5 minutes).
+
+Items update in place and disappear when the problem clears. Dismiss one to
+mute that problem until it clears; `aranea-doctor` lists which checks are on.
 
 ### Diagnostics
 

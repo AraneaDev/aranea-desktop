@@ -135,6 +135,21 @@ assert(inbox.indexOfKey(after, key) === 3, 'cursor key re-resolves after a new g
 assert(inbox.indexOfKey(after, 'e:gone') === -1, 'missing key resolves to -1')
 assert(typeof inbox.stackSplit === 'undefined', 'toast stack rules are gone')
 
+// --- sourceKey (system health items)
+const keyed = logic.parsePopupFiles(logic.serializePopup({ id: 0, originalId: 0, timestamp: 9, sourceKey: 'disk:/' }, 1), 1)
+assert(keyed.length === 1 && keyed[0].sourceKey === 'disk:/', 'sourceKey must survive serialize/parse')
+assert(logic.popupEntry({ id: 1, timestamp: 1 }, 1).sourceKey === '', 'ordinary entries carry an empty sourceKey')
+const agedSource = inbox.pruneInbox([{ fileName: 'h', timestamp: now - 30 * DAY, urgency: 1, sourceKey: 'reboot' }], now)
+assert(agedSource.drop.length === 0, 'health items are never age-pruned')
+const capped = []
+for (let i = 0; i < 100; i++) capped.push({ fileName: 'o' + i, timestamp: now - i, urgency: 1, sourceKey: '' })
+capped.push({ fileName: 'src', timestamp: now - 500, urgency: 1, sourceKey: 'disk:/' })
+const cappedResult = inbox.pruneInbox(capped, now)
+assert(cappedResult.drop.length === 1 && cappedResult.drop[0].fileName === 'o99', 'cap drops ordinary entries before health items')
+const manySources = []
+for (let i = 0; i < 101; i++) manySources.push({ fileName: 's' + i, timestamp: now - i, urgency: 1, sourceKey: 'disk:/m' + i })
+assert(inbox.pruneInbox(manySources, now).drop.length === 0, 'health items are never pruned (pruning would read as a dismissal)')
+
 console.log('inbox logic contract passed')
 NODE
 
@@ -178,5 +193,17 @@ grep -Fq 'InboxLogic.badgeState' "$plugin/Panel.qml"
 grep -Fq 'InboxLogic.sortForCenter' "$plugin/Panel.qml"
 grep -Fq 'cursorKey' "$plugin/Panel.qml"
 if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then echo "centerOpen must be gone from Panel.qml" >&2; exit 1; fi
+
+grep -Fq 'sourceKey' "$plugin/Inbox.qml"
+
+grep -Fq 'NotificationLogic.popupRowChanged(prior, next)' "$plugin/Service.qml"
+
+test -f "$plugin/Health.qml"
+grep -Fq 'onLoaded: item.service = service' "$plugin/Service.qml"
+# Inside Health { }, `service` names Health's own property: binding it there
+# would bind the property to itself and leave the monitor without a service.
+if grep -Fq 'Health { service: service }' "$plugin/Service.qml"; then echo "Health must get the service via onLoaded" >&2; exit 1; fi
+grep -Fq 'HealthLogic.reconcile' "$plugin/Health.qml"
+if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$plugin/Health.qml"; then echo "Health.qml must not run shell strings" >&2; exit 1; fi
 
 echo "notifications contract passed"
