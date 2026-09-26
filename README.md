@@ -164,9 +164,9 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- |
 | ![Aranea diagnostics](screenshots/diagnostics.png) | ![Aranea filament OSD](screenshots/osd.png) |
 
-| Notification center | Toast stack | All caught up |
-| --- | --- | --- |
-| ![Aranea notification center](screenshots/notifications.png) | ![Aranea toast stack with overflow pill](screenshots/notifications-stack.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
+| Notification center | All caught up |
+| --- | --- |
+| ![Aranea notification center](screenshots/notifications.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
 
 ### System popups
 
@@ -264,21 +264,25 @@ and icon integrations.
 
 ### Notifications
 
-Every notification you don't act on waits in the notification center behind
-the bell in the bar. The badge counts what's waiting.
+Notifications never pop up: every one goes straight to the notification
+center behind the bell in the bar.
 
-- **Bell:** left-click opens the center, middle-click clears it, right-click
-  toggles Do Not Disturb.
-- **Toasts:** at most three at a time; the rest collapse into a
-  `+N more · Clear all` pill. Swipe a toast right to dismiss it, right-click
-  to dismiss, click to open.
-- **Center:** grouped by app. ✕ dismisses an item or a whole group; arrow keys,
-  Enter, Delete and Shift+Delete work while it is open.
-- **Keys (Omarchy defaults):** `Super+,` dismiss newest, `Super+Shift+,`
-  dismiss all, `Super+Alt+,` open newest, `Super+Shift+Alt+,` toggle the center.
+- **Bell:** a mint badge counts what's waiting. A **red** badge counts the
+  critical notifications (alarms, low battery, failed jobs) whenever any are
+  waiting. Left-click opens the center, middle-click clears it, right-click
+  toggles Do Not Disturb, which hides the mint badge (critical still shows red).
+- **Center:** critical first, then grouped by app, newest first. Click an item
+  to open it (the app's own action when it is still running), ✕ dismisses an
+  item or a whole group, swipe right to dismiss. Arrow keys, Enter, Delete and
+  Shift+Delete work while it is open.
+- **Feedback toasts:** Omarchy's short confirmations for things you just did
+  ("Screenshot saved", "Copied") still appear briefly and are not kept.
+- **Keys (Omarchy defaults):** `Super+,` dismiss the newest item,
+  `Super+Shift+,` open the center, `Super+Alt+,` open the newest item,
+  `Super+Shift+Alt+,` toggle the center.
 
-Expired toasts stay in the center; anything you dismiss or open is gone. The
-inbox keeps at most 100 items for up to 7 days.
+A notification an app updates in place stays one entry. The center keeps at
+most 100 items for up to 7 days.
 
 ### Diagnostics
 

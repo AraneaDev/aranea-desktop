@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications notifications-stack notifications-empty network audio bluetooth agents power monitor apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications notifications-empty network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
@@ -86,7 +86,7 @@ case "$surface" in
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
-  notifications-stack|notifications-empty) showcase_surface=notifications ;;
+  notifications-empty) showcase_surface=notifications ;;
 esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
@@ -204,7 +204,7 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  notifications|notifications-stack|notifications-empty)
+  notifications|notifications-empty)
     # These surfaces *want* araneadev.notifications on; batch mode disables it
     # for every other surface, so re-enable here and restore afterwards.
     omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
@@ -217,19 +217,14 @@ case "$surface" in
     sleep 2
     case "$surface" in
       notifications)
+        # Notifications go straight to the center (no toasts); one critical
+        # entry shows the red bell badge.
         for app in Slack Slack Slack Build; do
-          notify-send -a "$app" -t 1000 "$app update" 'Theme capture · notification center' || true
+          notify-send -a "$app" "$app update" 'Theme capture · notification center' || true
         done
-        # The fourth toast waits in overflow (clock paused) until a slot frees,
-        # so the last one leaves the screen after about two lifetimes.
-        sleep 18
-        omarchy-shell shell toggle araneadev.notifications >/dev/null
-        ;;
-      notifications-stack)
-        for i in 1 2 3 4 5 6; do
-          notify-send -a Aranea -u normal -t 20000 "Aranea notification $i" 'Theme capture · toast stack' || true
-        done
+        notify-send -a Alarm -u critical 'Battery low' 'Theme capture · critical notification' || true
         sleep 1
+        omarchy-shell shell toggle araneadev.notifications >/dev/null
         ;;
       notifications-empty)
         omarchy-shell shell toggle araneadev.notifications >/dev/null
