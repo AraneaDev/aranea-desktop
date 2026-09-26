@@ -6,6 +6,7 @@ qml_files=(
   "$repo_root/plugins/araneadev.bar/Bar.qml"
   "$repo_root/plugins/araneadev.notifications/Service.qml"
   "$repo_root/plugins/araneadev.notifications/Inbox.qml"
+  "$repo_root/plugins/araneadev.notifications/Panel.qml"
   "$repo_root/plugins/araneadev.notifications/components/NotificationCard.qml"
   "$repo_root/plugins/araneadev.lock/Service.qml"
   "$repo_root/plugins/araneadev.lock/LockView.qml"

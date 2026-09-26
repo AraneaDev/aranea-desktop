@@ -27,6 +27,12 @@ BorderSurface {
   property int urgency: 1
   property double timestamp: 0
   property int cornerRadius: 0
+  // Center rows: one-line summary, two-line body, relative time and a close
+  // button. Toasts keep the full layout and dismiss by right-click or swipe.
+  property bool compact: false
+  property string timeLabel: ""
+  // Keyboard cursor in the center.
+  property bool selected: false
 
   // System monospace font injected by the container.
   property string fontFamily: ""
@@ -65,7 +71,9 @@ BorderSurface {
   readonly property color cardBackground: urgency === 2
     ? Util.alpha(Color.urgent, 0.08)
     : (hovered ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
-  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1)))
+  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border",
+    urgency === 2 ? Color.urgent : (selected ? Color.notifications.countdown : Color.notifications.border),
+    Math.max(1, Style.space(1)))
 
   function sanitizeBody(s: string): string {
     return NotificationLogic.sanitizeBody(s, app, appIcon)
@@ -79,7 +87,8 @@ BorderSurface {
     return Quickshell.iconPath(value, true)
   }
 
-  implicitWidth: Style.space(380)
+  // The center sets width explicitly for compact rows.
+  implicitWidth: compact ? 0 : Style.space(380)
   // Add vertical border insets so mainColumn (inset by border on top/left/right)
   // doesn't push content under the bottom edge.
   implicitHeight: mainColumn.implicitHeight + borderTop + borderBottom
@@ -182,8 +191,8 @@ BorderSurface {
 
       Item {
         id: smallIconSlot
-        Layout.preferredWidth: visible ? Style.space(40) : 0
-        Layout.preferredHeight: visible ? Style.space(40) : 0
+        Layout.preferredWidth: visible ? (root.compact ? Style.space(28) : Style.space(40)) : 0
+        Layout.preferredHeight: visible ? (root.compact ? Style.space(28) : Style.space(40)) : 0
         Layout.alignment: Qt.AlignVCenter
         // Hide the slot when the icon failed to resolve (themed-icon name
         // not in the user's icon theme) AND we don't have a glyph fallback
@@ -256,7 +265,7 @@ BorderSurface {
           font.bold: true
           wrapMode: Text.WordWrap
           elide: Text.ElideRight
-          maximumLineCount: 2
+          maximumLineCount: root.compact ? 1 : 2
         }
 
         Text {
@@ -270,7 +279,39 @@ BorderSurface {
           font.pixelSize: Style.font.title
           wrapMode: Text.WordWrap
           elide: Text.ElideRight
-          maximumLineCount: 3
+          maximumLineCount: root.compact ? 2 : 3
+        }
+      }
+
+      ColumnLayout {
+        visible: root.compact
+        Layout.alignment: Qt.AlignTop
+        spacing: Style.space(4)
+
+        Text {
+          Layout.alignment: Qt.AlignRight
+          textFormat: Text.PlainText
+          text: root.timeLabel
+          color: root.dimColor
+          font.family: Style.font.family
+          font.pixelSize: Style.font.caption
+        }
+
+        Text {
+          Layout.alignment: Qt.AlignRight
+          textFormat: Text.PlainText
+          text: "✕"
+          color: closeArea.containsMouse ? Color.notifications.countdown : root.dimColor
+          font.family: Style.font.family
+          font.pixelSize: Style.font.body
+          MouseArea {
+            id: closeArea
+            anchors.fill: parent
+            anchors.margins: -Style.space(4)
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.closeRequested()
+          }
         }
       }
     }

@@ -102,6 +102,27 @@ const legacy = logic.popupEntry({ id: 5, originalId: 5, timestamp: 7 }, 1)
 assert(legacy.onScreen === undefined, 'legacy entries carry no onScreen; Inbox.qml treats them as on screen')
 assert(typeof logic.historyRows === 'undefined', 'history replay helper must be gone')
 
+// --- the bell must survive the default (minimal) Aranea bar profile
+const barModel = require(`${root}/plugins/araneadev.bar/BarModel.js`)
+assert(barModel.profileAllows('minimal', 'araneadev.notifications') === true, 'minimal bar profile must allow the notification bell')
+
+// --- service bridge: the Aranea bar hands widgets a service-less facade, so
+// the panel finds its own plugin's service through a shared library module.
+const bridgeSrc = require('fs').readFileSync(`${root}/plugins/araneadev.notifications/ServiceBridge.js`, 'utf8')
+assert(bridgeSrc.startsWith('.pragma library'), 'bridge must be a shared library module')
+const bridge = {}
+new Function('exports', bridgeSrc.replace('.pragma library', '') +
+  '\nexports.publish = publish; exports.current = current; exports.retract = retract')(bridge)
+const svcA = { name: 'a' }, svcB = { name: 'b' }
+assert(bridge.current() === null, 'no service before publish')
+bridge.publish(svcA)
+assert(bridge.current() === svcA, 'published service is current')
+bridge.publish(svcB)
+bridge.retract(svcA)
+assert(bridge.current() === svcB, 'retracting a stale service keeps the newer one')
+bridge.retract(svcB)
+assert(bridge.current() === null, 'retracting the current service clears it')
+
 console.log('inbox logic contract passed')
 NODE
 
@@ -122,5 +143,17 @@ grep -Fq 'more · Clear all' "$plugin/Service.qml"
 for fn in 'function dismissInbox' 'function dismissGroup' 'function invokeInbox' 'function popupIndexFor' 'function center(): string' 'function count(): string'; do
   grep -Fq "$fn" "$plugin/Service.qml" || { echo "missing in Service.qml: $fn" >&2; exit 1; }
 done
+
+jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" and .barWidget.defaultSection == "right"' \
+  "$plugin/manifest.json" >/dev/null
+jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml"' "$plugin/manifest.json" >/dev/null
+test -f "$plugin/Panel.qml"
+grep -Fq 'KeyboardPanel' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.flattenGroups' "$plugin/Panel.qml"
+grep -Fq 'All caught up' "$plugin/Panel.qml"
+grep -Fq 'ServiceBridge.current()' "$plugin/Panel.qml"
+grep -Fq 'ServiceBridge.publish(service)' "$plugin/Service.qml"
+grep -Fq 'ServiceBridge.retract(service)' "$plugin/Service.qml"
+grep -Fq 'property bool compact' "$plugin/components/NotificationCard.qml"
 
 echo "notifications contract passed"

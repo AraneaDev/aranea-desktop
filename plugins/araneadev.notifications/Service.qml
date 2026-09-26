@@ -12,6 +12,7 @@ import qs.Ui
 import "components"
 import "NotificationLogic.js" as NotificationLogic
 import "InboxLogic.js" as InboxLogic
+import "ServiceBridge.js" as ServiceBridge
 
 Item {
   id: service
@@ -611,7 +612,11 @@ Item {
     settingsFile.setText(JSON.stringify({ version: 3, dnd: persisted.doNotDisturb }, null, 2) + "\n")
   }
 
+  Component.onDestruction: ServiceBridge.retract(service)
+
   Component.onCompleted: {
+    // The bar widget (Panel.qml) finds this service here; see ServiceBridge.js.
+    ServiceBridge.publish(service)
     Qt.callLater(function() {
       settingsFile.reload()
       // Load the inbox (migrating pre-inbox popup files), then bring back the
