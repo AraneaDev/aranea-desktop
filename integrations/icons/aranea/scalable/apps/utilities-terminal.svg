@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea utilities-terminal</title><rect x="3" y="4" width="18" height="16" rx="2"/><path fill="#061015" d="m7 9 3 3-3 3 1.5 1.5 4.5-4.5L8.5 7.5zM14 15h4v2h-4z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41 65" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center terminal glyph</title>
+<metadata>Source glyph U+F489 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,65.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M0 578 c1 -55 3 -69 11 -55 9 15 31 17 229 17 207 0 220 -1 230 -19
+6 -12 10 -93 10 -194 0 -150 -2 -176 -17 -188 -25 -21 -392 -26 -433 -5 l-30
+14 0 -74 0 -74 245 0 245 0 0 325 0 325 -245 0 -245 0 0 -72z M50 335 l0 -165
+190 0 190 0 0 165 0 165 -190 0 -190 0 0 -165z m130 40 l44 -45 -44 -45 c-48
+-49 -58 -53 -67 -29 -3 9 6 27 23 45 l28 29 -27 28 c-29 30 -36 62 -14 62 7 0
+33 -20 57 -45z m185 -110 c0 -17 -8 -20 -58 -23 -46 -2 -59 0 -64 14 -9 24 15
+35 72 32 42 -3 50 -6 50 -23z"/>
+</g>
+</svg>

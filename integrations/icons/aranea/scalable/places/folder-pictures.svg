@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#3bff9e"><title>Aranea folder-pictures</title><path d="M3 6.5h6l2 2h10v10H3z"/><path fill="#061015" d="m6 17 3-4 2 2 2-2 4 4zm9-5a1.3 1.3 0 1 0 0 .1z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41 65" preserveAspectRatio="xMidYMid meet">
+<title>Aranea Command Center image glyph</title>
+<metadata>Source glyph U+F02E9 from JetBrainsMono Nerd Font</metadata>
+<g transform="translate(0.000000,65.000000) scale(0.100000,-0.100000)"
+fill="#3bff9e">
+<path d="M0 568 c0 -64 3 -79 12 -70 17 17 319 17 336 0 17 -17 17 -319 0
+-336 -17 -17 -319 -17 -336 0 -9 9 -12 -7 -12 -75 l0 -87 185 0 185 0 0 325 0
+325 -185 0 -185 0 0 -82z M192 283 l-30 -38 -24 23 c-13 12 -27 22 -30 22 -4
+0 -21 -18 -38 -40 l-32 -40 141 0 142 0 -42 55 c-23 30 -45 55 -49 55 -5 0
+-22 -17 -38 -37z"/>
+</g>
+</svg>

@@ -57,6 +57,15 @@ for icon in "${required_core[@]}"; do
   ! grep -Fq 'stroke=' "$theme_root/scalable/$icon"
 done
 
+declare -A command_center_sources=(
+  [places/folder.svg]='Source glyph U+F024B'
+  [apps/utilities-terminal.svg]='Source glyph U+F489'
+  [apps/preferences-system.svg]='Source glyph U+E615'
+)
+for icon in "${!command_center_sources[@]}"; do
+  grep -Fq "${command_center_sources[$icon]}" "$theme_root/scalable/$icon"
+done
+
 actual_svg_count="$(find "$theme_root/scalable" -type f -name '*.svg' | wc -l)"
 test "$actual_svg_count" -eq "${#required_core[@]}"
 
