@@ -37,19 +37,20 @@ jq --argjson place "$place_bell" '
       "tim.menu",
       "tim.lock"
     ]) | unique | sort)
-  # Place the notification bell once. Only a layout the user already owns is
+  # Place the notification bell once. Layout entries may be plain id strings
+  # or {id: ...} objects; both count. Only a layout the user already owns is
   # touched: writing a partial layout would replace the host defaults.
   | if $place
        and ((.bar.layout.right | type) == "array")
-       and ([.bar.layout[]? | arrays | .[] | objects | .id] | index("araneadev.notifications") == null)
+       and ([.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") == null)
     then .bar.layout.right |= (
-      (map(.id) | index("omarchy.tray")) as $tray
+      (map(if type == "string" then . else .id? end) | index("omarchy.tray")) as $tray
       | if $tray == null then [{id: "araneadev.notifications"}] + .
         else .[:$tray] + [{id: "araneadev.notifications"}] + .[$tray:] end)
     else . end
 ' "$config_file" > "$tmp_file"
 
-if jq -e '[.bar.layout[]? | arrays | .[] | objects | .id] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
   : > "$bell_marker"
 fi

@@ -75,4 +75,18 @@ EOF
 jq -e '[.bar.layout.right[].id] == ["omarchy.tray"]' "$config" >/dev/null
 test -f "$marker"
 
+# String layout entries (review Important #1)
+rm -f "$marker"
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.clock", {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right[1].id == "araneadev.notifications" and .bar.id == "araneadev.bar"' "$config" >/dev/null
+rm -f "$marker"
+cat > "$config" <<'EOF'
+{"bar": {"layout": {"right": ["araneadev.notifications", "omarchy.tray"]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end) | select(. == "araneadev.notifications")] | length == 1' "$config" >/dev/null
+
 echo "shell config contract passed"
