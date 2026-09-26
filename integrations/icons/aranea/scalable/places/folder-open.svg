@@ -1,12 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41 65" preserveAspectRatio="xMidYMid meet">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 85.000000 65.000000" preserveAspectRatio="xMidYMid meet">
 <title>Aranea Command Center folder-open glyph</title>
 <metadata>Source glyph U+F0770 from JetBrainsMono Nerd Font</metadata>
 <g transform="translate(0.000000,65.000000) scale(0.100000,-0.100000)"
 fill="#3bff9e">
-<path d="M0 558 c0 -72 3 -89 12 -80 7 7 41 12 83 12 59 0 75 -4 90 -20 15
--17 31 -20 95 -20 71 0 100 -9 100 -32 0 -4 -76 -8 -170 -8 l-170 0 1 -92 1
--93 20 73 20 72 169 0 c93 0 169 -3 169 -6 0 -19 -44 -171 -52 -181 -14 -18
--339 -18 -356 -1 -9 9 -12 -10 -12 -85 l0 -97 220 0 220 0 0 325 0 325 -220 0
--220 0 0 -92z"/>
+<path d="M45 638 c-43 -25 -44 -32 -45 -311 l0 -268 25 -24 24 -25 328 0 c370
+0 364 -1 384 73 6 23 28 106 49 185 l38 142 -342 0 -341 0 -42 -153 -41 -152
+-1 193 -1 192 340 0 c236 0 340 3 340 11 0 6 -13 24 -29 40 l-29 29 -154 0
+-154 0 -39 40 -39 40 -126 0 c-75 0 -133 -5 -145 -12z"/>
 </g>
 </svg>

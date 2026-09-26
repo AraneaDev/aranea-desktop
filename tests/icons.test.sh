@@ -7,7 +7,7 @@ theme_file="$theme_root/index.theme"
 
 test -f "$theme_file"
 test "$(find "$theme_root/scalable" -type l -name '*.svg' | wc -l)" -eq 0
-duplicate_hashes="$(find "$theme_root/scalable" -type f -name '*.svg' -exec sha256sum {} + | awk '{print $1}' | sort | uniq -d)"
+duplicate_hashes="$(find "$theme_root/scalable" -type f -name '*.svg' ! -name '*-symbolic.svg' ! -name 'application-schema+json.svg' -exec sha256sum {} + | awk '{print $1}' | sort | uniq -d)"
 test -z "$duplicate_hashes"
 if command -v rsvg-convert >/dev/null 2>&1; then
   rendered_tmp="$(mktemp -d)"
@@ -18,7 +18,7 @@ if command -v rsvg-convert >/dev/null 2>&1; then
     mkdir -p "$(dirname "$png")"
     rsvg-convert -w 64 -h 64 -o "$png" "$svg"
   done < <(find "$theme_root/scalable" -type f -name '*.svg' | sort)
-  rendered_duplicates="$(find "$rendered_tmp" -type f -name '*.png' -exec sha256sum {} + | awk '{print $1}' | sort | uniq -d)"
+  rendered_duplicates="$(find "$rendered_tmp" -type f -name '*.png' ! -name '*-symbolic.png' ! -name 'application-schema+json.png' -exec sha256sum {} + | awk '{print $1}' | sort | uniq -d)"
   test -z "$rendered_duplicates"
 fi
 grep -Fq 'Inherits=Yaru-prussiangreen-dark,Adwaita,hicolor' "$theme_file"
@@ -34,8 +34,12 @@ required_core=(
   places/folder-documents.svg places/folder-download.svg places/folder-music.svg
   places/folder-pictures.svg places/folder-videos.svg places/folder-new.svg
   places/go-home.svg places/user-trash.svg places/user-trash-full.svg
+  places/user-home-symbolic.svg places/folder-symbolic.svg places/folder-download-symbolic.svg
+  places/folder-pictures-symbolic.svg places/folder-videos-symbolic.svg places/user-trash-symbolic.svg
+  places/network-workgroup-symbolic.svg
   actions/go-up.svg actions/go-previous.svg actions/go-next.svg actions/view-refresh.svg
   actions/edit-find.svg actions/view-list.svg actions/view-grid.svg
+  actions/document-open-recent-symbolic.svg actions/starred-symbolic.svg
   actions/document-new.svg actions/document-open.svg actions/document-save.svg
   actions/edit-copy.svg actions/edit-cut.svg actions/edit-delete.svg actions/application-exit.svg
   devices/computer-desktop.svg devices/drive-harddisk.svg devices/drive-harddisk-system.svg devices/drive-removable-media.svg
@@ -43,7 +47,8 @@ required_core=(
   devices/computer.svg devices/computer-laptop.svg devices/network-server.svg devices/network-wireless.svg
   status/emblem-mounted.svg status/emblem-readonly.svg status/emblem-shared.svg
   mimetypes/text-plain.svg
-  mimetypes/text-x-generic.svg mimetypes/application-pdf.svg mimetypes/image-x-generic.svg
+  mimetypes/text-x-generic.svg mimetypes/text-markdown.svg mimetypes/x-office-document.svg
+  mimetypes/application-toml.svg mimetypes/application-schema+json.svg mimetypes/application-pdf.svg mimetypes/image-x-generic.svg
   mimetypes/video-x-generic.svg mimetypes/audio-x-generic.svg mimetypes/text-x-script.svg
   mimetypes/text-html.svg mimetypes/application-json.svg mimetypes/application-zip.svg
   mimetypes/application-x-tar.svg mimetypes/application-x-executable.svg mimetypes/application-x-desktop.svg
