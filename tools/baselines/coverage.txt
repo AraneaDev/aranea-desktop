@@ -5,6 +5,6 @@ plugins/araneadev.health/HealthLogic.js 96
 plugins/araneadev.health/MetricsLogic.js 100
 plugins/araneadev.menu/MenuModel.js 44
 plugins/araneadev.notifications/InboxLogic.js 100
-plugins/araneadev.notifications/NotificationLogic.js 72
+plugins/araneadev.notifications/NotificationLogic.js 73
 plugins/araneadev.osd/OsdModel.js 100
 plugins/araneadev.polkit/PolkitLogic.js 100
