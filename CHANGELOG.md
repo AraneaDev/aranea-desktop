@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.7.0...v2.0.0) (2026-09-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* `scripts/install.sh --skip-conky` and the `aranea-diagnostics-toggle` command are removed. Use the health icon in the bar (or `omarchy-shell shell toggle araneadev.health`) instead.
+
+### Features
+
+* health dropdown with live metrics; remove Conky ([#44](https://github.com/AraneaDev/aranea-desktop/issues/44)) ([72b17c2](https://github.com/AraneaDev/aranea-desktop/commit/72b17c2af58c30827897ddeacd2ad57cd09cd11c))
+
 ## [1.7.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.6.1...v1.7.0) (2026-09-26)
 
 
