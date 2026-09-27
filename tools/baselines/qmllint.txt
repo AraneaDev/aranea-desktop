@@ -90,15 +90,10 @@
 1	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "barSize" not found on type "QObject"
 2	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "run" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "background" not found on type "QObject"
-2	plugins/araneadev.menu/Menu.qml:missing-property:Member "body" not found on type "QObject"
-5	plugins/araneadev.menu/Menu.qml:missing-property:Member "bodySmall" not found on type "QObject"
+2	plugins/araneadev.menu/Menu.qml:missing-property:Member "bodySmall" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "border" not found on type "QObject"
-9	plugins/araneadev.menu/Menu.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.menu/Menu.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
-1	plugins/araneadev.menu/Menu.qml:missing-property:Member "displayLarge" not found on type "QObject"
-1	plugins/araneadev.menu/Menu.qml:missing-property:Member "hairline" not found on type "QObject"
-4	plugins/araneadev.menu/Menu.qml:missing-property:Member "iconLarge" not found on type "QObject"
-1	plugins/araneadev.menu/Menu.qml:missing-property:Member "md" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "menuFamily" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "panelPadding" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "scrim" not found on type "QObject"
@@ -106,11 +101,19 @@
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "selectedBorder" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "selectedText" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "text" not found on type "QObject"
-4	plugins/araneadev.menu/Menu.qml:missing-property:Member "title" not found on type "QObject"
-2	plugins/araneadev.menu/Menu.qml:missing-property:Member "xs" not found on type "QObject"
+2	plugins/araneadev.menu/Menu.qml:missing-property:Member "title" not found on type "QObject"
 3	plugins/araneadev.menu/Menu.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
-1	plugins/araneadev.menu/Menu.qml:uncreatable-type:Type PanelWindow is not creatable.
-65	plugins/araneadev.menu/Menu.qml:unqualified:Unqualified access
+2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "body" not found on type "QObject"
+3	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "bodySmall" not found on type "QObject"
+8	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "displayLarge" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "hairline" not found on type "QObject"
+4	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "iconLarge" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "md" not found on type "QObject"
+2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "title" not found on type "QObject"
+2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "xs" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+65	plugins/araneadev.menu/MenuWindow.qml:unqualified:Unqualified access
 2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.notifications/Inbox.qml:unused-imports:Unused import
 5	plugins/araneadev.notifications/Panel.qml:missing-property:Member "body" not found on type "QObject"

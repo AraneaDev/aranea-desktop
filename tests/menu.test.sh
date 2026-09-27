@@ -9,6 +9,18 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/assert.sh"
 menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
+menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
+# Behaviour (pin limit and notice, search dedupe, hints, Ctrl+P, Ctrl+1..3,
+# Favorites route after the menu files load): tests/qml/menu.qml, run
+# offscreen by tests/qml-behaviour.test.sh.
+
+# --- 4f: the entry is non-visual; the window is created from its own file
+if grep -Eq 'PanelWindow|import Quickshell.Wayland' "$menu_qml"; then
+  echo "Menu.qml must stay free of window types (it runs offscreen in tests)" >&2
+  exit 1
+fi
+grep -Fq 'Qt.createComponent(Qt.resolvedUrl("MenuWindow.qml"))' "$menu_qml"
+grep -Fq 'panel.root.handleKey(event)' "$menu_window"
 
 # --- 4b: favourites and recents persist to $XDG_STATE_HOME/aranea/menu.json
 grep -Fq '"/menu.json"' "$menu_qml"
@@ -20,8 +32,6 @@ if grep -Fq 'PersistentProperties' "$menu_qml"; then
   exit 1
 fi
 # --- 4b: a 13th favourite is refused with a notice; Ctrl+P pins from the keyboard
-grep -Fq '12 FAVOURITES · UNPIN ONE FIRST' "$menu_qml"
-grep -Fq 'event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)' "$menu_qml"
 # --- 4b: search shows each app once; Apps keeps Favorites/Recent on top
 grep -Fq 'rows = MenuModel.dedupeAppRows(currentRows.concat(drilldownRows))' "$menu_qml"
 grep -Fq 'rows = MenuModel.sortAppsMenu(rows)' "$menu_qml"
@@ -31,7 +41,6 @@ if grep -Fq '"ESC BACK  ·  ENTER OPEN"' "$menu_qml"; then
   echo "stale ESC BACK hint" >&2
   exit 1
 fi
-grep -Fq 'event.key >= Qt.Key_1 && event.key <= Qt.Key_3' "$menu_qml"
 grep -Fq 'precision: SystemClock.Minutes' "$menu_qml"
 grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_qml"
 # --- 4b: provider state per menu; routes resolve when the rows exist
@@ -43,7 +52,6 @@ if grep -Eq 'property bool provider(Loading|Error)|openGeneratedAppsMenu|attempt
   exit 1
 fi
 grep -Fq 'function resolvePendingAppsRoute(): void' "$menu_qml"
-[[ "$(grep -c 'root.resolvePendingAppsRoute()' "$menu_qml")" -ge 3 ]]
 # --- 4b: no "undefined" commands; scaled bar button; dead code stays gone
 block_grep "$menu_qml" 'function runAction(action): void' 'if (typeof action !== "string" || !action.trim())'
 block_grep "$repo_root/plugins/araneadev.bar/Bar.qml" 'function run(command): void' 'if (typeof command !== "string" || !command.trim())'

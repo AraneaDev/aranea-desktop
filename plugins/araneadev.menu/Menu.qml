@@ -4,10 +4,8 @@
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs.Commons
-import qs.Ui
 import "MenuModel.js" as MenuModel
 
 Item {
@@ -24,6 +22,133 @@ Item {
   // `omarchy-shell shell summon araneadev.menu ...` and close() when hidden.
   // Favorites or Recent route waiting for the generated Apps rows; resolved by resolvePendingAppsRoute.
   property string pendingInitialMenu: ""
+
+  // The rows shown in the menu (display order), read by the window.
+  readonly property alias displayModel: rowsModel
+  // Omarchy's default menu file has loaded (or is missing).
+  property bool defaultMenuSeen: false
+  // The user's menu extension file has loaded (or is missing).
+  property bool userMenuSeen: false
+  // Both menu files have reported: a pending route can only resolve then, or
+  // it would resolve against a half-built menu and fall back to the root.
+  readonly property bool menuSourcesReady: root.defaultMenuSeen && root.userMenuSeen
+  // Whether to create the on-screen window (MenuWindow.qml); tests switch it off.
+  property bool windowEnabled: true
+  // The window, once created; null offscreen.
+  property var view: null
+  // Runs a detached shell command; tests replace it with a recorder.
+  property var run: function (command) {
+    Util.execDetached(command)
+  }
+  // Screen width from the window (1920 offscreen).
+  readonly property int screenWidth: root.view ? root.view.width : 1920
+  // Screen height from the window (1080 offscreen).
+  readonly property int screenHeight: root.view ? root.view.height : 1080
+  // The window's frozen card top, or -1.
+  readonly property int viewCardTop: root.view ? root.view.cardTop : -1
+  // The window's row-height ceiling for this opening, or -1.
+  readonly property int viewMaxRowsHeight: root.view ? root.view.maxRowsHeight : -1
+  // Key hint line for the current state (a notice replaces it for a moment).
+  readonly property string hint: root.notice || MenuModel.hintText({
+    root: root.fullRootHeader,
+    filter: !!root.filterText.trim(),
+    dmenu: root.dmenuActive,
+    input: root.mode === "input",
+    count: displayModel.count,
+    appRow: root.cursorRowIsApp()
+  })
+
+  // Freezes the card's top edge in the window (no-op offscreen).
+  function freezeCardTop(): void {
+    if (root.view)
+      root.view.freezeCardTop()
+  }
+
+  // Gives the window's key handler the keyboard focus (no-op offscreen).
+  function focusKeys(): void {
+    if (root.view)
+      root.view.focusKeys()
+  }
+
+  // Scrolls the cursor row into view with a peek of its neighbour (window).
+  function revealCursor(): void {
+    if (root.view)
+      root.view.revealCursor()
+  }
+
+  // One key map for the menu (the window forwards its key presses here).
+  function handleKey(event): void {
+    if (root.deleteConfirmOpen) {
+      if (root.view && root.view.deleteConfirmHandleKey(event))
+        event.accepted = true
+      return
+    }
+
+    if (event.key === Qt.Key_Delete) {
+      root.requestDeleteSelected()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Escape) {
+      if (root.filterText)
+        root.setFilter("")
+      else
+        root.cancel()
+      event.accepted = true
+    } else if ((event.modifiers & Qt.ControlModifier) && event.key >= Qt.Key_1 && event.key <= Qt.Key_3 && !root.dmenuActive) {
+      root.activateTile(root.rootTiles[event.key - Qt.Key_1])
+      event.accepted = true
+    } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier) && !root.dmenuActive) {
+      if (root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
+        var pinRow = displayModel.get(root.selectedIndex)
+        if (pinRow.kind === "app" && pinRow.appId)
+          root.toggleFavoriteApp(pinRow.appId)
+      }
+      event.accepted = true
+    } else if (Util.editsFilter(event, root.filterText)) {
+      root.setFilter(Util.editedFilter(event, root.filterText))
+      event.accepted = true
+    } else if ((event.key === Qt.Key_Backspace || event.key === Qt.Key_Left) && !root.filterText) {
+      root.goBack()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Up) {
+      root.select(-1)
+      event.accepted = true
+    } else if (event.key === Qt.Key_Down) {
+      root.select(1)
+      event.accepted = true
+    } else if (event.key === Qt.Key_PageUp) {
+      root.select(-6)
+      event.accepted = true
+    } else if (event.key === Qt.Key_PageDown) {
+      root.select(6)
+      event.accepted = true
+    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
+      if (root.dmenuActive) {
+        if (root.mode === "input")
+          root.applyDmenuSelection(root.filterText)
+        else if (displayModel.count > 0)
+          root.activateIndex(root.cursorActive ? root.selectedIndex : 0, false)
+      } else if (root.cursorActive)
+        root.activateIndex(root.selectedIndex, false)
+      else if (displayModel.count > 0)
+        root.cursorActive = true
+      event.accepted = true
+    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
+      root.setFilter(root.filterText + event.text)
+      event.accepted = true
+    }
+  }
+
+  Component.onCompleted: {
+    if (!root.windowEnabled)
+      return
+    var windowComponent = Qt.createComponent(Qt.resolvedUrl("MenuWindow.qml"))
+    if (windowComponent.status === Component.Ready)
+      root.view = windowComponent.createObject(root, {
+        root: root
+      })
+    else
+      console.warn("menu: window failed to load:", windowComponent.errorString())
+  }
 
   // Opens the menu at the payload's route, or as a dmenu picker when mode is select/input.
   function open(payloadJson: string): void {
@@ -243,12 +368,12 @@ Item {
     function launch(desktopId, name) {
       var id = String(desktopId || "")
       if (id)
-        Util.execDetached("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
+        root.run("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
     }
     function remove(desktopId, name) {
       var id = String(desktopId || "")
       if (id)
-        Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
+        root.run(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
     }
   }
   // Whether the uninstall confirmation dialog is showing.
@@ -435,11 +560,11 @@ Item {
   // Bumped after each display rebuild so row-height bindings recompute.
   property int layoutSerial: 0
   // Card width: depends on mode and menu, capped to the screen.
-  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(root.dmenuWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), panel.width - Style.gapsOut * 2)
+  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(root.dmenuWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), root.screenWidth - Style.gapsOut * 2)
   // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   // Total card height, capped to the screen.
-  property int cardHeight: root.dmenuActive ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), panel.height - Style.gapsOut * 2) : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, panel.height - Style.gapsOut * 2)
+  property int cardHeight: root.dmenuActive ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), root.screenHeight - Style.gapsOut * 2) : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, root.screenHeight - Style.gapsOut * 2)
 
   // Answers a pending dmenu request: writes the selection (unless null) and touches the done file.
   function finishRequest(selection) {
@@ -466,7 +591,7 @@ Item {
   function runAction(action): void {
     if (typeof action !== "string" || !action.trim())
       return
-    Util.execDetached(action)
+    root.run(action)
   }
 
   // Handles a root tile click or Ctrl+1..3: open Files, a terminal or Setup.
@@ -497,20 +622,20 @@ Item {
 
   // Height the card can devote to rows before running off the screen — or
   // past the frozen top edge once a search has pinned the card in place.
-  // Uses panel.cardTop rather than effectiveCardTop: the centered top is
+  // Uses root.viewCardTop rather than effectiveCardTop: the centered top is
   // derived from the card height, which this value feeds.
   function availableRowsHeight(): int {
-    var top = panel.cardTop >= 0 ? panel.cardTop : Style.gapsOut
+    var top = root.viewCardTop >= 0 ? root.viewCardTop : Style.gapsOut
     var headerHeight = root.fullRootHeader ? root.rootHeaderHeight : root.headerHeight
-    var available = panel.height - top - Style.gapsOut - root.contentMargin * 2 - headerHeight - root.contentSpacing - root.rootExtrasHeight
+    var available = root.screenHeight - top - Style.gapsOut - root.contentMargin * 2 - headerHeight - root.contentSpacing - root.rootExtrasHeight
     // The starting menu sets the ceiling along with the offset: drilling into
     // a longer submenu scrolls behind the fold instead of growing the card.
-    if (panel.maxRowsHeight >= 0)
-      available = Math.min(available, panel.maxRowsHeight)
+    if (root.viewMaxRowsHeight >= 0)
+      available = Math.min(available, root.viewMaxRowsHeight)
     // The root surface is intentionally a shorter command viewport: the
     // header, context band, tiles, and footer need to read as one composition
     // instead of allowing the command list to turn the card into a page.
-    var menuCeiling = root.fullRootHeader ? Style.space(250) : Math.round(panel.height * 0.7)
+    var menuCeiling = root.fullRootHeader ? Style.space(250) : Math.round(root.screenHeight * 0.7)
     return Math.min(available, menuCeiling)
   }
 
@@ -626,6 +751,11 @@ Item {
     root.itemOrder = mergedMenu.itemOrder
     root.rowsLoaded = true
     root.evaluateGuards()
+    // The generated Apps rows (apps, Favorites, Recent) are not in the JSONC
+    // sources: merge them back, so a rebuild (the user menu file loading after
+    // the default one) keeps an open generated menu instead of resetting to root.
+    if (root.appRows.length > 0)
+      root.startProviderForMenu("apps")
     if (root.opened) {
       root.rebuildDisplay()
       if (!root.dmenuActive) {
@@ -1134,31 +1264,6 @@ Item {
     })
   }
 
-  // Contain alone parks the cursor row flush with the viewport edge, hiding
-  // the neighbor entirely and losing the fold affordance. Keep the next
-  // hidden row peeking past the cursor in the direction of travel.
-  function revealCursor(): void {
-    if (displayModel.count === 0)
-      return
-    resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
-
-    var item = resultList.itemAtIndex(root.selectedIndex)
-    if (!item)
-      return
-    var reach = root.rowPeek + root.rowSpacing
-    if (root.selectedIndex < displayModel.count - 1) {
-      var maxY = Math.max(resultList.originY, resultList.originY + resultList.contentHeight - resultList.height)
-      var overhang = item.y + item.height + reach - (resultList.contentY + resultList.height)
-      if (overhang > 0)
-        resultList.contentY = Math.min(resultList.contentY + overhang, maxY)
-    }
-    if (root.selectedIndex > 0) {
-      var underhang = resultList.contentY - (item.y - reach)
-      if (underhang > 0)
-        resultList.contentY = Math.max(resultList.contentY - underhang, resultList.originY)
-    }
-  }
-
   // Moves the cursor by `delta` rows, wrapping; the first move activates the cursor.
   function select(delta: int): void {
     if (displayModel.count === 0)
@@ -1175,7 +1280,7 @@ Item {
 
   // Sets the search text, resets the cursor and rebuilds the rows.
   function setFilter(nextFilter: string): void {
-    panel.freezeCardTop()
+    root.freezeCardTop()
     root.filterText = nextFilter
     root.selectedIndex = 0
     root.cursorActive = root.mode !== "input"
@@ -1187,7 +1292,7 @@ Item {
 
   // Shows submenu `id` (root if unknown), optionally pushing the current one onto navStack.
   function setActiveMenu(id: string, pushHistory: bool, fromPointer: bool): void {
-    panel.freezeCardTop()
+    root.freezeCardTop()
     if (!root.item(id))
       id = "root"
     if (pushHistory && id !== root.activeMenu)
@@ -1196,9 +1301,9 @@ Item {
     root.filterText = ""
     root.selectedIndex = 0
     root.cursorActive = true
-    if (fromPointer)
-      pointerGate.allowInitialSample()
-    else
+    if (fromPointer && root.view)
+      root.view.allowInitialPointerSample()
+    else if (!fromPointer)
       root.disarmPointer()
     root.rebuildDisplay()
     root.invalidateVolatileProvider(id)
@@ -1268,7 +1373,8 @@ Item {
       appId: row.appId,
       label: row.label
     }
-    deleteConfirm.selectedIndex = 1
+    if (root.view)
+      root.view.resetDeleteConfirm()
     root.deleteConfirmOpen = true
   }
 
@@ -1276,10 +1382,11 @@ Item {
   function cancelDelete() {
     root.deleteConfirmOpen = false
     root.deleteTarget = null
-    deleteConfirm.selectedIndex = 1
+    if (root.view)
+      root.view.resetDeleteConfirm()
     root.disarmPointer()
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      root.focusKeys()
     })
   }
 
@@ -1349,7 +1456,7 @@ Item {
       root.appLibrary.refreshIcons()
 
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      root.focusKeys()
     })
   }
 
@@ -1375,11 +1482,11 @@ Item {
     rebuildDisplay()
 
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      root.focusKeys()
     })
   }
   ListModel {
-    id: displayModel
+    id: rowsModel
   }
 
   // ----------------------------------------------------------- route surface
@@ -1426,7 +1533,7 @@ Item {
   // when its rows exist, else Apps.
   function resolvePendingAppsRoute(): void {
     var route = root.pendingInitialMenu
-    if (!route || !root.rowsLoaded)
+    if (!route || !root.rowsLoaded || !root.menuSourcesReady)
       return
     root.pendingInitialMenu = ""
     root.openExistingMenu(root.item(route) ? route : "apps")
@@ -1434,12 +1541,13 @@ Item {
 
   // Ignores the pointer until it actually moves, so a still mouse cannot steal the cursor.
   function disarmPointer() {
-    pointerGate.reset()
+    if (root.view)
+      root.view.disarmPointer()
   }
 
   // Moves the cursor to row `index` when the pointer has really moved over it.
   function selectFromPointer(index, item, mouse) {
-    if (!pointerGate.moved(item, mouse))
+    if (!root.view || !root.view.pointerMoved(item, mouse))
       return
     root.cursorActive = true
     root.selectedIndex = index
@@ -1474,11 +1582,6 @@ Item {
       if (root.applySerial === root.requestSerial)
         root.opened = false
     }
-  }
-
-  PointerMoveGate {
-    id: pointerGate
-    referenceItem: card
   }
 
   Connections {
@@ -1516,6 +1619,11 @@ Item {
     printErrors: false
     onLoaded: {
       root.defaultMenuItems = root.parseMenuJsonc(text())
+      root.defaultMenuSeen = true
+      root.rebuildItemsFromSources()
+    }
+    onLoadFailed: {
+      root.defaultMenuSeen = true
       root.rebuildItemsFromSources()
     }
     onFileChanged: reload()
@@ -1528,10 +1636,12 @@ Item {
     printErrors: false
     onLoaded: {
       root.userMenuItems = root.parseMenuJsonc(text())
+      root.userMenuSeen = true
       root.rebuildItemsFromSources()
     }
     onLoadFailed: {
       root.userMenuItems = []
+      root.userMenuSeen = true
       root.rebuildItemsFromSources()
     }
     onFileChanged: reload()
@@ -1629,737 +1739,6 @@ Item {
         Qt.callLater(function () {
           root.evaluateGuards()
         })
-    }
-  }
-  PanelWindow {
-    id: panel
-    visible: root.opened && root.rowsLoaded
-    anchors {
-      top: true
-      bottom: true
-      left: true
-      right: true
-    }
-    color: "transparent"
-    WlrLayershell.namespace: "omarchy-menu"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-    exclusionMode: ExclusionMode.Ignore
-
-    // The card opens centered exactly as always. The first search keystroke
-    // or submenu move freezes the top line where it currently sits — from
-    // then on the card grows and shrinks downward instead of re-centering
-    // on every resize, which made the menu jump around. The rows height is
-    // frozen at the same moment, so the starting menu also caps how tall the
-    // card may grow from there. Closing unfreezes both.
-    property int cardTop: -1
-    property int maxRowsHeight: -1
-    readonly property int centeredTop: Math.max(Style.gapsOut, Math.round((height - root.cardHeight) / 2))
-    readonly property int effectiveCardTop: cardTop >= 0 ? cardTop : centeredTop
-    function freezeCardTop() {
-      if (visible && cardTop < 0) {
-        cardTop = effectiveCardTop
-        maxRowsHeight = root.visibleRowsHeight
-      }
-    }
-    onVisibleChanged: if (!visible) {
-      cardTop = -1
-      maxRowsHeight = -1
-    }
-
-    Rectangle {
-      anchors.fill: parent
-      color: root.scrim
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.cancel()
-    }
-
-    BorderSurface {
-      id: card
-      width: root.cardWidth
-      height: Math.min(root.cardHeight, panel.height - Style.gapsOut - panel.effectiveCardTop)
-      radius: root.cornerRadius
-      anchors.horizontalCenter: parent.horizontalCenter
-      y: panel.effectiveCardTop
-      color: root.background
-      borderSpec: root.borderSpec
-      padding: root.contentMargin
-
-      MouseArea {
-        anchors.fill: parent
-        onClicked: {}
-      }
-
-      Item {
-        id: keyCatcher
-        anchors.fill: parent
-        z: root.deleteConfirmOpen ? 20 : 0
-        focus: true
-
-        Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function (event) {
-          if (root.deleteConfirmOpen) {
-            if (deleteConfirm.handleKey(event))
-              event.accepted = true
-            return
-          }
-
-          if (event.key === Qt.Key_Delete) {
-            root.requestDeleteSelected()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Escape) {
-            if (root.filterText)
-              root.setFilter("")
-            else
-              root.cancel()
-            event.accepted = true
-          } else if ((event.modifiers & Qt.ControlModifier) && event.key >= Qt.Key_1 && event.key <= Qt.Key_3 && !root.dmenuActive) {
-            root.activateTile(root.rootTiles[event.key - Qt.Key_1])
-            event.accepted = true
-          } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier) && !root.dmenuActive) {
-            if (root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
-              var pinRow = displayModel.get(root.selectedIndex)
-              if (pinRow.kind === "app" && pinRow.appId)
-                root.toggleFavoriteApp(pinRow.appId)
-            }
-            event.accepted = true
-          } else if (Util.editsFilter(event, root.filterText)) {
-            root.setFilter(Util.editedFilter(event, root.filterText))
-            event.accepted = true
-          } else if ((event.key === Qt.Key_Backspace || event.key === Qt.Key_Left) && !root.filterText) {
-            root.goBack()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Up) {
-            root.select(-1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Down) {
-            root.select(1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_PageUp) {
-            root.select(-6)
-            event.accepted = true
-          } else if (event.key === Qt.Key_PageDown) {
-            root.select(6)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
-            if (root.dmenuActive) {
-              if (root.mode === "input")
-                root.applyDmenuSelection(root.filterText)
-              else if (displayModel.count > 0)
-                root.activateIndex(root.cursorActive ? root.selectedIndex : 0, false)
-            } else if (root.cursorActive)
-              root.activateIndex(root.selectedIndex, false)
-            else if (displayModel.count > 0)
-              root.cursorActive = true
-            event.accepted = true
-          } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
-            root.setFilter(root.filterText + event.text)
-            event.accepted = true
-          }
-        }
-
-        ConfirmDialog {
-          id: deleteConfirm
-
-          anchors.fill: parent
-          opened: root.deleteConfirmOpen
-          z: 10
-          message: "Do you want to uninstall " + ((root.deleteTarget && root.deleteTarget.label) || "") + "?"
-          confirmText: "Uninstall"
-          background: root.background
-          foreground: root.foreground
-          scrim: root.scrim
-          selectedBackground: root.selectedBackground
-          selectedText: root.selectedText
-          fontFamily: root.fontFamily
-          cornerRadius: root.cornerRadius
-          onCanceled: root.cancelDelete()
-          onConfirmed: root.confirmDelete()
-        }
-      }
-
-      Column {
-        anchors.fill: parent
-        anchors.topMargin: card.contentTopInset
-        anchors.rightMargin: card.contentRightInset
-        anchors.bottomMargin: card.contentBottomInset
-        anchors.leftMargin: card.contentLeftInset
-        spacing: root.fullRootHeader ? root.contentSpacing : root.compactContentSpacing
-
-        Rectangle {
-          width: parent.width
-          height: root.fullRootHeader ? root.rootHeaderHeight : root.headerHeight
-          radius: root.cornerRadius
-          color: "transparent"
-
-          Image {
-            opacity: root.fullRootHeader ? (root.headerMarkSettled ? 1 : 0) : 1
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            width: root.fullRootHeader ? Style.space(48) : Style.space(28)
-            height: width
-            source: "file://" + root.brandingMarksPath + (root.fullRootHeader ? "aranea-primary.svg" : "aranea-glyph.svg")
-            fillMode: Image.PreserveAspectFit
-            sourceSize.width: width * Screen.devicePixelRatio
-            sourceSize.height: height * Screen.devicePixelRatio
-            smooth: true
-            mipmap: true
-            Behavior on opacity {
-              enabled: root.motionEnabled
-              NumberAnimation {
-                duration: 180
-                easing.type: Easing.OutCubic
-              }
-            }
-          }
-
-          Image {
-            visible: root.fullRootHeader
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: Style.space(220)
-            height: Style.space(68)
-            source: "file://" + root.brandingMotifsPath + "menu-network.svg"
-            fillMode: Image.PreserveAspectFit
-            opacity: 0.24
-            sourceSize.width: width * Screen.devicePixelRatio
-            sourceSize.height: height * Screen.devicePixelRatio
-            smooth: true
-            mipmap: true
-          }
-
-          Column {
-            anchors.left: parent.left
-            anchors.leftMargin: root.fullRootHeader ? Style.space(62) : Style.space(38)
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(4)
-
-            Text {
-              textFormat: Text.PlainText
-              width: parent.width
-              text: root.fullRootHeader ? "ARANEA" : root.dmenuActive ? root.dmenuPrompt : "ARANEA / " + (root.item(root.activeMenu) ? (root.item(root.activeMenu).title || root.item(root.activeMenu).label) : "GO")
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: root.fullRootHeader ? root.menuFontSize(Style.font.title) : root.menuFontSize(Style.font.body)
-              font.weight: Font.Medium
-              font.letterSpacing: root.menuLetterSpacing
-              elide: Text.ElideRight
-            }
-
-            Text {
-              visible: true
-              textFormat: Text.PlainText
-              width: parent.width
-              text: root.notice || MenuModel.hintText({
-                root: root.fullRootHeader,
-                filter: !!root.filterText.trim(),
-                dmenu: root.dmenuActive,
-                input: root.mode === "input",
-                count: displayModel.count,
-                appRow: root.cursorRowIsApp()
-              })
-              color: root.contextText
-              font.family: root.fontFamily
-              font.pixelSize: root.menuFontSize(Style.font.caption)
-              font.weight: Font.Medium
-              font.letterSpacing: root.menuLetterSpacing
-              elide: Text.ElideRight
-            }
-          }
-
-          Image {
-            visible: root.fullRootHeader
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: Style.space(64)
-            height: Style.space(12)
-            source: "file://" + root.brandingMotifsPath + "edge-trace.svg"
-            fillMode: Image.PreserveAspectFit
-            opacity: 0.55
-            sourceSize.width: width * Screen.devicePixelRatio
-            sourceSize.height: height * Screen.devicePixelRatio
-            smooth: true
-            mipmap: true
-          }
-        }
-
-        Row {
-          visible: root.fullRootHeader
-          width: parent.width
-          height: root.rootContextHeight
-          spacing: Style.spacing.md
-
-          Image {
-            width: root.menuFontSize(Style.font.caption)
-            height: width
-            source: "file://" + root.brandingGlyphsPath + "ready.svg"
-            fillMode: Image.PreserveAspectFit
-            sourceSize.width: width * Screen.devicePixelRatio
-            sourceSize.height: height * Screen.devicePixelRatio
-            smooth: true
-            mipmap: true
-            anchors.verticalCenter: parent.verticalCenter
-          }
-
-          Text {
-            text: root.workspaceContext
-            color: root.contextText
-            font.family: root.fontFamily
-            font.pixelSize: root.menuFontSize(Style.font.caption)
-            font.weight: Font.Medium
-            font.letterSpacing: root.menuLetterSpacing
-            verticalAlignment: Text.AlignVCenter
-          }
-
-          Text {
-            text: "SYSTEM READY"
-            color: root.contextText
-            font.family: root.fontFamily
-            font.pixelSize: root.menuFontSize(Style.font.caption)
-            font.weight: Font.Medium
-            font.letterSpacing: root.menuLetterSpacing
-            verticalAlignment: Text.AlignVCenter
-          }
-
-          Text {
-            text: root.clockContext
-            color: root.contextText
-            font.family: root.fontFamily
-            font.pixelSize: root.menuFontSize(Style.font.caption)
-            font.weight: Font.Medium
-            font.letterSpacing: root.menuLetterSpacing
-            verticalAlignment: Text.AlignVCenter
-          }
-        }
-
-        Row {
-          visible: root.fullRootHeader
-          width: parent.width
-          height: root.rootTileHeight
-          spacing: Style.spacing.xs
-
-          Repeater {
-            model: root.rootTiles
-
-            delegate: BorderSurface {
-              required property var modelData
-              property bool hovered: false
-
-              opacity: root.fullRootHeader ? 1 : 0
-              width: (parent.width - Style.spacing.xs * 2) / 3
-              height: root.rootTileHeight
-              radius: Style.space(5)
-              color: root.hoveredTileBackground(hovered)
-              borderSpec: Border.none()
-
-              Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                width: Style.space(18)
-                height: Style.space(2)
-                color: root.selectedText
-                opacity: hovered ? 0.9 : 0.25
-              }
-
-              Rectangle {
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                width: Style.space(18)
-                height: Style.space(2)
-                color: root.selectedText
-                opacity: hovered ? 0.9 : 0.25
-              }
-
-              Behavior on opacity {
-                enabled: root.motionEnabled
-                NumberAnimation {
-                  duration: 160
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              Column {
-                width: parent.width - Style.space(28)
-                anchors.centerIn: parent
-                spacing: Style.space(11)
-
-                Text {
-                  width: parent.width
-                  text: modelData.icon
-                  color: root.selectedText
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.iconLarge
-                  horizontalAlignment: Text.AlignHCenter
-                }
-
-                Text {
-                  width: parent.width
-                  text: modelData.label
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: root.menuFontSize(Style.font.bodySmall)
-                  font.letterSpacing: root.menuLetterSpacing
-                  horizontalAlignment: Text.AlignHCenter
-                  elide: Text.ElideRight
-                }
-
-                Text {
-                  width: parent.width
-                  text: modelData.detail
-                  color: root.contextText
-                  font.family: root.fontFamily
-                  font.pixelSize: root.menuFontSize(Style.font.caption)
-                  font.weight: Font.Medium
-                  font.letterSpacing: root.menuLetterSpacing
-                  horizontalAlignment: Text.AlignHCenter
-                  elide: Text.ElideRight
-                }
-              }
-
-              MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.activateTile(modelData)
-                onEntered: parent.hovered = true
-                onExited: parent.hovered = false
-              }
-            }
-          }
-        }
-
-        Rectangle {
-          visible: root.fullRootHeader
-          width: parent.width
-          height: root.footerHeight
-          color: "transparent"
-
-          Image {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Style.space(8)
-            source: "file://" + root.brandingMotifsPath + "node-divider.svg"
-            fillMode: Image.PreserveAspectFit
-            opacity: root.nodeAlpha
-            sourceSize.width: width * Screen.devicePixelRatio
-            sourceSize.height: height * Screen.devicePixelRatio
-            smooth: true
-            mipmap: true
-          }
-
-          Text {
-            anchors.left: parent.left
-            anchors.bottom: parent.bottom
-            textFormat: Text.PlainText
-            text: "COMMANDS  ·  QUICK ACCESS  ·  ENTER TO OPEN"
-            color: root.footerText
-            opacity: 0.9
-            font.family: root.fontFamily
-            font.pixelSize: root.menuFontSize(Style.font.bodySmall)
-            font.weight: Font.Medium
-            font.letterSpacing: root.menuLetterSpacing
-            elide: Text.ElideRight
-          }
-
-          Text {
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            textFormat: Text.PlainText
-            text: "ARANEA"
-            color: root.selectedText
-            opacity: 0.7
-            font.family: root.fontFamily
-            font.pixelSize: root.menuFontSize(Style.font.caption)
-            font.weight: Font.Medium
-            font.letterSpacing: root.menuLetterSpacing
-          }
-        }
-
-        Item {
-          width: parent.width
-          height: root.visibleRowsHeight
-
-          ListView {
-            id: resultList
-            anchors.fill: parent
-            model: displayModel
-            clip: true
-            spacing: root.rowSpacing
-            boundsBehavior: Flickable.StopAtBounds
-
-            section.property: "section"
-            section.criteria: ViewSection.FullString
-            section.delegate: Item {
-              required property string section
-
-              width: ListView.view.width
-              height: section === "drilldown" ? root.dividerHeight : 0
-              visible: section === "drilldown"
-
-              Rectangle {
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(4)
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(4)
-                anchors.verticalCenter: parent.verticalCenter
-                height: Style.spacing.hairline
-                color: Util.alpha(root.foreground, 0.2)
-              }
-            }
-
-            delegate: BorderSurface {
-              id: row
-              required property int index
-              required property string itemId
-              required property string kind
-              required property string icon
-              required property string iconFont
-              required property string appIcon
-              required property string appId
-              required property string label
-              required property string target
-              required property string detail
-              required property string path
-              required property string action
-              required property int childCount
-
-              readonly property bool hasCursor: root.cursorActive && row.index === root.selectedIndex
-              readonly property bool isApp: row.kind === "app"
-              readonly property bool hasIcon: row.icon.length > 0 || row.isApp
-
-              width: ListView.view.width
-              height: root.rowHeightForDetail(row.detail)
-              radius: root.cornerRadius
-              color: row.hasCursor ? root.selectedBackground : "transparent"
-              borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
-
-              Behavior on color {
-                ColorAnimation {
-                  duration: 140
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              Rectangle {
-                visible: row.hasCursor
-                width: Style.space(2)
-                height: parent.height - Style.space(14)
-                radius: Style.space(1)
-                color: root.selectedText
-                opacity: 0.9
-                anchors.left: parent.left
-                anchors.leftMargin: root.rowReservedBorderLeft + Style.space(4)
-                anchors.verticalCenter: parent.verticalCenter
-
-                Behavior on opacity {
-                  NumberAnimation {
-                    duration: 120
-                    easing.type: Easing.OutCubic
-                  }
-                }
-              }
-
-              Text {
-                id: iconText
-                textFormat: Text.PlainText
-                visible: row.hasIcon && !row.isApp
-                text: row.icon
-                color: row.hasCursor ? root.selectedText : root.foreground
-                font.family: row.iconFont.length > 0 ? row.iconFont : root.fontFamily
-                font.pixelSize: Style.font.iconLarge
-                width: Style.space(36)
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                anchors.left: parent.left
-                anchors.leftMargin: root.rowReservedBorderLeft + Style.space(8)
-                y: contentColumn.y + labelText.y + (labelText.height - height) / 2
-              }
-
-              Image {
-                id: appIconImage
-                visible: row.isApp
-                width: Style.font.iconLarge
-                height: Style.font.iconLarge
-                fillMode: Image.PreserveAspectFit
-                // Decode at physical pixels — a logical-size decode leaves
-                // PNG icons upscaled and blurry on HiDPI displays.
-                sourceSize.width: width * Screen.devicePixelRatio
-                sourceSize.height: height * Screen.devicePixelRatio
-                source: row.isApp && root.appLibrary ? root.appLibrary.iconSource(row.appIcon) : ""
-                asynchronous: true
-                anchors.left: parent.left
-                anchors.leftMargin: root.rowReservedBorderLeft + Style.space(8) + (Style.space(36) - width) / 2
-                y: contentColumn.y + labelText.y + (labelText.height - height) / 2
-              }
-
-              Column {
-                id: contentColumn
-                anchors.left: row.hasIcon ? iconText.right : parent.left
-                anchors.leftMargin: row.hasIcon ? Style.space(6) : root.rowReservedBorderLeft + Style.space(18)
-                anchors.right: trail.left
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(4)
-
-                Text {
-                  id: labelText
-                  textFormat: Text.PlainText
-                  width: parent.width
-                  text: row.label
-                  color: row.hasCursor ? root.selectedText : root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: root.menuFontSize(Style.font.bodySmall)
-                  font.weight: Font.Medium
-                  font.letterSpacing: root.menuLetterSpacing
-                  elide: Text.ElideRight
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  width: parent.width
-                  text: row.detail
-                  visible: (root.fullRootHeader || root.filterText || row.kind === "dmenu") && row.detail.length > 0
-                  color: row.hasCursor ? root.selectedText : root.foreground
-                  opacity: row.hasCursor ? 0.7 : 0.52
-                  font.family: root.fontFamily
-                  font.pixelSize: root.menuFontSize(Style.font.caption)
-                  font.weight: Font.Medium
-                  font.letterSpacing: root.menuLetterSpacing
-                  elide: Text.ElideRight
-
-                  Behavior on opacity {
-                    NumberAnimation {
-                      duration: 140
-                      easing.type: Easing.OutCubic
-                    }
-                  }
-                }
-              }
-
-              Row {
-                id: trail
-                width: Style.space(14)
-                anchors.right: parent.right
-                anchors.rightMargin: root.rowReservedBorderRight + Style.space(8)
-                y: contentColumn.y + labelText.y + (labelText.height - height) / 2
-                spacing: 0
-
-                Text {
-                  textFormat: Text.PlainText
-                  text: row.kind === "menu" || row.kind === "link" ? "›" : ""
-                  color: row.hasCursor ? root.selectedText : root.foreground
-                  opacity: row.kind === "menu" || row.kind === "link" ? 0.36 : 0
-                  font.family: root.fontFamily
-                  font.pixelSize: root.menuFontSize(Style.font.body)
-                  font.weight: Font.Normal
-                  font.letterSpacing: root.menuLetterSpacing
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-              }
-
-              MouseArea {
-                id: mouseArea
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                cursorShape: Qt.PointingHandCursor
-                onEntered: root.selectFromPointer(row.index, row, {
-                  x: mouseArea.mouseX,
-                  y: mouseArea.mouseY
-                })
-                onPositionChanged: function (mouse) {
-                  root.selectFromPointer(row.index, row, mouse)
-                }
-                onClicked: function (mouse) {
-                  root.cursorActive = true
-                  root.selectedIndex = row.index
-                  if (mouse.button === Qt.RightButton && row.isApp) {
-                    root.toggleFavoriteApp(row.appId)
-                    return
-                  }
-                  root.activateIndex(row.index, true)
-                }
-              }
-            }
-          }
-
-          // Scroll scrims. The clipped row already marks the fold at rest;
-          // these keep both edges honest once the list has been scrolled,
-          // when content hides above the card top as well as below. Strength
-          // tracks the distance still hidden past each edge rather than
-          // animating on a clock, so a programmatic jump — wrapping from the
-          // last row back to the first — lands with the fade already applied.
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Math.min(Style.space(28), parent.height / 2)
-            visible: opacity > 0
-            opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.contentY - resultList.originY) / height)) : 0
-            gradient: Gradient {
-              GradientStop {
-                position: 0
-                color: root.background
-              }
-              GradientStop {
-                position: 1
-                color: Util.alpha(root.background, 0)
-              }
-            }
-          }
-
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: Math.min(Style.space(28), parent.height / 2)
-            visible: opacity > 0
-            opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.originY + resultList.contentHeight - resultList.height - resultList.contentY) / height)) : 0
-            gradient: Gradient {
-              GradientStop {
-                position: 0
-                color: Util.alpha(root.background, 0)
-              }
-              GradientStop {
-                position: 1
-                color: root.background
-              }
-            }
-          }
-
-          Column {
-            anchors.centerIn: parent
-            spacing: Style.space(12)
-            visible: displayModel.count === 0 && root.mode !== "input"
-
-            Text {
-              text: root.emptyStateInfo.icon
-              color: root.selectedText
-              opacity: 0.8
-              font.family: root.fontFamily
-              font.pixelSize: root.menuFontSize(Style.font.displayLarge)
-              horizontalAlignment: Text.AlignHCenter
-              width: Style.space(320)
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              text: root.emptyStateInfo.text
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: root.menuFontSize(Style.font.title)
-              horizontalAlignment: Text.AlignHCenter
-              width: Style.space(320)
-            }
-          }
-        }
-      }
     }
   }
 }
