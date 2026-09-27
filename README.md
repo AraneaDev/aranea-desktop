@@ -189,9 +189,9 @@ interaction states rather than repeating the same wallpaper.
 | ----------------------------------------------------- | ---------------------------------------------- |
 | ![Aranea clipboard picker](screenshots/clipboard.png) | ![Aranea emoji picker](screenshots/emojis.png) |
 
-| Authentication                                  |
-| ----------------------------------------------- |
-| ![Aranea polkit prompt](screenshots/polkit.png) |
+| Authentication                                  | Wallpaper picker                                         |
+| ----------------------------------------------- | -------------------------------------------------------- |
+| ![Aranea polkit prompt](screenshots/polkit.png) | ![Aranea wallpaper picker](screenshots/image-picker.png) |
 
 ### System popups
 
@@ -202,6 +202,10 @@ interaction states rather than repeating the same wallpaper.
 | Agents                                        | Power                                        | Displays                                         |
 | --------------------------------------------- | -------------------------------------------- | ------------------------------------------------ |
 | ![Aranea agent popup](screenshots/agents.png) | ![Aranea power popup](screenshots/power.png) | ![Aranea display popup](screenshots/monitor.png) |
+
+| Calendar                                        | Weather                                          |
+| ----------------------------------------------- | ------------------------------------------------ |
+| ![Aranea calendar popup](screenshots/clock.png) | ![Aranea weather popup](screenshots/weather.png) |
 
 ### Wallpaper collection
 

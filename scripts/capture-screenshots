@@ -19,7 +19,7 @@ output=""
 capture_all=0
 build_hero_only=0
 # The surfaces --all captures.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
 # magick or a frame is missing.
@@ -28,7 +28,7 @@ build_hero_showcase() {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications health network audio bluetooth agents power monitor btop file-manager neovim lock osd)
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty clipboard emojis image-picker polkit health network audio bluetooth agents power monitor clock weather btop file-manager neovim lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
