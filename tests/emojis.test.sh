@@ -26,4 +26,11 @@ assert(Array.isArray(data) && data.length > 1000 && data[0].e && data[0].k, 'emo
 console.log('emoji logic contract passed')
 NODE
 
+plugin="$repo_root/plugins/araneadev.emojis"
+jq -e '.id == "araneadev.emojis" and .entryPoints.overlay == "Emojis.qml" and .omarchy.clonedFrom == "omarchy.emojis"' "$plugin/manifest.json" >/dev/null
+grep -Fq 'OverlayChrome {' "$plugin/Emojis.qml"
+grep -Fq 'EmojiLogic.pushRecent' "$plugin/Emojis.qml"
+grep -Fq 'EmojiLogic.emojiName' "$plugin/Emojis.qml"
+cmp -s "$plugin/OverlayChrome.qml" "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml" || { echo "OverlayChrome.qml copies differ" >&2; exit 1; }
+
 echo "emojis contract passed"
