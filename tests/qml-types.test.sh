@@ -13,6 +13,7 @@ qml_files=(
   "$repo_root/plugins/araneadev.clipboard/Clipboard.qml"
   "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml"
   "$repo_root/plugins/araneadev.emojis/Emojis.qml"
+  "$repo_root/plugins/araneadev.polkit/PolkitAgent.qml"
   "$repo_root/plugins/araneadev.notifications/Panel.qml"
   "$repo_root/plugins/araneadev.notifications/components/NotificationCard.qml"
   "$repo_root/plugins/araneadev.lock/Service.qml"

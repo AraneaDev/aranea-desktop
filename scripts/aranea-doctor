@@ -163,6 +163,23 @@ if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
   fi
 fi
 
+# Exactly one polkit prompt should be enabled: Aranea's, or Omarchy's when
+# the Aranea one is turned off. Without either, privileged actions cannot
+# ask for a password. (Which one is a choice, so neither is required.)
+if ! emit_override polkit ARANEA_DOCTOR_POLKIT_STATUS; then
+  if command -v omarchy-shell >/dev/null 2>&1; then
+    polkit_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
+    polkit_owner="$(jq -r '[.[] | select((.id == "araneadev.polkit" or .id == "omarchy.polkit") and .enabled) | .id] | first // ""' <<<"$polkit_json" 2>/dev/null || true)"
+    case "$polkit_owner" in
+      araneadev.polkit) emit polkit ok 'Aranea polkit prompt is enabled' ;;
+      omarchy.polkit) emit polkit ok 'Omarchy polkit prompt is enabled' ;;
+      *) emit polkit repair 'no polkit prompt is enabled; run omarchy restart shell after enabling one' ;;
+    esac
+  else
+    emit polkit skipped 'polkit state requires omarchy-shell'
+  fi
+fi
+
 if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
   inbox_root="${ARANEA_DOCTOR_INBOX_ROOT:-$HOME/.local/state/omarchy/notifications/inbox}"
   if [[ ! -d "$inbox_root" ]]; then

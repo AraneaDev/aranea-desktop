@@ -29,6 +29,21 @@ tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
+# Which polkit agent this config enables. An agent registers once per shell
+# process, so a change of owner needs a shell restart: leave a marker for
+# finish-polkit-handover (the hooks run it) instead of restarting from here.
+polkit_owner() {
+  jq -r 'if ([.plugins[]? | (if type == "string" then . else .id? end)] | index("araneadev.polkit")) != null
+            and (((.disabledPlugins // []) | index("omarchy.polkit")) != null)
+         then "aranea" else "stock" end' "$1" 2>/dev/null || echo unknown
+}
+note_polkit_handover() {
+  if [[ "$(polkit_owner "$config_file")" != "$(polkit_owner "$tmp_file")" ]]; then
+    mkdir -p "$state_root"
+    : > "$state_root/polkit-handover"
+  fi
+}
+
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' \
     "$config_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
@@ -43,8 +58,8 @@ fi
 jq '
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
-  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis"];
-  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis"];
+  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit"];
+  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit"];
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(
       .value |= (if type == "array" then map(select(entry_id as $id | ours | index($id) | not)) else . end))
@@ -56,6 +71,8 @@ jq '
       | if (.cloneSourceRestores | length) == 0 then del(.cloneSourceRestores) else . end
     else . end
 ' "$config_file" > "$tmp_file"
+
+note_polkit_handover
 
 if cmp -s "$config_file" "$tmp_file"; then
   exit 0

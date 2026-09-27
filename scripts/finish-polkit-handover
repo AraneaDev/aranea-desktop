@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Completes a polkit agent handover recorded by repair-shell-config or
+# release-shell-config. Quickshell registers the agent once per shell
+# process: when the prompt changes hands in a running shell, the incoming
+# plugin cannot register while the outgoing one holds the session, and once
+# that one is gone nothing is registered, so privileged actions get no prompt.
+# A restart lets the enabled agent register cleanly.
+
+state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+marker="$state_root/polkit-handover"
+
+[[ -e "$marker" ]] || exit 0
+rm -f "$marker"
+# A stopped shell registers the right agent when it next starts.
+if omarchy-shell shell ping >/dev/null 2>&1; then
+  omarchy restart shell >/dev/null 2>&1 || true
+fi

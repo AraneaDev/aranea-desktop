@@ -170,6 +170,10 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- |
 | ![Aranea clipboard picker](screenshots/clipboard.png) | ![Aranea emoji picker](screenshots/emojis.png) |
 
+| Authentication |
+| --- |
+| ![Aranea polkit prompt](screenshots/polkit.png) |
+
 ### System popups
 
 | Network | Audio | Bluetooth |
@@ -324,6 +328,22 @@ secret, `Ctrl+S` marks or unmarks a secret, `Delete` removes an item and
 **Emoji** (`Super+Ctrl+E`) shows your recent emojis above the full set and
 names the emoji under the cursor. `Enter` inserts it into the focused window,
 `Shift+Enter` only copies it.
+
+### Authentication prompt
+
+Privileged actions (`pkexec`, mounting, system settings) ask for your password
+on an Aranea card over a dimmed desktop. It names the request ("Run
+'/usr/bin/true' as root"), the polkit action's own description and the
+account you are authenticating as. `Tab` shows the details — action id,
+vendor, command and the raw polkit message — and `Shift+Tab` switches account
+when more than one may authorise. Fingerprint login and the closed-lid
+fallback work as in Omarchy.
+
+Only one prompt can be registered per shell, and it registers when the shell
+starts. Switching themes restarts the shell for you. If you turn the Aranea
+prompt off by hand (`omarchy plugin disable araneadev.polkit`), run
+`omarchy restart shell` so Omarchy's own prompt can take over; until then,
+privileged actions have no password prompt.
 
 ## Palette
 
