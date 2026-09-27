@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.2.0...v2.3.0) (2026-09-27)
+
+
+### Features
+
+* Aranea polkit prompt ([#51](https://github.com/AraneaDev/aranea-desktop/issues/51)) ([59479a9](https://github.com/AraneaDev/aranea-desktop/commit/59479a9e412f97f1728e75f33f2d4000310519e0))
+
 ## [2.2.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.1.0...v2.2.0) (2026-09-27)
 
 
