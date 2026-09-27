@@ -52,11 +52,14 @@ if [[ -x "$theme_root/scripts/repair-shell-config" ]]; then
   "$theme_root/scripts/repair-shell-config" "$HOME/.config/omarchy/shell.json" >/dev/null 2>&1 || true
 fi
 
-mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/omarchy/branding
-ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
-ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
-ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
-ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
+# GTK css, cava colours and the screensaver text follow the theme; they are
+# managed files, so a user's own file is backed up and restored on uninstall.
+if [[ -f "$installed_theme/scripts/lib/ownership.sh" ]]; then
+  (
+    source "$installed_theme/scripts/lib/ownership.sh"
+    link_theme_files
+  ) >/dev/null 2>&1 || true
+fi
 
 # Integrations link from the stable installed theme so they survive theme
 # switches; ones the user deactivated (aranea-integrations) stay off.

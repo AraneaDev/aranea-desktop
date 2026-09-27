@@ -157,6 +157,10 @@ saved="$gen_tmp/state/aranea/gsettings"
 printf "'Aranea-icons'\n" >"$gen_tmp/current-icon-theme"
 gen_run icons
 [[ "$(<"$saved/org.gnome.desktop.interface.icon-theme")" == "'Adwaita'" ]]
+# an install that finds Aranea's own value already set saves nothing
+rm -f "$saved/org.gnome.desktop.interface.icon-theme"
+gen_run icons
+[[ ! -e "$saved/org.gnome.desktop.interface.icon-theme" ]]
 rm -rf "$gen_tmp"
 
 echo "icon theme contract passed (${#contexts[@]} contexts)"

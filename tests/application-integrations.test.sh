@@ -30,8 +30,9 @@ done
 
 grep -Fq 'Aranea' "$repo_root/branding/about-card.txt"
 test -s "$repo_root/branding/screensaver.txt"
-grep -Fq 'branding/screensaver.txt' "$repo_root/hooks/theme-set"
-grep -Fq 'branding/screensaver.txt' "$repo_root/hooks/post-boot"
+grep -Fq 'branding/screensaver.txt' "$repo_root/scripts/lib/ownership.sh"
+grep -Fq 'link_theme_files' "$repo_root/hooks/theme-set"
+grep -Fq 'link_theme_files' "$repo_root/hooks/post-boot"
 grep -Fq 'fall back' "$repo_root/integrations/browser/README.md"
 grep -Fq 'unsupported' "$repo_root/integrations/session/README.md"
 grep -Fq 'native' "$repo_root/integrations/media/README.md"

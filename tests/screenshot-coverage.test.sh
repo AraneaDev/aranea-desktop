@@ -134,7 +134,8 @@ done
 # --- 4d: --all captures every surface, lists failures and exits 1 on any
 capture="$repo_root/scripts/capture-screenshots"
 grep -Fq "capture_one \"\$all_surface\" || failed_surfaces+=(\"\$all_surface\")" "$capture"
-grep -Fq "rm -f -- \"\$output/\$all_surface.png\"" "$capture"
+grep -Fq "if [[ -f \"\$png\" ]]; then mv -- \"\$png\" \"\$previous\"; fi" "$capture"
+grep -Fq "if [[ -f \"\$previous\" ]]; then mv -- \"\$previous\" \"\$png\"; fi" "$capture"
 grep -Fq "printf 'capture failed: %s\\n' \"\${failed_surfaces[*]}\"" "$capture"
 
 echo "screenshot coverage contract passed (${#surfaces[@]} surfaces)"

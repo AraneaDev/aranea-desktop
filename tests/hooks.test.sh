@@ -83,16 +83,28 @@ rm "$XDG_STATE_HOME/aranea/integrations/session"
 "$repo_root/hooks/post-boot"
 [[ "$(readlink "$session_link")" == "$stable/integrations/session/omarchy.css" ]]
 
-# --- 4d: post-boot links the screensaver text only when it is missing or
-# already Aranea's, and never replaces a user's own file
+# --- 4d: theme-set and post-boot link the theme files (GTK css, cava, the
+# screensaver text) as managed files: an existing file is backed up and
+# restored on uninstall, and a later user change is kept.
 screensaver="$HOME/.config/omarchy/branding/screensaver.txt"
+screensaver_source="$HOME/.local/state/omarchy/current/theme/branding/screensaver.txt"
+ledger="$XDG_STATE_HOME/aranea/managed-files"
+# Start from a machine where Aranea never linked it (earlier runs above did).
 rm -f "$screensaver"
-"$repo_root/hooks/post-boot"
-[[ "$(readlink "$screensaver")" == "$HOME/.local/state/omarchy/current/theme/branding/screensaver.txt" ]]
-grep -Fqx "$screensaver" "$XDG_STATE_HOME/aranea/managed-files"
-rm -f "$screensaver"
+sed -i "\|^$screensaver\$|d" "$ledger"
 printf 'mine\n' >"$screensaver"
+"$repo_root/hooks/theme-set" aranea
+[[ "$(readlink "$screensaver")" == "$screensaver_source" ]]
+grep -Fqx "$screensaver" "$ledger"
+grep -Fqx "$HOME/.config/gtk-4.0/gtk.css" "$ledger"
+grep -Fqx "$HOME/.config/cava/config" "$ledger"
+backup_dir="$XDG_STATE_HOME/aranea/backups"
+[[ "$(find "$backup_dir" -path '*screensaver.txt' -type f -exec cat {} + 2>/dev/null)" == mine ]]
+# a change the user makes afterwards is kept by both hooks
+rm -f "$screensaver"
+printf 'changed\n' >"$screensaver"
+"$repo_root/hooks/theme-set" aranea
 "$repo_root/hooks/post-boot"
-[[ ! -L "$screensaver" && "$(<"$screensaver")" == mine ]]
+[[ ! -L "$screensaver" && "$(<"$screensaver")" == changed ]]
 
 echo "hooks contract passed"

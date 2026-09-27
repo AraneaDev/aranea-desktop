@@ -5,7 +5,6 @@
 /**
  * Display state for one OSD request (stateForShow).
  * @typedef {object} OsdState
- * @property {string} iconKey - lower-cased icon name
  * @property {number} maxValue - progress maximum, at least 1
  * @property {boolean} hasProgress - a numeric value was given and no message
  * @property {number} value - progress value clamped to 0..maxValue (0 without progress)
@@ -86,7 +85,6 @@ function stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, r
   var parsedDuration = parseInt(rawDuration || "1200", 10)
 
   return {
-    iconKey: String(iconName || "").toLowerCase(),
     maxValue: maxValue,
     hasProgress: hasProgress,
     value: value,

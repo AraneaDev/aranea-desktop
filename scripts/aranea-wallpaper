@@ -98,10 +98,16 @@ wallpaper_rows() {
     END { flush() }
   ' "$manifest"
 }
+# Prints the absolute path of the wallpaper whose id is $WANTED (below $ROOT),
+# comparing ids as text.
+wallpaper_rows_lookup() {
+  wallpaper_rows | awk -F '\t' '$1 == ENVIRON["WANTED"] { print ENVIRON["ROOT"] $2; exit }'
+}
 # Prints the absolute path of wallpaper ID from the manifest (nothing when
 # the id is unknown); the id is compared as text, never as a pattern.
 wallpaper_path() {
-  wallpaper_rows | awk -F '\t' -v wanted="$1" -v root="$repo_root/" '$1 == wanted { print root $2; exit }'
+  # Passed through the environment: awk -v would expand backslashes.
+  WANTED="$1" ROOT="$repo_root/" wallpaper_rows_lookup
 }
 # Prints the phase (dawn, day, dusk or night) that time NOW (HH:MM) falls in.
 phase_for_now() {

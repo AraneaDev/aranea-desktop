@@ -100,13 +100,14 @@ install_generated() {
 }
 
 # Saves the current value of gsettings SCHEMA KEY once (the value from before
-# Aranea), so uninstall can put it back; later installs keep the first save.
+# Aranea), so uninstall can put it back; later installs keep the first save,
+# and Aranea's own values (an install from before this was saved) never count.
 save_gsetting() {
   local schema="$1" key="$2" saved value
-  saved="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/gsettings/$schema.$key"
+  saved="$(aranea_ownership_root)/gsettings/$schema.$key"
   [[ -e "$saved" ]] && return 0
   value="$(gsettings get "$schema" "$key" 2>/dev/null)" || return 0
-  [[ -n "$value" ]] || return 0
+  [[ -n "$value" && "$value" != "'Aranea'" && "$value" != "'Aranea-icons'" ]] || return 0
   mkdir -p "$(dirname "$saved")"
   printf '%s\n' "$value" >"$saved"
 }

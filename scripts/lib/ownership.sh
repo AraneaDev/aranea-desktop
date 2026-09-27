@@ -47,6 +47,11 @@ is_aranea_target() {
     # Any other Aranea checkout (the README has users run the integration
     # controller from one): an .../integrations/<path> that this theme ships,
     # even when that checkout is gone and the link dangles.
+    # The theme files the hooks link at the current theme (link_theme_files).
+    local theme_link
+    while IFS= read -r theme_link; do
+      [[ "$destination" == "${theme_link#* }" ]] && return 0
+    done < <(aranea_theme_links)
     if [[ "$destination" == */integrations/* ]]; then
       [[ -e "$ownership_lib_repo/integrations/${destination##*/integrations/}" ]] && return 0
     fi
@@ -54,6 +59,28 @@ is_aranea_target() {
   fi
   local data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
   [[ "$target" == "$data_root/icons/Aranea/"* || "$target" == "$data_root/icons/Aranea-icons/"* ]]
+}
+
+# Prints "target source" for each file the hooks point at the current theme:
+# GTK 3 and 4 css, the cava colours and the screensaver text. Omarchy does not
+# manage these, so Aranea links them as managed files.
+aranea_theme_links() {
+  local current="$HOME/.local/state/omarchy/current/theme"
+  printf '%s %s\n' \
+    "$HOME/.config/gtk-4.0/gtk.css" "$current/gtk.css" \
+    "$HOME/.config/gtk-3.0/gtk.css" "$current/gtk.css" \
+    "$HOME/.config/cava/config" "$current/cava-theme" \
+    "$HOME/.config/omarchy/branding/screensaver.txt" "$current/branding/screensaver.txt"
+}
+
+# Links the theme files (aranea_theme_links) as managed files: an existing
+# file is backed up and restored on uninstall, and a later user change is
+# kept (link_managed_file).
+link_theme_files() {
+  local target source
+  while read -r target source; do
+    link_managed_file "$target" "$source"
+  done < <(aranea_theme_links)
 }
 
 # True when TARGET is in the managed-files ledger.

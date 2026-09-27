@@ -118,13 +118,21 @@ if ((capture_all)); then
   batch_swapped=1
   omarchy restart shell >/dev/null 2>&1 || true
   sleep 3
-  # Captures one surface in a child run; fails when it wrote no PNG (an old
-  # PNG from an earlier run is removed first, so it never counts).
+  # Captures one surface in a child run; fails when it wrote no new PNG. The
+  # previous PNG is set aside first (so it never counts as a new capture) and
+  # put back when the capture fails, so the README keeps its old screenshot.
   capture_one() {
     local all_surface="$1"
-    rm -f -- "$output/$all_surface.png"
+    local png="$output/$all_surface.png" previous="$output/.$all_surface.png.previous"
+    rm -f -- "$previous"
+    if [[ -f "$png" ]]; then mv -- "$png" "$previous"; fi
     "$0" --surface "$all_surface" --output "$output" || true
-    [[ -f "$output/$all_surface.png" ]]
+    if [[ -f "$png" ]]; then
+      rm -f -- "$previous"
+      return 0
+    fi
+    if [[ -f "$previous" ]]; then mv -- "$previous" "$png"; fi
+    return 1
   }
   # A failed surface is reported at the end; the batch captures the rest.
   failed_surfaces=()

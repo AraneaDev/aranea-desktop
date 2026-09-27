@@ -69,8 +69,9 @@ cat >"$odd_manifest" <<'TOML'
 [profiles.full] # everything
 integrations = ["a"]
 
-[[integrations]]
+[[integrations]] # the only one
 id = "a"
+optional_command = "own"
 
 [other]
 optional_command = "leak"
@@ -78,8 +79,8 @@ TOML
 (
   export ARANEA_MANIFEST_FILE="$odd_manifest"
   source "$repo_root/scripts/lib/manifest.sh"
-  [[ -z "$(manifest_integration_field a optional_command)" ]] || {
-    echo "field leaked from [other]" >&2
+  [[ "$(manifest_integration_field a optional_command)" == own ]] || {
+    echo "field lookup (commented block header, no leak from [other])" >&2
     exit 1
   }
   manifest_profile_exists full || {
@@ -88,6 +89,10 @@ TOML
   }
   [[ "$(manifest_profile_integrations full)" == a ]] || {
     echo "commented profile integrations" >&2
+    exit 1
+  }
+  [[ -z "$(manifest_integration_field "a\\" optional_command)" ]] || {
+    echo "id with a backslash matched" >&2
     exit 1
   }
   [[ -z "$(manifest_integration_field a 'opt.*')" ]] || {

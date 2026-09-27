@@ -56,4 +56,15 @@ mkdir -p "$state"
 printf '%s%s' 'act"ive' "\\" >"$state/session"
 "$ctl" status --json | jq -e 'select(.id == "session") | .status == "inactive"' >/dev/null
 
+# --- 4d review: status --json without jq says so
+nojq_bin="$(mktemp -d)"
+for tool in bash cat grep sed awk mkdir dirname readlink find; do
+  ln -s "$(command -v "$tool")" "$nojq_bin/$tool"
+done
+rc=0
+out="$(PATH="$nojq_bin" "$ctl" status --json 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'jq is required for --json' <<<"$out"
+rm -rf "$nojq_bin"
+
 echo "integration controller contract passed"

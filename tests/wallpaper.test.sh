@@ -80,6 +80,8 @@ regex_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1
 grep -Fq 'Unknown wallpaper: d.*' <<<"$regex_out"
 exact_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set day 2>&1 || true)"
 grep -Fq "backgrounds/day.png" <<<"$exact_out"
+bs_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set 'da\y' 2>&1 || true)"
+grep -Fq 'Unknown wallpaper: da\y' <<<"$bs_out"
 rm -f "$wp_manifest"
 
 echo "wallpaper contract passed"
