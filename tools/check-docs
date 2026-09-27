@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Checks the inline documentation rules for shell and QML files (JS is
+# checked by ESLint's jsdoc rules and TypeScript). Prints
+# "file:line: missing ..." for each gap and exits 1 when there is any.
+#
+# Usage: tools/check-docs [--root DIR] FILE...
+#
+# Shell: a header comment right after the shebang (or at the top of a sourced
+# file; `set` lines and blank lines may come first), with a "Usage:" line for
+# executables under scripts/ and tools/ (not their lib/); a "#" comment
+# directly above every function definition (heredoc bodies are ignored).
+# QML: a "//" header before the imports; a "//" comment directly above every
+# root-level property, signal and function, unless its name starts with "_".
+set -euo pipefail
+
+root="."
+if [[ "${1:-}" == --root ]]; then
+  root="$2"
+  shift 2
+fi
+
+# Prints the gaps of one shell FILE (path relative to $root).
+check_shell() {
+  local file="$1" executable=0 needs_usage=0
+  [[ -x "$root/$file" ]] && executable=1
+  if ((executable)) && [[ "$file" =~ ^(scripts|tools)/ && ! "$file" =~ /lib/ ]]; then needs_usage=1; fi
+  awk -v file="$file" -v needs_usage="$needs_usage" '
+    function report(line, what) { printf "%s:%d: missing %s\n", file, line, what; bad = 1 }
+    NR == 1 && /^#!/ { next }
+    # Header: the first comment block, allowing blank and `set` lines before it.
+    !header_done {
+      if ($0 ~ /^#/ && $0 !~ /^# *shellcheck /) { in_header = 1; if ($0 ~ /Usage:/) usage = 1; prev = $0; next }
+      # Blank and `set` lines may come before the header, not inside it.
+      if (!in_header && ($0 ~ /^[[:space:]]*$/ || $0 ~ /^set /)) next
+      if (!in_header) report(NR, "header comment")
+      header_done = 1
+      if (in_header && needs_usage && !usage) report(NR - 1, "Usage: line in the header")
+      prev = ""   # the file header does not document the next function
+    }
+    # Heredoc bodies are data, not code.
+    in_heredoc { if ($0 ~ "^[[:space:]]*" heredoc_end "$") in_heredoc = 0; prev = ""; next }
+    {
+      if (match($0, /<<-?[[:space:]]*["\047]?[A-Za-z_]+["\047]?/)) {
+        tag = substr($0, RSTART, RLENGTH); sub(/^<<-?[[:space:]]*["\047]?/, "", tag); sub(/["\047]$/, "", tag)
+        heredoc_end = tag; in_heredoc = 1
+      }
+      if ($0 ~ /^[[:space:]]*(function[[:space:]]+)?[A-Za-z_][A-Za-z0-9_:-]*[[:space:]]*\(\)[[:space:]]*\{?/ && prev !~ /^[[:space:]]*#/) {
+        name = $0; sub(/^[[:space:]]*(function[[:space:]]+)?/, "", name); sub(/[[:space:]]*\(.*/, "", name)
+        report(NR, "comment for function " name)
+      }
+      if ($0 !~ /^[[:space:]]*$/) prev = $0; else prev = ""
+    }
+    END { if (!header_done && !in_header) report(1, "header comment"); exit bad }
+  ' "$root/$file"
+}
+
+# Prints the gaps of one QML FILE (path relative to $root).
+check_qml() {
+  local file="$1"
+  awk -v file="$file" '
+    function report(line, what) { printf "%s:%d: missing %s\n", file, line, what; bad = 1 }
+    # Removes string literals and // comments so braces in them do not count.
+    function code_of(s) {
+      gsub(/"([^"\\]|\\.)*"/, "\"\"", s); gsub(/\047([^\047\\]|\\.)*\047/, "\047\047", s)
+      sub(/\/\/.*$/, "", s)
+      return s
+    }
+    !seen_code {
+      if ($0 ~ /^[[:space:]]*$/) next
+      seen_code = 1
+      if ($0 !~ /^[[:space:]]*\/\//) report(NR, "header comment")
+    }
+    {
+      line = $0
+      code = code_of(line)
+      if (depth == 1 && code ~ /^[[:space:]]*((readonly|required|default)[[:space:]]+)*(property[[:space:]]|signal[[:space:]]|function[[:space:]])/) {
+        name = code; sub(/^[[:space:]]*((readonly|required|default)[[:space:]]+)*/, "", name)
+        kind = name; sub(/[[:space:]].*/, "", kind)
+        if (kind == "property") { sub(/^property[[:space:]]+[^[:space:]]+[[:space:]]+/, "", name) } else { sub(/^[a-z]+[[:space:]]+/, "", name) }
+        sub(/[^A-Za-z0-9_].*$/, "", name)
+        if (name !~ /^_/ && prev !~ /^[[:space:]]*(\/\/|\*\/|\/\*\*)/ && prev !~ /\*\/[[:space:]]*$/) report(NR, "comment for " kind " " name)
+      }
+      opens = gsub(/\{/, "{", code); closes = gsub(/\}/, "}", code)
+      depth += opens - closes
+      if (line !~ /^[[:space:]]*$/) prev = line; else prev = ""
+    }
+    END { exit bad }
+  ' "$root/$file"
+}
+
+status=0
+for file in "$@"; do
+  case "$file" in
+    *.qml) check_qml "$file" || status=1 ;;
+    *) check_shell "$file" || status=1 ;;
+  esac
+done
+exit "$status"

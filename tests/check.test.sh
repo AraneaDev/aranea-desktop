@@ -13,10 +13,12 @@ git init -q . && git config user.email t@example.invalid && git config user.name
 mkdir -p tools/lib tools/baselines docs
 cp "$repo_root/tools/check" tools/
 cp "$repo_root"/tools/lib/check-*.sh tools/lib/
+cp "$repo_root/tools/check-docs" tools/
+mkdir -p types && cp "$repo_root"/types/*.d.ts types/
 cp "$repo_root/tools/baselines/em-dash-allow.txt" tools/baselines/
 : >tools/baselines/qmllint.txt
 : >tools/baselines/coverage.txt
-for config in .prettierrc.json .prettierignore .editorconfig .qmlformat.ini eslint.config.js .markdownlint-cli2.jsonc; do cp "$repo_root/$config" .; done
+for config in .prettierrc.json .prettierignore .editorconfig .qmlformat.ini eslint.config.js .markdownlint-cli2.jsonc tsconfig.json; do cp "$repo_root/$config" .; done
 export ARANEA_CHECK_NODE_MODULES="$repo_root/node_modules"
 ln -s "$repo_root/node_modules" node_modules # the configs resolve their plugins from here
 printf 'node_modules\n' >.gitignore
@@ -325,4 +327,83 @@ else
   }
 fi
 git reset -q --hard
+# docs: undocumented code fails, documented code passes.
+mkdir -p plugins/d scripts
+cat >plugins/d/Logic.js <<'EOF'
+// Scratch logic module.
+
+/**
+ * Adds two numbers.
+ * @param {number} a - first
+ * @param {number} b - second
+ * @returns {number} the sum
+ */
+function add(a, b) {
+  return a + b
+}
+
+if (typeof module !== "undefined") module.exports = { add: add }
+EOF
+cat >plugins/d/View.qml <<'EOF'
+// Scratch view.
+import QtQuick
+
+Item {
+  // The label text; braces in "{strings}" and // comments { do not count.
+  property string label: "{"
+  property int _internal: 0
+
+  // Emitted when picked.
+  signal picked
+
+  // Clears the label.
+  function clear() {
+    label = ""
+  }
+}
+EOF
+cat >scripts/tool <<'EOF'
+#!/usr/bin/env bash
+# Scratch tool: prints hello.
+# Usage: scripts/tool
+set -euo pipefail
+
+# Prints the greeting.
+greet() {
+  cat >"$1" <<'STUB'
+undocumented_inside_heredoc() { :; }
+STUB
+  echo hello
+}
+greet /dev/null
+EOF
+chmod +x scripts/tool
+git add -A
+run_check --only docs || {
+  cat "$ARANEA_TEST_SANDBOX/out" >&2
+  exit 1
+}
+git commit -qm "documented fixtures"
+# Each planted gap fails with its own message.
+plant_docs() { # file content expected
+  printf '%s' "$2" >"$1"
+  git add -A
+  if run_check --only docs; then
+    echo "docs passed: $3" >&2
+    exit 1
+  fi
+  grep -Fq "$3" "$ARANEA_TEST_SANDBOX/out" || {
+    cat "$ARANEA_TEST_SANDBOX/out" >&2
+    exit 1
+  }
+  git reset -q --hard
+}
+plant_docs plugins/d/Bare.js $'// h\nfunction f(a) {\n  return a\n}\nif (typeof module !== "undefined") module.exports = { f: f }\n' 'Missing JSDoc'
+plant_docs plugins/d/Name.js $'// h\n/**\n * F.\n * @param {number} b - x\n * @returns {number} y\n */\nfunction f(a) {\n  return a\n}\nif (typeof module !== "undefined") module.exports = { f: f }\n' 'check-param-names'
+plant_docs plugins/d/Type.js $'// h\n/**\n * F.\n * @param {number} a - x\n * @returns {number} y\n */\nfunction f(a) {\n  return a.toUpperCase()\n}\nif (typeof module !== "undefined") module.exports = { f: f }\n' 'toUpperCase'
+plant_docs scripts/nohead $'#!/usr/bin/env bash\nset -euo pipefail\necho x\n' 'scripts/nohead:3: missing header comment'
+plant_docs scripts/fn $'#!/usr/bin/env bash\n# Tool.\n# Usage: scripts/fn\nhelper() {\n  :\n}\n' 'scripts/fn:4: missing comment for function helper'
+plant_docs plugins/d/NoHead.qml $'import QtQuick\nItem {}\n' 'plugins/d/NoHead.qml:1: missing header comment'
+plant_docs plugins/d/Prop.qml $'// h\nimport QtQuick\nItem {\n  property int count: 0\n}\n' 'plugins/d/Prop.qml:4: missing comment for property count'
+plant_docs plugins/d/Gap.qml $'// h\nimport QtQuick\nItem {\n  // Count.\n\n  property int count: 0\n}\n' 'plugins/d/Gap.qml:6: missing comment for property count'
 echo "check contract passed"
