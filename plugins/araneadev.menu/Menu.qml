@@ -21,8 +21,9 @@ Item {
   property var manifest: null
 
   // Plugin lifecycle hooks. The host calls open(payloadJson) after
-  // `omarchy-shell shell summon omarchy.menu ...` and close() when hidden.
-  property string pendingInitialMenu: "root"
+  // `omarchy-shell shell summon araneadev.menu ...` and close() when hidden.
+  // Favorites or Recent route waiting for the generated Apps rows; resolved by resolvePendingAppsRoute.
+  property string pendingInitialMenu: ""
 
   // Opens the menu at the payload's route, or as a dmenu picker when mode is select/input.
   function open(payloadJson: string): void {
@@ -99,10 +100,28 @@ Item {
   property int dmenuMaxHeight: 0
   // Whether a dmenu request is still waiting for its answer.
   property bool requestActive: false
-  // True while a bash provider is running.
-  property bool providerLoading: false
-  // True when the last bash provider exited nonzero.
-  property bool providerError: false
+  // Menu ids whose bash provider is running (id → true).
+  property var providerLoadingMenus: ({})
+  // Menu ids whose last bash provider run exited nonzero (id → true).
+  property var providerErrorMenus: ({})
+  // What the empty list shows for the active menu (its own provider only).
+  readonly property var emptyStateInfo: MenuModel.emptyState({
+    loading: !!root.providerLoadingMenus[root.activeMenu],
+    error: !!root.providerErrorMenus[root.activeMenu],
+    filter: root.filterText
+  })
+
+  // Returns a copy of map with key set (or removed); maps are replaced, not mutated, so bindings update.
+  function withFlag(map: var, key: string, value: bool): var {
+    var next = ({})
+    for (var k in map)
+      next[k] = map[k]
+    if (value)
+      next[key] = true
+    else
+      delete next[key]
+    return next
+  }
   // Set once the JSONC sources have been merged; the panel stays hidden until then.
   property bool rowsLoaded: false
   // Id of the submenu being shown.
@@ -610,6 +629,8 @@ Item {
     root.providerRevision += 1
     root.providersLoaded = ({})
     root.providerQueue = []
+    root.providerLoadingMenus = ({})
+    root.providerErrorMenus = ({})
     root.items = mergedMenu.items
     root.itemOrder = mergedMenu.itemOrder
     root.rowsLoaded = true
@@ -622,6 +643,10 @@ Item {
         else
           root.loadProviderForMenu(root.activeMenu)
       }
+    }
+    if (root.pendingInitialMenu) {
+      root.startProviderForMenu("apps")
+      root.resolvePendingAppsRoute()
     }
   }
 
@@ -753,6 +778,7 @@ Item {
     root.itemOrder = merged.itemOrder
     if (root.opened)
       root.rebuildDisplay()
+    root.resolvePendingAppsRoute()
   }
 
   // Runs the provider of submenu `id` unless it already ran; apps merge inline, others start providerProc.
@@ -769,8 +795,8 @@ Item {
     if (!spec)
       return
     root.providersLoaded[id] = true
-    root.providerLoading = true
-    root.providerError = false
+    root.providerLoadingMenus = root.withFlag(root.providerLoadingMenus, id, true)
+    root.providerErrorMenus = root.withFlag(root.providerErrorMenus, id, false)
     providerProc.menuId = id
     providerProc.providerKey = entry.provider
     providerProc.revision = root.providerRevision
@@ -1379,8 +1405,9 @@ Item {
     // Favorites and Recent are injected by the Apps provider, so resolve
     // them after that provider has merged its generated submenu entries.
     if (initialMenu === "apps.favorites" || initialMenu === "apps.recent") {
+      root.pendingInitialMenu = initialMenu
       root.startProviderForMenu("apps")
-      root.openGeneratedAppsMenu(initialMenu, 0)
+      root.resolvePendingAppsRoute()
       return
     }
     var id = root.resolveRoute(initialMenu)
@@ -1396,27 +1423,18 @@ Item {
     // If it's a link (a redirect to another menu), follow the link.
     if (entry && entry.kind === "link" && entry.target)
       id = entry.target
-    root.pendingInitialMenu = id
     root.openExistingMenu(id)
   }
 
-  // Opens apps.favorites or apps.recent, retrying for up to 12 turns before falling back to Apps.
-  function openGeneratedAppsMenu(initialMenu: string, attempt: int): void {
-    // AppLibrary can finish its first desktop-entry refresh after the summon
-    // request. Retry briefly so direct screenshot/shortcut routes never fall
-    // back to the generic Apps list just because the generated node arrived a
-    // frame later.
-    if (root.item(initialMenu)) {
-      root.openExistingMenu(initialMenu)
+  // Opens a pending Favorites/Recent route once the menu sources are loaded
+  // (a rebuild before that would drop the generated rows again): the route
+  // when its rows exist, else Apps.
+  function resolvePendingAppsRoute(): void {
+    var route = root.pendingInitialMenu
+    if (!route || !root.rowsLoaded)
       return
-    }
-    if (attempt < 12) {
-      Qt.callLater(function () {
-        root.openGeneratedAppsMenu(initialMenu, attempt + 1)
-      })
-      return
-    }
-    root.openExistingMenu("apps")
+    root.pendingInitialMenu = ""
+    root.openExistingMenu(root.item(route) ? route : "apps")
   }
 
   // Ignores the pointer until it actually moves, so a still mouse cannot steal the cursor.
@@ -1444,9 +1462,9 @@ Item {
       }
     }
     onExited: function (exitCode, exitStatus) {
-      root.providerLoading = false
-      root.providerError = exitCode !== 0
+      root.providerLoadingMenus = root.withFlag(root.providerLoadingMenus, providerProc.menuId, false)
       if (providerProc.revision === root.providerRevision) {
+        root.providerErrorMenus = root.withFlag(root.providerErrorMenus, providerProc.menuId, exitCode !== 0)
         root.mergeProviderRows(providerProc.collected, providerProc.menuId, providerProc.providerKey)
         if (root.filterText.trim())
           root.loadProvidersForSearch()
@@ -2336,7 +2354,7 @@ Item {
             visible: displayModel.count === 0 && root.mode !== "input"
 
             Text {
-              text: root.providerLoading ? "󰑐" : (root.providerError ? "󰀦" : "󰈉")
+              text: root.emptyStateInfo.icon
               color: root.selectedText
               opacity: 0.8
               font.family: root.fontFamily
@@ -2347,7 +2365,7 @@ Item {
 
             Text {
               textFormat: Text.PlainText
-              text: root.providerLoading ? "Loading…" : (root.providerError ? "Couldn’t load this list" : (root.filterText ? "No matches for “" + root.filterText + "”" : "Nothing here yet"))
+              text: root.emptyStateInfo.text
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily

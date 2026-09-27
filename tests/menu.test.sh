@@ -34,5 +34,15 @@ fi
 grep -Fq 'event.key >= Qt.Key_1 && event.key <= Qt.Key_3' "$menu_qml"
 grep -Fq 'precision: SystemClock.Minutes' "$menu_qml"
 grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_qml"
+# --- 4b: provider state per menu; routes resolve when the rows exist
+grep -Fq 'property var providerLoadingMenus: ({})' "$menu_qml"
+grep -Fq 'property var providerErrorMenus: ({})' "$menu_qml"
+grep -Fq 'MenuModel.emptyState(' "$menu_qml"
+if grep -Eq 'property bool provider(Loading|Error)|openGeneratedAppsMenu|attempt < 12' "$menu_qml"; then
+  echo "global provider flags and the route retry loop must be gone" >&2
+  exit 1
+fi
+grep -Fq 'function resolvePendingAppsRoute(): void' "$menu_qml"
+[[ "$(grep -c 'root.resolvePendingAppsRoute()' "$menu_qml")" -ge 3 ]]
 
 echo "menu contract passed"
