@@ -171,36 +171,41 @@ Item {
     root.revealedIndex = root.revealedIndex === index ? -1 : index
   }
 
-  // Our own writes come back through watchChanges; skipping that echo avoids
-  // re-parsing (and re-detecting) the whole history after every change.
-  property string lastSavedText: ""
-  // Paste/copy read the history file by index, so they wait for a pending
-  // write (Delete then Enter must not paste the neighbour from the old file).
-  property bool saving: false
-  // Paste/copy/open action waiting for the current history write to finish.
-  property var pendingAction: null
+  // Our own writes come back through watchChanges; skipping those echoes
+  // avoids re-parsing the whole history, and skipping every reload while a
+  // write is pending keeps an older file from replacing newer history.
+  property var savedTexts: []
+  // History writes started and not yet finished (saved or failed).
+  property int pendingSaves: 0
+  // Paste/copy/open actions waiting until no history write is pending; they
+  // read the history file by index, so they must see the final file.
+  property var pendingActions: []
 
-  // Writes the history as pretty JSON to historyPath and marks a save as in flight.
+  // Writes the history as pretty JSON to historyPath and counts the write as pending.
   function saveHistory() {
-    root.lastSavedText = JSON.stringify(root.history, null, 2) + "\n"
-    root.saving = true
-    historyFile.setText(root.lastSavedText)
+    var text = JSON.stringify(root.history, null, 2) + "\n"
+    root.savedTexts = root.savedTexts.concat([text]).slice(-8)
+    root.pendingSaves += 1
+    saveWatchdog.restart()
+    historyFile.setText(text)
   }
 
-  // Clears the in-flight save flag and runs the pending action, if any.
+  // Counts one write as finished; when none is pending, runs the queued actions in order.
   function finishSave() {
-    root.saving = false
-    var action = root.pendingAction
-    root.pendingAction = null
-    if (action)
-      action()
+    root.pendingSaves = Math.max(0, root.pendingSaves - 1)
+    if (root.pendingSaves > 0)
+      return
+    saveWatchdog.stop()
+    var actions = root.pendingActions
+    root.pendingActions = []
+    for (var i = 0; i < actions.length; i++)
+      actions[i]()
   }
 
-  // Runs action now, or after the in-flight save finishes (replacing any
-  // action already waiting).
+  // Runs action now, or queues it until every pending history write is done.
   function whenSaved(action) {
-    if (root.saving)
-      root.pendingAction = action
+    if (root.pendingSaves > 0)
+      root.pendingActions = root.pendingActions.concat([action])
     else
       action()
   }
@@ -452,6 +457,17 @@ Item {
     onTriggered: root.expireNow()
   }
 
+  // Safety net: if a write never reports back (FileView may merge quick
+  // writes), release the queue instead of holding pastes forever.
+  Timer {
+    id: saveWatchdog
+    interval: 2000
+    onTriggered: {
+      root.pendingSaves = 0
+      root.finishSave()
+    }
+  }
+
   Timer {
     id: noticeTimer
     interval: 3000
@@ -475,8 +491,9 @@ Item {
     printErrors: false
     onLoaded: {
       var raw = text()
-      if (raw !== root.lastSavedText)
-        root.loadHistory(raw)
+      if (root.pendingSaves > 0 || root.savedTexts.indexOf(raw) >= 0)
+        return
+      root.loadHistory(raw)
     }
     onLoadFailed: root.loadHistory("[]")
     onSaved: root.finishSave()

@@ -455,9 +455,9 @@ function enrich(value, now) {
 // the loader then saves once, so the stamped time (and secret expiry)
 // survives restarts.
 /**
- * Checks the raw history JSON for an object entry whose capturedAtMs is not a
- * finite number. A null capturedAtMs becomes 0 and so counts as stamped, and
- * plain string entries are not checked.
+ * Checks the raw history JSON for an entry without a usable capture time: a
+ * plain string entry, or an object whose capturedAtMs is not a finite number
+ * (missing, null or a string). Mirrors enrich(), which stamps exactly those.
  * @param {*} raw - The history file contents; empty means "[]".
  * @returns {boolean} True when some entry lacks a capture time; false for invalid JSON or a non-array.
  */
@@ -466,7 +466,12 @@ function hadUnstamped(raw) {
     var parsed = JSON.parse(String(raw || "[]"))
     if (!Array.isArray(parsed)) return false
     return parsed.some(function (e) {
-      return e && typeof e === "object" && !isFinite(Number(e.capturedAtMs))
+      if (typeof e === "string") return true
+      return (
+        !!e &&
+        typeof e === "object" &&
+        !(typeof e.capturedAtMs === "number" && isFinite(e.capturedAtMs))
+      )
     })
   } catch (e) {
     return false

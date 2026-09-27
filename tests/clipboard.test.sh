@@ -30,12 +30,19 @@ grep -Fq 'NumberAnimation' "$plugin/Clipboard.qml"
 grep -Fq 'ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex, Date.now())' "$plugin/Clipboard.qml"
 grep -Fq 'row.kind !== "image"' "$plugin/Clipboard.qml"
 grep -Fq ' 📌' "$plugin/Clipboard.qml"
-# m3: our own writes do not trigger a full re-parse
-grep -Fq 'root.lastSavedText' "$plugin/Clipboard.qml"
+# m3 + 4a: our own writes (every one of them) do not trigger a re-parse
+grep -Fq 'root.savedTexts.indexOf(raw) >= 0' "$plugin/Clipboard.qml"
+grep -Fq 'if (root.pendingSaves > 0' "$plugin/Clipboard.qml"
 # m4: stock entries get their capture time saved once
 grep -Fq 'ClipboardLogic.hadUnstamped' "$plugin/Clipboard.qml"
-# m10: paste/copy wait for a pending history write
-grep -Fq 'root.pendingAction' "$plugin/Clipboard.qml"
+# m10 + 4a: paste/copy wait until every pending write is done; actions queue
+block_grep "$plugin/Clipboard.qml" 'function whenSaved(action)' 'root.pendingActions = root.pendingActions.concat([action])'
+block_grep "$plugin/Clipboard.qml" 'function finishSave()' 'root.pendingSaves = Math.max(0, root.pendingSaves - 1)'
+grep -Fq 'id: saveWatchdog' "$plugin/Clipboard.qml"
+if grep -Fq 'lastSavedText' "$plugin/Clipboard.qml"; then
+  echo "lastSavedText only remembers the last write" >&2
+  exit 1
+fi
 
 # --- 4a: secrets never reach clipboard-open (Alt+Enter refused with a notice)
 block_grep "$plugin/Clipboard.qml" 'function openIndex(index)' 'ClipboardLogic.canOpen(row)'

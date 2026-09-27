@@ -290,3 +290,17 @@ test("secrets cannot be opened (4a)", () => {
   if (c.canOpen({ secret: false }) !== true) throw new Error("plain refused")
   if (c.canOpen(null) !== false) throw new Error("null opened")
 })
+
+test("unstamped entries are detected (4a)", () => {
+  const c = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
+  )
+  const t = (raw, want, msg) => {
+    if (c.hadUnstamped(raw) !== want) throw new Error(msg)
+  }
+  t('[{"type":"text","text":"a","capturedAtMs":null}]', true, "null stamp")
+  t('["plain string entry"]', true, "string entry")
+  t('[{"type":"text","text":"a","capturedAtMs":"5"}]', true, "string stamp")
+  t('[{"type":"text","text":"a","capturedAtMs":5}]', false, "stamped")
+  t("not json", false, "invalid json")
+})
