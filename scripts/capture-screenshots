@@ -63,6 +63,8 @@ if (( capture_all )); then
   find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
   omarchy restart shell >/dev/null 2>&1 || true
   sleep 3
+  # Called from the EXIT trap string below, which ShellCheck cannot see.
+  # shellcheck disable=SC2329
   restore_batch_inbox() {
     omarchy-shell notifications clear >/dev/null 2>&1 || true
     sleep 1

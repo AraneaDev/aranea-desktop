@@ -2,10 +2,9 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck unavailable; skipped"; exit 0; }
-shellcheck "$repo_root/scripts/aranea-motion" \
-  "$repo_root/scripts/aranea-wallpaper" \
-  "$repo_root/scripts/aranea-integrations" \
-  "$repo_root/scripts/aranea-doctor" \
-  "$repo_root/hooks/theme-set" \
-  "$repo_root/hooks/post-boot"
+# Same scope and flags as CI (.github/workflows/ci.yml): every shell script.
+cd "$repo_root"
+find scripts hooks tests tools .githooks -type f -print0 2>/dev/null |
+  xargs -0 grep -lI '^#!.*sh' |
+  xargs -r shellcheck -x
 echo "shellcheck contract passed"

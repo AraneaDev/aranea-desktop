@@ -35,6 +35,7 @@ test -f "$home/.config/conky/conky.conf" && test -f "$home/.config/conky/gradien
 
 # A Conky started by the old toggle (config = Aranea's symlink) is stopped;
 # the match is on that exact config path, so a user's own Conky survives.
+# shellcheck disable=SC2016 # matching the script's literal text, not expanding it
 grep -Fq 'pkill -f -- "conky -c $conky_dir/conky.conf"' "$repo_root/scripts/remove-legacy-diagnostics"
 
 echo "no-conky contract passed"
