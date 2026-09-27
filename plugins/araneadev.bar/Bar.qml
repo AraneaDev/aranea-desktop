@@ -109,7 +109,7 @@ Item {
   // Turned off briefly so a foreground switch jumps instead of animating.
   property bool foregroundAnimationEnabled: true
   // Whether Aranea motion is on. Starts from ARANEA_REDUCED_MOTION (1 = off);
-  // once the motion state file loads, its content decides ("off" = off).
+  // once the motion state file loads, the env var wins; otherwise the file's content decides ("off" = off).
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
   // State file ($XDG_STATE_HOME/aranea/motion) whose "off" content disables bar animations.
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
@@ -1420,7 +1420,7 @@ Item {
     path: root.motionStatePath
     watchChanges: true
     printErrors: false
-    onLoaded: root.motionEnabled = String(text || "").trim() !== "off"
+    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
     onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
     onFileChanged: reload()
   }

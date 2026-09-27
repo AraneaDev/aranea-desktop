@@ -144,7 +144,7 @@ Item {
     path: service.motionStatePath
     watchChanges: true
     printErrors: false
-    onLoaded: service.motionEnabled = String(text || "").trim() !== "off"
+    onLoaded: service.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
     onLoadFailed: service.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
     onFileChanged: reload()
   }

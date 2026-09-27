@@ -96,7 +96,7 @@ Item {
     path: root.motionStatePath
     watchChanges: true
     printErrors: false
-    onLoaded: root.motionEnabled = String(text || "").trim() !== "off"
+    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
     onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
     onFileChanged: reload()
   }

@@ -47,4 +47,29 @@ grep -Fq 'motionStatePath' "$repo_root/plugins/araneadev.menu/Menu.qml"
 grep -Fq 'motionStatePath' "$repo_root/plugins/araneadev.bar/Bar.qml"
 grep -Fq 'root.motionEnabled && root.foregroundAnimationEnabled' "$repo_root/plugins/araneadev.bar/Bar.qml"
 
+# --- 4b: one motion rule in every plugin: env 1 wins, else the file's "off",
+# read with text() (text is a function), and a missing file falls back to env.
+for qml in \
+  plugins/araneadev.bar/Bar.qml \
+  plugins/araneadev.menu/Menu.qml \
+  plugins/araneadev.notifications/Service.qml \
+  plugins/araneadev.osd/Osd.qml \
+  plugins/araneadev.clipboard/Clipboard.qml \
+  plugins/araneadev.emojis/Emojis.qml \
+  plugins/araneadev.polkit/PolkitAgent.qml; do
+  file="$repo_root/$qml"
+  if grep -Fq 'String(text ||' "$file"; then
+    echo "$qml reads the motion file with text instead of text()" >&2
+    exit 1
+  fi
+  grep -Eq 'onLoaded: (root|service)\.motionEnabled = Quickshell\.env\("ARANEA_REDUCED_MOTION"\) !== "1" && String\(text\(\) \|\| ""\)\.trim\(\) !== "off"' "$file" || {
+    echo "$qml: motion onLoaded must apply the env and the file" >&2
+    exit 1
+  }
+  grep -Eq 'onLoadFailed: (root|service)\.motionEnabled = Quickshell\.env\("ARANEA_REDUCED_MOTION"\) !== "1"$' "$file" || {
+    echo "$qml: motion onLoadFailed must fall back to the env" >&2
+    exit 1
+  }
+done
+
 echo "motion contract passed"
