@@ -95,4 +95,14 @@ if (fs.existsSync(stock)) {
 console.log('clipboard logic contract passed')
 NODE
 
+plugin="$repo_root/plugins/araneadev.clipboard"
+jq -e '.id == "araneadev.clipboard" and (.kinds | index("overlay")) and .entryPoints.overlay == "Clipboard.qml" and .omarchy.clonedFrom == "omarchy.clipboard"' "$plugin/manifest.json" >/dev/null
+grep -Fq 'OverlayChrome {' "$plugin/Clipboard.qml"
+grep -Fq 'ClipboardLogic.displayRows' "$plugin/Clipboard.qml"
+grep -Fq 'ClipboardLogic.expire' "$plugin/Clipboard.qml"
+grep -Fq '"--history-index", String(row.historyIndex)' "$plugin/Clipboard.qml"
+grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$plugin/Clipboard.qml"
+# the preview only shows secret text after an explicit reveal (Review Focus 1)
+grep -Fq 'root.revealedIndex === root.selectedIndex' "$plugin/Clipboard.qml"
+
 echo "clipboard contract passed"

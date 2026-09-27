@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.emojis",
+  "name": "Aranea emoji picker",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Emoji search with recents, insert and copy",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Emojis.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.emojis"
+  }
+}

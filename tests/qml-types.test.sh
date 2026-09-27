@@ -10,6 +10,8 @@ qml_files=(
   "$repo_root/plugins/araneadev.health/Service.qml"
   "$repo_root/plugins/araneadev.health/Metrics.qml"
   "$repo_root/plugins/araneadev.health/Panel.qml"
+  "$repo_root/plugins/araneadev.clipboard/Clipboard.qml"
+  "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml"
   "$repo_root/plugins/araneadev.notifications/Panel.qml"
   "$repo_root/plugins/araneadev.notifications/components/NotificationCard.qml"
   "$repo_root/plugins/araneadev.lock/Service.qml"

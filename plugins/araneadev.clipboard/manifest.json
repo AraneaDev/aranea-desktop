@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.clipboard",
+  "name": "Aranea clipboard",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Clipboard history with pins, typed rows and masked secrets",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Clipboard.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.clipboard"
+  }
+}
