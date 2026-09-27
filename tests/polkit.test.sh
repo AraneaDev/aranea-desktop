@@ -126,4 +126,33 @@ grep -Fq 'id: shakeAnimation' "$plugin/PolkitAgent.qml"
 grep -Fq 'flow.cancelAuthenticationRequest()' "$plugin/PolkitAgent.qml"
 if grep -E 'console\.(log|warn).*passwordInput' "$plugin/PolkitAgent.qml"; then echo "never log the password" >&2; exit 1; fi
 
+# --- Aranea card
+agent="$plugin/PolkitAgent.qml"
+grep -Fq 'AUTHENTICATION REQUIRED' "$agent"
+grep -Fq 'SYSTEM // PRIVILEGED' "$agent"
+grep -Fq 'aranea-glyph.svg' "$agent"
+grep -Fq 'PolkitLogic.requestMarkup(root.currentMessage' "$agent"
+grep -Fq 'textFormat: Text.StyledText' "$agent"
+grep -Fq 'PolkitLogic.contextLine(' "$agent"
+grep -Fq 'PolkitLogic.detailRows(' "$agent"
+grep -Fq 'ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL' "$agent"
+grep -Fq 'Math.max(Color.polkit.scrim.a, 0.72)' "$agent"
+grep -Fq 'aranea/motion' "$agent"
+# Review Focus 5: the card never exceeds the screen
+grep -Fq 'Math.min(Style.space(380), Math.max(Style.space(260), panel.width - Style.gapsOut * 2))' "$agent"
+# Action lookup: argv only, validated id, one request's result only (Review Focus 1)
+grep -Fq '["timeout", "2", "pkaction", "--action-id", id, "--verbose"]' "$agent"
+grep -Fq 'PolkitLogic.validActionId(id)' "$agent"
+grep -Fq 'root.lookupQueued' "$agent"
+grep -Fq 'String(flow.cookie || "") === root.lookupCookie' "$agent"
+if grep -Eq '"(sh|bash)", "-c".*pkaction' "$agent"; then echo "pkaction must not run through a shell" >&2; exit 1; fi
+# Details start collapsed for every request
+grep -Fq 'detailsOpen = false' "$agent"
+# Review Focus 4: every focus holder routes keys through one handler
+[[ "$(grep -c 'root.handleKey(event)' "$agent")" -ge 3 ]]
+grep -Fq 'Qt.Key_Backtab' "$agent"
+grep -Fq 'flow.selectedIdentity = flow.identities[' "$agent"
+# The old pill above the card is gone (the request lives in the card now)
+if grep -Fq 'justificationText' "$agent"; then echo "stock justification pill should be gone" >&2; exit 1; fi
+
 echo "polkit contract passed"

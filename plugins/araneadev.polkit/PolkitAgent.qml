@@ -1,4 +1,10 @@
+// Aranea polkit prompt. Forked from Omarchy's polkit agent
+// (shell/plugins/polkit): the flow handling, fingerprint mode, lid check and
+// failure shake are stock; the card is Aranea's — mark, request, context line
+// with the polkit action's own description, and details on Tab.
+
 import QtQuick
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Polkit
@@ -18,7 +24,12 @@ Item {
   property color border: Color.polkit.border
   property color borderError: Color.polkit.borderError
   property var borderSpec: Border.surfaceSpec("polkit", errorFlash ? "border-error" : "border", errorFlash ? borderError : border, Math.max(1, Style.space(2)), "border-alpha")
-  property color scrim: Color.polkit.scrim
+  // Lock-grade dim: at least 0.72, whatever the theme's scrim alpha is.
+  readonly property color scrim: Qt.rgba(Color.polkit.scrim.r, Color.polkit.scrim.g, Color.polkit.scrim.b, Math.max(Color.polkit.scrim.a, 0.72))
+  readonly property color dim: Util.alpha(foreground, 0.58)
+  readonly property real letterSpacing: 0.20
+  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state"))
+    + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
   readonly property int cornerRadius: Style.cornerRadius
   property int contentMargin: Style.spacing.panelPadding
   property int fieldHeight: Math.max(Style.space(42), Style.spacing.controlHeight)
@@ -28,6 +39,7 @@ Item {
   property string currentMessage: ""
   property string currentPrompt: ""
   property string currentSupplementary: ""
+  property bool supplementaryIsError: false
   property bool responseRequired: false
   property bool responseVisible: false
   property bool failed: false
@@ -39,20 +51,25 @@ Item {
   property bool laptopClosed: false
   property int shakeOffset: 0
 
+  // Context for the current request.
+  property string currentActionId: ""
+  property string actionDescription: ""
+  property string actionVendor: ""
+  property string identityText: ""
+  property string identityCount: ""
+  property bool detailsOpen: false
+  // The pkaction lookup in flight belongs to this cookie; a request that
+  // starts while one is running waits for it (lookupQueued).
+  property string lookupCookie: ""
+  property bool lookupQueued: false
+
   readonly property bool dialogVisible: polkitAgent.isActive || closing
   // We show one method at a time. Fingerprint owns the dialog while PAM is
   // waiting on the reader (lid open, sensor enrolled); the moment PAM asks for
   // a password — including immediately when the lid is shut and the clamshell
   // gate skips pam_fprintd — we switch to the password field instead.
   readonly property bool fingerprintMode: fingerprintConfigured && !laptopClosed && dialogVisible && !responseRequired && !submitted && !errorFlash
-  readonly property int cardHeight: panel.height > 0 ? Math.min(fieldHeight + contentMargin * 2, panel.height - Style.gapsOut * 2) : fieldHeight + contentMargin * 2
-  // Password mode is a wide field; fingerprint mode collapses to a square that
-  // just frames the centered sensor icon.
-  readonly property int cardWidth: fingerprintMode ? cardHeight : Math.min(Style.space(312), Math.max(Style.space(260), panel.width - Style.gapsOut * 2))
-
-  function authorizationLabel(message) {
-    return PolkitLogic.authorizationLabel(message)
-  }
+  readonly property int cardWidth: Math.min(Style.space(380), Math.max(Style.space(260), panel.width - Style.gapsOut * 2))
 
   function loadPamConfig(raw) {
     fingerprintConfigured = PolkitLogic.fingerprintConfiguredFromPamConfig(raw)
@@ -66,12 +83,30 @@ Item {
     currentMessage = ""
     currentPrompt = ""
     currentSupplementary = ""
+    supplementaryIsError = false
     responseRequired = false
     responseVisible = false
     failed = false
     errorFlash = false
     submitted = false
+    currentActionId = ""
+    actionDescription = ""
+    actionVendor = ""
+    identityText = ""
+    identityCount = ""
+    detailsOpen = false
     passwordInput.text = ""
+  }
+
+  function syncIdentity() {
+    var flow = polkitAgent.flow
+    if (!flow) {
+      identityText = ""
+      identityCount = ""
+      return
+    }
+    identityText = PolkitLogic.identityLabel(flow.selectedIdentity)
+    identityCount = PolkitLogic.identityPosition(flow.identities, flow.selectedIdentity)
   }
 
   function syncFromFlow() {
@@ -81,11 +116,28 @@ Item {
     currentMessage = String(flow.message || "Authentication is needed...")
     currentPrompt = String(flow.inputPrompt || "")
     currentSupplementary = String(flow.supplementaryMessage || "")
+    supplementaryIsError = !!flow.supplementaryIsError
+    currentActionId = String(flow.actionId || "")
     responseRequired = !!flow.isResponseRequired
     responseVisible = !!flow.responseVisible
     failed = !!flow.failed
+    syncIdentity()
 
     if (responseRequired) submitted = false
+  }
+
+  function startActionLookup() {
+    if (actionLookup.running) {
+      lookupQueued = true
+      return
+    }
+    lookupQueued = false
+    var flow = polkitAgent.flow
+    var id = flow ? String(flow.actionId || "") : ""
+    if (!flow || !PolkitLogic.validActionId(id)) return
+    lookupCookie = String(flow.cookie || "")
+    actionLookup.command = ["timeout", "2", "pkaction", "--action-id", id, "--verbose"]
+    actionLookup.running = true
   }
 
   function beginFlow() {
@@ -93,8 +145,13 @@ Item {
     closing = false
     submitted = false
     passwordInput.text = ""
+    detailsOpen = false
+    actionDescription = ""
+    actionVendor = ""
     refreshLidState()
     syncFromFlow()
+    startActionLookup()
+    if (motionEnabled) openAnimation.restart()
     Qt.callLater(refocus)
   }
 
@@ -104,6 +161,35 @@ Item {
     // key catcher so Escape still cancels; otherwise focus the password field.
     if (fingerprintMode) keyCatcher.forceActiveFocus()
     else passwordInput.forceActiveFocus()
+  }
+
+  function toggleDetails() {
+    detailsOpen = !detailsOpen
+    Qt.callLater(refocus)
+  }
+
+  function cycleIdentity() {
+    var flow = polkitAgent.flow
+    if (!flow || !flow.identities || flow.identities.length < 2) return
+    var next = PolkitLogic.nextIdentityIndex(flow.identities.length, PolkitLogic.indexOfIdentity(flow.identities, flow.selectedIdentity))
+    if (next >= 0) flow.selectedIdentity = flow.identities[next]
+  }
+
+  // One key map for every focus holder (field, key catcher, details text).
+  function handleKey(event) {
+    if (event.key === Qt.Key_Escape) {
+      cancelRequest()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+      if (responseRequired) submitResponse()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Tab) {
+      toggleDetails()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Backtab) {
+      cycleIdentity()
+      event.accepted = true
+    }
   }
 
   function submitResponse() {
@@ -157,6 +243,25 @@ Item {
     NumberAnimation { target: root; property: "shakeOffset"; to: 8; duration: 50; easing.type: Easing.InOutQuad }
     NumberAnimation { target: root; property: "shakeOffset"; to: 0; duration: 55; easing.type: Easing.OutQuad }
   }
+
+  // Lock-like entrance (scrim fade, card fade + slight scale), unless Aranea
+  // motion is off (`off` in ~/.local/state/aranea/motion, or
+  // ARANEA_REDUCED_MOTION=1).
+  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  FileView {
+    path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.motionEnabled = String(text() || "").trim() !== "off"
+    onFileChanged: reload()
+  }
+  ParallelAnimation {
+    id: openAnimation
+    NumberAnimation { target: scrimRect; property: "opacity"; from: 0; to: 1; duration: 160; easing.type: Easing.OutCubic }
+    NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    NumberAnimation { target: card; property: "scale"; from: 0.97; to: 1; duration: 180; easing.type: Easing.OutCubic }
+  }
+
   FileView {
     path: "/etc/pam.d/polkit-1"
     watchChanges: true
@@ -173,6 +278,23 @@ Item {
     onExited: root.laptopClosed = String(laptopClosedOut.text || "").trim() === "closed"
   }
 
+  // The polkit action's own description and vendor. Never waited on: until
+  // it answers (or when it fails) the context line shows the identity only.
+  Process {
+    id: actionLookup
+    stdout: StdioCollector { id: actionLookupOut; waitForEnd: true }
+    onExited: function(exitCode) {
+      var flow = polkitAgent.flow
+      // A result belongs to one request: drop it for a finished or newer one.
+      if (flow && exitCode === 0 && String(flow.cookie || "") === root.lookupCookie) {
+        var info = PolkitLogic.parseActionInfo(actionLookupOut.text)
+        root.actionDescription = info.description
+        root.actionVendor = info.vendor
+      }
+      if (root.lookupQueued) Qt.callLater(root.startActionLookup)
+    }
+  }
+
   PolkitAgent {
     id: polkitAgent
     path: "/org/omarchy/PolkitAgent"
@@ -184,7 +306,7 @@ Item {
     }
     onIsRegisteredChanged: {
       if (isRegistered) console.log("aranea polkit agent registered")
-      else console.warn("omarchy polkit agent is not registered; another agent may be running")
+      else console.warn("aranea polkit agent is not registered; another agent may be running")
     }
   }
 
@@ -200,6 +322,8 @@ Item {
     function onInputPromptChanged() { root.syncFromFlow() }
     function onResponseVisibleChanged() { root.syncFromFlow() }
     function onSupplementaryMessageChanged() { root.syncFromFlow() }
+    function onSupplementaryIsErrorChanged() { root.syncFromFlow() }
+    function onSelectedIdentityChanged() { root.syncIdentity() }
     function onFailedChanged() { root.syncFromFlow() }
 
     function onAuthenticationFailed() {
@@ -229,6 +353,7 @@ Item {
     exclusionMode: ExclusionMode.Ignore
 
     Rectangle {
+      id: scrimRect
       anchors.fill: parent
       color: root.scrim
     }
@@ -241,7 +366,7 @@ Item {
     BorderSurface {
       id: card
       width: root.cardWidth
-      height: root.cardHeight
+      height: Math.min(content.implicitHeight + card.contentTopInset + card.contentBottomInset, panel.height - Style.gapsOut * 2)
       radius: root.cornerRadius
       anchors.centerIn: parent
       anchors.horizontalCenterOffset: root.shakeOffset
@@ -257,135 +382,272 @@ Item {
         focus: true
 
         Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function(event) {
-          if (event.key === Qt.Key_Escape) {
-            root.cancelRequest()
-            event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.responseRequired) root.submitResponse()
-            event.accepted = true
+        Keys.onPressed: function(event) { root.handleKey(event) }
+      }
+
+      ColumnLayout {
+        id: content
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: card.contentTopInset
+        anchors.leftMargin: card.contentLeftInset
+        anchors.rightMargin: card.contentRightInset
+        spacing: Style.space(10)
+
+        // Header: the mark says this is the system asking.
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(10)
+
+          Image {
+            Layout.preferredWidth: Style.space(22)
+            Layout.preferredHeight: Style.space(22)
+            source: root.glyphSource
+            sourceSize: Qt.size(44, 44)
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
+
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: Style.space(2)
+            Text {
+              Layout.fillWidth: true
+              textFormat: Text.PlainText
+              text: "AUTHENTICATION REQUIRED"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.title
+              font.weight: Font.Medium
+              font.letterSpacing: root.letterSpacing
+              elide: Text.ElideRight
+            }
+            Text {
+              Layout.fillWidth: true
+              textFormat: Text.PlainText
+              text: "SYSTEM // PRIVILEGED"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.weight: Font.Medium
+              font.letterSpacing: root.letterSpacing
+              elide: Text.ElideRight
+            }
           }
         }
-      }
 
-      // Fingerprint mode shows just the sensor icon, centered and alone \u2014 no
-      // padlock, no field, no prompt text.
-      OpticalGlyph {
-        anchors.centerIn: parent
-        width: Math.round(root.fieldHeight * 0.7)
-        height: width
-        visible: root.fingerprintMode
-        text: "\udb80\ude37"
-        fontFamily: root.fontFamily
-        fontSize: Math.round(root.fieldHeight * 0.7)
-        color: root.errorFlash ? Color.polkit.textError : root.accent
-      }
-
-      Row {
-        id: cardRow
-        visible: !root.fingerprintMode
-        anchors.fill: parent
-        anchors.topMargin: card.contentTopInset
-        anchors.rightMargin: card.contentRightInset
-        anchors.bottomMargin: card.contentBottomInset
-        anchors.leftMargin: card.contentLeftInset
-        spacing: Style.space(14)
-
+        // The request, command in the accent colour (polkit text escaped).
         Text {
-          text: "\uf023"
-          color: root.errorFlash ? Color.polkit.textError : root.accent
+          Layout.fillWidth: true
+          textFormat: Text.StyledText
+          text: PolkitLogic.requestMarkup(root.currentMessage, root.accent.toString())
+          color: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: Style.font.iconLarge
-          width: Style.space(26)
-          height: root.fieldHeight
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
+          font.pixelSize: Style.font.subtitle
+          wrapMode: Text.Wrap
+          maximumLineCount: 2
+          elide: Text.ElideRight
         }
 
-        Item {
-          width: parent.width - Style.space(40)
-          height: root.fieldHeight
-
-          TextInput {
-            id: passwordInput
-            anchors.fill: parent
-            verticalAlignment: TextInput.AlignVCenter
-            activeFocusOnPress: true
-            clip: true
-            selectionColor: Util.alpha(root.accent, 0.45)
-            selectedTextColor: root.foreground
+        // What polkit says the action is, and who is authenticating.
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(8)
+          Text {
+            Layout.fillWidth: true
+            textFormat: Text.PlainText
+            text: PolkitLogic.contextLine(root.actionDescription, root.identityText, root.identityCount)
+            color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.iconLarge
-            echoMode: root.responseVisible ? TextInput.Normal : TextInput.Password
-            passwordCharacter: "\u2022"
-            color: root.errorFlash ? Color.polkit.textError : root.foreground
-            cursorVisible: activeFocus && !root.submitted && !root.errorFlash
-            readOnly: root.submitted || root.errorFlash
-            enabled: root.dialogVisible
-            onAccepted: root.submitResponse()
-            Keys.onPressed: function(event) {
-              if (event.key === Qt.Key_Escape) {
-                root.cancelRequest()
-                event.accepted = true
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
+          Text {
+            textFormat: Text.PlainText
+            text: (root.detailsOpen ? "▴" : "▾") + " DETAILS"
+            color: root.accent
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.weight: Font.Medium
+            font.letterSpacing: root.letterSpacing
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.toggleDetails()
+            }
+          }
+        }
+
+        // Details: raw polkit data, selectable, hidden rows when empty.
+        ColumnLayout {
+          Layout.fillWidth: true
+          visible: root.detailsOpen
+          spacing: Style.space(4)
+          Repeater {
+            model: PolkitLogic.detailRows(root.currentActionId, root.actionVendor, PolkitLogic.commandFromMessage(root.currentMessage), root.currentMessage)
+            delegate: RowLayout {
+              id: detailRow
+              required property var modelData
+              Layout.fillWidth: true
+              spacing: Style.space(10)
+              Text {
+                Layout.preferredWidth: Style.space(64)
+                Layout.alignment: Qt.AlignTop
+                textFormat: Text.PlainText
+                text: detailRow.modelData.key
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.Medium
+                font.letterSpacing: root.letterSpacing
+              }
+              TextEdit {
+                Layout.fillWidth: true
+                textFormat: TextEdit.PlainText
+                text: detailRow.modelData.value
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.WrapAnywhere
+                color: root.foreground
+                selectionColor: Util.alpha(root.accent, 0.45)
+                selectedTextColor: root.foreground
+                font.family: Style.font.family
+                font.pixelSize: Style.font.bodySmall
+                Keys.priority: Keys.BeforeItem
+                Keys.onPressed: function(event) { root.handleKey(event) }
               }
             }
           }
+        }
 
-          Text {
-            textFormat: Text.PlainText
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.errorFlash ? "Wrong" : (root.submitted ? "Checking..." : "Enter password")
-            color: root.errorFlash ? Color.polkit.textError : root.foreground
-            opacity: root.errorFlash ? 1 : 0.36
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.iconLarge
-            elide: Text.ElideRight
-            visible: passwordInput.text.length === 0
+        // Password field (or the sensor in fingerprint mode).
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: root.fieldHeight
+          radius: root.cornerRadius
+          color: Util.alpha(root.foreground, 0.04)
+          border.width: 1
+          border.color: root.errorFlash ? Color.polkit.textError : Util.alpha(root.foreground, passwordInput.activeFocus ? 0.22 : 0.10)
+
+          Row {
+            visible: root.fingerprintMode
+            anchors.centerIn: parent
+            spacing: Style.space(10)
+            OpticalGlyph {
+              width: Math.round(root.fieldHeight * 0.55)
+              height: width
+              text: "󰈷"
+              fontFamily: root.fontFamily
+              fontSize: Math.round(root.fieldHeight * 0.55)
+              color: root.errorFlash ? Color.polkit.textError : root.accent
+            }
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: "TOUCH THE SENSOR"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.weight: Font.Medium
+              font.letterSpacing: root.letterSpacing
+            }
           }
 
-          Rectangle {
-            width: Math.max(1, Style.space(2))
-            height: Style.space(24)
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            color: root.errorFlash ? Color.polkit.textError : root.foreground
-            visible: passwordInput.visible && passwordInput.activeFocus && passwordInput.text.length === 0 && !root.submitted && !root.errorFlash
-          }
-
-          MouseArea {
+          Row {
+            visible: !root.fingerprintMode
             anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            enabled: passwordInput.visible
-            onClicked: passwordInput.forceActiveFocus()
+            anchors.leftMargin: Style.space(12)
+            anchors.rightMargin: Style.space(12)
+            spacing: Style.space(10)
+
+            Text {
+              text: ""
+              color: root.errorFlash ? Color.polkit.textError : root.accent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.iconLarge
+              width: Style.space(20)
+              height: root.fieldHeight
+              horizontalAlignment: Text.AlignHCenter
+              verticalAlignment: Text.AlignVCenter
+            }
+
+            Item {
+              width: parent.width - Style.space(30)
+              height: root.fieldHeight
+
+              TextInput {
+                id: passwordInput
+                anchors.fill: parent
+                verticalAlignment: TextInput.AlignVCenter
+                activeFocusOnPress: true
+                clip: true
+                selectionColor: Util.alpha(root.accent, 0.45)
+                selectedTextColor: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.iconLarge
+                echoMode: root.responseVisible ? TextInput.Normal : TextInput.Password
+                passwordCharacter: "•"
+                color: root.errorFlash ? Color.polkit.textError : root.foreground
+                cursorVisible: activeFocus && !root.submitted && !root.errorFlash
+                readOnly: root.submitted || root.errorFlash
+                enabled: root.dialogVisible
+                Keys.priority: Keys.BeforeItem
+                Keys.onPressed: function(event) { root.handleKey(event) }
+              }
+
+              Text {
+                textFormat: Text.PlainText
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.errorFlash ? "Wrong" : (root.submitted ? "Checking..." : PolkitLogic.promptPlaceholder(root.currentPrompt))
+                color: root.errorFlash ? Color.polkit.textError : root.foreground
+                opacity: root.errorFlash ? 1 : 0.36
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.subtitle
+                elide: Text.ElideRight
+                visible: passwordInput.text.length === 0
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                onClicked: passwordInput.forceActiveFocus()
+              }
+            }
           }
         }
-      }
-    }
 
-    Rectangle {
-      width: Math.min(justificationText.implicitWidth + Style.space(24), panel.width - Style.gapsOut * 2)
-      height: Style.space(28)
-      anchors.horizontalCenter: card.horizontalCenter
-      anchors.bottom: card.top
-      anchors.bottomMargin: Style.space(10)
-      radius: root.cornerRadius
-      color: root.background
+        // PAM's own messages ("Sorry, try again", fingerprint hints).
+        Text {
+          Layout.fillWidth: true
+          visible: root.currentSupplementary.length > 0
+          textFormat: Text.PlainText
+          text: root.currentSupplementary
+          color: root.supplementaryIsError ? Color.polkit.textError : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.Wrap
+        }
 
-      Text {
-        id: justificationText
-        textFormat: Text.PlainText
-        anchors.fill: parent
-        anchors.leftMargin: Style.space(12)
-        anchors.rightMargin: Style.space(12)
-        text: root.authorizationLabel(root.currentMessage)
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideMiddle
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: 1
+          color: Util.alpha(root.foreground, 0.10)
+        }
+
+        Text {
+          Layout.fillWidth: true
+          textFormat: Text.PlainText
+          text: root.fingerprintMode ? "TAB DETAILS · ESC CANCEL" : "ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.weight: Font.Medium
+          font.letterSpacing: root.letterSpacing
+          elide: Text.ElideRight
+        }
       }
     }
   }
