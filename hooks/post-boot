@@ -10,7 +10,6 @@
 
 mkdir -p ~/.config/omarchy/branding
 ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
-~/.local/state/omarchy/current/theme/scripts/remove-legacy-diagnostics || true
 
 theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
 profile_file="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"

@@ -46,7 +46,6 @@ ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
 ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
-~/.local/state/omarchy/current/theme/scripts/remove-legacy-diagnostics || true
 
 # Apply optional developer integrations through the ownership-aware linker.
 # Missing applications are skipped and existing configs are backed up.
