@@ -257,7 +257,8 @@ test("plugin-state logic", () => {
   requiresSignature(menuQml, "id: localAppLibrary", "menu local app-library fallback")
   requiresSignature(menuQml, "DesktopEntries.applications.values", "menu DesktopEntries fallback")
   requiresSignature(menuQml, "function openRoute(initialMenu: string): void", "menu openRoute")
-  requiresSignature(menuQml, "function goBack(): void", "menu goBack")
+  requiresSignature(menuQml, "function goBack(): bool", "menu goBack")
+  requiresSignature(menuQml, "function runAction(action): void", "menu runAction")
   requiresSignature(menuQml, "function rebuildDisplay(): void", "menu rebuildDisplay")
   requiresSignature(menuQml, "function revealCursor(): void", "menu revealCursor")
   requiresSignature(
@@ -370,7 +371,7 @@ test("plugin-state logic", () => {
     "bar pluginBarApiUsed"
   )
   requiresSignature(barQml, "function moduleWidgets(pluginId: string): var", "bar moduleWidgets")
-  requiresSignature(barQml, "function run(command: string): void", "bar run")
+  requiresSignature(barQml, "function run(command): void", "bar run")
   requiresSignature(barQml, "function toggleTransparency(): void", "bar toggleTransparency")
   requiresSignature(
     barQml,

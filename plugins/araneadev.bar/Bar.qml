@@ -1113,9 +1113,9 @@ Item {
       root.centerSectionRevealHeld = false
   }
 
-  // Run a shell command detached; empty commands are ignored.
-  function run(command: string): void {
-    if (!command)
+  // Run a shell command detached; anything but a non-empty string is ignored.
+  function run(command): void {
+    if (typeof command !== "string" || !command.trim())
       return
     Util.execDetached(command)
   }

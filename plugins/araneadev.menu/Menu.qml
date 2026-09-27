@@ -326,15 +326,9 @@ Item {
   // tokens, so these are composited here instead of reaching for ad-hoc
   // Color.menu members that older shells do not publish.
   property color contextText: Util.alpha(foreground, 0.58)
-  // Faint fill for root tiles (currently unused in this file).
-  property color tileBackground: Util.alpha(foreground, 0.045)
   // Root tile fill: tinted with the selection color when hovered.
   function hoveredTileBackground(hovered: bool): color {
     return hovered ? Util.alpha(selectedText, 0.10) : Util.alpha(foreground, 0.028)
-  }
-  // Root tile border color, stronger when hovered (currently unused in this file).
-  function hoveredTileBorder(hovered: bool): color {
-    return hovered ? Util.alpha(selectedText, 0.72) : Util.alpha(foreground, 0.16)
   }
   // Color of the root footer text.
   property color footerText: Util.alpha(foreground, 0.58)
@@ -350,7 +344,7 @@ Item {
   property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", selectedBorder, 0)
   // Left border width of the cursor row, added to every row's content inset.
   readonly property real rowReservedBorderLeft: Border.left(selectedBorderSpec)
-  // Right border width of the cursor row (currently unused in this file).
+  // Space the row reserves on its right edge for the selection border.
   readonly property real rowReservedBorderRight: Border.right(selectedBorderSpec)
   // Corner radius of the card and its header.
   readonly property int cornerRadius: Math.max(8, Style.space(8))
@@ -366,8 +360,6 @@ Item {
   property int contentMargin: Style.spacing.panelPadding
   // Header height for submenus and dmenu requests.
   property int headerHeight: Math.max(Style.space(46), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
-  // Alternative compact header height (currently unused in this file).
-  property int compactHeaderHeight: Math.max(Style.space(64), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   // Header height on the unfiltered root menu.
   property int rootHeaderHeight: Math.max(Style.space(68), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   // Height of the root tile row.
@@ -467,15 +459,14 @@ Item {
     resultProc.running = true
   }
 
-  // Runs a shell command detached; empty commands are ignored.
-  function runAction(action: string): void {
-    var command = String(action || "")
-    if (!command)
+  // Runs a shell command detached; anything but a non-empty string is ignored.
+  function runAction(action): void {
+    if (typeof action !== "string" || !action.trim())
       return
-    Util.execDetached(command)
+    Util.execDetached(action)
   }
 
-  // Handles a root tile click: open Files, a terminal, Setup, or launch the tile's app.
+  // Handles a root tile click or Ctrl+1..3: open Files, a terminal or Setup.
   function activateTile(tile): void {
     if (!tile)
       return
@@ -492,9 +483,6 @@ Item {
     if (tile.id === "tile.setup") {
       root.openRoute("setup")
       return
-    }
-    if (tile.appId && root.appLibrary && typeof root.appLibrary.launch === "function") {
-      root.appLibrary.launch(tile.appId, tile.label)
     }
   }
 
@@ -1214,20 +1202,20 @@ Item {
     root.loadProviderForMenu(id)
   }
 
-  // Returns to the previous submenu (or the parent); does nothing on root.
-  function goBack(): void {
+  // Returns to the previous submenu (or the parent); returns false on root.
+  function goBack(): bool {
     if (root.activeMenu === "root")
       return false
 
     if (root.navStack.length > 0) {
       var previous = root.navStack[root.navStack.length - 1]
       root.navStack = root.navStack.slice(0, root.navStack.length - 1)
-      root.setActiveMenu(previous, false)
+      root.setActiveMenu(previous, false, false)
       return true
     }
 
     var active = root.item(root.activeMenu)
-    root.setActiveMenu((active && active.parent) ? active.parent : "root", false)
+    root.setActiveMenu((active && active.parent) ? active.parent : "root", false, false)
     return true
   }
 
@@ -1392,7 +1380,7 @@ Item {
   // ----------------------------------------------------------- route surface
   //
   // The menu is opened through the standard plugin lifecycle:
-  // `omarchy-shell shell summon omarchy.menu '{"menu":"system"}'`.
+  // `omarchy-shell shell summon araneadev.menu '{"menu":"system"}'`.
   // Callers may pass a real id (`system`, `setup.power`) or an alias declared
   // in JSONC (`power`, `reminder-set`). Unknown strings fall through to the
   // id-as-route behavior so misspellings still attempt to open the literal id.
@@ -1413,7 +1401,7 @@ Item {
     var id = root.resolveRoute(initialMenu)
     var entry = root.items[id]
     // If the resolved id is an action (i.e. the user invoked an alias for
-    // a leaf, e.g. `omarchy menu summon screenrecord-stop`), run it directly
+    // a leaf, e.g. `omarchy-shell shell summon araneadev.menu '{"menu":"screenrecord-stop"}'`), run it directly
     // instead of opening an action with no children.
     if (entry && entry.kind === "action" && entry.action) {
       root.cancel()
@@ -1754,9 +1742,9 @@ Item {
               if (root.mode === "input")
                 root.applyDmenuSelection(root.filterText)
               else if (displayModel.count > 0)
-                root.activateIndex(root.cursorActive ? root.selectedIndex : 0)
+                root.activateIndex(root.cursorActive ? root.selectedIndex : 0, false)
             } else if (root.cursorActive)
-              root.activateIndex(root.selectedIndex)
+              root.activateIndex(root.selectedIndex, false)
             else if (displayModel.count > 0)
               root.cursorActive = true
             event.accepted = true
@@ -2256,17 +2244,6 @@ Item {
 
                 Text {
                   textFormat: Text.PlainText
-                  visible: false
-                  text: row.childCount
-                  color: root.foreground
-                  opacity: 0.45
-                  font.family: root.fontFamily
-                  font.pixelSize: root.menuFontSize(Style.font.body)
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Text {
-                  textFormat: Text.PlainText
                   text: row.kind === "menu" || row.kind === "link" ? "›" : ""
                   color: row.hasCursor ? root.selectedText : root.foreground
                   opacity: row.kind === "menu" || row.kind === "link" ? 0.36 : 0
@@ -2374,11 +2351,6 @@ Item {
               width: Style.space(320)
             }
           }
-        }
-
-        Item {
-          width: parent.width
-          height: 0
         }
       }
     }

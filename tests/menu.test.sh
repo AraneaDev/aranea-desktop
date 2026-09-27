@@ -44,5 +44,17 @@ if grep -Eq 'property bool provider(Loading|Error)|openGeneratedAppsMenu|attempt
 fi
 grep -Fq 'function resolvePendingAppsRoute(): void' "$menu_qml"
 [[ "$(grep -c 'root.resolvePendingAppsRoute()' "$menu_qml")" -ge 3 ]]
+# --- 4b: no "undefined" commands; scaled bar button; dead code stays gone
+block_grep "$menu_qml" 'function runAction(action): void' 'if (typeof action !== "string" || !action.trim())'
+block_grep "$repo_root/plugins/araneadev.bar/Bar.qml" 'function run(command): void' 'if (typeof command !== "string" || !command.trim())'
+grep -Fq 'fixedWidth: Style.space(30)' "$repo_root/plugins/araneadev.menu/BarWidget.qml"
+if grep -Eq 'tileBackground|hoveredTileBorder|compactHeaderHeight|summon omarchy\.menu|text: row\.childCount|tile\.appId' "$menu_qml"; then
+  echo "menu dead code or stale comments are back" >&2
+  exit 1
+fi
+if grep -Eq 'root\.setActiveMenu\([^,()]+, (true|false)\)|root\.activateIndex\([^,()]+\)$' "$menu_qml"; then
+  echo "setActiveMenu/activateIndex must receive every declared argument" >&2
+  exit 1
+fi
 
 echo "menu contract passed"

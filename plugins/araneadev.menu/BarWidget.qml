@@ -2,6 +2,7 @@
 // in the omarchy-shell bar. Left click toggles the menu, right click opens a terminal.
 import Quickshell
 import QtQuick
+import qs.Commons
 import qs.Ui
 
 BarWidget {
@@ -19,7 +20,7 @@ BarWidget {
     bar: root.bar
     text: " "
     labelVisible: false
-    fixedWidth: 30
+    fixedWidth: Style.space(30)
     fixedHeight: root.bar ? root.bar.barSize : 32
     horizontalMargin: 0
     verticalPadding: 0
@@ -27,8 +28,8 @@ BarWidget {
 
     Image {
       anchors.centerIn: parent
-      width: 16
-      height: 16
+      width: Style.space(16)
+      height: Style.space(16)
       source: "file://" + root.brandingMarksPath + "aranea-glyph.svg"
       fillMode: Image.PreserveAspectFit
       sourceSize.width: width * Screen.devicePixelRatio
