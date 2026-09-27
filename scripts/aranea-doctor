@@ -15,14 +15,14 @@ for arg in "$@"; do
     --fix) fix=1 ;;
   esac
 done
-if (( json )) && ! command -v jq >/dev/null 2>&1; then
+if ((json)) && ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' 'jq is required for --json' >&2
   exit 2
 fi
 
 emit() {
   local id="$1" status="$2" message="$3"
-  if (( json )); then
+  if ((json)); then
     jq -cn --arg id "$id" --arg status "$status" --arg message "$message" '{id: $id, status: $status, message: $message}'
   else
     printf '%-14s %-8s %s\n' "$id" "$status" "$message"
@@ -59,22 +59,22 @@ post_boot_hook="$hook_root/post-boot.d/post-boot"
 # update: theme-set/post-boot never fire, so nothing re-runs
 # repair-shell-config. Reinstalling the hook files directly is safe to redo
 # unconditionally.
-if (( fix )) && [[ -z "${ARANEA_DOCTOR_HOOKS:-}" ]]; then
+if ((fix)) && [[ -z "${ARANEA_DOCTOR_HOOKS:-}" ]]; then
   install -Dm755 "$repo_root/hooks/theme-set" "$theme_hook" 2>/dev/null || true
   install -Dm755 "$repo_root/hooks/post-boot" "$post_boot_hook" 2>/dev/null || true
 fi
 
 if [[ "${ARANEA_DOCTOR_HOOKS:-}" == ok ]]; then
   hooks_ok=1
-elif [[ -f "$theme_hook" && -f "$post_boot_hook" ]] \
-  && cmp -s "$repo_root/hooks/theme-set" "$theme_hook" \
-  && cmp -s "$repo_root/hooks/post-boot" "$post_boot_hook"; then
+elif [[ -f "$theme_hook" && -f "$post_boot_hook" ]] &&
+  cmp -s "$repo_root/hooks/theme-set" "$theme_hook" &&
+  cmp -s "$repo_root/hooks/post-boot" "$post_boot_hook"; then
   hooks_ok=1
 else
   hooks_ok=0
 fi
 
-if (( hooks_ok )); then
+if ((hooks_ok)); then
   emit hooks ok 'theme-set and post-boot hooks reported healthy'
 else
   emit hooks repair 'theme-set or post-boot hook is missing or stale'
@@ -97,7 +97,7 @@ if [[ -d "$icon_root/scalable" ]]; then
   broken_icon_count="$(find "$icon_root/scalable" -xtype l -name '*.svg' -print 2>/dev/null | wc -l)"
   linked_icon_count="$(find "$icon_root/scalable" -type l -name '*.svg' -print 2>/dev/null | wc -l)"
 fi
-if [[ -f "$icon_root/index.theme" ]] && (( installed_icon_count == expected_icon_count )) && (( broken_icon_count == 0 )) && (( linked_icon_count == 0 )); then
+if [[ -f "$icon_root/index.theme" ]] && ((installed_icon_count == expected_icon_count)) && ((broken_icon_count == 0)) && ((linked_icon_count == 0)); then
   emit icons ok "Aranea-icons has $installed_icon_count standalone SVGs"
 else
   emit icons repair "Aranea-icons is incomplete or linked to a missing checkout; run scripts/install-integration --yes icons"
@@ -125,11 +125,11 @@ if [[ -f "$ownership_record_file" ]]; then
     elif ! is_aranea_target "$managed_target"; then
       ownership_customised+=("$managed_target")
     fi
-  done < "$ownership_record_file"
+  done <"$ownership_record_file"
 fi
-if (( ! ownership_ok )); then
+if ((! ownership_ok)); then
   emit ownership repair 'one or more managed targets are missing or stale'
-elif (( ${#ownership_customised[@]} > 0 )); then
+elif ((${#ownership_customised[@]} > 0)); then
   emit ownership ok "${ownership_count} managed targets, ${#ownership_customised[@]} customised and left alone: ${ownership_customised[*]:0:3}"
 else
   emit ownership ok "${ownership_count} managed targets are present"
@@ -152,7 +152,7 @@ if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
   # directories actually exist on disk even when no plugin file changed, so
   # it also repairs the "deployed but never enabled" drift this doctor check
   # exists to catch.
-  if (( fix )) && command -v omarchy-shell >/dev/null 2>&1 && [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]; then
+  if ((fix)) && command -v omarchy-shell >/dev/null 2>&1 && [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]; then
     "$repo_root/scripts/deploy-plugins-safely" "$repo_root" >/dev/null 2>&1 || true
   fi
   if command -v omarchy-shell >/dev/null 2>&1; then
@@ -202,7 +202,7 @@ if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
       inbox_total=$((inbox_total + 1))
       jq -e 'type == "object"' "$inbox_file" >/dev/null 2>&1 || inbox_bad=$((inbox_bad + 1))
     done
-    if (( inbox_bad > 0 )); then
+    if ((inbox_bad > 0)); then
       emit notifications repair "inbox holds $inbox_total entries, $inbox_bad unreadable"
     else
       emit notifications ok "inbox holds $inbox_total entries"
@@ -211,7 +211,10 @@ if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
 fi
 
 if ! emit_override health ARANEA_DOCTOR_HEALTH_STATUS; then
-  health_units=off; health_disk=off; health_reboot=off; health_docker='off (docker not installed)'
+  health_units=off
+  health_disk=off
+  health_reboot=off
+  health_docker='off (docker not installed)'
   command -v systemctl >/dev/null 2>&1 && health_units=on
   command -v df >/dev/null 2>&1 && health_disk=on
   [[ -d /usr/lib/modules ]] && health_reboot=on

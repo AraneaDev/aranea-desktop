@@ -20,9 +20,18 @@ case "${1:-current}" in
     fi
     ;;
   set)
-    [[ "$profile" =~ ^(minimal|diagnostic|ceremony)$ ]] || { usage; exit 2; }
-    [[ -f "$config_file" ]] || { printf 'Shell config not found: %s\n' "$config_file" >&2; exit 1; }
-    command -v jq >/dev/null 2>&1 || { printf 'jq is required to set the bar profile\n' >&2; exit 1; }
+    [[ "$profile" =~ ^(minimal|diagnostic|ceremony)$ ]] || {
+      usage
+      exit 2
+    }
+    [[ -f "$config_file" ]] || {
+      printf 'Shell config not found: %s\n' "$config_file" >&2
+      exit 1
+    }
+    command -v jq >/dev/null 2>&1 || {
+      printf 'jq is required to set the bar profile\n' >&2
+      exit 1
+    }
 
     # Write through a symlinked shell.json instead of replacing the link.
     resolved_config="$(readlink -f -- "$config_file" 2>/dev/null || true)"
@@ -32,7 +41,7 @@ case "${1:-current}" in
     backup_file="$config_file.aranea-profile.bak"
     cleanup() { rm -f "$tmp_file"; }
     trap cleanup EXIT
-    jq --arg profile "$profile" '.bar = ((.bar // {}) + {profile: $profile})' "$config_file" > "$tmp_file"
+    jq --arg profile "$profile" '.bar = ((.bar // {}) + {profile: $profile})' "$config_file" >"$tmp_file"
     if cmp -s "$config_file" "$tmp_file"; then
       printf 'bar profile already: %s\n' "$profile"
       exit 0

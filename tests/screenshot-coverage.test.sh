@@ -44,7 +44,10 @@ grep -Fq 'trap cleanup_health_probe EXIT' "$capture_script"
 # The bell belongs in every capture: never disable the notifications plugin
 # (the host rewrites a disabled clone's bar entry). The real inbox is parked
 # for the batch instead, so badges show capture data only.
-if grep -Eq 'plugin (disable|enable) araneadev.notifications' "$capture_script"; then echo "capture must not toggle the notifications plugin" >&2; exit 1; fi
+if grep -Eq 'plugin (disable|enable) araneadev.notifications' "$capture_script"; then
+  echo "capture must not toggle the notifications plugin" >&2
+  exit 1
+fi
 grep -Fq 'batch_inbox_backup' "$capture_script"
 # The health probe is cleared before the next surface is captured.
 grep -Fq 'omarchy-shell health refresh' "$capture_script"
@@ -65,7 +68,10 @@ grep -Fq 'pkexec /usr/bin/true' "$capture_script"
 grep -Fq 'wtype -k Escape' "$capture_script"
 grep -Fq 'omarchy-polkit' "$capture_script"
 # Only single named keys (Tab, Escape) are ever sent; no text.
-if grep -E '^\s*wtype |[;&|(] *wtype ' "$capture_script" | grep -Ev 'wtype -k (Tab|Escape)( |$)'; then echo "capture must never type text" >&2; exit 1; fi
+if grep -E '^\s*wtype |[;&|(] *wtype ' "$capture_script" | grep -Ev 'wtype -k (Tab|Escape)( |$)'; then
+  echo "capture must never type text" >&2
+  exit 1
+fi
 
 # Final review I2: no keys are sent unless the prompt is on screen, and a
 # pkexec left running is killed.
@@ -74,20 +80,23 @@ grep -Fq "kill \"\$pkexec_pid\"" "$capture_script"
 # The real inbox / picker data is protected by a restore trap set before it
 # is moved aside, and parked under the state dir, not /tmp (spec D).
 line_of() { grep -nF -- "$1" "$capture_script" | head -n 1 | cut -d: -f1; }
-(( $(line_of 'trap restore_inbox EXIT') < $(line_of "mv -t \"\$inbox_backup\"") ))
-(( $(line_of 'trap finish_picker EXIT') < $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"") ))
+(($(line_of 'trap restore_inbox EXIT') < $(line_of "mv -t \"\$inbox_backup\"")))
+(($(line_of 'trap finish_picker EXIT') < $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"")))
 grep -Fq "inbox_backup=\"\$(mktemp -d \"\$state_home/aranea/capture-backup.XXXXXX\")\"" "$capture_script"
-if grep -Fq "capture_status" "$capture_script"; then echo "capture_status is gone: capture fails only when no frame was written" >&2; exit 1; fi
+if grep -Fq "capture_status" "$capture_script"; then
+  echo "capture_status is gone: capture fails only when no frame was written" >&2
+  exit 1
+fi
 # ...and the cleanup only undoes what was done: it never deletes an unmoved
 # history file or clears an untouched clipboard.
-(( $(line_of 'picker_swapped=1') > $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"") ))
-grep -Fq 'if (( picker_swapped )); then' "$capture_script"
-grep -Fq '&& (( clipboard_swapped )); then' "$capture_script"
-(( $(line_of 'inbox_swapped=1') > $(line_of "mv -t \"\$inbox_backup\"") ))
-grep -Fq 'if (( ! inbox_swapped )); then return 0; fi' "$capture_script"
+(($(line_of 'picker_swapped=1') > $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"")))
+grep -Fq 'if ((picker_swapped)); then' "$capture_script"
+grep -Fq '&& ((clipboard_swapped)); then' "$capture_script"
+(($(line_of 'inbox_swapped=1') > $(line_of "mv -t \"\$inbox_backup\"")))
+grep -Fq 'if ((! inbox_swapped)); then return 0; fi' "$capture_script"
 # The --all batch also sets its restore trap before parking the inbox, and a
 # clipboard that cannot be saved is never replaced.
-(( $(line_of 'trap finish_batch EXIT') < $(line_of "-exec mv -t \"\$batch_inbox_backup\"") ))
+(($(line_of 'trap finish_batch EXIT') < $(line_of "-exec mv -t \"\$batch_inbox_backup\"")))
 grep -Fq 'could not save the clipboard' "$capture_script"
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]

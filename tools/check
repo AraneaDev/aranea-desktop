@@ -34,10 +34,23 @@ while (($#)); do
     --fast) fast=1 ;;
     --staged) staged=1 ;;
     --update-baselines) update_baselines=1 ;;
-    --only) only="${2:?--only needs a stage list}"; shift ;;
-    --skip) skip="${2:?--skip needs a stage list}"; shift ;;
-    -h | --help) usage; exit 0 ;;
-    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+    --only)
+      only="${2:?--only needs a stage list}"
+      shift
+      ;;
+    --skip)
+      skip="${2:?--skip needs a stage list}"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
   esac
   shift
 done
@@ -56,7 +69,10 @@ known_stage() {
 for list in "$only" "$skip"; do
   IFS=',' read -r -a names <<<"$list"
   for name in "${names[@]}"; do
-    known_stage "$name" || { printf 'Unknown stage: %s\n' "$name" >&2; exit 2; }
+    known_stage "$name" || {
+      printf 'Unknown stage: %s\n' "$name" >&2
+      exit 2
+    }
   done
 done
 
@@ -133,9 +149,17 @@ for stage in "${all_stages[@]}"; do
   status=$?
   case "$status" in
     0) results+=("$stage: ok") ;;
-    77) results+=("$stage: skipped")
-        if [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" == 1 ]]; then results[-1]="$stage: FAILED (skip not allowed)"; failed=1; fi ;;
-    *) results+=("$stage: FAILED"); failed=1 ;;
+    77)
+      results+=("$stage: skipped")
+      if [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" == 1 ]]; then
+        results[-1]="$stage: FAILED (skip not allowed)"
+        failed=1
+      fi
+      ;;
+    *)
+      results+=("$stage: FAILED")
+      failed=1
+      ;;
   esac
 done
 

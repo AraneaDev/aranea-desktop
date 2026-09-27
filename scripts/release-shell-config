@@ -45,10 +45,9 @@ polkit_owner() {
 note_polkit_handover() {
   if [[ "$(polkit_owner "$config_file")" != "$(polkit_owner "$tmp_file")" ]]; then
     mkdir -p "$state_root"
-    : > "$state_root/polkit-handover"
+    : >"$state_root/polkit-handover"
   fi
 }
-
 
 jq '
   def entry_id: if type == "string" then . else .id? end;
@@ -76,19 +75,19 @@ jq '
       .cloneSourceRestores |= map(select(. as $id | ours | index($id) | not))
       | if (.cloneSourceRestores | length) == 0 then del(.cloneSourceRestores) else . end
     else . end
-' "$config_file" > "$tmp_file"
+' "$config_file" >"$tmp_file"
 
 # Park the bell and health icon for the return to Aranea — only now that the
 # release itself succeeded (a failing jq exits above under set -e).
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' \
-    "$config_file" >/dev/null 2>&1; then
+  "$config_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
-  : > "$parked_marker"
+  : >"$parked_marker"
 fi
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") != null' \
-    "$config_file" >/dev/null 2>&1; then
+  "$config_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
-  : > "$health_parked"
+  : >"$health_parked"
 fi
 
 note_polkit_handover

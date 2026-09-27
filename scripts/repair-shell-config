@@ -46,7 +46,7 @@ polkit_owner() {
 note_polkit_handover() {
   if [[ "$(polkit_owner "$config_file")" != "$(polkit_owner "$tmp_file")" ]]; then
     mkdir -p "$state_root"
-    : > "$state_root/polkit-handover"
+    : >"$state_root/polkit-handover"
   fi
 }
 
@@ -111,16 +111,16 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
         elif $tray != null then .[:$tray] + [{id: "araneadev.health"}] + .[$tray:]
         else [{id: "araneadev.health"}] + . end)
     else . end
-' "$config_file" > "$tmp_file"
+' "$config_file" >"$tmp_file"
 
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
-  : > "$bell_marker"
+  : >"$bell_marker"
   rm -f "$parked_marker"
 fi
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") != null' "$tmp_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
-  : > "$health_marker"
+  : >"$health_marker"
   rm -f "$health_parked"
 fi
 

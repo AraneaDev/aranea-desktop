@@ -145,18 +145,27 @@ NODE
 # "unknown", not freeze the check (review Important #4).
 health_qml="$repo_root/plugins/araneadev.health/Monitor.qml"
 for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker", "info"' '"docker", "ps"'; do
-  grep -F "command: [\"timeout\", \"10\", $cmd" "$health_qml" >/dev/null || { echo "unbounded check command: $cmd" >&2; exit 1; }
+  grep -F "command: [\"timeout\", \"10\", $cmd" "$health_qml" >/dev/null || {
+    echo "unbounded check command: $cmd" >&2
+    exit 1
+  }
 done
 grep -Fq '"-l"' "$health_qml"
 grep -Fq '"--since"' "$health_qml"
 grep -Fq 'HealthLogic.pruneDockerHistory' "$health_qml"
 grep -Fq '"which", "xdg-terminal-exec"' "$health_qml"
-if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$health_qml"; then echo "Monitor.qml must not run shell strings" >&2; exit 1; fi
+if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$health_qml"; then
+  echo "Monitor.qml must not run shell strings" >&2
+  exit 1
+fi
 plugin="$repo_root/plugins/araneadev.health"
 jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml" and .id == "araneadev.health"' "$plugin/manifest.json" >/dev/null
 grep -Fq '.pragma library' "$plugin/HealthBridge.js"
 grep -Fq 'HealthBridge.publish(service)' "$plugin/Service.qml"
-if grep -Eq 'ServiceBridge|NotificationsBridge|FileViewError|upsertSourceItem' "$plugin/Monitor.qml"; then echo "health must not post to the notification center" >&2; exit 1; fi
+if grep -Eq 'ServiceBridge|NotificationsBridge|FileViewError|upsertSourceItem' "$plugin/Monitor.qml"; then
+  echo "health must not post to the notification center" >&2
+  exit 1
+fi
 grep -Fq 'HealthLogic.annotateProblems' "$plugin/Monitor.qml"
 test ! -e "$repo_root/plugins/araneadev.notifications/Health.qml"
 
@@ -174,7 +183,10 @@ grep -Fq '󰗶' "$plugin/Panel.qml"
 grep -Fq 'topActive: service.openPanels > 0' "$plugin/Service.qml"
 grep -Fq 'service.panelOpened()' "$plugin/Panel.qml"
 grep -Fq 'Component.onDestruction' "$plugin/Panel.qml"
-if grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"; then echo "Panel must not set topActive directly" >&2; exit 1; fi
+if grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"; then
+  echo "Panel must not set topActive directly" >&2
+  exit 1
+fi
 
 # --- final-review minors
 # 1: a sample still in flight when the dropdown closes is dropped
@@ -182,9 +194,15 @@ grep -Fq 'if (!metrics.topActive) return' "$plugin/Metrics.qml"
 # 2: page size and clock tick come from getconf, not constants
 grep -Fq '"getconf", "PAGESIZE"' "$plugin/Metrics.qml"
 grep -Fq '"getconf", "CLK_TCK"' "$plugin/Metrics.qml"
-if grep -Eq 'parseProcStat\(text, 4096\)|, 3, 100\)' "$plugin/Metrics.qml"; then echo "page size / clock tick must not be hard-coded" >&2; exit 1; fi
+if grep -Eq 'parseProcStat\(text, 4096\)|, 3, 100\)' "$plugin/Metrics.qml"; then
+  echo "page size / clock tick must not be hard-coded" >&2
+  exit 1
+fi
 # 3: TOP rows survive the service disappearing mid-reload
-if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then echo "TOP rows must guard root.m" >&2; exit 1; fi
+if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then
+  echo "TOP rows must guard root.m" >&2
+  exit 1
+fi
 # 4: the sparkline repaints only while the dropdown is open
 grep -Fq 'onValuesChanged: if (root.opened) requestPaint()' "$plugin/Panel.qml"
 # 5: opening without a service closes again instead of sticking open
@@ -192,7 +210,10 @@ grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
 # 9: branding paths honour XDG_STATE_HOME everywhere
 # (Omarchy's own state files, e.g. clipboard-history.json, stay at the
 # $HOME path its scripts hard-code; only branding assets are theme-owned.)
-if grep -rFq 'Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding' "$repo_root/plugins"; then echo "branding paths must honour XDG_STATE_HOME" >&2; exit 1; fi
+if grep -rFq 'Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding' "$repo_root/plugins"; then
+  echo "branding paths must honour XDG_STATE_HOME" >&2
+  exit 1
+fi
 
 # `omarchy-shell health refresh` reruns the checks now (captures, scripts).
 grep -Fq 'function refresh(): string' "$plugin/Service.qml"

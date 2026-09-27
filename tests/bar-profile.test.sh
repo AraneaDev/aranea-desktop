@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 config_root="$(mktemp -d)"
 config_file="$config_root/shell.json"
-printf '%s\n' '{"bar":{"id":"araneadev.bar"},"plugins":[]}' > "$config_file"
+printf '%s\n' '{"bar":{"id":"araneadev.bar"},"plugins":[]}' >"$config_file"
 
 list_output="$("$repo_root"/scripts/aranea-bar-profile list)"
 grep -Fxq minimal <<<"$list_output"
@@ -22,8 +22,10 @@ if ARANEA_SHELL_CONFIG="$config_file" "$repo_root/scripts/aranea-bar-profile" se
 fi
 
 # A symlinked shell.json stays a symlink (Review Focus 5).
-real_profile_cfg="$(mktemp -d)/shell.json"; printf '{"bar": {}}\n' > "$real_profile_cfg"
-linked_profile_cfg="$(mktemp -d)/shell.json"; ln -s "$real_profile_cfg" "$linked_profile_cfg"
+real_profile_cfg="$(mktemp -d)/shell.json"
+printf '{"bar": {}}\n' >"$real_profile_cfg"
+linked_profile_cfg="$(mktemp -d)/shell.json"
+ln -s "$real_profile_cfg" "$linked_profile_cfg"
 ARANEA_SHELL_CONFIG="$linked_profile_cfg" "$repo_root/scripts/aranea-bar-profile" set ceremony >/dev/null
 test -L "$linked_profile_cfg"
 jq -e '.bar.profile == "ceremony"' "$real_profile_cfg" >/dev/null

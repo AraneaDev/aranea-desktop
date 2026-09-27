@@ -69,7 +69,7 @@ if [ -n "$staged" ]; then
     mkdir -p "$tmp/$(dirname "$f")"
     # Fail closed. A staged path git cannot read is a reason to stop, not a
     # reason to skip the file and still report success.
-    if ! git show ":$f" > "$tmp/$f" 2>/dev/null; then
+    if ! git show ":$f" >"$tmp/$f" 2>/dev/null; then
       echo "  could not read staged content for $f" >&2
       rc=1
       continue

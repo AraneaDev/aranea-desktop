@@ -35,7 +35,10 @@ jq -e '.id == "araneadev.emojis" and .entryPoints.overlay == "Emojis.qml" and .o
 grep -Fq 'OverlayChrome {' "$plugin/Emojis.qml"
 grep -Fq 'EmojiLogic.pushRecent' "$plugin/Emojis.qml"
 grep -Fq 'EmojiLogic.emojiName' "$plugin/Emojis.qml"
-cmp -s "$plugin/OverlayChrome.qml" "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml" || { echo "OverlayChrome.qml copies differ" >&2; exit 1; }
+cmp -s "$plugin/OverlayChrome.qml" "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml" || {
+  echo "OverlayChrome.qml copies differ" >&2
+  exit 1
+}
 
 # --- final-review fixes (Emojis.qml)
 grep -Fq 'aranea/motion' "$plugin/Emojis.qml"

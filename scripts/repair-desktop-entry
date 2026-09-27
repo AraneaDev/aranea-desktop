@@ -29,7 +29,7 @@ awk '
     next
   }
   { print }
-' "$source_file" > "$tmp_file"
+' "$source_file" >"$tmp_file"
 
 install -Dm644 "$tmp_file" "$target_file"
 printf 'repaired: %s\n' "$target_file"

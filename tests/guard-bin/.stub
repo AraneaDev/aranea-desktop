@@ -3,4 +3,4 @@
 # command that tests must never reach for real. It records its name and
 # arguments in "$ARANEA_TEST_SANDBOX/guard.log" and succeeds silently.
 # Every file in tests/guard-bin is a symlink to this one.
-printf '%s\n' "$(basename "$0")${*:+ $*}" >> "${ARANEA_TEST_SANDBOX:?guard stub used outside the test sandbox}/guard.log"
+printf '%s\n' "$(basename "$0")${*:+ $*}" >>"${ARANEA_TEST_SANDBOX:?guard stub used outside the test sandbox}/guard.log"

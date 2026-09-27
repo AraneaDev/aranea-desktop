@@ -8,9 +8,18 @@ point_size="${ARANEA_ICON_POINT_SIZE:-96}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-[[ -f "$font" ]] || { printf 'Font not found: %s\n' "$font" >&2; exit 1; }
-command -v magick >/dev/null 2>&1 || { echo 'magick is required' >&2; exit 1; }
-command -v potrace >/dev/null 2>&1 || { echo 'potrace is required' >&2; exit 1; }
+[[ -f "$font" ]] || {
+  printf 'Font not found: %s\n' "$font" >&2
+  exit 1
+}
+command -v magick >/dev/null 2>&1 || {
+  echo 'magick is required' >&2
+  exit 1
+}
+command -v potrace >/dev/null 2>&1 || {
+  echo 'potrace is required' >&2
+  exit 1
+}
 
 render_group() {
   local codepoint="$1"
@@ -29,10 +38,10 @@ render_group() {
       printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s" preserveAspectRatio="xMidYMid meet">\n' "$viewbox"
       printf '<title>Aranea Command Center %s glyph</title>\n' "$label"
       printf '<metadata>Source glyph U+%s from JetBrainsMono Nerd Font</metadata>\n' "$codepoint"
-      sed -n '/<g transform=/,/<\/g>/p' "$tmp_dir/raw.svg" \
-        | sed 's/fill="#000000" stroke="none"/fill="#3bff9e"/'
+      sed -n '/<g transform=/,/<\/g>/p' "$tmp_dir/raw.svg" |
+        sed 's/fill="#000000" stroke="none"/fill="#3bff9e"/'
       printf '</svg>\n'
-    } > "$output"
+    } >"$output"
   done
 }
 

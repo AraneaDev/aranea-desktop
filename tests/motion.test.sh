@@ -22,7 +22,7 @@ grep -Fq 'keyword animations:enabled true' "$hyprctl_log"
 grep -Fq 'popin 94%' "$hyprctl_log"
 grep -Fq 'slidefade 12%' "$hyprctl_log"
 
-: > "$hyprctl_log"
+: >"$hyprctl_log"
 PATH="$test_path" ARANEA_HYPRCTL_LOG="$hyprctl_log" ARANEA_STATE_ROOT="$state_root" \
   "$repo_root/scripts/aranea-motion" set off >/dev/null
 grep -Fq 'keyword animations:enabled false' "$hyprctl_log"
@@ -31,7 +31,7 @@ deferred="$(PATH="$test_path" ARANEA_HYPRCTL="$state_root/missing-hyprctl" ARANE
   "$repo_root/scripts/aranea-motion" apply)"
 grep -Fq 'Hyprland apply deferred' <<<"$deferred"
 
-: > "$hyprctl_log"
+: >"$hyprctl_log"
 PATH="$test_path" ARANEA_HYPRCTL_LOG="$hyprctl_log" ARANEA_STATE_ROOT="$state_root" \
   "$repo_root/scripts/aranea-wallpaper" motion on >/dev/null
 grep -Fxq on "$state_root/motion"

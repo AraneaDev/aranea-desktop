@@ -71,7 +71,7 @@ record_managed_file() {
   record="$(ownership_record)"
   mkdir -p "$(dirname "$record")"
   touch "$record"
-  grep -Fqx -- "$target" "$record" || printf '%s\n' "$target" >> "$record"
+  grep -Fqx -- "$target" "$record" || printf '%s\n' "$target" >>"$record"
 }
 
 # The inverse of record_managed_file, for a caller that has just removed a
@@ -86,7 +86,7 @@ forget_managed_file() {
   [[ -f "$record" ]] || return 0
   local tmp
   tmp="$(mktemp "$(dirname "$record")/.managed-files.XXXXXX")"
-  grep -Fvx -- "$target" "$record" > "$tmp" || true
+  grep -Fvx -- "$target" "$record" >"$tmp" || true
   mv "$tmp" "$record"
 }
 
@@ -174,7 +174,7 @@ restore_managed_files() {
     [[ -n "$target" ]] || continue
     restore_one_target "$target"
     if [[ "$ownership_last_action" == kept ]]; then printf '%s
-' "$target" >> "$kept_file"; fi
-  done < "$record"
+' "$target" >>"$kept_file"; fi
+  done <"$record"
   mv -- "$kept_file" "$record"
 }

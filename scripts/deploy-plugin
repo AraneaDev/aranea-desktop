@@ -23,7 +23,7 @@ restore_needed=0
 
 cleanup() {
   rm -rf "$stage_dir"
-  if (( restore_needed )) && [[ -d "$old_dir" && ! -e "$target_dir" ]]; then
+  if ((restore_needed)) && [[ -d "$old_dir" && ! -e "$target_dir" ]]; then
     mv "$old_dir" "$target_dir"
   fi
   rm -rf "$old_dir"

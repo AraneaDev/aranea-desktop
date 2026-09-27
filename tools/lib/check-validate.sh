@@ -7,7 +7,8 @@ repo_root="${repo_root:?tools/check sets repo_root}"
 
 # Runs one validator over FILES (read from stdin), reporting each failure.
 validate_each() {
-  local label="$1"; shift
+  local label="$1"
+  shift
   local file status=0
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
@@ -32,7 +33,10 @@ markdown_links() {
   while IFS= read -r target; do
     target="${target%%#*}"
     [[ -z "$target" || "$target" == *://* || "$target" == mailto:* ]] && continue
-    [[ -e "$dir/$target" ]] || { printf 'broken link %s\n' "$target" >&2; status=1; }
+    [[ -e "$dir/$target" ]] || {
+      printf 'broken link %s\n' "$target" >&2
+      status=1
+    }
   done < <(grep -oE '\]\([^) ]+' "$file" | sed 's/^](//')
   return "$status"
 }
@@ -40,19 +44,27 @@ markdown_links() {
 # validate stage entry point.
 stage_validate() {
   local status=0
-  command -v jq >/dev/null || { echo "jq is required (install jq)"; return 1; }
-  command -v python3 >/dev/null || { echo "python3 is required"; return 1; }
+  command -v jq >/dev/null || {
+    echo "jq is required (install jq)"
+    return 1
+  }
+  command -v python3 >/dev/null || {
+    echo "python3 is required"
+    return 1
+  }
   check_files '\.json$' | validate_each JSON jq empty || status=1
   check_files '\.toml$' | validate_each TOML toml_parse || status=1
   if command -v xmllint >/dev/null; then
     check_files '\.svg$' | validate_each SVG xmllint --noout || status=1
   else
-    echo "xmllint is required (install libxml2)"; status=1
+    echo "xmllint is required (install libxml2)"
+    status=1
   fi
   if command -v identify >/dev/null; then
     check_files '\.png$' '\.jpe?g$' | validate_each image identify || status=1
   else
-    echo "identify is required (install imagemagick)"; status=1
+    echo "identify is required (install imagemagick)"
+    status=1
   fi
   if command -v luac >/dev/null; then
     check_files '\.lua$' | validate_each Lua luac -p -o /dev/null || status=1

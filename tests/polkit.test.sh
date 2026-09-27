@@ -119,7 +119,10 @@ NODE
 jq -e '.id == "araneadev.polkit" and .omarchy.clonedFrom == "omarchy.polkit" and .keepLoaded == true
   and .kinds == ["service"] and .entryPoints.service == "PolkitAgent.qml"' "$plugin/manifest.json" >/dev/null
 grep -Fq 'import "PolkitLogic.js" as PolkitLogic' "$plugin/PolkitAgent.qml"
-if grep -Fq 'PolkitModel' "$plugin/PolkitAgent.qml"; then echo "use PolkitLogic, not PolkitModel" >&2; exit 1; fi
+if grep -Fq 'PolkitModel' "$plugin/PolkitAgent.qml"; then
+  echo "use PolkitLogic, not PolkitModel" >&2
+  exit 1
+fi
 # The stock behaviour that must survive the restyle.
 grep -Fq 'path: "/org/omarchy/PolkitAgent"' "$plugin/PolkitAgent.qml"
 grep -Fq 'WlrLayershell.namespace: "omarchy-polkit"' "$plugin/PolkitAgent.qml"
@@ -127,7 +130,10 @@ grep -Fq 'path: "/etc/pam.d/polkit-1"' "$plugin/PolkitAgent.qml"
 grep -Fq 'omarchy-hw-laptop-closed' "$plugin/PolkitAgent.qml"
 grep -Fq 'id: shakeAnimation' "$plugin/PolkitAgent.qml"
 grep -Fq 'flow.cancelAuthenticationRequest()' "$plugin/PolkitAgent.qml"
-if grep -E 'console\.(log|warn).*passwordInput' "$plugin/PolkitAgent.qml"; then echo "never log the password" >&2; exit 1; fi
+if grep -E 'console\.(log|warn).*passwordInput' "$plugin/PolkitAgent.qml"; then
+  echo "never log the password" >&2
+  exit 1
+fi
 
 # --- Aranea card
 agent="$plugin/PolkitAgent.qml"
@@ -148,7 +154,10 @@ grep -Fq '["timeout", "2", "pkaction", "--action-id", id, "--verbose"]' "$agent"
 grep -Fq 'PolkitLogic.validActionId(id)' "$agent"
 grep -Fq 'root.lookupQueued' "$agent"
 grep -Fq 'String(flow.cookie || "") === root.lookupCookie' "$agent"
-if grep -Eq '"(sh|bash)", "-c".*pkaction' "$agent"; then echo "pkaction must not run through a shell" >&2; exit 1; fi
+if grep -Eq '"(sh|bash)", "-c".*pkaction' "$agent"; then
+  echo "pkaction must not run through a shell" >&2
+  exit 1
+fi
 # Details start collapsed for every request
 grep -Fq 'detailsOpen = false' "$agent"
 # Review Focus 4: every focus holder routes keys through one handler
@@ -156,7 +165,10 @@ grep -Fq 'detailsOpen = false' "$agent"
 grep -Fq 'Qt.Key_Backtab' "$agent"
 grep -Fq 'flow.selectedIdentity = flow.identities[' "$agent"
 # The old pill above the card is gone (the request lives in the card now)
-if grep -Fq 'justificationText' "$agent"; then echo "stock justification pill should be gone" >&2; exit 1; fi
+if grep -Fq 'justificationText' "$agent"; then
+  echo "stock justification pill should be gone" >&2
+  exit 1
+fi
 
 # --- final review fixes
 # m1: a pkaction result rebuilds the details; keep keys working afterwards

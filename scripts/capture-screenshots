@@ -33,17 +33,40 @@ build_hero_showcase() {
 
 while (($#)); do
   case "$1" in
-    --surface) (($# >= 2)) || { echo '--surface requires a value' >&2; exit 2; }; surface="$2"; shift ;;
-    --output) (($# >= 2)) || { echo '--output requires a directory' >&2; exit 2; }; output="$2"; shift ;;
+    --surface)
+      (($# >= 2)) || {
+        echo '--surface requires a value' >&2
+        exit 2
+      }
+      surface="$2"
+      shift
+      ;;
+    --output)
+      (($# >= 2)) || {
+        echo '--output requires a directory' >&2
+        exit 2
+      }
+      output="$2"
+      shift
+      ;;
     --all) capture_all=1 ;;
-    *) echo "Unknown option: $1" >&2; exit 2 ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
   esac
   shift
 done
 
-if (( capture_all )); then
-  [[ -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --all --output <dir>' >&2; exit 2; }
-  command -v hyprctl >/dev/null 2>&1 || { echo '--all requires hyprctl so captures cannot silently run on the wrong workspace' >&2; exit 3; }
+if ((capture_all)); then
+  [[ -n "$output" ]] || {
+    echo 'Usage: scripts/capture-screenshots --all --output <dir>' >&2
+    exit 2
+  }
+  command -v hyprctl >/dev/null 2>&1 || {
+    echo '--all requires hyprctl so captures cannot silently run on the wrong workspace' >&2
+    exit 3
+  }
   active_workspace="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id' 2>/dev/null || true)"
   [[ -n "$active_workspace" && "$active_workspace" != "null" ]] || {
     echo 'Unable to verify the active workspace; refusing --all capture' >&2
@@ -66,7 +89,7 @@ if (( capture_all )); then
   # real one has actually been moved aside.
   batch_swapped=0
   finish_batch() {
-    if (( batch_swapped )); then
+    if ((batch_swapped)); then
       omarchy-shell notifications clear >/dev/null 2>&1 || true
       sleep 1
       find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
@@ -101,7 +124,10 @@ if (( capture_all )); then
   exit 0
 fi
 
-[[ -n "$surface" && -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --surface <name> --output <dir>' >&2; exit 2; }
+[[ -n "$surface" && -n "$output" ]] || {
+  echo 'Usage: scripts/capture-screenshots --surface <name> --output <dir>' >&2
+  exit 2
+}
 showcase_surface="$surface"
 case "$surface" in
   plymouth) showcase_surface=boot ;;
@@ -151,8 +177,14 @@ capture_menu_surface() {
 capture_terminal_surface() {
   local title="$1"
   local command_name="$2"
-  command -v kitty >/dev/null 2>&1 || { echo "kitty is required to capture $surface" >&2; exit 3; }
-  command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required to capture $surface" >&2; exit 3; }
+  command -v kitty >/dev/null 2>&1 || {
+    echo "kitty is required to capture $surface" >&2
+    exit 3
+  }
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "$command_name is required to capture $surface" >&2
+    exit 3
+  }
 
   kitty --config "$repo_root/integrations/terminal/kitty.conf" \
     --class "aranea-screenshot-$surface" --title "$title" \
@@ -179,8 +211,14 @@ capture_terminal_surface() {
 
 capture_popup_surface() {
   local target="$1"
-  command -v omarchy-shell >/dev/null 2>&1 || { echo "omarchy-shell is required to capture $surface" >&2; exit 3; }
-  command -v grim >/dev/null 2>&1 || { echo "grim is required to capture $surface" >&2; exit 3; }
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo "omarchy-shell is required to capture $surface" >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo "grim is required to capture $surface" >&2
+    exit 3
+  }
 
   hyprctl dismissnotify >/dev/null 2>&1 || true
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
@@ -198,8 +236,14 @@ capture_popup_surface() {
 }
 
 capture_osd_surface() {
-  command -v omarchy-shell >/dev/null 2>&1 || { echo 'omarchy-shell is required to capture osd' >&2; exit 3; }
-  command -v grim >/dev/null 2>&1 || { echo 'grim is required to capture osd' >&2; exit 3; }
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo 'omarchy-shell is required to capture osd' >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo 'grim is required to capture osd' >&2
+    exit 3
+  }
 
   # OSD captures must always be taken on the clean showcase workspace.  This
   # avoids terminal/chat text leaking into the reference frame.
@@ -220,7 +264,7 @@ capture_osd_surface() {
 }
 
 case "$surface" in
-  menu|menu-submenu|menu-search|menu-input|apps|favorites|recent)
+  menu | menu-submenu | menu-search | menu-input | apps | favorites | recent)
     capture_menu_surface
     exit 0
     ;;
@@ -230,7 +274,7 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  notifications|notifications-empty)
+  notifications | notifications-empty)
     state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
     mkdir -p "$state_home/aranea"
     inbox_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
@@ -241,7 +285,7 @@ case "$surface" in
     inbox_swapped=0
     restore_inbox() {
       omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
-      if (( ! inbox_swapped )); then return 0; fi
+      if ((! inbox_swapped)); then return 0; fi
       omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
       omarchy-shell notifications clear >/dev/null 2>&1 || true
       sleep 1
@@ -278,7 +322,7 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  clipboard|emojis)
+  clipboard | emojis)
     # Fixture data only: the real clipboard history (or emoji recents) is set
     # aside for the capture and put back afterwards, so no real clipboard
     # content can reach a screenshot. Files are swapped only while the shell
@@ -308,12 +352,12 @@ case "$surface" in
     clipboard_swapped=0
     finish_picker() {
       stop_shell
-      if (( picker_swapped )); then
+      if ((picker_swapped)); then
         rm -f "$picker_file"
         if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
       fi
-      if [[ "$surface" == clipboard ]] && (( clipboard_swapped )); then
-        if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" < "$picker_backup/clipboard"; else wl-copy --clear; fi
+      if [[ "$surface" == clipboard ]] && ((clipboard_swapped)); then
+        if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" <"$picker_backup/clipboard"; else wl-copy --clear; fi
       fi
       rm -rf "$picker_backup"
       omarchy restart shell >/dev/null 2>&1 || true
@@ -326,7 +370,7 @@ case "$surface" in
       # The picker records the live clipboard when the shell starts: save it
       # (never a password manager's marker type) and seed fixture text.
       clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
-      if [[ -n "$clip_type" ]] && ! wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null; then
+      if [[ -n "$clip_type" ]] && ! wl-paste --type "$clip_type" >"$picker_backup/clipboard" 2>/dev/null; then
         echo "could not save the clipboard; not replacing it" >&2
         exit 3
       fi
@@ -344,9 +388,9 @@ case "$surface" in
         {type:"text", text:"~/Work/AraneaDev/aranea-desktop/README.md", capturedAtMs:($now - 1500000)},
         {type:"image", path:$img, mime:"image/png", capturedAt:"Sunday 11:20", capturedAtMs:($now - 2400000)},
         {type:"text", text:"A quiet obsidian desktop with a living network of light.", capturedAtMs:($now - 3600000)}
-      ]' > "$picker_file"
+      ]' >"$picker_file"
     else
-      printf '%s\n' '{"version":1,"recent":["🚀","✅","👍","🎉","🔥","🕷️","💚","✨"]}' > "$picker_file"
+      printf '%s\n' '{"version":1,"recent":["🚀","✅","👍","🎉","🔥","🕷️","💚","✨"]}' >"$picker_file"
     fi
     omarchy restart shell >/dev/null 2>&1 || true
     sleep 5
@@ -361,8 +405,14 @@ case "$surface" in
   polkit)
     # A harmless request (pkexec /usr/bin/true) with the details open. It is
     # always cancelled with Escape; nothing is ever typed into the field.
-    command -v pkexec >/dev/null 2>&1 || { echo "pkexec is required to capture $surface" >&2; exit 3; }
-    command -v wtype >/dev/null 2>&1 || { echo "wtype is required to capture $surface" >&2; exit 3; }
+    command -v pkexec >/dev/null 2>&1 || {
+      echo "pkexec is required to capture $surface" >&2
+      exit 3
+    }
+    command -v wtype >/dev/null 2>&1 || {
+      echo "wtype is required to capture $surface" >&2
+      exit 3
+    }
     pkexec /usr/bin/true >/dev/null 2>&1 &
     pkexec_pid=$!
     prompt_visible() {
@@ -381,10 +431,13 @@ case "$surface" in
     trap finish_polkit EXIT
     shown=0
     for _ in $(seq 1 20); do
-      if prompt_visible; then shown=1; break; fi
+      if prompt_visible; then
+        shown=1
+        break
+      fi
       sleep 0.5
     done
-    if (( ! shown )); then
+    if ((! shown)); then
       echo "polkit prompt never appeared; is a polkit agent registered?" >&2
       exit 3
     fi
@@ -417,7 +470,7 @@ case "$surface" in
     # A fresh shell has no CPU history yet; wait for ~100 s of it (50
     # samples at 2 s) so the sparkline is a real graph.
     for _ in $(seq 1 120); do
-      (( $(omarchy-shell health metrics 2>/dev/null | jq -r '.samples // 0' 2>/dev/null || echo 0) >= 50 )) && break
+      (($(omarchy-shell health metrics 2>/dev/null | jq -r '.samples // 0' 2>/dev/null || echo 0) >= 50)) && break
       sleep 2
     done
     systemd-run --user --unit=aranea-capture-probe false >/dev/null 2>&1 || true
@@ -478,7 +531,10 @@ case "$surface" in
     exit 0
     ;;
   file-manager)
-    command -v nautilus >/dev/null 2>&1 || { echo 'nautilus is required to capture file-manager' >&2; exit 3; }
+    command -v nautilus >/dev/null 2>&1 || {
+      echo 'nautilus is required to capture file-manager' >&2
+      exit 3
+    }
     nautilus --new-window "$repo_root" >/dev/null 2>&1 &
     child_pid=$!
     sleep 1

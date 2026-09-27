@@ -8,9 +8,9 @@ work_dir="$(mktemp -d)"
 source_dir="$work_dir/source"
 target_dir="$work_dir/target"
 mkdir -p "$source_dir" "$target_dir"
-printf '%s\n' manifest > "$source_dir/manifest.json"
-printf '%s\n' qml > "$source_dir/Widget.qml"
-printf '%s\n' stale > "$target_dir/stale.txt"
+printf '%s\n' manifest >"$source_dir/manifest.json"
+printf '%s\n' qml >"$source_dir/Widget.qml"
+printf '%s\n' stale >"$target_dir/stale.txt"
 
 "$repo_root/scripts/deploy-plugin" "$source_dir" "$target_dir"
 

@@ -7,7 +7,7 @@ test_root="$(mktemp -d)"
 
 source_file="$test_root/teams-for-linux.desktop"
 target_file="$test_root/applications/teams-for-linux.desktop"
-cat > "$source_file" <<'EOF'
+cat >"$source_file" <<'EOF'
 [Desktop Entry]
 Type=Application
 Name=Microsoft Teams for Linux

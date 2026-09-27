@@ -14,12 +14,12 @@ ln -s "$repo_root" "$stable"
 ln -s "$repo_root" "$current"
 cfg="$XDG_CONFIG_HOME/omarchy/shell.json"
 mkdir -p "$(dirname "$cfg")"
-printf '{"bar": {"layout": {"right": ["omarchy.tray"]}}, "plugins": []}\n' > "$cfg"
+printf '{"bar": {"layout": {"right": ["omarchy.tray"]}}, "plugins": []}\n' >"$cfg"
 
 # `omarchy theme current` must say Aranea for post-boot to run.
 fake="$ARANEA_TEST_SANDBOX/fake-bin"
 mkdir -p "$fake"
-cat > "$fake/omarchy" <<'EOF'
+cat >"$fake/omarchy" <<'EOF'
 #!/usr/bin/env bash
 printf 'omarchy %s\n' "$*" >> "$ARANEA_TEST_SANDBOX/guard.log"
 if [[ "$*" == "theme current" ]]; then echo Aranea; fi
@@ -33,25 +33,38 @@ plugin_ids() { jq -c '[.plugins[]? | (if type == "string" then . else .id end)]'
 
 # Aranea branch: integrations link from the stable installed theme (spec B3).
 "$repo_root/hooks/theme-set" aranea
-[[ "$(readlink "$session_link")" == "$stable/integrations/session/omarchy.css" ]] || { echo "session link: $(readlink "$session_link")" >&2; exit 1; }
-jq -e '[.plugins[]? | (if type == "string" then . else .id end)] | index("araneadev.lock") != null' "$cfg" >/dev/null || { plugin_ids; exit 1; }
+[[ "$(readlink "$session_link")" == "$stable/integrations/session/omarchy.css" ]] || {
+  echo "session link: $(readlink "$session_link")" >&2
+  exit 1
+}
+jq -e '[.plugins[]? | (if type == "string" then . else .id end)] | index("araneadev.lock") != null' "$cfg" >/dev/null || {
+  plugin_ids
+  exit 1
+}
 
 # Reinstall name: still the Aranea branch, nothing released (spec A3).
 "$repo_root/hooks/theme-set" aranea-desktop
-jq -e '[.plugins[]? | (if type == "string" then . else .id end)] | index("araneadev.lock") != null' "$cfg" >/dev/null || { plugin_ids; exit 1; }
+jq -e '[.plugins[]? | (if type == "string" then . else .id end)] | index("araneadev.lock") != null' "$cfg" >/dev/null || {
+  plugin_ids
+  exit 1
+}
 
 # Leaving with the wallpaper schedule on: units go, the state stays "on" (spec A2).
 mkdir -p "$XDG_STATE_HOME/aranea"
-printf on > "$XDG_STATE_HOME/aranea/wallpaper-schedule"
+printf on >"$XDG_STATE_HOME/aranea/wallpaper-schedule"
 "$repo_root/hooks/theme-set" tokyo-night
 [[ "$(<"$XDG_STATE_HOME/aranea/wallpaper-schedule")" == on ]]
 if grep -Fq 'omarchy plugin disable araneadev.lock' "$ARANEA_TEST_SANDBOX/guard.log"; then
-  echo "leaving must not disable the lock over IPC" >&2; exit 1
+  echo "leaving must not disable the lock over IPC" >&2
+  exit 1
 fi
-test -e "$session_link"   # stable links survive leaving
+test -e "$session_link" # stable links survive leaving
 # Lock and OSD are handed back to Omarchy (spec A1, Review Focus 3).
 jq -e '((.disabledPlugins // []) | (index("omarchy.lock") == null and index("omarchy.osd") == null))
-  and ([.plugins[]? | (if type == "string" then . else .id end)] | (index("araneadev.lock") == null and index("araneadev.osd") == null))' "$cfg" >/dev/null || { cat "$cfg"; exit 1; }
+  and ([.plugins[]? | (if type == "string" then . else .id end)] | (index("araneadev.lock") == null and index("araneadev.osd") == null))' "$cfg" >/dev/null || {
+  cat "$cfg"
+  exit 1
+}
 
 # Returning brings the schedule units back.
 "$repo_root/hooks/theme-set" aranea
@@ -59,7 +72,7 @@ test -f "$XDG_CONFIG_HOME/systemd/user/aranea-wallpaper-day-night.timer"
 
 # An integration the user deactivated stays off (spec B4).
 mkdir -p "$XDG_STATE_HOME/aranea/integrations"
-printf inactive > "$XDG_STATE_HOME/aranea/integrations/session"
+printf inactive >"$XDG_STATE_HOME/aranea/integrations/session"
 rm -f "$session_link"
 "$repo_root/hooks/theme-set" aranea
 test ! -e "$session_link"

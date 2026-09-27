@@ -34,7 +34,8 @@ emit_status() {
   local id="$1" state=inactive availability=unavailable
   [[ -f "$state_root/$id" ]] && state="$(<"$state_root/$id")"
   available "$id" && availability=available
-  if (( json )); then printf '{"id":"%s","status":"%s","availability":"%s"}\n' "$id" "$state" "$availability"
+  if ((json)); then
+    printf '{"id":"%s","status":"%s","availability":"%s"}\n' "$id" "$state" "$availability"
   else printf '%-14s %-10s %s\n' "$id" "$state" "$availability"; fi
 }
 
@@ -46,27 +47,43 @@ case "$command_name" in
     while read -r id; do [[ -n "$id" ]] && emit_status "$id"; done < <(known_ids)
     ;;
   activate)
-    id="${2:-}"; [[ "${3:-}" == --yes || -z "${3:-}" ]] || { usage >&2; exit 2; }
-    known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
-    available "$id" || { printf 'Integration unavailable: %s\n' "$id" >&2; exit 1; }
+    id="${2:-}"
+    [[ "${3:-}" == --yes || -z "${3:-}" ]] || {
+      usage >&2
+      exit 2
+    }
+    known "$id" || {
+      printf 'Unknown integration: %s\n' "$id" >&2
+      exit 1
+    }
+    available "$id" || {
+      printf 'Integration unavailable: %s\n' "$id" >&2
+      exit 1
+    }
     mkdir -p "$state_root"
     install_status=0
     output="$("$repo_root/scripts/install-integration" "$id" --yes)" || install_status=$?
     printf '%s\n' "$output"
     # Exactly the targets this integration manages now — recorded even when
     # the install stopped partway, so deactivate can still undo them.
-    sed -n 's/^\(linked\|copied\) .* -> //p' <<<"$output" > "$state_root/$id.files"
-    (( install_status == 0 )) || exit "$install_status"
-    printf active > "$state_root/$id"; printf 'integration: %s active\n' "$id"
+    sed -n 's/^\(linked\|copied\) .* -> //p' <<<"$output" >"$state_root/$id.files"
+    ((install_status == 0)) || exit "$install_status"
+    printf active >"$state_root/$id"
+    printf 'integration: %s active\n' "$id"
     ;;
   deactivate)
-    id="${2:-}"; known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
+    id="${2:-}"
+    known "$id" || {
+      printf 'Unknown integration: %s\n' "$id" >&2
+      exit 1
+    }
     mkdir -p "$state_root"
     files="$state_root/$id.files"
     # What activate recorded, plus everything this integration would link or
     # copy (the installer and hooks link without recording per-integration).
     targets="$(
-      { [[ -f "$files" ]] && cat "$files"
+      {
+        [[ -f "$files" ]] && cat "$files"
         "$repo_root/scripts/install-integration" --dry-run "$id" 2>/dev/null | sed -n 's/^would \(link\|copy\) .* -> //p'
       } | sort -u
     )"
@@ -78,7 +95,11 @@ case "$command_name" in
     done <<<"$targets"
     rm -f "$files"
     # "inactive" (not just no file) tells the hooks to leave it off.
-    printf inactive > "$state_root/$id"; printf 'integration: %s inactive\n' "$id"
+    printf inactive >"$state_root/$id"
+    printf 'integration: %s inactive\n' "$id"
     ;;
-  *) usage >&2; exit 2 ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
 esac

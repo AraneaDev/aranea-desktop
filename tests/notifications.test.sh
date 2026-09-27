@@ -161,7 +161,10 @@ grep -Fq 'InboxLogic.swipeOutcome' "$plugin/components/NotificationCard.qml"
 grep -Fq 'InboxLogic.suppressesClick' "$plugin/components/NotificationCard.qml"
 
 for fn in 'function dismissInbox' 'function dismissGroup' 'function invokeInbox' 'function center(): string' 'function count(): string'; do
-  grep -Fq "$fn" "$plugin/Service.qml" || { echo "missing in Service.qml: $fn" >&2; exit 1; }
+  grep -Fq "$fn" "$plugin/Service.qml" || {
+    echo "missing in Service.qml: $fn" >&2
+    exit 1
+  }
 done
 
 jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" and .barWidget.defaultSection == "right"' \
@@ -177,26 +180,38 @@ grep -Fq 'ServiceBridge.retract(service)' "$plugin/Service.qml"
 grep -Fq 'property bool compact' "$plugin/components/NotificationCard.qml"
 
 if grep -Eq 'stackLayout|overflowPill|centerOpen|writeSilenced|restorePopups' "$plugin/Service.qml"; then
-  echo "toast-era code must be gone from Service.qml" >&2; exit 1
+  echo "toast-era code must be gone from Service.qml" >&2
+  exit 1
 fi
 grep -Fq 'function refreshInbox' "$plugin/Service.qml"
 grep -Fq 'inboxRefs' "$plugin/Service.qml"
-if grep -Eq 'setOnScreen|onScreen' "$plugin/Inbox.qml"; then echo "onScreen must be gone from Inbox.qml" >&2; exit 1; fi
+if grep -Eq 'setOnScreen|onScreen' "$plugin/Inbox.qml"; then
+  echo "onScreen must be gone from Inbox.qml" >&2
+  exit 1
+fi
 grep -Fq 'merge' "$plugin/Inbox.qml"
 
 grep -Fq 'InboxLogic.badgeState' "$plugin/Panel.qml"
 grep -Fq 'InboxLogic.sortForCenter' "$plugin/Panel.qml"
 grep -Fq 'cursorKey' "$plugin/Panel.qml"
-if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then echo "centerOpen must be gone from Panel.qml" >&2; exit 1; fi
+if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then
+  echo "centerOpen must be gone from Panel.qml" >&2
+  exit 1
+fi
 
 grep -Fq 'sourceKey' "$plugin/Inbox.qml"
 
-
-if grep -Fq 'Health' "$plugin/Service.qml"; then echo "health moved out of the notifications plugin" >&2; exit 1; fi
+if grep -Fq 'Health' "$plugin/Service.qml"; then
+  echo "health moved out of the notifications plugin" >&2
+  exit 1
+fi
 
 # Revision 1: health lives only in its dropdown. The keyed source API is gone
 # and leftover 1.7.0 health items are deleted when the inbox loads.
-if grep -Eq 'upsertSourceItem|resolveSourceItem|sourceItemKeys|sourceFileName' "$plugin/Service.qml"; then echo "source-item API must be gone" >&2; exit 1; fi
+if grep -Eq 'upsertSourceItem|resolveSourceItem|sourceItemKeys|sourceFileName' "$plugin/Service.qml"; then
+  echo "source-item API must be gone" >&2
+  exit 1
+fi
 grep -Fq 'legacy health item' "$plugin/Inbox.qml"
 
 echo "notifications contract passed"

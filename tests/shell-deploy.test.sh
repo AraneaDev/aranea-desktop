@@ -23,7 +23,7 @@ export ARANEA_STATE_ROOT="$work_dir/state"
 config_dir="$work_dir/config"
 plugins_dir="$config_dir/plugins"
 mkdir -p "$plugins_dir"
-cat > "$config_dir/shell.json" <<'EOF'
+cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
 for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd; do

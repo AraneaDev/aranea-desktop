@@ -37,15 +37,15 @@ repair_shell_config() {
   fi
 }
 
-if (( ! needs_deploy )); then
+if ((! needs_deploy)); then
   repair_shell_config
   exit 0
 fi
 
 # A live directory swap makes QuickShell reload plugins. Stop it first so its
 # stock panels never observe the short interval between plugin generations.
-if command -v omarchy-hyprland-session-locked >/dev/null 2>&1 \
-    && omarchy-hyprland-session-locked; then
+if command -v omarchy-hyprland-session-locked >/dev/null 2>&1 &&
+  omarchy-hyprland-session-locked; then
   echo "Skipping plugin deployment while the session is locked." >&2
   repair_shell_config
   exit 0
@@ -59,7 +59,7 @@ fi
 
 restart_needed=$shell_was_running
 finish() {
-  if (( restart_needed )); then
+  if ((restart_needed)); then
     restart_needed=0
     omarchy restart shell >/dev/null 2>&1 || true
     # This restart also completes any polkit agent handover.

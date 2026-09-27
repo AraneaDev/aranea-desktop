@@ -15,7 +15,10 @@ grep -Fqx "$XDG_CONFIG_HOME/omarchy/session/aranea.css" "$state/session.files"
 "$ctl" deactivate session >/dev/null
 test ! -e "$XDG_CONFIG_HOME/omarchy/session/aranea.css"
 [[ "$(<"$state/session")" == inactive ]]
-if grep -Fqx "$XDG_CONFIG_HOME/omarchy/session/aranea.css" "$HOME/.local/state/aranea/managed-files"; then echo "deactivate left the target in the ledger" >&2; exit 1; fi
+if grep -Fqx "$XDG_CONFIG_HOME/omarchy/session/aranea.css" "$HOME/.local/state/aranea/managed-files"; then
+  echo "deactivate left the target in the ledger" >&2
+  exit 1
+fi
 "$repo_root/scripts/install-integration" session --yes >/dev/null
 "$ctl" activate session --yes >/dev/null
 grep -Fqx "$XDG_CONFIG_HOME/omarchy/session/aranea.css" "$state/session.files"
@@ -28,12 +31,19 @@ rm -f "$state/session" "$state/session.files"
 "$repo_root/scripts/install-integration" session --yes >/dev/null
 test -L "$link"
 "$ctl" deactivate session >/dev/null
-test ! -e "$link" || { echo "deactivate left an installer-made link" >&2; exit 1; }
+test ! -e "$link" || {
+  echo "deactivate left an installer-made link" >&2
+  exit 1
+}
 # M10: a target another active integration also lists is left in place.
 rm -f "$state/session"
 "$ctl" activate session --yes >/dev/null
-printf '%s\n' "$link" > "$state/media.files"; printf active > "$state/media"
+printf '%s\n' "$link" >"$state/media.files"
+printf active >"$state/media"
 "$ctl" deactivate session >/dev/null
-test -L "$link" || { echo "shared target removed" >&2; exit 1; }
+test -L "$link" || {
+  echo "shared target removed" >&2
+  exit 1
+}
 
 echo "integration controller contract passed"

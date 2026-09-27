@@ -8,10 +8,19 @@ fix="${fix:-0}"
 # format stage entry point.
 stage_format() {
   local status=0 files
-  command -v shfmt >/dev/null || { echo "shfmt is required: tools/install-shfmt ~/.local/bin"; return 1; }
-  [[ -x "$(node_bin)/prettier" ]] || { echo "prettier is required: npm ci"; return 1; }
+  command -v shfmt >/dev/null || {
+    echo "shfmt is required: tools/install-shfmt ~/.local/bin"
+    return 1
+  }
+  [[ -x "$(node_bin)/prettier" ]] || {
+    echo "prettier is required: npm ci"
+    return 1
+  }
   local qmlformat
-  qmlformat="$(qt_tool qmlformat)" || { echo "qmlformat is required (qt6-declarative)"; return 1; }
+  qmlformat="$(qt_tool qmlformat)" || {
+    echo "qmlformat is required (qt6-declarative)"
+    return 1
+  }
 
   mapfile -t files < <(shell_files)
   if ((${#files[@]})); then
@@ -34,7 +43,11 @@ stage_format() {
   local file formatted
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
-    formatted="$(cd "$check_root" && "$qmlformat" "$file")" || { echo "$file: qmlformat failed"; status=1; continue; }
+    formatted="$(cd "$check_root" && "$qmlformat" "$file")" || {
+      echo "$file: qmlformat failed"
+      status=1
+      continue
+    }
     if [[ "$formatted" != "$(<"$check_root/$file")" ]]; then
       if ((fix)); then
         printf '%s\n' "$formatted" >"$check_root/$file"

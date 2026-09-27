@@ -21,7 +21,7 @@ EOF
 say() { printf '%s\n' "$*"; }
 
 run() {
-  if (( dry_run )); then
+  if ((dry_run)); then
     say "would run: $*"
   else
     "$@"
@@ -48,7 +48,10 @@ adopt_installed_theme() {
   name="$(installed_theme_name "$1")"
   [[ "$name" == aranea ]] && return 0
   themes_dir="$HOME/.config/omarchy/themes"
-  [[ -d "$themes_dir/$name" ]] || { say "installed theme not found: $themes_dir/$name" >&2; return 1; }
+  [[ -d "$themes_dir/$name" ]] || {
+    say "installed theme not found: $themes_dir/$name" >&2
+    return 1
+  }
   rm -rf "$themes_dir/aranea"
   mv "$themes_dir/$name" "$themes_dir/aranea"
 }
@@ -66,25 +69,38 @@ while (($#)); do
     --dry-run) dry_run=1 ;;
     --yes) assume_yes=1 ;;
     --source)
-      (($# >= 2)) || { say "--source requires a path or URL" >&2; exit 2; }
+      (($# >= 2)) || {
+        say "--source requires a path or URL" >&2
+        exit 2
+      }
       theme_source="$2"
       shift
       ;;
     --profile)
-      (($# >= 2)) || { say "--profile requires a value" >&2; exit 2; }
+      (($# >= 2)) || {
+        say "--profile requires a value" >&2
+        exit 2
+      }
       profile="$2"
       profile_explicit=1
       shift
       ;;
-    -h|--help) usage; exit 0 ;;
-    *) say "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      say "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
   esac
   shift
 done
 
 # An explicit --profile, --yes, or no interactive terminal all keep the
 # "full" default silent, exactly as before gum was ever in the picture.
-if (( ! profile_explicit )) && (( ! assume_yes )) && [[ -t 0 ]] && has_gum; then
+if ((! profile_explicit)) && ((! assume_yes)) && [[ -t 0 ]] && has_gum; then
   if profile_choice="$(gum choose \
     --header 'Choose an installation profile:' \
     'full       Every supported application integration' \
@@ -115,7 +131,7 @@ if ! command -v omarchy >/dev/null 2>&1 && [[ "${OMARCHY_INSTALLER_TEST:-}" != 1
   exit 1
 fi
 
-if (( dry_run )); then
+if ((dry_run)); then
   say "would persist profile: $profile"
   say "would install theme from: $theme_source"
   say "would install theme hooks"
@@ -131,7 +147,7 @@ else
   previous_theme="$(omarchy theme current 2>/dev/null || true)"
   install_failure_handler() {
     local status=$?
-    if (( status != 0 )); then
+    if ((status != 0)); then
       if [[ -n "$previous_theme" ]]; then
         say "Aranea install failed. Restore the previous theme with: omarchy theme set \"$previous_theme\"" >&2
       else
@@ -143,7 +159,7 @@ else
   trap install_failure_handler EXIT
   profile_state="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
   install -Dm644 /dev/null "$profile_state"
-  printf '%s\n' "$profile" > "$profile_state"
+  printf '%s\n' "$profile" >"$profile_state"
   run omarchy theme install "$theme_source"
   adopt_installed_theme "$theme_source"
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"

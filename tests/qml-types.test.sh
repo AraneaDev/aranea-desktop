@@ -56,8 +56,8 @@ sandbox_on_exit cleanup
 
 qml_args=(--ignore-settings)
 validation_mode=strict
-if [[ -d "$shell_dir/Commons" && -f "$shell_dir/Commons/qmldir" \
-   && -d "$shell_dir/Ui" && -f "$shell_dir/Ui/qmldir" ]]; then
+if [[ -d "$shell_dir/Commons" && -f "$shell_dir/Commons/qmldir" &&
+  -d "$shell_dir/Ui" && -f "$shell_dir/Ui/qmldir" ]]; then
   import_root="$(mktemp -d)"
   mkdir "$import_root/qs"
   ln -s "$shell_dir/Commons" "$import_root/qs/Commons"

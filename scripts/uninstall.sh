@@ -19,8 +19,15 @@ while (($#)); do
   case "$1" in
     --dry-run) dry_run=1 ;;
     --yes) assume_yes=1 ;;
-    -h|--help) usage; exit 0 ;;
-    *) printf 'Unknown option: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
   esac
   shift
 done
@@ -31,15 +38,18 @@ if [[ ! -f "$record" ]]; then
   exit 0
 fi
 
-if (( dry_run )); then
+if ((dry_run)); then
   printf '%s\n' 'would restore Aranea-managed files:'
   sed 's/^/  /' "$record"
   exit 0
 fi
 
-if (( ! assume_yes )) && [[ -t 0 ]]; then
+if ((! assume_yes)) && [[ -t 0 ]]; then
   read -r -p 'Restore Aranea-managed files? [y/N] ' answer
-  [[ "$answer" =~ ^[Yy]$ ]] || { printf '%s\n' 'Cancelled.'; exit 0; }
+  [[ "$answer" =~ ^[Yy]$ ]] || {
+    printf '%s\n' 'Cancelled.'
+    exit 0
+  }
 fi
 
 restore_managed_files
