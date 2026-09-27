@@ -189,7 +189,9 @@ grep -Fq 'onValuesChanged: if (root.opened) requestPaint()' "$plugin/Panel.qml"
 # 5: opening without a service closes again instead of sticking open
 grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
 # 9: branding paths honour XDG_STATE_HOME everywhere
-if grep -rFq 'Quickshell.env("HOME") + "/.local/state/omarchy' "$repo_root/plugins"; then echo "branding paths must honour XDG_STATE_HOME" >&2; exit 1; fi
+# (Omarchy's own state files, e.g. clipboard-history.json, stay at the
+# $HOME path its scripts hard-code; only branding assets are theme-owned.)
+if grep -rFq 'Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding' "$repo_root/plugins"; then echo "branding paths must honour XDG_STATE_HOME" >&2; exit 1; fi
 
 # `omarchy-shell health refresh` reruns the checks now (captures, scripts).
 grep -Fq 'function refresh(): string' "$plugin/Service.qml"
