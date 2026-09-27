@@ -249,3 +249,18 @@ test("polkit spoofing (4a)", () => {
   const rows = p.detailRows("org.x", "", p.commandFromMessage(padded), padded)
   if (rows.some((r) => r.value.includes("⠀"))) throw new Error("details hide padding")
 })
+
+test("polkit hint line (4a)", () => {
+  const p = require(path.join(__dirname, "..", "..", "plugins/araneadev.polkit/PolkitLogic.js"))
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  eq(p.hintLine(false, 1), "ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL", "password, one identity")
+  eq(p.hintLine(true, 0), "TAB DETAILS · ESC CANCEL", "fingerprint")
+  eq(
+    p.hintLine(false, 2),
+    "ENTER AUTHORIZE · TAB DETAILS · ⇧TAB SWITCH IDENTITY · ESC CANCEL",
+    "several identities"
+  )
+  eq(p.hintLine(true, 3), "TAB DETAILS · ⇧TAB SWITCH IDENTITY · ESC CANCEL", "fingerprint, several")
+})

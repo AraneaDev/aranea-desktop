@@ -340,6 +340,22 @@ function promptPlaceholder(prompt) {
   return s
 }
 
+/**
+ * The key hint line: Enter only when a password is asked (not in fingerprint
+ * mode), Shift+Tab only when there are several identities to switch between.
+ * @param {boolean} fingerprintMode - the dialog is waiting on the fingerprint reader
+ * @param {number} identityTotal - how many identities the request offers
+ * @returns {string} the hints joined with " · "
+ */
+function hintLine(fingerprintMode, identityTotal) {
+  var parts = []
+  if (!fingerprintMode) parts.push("ENTER AUTHORIZE")
+  parts.push("TAB DETAILS")
+  if (identityTotal > 1) parts.push("⇧TAB SWITCH IDENTITY")
+  parts.push("ESC CANCEL")
+  return parts.join(" · ")
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     promptLooksFingerprint: promptLooksFingerprint,
@@ -361,6 +377,7 @@ if (typeof module !== "undefined") {
     nextIdentityIndex: nextIdentityIndex,
     contextLine: contextLine,
     detailRows: detailRows,
-    promptPlaceholder: promptPlaceholder
+    promptPlaceholder: promptPlaceholder,
+    hintLine: hintLine
   }
 }

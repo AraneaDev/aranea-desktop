@@ -43,7 +43,7 @@ grep -Fq 'PolkitLogic.requestMarkup(root.currentMessage' "$agent"
 grep -Fq 'textFormat: Text.StyledText' "$agent"
 grep -Fq 'PolkitLogic.contextLine(' "$agent"
 grep -Fq 'PolkitLogic.detailRows(' "$agent"
-grep -Fq 'ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL' "$agent"
+grep -Fq 'PolkitLogic.hintLine(root.fingerprintMode, root.identityTotal)' "$agent"
 grep -Fq 'Math.max(Color.polkit.scrim.a, 0.72)' "$agent"
 grep -Fq 'aranea/motion' "$agent"
 # Review Focus 5: the card never exceeds the screen
@@ -84,6 +84,19 @@ grep -Fq 'PolkitLogic.targetLine(root.currentMessage)' <<<"$target_block"
 grep -Fq 'wrapMode: Text.Wrap' <<<"$target_block"
 if grep -Eq 'elide:|maximumLineCount' <<<"$target_block"; then
   echo "the target line must never elide" >&2
+  exit 1
+fi
+# --- 4a: clicking the details never takes focus from the password field
+block_grep "$agent" 'TextEdit {' 'activeFocusOnPress: false'
+# --- 4a: an empty Enter never submits (no wasted attempt), it nudges
+block_grep "$agent" 'function submitResponse()' 'if (passwordInput.text.length === 0) {'
+block_grep "$agent" 'function submitResponse()' 'root.nudge()'
+block_grep "$agent" 'function nudge()' 'if (root.motionEnabled)'
+grep -Fq 'id: nudgeAnimation' "$agent"
+# --- 4a: the identity count feeds the hint; the unused failed mirror is gone
+block_grep "$agent" 'function syncIdentity()' 'identityTotal ='
+if grep -Eq 'property bool failed|failed = ' "$agent"; then
+  echo "failed is never read" >&2
   exit 1
 fi
 

@@ -64,8 +64,6 @@ Item {
   property bool responseRequired: false
   // The response may be echoed (not a secret), so the field shows plain text.
   property bool responseVisible: false
-  // Mirror of the flow's failed flag; synced but not read by anything in this file.
-  property bool failed: false
   // Failure feedback is on (red border and text, "Wrong"); errorTimer clears it after 1.2 s.
   property bool errorFlash: false
   // pam_fprintd appears in the polkit PAM stack (a sensor is enrolled).
@@ -86,6 +84,8 @@ Item {
   property string identityText: ""
   // " (n of m)" suffix when there are several identities, else "".
   property string identityCount: ""
+  // Number of identities the request offers; the hint shows Shift+Tab when above one.
+  property int identityTotal: 0
   // The details rows are shown (toggled with Tab or the DETAILS link).
   property bool detailsOpen: false
   // The pkaction lookup in flight belongs to this cookie; a request that
@@ -124,7 +124,6 @@ Item {
     supplementaryIsError = false
     responseRequired = false
     responseVisible = false
-    failed = false
     errorFlash = false
     submitted = false
     currentActionId = ""
@@ -132,6 +131,7 @@ Item {
     actionVendor = ""
     identityText = ""
     identityCount = ""
+    identityTotal = 0
     detailsOpen = false
     passwordInput.text = ""
   }
@@ -142,10 +142,12 @@ Item {
     if (!flow) {
       identityText = ""
       identityCount = ""
+      identityTotal = 0
       return
     }
     identityText = PolkitLogic.identityLabel(flow.selectedIdentity)
     identityCount = PolkitLogic.identityPosition(flow.identities, flow.selectedIdentity)
+    identityTotal = flow.identities ? flow.identities.length : 0
   }
 
   // Copies the flow's message, prompt, supplementary text and flags into the root properties; a new response request clears submitted.
@@ -160,7 +162,6 @@ Item {
     currentActionId = String(flow.actionId || "")
     responseRequired = !!flow.isResponseRequired
     responseVisible = !!flow.responseVisible
-    failed = !!flow.failed
     syncIdentity()
 
     if (responseRequired)
@@ -246,16 +247,28 @@ Item {
     }
   }
 
-  // Sends the typed password to the flow when PAM wants a response, clears the field and parks focus on the key catcher.
+  // Sends the typed password to the flow when PAM wants a response, clears
+  // the field and parks focus on the key catcher; an empty field only nudges
+  // (an empty attempt would count toward faillock).
   function submitResponse() {
     var flow = polkitAgent.flow
     if (!flow || !flow.isResponseRequired)
       return
+    if (passwordInput.text.length === 0) {
+      root.nudge()
+      return
+    }
     submitted = true
     errorFlash = false
     flow.submit(passwordInput.text)
     passwordInput.text = ""
     keyCatcher.forceActiveFocus()
+  }
+
+  // A small shake that says "type something first"; none when motion is off.
+  function nudge() {
+    if (root.motionEnabled)
+      nudgeAnimation.restart()
   }
 
   // Cancels the request and starts the close delay.
@@ -317,6 +330,32 @@ Item {
       property: "shakeOffset"
       to: 0
       duration: 55
+      easing.type: Easing.OutQuad
+    }
+  }
+
+  // Gentler, slower shake than the failure shake, for an empty Enter (~200 ms).
+  SequentialAnimation {
+    id: nudgeAnimation
+    NumberAnimation {
+      target: root
+      property: "shakeOffset"
+      to: -4
+      duration: 50
+      easing.type: Easing.OutQuad
+    }
+    NumberAnimation {
+      target: root
+      property: "shakeOffset"
+      to: 4
+      duration: 70
+      easing.type: Easing.InOutQuad
+    }
+    NumberAnimation {
+      target: root
+      property: "shakeOffset"
+      to: 0
+      duration: 80
       easing.type: Easing.OutQuad
     }
   }
@@ -658,6 +697,7 @@ Item {
                 text: detailRow.modelData.value
                 readOnly: true
                 selectByMouse: true
+                activeFocusOnPress: false
                 wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
                 color: root.foreground
                 selectionColor: Util.alpha(root.accent, 0.45)
@@ -794,7 +834,7 @@ Item {
         Text {
           Layout.fillWidth: true
           textFormat: Text.PlainText
-          text: root.fingerprintMode ? "TAB DETAILS · ESC CANCEL" : "ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL"
+          text: PolkitLogic.hintLine(root.fingerprintMode, root.identityTotal)
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
