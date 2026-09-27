@@ -58,7 +58,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       | if $tray == null then [{id: "araneadev.notifications"}] + .
         else .[:$tray] + [{id: "araneadev.notifications"}] + .[$tray:] end)
     else . end
-  # Place the health icon once: after the bell when the bell is in the right
+  # Place the health icon once: before the bell when the bell is in the right
   # section, else before the tray, else first.
   | if $placeHealth
        and ((.bar.layout.right | type) == "array")
@@ -67,7 +67,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       (map(if type == "string" then . else .id? end)) as $ids
       | ($ids | index("araneadev.notifications")) as $bell
       | ($ids | index("omarchy.tray")) as $tray
-      | if $bell != null then .[:$bell + 1] + [{id: "araneadev.health"}] + .[$bell + 1:]
+      | if $bell != null then .[:$bell] + [{id: "araneadev.health"}] + .[$bell:]
         elif $tray != null then .[:$tray] + [{id: "araneadev.health"}] + .[$tray:]
         else [{id: "araneadev.health"}] + . end)
     else . end
