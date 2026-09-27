@@ -48,5 +48,14 @@ fi
 block_grep "$plugin/Clipboard.qml" 'function openIndex(index)' 'ClipboardLogic.canOpen(row)'
 block_grep "$plugin/Clipboard.qml" 'function openIndex(index)' "root.showNotice(\"SECRETS CAN'T BE OPENED IN THE EDITOR\")"
 block_grep "$plugin/Clipboard.qml" 'function hintText()' 'if (root.notice)'
+# --- 4a: expiry runs on open, Ctrl+S restamps, remaining time from the TTL
+block_grep "$plugin/Clipboard.qml" 'function open(payloadJson)' 'root.expireNow()'
+grep -Fq 'ClipboardLogic.toggleSecret(root.history, displayModel.get(index).historyIndex, Date.now())' "$plugin/Clipboard.qml"
+grep -Fq 'ClipboardLogic.secretExpiryText(' "$plugin/Clipboard.qml"
+if grep -Fq 'EXPIRES 10 MIN' "$plugin/Clipboard.qml"; then
+  echo "expiry text must come from secretTtlMs" >&2
+  exit 1
+fi
+grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$repo_root/README.md"
 
 echo "clipboard contract passed"

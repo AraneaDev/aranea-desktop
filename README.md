@@ -316,8 +316,9 @@ which checks are on.
 and labels each item by kind — link, path, colour (with a swatch), code,
 image or text. Anything that looks like a secret (GitHub, OpenAI, Slack or AWS
 tokens, JWTs, private keys, random-looking strings of 16+ characters) is
-masked in the list and the preview, and removed from history 10 minutes after
-it was copied unless pinned. Copies a password manager marks as secret are
+masked in the list and the preview, and removed from history 10 minutes (by
+default; set `ARANEA_CLIPBOARD_SECRET_TTL_MS` to change it) after it was
+copied or marked secret, unless pinned; the preview shows the time left. Copies a password manager marks as secret are
 never stored at all.
 
 `Enter` pastes, `Shift+Enter` copies, `Alt+Enter` opens an item in the editor

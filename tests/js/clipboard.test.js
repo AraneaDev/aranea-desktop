@@ -304,3 +304,31 @@ test("unstamped entries are detected (4a)", () => {
   t('[{"type":"text","text":"a","capturedAtMs":5}]', false, "stamped")
   t("not json", false, "invalid json")
 })
+
+test("secret expiry (4a)", () => {
+  const c = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const now = 1000000000000
+  const MIN = 60000
+  const TTL = 10 * MIN
+  const s = (at, extra) =>
+    Object.assign({ type: "text", text: "x", secret: true, capturedAtMs: at }, extra)
+  eq(c.secretExpiryText(s(now - 3 * MIN), now, TTL), "expires in 7m", "minutes left")
+  eq(c.secretExpiryText(s(now - TTL + 30000), now, TTL), "expires in <1m", "under a minute")
+  eq(c.secretExpiryText(s(now - TTL - MIN), now, TTL), "expires in <1m", "overdue")
+  eq(c.secretExpiryText(s(now, {}), now, 3 * 60 * MIN), "expires in 3h", "hours")
+  eq(c.secretExpiryText(s(now, { pinned: true }), now, TTL), "", "pinned never expires")
+  eq(c.secretExpiryText({ type: "text", text: "x", capturedAtMs: now }, now, TTL), "", "not secret")
+  eq(c.secretExpiryText(null, now, TTL), "", "no entry")
+  // Marking an old item secret restarts its clock, so it is not dropped at once
+  const old = [c.enrich({ type: "text", text: "plain words", capturedAtMs: now - 60 * MIN }, now)]
+  const marked = c.toggleSecret(old, 0, now)
+  eq(marked[0].secret, true, "marked")
+  eq(marked[0].capturedAtMs, now, "restamped")
+  eq(c.expire(marked, now + MIN, TTL).changed, false, "kept after marking")
+  eq(c.toggleSecret(marked, 0, now + MIN)[0].capturedAtMs, now, "unmarking keeps the stamp")
+})

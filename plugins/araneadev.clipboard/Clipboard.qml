@@ -72,6 +72,8 @@ Item {
   property int historyLimit: 300
   // Secrets leave history this long after capture (pinned ones stay).
   readonly property real secretTtlMs: Number(Quickshell.env("ARANEA_CLIPBOARD_SECRET_TTL_MS")) || 600000
+  // Clock for the remaining-time text; set on open and by the expiry timer.
+  property real nowMs: Date.now()
   // Display index whose secret is revealed in the preview; any cursor move
   // masks it again.
   property int revealedIndex: -1
@@ -92,6 +94,8 @@ Item {
     root.selectedIndex = 0
     root.cursorActive = true
     root.disarmPointer()
+    root.nowMs = Date.now()
+    root.expireNow()
     root.rebuildDisplay()
     Qt.callLater(function () {
       keyCatcher.forceActiveFocus()
@@ -161,7 +165,7 @@ Item {
   function toggleSecretIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
-    root.updateHistory(ClipboardLogic.toggleSecret(root.history, displayModel.get(index).historyIndex))
+    root.updateHistory(ClipboardLogic.toggleSecret(root.history, displayModel.get(index).historyIndex, Date.now()))
   }
 
   // Toggles showing the secret at display index in the preview; no-op for non-secret rows.
@@ -454,7 +458,10 @@ Item {
     interval: 60000
     repeat: true
     running: true
-    onTriggered: root.expireNow()
+    onTriggered: {
+      root.nowMs = Date.now()
+      root.expireNow()
+    }
   }
 
   // Safety net: if a write never reports back (FileView may merge quick
@@ -975,7 +982,10 @@ Item {
               }
               Text {
                 textFormat: Text.PlainText
-                text: "SPACE TO REVEAL  ·  EXPIRES 10 MIN AFTER COPY"
+                text: {
+                  var left = preview.activeRow ? ClipboardLogic.secretExpiryText(root.history[preview.activeRow.historyIndex], root.nowMs, root.secretTtlMs) : ""
+                  return "SPACE TO REVEAL" + (left ? "  ·  " + left.toUpperCase() : "")
+                }
                 color: Util.alpha(root.foreground, 0.5)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption

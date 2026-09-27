@@ -605,16 +605,20 @@ function togglePinned(history, index, now) {
 /**
  * Flips the secret flag of the entry at index and records the choice in
  * secretOverride so detection does not undo it; images are left unchanged.
+ * Marking an entry secret restamps its capture time, so an old item is not
+ * expired the moment it is marked.
  * @param {*} history - The history array.
  * @param {*} index - The position of the entry.
+ * @param {*} [now] - The current time in ms; the stamp is left alone when omitted.
  * @returns {Array<ClipboardEntry>} The new history array.
  */
-function toggleSecret(history, index) {
+function toggleSecret(history, index, now) {
   return withEntry(history, index, function (e) {
     // Images are never secrets (the thumbnail would still show).
     if (e.type === "image") return
     e.secretOverride = !e.secret
     e.secret = e.secretOverride
+    if (e.secret && now !== undefined) e.capturedAtMs = Number(now) || 0
   })
 }
 
@@ -655,6 +659,23 @@ function relativeAge(ms, now) {
   var h = Math.floor(m / 60)
   if (h < 24) return h + "h"
   return Math.floor(h / 24) + "d"
+}
+
+/**
+ * Time left before an unpinned secret leaves history: "expires in Nm",
+ * "expires in Nh" from an hour on, or "expires in <1m".
+ * @param {?ClipboardEntry} entry - The entry.
+ * @param {*} now - The current time in ms.
+ * @param {*} ttlMs - How long a secret is kept, in ms.
+ * @returns {string} The text, or "" for a missing, pinned or non-secret entry.
+ */
+function secretExpiryText(entry, now, ttlMs) {
+  if (!entry || !entry.secret || entry.pinned) return ""
+  var left = Number(entry.capturedAtMs) + Number(ttlMs) - Number(now)
+  var minutes = Math.floor(left / 60000)
+  if (!(minutes >= 1)) return "expires in <1m"
+  if (minutes >= 60) return "expires in " + Math.floor(minutes / 60) + "h"
+  return "expires in " + minutes + "m"
 }
 
 /**
@@ -778,6 +799,7 @@ if (typeof module !== "undefined") {
     clearUnpinned: clearUnpinned,
     canOpen: canOpen,
     relativeAge: relativeAge,
+    secretExpiryText: secretExpiryText,
     linkParts: linkParts,
     colourValue: colourValue,
     displayRows: displayRows
