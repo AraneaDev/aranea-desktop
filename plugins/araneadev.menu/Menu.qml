@@ -26,6 +26,7 @@ Item {
 
   // Opens the menu at the payload's route, or as a dmenu picker when mode is select/input.
   function open(payloadJson: string): void {
+    root.notice = ""
     var payload = ({})
     try {
       payload = JSON.parse(payloadJson || "{}")
@@ -133,18 +134,40 @@ Item {
   readonly property int favoriteAppLimit: 12
   // Maximum number of recent apps kept.
   readonly property int recentAppLimit: 12
-  // Pinned app ids, persisted across reloads.
+  // Pinned app ids, saved to the state file.
   property var favoriteAppIds: []
-  // Recently launched app ids, newest first, persisted across reloads.
+  // Recently launched app ids, newest first, saved to the state file.
   property var recentAppIds: []
   // Last generated Apps rows, including the Favorites and Recent submenus.
   property var appRows: []
+  // Aranea state directory ($XDG_STATE_HOME/aranea).
+  readonly property string stateRoot: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea"
+  // Favourites and recents on disk, so they survive shell restarts.
+  readonly property string appHistoryPath: root.stateRoot + "/menu.json"
+  // One-off message that replaces the key hints until noticeTimer clears it.
+  property string notice: ""
 
-  PersistentProperties {
-    id: persisted
-    reloadableId: "araneadev-menu"
-    property string favoriteAppIdsJson: "[]"
-    property string recentAppIdsJson: "[]"
+  // Loads the favourites and recents; a missing or broken file means none.
+  FileView {
+    id: appHistoryFile
+    path: root.appHistoryPath
+    atomicWrites: true
+    printErrors: false
+    onLoaded: root.applyAppHistory(text())
+    onLoadFailed: root.applyAppHistory("")
+  }
+
+  // Makes sure the state directory exists before the first write.
+  Process {
+    running: true
+    command: ["mkdir", "-p", root.stateRoot]
+  }
+
+  // Clears the hint-line notice three seconds after showNotice.
+  Timer {
+    id: noticeTimer
+    interval: 3000
+    onTriggered: root.notice = ""
   }
 
   // Shared application engine (entries, hidden filters, icons, launch,
@@ -225,31 +248,34 @@ Item {
       })
     }
   }
-  Component.onCompleted: root.loadAppHistory()
 
-  // Restores pinned and recent app ids from PersistentProperties.
-  function loadAppHistory(): void {
-    try {
-      root.favoriteAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.favoriteAppIdsJson), root.favoriteAppLimit)
-    } catch (e) {
-      root.favoriteAppIds = []
-    }
-    try {
-      root.recentAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.recentAppIdsJson), root.recentAppLimit)
-    } catch (e) {
-      root.recentAppIds = []
-    }
+  // Applies the state file's favourites and recents and regenerates the Apps rows.
+  function applyAppHistory(raw: string): void {
+    var history = MenuModel.parseAppHistory(raw, root.favoriteAppLimit)
+    root.favoriteAppIds = history.favorites
+    root.recentAppIds = MenuModel.normalizeAppIds(history.recent, root.recentAppLimit)
+    root.mergeAppRows()
   }
 
-  // Writes pinned and recent app ids to PersistentProperties.
+  // Writes pinned and recent app ids to the state file.
   function saveAppHistory(): void {
-    persisted.favoriteAppIdsJson = JSON.stringify(MenuModel.normalizeAppIds(root.favoriteAppIds, root.favoriteAppLimit))
-    persisted.recentAppIdsJson = JSON.stringify(MenuModel.normalizeAppIds(root.recentAppIds, root.recentAppLimit))
+    appHistoryFile.setText(MenuModel.serializeAppHistory(root.favoriteAppIds, root.recentAppIds, root.favoriteAppLimit))
   }
 
-  // Pins or unpins an app, saves, and regenerates the Apps rows.
+  // Shows text on the hint line for three seconds.
+  function showNotice(text: string): void {
+    root.notice = text
+    noticeTimer.restart()
+  }
+
+  // Pins or unpins an app, saves, and regenerates the Apps rows; a 13th pin is refused with a notice.
   function toggleFavoriteApp(appId: string): void {
-    root.favoriteAppIds = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit).ids
+    var result = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit)
+    if (result.refused) {
+      root.showNotice("12 FAVOURITES · UNPIN ONE FIRST")
+      return
+    }
+    root.favoriteAppIds = result.ids
     root.saveAppHistory()
     root.mergeAppRows()
   }
@@ -624,6 +650,18 @@ Item {
     if (!root.appLibrary)
       return
     var rows = root.appLibrary.sortedEntries("")
+    // Uninstalled apps must not use up favourite or recent slots; an app
+    // library that has not loaded yet (no rows) must not wipe the lists.
+    var installed = rows.map(function (r) {
+      return String(r.entry.id || "")
+    })
+    var favorites = MenuModel.pruneAppIds(root.favoriteAppIds, installed)
+    var recent = MenuModel.pruneAppIds(root.recentAppIds, installed)
+    if (rows.length > 0 && (favorites.length !== root.favoriteAppIds.length || recent.length !== root.recentAppIds.length)) {
+      root.favoriteAppIds = favorites
+      root.recentAppIds = recent
+      root.saveAppHistory()
+    }
     var appRows = []
     for (var j = 0; j < rows.length; j++) {
       var entry = rows[j].entry
@@ -1657,6 +1695,13 @@ Item {
               root.setFilter("")
             else
               root.cancel()
+            event.accepted = true
+          } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier) && !root.dmenuActive) {
+            if (root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
+              var pinRow = displayModel.get(root.selectedIndex)
+              if (pinRow.kind === "app" && pinRow.appId)
+                root.toggleFavoriteApp(pinRow.appId)
+            }
             event.accepted = true
           } else if (Util.editsFilter(event, root.filterText)) {
             root.setFilter(Util.editedFilter(event, root.filterText))
