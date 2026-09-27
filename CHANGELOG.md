@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.0.0...v2.1.0) (2026-09-27)
+
+
+### Features
+
+* **shell:** place the health icon before the bell ([#47](https://github.com/AraneaDev/aranea-desktop/issues/47)) ([52a20aa](https://github.com/AraneaDev/aranea-desktop/commit/52a20aa75e8f84775876708c53b4ab1f4c2182e9))
+
 ## [2.0.0](https://github.com/AraneaDev/aranea-desktop/compare/v1.7.0...v2.0.0) (2026-09-27)
 
 
