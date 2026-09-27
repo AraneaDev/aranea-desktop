@@ -85,4 +85,15 @@ grep -Fq 'function holdPopup(key: string, on: bool): void' "$svc"
 grep -Fq '!cardSlot.svc.popupHeld(cardSlot.holdKey)' "$svc"
 grep -Fq 'Component.onDestruction: if (cardSlot.held)' "$svc"
 
+# --- 4c: the JSON goes through stdin (argv is limited to 128 KiB per arg);
+# a job whose process never starts still finishes and the queue moves on
+inbox_qml="$repo_root/plugins/araneadev.notifications/Inbox.qml"
+grep -Fq 'IFS= read -r json' "$inbox_qml"
+if grep -Fq 'NotificationLogic.serializePopup(record, normalUrgency), NotificationLogic.popupFileName(record)]' "$inbox_qml"; then
+  echo "the notification JSON must not travel as an argument" >&2
+  exit 1
+fi
+grep -Fq 'fileProc.write(inbox.runningStdin + "\n")' "$inbox_qml"
+grep -Fq 'if (!running && !inbox.runningStarted)' "$inbox_qml"
+
 echo "notifications contract passed"

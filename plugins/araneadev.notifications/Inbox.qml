@@ -160,36 +160,45 @@ Item {
   // must neither hang the serialized queue nor fill the state dir.
   readonly property string copyImagesScript: "while (( $# >= 2 )); do\n" + "  if [[ -f $1 ]] && timeout 5 head -c 5242881 -- \"$1\" > \"$2.tmp\" 2>/dev/null &&\n" + "     (( $(stat -c%s -- \"$2.tmp\") <= 5242880 )); then mv -f -- \"$2.tmp\" \"$2\"; else rm -f -- \"$2.tmp\"; fi\n" + "  shift 2\n" + "done\n"
 
-  // The JSON travels as an argument, never through shell interpolation.
-  // Image copies run before the JSON that references them.
+  // The JSON travels on stdin (one line; serializePopup is compact), never as
+  // an argument (argv is limited to 128 KiB per argument) or through shell
+  // interpolation. Image copies run before the JSON that references them.
+  // done, when given, receives the persisted record once the write finished.
   function writeFile(entry, done) {
     if (!entry) {
       if (done)
-        done()
+        done(null)
       return
     }
     var persistable = NotificationLogic.persistablePopup(entry, imagesDir)
     var record = persistable.entry
-    var command = ["bash", "-c", "mkdir -p \"$1\" \"$2\" || exit 0\n" + "dir=\"$1\" json=\"$3\" name=\"$4\"\n" + "shift 4\n" + copyImagesScript + "printf '%s\\n' \"$json\" > \"$dir/$name\"", "--", inboxDir, imagesDir, NotificationLogic.serializePopup(record, normalUrgency), NotificationLogic.popupFileName(record)]
+    var command = ["bash", "-c", "IFS= read -r json || exit 0\n" + "mkdir -p \"$1\" \"$2\" || exit 0\n" + "dir=\"$1\" name=\"$3\"\n" + "shift 3\n" + copyImagesScript + "printf '%s\\n' \"$json\" > \"$dir/$name.tmp\" && mv -f -- \"$dir/$name.tmp\" \"$dir/$name\"", "--", inboxDir, imagesDir, NotificationLogic.popupFileName(record)]
     for (var i = 0; i < persistable.copies.length; i++)
       command.push(persistable.copies[i].from, persistable.copies[i].to)
-    enqueue(command, done)
+    enqueue(command, done ? function () {
+      done(record)
+    } : null, NotificationLogic.serializePopup(record, normalUrgency))
   }
 
   // ---------------------------------------------------- queue
 
-  // Pending file jobs, each {command, done}, run one at a time by fileProc.
+  // Pending file jobs, each {command, done, stdin}, run one at a time by fileProc.
   property var queue: []
   // Callback of the job fileProc is running, called when it exits.
   property var runningDone: null
+  // Line written to the running job's stdin when it starts, or "".
+  property string runningStdin: ""
+  // Whether the running job's process started (a failed start never exits).
+  property bool runningStarted: false
 
   // Queues an argv to run after every job already queued, with an optional done
-  // callback.
-  function enqueue(command, done) {
+  // callback and an optional line for its stdin.
+  function enqueue(command, done, stdin) {
     queue = queue.concat([
       {
         command: command,
-        done: done || null
+        done: done || null,
+        stdin: stdin || ""
       }
     ])
     runNext()
@@ -202,25 +211,42 @@ Item {
     var job = queue[0]
     queue = queue.slice(1)
     fileProc.command = job.command
+    fileProc.stdinEnabled = job.stdin.length > 0
+    inbox.runningStdin = job.stdin
     inbox.runningDone = job.done
+    inbox.runningStarted = false
     fileProc.running = true
+  }
+
+  // Calls the running job's done callback once and starts the next job.
+  function finishJob(): void {
+    var done = inbox.runningDone
+    inbox.runningDone = null
+    inbox.runningStdin = ""
+    if (done) {
+      try {
+        done()
+      } catch (e) {
+        console.warn("notifications: inbox job callback failed:", e)
+      }
+    }
+    inbox.runNext()
   }
 
   Process {
     id: fileProc
     running: false
-    onExited: {
-      var done = inbox.runningDone
-      inbox.runningDone = null
-      if (done) {
-        try {
-          done()
-        } catch (e) {
-          console.warn("notifications: inbox job callback failed:", e)
-        }
-      }
-      inbox.runNext()
+    onStarted: {
+      inbox.runningStarted = true
+      if (inbox.runningStdin)
+        fileProc.write(inbox.runningStdin + "\n")
     }
+    // A process that fails to start (e.g. E2BIG) never emits exited.
+    onRunningChanged: if (!running && !inbox.runningStarted) {
+      console.warn("notifications: inbox job failed to start")
+      inbox.finishJob()
+    }
+    onExited: inbox.finishJob()
   }
 
   // ---------------------------------------------------- load
