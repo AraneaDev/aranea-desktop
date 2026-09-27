@@ -116,6 +116,9 @@ session (see the "Artwork" section of the README for the exact invocation).
 `tests/screenshot-coverage.test.sh` enforces that every surface
 the capture script knows about has a checked-in screenshot, is referenced in
 the README, and that the hero GIF's frame order and count match.
+`tests/capture-batch.test.sh` runs the `--all` batch with every capture
+replaced (`ARANEA_CAPTURE_SURFACE_COMMAND`): a failed surface keeps its old
+PNG and fails the batch, and the notification inbox always comes back.
 
 ## Commit messages
 

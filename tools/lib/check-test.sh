@@ -67,7 +67,7 @@ stage_test() {
     # js, qml-types and qml-behaviour duplicate this stage's node run and the
     # qml and qmltest stages.
     local skip_list="js,qml-types,qml-behaviour"
-    ((fast)) && skip_list="js,qml-types,qml-behaviour,hooks,screenshot-coverage"
+    ((fast)) && skip_list="js,qml-types,qml-behaviour,hooks,screenshot-coverage,capture-batch"
     (cd "$check_root" && ARANEA_TESTS_SKIP="$skip_list" tests/run) || status=1
   fi
   if [[ -d "$check_root/tests/js" ]]; then

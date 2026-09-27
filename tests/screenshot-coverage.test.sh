@@ -133,11 +133,8 @@ for index in "${!expected_hero_frames[@]}"; do
 done
 
 # --- 4d: --all captures every surface, lists failures and exits 1 on any
+# (behaviour: tests/capture-batch.test.sh)
 capture="$repo_root/scripts/capture-screenshots"
-grep -Fq "capture_one \"\$all_surface\" || failed_surfaces+=(\"\$all_surface\")" "$capture"
-grep -Fq "if [[ -f \"\$png\" ]]; then mv -- \"\$png\" \"\$previous\"; fi" "$capture"
-grep -Fq "if [[ -f \"\$previous\" ]]; then mv -- \"\$previous\" \"\$png\"; fi" "$capture"
-grep -Fq "printf 'capture failed: %s\\n' \"\${failed_surfaces[*]}\"" "$capture"
 
 # --- 4e: the weather capture shows a demo city and always restores the user's
 # location; there is no wifiqr capture; --hero rebuilds the GIF from stills

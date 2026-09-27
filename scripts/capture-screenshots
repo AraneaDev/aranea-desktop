@@ -11,6 +11,9 @@ set -euo pipefail
 # Never captured: the keyboard-layout and system-update bar widgets (no popup
 # to summon) and wifiqr (it would put the Wi-Fi password in a screenshot).
 #
+# ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
+# --all: it is run as `<command> <surface> <output dir>` (tests use it).
+#
 # Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir> | --hero --output <dir>
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -138,7 +141,11 @@ if ((capture_all)); then
     local png="$output/$all_surface.png" previous="$output/.$all_surface.png.previous"
     rm -f -- "$previous"
     if [[ -f "$png" ]]; then mv -- "$png" "$previous"; fi
-    "$0" --surface "$all_surface" --output "$output" || true
+    if [[ -n "${ARANEA_CAPTURE_SURFACE_COMMAND:-}" ]]; then
+      "$ARANEA_CAPTURE_SURFACE_COMMAND" "$all_surface" "$output" || true
+    else
+      "$0" --surface "$all_surface" --output "$output" || true
+    fi
     if [[ -f "$png" ]]; then
       rm -f -- "$previous"
       return 0
