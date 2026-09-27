@@ -42,4 +42,12 @@ for token in context-text tile-background footer-text node-alpha; do
   grep -Eq "^${token}[[:space:]]*=" "$repo_root/shell.toml"
 done
 
+# Ids and profiles are matched literally, never as patterns.
+manifest_profile_exists full
+if manifest_profile_exists 'full|x'; then echo "unexpected success: manifest_profile_exists 'full|x'" >&2; exit 1; fi
+if manifest_profile_exists 'f.ll'; then echo "unexpected success: manifest_profile_exists 'f.ll'" >&2; exit 1; fi
+manifest_integration_exists session
+if manifest_integration_exists '.*'; then echo "unexpected success: manifest_integration_exists '.*'" >&2; exit 1; fi
+[[ -z "$(manifest_integration_field '.*' optional_command)" ]]
+
 echo "manifest contract passed"

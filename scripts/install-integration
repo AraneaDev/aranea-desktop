@@ -51,12 +51,19 @@ if [[ -n "$optional_command" ]]; then
 fi
 
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+# Temp dirs made below; removed however the script exits.
+cleanup_dirs=()
+trap 'rm -rf -- "${cleanup_dirs[@]}"' EXIT
 install_one() {
   local source="$1" target="$2"
   if (( dry_run )); then
     printf 'would link %s -> %s\n' "$source" "$target"
+    return 0
+  fi
+  link_managed_file "$target" "$source"
+  if [[ "$(last_ownership_action)" == kept ]]; then
+    printf 'kept your %s\n' "$target"
   else
-    link_managed_file "$target" "$source"
     printf 'linked %s -> %s\n' "$source" "$target"
   fi
 }
@@ -85,11 +92,11 @@ case "$integration" in
     fi
     ;;
   developer)
-    command -v nvim >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/neovim.lua" "$config_root/nvim/lua/plugins/aranea-theme.lua"
-    command -v starship >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/starship.toml" "$config_root/starship.toml"
-    command -v tmux >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/tmux.conf" "$config_root/tmux/themes/aranea.conf"
-    command -v btop >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"
-    command -v lazygit >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/lazygit.yml" "$config_root/lazygit/themes/aranea.yml"
+    if command -v nvim >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/neovim.lua" "$config_root/nvim/lua/plugins/aranea-theme.lua"; fi
+    if command -v starship >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/starship.toml" "$config_root/starship.toml"; fi
+    if command -v tmux >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/tmux.conf" "$config_root/tmux/themes/aranea.conf"; fi
+    if command -v btop >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"; fi
+    if command -v lazygit >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/lazygit.yml" "$config_root/lazygit/themes/aranea.yml"; fi
     ;;
   qt)
     if command -v kvantummanager >/dev/null 2>&1; then
@@ -119,7 +126,7 @@ case "$integration" in
         printf 'would link %s -> %s\n' "$repo_root/integrations/cursor/hyprcursor" "$cursor_root"
       else
         hyprcursor_tmp="$(mktemp -d)"
-        trap 'rm -rf -- "$hyprcursor_tmp"' RETURN
+        cleanup_dirs+=("$hyprcursor_tmp")
         mkdir -p "$hyprcursor_tmp/out"
         if command -v hyprcursor-util >/dev/null 2>&1; then
           hyprcursor-util --create "$repo_root/integrations/cursor/hyprcursor" \
@@ -142,7 +149,7 @@ case "$integration" in
     if ! (( dry_run )) && command -v xcursorgen >/dev/null 2>&1 &&
        { command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1; }; then
       cursor_tmp="$(mktemp -d)"
-      trap 'rm -rf -- "$cursor_tmp"' RETURN
+      cleanup_dirs+=("$cursor_tmp")
       for cursor_spec in \
         "left_ptr 2 2" \
         "hand2 16 16" \

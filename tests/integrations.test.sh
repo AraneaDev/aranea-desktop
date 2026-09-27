@@ -34,4 +34,7 @@ grep -Fq 'cursor/cursors/left_ptr.svg' <<<"$cursor_output"
 icons_output="$("$repo_root/scripts/install-integration" icons --dry-run)"
 grep -Eq 'Skipping icons:|would set desktop icon theme' <<<"$icons_output"
 
+# An optional app that isn't installed never fails the integration (spec B5).
+"$repo_root/scripts/install-integration" developer --yes >/dev/null
+
 echo "integration contract passed"

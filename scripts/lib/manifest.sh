@@ -6,7 +6,7 @@ manifest_file="${ARANEA_MANIFEST_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.
 
 manifest_profile_exists() {
   local profile="$1"
-  grep -Eq "^\[profiles\.${profile//./\.}\]$" "$manifest_file"
+  awk -v section="[profiles.$profile]" '$0 == section { found = 1; exit } END { exit(found ? 0 : 1) }' "$manifest_file"
 }
 
 manifest_profile_integrations() {
@@ -32,7 +32,12 @@ manifest_integration_exists() {
   awk -v wanted="$integration" '
     /^\[\[integrations\]\]$/ { in_block = 1; found = 0; next }
     in_block && /^\[/ { in_block = 0 }
-    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { found = 1; exit }
+    in_block && /^id[[:space:]]*=/ {
+      value = $0
+      sub(/^id[[:space:]]*=[[:space:]]*"/, "", value)
+      sub(/"[[:space:]]*$/, "", value)
+      if (value == wanted) { found = 1; exit }
+    }
     END { exit(found ? 0 : 1) }
   ' "$manifest_file"
 }
@@ -43,7 +48,12 @@ manifest_integration_field() {
   awk -v wanted="$integration" -v wanted_field="$field" '
     /^\[\[integrations\]\]$/ { in_block = 1; found = 0; next }
     in_block && /^\[/ { in_block = 0 }
-    in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { found = 1; next }
+    in_block && /^id[[:space:]]*=/ {
+      value = $0
+      sub(/^id[[:space:]]*=[[:space:]]*"/, "", value)
+      sub(/"[[:space:]]*$/, "", value)
+      if (value == wanted) { found = 1; next }
+    }
     found && $0 ~ "^" wanted_field "[[:space:]]*=" {
       line = $0
       sub(/^[^=]*=[[:space:]]*/, "", line)
