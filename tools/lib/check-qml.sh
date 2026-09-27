@@ -88,7 +88,10 @@ stage_qml() {
   if ((update_baselines)); then
     local others
     others="$(grep -v -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" || true)"
-    { [[ -n "$others" ]] && printf '%s\n' "$others"; qml_shrunk_baseline "$current" "$relevant"; } |
+    {
+      [[ -n "$others" ]] && printf '%s\n' "$others"
+      qml_shrunk_baseline "$current" "$relevant"
+    } |
       LC_ALL=C sort -t$'\t' -k2 >"$baseline.new"
     mv "$baseline.new" "$baseline"
     grep -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" >"$relevant" || true

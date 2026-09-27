@@ -46,7 +46,7 @@ done
 # Side-effect commands resolve to logging stubs.
 for cmd in omarchy omarchy-shell hyprctl quickshell systemctl gsettings pkexec wtype wl-copy wl-paste \
   grim notify-send uwsm curl omarchy-theme-install omarchy-hyprland-session-locked kvantummanager \
-  kitty foot alacritty firefox chromium code nvim xdg-open; do
+  kitty foot alacritty firefox chromium code nvim xdg-open pavucontrol; do
   [[ "$(command -v "$cmd")" == "$repo_root/tests/guard-bin/$cmd" ]] || {
     echo "$cmd is not guarded: $(command -v "$cmd" || echo missing)" >&2
     exit 1

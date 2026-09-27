@@ -53,21 +53,16 @@ grep -Fq 'Health:' <<<"$about_output"
 
 browser_output="$("$repo_root/scripts/install-integration" browser --dry-run)"
 printf '%s\n' "$browser_output"
-if command -v firefox >/dev/null 2>&1; then
-  grep -Fq 'browser/firefox/userChrome.css' <<<"$browser_output"
-fi
-if command -v chromium >/dev/null 2>&1; then
-  grep -Fq 'browser/chromium/new-tab/index.html' <<<"$browser_output"
-fi
+# firefox and chromium are guard stubs, so both are always planned.
+grep -Fq 'browser/firefox/userChrome.css' <<<"$browser_output"
+grep -Fq 'browser/chromium/new-tab/index.html' <<<"$browser_output"
 
 session_output="$("$repo_root/scripts/install-integration" session --dry-run)"
 printf '%s\n' "$session_output"
 grep -Fq 'session/omarchy.css' <<<"$session_output"
 
-if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
-  media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
-  printf '%s\n' "$media_output"
-  grep -Fq 'media/pavucontrol.css' <<<"$media_output"
-fi
+media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
+printf '%s\n' "$media_output"
+grep -Fq 'media/pavucontrol.css' <<<"$media_output"
 
 echo "application integration contract passed"

@@ -1,0 +1,10 @@
+plugins/araneadev.bar/BarModel.js 33
+plugins/araneadev.clipboard/ClipboardLogic.js 85
+plugins/araneadev.emojis/EmojiLogic.js 100
+plugins/araneadev.health/HealthLogic.js 96
+plugins/araneadev.health/MetricsLogic.js 100
+plugins/araneadev.menu/MenuModel.js 27
+plugins/araneadev.notifications/InboxLogic.js 100
+plugins/araneadev.notifications/NotificationLogic.js 46
+plugins/araneadev.osd/OsdModel.js 100
+plugins/araneadev.polkit/PolkitLogic.js 100

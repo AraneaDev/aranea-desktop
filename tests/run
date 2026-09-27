@@ -77,6 +77,11 @@ start_all=$(date +%s.%N)
 
 for t in "${tests[@]}"; do
   name="$(basename "$t" .test.sh)"
+  # ARANEA_TESTS_SKIP=a,b skips those tests (tools/check runs some itself).
+  if [[ ",${ARANEA_TESTS_SKIP:-}," == *",$name,"* ]]; then
+    printf '%s-%s %-32s %s(skipped)%s\n' "$dim" "$reset" "$name" "$dim" "$reset"
+    continue
+  fi
   ((in_actions)) && printf '::group::%s\n' "$name"
   out="$(mktemp)"
   start=$(date +%s.%N)

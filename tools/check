@@ -125,6 +125,7 @@ source "$repo_root/tools/lib/check-format.sh"
 source "$repo_root/tools/lib/check-lint.sh"
 source "$repo_root/tools/lib/check-validate.sh"
 source "$repo_root/tools/lib/check-qml.sh"
+source "$repo_root/tools/lib/check-test.sh"
 
 # Runs one stage function (defined by the libraries above).
 run_stage() {

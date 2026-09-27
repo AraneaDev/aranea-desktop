@@ -15,6 +15,7 @@ cp "$repo_root/tools/check" tools/
 cp "$repo_root"/tools/lib/check-*.sh tools/lib/
 cp "$repo_root/tools/baselines/em-dash-allow.txt" tools/baselines/
 : >tools/baselines/qmllint.txt
+: >tools/baselines/coverage.txt
 for config in .prettierrc.json .prettierignore .editorconfig .qmlformat.ini eslint.config.js .markdownlint-cli2.jsonc; do cp "$repo_root/$config" .; done
 export ARANEA_CHECK_NODE_MODULES="$repo_root/node_modules"
 ln -s "$repo_root/node_modules" node_modules # the configs resolve their plugins from here
@@ -182,4 +183,48 @@ if [[ -f /usr/share/omarchy/shell/Commons/qmldir && -d /usr/lib/qt6/qml/Quickshe
 else
   echo "SKIP: qmllint baseline cases need Omarchy's shell and Quickshell"
 fi
+# test: a failing node:test fails the stage; a module below its coverage
+# floor fails it; --update-baselines raises floors but never lowers them.
+mkdir -p tests/js plugins/cov
+cat >plugins/cov/Mod.js <<'EOF'
+function used() { return 1 }
+function unused() { return 2 }
+if (typeof module !== "undefined") module.exports = { used: used, unused: unused }
+EOF
+cat >tests/js/mod.test.js <<'EOF'
+const { test } = require("node:test")
+const assert = require("node:assert/strict")
+const m = require("../../plugins/cov/Mod.js")
+test("used", () => assert.equal(m.used(), 1))
+EOF
+git add -A
+unset ARANEA_CHECK_NO_TESTS
+run_check --only test || {
+  echo "clean test stage failed" >&2
+  cat "$ARANEA_TEST_SANDBOX/out"
+  exit 1
+}
+printf 'plugins/cov/Mod.js 100\n' >tools/baselines/coverage.txt
+if run_check --only test; then
+  echo "coverage below its floor passed" >&2
+  exit 1
+fi
+grep -Fq 'plugins/cov/Mod.js' "$ARANEA_TEST_SANDBOX/out" || {
+  cat "$ARANEA_TEST_SANDBOX/out"
+  exit 1
+}
+printf 'plugins/cov/Mod.js 10\n' >tools/baselines/coverage.txt
+run_check --only test --update-baselines
+[[ "$(<tools/baselines/coverage.txt)" == "plugins/cov/Mod.js 50" ]] || {
+  echo "floor not raised: $(<tools/baselines/coverage.txt)" >&2
+  exit 1
+}
+printf 'test("fails", () => assert.equal(1, 2))\n' >>tests/js/mod.test.js
+git add -A
+if run_check --only test; then
+  echo "a failing node test passed" >&2
+  exit 1
+fi
+git reset -q --hard
+export ARANEA_CHECK_NO_TESTS=1
 echo "check contract passed"
