@@ -312,3 +312,26 @@ test("inbox consistency (4c)", () => {
     "live copy of a disk row is not doubled"
   )
 })
+
+test("dismiss actions (4c)", () => {
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  eq(inbox.dismissAction({ kind: "more", app: "x" }, false), "expand", "Delete on +N more expands")
+  eq(
+    inbox.dismissAction({ kind: "more", app: "x" }, true),
+    "group",
+    "Shift+Delete clears the group"
+  )
+  eq(inbox.dismissAction({ kind: "entry" }, false), "dismiss", "entry")
+  eq(
+    inbox.dismissAction({ kind: "entry" }, true),
+    "group",
+    "Shift+Delete on an entry clears its group"
+  )
+  eq(inbox.dismissAction({ kind: "group" }, false), "group", "group header")
+  eq(inbox.dismissAction(null, false), "", "no row")
+})

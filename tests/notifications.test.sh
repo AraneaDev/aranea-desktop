@@ -117,4 +117,9 @@ fi
 grep -Fq 'if (settingsSaveTimer.running)' "$svc"
 grep -Fq 'onReloaded: service.reloadedSettings = true' "$svc"
 
+# --- 4c: Delete on "+N more" expands; Shift+Delete clears the group; the panel says so
+panel_qml="$repo_root/plugins/araneadev.notifications/Panel.qml"
+grep -Fq 'InboxLogic.dismissAction(' "$panel_qml"
+grep -Fq 'ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP' "$panel_qml"
+
 echo "notifications contract passed"

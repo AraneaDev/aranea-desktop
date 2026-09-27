@@ -331,6 +331,21 @@ function relativeTime(timestamp, now) {
 }
 
 /**
+ * What Delete does on a center row: a "+N more" row expands its group (so
+ * hidden entries are never deleted unseen), an entry is dismissed, a group
+ * header, or any row with Shift, clears the whole app group.
+ * @param {?{kind: string}} row - the row under the cursor
+ * @param {boolean} wholeGroup - Shift was held
+ * @returns {string} "expand", "dismiss", "group", or "" for no row
+ */
+function dismissAction(row, wholeGroup) {
+  if (!row) return ""
+  if (wholeGroup || row.kind === "group") return "group"
+  if (row.kind === "more") return "expand"
+  return "dismiss"
+}
+
+/**
  * Merges the rows read from disk at startup with rows already in the model:
  * disk rows cleared or removed while the read ran are dropped, model rows not
  * on disk (arrived during the read) are kept; newest first.
@@ -358,6 +373,7 @@ function mergeLoaded(diskRows, liveRows, removed, cleared) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    dismissAction: dismissAction,
     mergeLoaded: mergeLoaded,
     MAX_ITEMS: MAX_ITEMS,
     MAX_AGE_MS: MAX_AGE_MS,

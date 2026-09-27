@@ -281,7 +281,8 @@ center behind the bell in the bar.
 - **Center:** critical first, then grouped by app, newest first. Click an item
   to open it (the app's own action when it is still running), ✕ dismisses an
   item or a whole group, swipe right to dismiss. Arrow keys, Enter, Delete and
-  Shift+Delete work while it is open.
+  Shift+Delete work while it is open: Delete on a "+N more" row expands the
+  group, Shift+Delete clears it.
 - **Feedback toasts:** Omarchy's short confirmations for things you just did
   ("Screenshot saved", "Copied") still appear briefly and are not kept.
 - **Keys (Omarchy defaults):** `Super+,` dismiss the newest item,

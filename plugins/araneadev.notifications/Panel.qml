@@ -130,15 +130,15 @@ Panel {
       toggleGroup(row.app)
   }
 
-  // Dismisses the row's entry, or its whole app group for a group or "more" row
-  // or when wholeGroup is set.
+  // Delete on a row (Shift sets wholeGroup): see InboxLogic.dismissAction.
   function dismissAt(index: int, wholeGroup: bool): void {
     var row = rows[index]
-    if (!row)
-      return
-    if (wholeGroup || row.kind === "group" || row.kind === "more")
+    var action = InboxLogic.dismissAction(row, wholeGroup)
+    if (action === "expand")
+      toggleGroup(row.app)
+    else if (action === "group")
       service.dismissGroup(row.app)
-    else
+    else if (action === "dismiss")
       service.dismissInbox(row.entry.fileName)
   }
 
@@ -308,6 +308,18 @@ Panel {
                 onClicked: root.clearAll()
               }
             }
+          }
+
+          // Key hints for the center list.
+          Text {
+            Layout.fillWidth: true
+            textFormat: Text.PlainText
+            text: "ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP"
+            color: Color.popups.text
+            opacity: 0.5
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
           }
 
           Text {
