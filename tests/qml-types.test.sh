@@ -56,6 +56,7 @@ if grep -Fq 'Bar profile' "$repo_root/scripts/aranea-about"; then
   echo "aranea-about must not report a bar profile" >&2
   exit 1
 fi
+grep -Fq 'setRequestedTransparency(BarModel.barTransparent(config))' "$bar_qml"
 
 # The QML contract is the tools/check qml stage: strict qmllint against the
 # shrink-only baseline when Omarchy and Quickshell are present, syntax-only

@@ -810,10 +810,8 @@ Item {
     var config = Util.isPlainObject(barConfig) ? barConfig : fallbackBarConfig
 
     position = normalizePosition(config.position)
-    // Custom theme bars default to the transparent treatment; an explicit
-    // false remains available for bars that intentionally need a slab.
-    // Aranea uses a fully glass bar, including the module regions.
-    setRequestedTransparency(true)
+    // Aranea is glass by default; `bar.transparent: false` gives the opaque bar.
+    setRequestedTransparency(BarModel.barTransparent(config))
     centerAnchor = Util.canonicalWidgetId(config.centerAnchor || "")
 
     // layoutEntries feeds plain JS arrays to the module Repeaters, and QML
@@ -1339,8 +1337,8 @@ Item {
   }
 
   // Request a transparent or opaque bar; transparent applies at once, then the contrast probe refines the foreground.
-  function setRequestedTransparency(value: real): void {
-    var nextTransparent = value === true
+  function setRequestedTransparency(value: bool): void {
+    var nextTransparent = value
     requestedTransparent = nextTransparent
     if (!nextTransparent) {
       foregroundAnimationEnabled = false

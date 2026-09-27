@@ -40,6 +40,13 @@ test("plugin-state logic", () => {
   // 4b: no profile filtering; the bar shows every configured module
   for (const gone of ["normalizeProfile", "profileAllows", "filterProfile"])
     if (bar[gone] !== undefined) throw new Error("bar profile helper still exported: " + gone)
+  // 4b: glass by default; only an explicit false gives the opaque bar
+  if (bar.barTransparent({}) !== true) throw new Error("missing transparent must be glass")
+  if (bar.barTransparent({ transparent: true }) !== true) throw new Error("true must be glass")
+  if (bar.barTransparent({ transparent: false }) !== false) throw new Error("false must be opaque")
+  if (bar.barTransparent(null) !== true) throw new Error("non-object config must be glass")
+  if (bar.barTransparent({ transparent: "false" }) !== true)
+    throw new Error("only the boolean false is opaque")
 
   const grouped = notifications.groupNotifications([
     { app: "browser", summary: "One" },
@@ -386,7 +393,7 @@ test("plugin-state logic", () => {
   requiresSignature(barQml, "function toggleTransparency(): void", "bar toggleTransparency")
   requiresSignature(
     barQml,
-    "function setRequestedTransparency(value: real): void",
+    "function setRequestedTransparency(value: bool): void",
     "bar setRequestedTransparency"
   )
   requiresSignature(

@@ -76,6 +76,16 @@ function semanticColor(state) {
 }
 
 /**
+ * Whether the bar is drawn as glass: Aranea's default, so only an explicit
+ * `transparent: false` in the bar config gives the opaque bar.
+ * @param {*} config - the bar config object; anything else counts as {}
+ * @returns {boolean} true unless config.transparent is exactly false
+ */
+function barTransparent(config) {
+  return !(config && typeof config === "object" && config.transparent === false)
+}
+
+/**
  * Normalize a bar position to top, bottom, left or right (default top).
  * @param {?string} value - raw position from config
  * @returns {string} a valid position
@@ -416,6 +426,7 @@ if (typeof module !== "undefined") {
     pickDrawnSlot: pickDrawnSlot,
     pickPanelSlot: pickPanelSlot,
     nearestDropTarget: nearestDropTarget,
+    barTransparent: barTransparent,
     normalizePosition: normalizePosition,
     entrySettings: entrySettings,
     entryId: entryId,
