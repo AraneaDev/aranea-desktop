@@ -227,4 +227,18 @@ if run_check --only test; then
 fi
 git reset -q --hard
 export ARANEA_CHECK_NO_TESTS=1
+# smoke: without Omarchy's shell it reports SKIP (exit 0); the Arch CI job
+# sets ARANEA_CHECK_REQUIRE_ALL=1, which turns that skip into a failure
+# (Review Focus 5).
+ARANEA_QML_SHELL_DIR=/nonexistent run_check --only smoke || {
+  cat "$ARANEA_TEST_SANDBOX/out"
+  exit 1
+}
+grep -Fq 'SKIP: runtime QML smoke needs' "$ARANEA_TEST_SANDBOX/out"
+grep -Fq 'smoke: skipped' "$ARANEA_TEST_SANDBOX/out"
+if ARANEA_QML_SHELL_DIR=/nonexistent ARANEA_CHECK_REQUIRE_ALL=1 run_check --only smoke; then
+  echo "a required smoke stage was allowed to skip" >&2
+  exit 1
+fi
+grep -Fq 'smoke: FAILED (skip not allowed)' "$ARANEA_TEST_SANDBOX/out"
 echo "check contract passed"
