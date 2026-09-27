@@ -63,18 +63,19 @@ if (( capture_all )); then
   find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
   omarchy restart shell >/dev/null 2>&1 || true
   sleep 3
-  # Called from the EXIT trap string below, which ShellCheck cannot see.
-  # shellcheck disable=SC2317,SC2329
-  restore_batch_inbox() {
+  # Restore the real inbox, leave the finished capture set visible on the
+  # intentionally empty workspace for a moment, then return focus.
+  finish_batch() {
     omarchy-shell notifications clear >/dev/null 2>&1 || true
     sleep 1
     find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
     rmdir "$batch_inbox_backup" 2>/dev/null || true
     omarchy restart shell >/dev/null 2>&1 || true
+    sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
+    hyprctl dispatch 'hl.dsp.focus({ workspace = "1" })' >/dev/null 2>&1 || true
   }
-  # Leave the finished capture set visible on the intentionally empty
-  # workspace long enough for visual inspection before returning focus.
-  trap 'restore_batch_inbox; sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
+  # A batch that stops early (set -e) still restores the inbox and focus.
+  trap finish_batch EXIT
   capture_one() {
     local all_surface="$1"
     if ! "$0" --surface "$all_surface" --output "$output"; then
@@ -86,6 +87,10 @@ if (( capture_all )); then
     capture_one "$all_surface"
   done
   build_hero_showcase
+  # Normal completion restores explicitly; the trap only covers a batch that
+  # stops early.
+  trap - EXIT
+  finish_batch
   exit 0
 fi
 
