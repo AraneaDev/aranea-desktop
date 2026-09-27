@@ -5,10 +5,7 @@
   "version": "1.0.0",
   "author": "AraneaDev",
   "description": "Quickshell-powered Omarchy command menu",
-  "kinds": [
-    "menu",
-    "bar-widget"
-  ],
+  "kinds": ["menu", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
     "menu": "Menu.qml",

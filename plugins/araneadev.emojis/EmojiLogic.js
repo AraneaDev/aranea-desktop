@@ -8,7 +8,9 @@ function parseRecents(text) {
   try {
     var parsed = JSON.parse(String(text || ""))
     if (!parsed || !Array.isArray(parsed.recent)) return []
-    return parsed.recent.filter(function(e) { return typeof e === "string" && e.length > 0 })
+    return parsed.recent.filter(function (e) {
+      return typeof e === "string" && e.length > 0
+    })
   } catch (e) {
     return []
   }
@@ -32,7 +34,12 @@ function pushRecent(list, emoji, cap) {
 // Keywords start with the emoji's name ("grinning face smile grinning
 // happy"); take at most three words, stopping at the first repeat.
 function emojiName(keywords) {
-  var words = String(keywords || "").trim().split(/\s+/).filter(function(w) { return w.length > 0 })
+  var words = String(keywords || "")
+    .trim()
+    .split(/\s+/)
+    .filter(function (w) {
+      return w.length > 0
+    })
   var out = []
   for (var i = 0; i < words.length && out.length < 3; i++) {
     if (out.indexOf(words[i]) >= 0) break

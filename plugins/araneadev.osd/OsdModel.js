@@ -10,7 +10,8 @@ function iconFor(name, percent) {
   if (n === "volume-low") return ""
   if (n === "volume-medium") return ""
   if (n === "volume-high" || n === "volume") return ""
-  if (n === "microphone-muted" || n === "microphone-off" || n === "mic-muted" || n === "mic-off") return "󰍭"
+  if (n === "microphone-muted" || n === "microphone-off" || n === "mic-muted" || n === "mic-off")
+    return "󰍭"
   if (n === "microphone" || n === "mic") return "󰍬"
   if (n === "keyboard") return "󰌌"
   if (n === "brightness" || n === "display") return "󰍹"
@@ -38,7 +39,7 @@ function stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, r
   var messageText = String(rawMessage || "")
   var hasProgress = rawValue !== "" && !isNaN(parsedValue) && messageText === ""
   var value = hasProgress ? clamp(parsedValue, 0, maxValue) : 0
-  var percent = hasProgress ? Math.round(value * 100 / maxValue) : -1
+  var percent = hasProgress ? Math.round((value * 100) / maxValue) : -1
   var parsedDuration = parseInt(rawDuration || "1200", 10)
 
   return {
@@ -46,7 +47,7 @@ function stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, r
     maxValue: maxValue,
     hasProgress: hasProgress,
     value: value,
-    message: messageText || (hasProgress ? (rawProgressText || percent + "%") : ""),
+    message: messageText || (hasProgress ? rawProgressText || percent + "%" : ""),
     icon: iconFor(iconName, percent),
     duration: isNaN(parsedDuration) ? 1200 : Math.max(0, parsedDuration)
   }

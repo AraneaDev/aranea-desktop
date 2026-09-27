@@ -38,7 +38,7 @@ jobs:
 
       - name: Exercise installer profiles
         env:
-          OMARCHY_INSTALLER_TEST: '1'
+          OMARCHY_INSTALLER_TEST: "1"
         run: |
           for profile in minimal full no_apps; do
             PATH="$GITHUB_WORKSPACE/tests/fake-bin:$PATH" \

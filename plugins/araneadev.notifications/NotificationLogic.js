@@ -1,8 +1,12 @@
 function isChromiumDerived(app, appIcon) {
   var source = (String(app || "") + "\n" + String(appIcon || "")).toLowerCase()
-  return source.indexOf("chrom") >= 0 || source.indexOf("brave") >= 0 ||
-         source.indexOf("vivaldi") >= 0 || source.indexOf("microsoft-edge") >= 0 ||
-         source.indexOf("opera") >= 0
+  return (
+    source.indexOf("chrom") >= 0 ||
+    source.indexOf("brave") >= 0 ||
+    source.indexOf("vivaldi") >= 0 ||
+    source.indexOf("microsoft-edge") >= 0 ||
+    source.indexOf("opera") >= 0
+  )
 }
 
 // True when a `<...>` run is an image tag, so the name is read the way Qt's
@@ -94,7 +98,10 @@ function sanitizeBody(body, app, appIcon) {
   if (!isChromiumDerived(app, appIcon)) return text
 
   return text
-    .replace(/^\s*<a\b[^>]*>\s*(?:https?:\/\/|www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:\/[^<\s]*)?\s*<\/a>\s*/i, "")
+    .replace(
+      /^\s*<a\b[^>]*>\s*(?:https?:\/\/|www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:\/[^<\s]*)?\s*<\/a>\s*/i,
+      ""
+    )
     .replace(/^\s*(?:https?:\/\/|www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?(?:\/\S*)?\s+/i, "")
 }
 
@@ -132,8 +139,7 @@ function stringHint(hints, name) {
       var value = hints[name]
       if (value !== undefined && value !== null) return String(value)
     }
-  } catch (e) {
-  }
+  } catch (e) {}
   return ""
 }
 
@@ -177,7 +183,9 @@ function parseExecArgv(value) {
 }
 
 function shouldRenderCompactGlyph(glyph, iconSource, singleLineToast) {
-  return String(glyph || "").length > 0 && String(iconSource || "").length === 0 && !!singleLineToast
+  return (
+    String(glyph || "").length > 0 && String(iconSource || "").length === 0 && !!singleLineToast
+  )
 }
 
 function finiteNumber(value, fallback) {
@@ -238,7 +246,17 @@ function snapshotOf(notification, timestamp) {
 
 // Everything the popup card draws, and therefore everything an in-place
 // update has to write through to the row and its file.
-var POPUP_ROLES = ["app", "appIcon", "summary", "body", "image", "glyph", "execArgv", "urgency", "expireTimeout"]
+var POPUP_ROLES = [
+  "app",
+  "appIcon",
+  "summary",
+  "body",
+  "image",
+  "glyph",
+  "execArgv",
+  "urgency",
+  "expireTimeout"
+]
 
 function popupRoles() {
   return POPUP_ROLES
@@ -360,7 +378,9 @@ function localImageFile(value) {
   var s = String(value || "")
   if (s.indexOf("file://") === 0) {
     s = s.slice(7)
-    try { s = decodeURIComponent(s) } catch (e) {}
+    try {
+      s = decodeURIComponent(s)
+    } catch (e) {}
   }
   return s.charAt(0) === "/" ? s : ""
 }
@@ -417,7 +437,9 @@ function parsePopupFiles(raw, normalUrgency) {
       // A torn write from a crash mid-save — skip the line, keep the rest.
     }
   }
-  entries.sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0) })
+  entries.sort(function (a, b) {
+    return (b.timestamp || 0) - (a.timestamp || 0)
+  })
   return entries
 }
 
@@ -432,7 +454,7 @@ function popupExpired(entry, duration, now) {
   if (isFinite(deadline) && deadline > 0) return Number(now) >= deadline
   var lifetime = Number(duration || 0)
   if (!isFinite(lifetime) || lifetime <= 0) return false
-  return (Number(now) - Number((entry || {}).timestamp || 0)) >= lifetime
+  return Number(now) - Number((entry || {}).timestamp || 0) >= lifetime
 }
 
 function popupPlacement(barPosition, barClearance, gapsOut) {
@@ -473,9 +495,7 @@ function groupNotifications(entries) {
 
 function collapseQuietHours(entries, quietHours) {
   var rows = Array.isArray(entries) ? entries : []
-  return quietHours
-    ? { visible: [], count: rows.length }
-    : { visible: rows.slice(), count: 0 }
+  return quietHours ? { visible: [], count: rows.length } : { visible: rows.slice(), count: 0 }
 }
 
 function limitHistory(entries, limit) {
@@ -492,8 +512,15 @@ function isWithinQuietHours(window, date) {
   var startMinute = Number(match[2])
   var endHour = Number(match[3])
   var endMinute = Number(match[4])
-  if ([startHour, endHour].some(function(v) { return v > 23 }) ||
-      [startMinute, endMinute].some(function(v) { return v > 59 })) return false
+  if (
+    [startHour, endHour].some(function (v) {
+      return v > 23
+    }) ||
+    [startMinute, endMinute].some(function (v) {
+      return v > 59
+    })
+  )
+    return false
 
   var start = startHour * 60 + startMinute
   var end = endHour * 60 + endMinute

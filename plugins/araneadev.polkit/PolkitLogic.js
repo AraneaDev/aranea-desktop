@@ -31,17 +31,22 @@ function authorizationLabel(message) {
 
 // pkexec's messages: "Authentication is needed to run `/usr/bin/true' as the
 // super user" and "... as user Tim Schipper (tim)".
-var PKEXEC_MESSAGE = /^Authentication is (?:needed|required) to run [`']([^`']+)[`'] as (?:(the super user)|user (.+))$/i
+var PKEXEC_MESSAGE =
+  /^Authentication is (?:needed|required) to run [`']([^`']+)[`'] as (?:(the super user)|user (.+))$/i
 
 function parsePkexec(message) {
-  var match = String(message || "").trim().match(PKEXEC_MESSAGE)
+  var match = String(message || "")
+    .trim()
+    .match(PKEXEC_MESSAGE)
   if (!match) return null
   return { command: match[1], target: match[2] ? "root" : match[3].trim() }
 }
 
 function summaryParts(message) {
   // One logical line: StyledText would otherwise decide how breaks render.
-  var text = String(message || "").replace(/\s*[\r\n]+\s*/g, " ").trim()
+  var text = String(message || "")
+    .replace(/\s*[\r\n]+\s*/g, " ")
+    .trim()
   var parsed = parsePkexec(text)
   if (parsed) return { prefix: "Run '", command: parsed.command, suffix: "' as " + parsed.target }
   return { prefix: text || "Authentication is needed", command: "", suffix: "" }
@@ -67,7 +72,11 @@ function shortenMiddle(text, max) {
 }
 
 function escapeHtml(text) {
-  return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
 }
 
 // StyledText for the request line: the command in the accent colour, every
@@ -76,7 +85,12 @@ function requestMarkup(message, accent) {
   var parts = summaryParts(message)
   var out = escapeHtml(parts.prefix)
   if (parts.command)
-    out += '<font color="' + escapeHtml(accent) + '">' + escapeHtml(shortenMiddle(parts.command, 64)) + "</font>"
+    out +=
+      '<font color="' +
+      escapeHtml(accent) +
+      '">' +
+      escapeHtml(shortenMiddle(parts.command, 64)) +
+      "</font>"
   return out + escapeHtml(parts.suffix)
 }
 
@@ -138,11 +152,16 @@ function detailRows(actionId, vendor, command, message) {
     { key: "COMMAND", value: String(command || "") },
     { key: "MESSAGE", value: String(message || "") }
   ]
-  return rows.filter(function(row) { return row.value.length > 0 })
+  return rows.filter(function (row) {
+    return row.value.length > 0
+  })
 }
 
 function promptPlaceholder(prompt) {
-  var s = String(prompt || "").trim().replace(/:\s*$/, "").trim()
+  var s = String(prompt || "")
+    .trim()
+    .replace(/:\s*$/, "")
+    .trim()
   if (!s || /^password$/i.test(s)) return "Enter password"
   return s
 }

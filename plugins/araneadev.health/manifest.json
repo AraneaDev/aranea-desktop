@@ -5,10 +5,7 @@
   "version": "1.0.0",
   "author": "AraneaDev",
   "description": "System health checks, live metrics and the health dropdown",
-  "kinds": [
-    "service",
-    "bar-widget"
-  ],
+  "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
     "service": "Service.qml",

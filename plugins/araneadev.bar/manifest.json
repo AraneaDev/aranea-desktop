@@ -5,9 +5,7 @@
   "version": "1.0.0",
   "author": "AraneaDev",
   "description": "Aranea composition for the Omarchy status bar",
-  "kinds": [
-    "bar"
-  ],
+  "kinds": ["bar"],
   "entryPoints": {
     "bar": "Bar.qml"
   },

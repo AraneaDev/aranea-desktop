@@ -5,7 +5,14 @@ function stripJsonc(raw) {
 }
 
 function normalizeAliases(value) {
-  if (Array.isArray(value)) return value.map(function(v) { return String(v || "") }).filter(function(v) { return v })
+  if (Array.isArray(value))
+    return value
+      .map(function (v) {
+        return String(v || "")
+      })
+      .filter(function (v) {
+        return v
+      })
   if (typeof value === "string" && value) return [value]
   return []
 }
@@ -48,7 +55,7 @@ function recordRecentApp(values, appId, limit) {
 function appRowsForIds(appRows, ids, parent, prefix) {
   var source = Array.isArray(appRows) ? appRows : []
   var wanted = normalizeAppIds(ids, source.length)
-  var byId = ({})
+  var byId = {}
   for (var i = 0; i < source.length; i++) {
     var row = source[i]
     if (row && row.appId) byId[String(row.appId)] = row
@@ -60,7 +67,7 @@ function appRowsForIds(appRows, ids, parent, prefix) {
   for (var j = 0; j < wanted.length; j++) {
     var sourceRow = byId[wanted[j]]
     if (!sourceRow) continue
-    var copy = ({})
+    var copy = {}
     for (var key in sourceRow) copy[key] = sourceRow[key]
     copy.id = targetPrefix + "." + sourceRow.appId
     copy.parent = targetParent
@@ -72,7 +79,7 @@ function appRowsForIds(appRows, ids, parent, prefix) {
 
 function dynamicTileForAppRows(appRows, favoriteIds, recentIds, workspaceId) {
   var source = Array.isArray(appRows) ? appRows : []
-  var byId = ({})
+  var byId = {}
   for (var i = 0; i < source.length; i++) {
     var row = source[i]
     if (row && row.appId) byId[String(row.appId)] = row
@@ -135,7 +142,7 @@ function normalizeItem(id, raw) {
   if (!parent) parent = itemId.indexOf(".") >= 0 ? itemId.split(".").slice(0, -1).join(".") : "root"
   if (itemId === "root") parent = ""
 
-  var kind = value.action ? "action" : (value.target ? "link" : "menu")
+  var kind = value.action ? "action" : value.target ? "link" : "menu"
 
   return {
     id: itemId,
@@ -167,9 +174,10 @@ function parseMenuJsonc(raw) {
   }
   if (typeof parsed !== "object" || parsed === null) return []
 
-  var source = (parsed.items && typeof parsed.items === "object" && !Array.isArray(parsed.items))
-    ? parsed.items
-    : parsed
+  var source =
+    parsed.items && typeof parsed.items === "object" && !Array.isArray(parsed.items)
+      ? parsed.items
+      : parsed
   var out = []
   for (var id in source) {
     var entry = source[id]
@@ -180,7 +188,7 @@ function parseMenuJsonc(raw) {
 }
 
 function mergeMenuSources(defaultItems, userItems) {
-  var nextItems = ({})
+  var nextItems = {}
   var nextOrder = []
   var sources = [defaultItems || [], userItems || []]
 
@@ -200,7 +208,22 @@ function mergeMenuSources(defaultItems, userItems) {
   }
 
   if (!nextItems.root) {
-    nextItems.root = { id: "root", parent: "", kind: "menu", icon: "", iconFont: "", label: "Go", title: "", target: "", description: "", aliases: [], when: "", checked: "", action: "", provider: "" }
+    nextItems.root = {
+      id: "root",
+      parent: "",
+      kind: "menu",
+      icon: "",
+      iconFont: "",
+      label: "Go",
+      title: "",
+      target: "",
+      description: "",
+      aliases: [],
+      when: "",
+      checked: "",
+      action: "",
+      provider: ""
+    }
     nextOrder.unshift("root")
   }
   for (var k3 = 0; k3 < nextOrder.length; k3++) nextItems[nextOrder[k3]].order = k3
@@ -222,10 +245,10 @@ function mergeMenuSources(defaultItems, userItems) {
 // Swaps every app row for the current set. Rows keep the order they arrive in;
 // ids already claimed (including duplicate desktop ids) are listed once.
 function mergeAppRows(items, itemOrder, appRows) {
-  var source = items || ({})
+  var source = items || {}
   var order = Array.isArray(itemOrder) ? itemOrder : []
   var rows = Array.isArray(appRows) ? appRows : []
-  var nextItems = ({})
+  var nextItems = {}
   var nextOrder = []
 
   for (var i = 0; i < order.length; i++) {
@@ -254,10 +277,10 @@ function mergeAppRows(items, itemOrder, appRows) {
 // again drops its previous batch — a plugin that was just enabled disappears
 // from the Enable list — without disturbing static children declared in JSONC.
 function swapProviderRows(items, itemOrder, menuId, rows) {
-  var source = items || ({})
+  var source = items || {}
   var order = Array.isArray(itemOrder) ? itemOrder : []
   var incoming = Array.isArray(rows) ? rows : []
-  var nextItems = ({})
+  var nextItems = {}
   var nextOrder = []
 
   for (var i = 0; i < order.length; i++) {
@@ -291,7 +314,9 @@ function item(items, id) {
 // (htop ships `Keywords=system;...`). Unknown strings fall through as the
 // literal input so misspellings still attempt to open that id.
 function resolveRoute(items, itemOrder, input) {
-  var raw = String(input || "").toLowerCase().replace(/_/g, "-")
+  var raw = String(input || "")
+    .toLowerCase()
+    .replace(/_/g, "-")
   if (!raw || raw === "go" || raw === "menu") return "root"
   if (item(items, raw)) return raw
   var order = Array.isArray(itemOrder) ? itemOrder : []
@@ -299,7 +324,9 @@ function resolveRoute(items, itemOrder, input) {
     var entry = item(items, order[i])
     if (!entry || entry.kind === "app" || !entry.aliases) continue
     for (var j = 0; j < entry.aliases.length; j++) {
-      var alias = String(entry.aliases[j] || "").toLowerCase().replace(/_/g, "-")
+      var alias = String(entry.aliases[j] || "")
+        .toLowerCase()
+        .replace(/_/g, "-")
       if (alias === raw) return entry.id
     }
   }
@@ -307,7 +334,12 @@ function resolveRoute(items, itemOrder, input) {
 }
 
 function slugify(value) {
-  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "item"
+  return (
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "item"
+  )
 }
 
 function depthFor(items, id) {
@@ -381,7 +413,12 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
   var order = Array.isArray(itemOrder) ? itemOrder : []
   for (var i = 0; i < order.length; i++) {
     var child = item(items, order[i])
-    if (child && child.parent === target && isVisible(items, itemOrder, whenResults, child, guard + 1)) return true
+    if (
+      child &&
+      child.parent === target &&
+      isVisible(items, itemOrder, whenResults, child, guard + 1)
+    )
+      return true
   }
 
   return false
@@ -407,11 +444,15 @@ function nameSearchText(entry) {
   var aliases = []
   var values = Array.isArray(entry.aliases) ? entry.aliases : []
   for (var i = 0; i < values.length; i++) aliases.push(searchableToken(values[i]))
-  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")].join(" ").toLowerCase()
+  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")]
+    .join(" ")
+    .toLowerCase()
 }
 
 function termInSearchWords(term, text) {
-  var words = String(text || "").toLowerCase().split(/\s+/)
+  var words = String(text || "")
+    .toLowerCase()
+    .split(/\s+/)
   for (var i = 0; i < words.length; i++) {
     if (words[i] === term) return true
   }
@@ -419,7 +460,10 @@ function termInSearchWords(term, text) {
 }
 
 function descriptionTextMatches(query, text) {
-  var terms = String(query || "").toLowerCase().trim().split(/\s+/)
+  var terms = String(query || "")
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
   for (var i = 0; i < terms.length; i++) {
     if (terms[i] && !termInSearchWords(terms[i], text)) return false
   }
@@ -432,7 +476,10 @@ function matchesQuery(entry, query, visible) {
 
   var nameText = nameSearchText(entry)
   var descriptionText = String(entry.description || "").toLowerCase()
-  var terms = String(query || "").toLowerCase().trim().split(/\s+/)
+  var terms = String(query || "")
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
 
   for (var i = 0; i < terms.length; i++) {
     if (!terms[i]) continue
@@ -445,7 +492,9 @@ function matchesQuery(entry, query, visible) {
 }
 
 function searchScore(items, entry, query) {
-  var needle = String(query || "").toLowerCase().trim()
+  var needle = String(query || "")
+    .toLowerCase()
+    .trim()
   var label = entry.label.toLowerCase()
   var nameText = nameSearchText(entry)
   var descriptionText = String(entry.description || "").toLowerCase()
@@ -481,7 +530,8 @@ function displayRow(items, itemOrder, checkedResults, entry, detail, score, sect
     target: target,
     detail: semanticDetail(entry, detail),
     path: pathFor(items, entry.id),
-    childCount: (entry.kind === "menu" || entry.kind === "link") ? childCount(items, itemOrder, target) : 0,
+    childCount:
+      entry.kind === "menu" || entry.kind === "link" ? childCount(items, itemOrder, target) : 0,
     action: entry.action || "",
     provider: entry.provider || "",
     score: score || 0,
@@ -525,18 +575,20 @@ var GUARD_READERS = [
 // parser follows the indented lines rather than reading the first one and
 // dropping half of what is installed.
 function guardHelpers() {
-  return 'declare -A __omarchy_pkgs=()\n'
-    + 'mapfile -t __omarchy_pkg_names < <({ pacman -Qq; LC_ALL=C pacman -Qi'
-    + " | awk '/^[A-Za-z]/ { provides = ($0 ~ /^Provides/); sub(/^[^:]*: /, \"\") }"
-    + ' provides && $0 != "None" { n = split($0, p, " ");'
-    + ' for (i = 1; i <= n; i++) { sub(/[<>=].*/, "", p[i]); print p[i] } }\'; } 2>/dev/null)\n'
-    + 'for __omarchy_pkg in "${__omarchy_pkg_names[@]}"; do __omarchy_pkgs[$__omarchy_pkg]=1; done\n'
-    + '__omarchy_pkg_has() { [[ -n ${__omarchy_pkgs[$1]-} ]] && return 0; '
-    + '[[ $1 == *[\\<\\>=]* ]] && { pacman -Q "$1" &>/dev/null; return; }; return 1; }\n'
-    + 'omarchy-pkg-present() { local p; for p in "$@"; do __omarchy_pkg_has "$p" || return 1; done; return 0; }\n'
-    + 'omarchy-pkg-missing() { local p; for p in "$@"; do __omarchy_pkg_has "$p" || return 0; done; return 1; }\n'
-    + 'omarchy-cmd-present() { local c; for c in "$@"; do command -v "$c" &>/dev/null || return 1; done; return 0; }\n'
-    + 'omarchy-cmd-missing() { local c; for c in "$@"; do command -v "$c" &>/dev/null || return 0; done; return 1; }\n'
+  return (
+    "declare -A __omarchy_pkgs=()\n" +
+    "mapfile -t __omarchy_pkg_names < <({ pacman -Qq; LC_ALL=C pacman -Qi" +
+    ' | awk \'/^[A-Za-z]/ { provides = ($0 ~ /^Provides/); sub(/^[^:]*: /, "") }' +
+    ' provides && $0 != "None" { n = split($0, p, " ");' +
+    ' for (i = 1; i <= n; i++) { sub(/[<>=].*/, "", p[i]); print p[i] } }\'; } 2>/dev/null)\n' +
+    'for __omarchy_pkg in "${__omarchy_pkg_names[@]}"; do __omarchy_pkgs[$__omarchy_pkg]=1; done\n' +
+    "__omarchy_pkg_has() { [[ -n ${__omarchy_pkgs[$1]-} ]] && return 0; " +
+    '[[ $1 == *[\\<\\>=]* ]] && { pacman -Q "$1" &>/dev/null; return; }; return 1; }\n' +
+    'omarchy-pkg-present() { local p; for p in "$@"; do __omarchy_pkg_has "$p" || return 1; done; return 0; }\n' +
+    'omarchy-pkg-missing() { local p; for p in "$@"; do __omarchy_pkg_has "$p" || return 0; done; return 1; }\n' +
+    'omarchy-cmd-present() { local c; for c in "$@"; do command -v "$c" &>/dev/null || return 1; done; return 0; }\n' +
+    'omarchy-cmd-missing() { local c; for c in "$@"; do command -v "$c" &>/dev/null || return 0; done; return 1; }\n'
+  )
 }
 
 // Substitute the captured answer into the expression rather than shadowing
@@ -572,8 +624,19 @@ function substituteGuardReaders(expression) {
 }
 
 function guardLine(id, tag, expression) {
-  return "if { " + substituteGuardReaders(expression) + "; } >/dev/null 2>&1; then echo "
-    + id + ":" + tag + ":1; else echo " + id + ":" + tag + ":0; fi\n"
+  return (
+    "if { " +
+    substituteGuardReaders(expression) +
+    "; } >/dev/null 2>&1; then echo " +
+    id +
+    ":" +
+    tag +
+    ":1; else echo " +
+    id +
+    ":" +
+    tag +
+    ":0; fi\n"
+  )
 }
 
 // One bash script for every `when:` and `checked:` in the menu, reporting

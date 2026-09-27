@@ -37,7 +37,11 @@ function parseFailedUnits(text, scope) {
 // `df --output=source,target,fstype,size,used,avail,pcent -B1`, header first.
 // Subvolumes and bind mounts share a source: keep the shortest mount point.
 function parseDf(text) {
-  var lines = String(text || "").split("\n").filter(function(l) { return l.trim() })
+  var lines = String(text || "")
+    .split("\n")
+    .filter(function (l) {
+      return l.trim()
+    })
   if (lines.length < 2) return null
   var bySource = {}
   var order = []
@@ -48,17 +52,25 @@ function parseDf(text) {
     if (f.length < 7) continue
     var n = f.length
     var row = {
-      source: f[0], target: f.slice(1, n - 5).join(" "), size: Number(f[n - 4]), used: Number(f[n - 3]),
-      avail: Number(f[n - 2]), percent: parseInt(f[n - 1], 10)
+      source: f[0],
+      target: f.slice(1, n - 5).join(" "),
+      size: Number(f[n - 4]),
+      used: Number(f[n - 3]),
+      avail: Number(f[n - 2]),
+      percent: parseInt(f[n - 1], 10)
     }
     if (!isFinite(row.size) || !isFinite(row.percent)) continue
     if (!alertableFsType(f[n - 5])) continue
     var seen = bySource[row.source]
-    if (!seen) { bySource[row.source] = row; order.push(row.source) }
-    else if (row.target.length < seen.target.length) bySource[row.source] = row
+    if (!seen) {
+      bySource[row.source] = row
+      order.push(row.source)
+    } else if (row.target.length < seen.target.length) bySource[row.source] = row
   }
   if (order.length === 0) return null
-  return order.map(function(s) { return bySource[s] })
+  return order.map(function (s) {
+    return bySource[s]
+  })
 }
 
 // Read-only images (ISO/UDF) and FUSE app mounts (AppImages) are always
@@ -87,8 +99,15 @@ function diskProblems(rows, levels) {
     var level = diskLevel(previous[r.target] || "ok", r.percent)
     next[r.target] = level
     if (level === "ok") continue
-    problems.push({ key: "disk:" + r.target, check: "disk", target: r.target, percent: r.percent,
-      size: r.size, avail: r.avail, level: level })
+    problems.push({
+      key: "disk:" + r.target,
+      check: "disk",
+      target: r.target,
+      percent: r.percent,
+      size: r.size,
+      avail: r.avail,
+      level: level
+    })
   }
   return { problems: problems, levels: next }
 }
@@ -109,7 +128,9 @@ function parseDockerEvent(line) {
   var action = String(e.Action || e.status || "")
   if (action !== "die" && action !== "start" && action !== "destroy") return null
   return {
-    action: action, name: String(attrs.name), image: String(attrs.image || ""),
+    action: action,
+    name: String(attrs.name),
+    image: String(attrs.image || ""),
     exitCode: parseInt(attrs.exitCode || "0", 10) || 0,
     time: (Number(e.time) || 0) * 1000
   }
@@ -118,17 +139,21 @@ function parseDockerEvent(line) {
 // history: name -> { image, exits: [ms], last: "die"|"start", lastExit: int }
 function recordDockerEvent(history, event, now) {
   var next = {}
-  for (var k in (history || {})) next[k] = history[k]
+  for (var k in history || {}) next[k] = history[k]
   if (!event) return next
   if (event.action === "destroy") {
     delete next[event.name]
     return next
   }
   var prev = next[event.name] || { image: event.image, exits: [], last: "start", lastExit: 0 }
-  var exits = prev.exits.filter(function(t) { return now - t <= LOOP_WINDOW_MS })
+  var exits = prev.exits.filter(function (t) {
+    return now - t <= LOOP_WINDOW_MS
+  })
   if (event.action === "die" && event.exitCode !== 0) exits.push(now)
   next[event.name] = {
-    image: event.image || prev.image, exits: exits, last: event.action,
+    image: event.image || prev.image,
+    exits: exits,
+    last: event.action,
     lastExit: event.action === "die" ? event.exitCode : prev.lastExit
   }
   return next
@@ -147,8 +172,12 @@ function parseDockerPs(text) {
       return null
     }
     var code = /Exited \((-?\d+)\)/.exec(String(c.Status || ""))
-    out.push({ name: String(c.Names || ""), image: String(c.Image || ""),
-      running: String(c.State || "") === "running", exitCode: code ? parseInt(code[1], 10) : 0 })
+    out.push({
+      name: String(c.Names || ""),
+      image: String(c.Image || ""),
+      running: String(c.State || "") === "running",
+      exitCode: code ? parseInt(code[1], 10) : 0
+    })
   }
   return out
 }
@@ -163,9 +192,17 @@ function seedDockerHistory(history, containers, now) {
     var c = containers[i]
     if (!c.name) continue
     var prev = (history || {})[c.name]
-    var exits = prev ? prev.exits.filter(function(t) { return now - t <= LOOP_WINDOW_MS }) : []
-    next[c.name] = { image: c.image || (prev && prev.image) || "", exits: exits,
-      last: c.running ? "start" : "die", lastExit: c.running ? 0 : c.exitCode }
+    var exits = prev
+      ? prev.exits.filter(function (t) {
+          return now - t <= LOOP_WINDOW_MS
+        })
+      : []
+    next[c.name] = {
+      image: c.image || (prev && prev.image) || "",
+      exits: exits,
+      last: c.running ? "start" : "die",
+      lastExit: c.running ? 0 : c.exitCode
+    }
   }
   return next
 }
@@ -174,9 +211,11 @@ function seedDockerHistory(history, containers, now) {
 // their next event starts a fresh entry.
 function pruneDockerHistory(history, now) {
   var next = {}
-  for (var name in (history || {})) {
+  for (var name in history || {}) {
     var h = history[name]
-    var recent = h.exits.filter(function(t) { return now - t <= LOOP_WINDOW_MS }).length
+    var recent = h.exits.filter(function (t) {
+      return now - t <= LOOP_WINDOW_MS
+    }).length
     if (recent > 0 || (h.last === "die" && h.lastExit !== 0)) next[name] = h
   }
   return next
@@ -184,13 +223,22 @@ function pruneDockerHistory(history, now) {
 
 function containerProblems(history, now) {
   var out = []
-  for (var name in (history || {})) {
+  for (var name in history || {}) {
     var h = history[name]
-    var exits = h.exits.filter(function(t) { return now - t <= LOOP_WINDOW_MS }).length
+    var exits = h.exits.filter(function (t) {
+      return now - t <= LOOP_WINDOW_MS
+    }).length
     var loop = exits >= LOOP_EXITS
     if (!loop && !(h.last === "die" && h.lastExit !== 0)) continue
-    out.push({ key: "container:" + name, check: "container", name: name, image: h.image,
-      exitCode: h.lastExit, exits: exits, loop: loop })
+    out.push({
+      key: "container:" + name,
+      check: "container",
+      name: name,
+      image: h.image,
+      exitCode: h.lastExit,
+      exits: exits,
+      loop: loop
+    })
   }
   return out
 }
@@ -199,7 +247,10 @@ function humanBytes(n) {
   var units = ["B", "KB", "MB", "GB", "TB", "PB"]
   var v = Math.max(0, Number(n) || 0)
   var i = 0
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
   var text = v >= 10 || i === 0 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "")
   return text + " " + units[i]
 }
@@ -211,26 +262,49 @@ function itemFor(p, tools) {
   if (p.check === "unit") {
     var journal = ["xdg-terminal-exec", "journalctl"]
     if (p.scope === "user") journal.push("--user")
-    return { summary: p.unit + " failed", body: p.scope === "user" ? "User service" : "System service",
-      urgency: 2, glyph: GLYPH_UNIT, execArgv: terminal ? journal.concat(["-u", p.unit, "-e"]) : [] }
+    return {
+      summary: p.unit + " failed",
+      body: p.scope === "user" ? "User service" : "System service",
+      urgency: 2,
+      glyph: GLYPH_UNIT,
+      execArgv: terminal ? journal.concat(["-u", p.unit, "-e"]) : []
+    }
   }
   if (p.check === "disk") {
-    return { summary: p.target + " is " + p.percent + "% full",
+    return {
+      summary: p.target + " is " + p.percent + "% full",
       body: humanBytes(p.avail) + " free of " + humanBytes(p.size),
-      urgency: p.level === "critical" ? 2 : 1, glyph: GLYPH_DISK, execArgv: ["xdg-open", p.target] }
+      urgency: p.level === "critical" ? 2 : 1,
+      glyph: GLYPH_DISK,
+      execArgv: ["xdg-open", p.target]
+    }
   }
   if (p.check === "reboot") {
-    return { summary: "Reboot to finish the kernel update",
+    return {
+      summary: "Reboot to finish the kernel update",
       body: "Running " + p.release + "; its modules were removed",
-      urgency: 1, glyph: GLYPH_REBOOT, execArgv: ["omarchy-menu", "toggle", "system"] }
+      urgency: 1,
+      glyph: GLYPH_REBOOT,
+      execArgv: ["omarchy-menu", "toggle", "system"]
+    }
   }
   var logs = terminal ? ["xdg-terminal-exec", "docker", "logs", "--tail", "200", "-f", p.name] : []
   if (p.loop) {
-    return { summary: "Container " + p.name + " keeps restarting", body: p.exits + " exits in 5 minutes",
-      urgency: 2, glyph: GLYPH_CONTAINER, execArgv: logs }
+    return {
+      summary: "Container " + p.name + " keeps restarting",
+      body: p.exits + " exits in 5 minutes",
+      urgency: 2,
+      glyph: GLYPH_CONTAINER,
+      execArgv: logs
+    }
   }
-  return { summary: "Container " + p.name + " exited (code " + p.exitCode + ")", body: "Image " + p.image,
-    urgency: 1, glyph: GLYPH_CONTAINER, execArgv: logs }
+  return {
+    summary: "Container " + p.name + " exited (code " + p.exitCode + ")",
+    body: "Image " + p.image,
+    urgency: 1,
+    glyph: GLYPH_CONTAINER,
+    execArgv: logs
+  }
 }
 
 // The status icon: any open problem counts.
@@ -247,12 +321,21 @@ function statusFor(open) {
 
 // Rows for the dropdown's problem list (copy, urgency, click action).
 function annotateProblems(open, tools) {
-  var rows = (open || []).map(function(p) {
+  var rows = (open || []).map(function (p) {
     var item = itemFor(p, tools)
-    return { key: p.key, check: p.check, summary: item.summary, body: item.body, urgency: item.urgency,
-      glyph: item.glyph, execArgv: item.execArgv }
+    return {
+      key: p.key,
+      check: p.check,
+      summary: item.summary,
+      body: item.body,
+      urgency: item.urgency,
+      glyph: item.glyph,
+      execArgv: item.execArgv
+    }
   })
-  rows.sort(function(a, b) { return (b.urgency - a.urgency) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0) })
+  rows.sort(function (a, b) {
+    return b.urgency - a.urgency || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+  })
   return rows
 }
 

@@ -41,9 +41,11 @@ function normalizeEntry(value) {
   if (typeof value.secretOverride === "boolean") entry.secretOverride = value.secretOverride
   if (typeof value.pinned === "boolean") entry.pinned = value.pinned
   var pinnedAt = Number(value.pinnedAtMs)
-  if (value.pinnedAtMs !== undefined && value.pinnedAtMs !== null && isFinite(pinnedAt)) entry.pinnedAtMs = pinnedAt
+  if (value.pinnedAtMs !== undefined && value.pinnedAtMs !== null && isFinite(pinnedAt))
+    entry.pinnedAtMs = pinnedAt
   var at = Number(value.capturedAtMs)
-  if (value.capturedAtMs !== undefined && value.capturedAtMs !== null && isFinite(at)) entry.capturedAtMs = at
+  if (value.capturedAtMs !== undefined && value.capturedAtMs !== null && isFinite(at))
+    entry.capturedAtMs = at
   return entry
 }
 
@@ -52,8 +54,6 @@ function entryKey(entry) {
   if (entry.type === "image") return "image:" + String(entry.path || "")
   return "text:" + String(entry.text || "")
 }
-
-
 
 function removeEntryAt(history, index) {
   var values = Array.isArray(history) ? history : []
@@ -65,16 +65,20 @@ function removeEntryAt(history, index) {
   return next
 }
 
-
 function parseEntryJson(line) {
   var raw = String(line || "").trim()
   if (!raw) return null
-  try { return normalizeEntry(JSON.parse(raw)) } catch (e) { return null }
+  try {
+    return normalizeEntry(JSON.parse(raw))
+  } catch (e) {
+    return null
+  }
 }
 
 function searchableText(entry) {
   if (!entry) return ""
-  if (entry.type === "image") return "image screenshot " + String(entry.mime || "") + " " + String(entry.capturedAt || "")
+  if (entry.type === "image")
+    return "image screenshot " + String(entry.mime || "") + " " + String(entry.capturedAt || "")
   return String(entry.text || "") + " " + fileEntryText(entry)
 }
 
@@ -86,7 +90,11 @@ function decodeFileUri(uri) {
   if (path.indexOf("localhost/") === 0) path = path.substring(9)
   if (path.charAt(0) !== "/") return ""
 
-  try { return decodeURIComponent(path) } catch (e) { return path }
+  try {
+    return decodeURIComponent(path)
+  } catch (e) {
+    return path
+  }
 }
 
 function filePaths(entry) {
@@ -118,10 +126,10 @@ function fileEntryText(entry) {
 }
 
 function imagePreviewText(entry) {
-  var timestamp = String(entry && entry.capturedAt || "")
+  var timestamp = String((entry && entry.capturedAt) || "")
   if (!timestamp) return "Image"
 
-  var label = String(entry && entry.mime || "") === "image/png" ? "Screenshot" : "Image"
+  var label = String((entry && entry.mime) || "") === "image/png" ? "Screenshot" : "Image"
   return label + " from " + timestamp
 }
 
@@ -154,7 +162,6 @@ function cappedEntry(entry) {
   return { type: "text", text: entry.text.slice(0, cut > 0 ? cut : displayTextLimit) }
 }
 
-
 // ---------------------------------------------------- kinds
 
 var COLOUR_RE = /^(#[0-9a-f]{3}|#[0-9a-f]{6}|#[0-9a-f]{8}|rgba?\([^)]*\)|hsla?\([^)]*\))$/i
@@ -167,10 +174,17 @@ function detectKind(entry) {
   var lines = text.split(/\r?\n/)
   if (lines.length === 1 && /^https?:\/\/\S+$/i.test(text)) return "link"
   if (COLOUR_RE.test(text)) return "colour"
-  var allPaths = lines.every(function(l) { return /^(\/|~\/)\S*$/.test(l.trim()) && l.trim().length > 1 })
+  var allPaths = lines.every(function (l) {
+    return /^(\/|~\/)\S*$/.test(l.trim()) && l.trim().length > 1
+  })
   if (allPaths) return "path"
-  var indented = lines.length >= 2 && lines.some(function(l) { return /^(\t| {2,})\S/.test(l) })
-  if (indented || /^\$ /.test(lines[0]) || / \| /.test(lines[0]) || /&&/.test(lines[0])) return "code"
+  var indented =
+    lines.length >= 2 &&
+    lines.some(function (l) {
+      return /^(\t| {2,})\S/.test(l)
+    })
+  if (indented || /^\$ /.test(lines[0]) || / \| /.test(lines[0]) || /&&/.test(lines[0]))
+    return "code"
   return "text"
 }
 
@@ -193,7 +207,7 @@ function entropy(text) {
   var h = 0
   for (var c in counts) {
     var p = counts[c] / text.length
-    h -= p * Math.log(p) / Math.LN2
+    h -= (p * Math.log(p)) / Math.LN2
   }
   return h
 }
@@ -212,8 +226,11 @@ function isSecretText(value) {
   // emails or hashes with a prefix -- developer text, not passwords.
   if (/[.\/:@\\()]/.test(text)) return false
   // `-` and `_` join words; they do not make a string look random.
-  var classes = (/[a-z]/.test(text) ? 1 : 0) + (/[A-Z]/.test(text) ? 1 : 0) +
-    (/[0-9]/.test(text) ? 1 : 0) + (/[^A-Za-z0-9_-]/.test(text) ? 1 : 0)
+  var classes =
+    (/[a-z]/.test(text) ? 1 : 0) +
+    (/[A-Z]/.test(text) ? 1 : 0) +
+    (/[0-9]/.test(text) ? 1 : 0) +
+    (/[^A-Za-z0-9_-]/.test(text) ? 1 : 0)
   return classes >= 3 && entropy(text) >= 3.5
 }
 
@@ -222,7 +239,8 @@ function isSecretText(value) {
 function enrich(value, now) {
   var entry = normalizeEntry(value)
   if (!entry) return null
-  if (!(typeof entry.capturedAtMs === "number" && isFinite(entry.capturedAtMs))) entry.capturedAtMs = Number(now) || 0
+  if (!(typeof entry.capturedAtMs === "number" && isFinite(entry.capturedAtMs)))
+    entry.capturedAtMs = Number(now) || 0
   // A stored kind is reused: detecting it again means scanning the whole
   // text on every load.
   if (KINDS.indexOf(entry.kind) < 0) entry.kind = detectKind(entry)
@@ -240,7 +258,9 @@ function hadUnstamped(raw) {
   try {
     var parsed = JSON.parse(String(raw || "[]"))
     if (!Array.isArray(parsed)) return false
-    return parsed.some(function(e) { return e && typeof e === "object" && !isFinite(Number(e.capturedAtMs)) })
+    return parsed.some(function (e) {
+      return e && typeof e === "object" && !isFinite(Number(e.capturedAtMs))
+    })
   } catch (e) {
     return false
   }
@@ -265,7 +285,7 @@ function parseHistory(raw, now) {
 function applyLimit(list, limit) {
   var max = Math.max(0, Number(limit) || 0)
   var unpinned = 0
-  return list.filter(function(e) {
+  return list.filter(function (e) {
     if (e.pinned) return true
     unpinned++
     return unpinned <= max
@@ -284,19 +304,23 @@ function addEntry(history, value, limit, now) {
     if (entryKey(existing) === key) {
       // A re-copy keeps what the user decided about this item.
       if (existing.pinned) entry.pinned = true
-      if (typeof existing.secretOverride === "boolean") entry.secretOverride = existing.secretOverride
+      if (typeof existing.secretOverride === "boolean")
+        entry.secretOverride = existing.secretOverride
       continue
     }
     rest.push(existing)
   }
   delete entry.capturedAtMs
-  return applyLimit([enrich(entry, now)].concat(rest), limit === undefined || limit === null ? 300 : limit)
+  return applyLimit(
+    [enrich(entry, now)].concat(rest),
+    limit === undefined || limit === null ? 300 : limit
+  )
 }
 
 function expire(history, now, ttlMs) {
   var values = Array.isArray(history) ? history : []
   var cutoff = Number(now) - Number(ttlMs)
-  var next = values.filter(function(e) {
+  var next = values.filter(function (e) {
     return !(e && e.secret && !e.pinned && Number(e.capturedAtMs) < cutoff)
   })
   return { history: next, changed: next.length !== values.length }
@@ -314,7 +338,7 @@ function withEntry(history, index, change) {
 }
 
 function togglePinned(history, index, now) {
-  return withEntry(history, index, function(e) {
+  return withEntry(history, index, function (e) {
     e.pinned = !e.pinned
     if (e.pinned) e.pinnedAtMs = Number(now) || 0
     else delete e.pinnedAtMs
@@ -322,7 +346,7 @@ function togglePinned(history, index, now) {
 }
 
 function toggleSecret(history, index) {
-  return withEntry(history, index, function(e) {
+  return withEntry(history, index, function (e) {
     // Images are never secrets (the thumbnail would still show).
     if (e.type === "image") return
     e.secretOverride = !e.secret
@@ -331,7 +355,9 @@ function toggleSecret(history, index) {
 }
 
 function clearUnpinned(history) {
-  return (Array.isArray(history) ? history : []).filter(function(e) { return e && e.pinned })
+  return (Array.isArray(history) ? history : []).filter(function (e) {
+    return e && e.pinned
+  })
 }
 
 // ---------------------------------------------------- display
@@ -370,7 +396,9 @@ function rowTitle(entry, kind) {
 
 function displayRows(history, query, limit, now) {
   var values = Array.isArray(history) ? history : []
-  var needle = String(query || "").trim().toLowerCase()
+  var needle = String(query || "")
+    .trim()
+    .toLowerCase()
   var max = limit === undefined || limit === null ? 50 : Math.max(0, Number(limit) || 0)
   var pinned = []
   var recent = []
@@ -392,10 +420,14 @@ function displayRows(history, query, limit, now) {
       secret: !!entry.secret,
       pinned: !!entry.pinned,
       title: rowTitle(shown, entry.kind),
-      detail: (entry.secret ? "secret" : (entry.kind || "text")) + " · " + age,
+      detail: (entry.secret ? "secret" : entry.kind || "text") + " · " + age,
       fullText: entry.secret || isImage ? "" : fullText(shown),
-      previewImage: isImage ? String(entry.path || "") : (paths.length === 1 && isImagePath(paths[0]) ? paths[0] : ""),
-      path: isImage ? String(entry.path || "") : (paths.length === 1 ? paths[0] : ""),
+      previewImage: isImage
+        ? String(entry.path || "")
+        : paths.length === 1 && isImagePath(paths[0])
+          ? paths[0]
+          : "",
+      path: isImage ? String(entry.path || "") : paths.length === 1 ? paths[0] : "",
       mime: isImage ? String(entry.mime || "image/png") : "text/plain",
       colour: entry.secret ? "" : colourValue(entry.text)
     }
@@ -404,7 +436,9 @@ function displayRows(history, query, limit, now) {
     else recent.push(row)
   }
   // Most recently pinned first.
-  pinned.sort(function(a, b) { return b.pinnedAtMs - a.pinnedAtMs })
+  pinned.sort(function (a, b) {
+    return b.pinnedAtMs - a.pinnedAtMs
+  })
   return pinned.concat(recent)
 }
 

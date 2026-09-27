@@ -150,38 +150,38 @@ state glyphs and the menu’s network, node, and edge motifs live under
 The hero above is the primary desktop view; the capture set below focuses on
 interaction states rather than repeating the same wallpaper.
 
-| Command center |
-| --- |
+| Command center                               |
+| -------------------------------------------- |
 | ![Aranea command menu](screenshots/menu.png) |
 
-| System submenu | Menu search | Menu input |
-| --- | --- | --- |
+| System submenu                                         | Menu search                                                  | Menu input                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------- |
 | ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) |
 
-| Health | OSD |
-| --- | --- |
+| Health                                            | OSD                                         |
+| ------------------------------------------------- | ------------------------------------------- |
 | ![Aranea health dropdown](screenshots/health.png) | ![Aranea filament OSD](screenshots/osd.png) |
 
-| Notification center | All caught up |
-| --- | --- |
+| Notification center                                          | All caught up                                                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | ![Aranea notification center](screenshots/notifications.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
 
-| Clipboard | Emoji |
-| --- | --- |
+| Clipboard                                             | Emoji                                          |
+| ----------------------------------------------------- | ---------------------------------------------- |
 | ![Aranea clipboard picker](screenshots/clipboard.png) | ![Aranea emoji picker](screenshots/emojis.png) |
 
-| Authentication |
-| --- |
+| Authentication                                  |
+| ----------------------------------------------- |
 | ![Aranea polkit prompt](screenshots/polkit.png) |
 
 ### System popups
 
-| Network | Audio | Bluetooth |
-| --- | --- | --- |
+| Network                                          | Audio                                        | Bluetooth                                            |
+| ------------------------------------------------ | -------------------------------------------- | ---------------------------------------------------- |
 | ![Aranea network popup](screenshots/network.png) | ![Aranea audio popup](screenshots/audio.png) | ![Aranea Bluetooth popup](screenshots/bluetooth.png) |
 
-| Agents | Power | Displays |
-| --- | --- | --- |
+| Agents                                        | Power                                        | Displays                                         |
+| --------------------------------------------- | -------------------------------------------- | ------------------------------------------------ |
 | ![Aranea agent popup](screenshots/agents.png) | ![Aranea power popup](screenshots/power.png) | ![Aranea display popup](screenshots/monitor.png) |
 
 ### Wallpaper collection
@@ -190,16 +190,16 @@ The day/night pair anchors the collection. The variants keep the same fine silk
 topology, edge-weighted composition, and quiet center while changing density,
 color, contrast, or aspect ratio.
 
-| Day | Night |
-| --- | --- |
+| Day                                              | Night                                                |
+| ------------------------------------------------ | ---------------------------------------------------- |
 | ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) |
 
-| Sparse | Dense | Dusk |
-| --- | --- | --- |
+| Sparse                                               | Dense                                              | Dusk                                             |
+| ---------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
 | ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
 
-| Monochrome | Ultrawide | Dawn |
-| --- | --- | --- |
+| Monochrome                                                   | Ultrawide                                                  | Dawn                                             |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------ |
 | ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Dawn wallpaper](backgrounds/variants/dawn.png) |
 
 The canonical OSD reference is captured at [screenshots/osd.png](screenshots/osd.png).
@@ -208,8 +208,8 @@ capture command to replace the static reference with a live frame.
 
 ### Secure and boot surfaces
 
-| Lock screen | Plymouth boot screen |
-| --- | --- |
+| Lock screen                                 | Plymouth boot screen                                     |
+| ------------------------------------------- | -------------------------------------------------------- |
 | ![Aranea lock screen](screenshots/lock.png) | ![Aranea Plymouth boot screen](screenshots/plymouth.png) |
 
 Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
@@ -220,8 +220,8 @@ omarchy plymouth set-by-theme aranea
 
 ### Cursor artwork
 
-| Pointer | Hand | Activity | Crosshair |
-| --- | --- | --- | --- |
+| Pointer                                                            | Hand                                                                | Activity                                                             | Crosshair                                                             |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | ![Aranea pointer cursor](integrations/cursor/cursors/left_ptr.svg) | ![Aranea spider hand cursor](integrations/cursor/cursors/hand2.svg) | ![Aranea web activity cursor](integrations/cursor/cursors/watch.svg) | ![Aranea crosshair cursor](integrations/cursor/cursors/crosshair.svg) |
 
 The busy cursor animation is shipped as eight matching SVG frames:
@@ -237,12 +237,12 @@ The busy cursor animation is shipped as eight matching SVG frames:
 
 ### Application surfaces
 
-| Btop | File manager | Neovim |
-| --- | --- | --- |
+| Btop                                 | File manager                                         | Neovim                                   |
+| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------- |
 | ![Aranea btop](screenshots/btop.png) | ![Aranea file manager](screenshots/file-manager.png) | ![Aranea Neovim](screenshots/neovim.png) |
 
-| Apps | Favorites | Recent |
-| --- | --- | --- |
+| Apps                                          | Favorites                                      | Recent                                   |
+| --------------------------------------------- | ---------------------------------------------- | ---------------------------------------- |
 | ![Aranea Apps launcher](screenshots/apps.png) | ![Aranea Favorites](screenshots/favorites.png) | ![Aranea Recent](screenshots/recent.png) |
 
 Refresh the complete README capture set in one pass. Menu, desktop,
@@ -347,12 +347,12 @@ privileged actions have no password prompt.
 
 ## Palette
 
-| Role | Value |
-| --- | --- |
-| Background | `#08090b` |
-| Mint accent | `#3bff9e` |
-| Violet accent | `#7a5cff` |
-| Foreground | `#e7ecf3` |
+| Role             | Value     |
+| ---------------- | --------- |
+| Background       | `#08090b` |
+| Mint accent      | `#3bff9e` |
+| Violet accent    | `#7a5cff` |
+| Foreground       | `#e7ecf3` |
 | Muted foreground | `#8b96a6` |
 
 The source tokens are in [`colors.toml`](colors.toml) and

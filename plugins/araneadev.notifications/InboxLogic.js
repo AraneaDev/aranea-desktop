@@ -45,7 +45,9 @@ function newestFirst(a, b) {
 
 // Entries on screen are never pruned: their toast still owns the file.
 function pruneInbox(entries, now) {
-  var rows = (Array.isArray(entries) ? entries : []).filter(function(e) { return !!e })
+  var rows = (Array.isArray(entries) ? entries : []).filter(function (e) {
+    return !!e
+  })
   var keep = []
   var drop = []
   var cutoff = Number(now) - MAX_AGE_MS
@@ -62,8 +64,12 @@ function pruneInbox(entries, now) {
       if (!keep[j].onScreen && predicate(keep[j])) drop.push(keep.splice(j, 1)[0])
     }
   }
-  dropOldest(function(x) { return Number(x.urgency) !== CRITICAL })
-  dropOldest(function() { return true })
+  dropOldest(function (x) {
+    return Number(x.urgency) !== CRITICAL
+  })
+  dropOldest(function () {
+    return true
+  })
   return { keep: keep, drop: drop }
 }
 
@@ -112,7 +118,8 @@ function flattenGroups(groups) {
   for (var i = 0; i < list.length; i++) {
     var g = list[i]
     out.push({ kind: "group", app: g.app, count: g.count, collapsed: g.collapsed })
-    for (var j = 0; j < g.visible.length; j++) out.push({ kind: "entry", app: g.app, entry: g.visible[j] })
+    for (var j = 0; j < g.visible.length; j++)
+      out.push({ kind: "entry", app: g.app, entry: g.visible[j] })
     if (g.hidden > 0) out.push({ kind: "more", app: g.app, hidden: g.hidden })
   }
   return out
@@ -128,7 +135,7 @@ function tooltipText(count, critical, dnd, quiet) {
   var n = Math.max(0, Math.floor(Number(count) || 0))
   var c = Math.max(0, Math.floor(Number(critical) || 0))
   var noun = n === 1 ? "notification" : "notifications"
-  var state = quiet ? "Quiet hours" : (dnd ? "DND on" : "DND off")
+  var state = quiet ? "Quiet hours" : dnd ? "DND on" : "DND off"
   return n + " " + noun + (c > 0 ? " · " + c + " critical" : "") + " · " + state
 }
 
@@ -144,7 +151,7 @@ function badgeState(total, critical, dnd) {
 // Critical first, then newest first. Returns a new array.
 function sortForCenter(entries) {
   var rows = (Array.isArray(entries) ? entries : []).slice()
-  rows.sort(function(a, b) {
+  rows.sort(function (a, b) {
     var ca = Number(a.urgency) === CRITICAL ? 1 : 0
     var cb = Number(b.urgency) === CRITICAL ? 1 : 0
     if (ca !== cb) return cb - ca

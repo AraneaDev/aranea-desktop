@@ -17,7 +17,9 @@ function semanticColor(state) {
 }
 
 function normalizeProfile(value) {
-  var profile = String(value || "").trim().toLowerCase()
+  var profile = String(value || "")
+    .trim()
+    .toLowerCase()
   return /^(minimal|diagnostic|ceremony)$/.test(profile) ? profile : "minimal"
 }
 
@@ -25,20 +27,34 @@ function profileAllows(profile, id) {
   var selected = normalizeProfile(profile)
   var moduleId = String(id || "")
   if (selected !== "minimal") return true
-  return [
-    "omarchy.indicators", "omarchy.idle", "omarchy.clock",
-    "omarchy.keyboard-layout", "omarchy.system-update", "omarchy.workspaces", "omarchy.tray",
-    "omarchy.network", "omarchy.audio", "omarchy.microphone", "omarchy.monitor", "omarchy.power",
-    "omarchy.bluetooth", "omarchy.agents",
-    "araneadev.menu", "araneadev.notifications", "araneadev.health"
-  ].indexOf(moduleId) !== -1
+  return (
+    [
+      "omarchy.indicators",
+      "omarchy.idle",
+      "omarchy.clock",
+      "omarchy.keyboard-layout",
+      "omarchy.system-update",
+      "omarchy.workspaces",
+      "omarchy.tray",
+      "omarchy.network",
+      "omarchy.audio",
+      "omarchy.microphone",
+      "omarchy.monitor",
+      "omarchy.power",
+      "omarchy.bluetooth",
+      "omarchy.agents",
+      "araneadev.menu",
+      "araneadev.notifications",
+      "araneadev.health"
+    ].indexOf(moduleId) !== -1
+  )
 }
 
 function filterProfile(entries, profile) {
   var values = Array.isArray(entries) ? entries : []
   var selected = normalizeProfile(profile)
   if (selected !== "minimal") return values.slice()
-  return values.filter(function(entry) {
+  return values.filter(function (entry) {
     var id = typeof entry === "string" ? entry : entry && entry.id
     return profileAllows(selected, id)
   })
@@ -216,16 +232,27 @@ function pickDrawnSlot(slots) {
 // a single monitor, or when the focused output has no bar of its own.
 function pickPanelSlot(candidates, focusedScreen) {
   var rows = Array.isArray(candidates) ? candidates : []
-  var pool = rows.filter(function(row) { return row && row.opened === true })
-  if (pool.length === 0) pool = rows.filter(function(row) { return !!row })
+  var pool = rows.filter(function (row) {
+    return row && row.opened === true
+  })
+  if (pool.length === 0)
+    pool = rows.filter(function (row) {
+      return !!row
+    })
 
   var focused = String(focusedScreen || "")
   if (focused) {
-    var onFocused = pool.filter(function(row) { return row.screenName === focused })
+    var onFocused = pool.filter(function (row) {
+      return row.screenName === focused
+    })
     if (onFocused.length > 0) pool = onFocused
   }
 
-  return pickDrawnSlot(pool.map(function(row) { return row.slot }))
+  return pickDrawnSlot(
+    pool.map(function (row) {
+      return row.slot
+    })
+  )
 }
 
 // Resolve a pointer anywhere along the bar to the closest insertion edge.
@@ -278,10 +305,10 @@ if (typeof module !== "undefined") {
     customModuleSafeName: customModuleSafeName,
     customModuleType: customModuleType,
     customModulePath: customModulePath,
-    semanticColor: semanticColor
-    ,normalizeProfile: normalizeProfile
-    ,profileAllows: profileAllows
-    ,filterProfile: filterProfile
-    ,normalizeLayout: normalizeLayout
+    semanticColor: semanticColor,
+    normalizeProfile: normalizeProfile,
+    profileAllows: profileAllows,
+    filterProfile: filterProfile,
+    normalizeLayout: normalizeLayout
   }
 }

@@ -45,14 +45,8 @@ Example `shell.json` (bar subtree only shown):
         { "id": "omarchy.spacer", "size": 12 },
         { "id": "omarchy.workspaces" }
       ],
-      "center": [
-        { "id": "omarchy.media" },
-        { "id": "omarchy.clock", "format": "HH:mm" }
-      ],
-      "right": [
-        { "id": "omarchy.audio" },
-        { "id": "omarchy.power" }
-      ]
+      "center": [{ "id": "omarchy.media" }, { "id": "omarchy.clock", "format": "HH:mm" }],
+      "right": [{ "id": "omarchy.audio" }, { "id": "omarchy.power" }]
     }
   }
 }
@@ -64,17 +58,17 @@ Example `shell.json` (bar subtree only shown):
 
 ### First-party interactive widgets
 
-| Name | What it does | Interactions |
-|---|---|---|
-| `omarchy.menu` | Omarchy menu launcher | left = menu · right = terminal |
-| `omarchy.workspaces` | Hyprland workspace switcher | left = focus workspace |
-| `omarchy.clock` | Date/time label + popup with a month grid, ISO week numbers, and month stepping | left = popup · right = cycle label format · middle = timezone selector |
-| `omarchy.media` | MPRIS now-playing — scrolling track + artist, cover-art popup | left = play/pause · middle = next · scroll = prev/next · right = popup |
-| `omarchy.indicators` | Manual state indicators | left = indicator action |
-| `omarchy.system-update` | Available update indicator | left = update |
-| `omarchy.tray` | System tray | hover = reveal drawer · right on chevron = manage |
-| `omarchy.weather` | Weather icon + popup with forecast | left = popup · right = full notification |
-| `omarchy.microphone` | Mic icon + scroll volume | left = mute toggle · middle = audio panel · scroll = source volume |
+| Name                    | What it does                                                                    | Interactions                                                           |
+| ----------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `omarchy.menu`          | Omarchy menu launcher                                                           | left = menu · right = terminal                                         |
+| `omarchy.workspaces`    | Hyprland workspace switcher                                                     | left = focus workspace                                                 |
+| `omarchy.clock`         | Date/time label + popup with a month grid, ISO week numbers, and month stepping | left = popup · right = cycle label format · middle = timezone selector |
+| `omarchy.media`         | MPRIS now-playing — scrolling track + artist, cover-art popup                   | left = play/pause · middle = next · scroll = prev/next · right = popup |
+| `omarchy.indicators`    | Manual state indicators                                                         | left = indicator action                                                |
+| `omarchy.system-update` | Available update indicator                                                      | left = update                                                          |
+| `omarchy.tray`          | System tray                                                                     | hover = reveal drawer · right on chevron = manage                      |
+| `omarchy.weather`       | Weather icon + popup with forecast                                              | left = popup · right = full notification                               |
+| `omarchy.microphone`    | Mic icon + scroll volume                                                        | left = mute toggle · middle = audio panel · scroll = source volume     |
 
 | `omarchy.audio` | Volume icon + popup with master slider, output-device picker, per-app mixer | left = popup · right = mute · middle = popup · scroll = volume |
 | `omarchy.network` | Wi-Fi/Ethernet icon + popup with Wi-Fi scan, signal, connect, DNS provider selection | left = popup |
@@ -103,7 +97,14 @@ Command module:
     "layout": {
       "right": [
         { "id": "omarchy.tray" },
-        { "id": "vpn", "type": "command", "exec": "~/.config/omarchy/bar/scripts/vpn-status", "interval": 5, "tooltip": "VPN", "onClick": "nm-connection-editor" },
+        {
+          "id": "vpn",
+          "type": "command",
+          "exec": "~/.config/omarchy/bar/scripts/vpn-status",
+          "interval": 5,
+          "tooltip": "VPN",
+          "onClick": "nm-connection-editor"
+        },
         { "id": "omarchy.audio" }
       ]
     }
@@ -114,7 +115,7 @@ Command module:
 The command may print plain text or Waybar-style JSON, for example:
 
 ```json
-{"text":"󰌆","tooltip":"Work VPN","class":"active"}
+{ "text": "󰌆", "tooltip": "Work VPN", "class": "active" }
 ```
 
 QML module:
@@ -124,10 +125,7 @@ QML module:
   "version": 1,
   "bar": {
     "layout": {
-      "right": [
-        { "id": "gpu", "type": "qml" },
-        { "id": "omarchy.audio" }
-      ]
+      "right": [{ "id": "gpu", "type": "qml" }, { "id": "omarchy.audio" }]
     }
   }
 }

@@ -8,7 +8,9 @@ function parseEmojis(raw) {
 }
 
 function normalizedQuery(query) {
-  return String(query || "").trim().toLowerCase()
+  return String(query || "")
+    .trim()
+    .toLowerCase()
 }
 
 function keywordText(item) {
