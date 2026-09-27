@@ -71,6 +71,20 @@ if grep -E '^\s*wtype |[;&|(] *wtype ' "$capture_script" | grep -Ev 'wtype -k (T
 # pkexec left running is killed.
 grep -Fq 'polkit prompt never appeared' "$capture_script"
 grep -Fq "kill \"\$pkexec_pid\"" "$capture_script"
+# The real inbox / picker data is protected by a restore trap set before it
+# is moved aside, and parked under the state dir, not /tmp (spec D).
+line_of() { grep -nF -- "$1" "$capture_script" | head -n 1 | cut -d: -f1; }
+(( $(line_of 'trap restore_inbox EXIT') < $(line_of "mv -t \"\$inbox_backup\"") ))
+(( $(line_of 'trap finish_picker EXIT') < $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"") ))
+grep -Fq "inbox_backup=\"\$(mktemp -d \"\$state_home/aranea/capture-backup.XXXXXX\")\"" "$capture_script"
+if grep -Fq "capture_status" "$capture_script"; then echo "capture_status is gone: capture fails only when no frame was written" >&2; exit 1; fi
+# ...and the cleanup only undoes what was done: it never deletes an unmoved
+# history file or clears an untouched clipboard.
+(( $(line_of 'picker_swapped=1') > $(line_of "mv \"\$picker_file\" \"\$picker_backup/saved\"") ))
+grep -Fq 'if (( picker_swapped )); then' "$capture_script"
+grep -Fq '&& (( clipboard_swapped )); then' "$capture_script"
+(( $(line_of 'inbox_swapped=1') > $(line_of "mv -t \"\$inbox_backup\"") ))
+grep -Fq 'if (( ! inbox_swapped )); then return 0; fi' "$capture_script"
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]
 

@@ -133,4 +133,17 @@ own_out="$(ARANEA_DOCTOR_THEME='Aranea Pulse' ARANEA_OWNERSHIP_ROOT="$own_root" 
 grep -Fq '"id":"ownership","status":"ok"' <<<"$own_out"
 grep -Fq '1 customised and left alone' <<<"$own_out"
 
+# Every --json line is valid JSON, even with quotes and backslashes in paths (spec E).
+odd_root="$(mktemp -d)/we\"ird\\dir"; mkdir -p "$odd_root"
+odd_out="$(ARANEA_DOCTOR_THEME='Aranea Pulse' ARANEA_DOCTOR_RUNTIME_ROOT="$odd_root" ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped ARANEA_DOCTOR_POLKIT_STATUS=skipped ARANEA_DOCTOR_QMLLINT_STATUS=ok \
+  "$repo_root/scripts/aranea-doctor" --json)"
+while IFS= read -r line; do jq -e . <<<"$line" >/dev/null; done <<<"$odd_out"
+# No rg: the runtime check is skipped, not "ok".
+printf 'TypeError: x\n' > "$odd_root/log.log"
+rg_out="$(ARANEA_DOCTOR_THEME='Aranea Pulse' ARANEA_DOCTOR_RUNTIME_ROOT="$odd_root" ARANEA_DOCTOR_RG=aranea-no-such-rg \
+  ARANEA_DOCTOR_SHELL_STATUS=skipped ARANEA_DOCTOR_PLUGINS_STATUS=skipped ARANEA_DOCTOR_POLKIT_STATUS=skipped \
+  ARANEA_DOCTOR_QMLLINT_STATUS=ok "$repo_root/scripts/aranea-doctor" --json)"
+grep -Fq '"id":"runtime","status":"skipped"' <<<"$rg_out"
+
 echo "doctor contract passed"

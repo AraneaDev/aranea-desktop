@@ -58,7 +58,8 @@ if (( capture_all )); then
   # the real inbox is parked for the whole batch and restored afterwards;
   # badges then show capture data only, never the user's own count.
   batch_inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
-  batch_inbox_backup="$(mktemp -d)"
+  mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+  batch_inbox_backup="$(mktemp -d "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/capture-backup.XXXXXX")"
   mkdir -p "$batch_inbox_dir"
   find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
   omarchy restart shell >/dev/null 2>&1 || true
@@ -131,12 +132,13 @@ capture_menu_surface() {
   omarchy-shell shell toggle araneadev.menu "$payload"
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  # Terminal applications can exit non-zero after the compositor frame is
-  # already captured (Neovim emits a harmless terminal escape warning on some
-  # builds). Keep the frame and continue the batch when the file exists.
-  local capture_status=0
-  grim "$output/$surface.png" || capture_status=$?
+  # A grim error after the frame was written is not fatal; no frame is.
+  grim "$output/$surface.png" || true
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
+  if [[ ! -f "$output/$surface.png" ]]; then
+    echo "capture failed: $output/$surface.png was not written" >&2
+    return 3
+  fi
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
@@ -159,8 +161,12 @@ capture_terminal_surface() {
   hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
   kill "$child_pid" >/dev/null 2>&1 || true
   wait "$child_pid" >/dev/null 2>&1 || true
+  # Terminal applications can exit non-zero after the compositor frame is
+  # already captured (Neovim emits a harmless terminal escape warning on some
+  # builds). Keep the frame and continue the batch when the file exists.
   if [[ ! -f "$output/$surface.png" ]]; then
-    return "$capture_status"
+    echo "capture failed: $output/$surface.png was not written" >&2
+    return 3
   fi
   printf 'captured: %s\n' "$output/$surface.png"
 }
@@ -219,11 +225,29 @@ case "$surface" in
     exit 0
     ;;
   notifications|notifications-empty)
-    inbox_backup="$(mktemp -d)"
+    state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+    mkdir -p "$state_home/aranea"
+    inbox_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
     inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
+    # Put the real inbox back however this ends (set by the move below).
+    # Only undo what was done: before the move, the inbox is the real one and
+    # must not be cleared.
+    inbox_swapped=0
+    restore_inbox() {
+      omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
+      if (( ! inbox_swapped )); then return 0; fi
+      omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
+      omarchy-shell notifications clear >/dev/null 2>&1 || true
+      sleep 1
+      find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
+      rmdir "$inbox_backup" 2>/dev/null || true
+      omarchy restart shell >/dev/null 2>&1 || true
+    }
+    trap restore_inbox EXIT
     # Sanitized fixtures: park the real inbox, show only capture notifications.
     mkdir -p "$inbox_dir"
     find "$inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_backup" {} + 2>/dev/null || true
+    inbox_swapped=1
     omarchy restart shell >/dev/null 2>&1 || true
     sleep 2
     case "$surface" in
@@ -243,13 +267,8 @@ case "$surface" in
     esac
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
-    omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
-    omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
-    omarchy-shell notifications clear >/dev/null 2>&1 || true
-    sleep 1
-    find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
-    rmdir "$inbox_backup" 2>/dev/null || true
-    omarchy restart shell >/dev/null 2>&1 || true
+    restore_inbox
+    trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
@@ -276,26 +295,35 @@ case "$surface" in
     mkdir -p "$state_home/aranea"
     picker_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
     clip_type=""
-    stop_shell
-    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
-    if [[ "$surface" == clipboard ]]; then
-      # The picker records the live clipboard when the shell starts: save it
-      # (never a password manager's marker type) and seed fixture text.
-      clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
-      if [[ -n "$clip_type" ]]; then wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null || clip_type=""; fi
-      printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
-    fi
+    # Put everything back however this ends (set before anything is moved).
+    # Only undo what was actually done: a run that stops before the real file
+    # was moved aside must not delete it, nor clear an untouched clipboard.
+    picker_swapped=0
+    clipboard_swapped=0
     finish_picker() {
       stop_shell
-      rm -f "$picker_file"
-      if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
-      if [[ "$surface" == clipboard ]]; then
+      if (( picker_swapped )); then
+        rm -f "$picker_file"
+        if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
+      fi
+      if [[ "$surface" == clipboard ]] && (( clipboard_swapped )); then
         if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" < "$picker_backup/clipboard"; else wl-copy --clear; fi
       fi
       rm -rf "$picker_backup"
       omarchy restart shell >/dev/null 2>&1 || true
     }
     trap finish_picker EXIT
+    stop_shell
+    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
+    picker_swapped=1
+    if [[ "$surface" == clipboard ]]; then
+      # The picker records the live clipboard when the shell starts: save it
+      # (never a password manager's marker type) and seed fixture text.
+      clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
+      if [[ -n "$clip_type" ]]; then wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null || clip_type=""; fi
+      clipboard_swapped=1
+      printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
+    fi
     mkdir -p "$(dirname "$picker_file")"
     now_ms="$(date +%s%3N)"
     if [[ "$surface" == clipboard ]]; then
