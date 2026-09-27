@@ -108,6 +108,7 @@ fi
 ownership_record_file="$(ownership_record)"
 ownership_ok=1
 ownership_count=0
+ownership_customised=()
 if [[ -f "$ownership_record_file" ]]; then
   while IFS= read -r managed_target; do
     [[ -n "$managed_target" ]] || continue
@@ -116,13 +117,17 @@ if [[ -f "$ownership_record_file" ]]; then
       ownership_ok=0
     elif [[ -L "$managed_target" && ! -e "$(readlink -f "$managed_target")" ]]; then
       ownership_ok=0
+    elif ! is_aranea_target "$managed_target"; then
+      ownership_customised+=("$managed_target")
     fi
   done < "$ownership_record_file"
 fi
-if (( ownership_ok )); then
-  emit ownership ok "${ownership_count} managed targets are present"
-else
+if (( ! ownership_ok )); then
   emit ownership repair 'one or more managed targets are missing or stale'
+elif (( ${#ownership_customised[@]} > 0 )); then
+  emit ownership ok "${ownership_count} managed targets, ${#ownership_customised[@]} customised and left alone: ${ownership_customised[*]:0:3}"
+else
+  emit ownership ok "${ownership_count} managed targets are present"
 fi
 
 if ! emit_override shell ARANEA_DOCTOR_SHELL_STATUS; then

@@ -123,4 +123,14 @@ if grep -Eq 'select\(.id == "araneadev.(clipboard|emojis)"\)' "$repo_root/script
 # stock agent back, which is a choice, not a broken install.
 if grep -Fq 'select(.id == "araneadev.polkit")' "$repo_root/scripts/aranea-doctor"; then echo "polkit must be optional in the plugins check" >&2; exit 1; fi
 
+# Customised managed targets are reported, not flagged for repair (spec B7).
+own_root="$(mktemp -d)"
+printf '%s\n' "$own_root/mine.conf" > "$own_root/managed-files"
+printf 'user\n' > "$own_root/mine.conf"
+own_out="$(ARANEA_DOCTOR_THEME='Aranea Pulse' ARANEA_OWNERSHIP_ROOT="$own_root" ARANEA_DOCTOR_SHELL_STATUS=skipped \
+  ARANEA_DOCTOR_PLUGINS_STATUS=skipped ARANEA_DOCTOR_POLKIT_STATUS=skipped ARANEA_DOCTOR_QMLLINT_STATUS=ok \
+  ARANEA_DOCTOR_RUNTIME_STATUS=skipped "$repo_root/scripts/aranea-doctor" --json)"
+grep -Fq '"id":"ownership","status":"ok"' <<<"$own_out"
+grep -Fq '1 customised and left alone' <<<"$own_out"
+
 echo "doctor contract passed"
