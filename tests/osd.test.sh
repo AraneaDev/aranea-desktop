@@ -13,3 +13,9 @@ grep -Fq '"id": "araneadev.osd"' "$repo_root/plugins/araneadev.osd/manifest.json
 grep -Fq 'target: "osd"' "$repo_root/plugins/araneadev.osd/Osd.qml"
 grep -Fq 'araneadev.osd' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'araneadev.osd' "$repo_root/scripts/repair-shell-config"
+
+# --- 4d: unused OSD members stay gone
+if grep -Eq 'mediaOsd|iconKey' "$repo_root/plugins/araneadev.osd/Osd.qml"; then
+  echo "unused mediaOsd/iconKey are back" >&2
+  exit 1
+fi

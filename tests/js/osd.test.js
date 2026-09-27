@@ -24,3 +24,18 @@ test("osd logic", () => {
 
   console.log("osd model contract passed")
 })
+
+test("osd maximum and value (4d)", () => {
+  const o = require(path.join(__dirname, "..", "..", "plugins/araneadev.osd/OsdModel.js"))
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const bad = o.stateForShow("", "", "50", "abc", "", "")
+  eq(bad.maxValue, 100, "non-numeric max means 100")
+  eq(bad.message, "50%", "no NaN%")
+  eq(o.stateForShow("", "", undefined, "", "", "").hasProgress, false, "undefined value: no bar")
+  eq(o.stateForShow("", "", null, "", "", "").hasProgress, false, "null value: no bar")
+  eq(o.stateForShow("", "", "", "", "", "").hasProgress, false, "empty value: no bar")
+  eq(o.stateForShow("", "", "0", "", "", "").hasProgress, true, "zero is a value")
+  eq(o.widestIcon, undefined, "unused export removed")
+})

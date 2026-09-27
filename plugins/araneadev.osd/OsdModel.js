@@ -25,10 +25,6 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
 }
 
-// The widest glyph iconFor returns (for sizing an icon column). Exported
-// only; nothing in this repo reads it.
-var widestIcon = ""
-
 /**
  * Picks the OSD glyph for an icon name. Known names map to Nerd Font glyphs,
  * any other non-empty name is used as the glyph itself, and an empty name
@@ -70,17 +66,21 @@ function iconFor(name, percent) {
  * Turns the raw strings of an OSD request into display state.
  * @param {string} iconName - icon name for iconFor
  * @param {string} rawMessage - message text; a non-empty message disables progress
- * @param {string} rawValue - progress value, "" for none
- * @param {string} rawMax - progress maximum, "100" when empty
+ * @param {*} rawValue - progress value; undefined, null or "" for none
+ * @param {*} rawMax - progress maximum; 100 when not a number
  * @param {string} rawProgressText - text shown instead of "<percent>%"
  * @param {string} rawDuration - display time in ms, "1200" when empty or not a number
  * @returns {OsdState} the state Osd.qml copies into its properties
  */
 function stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration) {
-  var maxValue = Math.max(1, parseInt(rawMax || "100", 10))
-  var parsedValue = parseInt(rawValue || "0", 10)
+  // A maximum that is not a number means 100; a missing value (undefined,
+  // null or "") means no progress bar.
+  var parsedMax = parseInt(rawMax, 10)
+  var maxValue = isNaN(parsedMax) ? 100 : Math.max(1, parsedMax)
+  var hasValue = rawValue !== undefined && rawValue !== null && String(rawValue) !== ""
+  var parsedValue = hasValue ? parseInt(rawValue, 10) : NaN
   var messageText = String(rawMessage || "")
-  var hasProgress = rawValue !== "" && !isNaN(parsedValue) && messageText === ""
+  var hasProgress = hasValue && !isNaN(parsedValue) && messageText === ""
   var value = hasProgress ? clamp(parsedValue, 0, maxValue) : 0
   var percent = hasProgress ? Math.round((value * 100) / maxValue) : -1
   var parsedDuration = parseInt(rawDuration || "1200", 10)
@@ -107,5 +107,5 @@ function progressFraction(state) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { widestIcon, iconFor, stateForShow, progressFraction }
+  module.exports = { iconFor, stateForShow, progressFraction }
 }

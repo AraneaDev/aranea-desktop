@@ -18,8 +18,6 @@ Item {
   property bool opened: false
   // Glyph shown in the icon column.
   property string icon: ""
-  // Lower-cased icon name of the current request.
-  property string iconKey: ""
   // Value text (progress) or message text.
   property string message: ""
   // Progress value, 0..maxValue.
@@ -41,8 +39,6 @@ Item {
     value: root.value,
     maxValue: root.maxValue
   })
-  // The request is a media/player OSD (not read anywhere in this file).
-  readonly property bool mediaOsd: root.iconKey.indexOf("media") === 0 || root.iconKey.indexOf("player") === 0
   // Padding between the card border and its content.
   readonly property int pad: Style.space(14)
   // Spacing between the icon, strand and text.
@@ -64,7 +60,6 @@ Item {
   // (re)starts the hide timer, or stops it for duration 0.
   function show(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration) {
     var next = OsdModel.stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration)
-    root.iconKey = next.iconKey
     root.icon = next.icon
     root.message = next.message
     root.value = next.value
