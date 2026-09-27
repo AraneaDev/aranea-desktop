@@ -76,9 +76,11 @@ for list in "$only" "$skip"; do
   done
 done
 
-# True when STAGE should run given --only/--skip.
+# True when STAGE should run given --only/--skip (and --fast, which drops the
+# runtime smoke test unless it is asked for by name).
 wanted() {
   local stage="$1"
+  [[ "$stage" == smoke && "$fast" == 1 && ",$only," != *",smoke,"* ]] && return 1
   [[ -n "$only" && ",$only," != *",$stage,"* ]] && return 1
   [[ ",$skip," == *",$stage,"* ]] && return 1
   return 0

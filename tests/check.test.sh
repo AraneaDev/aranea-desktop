@@ -241,4 +241,10 @@ if ARANEA_QML_SHELL_DIR=/nonexistent ARANEA_CHECK_REQUIRE_ALL=1 run_check --only
   exit 1
 fi
 grep -Fq 'smoke: FAILED (skip not allowed)' "$ARANEA_TEST_SANDBOX/out"
+# --fast drops the smoke stage (unless named with --only).
+run_check --fast --skip format,lint,qml,test
+if grep -Fq 'smoke:' "$ARANEA_TEST_SANDBOX/out"; then
+  echo "--fast ran smoke" >&2
+  exit 1
+fi
 echo "check contract passed"

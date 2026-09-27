@@ -68,4 +68,22 @@ grep -Fq '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' "$re
 grep -Fxq 'node_modules/' "$repo_root/.gitignore"
 grep -Fxq 'coverage/' "$repo_root/.gitignore"
 
+# CI runs tools/check; release checks before tagging; actions pinned by SHA.
+grep -Fq 'tools/check --skip smoke' "$repo_root/.github/workflows/ci.yml"
+grep -Fq 'ARANEA_CHECK_REQUIRE_ALL' "$repo_root/.github/workflows/ci.yml"
+grep -Fq 'container: archlinux' "$repo_root/.github/workflows/ci.yml"
+[[ "$(<"$repo_root/.omarchy-version")" == v4.0.4 ]]
+if grep -hE '^\s*-?\s*uses: [^@]+@v[0-9]' "$repo_root"/.github/workflows/*.yml; then
+  echo "action pinned by tag, not SHA" >&2
+  exit 1
+fi
+grep -Fq 'persist-credentials: false' "$repo_root/.github/workflows/release-please.yml"
+grep -Fq 'tools/check --staged --fast' "$repo_root/.githooks/pre-commit"
+grep -Fq 'tools/check --fast' "$repo_root/.githooks/pre-push"
+grep -Fq 'package-ecosystem: npm' "$repo_root/.github/dependabot.yml"
+# build: and revert: are real commit types here (this branch uses build:).
+"$repo_root/tools/check-commit-style.sh" "build: pin a tool"
+"$repo_root/tools/check-commit-style.sh" "revert: undo a change"
+# The release only tags after tools/check passed on the merged commit.
+grep -Fq 'needs: verify' "$repo_root/.github/workflows/release-please.yml"
 echo "toolkit contract passed"
