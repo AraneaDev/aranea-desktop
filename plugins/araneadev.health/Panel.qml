@@ -1,6 +1,7 @@
-// Health bar icon + dropdown: open problems and live metrics. State lives in the health service (Service.qml),
-// read through HealthBridge.js because the Aranea bar gives widgets a
-// service-less facade.
+// Health bar widget (the plugin's "barWidget" entry point, placed in the
+// Aranea bar): a status icon plus a dropdown with open problems and live
+// metrics. State lives in the health service (Service.qml), read through
+// HealthBridge.js because the Aranea bar gives widgets a service-less facade.
 
 import QtQuick
 import QtQuick.Layouts
@@ -15,6 +16,8 @@ Panel {
   moduleName: "araneadev.health"
   manageIpc: false
 
+  // The published health service, or null; re-polled every second so a
+  // reloaded service is picked up.
   property var service: HealthBridge.current()
   Timer {
     interval: 1000
@@ -27,18 +30,27 @@ Panel {
     }
   }
 
+  // True while a service with metrics is published.
   readonly property bool available: !!(service && service.metrics)
+  // The service's status, "healthy" while unavailable.
   readonly property string status: available ? service.status : "healthy"
+  // The service's annotated open problems, [] while unavailable.
   readonly property var problems: available ? service.problems : []
+  // The service's Metrics.qml, or null while unavailable.
   readonly property var m: available ? service.metrics : null
+  // Colour of the "attention" status and levels.
   readonly property color amber: "#ffbd2e"
+  // Icon colour for the current status.
   readonly property color statusColor: status === "critical" ? Color.urgent : (status === "attention" ? amber : Color.notifications.countdown)
+  // Keyboard-selected problem row, -1 for none; reset when the dropdown opens.
   property int cursor: -1
 
+  // Colour for a usage level: urgent, amber, or the normal text colour.
   function levelColor(level: string): color {
     return level === "critical" ? Color.urgent : (level === "attention" ? root.amber : Color.popups.text)
   }
 
+  // Runs a problem row's click command, if it has one.
   function runRow(row): void {
     if (row && row.execArgv && row.execArgv.length)
       Util.execArgv(row.execArgv)
@@ -46,7 +58,9 @@ Panel {
 
   // Counted per panel, so switching the dropdown between monitors (the host
   // closes one as it opens the other) never leaves sampling off.
+  // The service this panel told panelOpened(), or null.
   property var countedService: null
+  // Tells the counted service this panel closed and forgets it.
   function releaseCount(): void {
     if (countedService)
       countedService.panelClosed()

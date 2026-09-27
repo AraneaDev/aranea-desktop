@@ -1,9 +1,42 @@
+// Pure state rules for the Aranea OSD (Osd.qml): map an icon name to a Nerd
+// Font glyph and turn the raw strings of an `osd show` request into display
+// state. No QML, no I/O; tests/osd.test.sh runs this under Node.
+
+/**
+ * Display state for one OSD request (stateForShow).
+ * @typedef {object} OsdState
+ * @property {string} iconKey - lower-cased icon name
+ * @property {number} maxValue - progress maximum, at least 1
+ * @property {boolean} hasProgress - a numeric value was given and no message
+ * @property {number} value - progress value clamped to 0..maxValue (0 without progress)
+ * @property {string} message - the message, else the progress text or "<percent>%"
+ * @property {string} icon - glyph from iconFor
+ * @property {number} duration - ms before the OSD hides; 0 keeps it open
+ */
+
+/**
+ * Limits a number to a range.
+ * @param {number} value - number to limit
+ * @param {number} min - lower bound
+ * @param {number} max - upper bound
+ * @returns {number} value clamped to min..max
+ */
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
 }
 
+// The widest glyph iconFor returns (for sizing an icon column). Exported
+// only; nothing in this repo reads it.
 var widestIcon = ""
 
+/**
+ * Picks the OSD glyph for an icon name. Known names map to Nerd Font glyphs,
+ * any other non-empty name is used as the glyph itself, and an empty name
+ * gets a volume glyph chosen by percent.
+ * @param {string} name - icon name, matched case-insensitively
+ * @param {number} percent - progress percent, -1 without progress
+ * @returns {string} the glyph
+ */
 function iconFor(name, percent) {
   var n = String(name || "").toLowerCase()
   if (n === "volume-muted" || n === "volume-mute" || n === "muted" || n === "mute") return ""
@@ -33,6 +66,16 @@ function iconFor(name, percent) {
   return ""
 }
 
+/**
+ * Turns the raw strings of an OSD request into display state.
+ * @param {string} iconName - icon name for iconFor
+ * @param {string} rawMessage - message text; a non-empty message disables progress
+ * @param {string} rawValue - progress value, "" for none
+ * @param {string} rawMax - progress maximum, "100" when empty
+ * @param {string} rawProgressText - text shown instead of "<percent>%"
+ * @param {string} rawDuration - display time in ms, "1200" when empty or not a number
+ * @returns {OsdState} the state Osd.qml copies into its properties
+ */
 function stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration) {
   var maxValue = Math.max(1, parseInt(rawMax || "100", 10))
   var parsedValue = parseInt(rawValue || "0", 10)
@@ -53,6 +96,11 @@ function stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, r
   }
 }
 
+/**
+ * Computes how full the progress strand is.
+ * @param {?{hasProgress: boolean, value: number, maxValue: number}} state - progress fields of an OsdState
+ * @returns {number} value / maxValue clamped to 0..1, 0 without progress
+ */
 function progressFraction(state) {
   if (!state || !state.hasProgress || !state.maxValue) return 0
   return clamp(Number(state.value) / Number(state.maxValue), 0, 1)

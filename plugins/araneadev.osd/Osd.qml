@@ -1,3 +1,8 @@
+// Aranea on-screen display (the araneadev.osd plugin's "panel" entry point,
+// replacing the stock Omarchy OSD): a bottom-centre card with an icon, a
+// filament progress strand and a value or message. Driven through the "osd"
+// IPC target (show/close/state/ping); display rules live in OsdModel.js.
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -9,33 +14,54 @@ import "OsdModel.js" as OsdModel
 Item {
   id: root
 
+  // Whether the card is shown; cleared by the hide timer or close().
   property bool opened: false
+  // Glyph shown in the icon column.
   property string icon: ""
+  // Lower-cased icon name of the current request.
   property string iconKey: ""
+  // Value text (progress) or message text.
   property string message: ""
+  // Progress value, 0..maxValue.
   property int value: 0
+  // Progress maximum.
   property int maxValue: 100
+  // Show a progress strand and value; false shows a short strand and message.
   property bool hasProgress: true
+  // Ms before the card hides; 0 keeps it open.
   property int duration: 1200
+  // Animate the card; follows the aranea motion state file, else
+  // ARANEA_REDUCED_MOTION.
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  // $XDG_STATE_HOME/aranea/motion ("off" disables motion).
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  // Filled part of the strand, 0..1.
   readonly property real fraction: OsdModel.progressFraction({
     hasProgress: root.hasProgress,
     value: root.value,
     maxValue: root.maxValue
   })
+  // The request is a media/player OSD (not read anywhere in this file).
   readonly property bool mediaOsd: root.iconKey.indexOf("media") === 0 || root.iconKey.indexOf("player") === 0
+  // Padding between the card border and its content.
   readonly property int pad: Style.space(14)
+  // Spacing between the icon, strand and text.
   readonly property int gap: Style.space(12)
+  // Strand width: long with progress, short without.
   readonly property int strandWidth: root.hasProgress ? Style.space(180) : Style.space(80)
+  // Width of the icon column.
   readonly property int iconWidth: Style.space(28)
   // Keep the percentage/message slot wide enough for the largest normal
   // value at the active font size; a fixed 42px slot clipped `71%` to `7...`
   // on 4K captures.
   readonly property int valueWidth: Math.max(Style.space(56), messageMetrics.advanceWidth + Style.space(8))
+  // Message column width: the message's width, capped.
   readonly property int messageWidth: Math.min(Style.space(220), messageMetrics.advanceWidth)
+  // Width of the card content between the paddings.
   readonly property int contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
 
+  // Applies a request (OsdModel.stateForShow), opens the card and
+  // (re)starts the hide timer, or stops it for duration 0.
   function show(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration) {
     var next = OsdModel.stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration)
     root.iconKey = next.iconKey
@@ -52,6 +78,8 @@ Item {
       hideTimer.stop()
   }
 
+  // Parses a JSON payload {icon, message, value, max, progressText,
+  // duration} and shows it; invalid JSON is ignored.
   function open(payloadJson: string): void {
     try {
       var payload = JSON.parse(payloadJson || "{}")
@@ -59,6 +87,7 @@ Item {
     } catch (error) {}
   }
 
+  // Hides the card.
   function close(): void {
     root.opened = false
   }

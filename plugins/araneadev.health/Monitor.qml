@@ -18,11 +18,17 @@ Item {
       reboot: [],
       container: []
     })
+  // Per check: true once it reported, false while it is unavailable.
   property var known: ({})
+  // parseFailedUnits results per scope ("system", "user") until both arrived.
   property var unitParts: ({})
+  // Alert level per mount point, fed back into diskProblems for hysteresis.
   property var diskLevels: ({})
+  // Container history by name (HealthLogic DockerHistoryEntry).
   property var dockerHistory: ({})
+  // Running kernel release from `uname -r`; "" until read.
   property string release: ""
+  // Set by startChecks so the checks start only once.
   property bool checksStarted: false
   // Tools the item actions need; assume present until `which` says otherwise.
   property var tools: ({
@@ -33,6 +39,7 @@ Item {
   // Latest df rows (HealthLogic.parseDf), shared with the metrics view.
   property var diskRows: []
 
+  // Runs every check once and starts the docker connection (first call only).
   function startChecks(): void {
     if (checksStarted)
       return
@@ -43,6 +50,7 @@ Item {
     startDocker()
   }
 
+  // Replaces one check's problems, marks it known and rebuilds openProblems.
   function setProblems(check: string, list: var): void {
     var next = Object.assign({}, problems)
     next[check] = list
@@ -53,6 +61,7 @@ Item {
     reconcileNow()
   }
 
+  // Marks a check unavailable (warns once per outage); its last problems stay.
   function markUnknown(check: string, reason: string): void {
     if (known[check] === false)
       return
@@ -62,6 +71,7 @@ Item {
     known = k
   }
 
+  // Rebuilds openProblems from all checks' problems and the current tools.
   function reconcileNow(): void {
     var open = []
     for (var check in problems)
@@ -71,6 +81,7 @@ Item {
 
   // ---------------------------------------------------- failed units
 
+  // Starts the system and user failed-unit queries unless already running.
   function checkUnits(): void {
     if (!systemUnits.running)
       systemUnits.running = true
@@ -78,6 +89,8 @@ Item {
       userUnits.running = true
   }
 
+  // Collects one scope's systemctl output; once both scopes are in, sets the
+  // unit problems, or marks the check unknown if either failed to parse.
   function unitResult(scope: string, text: string): void {
     var parsed = HealthLogic.parseFailedUnits(text, scope)
     var parts = Object.assign({}, unitParts)
@@ -119,6 +132,7 @@ Item {
 
   // ---------------------------------------------------- disk
 
+  // Starts df unless it is already running.
   function checkDisk(): void {
     if (!dfProc.running)
       dfProc.running = true
@@ -148,6 +162,8 @@ Item {
 
   // ---------------------------------------------------- reboot
 
+  // Reads the kernel release first if needed, then tests whether its module
+  // directory still exists.
   function checkReboot(): void {
     if (!release) {
       if (!unameProc.running)
@@ -187,6 +203,8 @@ Item {
 
   // ---------------------------------------------------- containers
 
+  // Connects to docker (info, then ps snapshot, then the events stream)
+  // unless a step is already running; retried every 30 s on failure.
   function startDocker(): void {
     if (!dockerInfo.running && !dockerPs.running && !dockerEvents.running)
       dockerInfo.running = true

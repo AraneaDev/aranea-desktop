@@ -13,10 +13,98 @@ var GLYPH_DISK = "󰋊"
 var GLYPH_REBOOT = "󰜉"
 var GLYPH_CONTAINER = "󰡨"
 
+/**
+ * One filesystem row from `df` (parseDf).
+ * @typedef {object} DfRow
+ * @property {string} source - device or filesystem source
+ * @property {string} target - mount point
+ * @property {number} size - total size in bytes
+ * @property {number} used - used bytes
+ * @property {number} avail - available bytes
+ * @property {number} percent - df's use percentage
+ */
+
+/**
+ * A container lifecycle event from `docker events` (parseDockerEvent).
+ * @typedef {object} DockerEvent
+ * @property {string} action - "die", "start" or "destroy"
+ * @property {string} name - container name
+ * @property {string} image - image name, "" when absent
+ * @property {number} exitCode - exit code (0 when absent or not a die event)
+ * @property {number} time - event time in ms since the epoch
+ */
+
+/**
+ * Per-container state kept between events.
+ * @typedef {object} DockerHistoryEntry
+ * @property {string} image - image name
+ * @property {Array<number>} exits - times (ms) of non-zero exits
+ * @property {string} last - last action seen: "die" or "start"
+ * @property {number} lastExit - exit code of the last die (0 when running)
+ */
+
+/**
+ * One container from `docker ps -a` (parseDockerPs).
+ * @typedef {object} DockerContainer
+ * @property {string} name - container name
+ * @property {string} image - image name
+ * @property {boolean} running - State is "running"
+ * @property {number} exitCode - code from "Exited (n)" in Status, else 0
+ */
+
+/**
+ * An open problem from one of the checks. Which optional fields are set
+ * depends on `check`; annotated rows (annotateProblems) also fit this shape.
+ * @typedef {object} Problem
+ * @property {string} key - unique id, "<check>:..." or "reboot"
+ * @property {string} check - "unit", "disk", "reboot" or "container"
+ * @property {string} [unit] - unit: the failed unit's name
+ * @property {string} [scope] - unit: "system" or "user"
+ * @property {string} [target] - disk: mount point
+ * @property {number} [percent] - disk: use percentage
+ * @property {number} [size] - disk: total bytes
+ * @property {number} [avail] - disk: available bytes
+ * @property {string} [level] - disk: "normal" or "critical"
+ * @property {string} [release] - reboot: running kernel release
+ * @property {string} [name] - container: name
+ * @property {string} [image] - container: image
+ * @property {number} [exitCode] - container: last exit code
+ * @property {number} [exits] - container: exits within the loop window
+ * @property {boolean} [loop] - container: restart loop detected
+ * @property {number} [urgency] - annotated rows only: 1 or 2
+ */
+
+/**
+ * Which external tools the click actions may use.
+ * @typedef {object} Tools
+ * @property {boolean} terminal - whether xdg-terminal-exec exists
+ */
+
+/**
+ * Dropdown copy and click action for one problem (itemFor).
+ * @typedef {object} ProblemItem
+ * @property {string} summary - headline
+ * @property {string} body - detail line
+ * @property {number} urgency - 1 normal, 2 critical
+ * @property {string} glyph - Nerd Font icon
+ * @property {Array<string>} execArgv - command run on click; empty for none
+ */
+
+/**
+ * Returns the check name of a problem key ("disk:/home" gives "disk").
+ * @param {string} key - problem key
+ * @returns {string} the part before the first ":"
+ */
 function checkOf(key) {
   return String(key || "").split(":")[0]
 }
 
+/**
+ * Turns `systemctl list-units --failed --output=json` output into unit problems.
+ * @param {string} text - the JSON output
+ * @param {string} scope - "system" or "user"
+ * @returns {?Array<Problem>} one problem per failed unit, or null if the output is not a JSON array
+ */
 function parseFailedUnits(text, scope) {
   var parsed
   try {
@@ -36,6 +124,11 @@ function parseFailedUnits(text, scope) {
 
 // `df --output=source,target,fstype,size,used,avail,pcent -B1`, header first.
 // Subvolumes and bind mounts share a source: keep the shortest mount point.
+/**
+ * Parses df output into one row per source, skipping filesystems that never alert.
+ * @param {string} text - df output including its header line
+ * @returns {?Array<DfRow>} rows in df order, or null when there is no usable row
+ */
 function parseDf(text) {
   var lines = String(text || "")
     .split("\n")
@@ -43,6 +136,7 @@ function parseDf(text) {
       return l.trim()
     })
   if (lines.length < 2) return null
+  /** @type {{[key: string]: DfRow}} */
   var bySource = {}
   var order = []
   for (var i = 1; i < lines.length; i++) {
@@ -75,6 +169,11 @@ function parseDf(text) {
 
 // Read-only images (ISO/UDF) and FUSE app mounts (AppImages) are always
 // "100% full" by design. fuseblk (NTFS/exFAT disks) is real storage.
+/**
+ * Tells whether a filesystem type can raise a disk-full problem.
+ * @param {string} fstype - df's fstype column
+ * @returns {boolean} false for iso9660, udf and fuse.* mounts
+ */
 function alertableFsType(fstype) {
   var t = String(fstype || "")
   if (t === "iso9660" || t === "udf") return false
@@ -82,6 +181,13 @@ function alertableFsType(fstype) {
   return true
 }
 
+/**
+ * Classifies disk usage with hysteresis: once alerted, a disk stays alerted
+ * until it drops below DISK_CLEAR.
+ * @param {?string} previous - the mount's previous level ("ok", "normal", "critical"), undefined if unseen
+ * @param {number} percent - current use percentage
+ * @returns {string} "critical", "normal" (alert) or "ok"
+ */
 function diskLevel(previous, percent) {
   var p = Number(percent)
   if (p >= DISK_CRITICAL) return "critical"
@@ -90,8 +196,15 @@ function diskLevel(previous, percent) {
   return "ok"
 }
 
+/**
+ * Derives disk problems from df rows and the previous levels per mount point.
+ * @param {Array<DfRow>} rows - parseDf output
+ * @param {?{[key: string]: string}} levels - previous level per mount point
+ * @returns {{problems: Array<Problem>, levels: {[key: string]: string}}} open disk problems and the new levels
+ */
 function diskProblems(rows, levels) {
   var previous = levels || {}
+  /** @type {{[key: string]: string}} */
   var next = {}
   var problems = []
   for (var i = 0; i < rows.length; i++) {
@@ -112,10 +225,21 @@ function diskProblems(rows, levels) {
   return { problems: problems, levels: next }
 }
 
+/**
+ * Reports a pending reboot when the running kernel's modules are gone.
+ * @param {boolean} modulesPresent - whether /usr/lib/modules/<release> exists
+ * @param {string} release - running kernel release (uname -r)
+ * @returns {Array<Problem>} empty, or one reboot problem
+ */
 function rebootProblem(modulesPresent, release) {
   return modulesPresent ? [] : [{ key: "reboot", check: "reboot", release: String(release || "") }]
 }
 
+/**
+ * Parses one `docker events --format '{{json .}}'` line.
+ * @param {string} line - one JSON event
+ * @returns {?DockerEvent} the event, or null for bad JSON, a missing name or another action
+ */
 function parseDockerEvent(line) {
   var e
   try {
@@ -137,7 +261,16 @@ function parseDockerEvent(line) {
 }
 
 // history: name -> { image, exits: [ms], last: "die"|"start", lastExit: int }
+/**
+ * Applies one docker event to a copy of the history: destroy forgets the
+ * container, a non-zero die records an exit, exits older than the loop window drop.
+ * @param {?{[key: string]: DockerHistoryEntry}} history - current history by container name
+ * @param {?DockerEvent} event - the event; null returns an unchanged copy
+ * @param {number} now - current time in ms
+ * @returns {{[key: string]: DockerHistoryEntry}} the new history
+ */
 function recordDockerEvent(history, event, now) {
+  /** @type {{[key: string]: DockerHistoryEntry}} */
   var next = {}
   for (var k in history || {}) next[k] = history[k]
   if (!event) return next
@@ -160,6 +293,11 @@ function recordDockerEvent(history, event, now) {
 }
 
 // `docker ps -a --format '{{json .}}'`, one object per line.
+/**
+ * Parses `docker ps -a` JSON lines into container snapshots.
+ * @param {string} text - the command output
+ * @returns {?Array<DockerContainer>} the containers, or null if any line is not JSON
+ */
 function parseDockerPs(text) {
   var out = []
   var lines = String(text || "").split("\n")
@@ -186,7 +324,15 @@ function parseDockerPs(text) {
 // events stream (re)connects: after a shell restart or a stream gap the
 // snapshot is the truth. Exit timestamps already counted are kept so a
 // restart loop spanning the gap is still recognised.
+/**
+ * Builds a fresh history from a container snapshot, keeping recent exits.
+ * @param {?{[key: string]: DockerHistoryEntry}} history - previous history by container name
+ * @param {?Array<DockerContainer>} containers - parseDockerPs output
+ * @param {number} now - current time in ms
+ * @returns {{[key: string]: DockerHistoryEntry}} one entry per named container
+ */
 function seedDockerHistory(history, containers, now) {
+  /** @type {{[key: string]: DockerHistoryEntry}} */
   var next = {}
   for (var i = 0; i < (containers || []).length; i++) {
     var c = containers[i]
@@ -209,7 +355,14 @@ function seedDockerHistory(history, containers, now) {
 
 // Forget containers that are neither a problem nor counting recent exits;
 // their next event starts a fresh entry.
+/**
+ * Drops history entries with no exits in the loop window and no failed last exit.
+ * @param {?{[key: string]: DockerHistoryEntry}} history - history by container name
+ * @param {number} now - current time in ms
+ * @returns {{[key: string]: DockerHistoryEntry}} the entries still worth keeping
+ */
 function pruneDockerHistory(history, now) {
+  /** @type {{[key: string]: DockerHistoryEntry}} */
   var next = {}
   for (var name in history || {}) {
     var h = history[name]
@@ -221,6 +374,13 @@ function pruneDockerHistory(history, now) {
   return next
 }
 
+/**
+ * Lists container problems: a restart loop (LOOP_EXITS exits within the
+ * window) or a last exit with a non-zero code.
+ * @param {?{[key: string]: DockerHistoryEntry}} history - history by container name
+ * @param {number} now - current time in ms
+ * @returns {Array<Problem>} container problems
+ */
 function containerProblems(history, now) {
   var out = []
   for (var name in history || {}) {
@@ -243,6 +403,11 @@ function containerProblems(history, now) {
   return out
 }
 
+/**
+ * Formats a byte count with 1024-based units ("1.5 GB", "12 MB").
+ * @param {number} n - bytes; negative or non-numeric counts as 0
+ * @returns {string} the formatted size
+ */
 function humanBytes(n) {
   var units = ["B", "KB", "MB", "GB", "TB", "PB"]
   var v = Math.max(0, Number(n) || 0)
@@ -257,6 +422,12 @@ function humanBytes(n) {
 
 // tools.terminal: whether xdg-terminal-exec exists (default true). Without it
 // the journal/log actions are left out; clicking then just focuses/dismisses.
+/**
+ * Words a problem for the dropdown and picks its click command.
+ * @param {Problem} p - a problem from one of the checks (unit, disk, reboot, container)
+ * @param {Tools} [tools] - available tools; `terminal: false` drops the terminal commands
+ * @returns {ProblemItem} the problem's copy, urgency, glyph and command
+ */
 function itemFor(p, tools) {
   var terminal = !tools || tools.terminal !== false
   if (p.check === "unit") {
@@ -308,6 +479,23 @@ function itemFor(p, tools) {
 }
 
 // The status icon: any open problem counts.
+/**
+ * A dropdown row: a problem's key and check plus its itemFor fields.
+ * @typedef {object} ProblemRow
+ * @property {string} key - the problem's key
+ * @property {string} check - the problem's check
+ * @property {string} summary - headline
+ * @property {string} body - detail line
+ * @property {number} urgency - 1 normal, 2 critical
+ * @property {string} glyph - Nerd Font icon
+ * @property {Array<string>} execArgv - command run on click; empty for none
+ */
+
+/**
+ * Summarises open problems into the bar icon's status.
+ * @param {Array<Problem>} open - raw problems or annotated rows
+ * @returns {string} "critical" if any is urgency 2, "attention" if any other, else "healthy"
+ */
 function statusFor(open) {
   var status = "healthy"
   for (var i = 0; i < (open || []).length; i++) {
@@ -320,6 +508,12 @@ function statusFor(open) {
 }
 
 // Rows for the dropdown's problem list (copy, urgency, click action).
+/**
+ * Turns open problems into dropdown rows, most urgent first, then by key.
+ * @param {Array<Problem>} open - raw problems
+ * @param {Tools} [tools] - available tools, passed to itemFor
+ * @returns {Array<ProblemRow>} rows with key, check and the itemFor fields
+ */
 function annotateProblems(open, tools) {
   var rows = (open || []).map(function (p) {
     var item = itemFor(p, tools)
