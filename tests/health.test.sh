@@ -14,12 +14,16 @@ source "$repo_root/tests/lib/sandbox.sh"
 # Every check command is bounded: a hung df/systemctl/docker must become
 # "unknown", not freeze the check (review Important #4).
 health_qml="$repo_root/plugins/araneadev.health/Monitor.qml"
-for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker", "info"' '"docker", "ps"'; do
+for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"'; do
   grep -F "command: [\"timeout\", \"10\", $cmd" "$health_qml" >/dev/null || {
     echo "unbounded check command: $cmd" >&2
     exit 1
   }
 done
+# docker goes through dockerCommand (tests replace it); still bounded.
+grep -Fq 'property var dockerCommand: ["docker"]' "$health_qml"
+grep -Fq 'command: ["timeout", "10"].concat(monitor.dockerCommand, ["info"' "$health_qml"
+grep -Fq 'command: ["timeout", "10"].concat(monitor.dockerCommand, ["ps"' "$health_qml"
 grep -Fq '"-l"' "$health_qml"
 grep -Fq '"--since"' "$health_qml"
 grep -Fq 'HealthLogic.pruneDockerHistory' "$health_qml"
@@ -50,7 +54,7 @@ grep -Fq '󰗶' "$plugin/Panel.qml"
 
 # One dropdown per monitor: top-process sampling follows an open-panel count,
 # never a shared boolean one bar can switch off for another (review Important #1).
-grep -Fq 'topActive: service.openPanels > 0' "$plugin/Service.qml"
+# The count itself and a reload moving it: tests/qml/health.qml.
 grep -Fq 'service.panelOpened()' "$plugin/Panel.qml"
 grep -Fq 'Component.onDestruction' "$plugin/Panel.qml"
 if grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"; then
@@ -99,11 +103,10 @@ if grep -Fq 'root.problems[root.cursor]' "$hpanel"; then
 fi
 grep -Fq 'onServiceChanged:' "$hpanel"
 
-# --- 4c: docker OOM events are watched; a failed `docker ps` never clears problems
+# --- 4c: docker OOM events are watched (a failed `docker ps` never clearing
+# problems: tests/qml/health.qml)
 mon="$repo_root/plugins/araneadev.health/Monitor.qml"
 grep -Fq '"--filter", "event=oom"' "$mon"
-grep -Fq 'function finishDockerPs(): void' "$mon"
-grep -Fq 'if (monitor.dockerPsCode !== 0)' "$mon"
 
 # --- 4c: rates use the uptime clock
 metrics_qml="$repo_root/plugins/araneadev.health/Metrics.qml"

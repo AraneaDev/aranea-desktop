@@ -38,6 +38,11 @@ Item {
   property var openProblems: []
   // Latest df rows (HealthLogic.parseDf), shared with the metrics view.
   property var diskRows: []
+  // Whether the checks start by themselves on creation; tests switch it off
+  // and call the checks they need.
+  property bool autoStart: true
+  // The docker command (argv prefix); tests replace it with a shell function.
+  property var dockerCommand: ["docker"]
 
   // Runs every check once and starts the docker connection (first call only).
   function startChecks(): void {
@@ -214,7 +219,7 @@ Item {
   // so a non-empty answer means docker is up (no exit-code handler needed).
   Process {
     id: dockerInfo
-    command: ["timeout", "10", "docker", "info", "--format", "{{.ServerVersion}}"]
+    command: ["timeout", "10"].concat(monitor.dockerCommand, ["info", "--format", "{{.ServerVersion}}"])
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -261,14 +266,14 @@ Item {
     }
     var now = Date.now()
     monitor.dockerHistory = HealthLogic.seedDockerHistory(monitor.dockerHistory, containers, now)
-    dockerEvents.command = ["docker", "events", "--since", String(Math.floor(now / 1000)), "--filter", "type=container", "--filter", "event=die", "--filter", "event=oom", "--filter", "event=start", "--filter", "event=destroy", "--format", "{{json .}}"]
+    dockerEvents.command = monitor.dockerCommand.concat(["events", "--since", String(Math.floor(now / 1000)), "--filter", "type=container", "--filter", "event=die", "--filter", "event=oom", "--filter", "event=start", "--filter", "event=destroy", "--format", "{{json .}}"])
     dockerEvents.running = true
     monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
   }
 
   Process {
     id: dockerPs
-    command: ["timeout", "10", "docker", "ps", "-a", "--format", "{{json .}}"]
+    command: ["timeout", "10"].concat(monitor.dockerCommand, ["ps", "-a", "--format", "{{json .}}"])
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -336,6 +341,8 @@ Item {
   }
 
   Component.onCompleted: {
+    if (!monitor.autoStart)
+      return
     terminalProbe.running = true
     startChecks()
   }

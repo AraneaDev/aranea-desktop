@@ -13,11 +13,15 @@ Item {
 
   // Injected by omarchy-shell.
   property var shell: null
+  // Whether the checks start by themselves (Monitor.autoStart); tests switch
+  // it off.
+  property bool checksEnabled: true
 
   // The health checks; Panel.qml calls monitor.checkDisk() when it opens.
   property alias monitor: monitor
   Monitor {
     id: monitor
+    autoStart: service.checksEnabled
   }
 
   // The live metrics sampler the dropdown reads.
