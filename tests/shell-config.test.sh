@@ -18,8 +18,8 @@ EOF
 "$repo_root/scripts/repair-shell-config" "$config"
 
 jq -e '.bar.id == "araneadev.bar"' "$config" >/dev/null
-jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd"] | sort)' "$config" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd"] | sort)' "$config" >/dev/null
+jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.clipboard", "omarchy.emojis", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd"] | sort)' "$config" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd"] | sort)' "$config" >/dev/null
 grep -Fq 'araneadev.health' "$repo_root/scripts/deploy-plugins-safely"
 jq -e '.bar.position == "top" and .unrelated.keep == true' "$config" >/dev/null
 
@@ -158,5 +158,15 @@ test -f "$hparked"
 "$repo_root/scripts/repair-shell-config" "$config"
 jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.health") != null' "$config" >/dev/null
 test ! -e "$hparked"
+
+# --- pickers: stock pickers stay disabled on Aranea and come back elsewhere
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '([.plugins[]?.id] | index("araneadev.clipboard") != null) and ([.plugins[]?.id] | index("araneadev.emojis") != null)' "$config" >/dev/null
+jq -e '(.disabledPlugins | index("omarchy.clipboard") != null) and (.disabledPlugins | index("omarchy.emojis") != null)' "$config" >/dev/null
+jq -e '(.cloneSourceRestores | index("araneadev.clipboard") != null) and (.cloneSourceRestores | index("araneadev.emojis") != null)' "$config" >/dev/null
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '([.plugins[]?.id] | index("araneadev.clipboard") == null) and ([.plugins[]?.id] | index("araneadev.emojis") == null)' "$config" >/dev/null
+jq -e '((.disabledPlugins // []) | index("omarchy.clipboard") == null) and ((.disabledPlugins // []) | index("omarchy.emojis") == null)' "$config" >/dev/null
+jq -e '((.cloneSourceRestores // []) | index("araneadev.clipboard") == null)' "$config" >/dev/null
 
 echo "shell config contract passed"

@@ -166,6 +166,10 @@ interaction states rather than repeating the same wallpaper.
 | --- | --- |
 | ![Aranea notification center](screenshots/notifications.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
 
+| Clipboard | Emoji |
+| --- | --- |
+| ![Aranea clipboard picker](screenshots/clipboard.png) | ![Aranea emoji picker](screenshots/emojis.png) |
+
 ### System popups
 
 | Network | Audio | Bluetooth |
@@ -302,6 +306,24 @@ opens btop. Health problems never go to the notification center.
 
 Problems appear and clear with the condition itself; `aranea-doctor` lists
 which checks are on.
+
+### Pickers
+
+**Clipboard** (`Super+Ctrl+V`) keeps pinned items above the recent history
+and labels each item by kind — link, path, colour (with a swatch), code,
+image or text. Anything that looks like a secret (GitHub, OpenAI, Slack or AWS
+tokens, JWTs, private keys, random-looking strings of 16+ characters) is
+masked in the list and the preview, and removed from history 10 minutes after
+it was copied unless pinned. Copies a password manager marks as secret are
+never stored at all.
+
+`Enter` pastes, `Shift+Enter` copies, `Ctrl+P` pins, `Space` reveals a masked
+secret, `Ctrl+S` marks or unmarks a secret, `Delete` removes an item and
+`Ctrl+Shift+Delete` clears everything that is not pinned.
+
+**Emoji** (`Super+Ctrl+E`) shows your recent emojis above the full set and
+names the emoji under the cursor. `Enter` inserts it into the focused window,
+`Shift+Enter` only copies it.
 
 ## Palette
 

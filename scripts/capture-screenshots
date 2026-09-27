@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty network audio bluetooth agents power monitor apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
@@ -250,6 +250,74 @@ case "$surface" in
     find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
     rmdir "$inbox_backup" 2>/dev/null || true
     omarchy restart shell >/dev/null 2>&1 || true
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  clipboard|emojis)
+    # Fixture data only: the real clipboard history (or emoji recents) is set
+    # aside for the capture and put back afterwards, so no real clipboard
+    # content can reach a screenshot. Files are swapped only while the shell
+    # is stopped, so a running picker can neither capture into the fixture nor
+    # write its in-memory history over the restored file.
+    state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+    if [[ "$surface" == clipboard ]]; then
+      picker_file="$HOME/.local/state/omarchy/clipboard-history.json"
+      picker_id=omarchy.clipboard
+    else
+      picker_file="$state_home/aranea/emoji-recent.json"
+      picker_id=omarchy.emojis
+    fi
+    stop_shell() {
+      quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null 2>&1 || true
+      sleep 1
+    }
+    # The backup lives in the state dir, not /tmp: if this script is killed,
+    # the real file is still next to where it belongs.
+    mkdir -p "$state_home/aranea"
+    picker_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
+    clip_type=""
+    stop_shell
+    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
+    if [[ "$surface" == clipboard ]]; then
+      # The picker records the live clipboard when the shell starts: save it
+      # (never a password manager's marker type) and seed fixture text.
+      clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
+      if [[ -n "$clip_type" ]]; then wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null || clip_type=""; fi
+      printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
+    fi
+    finish_picker() {
+      stop_shell
+      rm -f "$picker_file"
+      if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
+      if [[ "$surface" == clipboard ]]; then
+        if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" < "$picker_backup/clipboard"; else wl-copy --clear; fi
+      fi
+      rm -rf "$picker_backup"
+      omarchy restart shell >/dev/null 2>&1 || true
+    }
+    trap finish_picker EXIT
+    mkdir -p "$(dirname "$picker_file")"
+    now_ms="$(date +%s%3N)"
+    if [[ "$surface" == clipboard ]]; then
+      jq -n --argjson now "$now_ms" --arg img "$repo_root/screenshots/desktop.png" '[
+        {type:"text", text:"https://github.com/AraneaDev/aranea-desktop", pinned:true, pinnedAtMs:($now - 7200000), capturedAtMs:($now - 7200000)},
+        {type:"text", text:"ghp_Fixture0123456789abcdefABCDEF0123", capturedAtMs:($now - 180000)},
+        {type:"text", text:"#7a5cff", capturedAtMs:($now - 600000)},
+        {type:"text", text:"for f in *.png; do\n  magick \"$f\" -resize 50% \"small-$f\"\ndone", capturedAtMs:($now - 900000)},
+        {type:"text", text:"~/Work/AraneaDev/aranea-desktop/README.md", capturedAtMs:($now - 1500000)},
+        {type:"image", path:$img, mime:"image/png", capturedAt:"Sunday 11:20", capturedAtMs:($now - 2400000)},
+        {type:"text", text:"A quiet obsidian desktop with a living network of light.", capturedAtMs:($now - 3600000)}
+      ]' > "$picker_file"
+    else
+      printf '%s\n' '{"version":1,"recent":["🚀","✅","👍","🎉","🔥","🕷️","💚","✨"]}' > "$picker_file"
+    fi
+    omarchy restart shell >/dev/null 2>&1 || true
+    sleep 5
+    omarchy-shell shell toggle "$picker_id" >/dev/null
+    sleep 1.5
+    grim "$output/$surface.png"
+    trap - EXIT
+    finish_picker
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;

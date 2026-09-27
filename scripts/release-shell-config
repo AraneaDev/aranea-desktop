@@ -42,14 +42,17 @@ fi
 
 jq '
   def entry_id: if type == "string" then . else .id? end;
+  # Aranea clones that step aside, and the stock plugins that take over again.
+  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis"];
+  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis"];
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(
-      .value |= (if type == "array" then map(select(entry_id != "araneadev.notifications" and entry_id != "araneadev.health")) else . end))
+      .value |= (if type == "array" then map(select(entry_id as $id | ours | index($id) | not)) else . end))
   else . end
-  | if (.plugins | type) == "array" then .plugins |= map(select(entry_id != "araneadev.notifications" and entry_id != "araneadev.health")) else . end
-  | if (.disabledPlugins | type) == "array" then .disabledPlugins |= map(select(. != "omarchy.notifications")) else . end
+  | if (.plugins | type) == "array" then .plugins |= map(select(entry_id as $id | ours | index($id) | not)) else . end
+  | if (.disabledPlugins | type) == "array" then .disabledPlugins |= map(select(. as $id | stock | index($id) | not)) else . end
   | if (.cloneSourceRestores | type) == "array" then
-      .cloneSourceRestores |= map(select(. != "araneadev.notifications"))
+      .cloneSourceRestores |= map(select(. as $id | ours | index($id) | not))
       | if (.cloneSourceRestores | length) == 0 then del(.cloneSourceRestores) else . end
     else . end
 ' "$config_file" > "$tmp_file"
