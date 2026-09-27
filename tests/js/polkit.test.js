@@ -264,3 +264,35 @@ test("polkit hint line (4a)", () => {
   )
   eq(p.hintLine(true, 3), "TAB DETAILS · ⇧TAB SWITCH IDENTITY · ESC CANCEL", "fingerprint, several")
 })
+
+test("polkit final review fixes (4a)", () => {
+  const p = require(path.join(__dirname, "..", "..", "plugins/araneadev.polkit/PolkitLogic.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  // C1: a line or paragraph separator in the command still parses; the fallback is escaped too
+  const sep = "Authentication is needed to run `/tmp/x' as user tim (tim)⠀⠀ ' as the super user"
+  eq(p.targetLine(sep), "as root", "separator in command")
+  eq(p.commandFromMessage(sep), "/tmp/x' as user tim (tim)⠀⠀ ", "command kept whole")
+  const fallback = p.requestMarkup("Install⠀⠀ pkg‮", "#fff")
+  if (/[⠀‮]/.test(fallback)) throw new Error("fallback hides characters: " + fallback)
+  // I3: display names may contain an apostrophe
+  eq(
+    p.targetLine("Authentication is needed to run `/usr/bin/true' as user Tim O'Brien (tim)"),
+    "as Tim O'Brien (tim)",
+    "apostrophe in name"
+  )
+  eq(
+    p.targetLine("Authentication is needed to run `/tmp/x' as the super user' as user Bob (bob)"),
+    "as Bob (bob)",
+    "spoof still loses"
+  )
+  // m2: more blank-looking characters, astral ones included
+  eq(
+    p.visibleCommand("a b؜c᠎d e　f️gﾠh"),
+    "a\\u00A0b\\u061Cc\\u180Ed\\u2003e\\u3000f\\uFE0Fg\\uFFA0h",
+    "BMP invisibles"
+  )
+  eq(p.visibleCommand("x\u{E0041}y"), "x\\u{E0041}y", "tag character")
+  eq(p.visibleCommand("ü😀"), "ü😀", "visible astral kept")
+})

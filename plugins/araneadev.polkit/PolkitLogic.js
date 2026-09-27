@@ -1,5 +1,7 @@
-// Text rules for the Aranea polkit prompt. The first three functions are
-// Omarchy's PolkitModel.js (shell/plugins/polkit), unchanged; the rest build
+// Text rules for the Aranea polkit prompt. The first two functions are
+// Omarchy's PolkitModel.js (shell/plugins/polkit), unchanged;
+// authorizationLabel keeps the stock name and output for ordinary pkexec
+// messages but uses the stricter end-anchored parse below; the rest build
 // the request summary, context line and details from what polkit gives the
 // agent (message, action id, identities) plus `pkaction --verbose` output.
 // No QML, no I/O; tests/polkit.test.sh runs this under Node.
@@ -53,9 +55,10 @@ function fingerprintConfiguredFromPamConfig(raw) {
 // super user" and "... as user Tim Schipper (tim)". The command is matched
 // greedily and the target only at the very end, so a command (a file name the
 // caller controls) that contains "' as the super user" or "' as user x" can
-// never change the target shown.
+// never change the target shown. [\s\S] rather than . so a line or
+// paragraph separator (U+2028/U+2029) in the command cannot break the parse.
 var PKEXEC_MESSAGE =
-  /^Authentication is (?:needed|required) to run [`'](.+)[`'] as (?:(the super user)|user ([^`']+))$/i
+  /^Authentication is (?:needed|required) to run [`']([\s\S]+)[`'] as (?:(the super user)|user ([\s\S]+))$/i
 
 /**
  * Parses a pkexec message into the command and the target user ("root" for the super user).
@@ -145,26 +148,38 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;")
 }
 
-// Characters that render blank or reorder text: C0/C1 controls, soft hyphen,
-// Hangul fillers, zero-width and direction marks, line/paragraph separators,
-// bidi embeddings and isolates, word joiners, braille blank and the BOM.
+// Characters that render blank or reorder text: C0/C1 controls, no-break
+// and other spaces, soft hyphen, combining grapheme joiner, Arabic letter
+// mark, Hangul fillers, Mongolian vowel separator, zero-width and direction
+// marks, line/paragraph separators, bidi embeddings and isolates, word
+// joiners, braille blank, ideographic space, variation selectors, the BOM,
+// tag characters and supplementary variation selectors.
 var INVISIBLE_RANGES = [
   [0x00, 0x1f],
-  [0x7f, 0x9f],
+  [0x7f, 0xa0],
   [0xad, 0xad],
+  [0x34f, 0x34f],
+  [0x61c, 0x61c],
   [0x115f, 0x1160],
-  [0x200b, 0x200f],
-  [0x2028, 0x202e],
-  [0x2060, 0x2064],
+  [0x180e, 0x180e],
+  [0x2000, 0x200f],
+  [0x2028, 0x202f],
+  [0x205f, 0x2064],
   [0x2066, 0x2069],
   [0x2800, 0x2800],
+  [0x3000, 0x3000],
   [0x3164, 0x3164],
-  [0xfeff, 0xfeff]
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xffa0, 0xffa0],
+  [0xe0000, 0xe007f],
+  [0xe0100, 0xe01ef]
 ]
 
 /**
- * Replaces characters that render blank or reorder text with visible \uXXXX
- * escapes, so padding cannot push part of a command out of view.
+ * Replaces characters that render blank or reorder text with visible escapes
+ * (\uXXXX, or \u{XXXXX} beyond the BMP), so padding cannot push part of a
+ * command out of view.
  * @param {*} text - the text; falsy values give ""
  * @returns {string} the text with those characters escaped
  */
@@ -172,11 +187,15 @@ function visibleCommand(text) {
   var s = String(text || "")
   var out = ""
   for (var i = 0; i < s.length; i++) {
-    var code = s.charCodeAt(i)
+    var code = /** @type {number} */ (s.codePointAt(i))
+    var ch = String.fromCodePoint(code)
+    if (code > 0xffff) i++
     var hidden = INVISIBLE_RANGES.some(function (r) {
       return code >= r[0] && code <= r[1]
     })
-    out += hidden ? "\\u" + ("000" + code.toString(16).toUpperCase()).slice(-4) : s.charAt(i)
+    if (!hidden) out += ch
+    else if (code > 0xffff) out += "\\u{" + code.toString(16).toUpperCase() + "}"
+    else out += "\\u" + ("000" + code.toString(16).toUpperCase()).slice(-4)
   }
   return out
 }
@@ -202,7 +221,7 @@ function targetLine(message) {
  */
 function requestMarkup(message, accent) {
   var parts = summaryParts(message)
-  var out = escapeHtml(parts.prefix)
+  var out = escapeHtml(visibleCommand(parts.prefix))
   if (parts.command)
     out +=
       '<font color="' +
