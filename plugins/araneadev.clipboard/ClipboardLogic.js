@@ -36,6 +36,7 @@
  * @property {string} path - The image or single file path, or "".
  * @property {string} mime - The image MIME type, or "text/plain".
  * @property {string} colour - Colour value for a swatch, or "".
+ * @property {string} swatch - Qt colour for the swatch (see swatchColor), or "".
  * @property {number} [pinnedAtMs] - Sort key for pinned rows (pin time, else capture time); set on every row right after it is built.
  */
 
@@ -699,6 +700,85 @@ function colourValue(text) {
   return COLOUR_RE.test(t) ? t : ""
 }
 
+/**
+ * Two lowercase hex digits for a channel value, rounded and clamped to 0–255.
+ * @param {number} n - The channel value.
+ * @returns {string} The hex pair.
+ */
+function hexByte(n) {
+  var v = Math.max(0, Math.min(255, Math.round(n)))
+  return (v < 16 ? "0" : "") + v.toString(16)
+}
+
+/**
+ * Parses one CSS number, or a percentage of `full` when it ends in "%".
+ * @param {string} part - The token, e.g. "59", "50%", "0.5" or "120deg".
+ * @param {number} full - The value that 100% stands for.
+ * @returns {number} The number, NaN when it is not one.
+ */
+function cssNumber(part, full) {
+  var m = /^(-?\d*\.?\d+)(%|deg)?$/.exec(part)
+  if (!m) return NaN
+  var n = Number(m[1])
+  return m[2] === "%" ? (n / 100) * full : n
+}
+
+/**
+ * Converts a CSS colour to a string Qt parses with the same meaning:
+ * #rgb and #rrggbb as they are (lowercase), #rrggbbaa to Qt's #aarrggbb,
+ * and rgb()/rgba()/hsl()/hsla() (comma or space syntax, % or plain numbers,
+ * optional alpha) to #rrggbb, or #aarrggbb when the alpha is below 1.
+ * @param {*} text - The colour text.
+ * @returns {string} The Qt colour, or "" when the text is not a colour this parses.
+ */
+function swatchColor(text) {
+  var t = String(text || "")
+    .trim()
+    .toLowerCase()
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/.test(t)) return t
+  var hex8 = /^#([0-9a-f]{6})([0-9a-f]{2})$/.exec(t)
+  if (hex8) return "#" + hex8[2] + hex8[1]
+  var fn = /^(rgba?|hsla?)\(([^)]*)\)$/.exec(t)
+  if (!fn) return ""
+  var parts = fn[2].split(/[\s,/]+/).filter(function (p) {
+    return p.length > 0
+  })
+  if (parts.length < 3 || parts.length > 4) return ""
+  var alpha = parts.length === 4 ? cssNumber(parts[3], 1) : 1
+  var r, g, b
+  if (fn[1].charAt(0) === "r") {
+    r = cssNumber(parts[0], 255)
+    g = cssNumber(parts[1], 255)
+    b = cssNumber(parts[2], 255)
+  } else {
+    var h = (((cssNumber(parts[0], 360) % 360) + 360) % 360) / 360
+    var s = cssNumber(parts[1], 1)
+    var l = cssNumber(parts[2], 1)
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    var p = 2 * l - q
+    /**
+     * One RGB channel from the HSL helper values.
+     * @param {number} x - The hue offset for the channel, 0 to 1 after wrapping.
+     * @returns {number} The channel, 0 to 1.
+     */
+    var hue = function (x) {
+      if (x < 0) x += 1
+      if (x > 1) x -= 1
+      if (x < 1 / 6) return p + (q - p) * 6 * x
+      if (x < 1 / 2) return q
+      if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6
+      return p
+    }
+    r = hue(h + 1 / 3) * 255
+    g = hue(h) * 255
+    b = hue(h - 1 / 3) * 255
+  }
+  if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(alpha)) return ""
+  var rgb = hexByte(r) + hexByte(g) + hexByte(b)
+  alpha = Math.max(0, Math.min(1, alpha))
+  return alpha < 1 ? "#" + hexByte(alpha * 255) + rgb : "#" + rgb
+}
+
 // `kind` comes from the full entry: a capped copy of a large paste has lost it.
 /**
  * Title of a picker row: a mask for secrets, host plus path for links, the
@@ -763,7 +843,8 @@ function displayRows(history, query, limit, now) {
           : "",
       path: isImage ? String(entry.path || "") : paths.length === 1 ? paths[0] : "",
       mime: isImage ? String(entry.mime || "image/png") : "text/plain",
-      colour: entry.secret ? "" : colourValue(entry.text)
+      colour: entry.secret ? "" : colourValue(entry.text),
+      swatch: entry.secret ? "" : swatchColor(colourValue(entry.text))
     }
     row.pinnedAtMs = Number(entry.pinnedAtMs) || Number(entry.capturedAtMs) || 0
     if (entry.pinned) pinned.push(row)
@@ -802,6 +883,7 @@ if (typeof module !== "undefined") {
     secretExpiryText: secretExpiryText,
     linkParts: linkParts,
     colourValue: colourValue,
+    swatchColor: swatchColor,
     displayRows: displayRows
   }
 }

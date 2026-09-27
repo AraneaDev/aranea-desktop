@@ -58,10 +58,6 @@ Item {
   property string fontFamily: Style.font.menuFamily
   // Inner padding of the card and the preview pane.
   property int contentMargin: Style.spacing.panelPadding
-  // Header height; currently not read anywhere in this file.
-  property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
-  // Spacing token; currently not read anywhere in this file.
-  property int contentSpacing: Style.spacing.md
   // Card width: up to 875 scaled px, inside the screen gaps.
   property int cardWidth: Math.min(Style.space(875), panel.width - Style.gapsOut * 2)
   // Card height: up to 600 scaled px, inside the screen gaps.
@@ -301,6 +297,7 @@ Item {
         fullText: row.fullText,
         previewImage: row.previewImage ? Util.fileUrl(row.previewImage) : "",
         colour: row.colour,
+        swatch: row.swatch,
         path: row.path,
         mime: row.mime,
         historyIndex: row.historyIndex
@@ -837,6 +834,7 @@ Item {
                 required property string detail
                 required property string previewImage
                 required property string colour
+                required property string swatch
 
                 readonly property bool hasCursor: root.cursorActive && index === root.selectedIndex
 
@@ -886,12 +884,12 @@ Item {
                       asynchronous: true
                     }
                     Rectangle {
-                      visible: row.colour.length > 0
+                      visible: row.swatch.length > 0
                       anchors.centerIn: parent
                       width: Style.space(14)
                       height: Style.space(14)
                       radius: Style.space(3)
-                      color: row.colour.length > 0 ? row.colour : "transparent"
+                      color: row.swatch.length > 0 ? row.swatch : "transparent"
                       border.width: 1
                       border.color: Util.alpha(root.foreground, 0.25)
                     }
@@ -1001,10 +999,11 @@ Item {
               anchors.top: parent.top
               spacing: Style.space(10)
               Rectangle {
+                visible: !!preview.activeRow && preview.activeRow.swatch.length > 0
                 width: Style.space(120)
                 height: Style.space(80)
                 radius: root.cornerRadius
-                color: preview.activeRow && preview.activeRow.colour.length > 0 ? preview.activeRow.colour : "transparent"
+                color: preview.activeRow && preview.activeRow.swatch.length > 0 ? preview.activeRow.swatch : "transparent"
                 border.width: 1
                 border.color: Util.alpha(root.foreground, 0.25)
               }

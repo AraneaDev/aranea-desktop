@@ -57,5 +57,12 @@ if grep -Fq 'EXPIRES 10 MIN' "$plugin/Clipboard.qml"; then
   exit 1
 fi
 grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$repo_root/README.md"
+# --- 4a: swatches use the Qt-ready colour; unused properties are gone
+[[ "$(grep -c 'row.swatch' "$plugin/Clipboard.qml")" -ge 2 ]]
+grep -Fq 'preview.activeRow.swatch' "$plugin/Clipboard.qml"
+if grep -Eq 'property int (headerHeight|contentSpacing)' "$plugin/Clipboard.qml"; then
+  echo "unused headerHeight/contentSpacing" >&2
+  exit 1
+fi
 
 echo "clipboard contract passed"

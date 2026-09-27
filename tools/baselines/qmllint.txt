@@ -22,10 +22,8 @@
 3	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "border" not found on type "QObject"
 4	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "caption" not found on type "QObject"
-1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "displayLarge" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "icon" not found on type "QObject"
-1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "md" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "menuFamily" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "panelPadding" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "rowPaddingX" not found on type "QObject"
@@ -33,7 +31,7 @@
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "selectedBackground" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "selectedText" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "text" not found on type "QObject"
-5	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "title" not found on type "QObject"
+4	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "title" not found on type "QObject"
 3	plugins/araneadev.clipboard/Clipboard.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.clipboard/Clipboard.qml:uncreatable-type:Type PanelWindow is not creatable.
 23	plugins/araneadev.clipboard/Clipboard.qml:unqualified:Unqualified access

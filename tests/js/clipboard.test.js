@@ -332,3 +332,29 @@ test("secret expiry (4a)", () => {
   eq(c.expire(marked, now + MIN, TTL).changed, false, "kept after marking")
   eq(c.toggleSecret(marked, 0, now + MIN)[0].capturedAtMs, now, "unmarking keeps the stamp")
 })
+
+test("colour swatches (4a)", () => {
+  const c = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  eq(c.swatchColor("#7a5cff"), "#7a5cff", "rgb hex")
+  eq(c.swatchColor("#ABC"), "#abc", "short hex")
+  eq(c.swatchColor("#11223380"), "#80112233", "RRGGBBAA becomes AARRGGBB")
+  eq(c.swatchColor("rgb(59, 255, 158)"), "#3bff9e", "rgb()")
+  eq(c.swatchColor("rgb(100%, 0%, 50%)"), "#ff0080", "rgb percentages")
+  eq(c.swatchColor("rgba(255, 0, 0, 0.5)"), "#80ff0000", "rgba alpha")
+  eq(c.swatchColor("rgba(255, 0, 0, 0)"), "#00ff0000", "rgba alpha 0")
+  eq(c.swatchColor("rgb(255 0 0 / 50%)"), "#80ff0000", "space syntax with alpha")
+  eq(c.swatchColor("hsl(120, 100%, 50%)"), "#00ff00", "hsl()")
+  eq(c.swatchColor("hsla(240deg, 100%, 50%, 1)"), "#0000ff", "hsla deg")
+  eq(c.swatchColor("hsl(0, 0%, 100%)"), "#ffffff", "hsl white")
+  eq(c.swatchColor("rgb(1, 2)"), "", "too few channels")
+  eq(c.swatchColor("rgb(a, b, c)"), "", "not numbers")
+  eq(c.swatchColor("red"), "", "names are not swatched")
+  const rows = c.displayRows([c.enrich({ type: "text", text: "#11223380" }, 0)], "", 50, 0)
+  eq(rows[0].colour, "#11223380", "row keeps the text")
+  eq(rows[0].swatch, "#80112233", "row carries the Qt colour")
+})
