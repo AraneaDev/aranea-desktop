@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Installs the pinned actionlint release into a bin directory (default
+# /usr/local/bin) so workflows are linted with the same version everywhere.
+# Usage: tools/install-actionlint [BIN_DIR]
+version="1.7.12"
+sha256="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+bin_dir="${1:-/usr/local/bin}"
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+asset="actionlint_${version}_linux_amd64.tar.gz"
+curl -fsSL -o "$work/$asset" "https://github.com/rhysd/actionlint/releases/download/v${version}/${asset}"
+printf '%s  %s\n' "$sha256" "$work/$asset" | sha256sum --check --status
+tar -xzf "$work/$asset" -C "$work"
+install -m 0755 "$work/actionlint" "$bin_dir/actionlint"
+"$bin_dir/actionlint" -version

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Installs the pinned shfmt release into a bin directory (default
+# /usr/local/bin) so formatting is checked with the same version everywhere.
+# Usage: tools/install-shfmt [BIN_DIR]
+version="3.14.1"
+sha256="76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf"
+bin_dir="${1:-/usr/local/bin}"
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+asset="shfmt_v${version}_linux_amd64"
+curl -fsSL -o "$work/$asset" "https://github.com/mvdan/sh/releases/download/v${version}/${asset}"
+printf '%s  %s\n' "$sha256" "$work/$asset" | sha256sum --check --status
+install -m 0755 "$work/$asset" "$bin_dir/shfmt"
+"$bin_dir/shfmt" --version
