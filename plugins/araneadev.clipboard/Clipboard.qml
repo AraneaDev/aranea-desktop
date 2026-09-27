@@ -73,6 +73,9 @@ Item {
 
   function loadHistory(raw) {
     root.history = ClipboardLogic.parseHistory(raw, Date.now())
+    // Stock-written entries just got their capture time; keep it, so secret
+    // expiry counts from the first load rather than from every restart.
+    if (ClipboardLogic.hadUnstamped(raw)) root.saveHistory()
     root.expireNow()
     if (root.opened) root.rebuildDisplay()
   }
@@ -93,7 +96,7 @@ Item {
 
   function togglePinnedIndex(index) {
     if (index < 0 || index >= displayModel.count) return
-    root.updateHistory(ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex))
+    root.updateHistory(ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex, Date.now()))
   }
 
   function toggleSecretIndex(index) {
@@ -106,8 +109,30 @@ Item {
     root.revealedIndex = root.revealedIndex === index ? -1 : index
   }
 
+  // Our own writes come back through watchChanges; skipping that echo avoids
+  // re-parsing (and re-detecting) the whole history after every change.
+  property string lastSavedText: ""
+  // Paste/copy read the history file by index, so they wait for a pending
+  // write (Delete then Enter must not paste the neighbour from the old file).
+  property bool saving: false
+  property var pendingAction: null
+
   function saveHistory() {
-    historyFile.setText(JSON.stringify(root.history, null, 2) + "\n")
+    root.lastSavedText = JSON.stringify(root.history, null, 2) + "\n"
+    root.saving = true
+    historyFile.setText(root.lastSavedText)
+  }
+
+  function finishSave() {
+    root.saving = false
+    var action = root.pendingAction
+    root.pendingAction = null
+    if (action) action()
+  }
+
+  function whenSaved(action) {
+    if (root.saving) root.pendingAction = action
+    else action()
   }
 
   function addClipboardEntry(entry) {
@@ -164,6 +189,7 @@ Item {
   }
 
   function rebuildDisplay() {
+    root.revealedIndex = -1  // list changed: rows may have moved under the cursor
     var rows = ClipboardLogic.displayRows(root.history, root.filterText, 50, Date.now())
 
     displayModel.clear()
@@ -251,31 +277,42 @@ Item {
     root.openSelected(row)
   }
 
+  // A plain copy of the row: the model can change before a pending history
+  // write finishes.
+  function plainRow(row) {
+    return { entryType: row.entryType, mime: row.mime, path: row.path, historyIndex: row.historyIndex }
+  }
+
+  function pasteRow(row, copyOnly) {
+    if (row.entryType === "image") {
+      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-file"].concat(copyOnly ? ["--copy-only"] : []).concat([row.mime, row.path]))
+    } else {
+      // Secrets have no display text; the script reads the entry by index.
+      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-text", copyOnly ? "--copy-only" : "--shift-insert", "--history-index", String(row.historyIndex)])
+    }
+  }
+
   function applySelected(row) {
     if (!row) return
     root.opened = false
-    if (row.entryType === "image") {
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-file", row.mime, row.path])
-    } else {
-      // Secrets have no display text; the script reads the entry by index.
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-text", "--shift-insert", "--history-index", String(row.historyIndex)])
-    }
+    var plain = root.plainRow(row)
+    root.whenSaved(function() { root.pasteRow(plain, false) })
   }
 
   function copySelected(row) {
     if (!row) return
     root.opened = false
-    if (row.entryType === "image") {
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-file", "--copy-only", row.mime, row.path])
-    } else {
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-text", "--copy-only", "--history-index", String(row.historyIndex)])
-    }
+    var plain = root.plainRow(row)
+    root.whenSaved(function() { root.pasteRow(plain, true) })
   }
 
   function openSelected(row) {
     if (!row) return
     root.opened = false
-    Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-open", "--history-index", String(row.historyIndex)])
+    var plain = root.plainRow(row)
+    root.whenSaved(function() {
+      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-open", "--history-index", String(plain.historyIndex)])
+    })
   }
 
   Component.onCompleted: initProc.running = true
@@ -300,8 +337,13 @@ Item {
     watchChanges: true
     atomicWrites: true
     printErrors: false
-    onLoaded: root.loadHistory(text())
+    onLoaded: {
+      var raw = text()
+      if (raw !== root.lastSavedText) root.loadHistory(raw)
+    }
     onLoadFailed: root.loadHistory("[]")
+    onSaved: root.finishSave()
+    onSaveFailed: root.finishSave()
     onFileChanged: reload()
   }
 
@@ -358,6 +400,23 @@ Item {
     }
   }
 
+  // Menu-like entrance (fade + slight scale), unless Aranea motion is off
+  // (`off` in ~/.local/state/aranea/motion, or ARANEA_REDUCED_MOTION=1).
+  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  FileView {
+    path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.motionEnabled = String(text() || "").trim() !== "off"
+    onFileChanged: reload()
+  }
+  onOpenedChanged: if (opened && root.motionEnabled) openAnimation.restart()
+  ParallelAnimation {
+    id: openAnimation
+    NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    NumberAnimation { target: card; property: "scale"; from: 0.97; to: 1; duration: 180; easing.type: Easing.OutCubic }
+  }
+
   function kindGlyph(kind) {
     if (kind === "link") return "󰌷"
     if (kind === "path") return "󰉋"
@@ -371,7 +430,7 @@ Item {
     var row = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     var parts = ["↑↓ SELECT", "ENTER PASTE", "⇧ENTER COPY", "^P " + (row && row.pinned ? "UNPIN" : "PIN")]
     if (row && row.secret && !root.filterText) parts.push("SPACE " + (root.revealedIndex === root.selectedIndex ? "HIDE" : "REVEAL"))
-    parts.push("^S " + (row && row.secret ? "NOT SECRET" : "SECRET"))
+    if (row && row.kind !== "image") parts.push("^S " + (row.secret ? "NOT SECRET" : "SECRET"))
     parts.push("DEL DROP")
     return parts.join("  ·  ")
   }
@@ -501,7 +560,7 @@ Item {
         anchors.leftMargin: card.contentLeftInset
         title: "CLIPBOARD"
         subtitle: "HISTORY // PASTE // PIN"
-        counts: root.history.length + " ITEMS" + (root.pinnedCount > 0 ? "  ·  " + root.pinnedCount + " PINNED" : "")
+        counts: root.history.length + " ITEMS" + (root.pinnedCount > 0 ? "  ·  " + root.pinnedCount + " 📌" : "")
         searchText: root.filterText
         searchPlaceholder: "Search clipboard…"
         hints: root.opened ? root.hintText() : ""
@@ -532,7 +591,18 @@ Item {
                 required property string section
                 width: ListView.view.width
                 height: Style.space(26)
+                // Hairline after the caption, as in the Aranea menu.
+                Rectangle {
+                  anchors.left: sectionCaption.right
+                  anchors.leftMargin: Style.space(8)
+                  anchors.right: parent.right
+                  anchors.rightMargin: Style.space(6)
+                  anchors.verticalCenter: sectionCaption.verticalCenter
+                  height: 1
+                  color: Util.alpha(root.foreground, 0.10)
+                }
                 Text {
+                  id: sectionCaption
                   anchors.left: parent.left
                   anchors.leftMargin: Style.space(6)
                   anchors.bottom: parent.bottom

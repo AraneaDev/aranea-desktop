@@ -115,7 +115,8 @@ grep -Fq '"id":"notifications","status":"ok","message":"inbox holds 1 entries"' 
 # A deliberately disabled health plugin is not a broken install.
 if grep -Fq 'select(.id == "araneadev.health")' "$repo_root/scripts/aranea-doctor"; then echo "health plugin must be optional in the plugins check" >&2; exit 1; fi
 
-grep -Fq 'select(.id == "araneadev.clipboard")' "$repo_root/scripts/aranea-doctor"
-grep -Fq 'select(.id == "araneadev.emojis")' "$repo_root/scripts/aranea-doctor"
+# m9: the pickers are optional like the health plugin (disabling one brings
+# the stock picker back; that is a choice, not a broken install).
+if grep -Eq 'select\(.id == "araneadev.(clipboard|emojis)"\)' "$repo_root/scripts/aranea-doctor"; then echo "pickers must be optional in the plugins check" >&2; exit 1; fi
 
 echo "doctor contract passed"

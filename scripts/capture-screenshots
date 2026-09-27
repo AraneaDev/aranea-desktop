@@ -256,32 +256,43 @@ case "$surface" in
   clipboard|emojis)
     # Fixture data only: the real clipboard history (or emoji recents) is set
     # aside for the capture and put back afterwards, so no real clipboard
-    # content can ever reach a screenshot.
+    # content can reach a screenshot. Files are swapped only while the shell
+    # is stopped, so a running picker can neither capture into the fixture nor
+    # write its in-memory history over the restored file.
+    state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
     if [[ "$surface" == clipboard ]]; then
       picker_file="$HOME/.local/state/omarchy/clipboard-history.json"
       picker_id=omarchy.clipboard
     else
-      picker_file="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/emoji-recent.json"
+      picker_file="$state_home/aranea/emoji-recent.json"
       picker_id=omarchy.emojis
     fi
-    picker_backup="$(mktemp -d)"
-    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
-    # The clipboard picker records the current clipboard whenever the shell
-    # starts, so the live clipboard is saved, replaced by fixture text for the
-    # capture, and put back afterwards.
+    stop_shell() {
+      quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null 2>&1 || true
+      sleep 1
+    }
+    # The backup lives in the state dir, not /tmp: if this script is killed,
+    # the real file is still next to where it belongs.
+    mkdir -p "$state_home/aranea"
+    picker_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
     clip_type=""
+    stop_shell
+    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
     if [[ "$surface" == clipboard ]]; then
-      clip_type="$(wl-paste --list-types 2>/dev/null | head -n 1 || true)"
+      # The picker records the live clipboard when the shell starts: save it
+      # (never a password manager's marker type) and seed fixture text.
+      clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
       if [[ -n "$clip_type" ]]; then wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null || clip_type=""; fi
       printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
     fi
     finish_picker() {
-      omarchy-shell shell hide "$picker_id" >/dev/null 2>&1 || true
-      if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" < "$picker_backup/clipboard"; fi
-      rm -f "$picker_backup/clipboard"
+      stop_shell
       rm -f "$picker_file"
       if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
-      rmdir "$picker_backup" 2>/dev/null || true
+      if [[ "$surface" == clipboard ]]; then
+        if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" < "$picker_backup/clipboard"; else wl-copy --clear; fi
+      fi
+      rm -rf "$picker_backup"
       omarchy restart shell >/dev/null 2>&1 || true
     }
     trap finish_picker EXIT
@@ -289,7 +300,7 @@ case "$surface" in
     now_ms="$(date +%s%3N)"
     if [[ "$surface" == clipboard ]]; then
       jq -n --argjson now "$now_ms" --arg img "$repo_root/screenshots/desktop.png" '[
-        {type:"text", text:"https://github.com/AraneaDev/aranea-desktop", pinned:true, capturedAtMs:($now - 7200000)},
+        {type:"text", text:"https://github.com/AraneaDev/aranea-desktop", pinned:true, pinnedAtMs:($now - 7200000), capturedAtMs:($now - 7200000)},
         {type:"text", text:"ghp_Fixture0123456789abcdefABCDEF0123", capturedAtMs:($now - 180000)},
         {type:"text", text:"#7a5cff", capturedAtMs:($now - 600000)},
         {type:"text", text:"for f in *.png; do\n  magick \"$f\" -resize 50% \"small-$f\"\ndone", capturedAtMs:($now - 900000)},

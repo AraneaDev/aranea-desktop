@@ -92,6 +92,43 @@ if (fs.existsSync(stock)) {
   assert(sh.parseHistory(ours).length === 2, 'clone-written history loads in stock')
 }
 
+
+// --- final-review fixes
+// I2: ordinary developer text is not a secret (paths, identifiers, emails, versions)
+for (const s of ['src/components/Button.tsx', 'AraneaDev/omarchy-aranea-theme', 'Color.menu.selectedBackground',
+  'ClipboardLogic.displayRows()', 'ClipboardLogic.js:147', 'Screenshot_2026-09-27_10-11-12.png', 'v1.2.3-rc.1+build.5',
+  'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'Tim.Schipper@Example.com', 'C:\\Users\\Tim\\Desktop']) {
+  assert(!c.isSecretText(s), 'developer text flagged as secret: ' + s)
+}
+// ...while real secrets still are (pattern tokens and random passwords)
+for (const s of ['Marjonekke123!Q9', 'Tr0ub4dor&3xK9#pQ', 'ghp_0123456789abcdefghijABCDEFGHIJ0123']) assert(c.isSecretText(s), 'lost secret ' + s)
+// m5: PGP private key blocks
+assert(c.isSecretText('-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----'), 'PGP private key')
+
+// I5: PINNED is most recently pinned first
+let ph = [c.enrich({ type: 'text', text: 'first' }, now - 3 * MIN), c.enrich({ type: 'text', text: 'second' }, now - 2 * MIN)]
+ph = c.togglePinned(ph, 1, now - MIN)   // pin "second" first
+ph = c.togglePinned(ph, 0, now)         // then "first"
+const pr = c.displayRows(ph, '', 50, now).filter(r => r.section === 'pinned')
+assert(pr[0].historyIndex === 0 && pr[1].historyIndex === 1, 'most recently pinned first')
+assert(c.togglePinned(ph, 0, now)[0].pinned === false, 'unpin')
+
+// m1: images can't be marked secret
+const img = [c.enrich({ type: 'image', path: '/tmp/a.png', mime: 'image/png' }, now)]
+assert(c.toggleSecret(img, 0)[0].secret === false && c.toggleSecret(img, 0)[0].secretOverride === undefined, 'image secret toggle is a no-op')
+
+// m2: a large code paste keeps its kind in the row title
+const big = 'function f() {\n' + '  x()\n'.repeat(3000) + '}'
+const bigRow = c.displayRows([c.enrich({ type: 'text', text: big }, now)], '', 50, now)[0]
+assert(bigRow.kind === 'code' && bigRow.title === 'function f() {', 'capped code keeps kind and first line')
+
+// m3: stored kind is reused, not recomputed
+assert(c.enrich({ type: 'text', text: 'plain words here', kind: 'code' }, now).kind === 'code', 'stored kind reused')
+
+// m4: stock entries without a timestamp are reported so they get saved once
+assert(c.hadUnstamped('[{"type":"text","text":"a"}]') === true, 'unstamped detected')
+assert(c.hadUnstamped('[{"type":"text","text":"a","capturedAtMs":5}]') === false, 'stamped history')
+
 console.log('clipboard logic contract passed')
 NODE
 
@@ -104,5 +141,22 @@ grep -Fq '"--history-index", String(row.historyIndex)' "$plugin/Clipboard.qml"
 grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$plugin/Clipboard.qml"
 # the preview only shows secret text after an explicit reveal (Review Focus 1)
 grep -Fq 'root.revealedIndex === root.selectedIndex' "$plugin/Clipboard.qml"
+
+# --- final-review fixes (Clipboard.qml)
+# C1: a reveal belongs to one item; any change to the list masks everything again
+grep -Fq 'root.revealedIndex = -1  // list changed' "$plugin/Clipboard.qml"
+# I4: menu-like open motion that honours the Aranea motion setting
+grep -Fq 'aranea/motion' "$plugin/Clipboard.qml"
+grep -Fq 'NumberAnimation' "$plugin/Clipboard.qml"
+# I5 / m1 / m6: pin time recorded; no secret toggle offered for images; header wording
+grep -Fq 'ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex, Date.now())' "$plugin/Clipboard.qml"
+grep -Fq 'row.kind !== "image"' "$plugin/Clipboard.qml"
+grep -Fq ' 📌' "$plugin/Clipboard.qml"
+# m3: our own writes do not trigger a full re-parse
+grep -Fq 'root.lastSavedText' "$plugin/Clipboard.qml"
+# m4: stock entries get their capture time saved once
+grep -Fq 'ClipboardLogic.hadUnstamped' "$plugin/Clipboard.qml"
+# m10: paste/copy wait for a pending history write
+grep -Fq 'root.pendingAction' "$plugin/Clipboard.qml"
 
 echo "clipboard contract passed"

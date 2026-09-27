@@ -50,14 +50,16 @@ Item {
 
   property int cellWidth: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
   property int cellHeight: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
-  property int columns: Math.max(1, Math.floor((cardWidth - contentMargin * 2) / cellWidth))
+  // From the real grid width (inside the chrome insets), so Up/Down move
+  // straight rather than drifting diagonally.
+  property int columns: Math.max(1, Math.floor(resultGrid.width / root.cellWidth))
 
   readonly property string selectedEmoji: {
     if (root.inRecents) return root.recents[root.recentIndex] || ""
     var item = root.filteredEmojis[root.selectedIndex]
     return item ? item.e : ""
   }
-  readonly property string selectedName: root.selectedEmoji ? EmojiLogic.emojiName(root.keywordsByEmoji[root.selectedEmoji] || "") : ""
+  readonly property string selectedName: root.selectedEmoji ? EmojiLogic.emojiName(EmojiLogic.keywordsFor(root.keywordsByEmoji, root.selectedEmoji)) : ""
 
   function open(payloadJson) {
     root.opened = true
@@ -131,15 +133,20 @@ Item {
 
   function selectRow(delta) {
     if (root.inRecents) {
-      var nextRecent = root.recentIndex + delta * columns
-      if (nextRecent >= root.recents.length) {
-        // Down out of the recent row enters the grid at the same column.
+      var count = root.recents.length
+      var row = Math.floor(root.recentIndex / columns)
+      var lastRow = Math.floor((count - 1) / columns)
+      var column = root.recentIndex % columns
+      if (delta > 0 && row >= lastRow) {
+        // Down out of the last recent row enters the grid at the same column.
         if (displayModel.count === 0) return
         root.inRecents = false
-        root.selectedIndex = Math.min(root.recentIndex % columns, displayModel.count - 1)
+        root.selectedIndex = Math.min(column, displayModel.count - 1)
         resultGrid.positionViewAtIndex(root.selectedIndex, GridView.Contain)
-      } else if (nextRecent >= 0) {
-        root.recentIndex = nextRecent
+      } else if (delta > 0) {
+        root.recentIndex = Math.min(root.recentIndex + columns, count - 1)
+      } else if (row > 0) {
+        root.recentIndex = root.recentIndex - columns
       }
       return
     }
@@ -152,10 +159,11 @@ Item {
     }
     var newIndex = selectedIndex + delta * columns
     if (newIndex < 0) {
-      // Up out of the first grid row enters the recent row.
+      // Up out of the first grid row enters the last recent row.
       if (root.showRecents) {
+        var lastRowStart = Math.floor((root.recents.length - 1) / columns) * columns
         root.inRecents = true
-        root.recentIndex = Math.min(selectedIndex % columns, root.recents.length - 1)
+        root.recentIndex = Math.min(lastRowStart + selectedIndex % columns, root.recents.length - 1)
         return
       }
       newIndex = 0
@@ -200,6 +208,23 @@ Item {
 
   function hintText() {
     return ["←↑↓→ MOVE", "ENTER INSERT", "⇧ENTER COPY", "ESC " + (root.filterText ? "CLEAR" : "CLOSE")].join("  ·  ")
+  }
+
+  // Menu-like entrance (fade + slight scale), unless Aranea motion is off
+  // (`off` in ~/.local/state/aranea/motion, or ARANEA_REDUCED_MOTION=1).
+  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  FileView {
+    path: root.stateRoot + "/motion"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.motionEnabled = String(text() || "").trim() !== "off"
+    onFileChanged: reload()
+  }
+  onOpenedChanged: if (opened && root.motionEnabled) openAnimation.restart()
+  ParallelAnimation {
+    id: openAnimation
+    NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    NumberAnimation { target: card; property: "scale"; from: 0.97; to: 1; duration: 180; easing.type: Easing.OutCubic }
   }
 
   ListModel { id: displayModel }

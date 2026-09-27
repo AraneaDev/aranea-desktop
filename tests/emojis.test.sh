@@ -20,6 +20,9 @@ assert(m.emojiName('grinning face smile grinning happy') === 'grinning face smil
 assert(m.emojiName('rocket launch space ship') === 'rocket launch space', 'max three words')
 assert(m.emojiName('thumbs thumbs up') === 'thumbs', 'repeat stops early')
 assert(m.emojiName('') === '', 'empty keywords')
+// m8: a recent stored with VS16 still finds its keywords
+assert(m.keywordsFor({ '🕷': 'spider insect' }, '🕷️') === 'spider insect', 'VS16 variant falls back to the base emoji')
+assert(m.keywordsFor({ '❤️': 'red heart love' }, '❤️') === 'red heart love', 'exact match first')
 
 const data = JSON.parse(require('fs').readFileSync(`${root}/plugins/araneadev.emojis/emojis.json`, 'utf8'))
 assert(Array.isArray(data) && data.length > 1000 && data[0].e && data[0].k, 'emoji data copied')
@@ -32,5 +35,12 @@ grep -Fq 'OverlayChrome {' "$plugin/Emojis.qml"
 grep -Fq 'EmojiLogic.pushRecent' "$plugin/Emojis.qml"
 grep -Fq 'EmojiLogic.emojiName' "$plugin/Emojis.qml"
 cmp -s "$plugin/OverlayChrome.qml" "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml" || { echo "OverlayChrome.qml copies differ" >&2; exit 1; }
+
+# --- final-review fixes (Emojis.qml)
+grep -Fq 'aranea/motion' "$plugin/Emojis.qml"
+grep -Fq 'EmojiLogic.keywordsFor' "$plugin/Emojis.qml"
+# m7: columns follow the real grid width; Up from the grid lands in the last recent row
+grep -Fq 'Math.floor(resultGrid.width / root.cellWidth)' "$plugin/Emojis.qml"
+grep -Fq 'lastRowStart' "$plugin/Emojis.qml"
 
 echo "emojis contract passed"

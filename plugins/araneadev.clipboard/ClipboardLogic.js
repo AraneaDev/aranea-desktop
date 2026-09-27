@@ -40,6 +40,8 @@ function normalizeEntry(value) {
   if (typeof value.secret === "boolean") entry.secret = value.secret
   if (typeof value.secretOverride === "boolean") entry.secretOverride = value.secretOverride
   if (typeof value.pinned === "boolean") entry.pinned = value.pinned
+  var pinnedAt = Number(value.pinnedAtMs)
+  if (value.pinnedAtMs !== undefined && value.pinnedAtMs !== null && isFinite(pinnedAt)) entry.pinnedAtMs = pinnedAt
   var at = Number(value.capturedAtMs)
   if (value.capturedAtMs !== undefined && value.capturedAtMs !== null && isFinite(at)) entry.capturedAtMs = at
   return entry
@@ -172,6 +174,8 @@ function detectKind(entry) {
   return "text"
 }
 
+var KINDS = ["link", "path", "colour", "code", "image", "text"]
+
 // ---------------------------------------------------- secrets
 
 var SECRET_PATTERNS = [
@@ -197,15 +201,19 @@ function entropy(text) {
 function isSecretText(value) {
   var text = String(value || "").trim()
   if (!text) return false
-  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text)) return true
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY( BLOCK)?-----/.test(text)) return true
   if (/\s/.test(text)) return false
   if (/^https?:/i.test(text) || text.charAt(0) === "/" || text.indexOf("~/") === 0) return false
   if (/^[0-9a-f]{7,40}$/.test(text)) return false
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return false
   for (var i = 0; i < SECRET_PATTERNS.length; i++) if (SECRET_PATTERNS[i].test(text)) return true
   if (text.length < 16) return false
+  // Dotted, slashed, colon or @ strings are identifiers, paths, versions,
+  // emails or hashes with a prefix -- developer text, not passwords.
+  if (/[.\/:@\\()]/.test(text)) return false
+  // `-` and `_` join words; they do not make a string look random.
   var classes = (/[a-z]/.test(text) ? 1 : 0) + (/[A-Z]/.test(text) ? 1 : 0) +
-    (/[0-9]/.test(text) ? 1 : 0) + (/[^A-Za-z0-9]/.test(text) ? 1 : 0)
+    (/[0-9]/.test(text) ? 1 : 0) + (/[^A-Za-z0-9_-]/.test(text) ? 1 : 0)
   return classes >= 3 && entropy(text) >= 3.5
 }
 
@@ -215,12 +223,27 @@ function enrich(value, now) {
   var entry = normalizeEntry(value)
   if (!entry) return null
   if (!(typeof entry.capturedAtMs === "number" && isFinite(entry.capturedAtMs))) entry.capturedAtMs = Number(now) || 0
-  entry.kind = detectKind(entry)
+  // A stored kind is reused: detecting it again means scanning the whole
+  // text on every load.
+  if (KINDS.indexOf(entry.kind) < 0) entry.kind = detectKind(entry)
   if (entry.type === "image") entry.secret = false
   else if (typeof entry.secretOverride === "boolean") entry.secret = entry.secretOverride
   else entry.secret = isSecretText(entry.text)
   if (typeof entry.pinned !== "boolean") entry.pinned = false
   return entry
+}
+
+// True when some entry has no capture time yet (written by the stock picker):
+// the loader then saves once, so the stamped time -- and secret expiry --
+// survives restarts.
+function hadUnstamped(raw) {
+  try {
+    var parsed = JSON.parse(String(raw || "[]"))
+    if (!Array.isArray(parsed)) return false
+    return parsed.some(function(e) { return e && typeof e === "object" && !isFinite(Number(e.capturedAtMs)) })
+  } catch (e) {
+    return false
+  }
 }
 
 function parseHistory(raw, now) {
@@ -290,12 +313,18 @@ function withEntry(history, index, change) {
   return values
 }
 
-function togglePinned(history, index) {
-  return withEntry(history, index, function(e) { e.pinned = !e.pinned })
+function togglePinned(history, index, now) {
+  return withEntry(history, index, function(e) {
+    e.pinned = !e.pinned
+    if (e.pinned) e.pinnedAtMs = Number(now) || 0
+    else delete e.pinnedAtMs
+  })
 }
 
 function toggleSecret(history, index) {
   return withEntry(history, index, function(e) {
+    // Images are never secrets (the thumbnail would still show).
+    if (e.type === "image") return
     e.secretOverride = !e.secret
     e.secret = e.secretOverride
   })
@@ -328,13 +357,14 @@ function colourValue(text) {
   return COLOUR_RE.test(t) ? t : ""
 }
 
-function rowTitle(entry) {
+// `kind` comes from the full entry: a capped copy of a large paste has lost it.
+function rowTitle(entry, kind) {
   if (entry.secret) return "••••••••"
-  if (entry.kind === "link") {
+  if (kind === "link") {
     var parts = linkParts(entry.text)
     return parts.domain + parts.path
   }
-  if (entry.kind === "code") return String(entry.text || "").split(/\r?\n/)[0]
+  if (kind === "code") return String(entry.text || "").split(/\r?\n/)[0]
   return previewText(entry)
 }
 
@@ -361,7 +391,7 @@ function displayRows(history, query, limit, now) {
       kind: entry.kind || "text",
       secret: !!entry.secret,
       pinned: !!entry.pinned,
-      title: rowTitle(shown),
+      title: rowTitle(shown, entry.kind),
       detail: (entry.secret ? "secret" : (entry.kind || "text")) + " · " + age,
       fullText: entry.secret || isImage ? "" : fullText(shown),
       previewImage: isImage ? String(entry.path || "") : (paths.length === 1 && isImagePath(paths[0]) ? paths[0] : ""),
@@ -369,9 +399,12 @@ function displayRows(history, query, limit, now) {
       mime: isImage ? String(entry.mime || "image/png") : "text/plain",
       colour: entry.secret ? "" : colourValue(entry.text)
     }
+    row.pinnedAtMs = Number(entry.pinnedAtMs) || Number(entry.capturedAtMs) || 0
     if (entry.pinned) pinned.push(row)
     else recent.push(row)
   }
+  // Most recently pinned first.
+  pinned.sort(function(a, b) { return b.pinnedAtMs - a.pinnedAtMs })
   return pinned.concat(recent)
 }
 
@@ -388,6 +421,7 @@ if (typeof module !== "undefined") {
     isSecretText: isSecretText,
     enrich: enrich,
     parseHistory: parseHistory,
+    hadUnstamped: hadUnstamped,
     addEntry: addEntry,
     expire: expire,
     togglePinned: togglePinned,

@@ -41,11 +41,24 @@ function emojiName(keywords) {
   return out.join(" ")
 }
 
+// Keywords for an emoji; a copy stored with the VS16 selector (U+FE0F)
+// falls back to the base form the data uses, and vice versa.
+function keywordsFor(map, emoji) {
+  var m = map || {}
+  var e = String(emoji || "")
+  if (m[e] !== undefined) return m[e]
+  var bare = e.replace(/\uFE0F/g, "")
+  if (m[bare] !== undefined) return m[bare]
+  if (m[e + "\uFE0F"] !== undefined) return m[e + "\uFE0F"]
+  return ""
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     parseRecents: parseRecents,
     serializeRecents: serializeRecents,
     pushRecent: pushRecent,
-    emojiName: emojiName
+    emojiName: emojiName,
+    keywordsFor: keywordsFor
   }
 }

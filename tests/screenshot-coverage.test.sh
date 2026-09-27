@@ -47,6 +47,13 @@ if grep -Eq 'plugin (disable|enable) araneadev.notifications' "$capture_script";
 grep -Fq 'batch_inbox_backup' "$capture_script"
 # The health probe is cleared before the next surface is captured.
 grep -Fq 'omarchy-shell health refresh' "$capture_script"
+# I3: picker fixtures are swapped only while the shell is stopped, the backup
+# lives in the state dir (not /tmp), a password-manager hint is never the
+# saved clipboard type, and an empty clipboard is left empty.
+grep -Fq 'stop_shell' "$capture_script"
+grep -Fq 'capture-backup' "$capture_script"
+grep -Fq 'x-kde-passwordManagerHint' "$capture_script"
+grep -Fq 'wl-copy --clear' "$capture_script"
 # The health shot waits for enough CPU history to draw a real sparkline.
 grep -Fq '.samples' "$capture_script"
 grep -Fq 'omarchy-shell health status' "$capture_script"
