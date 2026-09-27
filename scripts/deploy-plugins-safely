@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Deploys Aranea's plugins from <theme-root>/plugins into the Omarchy plugin
+# dir (default ~/.config/omarchy/plugins) when any of them changed, stopping
+# the shell for the swap and restarting it after. Skips the deploy while the
+# session is locked. Always reconciles shell.json via repair-shell-config.
+#
+# Usage: scripts/deploy-plugins-safely <theme-root> [target-root]
+
 theme_root=${1:?theme root is required}
 target_root=${2:-$HOME/.config/omarchy/plugins}
 deploy_plugin="$theme_root/scripts/deploy-plugin"
@@ -58,6 +65,8 @@ if omarchy-shell shell ping >/dev/null 2>&1; then
 fi
 
 restart_needed=$shell_was_running
+# Restarts the shell when this run stopped it, and clears the polkit
+# handover marker that the restart completes.
 finish() {
   if ((restart_needed)); then
     restart_needed=0

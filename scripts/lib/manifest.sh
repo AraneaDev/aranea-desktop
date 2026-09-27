@@ -2,13 +2,18 @@
 
 set -euo pipefail
 
+# Readers for theme-manifest.toml (ARANEA_MANIFEST_FILE overrides the path):
+# profiles, their integrations, and integration fields.
+
 manifest_file="${ARANEA_MANIFEST_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/theme-manifest.toml}"
 
+# True when the manifest has a [profiles.PROFILE] section.
 manifest_profile_exists() {
   local profile="$1"
   awk -v section="[profiles.$profile]" '$0 == section { found = 1; exit } END { exit(found ? 0 : 1) }' "$manifest_file"
 }
 
+# Prints the integration ids listed by profile PROFILE, one per line.
 manifest_profile_integrations() {
   local profile="$1"
   awk -v section="[profiles.$profile]" '
@@ -27,6 +32,7 @@ manifest_profile_integrations() {
   ' "$manifest_file"
 }
 
+# True when the manifest has an [[integrations]] entry with id INTEGRATION.
 manifest_integration_exists() {
   local integration="$1"
   awk -v wanted="$integration" '
@@ -42,6 +48,8 @@ manifest_integration_exists() {
   ' "$manifest_file"
 }
 
+# Prints FIELD of integration INTEGRATION without surrounding quotes
+# (nothing when absent).
 manifest_integration_field() {
   local integration="$1"
   local field="$2"

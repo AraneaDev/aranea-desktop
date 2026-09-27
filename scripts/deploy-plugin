@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Replaces a plugin directory with a copy of the source in one rename: stages
+# the copy next to the target, moves the old one aside, swaps, and puts the
+# old one back when the swap does not finish. Does nothing when both match.
+#
+# Usage: scripts/deploy-plugin <source-dir> <target-dir>
+
 source_dir=${1:?source plugin directory is required}
 target_dir=${2:?target plugin directory is required}
 
@@ -21,6 +27,8 @@ stage_dir=$(mktemp -d "$parent_dir/.${target_name}.stage.XXXXXX")
 old_dir="$parent_dir/.${target_name}.old.$$"
 restore_needed=0
 
+# Removes the staging dir, restores the old target when the swap did not
+# finish, and deletes the moved-aside copy.
 cleanup() {
   rm -rf "$stage_dir"
   if ((restore_needed)) && [[ -d "$old_dir" && ! -e "$target_dir" ]]; then

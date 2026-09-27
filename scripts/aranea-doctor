@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Runs the Aranea health checks (theme, hooks, manifest, icons, fonts,
+# ownership, shell, plugins, polkit, notifications, health, runtime log,
+# qmllint, optional commands) and prints one "id status message" line per
+# check, or one JSON object per line with --json. --fix first reinstalls the
+# hooks and redeploys the plugins. ARANEA_DOCTOR_* variables override inputs
+# and individual checks (used by the tests).
+#
+# Usage: scripts/aranea-doctor [--json] [--fix]
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/manifest.sh"
@@ -20,6 +29,8 @@ if ((json)) && ! command -v jq >/dev/null 2>&1; then
   exit 2
 fi
 
+# Prints one check result: ID, STATUS (ok, repair or skipped) and MESSAGE,
+# as text or as JSON with --json.
 emit() {
   local id="$1" status="$2" message="$3"
   if ((json)); then
@@ -29,6 +40,8 @@ emit() {
   fi
 }
 
+# Emits check ID with the status held in environment VARIABLE and returns 0
+# when it is set; returns 1 otherwise so the real check runs.
 emit_override() {
   local id="$1" variable="$2"
   local value="${!variable:-}"

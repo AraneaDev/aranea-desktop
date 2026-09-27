@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Installs Aranea Desktop: saves the profile, installs the theme with
+# `omarchy theme install`, adopts it as "aranea", installs the theme-set and
+# post-boot hooks, applies the theme and links the profile's integrations.
+# Asks for the profile with gum when interactive without --profile or --yes.
+#
+# Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes]
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
 theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/aranea-desktop.git}"
@@ -10,6 +17,7 @@ assume_yes=0
 profile="full"
 profile_explicit=0
 
+# Prints the usage text.
 usage() {
   cat <<'EOF'
 Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes]
@@ -18,8 +26,10 @@ Installs Aranea Desktop and its Omarchy theme/hooks.
 EOF
 }
 
+# Prints its arguments as one line.
 say() { printf '%s\n' "$*"; }
 
+# Runs the command, or only prints it in dry-run.
 run() {
   if ((dry_run)); then
     say "would run: $*"
@@ -145,6 +155,7 @@ if ((dry_run)); then
   fi
 else
   previous_theme="$(omarchy theme current 2>/dev/null || true)"
+  # EXIT trap: on failure, tells the user how to restore the previous theme.
   install_failure_handler() {
     local status=$?
     if ((status != 0)); then

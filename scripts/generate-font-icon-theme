@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Regenerates the Aranea-icons SVGs under integrations/icons/aranea/scalable
+# by tracing JetBrainsMono Nerd Font glyphs with magick and potrace
+# (ARANEA_ICON_FONT and ARANEA_ICON_POINT_SIZE override font and size).
+#
+# Usage: scripts/generate-font-icon-theme
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 icon_root="$repo_root/integrations/icons/aranea/scalable"
 font="${ARANEA_ICON_FONT:-/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf}"
@@ -21,6 +27,8 @@ command -v potrace >/dev/null 2>&1 || {
   exit 1
 }
 
+# Traces the glyph at hex CODEPOINT once and writes it, recoloured, to each
+# icon path given after it (relative to the scalable dir).
 render_group() {
   local codepoint="$1"
   shift

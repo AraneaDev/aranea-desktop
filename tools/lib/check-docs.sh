@@ -7,7 +7,10 @@ repo_root="${repo_root:?tools/check sets repo_root}"
 # docs stage entry point.
 stage_docs() {
   local status=0 files
-  [[ -x "$(node_bin)/tsc" ]] || { echo "typescript is required: npm ci"; return 1; }
+  [[ -x "$(node_bin)/tsc" ]] || {
+    echo "typescript is required: npm ci"
+    return 1
+  }
   mapfile -t files < <(shell_files)
   local qml
   mapfile -t qml < <(check_files '\.qml$')

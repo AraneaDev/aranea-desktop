@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Restores every file in the Aranea ownership ledger (scripts/lib/ownership.sh),
+# asking first when interactive unless --yes.
+#
+# Usage: scripts/uninstall.sh [--dry-run] [--yes]
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/ownership.sh"
 
 dry_run=0
 assume_yes=0
 
+# Prints the usage text.
 usage() {
   cat <<'EOF'
 Usage: scripts/uninstall.sh [--dry-run] [--yes]

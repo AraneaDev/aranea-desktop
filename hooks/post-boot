@@ -37,6 +37,8 @@ fi
 # switches; ones the user deactivated (aranea-integrations) stay off.
 integration_scripts="$installed_theme/scripts"
 [[ -x "$integration_scripts/install-integration" ]] || integration_scripts="$theme_root/scripts"
+# Runs install-integration for integration $1 (errors ignored) unless the
+# user deactivated it.
 run_integration() {
   [[ "$(cat "$state_home/aranea/integrations/$1" 2>/dev/null)" == inactive ]] && return 0
   "$integration_scripts/install-integration" "$1" --yes >/dev/null 2>&1 || true

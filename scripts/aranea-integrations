@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Lists integration states and activates or deactivates one. activate runs
+# install-integration and records the targets it linked or copied;
+# deactivate restores those targets (except ones another active integration
+# shares) and marks the integration inactive so the hooks leave it off.
+#
+# Usage: scripts/aranea-integrations status [--json] | activate <id> [--yes] | deactivate <id>
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/manifest.sh"
@@ -8,9 +15,14 @@ source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
 state_root="${ARANEA_INTEGRATION_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea/integrations}"
 
+# Prints the usage line.
 usage() { printf '%s\n' "Usage: $0 status [--json] | activate <id> [--yes] | deactivate <id>"; }
+# Prints every integration id in theme-manifest.toml.
 known_ids() { awk -F'"' '/^id = / { print $2 }' "$repo_root/theme-manifest.toml"; }
+# True when ID is an integration in the manifest.
 known() { manifest_integration_exists "$1"; }
+# True when integration ID has no optional_command, or one of its
+# |-separated optional commands is installed.
 available() {
   local optional command_name
   optional="$(manifest_integration_field "$1" optional_command || true)"
@@ -30,6 +42,8 @@ shared_with_active() {
   done
   return 1
 }
+# Prints the state (active or inactive) and availability of integration ID,
+# as text or as JSON when json=1.
 emit_status() {
   local id="$1" state=inactive availability=unavailable
   [[ -f "$state_root/$id" ]] && state="$(<"$state_root/$id")"
@@ -64,7 +78,7 @@ case "$command_name" in
     install_status=0
     output="$("$repo_root/scripts/install-integration" "$id" --yes)" || install_status=$?
     printf '%s\n' "$output"
-    # Exactly the targets this integration manages now — recorded even when
+    # Exactly the targets this integration manages now, recorded even when
     # the install stopped partway, so deactivate can still undo them.
     sed -n 's/^\(linked\|copied\) .* -> //p' <<<"$output" >"$state_root/$id.files"
     ((install_status == 0)) || exit "$install_status"

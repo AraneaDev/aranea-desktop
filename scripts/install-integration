@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Installs one integration's files from integrations/ into the user's config
+# and data dirs through the ownership ledger (a user's own file is backed up
+# first, a customised one kept). Skips an integration whose optional command
+# is not installed. --dry-run prints the plan; --yes is accepted for parity
+# with install.sh.
+#
+# Usage: scripts/install-integration [--dry-run] [--yes] <integration-id>
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
@@ -60,6 +68,8 @@ config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
 # Temp dirs made below; removed however the script exits.
 cleanup_dirs=()
 trap 'rm -rf -- "${cleanup_dirs[@]}"' EXIT
+# Links TARGET to SOURCE via link_managed_file and reports it, or prints
+# the plan in dry-run.
 install_one() {
   local source="$1" target="$2"
   if ((dry_run)); then
@@ -74,6 +84,8 @@ install_one() {
   fi
 }
 
+# Copies generated SOURCE to TARGET (mode 644), backing up and recording
+# the target, or prints the plan in dry-run.
 install_generated() {
   local source="$1" target="$2"
   if ((dry_run)); then

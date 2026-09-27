@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Shows, lists or sets the bar profile (.bar.profile) in the Omarchy
+# shell.json (ARANEA_SHELL_CONFIG overrides the path). Setting it writes
+# through a symlink and keeps a one-time .aranea-profile.bak backup.
+#
+# Usage: scripts/aranea-bar-profile [current|list|set <minimal|diagnostic|ceremony>]
+
 config_file="${ARANEA_SHELL_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json}"
 profile="${2:-}"
 
+# Prints the usage line to stderr.
 usage() {
   printf 'Usage: %s current|list|set <minimal|diagnostic|ceremony>\n' "$0" >&2
 }
@@ -39,6 +46,7 @@ case "${1:-current}" in
     config_dir="$(dirname "$config_file")"
     tmp_file="$(mktemp "$config_dir/.shell.json.aranea-profile.XXXXXX")"
     backup_file="$config_file.aranea-profile.bak"
+    # Removes the temp file on exit.
     cleanup() { rm -f "$tmp_file"; }
     trap cleanup EXIT
     jq --arg profile "$profile" '.bar = ((.bar // {}) + {profile: $profile})' "$config_file" >"$tmp_file"

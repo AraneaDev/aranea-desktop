@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Captures screenshots of Aranea surfaces into an output directory. --surface
+# captures one; --all (only on workspace 2, needs hyprctl) captures every
+# surface with the real notification inbox parked, then builds
+# hero-showcase.gif. Surfaces without a built-in capture use
+# ARANEA_SCREENSHOT_COMMAND.
+#
+# Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir>
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
@@ -11,6 +19,8 @@ capture_all=0
 # "unknown" here and they must not poison a complete batch with blank PNGs.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
+# Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
+# magick or a frame is missing.
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
@@ -88,6 +98,8 @@ if ((capture_all)); then
   # before the inbox is parked; the capture inbox is only cleared once the
   # real one has actually been moved aside.
   batch_swapped=0
+  # Moves the real inbox back (when it was parked), restarts the shell, waits,
+  # then focuses workspace 1.
   finish_batch() {
     if ((batch_swapped)); then
       omarchy-shell notifications clear >/dev/null 2>&1 || true
@@ -106,6 +118,7 @@ if ((capture_all)); then
   batch_swapped=1
   omarchy restart shell >/dev/null 2>&1 || true
   sleep 3
+  # Captures one surface in a child run; fails only when no PNG was written.
   capture_one() {
     local all_surface="$1"
     if ! "$0" --surface "$all_surface" --output "$output"; then
@@ -138,6 +151,7 @@ esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
 
+# Opens the Aranea menu page for $surface and grabs the screen with grim.
 capture_menu_surface() {
   command -v omarchy-shell >/dev/null 2>&1 || {
     echo "omarchy-shell is required to capture $surface" >&2
@@ -174,6 +188,8 @@ capture_menu_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Opens kitty with the Aranea config running COMMAND in a window titled
+# TITLE, grabs the screen, then closes the window.
 capture_terminal_surface() {
   local title="$1"
   local command_name="$2"
@@ -209,6 +225,7 @@ capture_terminal_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Summons shell popup TARGET, grabs the screen, then hides it.
 capture_popup_surface() {
   local target="$1"
   command -v omarchy-shell >/dev/null 2>&1 || {
@@ -235,6 +252,7 @@ capture_popup_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Shows a sample volume OSD on workspace 2 and grabs the screen.
 capture_osd_surface() {
   command -v omarchy-shell >/dev/null 2>&1 || {
     echo 'omarchy-shell is required to capture osd' >&2
@@ -283,6 +301,8 @@ case "$surface" in
     # Only undo what was done: before the move, the inbox is the real one and
     # must not be cleared.
     inbox_swapped=0
+    # Hides the notification center; when the inbox was parked, clears the
+    # capture notifications, moves the real inbox back and restarts the shell.
     restore_inbox() {
       omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
       if ((! inbox_swapped)); then return 0; fi
@@ -336,6 +356,7 @@ case "$surface" in
       picker_file="$state_home/aranea/emoji-recent.json"
       picker_id=omarchy.emojis
     fi
+    # Stops the running shell and waits a second.
     stop_shell() {
       quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null 2>&1 || true
       sleep 1
@@ -350,6 +371,8 @@ case "$surface" in
     # was moved aside must not delete it, nor clear an untouched clipboard.
     picker_swapped=0
     clipboard_swapped=0
+    # Stops the shell, restores the picker file and clipboard (only what was
+    # swapped), deletes the backup dir and restarts the shell.
     finish_picker() {
       stop_shell
       if ((picker_swapped)); then
@@ -415,6 +438,7 @@ case "$surface" in
     }
     pkexec /usr/bin/true >/dev/null 2>&1 &
     pkexec_pid=$!
+    # True when the omarchy-polkit layer is on screen.
     prompt_visible() {
       hyprctl layers -j 2>/dev/null | jq -e '[.. | objects | select(.namespace? == "omarchy-polkit")] | length > 0' >/dev/null 2>&1
     }

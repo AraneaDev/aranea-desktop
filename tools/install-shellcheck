@@ -4,6 +4,9 @@ set -euo pipefail
 # Install the pinned ShellCheck release into a bin directory (default
 # /usr/local/bin) so CI checks with the same version developers run locally.
 # tests/shellcheck.test.sh fails when the local version differs from this pin.
+#
+# Usage: tools/install-shellcheck [BIN_DIR]
+
 version="0.11.0"
 sha256="8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
 bin_dir="${1:-/usr/local/bin}"

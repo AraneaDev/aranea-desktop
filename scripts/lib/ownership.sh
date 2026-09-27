@@ -2,14 +2,22 @@
 
 set -euo pipefail
 
+# Ownership ledger for files Aranea installs into the user's home: records
+# managed targets, backs up what they replaced, tells Aranea's links apart
+# from user customisations, and restores the backups on deactivate or
+# uninstall. ARANEA_OWNERSHIP_ROOT overrides the state dir.
+
+# Prints the state dir that holds the ledger and the backups.
 aranea_ownership_root() {
   printf '%s\n' "${ARANEA_OWNERSHIP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 }
 
+# Prints the path of the managed-files ledger.
 ownership_record() {
   printf '%s/managed-files\n' "$(aranea_ownership_root)"
 }
 
+# Prints where the backup of absolute path TARGET is kept.
 backup_path() {
   local target="$1"
   printf '%s/backups%s\n' "$(aranea_ownership_root)" "$target"
@@ -55,6 +63,8 @@ is_recorded_target() {
   [[ -f "$record" ]] && grep -Fqx -- "$1" "$record"
 }
 
+# Copies TARGET to its backup path unless TARGET is missing or a backup
+# already exists.
 backup_target() {
   local target="$1"
   local backup
@@ -65,6 +75,7 @@ backup_target() {
   cp -a "$target" "$backup"
 }
 
+# Adds TARGET to the ledger unless it is already there.
 record_managed_file() {
   local target="$1"
   local record

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Lists and applies the wallpapers in backgrounds/manifest.toml, applies the
+# phase wallpaper (dawn, day, dusk or night) for the current time, and
+# manages the systemd user timer that switches phases on a schedule.
+#
+# Usage: scripts/aranea-wallpaper [list|set <id>|set-phase|set-day-night|schedule on|off|status|configure DAWN DAY DUSK NIGHT|motion on|off]
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 manifest="$repo_root/backgrounds/manifest.toml"
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
@@ -10,7 +16,10 @@ systemd_user_dir="${ARANEA_SYSTEMD_USER_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/s
 timer_unit="aranea-wallpaper-day-night.timer"
 service_unit="aranea-wallpaper-day-night.service"
 
+# Runs systemctl --user (ARANEA_SYSTEMCTL overrides the binary).
 systemctl_user() { "${ARANEA_SYSTEMCTL:-systemctl}" --user "$@"; }
+# Sets dawn, day, dusk and night to the defaults, then sources the user's
+# schedule config over them when it exists.
 load_schedule() {
   dawn=06:00
   day=08:00
@@ -21,7 +30,10 @@ load_schedule() {
     source "$schedule_config"
   fi
 }
+# True when $1 is a 24-hour HH:MM time.
 valid_time() { [[ "$1" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; }
+# Fails with a message unless the four phase times are valid and strictly
+# ascending.
 validate_schedule() {
   local value
   for value in "$dawn" "$day" "$dusk" "$night"; do valid_time "$value" || {
@@ -33,10 +45,12 @@ validate_schedule() {
     return 1
   }
 }
+# Writes the current phase times to the schedule config file.
 write_schedule_config() {
   mkdir -p "$config_root"
   printf 'dawn=%s\nday=%s\ndusk=%s\nnight=%s\n' "$dawn" "$day" "$dusk" "$night" >"$schedule_config"
 }
+# Writes the systemd user service and a timer that fires at each phase time.
 write_schedule_units() {
   load_schedule
   validate_schedule
@@ -64,10 +78,13 @@ Persistent=true
 WantedBy=timers.target
 UNIT
 }
+# Prints the absolute path of wallpaper ID from the manifest (nothing when
+# the id is unknown).
 wallpaper_path() {
   local id="$1"
   awk -v wanted="$id" -v root="$repo_root/" '/^\[\[wallpapers\]\]$/ { in_block = 1; match_id = 0; next } in_block && /^\[/ { in_block = 0 } in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { match_id = 1; next } match_id && /^path[[:space:]]*=/ { line = $0; sub(/^[^=]*=[[:space:]]*/, "", line); gsub(/^"|"$/, "", line); print root line; exit }' "$manifest"
 }
+# Prints the phase (dawn, day, dusk or night) that time NOW (HH:MM) falls in.
 phase_for_now() {
   local now="$1"
   local dawn_minutes=$((10#${dawn/:/}))

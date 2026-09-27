@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Writes a copy of a .desktop entry to TARGET without its Version= line and
+# with "Application" dropped from Categories=, so strict launchers list it.
+#
+# Usage: scripts/repair-desktop-entry <source.desktop> <target.desktop>
+
 source_file="${1:-}"
 target_file="${2:-}"
 

@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Registers Aranea in the Omarchy shell.json: sets the Aranea bar, swaps the
+# stock menu entry for Aranea's, enables the Aranea plugins and disables the
+# stock ones they replace, and places the notification bell and health icon
+# once (again after release-shell-config parked them). Keeps a one-time
+# .aranea.bak backup and writes through a symlink.
+#
+# Usage: scripts/repair-shell-config [shell.json]
+
 config_file="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json}"
 
 if [[ ! -f "$config_file" ]]; then
@@ -32,6 +40,7 @@ health_marker="$state_root/health-widget-placed"
 health_parked="$state_root/health-widget-parked"
 place_health=true
 [[ -e "$health_marker" && ! -e "$health_parked" ]] && place_health=false
+# Removes the temp file on exit.
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
@@ -43,6 +52,8 @@ polkit_owner() {
             and (((.disabledPlugins // []) | index("omarchy.polkit")) != null)
          then "aranea" else "stock" end' "$1" 2>/dev/null || echo unknown
 }
+# Leaves the polkit-handover marker when the rewrite changes which polkit
+# agent is enabled.
 note_polkit_handover() {
   if [[ "$(polkit_owner "$config_file")" != "$(polkit_owner "$tmp_file")" ]]; then
     mkdir -p "$state_root"
