@@ -35,11 +35,19 @@ while (($#)); do
     --staged) staged=1 ;;
     --update-baselines) update_baselines=1 ;;
     --only)
-      only="${2:?--only needs a stage list}"
+      [[ $# -ge 2 && -n "$2" ]] || {
+        usage >&2
+        exit 2
+      }
+      only="$2"
       shift
       ;;
     --skip)
-      skip="${2:?--skip needs a stage list}"
+      [[ $# -ge 2 && -n "$2" ]] || {
+        usage >&2
+        exit 2
+      }
+      skip="$2"
       shift
       ;;
     -h | --help)

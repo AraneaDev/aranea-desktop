@@ -8,7 +8,11 @@ set -euo pipefail
 #
 # Usage: scripts/deploy-plugins-safely <theme-root> [target-root]
 
-theme_root=${1:?theme root is required}
+[[ $# -ge 1 && -n "$1" ]] || {
+  echo "Usage: scripts/deploy-plugins-safely <theme-root> [target-root]" >&2
+  exit 2
+}
+theme_root="$1"
 target_root=${2:-$HOME/.config/omarchy/plugins}
 deploy_plugin="$theme_root/scripts/deploy-plugin"
 

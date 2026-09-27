@@ -433,4 +433,14 @@ git reset -q --hard
 plant_docs plugins/d/Block.qml $'// h\nimport QtQuick\nItem {\n  /* { */\n\n  property int count: 0\n}\n' 'plugins/d/Block.qml:6: missing comment for property count'
 plant_docs plugins/d/Trail.qml $'// h\nimport QtQuick\nItem {\n  // A.\n  property int a: 0 /* x */\n  property int b: 0\n}\n' 'plugins/d/Trail.qml:6: missing comment for property b'
 plant_docs plugins/d/Same.qml $'// h\nimport QtQuick\nItem { property int a: 0\n}\n' 'plugins/d/Same.qml:3: missing comment for property a'
+# --- 4d: --only / --skip without a value print the usage and exit 2
+rc=0
+out="$("$repo_root/tools/check" --only 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'Usage:' <<<"$out"
+rc=0
+out="$("$repo_root/tools/check" --skip 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'Usage:' <<<"$out"
+
 echo "check contract passed"

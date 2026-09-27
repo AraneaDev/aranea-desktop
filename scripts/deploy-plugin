@@ -7,8 +7,12 @@ set -euo pipefail
 #
 # Usage: scripts/deploy-plugin <source-dir> <target-dir>
 
-source_dir=${1:?source plugin directory is required}
-target_dir=${2:?target plugin directory is required}
+[[ $# -ge 2 && -n "$1" && -n "$2" ]] || {
+  echo "Usage: scripts/deploy-plugin <source-dir> <target-dir>" >&2
+  exit 2
+}
+source_dir="$1"
+target_dir="$2"
 
 [[ -d "$source_dir" ]] || {
   echo "plugin source directory does not exist: $source_dir" >&2

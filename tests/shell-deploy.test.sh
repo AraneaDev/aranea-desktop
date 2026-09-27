@@ -39,4 +39,14 @@ done
 jq -e '.bar.id == "araneadev.bar"' "$config_dir/shell.json" >/dev/null
 jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit"] | sort)' "$config_dir/shell.json" >/dev/null
 
+# --- 4d: a missing argument prints a usage line and exits 2
+rc=0
+out="$("$repo_root/scripts/deploy-plugins-safely" 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'Usage: scripts/deploy-plugins-safely <theme-root> [target-root]' <<<"$out"
+rc=0
+out="$("$repo_root/scripts/deploy-plugin" 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'Usage: scripts/deploy-plugin <source-dir> <target-dir>' <<<"$out"
+
 echo "shell deployment lifecycle contract passed"
