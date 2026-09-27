@@ -1,7 +1,10 @@
 // Aranea polkit prompt. Forked from Omarchy's polkit agent
 // (shell/plugins/polkit): the flow handling, fingerprint mode, lid check and
-// failure shake are stock; the card is Aranea's — mark, request, context line
+// failure shake are stock; the card is Aranea's: mark, request, context line
 // with the polkit action's own description, and details on Tab.
+// Loaded by the Omarchy shell as the always-loaded service entry point of the
+// araneadev.polkit plugin (manifest.json); it registers the polkit agent at
+// /org/omarchy/PolkitAgent and shows a full-screen overlay per request.
 
 import QtQuick
 import QtQuick.Layouts
@@ -16,70 +19,103 @@ import "PolkitLogic.js" as PolkitLogic
 Item {
   id: root
 
+  // Font for the card's text (the shell's menu font).
   property string fontFamily: Style.font.menuFamily
   // Bound to the central [polkit] section in shell.toml via Color.qml.
   property color accent: Color.polkit.accent
+  // Card fill colour.
   property color background: Color.polkit.background
+  // Main text colour.
   property color foreground: Color.polkit.text
+  // Card border colour in the normal state.
   property color border: Color.polkit.border
+  // Card border colour while the failure flash is on.
   property color borderError: Color.polkit.borderError
+  // Border spec handed to BorderSurface; switches to the error border during errorFlash.
   property var borderSpec: Border.surfaceSpec("polkit", errorFlash ? "border-error" : "border", errorFlash ? borderError : border, Math.max(1, Style.space(2)), "border-alpha")
   // Lock-grade dim: at least 0.72, whatever the theme's scrim alpha is.
   readonly property color scrim: Qt.rgba(Color.polkit.scrim.r, Color.polkit.scrim.g, Color.polkit.scrim.b, Math.max(Color.polkit.scrim.a, 0.72))
+  // Secondary text colour: foreground at 58% alpha.
   readonly property color dim: Util.alpha(foreground, 0.58)
+  // Letter spacing for the uppercase labels.
   readonly property real letterSpacing: 0.20
+  // file:// URL of the Aranea glyph from the current theme's branding, shown in the header.
   readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  // Corner radius of the card and the password field.
   readonly property int cornerRadius: Style.cornerRadius
+  // Padding inside the card.
   property int contentMargin: Style.spacing.panelPadding
+  // Height of the password field (at least the shell's control height).
   property int fieldHeight: Math.max(Style.space(42), Style.spacing.controlHeight)
 
+  // True while the close delay runs after success or cancel; keeps the dialog visible until resetSnapshot.
   property bool closing: false
+  // A response was submitted and PAM has not asked again yet; shows "Checking..." and makes the field read-only.
   property bool submitted: false
+  // The flow's request message ("Authentication is needed..." when polkit gives none).
   property string currentMessage: ""
+  // PAM's input prompt, turned into the field placeholder.
   property string currentPrompt: ""
+  // PAM's supplementary message, shown under the field.
   property string currentSupplementary: ""
+  // The supplementary message is an error (shown in the error colour).
   property bool supplementaryIsError: false
+  // PAM is waiting for a response; Enter submits only then.
   property bool responseRequired: false
+  // The response may be echoed (not a secret), so the field shows plain text.
   property bool responseVisible: false
+  // Mirror of the flow's failed flag; synced but not read by anything in this file.
   property bool failed: false
+  // Failure feedback is on (red border and text, "Wrong"); errorTimer clears it after 1.2 s.
   property bool errorFlash: false
   // pam_fprintd appears in the polkit PAM stack (a sensor is enrolled).
   property bool fingerprintConfigured: false
-  // Lid shut right now — the reader is physically unreachable, so we fall back
+  // Lid shut right now: the reader is physically unreachable, so we fall back
   // to the password even when a sensor is enrolled. Refreshed per request.
   property bool laptopClosed: false
+  // Horizontal offset of the card, animated by shakeAnimation on failure.
   property int shakeOffset: 0
 
   // Context for the current request.
   property string currentActionId: ""
+  // The polkit action's description from pkaction, "" until the lookup answers.
   property string actionDescription: ""
+  // The polkit action's vendor from pkaction, shown in the details.
   property string actionVendor: ""
+  // Label of the identity being authenticated as.
   property string identityText: ""
+  // " (n of m)" suffix when there are several identities, else "".
   property string identityCount: ""
+  // The details rows are shown (toggled with Tab or the DETAILS link).
   property bool detailsOpen: false
   // The pkaction lookup in flight belongs to this cookie; a request that
   // starts while one is running waits for it (lookupQueued).
   property string lookupCookie: ""
+  // A new lookup was requested while one was running; it starts when that one exits.
   property bool lookupQueued: false
 
+  // The overlay is shown: a request is active or the close delay is running.
   readonly property bool dialogVisible: polkitAgent.isActive || closing
   // We show one method at a time. Fingerprint owns the dialog while PAM is
   // waiting on the reader (lid open, sensor enrolled); the moment PAM asks for
-  // a password — including immediately when the lid is shut and the clamshell
-  // gate skips pam_fprintd — we switch to the password field instead.
+  // a password (including immediately when the lid is shut and the clamshell
+  // gate skips pam_fprintd) we switch to the password field instead.
   readonly property bool fingerprintMode: fingerprintConfigured && !laptopClosed && dialogVisible && !responseRequired && !submitted && !errorFlash
   // Never wider than the screen (minus gaps), even on a very narrow one.
   readonly property int cardWidth: Math.max(Style.space(120), Math.min(Style.space(380), panel.width - Style.gapsOut * 2))
 
+  // Sets fingerprintConfigured from the contents of /etc/pam.d/polkit-1.
   function loadPamConfig(raw) {
     fingerprintConfigured = PolkitLogic.fingerprintConfiguredFromPamConfig(raw)
   }
 
+  // Starts the lid check (omarchy-hw-laptop-closed) unless one is already running; the result lands in laptopClosed.
   function refreshLidState() {
     if (!laptopClosedProc.running)
       laptopClosedProc.running = true
   }
 
+  // Clears every per-request field and the password text.
   function resetSnapshot() {
     currentMessage = ""
     currentPrompt = ""
@@ -99,6 +135,7 @@ Item {
     passwordInput.text = ""
   }
 
+  // Refreshes identityText and identityCount from the flow's selected identity.
   function syncIdentity() {
     var flow = polkitAgent.flow
     if (!flow) {
@@ -110,6 +147,7 @@ Item {
     identityCount = PolkitLogic.identityPosition(flow.identities, flow.selectedIdentity)
   }
 
+  // Copies the flow's message, prompt, supplementary text and flags into the root properties; a new response request clears submitted.
   function syncFromFlow() {
     var flow = polkitAgent.flow
     if (!flow)
@@ -128,6 +166,7 @@ Item {
       submitted = false
   }
 
+  // Runs `pkaction --action-id <id> --verbose` (2 s timeout) for the current flow's action, or queues it when a lookup is running; invalid ids are skipped.
   function startActionLookup() {
     if (actionLookup.running) {
       lookupQueued = true
@@ -143,6 +182,7 @@ Item {
     actionLookup.running = true
   }
 
+  // Prepares the dialog for a new request: resets state, checks the lid, syncs the flow, looks up the action, plays the open animation and focuses.
   function beginFlow() {
     closeTimer.stop()
     closing = false
@@ -159,10 +199,11 @@ Item {
     Qt.callLater(refocus)
   }
 
+  // Puts keyboard focus on the password field, or on the key catcher in fingerprint mode; no-op when hidden.
   function refocus() {
     if (!dialogVisible)
       return
-    // In fingerprint mode there is no field to type into — park focus on the
+    // In fingerprint mode there is no field to type into; park focus on the
     // key catcher so Escape still cancels; otherwise focus the password field.
     if (fingerprintMode)
       keyCatcher.forceActiveFocus()
@@ -170,11 +211,13 @@ Item {
       passwordInput.forceActiveFocus()
   }
 
+  // Shows or hides the details rows, then restores focus.
   function toggleDetails() {
     detailsOpen = !detailsOpen
     Qt.callLater(refocus)
   }
 
+  // Selects the next identity of the flow (wrapping); no-op with fewer than two.
   function cycleIdentity() {
     var flow = polkitAgent.flow
     if (!flow || !flow.identities || flow.identities.length < 2)
@@ -202,6 +245,7 @@ Item {
     }
   }
 
+  // Sends the typed password to the flow when PAM wants a response, clears the field and parks focus on the key catcher.
   function submitResponse() {
     var flow = polkitAgent.flow
     if (!flow || !flow.isResponseRequired)
@@ -213,6 +257,7 @@ Item {
     keyCatcher.forceActiveFocus()
   }
 
+  // Cancels the request and starts the close delay.
   function cancelRequest() {
     var flow = polkitAgent.flow
     passwordInput.text = ""
@@ -223,6 +268,7 @@ Item {
       flow.cancelAuthenticationRequest()
   }
 
+  // Shows a failed attempt: error flash, cleared field, shake, then refocus.
   function triggerFailureFeedback() {
     submitted = false
     errorFlash = true

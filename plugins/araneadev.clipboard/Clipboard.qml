@@ -1,3 +1,11 @@
+// Aranea clipboard: a clone of Omarchy's clipboard picker (omarchy.clipboard)
+// in the Aranea menu language, with typed rows, pins and masked, expiring
+// secrets. Capture, paste and copy still use Omarchy's scripts; rules live in
+// ClipboardLogic.js.
+// Overlay entry point of the araneadev.clipboard plugin (manifest.json); the
+// Omarchy shell keeps it loaded and calls open()/close()/toggle() on summon
+// and hide. It records clipboard history in the background even while closed.
+
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -6,53 +14,76 @@ import qs.Commons
 import qs.Ui
 import "ClipboardLogic.js" as ClipboardLogic
 
-// Aranea clipboard: a clone of Omarchy's clipboard picker (omarchy.clipboard)
-// in the Aranea menu language, with typed rows, pins and masked, expiring
-// secrets. Capture, paste and copy still use Omarchy's scripts; rules live in
-// ClipboardLogic.js.
-
 Item {
   id: root
 
+  // Omarchy install root ($OMARCHY_PATH), for its clipboard scripts.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  // Whether the picker window is shown.
   property bool opened: false
+  // Current search text typed into the picker.
   property string filterText: ""
+  // Cursor position in the displayed rows (display index, not history index).
   property int selectedIndex: 0
+  // Whether the cursor is shown; keys that act on a row need it.
   property bool cursorActive: false
+  // Whether the "clear history" confirmation dialog is open.
   property bool clearConfirmOpen: false
+  // All history entries (ClipboardLogic entries), newest first, as saved to historyPath.
   property var history: []
 
+  // History file shared with the stock Omarchy picker.
   property string historyPath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-history.json"
+  // Omarchy's capture script; wl-paste runs it on every copy and it prints the entry as JSON.
   property string captureScript: root.omarchyPath + "/shell/plugins/clipboard/capture.sh"
-  // Shares the [menu] surface tokens — themes that style the menu also
+  // Shares the [menu] surface tokens; themes that style the menu also
   // style the clipboard. Selected-row colors composed in the
   // singleton so consumers drop them straight into Rectangle bindings.
   property color background: Color.menu.background
+  // Text colour (menu text token).
   property color foreground: Color.menu.text
+  // Border colour (menu border token); also tints the preview divider.
   property color border: Color.menu.border
+  // Border description for the card, from the theme's [menu] border settings.
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
+  // Colour laid over the screen behind the card.
   property color scrim: Color.menu.scrim
+  // Background of the row under the cursor.
   property color selectedBackground: Color.menu.selectedBackground
+  // Text colour of the row under the cursor; also the accent of the chrome.
   property color selectedText: Color.menu.selectedText
+  // Corner radius of the card and rows.
   readonly property int cornerRadius: Style.cornerRadius
+  // Font for all picker text (the menu font).
   property string fontFamily: Style.font.menuFamily
+  // Inner padding of the card and the preview pane.
   property int contentMargin: Style.spacing.panelPadding
+  // Header height; currently not read anywhere in this file.
   property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
+  // Spacing token; currently not read anywhere in this file.
   property int contentSpacing: Style.spacing.md
+  // Card width: up to 875 scaled px, inside the screen gaps.
   property int cardWidth: Math.min(Style.space(875), panel.width - Style.gapsOut * 2)
+  // Card height: up to 600 scaled px, inside the screen gaps.
   property int cardHeight: Math.min(Style.space(600), panel.height - Style.gapsOut * 2)
+  // Height of one history row (title plus detail line).
   property int rowHeight: Math.max(Style.space(50), Style.font.body + Style.font.caption + Style.spacing.rowPaddingX * 2)
+  // Unpinned entries kept in history; pinned ones do not count.
   property int historyLimit: 300
   // Secrets leave history this long after capture (pinned ones stay).
   readonly property real secretTtlMs: Number(Quickshell.env("ARANEA_CLIPBOARD_SECRET_TTL_MS")) || 600000
   // Display index whose secret is revealed in the preview; any cursor move
   // masks it again.
   property int revealedIndex: -1
+  // Number of pinned entries, shown in the header counts.
   readonly property int pinnedCount: root.history.filter(function (e) {
     return e && e.pinned
   }).length
   onSelectedIndexChanged: root.revealedIndex = -1
 
+  // Shows the picker with an empty filter and the cursor on the first row,
+  // and focuses the key handler. Called by the shell on summon; the payload
+  // is ignored.
   function open(payloadJson) {
     root.opened = true
     root.filterText = ""
@@ -65,11 +96,13 @@ Item {
     })
   }
 
+  // Hides the picker and dismisses the clear confirmation.
   function close() {
     root.cancelClearHistory()
     root.opened = false
   }
 
+  // Closes the picker when open, opens it otherwise.
   function toggle() {
     if (root.opened)
       root.close()
@@ -77,6 +110,8 @@ Item {
       root.open("{}")
   }
 
+  // Replaces the history with the parsed file contents, saves once when
+  // entries needed a capture time, and expires old secrets.
   function loadHistory(raw) {
     root.history = ClipboardLogic.parseHistory(raw, Date.now())
     // Stock-written entries just got their capture time; keep it, so secret
@@ -88,6 +123,7 @@ Item {
       root.rebuildDisplay()
   }
 
+  // Drops unpinned secrets older than secretTtlMs; saves and redraws only when something was dropped.
   function expireNow() {
     var result = ClipboardLogic.expire(root.history, Date.now(), root.secretTtlMs)
     if (!result.changed)
@@ -98,24 +134,28 @@ Item {
       root.rebuildDisplay()
   }
 
+  // Sets the history to next, saves it and redraws the list.
   function updateHistory(next) {
     root.history = next
     root.saveHistory()
     root.rebuildDisplay()
   }
 
+  // Pins or unpins the entry shown at display index.
   function togglePinnedIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
     root.updateHistory(ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex, Date.now()))
   }
 
+  // Marks the entry shown at display index as secret or not secret.
   function toggleSecretIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
     root.updateHistory(ClipboardLogic.toggleSecret(root.history, displayModel.get(index).historyIndex))
   }
 
+  // Toggles showing the secret at display index in the preview; no-op for non-secret rows.
   function revealIndex(index) {
     if (index < 0 || index >= displayModel.count || !displayModel.get(index).secret)
       return
@@ -128,14 +168,17 @@ Item {
   // Paste/copy read the history file by index, so they wait for a pending
   // write (Delete then Enter must not paste the neighbour from the old file).
   property bool saving: false
+  // Paste/copy/open action waiting for the current history write to finish.
   property var pendingAction: null
 
+  // Writes the history as pretty JSON to historyPath and marks a save as in flight.
   function saveHistory() {
     root.lastSavedText = JSON.stringify(root.history, null, 2) + "\n"
     root.saving = true
     historyFile.setText(root.lastSavedText)
   }
 
+  // Clears the in-flight save flag and runs the pending action, if any.
   function finishSave() {
     root.saving = false
     var action = root.pendingAction
@@ -144,6 +187,8 @@ Item {
       action()
   }
 
+  // Runs action now, or after the in-flight save finishes (replacing any
+  // action already waiting).
   function whenSaved(action) {
     if (root.saving)
       root.pendingAction = action
@@ -151,6 +196,7 @@ Item {
       action()
   }
 
+  // Adds a captured entry to the top of history, saves and redraws when open.
   function addClipboardEntry(entry) {
     if (!entry)
       return
@@ -160,10 +206,12 @@ Item {
       root.rebuildDisplay()
   }
 
+  // Adds an entry from one JSON line printed by the capture script.
   function addClipboardJson(line) {
     root.addClipboardEntry(ClipboardLogic.parseEntryJson(line))
   }
 
+  // Opens the clear confirmation (with "cancel" preselected) when history is not empty.
   function requestClearHistory() {
     if (root.history.length === 0)
       return
@@ -171,6 +219,7 @@ Item {
     root.clearConfirmOpen = true
   }
 
+  // Closes the clear confirmation and returns focus to the key handler.
   function cancelClearHistory() {
     root.clearConfirmOpen = false
     root.disarmPointer()
@@ -179,6 +228,7 @@ Item {
     })
   }
 
+  // Removes every unpinned entry, saves, and resets the cursor.
   function confirmClearHistory() {
     // Pinned items are kept: clearing is for the churn, not what was chosen.
     root.history = ClipboardLogic.clearUnpinned(root.history)
@@ -193,6 +243,7 @@ Item {
     })
   }
 
+  // Deletes the entry shown at display index from history and keeps the cursor in range.
   function removeDisplayIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
@@ -211,6 +262,8 @@ Item {
     root.rebuildDisplay()
   }
 
+  // Rebuilds the list model from history and the filter (at most 50 recent
+  // rows plus pinned ones), clamps the cursor and scrolls it into view.
   function rebuildDisplay() {
     root.revealedIndex = -1
     // list changed: rows may have moved under the cursor
@@ -249,6 +302,8 @@ Item {
     })
   }
 
+  // Moves the cursor by delta rows, wrapping around; the first move only
+  // shows the cursor at the top (or bottom for a negative delta).
   function select(delta) {
     if (displayModel.count === 0)
       return
@@ -262,6 +317,7 @@ Item {
     resultList.positionViewAtIndex(selectedIndex, ListView.Contain)
   }
 
+  // Puts the cursor on index, clamped to the list, and scrolls to it.
   function selectAbsolute(index) {
     if (displayModel.count === 0)
       return
@@ -271,6 +327,7 @@ Item {
     resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
   }
 
+  // Sets the search text, resets the cursor to the top and rebuilds the list.
   function setFilter(nextFilter) {
     root.filterText = nextFilter
     root.selectedIndex = 0
@@ -279,10 +336,12 @@ Item {
     root.rebuildDisplay()
   }
 
+  // Makes the mouse ignore hover until it really moves, so a still pointer does not steal the cursor.
   function disarmPointer() {
     pointerGate.reset()
   }
 
+  // Moves the cursor to the hovered row, but only after real pointer movement.
   function selectFromPointer(index, item, mouse) {
     if (!pointerGate.moved(item, mouse))
       return
@@ -290,6 +349,7 @@ Item {
     root.selectedIndex = index
   }
 
+  // Pastes the row at display index.
   function activateIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
@@ -297,6 +357,7 @@ Item {
     root.applySelected(row)
   }
 
+  // Copies the row at display index to the clipboard without pasting.
   function copyIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
@@ -304,6 +365,7 @@ Item {
     root.copySelected(row)
   }
 
+  // Opens the row at display index with omarchy-clipboard-open.
   function openIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
@@ -322,6 +384,8 @@ Item {
     }
   }
 
+  // Runs Omarchy's paste script for a row: paste-file for images, paste-text
+  // (by history index) for text; copyOnly only puts it on the clipboard.
   function pasteRow(row, copyOnly) {
     if (row.entryType === "image") {
       Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-file"].concat(copyOnly ? ["--copy-only"] : []).concat([row.mime, row.path]))
@@ -331,6 +395,7 @@ Item {
     }
   }
 
+  // Closes the picker and pastes the row once any pending history write is done.
   function applySelected(row) {
     if (!row)
       return
@@ -341,6 +406,7 @@ Item {
     })
   }
 
+  // Closes the picker and copies the row once any pending history write is done.
   function copySelected(row) {
     if (!row)
       return
@@ -351,6 +417,8 @@ Item {
     })
   }
 
+  // Closes the picker and opens the entry with omarchy-clipboard-open once any
+  // pending history write is done.
   function openSelected(row) {
     if (!row)
       return
@@ -487,6 +555,7 @@ Item {
     }
   }
 
+  // Nerd Font icon for a row kind (link, path, code, image; text otherwise).
   function kindGlyph(kind) {
     if (kind === "link")
       return "󰌷"
@@ -499,6 +568,7 @@ Item {
     return "󰦨"
   }
 
+  // Key-hint line for the current state and the row under the cursor.
   function hintText() {
     if (displayModel.count === 0)
       return root.filterText ? "ESC CLEAR SEARCH" : "ESC CLOSE"

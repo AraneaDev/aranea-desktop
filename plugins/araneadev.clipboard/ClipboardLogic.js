@@ -5,6 +5,47 @@
 // own parser ignores them, so the file stays readable by the stock picker.
 // No QML, no I/O; tests/clipboard.test.sh runs this under Node.
 
+/**
+ * A clipboard history entry as stored in the history file.
+ * @typedef {object} ClipboardEntry
+ * @property {string} type - "text" or "image".
+ * @property {string} [text] - The copied text (text entries).
+ * @property {string} [path] - The image file (image entries).
+ * @property {string} [mime] - The image MIME type (image entries).
+ * @property {string} [capturedAt] - Human-readable capture time from the capture script (image entries).
+ * @property {string} [kind] - One of KINDS.
+ * @property {boolean} [secret] - Masked in the picker and expired after a while.
+ * @property {boolean} [secretOverride] - The user's secret choice, which wins over detection.
+ * @property {boolean} [pinned] - Kept by limits, expiry and clearing.
+ * @property {number} [pinnedAtMs] - When the entry was pinned, in ms.
+ * @property {number} [capturedAtMs] - When the entry was captured, in ms.
+ */
+
+/**
+ * One row of the picker list, built by displayRows.
+ * @typedef {object} ClipboardRow
+ * @property {string} section - "pinned" or "recent".
+ * @property {number} historyIndex - Index of the entry in the history array.
+ * @property {string} kind - The entry's kind.
+ * @property {boolean} secret - Whether the row is masked.
+ * @property {boolean} pinned - Whether the entry is pinned.
+ * @property {string} title - The row title.
+ * @property {string} detail - "<kind or secret> · <age>".
+ * @property {string} fullText - Text for the preview pane ("" for secrets and images).
+ * @property {string} previewImage - Image file to preview, or "".
+ * @property {string} path - The image or single file path, or "".
+ * @property {string} mime - The image MIME type, or "text/plain".
+ * @property {string} colour - Colour value for a swatch, or "".
+ * @property {number} [pinnedAtMs] - Sort key for pinned rows (pin time, else capture time); set on every row right after it is built.
+ */
+
+/**
+ * Validates the base fields of a history entry: a non-blank string or text
+ * entry becomes {type:"text", text}, an image entry with a path becomes
+ * {type:"image", path, mime, capturedAt?}; the extra fields are dropped.
+ * @param {*} value - A raw string or parsed entry object.
+ * @returns {?ClipboardEntry} The base entry, or null when the value is not a usable entry.
+ */
 function normalizeBase(value) {
   if (typeof value === "string")
     return value.trim().length > 0 ? { type: "text", text: value } : null
@@ -20,6 +61,7 @@ function normalizeBase(value) {
   if (type === "image") {
     var path = String(value.path || "")
     if (!path) return null
+    /** @type {ClipboardEntry} */
     var entry = {
       type: "image",
       path: path,
@@ -33,6 +75,12 @@ function normalizeBase(value) {
   return null
 }
 
+/**
+ * Normalizes an entry like normalizeBase and keeps the Aranea extras (kind,
+ * secret, secretOverride, pinned, pinnedAtMs, capturedAtMs) when they have the right type.
+ * @param {*} value - A raw string or parsed entry object.
+ * @returns {?ClipboardEntry} The normalized entry, or null when the value is not a usable entry.
+ */
 function normalizeEntry(value) {
   var entry = normalizeBase(value)
   if (!entry || !value || typeof value !== "object") return entry
@@ -49,12 +97,23 @@ function normalizeEntry(value) {
   return entry
 }
 
+/**
+ * Builds the identity used to de-duplicate entries: "image:<path>" or "text:<text>".
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {string} The key, or "" for a missing entry.
+ */
 function entryKey(entry) {
   if (!entry) return ""
   if (entry.type === "image") return "image:" + String(entry.path || "")
   return "text:" + String(entry.text || "")
 }
 
+/**
+ * Returns a copy of the history without the entry at index; an out-of-range index gives an unchanged copy.
+ * @param {*} history - The history array (anything else counts as empty).
+ * @param {*} index - The position to remove, coerced with Number().
+ * @returns {Array<ClipboardEntry>} The new history array.
+ */
 function removeEntryAt(history, index) {
   var values = Array.isArray(history) ? history : []
   var target = Number(index)
@@ -65,6 +124,11 @@ function removeEntryAt(history, index) {
   return next
 }
 
+/**
+ * Parses one JSON-encoded entry (as the capture script prints it) and normalizes it.
+ * @param {*} line - The JSON text; null or blank gives null.
+ * @returns {?ClipboardEntry} The entry, or null when the text is blank, invalid JSON or not an entry.
+ */
 function parseEntryJson(line) {
   var raw = String(line || "").trim()
   if (!raw) return null
@@ -75,6 +139,12 @@ function parseEntryJson(line) {
   }
 }
 
+/**
+ * Builds the text the filter matches against: for images "image screenshot"
+ * plus mime and capture time, for text the text plus its file-name summary.
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {string} The searchable text, or "" for a missing entry.
+ */
 function searchableText(entry) {
   if (!entry) return ""
   if (entry.type === "image")
@@ -82,6 +152,12 @@ function searchableText(entry) {
   return String(entry.text || "") + " " + fileEntryText(entry)
 }
 
+/**
+ * Converts a file:// URI (optionally file://localhost/) to an absolute,
+ * percent-decoded path; a malformed escape leaves the path undecoded.
+ * @param {*} uri - The URI text.
+ * @returns {string} The path, or "" when the value is not an absolute file:// URI.
+ */
 function decodeFileUri(uri) {
   var value = String(uri || "").trim()
   if (value.indexOf("file://") !== 0) return ""
@@ -97,6 +173,11 @@ function decodeFileUri(uri) {
   }
 }
 
+/**
+ * Lists the paths of the file:// URIs in a text entry, one per line (e.g. a file-manager copy).
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {Array<string>} The decoded paths; empty for images and plain text.
+ */
 function filePaths(entry) {
   if (!entry || entry.type !== "text") return []
 
@@ -109,15 +190,30 @@ function filePaths(entry) {
   return paths
 }
 
+/**
+ * Returns the last "/"-separated component of a path.
+ * @param {*} path - The path.
+ * @returns {string} The file name.
+ */
 function fileName(path) {
   var parts = String(path || "").split("/")
   return parts.length > 0 ? parts[parts.length - 1] : String(path || "")
 }
 
+/**
+ * Tells whether a path ends in a common image extension (png, jpg, jpeg, webp, gif, bmp, tif, tiff).
+ * @param {*} path - The path.
+ * @returns {boolean} True for an image file name.
+ */
 function isImagePath(path) {
   return /\.(png|jpe?g|webp|gif|bmp|tiff?)$/i.test(String(path || ""))
 }
 
+/**
+ * Summarizes the file URIs of a text entry: the file name for one file, "N files" for several.
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {string} The summary, or "" when the entry holds no file URIs.
+ */
 function fileEntryText(entry) {
   var paths = filePaths(entry)
   if (paths.length === 0) return ""
@@ -125,6 +221,11 @@ function fileEntryText(entry) {
   return paths.length + " files"
 }
 
+/**
+ * Labels an image entry: "Screenshot from <time>" for PNG, "Image from <time>" otherwise, "Image" without a capture time.
+ * @param {?ClipboardEntry} entry - The image entry.
+ * @returns {string} The label.
+ */
 function imagePreviewText(entry) {
   var timestamp = String((entry && entry.capturedAt) || "")
   if (!timestamp) return "Image"
@@ -133,6 +234,11 @@ function imagePreviewText(entry) {
   return label + " from " + timestamp
 }
 
+/**
+ * One-line preview of an entry: the image label, the file summary, or the text with whitespace runs collapsed to single spaces.
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {string} The preview, or "" for a missing entry.
+ */
 function previewText(entry) {
   if (!entry) return ""
   if (entry.type === "image") return imagePreviewText(entry)
@@ -141,6 +247,11 @@ function previewText(entry) {
   return String(entry.text || "").replace(/\s+/g, " ")
 }
 
+/**
+ * Full text of an entry for the preview pane: its file paths one per line, or the raw text.
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {string} The text, or "" for a missing entry.
+ */
 function fullText(entry) {
   if (!entry) return ""
   var paths = filePaths(entry)
@@ -154,6 +265,13 @@ function fullText(entry) {
 // Pasting reads the full entry back from history by index, so nothing is lost.
 var displayTextLimit = 8192
 
+/**
+ * Returns a text entry cut to displayTextLimit characters (at the last line
+ * break before the limit when there is one); other entries come back as they are.
+ * The cut copy keeps only type and text.
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {?ClipboardEntry} The entry itself or a shortened text-only copy.
+ */
 function cappedEntry(entry) {
   if (!entry || entry.type !== "text" || entry.text.length <= displayTextLimit) return entry
 
@@ -166,6 +284,14 @@ function cappedEntry(entry) {
 
 var COLOUR_RE = /^(#[0-9a-f]{3}|#[0-9a-f]{6}|#[0-9a-f]{8}|rgba?\([^)]*\)|hsla?\([^)]*\))$/i
 
+/**
+ * Classifies an entry by content: image, path (file URIs or lines that are
+ * absolute or ~/ paths), link (single http(s) URL), colour (hex, rgb(a),
+ * hsl(a)), code (indented multi-line text, or a first line starting "$ " or
+ * containing " | " or "&&") and otherwise text.
+ * @param {?ClipboardEntry} entry - The entry.
+ * @returns {string} One of the KINDS names.
+ */
 function detectKind(entry) {
   if (!entry) return "text"
   if (entry.type === "image") return "image"
@@ -201,7 +327,13 @@ var SECRET_PATTERNS = [
   /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 ]
 
+/**
+ * Shannon entropy of the characters of a string, in bits per character.
+ * @param {string} text - The text.
+ * @returns {number} The entropy; 0 for an empty string.
+ */
 function entropy(text) {
+  /** @type {{[key: string]: number}} */
   var counts = {}
   for (var i = 0; i < text.length; i++) counts[text[i]] = (counts[text[i]] || 0) + 1
   var h = 0
@@ -212,6 +344,15 @@ function entropy(text) {
   return h
 }
 
+/**
+ * Guesses whether copied text is a secret: a PEM private key, a known token
+ * format (GitHub, OpenAI-style sk-, Slack, AWS key id, JWT), or a single
+ * word of 16+ characters with at least three character classes and entropy
+ * of 3.5 bits or more. URLs, paths, git hashes, UUIDs and strings with
+ * whitespace or . / : @ \ ( ) are never secrets (except the PEM key).
+ * @param {*} value - The text.
+ * @returns {boolean} True when the text looks like a secret.
+ */
 function isSecretText(value) {
   var text = String(value || "").trim()
   if (!text) return false
@@ -236,6 +377,14 @@ function isSecretText(value) {
 
 // ---------------------------------------------------- history
 
+/**
+ * Normalizes an entry and fills the Aranea fields: capturedAtMs (now when
+ * missing), kind (detected unless a known one is stored), secret (false for
+ * images, else secretOverride when set, else detected) and pinned (false by default).
+ * @param {*} value - A raw string or parsed entry object.
+ * @param {*} now - The current time in ms, coerced with Number() (0 when not a number).
+ * @returns {?ClipboardEntry} The enriched entry, or null when the value is not a usable entry.
+ */
 function enrich(value, now) {
   var entry = normalizeEntry(value)
   if (!entry) return null
@@ -254,6 +403,11 @@ function enrich(value, now) {
 // True when some entry has no capture time yet (written by the stock picker):
 // the loader then saves once, so the stamped time -- and secret expiry --
 // survives restarts.
+/**
+ * Checks the raw history JSON for an object entry without a numeric capturedAtMs.
+ * @param {*} raw - The history file contents; empty means "[]".
+ * @returns {boolean} True when some entry lacks a capture time; false for invalid JSON or a non-array.
+ */
 function hadUnstamped(raw) {
   try {
     var parsed = JSON.parse(String(raw || "[]"))
@@ -266,6 +420,12 @@ function hadUnstamped(raw) {
   }
 }
 
+/**
+ * Parses the history file JSON and enriches every entry, dropping unusable ones.
+ * @param {*} raw - The history file contents; empty means "[]".
+ * @param {*} now - The time in ms stamped on entries that have none.
+ * @returns {Array<ClipboardEntry>} The entries; empty for invalid JSON or a non-array.
+ */
 function parseHistory(raw, now) {
   try {
     var parsed = JSON.parse(String(raw || "[]"))
@@ -282,6 +442,12 @@ function parseHistory(raw, now) {
 }
 
 // Keep every pinned entry and the first `limit` unpinned ones, in order.
+/**
+ * Trims a history list to the limit while never dropping pinned entries.
+ * @param {Array<ClipboardEntry>} list - The history, newest first.
+ * @param {*} limit - The number of unpinned entries to keep, coerced with Number() (0 when not a number).
+ * @returns {Array<ClipboardEntry>} The trimmed list.
+ */
 function applyLimit(list, limit) {
   var max = Math.max(0, Number(limit) || 0)
   var unpinned = 0
@@ -292,6 +458,16 @@ function applyLimit(list, limit) {
   })
 }
 
+/**
+ * Puts a newly copied value at the top of the history, removing an older
+ * copy of the same content (keeping its pin and secretOverride), re-stamping
+ * its capture time, and trimming to the limit.
+ * @param {*} history - The history array (anything else counts as empty).
+ * @param {*} value - The new raw string or entry object.
+ * @param {?number} [limit] - Unpinned entries to keep; 300 when null or omitted.
+ * @param {*} [now] - The current time in ms.
+ * @returns {Array<ClipboardEntry>} The new history, or a copy of the old one when the value is not a usable entry.
+ */
 function addEntry(history, value, limit, now) {
   var entry = normalizeEntry(value)
   if (!entry) return Array.isArray(history) ? history.slice() : []
@@ -317,6 +493,13 @@ function addEntry(history, value, limit, now) {
   )
 }
 
+/**
+ * Drops unpinned secret entries captured more than ttlMs before now.
+ * @param {*} history - The history array (anything else counts as empty).
+ * @param {*} now - The current time in ms.
+ * @param {*} ttlMs - How long a secret is kept, in ms.
+ * @returns {{history: Array<ClipboardEntry>, changed: boolean}} The kept entries and whether any were dropped.
+ */
 function expire(history, now, ttlMs) {
   var values = Array.isArray(history) ? history : []
   var cutoff = Number(now) - Number(ttlMs)
@@ -326,10 +509,19 @@ function expire(history, now, ttlMs) {
   return { history: next, changed: next.length !== values.length }
 }
 
+/**
+ * Returns a copy of the history in which the entry at index is replaced by a
+ * shallow copy that change() has modified; an invalid index gives an unchanged copy.
+ * @param {*} history - The history array (anything else counts as empty).
+ * @param {*} index - The position of the entry, coerced with Number().
+ * @param {function({[key: string]: *}): void} change - Mutates the copied entry.
+ * @returns {Array<ClipboardEntry>} The new history array.
+ */
 function withEntry(history, index, change) {
   var values = Array.isArray(history) ? history.slice() : []
   var i = Number(index)
   if (!(i >= 0 && i < values.length) || !values[i]) return values
+  /** @type {{[key: string]: *}} */
   var copy = {}
   for (var k in values[i]) copy[k] = values[i][k]
   change(copy)
@@ -337,6 +529,13 @@ function withEntry(history, index, change) {
   return values
 }
 
+/**
+ * Flips the pin of the entry at index, stamping pinnedAtMs when it becomes pinned and removing it when unpinned.
+ * @param {*} history - The history array.
+ * @param {*} index - The position of the entry.
+ * @param {*} now - The current time in ms.
+ * @returns {Array<ClipboardEntry>} The new history array.
+ */
 function togglePinned(history, index, now) {
   return withEntry(history, index, function (e) {
     e.pinned = !e.pinned
@@ -345,6 +544,13 @@ function togglePinned(history, index, now) {
   })
 }
 
+/**
+ * Flips the secret flag of the entry at index and records the choice in
+ * secretOverride so detection does not undo it; images are left unchanged.
+ * @param {*} history - The history array.
+ * @param {*} index - The position of the entry.
+ * @returns {Array<ClipboardEntry>} The new history array.
+ */
 function toggleSecret(history, index) {
   return withEntry(history, index, function (e) {
     // Images are never secrets (the thumbnail would still show).
@@ -354,6 +560,11 @@ function toggleSecret(history, index) {
   })
 }
 
+/**
+ * Removes every unpinned entry.
+ * @param {*} history - The history array (anything else counts as empty).
+ * @returns {Array<ClipboardEntry>} The pinned entries.
+ */
 function clearUnpinned(history) {
   return (Array.isArray(history) ? history : []).filter(function (e) {
     return e && e.pinned
@@ -362,6 +573,12 @@ function clearUnpinned(history) {
 
 // ---------------------------------------------------- display
 
+/**
+ * Formats the time since ms as "now" (under a minute), "Nm", "Nh" or "Nd".
+ * @param {*} ms - The past time in ms.
+ * @param {*} now - The current time in ms.
+ * @returns {string} The short age.
+ */
 function relativeAge(ms, now) {
   var s = Math.max(0, Math.floor((Number(now) - Number(ms)) / 1000))
   if (s < 60) return "now"
@@ -372,18 +589,35 @@ function relativeAge(ms, now) {
   return Math.floor(h / 24) + "d"
 }
 
+/**
+ * Splits an http(s) URL into its host (without "www.") and its path (without query or fragment; "" for a bare "/").
+ * @param {*} text - The URL text.
+ * @returns {{domain: string, path: string}} The parts; both "" when the text is not an http(s) URL.
+ */
 function linkParts(text) {
   var m = /^https?:\/\/([^/?#]+)([^?#]*)/i.exec(String(text || "").trim())
   if (!m) return { domain: "", path: "" }
   return { domain: m[1].replace(/^www\./, ""), path: m[2] === "/" ? "" : m[2] }
 }
 
+/**
+ * Returns the trimmed text when it is a CSS colour the picker can swatch (hex, rgb(a), hsl(a)).
+ * @param {*} text - The text.
+ * @returns {string} The colour, or "".
+ */
 function colourValue(text) {
   var t = String(text || "").trim()
   return COLOUR_RE.test(t) ? t : ""
 }
 
 // `kind` comes from the full entry: a capped copy of a large paste has lost it.
+/**
+ * Title of a picker row: a mask for secrets, host plus path for links, the
+ * first line for code, otherwise the one-line preview.
+ * @param {ClipboardEntry} entry - The (possibly capped) entry to show.
+ * @param {string} kind - The kind of the full entry.
+ * @returns {string} The title.
+ */
 function rowTitle(entry, kind) {
   if (entry.secret) return "••••••••"
   if (kind === "link") {
@@ -394,6 +628,16 @@ function rowTitle(entry, kind) {
   return previewText(entry)
 }
 
+/**
+ * Builds the picker rows: filters by query (secrets only match "secret"),
+ * keeps every matching pinned entry plus up to limit recent ones, and puts
+ * pinned rows first, most recently pinned on top.
+ * @param {*} history - The history array (anything else counts as empty).
+ * @param {*} query - The filter text; matched case-insensitively as a substring.
+ * @param {?number} [limit] - Recent rows to show; 50 when null or omitted.
+ * @param {*} [now] - The current time in ms, for the age in each row's detail.
+ * @returns {Array<ClipboardRow>} The rows.
+ */
 function displayRows(history, query, limit, now) {
   var values = Array.isArray(history) ? history : []
   var needle = String(query || "")
@@ -413,6 +657,7 @@ function displayRows(history, query, limit, now) {
     var paths = entry.secret ? [] : filePaths(shown)
     var isImage = entry.type === "image"
     var age = relativeAge(entry.capturedAtMs, now)
+    /** @type {ClipboardRow} */
     var row = {
       section: entry.pinned ? "pinned" : "recent",
       historyIndex: i,

@@ -2,6 +2,9 @@
 // in the Aranea menu language, with a RECENT row and the selected emoji's
 // name. Search and data are Omarchy's own (EmojiSearch.js, emojis.json);
 // inserting still goes through omarchy-menu-emoji-insert.
+// Loaded by the Omarchy shell as the "overlay" entry point of the
+// araneadev.emojis plugin (manifest.json); the host calls open()/close() and
+// reads `opened`.
 
 import Quickshell
 import Quickshell.Io
@@ -15,53 +18,90 @@ import "EmojiLogic.js" as EmojiLogic
 Item {
   id: root
 
+  // Omarchy install root (OMARCHY_PATH); the host also sets it on load. Used to
+  // run bin/omarchy-menu-emoji-insert.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  // Host plugin-shell handle, injected by the Omarchy shell; dismiss() calls
+  // its hide().
   property var shell: null
+  // Public manifest of this plugin, injected by the host; its id is what
+  // dismiss() asks the shell to hide.
   property var manifest: null
 
+  // Whether the overlay is showing; read by the host to know the open state.
   property bool opened: false
+  // Current search text; empty shows every emoji plus the RECENT row.
   property string filterText: ""
+  // Index of the selected cell in the filtered grid.
   property int selectedIndex: 0
+  // Whether a selection highlight is shown (false when nothing is selectable).
   property bool cursorActive: false
   // The cursor is either in the RECENT row or in the grid.
   property bool inRecents: false
+  // Index of the selected emoji in the RECENT row, used while inRecents.
   property int recentIndex: 0
+  // All entries parsed from emojis.json ({ e, k } objects).
   property var emojis: []
+  // Entries matching filterText, in grid order.
   property var filteredEmojis: []
+  // Keyword string by emoji, built from emojis; used to name the selection.
   property var keywordsByEmoji: ({})
+  // Recently used emojis, newest first, loaded from and saved to recentsPath.
   property var recents: []
 
+  // Aranea state directory: $XDG_STATE_HOME/aranea (default ~/.local/state/aranea).
   readonly property string stateRoot: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea"
+  // File that stores the recent list (emoji-recent.json under stateRoot).
   readonly property string recentsPath: stateRoot + "/emoji-recent.json"
+  // The RECENT row shows only with an empty search and at least one recent.
   readonly property bool showRecents: !root.filterText && root.recents.length > 0
 
+  // Card fill colour (menu background).
   property color background: Color.menu.background
+  // Text colour for glyphs, labels and hints (menu text).
   property color foreground: Color.menu.text
+  // Card border colour; feeds borderSpec.
   property color border: Color.menu.border
+  // Border description handed to the card, from the menu surface style.
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
+  // Colour of the full-screen backdrop behind the card.
   property color scrim: Color.menu.scrim
+  // Fill of the selected cell.
   property color selectedBackground: Color.menu.selectedBackground
+  // Accent colour: selected-cell ring, section labels and chrome accent.
   property color selectedText: Color.menu.selectedText
+  // Corner radius of the card and of each cell.
   readonly property int cornerRadius: Style.cornerRadius
+  // Font for all text in the picker (menu family).
   property string fontFamily: Style.font.menuFamily
+  // Inner padding of the card.
   property int contentMargin: Style.spacing.panelPadding
+  // Card width: 440 scaled units, capped to the panel minus outer gaps.
   property int cardWidth: Math.min(Style.space(440), panel.width - Style.gapsOut * 2)
+  // Card height: 560 scaled units, capped to the panel minus outer gaps.
   property int cardHeight: Math.min(Style.space(560), panel.height - Style.gapsOut * 2)
 
+  // Width of one emoji cell (at least 44 scaled units, or the display font plus spacing).
   property int cellWidth: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
+  // Height of one emoji cell, sized like cellWidth.
   property int cellHeight: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
   // From the real grid width (inside the chrome insets), so Up/Down move
   // straight rather than drifting diagonally.
   property int columns: Math.max(1, Math.floor(resultGrid.width / root.cellWidth))
 
+  // The emoji under the cursor, from the RECENT row or the grid; "" when none.
   readonly property string selectedEmoji: {
     if (root.inRecents)
       return root.recents[root.recentIndex] || ""
     var item = root.filteredEmojis[root.selectedIndex]
     return item ? item.e : ""
   }
+  // Display name of selectedEmoji, derived from its keywords (EmojiLogic.emojiName).
   readonly property string selectedName: root.selectedEmoji ? EmojiLogic.emojiName(EmojiLogic.keywordsFor(root.keywordsByEmoji, root.selectedEmoji)) : ""
 
+  // Shows the overlay with an empty search, the cursor in the RECENT row when
+  // there are recents, and focuses the key handler. Called by the host; the
+  // payload is ignored.
   function open(payloadJson) {
     root.opened = true
     root.filterText = ""
@@ -75,16 +115,19 @@ Item {
     })
   }
 
+  // Hides the overlay without notifying the host shell.
   function close() {
     root.opened = false
   }
 
+  // Hides the overlay and asks the host shell to hide this plugin.
   function dismiss() {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide((root.manifest && root.manifest.id) || "omarchy.emojis")
   }
 
+  // Dismisses the overlay when open, otherwise opens it with an empty payload.
   function toggle() {
     if (root.opened)
       root.dismiss()
@@ -92,6 +135,8 @@ Item {
       root.open("{}")
   }
 
+  // Parses the emojis.json text into emojis and keywordsByEmoji, and refreshes
+  // the grid when open.
   function loadEmojis(raw) {
     root.emojis = EmojiSearch.parseEmojis(raw)
     var map = {}
@@ -102,6 +147,8 @@ Item {
       root.rebuildDisplay()
   }
 
+  // Re-runs the search over all emojis, refills the grid model, clamps the
+  // selection and leaves the RECENT row when it is hidden.
   function rebuildDisplay() {
     // No cap below the data size, so the count and the grid cover every emoji.
     var out = EmojiSearch.filterEmojis(root.emojis, root.filterText, Math.max(1000, root.emojis.length))
@@ -131,6 +178,9 @@ Item {
     })
   }
 
+  // Moves the cursor by delta cells, wrapping, within the RECENT row or the
+  // grid; the first move after the cursor was inactive jumps to the first or
+  // last cell.
   function select(delta) {
     if (root.inRecents) {
       root.recentIndex = (root.recentIndex + delta + root.recents.length) % root.recents.length
@@ -147,6 +197,8 @@ Item {
     resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
   }
 
+  // Moves the cursor by delta rows, crossing between the RECENT row and the
+  // grid at the same column; clamps at the ends of the grid.
   function selectRow(delta) {
     if (root.inRecents) {
       var count = root.recents.length
@@ -192,6 +244,8 @@ Item {
     resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
   }
 
+  // Moves the grid cursor by delta pages (the rows visible in the grid),
+  // clamped; does nothing in the RECENT row.
   function selectPage(delta) {
     if (root.inRecents || displayModel.count === 0)
       return
@@ -205,6 +259,8 @@ Item {
     resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
   }
 
+  // Sets the search text, resets the cursor to the first grid cell and
+  // rebuilds the grid.
   function setFilter(nextFilter) {
     root.filterText = nextFilter
     root.selectedIndex = 0
@@ -213,6 +269,8 @@ Item {
     root.rebuildDisplay()
   }
 
+  // Moves emoji to the front of the recent list (max 16) and writes it to
+  // recentsPath.
   function remember(emoji) {
     root.recents = EmojiLogic.pushRecent(root.recents, emoji, 16)
     recentsFile.setText(EmojiLogic.serializeRecents(root.recents))
@@ -231,6 +289,7 @@ Item {
       Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-menu-emoji-insert", emoji])
   }
 
+  // Key hints for the chrome footer; Esc reads CLEAR while searching, else CLOSE.
   function hintText() {
     return ["←↑↓→ MOVE", "ENTER INSERT", "⇧ENTER COPY", "ESC " + (root.filterText ? "CLEAR" : "CLOSE")].join("  ·  ")
   }

@@ -1,3 +1,10 @@
+// Aranea lock service: the plugin's "service" entry point (manifest.json),
+// kept loaded by the Omarchy shell. A copy of Omarchy's own
+// plugins/lock/Service.qml that renders LockView.qml instead of the stock
+// view. Owns the Wayland session lock, password and fingerprint PAM, display
+// blanking/waking, stranded-lock recovery after a shell restart, the lock
+// preview window, and the "lock" IPC target (lock, isLocked, status,
+// preview, hidePreview).
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -8,35 +15,61 @@ import qs.Commons
 Item {
   id: root
 
+  // Plugin shell API, injected by the host after loading; not used in this file.
   property var shell: null
+  // Omarchy install path for plugins that need it; not used in this file.
   property string omarchyPath: ""
 
+  // User home directory ($HOME).
   readonly property string home: Quickshell.env("HOME")
+  // ~/.local/state (fixed; $XDG_STATE_HOME is not consulted here).
   readonly property string stateHome: home + "/.local/state"
+  // User that PAM authenticates ($USER, else $LOGNAME).
   readonly property string userName: Quickshell.env("USER") || Quickshell.env("LOGNAME")
+  // Symlink to the current Omarchy wallpaper; resolved by refreshBackground().
   readonly property string currentBackgroundLink: stateHome + "/omarchy/current/background"
 
+  // True from beginLock() until unlock: the shell wants the session locked.
   property bool lockRequested: false
+  // True while a requested lock waits for screens to settle or appear before the session lock is taken.
   property bool pendingSessionLock: false
+  // True while password PAM is checking a submitted password.
   property bool authenticatingPassword: false
+  // True while fingerprint PAM is running.
   property bool fingerprintAuthenticating: false
+  // Whether /etc/pam.d/omarchy-lock-password exists; locking is refused without it.
   property bool passwordPamConfigured: false
+  // Whether the fingerprint PAM file exists and fprintd lists an enrolled finger for the user.
   property bool fingerprintConfigured: false
+  // Whether the lock preview overlay (IPC preview) is shown; any click hides it.
   property bool previewVisible: false
+  // Text currently typed into the lock view's field.
   property string enteredPassword: ""
+  // Password submitted to PAM, answered on its prompt and cleared when the check ends.
   property string pendingPassword: ""
+  // Error shown in the lock view after a failed password attempt; empty otherwise.
   property string failureMessage: ""
+  // Failed password attempts since the lock began.
   property int failedAttempts: 0
+  // Resolved path of the current wallpaper.
   property string backgroundPath: ""
+  // Incremented whenever backgroundPath changes, to cache-bust the view's image.
   property int backgroundVersion: 0
+  // Last lifecycle event logged by logEvent() (reported by IPC status).
   property string lastEvent: "init"
+  // ISO timestamp of lastEvent.
   property string lastEventAt: ""
+  // True when Hyprland reports a session lock this shell did not take (left over from a previous shell).
   property bool strandedLock: false
+  // True once the stranded-lock check has a definitive answer; stops further checks.
   property bool strandedLockResolved: false
 
+  // True when a lock is requested or the Wayland session lock is locked or secure.
   readonly property bool locked: lockRequested || sessionLock.locked || sessionLock.secure
+  // True while either password or fingerprint authentication is running.
   readonly property bool authenticating: authenticatingPassword || fingerprintAuthenticating
 
+  // Counts screens that have a name and a non-zero size (ignores placeholder outputs).
   function realScreenCount(): int {
     var screens = Quickshell.screens || []
     var count = 0
@@ -50,10 +83,12 @@ Item {
     return count
   }
 
+  // Returns true when at least one real screen exists.
   function hasRealScreen(): bool {
     return realScreenCount() > 0
   }
 
+  // Marks the lock pending and (re)starts the stabilize and retry timers that call requestSessionLock().
   function queueSessionLock(): void {
     pendingSessionLock = true
     if (!sessionLockStabilizeTimer.running)
@@ -63,6 +98,8 @@ Item {
       pendingSessionLockTimer.start()
   }
 
+  // Takes the Wayland session lock once a lock is requested, screens have stabilized and a real screen
+  // exists; otherwise leaves it pending for the retry timer.
   function requestSessionLock(): void {
     if (!lockRequested || sessionLock.locked || sessionLock.secure)
       return
@@ -98,6 +135,7 @@ Item {
     strandedLockCheckProc.running = true
   }
 
+  // Re-locks with this shell when a stranded lock was found, nothing is locked yet and PAM is ready.
   function recoverStrandedLock(): void {
     if (!strandedLock || locked || !passwordPamConfigured)
       return
@@ -106,22 +144,26 @@ Item {
     beginLock()
   }
 
+  // Starts resolving the wallpaper symlink (updates backgroundPath when it changed).
   function refreshBackground(): void {
     if (!readlinkProc.running)
       readlinkProc.running = true
   }
 
+  // Starts the check for fingerprint PAM plus an enrolled finger (updates fingerprintConfigured).
   function refreshFingerprintStatus(): void {
     if (!fingerprintCheckProc.running)
       fingerprintCheckProc.running = true
   }
 
+  // Records event as lastEvent with a timestamp and logs it to the console.
   function logEvent(event: string): void {
     lastEvent = event
     lastEventAt = new Date().toISOString()
     console.log("omarchy lock " + lastEventAt + " " + event)
   }
 
+  // Clears password, error and attempt state, stops fingerprint retries and aborts any active PAM.
   function resetAuthenticationState(): void {
     enteredPassword = ""
     pendingPassword = ""
@@ -136,6 +178,8 @@ Item {
       fingerprintPam.abort()
   }
 
+  // Starts a lock: refuses without password PAM, resets auth state, arms blanking, queues the session
+  // lock and refreshes wallpaper and fingerprint status. Returns false if refused.
   function beginLock(): bool {
     if (!passwordPamConfigured) {
       logEvent("lock-denied: missing-pam")
@@ -156,6 +200,8 @@ Item {
     return true
   }
 
+  // Ends the lock after successful authentication: clears lock and auth state, releases the session
+  // lock and wakes the display. No-op when not locked.
   function finishUnlock(): void {
     if (!root.locked && !lockRequested)
       return
@@ -170,11 +216,13 @@ Item {
     runWake()
   }
 
+  // Restarts the 5 s idle timer that blanks keyboard and display backlights, noting when it was armed.
   function armBlankTimer(): void {
     idleBlankTimer.armedAt = Date.now()
     idleBlankTimer.restart()
   }
 
+  // Runs omarchy-system-wake and, while locked, re-arms the blank timer.
   function runWake(): void {
     if (!wakeProcess.running)
       wakeProcess.running = true
@@ -182,11 +230,13 @@ Item {
       armBlankTimer()
   }
 
+  // Turns keyboard and display brightness off.
   function runBlank(): void {
     if (!blankProcess.running)
       blankProcess.running = true
   }
 
+  // Starts password PAM for value while locked and idle; the password is answered on PAM's prompt.
   function submitPassword(value: string): void {
     var password = String(value || "")
     if (!lockRequested || authenticatingPassword || password.length === 0)
@@ -204,12 +254,15 @@ Item {
     Qt.callLater(respondToPasswordPrompt)
   }
 
+  // Answers the pending password when password PAM is active and asking for a response.
   function respondToPasswordPrompt(): void {
     if (!authenticatingPassword || !passwordPam.active || !passwordPam.responseRequired)
       return
     passwordPam.respond(pendingPassword)
   }
 
+  // Records a failed password attempt: clears the password, bumps failedAttempts, sets the message
+  // and wakes the display.
   function handlePasswordFailure() {
     if (!lockRequested)
       return
@@ -221,6 +274,7 @@ Item {
     runWake()
   }
 
+  // Starts fingerprint PAM once the session lock is secure and a fingerprint is enrolled.
   function startFingerprint() {
     if (!lockRequested || !sessionLock.secure || !fingerprintConfigured)
       return
@@ -232,6 +286,8 @@ Item {
     }
   }
 
+  // Handles a finished fingerprint PAM run: unlocks on success, else retries after 250 ms if
+  // fingerprint is still configured.
   function handleFingerprintFinished(result) {
     fingerprintAuthenticating = false
 
