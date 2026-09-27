@@ -18,8 +18,8 @@ EOF
 "$repo_root/scripts/repair-shell-config" "$config"
 
 jq -e '.bar.id == "araneadev.bar"' "$config" >/dev/null
-jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.clipboard", "omarchy.emojis", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd"] | sort)' "$config" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd"] | sort)' "$config" >/dev/null
+jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.clipboard", "omarchy.emojis", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd", "omarchy.polkit"] | sort)' "$config" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit"] | sort)' "$config" >/dev/null
 grep -Fq 'araneadev.health' "$repo_root/scripts/deploy-plugins-safely"
 jq -e '.bar.position == "top" and .unrelated.keep == true' "$config" >/dev/null
 
@@ -168,5 +168,16 @@ jq -e '(.cloneSourceRestores | index("araneadev.clipboard") != null) and (.clone
 jq -e '([.plugins[]?.id] | index("araneadev.clipboard") == null) and ([.plugins[]?.id] | index("araneadev.emojis") == null)' "$config" >/dev/null
 jq -e '((.disabledPlugins // []) | index("omarchy.clipboard") == null) and ((.disabledPlugins // []) | index("omarchy.emojis") == null)' "$config" >/dev/null
 jq -e '((.cloneSourceRestores // []) | index("araneadev.clipboard") == null)' "$config" >/dev/null
+
+# --- polkit: exactly one agent. Ours on Aranea, stock back elsewhere, and
+# stock back if ours is disabled by hand (cloneSourceRestores).
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.plugins[]?.id] | index("araneadev.polkit") != null' "$config" >/dev/null
+jq -e '.disabledPlugins | index("omarchy.polkit") != null' "$config" >/dev/null
+jq -e '.cloneSourceRestores | index("araneadev.polkit") != null' "$config" >/dev/null
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '[.plugins[]?.id] | index("araneadev.polkit") == null' "$config" >/dev/null
+jq -e '(.disabledPlugins // []) | index("omarchy.polkit") == null' "$config" >/dev/null
+jq -e '(.cloneSourceRestores // []) | index("araneadev.polkit") == null' "$config" >/dev/null
 
 echo "shell config contract passed"

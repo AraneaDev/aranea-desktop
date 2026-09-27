@@ -112,4 +112,18 @@ eq(p.promptPlaceholder(''), 'Enter password', 'empty prompt')
 eq(p.promptPlaceholder('Verification code:'), 'Verification code', 'custom prompt')
 NODE
 
+# --- plugin shape: a clone of the stock agent
+jq -e '.id == "araneadev.polkit" and .omarchy.clonedFrom == "omarchy.polkit" and .keepLoaded == true
+  and .kinds == ["service"] and .entryPoints.service == "PolkitAgent.qml"' "$plugin/manifest.json" >/dev/null
+grep -Fq 'import "PolkitLogic.js" as PolkitLogic' "$plugin/PolkitAgent.qml"
+if grep -Fq 'PolkitModel' "$plugin/PolkitAgent.qml"; then echo "use PolkitLogic, not PolkitModel" >&2; exit 1; fi
+# The stock behaviour that must survive the restyle.
+grep -Fq 'path: "/org/omarchy/PolkitAgent"' "$plugin/PolkitAgent.qml"
+grep -Fq 'WlrLayershell.namespace: "omarchy-polkit"' "$plugin/PolkitAgent.qml"
+grep -Fq 'path: "/etc/pam.d/polkit-1"' "$plugin/PolkitAgent.qml"
+grep -Fq 'omarchy-hw-laptop-closed' "$plugin/PolkitAgent.qml"
+grep -Fq 'id: shakeAnimation' "$plugin/PolkitAgent.qml"
+grep -Fq 'flow.cancelAuthenticationRequest()' "$plugin/PolkitAgent.qml"
+if grep -E 'console\.(log|warn).*passwordInput' "$plugin/PolkitAgent.qml"; then echo "never log the password" >&2; exit 1; fi
+
 echo "polkit contract passed"

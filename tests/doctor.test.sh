@@ -119,4 +119,8 @@ if grep -Fq 'select(.id == "araneadev.health")' "$repo_root/scripts/aranea-docto
 # the stock picker back; that is a choice, not a broken install).
 if grep -Eq 'select\(.id == "araneadev.(clipboard|emojis)"\)' "$repo_root/scripts/aranea-doctor"; then echo "pickers must be optional in the plugins check" >&2; exit 1; fi
 
+# The polkit prompt is optional like the pickers: disabling it brings the
+# stock agent back, which is a choice, not a broken install.
+if grep -Fq 'select(.id == "araneadev.polkit")' "$repo_root/scripts/aranea-doctor"; then echo "polkit must be optional in the plugins check" >&2; exit 1; fi
+
 echo "doctor contract passed"

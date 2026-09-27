@@ -37,7 +37,8 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       {id: "araneadev.health"},
       {id: "araneadev.clipboard"},
       {id: "araneadev.emojis"},
-      {id: "araneadev.osd"}
+      {id: "araneadev.osd"},
+      {id: "araneadev.polkit"}
     ] | unique_by(.id))
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
@@ -45,12 +46,14 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       "omarchy.emojis",
       "omarchy.lock",
       "omarchy.notifications",
-      "omarchy.osd"
+      "omarchy.osd",
+      "omarchy.polkit"
     ]) | unique | sort)
-  # Tell the host to re-enable the Omarchy daemon if the user ever disables
-  # the Aranea notifications by hand (host bookkeeping for cloned plugins).
+  # Tell the host to re-enable the Omarchy plugin if the user ever disables
+  # an Aranea clone by hand (host bookkeeping for cloned plugins; for polkit
+  # this keeps an agent registered).
   | .cloneSourceRestores = ((if (.cloneSourceRestores | type) == "array" then .cloneSourceRestores else [] end)
-      + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis"] | unique)
+      + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit"] | unique)
   # Place the notification bell once. Layout entries may be plain id strings
   # or {id: ...} objects; both count. Only a layout the user already owns is
   # touched: writing a partial layout would replace the host defaults.

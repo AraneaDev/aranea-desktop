@@ -43,8 +43,8 @@ fi
 jq '
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
-  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis"];
-  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis"];
+  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit"];
+  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit"];
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(
       .value |= (if type == "array" then map(select(entry_id as $id | ours | index($id) | not)) else . end))

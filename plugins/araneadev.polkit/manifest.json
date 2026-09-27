@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.polkit",
+  "name": "Aranea polkit prompt",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Lock-style authentication prompt that shows who is asking for what",
+  "omarchy": {
+    "capabilities": [
+      "authentication"
+    ],
+    "clonedFrom": "omarchy.polkit"
+  },
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "PolkitAgent.qml"
+  }
+}
