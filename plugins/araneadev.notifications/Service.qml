@@ -107,6 +107,7 @@ Item {
     id: persisted
     reloadableId: "omarchy-notifications"
     property bool doNotDisturb: false
+    onReloaded: service.reloadedSettings = true
     onDoNotDisturbChanged: {
       // Suppress the write that load-time hydration would otherwise trigger.
       if (service._hydrating)
@@ -114,6 +115,9 @@ Item {
       service.scheduleSettingsSave()
     }
   }
+
+  // Set when PersistentProperties carried values over a reload; the file must not overwrite them.
+  property bool reloadedSettings: false
 
   // Guards onDoNotDisturbChanged while we're hydrating from disk so the
   // hydration assignment doesn't immediately schedule a write-back.
@@ -125,16 +129,14 @@ Item {
   // notifications still enter history through the same path as DND, while
   // critical CLI alerts retain the existing explicit bypass rule.
   readonly property string quietHoursWindow: Quickshell.env("ARANEA_QUIET_HOURS")
-  // Bumped every minute while a window is set, so quietHours re-evaluates.
-  property int quietHoursTick: 0
   // True while the current time is inside quietHoursWindow; acts like DND.
-  readonly property bool quietHours: quietHoursTick >= 0 && NotificationLogic.isWithinQuietHours(quietHoursWindow, new Date())
+  readonly property bool quietHours: NotificationLogic.isWithinQuietHours(quietHoursWindow, quietClock.date)
 
-  Timer {
-    interval: 60000
-    repeat: true
-    running: service.quietHoursWindow.length > 0
-    onTriggered: service.quietHoursTick++
+  // Minute clock for quiet hours; runs only while a window is set.
+  SystemClock {
+    id: quietClock
+    precision: SystemClock.Minutes
+    enabled: service.quietHoursWindow.length > 0
   }
 
   // Turns DND on or off; the change is persisted to settingsPath.
@@ -623,7 +625,7 @@ Item {
     if (parsed.error)
       console.warn("notifications: settings parse failed:", parsed.errorMessage || "")
 
-    if (parsed.dnd !== null) {
+    if (parsed.dnd !== null && !service.reloadedSettings) {
       service._hydrating = true
       persisted.doNotDisturb = parsed.dnd
       service._hydrating = false
@@ -645,7 +647,12 @@ Item {
     }, null, 2) + "\n")
   }
 
-  Component.onDestruction: ServiceBridge.retract(service)
+  Component.onDestruction: {
+    // A toggle less than 200 ms old would otherwise be lost with the timer.
+    if (settingsSaveTimer.running)
+      service.flushSettings()
+    ServiceBridge.retract(service)
+  }
 
   Component.onCompleted: {
     // The bar widget (Panel.qml) finds this service here; see ServiceBridge.js.

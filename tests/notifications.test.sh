@@ -107,4 +107,14 @@ grep -Fq 'onPruned' "$svc"
 grep -Fq 'NotificationLogic.persistablePopup(updated, inbox.imagesDir).entry' "$svc"
 grep -Fq 'critical notifications stay until dismissed' "$repo_root/README.md"
 
+# --- 4c: quiet hours follow a minute-aligned clock; a pending DND save is flushed
+grep -Fq 'precision: SystemClock.Minutes' "$svc"
+grep -Fq 'NotificationLogic.isWithinQuietHours(quietHoursWindow, quietClock.date)' "$svc"
+if grep -Fq 'quietHoursTick' "$svc"; then
+  echo "quiet hours must not use the unaligned tick" >&2
+  exit 1
+fi
+grep -Fq 'if (settingsSaveTimer.running)' "$svc"
+grep -Fq 'onReloaded: service.reloadedSettings = true' "$svc"
+
 echo "notifications contract passed"
