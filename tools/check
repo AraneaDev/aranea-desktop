@@ -42,6 +42,10 @@ while (($#)); do
   shift
 done
 export fix fast staged update_baselines
+if ((staged && fix)); then
+  echo "--fix cannot be combined with --staged (it would only rewrite a snapshot)" >&2
+  exit 2
+fi
 
 # True when NAME is one of the known stages.
 known_stage() {
@@ -99,7 +103,9 @@ check_files() {
   done <<<"$list"
 }
 
-# Stage libraries (each defines stage_<name>).
+# Shared helpers, then the stage libraries (each defines stage_<name>).
+source "$repo_root/tools/lib/check-common.sh"
+source "$repo_root/tools/lib/check-format.sh"
 source "$repo_root/tools/lib/check-validate.sh"
 
 # Runs one stage function (defined by the libraries above).

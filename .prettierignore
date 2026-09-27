@@ -1,0 +1,6 @@
+node_modules/
+coverage/
+CHANGELOG.md
+docs/superpowers/
+plugins/araneadev.emojis/emojis.json
+package-lock.json

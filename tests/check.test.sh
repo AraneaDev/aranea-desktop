@@ -14,6 +14,8 @@ mkdir -p tools/lib tools/baselines docs
 cp "$repo_root/tools/check" tools/
 cp "$repo_root"/tools/lib/check-*.sh tools/lib/
 cp "$repo_root/tools/baselines/em-dash-allow.txt" tools/baselines/
+for config in .prettierrc.json .prettierignore .editorconfig .qmlformat.ini; do cp "$repo_root/$config" .; done
+export ARANEA_CHECK_NODE_MODULES="$repo_root/node_modules"
 printf '{"ok": true}\n' > data.json
 printf 'a = 1\n' > conf.toml
 printf '# Title\n\nSee [data](../data.json).\n' > docs/readme.md
@@ -50,4 +52,16 @@ if PATH="$fake:$PATH" run_check --only validate; then echo "crashing jq passed" 
 if tools/check --only nope >/dev/null 2>&1; then exit 1; fi
 if tools/check --bogus >/dev/null 2>&1; then exit 1; fi
 
+# format: unformatted shell, JSON and QML fail; --fix repairs them.
+printf '#!/usr/bin/env bash\nif true;then\necho x\nfi\n' > s.sh
+printf '{"a":1,\n"b":2}\n' > f.json
+git add -A
+if run_check --only format; then echo "format passed unformatted files" >&2; exit 1; fi
+grep -Fq 's.sh' "$ARANEA_TEST_SANDBOX/out" && grep -Fq 'f.json' "$ARANEA_TEST_SANDBOX/out"
+run_check --only format --fix
+git add -A
+run_check --only format || { cat "$ARANEA_TEST_SANDBOX/out"; exit 1; }
+git reset -q --hard
+# --fix together with --staged is refused (it would only write a snapshot).
+if tools/check --staged --fix --only format >/dev/null 2>&1; then echo "--staged --fix accepted" >&2; exit 1; fi
 echo "check contract passed"
