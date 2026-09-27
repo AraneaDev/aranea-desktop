@@ -320,9 +320,10 @@ masked in the list and the preview, and removed from history 10 minutes after
 it was copied unless pinned. Copies a password manager marks as secret are
 never stored at all.
 
-`Enter` pastes, `Shift+Enter` copies, `Ctrl+P` pins, `Space` reveals a masked
-secret, `Ctrl+S` marks or unmarks a secret, `Delete` removes an item and
-`Ctrl+Shift+Delete` clears everything that is not pinned.
+`Enter` pastes, `Shift+Enter` copies, `Alt+Enter` opens an item in the editor
+(never a secret), `Ctrl+P` pins, `Space` reveals a masked secret, `Ctrl+S`
+marks or unmarks a secret, `Delete` removes an item and `Ctrl+Shift+Delete`
+clears everything that is not pinned.
 
 **Emoji** (`Super+Ctrl+E`) shows your recent emojis above the full set and
 names the emoji under the cursor. `Enter` inserts it into the focused window,

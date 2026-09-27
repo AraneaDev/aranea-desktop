@@ -75,6 +75,8 @@ Item {
   // Display index whose secret is revealed in the preview; any cursor move
   // masks it again.
   property int revealedIndex: -1
+  // One-off message that replaces the key hints until noticeTimer clears it.
+  property string notice: ""
   // Number of pinned entries, shown in the header counts.
   readonly property int pinnedCount: root.history.filter(function (e) {
     return e && e.pinned
@@ -98,8 +100,15 @@ Item {
 
   // Hides the picker and dismisses the clear confirmation.
   function close() {
+    root.notice = ""
     root.cancelClearHistory()
     root.opened = false
+  }
+
+  // Shows text on the hint line for three seconds.
+  function showNotice(text) {
+    root.notice = text
+    noticeTimer.restart()
   }
 
   // Closes the picker when open, opens it otherwise.
@@ -365,11 +374,16 @@ Item {
     root.copySelected(row)
   }
 
-  // Opens the row at display index with omarchy-clipboard-open.
+  // Opens the row at display index with omarchy-clipboard-open; secrets are
+  // refused with a notice (opening would write them to a file).
   function openIndex(index) {
     if (index < 0 || index >= displayModel.count)
       return
     var row = displayModel.get(index)
+    if (!ClipboardLogic.canOpen(row)) {
+      root.showNotice("SECRETS CAN'T BE OPENED IN THE EDITOR")
+      return
+    }
     root.openSelected(row)
   }
 
@@ -436,6 +450,12 @@ Item {
     repeat: true
     running: true
     onTriggered: root.expireNow()
+  }
+
+  Timer {
+    id: noticeTimer
+    interval: 3000
+    onTriggered: root.notice = ""
   }
 
   ListModel {
@@ -571,6 +591,8 @@ Item {
 
   // Key-hint line for the current state and the row under the cursor.
   function hintText() {
+    if (root.notice)
+      return root.notice
     if (displayModel.count === 0)
       return root.filterText ? "ESC CLEAR SEARCH" : "ESC CLOSE"
     var row = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null

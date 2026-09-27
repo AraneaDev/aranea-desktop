@@ -37,4 +37,9 @@ grep -Fq 'ClipboardLogic.hadUnstamped' "$plugin/Clipboard.qml"
 # m10: paste/copy wait for a pending history write
 grep -Fq 'root.pendingAction' "$plugin/Clipboard.qml"
 
+# --- 4a: secrets never reach clipboard-open (Alt+Enter refused with a notice)
+block_grep "$plugin/Clipboard.qml" 'function openIndex(index)' 'ClipboardLogic.canOpen(row)'
+block_grep "$plugin/Clipboard.qml" 'function openIndex(index)' "root.showNotice(\"SECRETS CAN'T BE OPENED IN THE EDITOR\")"
+block_grep "$plugin/Clipboard.qml" 'function hintText()' 'if (root.notice)'
+
 echo "clipboard contract passed"

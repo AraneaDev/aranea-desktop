@@ -624,6 +624,16 @@ function clearUnpinned(history) {
   })
 }
 
+/**
+ * Tells whether an entry may be opened in the editor: secrets never are,
+ * because opening writes the text to a file.
+ * @param {?{secret?: boolean}} entry - The entry or display row.
+ * @returns {boolean} True when it may be opened.
+ */
+function canOpen(entry) {
+  return !!entry && !entry.secret
+}
+
 // ---------------------------------------------------- display
 
 /**
@@ -761,6 +771,7 @@ if (typeof module !== "undefined") {
     togglePinned: togglePinned,
     toggleSecret: toggleSecret,
     clearUnpinned: clearUnpinned,
+    canOpen: canOpen,
     relativeAge: relativeAge,
     linkParts: linkParts,
     colourValue: colourValue,

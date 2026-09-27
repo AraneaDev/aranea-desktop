@@ -281,3 +281,12 @@ test("secret detection (4a)", () => {
   assert(c.isDeveloperText("Tim.Schipper@Example.com"), "email is developer text")
   assert(!c.isDeveloperText("P@ssw0rd123456789"), "leetspeak is not an email")
 })
+
+test("secrets cannot be opened (4a)", () => {
+  const c = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
+  )
+  if (c.canOpen({ secret: true }) !== false) throw new Error("secret opened")
+  if (c.canOpen({ secret: false }) !== true) throw new Error("plain refused")
+  if (c.canOpen(null) !== false) throw new Error("null opened")
+})
