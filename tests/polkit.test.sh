@@ -78,5 +78,13 @@ block_grep "$agent" 'id: card' 'clip: true'
 grep -Fq 'ARANEA_DOCTOR_POLKIT_STATUS' "$repo_root/scripts/aranea-doctor"
 # README tells a hand-disabler to restart the shell
 grep -Fq 'omarchy plugin disable araneadev.polkit' "$repo_root/README.md"
+# --- 4a: the target has its own line that is never elided
+target_block="$(awk '/The target, never elided/ { on = 1 } on { print } on && /^        }$/ { exit }' "$agent")"
+grep -Fq 'PolkitLogic.targetLine(root.currentMessage)' <<<"$target_block"
+grep -Fq 'wrapMode: Text.Wrap' <<<"$target_block"
+if grep -Eq 'elide:|maximumLineCount' <<<"$target_block"; then
+  echo "the target line must never elide" >&2
+  exit 1
+fi
 
 echo "polkit contract passed"

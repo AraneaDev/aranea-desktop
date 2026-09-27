@@ -64,7 +64,7 @@ test("polkit logic", () => {
   const user1 = "Authentication is required to run '/usr/bin/btop' as user Tim Schipper (tim)"
   eq(
     p.summaryParts(root1),
-    { prefix: "Run '", command: "/usr/bin/true", suffix: "' as root" },
+    { prefix: "Run '", command: "/usr/bin/true", suffix: "'", target: "root" },
     "super user parts"
   )
   eq(p.requestSummary(root1), "Run '/usr/bin/true' as root", "super user summary")
@@ -96,7 +96,7 @@ test("polkit logic", () => {
   eq(p.escapeHtml('<b>&"x"</b>'), "&lt;b&gt;&amp;&quot;x&quot;&lt;/b&gt;", "escapeHtml")
   eq(
     p.requestMarkup(root1, "#3bff9e"),
-    "Run '<font color=\"#3bff9e\">/usr/bin/true</font>' as root",
+    "Run '<font color=\"#3bff9e\">/usr/bin/true</font>'",
     "markup"
   )
   const hostile = "Authentication is needed to run `/tmp/<b>x</b>&y' as the super user"
@@ -214,4 +214,38 @@ test("polkit logic", () => {
   eq(p.promptPlaceholder("password: "), "Enter password", "password: ")
   eq(p.promptPlaceholder(""), "Enter password", "empty prompt")
   eq(p.promptPlaceholder("Verification code:"), "Verification code", "custom prompt")
+})
+
+test("polkit spoofing (4a)", () => {
+  const p = require(path.join(__dirname, "..", "..", "plugins/araneadev.polkit/PolkitLogic.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const spoof = "Authentication is needed to run `/tmp/x' as user tim (tim)' as the super user"
+  eq(p.commandFromMessage(spoof), "/tmp/x' as user tim (tim)", "command keeps the fake tail")
+  eq(p.targetLine(spoof), "as root", "real target wins")
+  const reverse = "Authentication is needed to run `/tmp/x' as the super user' as user Bob (bob)"
+  eq(p.targetLine(reverse), "as Bob (bob)", "named user at the end wins")
+  eq(
+    p.targetLine("Authentication is needed to run `/usr/bin/true' as the super user"),
+    "as root",
+    "root"
+  )
+  eq(p.targetLine("Authentication is required to mount /dev/sdb1"), "", "not pkexec")
+  eq(
+    p.targetLine("Authentication is needed to run `/usr/bin/true' as the admin"),
+    "",
+    "unknown tail"
+  )
+  eq(p.requestSummary(spoof), "Run '/tmp/x' as user tim (tim)' as root", "summary")
+  // invisible or blank-looking characters are shown as escapes
+  eq(p.visibleCommand("/bin/a⠀⠀b"), "/bin/a\\u2800\\u2800b", "braille blank")
+  eq(p.visibleCommand("a​b‮c⁦d﻿e"), "a\\u200Bb\\u202Ec\\u2066d\\uFEFFe", "zero-width and bidi")
+  eq(p.visibleCommand("a\u0007b\u0085c"), "a\\u0007b\\u0085c", "C0 and C1 controls")
+  eq(p.visibleCommand("/usr/bin/true --flag"), "/usr/bin/true --flag", "normal text untouched")
+  const padded = "Authentication is needed to run `/bin/sh" + "⠀".repeat(3) + "' as the super user"
+  const m = p.requestMarkup(padded, "#fff")
+  if (m.includes("⠀") || !m.includes("\\u2800")) throw new Error("markup hides padding: " + m)
+  const rows = p.detailRows("org.x", "", p.commandFromMessage(padded), padded)
+  if (rows.some((r) => r.value.includes("⠀"))) throw new Error("details hide padding")
 })

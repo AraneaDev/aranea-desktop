@@ -16,7 +16,8 @@
  * @typedef {object} SummaryParts
  * @property {string} prefix - text before the command (the whole message when not pkexec)
  * @property {string} command - the pkexec command, or ""
- * @property {string} suffix - text after the command, e.g. "' as root", or ""
+ * @property {string} suffix - the closing quote after the command ("'"), or ""
+ * @property {string} target - who the command runs as ("root" or the user label), or ""
  */
 
 /**
@@ -48,21 +49,13 @@ function fingerprintConfiguredFromPamConfig(raw) {
   return false
 }
 
-/**
- * Turns pkexec's "Authentication is needed to run `cmd' as ..." into "Authorize running 'cmd'"; other text is returned as is.
- * @param {?string} message - the polkit request message
- * @returns {string} the short label, or the message unchanged
- */
-function authorizationLabel(message) {
-  var text = String(message || "")
-  var match = text.match(/^Authentication is (?:needed|required) to run [`']([^`']+)[`'] as /i)
-  return match ? "Authorize running '" + match[1] + "'" : text
-}
-
 // pkexec's messages: "Authentication is needed to run `/usr/bin/true' as the
-// super user" and "... as user Tim Schipper (tim)".
+// super user" and "... as user Tim Schipper (tim)". The command is matched
+// greedily and the target only at the very end, so a command (a file name the
+// caller controls) that contains "' as the super user" or "' as user x" can
+// never change the target shown.
 var PKEXEC_MESSAGE =
-  /^Authentication is (?:needed|required) to run [`']([^`']+)[`'] as (?:(the super user)|user (.+))$/i
+  /^Authentication is (?:needed|required) to run [`'](.+)[`'] as (?:(the super user)|user ([^`']+))$/i
 
 /**
  * Parses a pkexec message into the command and the target user ("root" for the super user).
@@ -78,10 +71,20 @@ function parsePkexec(message) {
 }
 
 /**
- * Splits the request message, flattened to one line, into prefix, command and suffix; non-pkexec
- * messages come back whole as the prefix ("Authentication is needed" when empty).
+ * Turns pkexec's "Authentication is needed to run `cmd' as ..." into "Authorize running 'cmd'"; other text is returned as is.
  * @param {?string} message - the polkit request message
- * @returns {SummaryParts} the three pieces of the request line
+ * @returns {string} the short label, or the message unchanged
+ */
+function authorizationLabel(message) {
+  var parsed = parsePkexec(message)
+  return parsed ? "Authorize running '" + parsed.command + "'" : String(message || "")
+}
+
+/**
+ * Splits the request message, flattened to one line, into prefix, command, suffix and target;
+ * non-pkexec messages come back whole as the prefix ("Authentication is needed" when empty).
+ * @param {?string} message - the polkit request message
+ * @returns {SummaryParts} the pieces of the request line
  */
 function summaryParts(message) {
   // One logical line: StyledText would otherwise decide how breaks render.
@@ -89,8 +92,9 @@ function summaryParts(message) {
     .replace(/\s*[\r\n]+\s*/g, " ")
     .trim()
   var parsed = parsePkexec(text)
-  if (parsed) return { prefix: "Run '", command: parsed.command, suffix: "' as " + parsed.target }
-  return { prefix: text || "Authentication is needed", command: "", suffix: "" }
+  if (parsed)
+    return { prefix: "Run '", command: parsed.command, suffix: "'", target: parsed.target }
+  return { prefix: text || "Authentication is needed", command: "", suffix: "", target: "" }
 }
 
 /**
@@ -100,7 +104,7 @@ function summaryParts(message) {
  */
 function requestSummary(message) {
   var parts = summaryParts(message)
-  return parts.prefix + parts.command + parts.suffix
+  return parts.prefix + parts.command + parts.suffix + (parts.target ? " as " + parts.target : "")
 }
 
 /**
@@ -141,10 +145,57 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;")
 }
 
+// Characters that render blank or reorder text: C0/C1 controls, soft hyphen,
+// Hangul fillers, zero-width and direction marks, line/paragraph separators,
+// bidi embeddings and isolates, word joiners, braille blank and the BOM.
+var INVISIBLE_RANGES = [
+  [0x00, 0x1f],
+  [0x7f, 0x9f],
+  [0xad, 0xad],
+  [0x115f, 0x1160],
+  [0x200b, 0x200f],
+  [0x2028, 0x202e],
+  [0x2060, 0x2064],
+  [0x2066, 0x2069],
+  [0x2800, 0x2800],
+  [0x3164, 0x3164],
+  [0xfeff, 0xfeff]
+]
+
+/**
+ * Replaces characters that render blank or reorder text with visible \uXXXX
+ * escapes, so padding cannot push part of a command out of view.
+ * @param {*} text - the text; falsy values give ""
+ * @returns {string} the text with those characters escaped
+ */
+function visibleCommand(text) {
+  var s = String(text || "")
+  var out = ""
+  for (var i = 0; i < s.length; i++) {
+    var code = s.charCodeAt(i)
+    var hidden = INVISIBLE_RANGES.some(function (r) {
+      return code >= r[0] && code <= r[1]
+    })
+    out += hidden ? "\\u" + ("000" + code.toString(16).toUpperCase()).slice(-4) : s.charAt(i)
+  }
+  return out
+}
+
+/**
+ * The line saying who a pkexec command runs as, e.g. "as root" or "as Tim Schipper (tim)".
+ * @param {?string} message - the polkit request message
+ * @returns {string} the line (invisible characters escaped), or "" when it is not a pkexec message
+ */
+function targetLine(message) {
+  var target = summaryParts(message).target
+  return target ? "as " + visibleCommand(target) : ""
+}
+
 // StyledText for the request line: the command in the accent colour, every
 // piece of polkit-supplied text escaped so it is shown, never interpreted.
 /**
- * Builds the StyledText request line with the (middle-shortened) command wrapped in an accent-coloured font tag.
+ * Builds the StyledText request line (without the target, which targetLine gives) with the command,
+ * invisible characters escaped and middle-shortened, wrapped in an accent-coloured font tag.
  * @param {?string} message - the polkit request message
  * @param {string} accent - the accent colour as a string, e.g. "#ff00aa"
  * @returns {string} the escaped StyledText markup
@@ -157,7 +208,7 @@ function requestMarkup(message, accent) {
       '<font color="' +
       escapeHtml(accent) +
       '">' +
-      escapeHtml(shortenMiddle(parts.command, 64)) +
+      escapeHtml(shortenMiddle(visibleCommand(parts.command), 64)) +
       "</font>"
   return out + escapeHtml(parts.suffix)
 }
@@ -255,7 +306,8 @@ function contextLine(description, identity, position) {
 }
 
 /**
- * Builds the details rows (ACTION, VENDOR, COMMAND, MESSAGE), leaving out empty values.
+ * Builds the details rows (ACTION, VENDOR, COMMAND, MESSAGE), leaving out empty values;
+ * command and message have invisible characters escaped.
  * @param {?string} actionId - the polkit action id
  * @param {?string} vendor - the action's vendor from pkaction
  * @param {?string} command - the pkexec command
@@ -266,8 +318,8 @@ function detailRows(actionId, vendor, command, message) {
   var rows = [
     { key: "ACTION", value: String(actionId || "") },
     { key: "VENDOR", value: String(vendor || "") },
-    { key: "COMMAND", value: String(command || "") },
-    { key: "MESSAGE", value: String(message || "") }
+    { key: "COMMAND", value: visibleCommand(command) },
+    { key: "MESSAGE", value: visibleCommand(message) }
   ]
   return rows.filter(function (row) {
     return row.value.length > 0
@@ -299,6 +351,8 @@ if (typeof module !== "undefined") {
     shortenMiddle: shortenMiddle,
     escapeHtml: escapeHtml,
     requestMarkup: requestMarkup,
+    visibleCommand: visibleCommand,
+    targetLine: targetLine,
     validActionId: validActionId,
     parseActionInfo: parseActionInfo,
     identityLabel: identityLabel,

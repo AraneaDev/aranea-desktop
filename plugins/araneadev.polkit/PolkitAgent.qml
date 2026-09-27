@@ -576,6 +576,7 @@ Item {
 
         // The request, command in the accent colour (polkit text escaped).
         Text {
+          id: requestLine
           Layout.fillWidth: true
           textFormat: Text.StyledText
           text: PolkitLogic.requestMarkup(root.currentMessage, root.accent.toString())
@@ -585,6 +586,18 @@ Item {
           wrapMode: Text.Wrap
           maximumLineCount: 2
           elide: Text.ElideRight
+        }
+
+        // The target, never elided: who the command runs as always shows in full.
+        Text {
+          Layout.fillWidth: true
+          visible: text.length > 0
+          textFormat: Text.PlainText
+          text: PolkitLogic.targetLine(root.currentMessage)
+          color: root.accent
+          font.family: root.fontFamily
+          font.pixelSize: requestLine.font.pixelSize
+          wrapMode: Text.Wrap
         }
 
         // What polkit says the action is, and who is authenticating.
