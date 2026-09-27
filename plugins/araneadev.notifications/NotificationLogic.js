@@ -759,6 +759,18 @@ function isWithinQuietHours(window, date) {
 }
 
 /**
+ * Caps a timestamp at now, so an entry dated in the future neither sorts
+ * first nor outlives the age limit.
+ * @param {*} ts - the timestamp in ms
+ * @param {number} now - the current time in ms
+ * @returns {number} the timestamp, at most now; 0 when not a number
+ */
+function clampTimestamp(ts, now) {
+  var t = Number(ts) || 0
+  return t > now ? now : t
+}
+
+/**
  * Counts pause holds per toast: every screen's copy of a toast that is
  * hovered or dragged adds one, and the toast only counts down at zero.
  * @param {*} holds - current counts by toast key (not modified)
@@ -779,6 +791,7 @@ function holdPopup(holds, key, on) {
 if (typeof module !== "undefined") {
   module.exports = {
     holdPopup: holdPopup,
+    clampTimestamp: clampTimestamp,
     isChromiumDerived: isChromiumDerived,
     sanitizeBody: sanitizeBody,
     styledBody: styledBody,

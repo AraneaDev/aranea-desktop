@@ -96,4 +96,15 @@ fi
 grep -Fq 'fileProc.write(inbox.runningStdin + "\n")' "$inbox_qml"
 grep -Fq 'if (!running && !inbox.runningStarted)' "$inbox_qml"
 
+# --- 4c: pruning is timed and releases senders; the model shows persisted images;
+# changes during the startup read are applied after it; timestamps are capped
+grep -Fq 'signal pruned(string fileName)' "$inbox_qml"
+grep -Fq 'interval: 3600000' "$inbox_qml"
+grep -Fq 'InboxLogic.mergeLoaded(' "$inbox_qml"
+grep -Fq 'NotificationLogic.clampTimestamp(' "$inbox_qml"
+grep -Fq 'service.releaseInboxRef(fileName)' "$svc"
+grep -Fq 'onPruned' "$svc"
+grep -Fq 'NotificationLogic.persistablePopup(updated, inbox.imagesDir).entry' "$svc"
+grep -Fq 'critical notifications stay until dismissed' "$repo_root/README.md"
+
 echo "notifications contract passed"

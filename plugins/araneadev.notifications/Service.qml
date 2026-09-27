@@ -41,6 +41,10 @@ Item {
     id: inbox
     stateDir: service.popupStateDir
     normalUrgency: NotificationUrgency.Normal
+    // Pruned entries release their sender, like a manual dismiss.
+    onPruned: function (fileName) {
+      service.releaseInboxRef(fileName)
+    }
   }
 
   // Corner radius is shared with the menu and shell panels.
@@ -306,7 +310,9 @@ Item {
       return
     }
     var current = inbox.get(fileName)
-    if (current && !NotificationLogic.popupRowChanged(current, updated))
+    // The model shows the persisted image copies (Inbox.showPersisted), so
+    // compare against the persisted form, or every update would rewrite.
+    if (current && !NotificationLogic.popupRowChanged(current, NotificationLogic.persistablePopup(updated, inbox.imagesDir).entry))
       return
     inbox.upsert(updated)
   }

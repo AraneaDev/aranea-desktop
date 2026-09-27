@@ -36,6 +36,12 @@ Item {
 
   // Emitted after each directory read has been merged into the model.
   signal loaded
+  // Emitted for every entry pruning removes, so its sender can be released.
+  signal pruned(string fileName)
+  // File names removed before the first load finished (see mergeLoaded).
+  property var removedDuringLoad: ({})
+  // Whether the inbox was cleared before the first load finished.
+  property bool clearedDuringLoad: false
 
   ListModel {
     id: inboxModel
@@ -95,7 +101,7 @@ Item {
       execArgv: e.execArgv,
       urgency: e.urgency,
       expireTimeout: e.expireTimeout,
-      timestamp: e.timestamp,
+      timestamp: NotificationLogic.clampTimestamp(e.timestamp, Date.now()),
       sourceKey: e.sourceKey
     }
   }
@@ -114,12 +120,29 @@ Item {
       inboxModel.insert(0, row)
     }
     revision++
-    writeFile(entry)
+    writeFile(entry, function (record) {
+      inbox.showPersisted(record)
+    })
     prune()
+  }
+
+  // After a write, shows the persisted image copies instead of the sender's
+  // temporary paths (which vanish when the sender cleans up).
+  function showPersisted(record): void {
+    if (!record)
+      return
+    var i = indexOf(NotificationLogic.popupFileName(record))
+    if (i < 0)
+      return
+    inboxModel.setProperty(i, "image", record.image || "")
+    inboxModel.setProperty(i, "appIcon", record.appIcon || "")
+    revision++
   }
 
   // Removes an entry from the model and deletes its file and image copies.
   function remove(fileName: string): void {
+    if (!loadedOnce)
+      removedDuringLoad[fileName] = true
     var i = indexOf(fileName)
     if (i >= 0) {
       inboxModel.remove(i)
@@ -130,6 +153,8 @@ Item {
 
   // Empties the model and deletes every entry file with its image copies.
   function clear(): void {
+    if (!loadedOnce)
+      clearedDuringLoad = true
     inboxModel.clear()
     revision++
     enqueue(["bash", "-c", "for f in \"$1\"/*.json; do\n" + "  [[ -e $f ]] || continue\n" + "  stale=\"${f##*/}\"\n" + "  rm -f \"$f\" \"$2/${stale%.json}\"-*\n" + "done", "--", inboxDir, imagesDir])
@@ -148,8 +173,18 @@ Item {
       })
     }
     var result = InboxLogic.pruneInbox(rows, Date.now())
-    for (var d = 0; d < result.drop.length; d++)
+    for (var d = 0; d < result.drop.length; d++) {
       remove(result.drop[d].fileName)
+      pruned(result.drop[d].fileName)
+    }
+  }
+
+  // Ages entries out even while no notification arrives.
+  Timer {
+    interval: 3600000
+    repeat: true
+    running: inbox.loadedOnce
+    onTriggered: inbox.prune()
   }
 
   // ---------------------------------------------------- file writes
@@ -276,34 +311,51 @@ Item {
 
   // Rows upserted while the directory was being read are not on disk yet (their
   // writes are queued behind the read), so merge them with what the read
-  // returned instead of replacing the model.
+  // returned instead of replacing the model; entries cleared or removed while
+  // the read ran stay gone (their deletes are queued behind the read too).
   function finishLoad(raw: string): void {
     var entries = NotificationLogic.parsePopupFiles(raw, normalUrgency)
-    var rows = []
-    var seen = {}
+    var now = Date.now()
+    var diskRows = []
+    var future = []
     for (var i = 0; i < entries.length; i++) {
       var row = modelRow(entries[i])
-      seen[row.fileName] = true
       // A legacy health item (1.7.0 posted system-health problems here with
       // a sourceKey); health now lives in its own dropdown.
       if (row.sourceKey) {
         remove(row.fileName)
         continue
       }
-      rows.push(row)
+      if (Number(entries[i].timestamp) > now)
+        future.push(entries[i])
+      diskRows.push(row)
     }
-    for (var j = 0; j < inboxModel.count; j++) {
-      var live = inboxModel.get(j)
-      if (!seen[live.fileName])
-        rows.push(get(live.fileName))
-    }
-    rows.sort(function (a, b) {
-      return (b.timestamp || 0) - (a.timestamp || 0)
-    })
+    var liveRows = []
+    for (var j = 0; j < inboxModel.count; j++)
+      liveRows.push(get(inboxModel.get(j).fileName))
+    var rows = InboxLogic.mergeLoaded(diskRows, liveRows, removedDuringLoad, clearedDuringLoad)
+    var dropped = clearedDuringLoad ? ({}) : removedDuringLoad
+    var cleared = clearedDuringLoad
+    removedDuringLoad = ({})
+    clearedDuringLoad = false
     inboxModel.clear()
     for (var k = 0; k < rows.length; k++)
       inboxModel.append(rows[k])
     revision++
+    // An entry dated in the future (the clock was ahead when it arrived) is
+    // stored again under the current time, so it can age out; its file name
+    // follows the timestamp, so the old file goes.
+    for (var f = 0; f < future.length; f++) {
+      var oldName = NotificationLogic.popupFileName(future[f])
+      if (cleared || dropped[oldName])
+        continue
+      var fixed = Object.assign({}, future[f])
+      fixed.timestamp = now
+      // Write first: the new write copies the old persisted images, and the
+      // queue runs in order, so the old files are deleted only afterwards.
+      upsert(fixed)
+      remove(oldName)
+    }
     prune()
     sweepOrphanImages()
     var done = loadDone

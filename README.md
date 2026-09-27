@@ -289,7 +289,7 @@ center behind the bell in the bar.
   `Super+Shift+Alt+,` toggle the center.
 
 A notification an app updates in place stays one entry. The center keeps at
-most 100 items for up to 7 days.
+most 100 items for up to 7 days; critical notifications stay until dismissed.
 
 Switching to another theme hands notifications back to Omarchy's own toasts
 and takes the bell out of the bar; switching back to Aranea restores both

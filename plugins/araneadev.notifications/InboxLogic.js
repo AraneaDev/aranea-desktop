@@ -330,8 +330,35 @@ function relativeTime(timestamp, now) {
   return Math.floor(hours / 24) + "d"
 }
 
+/**
+ * Merges the rows read from disk at startup with rows already in the model:
+ * disk rows cleared or removed while the read ran are dropped, model rows not
+ * on disk (arrived during the read) are kept; newest first.
+ * @param {Array<{fileName: string, timestamp: number}>} diskRows - rows parsed from the inbox files
+ * @param {Array<{fileName: string, timestamp: number}>} liveRows - rows in the model when the read finished
+ * @param {{[key: string]: boolean}} removed - file names removed while the read ran
+ * @param {boolean} cleared - the inbox was cleared while the read ran
+ * @returns {Array<{fileName: string, timestamp: number}>} the merged rows
+ */
+function mergeLoaded(diskRows, liveRows, removed, cleared) {
+  /** @type {{[key: string]: boolean}} */
+  var seen = {}
+  var out = []
+  for (var i = 0; i < (diskRows || []).length; i++) {
+    var d = diskRows[i]
+    seen[d.fileName] = true
+    if (!cleared && !(removed || {})[d.fileName]) out.push(d)
+  }
+  for (var j = 0; j < (liveRows || []).length; j++)
+    if (!seen[liveRows[j].fileName]) out.push(liveRows[j])
+  return out.sort(function (a, b) {
+    return (b.timestamp || 0) - (a.timestamp || 0)
+  })
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    mergeLoaded: mergeLoaded,
     MAX_ITEMS: MAX_ITEMS,
     MAX_AGE_MS: MAX_AGE_MS,
     COLLAPSE_AT: COLLAPSE_AT,

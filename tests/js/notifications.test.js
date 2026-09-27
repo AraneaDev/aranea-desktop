@@ -274,3 +274,41 @@ test("toast holds (4c)", () => {
   eq(n.holdPopup({ "5-1": 1 }, "5-1", false), {}, "last hold removes the key")
   eq(n.holdPopup({}, "5-1", false), {}, "never negative")
 })
+
+test("inbox consistency (4c)", () => {
+  const root = path.join(__dirname, "..", "..", "plugins/araneadev.notifications")
+  const n = require(`${root}/NotificationLogic.js`)
+  const inbox = require(`${root}/InboxLogic.js`)
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const now = 1000000
+  eq(n.clampTimestamp(now + 5000, now), now, "future capped")
+  eq(n.clampTimestamp(now - 5, now), now - 5, "past kept")
+  eq(n.clampTimestamp("x", now), 0, "junk is 0")
+  const disk = [
+    { fileName: "a", timestamp: 3 },
+    { fileName: "b", timestamp: 1 }
+  ]
+  const live = [{ fileName: "c", timestamp: 2 }]
+  eq(
+    inbox.mergeLoaded(disk, live, {}, false).map((r) => r.fileName),
+    ["a", "c", "b"],
+    "merge"
+  )
+  eq(
+    inbox.mergeLoaded(disk, live, { a: true }, false).map((r) => r.fileName),
+    ["c", "b"],
+    "removed during load"
+  )
+  eq(
+    inbox.mergeLoaded(disk, live, {}, true).map((r) => r.fileName),
+    ["c"],
+    "cleared during load keeps later arrivals"
+  )
+  eq(
+    inbox.mergeLoaded(disk, [{ fileName: "a", timestamp: 3 }], {}, false).length,
+    2,
+    "live copy of a disk row is not doubled"
+  )
+})
