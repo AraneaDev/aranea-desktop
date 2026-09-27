@@ -10,7 +10,7 @@ mapfile -t surfaces < <(
 )
 expected_surfaces=(
   menu menu-submenu menu-search menu-input desktop health lock plymouth
-  btop file-manager neovim notifications notifications-empty
+  btop file-manager neovim notifications notifications-empty clipboard emojis
   network audio bluetooth agents
   power monitor apps favorites recent
   dawn osd
