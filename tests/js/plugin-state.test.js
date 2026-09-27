@@ -106,10 +106,15 @@ test("plugin-state logic", () => {
   const favoriteIds = menu.normalizeAppIds(["org.alpha", "org.alpha", 7, null, ""], 3)
   if (favoriteIds.length !== 2 || favoriteIds[1] !== "7")
     throw new Error("favorite app ids were not normalized")
-  if (menu.toggleFavoriteApp(favoriteIds, "org.beta", 3).join(",") !== "org.beta,org.alpha,7")
+  const added = menu.toggleFavoriteApp(favoriteIds, "org.beta", 3)
+  if (added.ids.join(",") !== "org.beta,org.alpha,7" || added.refused)
     throw new Error("favorite app was not added at the front")
-  if (menu.toggleFavoriteApp(["org.alpha", "org.beta"], "org.alpha", 3).join(",") !== "org.beta")
+  const removed = menu.toggleFavoriteApp(["org.alpha", "org.beta"], "org.alpha", 3)
+  if (removed.ids.join(",") !== "org.beta" || removed.refused)
     throw new Error("favorite app was not removed")
+  const full = menu.toggleFavoriteApp(["a", "b", "c"], "d", 3)
+  if (full.ids.join(",") !== "a,b,c" || full.refused !== true)
+    throw new Error("a pin beyond the limit must be refused, not drop the oldest")
   if (
     menu.recordRecentApp(["org.alpha", "org.beta"], "org.alpha", 3).join(",") !==
     "org.alpha,org.beta"
@@ -134,32 +139,8 @@ test("plugin-state logic", () => {
   ) {
     throw new Error("favorite app rows were not projected into their submenu")
   }
-  const pinnedTile = menu.dynamicTileForAppRows(appRows, ["org.beta"], ["org.alpha"], "workspace-1")
   if (
-    pinnedTile.source !== "pinned" ||
-    pinnedTile.label !== "Beta" ||
-    pinnedTile.detail !== "PINNED"
-  ) {
-    throw new Error("favorite app did not win dynamic tile resolution")
-  }
-  const recentTile = menu.dynamicTileForAppRows(appRows, [], ["org.alpha"], "workspace-1")
-  if (
-    recentTile.source !== "recent" ||
-    recentTile.label !== "Alpha" ||
-    recentTile.detail !== "RECENT"
-  ) {
-    throw new Error("recent app did not resolve dynamic tile")
-  }
-  const fallbackTile = menu.dynamicTileForAppRows([], [], [], "workspace-1")
-  if (
-    fallbackTile.source !== "workspace" ||
-    fallbackTile.detail !== "WORKSPACE" ||
-    !fallbackTile.label
-  ) {
-    throw new Error("dynamic tile fallback was not stable")
-  }
-  if (
-    menu.semanticDetail({ parent: "root", label: "Apps" }, "Applications") !==
+    menu.semanticDetail({ id: "apps", parent: "root", label: "Apps" }, "Applications") !==
     "FIND // LAUNCH // MANAGE"
   ) {
     throw new Error("root Apps semantic subtitle was not normalized")
@@ -452,4 +433,106 @@ test("bar model layout helpers (4b)", () => {
   )
   eq(bar.isDrawnSlot({ visible: true, width: 2, height: 2 }), true, "drawn slot")
   eq(bar.isDrawnSlot({ visible: false, width: 2, height: 2 }), false, "hidden slot")
+})
+
+test("menu model (4b)", () => {
+  const menu = require(path.join(__dirname, "..", "..", "plugins/araneadev.menu/MenuModel.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  // state file
+  eq(menu.parseAppHistory("", 12), { favorites: [], recent: [] }, "missing file")
+  eq(menu.parseAppHistory("not json", 12), { favorites: [], recent: [] }, "corrupt file")
+  eq(menu.parseAppHistory("[]", 12), { favorites: [], recent: [] }, "array")
+  eq(menu.parseAppHistory('{"favorites":"x"}', 12), { favorites: [], recent: [] }, "wrong type")
+  eq(
+    menu.parseAppHistory('{"favorites":["a"," a ","b",7,""],"recent":["c"]}', 12),
+    { favorites: ["a", "b", "7"], recent: ["c"] },
+    "normalized"
+  )
+  const many = JSON.stringify({ favorites: Array.from({ length: 20 }, (_, i) => "app" + i) })
+  eq(menu.parseAppHistory(many, 12).favorites.length, 12, "limit")
+  eq(
+    JSON.parse(menu.serializeAppHistory(["a", "a"], ["b"], 12)),
+    { favorites: ["a"], recent: ["b"] },
+    "serialize"
+  )
+  eq(menu.pruneAppIds(["a", "gone", "b"], ["b", "a"]), ["a", "b"], "prune uninstalled")
+  eq(menu.pruneAppIds(["a"], null), ["a"], "unknown library keeps ids")
+  // search shows each app once
+  const rows = [
+    { kind: "app", appId: "firefox", itemId: "apps.recent.firefox" },
+    { kind: "menu", appId: "", itemId: "apps.favorites" },
+    { kind: "app", appId: "firefox", itemId: "apps.firefox" },
+    { kind: "action", appId: "", itemId: "setup.x" },
+    { kind: "app", appId: "files", itemId: "apps.files" }
+  ]
+  eq(
+    menu.dedupeAppRows(rows).map((r) => r.itemId),
+    ["apps.recent.firefox", "apps.favorites", "setup.x", "apps.files"],
+    "dedupe keeps first per app"
+  )
+  // Apps: menus first in their order, apps by label
+  eq(
+    menu
+      .sortAppsMenu([
+        { kind: "app", label: "zed", itemId: "apps.zed", order: 0 },
+        { kind: "menu", label: "Recent", itemId: "apps.recent", order: 0 },
+        { kind: "app", label: "Alpha", itemId: "apps.alpha", order: 3 },
+        { kind: "menu", label: "Favorites", itemId: "apps.favorites", order: 1 }
+      ])
+      .map((r) => r.itemId),
+    ["apps.recent", "apps.favorites", "apps.alpha", "apps.zed"],
+    "apps sort"
+  )
+  // hints
+  const h = (s) =>
+    menu.hintText(
+      Object.assign(
+        { root: false, filter: false, dmenu: false, input: false, count: 0, appRow: false },
+        s
+      )
+    )
+  eq(h({ root: true }), "SYSTEM // READY", "root")
+  eq(h({ filter: true }), "ESC CLEAR  ·  ENTER OPEN", "filter")
+  eq(h({}), "⌫ BACK  ·  ENTER OPEN  ·  ESC CLOSE", "submenu")
+  eq(h({ appRow: true }), "⌫ BACK  ·  ENTER OPEN  ·  ^P PIN  ·  ESC CLOSE", "app row")
+  eq(h({ dmenu: true, input: true }), "TYPE TO FILTER  ·  ESC CANCEL", "dmenu input")
+  eq(h({ dmenu: true, count: 4 }), "4 RESULTS  ·  ENTER SELECT  ·  ESC CANCEL", "dmenu select")
+  // empty state
+  eq(menu.emptyState({ loading: true, error: false, filter: "" }).text, "Loading…", "loading")
+  eq(
+    menu.emptyState({ loading: false, error: true, filter: "" }).text,
+    "Couldn’t load this list",
+    "error"
+  )
+  eq(
+    menu.emptyState({ loading: true, error: true, filter: "fox" }).text,
+    "No matches for “fox”",
+    "search wins"
+  )
+  eq(
+    menu.emptyState({ loading: false, error: false, filter: "" }).text,
+    "Nothing here yet",
+    "empty"
+  )
+  // taglines by id
+  eq(
+    menu.semanticDetail({ id: "system", parent: "root", label: "System" }, "desc"),
+    "SLEEP // RESTART // SHUTDOWN",
+    "system tagline"
+  )
+  eq(
+    menu.semanticDetail({ id: "install", parent: "root", label: "Install" }, "desc"),
+    "desc",
+    "other roots keep description"
+  )
+  // merges do not mutate their input
+  const incoming = [{ id: "apps.x", kind: "app" }]
+  menu.mergeAppRows({}, [], incoming)
+  eq(incoming[0].order, undefined, "mergeAppRows mutated its input")
+  const provided = [{ id: "fonts.a", kind: "action" }]
+  menu.swapProviderRows({}, [], "fonts", provided)
+  eq(provided[0].providerMenu, undefined, "swapProviderRows mutated its input")
+  eq(menu.dynamicTileForAppRows, undefined, "dead tile helper removed")
 })

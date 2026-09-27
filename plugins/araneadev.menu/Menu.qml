@@ -249,7 +249,7 @@ Item {
 
   // Pins or unpins an app, saves, and regenerates the Apps rows.
   function toggleFavoriteApp(appId: string): void {
-    root.favoriteAppIds = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit)
+    root.favoriteAppIds = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit).ids
     root.saveAppHistory()
     root.mergeAppRows()
   }

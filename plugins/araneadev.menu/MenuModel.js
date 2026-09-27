@@ -93,22 +93,147 @@ function normalizeAppIds(values, limit) {
 }
 
 /**
- * Pins an app at the front of the favorites, or unpins it if already pinned.
+ * Pins an app at the front of the favorites, or unpins it if already pinned;
+ * a pin beyond the limit is refused (the list is left as it is).
  * @param {*} values - current favorite ids
  * @param {*} appId - app to toggle; empty leaves the list as is (normalized)
  * @param {*} limit - maximum number of favorites
- * @returns {Array<string>} the new favorite ids
+ * @returns {{ids: Array<string>, refused: boolean}} the new favorite ids, and whether a pin was refused
  */
 function toggleFavoriteApp(values, appId, limit) {
   var id = String(appId || "").trim()
   var current = normalizeAppIds(values, limit)
-  if (!id) return current
+  if (!id) return { ids: current, refused: false }
   var index = current.indexOf(id)
   if (index >= 0) {
     current.splice(index, 1)
-    return current
+    return { ids: current, refused: false }
   }
-  return normalizeAppIds([id].concat(current), limit)
+  var max = Number(limit)
+  if (isFinite(max) && max >= 0 && current.length >= Math.floor(max))
+    return { ids: current, refused: true }
+  return { ids: normalizeAppIds([id].concat(current), limit), refused: false }
+}
+
+/**
+ * Reads the menu state file: {"favorites": [ids], "recent": [ids]}.
+ * @param {*} text - the file contents; anything unparsable gives empty lists
+ * @param {number} limit - most ids kept per list
+ * @returns {{favorites: Array<string>, recent: Array<string>}} the normalized lists
+ */
+function parseAppHistory(text, limit) {
+  var parsed
+  try {
+    parsed = JSON.parse(String(text || ""))
+  } catch (e) {
+    parsed = null
+  }
+  var value = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
+  return {
+    favorites: normalizeAppIds(Array.isArray(value.favorites) ? value.favorites : [], limit),
+    recent: normalizeAppIds(Array.isArray(value.recent) ? value.recent : [], limit)
+  }
+}
+
+/**
+ * Writes the menu state file contents (pretty JSON with a trailing newline).
+ * @param {*} favorites - pinned app ids
+ * @param {*} recent - recently launched app ids
+ * @param {number} limit - most ids kept per list
+ * @returns {string} the file text
+ */
+function serializeAppHistory(favorites, recent, limit) {
+  return (
+    JSON.stringify(
+      { favorites: normalizeAppIds(favorites, limit), recent: normalizeAppIds(recent, limit) },
+      null,
+      2
+    ) + "\n"
+  )
+}
+
+/**
+ * Drops ids of apps that are not installed, so they do not use up slots.
+ * @param {*} ids - app ids
+ * @param {*} installed - ids of installed apps; not an array means unknown (nothing dropped)
+ * @returns {Array<string>} the kept ids, in order
+ */
+function pruneAppIds(ids, installed) {
+  var list = normalizeAppIds(ids, Array.isArray(ids) ? ids.length : 0)
+  if (!Array.isArray(installed)) return list
+  return list.filter(function (id) {
+    return installed.indexOf(id) >= 0
+  })
+}
+
+/**
+ * Keeps the first row per app id among rows of kind "app"; other rows are kept, order unchanged.
+ * @param {Array<{[key: string]: *}>} rows - display rows
+ * @returns {Array<{[key: string]: *}>} the rows without repeated apps
+ */
+function dedupeAppRows(rows) {
+  /** @type {{[key: string]: boolean}} */
+  var seen = {}
+  return (Array.isArray(rows) ? rows : []).filter(function (row) {
+    if (!row || row.kind !== "app" || !row.appId) return true
+    if (seen[row.appId]) return false
+    seen[row.appId] = true
+    return true
+  })
+}
+
+/**
+ * Orders the Apps menu: menu rows (Favorites, Recent) first in their order,
+ * then apps by label (case-insensitive), then by item id.
+ * @param {Array<{[key: string]: *}>} rows - display rows of the Apps menu
+ * @returns {Array<{[key: string]: *}>} a new, sorted array
+ */
+function sortAppsMenu(rows) {
+  return (Array.isArray(rows) ? rows.slice() : []).sort(function (a, b) {
+    var aApp = a.kind === "app" ? 1 : 0
+    var bApp = b.kind === "app" ? 1 : 0
+    if (aApp !== bApp) return aApp - bApp
+    if (!aApp) return (Number(a.order) || 0) - (Number(b.order) || 0)
+    var aLabel = String(a.label || "").toLowerCase()
+    var bLabel = String(b.label || "").toLowerCase()
+    if (aLabel !== bLabel) return aLabel < bLabel ? -1 : 1
+    var aId = String(a.itemId || "")
+    var bId = String(b.itemId || "")
+    return aId < bId ? -1 : aId > bId ? 1 : 0
+  })
+}
+
+/**
+ * The key hint line for the menu's current state.
+ * @param {{root: boolean, filter: boolean, dmenu: boolean, input: boolean, count: number, appRow: boolean}} state - root: root menu without a search; filter: a search is typed; dmenu/input: a dmenu request and its input mode; count: rows shown; appRow: the cursor row is an app
+ * @returns {string} the hints
+ */
+function hintText(state) {
+  /** @type {{[key: string]: *}} */
+  var s = state || {}
+  if (s.dmenu)
+    return s.input
+      ? "TYPE TO FILTER  ·  ESC CANCEL"
+      : (Number(s.count) || 0) + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL"
+  if (s.root) return "SYSTEM // READY"
+  if (s.filter) return "ESC CLEAR  ·  ENTER OPEN"
+  return "⌫ BACK  ·  ENTER OPEN" + (s.appRow ? "  ·  ^P PIN" : "") + "  ·  ESC CLOSE"
+}
+
+/**
+ * Icon and text for an empty list: a search that found nothing says so;
+ * otherwise loading, then a failed provider, then plain empty.
+ * @param {{loading: boolean, error: boolean, filter: string}} state - the active menu's provider state and the search text
+ * @returns {{icon: string, text: string}} what the empty state shows
+ */
+function emptyState(state) {
+  /** @type {{[key: string]: *}} */
+  var s = state || {}
+  var filter = String(s.filter || "")
+  if (filter) return { icon: "󰈉", text: "No matches for “" + filter + "”" }
+  if (s.loading) return { icon: "󰑐", text: "Loading…" }
+  if (s.error) return { icon: "󰀦", text: "Couldn’t load this list" }
+  return { icon: "󰈉", text: "Nothing here yet" }
 }
 
 /**
@@ -160,57 +285,8 @@ function appRowsForIds(appRows, ids, parent, prefix) {
 }
 
 /**
- * Picks the root menu's dynamic tile: the first pinned app, else the first recent app, else the workspace.
- * @param {Array<MenuItem>} appRows - all app rows
- * @param {*} favoriteIds - pinned app ids
- * @param {*} recentIds - recently launched app ids
- * @param {*} workspaceId - focused workspace id, shown when no app matches
- * @returns {object} the tile (id, appId, label, detail, source, icon, appIcon)
- */
-function dynamicTileForAppRows(appRows, favoriteIds, recentIds, workspaceId) {
-  var source = Array.isArray(appRows) ? appRows : []
-  /** @type {ItemMap} */
-  var byId = {}
-  for (var i = 0; i < source.length; i++) {
-    var row = source[i]
-    if (row && row.appId) byId[String(row.appId)] = row
-  }
-
-  var candidates = [
-    { ids: favoriteIds, source: "pinned", detail: "PINNED" },
-    { ids: recentIds, source: "recent", detail: "RECENT" }
-  ]
-  for (var c = 0; c < candidates.length; c++) {
-    var ids = normalizeAppIds(candidates[c].ids, source.length || 1)
-    for (var j = 0; j < ids.length; j++) {
-      var match = byId[ids[j]]
-      if (!match) continue
-      return {
-        id: "tile." + String(match.appId),
-        appId: String(match.appId),
-        label: textValue(match.label, String(match.appId)),
-        detail: candidates[c].detail,
-        source: candidates[c].source,
-        icon: textValue(match.icon, ""),
-        appIcon: textValue(match.appIcon, "")
-      }
-    }
-  }
-
-  var workspace = String(workspaceId || "").trim()
-  return {
-    id: "tile.workspace",
-    appId: "",
-    label: workspace ? "Workspace " + workspace : "Workspace",
-    detail: "WORKSPACE",
-    source: "workspace",
-    icon: "",
-    appIcon: ""
-  }
-}
-
-/**
- * Returns the fixed tagline for a top-level section (Apps, Learn, ...), else `detail`.
+ * Returns the fixed tagline for a top-level section, keyed by the entry's id
+ * (or its lowercased label when it has none), else `detail`.
  * @param {*} entry - the menu item
  * @param {*} detail - fallback detail text
  * @returns {string} the tagline, or the detail ("" when null or undefined)
@@ -220,16 +296,16 @@ function semanticDetail(entry, detail) {
   if (String(value.parent || "") !== "root") return textValue(detail, "")
 
   /** @type {{[key: string]: string}} */
-  var labels = {
-    Apps: "FIND // LAUNCH // MANAGE",
-    Learn: "DOCUMENTATION // GUIDES // IDEAS",
-    Trigger: "AUTOMATE // SCRIPTS // WORKFLOWS",
-    Style: "APPEARANCE // THEMES // BEHAVIOR",
-    Setup: "SYSTEM // DEVICES // PREFERENCES",
-    Power: "SLEEP // RESTART // SHUTDOWN"
+  var taglines = {
+    apps: "FIND // LAUNCH // MANAGE",
+    learn: "DOCUMENTATION // GUIDES // IDEAS",
+    trigger: "AUTOMATE // SCRIPTS // WORKFLOWS",
+    style: "APPEARANCE // THEMES // BEHAVIOR",
+    setup: "SYSTEM // DEVICES // PREFERENCES",
+    system: "SLEEP // RESTART // SHUTDOWN"
   }
-  var label = textValue(value.label, "")
-  return labels[label] || textValue(detail, "")
+  var key = textValue(value.id, textValue(value.label, "").toLowerCase())
+  return taglines[key] || textValue(detail, "")
 }
 
 /**
@@ -366,7 +442,7 @@ function mergeMenuSources(defaultItems, userItems) {
  * Replaces all app rows with a new set, returning fresh maps.
  * @param {ItemMap} items - current items by id (not modified)
  * @param {Array<string>} itemOrder - current item order
- * @param {Array<MenuItem>} appRows - the new app rows (their `order` is overwritten)
+ * @param {Array<MenuItem>} appRows - the new app rows (not modified; copies get `order`)
  * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
  */
 function mergeAppRows(items, itemOrder, appRows) {
@@ -390,8 +466,11 @@ function mergeAppRows(items, itemOrder, appRows) {
   for (var j = 0; j < rows.length; j++) {
     var row = rows[j]
     if (!row || !row.id || nextItems[row.id]) continue
-    row.order = nextOrder.length
-    nextItems[row.id] = row
+    /** @type {{[key: string]: *}} */
+    var copy = {}
+    for (var key in row) copy[key] = row[key]
+    copy.order = nextOrder.length
+    nextItems[row.id] = /** @type {MenuItem} */ (copy)
     nextOrder.push(row.id)
   }
 
@@ -407,7 +486,7 @@ function mergeAppRows(items, itemOrder, appRows) {
  * @param {ItemMap} items - current items by id (not modified)
  * @param {Array<string>} itemOrder - current item order
  * @param {string} menuId - id of the submenu whose provider produced the rows
- * @param {Array<MenuItem>} rows - the new rows (`providerMenu` and `order` are overwritten)
+ * @param {Array<MenuItem>} rows - the new rows (not modified; copies get `providerMenu` and `order`)
  * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
  */
 function swapProviderRows(items, itemOrder, menuId, rows) {
@@ -429,9 +508,12 @@ function swapProviderRows(items, itemOrder, menuId, rows) {
   for (var j = 0; j < incoming.length; j++) {
     var row = incoming[j]
     if (!row || !row.id || nextItems[row.id]) continue
-    row.providerMenu = menuId
-    row.order = nextOrder.length
-    nextItems[row.id] = row
+    /** @type {{[key: string]: *}} */
+    var copy = {}
+    for (var key in row) copy[key] = row[key]
+    copy.providerMenu = menuId
+    copy.order = nextOrder.length
+    nextItems[row.id] = /** @type {MenuItem} */ (copy)
     nextOrder.push(row.id)
   }
 
@@ -948,9 +1030,15 @@ if (typeof module !== "undefined") {
     normalizeAliases: normalizeAliases,
     normalizeAppIds: normalizeAppIds,
     toggleFavoriteApp: toggleFavoriteApp,
+    parseAppHistory: parseAppHistory,
+    serializeAppHistory: serializeAppHistory,
+    pruneAppIds: pruneAppIds,
+    dedupeAppRows: dedupeAppRows,
+    sortAppsMenu: sortAppsMenu,
+    hintText: hintText,
+    emptyState: emptyState,
     recordRecentApp: recordRecentApp,
     appRowsForIds: appRowsForIds,
-    dynamicTileForAppRows: dynamicTileForAppRows,
     semanticDetail: semanticDetail,
     normalizeItem: normalizeItem,
     parseMenuJsonc: parseMenuJsonc,
