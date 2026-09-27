@@ -8,17 +8,24 @@
 # Install with:
 #   omarchy hook install theme-set hooks/theme-set
 
-if [[ $1 != "aranea" ]]; then
+# Omarchy hard-codes these two locations (see omarchy-theme-set): the copy of
+# the current theme, and the stable installed Aranea theme that survives
+# theme switches (integration links point there).
+current_theme="$HOME/.local/state/omarchy/current/theme"
+installed_theme="$HOME/.config/omarchy/themes/aranea"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+
+# "aranea-*" is the temporary name `omarchy theme install` applies before
+# install.sh adopts the theme as "aranea": still Aranea, not a theme switch.
+if [[ $1 != aranea && $1 != aranea-* ]]; then
   systemctl --user disable --now aranea-wallpaper-day-night.timer >/dev/null 2>&1 || true
   systemctl --user daemon-reload >/dev/null 2>&1 || true
   rm -f "$HOME/.config/systemd/user/aranea-wallpaper-day-night.timer" \
     "$HOME/.config/systemd/user/aranea-wallpaper-day-night.service"
-  omarchy plugin disable araneadev.lock >/dev/null 2>&1 || true
-  omarchy plugin disable araneadev.osd >/dev/null 2>&1 || true
-  # Hand notifications back to Omarchy's own daemon (toasts) and take the
-  # bell out of the bar; repair-shell-config restores both on return.
+  # Hand notifications, lock, OSD and polkit back to Omarchy and take the
+  # Aranea entries out of the bar; repair-shell-config restores them on return.
   # current/theme already holds the new theme here; use the installed copy.
-  theme_scripts="$HOME/.config/omarchy/themes/aranea/scripts"
+  theme_scripts="$installed_theme/scripts"
   if [[ -x "$theme_scripts/release-shell-config" ]]; then
     "$theme_scripts/release-shell-config" "$HOME/.config/omarchy/shell.json" >/dev/null 2>&1 || true
   fi
@@ -30,8 +37,8 @@ if [[ $1 != "aranea" ]]; then
   exit 0
 fi
 
-theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
-profile_file="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
+theme_root="$current_theme"
+profile_file="$state_home/aranea/profile"
 profile="${ARANEA_INSTALL_PROFILE:-}"
 if [[ -z "$profile" && -f "$profile_file" ]]; then
   profile="$(<"$profile_file")"
@@ -51,21 +58,19 @@ ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
 ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
 
-# Apply optional developer integrations through the ownership-aware linker.
-# Missing applications are skipped and existing configs are backed up.
-if [[ -x "$theme_root/scripts/install-integration" ]]; then
+# Integrations link from the stable installed theme so they survive theme
+# switches; ones the user deactivated (aranea-integrations) stay off.
+integration_scripts="$installed_theme/scripts"
+[[ -x "$integration_scripts/install-integration" ]] || integration_scripts="$theme_root/scripts"
+run_integration() {
+  [[ "$(cat "$state_home/aranea/integrations/$1" 2>/dev/null)" == inactive ]] && return 0
+  "$integration_scripts/install-integration" "$1" --yes >/dev/null 2>&1 || true
+}
+if [[ -x "$integration_scripts/install-integration" ]]; then
   if [[ "$profile" == full ]]; then
-    "$theme_root/scripts/install-integration" terminal --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" developer --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" icons --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" qt --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" browser --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" session --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" media --yes >/dev/null 2>&1 || true
+    for integration in terminal developer cursor icons qt browser session media; do run_integration "$integration"; done
   elif [[ "$profile" == no_apps ]]; then
-    "$theme_root/scripts/install-integration" cursor --yes >/dev/null 2>&1 || true
-    "$theme_root/scripts/install-integration" icons --yes >/dev/null 2>&1 || true
+    for integration in cursor icons; do run_integration "$integration"; done
   fi
 fi
 
@@ -88,6 +93,11 @@ if [[ -x "$theme_root/scripts/finish-polkit-handover" ]]; then
 fi
 if [[ -x "$theme_root/scripts/ensure-shell-running" ]]; then
   "$theme_root/scripts/ensure-shell-running"
+fi
+# The day/night wallpaper schedule is switched off while another theme is
+# active; its state file still says "on", so bring it back.
+if [[ "$(cat "$state_home/aranea/wallpaper-schedule" 2>/dev/null)" == on && -x "$installed_theme/scripts/aranea-wallpaper" ]]; then
+  "$installed_theme/scripts/aranea-wallpaper" schedule on >/dev/null 2>&1 || true
 fi
 if [[ -x "$theme_root/scripts/aranea-motion" ]]; then
   "$theme_root/scripts/aranea-motion" apply >/dev/null 2>&1 || true

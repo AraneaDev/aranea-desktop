@@ -133,7 +133,7 @@ else
     local status=$?
     if (( status != 0 )); then
       if [[ -n "$previous_theme" ]]; then
-        say "Aranea install failed. Restore the previous theme with: omarchy theme set $previous_theme" >&2
+        say "Aranea install failed. Restore the previous theme with: omarchy theme set \"$previous_theme\"" >&2
       else
         say "Aranea install failed before a previous theme could be detected." >&2
       fi
@@ -150,7 +150,9 @@ else
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"
   run omarchy theme set aranea
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
-    theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+    # Link integrations from the stable installed theme, which survives theme
+    # switches (Omarchy's current-theme copy is replaced on every switch).
+    theme_root="$HOME/.config/omarchy/themes/aranea"
     run "$theme_root/scripts/install-integration" cursor --yes
     run "$theme_root/scripts/install-integration" icons --yes
     if [[ "$profile" == full ]]; then
