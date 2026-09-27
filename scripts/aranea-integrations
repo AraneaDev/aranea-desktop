@@ -47,9 +47,12 @@ shared_with_active() {
 emit_status() {
   local id="$1" state=inactive availability=unavailable
   [[ -f "$state_root/$id" ]] && state="$(<"$state_root/$id")"
+  # Anything but "active" (a hand-edited or corrupt state file) is inactive.
+  [[ "$state" == active ]] || state=inactive
   available "$id" && availability=available
   if ((json)); then
-    printf '{"id":"%s","status":"%s","availability":"%s"}\n' "$id" "$state" "$availability"
+    jq -cn --arg id "$id" --arg status "$state" --arg availability "$availability" \
+      '{id: $id, status: $status, availability: $availability}'
   else printf '%-14s %-10s %s\n' "$id" "$state" "$availability"; fi
 }
 

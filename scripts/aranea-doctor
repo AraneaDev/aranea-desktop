@@ -25,7 +25,12 @@ for arg in "$@"; do
     --fix) fix=1 ;;
   esac
 done
-if ((json)) && ! command -v jq >/dev/null 2>&1; then
+# jq reads the shell's plugin list and the inbox files; ARANEA_DOCTOR_JQ
+# overrides it (tests point it at a missing path).
+jq_bin="${ARANEA_DOCTOR_JQ:-jq}"
+have_jq=0
+command -v "$jq_bin" >/dev/null 2>&1 && have_jq=1
+if ((json)) && ((! have_jq)); then
   printf '%s\n' 'jq is required for --json' >&2
   exit 2
 fi
@@ -35,6 +40,7 @@ fi
 emit() {
   local id="$1" status="$2" message="$3"
   if ((json)); then
+    # JSON mode already requires jq (checked above).
     jq -cn --arg id "$id" --arg status "$status" --arg message "$message" '{id: $id, status: $status, message: $message}'
   else
     printf '%-14s %-8s %s\n' "$id" "$status" "$message"
@@ -169,9 +175,11 @@ if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
   if ((fix)) && command -v omarchy-shell >/dev/null 2>&1 && [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]; then
     "$repo_root/scripts/deploy-plugins-safely" "$repo_root" >/dev/null 2>&1 || true
   fi
-  if command -v omarchy-shell >/dev/null 2>&1; then
+  if ((! have_jq)); then
+    emit plugins skipped 'jq is not installed'
+  elif command -v omarchy-shell >/dev/null 2>&1; then
     plugin_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
-    if jq -e '
+    if "$jq_bin" -e '
       ([.[] | select(.id == "araneadev.bar") | .enabled] | any) and
       ([.[] | select(.id == "araneadev.lock") | .enabled] | any) and
       ([.[] | select(.id == "araneadev.menu") | .enabled] | any) and
@@ -191,9 +199,11 @@ fi
 # the Aranea one is turned off. Without either, privileged actions cannot
 # ask for a password. (Which one is a choice, so neither is required.)
 if ! emit_override polkit ARANEA_DOCTOR_POLKIT_STATUS; then
-  if command -v omarchy-shell >/dev/null 2>&1; then
+  if ((! have_jq)); then
+    emit polkit skipped 'jq is not installed'
+  elif command -v omarchy-shell >/dev/null 2>&1; then
     polkit_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
-    polkit_owner="$(jq -r '[.[] | select((.id == "araneadev.polkit" or .id == "omarchy.polkit") and .enabled) | .id] | first // ""' <<<"$polkit_json" 2>/dev/null || true)"
+    polkit_owner="$("$jq_bin" -r '[.[] | select((.id == "araneadev.polkit" or .id == "omarchy.polkit") and .enabled) | .id] | first // ""' <<<"$polkit_json" 2>/dev/null || true)"
     case "$polkit_owner" in
       araneadev.polkit) emit polkit ok 'Aranea polkit prompt is enabled' ;;
       omarchy.polkit) emit polkit ok 'Omarchy polkit prompt is enabled' ;;
@@ -206,7 +216,9 @@ fi
 
 if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
   inbox_root="${ARANEA_DOCTOR_INBOX_ROOT:-$HOME/.local/state/omarchy/notifications/inbox}"
-  if [[ ! -d "$inbox_root" ]]; then
+  if ((! have_jq)); then
+    emit notifications skipped 'jq is not installed'
+  elif [[ ! -d "$inbox_root" ]]; then
     emit notifications skipped 'no notification inbox yet'
   else
     inbox_total=0
@@ -214,7 +226,7 @@ if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
     for inbox_file in "$inbox_root"/*.json; do
       [[ -e "$inbox_file" ]] || continue
       inbox_total=$((inbox_total + 1))
-      jq -e 'type == "object"' "$inbox_file" >/dev/null 2>&1 || inbox_bad=$((inbox_bad + 1))
+      "$jq_bin" -e 'type == "object"' "$inbox_file" >/dev/null 2>&1 || inbox_bad=$((inbox_bad + 1))
     done
     if ((inbox_bad > 0)); then
       emit notifications repair "inbox holds $inbox_total entries, $inbox_bad unreadable"
@@ -258,10 +270,15 @@ if ! emit_override runtime ARANEA_DOCTOR_RUNTIME_STATUS; then
     emit runtime skipped 'rg is not installed'
   elif [[ -z "$log_file" ]]; then
     emit runtime skipped 'no QuickShell runtime log is available'
-  elif "$rg_bin" -qi 'TypeError|ReferenceError|duplicate.*target|coerced to void' "$log_file"; then
-    emit runtime repair "recent QuickShell runtime warnings found in $log_file"
   else
-    emit runtime ok 'recent QuickShell log has no Aranea runtime errors'
+    # rg exits 0 on a match, 1 on none, and 2 when it could not read the log.
+    rg_status=0
+    "$rg_bin" -qi 'TypeError|ReferenceError|duplicate.*target|coerced to void' "$log_file" || rg_status=$?
+    case "$rg_status" in
+      0) emit runtime repair "recent QuickShell runtime warnings found in $log_file" ;;
+      1) emit runtime ok 'recent QuickShell log has no Aranea runtime errors' ;;
+      *) emit runtime skipped 'rg failed' ;;
+    esac
   fi
 fi
 

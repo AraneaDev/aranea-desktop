@@ -51,4 +51,9 @@ test -L "$link" || {
   exit 1
 }
 
+# --- 4d: status --json stays valid JSON whatever the state file holds
+mkdir -p "$state"
+printf '%s%s' 'act"ive' "\\" >"$state/session"
+"$ctl" status --json | jq -e 'select(.id == "session") | .status == "inactive"' >/dev/null
+
 echo "integration controller contract passed"
