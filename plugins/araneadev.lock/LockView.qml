@@ -33,25 +33,22 @@ Item {
   readonly property real fingerprintReserve: fingerprintConfigured ? Math.round(fingerprintIcon.implicitWidth + 12) : 0
   // Shrink the dots to fit once the password outgrows the field, so every
   // keystroke stays visible — otherwise long passwords clip with no feedback.
-  readonly property real passwordDotScale: dotMetrics.advanceWidth > 0
-    ? Math.min(1, (passwordInput.width - 4) / dotMetrics.advanceWidth)
-    : 1
+  readonly property real passwordDotScale: dotMetrics.advanceWidth > 0 ? Math.min(1, (passwordInput.width - 4) / dotMetrics.advanceWidth) : 1
   readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
   readonly property bool errorState: failureMessage.length > 0
-  readonly property var inputBorderSpec: errorState
-    ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha")
-    : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
+  readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha") : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
 
   signal submitPassword(string password)
   signal passwordTextEdited(string password)
-  signal clearFailureRequested()
-  signal wakeRequested()
+  signal clearFailureRequested
+  signal wakeRequested
 
   // Cache-busts the lock background by appending `?v=`. Adding a query
   // string keeps Image's loader happy while forcing it to reload when the
   // user picks a new background mid-session.
   function fileUrl(path: string): string {
-    if (!path) return ""
+    if (!path)
+      return ""
     var encoded = String(path).split("/").map(encodeURIComponent).join("/")
     return "file://" + encoded + "?v=" + backgroundVersion
   }
@@ -65,7 +62,8 @@ Item {
   }
 
   function syncPasswordText() {
-    if (passwordInput.text === passwordText) return
+    if (passwordInput.text === passwordText)
+      return
     syncingPasswordText = true
     passwordInput.text = passwordText
     syncingPasswordText = false
@@ -73,12 +71,14 @@ Item {
 
   onPasswordTextChanged: syncPasswordText()
   onInputEnabledChanged: {
-    if (inputEnabled) Qt.callLater(forcePasswordFocus)
+    if (inputEnabled)
+      Qt.callLater(forcePasswordFocus)
   }
   Component.onCompleted: {
     syncPasswordText()
     updateClock()
-    if (inputEnabled) Qt.callLater(forcePasswordFocus)
+    if (inputEnabled)
+      Qt.callLater(forcePasswordFocus)
   }
 
   function updateClock(): void {
@@ -136,16 +136,28 @@ Item {
     Rectangle {
       anchors.fill: parent
       gradient: Gradient {
-        GradientStop { position: 0.0; color: "#4406090d" }
-        GradientStop { position: 0.48; color: "#1806090d" }
-        GradientStop { position: 1.0; color: "#7006090d" }
+        GradientStop {
+          position: 0.0
+          color: "#4406090d"
+        }
+        GradientStop {
+          position: 0.48
+          color: "#1806090d"
+        }
+        GradientStop {
+          position: 1.0
+          color: "#7006090d"
+        }
       }
     }
 
     MouseArea {
       anchors.fill: parent
       hoverEnabled: true
-      onClicked: { root.wakeRequested(); root.forcePasswordFocus() }
+      onClicked: {
+        root.wakeRequested()
+        root.forcePasswordFocus()
+      }
       onPositionChanged: root.wakeRequested()
     }
 
@@ -192,20 +204,23 @@ Item {
         }
 
         onTextChanged: {
-          if (!root.syncingPasswordText) root.passwordTextEdited(text)
+          if (!root.syncingPasswordText)
+            root.passwordTextEdited(text)
           if (text.length > 0) {
             root.wakeRequested()
           }
-          if (text.length > 0 && root.failureMessage.length > 0) root.clearFailureRequested()
+          if (text.length > 0 && root.failureMessage.length > 0)
+            root.clearFailureRequested()
         }
 
         onAccepted: {
           var submitted = root.passwordText
           root.passwordTextEdited("")
-          if (submitted.length > 0) root.submitPassword(submitted)
+          if (submitted.length > 0)
+            root.submitPassword(submitted)
         }
 
-        Keys.onPressed: function(event) {
+        Keys.onPressed: function (event) {
           root.wakeRequested()
           if (event.key === Qt.Key_Escape || (event.modifiers & Qt.ControlModifier && event.key === Qt.Key_U)) {
             root.passwordTextEdited("")

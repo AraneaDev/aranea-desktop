@@ -43,7 +43,8 @@ Item {
 
     for (var i = 0; i < screens.length; i++) {
       var screen = screens[i]
-      if (screen && screen.name && screen.width > 0 && screen.height > 0) count += 1
+      if (screen && screen.name && screen.width > 0 && screen.height > 0)
+        count += 1
     }
 
     return count
@@ -55,19 +56,24 @@ Item {
 
   function queueSessionLock(): void {
     pendingSessionLock = true
-    if (!sessionLockStabilizeTimer.running) logEvent("lock-pending: screen-stabilizing")
+    if (!sessionLockStabilizeTimer.running)
+      logEvent("lock-pending: screen-stabilizing")
     sessionLockStabilizeTimer.restart()
-    if (!pendingSessionLockTimer.running) pendingSessionLockTimer.start()
+    if (!pendingSessionLockTimer.running)
+      pendingSessionLockTimer.start()
   }
 
   function requestSessionLock(): void {
-    if (!lockRequested || sessionLock.locked || sessionLock.secure) return
-    if (sessionLockStabilizeTimer.running) return
-
+    if (!lockRequested || sessionLock.locked || sessionLock.secure)
+      return
+    if (sessionLockStabilizeTimer.running)
+      return
     if (!hasRealScreen()) {
-      if (!pendingSessionLock || lastEvent !== "lock-pending: no-real-screen") logEvent("lock-pending: no-real-screen")
+      if (!pendingSessionLock || lastEvent !== "lock-pending: no-real-screen")
+        logEvent("lock-pending: no-real-screen")
       pendingSessionLock = true
-      if (!pendingSessionLockTimer.running) pendingSessionLockTimer.start()
+      if (!pendingSessionLockTimer.running)
+        pendingSessionLockTimer.start()
       return
     }
 
@@ -80,7 +86,8 @@ Item {
   // a session locked this early is an orphan behind Hyprland's failsafe. Outputs
   // are often still absent here, so ask until the answer means something.
   function checkStrandedLock(): void {
-    if (strandedLockResolved || strandedLockCheckProc.running) return
+    if (strandedLockResolved || strandedLockCheckProc.running)
+      return
 
     // A lock this shell took is nobody's orphan.
     if (locked || lockRequested) {
@@ -92,19 +99,21 @@ Item {
   }
 
   function recoverStrandedLock(): void {
-    if (!strandedLock || locked || !passwordPamConfigured) return
-
+    if (!strandedLock || locked || !passwordPamConfigured)
+      return
     strandedLock = false
     logEvent("lock-stranded: recovering")
     beginLock()
   }
 
   function refreshBackground(): void {
-    if (!readlinkProc.running) readlinkProc.running = true
+    if (!readlinkProc.running)
+      readlinkProc.running = true
   }
 
   function refreshFingerprintStatus(): void {
-    if (!fingerprintCheckProc.running) fingerprintCheckProc.running = true
+    if (!fingerprintCheckProc.running)
+      fingerprintCheckProc.running = true
   }
 
   function logEvent(event: string): void {
@@ -121,8 +130,10 @@ Item {
     authenticatingPassword = false
     fingerprintAuthenticating = false
     fingerprintRetryTimer.stop()
-    if (passwordPam.active) passwordPam.abort()
-    if (fingerprintPam.active) fingerprintPam.abort()
+    if (passwordPam.active)
+      passwordPam.abort()
+    if (fingerprintPam.active)
+      fingerprintPam.abort()
   }
 
   function beginLock(): bool {
@@ -137,7 +148,7 @@ Item {
     logEvent("lock-requested")
     queueSessionLock()
 
-    Qt.callLater(function() {
+    Qt.callLater(function () {
       root.refreshBackground()
       root.refreshFingerprintStatus()
     })
@@ -146,8 +157,8 @@ Item {
   }
 
   function finishUnlock(): void {
-    if (!root.locked && !lockRequested) return
-
+    if (!root.locked && !lockRequested)
+      return
     lockRequested = false
     pendingSessionLock = false
     sessionLockStabilizeTimer.stop()
@@ -165,18 +176,21 @@ Item {
   }
 
   function runWake(): void {
-    if (!wakeProcess.running) wakeProcess.running = true
-    if (lockRequested) armBlankTimer()
+    if (!wakeProcess.running)
+      wakeProcess.running = true
+    if (lockRequested)
+      armBlankTimer()
   }
 
   function runBlank(): void {
-    if (!blankProcess.running) blankProcess.running = true
+    if (!blankProcess.running)
+      blankProcess.running = true
   }
 
   function submitPassword(value: string): void {
     var password = String(value || "")
-    if (!lockRequested || authenticatingPassword || password.length === 0) return
-
+    if (!lockRequested || authenticatingPassword || password.length === 0)
+      return
     runWake()
     pendingPassword = password
     failureMessage = ""
@@ -191,13 +205,14 @@ Item {
   }
 
   function respondToPasswordPrompt(): void {
-    if (!authenticatingPassword || !passwordPam.active || !passwordPam.responseRequired) return
+    if (!authenticatingPassword || !passwordPam.active || !passwordPam.responseRequired)
+      return
     passwordPam.respond(pendingPassword)
   }
 
   function handlePasswordFailure() {
-    if (!lockRequested) return
-
+    if (!lockRequested)
+      return
     authenticatingPassword = false
     enteredPassword = ""
     pendingPassword = ""
@@ -207,9 +222,10 @@ Item {
   }
 
   function startFingerprint() {
-    if (!lockRequested || !sessionLock.secure || !fingerprintConfigured) return
-    if (fingerprintPam.active || fingerprintAuthenticating) return
-
+    if (!lockRequested || !sessionLock.secure || !fingerprintConfigured)
+      return
+    if (fingerprintPam.active || fingerprintAuthenticating)
+      return
     fingerprintAuthenticating = true
     if (!fingerprintPam.start()) {
       fingerprintAuthenticating = false
@@ -219,7 +235,8 @@ Item {
   function handleFingerprintFinished(result) {
     fingerprintAuthenticating = false
 
-    if (!lockRequested) return
+    if (!lockRequested)
+      return
     if (result === PamResult.Success) {
       finishUnlock()
     } else if (fingerprintConfigured) {
@@ -277,19 +294,27 @@ Item {
         inputEnabled: root.lockRequested
         loadBackground: root.locked
         passwordText: root.enteredPassword
-        onPasswordTextEdited: function(password) { root.enteredPassword = password }
-        onSubmitPassword: function(password) { root.submitPassword(password) }
+        onPasswordTextEdited: function (password) {
+          root.enteredPassword = password
+        }
+        onSubmitPassword: function (password) {
+          root.submitPassword(password)
+        }
         onClearFailureRequested: root.failureMessage = ""
         onWakeRequested: root.runWake()
       }
-
     }
   }
 
   PanelWindow {
     id: previewWindow
     visible: root.previewVisible
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-lock-preview"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -324,16 +349,19 @@ Item {
     onResponseRequiredChanged: root.respondToPasswordPrompt()
     onPamMessage: root.respondToPasswordPrompt()
 
-    onCompleted: function(result) {
+    onCompleted: function (result) {
       root.authenticatingPassword = false
       root.pendingPassword = ""
 
-      if (!root.lockRequested) return
-      if (result === PamResult.Success) root.finishUnlock()
-      else root.handlePasswordFailure()
+      if (!root.lockRequested)
+        return
+      if (result === PamResult.Success)
+        root.finishUnlock()
+      else
+        root.handlePasswordFailure()
     }
 
-    onError: function(error) {
+    onError: function (error) {
       root.handlePasswordFailure()
     }
   }
@@ -343,13 +371,14 @@ Item {
     config: "omarchy-lock-fingerprint"
     user: root.userName
 
-    onCompleted: function(result) {
+    onCompleted: function (result) {
       root.handleFingerprintFinished(result)
     }
 
-    onError: function(error) {
+    onError: function (error) {
       root.fingerprintAuthenticating = false
-      if (root.lockRequested && root.fingerprintConfigured) fingerprintRetryTimer.restart()
+      if (root.lockRequested && root.fingerprintConfigured)
+        fingerprintRetryTimer.restart()
     }
   }
 
@@ -378,21 +407,26 @@ Item {
   Process {
     id: fingerprintCheckProc
     command: ["bash", "-c", "if [[ -f /etc/pam.d/omarchy-lock-fingerprint ]] && command -v fprintd-list >/dev/null 2>&1 && fprintd-list \"$USER\" 2>/dev/null | grep -qi finger; then echo yes; else echo no; fi"]
-    stdout: StdioCollector { id: fingerprintCheckStdout; waitForEnd: true }
+    stdout: StdioCollector {
+      id: fingerprintCheckStdout
+      waitForEnd: true
+    }
     onExited: {
       root.fingerprintConfigured = String(fingerprintCheckStdout.text || "").trim() === "yes"
-      if (root.lockRequested && root.fingerprintConfigured) root.startFingerprint()
-      else if (!root.fingerprintConfigured && fingerprintPam.active) fingerprintPam.abort()
+      if (root.lockRequested && root.fingerprintConfigured)
+        root.startFingerprint()
+      else if (!root.fingerprintConfigured && fingerprintPam.active)
+        fingerprintPam.abort()
     }
   }
 
   Process {
     id: strandedLockCheckProc
     command: ["bash", "-c", "omarchy-hyprland-session-locked"]
-    onExited: function(exitCode) {
+    onExited: function (exitCode) {
       // No output to read the lock off yet.
-      if (exitCode === 2) return
-
+      if (exitCode === 2)
+        return
       root.strandedLockResolved = true
 
       // A lock taken while this was in flight is this shell's own.
@@ -427,7 +461,8 @@ Item {
       // Only a password check in flight should hold the display up. The
       // fingerprint PAM stays armed for the whole lock, so gating on
       // `authenticating` here would keep the panel lit until unlock.
-      if (root.lockRequested && !root.authenticatingPassword) root.runBlank()
+      if (root.lockRequested && !root.authenticatingPassword)
+        root.runBlank()
     }
   }
 
@@ -455,7 +490,8 @@ Item {
     running: !root.strandedLockResolved && remaining > 0
 
     function rearm() {
-      if (!root.strandedLockResolved) remaining = budget
+      if (!root.strandedLockResolved)
+        remaining = budget
     }
 
     onTriggered: {
@@ -476,9 +512,12 @@ Item {
   }
 
   onAuthenticatingPasswordChanged: {
-    if (!lockRequested) return
-    if (authenticatingPassword) idleBlankTimer.stop()
-    else armBlankTimer()
+    if (!lockRequested)
+      return
+    if (authenticatingPassword)
+      idleBlankTimer.stop()
+    else
+      armBlankTimer()
   }
 
   FileView {
@@ -493,8 +532,8 @@ Item {
   // No lock before PAM is known good. An answer from before then may be stale --
   // the failsafe can be cleared from a TTY -- so re-ask rather than act on it.
   onPasswordPamConfiguredChanged: {
-    if (!passwordPamConfigured) return
-
+    if (!passwordPamConfigured)
+      return
     strandedLock = false
     strandedLockResolved = false
     strandedLockRetryTimer.rearm()
@@ -511,8 +550,10 @@ Item {
     target: "lock"
 
     function lock(): string {
-      if (!root.passwordPamConfigured) return "missing-pam"
-      if (!root.locked && !root.beginLock()) return "failed"
+      if (!root.passwordPamConfigured)
+        return "missing-pam"
+      if (!root.locked && !root.beginLock())
+        return "failed"
       return "ok"
     }
 

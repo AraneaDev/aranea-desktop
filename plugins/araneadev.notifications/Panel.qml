@@ -28,7 +28,8 @@ Panel {
     running: true
     onTriggered: {
       var next = ServiceBridge.current()
-      if (next !== root.service) root.service = next
+      if (next !== root.service)
+        root.service = next
     }
   }
   readonly property bool available: !!(service && service.inbox)
@@ -36,11 +37,15 @@ Panel {
   readonly property bool dnd: service ? !!service.doNotDisturb : false
   readonly property bool quiet: service ? !!service.quietHours : false
   readonly property int criticalCount: {
-    if (!available) return 0
-    var revision = service.inbox.revision   // re-evaluate on every inbox change
+    if (!available)
+      return 0
+    var revision = service.inbox.revision
+    // re-evaluate on every inbox change
     var n = 0
     var model = service.inbox.model
-    for (var i = 0; i < model.count; i++) if (model.get(i).urgency === 2) n++
+    for (var i = 0; i < model.count; i++)
+      if (model.get(i).urgency === 2)
+        n++
     return n
   }
   // Red with the critical count when anything critical waits; otherwise mint
@@ -58,11 +63,14 @@ Panel {
   property real now: Date.now()
 
   readonly property var rows: {
-    if (!available) return []
-    var revision = service.inbox.revision   // re-evaluate on every inbox change
+    if (!available)
+      return []
+    var revision = service.inbox.revision
+    // re-evaluate on every inbox change
     var entries = []
     var model = service.inbox.model
-    for (var i = 0; i < model.count; i++) entries.push(model.get(i))
+    for (var i = 0; i < model.count; i++)
+      entries.push(model.get(i))
     return InboxLogic.flattenGroups(InboxLogic.groupView(InboxLogic.sortForCenter(entries), root.expanded))
   }
 
@@ -72,34 +80,47 @@ Panel {
   }
 
   function moveCursor(delta: int): void {
-    if (rows.length === 0) return
+    if (rows.length === 0)
+      return
     var i = root.cursor
     for (var step = 0; step < rows.length; step++) {
       i = i < 0 ? (delta > 0 ? 0 : rows.length - 1) : (i + delta + rows.length) % rows.length
-      if (selectable(i)) { root.cursorKey = InboxLogic.rowKey(rows[i]); list.positionViewAtIndex(i, ListView.Contain); return }
+      if (selectable(i)) {
+        root.cursorKey = InboxLogic.rowKey(rows[i])
+        list.positionViewAtIndex(i, ListView.Contain)
+        return
+      }
     }
   }
 
   function toggleGroup(app: string): void {
     var next = Object.assign({}, root.expanded)
     var group = null
-    for (var i = 0; i < rows.length; i++) if (rows[i].kind === "group" && rows[i].app === app) group = rows[i]
+    for (var i = 0; i < rows.length; i++)
+      if (rows[i].kind === "group" && rows[i].app === app)
+        group = rows[i]
     next[app] = group ? group.collapsed : true
     root.expanded = next
   }
 
   function activate(index: int): void {
     var row = rows[index]
-    if (!row) return
-    if (row.kind === "entry") service.invokeInbox(row.entry.fileName)
-    else if (row.kind === "more" || row.kind === "group") toggleGroup(row.app)
+    if (!row)
+      return
+    if (row.kind === "entry")
+      service.invokeInbox(row.entry.fileName)
+    else if (row.kind === "more" || row.kind === "group")
+      toggleGroup(row.app)
   }
 
   function dismissAt(index: int, wholeGroup: bool): void {
     var row = rows[index]
-    if (!row) return
-    if (wholeGroup || row.kind === "group" || row.kind === "more") service.dismissGroup(row.app)
-    else service.dismissInbox(row.entry.fileName)
+    if (!row)
+      return
+    if (wholeGroup || row.kind === "group" || row.kind === "more")
+      service.dismissGroup(row.app)
+    else
+      service.dismissInbox(row.entry.fileName)
   }
 
   function clearAll(): void {
@@ -121,10 +142,20 @@ Panel {
   }
 
   // The item under the cursor was dismissed: drop the cursor.
-  onRowsChanged: if (root.cursorKey && root.cursor < 0) root.cursorKey = ""
+  onRowsChanged: if (root.cursorKey && root.cursor < 0)
+    root.cursorKey = ""
 
-  Timer { id: confirmTimer; interval: 4000; onTriggered: root.confirmingClear = false }
-  Timer { interval: 30000; repeat: true; running: root.opened; onTriggered: root.now = Date.now() }
+  Timer {
+    id: confirmTimer
+    interval: 4000
+    onTriggered: root.confirmingClear = false
+  }
+  Timer {
+    interval: 30000
+    repeat: true
+    running: root.opened
+    onTriggered: root.now = Date.now()
+  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -137,11 +168,15 @@ Panel {
     foreground: root.quiet ? root.focusAccent : root.barForeground
     dimmed: !root.available || root.count === 0
     tooltipText: root.available ? InboxLogic.tooltipText(root.count, root.criticalCount, root.dnd, root.quiet) : "Notifications unavailable"
-    onPressed: function(b) {
-      if (!root.available) return
-      if (b === Qt.RightButton) root.service.setDoNotDisturb(!root.dnd)
-      else if (b === Qt.MiddleButton) root.service.clearInbox()
-      else root.toggle()
+    onPressed: function (b) {
+      if (!root.available)
+        return
+      if (b === Qt.RightButton)
+        root.service.setDoNotDisturb(!root.dnd)
+      else if (b === Qt.MiddleButton)
+        root.service.clearInbox()
+      else
+        root.toggle()
     }
 
     Rectangle {
@@ -181,8 +216,9 @@ Panel {
       anchors.fill: parent
       // Delete / Shift+Delete are not PanelKeyCatcher signals; they propagate
       // here unaccepted.
-      Keys.onPressed: function(event) {
-        if (event.key !== Qt.Key_Delete || root.cursor < 0) return
+      Keys.onPressed: function (event) {
+        if (event.key !== Qt.Key_Delete || root.cursor < 0)
+          return
         root.dismissAt(root.cursor, (event.modifiers & Qt.ShiftModifier) !== 0)
         event.accepted = true
       }
@@ -190,11 +226,18 @@ Panel {
       PanelKeyCatcher {
         id: keyCatcher
         anchors.fill: parent
-        onMoveRequested: function(dx, dy) { if (dy !== 0) root.moveCursor(dy) }
-        onActivateRequested: if (root.cursor >= 0) root.activate(root.cursor)
-        onDeleteRequested: if (root.cursor >= 0) root.dismissAt(root.cursor, false)
+        onMoveRequested: function (dx, dy) {
+          if (dy !== 0)
+            root.moveCursor(dy)
+        }
+        onActivateRequested: if (root.cursor >= 0)
+          root.activate(root.cursor)
+        onDeleteRequested: if (root.cursor >= 0)
+          root.dismissAt(root.cursor, false)
         onCloseRequested: root.close()
-        onTabRequested: function(direction) { root.switchPanel(direction) }
+        onTabRequested: function (direction) {
+          root.switchPanel(direction)
+        }
 
         ColumnLayout {
           id: content
@@ -296,8 +339,7 @@ Panel {
               required property var modelData
               required property int index
               width: list.width
-              sourceComponent: modelData.kind === "group" ? groupRow
-                : (modelData.kind === "more" ? moreRow : entryRow)
+              sourceComponent: modelData.kind === "group" ? groupRow : (modelData.kind === "more" ? moreRow : entryRow)
 
               Component {
                 id: groupRow

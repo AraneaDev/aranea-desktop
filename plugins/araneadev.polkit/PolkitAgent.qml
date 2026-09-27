@@ -28,8 +28,7 @@ Item {
   readonly property color scrim: Qt.rgba(Color.polkit.scrim.r, Color.polkit.scrim.g, Color.polkit.scrim.b, Math.max(Color.polkit.scrim.a, 0.72))
   readonly property color dim: Util.alpha(foreground, 0.58)
   readonly property real letterSpacing: 0.20
-  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state"))
-    + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
   readonly property int cornerRadius: Style.cornerRadius
   property int contentMargin: Style.spacing.panelPadding
   property int fieldHeight: Math.max(Style.space(42), Style.spacing.controlHeight)
@@ -77,7 +76,8 @@ Item {
   }
 
   function refreshLidState() {
-    if (!laptopClosedProc.running) laptopClosedProc.running = true
+    if (!laptopClosedProc.running)
+      laptopClosedProc.running = true
   }
 
   function resetSnapshot() {
@@ -112,8 +112,8 @@ Item {
 
   function syncFromFlow() {
     var flow = polkitAgent.flow
-    if (!flow) return
-
+    if (!flow)
+      return
     currentMessage = String(flow.message || "Authentication is needed...")
     currentPrompt = String(flow.inputPrompt || "")
     currentSupplementary = String(flow.supplementaryMessage || "")
@@ -124,7 +124,8 @@ Item {
     failed = !!flow.failed
     syncIdentity()
 
-    if (responseRequired) submitted = false
+    if (responseRequired)
+      submitted = false
   }
 
   function startActionLookup() {
@@ -135,7 +136,8 @@ Item {
     lookupQueued = false
     var flow = polkitAgent.flow
     var id = flow ? String(flow.actionId || "") : ""
-    if (!flow || !PolkitLogic.validActionId(id)) return
+    if (!flow || !PolkitLogic.validActionId(id))
+      return
     lookupCookie = String(flow.cookie || "")
     actionLookup.command = ["timeout", "2", "pkaction", "--action-id", id, "--verbose"]
     actionLookup.running = true
@@ -152,16 +154,20 @@ Item {
     refreshLidState()
     syncFromFlow()
     startActionLookup()
-    if (motionEnabled) openAnimation.restart()
+    if (motionEnabled)
+      openAnimation.restart()
     Qt.callLater(refocus)
   }
 
   function refocus() {
-    if (!dialogVisible) return
+    if (!dialogVisible)
+      return
     // In fingerprint mode there is no field to type into — park focus on the
     // key catcher so Escape still cancels; otherwise focus the password field.
-    if (fingerprintMode) keyCatcher.forceActiveFocus()
-    else passwordInput.forceActiveFocus()
+    if (fingerprintMode)
+      keyCatcher.forceActiveFocus()
+    else
+      passwordInput.forceActiveFocus()
   }
 
   function toggleDetails() {
@@ -171,9 +177,11 @@ Item {
 
   function cycleIdentity() {
     var flow = polkitAgent.flow
-    if (!flow || !flow.identities || flow.identities.length < 2) return
+    if (!flow || !flow.identities || flow.identities.length < 2)
+      return
     var next = PolkitLogic.nextIdentityIndex(flow.identities.length, PolkitLogic.indexOfIdentity(flow.identities, flow.selectedIdentity))
-    if (next >= 0) flow.selectedIdentity = flow.identities[next]
+    if (next >= 0)
+      flow.selectedIdentity = flow.identities[next]
   }
 
   // One key map for every focus holder (field, key catcher, details text).
@@ -182,7 +190,8 @@ Item {
       cancelRequest()
       event.accepted = true
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-      if (responseRequired) submitResponse()
+      if (responseRequired)
+        submitResponse()
       event.accepted = true
     } else if (event.key === Qt.Key_Tab) {
       toggleDetails()
@@ -195,7 +204,8 @@ Item {
 
   function submitResponse() {
     var flow = polkitAgent.flow
-    if (!flow || !flow.isResponseRequired) return
+    if (!flow || !flow.isResponseRequired)
+      return
     submitted = true
     errorFlash = false
     flow.submit(passwordInput.text)
@@ -209,7 +219,8 @@ Item {
     submitted = false
     closing = true
     closeTimer.restart()
-    if (flow) flow.cancelAuthenticationRequest()
+    if (flow)
+      flow.cancelAuthenticationRequest()
   }
 
   function triggerFailureFeedback() {
@@ -240,9 +251,27 @@ Item {
 
   SequentialAnimation {
     id: shakeAnimation
-    NumberAnimation { target: root; property: "shakeOffset"; to: -8; duration: 35; easing.type: Easing.OutQuad }
-    NumberAnimation { target: root; property: "shakeOffset"; to: 8; duration: 50; easing.type: Easing.InOutQuad }
-    NumberAnimation { target: root; property: "shakeOffset"; to: 0; duration: 55; easing.type: Easing.OutQuad }
+    NumberAnimation {
+      target: root
+      property: "shakeOffset"
+      to: -8
+      duration: 35
+      easing.type: Easing.OutQuad
+    }
+    NumberAnimation {
+      target: root
+      property: "shakeOffset"
+      to: 8
+      duration: 50
+      easing.type: Easing.InOutQuad
+    }
+    NumberAnimation {
+      target: root
+      property: "shakeOffset"
+      to: 0
+      duration: 55
+      easing.type: Easing.OutQuad
+    }
   }
 
   // Lock-like entrance (scrim fade, card fade + slight scale), unless Aranea
@@ -258,9 +287,30 @@ Item {
   }
   ParallelAnimation {
     id: openAnimation
-    NumberAnimation { target: scrimRect; property: "opacity"; from: 0; to: 1; duration: 160; easing.type: Easing.OutCubic }
-    NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
-    NumberAnimation { target: card; property: "scale"; from: 0.97; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    NumberAnimation {
+      target: scrimRect
+      property: "opacity"
+      from: 0
+      to: 1
+      duration: 160
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: card
+      property: "opacity"
+      from: 0
+      to: 1
+      duration: 180
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: card
+      property: "scale"
+      from: 0.97
+      to: 1
+      duration: 180
+      easing.type: Easing.OutCubic
+    }
   }
 
   FileView {
@@ -275,7 +325,10 @@ Item {
   Process {
     id: laptopClosedProc
     command: ["bash", "-c", "omarchy-hw-laptop-closed && echo closed || echo open"]
-    stdout: StdioCollector { id: laptopClosedOut; waitForEnd: true }
+    stdout: StdioCollector {
+      id: laptopClosedOut
+      waitForEnd: true
+    }
     onExited: root.laptopClosed = String(laptopClosedOut.text || "").trim() === "closed"
   }
 
@@ -283,8 +336,11 @@ Item {
   // it answers (or when it fails) the context line shows the identity only.
   Process {
     id: actionLookup
-    stdout: StdioCollector { id: actionLookupOut; waitForEnd: true }
-    onExited: function(exitCode) {
+    stdout: StdioCollector {
+      id: actionLookupOut
+      waitForEnd: true
+    }
+    onExited: function (exitCode) {
       var flow = polkitAgent.flow
       // A result belongs to one request: drop it for a finished or newer one.
       if (flow && exitCode === 0 && String(flow.cookie || "") === root.lookupCookie) {
@@ -293,9 +349,11 @@ Item {
         root.actionVendor = info.vendor
         // The details rows were rebuilt; a clicked value that held focus is
         // gone, so hand focus back to the field or key catcher.
-        if (root.detailsOpen) Qt.callLater(root.refocus)
+        if (root.detailsOpen)
+          Qt.callLater(root.refocus)
       }
-      if (root.lookupQueued) Qt.callLater(root.startActionLookup)
+      if (root.lookupQueued)
+        Qt.callLater(root.startActionLookup)
     }
   }
 
@@ -305,12 +363,16 @@ Item {
 
     onAuthenticationRequestStarted: root.beginFlow()
     onIsActiveChanged: {
-      if (isActive) root.syncFromFlow()
-      else if (!root.closing) root.resetSnapshot()
+      if (isActive)
+        root.syncFromFlow()
+      else if (!root.closing)
+        root.resetSnapshot()
     }
     onIsRegisteredChanged: {
-      if (isRegistered) console.log("aranea polkit agent registered")
-      else console.warn("aranea polkit agent is not registered; another agent may be running")
+      if (isRegistered)
+        console.log("aranea polkit agent registered")
+      else
+        console.warn("aranea polkit agent is not registered; another agent may be running")
     }
   }
 
@@ -319,16 +381,29 @@ Item {
 
     function onIsResponseRequiredChanged() {
       root.syncFromFlow()
-      if (!polkitAgent.flow || !polkitAgent.flow.isResponseRequired) passwordInput.text = ""
+      if (!polkitAgent.flow || !polkitAgent.flow.isResponseRequired)
+        passwordInput.text = ""
       Qt.callLater(root.refocus)
     }
 
-    function onInputPromptChanged() { root.syncFromFlow() }
-    function onResponseVisibleChanged() { root.syncFromFlow() }
-    function onSupplementaryMessageChanged() { root.syncFromFlow() }
-    function onSupplementaryIsErrorChanged() { root.syncFromFlow() }
-    function onSelectedIdentityChanged() { root.syncIdentity() }
-    function onFailedChanged() { root.syncFromFlow() }
+    function onInputPromptChanged() {
+      root.syncFromFlow()
+    }
+    function onResponseVisibleChanged() {
+      root.syncFromFlow()
+    }
+    function onSupplementaryMessageChanged() {
+      root.syncFromFlow()
+    }
+    function onSupplementaryIsErrorChanged() {
+      root.syncFromFlow()
+    }
+    function onSelectedIdentityChanged() {
+      root.syncIdentity()
+    }
+    function onFailedChanged() {
+      root.syncFromFlow()
+    }
 
     function onAuthenticationFailed() {
       root.syncFromFlow()
@@ -349,7 +424,12 @@ Item {
   PanelWindow {
     id: panel
     visible: root.dialogVisible
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-polkit"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -379,7 +459,10 @@ Item {
       padding: root.contentMargin
       clip: true  // content never spills past the card on very short screens
 
-      MouseArea { anchors.fill: parent; onClicked: root.refocus() }
+      MouseArea {
+        anchors.fill: parent
+        onClicked: root.refocus()
+      }
 
       Item {
         id: keyCatcher
@@ -387,7 +470,9 @@ Item {
         focus: true
 
         Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function(event) { root.handleKey(event) }
+        Keys.onPressed: function (event) {
+          root.handleKey(event)
+        }
       }
 
       ColumnLayout {
@@ -520,7 +605,9 @@ Item {
                 font.family: Style.font.family
                 font.pixelSize: Style.font.bodySmall
                 Keys.priority: Keys.BeforeItem
-                Keys.onPressed: function(event) { root.handleKey(event) }
+                Keys.onPressed: function (event) {
+                  root.handleKey(event)
+                }
               }
             }
           }
@@ -598,7 +685,9 @@ Item {
                 readOnly: root.submitted || root.errorFlash
                 enabled: root.dialogVisible
                 Keys.priority: Keys.BeforeItem
-                Keys.onPressed: function(event) { root.handleKey(event) }
+                Keys.onPressed: function (event) {
+                  root.handleKey(event)
+                }
               }
 
               Text {

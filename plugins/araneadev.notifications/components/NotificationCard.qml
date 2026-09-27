@@ -39,9 +39,9 @@ BorderSurface {
 
   readonly property bool hovered: hoverTracker.hovered
 
-  signal closeRequested()
-  signal cardClicked()
-  signal swipeDismissed()
+  signal closeRequested
+  signal cardClicked
+  signal swipeDismissed
   // Off when Aranea motion is disabled: the card leaves without sliding.
   property bool motionEnabled: true
   property bool swipeEnabled: true
@@ -49,7 +49,9 @@ BorderSurface {
   property real dragOffset: 0
   property bool dragMoved: false
 
-  transform: Translate { x: root.dragOffset }
+  transform: Translate {
+    x: root.dragOffset
+  }
   opacity: 1 - Math.min(0.85, Math.max(0, root.dragOffset) / Math.max(1, root.width))
   // Prefer per-notification media/avatar data, then fall back to the app icon.
   // The `check` flag avoids Qt's missing-texture placeholder for unknown names.
@@ -68,12 +70,8 @@ BorderSurface {
   readonly property color bodyColor: Qt.darker(Color.notifications.text, 1.15)
   readonly property color accentColor: urgency === 2 ? Color.urgent : (urgency === 0 ? dimColor : Color.notifications.countdown)
   readonly property color railColor: urgency === 2 ? Color.urgent : (urgency === 0 ? Color.notifications.border : Color.notifications.countdown)
-  readonly property color cardBackground: urgency === 2
-    ? Util.alpha(Color.urgent, 0.08)
-    : (hovered ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
-  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border",
-    urgency === 2 ? Color.urgent : (selected ? Color.notifications.countdown : Color.notifications.border),
-    Math.max(1, Style.space(1)))
+  readonly property color cardBackground: urgency === 2 ? Util.alpha(Color.urgent, 0.08) : (hovered ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
+  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : (selected ? Color.notifications.countdown : Color.notifications.border), Math.max(1, Style.space(1)))
 
   function sanitizeBody(s: string): string {
     return NotificationLogic.sanitizeBody(s, app, appIcon)
@@ -81,9 +79,12 @@ BorderSurface {
 
   function iconSource(icon: string): string {
     var value = String(icon || "")
-    if (value.length === 0) return ""
-    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
-    if (value.charAt(0) === "/") return Util.fileUrl(value)
+    if (value.length === 0)
+      return ""
+    if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0)
+      return value
+    if (value.charAt(0) === "/")
+      return Util.fileUrl(value)
     return Quickshell.iconPath(value, true)
   }
 
@@ -108,18 +109,23 @@ BorderSurface {
     opacity: root.urgency === 0 ? 0.55 : 0.9
   }
 
-  HoverHandler { id: hoverTracker }
+  HoverHandler {
+    id: hoverTracker
+  }
 
   MouseArea {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onPressed: root.dragMoved = false
-    onClicked: function(mouse) {
+    onClicked: function (mouse) {
       // A swipe that started on the card must never count as a click.
-      if (root.dragMoved) return
-      if (mouse.button === Qt.RightButton) root.closeRequested()
-      else root.cardClicked()
+      if (root.dragMoved)
+        return
+      if (mouse.button === Qt.RightButton)
+        root.closeRequested()
+      else
+        root.cardClicked()
     }
   }
 
@@ -132,12 +138,15 @@ BorderSurface {
     dragThreshold: InboxLogic.CLICK_SUPPRESS_PX
     acceptedButtons: Qt.LeftButton
     onActiveTranslationChanged: {
-      if (!active) return
-      if (InboxLogic.suppressesClick(activeTranslation.x)) root.dragMoved = true
+      if (!active)
+        return
+      if (InboxLogic.suppressesClick(activeTranslation.x))
+        root.dragMoved = true
       root.dragOffset = Math.max(0, activeTranslation.x)
     }
     onActiveChanged: {
-      if (active) return
+      if (active)
+        return
       var outcome = InboxLogic.swipeOutcome(root.dragOffset, root.width, centroid.velocity.x)
       root.settle(outcome === "dismiss")
     }
@@ -146,7 +155,8 @@ BorderSurface {
   function settle(dismiss: bool): void {
     if (!root.motionEnabled) {
       root.dragOffset = 0
-      if (dismiss) root.swipeDismissed()
+      if (dismiss)
+        root.swipeDismissed()
       return
     }
     settleAnimation.to = dismiss ? root.width + Style.space(24) : 0
@@ -162,7 +172,8 @@ BorderSurface {
     property: "dragOffset"
     easing.type: Easing.OutCubic
     onFinished: {
-      if (!dismissing) return
+      if (!dismissing)
+        return
       root.dragOffset = 0
       root.swipeDismissed()
     }
@@ -316,5 +327,4 @@ BorderSurface {
       }
     }
   }
-
 }

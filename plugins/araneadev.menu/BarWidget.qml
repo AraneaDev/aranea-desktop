@@ -35,10 +35,13 @@ BarWidget {
       enabled: false
     }
 
-    onPressed: function(button) {
-      if (!root.bar) return
-      if (button === Qt.RightButton) root.bar.run("xdg-terminal-exec")
-      else root.bar.run("omarchy-shell shell toggle araneadev.menu '{\"menu\":\"root\"}'")
+    onPressed: function (button) {
+      if (!root.bar)
+        return
+      if (button === Qt.RightButton)
+        root.bar.run("xdg-terminal-exec")
+      else
+        root.bar.run("omarchy-shell shell toggle araneadev.menu '{\"menu\":\"root\"}'")
     }
   }
 }

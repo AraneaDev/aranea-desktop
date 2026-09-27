@@ -145,7 +145,7 @@ grep -Fq 'root.revealedIndex === root.selectedIndex' "$plugin/Clipboard.qml"
 
 # --- final-review fixes (Clipboard.qml)
 # C1: a reveal belongs to one item; any change to the list masks everything again
-grep -Fq 'root.revealedIndex = -1  // list changed' "$plugin/Clipboard.qml"
+grep -A1 -F 'root.revealedIndex = -1' "$plugin/Clipboard.qml" | grep -Fq '// list changed'
 # I4: menu-like open motion that honours the Aranea motion setting
 grep -Fq 'aranea/motion' "$plugin/Clipboard.qml"
 grep -Fq 'NumberAnimation' "$plugin/Clipboard.qml"

@@ -190,7 +190,7 @@ fi
 
 # --- final-review minors
 # 1: a sample still in flight when the dropdown closes is dropped
-grep -Fq 'if (!metrics.topActive) return' "$plugin/Metrics.qml"
+grep -A1 -F 'if (!metrics.topActive)' "$plugin/Metrics.qml" | grep -Fq return
 # 2: page size and clock tick come from getconf, not constants
 grep -Fq '"getconf", "PAGESIZE"' "$plugin/Metrics.qml"
 grep -Fq '"getconf", "CLK_TCK"' "$plugin/Metrics.qml"
@@ -204,7 +204,7 @@ if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then
   exit 1
 fi
 # 4: the sparkline repaints only while the dropdown is open
-grep -Fq 'onValuesChanged: if (root.opened) requestPaint()' "$plugin/Panel.qml"
+grep -A1 -F 'onValuesChanged: if (root.opened)' "$plugin/Panel.qml" | grep -Fq 'requestPaint()'
 # 5: opening without a service closes again instead of sticking open
 grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
 # 9: branding paths honour XDG_STATE_HOME everywhere

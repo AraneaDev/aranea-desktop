@@ -19,7 +19,11 @@ Item {
   property int duration: 1200
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
-  readonly property real fraction: OsdModel.progressFraction({ hasProgress: root.hasProgress, value: root.value, maxValue: root.maxValue })
+  readonly property real fraction: OsdModel.progressFraction({
+    hasProgress: root.hasProgress,
+    value: root.value,
+    maxValue: root.maxValue
+  })
   readonly property bool mediaOsd: root.iconKey.indexOf("media") === 0 || root.iconKey.indexOf("player") === 0
   readonly property int pad: Style.space(14)
   readonly property int gap: Style.space(12)
@@ -42,8 +46,10 @@ Item {
     root.hasProgress = next.hasProgress
     root.duration = next.duration
     root.opened = true
-    if (root.duration > 0) hideTimer.restart()
-    else hideTimer.stop()
+    if (root.duration > 0)
+      hideTimer.restart()
+    else
+      hideTimer.stop()
   }
 
   function open(payloadJson: string): void {
@@ -53,7 +59,9 @@ Item {
     } catch (error) {}
   }
 
-  function close(): void { root.opened = false }
+  function close(): void {
+    root.opened = false
+  }
 
   FileView {
     path: root.motionStatePath
@@ -80,16 +88,31 @@ Item {
 
   IpcHandler {
     target: "osd"
-    function show(payloadJson: string): string { root.open(payloadJson); return "ok" }
-    function close(): string { root.close(); return "ok" }
-    function state(): string { return root.opened ? "open" : "closed" }
-    function ping(): string { return "ok" }
+    function show(payloadJson: string): string {
+      root.open(payloadJson)
+      return "ok"
+    }
+    function close(): string {
+      root.close()
+      return "ok"
+    }
+    function state(): string {
+      return root.opened ? "open" : "closed"
+    }
+    function ping(): string {
+      return "ok"
+    }
   }
 
   PanelWindow {
     id: panel
     visible: root.opened || card.opacity > 0
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-osd"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -109,15 +132,23 @@ Item {
       borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(1)))
       radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
-      transform: Translate { y: card.revealOffset }
+      transform: Translate {
+        y: card.revealOffset
+      }
 
       Behavior on opacity {
         enabled: root.motionEnabled
-        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 160
+          easing.type: Easing.OutCubic
+        }
       }
       Behavior on revealOffset {
         enabled: root.motionEnabled
-        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 160
+          easing.type: Easing.OutCubic
+        }
       }
 
       Row {
@@ -159,7 +190,10 @@ Item {
             color: Color.accent
             Behavior on width {
               enabled: root.motionEnabled
-              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+              NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+              }
             }
           }
           Rectangle {
@@ -171,7 +205,10 @@ Item {
             color: Color.accent
             Behavior on x {
               enabled: root.motionEnabled
-              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+              NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+              }
             }
           }
         }

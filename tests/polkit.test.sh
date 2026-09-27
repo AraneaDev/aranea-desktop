@@ -172,7 +172,7 @@ fi
 
 # --- final review fixes
 # m1: a pkaction result rebuilds the details; keep keys working afterwards
-grep -Fq 'if (root.detailsOpen) Qt.callLater(root.refocus)' "$agent"
+grep -A1 -F 'if (root.detailsOpen)' "$agent" | grep -Fq 'Qt.callLater(root.refocus)'
 # m2: content never spills past the card on very short screens
 grep -Fq 'clip: true  // content never spills past the card' "$agent"
 # m4: doctor reports whether a polkit prompt is enabled

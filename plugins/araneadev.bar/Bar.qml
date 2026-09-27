@@ -34,7 +34,9 @@ Item {
     id: fallbackBarWidgetRegistry
     property var widgets: ({})
     property int revision: 0
-    function metadataFor(id) { return null }
+    function metadataFor(id) {
+      return null
+    }
   }
   // Mirrors the on-disk `bar-off` flag so the user can hide the bar without
   // killing the entire shell. Hidden panels stay mapped but park off-screen
@@ -44,11 +46,15 @@ Item {
   property string stateHome: home + "/.local/state"
   property string omarchyConfigDir: home + "/.config/omarchy"
   property var fallbackBarConfig: ({
-    position: "top",
-    transparent: true,
-    centerAnchor: "omarchy.clock",
-    layout: { left: [], center: [], right: [] }
-  })
+      position: "top",
+      transparent: true,
+      centerAnchor: "omarchy.clock",
+      layout: {
+        left: [],
+        center: [],
+        right: []
+      }
+    })
   property var layoutConfig: fallbackBarConfig.layout
   property string centerAnchor: ""
   property bool requestedTransparent: false
@@ -83,9 +89,27 @@ Item {
   property color background: Color.bar.background
   property color urgent: Color.bar.active
 
-  Behavior on barForeground { enabled: root.motionEnabled && root.foregroundAnimationEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-  Behavior on background { enabled: root.motionEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-  Behavior on urgent { enabled: root.motionEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+  Behavior on barForeground {
+    enabled: root.motionEnabled && root.foregroundAnimationEnabled
+    ColorAnimation {
+      duration: 420
+      easing.type: Easing.InOutCubic
+    }
+  }
+  Behavior on background {
+    enabled: root.motionEnabled
+    ColorAnimation {
+      duration: 420
+      easing.type: Easing.InOutCubic
+    }
+  }
+  Behavior on urgent {
+    enabled: root.motionEnabled
+    ColorAnimation {
+      duration: 420
+      easing.type: Easing.InOutCubic
+    }
+  }
   property var tooltipTarget: null
   property var pendingTooltipTarget: null
   property string tooltipText: ""
@@ -117,7 +141,7 @@ Item {
 
   Component {
     id: pluginBarApiComponent
-    PluginBarApi { }
+    PluginBarApi {}
   }
 
   function publicLayoutConfig(): var {
@@ -125,26 +149,51 @@ Item {
   }
 
   function bindPluginBarApi(api) {
-    if (!api) return
-    api.foreground = Qt.binding(function() { return root.foreground })
-    api.barForeground = Qt.binding(function() { return root.barForeground })
-    api.background = Qt.binding(function() { return root.background })
-    api.urgent = Qt.binding(function() { return root.urgent })
-    api.fontFamily = Qt.binding(function() { return root.fontFamily })
-    api.position = Qt.binding(function() { return root.position })
-    api.vertical = Qt.binding(function() { return root.vertical })
-    api.barSize = Qt.binding(function() { return root.barSize })
-    api.transparent = Qt.binding(function() { return root.transparent })
-    api.foregroundAnimationEnabled = Qt.binding(function() { return root.foregroundAnimationEnabled })
-    api.centerSectionRevealHeld = Qt.binding(function() { return root.centerSectionRevealHeld })
-    api._centerHoverRevealSuppressed = Qt.binding(function() { return root.centerHoverRevealSuppressed })
+    if (!api)
+      return
+    api.foreground = Qt.binding(function () {
+      return root.foreground
+    })
+    api.barForeground = Qt.binding(function () {
+      return root.barForeground
+    })
+    api.background = Qt.binding(function () {
+      return root.background
+    })
+    api.urgent = Qt.binding(function () {
+      return root.urgent
+    })
+    api.fontFamily = Qt.binding(function () {
+      return root.fontFamily
+    })
+    api.position = Qt.binding(function () {
+      return root.position
+    })
+    api.vertical = Qt.binding(function () {
+      return root.vertical
+    })
+    api.barSize = Qt.binding(function () {
+      return root.barSize
+    })
+    api.transparent = Qt.binding(function () {
+      return root.transparent
+    })
+    api.foregroundAnimationEnabled = Qt.binding(function () {
+      return root.foregroundAnimationEnabled
+    })
+    api.centerSectionRevealHeld = Qt.binding(function () {
+      return root.centerSectionRevealHeld
+    })
+    api._centerHoverRevealSuppressed = Qt.binding(function () {
+      return root.centerHoverRevealSuppressed
+    })
     root.syncPluginBarApiObjects(api)
   }
 
   function syncPluginBarApiObjects(api) {
-    if (!api) return
-    api.activePopout = root.pluginOwnsBarObject(api.pluginId, root.activePopout)
-      ? root.activePopout : (root.activePopout ? api.foreignPopoutMarker : null)
+    if (!api)
+      return
+    api.activePopout = root.pluginOwnsBarObject(api.pluginId, root.activePopout) ? root.activePopout : (root.activePopout ? api.foreignPopoutMarker : null)
     api.clickTargets = root.pluginClickTargets(api.pluginId)
     api.layoutConfig = root.publicLayoutConfig()
   }
@@ -152,22 +201,31 @@ Item {
   function pluginObjectRecord(target) {
     for (var i = 0; i < pluginObjectOwners.length; i++) {
       var record = pluginObjectOwners[i]
-      if (record && record.target === target) return record
+      if (record && record.target === target)
+        return record
     }
     return null
   }
 
   function markPluginObject(pluginId, target, role) {
     var key = String(pluginId || "")
-    if (!key || !target) return false
+    if (!key || !target)
+      return false
     var record = root.pluginObjectRecord(target)
-    if (record && record.pluginId !== key) return false
+    if (record && record.pluginId !== key)
+      return false
     var next = []
     for (var i = 0; i < pluginObjectOwners.length; i++) {
       var existing = pluginObjectOwners[i]
-      if (!existing || existing.target !== target) next.push(existing)
+      if (!existing || existing.target !== target)
+        next.push(existing)
     }
-    var updated = record || { target: target, pluginId: key, clickTarget: false, popout: false }
+    var updated = record || {
+      target: target,
+      pluginId: key,
+      clickTarget: false,
+      popout: false
+    }
     updated[role] = true
     next.push(updated)
     pluginObjectOwners = next
@@ -184,7 +242,8 @@ Item {
         continue
       }
       record[role] = false
-      if (record.clickTarget || record.popout) next.push(record)
+      if (record.clickTarget || record.popout)
+        next.push(record)
     }
     pluginObjectOwners = next
   }
@@ -198,40 +257,47 @@ Item {
     var out = []
     for (var i = 0; i < root.clickTargets.length; i++) {
       var target = root.clickTargets[i]
-      if (root.pluginOwnsBarObject(pluginId, target)) out.push(target)
+      if (root.pluginOwnsBarObject(pluginId, target))
+        out.push(target)
     }
     return out
   }
 
   function syncAllPluginBarApiObjects(): void {
-    for (var id in pluginBarApis) root.syncPluginBarApiObjects(pluginBarApis[id])
+    for (var id in pluginBarApis)
+      root.syncPluginBarApiObjects(pluginBarApis[id])
   }
 
   function registerPluginClickTarget(pluginId, target) {
-    if (!root.markPluginObject(pluginId, target, "clickTarget")) return
+    if (!root.markPluginObject(pluginId, target, "clickTarget"))
+      return
     root.registerClickTarget(target)
   }
 
   function unregisterPluginClickTarget(pluginId, target) {
-    if (!root.pluginOwnsBarObject(pluginId, target)) return
+    if (!root.pluginOwnsBarObject(pluginId, target))
+      return
     root.unregisterClickTarget(target)
     root.unmarkPluginObject(pluginId, target, "clickTarget")
   }
 
   function requestPluginPopout(pluginId, owner) {
-    if (!root.markPluginObject(pluginId, owner, "popout")) return
+    if (!root.markPluginObject(pluginId, owner, "popout"))
+      return
     root.requestPopout(owner)
   }
 
   function releasePluginPopout(pluginId, owner) {
-    if (!root.pluginOwnsBarObject(pluginId, owner)) return
+    if (!root.pluginOwnsBarObject(pluginId, owner))
+      return
     root.releasePopout(owner)
     root.unmarkPluginObject(pluginId, owner, "popout")
   }
 
   function pluginBarApiFor(pluginId, moduleName, registered) {
     var key = String(pluginId || "")
-    if (!key) return null
+    if (!key)
+      return null
 
     var pluginShell = null
     if (registered && root.shell && typeof root.shell.pluginShellForId === "function") {
@@ -254,28 +320,47 @@ Item {
       pluginId: key,
       moduleName: String(moduleName || ""),
       shell: pluginShell,
-      _showTooltip: function(target, text) { root.showTooltip(target, text) },
-      _hideTooltip: function(target) { root.hideTooltip(target) },
-      _registerClickTarget: function(target) { root.registerPluginClickTarget(key, target) },
-      _unregisterClickTarget: function(target) { root.unregisterPluginClickTarget(key, target) },
-      _requestPopout: function(owner) { root.requestPluginPopout(key, owner) },
-      _releasePopout: function(owner) { root.releasePluginPopout(key, owner) },
-      _switchPanelFrom: function(owner, direction) { return root.switchPanelFrom(owner, direction) },
-      _targetBelongsToWindow: function(target, window) { return root.targetBelongsToWindow(target, window) },
-      _moduleWidgets: function(requestedId) {
-        return String(requestedId || "") === String(moduleName || "")
-          ? root.moduleWidgets(moduleName) : []
+      _showTooltip: function (target, text) {
+        root.showTooltip(target, text)
       },
-      _run: function(command) { root.run(command) },
-      _setCenterHoverRevealSuppressed: function(value) {
+      _hideTooltip: function (target) {
+        root.hideTooltip(target)
+      },
+      _registerClickTarget: function (target) {
+        root.registerPluginClickTarget(key, target)
+      },
+      _unregisterClickTarget: function (target) {
+        root.unregisterPluginClickTarget(key, target)
+      },
+      _requestPopout: function (owner) {
+        root.requestPluginPopout(key, owner)
+      },
+      _releasePopout: function (owner) {
+        root.releasePluginPopout(key, owner)
+      },
+      _switchPanelFrom: function (owner, direction) {
+        return root.switchPanelFrom(owner, direction)
+      },
+      _targetBelongsToWindow: function (target, window) {
+        return root.targetBelongsToWindow(target, window)
+      },
+      _moduleWidgets: function (requestedId) {
+        return String(requestedId || "") === String(moduleName || "") ? root.moduleWidgets(moduleName) : []
+      },
+      _run: function (command) {
+        root.run(command)
+      },
+      _setCenterHoverRevealSuppressed: function (value) {
         root.centerHoverRevealSuppressed = !!value
       }
     })
-    if (!api) return null
+    if (!api)
+      return null
     root.bindPluginBarApi(api)
 
     var next = ({})
-    for (var id in pluginBarApis) next[id] = pluginBarApis[id]
+    for (var id in pluginBarApis)
+      next[id] = pluginBarApis[id]
     next[key] = api
     pluginBarApis = next
     return api
@@ -284,7 +369,8 @@ Item {
   function pluginBarApiUsed(pluginId: string): bool {
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
-      if (slot && slot.pluginApiId === pluginId) return true
+      if (slot && slot.pluginApiId === pluginId)
+        return true
     }
     return false
   }
@@ -293,11 +379,14 @@ Item {
     var owned = pluginObjectOwners.slice()
     for (var i = 0; i < owned.length; i++) {
       var record = owned[i]
-      if (!record || record.pluginId !== pluginId) continue
-      if (record.clickTarget) root.unregisterClickTarget(record.target)
-      if (record.popout && root.activePopout === record.target) root.releasePopout(record.target)
+      if (!record || record.pluginId !== pluginId)
+        continue
+      if (record.clickTarget)
+        root.unregisterClickTarget(record.target)
+      if (record.popout && root.activePopout === record.target)
+        root.releasePopout(record.target)
     }
-    pluginObjectOwners = pluginObjectOwners.filter(function(record) {
+    pluginObjectOwners = pluginObjectOwners.filter(function (record) {
       return record && record.pluginId !== pluginId
     })
   }
@@ -311,7 +400,8 @@ Item {
         continue
       }
       root.releasePluginObjects(id)
-      if (api && typeof api.destroy === "function") api.destroy()
+      if (api && typeof api.destroy === "function")
+        api.destroy()
     }
     pluginBarApis = next
   }
@@ -331,26 +421,32 @@ Item {
   }
 
   function registerClickTarget(target) {
-    if (!target || clickTargets.indexOf(target) !== -1) return
+    if (!target || clickTargets.indexOf(target) !== -1)
+      return
     var next = clickTargets.slice()
     next.push(target)
     clickTargets = next
   }
 
   function unregisterClickTarget(target) {
-    var next = clickTargets.filter(function(item) { return item !== target })
+    var next = clickTargets.filter(function (item) {
+      return item !== target
+    })
     clickTargets = next
   }
 
   function registerModuleSlot(slot) {
-    if (!slot || moduleSlots.indexOf(slot) !== -1) return
+    if (!slot || moduleSlots.indexOf(slot) !== -1)
+      return
     var next = moduleSlots.slice()
     next.push(slot)
     moduleSlots = next
   }
 
   function unregisterModuleSlot(slot) {
-    var next = moduleSlots.filter(function(item) { return item !== slot })
+    var next = moduleSlots.filter(function (item) {
+      return item !== slot
+    })
     moduleSlots = next
   }
 
@@ -358,12 +454,15 @@ Item {
     var out = []
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
-      if (!slot || !slot.activeItem) continue
-      var point = { x: slot.x, y: slot.y }
+      if (!slot || !slot.activeItem)
+        continue
+      var point = {
+        x: slot.x,
+        y: slot.y
+      }
       try {
         point = slot.mapToItem(null, 0, 0)
-      } catch (e) {
-      }
+      } catch (e) {}
       out.push({
         id: slot.moduleName,
         section: slot.region,
@@ -389,13 +488,16 @@ Item {
   }
 
   function slotWindow(slot) {
-    if (!slot) return null
+    if (!slot)
+      return null
     return targetWindow(slot.activeItem) || targetWindow(slot)
   }
 
   function sameWindow(left, right) {
-    if (!left || !right) return false
-    if (left === right) return true
+    if (!left || !right)
+      return false
+    if (left === right)
+      return true
     return !!left.screen && !!right.screen && !!left.screen.name && !!right.screen.name && left.screen.name === right.screen.name
   }
 
@@ -431,14 +533,21 @@ Item {
   function windowScreenPoint(scenePoint, window) {
     var x = scenePoint ? scenePoint.x : 0
     var y = scenePoint ? scenePoint.y : 0
-    if (!window || !window.screen) return { x: x, y: y }
+    if (!window || !window.screen)
+      return {
+        x: x,
+        y: y
+      }
 
     if (root.position === "bottom")
       y += Math.max(0, window.screen.height - window.height)
     else if (root.position === "right")
       x += Math.max(0, window.screen.width - window.width)
 
-    return { x: x, y: y }
+    return {
+      x: x,
+      y: y
+    }
   }
 
   function barDragScreenPoint(scenePoint) {
@@ -446,7 +555,8 @@ Item {
   }
 
   function dropMarkerRect(slot, after) {
-    if (!slot) return null
+    if (!slot)
+      return null
 
     try {
       var slotPoint = slot.mapToItem(null, 0, 0)
@@ -481,9 +591,18 @@ Item {
 
     var edge = "top"
     var best = ny
-    if (1 - ny < best) { edge = "bottom"; best = 1 - ny }
-    if (nx < best) { edge = "left"; best = nx }
-    if (1 - nx < best) { edge = "right"; best = 1 - nx }
+    if (1 - ny < best) {
+      edge = "bottom"
+      best = 1 - ny
+    }
+    if (nx < best) {
+      edge = "left"
+      best = nx
+    }
+    if (1 - nx < best) {
+      edge = "right"
+      best = 1 - nx
+    }
     return edge
   }
 
@@ -495,7 +614,8 @@ Item {
   }
 
   function updateBarMove(screenPoint) {
-    if (!barMoveActive || !barMoveScreen) return
+    if (!barMoveActive || !barMoveScreen)
+      return
     barMoveCandidate = nearestScreenEdge(screenPoint, barMoveScreen)
   }
 
@@ -520,8 +640,9 @@ Item {
   function setBarPosition(value) {
     var next = normalizePosition(value)
     if (root.shell && typeof root.shell.mutateShellConfig === "function") {
-      root.shell.mutateShellConfig(function(config) {
-        if (!Util.isPlainObject(config.bar)) config.bar = {}
+      root.shell.mutateShellConfig(function (config) {
+        if (!Util.isPlainObject(config.bar))
+          config.bar = {}
         config.bar.position = next
       })
     } else {
@@ -532,27 +653,32 @@ Item {
   function captureBarDragGhost(slot) {
     var item = slot && slot.activeItem ? slot.activeItem : null
     barDragImageUrl = ""
-    if (!item || typeof item.grabToImage !== "function") return
-
+    if (!item || typeof item.grabToImage !== "function")
+      return
     var grabWidth = Math.max(1, Math.ceil(item.width || item.implicitWidth || slot.width || 1))
     var grabHeight = Math.max(1, Math.ceil(item.height || item.implicitHeight || slot.height || 1))
-    item.grabToImage(function(result) {
-      if (root.barDragSource !== slot || !result || !result.url) return
+    item.grabToImage(function (result) {
+      if (root.barDragSource !== slot || !result || !result.url)
+        return
       root.barDragImageUrl = result.url
     }, Qt.size(grabWidth, grabHeight))
   }
 
   function requestPopout(owner) {
-    if (activePopout === owner) return
+    if (activePopout === owner)
+      return
     if (activePopout) {
-      if ("closeForPopoutSwitch" in activePopout) activePopout.closeForPopoutSwitch()
-      else if ("close" in activePopout) activePopout.close()
+      if ("closeForPopoutSwitch" in activePopout)
+        activePopout.closeForPopoutSwitch()
+      else if ("close" in activePopout)
+        activePopout.close()
     }
     activePopout = owner
   }
 
   function releasePopout(owner) {
-    if (activePopout === owner) activePopout = null
+    if (activePopout === owner)
+      activePopout = null
   }
 
   readonly property bool vertical: position === "left" || position === "right"
@@ -567,9 +693,9 @@ Item {
   function normalizeLayout(layout): var {
     var normalized = Util.normalizeLayout(Util.isPlainObject(layout) ? layout : fallbackBarConfig.layout)
     return {
-      left:   pinTrayToInner(normalized.left,   "left"),
+      left: pinTrayToInner(normalized.left, "left"),
       center: pinTrayToInner(normalized.center, "center"),
-      right:  pinTrayToInner(normalized.right,  "right")
+      right: pinTrayToInner(normalized.right, "right")
     }
   }
 
@@ -613,9 +739,11 @@ Item {
       var settings = entrySettings(change.entry)
       for (var s = 0; s < moduleSlots.length; s++) {
         var slot = moduleSlots[s]
-        if (!slot || slot.region !== change.region || slot.moduleName !== entryId(change.entry)) continue
+        if (!slot || slot.region !== change.region || slot.moduleName !== entryId(change.entry))
+          continue
         var item = slot.activeItem
-        if (item && "settings" in item) item.settings = settings
+        if (item && "settings" in item)
+          item.settings = settings
       }
     }
   }
@@ -638,11 +766,15 @@ Item {
       var id = entryId(entries[i])
       for (var j = 0; j < moduleSlots.length; j++) {
         var slot = moduleSlots[j]
-        if (!slot || slot.region !== region || slot.moduleName !== id) continue
-        if (window && !sameWindow(slotWindow(slot), window)) continue
+        if (!slot || slot.region !== region || slot.moduleName !== id)
+          continue
+        if (window && !sameWindow(slotWindow(slot), window))
+          continue
         var item = slot.activeItem
-        if (!item || item.visible !== true || slot.visible !== true || slot.width <= 0 || slot.height <= 0) continue
-        if (typeof item.open !== "function" || typeof item.close !== "function" || item.opened === undefined) continue
+        if (!item || item.visible !== true || slot.visible !== true || slot.width <= 0 || slot.height <= 0)
+          continue
+        if (typeof item.open !== "function" || typeof item.close !== "function" || item.opened === undefined)
+          continue
         slots.push(slot)
         break
       }
@@ -666,7 +798,8 @@ Item {
   }
 
   function switchPanelFrom(owner, direction) {
-    if (!owner) return false
+    if (!owner)
+      return false
 
     var currentSlot = null
     for (var i = 0; i < moduleSlots.length; i++) {
@@ -676,10 +809,12 @@ Item {
         break
       }
     }
-    if (!currentSlot) return false
+    if (!currentSlot)
+      return false
 
     var slots = panelNavigationSlots(currentSlot.region, slotWindow(currentSlot))
-    if (slots.length < 2) return false
+    if (slots.length < 2)
+      return false
 
     var currentIndex = -1
     for (var j = 0; j < slots.length; j++) {
@@ -688,11 +823,13 @@ Item {
         break
       }
     }
-    if (currentIndex < 0) return false
+    if (currentIndex < 0)
+      return false
 
     var step = direction < 0 ? -1 : 1
     var nextSlot = slots[(currentIndex + step + slots.length) % slots.length]
-    if (!nextSlot || !nextSlot.activeItem || nextSlot.activeItem === owner) return false
+    if (!nextSlot || !nextSlot.activeItem || nextSlot.activeItem === owner)
+      return false
 
     nextSlot.activeItem.open()
     return true
@@ -703,10 +840,12 @@ Item {
   function moduleWidgets(pluginId: string): var {
     var id = String(pluginId || "")
     var items = []
-    if (!id) return items
+    if (!id)
+      return items
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
-      if (!slot || !slot.activeItem || slot.moduleName !== id) continue
+      if (!slot || !slot.activeItem || slot.moduleName !== id)
+        continue
       items.push(slot.activeItem)
     }
     return items
@@ -732,15 +871,23 @@ Item {
   // that only reaches whichever per-monitor instance claimed the target.
   function findPanelWidget(pluginId) {
     var id = String(pluginId || "")
-    if (!id) return null
+    if (!id)
+      return null
     var candidates = []
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
-      if (!slot || !slot.activeItem) continue
-      if (slot.moduleName !== id) continue
+      if (!slot || !slot.activeItem)
+        continue
+      if (slot.moduleName !== id)
+        continue
       var item = slot.activeItem
-      if (typeof item.open !== "function" || typeof item.close !== "function" || item.opened === undefined) continue
-      candidates.push({ slot: slot, screenName: slotScreenName(slot), opened: item.opened === true })
+      if (typeof item.open !== "function" || typeof item.close !== "function" || item.opened === undefined)
+        continue
+      candidates.push({
+        slot: slot,
+        screenName: slotScreenName(slot),
+        opened: item.opened === true
+      })
     }
     // One copy per monitor, plus a zero-size placeholder for anchored center
     // modules. See BarModel.pickPanelSlot for which one a hotkey acts on.
@@ -750,14 +897,16 @@ Item {
 
   function summonBarWidget(pluginId) {
     var item = findPanelWidget(pluginId)
-    if (!item || typeof item.open !== "function") return false
+    if (!item || typeof item.open !== "function")
+      return false
     item.open()
     return true
   }
 
   function hideBarWidget(pluginId) {
     var item = findPanelWidget(pluginId)
-    if (!item || typeof item.close !== "function") return false
+    if (!item || typeof item.close !== "function")
+      return false
     item.close()
     return true
   }
@@ -829,7 +978,8 @@ Item {
 
   function setBarHovered(hovered) {
     barHoverCount = Math.max(0, barHoverCount + (hovered ? 1 : -1))
-    if (barHoverCount === 0) centerSectionRevealTimer.restart()
+    if (barHoverCount === 0)
+      centerSectionRevealTimer.restart()
   }
 
   function setCenterHoverRevealSuppressed(value) {
@@ -842,20 +992,22 @@ Item {
     // Collapse only. Opening the peek is the center section's own gesture, done
     // in setCenterSectionHovered, so a timer left pending by a pointer that dipped
     // off the bar and came back cannot reveal indicators it never pointed at.
-    onTriggered: if (!root.centerSectionHovered && !root.barHovered) root.centerSectionRevealHeld = false
+    onTriggered: if (!root.centerSectionHovered && !root.barHovered)
+      root.centerSectionRevealHeld = false
   }
 
   function run(command: string): void {
-    if (!command) return
-
+    if (!command)
+      return
     Util.execDetached(command)
   }
 
   function toggleTransparency(): void {
     var nextTransparent = !(root.requestedTransparent === true)
     if (root.shell && typeof root.shell.mutateShellConfig === "function") {
-      root.shell.mutateShellConfig(function(config) {
-        if (!Util.isPlainObject(config.bar)) config.bar = {}
+      root.shell.mutateShellConfig(function (config) {
+        if (!Util.isPlainObject(config.bar))
+          config.bar = {}
         config.bar.transparent = nextTransparent
       })
     } else {
@@ -864,16 +1016,20 @@ Item {
   }
 
   function rawLayoutSection(config, region) {
-    if (!Util.isPlainObject(config.bar)) config.bar = {}
-    if (!Util.isPlainObject(config.bar.layout)) config.bar.layout = {}
-    if (!Array.isArray(config.bar.layout[region])) config.bar.layout[region] = []
+    if (!Util.isPlainObject(config.bar))
+      config.bar = {}
+    if (!Util.isPlainObject(config.bar.layout))
+      config.bar.layout = {}
+    if (!Array.isArray(config.bar.layout[region]))
+      config.bar.layout[region] = []
 
     return config.bar.layout[region]
   }
 
   function rawEntryIndex(entries, name) {
     for (var i = 0; i < entries.length; i++) {
-      if (root.entryId(entries[i]) === name) return i
+      if (root.entryId(entries[i]) === name)
+        return i
     }
 
     return -1
@@ -883,19 +1039,25 @@ Item {
     var fromEntries = rawLayoutSection(config, fromRegion)
     var toEntries = rawLayoutSection(config, toRegion)
     var fromIndex = rawEntryIndex(fromEntries, fromName)
-    if (fromIndex < 0) return false
+    if (fromIndex < 0)
+      return false
 
     var toIndex = beforeName ? rawEntryIndex(toEntries, beforeName) : toEntries.length
-    if (toIndex < 0) toIndex = toEntries.length
+    if (toIndex < 0)
+      toIndex = toEntries.length
 
-    if (fromRegion === toRegion && fromIndex === toIndex) return false
+    if (fromRegion === toRegion && fromIndex === toIndex)
+      return false
 
     var movedEntry = fromEntries[fromIndex]
     fromEntries.splice(fromIndex, 1)
 
-    if (fromRegion === toRegion && fromIndex < toIndex) toIndex -= 1
-    if (toIndex < 0) toIndex = 0
-    if (toIndex > toEntries.length) toIndex = toEntries.length
+    if (fromRegion === toRegion && fromIndex < toIndex)
+      toIndex -= 1
+    if (toIndex < 0)
+      toIndex = 0
+    if (toIndex > toEntries.length)
+      toIndex = toEntries.length
     if (fromRegion === toRegion && fromIndex === toIndex) {
       fromEntries.splice(fromIndex, 0, movedEntry)
       return false
@@ -906,12 +1068,15 @@ Item {
   }
 
   function dropBarModule(source, toRegion, beforeName) {
-    if (!source || !source.region || !source.moduleName || !toRegion) return false
-    if (source.region === toRegion && source.moduleName === beforeName) return false
-    if (!root.shell || typeof root.shell.mutateShellConfig !== "function") return false
+    if (!source || !source.region || !source.moduleName || !toRegion)
+      return false
+    if (source.region === toRegion && source.moduleName === beforeName)
+      return false
+    if (!root.shell || typeof root.shell.mutateShellConfig !== "function")
+      return false
 
     var changed = false
-    root.shell.mutateShellConfig(function(config) {
+    root.shell.mutateShellConfig(function (config) {
       changed = moveModuleInConfig(config, source.region, source.moduleName, toRegion, beforeName)
     })
     return changed
@@ -921,22 +1086,24 @@ Item {
     var sourceWindow = root.slotWindow(sourceSlot) || root.barDragWindow
     if (sourceWindow && sourceWindow.contentItem) {
       var barPoint = sourceWindow.contentItem.mapFromItem(null, scenePoint.x, scenePoint.y)
-      if (barPoint.x < 0 || barPoint.x > sourceWindow.contentItem.width ||
-          barPoint.y < 0 || barPoint.y > sourceWindow.contentItem.height)
+      if (barPoint.x < 0 || barPoint.x > sourceWindow.contentItem.width || barPoint.y < 0 || barPoint.y > sourceWindow.contentItem.height)
         return null
     }
 
     var candidates = []
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
-      if (!slot || slot === sourceSlot || !slot.visible || slot.width <= 0 || slot.height <= 0) continue
-      if (sourceWindow && !root.sameWindow(root.slotWindow(slot), sourceWindow)) continue
-
-      var slotPoint = { x: slot.x, y: slot.y }
+      if (!slot || slot === sourceSlot || !slot.visible || slot.width <= 0 || slot.height <= 0)
+        continue
+      if (sourceWindow && !root.sameWindow(root.slotWindow(slot), sourceWindow))
+        continue
+      var slotPoint = {
+        x: slot.x,
+        y: slot.y
+      }
       try {
         slotPoint = slot.mapToItem(null, 0, 0)
-      } catch (e) {
-      }
+      } catch (e) {}
 
       candidates.push({
         slot: slot,
@@ -954,9 +1121,10 @@ Item {
     var sourceWindow = root.slotWindow(sourceSlot) || root.barDragWindow
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
-      if (!slot || slot === sourceSlot || slot.region !== region || slot.moduleName !== name ||
-          !slot.visible || slot.width <= 0 || slot.height <= 0) continue
-      if (sourceWindow && !root.sameWindow(root.slotWindow(slot), sourceWindow)) continue
+      if (!slot || slot === sourceSlot || slot.region !== region || slot.moduleName !== name || !slot.visible || slot.width <= 0 || slot.height <= 0)
+        continue
+      if (sourceWindow && !root.sameWindow(root.slotWindow(slot), sourceWindow))
+        continue
       return slot
     }
 
@@ -973,54 +1141,54 @@ Item {
         continue
       }
 
-      if (visibleModuleSlot(region, name, sourceSlot)) return name
+      if (visibleModuleSlot(region, name, sourceSlot))
+        return name
     }
 
     return ""
   }
 
   function dropBarModuleAtTarget(sourceSlot, targetSlot, afterTarget) {
-    if (!sourceSlot || !targetSlot) return false
+    if (!sourceSlot || !targetSlot)
+      return false
 
     var beforeName = afterTarget ? nextVisibleModuleName(targetSlot.region, targetSlot.moduleName, sourceSlot) : targetSlot.moduleName
     return dropBarModule(sourceSlot, targetSlot.region, beforeName)
   }
 
   function moduleTargetClickable(target) {
-    return target
-      && target.visible !== false
-      && target.opacity !== 0
-      && target.interactive !== false
-      && target.pressable !== false
-      && target.concealed !== true
-      && typeof target.triggerPress === "function"
+    return target && target.visible !== false && target.opacity !== 0 && target.interactive !== false && target.pressable !== false && target.concealed !== true && typeof target.triggerPress === "function"
   }
 
   function moduleClickTargetAt(slot, localX, localY) {
     for (var i = clickTargets.length - 1; i >= 0; i--) {
       var target = clickTargets[i]
-      if (!moduleTargetClickable(target)) continue
-
-      var targetPoint = { x: localX, y: localY }
+      if (!moduleTargetClickable(target))
+        continue
+      var targetPoint = {
+        x: localX,
+        y: localY
+      }
       try {
         targetPoint = slot.mapToItem(target, localX, localY)
       } catch (e) {
         continue
       }
 
-      if (targetPoint.x >= 0 && targetPoint.x <= target.width &&
-          targetPoint.y >= 0 && targetPoint.y <= target.height) {
+      if (targetPoint.x >= 0 && targetPoint.x <= target.width && targetPoint.y >= 0 && targetPoint.y <= target.height) {
         return target
       }
     }
 
-    if (moduleTargetClickable(slot.activeItem)) return slot.activeItem
+    if (moduleTargetClickable(slot.activeItem))
+      return slot.activeItem
     return null
   }
 
   function pressModuleClickTarget(slot, button, localX, localY) {
     var target = moduleClickTargetAt(slot, localX, localY)
-    if (!target) return false
+    if (!target)
+      return false
 
     target.triggerPress(button)
     return true
@@ -1028,7 +1196,8 @@ Item {
 
   function colorHex(colorValue) {
     var c = colorValue
-    if (typeof c === "string") c = Qt.color(c)
+    if (typeof c === "string")
+      c = Qt.color(c)
     function hexChannel(value) {
       var s = Math.round(Util.clamp(value, 0, 1) * 255).toString(16)
       return s.length < 2 ? "0" + s : s
@@ -1055,8 +1224,10 @@ Item {
   }
 
   function restoreForegroundAnimation(): void {
-    Qt.callLater(function() {
-      Qt.callLater(function() { root.foregroundAnimationEnabled = true })
+    Qt.callLater(function () {
+      Qt.callLater(function () {
+        root.foregroundAnimationEnabled = true
+      })
     })
   }
 
@@ -1069,15 +1240,9 @@ Item {
   }
 
   function refreshTransparentForeground(): void {
-    if (!requestedTransparent || transparentForegroundProc.running) return
-
-    transparentForegroundProc.command = [
-      "omarchy-bar-text-color",
-      root.position,
-      String(root.barSize),
-      colorHex(root.themeForeground),
-      colorHex(root.themeContrastForeground)
-    ]
+    if (!requestedTransparent || transparentForegroundProc.running)
+      return
+    transparentForegroundProc.command = ["omarchy-bar-text-color", root.position, String(root.barSize), colorHex(root.themeForeground), colorHex(root.themeContrastForeground)]
     transparentForegroundProc.running = true
   }
 
@@ -1096,10 +1261,10 @@ Item {
   Process {
     id: transparentForegroundProc
     stdout: SplitParser {
-      onRead: function(line) {
+      onRead: function (line) {
         var value = String(line || "").trim()
-        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) return
-
+        if (!/^#[0-9A-Fa-f]{6}$/.test(value))
+          return
         root.foregroundAnimationEnabled = false
         root.transparentForeground = value
         if (root.requestedTransparent) {
@@ -1146,8 +1311,9 @@ Item {
     pendingTooltipTarget = target
     pendingTooltipText = text
 
-    Qt.callLater(function() {
-      if (request !== tooltipRequest) return
+    Qt.callLater(function () {
+      if (request !== tooltipRequest)
+        return
       if (!targetTooltipHovered(pendingTooltipTarget)) {
         clearTooltip()
         return
@@ -1161,8 +1327,8 @@ Item {
   }
 
   function hideTooltip(target) {
-    if (tooltipTarget !== target && pendingTooltipTarget !== target) return
-
+    if (tooltipTarget !== target && pendingTooltipTarget !== target)
+      return
     tooltipRequest += 1
     clearTooltip()
   }
@@ -1171,8 +1337,10 @@ Item {
     id: tooltipTimer
     interval: 400
     onTriggered: {
-      if (root.targetTooltipHovered(root.tooltipTarget)) root.tooltipShown = true
-      else root.clearTooltip()
+      if (root.targetTooltipHovered(root.tooltipTarget))
+        root.tooltipShown = true
+      else
+        root.clearTooltip()
     }
   }
 
@@ -1180,7 +1348,8 @@ Item {
     interval: 100
     running: root.tooltipShown
     repeat: true
-    onTriggered: if (!root.targetTooltipHovered(root.tooltipTarget)) root.hideTooltip(root.tooltipTarget)
+    onTriggered: if (!root.targetTooltipHovered(root.tooltipTarget))
+      root.hideTooltip(root.tooltipTarget)
   }
 
   // Presence of the `bar-off` flag = bar hidden. Watching the parent toggles
@@ -1190,7 +1359,11 @@ Item {
     id: barHiddenProbe
     running: true
     command: ["bash", "-c", "[[ -f $HOME/.local/state/omarchy/toggles/bar-off ]] && echo yes || echo no"]
-    stdout: SplitParser { onRead: function(line) { root.barHidden = String(line).trim() === "yes" } }
+    stdout: SplitParser {
+      onRead: function (line) {
+        root.barHidden = String(line).trim() === "yes"
+      }
+    }
   }
   FileView {
     path: root.home + "/.local/state/omarchy/toggles"
@@ -1304,7 +1477,8 @@ Item {
         onHoveredChanged: root.setBarHovered(hovered)
         // Unplugging a monitor destroys its bar without a leave event, which
         // would strand this surface's tally and hold the peek open for good.
-        Component.onDestruction: if (hovered) root.setBarHovered(false)
+        Component.onDestruction: if (hovered)
+          root.setBarHovered(false)
       }
     }
 
@@ -1327,8 +1501,8 @@ Item {
 
         onAnchoring: {
           var target = root.tooltipTarget
-          if (!root.targetBelongsToWindow(target, barWindow)) return
-
+          if (!root.targetBelongsToWindow(target, barWindow))
+            return
           var popupWidth = tooltipWindow.implicitWidth
           var popupHeight = tooltipWindow.implicitHeight
           var localX = target.width / 2 - popupWidth / 2
@@ -1437,7 +1611,9 @@ Item {
           anchors.centerIn: parent
           width: centerSurface.width
           height: centerSurface.height
-          CenterModules { anchors.fill: parent }
+          CenterModules {
+            anchors.fill: parent
+          }
         }
       }
     }
@@ -1448,7 +1624,9 @@ Item {
       Item {
         anchors.fill: parent
 
-        CenterModules { anchors.fill: parent }
+        CenterModules {
+          anchors.fill: parent
+        }
 
         LeftModules {
           anchors.top: parent.top
@@ -1465,14 +1643,20 @@ Item {
     }
   }
 
-  Component { id: emptyModuleComponent; Item { implicitWidth: 0; implicitHeight: 0; visible: false } }
+  Component {
+    id: emptyModuleComponent
+    Item {
+      implicitWidth: 0
+      implicitHeight: 0
+      visible: false
+    }
+  }
 
   component DragGhostPanel: PanelWindow {
     id: ghostWindow
 
     required property var ghostScreen
-    readonly property bool screenMatches: root.barDragScreen === ghostScreen ||
-      (root.barDragScreen && ghostScreen && root.barDragScreen.name && ghostScreen.name && root.barDragScreen.name === ghostScreen.name)
+    readonly property bool screenMatches: root.barDragScreen === ghostScreen || (root.barDragScreen && ghostScreen && root.barDragScreen.name && ghostScreen.name && root.barDragScreen.name === ghostScreen.name)
     readonly property bool active: root.barDragSource && root.barDragScreen && screenMatches
     readonly property var sourceItem: root.barDragSource ? root.barDragSource.activeItem : null
     readonly property int ghostPadding: Style.space(1)
@@ -1539,8 +1723,7 @@ Item {
     id: moveGhostWindow
 
     required property var ghostScreen
-    readonly property bool screenMatches: root.barMoveScreen === ghostScreen ||
-      (root.barMoveScreen && ghostScreen && root.barMoveScreen.name && ghostScreen.name && root.barMoveScreen.name === ghostScreen.name)
+    readonly property bool screenMatches: root.barMoveScreen === ghostScreen || (root.barMoveScreen && ghostScreen && root.barMoveScreen.name && ghostScreen.name && root.barMoveScreen.name === ghostScreen.name)
     visible: root.barMoveActive && screenMatches
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
@@ -1582,7 +1765,10 @@ Item {
         opacity: root.barMoveCandidate === modelData ? (root.transparent ? 0.45 : 0.7) : 0
 
         Behavior on opacity {
-          NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+          NumberAnimation {
+            duration: 140
+            easing.type: Easing.OutCubic
+          }
         }
       }
     }
@@ -1622,7 +1808,9 @@ Item {
       Item {
         anchors.fill: parent
 
-        CenterGestureArea { anchors.fill: parent }
+        CenterGestureArea {
+          anchors.fill: parent
+        }
 
         HoverHandler {
           onHoveredChanged: root.setCenterSectionHovered(hovered)
@@ -1667,7 +1855,9 @@ Item {
       Item {
         anchors.fill: parent
 
-        CenterGestureArea { anchors.fill: parent }
+        CenterGestureArea {
+          anchors.fill: parent
+        }
 
         HoverHandler {
           onHoveredChanged: root.setCenterSectionHovered(hovered)
@@ -1721,33 +1911,36 @@ Item {
     pressAndHoldInterval: 200
 
     function startDrag(x, y) {
-      if (dragging) return
+      if (dragging)
+        return
       dragging = true
       root.beginBarMove(root.targetWindow(gestureArea))
       var scenePoint = gestureArea.mapToItem(null, x, y)
       root.updateBarMove(root.windowScreenPoint(scenePoint, root.barMoveWindow))
     }
 
-    onPressed: function(mouse) {
+    onPressed: function (mouse) {
       dragging = false
       suppressClick = false
       pressedX = mouse.x
       pressedY = mouse.y
     }
 
-    onPressAndHold: function(mouse) {
+    onPressAndHold: function (mouse) {
       // A widget above us propagates its composed press-and-hold down here without
       // ever handing over the grab, so we'd get no release or cancel to end the move.
-      if (!gestureArea.pressed) return
+      if (!gestureArea.pressed)
+        return
       startDrag(mouse.x, mouse.y)
     }
 
-    onPositionChanged: function(mouse) {
-      if (!(mouse.buttons & Qt.LeftButton)) return
-
+    onPositionChanged: function (mouse) {
+      if (!(mouse.buttons & Qt.LeftButton))
+        return
       if (!dragging) {
         var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
-        if (distance < dragThreshold) return
+        if (distance < dragThreshold)
+          return
         startDrag(mouse.x, mouse.y)
         return
       }
@@ -1756,8 +1949,9 @@ Item {
       root.updateBarMove(root.windowScreenPoint(scenePoint, root.barMoveWindow))
     }
 
-    onReleased: function(mouse) {
-      if (!dragging) return
+    onReleased: function (mouse) {
+      if (!dragging)
+        return
       dragging = false
       suppressClick = true
       root.finishBarMove()
@@ -1770,14 +1964,14 @@ Item {
       root.clearBarMove()
     }
 
-    onClicked: function(mouse) {
+    onClicked: function (mouse) {
       if (suppressClick) {
         suppressClick = false
         mouse.accepted = true
       }
     }
 
-    onDoubleClicked: function(mouse) {
+    onDoubleClicked: function (mouse) {
       if (suppressClick) {
         suppressClick = false
         return
@@ -1859,7 +2053,8 @@ Item {
     // the binding dependency — the wrapped function call alone wouldn't.
     readonly property var registryComponent: {
       var w = root.barWidgetRegistry.widgets
-      if (customType) return null
+      if (customType)
+        return null
       var registryName = root.canonicalWidgetId(moduleName)
       return w[registryName] ? w[registryName].component : null
     }
@@ -1867,8 +2062,10 @@ Item {
     readonly property bool commandCustom: customType === "command"
     readonly property bool registered: registryComponent !== null
     readonly property var activeItem: {
-      if (registered) return registryLoader.item
-      if (qmlCustom) return qmlLoader.item
+      if (registered)
+        return registryLoader.item
+      if (qmlCustom)
+        return qmlLoader.item
       return componentLoader.item
     }
     readonly property bool hovered: moduleHover.hovered
@@ -1881,7 +2078,8 @@ Item {
     readonly property real panelIndicatorExtent: {
       var key = root.vertical ? "openPanelIndicatorHeight" : "openPanelIndicatorWidth"
       var hint = activeItem && key in activeItem ? activeItem[key] : undefined
-      if (hint !== undefined && hint !== null && hint > 0) return Math.round(hint)
+      if (hint !== undefined && hint !== null && hint > 0)
+        return Math.round(hint)
       return Math.max(Style.space(10), Math.round((root.vertical ? slot.height : slot.width) * 0.55))
     }
     implicitWidth: activeItem && activeItem.visible ? (root.vertical ? root.barSize : activeItem.implicitWidth) : 0
@@ -1892,11 +2090,14 @@ Item {
 
     Component.onCompleted: root.registerModuleSlot(slot)
     Component.onDestruction: {
-      if (root.barDragSource === slot) root.clearBarDrag()
+      if (root.barDragSource === slot)
+        root.clearBarDrag()
       root.unregisterModuleSlot(slot)
     }
 
-    HoverHandler { id: moduleHover }
+    HoverHandler {
+      id: moduleHover
+    }
 
     BorderSurface {
       visible: slot.dragSource
@@ -1959,16 +2160,15 @@ Item {
       // desktop — so it underlines a top bar, overlines a bottom one, and
       // points inward from a left or right one. It reads as pointing at the
       // panel that opens on that side.
-      x: root.vertical
-        ? (root.position === "left" ? parent.width - width - inset : inset)
-        : Math.round((parent.width - width) / 2)
-      y: root.vertical
-        ? Math.round((parent.height - height) / 2)
-        : (root.position === "top" ? parent.height - height - inset : inset)
+      x: root.vertical ? (root.position === "left" ? parent.width - width - inset : inset) : Math.round((parent.width - width) / 2)
+      y: root.vertical ? Math.round((parent.height - height) / 2) : (root.position === "top" ? parent.height - height - inset : inset)
       z: 50
 
       Behavior on opacity {
-        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 120
+          easing.type: Easing.OutCubic
+        }
       }
     }
 
@@ -1991,7 +2191,7 @@ Item {
       // positioners, and mutating slot.x/slot.y can leave stale offsets that
       // make neighboring modules overlap after a small aborted drag.
 
-      onPressed: function(mouse) {
+      onPressed: function (mouse) {
         dragging = false
         suppressClick = false
         pressedX = mouse.x
@@ -1999,9 +2199,9 @@ Item {
         root.clearBarDrag()
       }
 
-      onPositionChanged: function(mouse) {
-        if (!canReorder || !(mouse.buttons & Qt.LeftButton)) return
-
+      onPositionChanged: function (mouse) {
+        if (!canReorder || !(mouse.buttons & Qt.LeftButton))
+          return
         var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
         if (distance >= dragThreshold) {
           if (!dragging) {
@@ -2031,12 +2231,13 @@ Item {
         }
       }
 
-      onReleased: function(mouse) {
+      onReleased: function (mouse) {
         var wasDragging = dragging
         var targetSlot = root.barDragTarget
         var afterTarget = root.barDragAfter
 
-        if (wasDragging) suppressClick = true
+        if (wasDragging)
+          suppressClick = true
 
         dragging = false
         root.clearBarDrag()
@@ -2055,14 +2256,15 @@ Item {
         root.clearBarDrag()
       }
 
-      onClicked: function(mouse) {
+      onClicked: function (mouse) {
         if (suppressClick) {
           suppressClick = false
           mouse.accepted = true
           return
         }
 
-        if (!root.pressModuleClickTarget(slot, mouse.button, mouse.x, mouse.y)) mouse.accepted = false
+        if (!root.pressModuleClickTarget(slot, mouse.button, mouse.x, mouse.y))
+          mouse.accepted = false
       }
     }
 
@@ -2071,16 +2273,21 @@ Item {
 
     function injectProps() {
       var target = activeItem
-      if (!target) return
-      if ("bar" in target) target.bar = firstParty
-        ? root : root.pluginBarApiFor(pluginApiId, moduleName, registered)
-      if ("moduleName" in target) target.moduleName = moduleName
-      if ("settings" in target) target.settings = moduleSettings
+      if (!target)
+        return
+      if ("bar" in target)
+        target.bar = firstParty ? root : root.pluginBarApiFor(pluginApiId, moduleName, registered)
+      if ("moduleName" in target)
+        target.moduleName = moduleName
+      if ("settings" in target)
+        target.settings = moduleSettings
     }
 
     Component {
       id: customCommandModuleComponent
-      CustomCommandModule { entry: slot.entry }
+      CustomCommandModule {
+        entry: slot.entry
+      }
     }
   }
 
@@ -2117,7 +2324,7 @@ Item {
     verticalPadding: Number(setting("verticalPadding", 6))
     fontSize: Number(setting("fontSize", 12))
 
-    onPressed: function(button) {
+    onPressed: function (button) {
       var command = ""
       if (button === Qt.RightButton)
         command = String(setting("onRightClick", ""))
@@ -2126,7 +2333,8 @@ Item {
       else
         command = String(setting("onClick", ""))
 
-      if (command) root.run(command)
+      if (command)
+        root.run(command)
     }
 
     Process {

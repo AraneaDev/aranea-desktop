@@ -21,10 +21,15 @@ Item {
 
   function open(payloadJson: string): void {
     var payload = ({})
-    try { payload = JSON.parse(payloadJson || "{}") } catch (e) { payload = ({}) }
+    try {
+      payload = JSON.parse(payloadJson || "{}")
+    } catch (e) {
+      payload = ({})
+    }
     root.clockContext = Qt.formatDateTime(new Date(), "HH:mm")
 
-    if (payload.fontFamily) root.fontFamily = payload.fontFamily
+    if (payload.fontFamily)
+      root.fontFamily = payload.fontFamily
 
     if (payload.mode === "select" || payload.mode === "input") {
       root.openDmenu(payload)
@@ -43,7 +48,9 @@ Item {
     return "ok"
   }
 
-  function ping(): string { return "ok" }
+  function ping(): string {
+    return "ok"
+  }
 
   property string fontFamily: Style.font.menuFamily
   readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
@@ -103,38 +110,56 @@ Item {
   // DesktopEntries source locally instead of turning Apps into an empty page.
   QtObject {
     id: localAppLibrary
-    signal appsChanged()
+    signal appsChanged
 
-    function entryName(entry) { return String((entry && entry.name) || (entry && entry.id) || "") }
-    function entrySubtext(entry) { return String((entry && entry.genericName) || "") }
+    function entryName(entry) {
+      return String((entry && entry.name) || (entry && entry.id) || "")
+    }
+    function entrySubtext(entry) {
+      return String((entry && entry.genericName) || "")
+    }
     function sortedEntries(query) {
       var needle = String(query || "").trim().toLowerCase()
       var values = DesktopEntries.applications.values || []
       var rows = []
       for (var i = 0; i < values.length; i++) {
         var entry = values[i]
-        if (!entry || entry.noDisplay || !entryName(entry)) continue
+        if (!entry || entry.noDisplay || !entryName(entry))
+          continue
         var text = [entryName(entry), entrySubtext(entry), entry.comment, entry.id].join(" ").toLowerCase()
-        if (needle && text.indexOf(needle) < 0) continue
-        rows.push({ entry: entry, score: needle ? 1 : 0, key: entryName(entry).toLowerCase(), name: entryName(entry).toLowerCase() })
+        if (needle && text.indexOf(needle) < 0)
+          continue
+        rows.push({
+          entry: entry,
+          score: needle ? 1 : 0,
+          key: entryName(entry).toLowerCase(),
+          name: entryName(entry).toLowerCase()
+        })
       }
-      rows.sort(function(a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0) })
+      rows.sort(function (a, b) {
+        return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0)
+      })
       return rows
     }
     function iconSource(icon) {
       var value = String(icon || "")
-      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
-      if (value.charAt(0) === "/") return Util.fileUrl(value)
+      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0)
+        return value
+      if (value.charAt(0) === "/")
+        return Util.fileUrl(value)
       return Quickshell.iconPath(value || "application-x-executable", true)
     }
-    function refreshIcons() {}
+    function refreshIcons() {
+    }
     function launch(desktopId, name) {
       var id = String(desktopId || "")
-      if (id) Util.execDetached("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
+      if (id)
+        Util.execDetached("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
     }
     function remove(desktopId, name) {
       var id = String(desktopId || "")
-      if (id) Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
+      if (id)
+        Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
     }
   }
   property bool deleteConfirmOpen: false
@@ -147,16 +172,24 @@ Item {
     } else if (!motionEnabled) {
       headerMarkSettled = true
     } else {
-      Qt.callLater(function() { headerMarkSettled = true })
+      Qt.callLater(function () {
+        headerMarkSettled = true
+      })
     }
   }
   Component.onCompleted: root.loadAppHistory()
 
   function loadAppHistory(): void {
-    try { root.favoriteAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.favoriteAppIdsJson), root.favoriteAppLimit) }
-    catch (e) { root.favoriteAppIds = [] }
-    try { root.recentAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.recentAppIdsJson), root.recentAppLimit) }
-    catch (e) { root.recentAppIds = [] }
+    try {
+      root.favoriteAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.favoriteAppIdsJson), root.favoriteAppLimit)
+    } catch (e) {
+      root.favoriteAppIds = []
+    }
+    try {
+      root.recentAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.recentAppIdsJson), root.recentAppLimit)
+    } catch (e) {
+      root.recentAppIds = []
+    }
   }
 
   function saveAppHistory(): void {
@@ -206,7 +239,9 @@ Item {
   readonly property int cornerRadius: Math.max(8, Style.space(8))
   readonly property real menuFontScale: 1.10
   readonly property real menuLetterSpacing: 0.20
-  function menuFontSize(size: real): int { return Math.max(1, Math.round(size * root.menuFontScale)) }
+  function menuFontSize(size: real): int {
+    return Math.max(1, Math.round(size * root.menuFontScale))
+  }
   property int contentMargin: Style.spacing.panelPadding
   property int headerHeight: Math.max(Style.space(46), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   property int compactHeaderHeight: Math.max(Style.space(64), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
@@ -223,11 +258,25 @@ Item {
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
   readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
   property string clockContext: Qt.formatDateTime(new Date(), "HH:mm")
-  readonly property var rootTiles: [
-    ({ id: "tile.files", label: "Files", detail: "BROWSE", icon: "󰉋", source: "fixed" }),
-    ({ id: "tile.terminal", label: "Terminal", detail: "EXECUTE", icon: "", source: "fixed" }),
-    ({ id: "tile.setup", label: "Setup", detail: "CONFIGURE", icon: "", source: "fixed" })
-  ]
+  readonly property var rootTiles: [({
+        id: "tile.files",
+        label: "Files",
+        detail: "BROWSE",
+        icon: "󰉋",
+        source: "fixed"
+      }), ({
+        id: "tile.terminal",
+        label: "Terminal",
+        detail: "EXECUTE",
+        icon: "",
+        source: "fixed"
+      }), ({
+        id: "tile.setup",
+        label: "Setup",
+        detail: "CONFIGURE",
+        icon: "",
+        source: "fixed"
+      })]
 
   property int contentSpacing: Style.space(12)
   property int compactContentSpacing: Style.space(8)
@@ -241,18 +290,9 @@ Item {
   property int dividerHeight: Style.space(20)
   property bool searchDivider: false
   property int layoutSerial: 0
-  property int cardWidth: Math.min(
-    root.dmenuActive
-      ? Math.max(Style.space(root.dmenuWidth), Style.space(420))
-      : root.fullRootHeader
-        ? Style.space(640)
-        : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)),
-    panel.width - Style.gapsOut * 2
-  )
+  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(root.dmenuWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), panel.width - Style.gapsOut * 2)
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
-  property int cardHeight: root.dmenuActive
-    ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), panel.height - Style.gapsOut * 2)
-    : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, panel.height - Style.gapsOut * 2)
+  property int cardHeight: root.dmenuActive ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), panel.height - Style.gapsOut * 2) : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, panel.height - Style.gapsOut * 2)
 
   function finishRequest(selection) {
     if (!root.requestActive || !root.doneFile) {
@@ -276,13 +316,14 @@ Item {
 
   function runAction(action: string): void {
     var command = String(action || "")
-    if (!command) return
-
+    if (!command)
+      return
     Util.execDetached(command)
   }
 
   function activateTile(tile): void {
-    if (!tile) return
+    if (!tile)
+      return
     if (tile.id === "tile.files") {
       root.runAction("xdg-open " + Util.shellQuote(Quickshell.env("HOME")))
       root.cancel()
@@ -318,7 +359,8 @@ Item {
     var available = panel.height - top - Style.gapsOut - root.contentMargin * 2 - headerHeight - root.contentSpacing - root.rootExtrasHeight
     // The starting menu sets the ceiling along with the offset: drilling into
     // a longer submenu scrolls behind the fold instead of growing the card.
-    if (panel.maxRowsHeight >= 0) available = Math.min(available, panel.maxRowsHeight)
+    if (panel.maxRowsHeight >= 0)
+      available = Math.min(available, panel.maxRowsHeight)
     // The root surface is intentionally a shorter command viewport: the
     // header, context band, tiles, and footer need to read as one composition
     // instead of allowing the command list to turn the card into a page.
@@ -331,20 +373,26 @@ Item {
   // more below the fold, so never come out even on a row boundary.
   function foldedListHeight(totals: var, available: int): int {
     var count = totals.length
-    if (count === 0) return root.baseRowHeight
-    if (totals[count - 1] <= available) return totals[count - 1]
+    if (count === 0)
+      return root.baseRowHeight
+    if (totals[count - 1] <= available)
+      return totals[count - 1]
 
     var peek = root.rowPeek
     var full = 0
-    while (full < count && totals[full] <= available) full++
-    while (full > 1 && totals[full - 1] + root.rowSpacing + peek > available) full--
-    if (full < 1) return Math.max(available, root.baseRowHeight)
+    while (full < count && totals[full] <= available)
+      full++
+    while (full > 1 && totals[full - 1] + root.rowSpacing + peek > available)
+      full--
+    if (full < 1)
+      return Math.max(available, root.baseRowHeight)
 
     return totals[full - 1] + root.rowSpacing + peek
   }
 
   function rowListHeight(_serial: int, _count: int, _filter: string, _divider: bool): int {
-    if (displayModel.count === 0) return root.emptyStateHeight
+    if (displayModel.count === 0)
+      return root.emptyStateHeight
 
     var totals = []
     var total = 0
@@ -352,8 +400,10 @@ Item {
 
     for (var i = 0; i < displayModel.count; i++) {
       var row = displayModel.get(i)
-      if (i > 0) total += root.rowSpacing
-      if (row.section === "drilldown" && previousSection !== "drilldown") total += root.dividerHeight
+      if (i > 0)
+        total += root.rowSpacing
+      if (row.section === "drilldown" && previousSection !== "drilldown")
+        total += root.dividerHeight
       total += root.rowHeightForDetail(row.detail)
       previousSection = row.section
       totals.push(total)
@@ -363,16 +413,20 @@ Item {
   }
 
   function dmenuRowListHeight(_serial: int, _count: int, _filter: string): int {
-    if (root.mode === "input") return 0
-    if (displayModel.count === 0) return root.baseRowHeight
+    if (root.mode === "input")
+      return 0
+    if (displayModel.count === 0)
+      return root.baseRowHeight
 
     var available = availableRowsHeight()
-    if (root.dmenuMaxHeight > 0) available = Math.min(available, Style.space(root.dmenuMaxHeight))
+    if (root.dmenuMaxHeight > 0)
+      available = Math.min(available, Style.space(root.dmenuMaxHeight))
 
     var totals = []
     var total = 0
     for (var i = 0; i < displayModel.count; i++) {
-      if (i > 0) total += root.rowSpacing
+      if (i > 0)
+        total += root.rowSpacing
       total += root.rowHeightForDetail(displayModel.get(i).detail)
       totals.push(total)
     }
@@ -420,8 +474,10 @@ Item {
     if (root.opened) {
       root.rebuildDisplay()
       if (!root.dmenuActive) {
-        if (root.filterText.trim()) root.loadProvidersForSearch()
-        else root.loadProviderForMenu(root.activeMenu)
+        if (root.filterText.trim())
+          root.loadProvidersForSearch()
+        else
+          root.loadProviderForMenu(root.activeMenu)
       }
     }
   }
@@ -432,18 +488,22 @@ Item {
   // re-runs every time its submenu is entered, so a font installed since the
   // shell started shows up without restarting it.
   readonly property var providers: ({
-    "fonts": {
-      script: "current=$(omarchy-font-current 2>/dev/null); omarchy-font-list 2>/dev/null | while read -r f; do [[ -z $f ]] && continue; printf '%s\\t%s\\t%s\\n' \"$f\" \"$f\" \"$current\"; done",
-      icon: "",
-      volatile: true,
-      actionFor: function(value) { return "omarchy-font-set " + Util.shellQuote(value) }
-    },
-    "power-profiles": {
-      script: "current=$(powerprofilesctl get 2>/dev/null); omarchy-powerprofiles-list 2>/dev/null | while read -r p; do [[ -z $p ]] && continue; printf '%s\\t%s\\t%s\\n' \"$p\" \"$p\" \"$current\"; done",
-      icon: "\udb81\udc0b",
-      actionFor: function(value) { return "omarchy-powerprofiles-set autodetect " + Util.shellQuote(value) }
-    }
-  })
+      "fonts": {
+        script: "current=$(omarchy-font-current 2>/dev/null); omarchy-font-list 2>/dev/null | while read -r f; do [[ -z $f ]] && continue; printf '%s\\t%s\\t%s\\n' \"$f\" \"$f\" \"$current\"; done",
+        icon: "",
+        volatile: true,
+        actionFor: function (value) {
+          return "omarchy-font-set " + Util.shellQuote(value)
+        }
+      },
+      "power-profiles": {
+        script: "current=$(powerprofilesctl get 2>/dev/null); omarchy-powerprofiles-list 2>/dev/null | while read -r p; do [[ -z $p ]] && continue; printf '%s\\t%s\\t%s\\n' \"$p\" \"$p\" \"$current\"; done",
+        icon: "\udb81\udc0b",
+        actionFor: function (value) {
+          return "omarchy-powerprofiles-set autodetect " + Util.shellQuote(value)
+        }
+      }
+    })
 
   function slugify(value: string): string {
     return MenuModel.slugify(value)
@@ -453,19 +513,21 @@ Item {
   // (DesktopEntries) instead of a bash enumeration, so they carry image
   // icons, launch feedback, and uninstall support like the launcher.
   function mergeAppRows() {
-    if (!root.appLibrary) return
-
+    if (!root.appLibrary)
+      return
     var rows = root.appLibrary.sortedEntries("")
     var appRows = []
     for (var j = 0; j < rows.length; j++) {
       var entry = rows[j].entry
       var appId = String(entry.id || "")
-      if (!appId) continue
+      if (!appId)
+        continue
       var subtext = root.appLibrary.entrySubtext(entry)
       var aliases = subtext ? [subtext] : []
       try {
-        if (entry.keywords && typeof entry.keywords.join === "function") aliases = aliases.concat(entry.keywords)
-      } catch (e) { }
+        if (entry.keywords && typeof entry.keywords.join === "function")
+          aliases = aliases.concat(entry.keywords)
+      } catch (e) {}
       appRows.push({
         id: "apps." + appId,
         parent: "apps",
@@ -490,29 +552,65 @@ Item {
     // Keep both generated destinations present even when they are empty. This
     // gives direct routes and screenshots a deliberate empty state, and lets
     // the sections become useful immediately after the first pin or launch.
-    appRows.unshift({ id: "apps.favorites", parent: "apps", kind: "menu", icon: "", appIcon: "", appId: "", label: "Favorites", title: "", target: "", description: "Pinned applications", action: "", provider: "", aliases: ["favorite", "favorites", "pinned"], when: "", checked: "", order: 0 })
+    appRows.unshift({
+      id: "apps.favorites",
+      parent: "apps",
+      kind: "menu",
+      icon: "",
+      appIcon: "",
+      appId: "",
+      label: "Favorites",
+      title: "",
+      target: "",
+      description: "Pinned applications",
+      action: "",
+      provider: "",
+      aliases: ["favorite", "favorites", "pinned"],
+      when: "",
+      checked: "",
+      order: 0
+    })
     appRows = appRows.slice(0, 1).concat(favoriteRows, appRows.slice(1))
-    appRows.unshift({ id: "apps.recent", parent: "apps", kind: "menu", icon: "󰋚", appIcon: "", appId: "", label: "Recent", title: "", target: "", description: "Recently launched applications", action: "", provider: "", aliases: ["recent", "history"], when: "", checked: "", order: 0 })
+    appRows.unshift({
+      id: "apps.recent",
+      parent: "apps",
+      kind: "menu",
+      icon: "󰋚",
+      appIcon: "",
+      appId: "",
+      label: "Recent",
+      title: "",
+      target: "",
+      description: "Recently launched applications",
+      action: "",
+      provider: "",
+      aliases: ["recent", "history"],
+      when: "",
+      checked: "",
+      order: 0
+    })
     appRows = appRows.slice(0, 1).concat(recentRows, appRows.slice(1))
 
     root.appRows = appRows
     var merged = MenuModel.mergeAppRows(root.items, root.itemOrder, appRows)
     root.items = merged.items
     root.itemOrder = merged.itemOrder
-    if (root.opened) root.rebuildDisplay()
+    if (root.opened)
+      root.rebuildDisplay()
   }
 
   function startProviderForMenu(id) {
     var entry = root.item(id)
-    if (!entry || !entry.provider || root.providersLoaded[id]) return
+    if (!entry || !entry.provider || root.providersLoaded[id])
+      return
     if (entry.provider === "apps") {
       root.providersLoaded[id] = true
       root.mergeAppRows()
       return
     }
     var spec = root.providers[entry.provider]
-    if (!spec) return
-
+    if (!spec)
+      return
     root.providersLoaded[id] = true
     root.providerLoading = true
     root.providerError = false
@@ -526,23 +624,27 @@ Item {
 
   function mergeProviderRows(rows, menuId, providerKey) {
     var spec = root.providers[providerKey]
-    if (!spec) return
+    if (!spec)
+      return
     var lines = String(rows || "").split("\n")
     var providerRows = []
     var takenIds = ({})
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i].trim()
-      if (!line) continue
+      if (!line)
+        continue
       var parts = line.split("\t")
       var label = parts[0] || ""
       var value = parts[1] || parts[0] || ""
       var current = parts[2] || ""
-      if (!label) continue
+      if (!label)
+        continue
       // Distinct values can slugify alike — Fira Code and Fira-Code both give
       // fira-code — and a repeated id is dropped, which would silently lose a
       // row from the list. Nudge it until it is the row's own.
       var rowId = menuId + "." + root.slugify(value)
-      while (takenIds[rowId]) rowId += "-"
+      while (takenIds[rowId])
+        rowId += "-"
       takenIds[rowId] = true
 
       providerRows.push({
@@ -565,17 +667,18 @@ Item {
     var merged = MenuModel.swapProviderRows(root.items, root.itemOrder, menuId, providerRows)
     root.items = merged.items
     root.itemOrder = merged.itemOrder
-    if (root.opened) root.rebuildDisplay()
+    if (root.opened)
+      root.rebuildDisplay()
   }
 
   function startNextProvider(): void {
-    if (providerProc.running) return
-
+    if (providerProc.running)
+      return
     while (root.providerQueue.length > 0) {
       var id = root.providerQueue.shift()
       var entry = root.item(id)
-      if (!entry || !entry.provider || root.providersLoaded[id]) continue
-
+      if (!entry || !entry.provider || root.providersLoaded[id])
+        continue
       root.startProviderForMenu(id)
       return
     }
@@ -587,12 +690,14 @@ Item {
   function invalidateVolatileProvider(id) {
     var entry = root.item(id)
     var spec = entry && entry.provider ? root.providers[entry.provider] : null
-    if (spec && spec.volatile) root.providersLoaded[id] = false
+    if (spec && spec.volatile)
+      root.providersLoaded[id] = false
   }
 
   function loadProviderForMenu(id) {
     var entry = root.item(id)
-    if (!entry || !entry.provider || root.providersLoaded[id]) return
+    if (!entry || !entry.provider || root.providersLoaded[id])
+      return
 
     // Native providers don't touch providerProc, so they never need to queue.
     if (entry.provider === "apps") {
@@ -601,7 +706,8 @@ Item {
     }
 
     if (providerProc.running) {
-      if (root.providerQueue.indexOf(id) < 0) root.providerQueue = root.providerQueue.concat([id])
+      if (root.providerQueue.indexOf(id) < 0)
+        root.providerQueue = root.providerQueue.concat([id])
       return
     }
 
@@ -613,9 +719,10 @@ Item {
 
     for (var i = 0; i < root.itemOrder.length; i++) {
       var entry = root.item(root.itemOrder[i])
-      if (!entry || !entry.provider || root.providersLoaded[entry.id]) continue
-      if (active !== "root" && entry.id !== active && !root.isDescendantOf(entry.id, active)) continue
-
+      if (!entry || !entry.provider || root.providersLoaded[entry.id])
+        continue
+      if (active !== "root" && entry.id !== active && !root.isDescendantOf(entry.id, active))
+        continue
       root.loadProviderForMenu(entry.id)
     }
   }
@@ -703,8 +810,8 @@ Item {
       var icon = parts.length > 1 ? parts.shift() : ""
       var label = parts.shift() || ""
       var detail = parts.join("\t")
-      if (query && label.toLowerCase().indexOf(query) < 0
-          && detail.toLowerCase().indexOf(query) < 0) continue
+      if (query && label.toLowerCase().indexOf(query) < 0 && detail.toLowerCase().indexOf(query) < 0)
+        continue
       displayModel.append({
         itemId: "dmenu." + i,
         kind: "dmenu",
@@ -726,12 +833,16 @@ Item {
 
     layoutSerial += 1
 
-    if (displayModel.count === 0) selectedIndex = 0
-    else if (selectedIndex >= displayModel.count) selectedIndex = displayModel.count - 1
-    else if (selectedIndex < 0) selectedIndex = 0
+    if (displayModel.count === 0)
+      selectedIndex = 0
+    else if (selectedIndex >= displayModel.count)
+      selectedIndex = displayModel.count - 1
+    else if (selectedIndex < 0)
+      selectedIndex = 0
 
-    Qt.callLater(function() {
-      if (displayModel.count > 0) root.revealCursor()
+    Qt.callLater(function () {
+      if (displayModel.count > 0)
+        root.revealCursor()
     })
   }
 
@@ -743,8 +854,8 @@ Item {
 
     displayModel.clear()
 
-    if (!root.rowsLoaded) return
-
+    if (!root.rowsLoaded)
+      return
     var active = root.item(root.activeMenu) ? root.activeMenu : "root"
     root.activeMenu = active
     var rows = []
@@ -757,18 +868,23 @@ Item {
 
       for (var i = 0; i < root.itemOrder.length; i++) {
         var entry = root.item(root.itemOrder[i])
-        if (!entry || entry.id === "root") continue
-        if (!root.isDescendantOf(entry.id, active)) continue
-        if (!root.matchesQuery(entry, query)) continue
-
+        if (!entry || entry.id === "root")
+          continue
+        if (!root.isDescendantOf(entry.id, active))
+          continue
+        if (!root.matchesQuery(entry, query))
+          continue
         var detail = root.parentPathFor(entry.id)
         var row = root.displayRow(entry, detail, root.searchScore(entry, query))
-        if (entry.parent === active) currentRows.push(row)
-        else drilldownRows.push(row)
+        if (entry.parent === active)
+          currentRows.push(row)
+        else
+          drilldownRows.push(row)
       }
 
-      var searchSort = function(a, b) {
-        if (a.score !== b.score) return a.score - b.score
+      var searchSort = function (a, b) {
+        if (a.score !== b.score)
+          return a.score - b.score
         return a.path.localeCompare(b.path)
       }
 
@@ -776,43 +892,55 @@ Item {
       drilldownRows.sort(searchSort)
       root.searchDivider = currentRows.length > 0 && drilldownRows.length > 0
       if (root.searchDivider) {
-        for (var d = 0; d < drilldownRows.length; d++) drilldownRows[d].section = "drilldown"
+        for (var d = 0; d < drilldownRows.length; d++)
+          drilldownRows[d].section = "drilldown"
       }
       rows = currentRows.concat(drilldownRows)
     } else {
       for (var j = 0; j < root.itemOrder.length; j++) {
         var child = root.item(root.itemOrder[j])
-        if (!child || child.parent !== active) continue
-        if (!root.isVisible(child)) continue
+        if (!child || child.parent !== active)
+          continue
+        if (!root.isVisible(child))
+          continue
         rows.push(root.displayRow(child, child.description, child.order))
       }
 
       // DesktopEntries can reorder its values when an application starts.
       // Keep the Apps menu alphabetical independently of provider refreshes.
       if (active === "apps") {
-        rows.sort(function(a, b) {
+        rows.sort(function (a, b) {
           var aLabel = String(a.label || "").toLowerCase()
           var bLabel = String(b.label || "").toLowerCase()
-          if (aLabel < bLabel) return -1
-          if (aLabel > bLabel) return 1
+          if (aLabel < bLabel)
+            return -1
+          if (aLabel > bLabel)
+            return 1
           var aId = String(a.itemId || "")
           var bId = String(b.itemId || "")
-          if (aId < bId) return -1
-          if (aId > bId) return 1
+          if (aId < bId)
+            return -1
+          if (aId > bId)
+            return 1
           return 0
         })
       }
     }
 
-    for (var k = 0; k < rows.length; k++) displayModel.append(rows[k])
+    for (var k = 0; k < rows.length; k++)
+      displayModel.append(rows[k])
     layoutSerial += 1
 
-    if (displayModel.count === 0) selectedIndex = 0
-    else if (selectedIndex >= displayModel.count) selectedIndex = displayModel.count - 1
-    else if (selectedIndex < 0) selectedIndex = 0
+    if (displayModel.count === 0)
+      selectedIndex = 0
+    else if (selectedIndex >= displayModel.count)
+      selectedIndex = displayModel.count - 1
+    else if (selectedIndex < 0)
+      selectedIndex = 0
 
-    Qt.callLater(function() {
-      if (displayModel.count > 0) root.revealCursor()
+    Qt.callLater(function () {
+      if (displayModel.count > 0)
+        root.revealCursor()
     })
   }
 
@@ -820,27 +948,30 @@ Item {
   // the neighbor entirely and losing the fold affordance. Keep the next
   // hidden row peeking past the cursor in the direction of travel.
   function revealCursor(): void {
-    if (displayModel.count === 0) return
+    if (displayModel.count === 0)
+      return
     resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
 
     var item = resultList.itemAtIndex(root.selectedIndex)
-    if (!item) return
-
+    if (!item)
+      return
     var reach = root.rowPeek + root.rowSpacing
     if (root.selectedIndex < displayModel.count - 1) {
       var maxY = Math.max(resultList.originY, resultList.originY + resultList.contentHeight - resultList.height)
       var overhang = item.y + item.height + reach - (resultList.contentY + resultList.height)
-      if (overhang > 0) resultList.contentY = Math.min(resultList.contentY + overhang, maxY)
+      if (overhang > 0)
+        resultList.contentY = Math.min(resultList.contentY + overhang, maxY)
     }
     if (root.selectedIndex > 0) {
       var underhang = resultList.contentY - (item.y - reach)
-      if (underhang > 0) resultList.contentY = Math.max(resultList.contentY - underhang, resultList.originY)
+      if (underhang > 0)
+        resultList.contentY = Math.max(resultList.contentY - underhang, resultList.originY)
     }
   }
 
   function select(delta: int): void {
-    if (displayModel.count === 0) return
-
+    if (displayModel.count === 0)
+      return
     root.disarmPointer()
     if (!cursorActive) {
       cursorActive = true
@@ -857,27 +988,33 @@ Item {
     root.selectedIndex = 0
     root.cursorActive = root.mode !== "input"
     root.disarmPointer()
-    if (!root.dmenuActive && root.filterText.trim()) root.loadProvidersForSearch()
+    if (!root.dmenuActive && root.filterText.trim())
+      root.loadProvidersForSearch()
     root.rebuildDisplay()
   }
 
   function setActiveMenu(id: string, pushHistory: bool, fromPointer: bool): void {
     panel.freezeCardTop()
-    if (!root.item(id)) id = "root"
-    if (pushHistory && id !== root.activeMenu) root.navStack = root.navStack.concat([root.activeMenu])
+    if (!root.item(id))
+      id = "root"
+    if (pushHistory && id !== root.activeMenu)
+      root.navStack = root.navStack.concat([root.activeMenu])
     root.activeMenu = id
     root.filterText = ""
     root.selectedIndex = 0
     root.cursorActive = true
-    if (fromPointer) pointerGate.allowInitialSample()
-    else root.disarmPointer()
+    if (fromPointer)
+      pointerGate.allowInitialSample()
+    else
+      root.disarmPointer()
     root.rebuildDisplay()
     root.invalidateVolatileProvider(id)
     root.loadProviderForMenu(id)
   }
 
   function goBack(): void {
-    if (root.activeMenu === "root") return false
+    if (root.activeMenu === "root")
+      return false
 
     if (root.navStack.length > 0) {
       var previous = root.navStack[root.navStack.length - 1]
@@ -892,20 +1029,22 @@ Item {
   }
 
   function activateIndex(index: int, fromPointer: bool): void {
-    if (root.deleteConfirmOpen) return
+    if (root.deleteConfirmOpen)
+      return
     if (root.dmenuActive) {
       if (root.mode === "input") {
         root.applyDmenuSelection(root.filterText)
         return
       }
-      if (index < 0 || index >= displayModel.count) return
+      if (index < 0 || index >= displayModel.count)
+        return
       var picked = displayModel.get(index)
       root.applyDmenuSelection(picked.detail ? picked.label + "\t" + picked.detail : picked.label)
       return
     }
 
-    if (index < 0 || index >= displayModel.count) return
-
+    if (index < 0 || index >= displayModel.count)
+      return
     var row = displayModel.get(index)
     if (row.kind === "menu" || row.kind === "link") {
       root.setActiveMenu(row.target || row.itemId, true, fromPointer)
@@ -916,17 +1055,23 @@ Item {
       applySerial = requestSerial
       opened = false
       filterText = ""
-      if (root.appLibrary) root.appLibrary.launch(appId, label)
+      if (root.appLibrary)
+        root.appLibrary.launch(appId, label)
     } else {
       root.applySelected(row.itemId, row.action)
     }
   }
 
   function requestDeleteSelected() {
-    if (!root.cursorActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count) return
+    if (!root.cursorActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
+      return
     var row = displayModel.get(root.selectedIndex)
-    if (!row || row.kind !== "app") return
-    root.deleteTarget = { appId: row.appId, label: row.label }
+    if (!row || row.kind !== "app")
+      return
+    root.deleteTarget = {
+      appId: row.appId,
+      label: row.label
+    }
     deleteConfirm.selectedIndex = 1
     root.deleteConfirmOpen = true
   }
@@ -936,16 +1081,20 @@ Item {
     root.deleteTarget = null
     deleteConfirm.selectedIndex = 1
     root.disarmPointer()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function () {
+      keyCatcher.forceActiveFocus()
+    })
   }
 
   function confirmDelete() {
     var target = root.deleteTarget
     root.deleteConfirmOpen = false
     root.deleteTarget = null
-    if (!target) return
+    if (!target)
+      return
     root.cancel()
-    if (root.appLibrary) root.appLibrary.remove(target.appId, target.label)
+    if (root.appLibrary)
+      root.appLibrary.remove(target.appId, target.label)
   }
 
   function applyDmenuSelection(value: string): void {
@@ -956,7 +1105,10 @@ Item {
   }
 
   function applySelected(id, action) {
-    if (!id) { cancel(); return }
+    if (!id) {
+      cancel()
+      return
+    }
 
     applySerial = requestSerial
     opened = false
@@ -965,7 +1117,8 @@ Item {
   }
 
   function cancel(): void {
-    if (root.dmenuActive) root.finishRequest(null)
+    if (root.dmenuActive)
+      root.finishRequest(null)
     opened = false
     filterText = ""
   }
@@ -989,9 +1142,12 @@ Item {
     loadProviderForMenu(activeMenu)
     // The shell may start before first-install packages have finished placing
     // their icons. Refresh here even when the desktop entry list did not change.
-    if (root.appLibrary) root.appLibrary.refreshIcons()
+    if (root.appLibrary)
+      root.appLibrary.refreshIcons()
 
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function () {
+      keyCatcher.forceActiveFocus()
+    })
   }
 
   function openDmenu(payload) {
@@ -1013,9 +1169,13 @@ Item {
     opened = true
     rebuildDisplay()
 
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function () {
+      keyCatcher.forceActiveFocus()
+    })
   }
-  ListModel { id: displayModel }
+  ListModel {
+    id: displayModel
+  }
 
   // ----------------------------------------------------------- route surface
   //
@@ -1047,7 +1207,8 @@ Item {
       return
     }
     // If it's a link (a redirect to another menu), follow the link.
-    if (entry && entry.kind === "link" && entry.target) id = entry.target
+    if (entry && entry.kind === "link" && entry.target)
+      id = entry.target
     root.pendingInitialMenu = id
     root.openExistingMenu(id)
   }
@@ -1062,7 +1223,9 @@ Item {
       return
     }
     if (attempt < 12) {
-      Qt.callLater(function() { root.openGeneratedAppsMenu(initialMenu, attempt + 1) })
+      Qt.callLater(function () {
+        root.openGeneratedAppsMenu(initialMenu, attempt + 1)
+      })
       return
     }
     root.openExistingMenu("apps")
@@ -1073,7 +1236,8 @@ Item {
   }
 
   function selectFromPointer(index, item, mouse) {
-    if (!pointerGate.moved(item, mouse)) return
+    if (!pointerGate.moved(item, mouse))
+      return
     root.cursorActive = true
     root.selectedIndex = index
   }
@@ -1085,14 +1249,17 @@ Item {
     property string collected: ""
     property int revision: 0
     stdout: SplitParser {
-      onRead: function(data) { providerProc.collected += data + "\n" }
+      onRead: function (data) {
+        providerProc.collected += data + "\n"
+      }
     }
-    onExited: function(exitCode, exitStatus) {
+    onExited: function (exitCode, exitStatus) {
       root.providerLoading = false
       root.providerError = exitCode !== 0
       if (providerProc.revision === root.providerRevision) {
         root.mergeProviderRows(providerProc.collected, providerProc.menuId, providerProc.providerKey)
-        if (root.filterText.trim()) root.loadProvidersForSearch()
+        if (root.filterText.trim())
+          root.loadProvidersForSearch()
       }
       root.startNextProvider()
     }
@@ -1113,13 +1280,16 @@ Item {
 
   Connections {
     target: DesktopEntries.applications
-    function onValuesChanged() { localAppLibrary.appsChanged() }
+    function onValuesChanged() {
+      localAppLibrary.appsChanged()
+    }
   }
 
   Connections {
     target: root.appLibrary
     function onAppsChanged() {
-      if (root.providersLoaded["apps"]) root.mergeAppRows()
+      if (root.providersLoaded["apps"])
+        root.mergeAppRows()
     }
   }
 
@@ -1141,7 +1311,10 @@ Item {
     path: root.defaultMenuPath
     watchChanges: true
     printErrors: false
-    onLoaded: { root.defaultMenuItems = root.parseMenuJsonc(text()); root.rebuildItemsFromSources() }
+    onLoaded: {
+      root.defaultMenuItems = root.parseMenuJsonc(text())
+      root.rebuildItemsFromSources()
+    }
     onFileChanged: reload()
   }
 
@@ -1150,8 +1323,14 @@ Item {
     path: root.userMenuPath
     watchChanges: true
     printErrors: false
-    onLoaded: { root.userMenuItems = root.parseMenuJsonc(text()); root.rebuildItemsFromSources() }
-    onLoadFailed: { root.userMenuItems = []; root.rebuildItemsFromSources() }
+    onLoaded: {
+      root.userMenuItems = root.parseMenuJsonc(text())
+      root.rebuildItemsFromSources()
+    }
+    onLoadFailed: {
+      root.userMenuItems = []
+      root.rebuildItemsFromSources()
+    }
     onFileChanged: reload()
   }
 
@@ -1194,15 +1373,20 @@ Item {
     id: guardProc
     property string collected: ""
     stdout: SplitParser {
-      onRead: function(data) { guardProc.collected += data + "\n" }
+      onRead: function (data) {
+        guardProc.collected += data + "\n"
+      }
     }
-    onExited: function(exitCode, exitStatus) {
+    onExited: function (exitCode, exitStatus) {
       // A batch that was killed rather than finished has only told us about
       // the rows it reached, and a row whose `when:` went unanswered shows.
       // Keep the last complete set rather than let a half-read one through.
       // A signal leaves the exit code at 0, so the status is what tells us.
       if (exitCode !== 0 || exitStatus !== 0) {
-        if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
+        if (root.guardsPending)
+          Qt.callLater(function () {
+            root.evaluateGuards()
+          })
         return
       }
 
@@ -1211,30 +1395,44 @@ Item {
       var lines = guardProc.collected.split("\n")
       for (var i = 0; i < lines.length; i++) {
         var line = lines[i].trim()
-        if (!line) continue
+        if (!line)
+          continue
         var colon = line.lastIndexOf(":")
-        if (colon < 0) continue
+        if (colon < 0)
+          continue
         var value = line.substring(colon + 1) === "1"
         var rest = line.substring(0, colon)
         var tagAt = rest.lastIndexOf(":")
-        if (tagAt < 0) continue
+        if (tagAt < 0)
+          continue
         var id = rest.substring(0, tagAt)
         var tag = rest.substring(tagAt + 1)
-        if (tag === "w") nextWhen[id] = value
-        else if (tag === "c") nextChecked[id] = value
+        if (tag === "w")
+          nextWhen[id] = value
+        else if (tag === "c")
+          nextChecked[id] = value
       }
       root.whenResults = nextWhen
       root.checkedResults = nextChecked
-      if (root.opened) root.rebuildDisplay()
+      if (root.opened)
+        root.rebuildDisplay()
       // Run the evaluation that had to stand aside. Deferred by a turn so the
       // process is settled before its command is set again.
-      if (root.guardsPending) Qt.callLater(function() { root.evaluateGuards() })
+      if (root.guardsPending)
+        Qt.callLater(function () {
+          root.evaluateGuards()
+        })
     }
   }
   PanelWindow {
     id: panel
     visible: root.opened && root.rowsLoaded
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-menu"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -1257,7 +1455,10 @@ Item {
         maxRowsHeight = root.visibleRowsHeight
       }
     }
-    onVisibleChanged: if (!visible) { cardTop = -1; maxRowsHeight = -1 }
+    onVisibleChanged: if (!visible) {
+      cardTop = -1
+      maxRowsHeight = -1
+    }
 
     Rectangle {
       anchors.fill: parent
@@ -1280,7 +1481,10 @@ Item {
       borderSpec: root.borderSpec
       padding: root.contentMargin
 
-      MouseArea { anchors.fill: parent; onClicked: {} }
+      MouseArea {
+        anchors.fill: parent
+        onClicked: {}
+      }
 
       Item {
         id: keyCatcher
@@ -1289,9 +1493,10 @@ Item {
         focus: true
 
         Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function(event) {
+        Keys.onPressed: function (event) {
           if (root.deleteConfirmOpen) {
-            if (deleteConfirm.handleKey(event)) event.accepted = true
+            if (deleteConfirm.handleKey(event))
+              event.accepted = true
             return
           }
 
@@ -1299,8 +1504,10 @@ Item {
             root.requestDeleteSelected()
             event.accepted = true
           } else if (event.key === Qt.Key_Escape) {
-            if (root.filterText) root.setFilter("")
-            else root.cancel()
+            if (root.filterText)
+              root.setFilter("")
+            else
+              root.cancel()
             event.accepted = true
           } else if (Util.editsFilter(event, root.filterText)) {
             root.setFilter(Util.editedFilter(event, root.filterText))
@@ -1322,10 +1529,14 @@ Item {
             event.accepted = true
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
             if (root.dmenuActive) {
-              if (root.mode === "input") root.applyDmenuSelection(root.filterText)
-              else if (displayModel.count > 0) root.activateIndex(root.cursorActive ? root.selectedIndex : 0)
-            } else if (root.cursorActive) root.activateIndex(root.selectedIndex)
-            else if (displayModel.count > 0) root.cursorActive = true
+              if (root.mode === "input")
+                root.applyDmenuSelection(root.filterText)
+              else if (displayModel.count > 0)
+                root.activateIndex(root.cursorActive ? root.selectedIndex : 0)
+            } else if (root.cursorActive)
+              root.activateIndex(root.selectedIndex)
+            else if (displayModel.count > 0)
+              root.cursorActive = true
             event.accepted = true
           } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
             root.setFilter(root.filterText + event.text)
@@ -1381,7 +1592,10 @@ Item {
             mipmap: true
             Behavior on opacity {
               enabled: root.motionEnabled
-              NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+              NumberAnimation {
+                duration: 180
+                easing.type: Easing.OutCubic
+              }
             }
           }
 
@@ -1410,11 +1624,7 @@ Item {
             Text {
               textFormat: Text.PlainText
               width: parent.width
-              text: root.fullRootHeader
-                ? "ARANEA"
-                : root.dmenuActive
-                  ? root.dmenuPrompt
-                  : "ARANEA / " + (root.item(root.activeMenu) ? (root.item(root.activeMenu).title || root.item(root.activeMenu).label) : "GO")
+              text: root.fullRootHeader ? "ARANEA" : root.dmenuActive ? root.dmenuPrompt : "ARANEA / " + (root.item(root.activeMenu) ? (root.item(root.activeMenu).title || root.item(root.activeMenu).label) : "GO")
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: root.fullRootHeader ? root.menuFontSize(Style.font.title) : root.menuFontSize(Style.font.body)
@@ -1427,11 +1637,7 @@ Item {
               visible: true
               textFormat: Text.PlainText
               width: parent.width
-              text: root.fullRootHeader
-                ? "SYSTEM // READY"
-                : root.dmenuActive
-                  ? (root.mode === "input" ? "TYPE TO FILTER  ·  ESC CANCEL" : displayModel.count + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL")
-                  : "ESC BACK  ·  ENTER OPEN"
+              text: root.fullRootHeader ? "SYSTEM // READY" : root.dmenuActive ? (root.mode === "input" ? "TYPE TO FILTER  ·  ESC CANCEL" : displayModel.count + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL") : "ESC BACK  ·  ENTER OPEN"
               color: root.contextText
               font.family: root.fontFamily
               font.pixelSize: root.menuFontSize(Style.font.caption)
@@ -1457,56 +1663,56 @@ Item {
           }
         }
 
-          Row {
-            visible: root.fullRootHeader
-            width: parent.width
-            height: root.rootContextHeight
-            spacing: Style.spacing.md
+        Row {
+          visible: root.fullRootHeader
+          width: parent.width
+          height: root.rootContextHeight
+          spacing: Style.spacing.md
 
-            Image {
-              width: root.menuFontSize(Style.font.caption)
-              height: width
-              source: "file://" + root.brandingGlyphsPath + "ready.svg"
-              fillMode: Image.PreserveAspectFit
-              sourceSize.width: width * Screen.devicePixelRatio
-              sourceSize.height: height * Screen.devicePixelRatio
-              smooth: true
-              mipmap: true
-              anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Text {
-              text: root.workspaceContext
-              color: root.contextText
-              font.family: root.fontFamily
-              font.pixelSize: root.menuFontSize(Style.font.caption)
-              font.weight: Font.Medium
-              font.letterSpacing: root.menuLetterSpacing
-              verticalAlignment: Text.AlignVCenter
-            }
-
-            Text {
-              text: "SYSTEM READY"
-              color: root.contextText
-              font.family: root.fontFamily
-              font.pixelSize: root.menuFontSize(Style.font.caption)
-              font.weight: Font.Medium
-              font.letterSpacing: root.menuLetterSpacing
-              verticalAlignment: Text.AlignVCenter
-            }
-
-            Text {
-              text: root.clockContext
-              color: root.contextText
-              font.family: root.fontFamily
-              font.pixelSize: root.menuFontSize(Style.font.caption)
-              font.weight: Font.Medium
-              font.letterSpacing: root.menuLetterSpacing
-              verticalAlignment: Text.AlignVCenter
-            }
+          Image {
+            width: root.menuFontSize(Style.font.caption)
+            height: width
+            source: "file://" + root.brandingGlyphsPath + "ready.svg"
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: width * Screen.devicePixelRatio
+            sourceSize.height: height * Screen.devicePixelRatio
+            smooth: true
+            mipmap: true
+            anchors.verticalCenter: parent.verticalCenter
           }
 
-          Row {
+          Text {
+            text: root.workspaceContext
+            color: root.contextText
+            font.family: root.fontFamily
+            font.pixelSize: root.menuFontSize(Style.font.caption)
+            font.weight: Font.Medium
+            font.letterSpacing: root.menuLetterSpacing
+            verticalAlignment: Text.AlignVCenter
+          }
+
+          Text {
+            text: "SYSTEM READY"
+            color: root.contextText
+            font.family: root.fontFamily
+            font.pixelSize: root.menuFontSize(Style.font.caption)
+            font.weight: Font.Medium
+            font.letterSpacing: root.menuLetterSpacing
+            verticalAlignment: Text.AlignVCenter
+          }
+
+          Text {
+            text: root.clockContext
+            color: root.contextText
+            font.family: root.fontFamily
+            font.pixelSize: root.menuFontSize(Style.font.caption)
+            font.weight: Font.Medium
+            font.letterSpacing: root.menuLetterSpacing
+            verticalAlignment: Text.AlignVCenter
+          }
+        }
+
+        Row {
           visible: root.fullRootHeader
           width: parent.width
           height: root.rootTileHeight
@@ -1546,13 +1752,16 @@ Item {
 
               Behavior on opacity {
                 enabled: root.motionEnabled
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                NumberAnimation {
+                  duration: 160
+                  easing.type: Easing.OutCubic
+                }
               }
 
               Column {
-              width: parent.width - Style.space(28)
-              anchors.centerIn: parent
-              spacing: Style.space(11)
+                width: parent.width - Style.space(28)
+                anchors.centerIn: parent
+                spacing: Style.space(11)
 
                 Text {
                   width: parent.width
@@ -1597,7 +1806,7 @@ Item {
               }
             }
           }
-          }
+        }
 
         Rectangle {
           visible: root.fullRootHeader
@@ -1706,7 +1915,10 @@ Item {
               borderSpec: row.hasCursor ? root.selectedBorderSpec : Border.none()
 
               Behavior on color {
-                ColorAnimation { duration: 140; easing.type: Easing.OutCubic }
+                ColorAnimation {
+                  duration: 140
+                  easing.type: Easing.OutCubic
+                }
               }
 
               Rectangle {
@@ -1721,7 +1933,10 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
 
                 Behavior on opacity {
-                  NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                  NumberAnimation {
+                    duration: 120
+                    easing.type: Easing.OutCubic
+                  }
                 }
               }
 
@@ -1773,11 +1988,11 @@ Item {
                   width: parent.width
                   text: row.label
                   color: row.hasCursor ? root.selectedText : root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: root.menuFontSize(Style.font.bodySmall)
-                font.weight: Font.Medium
-                font.letterSpacing: root.menuLetterSpacing
-                elide: Text.ElideRight
+                  font.family: root.fontFamily
+                  font.pixelSize: root.menuFontSize(Style.font.bodySmall)
+                  font.weight: Font.Medium
+                  font.letterSpacing: root.menuLetterSpacing
+                  elide: Text.ElideRight
                 }
 
                 Text {
@@ -1794,7 +2009,10 @@ Item {
                   elide: Text.ElideRight
 
                   Behavior on opacity {
-                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                      duration: 140
+                      easing.type: Easing.OutCubic
+                    }
                   }
                 }
               }
@@ -1841,10 +2059,10 @@ Item {
                   x: mouseArea.mouseX,
                   y: mouseArea.mouseY
                 })
-                onPositionChanged: function(mouse) {
+                onPositionChanged: function (mouse) {
                   root.selectFromPointer(row.index, row, mouse)
                 }
-                onClicked: function(mouse) {
+                onClicked: function (mouse) {
                   root.cursorActive = true
                   root.selectedIndex = row.index
                   if (mouse.button === Qt.RightButton && row.isApp) {
@@ -1869,12 +2087,16 @@ Item {
             anchors.top: parent.top
             height: Math.min(Style.space(28), parent.height / 2)
             visible: opacity > 0
-            opacity: resultList.contentHeight > resultList.height
-              ? Math.max(0, Math.min(1, (resultList.contentY - resultList.originY) / height))
-              : 0
+            opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.contentY - resultList.originY) / height)) : 0
             gradient: Gradient {
-              GradientStop { position: 0; color: root.background }
-              GradientStop { position: 1; color: Util.alpha(root.background, 0) }
+              GradientStop {
+                position: 0
+                color: root.background
+              }
+              GradientStop {
+                position: 1
+                color: Util.alpha(root.background, 0)
+              }
             }
           }
 
@@ -1884,12 +2106,16 @@ Item {
             anchors.bottom: parent.bottom
             height: Math.min(Style.space(28), parent.height / 2)
             visible: opacity > 0
-            opacity: resultList.contentHeight > resultList.height
-              ? Math.max(0, Math.min(1, (resultList.originY + resultList.contentHeight - resultList.height - resultList.contentY) / height))
-              : 0
+            opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.originY + resultList.contentHeight - resultList.height - resultList.contentY) / height)) : 0
             gradient: Gradient {
-              GradientStop { position: 0; color: Util.alpha(root.background, 0) }
-              GradientStop { position: 1; color: root.background }
+              GradientStop {
+                position: 0
+                color: Util.alpha(root.background, 0)
+              }
+              GradientStop {
+                position: 1
+                color: root.background
+              }
             }
           }
 
@@ -1910,11 +2136,7 @@ Item {
 
             Text {
               textFormat: Text.PlainText
-              text: root.providerLoading
-                ? "Loading…"
-                : (root.providerError
-                  ? "Couldn’t load this list"
-                  : (root.filterText ? "No matches for “" + root.filterText + "”" : "Nothing here yet"))
+              text: root.providerLoading ? "Loading…" : (root.providerError ? "Couldn’t load this list" : (root.filterText ? "No matches for “" + root.filterText + "”" : "Nothing here yet"))
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily

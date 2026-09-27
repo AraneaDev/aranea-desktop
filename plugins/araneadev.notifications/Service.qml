@@ -36,7 +36,6 @@ Item {
     normalUrgency: NotificationUrgency.Normal
   }
 
-
   // Corner radius is shared with the menu and shell panels.
   // It mirrors Hyprland's current decoration:rounding value.
   readonly property int cornerRadius: Style.cornerRadius
@@ -81,7 +80,8 @@ Item {
     property bool doNotDisturb: false
     onDoNotDisturbChanged: {
       // Suppress the write that load-time hydration would otherwise trigger.
-      if (service._hydrating) return
+      if (service._hydrating)
+        return
       service.scheduleSettingsSave()
     }
   }
@@ -115,7 +115,9 @@ Item {
   // Aliased as a property so consumers outside this Item's id scope can bind
   // to it. QML ids aren't visible to external consumers without the alias.
   property alias popupModel: popupModel
-  ListModel { id: popupModel }
+  ListModel {
+    id: popupModel
+  }
 
   // Aranea motion preference, shared with the OSD: `off` in the state file
   // (or ARANEA_REDUCED_MOTION=1) removes the swipe slide animation.
@@ -154,7 +156,8 @@ Item {
     // FreeDesktop notification spec (and Quickshell) report expireTimeout in
     // milliseconds, so pass it through directly.
     var ms = Number(expireTimeout || 0)
-    if (!isFinite(ms) || ms <= 0) return 0
+    if (!isFinite(ms) || ms <= 0)
+      return 0
     return Math.round(ms)
   }
 
@@ -184,8 +187,7 @@ Item {
   }
 
   function shouldStore(notification, snapshot): bool {
-    return InboxLogic.shouldStore(
-      NotificationLogic.isEphemeralApp(snapshot.app), snapshot.urgency, isTransient(notification))
+    return InboxLogic.shouldStore(NotificationLogic.isEphemeralApp(snapshot.app), snapshot.urgency, isTransient(notification))
   }
 
   function handleNotification(notification) {
@@ -212,14 +214,14 @@ Item {
     liveRefs[snapshot.originalId] = notification
     // Guard the delete: a newer notification may have reused this originalId
     // (freedesktop replaces_id) and taken over the map slot.
-    notification.closed.connect(function() {
+    notification.closed.connect(function () {
       if (service.liveRefs[snapshot.originalId] === notification)
         delete service.liveRefs[snapshot.originalId]
     })
     watchForUpdates(notification, snapshot)
     // Qt.callLater avoids "QV4::Object::insertMember" crashes when a
     // Repeater is mid-incubation while we mutate its model.
-    Qt.callLater(function() {
+    Qt.callLater(function () {
       removePopupsByOriginalId(snapshot.originalId, NotificationLogic.popupFileName(snapshot))
       popupModel.insert(0, snapshot)
       // An update that arrived while the insert was deferred found no row to
@@ -234,21 +236,26 @@ Item {
     inboxRefs[fileName] = notification
     // The sender closing its notification (it was read elsewhere, the app
     // quit) only ends the live link; the entry waits until the user clears it.
-    notification.closed.connect(function() {
-      if (service.inboxRefs[fileName] === notification) delete service.inboxRefs[fileName]
+    notification.closed.connect(function () {
+      if (service.inboxRefs[fileName] === notification)
+        delete service.inboxRefs[fileName]
     })
     inbox.upsert(snapshot)
-    var refresh = function() { service.refreshInbox(notification, fileName, snapshot.originalId, snapshot.timestamp) }
+    var refresh = function () {
+      service.refreshInbox(notification, fileName, snapshot.originalId, snapshot.timestamp)
+    }
     for (var i = 0; i < updateSignals.length; i++) {
       var signal = notification[updateSignals[i]]
-      if (signal && typeof signal.connect === "function") signal.connect(refresh)
+      if (signal && typeof signal.connect === "function")
+        signal.connect(refresh)
     }
   }
 
   // A replaces_id update rewrites the tracked object; copy it into the same
   // inbox entry (same file name), as long as the user has not cleared it.
   function refreshInbox(notification, fileName, originalId, timestamp) {
-    if (service.inboxRefs[fileName] !== notification || !inbox.has(fileName)) return
+    if (service.inboxRefs[fileName] !== notification || !inbox.has(fileName))
+      return
     var updated
     try {
       updated = NotificationLogic.replacementSnapshot(notification, originalId, timestamp)
@@ -256,17 +263,15 @@ Item {
       return
     }
     var current = inbox.get(fileName)
-    if (current && !NotificationLogic.popupRowChanged(current, updated)) return
+    if (current && !NotificationLogic.popupRowChanged(current, updated))
+      return
     inbox.upsert(updated)
   }
 
   // Everything the card draws. A change to any of these is a client updating
   // the notification in place, which is the only kind of update we ever hear
   // about after the popup exists.
-  readonly property var updateSignals: [
-    "summaryChanged", "bodyChanged", "appNameChanged", "appIconChanged",
-    "imageChanged", "urgencyChanged", "expireTimeoutChanged", "hintsChanged"
-  ]
+  readonly property var updateSignals: ["summaryChanged", "bodyChanged", "appNameChanged", "appIconChanged", "imageChanged", "urgencyChanged", "expireTimeoutChanged", "hintsChanged"]
 
   // A client that updates a notification through replaces_id does not produce
   // a second onNotification: the server writes the new content onto the object
@@ -280,15 +285,16 @@ Item {
 
     for (var i = 0; i < updateSignals.length; i++) {
       var signal = notification[updateSignals[i]]
-      if (signal && typeof signal.connect === "function") signal.connect(refresh)
+      if (signal && typeof signal.connect === "function")
+        signal.connect(refresh)
     }
   }
 
   function refreshPopup(notification, originalId, timestamp) {
     // A newer notification may have taken this id over, and the object may
     // outlive its popup — in both cases there is nothing here to refresh.
-    if (service.liveRefs[originalId] !== notification) return
-
+    if (service.liveRefs[originalId] !== notification)
+      return
     var updated
     try {
       updated = NotificationLogic.replacementSnapshot(notification, originalId, timestamp)
@@ -300,9 +306,12 @@ Item {
     var roles = NotificationLogic.popupRoles()
     for (var i = 0; i < popupModel.count; i++) {
       var row = popupModel.get(i)
-      if (!row || row.originalId !== originalId || row.timestamp !== timestamp) continue
-      if (!NotificationLogic.popupRowChanged(row, updated)) return
-      for (var r = 0; r < roles.length; r++) popupModel.setProperty(i, roles[r], updated[roles[r]])
+      if (!row || row.originalId !== originalId || row.timestamp !== timestamp)
+        continue
+      if (!NotificationLogic.popupRowChanged(row, updated))
+        return
+      for (var r = 0; r < roles.length; r++)
+        popupModel.setProperty(i, roles[r], updated[roles[r]])
       return
     }
   }
@@ -328,10 +337,12 @@ Item {
   function removePopupsByOriginalId(originalId, keepFileName) {
     for (var i = popupModel.count - 1; i >= 0; i--) {
       var row = popupModel.get(i)
-      if (!row || row.originalId !== originalId) continue
+      if (!row || row.originalId !== originalId)
+        continue
       // Not a replaces_id match — see isRestoredRow. Removing it here
       // would silently kill a restored critical alert on an unrelated ping.
-      if (isRestoredRow(row)) continue
+      if (isRestoredRow(row))
+        continue
       popupModel.remove(i)
     }
   }
@@ -345,7 +356,8 @@ Item {
   }
 
   function removePopup(index: int, reason: string): void {
-    if (index < 0 || index >= popupModel.count) return
+    if (index < 0 || index >= popupModel.count)
+      return
     var entry = popupModel.get(index)
     var originalId = entry ? entry.originalId : -1
     // A restored row has no live server object, and its old-generation id
@@ -353,13 +365,16 @@ Item {
     // id would dismiss that unrelated notification at the server.
     var restored = isRestoredRow(entry)
     var ref = !restored && originalId >= 0 ? liveRefs[originalId] : null
-    if (entry && restored) delete restoredPopups[NotificationLogic.popupFileName(entry)]
+    if (entry && restored)
+      delete restoredPopups[NotificationLogic.popupFileName(entry)]
     popupModel.remove(index)
     if (ref) {
       try {
         if (ref.tracked) {
-          if (reason === "expire" && typeof ref.expire === "function") ref.expire()
-          else ref.dismiss()
+          if (reason === "expire" && typeof ref.expire === "function")
+            ref.expire()
+          else
+            ref.dismiss()
         }
       } catch (e) {
         // Object already torn down by the server — nothing to dismiss.
@@ -368,7 +383,8 @@ Item {
   }
 
   function clearPopups(): void {
-    while (popupModel.count > 0) dismissPopup(0)
+    while (popupModel.count > 0)
+      dismissPopup(0)
   }
 
   function toggleCenter(): void {
@@ -385,16 +401,19 @@ Item {
   function releaseInboxRef(fileName: string): void {
     var ref = inboxRefs[fileName]
     delete inboxRefs[fileName]
-    if (!ref) return
+    if (!ref)
+      return
     try {
-      if (ref.tracked) ref.dismiss()
+      if (ref.tracked)
+        ref.dismiss()
     } catch (e) {
       // Already torn down by the server.
     }
   }
 
   function clearInbox(): void {
-    for (var i = 0; i < inbox.model.count; i++) releaseInboxRef(inbox.model.get(i).fileName)
+    for (var i = 0; i < inbox.model.count; i++)
+      releaseInboxRef(inbox.model.get(i).fileName)
     inbox.clear()
   }
 
@@ -407,19 +426,24 @@ Item {
     var names = []
     for (var i = 0; i < inbox.model.count; i++) {
       var row = inbox.model.get(i)
-      if (String(row.app || "unknown") === app) names.push(row.fileName)
+      if (String(row.app || "unknown") === app)
+        names.push(row.fileName)
     }
-    for (var j = 0; j < names.length; j++) dismissInbox(names[j])
+    for (var j = 0; j < names.length; j++)
+      dismissInbox(names[j])
   }
 
   // Omarchy's argv first, then the sender's own default action while it is
   // still live, then focusing the sending app.
   function invokeInbox(fileName: string): void {
     var entry = inbox.get(fileName)
-    if (!entry) return
+    if (!entry)
+      return
     var argv = NotificationLogic.parseExecArgv(entry.execArgv)
-    if (argv) Util.execArgv(argv)
-    else if (!invokeDefaultAction(inboxRefs[fileName])) focusApp(entry)
+    if (argv)
+      Util.execArgv(argv)
+    else if (!invokeDefaultAction(inboxRefs[fileName]))
+      focusApp(entry)
     dismissInbox(fileName)
   }
 
@@ -451,7 +475,8 @@ Item {
   // Third-party clients register a libnotify action under the canonical
   // identifier "default" instead; that one only works while the sender is live.
   function invokePopupDefault(index) {
-    if (index < 0 || index >= popupModel.count) return
+    if (index < 0 || index >= popupModel.count)
+      return
     var entry = popupModel.get(index)
 
     // Run the argv (via Util.execArgv, no shell interpretation). Detached so it
@@ -470,22 +495,24 @@ Item {
     // libnotify action — they just expect clicking the notification to
     // focus their window. Fall back to focusing the sending app by class so
     // that click-to-jump actually works.
-    if (!invoked) focusApp(entry)
+    if (!invoked)
+      focusApp(entry)
     removePopup(index, "invoke")
   }
 
   // Try to focus an existing Hyprland window matching the notification's
   // sender. The helper handles case-insensitive class matching.
   function focusApp(entry) {
-    if (!entry || !entry.app) return
-    focusAppProc.command = [
-      service.omarchyPath + "/bin/omarchy-hyprland-focus-app",
-      String(entry.app)
-    ]
+    if (!entry || !entry.app)
+      return
+    focusAppProc.command = [service.omarchyPath + "/bin/omarchy-hyprland-focus-app", String(entry.app)]
     focusAppProc.running = true
   }
 
-  Process { id: focusAppProc; running: false }
+  Process {
+    id: focusAppProc
+    running: false
+  }
 
   // ---------------------------------------------------- settings persistence
 
@@ -511,7 +538,8 @@ Item {
   }
 
   function scheduleSettingsSave(): void {
-    if (!service.settingsLoaded) return
+    if (!service.settingsLoaded)
+      return
     settingsSaveTimer.restart()
   }
 
@@ -521,10 +549,11 @@ Item {
     // FileView can fire onLoaded more than once during startup — the implicit
     // preload when `path` resolves, plus the explicit `settingsFile.reload()`
     // in Component.onCompleted can both end up calling here.
-    if (service.settingsLoaded) return
-
+    if (service.settingsLoaded)
+      return
     var parsed = NotificationLogic.parseSettings(raw)
-    if (parsed.error) console.warn("notifications: settings parse failed:", parsed.errorMessage || "")
+    if (parsed.error)
+      console.warn("notifications: settings parse failed:", parsed.errorMessage || "")
 
     if (parsed.dnd !== null) {
       service._hydrating = true
@@ -536,11 +565,15 @@ Item {
     // Versions before the history moved into its own directory kept every
     // notification in here. Rewrite once so that dead payload doesn't sit in
     // the file until the next DND toggle happens to clear it.
-    if (parsed.legacy) service.scheduleSettingsSave()
+    if (parsed.legacy)
+      service.scheduleSettingsSave()
   }
 
   function flushSettings(): void {
-    settingsFile.setText(JSON.stringify({ version: 3, dnd: persisted.doNotDisturb }, null, 2) + "\n")
+    settingsFile.setText(JSON.stringify({
+      version: 3,
+      dnd: persisted.doNotDisturb
+    }, null, 2) + "\n")
   }
 
   Component.onDestruction: ServiceBridge.retract(service)
@@ -548,7 +581,7 @@ Item {
   Component.onCompleted: {
     // The bar widget (Panel.qml) finds this service here; see ServiceBridge.js.
     ServiceBridge.publish(service)
-    Qt.callLater(function() {
+    Qt.callLater(function () {
       settingsFile.reload()
       // Load the inbox, migrating pre-inbox popup files into it.
       inbox.load(null)
@@ -581,7 +614,8 @@ Item {
     }
 
     function quietState(): string {
-      if (!service.quietHoursWindow) return "off"
+      if (!service.quietHoursWindow)
+        return "off"
       return service.quietHours ? "on" : "scheduled"
     }
 
@@ -625,7 +659,8 @@ Item {
         return "ok"
       }
       var fileName = service.newestInboxFile()
-      if (!fileName) return "none"
+      if (!fileName)
+        return "none"
       service.dismissInbox(fileName)
       return "ok"
     }
@@ -633,7 +668,8 @@ Item {
     // Open the newest inbox entry (its action or its app).
     function invokeLast(): string {
       var fileName = service.newestInboxFile()
-      if (!fileName) return "none"
+      if (!fileName)
+        return "none"
       service.invokeInbox(fileName)
       return "ok"
     }
@@ -642,7 +678,8 @@ Item {
     // first-run notifications once their action has been clicked.
     function dismiss(summary: string): string {
       var needle = String(summary || "")
-      if (!needle) return "none"
+      if (!needle)
+        return "none"
       var hit = false
       for (var i = popupModel.count - 1; i >= 0; i--) {
         var row = popupModel.get(i)
@@ -654,7 +691,9 @@ Item {
       return hit ? "ok" : "none"
     }
 
-    function ping(): string { return "ok" }
+    function ping(): string {
+      return "ok"
+    }
   }
 
   // ---------------------------------------------------- server
@@ -668,7 +707,7 @@ Item {
     bodyHyperlinksSupported: true
     persistenceSupported: true
 
-    onNotification: function(notification) {
+    onNotification: function (notification) {
       service.handleNotification(notification)
     }
   }
@@ -695,18 +734,24 @@ Item {
       exclusionMode: ExclusionMode.Ignore
       color: "transparent"
 
-      readonly property var popupPlacement: NotificationLogic.popupPlacement(
-        service.barPosition, service.barClearance, Style.gapsOut)
+      readonly property var popupPlacement: NotificationLogic.popupPlacement(service.barPosition, service.barClearance, Style.gapsOut)
 
       // Full-screen, fixed-size surface (like the OSD overlay). Adding or
       // removing a toast changes only the content inside; the Wayland surface
       // never resizes, so the compositor can't briefly scale a stale buffer --
       // which is what stretched/squished the cards during count changes.
-      anchors { top: true; bottom: true; left: true; right: true }
+      anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+      }
 
       // Keep the surface click-through except over the toast column, so the
       // rest of the (invisible) full-screen overlay never eats input.
-      mask: Region { item: popupColumn }
+      mask: Region {
+        item: popupColumn
+      }
 
       ColumnLayout {
         id: popupColumn
@@ -760,7 +805,8 @@ Item {
               repeat: true
               running: cardSlot.ticking
               onTriggered: {
-                if (cardSlot.lifetime <= 0) return
+                if (cardSlot.lifetime <= 0)
+                  return
                 cardSlot.remainingLifetime -= 50.0 / cardSlot.lifetime
                 if (cardSlot.remainingLifetime <= 0) {
                   cardSlot.remainingLifetime = 0

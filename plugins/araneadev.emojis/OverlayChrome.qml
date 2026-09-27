@@ -22,8 +22,7 @@ Item {
   property color accent: Color.menu.selectedText
   readonly property color dim: Util.alpha(foreground, 0.58)
   readonly property real letterSpacing: 0.20
-  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state"))
-    + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
 
   default property alias content: body.data
 

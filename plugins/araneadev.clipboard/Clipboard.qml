@@ -48,7 +48,9 @@ Item {
   // Display index whose secret is revealed in the preview; any cursor move
   // masks it again.
   property int revealedIndex: -1
-  readonly property int pinnedCount: root.history.filter(function(e) { return e && e.pinned }).length
+  readonly property int pinnedCount: root.history.filter(function (e) {
+    return e && e.pinned
+  }).length
   onSelectedIndexChanged: root.revealedIndex = -1
 
   function open(payloadJson) {
@@ -58,7 +60,9 @@ Item {
     root.cursorActive = true
     root.disarmPointer()
     root.rebuildDisplay()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function () {
+      keyCatcher.forceActiveFocus()
+    })
   }
 
   function close() {
@@ -67,25 +71,31 @@ Item {
   }
 
   function toggle() {
-    if (root.opened) root.close()
-    else root.open("{}")
+    if (root.opened)
+      root.close()
+    else
+      root.open("{}")
   }
 
   function loadHistory(raw) {
     root.history = ClipboardLogic.parseHistory(raw, Date.now())
     // Stock-written entries just got their capture time; keep it, so secret
     // expiry counts from the first load rather than from every restart.
-    if (ClipboardLogic.hadUnstamped(raw)) root.saveHistory()
+    if (ClipboardLogic.hadUnstamped(raw))
+      root.saveHistory()
     root.expireNow()
-    if (root.opened) root.rebuildDisplay()
+    if (root.opened)
+      root.rebuildDisplay()
   }
 
   function expireNow() {
     var result = ClipboardLogic.expire(root.history, Date.now(), root.secretTtlMs)
-    if (!result.changed) return
+    if (!result.changed)
+      return
     root.history = result.history
     root.saveHistory()
-    if (root.opened) root.rebuildDisplay()
+    if (root.opened)
+      root.rebuildDisplay()
   }
 
   function updateHistory(next) {
@@ -95,17 +105,20 @@ Item {
   }
 
   function togglePinnedIndex(index) {
-    if (index < 0 || index >= displayModel.count) return
+    if (index < 0 || index >= displayModel.count)
+      return
     root.updateHistory(ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex, Date.now()))
   }
 
   function toggleSecretIndex(index) {
-    if (index < 0 || index >= displayModel.count) return
+    if (index < 0 || index >= displayModel.count)
+      return
     root.updateHistory(ClipboardLogic.toggleSecret(root.history, displayModel.get(index).historyIndex))
   }
 
   function revealIndex(index) {
-    if (index < 0 || index >= displayModel.count || !displayModel.get(index).secret) return
+    if (index < 0 || index >= displayModel.count || !displayModel.get(index).secret)
+      return
     root.revealedIndex = root.revealedIndex === index ? -1 : index
   }
 
@@ -127,19 +140,24 @@ Item {
     root.saving = false
     var action = root.pendingAction
     root.pendingAction = null
-    if (action) action()
+    if (action)
+      action()
   }
 
   function whenSaved(action) {
-    if (root.saving) root.pendingAction = action
-    else action()
+    if (root.saving)
+      root.pendingAction = action
+    else
+      action()
   }
 
   function addClipboardEntry(entry) {
-    if (!entry) return
+    if (!entry)
+      return
     root.history = ClipboardLogic.addEntry(root.history, entry, root.historyLimit, Date.now())
     root.saveHistory()
-    if (root.opened) root.rebuildDisplay()
+    if (root.opened)
+      root.rebuildDisplay()
   }
 
   function addClipboardJson(line) {
@@ -147,7 +165,8 @@ Item {
   }
 
   function requestClearHistory() {
-    if (root.history.length === 0) return
+    if (root.history.length === 0)
+      return
     clearConfirm.selectedIndex = 1
     root.clearConfirmOpen = true
   }
@@ -155,7 +174,9 @@ Item {
   function cancelClearHistory() {
     root.clearConfirmOpen = false
     root.disarmPointer()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function () {
+      keyCatcher.forceActiveFocus()
+    })
   }
 
   function confirmClearHistory() {
@@ -167,12 +188,14 @@ Item {
     root.disarmPointer()
     root.clearConfirmOpen = false
     root.rebuildDisplay()
-    Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    Qt.callLater(function () {
+      keyCatcher.forceActiveFocus()
+    })
   }
 
   function removeDisplayIndex(index) {
-    if (index < 0 || index >= displayModel.count) return
-
+    if (index < 0 || index >= displayModel.count)
+      return
     var row = displayModel.get(index)
     root.history = ClipboardLogic.removeEntryAt(root.history, row.historyIndex)
     root.saveHistory()
@@ -189,7 +212,8 @@ Item {
   }
 
   function rebuildDisplay() {
-    root.revealedIndex = -1  // list changed: rows may have moved under the cursor
+    root.revealedIndex = -1
+    // list changed: rows may have moved under the cursor
     var rows = ClipboardLogic.displayRows(root.history, root.filterText, 50, Date.now())
 
     displayModel.clear()
@@ -212,17 +236,22 @@ Item {
       })
     }
 
-    if (displayModel.count === 0) selectedIndex = 0
-    else if (selectedIndex >= displayModel.count) selectedIndex = displayModel.count - 1
-    else if (selectedIndex < 0) selectedIndex = 0
+    if (displayModel.count === 0)
+      selectedIndex = 0
+    else if (selectedIndex >= displayModel.count)
+      selectedIndex = displayModel.count - 1
+    else if (selectedIndex < 0)
+      selectedIndex = 0
 
-    Qt.callLater(function() {
-      if (displayModel.count > 0) resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+    Qt.callLater(function () {
+      if (displayModel.count > 0)
+        resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
     })
   }
 
   function select(delta) {
-    if (displayModel.count === 0) return
+    if (displayModel.count === 0)
+      return
     root.disarmPointer()
     if (!cursorActive) {
       cursorActive = true
@@ -234,7 +263,8 @@ Item {
   }
 
   function selectAbsolute(index) {
-    if (displayModel.count === 0) return
+    if (displayModel.count === 0)
+      return
     root.disarmPointer()
     root.cursorActive = true
     root.selectedIndex = Math.max(0, Math.min(index, displayModel.count - 1))
@@ -254,25 +284,29 @@ Item {
   }
 
   function selectFromPointer(index, item, mouse) {
-    if (!pointerGate.moved(item, mouse)) return
+    if (!pointerGate.moved(item, mouse))
+      return
     root.cursorActive = true
     root.selectedIndex = index
   }
 
   function activateIndex(index) {
-    if (index < 0 || index >= displayModel.count) return
+    if (index < 0 || index >= displayModel.count)
+      return
     var row = displayModel.get(index)
     root.applySelected(row)
   }
 
   function copyIndex(index) {
-    if (index < 0 || index >= displayModel.count) return
+    if (index < 0 || index >= displayModel.count)
+      return
     var row = displayModel.get(index)
     root.copySelected(row)
   }
 
   function openIndex(index) {
-    if (index < 0 || index >= displayModel.count) return
+    if (index < 0 || index >= displayModel.count)
+      return
     var row = displayModel.get(index)
     root.openSelected(row)
   }
@@ -280,7 +314,12 @@ Item {
   // A plain copy of the row: the model can change before a pending history
   // write finishes.
   function plainRow(row) {
-    return { entryType: row.entryType, mime: row.mime, path: row.path, historyIndex: row.historyIndex }
+    return {
+      entryType: row.entryType,
+      mime: row.mime,
+      path: row.path,
+      historyIndex: row.historyIndex
+    }
   }
 
   function pasteRow(row, copyOnly) {
@@ -293,24 +332,31 @@ Item {
   }
 
   function applySelected(row) {
-    if (!row) return
+    if (!row)
+      return
     root.opened = false
     var plain = root.plainRow(row)
-    root.whenSaved(function() { root.pasteRow(plain, false) })
+    root.whenSaved(function () {
+      root.pasteRow(plain, false)
+    })
   }
 
   function copySelected(row) {
-    if (!row) return
+    if (!row)
+      return
     root.opened = false
     var plain = root.plainRow(row)
-    root.whenSaved(function() { root.pasteRow(plain, true) })
+    root.whenSaved(function () {
+      root.pasteRow(plain, true)
+    })
   }
 
   function openSelected(row) {
-    if (!row) return
+    if (!row)
+      return
     root.opened = false
     var plain = root.plainRow(row)
-    root.whenSaved(function() {
+    root.whenSaved(function () {
       Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-open", "--history-index", String(plain.historyIndex)])
     })
   }
@@ -324,7 +370,9 @@ Item {
     onTriggered: root.expireNow()
   }
 
-  ListModel { id: displayModel }
+  ListModel {
+    id: displayModel
+  }
 
   PointerMoveGate {
     id: pointerGate
@@ -339,7 +387,8 @@ Item {
     printErrors: false
     onLoaded: {
       var raw = text()
-      if (raw !== root.lastSavedText) root.loadHistory(raw)
+      if (raw !== root.lastSavedText)
+        root.loadHistory(raw)
     }
     onLoadFailed: root.loadHistory("[]")
     onSaved: root.finishSave()
@@ -374,7 +423,9 @@ Item {
     command: ["setpriv", "--pdeathsig", "TERM", "wl-paste", "--type", "text", "--watch", root.captureScript, "text"]
     onExited: watchRestartTimer.restart()
     stdout: SplitParser {
-      onRead: function(data) { root.addClipboardJson(data) }
+      onRead: function (data) {
+        root.addClipboardJson(data)
+      }
     }
   }
 
@@ -383,7 +434,9 @@ Item {
     command: ["setpriv", "--pdeathsig", "TERM", "wl-paste", "--type", "image/png", "--watch", root.captureScript, "image/png"]
     onExited: watchRestartTimer.restart()
     stdout: SplitParser {
-      onRead: function(data) { root.addClipboardJson(data) }
+      onRead: function (data) {
+        root.addClipboardJson(data)
+      }
     }
   }
 
@@ -395,8 +448,10 @@ Item {
     interval: 1000
     repeat: false
     onTriggered: {
-      if (!textWatchProc.running) textWatchProc.running = true
-      if (!imageWatchProc.running) imageWatchProc.running = true
+      if (!textWatchProc.running)
+        textWatchProc.running = true
+      if (!imageWatchProc.running)
+        imageWatchProc.running = true
     }
   }
 
@@ -410,27 +465,49 @@ Item {
     onLoaded: root.motionEnabled = String(text() || "").trim() !== "off"
     onFileChanged: reload()
   }
-  onOpenedChanged: if (opened && root.motionEnabled) openAnimation.restart()
+  onOpenedChanged: if (opened && root.motionEnabled)
+    openAnimation.restart()
   ParallelAnimation {
     id: openAnimation
-    NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
-    NumberAnimation { target: card; property: "scale"; from: 0.97; to: 1; duration: 180; easing.type: Easing.OutCubic }
+    NumberAnimation {
+      target: card
+      property: "opacity"
+      from: 0
+      to: 1
+      duration: 180
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: card
+      property: "scale"
+      from: 0.97
+      to: 1
+      duration: 180
+      easing.type: Easing.OutCubic
+    }
   }
 
   function kindGlyph(kind) {
-    if (kind === "link") return "󰌷"
-    if (kind === "path") return "󰉋"
-    if (kind === "code") return "󰅩"
-    if (kind === "image") return "󰋩"
+    if (kind === "link")
+      return "󰌷"
+    if (kind === "path")
+      return "󰉋"
+    if (kind === "code")
+      return "󰅩"
+    if (kind === "image")
+      return "󰋩"
     return "󰦨"
   }
 
   function hintText() {
-    if (displayModel.count === 0) return root.filterText ? "ESC CLEAR SEARCH" : "ESC CLOSE"
+    if (displayModel.count === 0)
+      return root.filterText ? "ESC CLEAR SEARCH" : "ESC CLOSE"
     var row = root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
     var parts = ["↑↓ SELECT", "ENTER PASTE", "⇧ENTER COPY", "^P " + (row && row.pinned ? "UNPIN" : "PIN")]
-    if (row && row.secret && !root.filterText) parts.push("SPACE " + (root.revealedIndex === root.selectedIndex ? "HIDE" : "REVEAL"))
-    if (row && row.kind !== "image") parts.push("^S " + (row.secret ? "NOT SECRET" : "SECRET"))
+    if (row && row.secret && !root.filterText)
+      parts.push("SPACE " + (root.revealedIndex === root.selectedIndex ? "HIDE" : "REVEAL"))
+    if (row && row.kind !== "image")
+      parts.push("^S " + (row.secret ? "NOT SECRET" : "SECRET"))
     parts.push("DEL DROP")
     return parts.join("  ·  ")
   }
@@ -438,7 +515,12 @@ Item {
   PanelWindow {
     id: panel
     visible: root.opened
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-clipboard"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -465,7 +547,10 @@ Item {
       borderSpec: root.borderSpec
       padding: root.contentMargin
 
-      MouseArea { anchors.fill: parent; onClicked: {} }
+      MouseArea {
+        anchors.fill: parent
+        onClicked: {}
+      }
 
       Item {
         id: keyCatcher
@@ -474,16 +559,19 @@ Item {
         focus: true
 
         Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function(event) {
+        Keys.onPressed: function (event) {
           if (root.clearConfirmOpen) {
-            if (clearConfirm.handleKey(event)) event.accepted = true
+            if (clearConfirm.handleKey(event))
+              event.accepted = true
             return
           }
 
           var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
           if (event.key === Qt.Key_Escape) {
-            if (root.filterText) root.setFilter("")
-            else root.close()
+            if (root.filterText)
+              root.setFilter("")
+            else
+              root.close()
             event.accepted = true
           } else if (ctrl && event.key === Qt.Key_P) {
             root.togglePinnedIndex(root.selectedIndex)
@@ -492,11 +580,12 @@ Item {
             root.toggleSecretIndex(root.selectedIndex)
             event.accepted = true
           } else if (event.key === Qt.Key_Delete) {
-            if (ctrl && (event.modifiers & Qt.ShiftModifier)) root.requestClearHistory()
-            else root.removeDisplayIndex(root.selectedIndex)
+            if (ctrl && (event.modifiers & Qt.ShiftModifier))
+              root.requestClearHistory()
+            else
+              root.removeDisplayIndex(root.selectedIndex)
             event.accepted = true
-          } else if (event.key === Qt.Key_Space && !root.filterText
-                     && displayModel.count > 0 && displayModel.get(root.selectedIndex).secret) {
+          } else if (event.key === Qt.Key_Space && !root.filterText && displayModel.count > 0 && displayModel.get(root.selectedIndex).secret) {
             root.revealIndex(root.selectedIndex)
             event.accepted = true
           } else if (Util.editsFilter(event, root.filterText)) {
@@ -521,10 +610,14 @@ Item {
             root.selectAbsolute(displayModel.count - 1)
             event.accepted = true
           } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.cursorActive && (event.modifiers & Qt.AltModifier)) root.openIndex(root.selectedIndex)
-            else if (root.cursorActive && (event.modifiers & Qt.ShiftModifier)) root.copyIndex(root.selectedIndex)
-            else if (root.cursorActive) root.activateIndex(root.selectedIndex)
-            else if (displayModel.count > 0) root.cursorActive = true
+            if (root.cursorActive && (event.modifiers & Qt.AltModifier))
+              root.openIndex(root.selectedIndex)
+            else if (root.cursorActive && (event.modifiers & Qt.ShiftModifier))
+              root.copyIndex(root.selectedIndex)
+            else if (root.cursorActive)
+              root.activateIndex(root.selectedIndex)
+            else if (displayModel.count > 0)
+              root.cursorActive = true
             event.accepted = true
           } else if (!ctrl && event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127) {
             root.setFilter(root.filterText + event.text)
@@ -636,7 +729,10 @@ Item {
                 color: hasCursor ? root.selectedBackground : "transparent"
 
                 Behavior on color {
-                  ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+                  ColorAnimation {
+                    duration: 120
+                    easing.type: Easing.OutCubic
+                  }
                 }
 
                 // Mint rail on the selected row, as in the Aranea menu.
@@ -722,7 +818,7 @@ Item {
                   anchors.fill: parent
                   hoverEnabled: true
                   cursorShape: Qt.PointingHandCursor
-                  onPositionChanged: function(mouse) {
+                  onPositionChanged: function (mouse) {
                     root.selectFromPointer(row.index, row, mouse)
                   }
                   onClicked: {
@@ -808,8 +904,7 @@ Item {
               anchors.fill: parent
               anchors.leftMargin: root.contentMargin
               textFormat: Text.PlainText
-              text: !preview.activeRow ? ""
-                : (preview.activeRow.secret ? ClipboardLogic.fullText(root.history[preview.activeRow.historyIndex]) : preview.activeRow.fullText)
+              text: !preview.activeRow ? "" : (preview.activeRow.secret ? ClipboardLogic.fullText(root.history[preview.activeRow.historyIndex]) : preview.activeRow.fullText)
               color: root.foreground
               font.family: preview.activeRow && preview.activeRow.kind === "code" ? "monospace" : root.fontFamily
               font.pixelSize: preview.activeRow && preview.activeRow.kind === "code" ? Style.font.body : Style.font.title

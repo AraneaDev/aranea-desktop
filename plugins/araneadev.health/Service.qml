@@ -13,14 +13,20 @@ Item {
   property var shell: null
 
   property alias monitor: monitor
-  Monitor { id: monitor }
+  Monitor {
+    id: monitor
+  }
 
   property alias metrics: metrics
   // Dropdowns currently open (one bar per monitor can each have one). Top
   // processes are sampled only while at least one is open.
   property int openPanels: 0
-  function panelOpened(): void { openPanels++ }
-  function panelClosed(): void { openPanels = Math.max(0, openPanels - 1) }
+  function panelOpened(): void {
+    openPanels++
+  }
+  function panelClosed(): void {
+    openPanels = Math.max(0, openPanels - 1)
+  }
 
   Metrics {
     id: metrics
@@ -56,9 +62,15 @@ Item {
       return "ok"
     }
     function metrics(): string {
-      return JSON.stringify({ cpu: service.metrics.cpu, mem: service.metrics.mem, iface: service.metrics.iface,
-        rates: service.metrics.rates, uptime: service.metrics.uptime, hostname: service.metrics.hostname,
-        samples: service.metrics.cpuHistory.length })
+      return JSON.stringify({
+        cpu: service.metrics.cpu,
+        mem: service.metrics.mem,
+        iface: service.metrics.iface,
+        rates: service.metrics.rates,
+        uptime: service.metrics.uptime,
+        hostname: service.metrics.hostname,
+        samples: service.metrics.cpuHistory.length
+      })
     }
   }
 }

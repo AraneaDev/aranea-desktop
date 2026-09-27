@@ -17,10 +17,16 @@ Item {
   property var load: null
   property var mem: null
   property string iface: ""
-  property var rates: ({ up: 0, down: 0 })
+  property var rates: ({
+      up: 0,
+      down: 0
+    })
   property string uptime: ""
   property string hostname: ""
-  property var topProcs: ({ cpu: [], mem: [] })
+  property var topProcs: ({
+      cpu: [],
+      mem: []
+    })
 
   property var lastCpu: null
   property var lastNet: null
@@ -32,13 +38,48 @@ Item {
   property int clockTicks: 100
   property real lastPsAt: 0
 
-  FileView { id: statFile; path: "/proc/stat"; blockLoading: true; printErrors: false }
-  FileView { id: loadFile; path: "/proc/loadavg"; blockLoading: true; printErrors: false }
-  FileView { id: memFile; path: "/proc/meminfo"; blockLoading: true; printErrors: false }
-  FileView { id: routeFile; path: "/proc/net/route"; blockLoading: true; printErrors: false }
-  FileView { id: devFile; path: "/proc/net/dev"; blockLoading: true; printErrors: false }
-  FileView { id: uptimeFile; path: "/proc/uptime"; blockLoading: true; printErrors: false }
-  FileView { id: hostFile; path: "/proc/sys/kernel/hostname"; blockLoading: true; printErrors: false }
+  FileView {
+    id: statFile
+    path: "/proc/stat"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: loadFile
+    path: "/proc/loadavg"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: memFile
+    path: "/proc/meminfo"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: routeFile
+    path: "/proc/net/route"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: devFile
+    path: "/proc/net/dev"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: uptimeFile
+    path: "/proc/uptime"
+    blockLoading: true
+    printErrors: false
+  }
+  FileView {
+    id: hostFile
+    path: "/proc/sys/kernel/hostname"
+    blockLoading: true
+    printErrors: false
+  }
 
   function read(view): string {
     view.reload()
@@ -77,19 +118,38 @@ Item {
     hostname = read(hostFile).trim()
   }
 
-  Timer { interval: 2000; repeat: true; running: true; triggeredOnStart: true; onTriggered: metrics.sample() }
-  Timer { interval: 60000; repeat: true; running: true; triggeredOnStart: true; onTriggered: metrics.refreshSlow() }
+  Timer {
+    interval: 2000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: metrics.sample()
+  }
+  Timer {
+    interval: 60000
+    repeat: true
+    running: true
+    triggeredOnStart: true
+    onTriggered: metrics.refreshSlow()
+  }
 
   // Top processes: two dumps of /proc/<pid>/stat, CPU from the tick delta
   // (ps only reports whole CPU seconds, too coarse for a 2 s window).
   Timer {
-    interval: 2000; repeat: true; running: metrics.topActive; triggeredOnStart: true
-    onTriggered: if (!psProc.running) psProc.running = true
+    interval: 2000
+    repeat: true
+    running: metrics.topActive
+    triggeredOnStart: true
+    onTriggered: if (!psProc.running)
+      psProc.running = true
   }
   onTopActiveChanged: {
     if (!topActive) {
       lastPs = null
-      topProcs = ({ cpu: [], mem: [] })
+      topProcs = ({
+          cpu: [],
+          mem: []
+        })
     }
   }
 
@@ -102,14 +162,19 @@ Item {
       onStreamFinished: {
         // A dump still in flight when the dropdown closed belongs to no
         // sampling window; keeping it would skew the first figures on reopen.
-        if (!metrics.topActive) return
+        if (!metrics.topActive)
+          return
         var list = MetricsLogic.parseProcStat(text, metrics.pageSize)
         var now = Date.now()
         if (!list || list.length === 0) {
-          metrics.topProcs = ({ cpu: [], mem: [] })
+          metrics.topProcs = ({
+              cpu: [],
+              mem: []
+            })
           return
         }
-        if (metrics.lastPs) metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, metrics.clockTicks)
+        if (metrics.lastPs)
+          metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, metrics.clockTicks)
         metrics.lastPs = list
         metrics.lastPsAt = now
       }
@@ -123,7 +188,8 @@ Item {
       waitForEnd: true
       onStreamFinished: {
         var n = parseInt(text, 10)
-        if (n > 0) metrics.pageSize = n
+        if (n > 0)
+          metrics.pageSize = n
       }
     }
   }
@@ -135,7 +201,8 @@ Item {
       waitForEnd: true
       onStreamFinished: {
         var n = parseInt(text, 10)
-        if (n > 0) metrics.clockTicks = n
+        if (n > 0)
+          metrics.clockTicks = n
       }
     }
   }
