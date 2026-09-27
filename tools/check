@@ -86,27 +86,43 @@ wanted() {
   return 0
 }
 
-# The tree being checked: the repository, or a snapshot of the index.
+# The files to check, read once. Paths are unquoted (core.quotePath off) so
+# non-ASCII names work; a failing git is a failure, never "no files".
+file_list="$(mktemp)"
+trap 'rm -f "$file_list"' EXIT
+if ((staged)); then
+  git -C "$repo_root" -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$file_list" || {
+    echo "git could not list the staged files" >&2
+    exit 2
+  }
+else
+  git -C "$repo_root" -c core.quotePath=false ls-files >"$file_list" || {
+    echo "git could not list the tracked files" >&2
+    exit 2
+  }
+fi
+
+# The tree being checked: the repository, or (with --staged) a snapshot of
+# the whole index, so staged files are checked with the repo's configs,
+# their siblings and their link targets as staged.
 check_root="$repo_root"
 if ((staged)); then
   check_root="$(mktemp -d)"
-  trap 'rm -rf "$check_root"' EXIT
-  (cd "$repo_root" && git diff --cached --name-only --diff-filter=ACMR -z |
-    xargs -0 -r git checkout-index --prefix="$check_root/" --)
+  trap 'rm -f "$file_list"; rm -rf "$check_root"' EXIT
+  git -C "$repo_root" checkout-index -a --prefix="$check_root/" || {
+    echo "git could not snapshot the index" >&2
+    exit 2
+  }
+  # The JS tools and their plugins, resolved from the snapshot.
+  [[ -d "$repo_root/node_modules" ]] && ln -s "$repo_root/node_modules" "$check_root/node_modules"
 fi
-export check_root repo_root
+export check_root repo_root file_list
 
-# Prints tracked (or staged) files, optionally filtered by extended regular
+# Prints the files to check, optionally filtered by extended regular
 # expressions matched against the whole path (e.g. '\.json$').
 check_files() {
-  local list
-  if ((staged)); then
-    list="$(cd "$repo_root" && git diff --cached --name-only --diff-filter=ACMR)"
-  else
-    list="$(cd "$repo_root" && git ls-files)"
-  fi
   if (($# == 0)); then
-    printf '%s\n' "$list"
+    cat "$file_list"
     return
   fi
   local file regex
@@ -118,10 +134,22 @@ check_files() {
         break
       fi
     done
-  done <<<"$list"
+  done <"$file_list"
 }
 
-# Shared helpers, then the stage libraries (each defines stage_<name>).
+# Lets a stage add a note to its summary line (e.g. "bare, syntax only").
+note_stage() {
+  stage_note="$1"
+}
+
+# Shared helpers, then the stage libraries (each defines stage_<name>). A
+# missing library is an error, not a stage that quietly does not run.
+for lib in common format lint validate qml test smoke; do
+  [[ -r "$repo_root/tools/lib/check-$lib.sh" ]] || {
+    echo "missing tools/lib/check-$lib.sh" >&2
+    exit 2
+  }
+done
 source "$repo_root/tools/lib/check-common.sh"
 source "$repo_root/tools/lib/check-format.sh"
 source "$repo_root/tools/lib/check-lint.sh"
@@ -147,16 +175,18 @@ failed=0
 for stage in "${all_stages[@]}"; do
   wanted "$stage" || continue
   if ! declare -F "stage_$stage" >/dev/null; then
-    results+=("$stage: not available")
+    results+=("$stage: FAILED (not available)")
+    failed=1
     continue
   fi
   printf '== %s\n' "$stage"
+  stage_note=""
   run_stage "$stage"
   status=$?
   case "$status" in
-    0) results+=("$stage: ok") ;;
+    0) results+=("$stage: ok${stage_note:+ ($stage_note)}") ;;
     77)
-      results+=("$stage: skipped")
+      results+=("$stage: skipped${stage_note:+ ($stage_note)}")
       if [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" == 1 ]]; then
         results[-1]="$stage: FAILED (skip not allowed)"
         failed=1

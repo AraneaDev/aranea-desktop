@@ -95,4 +95,7 @@ if grep -Fq 'tests-27%20passing' "$repo_root/README.md"; then
   exit 1
 fi
 grep -Fq 'actions/workflow/status/AraneaDev/aranea-desktop/ci.yml' "$repo_root/README.md"
+# Hooks do nothing on branches that predate tools/check.
+grep -Fq '[ -x tools/check ] || exit 0' "$repo_root/.githooks/pre-commit"
+grep -Fq '[ -x tools/check ] || exit 0' "$repo_root/.githooks/pre-push"
 echo "toolkit contract passed"

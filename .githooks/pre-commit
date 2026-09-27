@@ -38,13 +38,16 @@ MSG
 done
 
 # The staged content gets the same gates CI runs (format, lint, validate,
-# qml, and the fast tests when tests or scripts changed), checked from the
-# index rather than the working tree, so a partial `git add -p` cannot pass
-# here and fail there. See CONTRIBUTING.md; bypass once with --no-verify.
+# qml, and the fast tests when tests, scripts or plugin code are staged),
+# checked from a snapshot of the index rather than the working tree, so a
+# partial `git add -p` cannot pass here and fail there. Branches that predate
+# tools/check have nothing to run. See CONTRIBUTING.md; bypass once with
+# --no-verify.
 repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+[ -x tools/check ] || exit 0
 if [ ! -d "$repo_root/node_modules" ]; then
   echo "  tools/check needs the JS tooling first: npm ci" >&2
   exit 1
 fi
-cd "$repo_root"
 exec tools/check --staged --fast

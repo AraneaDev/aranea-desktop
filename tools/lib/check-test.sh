@@ -7,6 +7,7 @@ check_root="${check_root:?tools/check sets check_root}"
 repo_root="${repo_root:?tools/check sets repo_root}"
 update_baselines="${update_baselines:-0}"
 fast="${fast:-0}"
+staged="${staged:-0}"
 
 # Prints "path percent" (function coverage, rounded down) per plugin module
 # from an lcov file.
@@ -52,13 +53,20 @@ coverage_raised() {
 # test stage entry point.
 stage_test() {
   local status=0
+  # With --staged, tests run only when something they cover is staged.
+  if ((staged)) && ! check_files '^(tests|scripts|hooks|tools)/' '\.(js|qml|sh)$' '^package(-lock)?\.json$' | grep -q .; then
+    echo "no tests, scripts or plugin code staged"
+    note_stage "nothing to test"
+    return 0
+  fi
   command -v node >/dev/null || {
     echo "node is required (see .nvmrc)"
     return 1
   }
   if [[ "${ARANEA_CHECK_NO_TESTS:-0}" != 1 && -x "$check_root/tests/run" ]]; then
-    local skip_list="js"
-    ((fast)) && skip_list="js,hooks,screenshot-coverage"
+    # js and qml-types duplicate this stage's node run and the qml stage.
+    local skip_list="js,qml-types"
+    ((fast)) && skip_list="js,qml-types,hooks,screenshot-coverage"
     (cd "$check_root" && ARANEA_TESTS_SKIP="$skip_list" tests/run) || status=1
   fi
   if [[ -d "$check_root/tests/js" ]]; then

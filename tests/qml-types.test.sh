@@ -41,4 +41,8 @@ done
 # The QML contract is the tools/check qml stage: strict qmllint against the
 # shrink-only baseline when Omarchy and Quickshell are present, syntax-only
 # otherwise. Every tracked QML file is linted (not just the entry points).
+if ! command -v qmllint >/dev/null 2>&1 && [[ ! -x /usr/lib/qt6/bin/qmllint ]]; then
+  echo "SKIP: qmllint is not installed (CI runs QML checks in the Arch job)"
+  exit 0
+fi
 "$repo_root/tools/check" --only qml

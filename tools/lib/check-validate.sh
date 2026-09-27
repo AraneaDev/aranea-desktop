@@ -9,15 +9,16 @@ repo_root="${repo_root:?tools/check sets repo_root}"
 validate_each() {
   local label="$1"
   shift
-  local file status=0
+  local file status=0 err
+  err="$(mktemp)"
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
-    if ! "$@" "$check_root/$file" >/dev/null 2>"$check_root/.validate-err"; then
-      printf '%s: invalid %s: %s\n' "$file" "$label" "$(head -c 200 "$check_root/.validate-err")"
+    if ! "$@" "$check_root/$file" >/dev/null 2>"$err"; then
+      printf '%s: invalid %s: %s\n' "$file" "$label" "$(head -c 200 "$err")"
       status=1
     fi
   done
-  rm -f "$check_root/.validate-err"
+  rm -f "$err"
   return "$status"
 }
 
@@ -68,6 +69,8 @@ stage_validate() {
   fi
   if command -v luac >/dev/null; then
     check_files '\.lua$' | validate_each Lua luac -p -o /dev/null || status=1
+  elif [[ -n "$(check_files '\.lua$')" ]]; then
+    echo "SKIP: luac is not installed; Lua files are not checked (install lua)"
   fi
   check_files '\.md$' | validate_each 'Markdown links' markdown_links || status=1
   # House rule: no em dash outside the allowlist (one path per line).

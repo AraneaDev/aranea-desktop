@@ -58,15 +58,18 @@ a new smoke error fails, and so does a baseline entry that no longer applies.
 `tools/check --update-baselines` shrinks the qmllint and smoke lists and
 raises coverage floors, but never loosens them; adding an entry is a manual
 edit that shows up in review. Formatting-only commits are listed in
-`.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
+`.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`);
+merging rewrites commit hashes, so after merging a formatting commit, update
+the list with the hashes it got on `master`.
 
 `tests/run` on its own runs every `tests/*.test.sh` (including the JS suites
 through `tests/js.test.sh`); pass bare names to run a subset
 (`tests/run ownership manifest`), and `-v` to see passing output.
 
-CI (`.github/workflows/ci.yml`) runs `tools/check` on Ubuntu, plus strict QML
-and the smoke test in an Arch container with Quickshell, sway and Omarchy's
-shell at the tag in `.omarchy-version`. A release is only tagged after
+CI (`.github/workflows/ci.yml`) runs `tools/check` on Ubuntu without the
+Qt-dependent parts, and QML formatting, strict QML and the smoke test in an
+Arch container with Quickshell, sway and Omarchy's shell at the tag in
+`.omarchy-version`. A release is only tagged after
 `tools/check` passed on the merged commit.
 
 ## Working on it

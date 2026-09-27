@@ -10,10 +10,14 @@
 check_root="${check_root:?tools/check sets check_root}"
 repo_root="${repo_root:?tools/check sets repo_root}"
 update_baselines="${update_baselines:-0}"
+staged="${staged:-0}"
 
 # Prints "count<TAB>file:id:message" for every warning in qmllint JSON (stdin).
+# Machine-specific paths inside messages (the checked tree, the temporary
+# import root) are replaced, so the baseline is the same everywhere.
 qml_warning_counts() {
   jq -r '.files[]? | .filename as $file | .warnings[]? | "\($file):\(.id):\(.message)"' |
+    sed -e "s#${check_root}/##g" -e "s#${qml_import_root:-/nonexistent-import-root}#<imports>#g" |
     LC_ALL=C sort | uniq -c | awk '{count = $1; sub(/^ *[0-9]+ /, ""); print count "\t" $0}'
 }
 
@@ -50,10 +54,12 @@ stage_qml() {
   ((${#files[@]})) || return 0
 
   local shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}" mode=bare import_root=""
+  qml_import_root=""
   local args=(--ignore-settings --json -)
   if [[ -f "$shell_dir/Commons/qmldir" && -f "$shell_dir/Ui/qmldir" && -d /usr/lib/qt6/qml/Quickshell ]]; then
     mode=strict
     import_root="$(mktemp -d)"
+    qml_import_root="$import_root"
     mkdir "$import_root/qs"
     ln -s "$shell_dir/Commons" "$import_root/qs/Commons"
     ln -s "$shell_dir/Ui" "$import_root/qs/Ui"
@@ -76,25 +82,47 @@ stage_qml() {
     printf 'syntax error: %s\n' "$syntax"
     status=1
   fi
-  [[ "$mode" == strict ]] || return "$status"
+  if [[ "$mode" != strict ]]; then
+    # Bare: only syntax is checked. Where everything is required (the Arch CI
+    # job) that counts as a skip, which fails the run.
+    note_stage "bare, syntax only"
+    if ((status == 0)) && [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" == 1 ]]; then
+      echo "strict QML needs Omarchy's Commons/Ui at $shell_dir and Quickshell"
+      return 77
+    fi
+    return "$status"
+  fi
 
   local baseline="$repo_root/tools/baselines/qmllint.txt" current relevant
   current="$(mktemp)"
   relevant="$(mktemp)"
   qml_warning_counts <<<"$json" >"$current"
-  # Only the linted files' entries matter (--staged lints a subset).
+  # Every entry counts in a full run (entries of deleted or renamed files
+  # are stale); --staged lints a subset, so only those files' entries count.
   touch "$baseline"
-  grep -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" >"$relevant" || true
+  if ((staged)); then
+    grep -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" >"$relevant" || true
+  else
+    cp "$baseline" "$relevant"
+  fi
   if ((update_baselines)); then
-    local others
-    others="$(grep -v -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" || true)"
+    # With --staged, other files' entries are kept as they are; a full run
+    # drops entries of files that no longer exist.
+    local others=""
+    if ((staged)); then
+      others="$(grep -v -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" || true)"
+    fi
     {
       [[ -n "$others" ]] && printf '%s\n' "$others"
       qml_shrunk_baseline "$current" "$relevant"
     } |
       LC_ALL=C sort -t$'\t' -k2 >"$baseline.new"
     mv "$baseline.new" "$baseline"
-    grep -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" >"$relevant" || true
+    if ((staged)); then
+      grep -F -f <(printf '\t%s:\n' "${files[@]}") "$baseline" >"$relevant" || true
+    else
+      cp "$baseline" "$relevant"
+    fi
   fi
   qml_compare "$current" "$relevant" || status=1
   rm -f "$current" "$relevant"

@@ -34,18 +34,19 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick python3 lua5.4 qt6-declarative-dev qt6-declarative-dev-tools
+          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick python3 lua5.4
           # Pinned binaries, the same versions as local development.
           sudo tools/install-shellcheck
           sudo tools/install-shfmt
           sudo tools/install-actionlint
           npm ci
 
-      # Everything but the runtime smoke test, which needs Quickshell and a
-      # Wayland compositor (the Arch job below). QML is linted bare here:
-      # only syntax errors can fail without Omarchy's Commons/Ui.
+      # Everything that does not depend on the Qt version: Ubuntu's Qt is
+      # far older than the Qt 6.11 the QML is formatted and linted with, so
+      # QML formatting, qmllint and the runtime smoke test run in the Arch
+      # job below (the format stage notes the skipped QML part).
       - name: Run tools/check
-        run: tools/check --skip smoke
+        run: tools/check --skip smoke,qml
 
       - name: Exercise installer profiles
         env:
@@ -65,13 +66,13 @@ jobs:
           path: coverage/
 
   check-arch:
-    name: strict QML and runtime smoke (Arch)
+    name: QML format, strict QML and smoke (Arch)
     runs-on: ubuntu-latest
     container: archlinux:latest
     timeout-minutes: 30
     steps:
       - name: Install packages
-        run: pacman -Syu --noconfirm --needed git jq python nodejs npm quickshell qt6-declarative imagemagick libxml2 lua sway
+        run: pacman -Syu --noconfirm --needed git curl jq python nodejs npm quickshell qt6-declarative imagemagick libxml2 lua sway dbus
 
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -87,13 +88,16 @@ jobs:
       - name: Fetch the Omarchy shell
         run: git clone --depth 1 --branch "$(cat .omarchy-version)" https://github.com/basecamp/omarchy "$RUNNER_TEMP/omarchy"
 
-      - name: Install JS tooling
-        run: npm ci
+      - name: Install JS tooling and shfmt
+        run: |
+          npm ci
+          tools/install-shfmt /usr/local/bin
 
-      # Strict QML against the shrink-only baseline and the runtime smoke
-      # test; skipping is not allowed here.
-      - name: Strict QML and runtime smoke
+      # QML formatting, strict QML against the shrink-only baseline and the
+      # runtime smoke test, with Arch's current Qt; skipping is not allowed.
+      # The Omarchy path is built from $RUNNER_TEMP here: in container jobs
+      # ${{ runner.temp }} is the host path, not the container's.
+      - name: QML format, strict QML and runtime smoke
         env:
-          ARANEA_QML_SHELL_DIR: ${{ runner.temp }}/omarchy/shell
           ARANEA_CHECK_REQUIRE_ALL: "1"
-        run: tools/check --only qml,smoke
+        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tools/check --only format,qml,smoke

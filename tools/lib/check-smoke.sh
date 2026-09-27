@@ -4,9 +4,12 @@
 # with Omarchy's Commons/Ui, and fails on runtime errors (TypeError,
 # ReferenceError, failed component loads, binding loops).
 #
-# Nothing touches the running session: sway and Quickshell get a throwaway
-# runtime dir, HOME, config, state and cache. sway runs in the foreground
-# and starts the harness through its own config, then exits when it is done.
+# Isolation from the running session: sway and Quickshell get a throwaway
+# runtime dir, HOME, config, state and cache and their own D-Bus session bus
+# (dbus-run-session). The system bus is shared, so the polkit agent, which
+# would register with the user's real login session there, is left out of
+# local runs; the Arch CI job (no login session) loads it too. sway runs in
+# the foreground and starts the harness through its own config.
 # Known messages are listed in tools/baselines/smoke-allow.txt, which can
 # only shrink (like the qmllint baseline).
 check_root="${check_root:?tools/check sets check_root}"
@@ -18,6 +21,9 @@ smoke_entry_points() {
   local manifest
   while IFS= read -r manifest; do
     [[ -n "$manifest" ]] || continue
+    if [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" != 1 ]] && [[ "$(jq -r '.id // ""' "$check_root/$manifest" 2>/dev/null)" == araneadev.polkit ]]; then
+      continue
+    fi
     jq -r '.entryPoints[]? // empty' "$check_root/$manifest" 2>/dev/null |
       while IFS= read -r entry; do
         [[ "$entry" == *.qml ]] && printf '%s/%s\n' "$check_root/$(dirname "$manifest")" "$entry"
@@ -77,6 +83,7 @@ stage_smoke() {
   local shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}" missing=()
   command -v quickshell >/dev/null || missing+=(quickshell)
   command -v sway >/dev/null || missing+=("sway (headless compositor)")
+  command -v dbus-run-session >/dev/null || missing+=("dbus-run-session (dbus)")
   [[ -f "$shell_dir/Commons/qmldir" && -f "$shell_dir/Ui/qmldir" ]] || missing+=("Omarchy shell at $shell_dir")
   if ((${#missing[@]})); then
     printf 'SKIP: runtime QML smoke needs %s\n' "${missing[*]}"
@@ -104,16 +111,22 @@ swaymsg exit
 EOF
   chmod +x "$run/client"
   printf 'exec %s\n' "$run/client" >"$run/sway.conf"
-  env -u WAYLAND_DISPLAY -u HYPRLAND_INSTANCE_SIGNATURE -u DISPLAY \
+  env -u WAYLAND_DISPLAY -u HYPRLAND_INSTANCE_SIGNATURE -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$run" HOME="$run/home" XDG_CACHE_HOME="$run/cache" \
     XDG_STATE_HOME="$run/home/.local/state" XDG_CONFIG_HOME="$run/home/.config" \
     WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman \
-    timeout 90 sway -c "$run/sway.conf" >"$run/sway.log" 2>&1
+    timeout 90 dbus-run-session -- sway -c "$run/sway.conf" >"$run/sway.log" 2>&1
   local sway_status=$?
 
   local status=0
   if [[ ! -s "$run/client.log" ]] || ! grep -q 'SMOKE-LOADED\|SMOKE-ERROR' "$run/client.log"; then
-    echo "smoke harness did not run (sway exit $sway_status); see $run"
+    echo "smoke harness did not run (sway exit $sway_status); logs kept in $run (rm -rf it when done)"
+    return 1
+  fi
+  local client_exit
+  client_exit="$(sed -n 's/^exit \([0-9]*\)$/\1/p' "$run/client.log" | tail -n1)"
+  if [[ "$client_exit" != 0 ]]; then
+    echo "quickshell exited ${client_exit:-without a status} (crash or timeout); logs kept in $run (rm -rf it when done)"
     return 1
   fi
   echo "smoke: ${#files[@]} entry points"

@@ -179,6 +179,18 @@ if [[ -f /usr/share/omarchy/shell/Commons/qmldir && -d /usr/lib/qt6/qml/Quickshe
     echo "baseline did not shrink" >&2
     exit 1
   }
+  # An entry for a file that no longer exists is stale too, and a full
+  # --update-baselines removes it.
+  printf '1\tplugins/q/Gone.qml:unqualified:Unqualified access\n' >tools/baselines/qmllint.txt
+  if run_check --only qml; then
+    echo "entry of a deleted file passed" >&2
+    exit 1
+  fi
+  run_check --only qml --update-baselines
+  [[ ! -s tools/baselines/qmllint.txt ]] || {
+    echo "deleted file entry kept" >&2
+    exit 1
+  }
   git reset -q --hard
 else
   echo "SKIP: qmllint baseline cases need Omarchy's shell and Quickshell"
@@ -247,4 +259,70 @@ if grep -Fq 'smoke:' "$ARANEA_TEST_SANDBOX/out"; then
   echo "--fast ran smoke" >&2
   exit 1
 fi
+# --- final review fixes
+# Critical 1: --staged checks staged files in the context of the whole index:
+# repo configs, siblings and link targets are all there.
+mkdir -p docs/nested plugins/w
+printf '# Nested\n\nSee the [readme](../readme.md).\n' >docs/nested/note.md
+printf 'function f() {\n  return 1\n}\n\nif (typeof module !== "undefined") module.exports = { f: f }\n' >plugins/w/a.js
+git add -A && git commit -qm context
+printf 'More.\n' >>docs/nested/note.md
+printf '// changed\n' >>plugins/w/a.js
+git add -A
+run_check --staged --only format,lint,validate || {
+  echo "--staged lost the repo context" >&2
+  cat "$ARANEA_TEST_SANDBOX/out"
+  exit 1
+}
+git reset -q --hard HEAD~1
+# Important 2: a failing git is a failure, not "no files".
+if GIT_DIR=/nonexistent run_check --only validate; then
+  echo "git failure passed" >&2
+  exit 1
+fi
+# Important 3: a missing stage library fails.
+mv tools/lib/check-lint.sh "$ARANEA_TEST_SANDBOX/lint.sh.away"
+if run_check --only lint; then
+  echo "missing stage library passed" >&2
+  exit 1
+fi
+mv "$ARANEA_TEST_SANDBOX/lint.sh.away" tools/lib/check-lint.sh
+# Important 4: bare QML is not allowed where everything is required.
+mkdir -p plugins/ok && printf 'import QtQuick\nItem {}\n' >plugins/ok/Ok.qml && git add -A
+if ARANEA_QML_SHELL_DIR=/nonexistent ARANEA_CHECK_REQUIRE_ALL=1 run_check --only qml; then
+  echo "bare qml accepted under REQUIRE_ALL" >&2
+  exit 1
+fi
+git reset -q --hard
+# Important 8: non-ASCII file names are checked too.
+printf '{"a": 1,}\n' >"docs/naïve.json"
+git add -A
+if run_check --only validate; then
+  echo "non-ASCII file skipped" >&2
+  exit 1
+fi
+grep -Fq 'naïve.json' "$ARANEA_TEST_SANDBOX/out"
+git reset -q --hard
+# The smoke stage sees a plugin that throws at load (where sway can run).
+mkdir -p plugins/s
+printf '{"id": "t.s", "kinds": ["service"], "entryPoints": {"service": "Bad.qml"}}\n' >plugins/s/manifest.json
+printf 'import QtQuick\nItem {\n  Component.onCompleted: undefinedThing.x = 1\n}\n' >plugins/s/Bad.qml
+git add -A
+if run_check --only smoke; then
+  if grep -Fq 'smoke: skipped' "$ARANEA_TEST_SANDBOX/out"; then
+    echo "SKIP: smoke sensitivity (no quickshell/sway/Omarchy here)"
+  else
+    echo "smoke missed a runtime error" >&2
+    cat "$ARANEA_TEST_SANDBOX/out"
+    exit 1
+  fi
+elif grep -Fq 'smoke harness did not run' "$ARANEA_TEST_SANDBOX/out"; then
+  echo "SKIP: smoke sensitivity (the headless compositor cannot run here)"
+else
+  grep -Fq 'new runtime problem' "$ARANEA_TEST_SANDBOX/out" || {
+    cat "$ARANEA_TEST_SANDBOX/out"
+    exit 1
+  }
+fi
+git reset -q --hard
 echo "check contract passed"

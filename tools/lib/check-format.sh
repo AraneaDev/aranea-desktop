@@ -16,11 +16,19 @@ stage_format() {
     echo "prettier is required: npm ci"
     return 1
   }
-  local qmlformat
-  qmlformat="$(qt_tool qmlformat)" || {
-    echo "qmlformat is required (qt6-declarative)"
-    return 1
-  }
+  # QML formatting depends on the qmlformat version (its output and the
+  # .qmlformat.ini options changed across Qt releases), so it runs only with
+  # Qt 6.11 or newer; older or missing qmlformat skips the QML part with a
+  # note (a failure where everything is required, like the Arch CI job).
+  local qmlformat qml_version
+  qmlformat="$(qt_tool qmlformat)" || qmlformat=""
+  qml_version="$([[ -n "$qmlformat" ]] && "$qmlformat" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
+  if [[ -z "$qmlformat" ]] || ! printf '%s\n6.11\n' "${qml_version:-0.0}" | sort -V -C -r; then
+    echo "QML formatting skipped: needs qmlformat 6.11+ (found ${qml_version:-none})"
+    note_stage "QML skipped: qmlformat ${qml_version:-missing}"
+    [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" == 1 ]] && status=1
+    qmlformat=""
+  fi
 
   mapfile -t files < <(shell_files)
   if ((${#files[@]})); then
@@ -41,6 +49,7 @@ stage_format() {
   fi
 
   local file formatted
+  [[ -n "$qmlformat" ]] || return "$status"
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
     formatted="$(cd "$check_root" && "$qmlformat" "$file")" || {
