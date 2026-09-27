@@ -1,3 +1,7 @@
+// Aranea bar: the araneadev.bar plugin's `bar` entry point (manifest.json),
+// loaded by the omarchy-shell host in place of the stock omarchy.bar. Builds
+// one bar surface per monitor from the host's barConfig, filtered by the
+// Aranea profile, and handles popouts, tooltips, drag-reorder and bar moves.
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
@@ -21,8 +25,9 @@ Item {
   // Injected by the host shell every time shell.json is reloaded. Holds the
   // `bar:` subtree: position, centerAnchor, layout. The host owns file IO;
   // the bar just renders whatever it's handed. The bar font follows the
-  // OS-level fontconfig monospace binding — it is not stored in shell.json.
+  // OS-level fontconfig monospace binding; it is not stored in shell.json.
   property var barConfig: ({})
+  // Active bar profile (minimal, diagnostic or ceremony); set by applyBarConfig from bar.profile or ARANEA_BAR_PROFILE.
   property string profile: "minimal"
   // Injected by the host shell. Used for shell-wide actions such as opening
   // settings and persisting inline widget state.
@@ -42,9 +47,13 @@ Item {
   // killing the entire shell. Hidden panels stay mapped but park off-screen
   // without an exclusion zone; updated by the FileView watcher further down.
   property bool barHidden: false
+  // User home directory, from $HOME.
   property string home: Quickshell.env("HOME")
+  // XDG-style state directory under home (~/.local/state).
   property string stateHome: home + "/.local/state"
+  // Omarchy config directory (~/.config/omarchy); custom QML modules live in its bar/modules/.
   property string omarchyConfigDir: home + "/.config/omarchy"
+  // Config used when barConfig is not an object: top, transparent, clock as center anchor, empty layout.
   property var fallbackBarConfig: ({
       position: "top",
       transparent: true,
@@ -55,11 +64,17 @@ Item {
         right: []
       }
     })
+  // Normalized, tray-pinned layout ({left, center, right}) the module lists are built from.
   property var layoutConfig: fallbackBarConfig.layout
+  // Canonical id of the center module the center section is anchored on ("" for none).
   property string centerAnchor: ""
+  // Whether transparency was requested; the surface follows it, the foreground refines it.
   property bool requestedTransparent: false
+  // True once the contrast probe returned a foreground color to use over the wallpaper.
   property bool useTransparentForeground: false
+  // Whether the bar surface is drawn transparent right now.
   property bool transparent: false
+  // True while the pointer is over the center section.
   property bool centerSectionHovered: false
   // One bar surface exists per monitor and each reports into this count, so a
   // pointer crossing from one monitor's bar to another's stays counted however
@@ -68,9 +83,13 @@ Item {
   property int barHoverCount: 0
   // True while the pointer is over any bar, widgets included.
   readonly property bool barHovered: barHoverCount > 0
+  // Keeps the center section's indicator peek open until the pointer leaves every bar.
   property bool centerSectionRevealHeld: false
+  // Set by widgets (via their plugin API) to stop hover from revealing the center section.
   property bool centerHoverRevealSuppressed: false
+  // Bumped on every structural layout change so layoutEntries re-evaluates.
   property int barConfigSerial: 0
+  // Screen edge the bar sits on: top, bottom, left or right.
   property string position: "top"
   // Resolves through fontconfig at paint time (Style.font.family defaults
   // to "monospace"), so changing the system font (via `omarchy-font-set`)
@@ -79,14 +98,23 @@ Item {
   // Bound to the central Color singleton so the bar tracks shell.toml's
   // [bar] section. Property names kept for the rest of this file's bindings.
   property color themeForeground: Color.bar.text
+  // Contrast color passed to omarchy-bar-text-color as the alternative foreground.
   property color themeContrastForeground: Color.background
+  // Foreground picked by the contrast probe for the transparent bar.
   property color transparentForeground: Color.bar.text
+  // Theme foreground for widgets, independent of the transparency probe.
   property color foreground: themeForeground
+  // Foreground actually used on the bar: the probed color when transparent, else the theme's.
   property color barForeground: useTransparentForeground ? transparentForeground : themeForeground
+  // Turned off briefly so a foreground switch jumps instead of animating.
   property bool foregroundAnimationEnabled: true
+  // False when motion is off (the motion state file says "off", or ARANEA_REDUCED_MOTION=1).
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  // State file ($XDG_STATE_HOME/aranea/motion) whose "off" content disables bar animations.
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  // Bar background color, from the Color singleton.
   property color background: Color.bar.background
+  // Accent color for urgent or active states, from the Color singleton.
   property color urgent: Color.bar.active
 
   Behavior on barForeground {
@@ -110,33 +138,61 @@ Item {
       easing.type: Easing.InOutCubic
     }
   }
+  // Item whose tooltip is armed or shown.
   property var tooltipTarget: null
+  // Item waiting for the deferred hover check in showTooltip.
   property var pendingTooltipTarget: null
+  // Text of the armed or shown tooltip.
   property string tooltipText: ""
+  // Text waiting for the deferred hover check in showTooltip.
   property string pendingTooltipText: ""
+  // True once the tooltip delay has passed with the target still hovered.
   property bool tooltipShown: false
+  // Counter that invalidates deferred tooltip requests superseded by a newer show or hide.
   property int tooltipRequest: 0
+  // The widget whose popup is open; only one at a time across the bar.
   property var activePopout: null
+  // Module slot being dragged to reorder, or null.
   property var barDragSource: null
+  // Slot the dragged module would drop next to, or null.
   property var barDragTarget: null
+  // Screen rectangle of the drop marker ({x, y, width, height}), or null.
   property var barDragTargetGeometry: null
+  // True when the drop lands after barDragTarget rather than before it.
   property bool barDragAfter: false
+  // Bar window the drag started in.
   property var barDragWindow: null
+  // Screen of barDragWindow; the drag ghost only shows there.
   property var barDragScreen: null
+  // Grabbed image of the dragged widget, drawn as the drag ghost.
   property url barDragImageUrl: ""
+  // Pointer x of the drag in bar-window scene coordinates.
   property real barDragSceneX: 0
+  // Pointer y of the drag in bar-window scene coordinates.
   property real barDragSceneY: 0
+  // Pointer x of the drag in screen coordinates.
   property real barDragScreenX: 0
+  // Pointer y of the drag in screen coordinates.
   property real barDragScreenY: 0
+  // Press x inside the dragged slot, so the ghost stays under the grab point.
   property real barDragOffsetX: 0
+  // Press y inside the dragged slot, so the ghost stays under the grab point.
   property real barDragOffsetY: 0
+  // True while the whole bar is being dragged to another screen edge.
   property bool barMoveActive: false
+  // Edge the bar would move to if the move gesture ended now.
   property string barMoveCandidate: ""
+  // Bar window the move gesture started in.
   property var barMoveWindow: null
+  // Screen of barMoveWindow; the edge preview only shows there.
   property var barMoveScreen: null
+  // Registered clickable widget parts, checked newest-first by moduleClickTargetAt.
   property var clickTargets: []
+  // Every live module slot on every monitor's bar.
   property var moduleSlots: []
+  // Plugin bar API objects keyed by plugin id, created lazily by pluginBarApiFor.
   property var pluginBarApis: ({})
+  // Records {target, pluginId, clickTarget, popout} of bar objects claimed by plugins.
   property var pluginObjectOwners: []
 
   Component {
@@ -144,10 +200,12 @@ Item {
     PluginBarApi {}
   }
 
+  // Deep copy of layoutConfig handed to plugins so they cannot mutate the live layout.
   function publicLayoutConfig(): var {
     return JSON.parse(JSON.stringify(root.layoutConfig || {}))
   }
 
+  // Bind a plugin API object's appearance properties to the bar's, then sync its object views.
   function bindPluginBarApi(api) {
     if (!api)
       return
@@ -190,6 +248,7 @@ Item {
     root.syncPluginBarApiObjects(api)
   }
 
+  // Refresh a plugin API's view of the popout, its own click targets and the layout; a foreign popout shows as a marker.
   function syncPluginBarApiObjects(api) {
     if (!api)
       return
@@ -198,6 +257,7 @@ Item {
     api.layoutConfig = root.publicLayoutConfig()
   }
 
+  // Ownership record for a bar object, or null when no plugin claimed it.
   function pluginObjectRecord(target) {
     for (var i = 0; i < pluginObjectOwners.length; i++) {
       var record = pluginObjectOwners[i]
@@ -207,6 +267,7 @@ Item {
     return null
   }
 
+  // Claim target for a plugin in a role (clickTarget or popout); false when another plugin owns it.
   function markPluginObject(pluginId, target, role) {
     var key = String(pluginId || "")
     if (!key || !target)
@@ -232,6 +293,7 @@ Item {
     return true
   }
 
+  // Drop a plugin's role on target, removing the record once no role is left.
   function unmarkPluginObject(pluginId, target, role) {
     var key = String(pluginId || "")
     var next = []
@@ -248,11 +310,13 @@ Item {
     pluginObjectOwners = next
   }
 
+  // Whether target is claimed by the given plugin.
   function pluginOwnsBarObject(pluginId, target) {
     var record = target ? root.pluginObjectRecord(target) : null
     return !!record && record.pluginId === String(pluginId || "")
   }
 
+  // The registered click targets owned by one plugin.
   function pluginClickTargets(pluginId) {
     var out = []
     for (var i = 0; i < root.clickTargets.length; i++) {
@@ -263,17 +327,20 @@ Item {
     return out
   }
 
+  // Run syncPluginBarApiObjects on every plugin API.
   function syncAllPluginBarApiObjects(): void {
     for (var id in pluginBarApis)
       root.syncPluginBarApiObjects(pluginBarApis[id])
   }
 
+  // Register a click target on behalf of a plugin, if it can claim it.
   function registerPluginClickTarget(pluginId, target) {
     if (!root.markPluginObject(pluginId, target, "clickTarget"))
       return
     root.registerClickTarget(target)
   }
 
+  // Unregister a plugin's click target, only if that plugin owns it.
   function unregisterPluginClickTarget(pluginId, target) {
     if (!root.pluginOwnsBarObject(pluginId, target))
       return
@@ -281,12 +348,14 @@ Item {
     root.unmarkPluginObject(pluginId, target, "clickTarget")
   }
 
+  // Open a popout on behalf of a plugin, if it can claim the owner.
   function requestPluginPopout(pluginId, owner) {
     if (!root.markPluginObject(pluginId, owner, "popout"))
       return
     root.requestPopout(owner)
   }
 
+  // Release a plugin's popout, only if that plugin owns it.
   function releasePluginPopout(pluginId, owner) {
     if (!root.pluginOwnsBarObject(pluginId, owner))
       return
@@ -294,6 +363,7 @@ Item {
     root.unmarkPluginObject(pluginId, owner, "popout")
   }
 
+  // Get or create the bar API for a plugin id, refreshing its shell facade; null for an empty id.
   function pluginBarApiFor(pluginId, moduleName, registered) {
     var key = String(pluginId || "")
     if (!key)
@@ -366,6 +436,7 @@ Item {
     return api
   }
 
+  // Whether any module slot still uses the plugin API with this id.
   function pluginBarApiUsed(pluginId: string): bool {
     for (var i = 0; i < moduleSlots.length; i++) {
       var slot = moduleSlots[i]
@@ -375,6 +446,7 @@ Item {
     return false
   }
 
+  // Unregister and forget every click target and popout a plugin owns.
   function releasePluginObjects(pluginId) {
     var owned = pluginObjectOwners.slice()
     for (var i = 0; i < owned.length; i++) {
@@ -391,6 +463,7 @@ Item {
     })
   }
 
+  // Destroy plugin APIs no slot uses any more, releasing their objects.
   function prunePluginBarApis(): void {
     var next = ({})
     for (var id in pluginBarApis) {
@@ -420,6 +493,7 @@ Item {
     pluginBarApis = ({})
   }
 
+  // Add a clickable item to clickTargets (ignored if null or already there).
   function registerClickTarget(target) {
     if (!target || clickTargets.indexOf(target) !== -1)
       return
@@ -428,6 +502,7 @@ Item {
     clickTargets = next
   }
 
+  // Remove an item from clickTargets.
   function unregisterClickTarget(target) {
     var next = clickTargets.filter(function (item) {
       return item !== target
@@ -435,6 +510,7 @@ Item {
     clickTargets = next
   }
 
+  // Add a module slot to moduleSlots (ignored if null or already there).
   function registerModuleSlot(slot) {
     if (!slot || moduleSlots.indexOf(slot) !== -1)
       return
@@ -443,6 +519,7 @@ Item {
     moduleSlots = next
   }
 
+  // Remove a module slot from moduleSlots.
   function unregisterModuleSlot(slot) {
     var next = moduleSlots.filter(function (item) {
       return item !== slot
@@ -450,6 +527,7 @@ Item {
     moduleSlots = next
   }
 
+  // Scene geometry and visibility of every live slot, for the shell's debug IPC.
   function debugBarGeometry() {
     var out = []
     for (var i = 0; i < moduleSlots.length; i++) {
@@ -479,20 +557,24 @@ Item {
     return out
   }
 
+  // The Quickshell window an item lives in, or null.
   function targetWindow(target) {
     return target && target.QsWindow ? target.QsWindow.window : null
   }
 
+  // Whether target lives in the given window.
   function targetBelongsToWindow(target, window) {
     return !!target && !!window && targetWindow(target) === window
   }
 
+  // Window of a slot, via its active item first.
   function slotWindow(slot) {
     if (!slot)
       return null
     return targetWindow(slot.activeItem) || targetWindow(slot)
   }
 
+  // Whether two windows are the same, or sit on the same named screen.
   function sameWindow(left, right) {
     if (!left || !right)
       return false
@@ -501,10 +583,12 @@ Item {
     return !!left.screen && !!right.screen && !!left.screen.name && !!right.screen.name && left.screen.name === right.screen.name
   }
 
+  // Whether target is visible and reports its tooltip area hovered.
   function targetTooltipHovered(target) {
     return !!target && target.visible !== false && target.opacity !== 0 && target.tooltipHovered === true
   }
 
+  // Stop the tooltip timer and clear the pending and shown tooltip.
   function clearTooltip(): void {
     tooltipTimer.stop()
     pendingTooltipTarget = null
@@ -514,6 +598,7 @@ Item {
     tooltipShown = false
   }
 
+  // Reset all module-drag state.
   function clearBarDrag(): void {
     barDragSource = null
     barDragWindow = null
@@ -530,6 +615,7 @@ Item {
     barDragOffsetY = 0
   }
 
+  // Map a scene point in a bar window to screen coordinates, offsetting bottom and right bars.
   function windowScreenPoint(scenePoint, window) {
     var x = scenePoint ? scenePoint.x : 0
     var y = scenePoint ? scenePoint.y : 0
@@ -550,10 +636,12 @@ Item {
     }
   }
 
+  // windowScreenPoint for the window the current drag started in.
   function barDragScreenPoint(scenePoint) {
     return windowScreenPoint(scenePoint, barDragWindow)
   }
 
+  // Screen rectangle of the thin drop marker before or after slot; null if it cannot be mapped.
   function dropMarkerRect(slot, after) {
     if (!slot)
       return null
@@ -606,6 +694,7 @@ Item {
     return edge
   }
 
+  // Start the bar-move gesture from a window, with the current edge as candidate.
   function beginBarMove(window) {
     barMoveWindow = window
     barMoveScreen = window ? window.screen : null
@@ -613,12 +702,14 @@ Item {
     barMoveActive = true
   }
 
+  // Update the move candidate to the screen edge nearest screenPoint.
   function updateBarMove(screenPoint) {
     if (!barMoveActive || !barMoveScreen)
       return
     barMoveCandidate = nearestScreenEdge(screenPoint, barMoveScreen)
   }
 
+  // Reset the bar-move gesture state.
   function clearBarMove(): void {
     barMoveActive = false
     barMoveCandidate = ""
@@ -626,6 +717,7 @@ Item {
     barMoveScreen = null
   }
 
+  // End the move gesture and move the bar if the candidate edge differs.
   function finishBarMove() {
     var edge = barMoveCandidate
     if (!barMoveActive || !edge || edge === position) {
@@ -637,6 +729,7 @@ Item {
     setBarPosition(edge)
   }
 
+  // Persist a new bar position to shell.json, or set it locally when there is no shell.
   function setBarPosition(value) {
     var next = normalizePosition(value)
     if (root.shell && typeof root.shell.mutateShellConfig === "function") {
@@ -650,6 +743,7 @@ Item {
     }
   }
 
+  // Grab the dragged slot's widget to an image for the drag ghost.
   function captureBarDragGhost(slot) {
     var item = slot && slot.activeItem ? slot.activeItem : null
     barDragImageUrl = ""
@@ -664,6 +758,7 @@ Item {
     }, Qt.size(grabWidth, grabHeight))
   }
 
+  // Make owner the active popout, closing the previous one first.
   function requestPopout(owner) {
     if (activePopout === owner)
       return
@@ -676,14 +771,18 @@ Item {
     activePopout = owner
   }
 
+  // Clear the active popout if owner holds it.
   function releasePopout(owner) {
     if (activePopout === owner)
       activePopout = null
   }
 
+  // True for a left or right bar.
   readonly property bool vertical: position === "left" || position === "right"
+  // Bar thickness from Style, per orientation.
   readonly property int barSize: vertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
 
+  // Wrapper around BarModel.normalizePosition.
   function normalizePosition(value): string {
     return BarModel.normalizePosition(value)
   }
@@ -707,6 +806,7 @@ Item {
     return BarModel.pinTrayToInner(entries, section)
   }
 
+  // Apply barConfig: position, profile, transparency, center anchor and layout (patched in place when only settings changed).
   function applyBarConfig(): void {
     var config = Util.isPlainObject(barConfig) ? barConfig : fallbackBarConfig
 
@@ -732,6 +832,7 @@ Item {
     barConfigSerial++
   }
 
+  // Write settings-only changes into layoutConfig and push the new settings to matching live widgets.
   function applySettingsDelta(delta) {
     for (var i = 0; i < delta.length; i++) {
       var change = delta[i]
@@ -750,6 +851,7 @@ Item {
 
   onBarConfigChanged: applyBarConfig()
 
+  // Profile-filtered entries of one region; re-evaluated whenever barConfigSerial changes.
   function layoutEntries(region) {
     var serial = barConfigSerial
     var entries = layoutConfig ? layoutConfig[region] : null
@@ -797,6 +899,7 @@ Item {
     return slot ? String(slot.moduleName || "") : ""
   }
 
+  // Open the next or previous panel in owner's region on the same bar; false when there is none.
   function switchPanelFrom(owner, direction) {
     if (!owner)
       return false
@@ -851,6 +954,7 @@ Item {
     return items
   }
 
+  // Name of the screen a slot is on, or "".
   function slotScreenName(slot): string {
     var window = slotWindow(slot)
     return window && window.screen ? String(window.screen.name || "") : ""
@@ -895,6 +999,7 @@ Item {
     return chosen ? chosen.activeItem : null
   }
 
+  // Open the panel of a widget id (called by the shell's summon IPC); false if not found.
   function summonBarWidget(pluginId) {
     var item = findPanelWidget(pluginId)
     if (!item || typeof item.open !== "function")
@@ -903,6 +1008,7 @@ Item {
     return true
   }
 
+  // Close the panel of a widget id; false if not found.
   function hideBarWidget(pluginId) {
     var item = findPanelWidget(pluginId)
     if (!item || typeof item.close !== "function")
@@ -911,51 +1017,63 @@ Item {
     return true
   }
 
+  // Whether the panel of a widget id is open (used by the shell's toggle IPC).
   function isBarWidgetOpen(pluginId: string): bool {
     var item = findPanelWidget(pluginId)
     return !!item && item.opened === true
   }
 
+  // Wrapper around BarModel.entrySettings.
   function entrySettings(entry) {
     return BarModel.entrySettings(entry)
   }
 
+  // Wrapper around BarModel.entryId.
   function entryId(entry): string {
     return BarModel.entryId(entry)
   }
 
+  // Wrapper around BarModel.moduleString.
   function moduleString(entry, key, fallback): string {
     return BarModel.moduleString(entry, key, fallback)
   }
 
+  // Wrapper around BarModel.entryIndex.
   function entryIndex(entries, name) {
     return BarModel.entryIndex(entries, name)
   }
 
+  // Wrapper around BarModel.entriesBefore.
   function entriesBefore(entries, name) {
     return BarModel.entriesBefore(entries, name)
   }
 
+  // Wrapper around BarModel.entriesAfter.
   function entriesAfter(entries, name) {
     return BarModel.entriesAfter(entries, name)
   }
 
+  // Wrapper around Util.canonicalWidgetId (maps legacy module names to plugin ids).
   function canonicalWidgetId(name): string {
     return Util.canonicalWidgetId(name)
   }
 
+  // Expand ~/ and $HOME/ in a path against home.
   function expandPath(path: string): string {
     return BarModel.expandPath(path, home)
   }
 
+  // Wrapper around BarModel.customModuleSafeName.
   function customModuleSafeName(name): bool {
     return BarModel.customModuleSafeName(name)
   }
 
+  // Wrapper around BarModel.customModuleType.
   function customModuleType(entry): string {
     return BarModel.customModuleType(entry)
   }
 
+  // file:// URL of a custom QML module's source, or "".
   function customModuleSource(entry): string {
     var source = BarModel.customModulePath(entry, home, omarchyConfigDir)
     return source ? Util.fileUrl(source) : ""
@@ -976,12 +1094,14 @@ Item {
     }
   }
 
+  // Count a bar surface's pointer enter or leave; schedules the peek collapse when none is hovered.
   function setBarHovered(hovered) {
     barHoverCount = Math.max(0, barHoverCount + (hovered ? 1 : -1))
     if (barHoverCount === 0)
       centerSectionRevealTimer.restart()
   }
 
+  // Set centerHoverRevealSuppressed.
   function setCenterHoverRevealSuppressed(value) {
     centerHoverRevealSuppressed = !!value
   }
@@ -996,12 +1116,14 @@ Item {
       root.centerSectionRevealHeld = false
   }
 
+  // Run a shell command detached; empty commands are ignored.
   function run(command: string): void {
     if (!command)
       return
     Util.execDetached(command)
   }
 
+  // Flip bar.transparent in shell.json (or locally with no shell); called by the shell's IPC.
   function toggleTransparency(): void {
     var nextTransparent = !(root.requestedTransparent === true)
     if (root.shell && typeof root.shell.mutateShellConfig === "function") {
@@ -1015,6 +1137,7 @@ Item {
     }
   }
 
+  // The raw bar.layout[region] array of a shell.json config, creating missing levels.
   function rawLayoutSection(config, region) {
     if (!Util.isPlainObject(config.bar))
       config.bar = {}
@@ -1026,6 +1149,7 @@ Item {
     return config.bar.layout[region]
   }
 
+  // Index of the entry with id name in a raw entries array, or -1.
   function rawEntryIndex(entries, name) {
     for (var i = 0; i < entries.length; i++) {
       if (root.entryId(entries[i]) === name)
@@ -1035,6 +1159,7 @@ Item {
     return -1
   }
 
+  // Move a module entry within a raw config before beforeName (or to the end); true if it moved.
   function moveModuleInConfig(config, fromRegion, fromName, toRegion, beforeName) {
     var fromEntries = rawLayoutSection(config, fromRegion)
     var toEntries = rawLayoutSection(config, toRegion)
@@ -1067,6 +1192,7 @@ Item {
     return true
   }
 
+  // Persist moving source's module before beforeName in toRegion via shell.json; true if it moved.
   function dropBarModule(source, toRegion, beforeName) {
     if (!source || !source.region || !source.moduleName || !toRegion)
       return false
@@ -1082,6 +1208,7 @@ Item {
     return changed
   }
 
+  // Nearest drop slot and side for a scene point on the drag's bar; null outside that bar.
   function moduleDropAtScene(scenePoint, sourceSlot) {
     var sourceWindow = root.slotWindow(sourceSlot) || root.barDragWindow
     if (sourceWindow && sourceWindow.contentItem) {
@@ -1117,6 +1244,7 @@ Item {
     return BarModel.nearestDropTarget(candidates, scenePoint, root.vertical)
   }
 
+  // A visible slot of module name in region on the drag's bar, excluding sourceSlot; null if none.
   function visibleModuleSlot(region, name, sourceSlot) {
     var sourceWindow = root.slotWindow(sourceSlot) || root.barDragWindow
     for (var i = 0; i < moduleSlots.length; i++) {
@@ -1131,6 +1259,7 @@ Item {
     return null
   }
 
+  // Id of the first visible module after afterName in region, or "".
   function nextVisibleModuleName(region, afterName, sourceSlot) {
     var entries = layoutEntries(region)
     var found = false
@@ -1148,6 +1277,7 @@ Item {
     return ""
   }
 
+  // Drop the dragged slot before, or after, targetSlot; true if the layout changed.
   function dropBarModuleAtTarget(sourceSlot, targetSlot, afterTarget) {
     if (!sourceSlot || !targetSlot)
       return false
@@ -1156,10 +1286,12 @@ Item {
     return dropBarModule(sourceSlot, targetSlot.region, beforeName)
   }
 
+  // Whether target is visible, interactive and has a triggerPress method.
   function moduleTargetClickable(target) {
     return target && target.visible !== false && target.opacity !== 0 && target.interactive !== false && target.pressable !== false && target.concealed !== true && typeof target.triggerPress === "function"
   }
 
+  // Topmost click target under a point in slot, else the slot's widget if clickable; null if none.
   function moduleClickTargetAt(slot, localX, localY) {
     for (var i = clickTargets.length - 1; i >= 0; i--) {
       var target = clickTargets[i]
@@ -1185,6 +1317,7 @@ Item {
     return null
   }
 
+  // Trigger a press on the click target under a point in slot; false if there is none.
   function pressModuleClickTarget(slot, button, localX, localY) {
     var target = moduleClickTargetAt(slot, localX, localY)
     if (!target)
@@ -1194,6 +1327,7 @@ Item {
     return true
   }
 
+  // Format a color (or color string) as #rrggbb.
   function colorHex(colorValue) {
     var c = colorValue
     if (typeof c === "string")
@@ -1205,6 +1339,7 @@ Item {
     return "#" + hexChannel(c.r) + hexChannel(c.g) + hexChannel(c.b)
   }
 
+  // Request a transparent or opaque bar; transparent applies at once, then the contrast probe refines the foreground.
   function setRequestedTransparency(value: real): void {
     var nextTransparent = value === true
     requestedTransparent = nextTransparent
@@ -1223,6 +1358,7 @@ Item {
     scheduleTransparentForegroundRefresh()
   }
 
+  // Re-enable foreground animation two event-loop turns later, after the color jump has settled.
   function restoreForegroundAnimation(): void {
     Qt.callLater(function () {
       Qt.callLater(function () {
@@ -1231,6 +1367,7 @@ Item {
     })
   }
 
+  // Restart the debounce for the contrast probe, or reset the foreground when not transparent.
   function scheduleTransparentForegroundRefresh() {
     if (!requestedTransparent) {
       transparentForeground = themeForeground
@@ -1239,6 +1376,7 @@ Item {
     transparentForegroundTimer.restart()
   }
 
+  // Run omarchy-bar-text-color to pick a readable foreground over the wallpaper behind the bar.
   function refreshTransparentForeground(): void {
     if (!requestedTransparent || transparentForegroundProc.running)
       return
@@ -1293,11 +1431,13 @@ Item {
     onFileChanged: root.scheduleTransparentForegroundRefresh()
   }
 
+  // Start a Process unless it is already running.
   function runProcess(process) {
     if (!process.running)
       process.running = true
   }
 
+  // Arm a tooltip for target: checked after a deferred call, shown after tooltipTimer if still hovered.
   function showTooltip(target, text) {
     clearTooltip()
 
@@ -1326,6 +1466,7 @@ Item {
     })
   }
 
+  // Hide the tooltip if it belongs to target, cancelling pending requests.
   function hideTooltip(target) {
     if (tooltipTarget !== target && pendingTooltipTarget !== target)
       return
@@ -1775,6 +1916,7 @@ Item {
     }
   }
 
+  // The center-region entry matching centerAnchor, or null.
   function findCenterAnchorEntry() {
     var entries = root.layoutEntries("center")
     var idx = root.entryIndex(entries, root.centerAnchor)
