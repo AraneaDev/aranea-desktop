@@ -22,5 +22,17 @@ fi
 # --- 4b: a 13th favourite is refused with a notice; Ctrl+P pins from the keyboard
 grep -Fq '12 FAVOURITES · UNPIN ONE FIRST' "$menu_qml"
 grep -Fq 'event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier)' "$menu_qml"
+# --- 4b: search shows each app once; Apps keeps Favorites/Recent on top
+grep -Fq 'rows = MenuModel.dedupeAppRows(currentRows.concat(drilldownRows))' "$menu_qml"
+grep -Fq 'rows = MenuModel.sortAppsMenu(rows)' "$menu_qml"
+# --- 4b: honest hints, notice first; tiles have Ctrl+1..3; the clock ticks
+grep -Fq 'root.notice || MenuModel.hintText(' "$menu_qml"
+if grep -Fq '"ESC BACK  ·  ENTER OPEN"' "$menu_qml"; then
+  echo "stale ESC BACK hint" >&2
+  exit 1
+fi
+grep -Fq 'event.key >= Qt.Key_1 && event.key <= Qt.Key_3' "$menu_qml"
+grep -Fq 'precision: SystemClock.Minutes' "$menu_qml"
+grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_qml"
 
 echo "menu contract passed"

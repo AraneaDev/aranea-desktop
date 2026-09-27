@@ -33,7 +33,6 @@ Item {
     } catch (e) {
       payload = ({})
     }
-    root.clockContext = Qt.formatDateTime(new Date(), "HH:mm")
 
     if (payload.fontFamily)
       root.fontFamily = payload.fontFamily
@@ -262,6 +261,11 @@ Item {
     appHistoryFile.setText(MenuModel.serializeAppHistory(root.favoriteAppIds, root.recentAppIds, root.favoriteAppLimit))
   }
 
+  // Whether the cursor row is an app (the hint line then offers ^P PIN).
+  function cursorRowIsApp(): bool {
+    return root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count && displayModel.get(root.selectedIndex).kind === "app"
+  }
+
   // Shows text on the hint line for three seconds.
   function showNotice(text: string): void {
     root.notice = text
@@ -366,25 +370,31 @@ Item {
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
   // Focused workspace label for the root context band.
   readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
-  // HH:mm time shown in the root context band, captured on open.
-  property string clockContext: Qt.formatDateTime(new Date(), "HH:mm")
+  // HH:mm time shown in the root context band; ticks every minute.
+  readonly property string clockContext: Qt.formatDateTime(menuClock.date, "HH:mm")
+
+  // Minute clock for clockContext.
+  SystemClock {
+    id: menuClock
+    precision: SystemClock.Minutes
+  }
   // Fixed tiles (Files, Terminal, Setup) shown on the root menu.
   readonly property var rootTiles: [({
         id: "tile.files",
         label: "Files",
-        detail: "BROWSE",
+        detail: "BROWSE  ·  ^1",
         icon: "󰉋",
         source: "fixed"
       }), ({
         id: "tile.terminal",
         label: "Terminal",
-        detail: "EXECUTE",
+        detail: "EXECUTE  ·  ^2",
         icon: "",
         source: "fixed"
       }), ({
         id: "tile.setup",
         label: "Setup",
-        detail: "CONFIGURE",
+        detail: "CONFIGURE  ·  ^3",
         icon: "",
         source: "fixed"
       })]
@@ -1056,12 +1066,23 @@ Item {
 
       currentRows.sort(searchSort)
       drilldownRows.sort(searchSort)
-      root.searchDivider = currentRows.length > 0 && drilldownRows.length > 0
-      if (root.searchDivider) {
-        for (var d = 0; d < drilldownRows.length; d++)
-          drilldownRows[d].section = "drilldown"
+      // Favorites and Recent hold copies of app rows: show each app once.
+      rows = MenuModel.dedupeAppRows(currentRows.concat(drilldownRows))
+      var drilldownIds = ({})
+      for (var d = 0; d < drilldownRows.length; d++)
+        drilldownIds[drilldownRows[d].itemId] = true
+      var currentCount = 0
+      for (var c = 0; c < rows.length; c++) {
+        if (!drilldownIds[rows[c].itemId])
+          currentCount += 1
       }
-      rows = currentRows.concat(drilldownRows)
+      root.searchDivider = currentCount > 0 && currentCount < rows.length
+      if (root.searchDivider) {
+        for (var e = 0; e < rows.length; e++) {
+          if (drilldownIds[rows[e].itemId])
+            rows[e].section = "drilldown"
+        }
+      }
     } else {
       for (var j = 0; j < root.itemOrder.length; j++) {
         var child = root.item(root.itemOrder[j])
@@ -1073,24 +1094,10 @@ Item {
       }
 
       // DesktopEntries can reorder its values when an application starts.
-      // Keep the Apps menu alphabetical independently of provider refreshes.
-      if (active === "apps") {
-        rows.sort(function (a, b) {
-          var aLabel = String(a.label || "").toLowerCase()
-          var bLabel = String(b.label || "").toLowerCase()
-          if (aLabel < bLabel)
-            return -1
-          if (aLabel > bLabel)
-            return 1
-          var aId = String(a.itemId || "")
-          var bId = String(b.itemId || "")
-          if (aId < bId)
-            return -1
-          if (aId > bId)
-            return 1
-          return 0
-        })
-      }
+      // Keep the Apps menu alphabetical independently of provider refreshes,
+      // with Favorites and Recent on top.
+      if (active === "apps")
+        rows = MenuModel.sortAppsMenu(rows)
     }
 
     for (var k = 0; k < rows.length; k++)
@@ -1696,6 +1703,9 @@ Item {
             else
               root.cancel()
             event.accepted = true
+          } else if ((event.modifiers & Qt.ControlModifier) && event.key >= Qt.Key_1 && event.key <= Qt.Key_3 && !root.dmenuActive) {
+            root.activateTile(root.rootTiles[event.key - Qt.Key_1])
+            event.accepted = true
           } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier) && !root.dmenuActive) {
             if (root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
               var pinRow = displayModel.get(root.selectedIndex)
@@ -1831,7 +1841,14 @@ Item {
               visible: true
               textFormat: Text.PlainText
               width: parent.width
-              text: root.fullRootHeader ? "SYSTEM // READY" : root.dmenuActive ? (root.mode === "input" ? "TYPE TO FILTER  ·  ESC CANCEL" : displayModel.count + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL") : "ESC BACK  ·  ENTER OPEN"
+              text: root.notice || MenuModel.hintText({
+                root: root.fullRootHeader,
+                filter: !!root.filterText.trim(),
+                dmenu: root.dmenuActive,
+                input: root.mode === "input",
+                count: displayModel.count,
+                appRow: root.cursorRowIsApp()
+              })
               color: root.contextText
               font.family: root.fontFamily
               font.pixelSize: root.menuFontSize(Style.font.caption)
