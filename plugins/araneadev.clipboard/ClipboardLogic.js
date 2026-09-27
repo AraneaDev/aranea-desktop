@@ -345,12 +345,66 @@ function entropy(text) {
 }
 
 /**
- * Guesses whether copied text is a secret. Checked in order: a PEM private
- * key block is one; text with whitespace, URLs, paths, git hashes and UUIDs
- * are not; known token formats (GitHub, OpenAI-style sk-, Slack, AWS key id,
- * JWT) are; anything else shorter than 16 characters or containing
- * . / : @ \ ( ) is not; the rest is one when it has at least three character
- * classes and an entropy of 3.5 bits or more.
+ * Share of a string's letters and digits that sit in word runs of three or
+ * more letters (runs split at case changes: "getUserById2Async" gives get,
+ * User, By, Id, Async).
+ * @param {string} text - The text.
+ * @returns {number} A value from 0 to 1; 0 when there are no letters or digits.
+ */
+function wordShare(text) {
+  var runs = text.match(/[A-Z]?[a-z]+|[A-Z]+(?![a-z])/g) || []
+  var inWords = 0
+  for (var i = 0; i < runs.length; i++) if (runs[i].length >= 3) inWords += runs[i].length
+  var alnum = (text.match(/[A-Za-z0-9]/g) || []).length
+  return alnum ? inWords / alnum : 0
+}
+
+/**
+ * Tells whether a string is mostly made of words (wordShare of 0.65 or more).
+ * @param {string} text - The text.
+ * @returns {boolean} True when word-like.
+ */
+function wordLike(text) {
+  return wordShare(text) >= 0.65
+}
+
+/**
+ * Recognises developer text that is never a secret: URLs, Unix, home and
+ * Windows paths, git hashes, UUIDs, emails, dotted names (optionally ending
+ * in "()"), file:line, versions, algo:hex digests, slash-separated word-like
+ * names such as owner/repo, and file names with a lowercase extension.
+ * @param {string} text - Trimmed text without whitespace.
+ * @returns {boolean} True when the text is one of those shapes.
+ */
+function isDeveloperText(text) {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text) || /^https?:/i.test(text)) return true
+  if (text.charAt(0) === "/" || text.indexOf("~/") === 0 || /^[A-Za-z]:\\/.test(text)) return true
+  if (/^[0-9a-f]{7,40}$/.test(text)) return true
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return true
+  if (/^[\w.+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(text)) return true
+  if (/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)+(\(\))?$/.test(text)) return true
+  if (/^[\w.-]+\.[A-Za-z0-9]{1,6}:\d+(:\d+)?$/.test(text)) return true
+  if (/^v?\d+(\.\d+)+([-+][0-9A-Za-z.+-]*)?$/.test(text)) return true
+  if (/^[a-z0-9]+:[0-9a-f]{16,}$/i.test(text)) return true
+  if (
+    /^[\w.-]+(\/[\w.-]+)+$/.test(text) &&
+    text.split("/").every(function (s) {
+      return s.length < 3 || wordLike(s)
+    })
+  )
+    return true
+  if (/^[\w-][\w.-]*\.[a-z][a-z0-9]{0,5}$/.test(text)) return true
+  return false
+}
+
+/**
+ * Guesses whether copied text is a secret. Checked in order: a PEM/PGP
+ * private key block or a known token format (GitHub, OpenAI-style sk-,
+ * Slack, AWS key id, JWT) is one; text with whitespace and developer text
+ * (see isDeveloperText) are not; anything shorter than 16 characters is not;
+ * text of only letters, digits, _ and - is not when word-like (an
+ * identifier); the rest is one when it has at least three character classes
+ * and an entropy of 3.5 bits or more.
  * @param {*} value - The text.
  * @returns {boolean} True when the text looks like a secret.
  */
@@ -358,16 +412,12 @@ function isSecretText(value) {
   var text = String(value || "").trim()
   if (!text) return false
   if (/-----BEGIN [A-Z ]*PRIVATE KEY( BLOCK)?-----/.test(text)) return true
-  if (/\s/.test(text)) return false
-  if (/^https?:/i.test(text) || text.charAt(0) === "/" || text.indexOf("~/") === 0) return false
-  if (/^[0-9a-f]{7,40}$/.test(text)) return false
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return false
+  // Token formats first: a JWT is also a dotted name.
   for (var i = 0; i < SECRET_PATTERNS.length; i++) if (SECRET_PATTERNS[i].test(text)) return true
+  if (/\s/.test(text)) return false
+  if (isDeveloperText(text)) return false
   if (text.length < 16) return false
-  // Dotted, slashed, colon or @ strings are identifiers, paths, versions,
-  // emails or hashes with a prefix -- developer text, not passwords.
-  if (/[./:@\\()]/.test(text)) return false
-  // `-` and `_` join words; they do not make a string look random.
+  if (/^[A-Za-z0-9_-]+$/.test(text) && wordLike(text)) return false
   var classes =
     (/[a-z]/.test(text) ? 1 : 0) +
     (/[A-Z]/.test(text) ? 1 : 0) +
@@ -701,6 +751,8 @@ if (typeof module !== "undefined") {
     fullText: fullText,
     detectKind: detectKind,
     isSecretText: isSecretText,
+    wordShare: wordShare,
+    isDeveloperText: isDeveloperText,
     enrich: enrich,
     parseHistory: parseHistory,
     hadUnstamped: hadUnstamped,

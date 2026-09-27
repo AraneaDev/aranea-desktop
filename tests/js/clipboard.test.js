@@ -249,3 +249,35 @@ test("clipboard logic", () => {
 
   console.log("clipboard logic contract passed")
 })
+
+test("secret detection (4a)", () => {
+  const root = path.join(__dirname, "..", "..")
+  const c = require(`${root}/plugins/araneadev.clipboard/ClipboardLogic.js`)
+  const assert = (cond, msg) => {
+    if (!cond) throw new Error(msg)
+  }
+  for (const s of [
+    "P@ssw0rd123456789",
+    "x7Kp2mQ9vL4nR8sT",
+    "aB3xQ9pL2mZ7kR4t",
+    "dGhpcyBpcyBhIHNlY3JldA",
+    "AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY",
+    "Xk9/pQ2mZ7vL4nR8",
+    "Kq3:Zp9vL2mX7nR4w",
+    "hunter2.Pr0d#2026"
+  ])
+    assert(c.isSecretText(s), "secret not detected: " + s)
+  for (const s of [
+    "getUserById2Async",
+    "handleClick2Event",
+    "useQueryClient3Hook",
+    "AraneaDevOmarchyTheme2026",
+    "ssh://git@github.com:22/x.git",
+    "~/.config/omarchy/shell.json"
+  ])
+    assert(!c.isSecretText(s), "false secret: " + s)
+  assert(c.wordShare("getUserById2Async") > 0.65, "identifier is word-like")
+  assert(c.wordShare("x7Kp2mQ9vL4nR8sT") === 0, "random has no words")
+  assert(c.isDeveloperText("Tim.Schipper@Example.com"), "email is developer text")
+  assert(!c.isDeveloperText("P@ssw0rd123456789"), "leetspeak is not an email")
+})
