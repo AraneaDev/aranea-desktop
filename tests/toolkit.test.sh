@@ -86,4 +86,13 @@ grep -Fq 'package-ecosystem: npm' "$repo_root/.github/dependabot.yml"
 "$repo_root/tools/check-commit-style.sh" "revert: undo a change"
 # The release only tags after tools/check passed on the merged commit.
 grep -Fq 'needs: verify' "$repo_root/.github/workflows/release-please.yml"
+grep -Fq 'MIT License' "$repo_root/LICENSE"
+test -f "$repo_root/SECURITY.md" && test -f "$repo_root/.github/pull_request_template.md"
+grep -Fq 'tools/check' "$repo_root/CONTRIBUTING.md"
+grep -Fq 'tools/check' "$repo_root/.github/pull_request_template.md"
+if grep -Fq 'tests-27%20passing' "$repo_root/README.md"; then
+  echo "static test badge" >&2
+  exit 1
+fi
+grep -Fq 'actions/workflow/status/AraneaDev/aranea-desktop/ci.yml' "$repo_root/README.md"
 echo "toolkit contract passed"
