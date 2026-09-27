@@ -7,15 +7,14 @@ theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/aranea-des
 theme_source="${ARANEA_THEME_SOURCE:-$theme_repo_url}"
 dry_run=0
 assume_yes=0
-skip_conky=0
 profile="full"
 profile_explicit=0
 
 usage() {
   cat <<'EOF'
-Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes] [--skip-conky]
+Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes]
 
-Installs Aranea Desktop, its Omarchy theme/hooks, and optionally the Wayland Conky build.
+Installs Aranea Desktop and its Omarchy theme/hooks.
 EOF
 }
 
@@ -54,14 +53,6 @@ adopt_installed_theme() {
   mv "$themes_dir/$name" "$themes_dir/aranea"
 }
 
-aur_helper() {
-  if command -v paru >/dev/null 2>&1; then
-    printf 'paru'
-  elif command -v yay >/dev/null 2>&1; then
-    printf 'yay'
-  fi
-}
-
 # gum is already an Omarchy-ecosystem dependency (omarchy-theme-install uses
 # it too), so an interactive terminal running this installer is likely to
 # have it. Prompts fall back to plain read/output when it doesn't, so gum is
@@ -74,7 +65,6 @@ while (($#)); do
   case "$1" in
     --dry-run) dry_run=1 ;;
     --yes) assume_yes=1 ;;
-    --skip-conky) skip_conky=1 ;;
     --source)
       (($# >= 2)) || { say "--source requires a path or URL" >&2; exit 2; }
       theme_source="$2"
@@ -125,34 +115,6 @@ if ! command -v omarchy >/dev/null 2>&1 && [[ "${OMARCHY_INSTALLER_TEST:-}" != 1
   exit 1
 fi
 
-helper="$(aur_helper || true)"
-if [[ "$profile" != "no_apps" && "$profile" != "minimal" && $skip_conky -eq 0 ]]; then
-  if [[ -n "$helper" ]]; then
-    if (( dry_run )); then
-      say "would install conky-cairo-wayland-git with $helper"
-    elif (( assume_yes )); then
-      run "$helper" -S --needed conky-cairo-wayland-git
-    elif [[ -t 0 ]] && has_gum; then
-      if gum confirm --default "Install optional conky-cairo-wayland-git for Aranea diagnostics?"; then
-        run "$helper" -S --needed conky-cairo-wayland-git
-      fi
-    elif [[ -t 0 ]]; then
-      read -r -p "Install optional conky-cairo-wayland-git for Aranea diagnostics? [Y/n] " answer
-      if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-        run "$helper" -S --needed conky-cairo-wayland-git
-      fi
-    else
-      say "Skipping optional Conky install (rerun with --yes or install it manually)."
-    fi
-else
-  if [[ "$profile" == "no_apps" || "$profile" == "minimal" ]]; then
-    say "Skipping optional Conky install for profile: $profile"
-  else
-    say "Skipping optional Conky install: install paru or yay first."
-  fi
-fi
-fi
-
 if (( dry_run )); then
   say "would persist profile: $profile"
   say "would install theme from: $theme_source"
@@ -198,5 +160,5 @@ else
       run "$theme_root/scripts/install-integration" terminal --yes
     fi
   fi
-  say "Aranea installed. Conky remains off until you run aranea-diagnostics-toggle."
+  say "Aranea installed."
 fi

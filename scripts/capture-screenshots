@@ -9,14 +9,14 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop diagnostics lock plymouth btop file-manager neovim notifications notifications-empty network audio bluetooth agents power monitor apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications diagnostics network audio bluetooth agents power monitor btop file-manager neovim lock osd)
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications health network audio bluetooth agents power monitor btop file-manager neovim lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -53,19 +53,29 @@ if (( capture_all )); then
     echo "Refusing --all capture on workspace $active_workspace; switch to workspace 2 first" >&2
     exit 3
   }
-  # A stray toast (an unrelated app, or Claude Code itself narrating this
-  # very capture run) renders through araneadev.notifications, not the
-  # compositor's own notify layer, so hyprctl dismissnotify never touches
-  # it -- only disabling the plugin for the whole batch does. Individual
-  # surfaces re-enable it themselves when run standalone (see
-  # ARANEA_CAPTURE_BATCH below), so this has to be the only place that
-  # flips it back on for a full --all run, or an early surface's own
-  # cleanup would silently reopen the window for every surface after it.
-  omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
-  export ARANEA_CAPTURE_BATCH=1
-  # Leave the finished capture set visible on the intentionally empty
-  # workspace long enough for visual inspection before returning focus.
-  trap 'omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true; sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"; hyprctl dispatch '\''hl.dsp.focus({ workspace = "1" })'\'' >/dev/null 2>&1 || true' EXIT
+  # The bell is part of the desktop: it stays in every capture. Notifications
+  # no longer toast (they go to the center), so instead of hiding the plugin
+  # the real inbox is parked for the whole batch and restored afterwards;
+  # badges then show capture data only, never the user's own count.
+  batch_inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
+  batch_inbox_backup="$(mktemp -d)"
+  mkdir -p "$batch_inbox_dir"
+  find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
+  omarchy restart shell >/dev/null 2>&1 || true
+  sleep 3
+  # Restore the real inbox, leave the finished capture set visible on the
+  # intentionally empty workspace for a moment, then return focus.
+  finish_batch() {
+    omarchy-shell notifications clear >/dev/null 2>&1 || true
+    sleep 1
+    find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+    rmdir "$batch_inbox_backup" 2>/dev/null || true
+    omarchy restart shell >/dev/null 2>&1 || true
+    sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
+    hyprctl dispatch 'hl.dsp.focus({ workspace = "1" })' >/dev/null 2>&1 || true
+  }
+  # A batch that stops early (set -e) still restores the inbox and focus.
+  trap finish_batch EXIT
   capture_one() {
     local all_surface="$1"
     if ! "$0" --surface "$all_surface" --output "$output"; then
@@ -77,6 +87,10 @@ if (( capture_all )); then
     capture_one "$all_surface"
   done
   build_hero_showcase
+  # Normal completion restores explicitly; the trap only covers a batch that
+  # stops early.
+  trap - EXIT
+  finish_batch
   exit 0
 fi
 
@@ -205,9 +219,6 @@ case "$surface" in
     exit 0
     ;;
   notifications|notifications-empty)
-    # These surfaces *want* araneadev.notifications on; batch mode disables it
-    # for every other surface, so re-enable here and restore afterwards.
-    omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     inbox_backup="$(mktemp -d)"
     inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
     # Sanitized fixtures: park the real inbox, show only capture notifications.
@@ -239,39 +250,54 @@ case "$surface" in
     find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
     rmdir "$inbox_backup" 2>/dev/null || true
     omarchy restart shell >/dev/null 2>&1 || true
-    if [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]]; then
-      omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
-    fi
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  diagnostics)
-    # Keep the diagnostics capture free of unrelated toast notifications.
-    omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
-    aranea-diagnostics-toggle >/dev/null
-    sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
-    hyprctl dismissnotify >/dev/null 2>&1 || true
+  health)
+    # The health dropdown with one live problem: a throwaway failing unit.
+    # The probe is always reset, even when a later step fails, so no red
+    # problem is left behind in the real dropdown.
+    # Clear it before the next surface: reset the unit, recheck at once and
+    # wait for the monitor to report healthy again.
+    cleanup_health_probe() {
+      omarchy-shell shell hide araneadev.health >/dev/null 2>&1 || true
+      systemctl --user reset-failed aranea-capture-probe >/dev/null 2>&1 || true
+      omarchy-shell health refresh >/dev/null 2>&1 || true
+      for _ in $(seq 1 20); do
+        [[ "$(omarchy-shell health status 2>/dev/null)" == critical ]] || break
+        sleep 0.5
+      done
+    }
+    trap cleanup_health_probe EXIT
+    # A fresh shell has no CPU history yet; wait for ~100 s of it (50
+    # samples at 2 s) so the sparkline is a real graph.
+    for _ in $(seq 1 120); do
+      (( $(omarchy-shell health metrics 2>/dev/null | jq -r '.samples // 0' 2>/dev/null || echo 0) >= 50 )) && break
+      sleep 2
+    done
+    systemd-run --user --unit=aranea-capture-probe false >/dev/null 2>&1 || true
+    sleep 1
+    omarchy-shell health refresh >/dev/null 2>&1 || true
+    for _ in $(seq 1 60); do
+      [[ "$(omarchy-shell health status 2>/dev/null)" == critical ]] && break
+      sleep 1
+    done
+    omarchy-shell shell toggle araneadev.health >/dev/null
+    sleep 3
     grim "$output/$surface.png"
-    aranea-diagnostics-toggle >/dev/null 2>&1 || true
-    # A parent --all run owns re-enabling for the whole batch; re-enabling
-    # here too would reopen the window for every surface captured after
-    # this one.
-    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] || omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
+    cleanup_health_probe
+    trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
   btop)
-    omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Btop" btop
-    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] || omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
   neovim)
-    omarchy plugin disable araneadev.notifications >/dev/null 2>&1 || true
     hyprctl dismissnotify >/dev/null 2>&1 || true
     capture_terminal_surface "Aranea Neovim" nvim
-    [[ "${ARANEA_CAPTURE_BATCH:-0}" == "1" ]] || omarchy plugin enable araneadev.notifications >/dev/null 2>&1 || true
     exit 0
     ;;
   network)

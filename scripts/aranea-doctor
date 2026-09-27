@@ -226,7 +226,7 @@ if ! emit_override qmllint ARANEA_DOCTOR_QMLLINT_STATUS; then
   fi
 fi
 
-for optional in conky alacritty kitty foot starship tmux btop lazygit kvantummanager; do
+for optional in alacritty kitty foot starship tmux btop lazygit kvantummanager; do
   if command -v "$optional" >/dev/null 2>&1; then
     emit "$optional" ok 'optional command is available'
   else

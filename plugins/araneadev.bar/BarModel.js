@@ -30,7 +30,7 @@ function profileAllows(profile, id) {
     "omarchy.keyboard-layout", "omarchy.system-update", "omarchy.workspaces", "omarchy.tray",
     "omarchy.network", "omarchy.audio", "omarchy.microphone", "omarchy.monitor", "omarchy.power",
     "omarchy.bluetooth", "omarchy.agents",
-    "araneadev.menu", "araneadev.notifications"
+    "araneadev.menu", "araneadev.notifications", "araneadev.health"
   ].indexOf(moduleId) !== -1
 }
 

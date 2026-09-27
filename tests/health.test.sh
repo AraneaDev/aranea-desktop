@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 node - "$repo_root" <<'NODE'
 const root = process.argv[2]
-const h = require(`${root}/plugins/araneadev.notifications/HealthLogic.js`)
+const h = require(`${root}/plugins/araneadev.health/HealthLogic.js`)
 const assert = (cond, msg) => { if (!cond) throw new Error(msg) }
 
 // --- failed units
@@ -71,29 +71,10 @@ assert(diskItem.summary === '/ is 91% full' && diskItem.body === '86 GB free of 
 assert(h.itemFor(h.rebootProblem(false, '7.2.5')[0]).body === 'Running 7.2.5; its modules were removed', 'reboot copy')
 assert(loop[0] && h.itemFor(loop[0]).summary === 'Container pg keeps restarting' && h.itemFor(loop[0]).urgency === 2, 'loop copy')
 
-// --- reconcile (Review Focus 1-3)
-const P = key => ({ key: key, check: h.checkOf(key) })
-let r = h.reconcile([P('disk:/')], ['disk', 'unit'], [], [], [])
-assert(r.upsert.length === 1 && r.resolve.length === 0 && r.expected.join() === 'disk:/', 'new problem is upserted')
-r = h.reconcile([], ['disk'], ['disk:/'], ['disk:/'], [])
-assert(r.resolve.join() === 'disk:/' && r.expected.length === 0, 'cleared problem resolves')
-r = h.reconcile([], ['unit'], ['disk:/'], ['disk:/'], [])
-assert(r.resolve.length === 0 && r.expected.join() === 'disk:/', 'unknown check never resolves its items')
-r = h.reconcile([P('disk:/')], ['disk'], ['disk:/'], [], [])
-assert(r.muted.join() === 'disk:/' && r.upsert.length === 0, 'item removed by the user while open becomes muted')
-r = h.reconcile([P('disk:/')], ['disk'], [], [], ['disk:/'])
-assert(r.upsert.length === 0 && r.muted.join() === 'disk:/', 'muted problem stays hidden')
-r = h.reconcile([], ['disk'], [], [], ['disk:/'])
-assert(r.muted.length === 0, 'mute lifts when the problem clears')
-r = h.reconcile([], ['disk', 'unit', 'reboot', 'container'], [], ['unit:system:gone.service'], [])
-assert(r.resolve.join() === 'unit:system:gone.service', 'restart: stale items resolve on first known check')
-r = h.reconcile([P('reboot')], ['reboot'], [], ['reboot'], [])
-assert(r.upsert.length === 1 && r.muted.length === 0, 'restart: present item is reused, not muted')
-
-// --- mute file
-assert(h.parseMuteFile('{"version":1,"muted":["disk:/"]}').join() === 'disk:/', 'mute file parsed')
-assert(h.parseMuteFile('{broken').length === 0, 'corrupt mute file is empty')
-assert(JSON.parse(h.serializeMuteFile(['b', 'a'])).muted.join() === 'a,b', 'mute file sorted')
+// --- Revision 1: health lives only in the dropdown (no center items, no mutes)
+for (const gone of ['reconcile', 'parseMuteFile', 'serializeMuteFile', 'seedDiskLevels']) {
+  assert(typeof h[gone] === 'undefined', gone + ' must be gone: health no longer posts to the center')
+}
 
 // --- review fixes: container state survives restarts and stream gaps
 const ps = [
@@ -135,21 +116,6 @@ const dfSpaces = [
 const spaced = h.parseDf(dfSpaces)
 assert(spaced.length === 1 && spaced[0].target === '/run/media/tim/My Drive' && spaced[0].percent === 95, 'mount point with spaces is monitored')
 
-// disk items already in the inbox resume at "normal", keeping hysteresis across restarts
-const levels = h.seedDiskLevels(['disk:/', 'unit:user:x.service', 'disk:/run/media/tim/My Drive'])
-assert(levels['/'] === 'normal' && levels['/run/media/tim/My Drive'] === 'normal' && Object.keys(levels).length === 2, 'disk levels seeded from existing items')
-assert(h.diskProblems([{ source: 'a', target: '/', size: 100, used: 89, avail: 11, percent: 89 }], levels).problems.length === 1, 'an 89% disk that was alerting keeps alerting after a restart')
-
-// a dismissal before the first check of that kind completes is not lost
-let early = h.reconcile([], [], ['disk:/'], [], [])
-assert(early.muted.join() === 'disk:/', 'removed before its check ran: muted provisionally')
-early = h.reconcile([], ['disk'], [], [], early.muted)
-assert(early.muted.length === 0, 'provisional mute lifts if the problem turns out cleared')
-
-// expected never holds duplicates
-const dup = h.reconcile([{ key: 'disk:/', check: 'disk' }], [], [], ['disk:/'], [])
-assert(dup.expected.length === 1, 'expected keys are unique')
-
 // cleanly exited or running containers with no recent exits are forgotten
 const stale = { old: { image: 'a', exits: [], last: 'die', lastExit: 0 }, up: { image: 'b', exits: [], last: 'start', lastExit: 0 },
   bad: { image: 'c', exits: [], last: 'die', lastExit: 1 }, busy: { image: 'd', exits: [990], last: 'start', lastExit: 0 } }
@@ -161,21 +127,72 @@ const noTerm = h.itemFor({ key: 'unit:system:a.service', check: 'unit', unit: 'a
 assert(noTerm.execArgv.length === 0, 'no terminal: no journal action')
 assert(h.itemFor({ key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }).execArgv[0] === 'xdg-terminal-exec', 'terminal assumed by default')
 
+// --- dropdown status and rows
+const unitP = { key: 'unit:system:a.service', check: 'unit', unit: 'a.service', scope: 'system' }
+const diskP = { key: 'disk:/', check: 'disk', target: '/', percent: 92, size: 100, avail: 8, level: 'normal' }
+assert(h.statusFor([]) === 'healthy', 'no problems is healthy')
+assert(h.statusFor([diskP]) === 'attention', 'a normal problem is attention')
+assert(h.statusFor([diskP, unitP]) === 'critical', 'a critical problem is critical')
+const rowsA = h.annotateProblems([diskP, unitP], { terminal: true })
+assert(rowsA[0].key === 'unit:system:a.service' && rowsA[0].urgency === 2 && rowsA[0].muted === undefined, 'critical rows first, no mute state')
+assert(rowsA[1].key === 'disk:/' && rowsA[1].summary === '/ is 92% full', 'row copy')
+
 console.log('health logic contract passed')
 NODE
 
 # Every check command is bounded: a hung df/systemctl/docker must become
 # "unknown", not freeze the check (review Important #4).
-health_qml="$repo_root/plugins/araneadev.notifications/Health.qml"
+health_qml="$repo_root/plugins/araneadev.health/Monitor.qml"
 for cmd in '"systemctl", "list-units"' '"systemctl", "--user"' '"df"' '"docker", "info"' '"docker", "ps"'; do
   grep -F "command: [\"timeout\", \"10\", $cmd" "$health_qml" >/dev/null || { echo "unbounded check command: $cmd" >&2; exit 1; }
 done
 grep -Fq '"-l"' "$health_qml"
 grep -Fq '"--since"' "$health_qml"
-# a transient mute-file read error must not silently mean "no mutes"
-grep -Fq 'FileViewError.FileNotFound' "$health_qml"
-grep -Fq 'HealthLogic.seedDiskLevels' "$health_qml"
 grep -Fq 'HealthLogic.pruneDockerHistory' "$health_qml"
 grep -Fq '"which", "xdg-terminal-exec"' "$health_qml"
+if grep -Eq '"bash", *"-c"|"sh", *"-c"' "$health_qml"; then echo "Monitor.qml must not run shell strings" >&2; exit 1; fi
+plugin="$repo_root/plugins/araneadev.health"
+jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml" and .id == "araneadev.health"' "$plugin/manifest.json" >/dev/null
+grep -Fq '.pragma library' "$plugin/HealthBridge.js"
+grep -Fq 'HealthBridge.publish(service)' "$plugin/Service.qml"
+if grep -Eq 'ServiceBridge|NotificationsBridge|FileViewError|upsertSourceItem' "$plugin/Monitor.qml"; then echo "health must not post to the notification center" >&2; exit 1; fi
+grep -Fq 'HealthLogic.annotateProblems' "$plugin/Monitor.qml"
+test ! -e "$repo_root/plugins/araneadev.notifications/Health.qml"
+
+grep -Fq 'MetricsLogic.cpuPercent' "$plugin/Metrics.qml"
+grep -Fq 'running: metrics.topActive' "$plugin/Metrics.qml"
+grep -Fq 'Metrics {' "$plugin/Service.qml"
+
+jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" and .barWidget.defaultSection == "right"' "$plugin/manifest.json" >/dev/null
+grep -Fq 'HealthBridge.current()' "$plugin/Panel.qml"
+grep -Fq 'All systems healthy' "$plugin/Panel.qml"
+grep -Fq '󰗶' "$plugin/Panel.qml"
+
+# One dropdown per monitor: top-process sampling follows an open-panel count,
+# never a shared boolean one bar can switch off for another (review Important #1).
+grep -Fq 'topActive: service.openPanels > 0' "$plugin/Service.qml"
+grep -Fq 'service.panelOpened()' "$plugin/Panel.qml"
+grep -Fq 'Component.onDestruction' "$plugin/Panel.qml"
+if grep -Fq 'service.metrics.topActive = opened' "$plugin/Panel.qml"; then echo "Panel must not set topActive directly" >&2; exit 1; fi
+
+# --- final-review minors
+# 1: a sample still in flight when the dropdown closes is dropped
+grep -Fq 'if (!metrics.topActive) return' "$plugin/Metrics.qml"
+# 2: page size and clock tick come from getconf, not constants
+grep -Fq '"getconf", "PAGESIZE"' "$plugin/Metrics.qml"
+grep -Fq '"getconf", "CLK_TCK"' "$plugin/Metrics.qml"
+if grep -Eq 'parseProcStat\(text, 4096\)|, 3, 100\)' "$plugin/Metrics.qml"; then echo "page size / clock tick must not be hard-coded" >&2; exit 1; fi
+# 3: TOP rows survive the service disappearing mid-reload
+if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then echo "TOP rows must guard root.m" >&2; exit 1; fi
+# 4: the sparkline repaints only while the dropdown is open
+grep -Fq 'onValuesChanged: if (root.opened) requestPaint()' "$plugin/Panel.qml"
+# 5: opening without a service closes again instead of sticking open
+grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
+# 9: branding paths honour XDG_STATE_HOME everywhere
+if grep -rFq 'Quickshell.env("HOME") + "/.local/state/omarchy' "$repo_root/plugins"; then echo "branding paths must honour XDG_STATE_HOME" >&2; exit 1; fi
+
+# `omarchy-shell health refresh` reruns the checks now (captures, scripts).
+grep -Fq 'function refresh(): string' "$plugin/Service.qml"
+grep -Fq 'samples: service.metrics.cpuHistory.length' "$plugin/Service.qml"
 
 echo "health contract passed"

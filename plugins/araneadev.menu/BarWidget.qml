@@ -8,7 +8,7 @@ BarWidget {
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
-  readonly property string brandingMarksPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/theme/branding/marks/"
+  readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
 
   WidgetButton {
     id: button

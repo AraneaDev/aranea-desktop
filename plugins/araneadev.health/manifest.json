@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.health",
+  "name": "Health",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "System health checks, live metrics and the health dropdown",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Health",
+    "description": "System health status, problems and live metrics",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Aranea theme: keep GTK, cava, and the optional diagnostics toggle following
+# Aranea theme: keep GTK, cava and the shell plugins following
 # the theme. Omarchy calls theme-set hooks
 # on every theme change, snake-cased slug in $1 -- only act when Aranea is
 # the one being applied.
@@ -41,14 +41,11 @@ if [[ -x "$theme_root/scripts/repair-shell-config" ]]; then
   "$theme_root/scripts/repair-shell-config" "$HOME/.config/omarchy/shell.json" >/dev/null 2>&1 || true
 fi
 
-mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/conky ~/.config/omarchy/branding ~/.local/bin
+mkdir -p ~/.config/gtk-4.0 ~/.config/gtk-3.0 ~/.config/cava ~/.config/omarchy/branding
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-4.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/gtk.css ~/.config/gtk-3.0/gtk.css
 ln -nsf ~/.local/state/omarchy/current/theme/cava-theme ~/.config/cava/config
-ln -nsf ~/.local/state/omarchy/current/theme/conky.conf ~/.config/conky/conky.conf
-~/.local/state/omarchy/current/theme/scripts/write-conky-gradient-border || true
 ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
-install -Dm755 ~/.local/state/omarchy/current/theme/scripts/aranea-diagnostics-toggle ~/.local/bin/aranea-diagnostics-toggle
 
 # Apply optional developer integrations through the ownership-aware linker.
 # Missing applications are skipped and existing configs are backed up.
@@ -86,4 +83,3 @@ fi
 if [[ -x "$theme_root/scripts/aranea-motion" ]]; then
   "$theme_root/scripts/aranea-motion" apply >/dev/null 2>&1 || true
 fi
-pkill -x conky 2>/dev/null

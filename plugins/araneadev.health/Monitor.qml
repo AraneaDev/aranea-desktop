@@ -1,38 +1,39 @@
 // System health monitor: failed services, disk almost full, reboot after a
-// kernel update, containers exiting. Each open problem is one live inbox item
-// (sourceKey) that updates in place and disappears when the problem clears;
-// dismissing it mutes the problem until it clears. Rules live in
-// HealthLogic.js; this file only runs the checks and applies decisions.
+// kernel update, containers exiting. Open problems are live state for the
+// health dropdown (openProblems): they appear and clear with the problem.
+// Rules live in HealthLogic.js; this file only runs the checks.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import "HealthLogic.js" as HealthLogic
 
 Item {
-  id: health
-
-  property var service: null
-  readonly property string stateRoot: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/"
-  readonly property string muteFilePath: stateRoot + "health.json"
+  id: monitor
 
   // Last known problems per check; a check that errors keeps its previous
-  // list and stays out of knownChecks, so it never resolves anything.
+  // list until it can report again.
   property var problems: ({ unit: [], disk: [], reboot: [], container: [] })
   property var known: ({})
   property var unitParts: ({})
   property var diskLevels: ({})
   property var dockerHistory: ({})
-  property var muted: []
-  property var expected: []
   property string release: ""
-  property bool muteLoaded: false
-  property bool expectedSeeded: false
   property bool checksStarted: false
   // Tools the item actions need; assume present until `which` says otherwise.
   property var tools: ({ terminal: true })
+  // Annotated open problems for the dropdown (HealthLogic.annotateProblems).
+  property var openProblems: []
+  // Latest df rows (HealthLogic.parseDf), shared with the metrics view.
+  property var diskRows: []
 
-  onServiceChanged: reconcileNow()
+  function startChecks(): void {
+    if (checksStarted) return
+    checksStarted = true
+    checkUnits()
+    checkDisk()
+    checkReboot()
+    startDocker()
+  }
 
   function setProblems(check: string, list: var): void {
     var next = Object.assign({}, problems)
@@ -53,41 +54,9 @@ Item {
   }
 
   function reconcileNow(): void {
-    if (!muteLoaded || !service) return
-    if (!expectedSeeded) {
-      // Items already in the inbox (from before a restart) are expected:
-      // their absence later means the user removed them. Disk items resume
-      // at "normal" so the 88% clear point still applies to them.
-      var existing = service.sourceItemKeys()
-      expected = existing
-      diskLevels = HealthLogic.seedDiskLevels(existing)
-      expectedSeeded = true
-    }
-    // Checks start only now, so their first results see the seeded state.
-    if (!checksStarted) {
-      checksStarted = true
-      checkUnits()
-      checkDisk()
-      checkReboot()
-      startDocker()
-    }
     var open = []
-    var knownChecks = []
-    for (var check in problems) {
-      open = open.concat(problems[check])
-      if (known[check] === true) knownChecks.push(check)
-    }
-    var result = HealthLogic.reconcile(open, knownChecks, expected, service.sourceItemKeys(), muted)
-    for (var i = 0; i < result.resolve.length; i++) service.resolveSourceItem(result.resolve[i])
-    for (var j = 0; j < result.upsert.length; j++) {
-      var p = result.upsert[j]
-      service.upsertSourceItem(p.key, HealthLogic.itemFor(p, tools))
-    }
-    expected = result.expected
-    if (JSON.stringify(result.muted) !== JSON.stringify(muted)) {
-      muted = result.muted
-      muteFile.setText(HealthLogic.serializeMuteFile(muted))
-    }
+    for (var check in problems) open = open.concat(problems[check])
+    openProblems = HealthLogic.annotateProblems(open, tools)
   }
 
   // ---------------------------------------------------- failed units
@@ -120,13 +89,13 @@ Item {
   Process {
     id: systemUnits
     command: ["timeout", "10", "systemctl", "list-units", "--failed", "--output=json", "--no-pager"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: health.unitResult("system", text) }
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: monitor.unitResult("system", text) }
   }
 
   Process {
     id: userUnits
     command: ["timeout", "10", "systemctl", "--user", "list-units", "--failed", "--output=json", "--no-pager"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: health.unitResult("user", text) }
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: monitor.unitResult("user", text) }
   }
 
   // ---------------------------------------------------- disk
@@ -147,12 +116,13 @@ Item {
       onStreamFinished: {
         var rows = HealthLogic.parseDf(text)
         if (!rows) {
-          health.markUnknown("disk", "df failed")
+          monitor.markUnknown("disk", "df failed")
           return
         }
-        var result = HealthLogic.diskProblems(rows, health.diskLevels)
-        health.diskLevels = result.levels
-        health.setProblems("disk", result.problems)
+        monitor.diskRows = rows
+        var result = HealthLogic.diskProblems(rows, monitor.diskLevels)
+        monitor.diskLevels = result.levels
+        monitor.setProblems("disk", result.problems)
       }
     }
   }
@@ -174,9 +144,9 @@ Item {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        health.release = text.trim()
-        if (health.release) health.checkReboot()
-        else health.markUnknown("reboot", "uname failed")
+        monitor.release = text.trim()
+        if (monitor.release) monitor.checkReboot()
+        else monitor.markUnknown("reboot", "uname failed")
       }
     }
   }
@@ -185,10 +155,10 @@ Item {
     id: modulesProc
     onExited: function(code) {
       if (code !== 0 && code !== 1) {
-        health.markUnknown("reboot", "test failed")
+        monitor.markUnknown("reboot", "test failed")
         return
       }
-      health.setProblems("reboot", HealthLogic.rebootProblem(code === 0, health.release))
+      monitor.setProblems("reboot", HealthLogic.rebootProblem(code === 0, monitor.release))
     }
   }
 
@@ -205,7 +175,7 @@ Item {
       if (code === 0) {
         dockerPs.running = true
       } else {
-        health.markUnknown("container", "docker not running")
+        monitor.markUnknown("container", "docker not running")
         dockerRetry.restart()
       }
     }
@@ -222,18 +192,18 @@ Item {
       onStreamFinished: {
         var containers = HealthLogic.parseDockerPs(text)
         if (containers === null) {
-          health.markUnknown("container", "docker ps failed")
+          monitor.markUnknown("container", "docker ps failed")
           dockerRetry.restart()
           return
         }
         var now = Date.now()
-        health.dockerHistory = HealthLogic.seedDockerHistory(health.dockerHistory, containers, now)
+        monitor.dockerHistory = HealthLogic.seedDockerHistory(monitor.dockerHistory, containers, now)
         dockerEvents.command = ["docker", "events", "--since", String(Math.floor(now / 1000)),
           "--filter", "type=container",
           "--filter", "event=die", "--filter", "event=start", "--filter", "event=destroy",
           "--format", "{{json .}}"]
         dockerEvents.running = true
-        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, now))
+        monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
       }
     }
   }
@@ -245,83 +215,46 @@ Item {
         var event = HealthLogic.parseDockerEvent(line)
         if (!event) return
         var now = Date.now()
-        health.dockerHistory = HealthLogic.recordDockerEvent(health.dockerHistory, event, now)
-        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, now))
+        monitor.dockerHistory = HealthLogic.recordDockerEvent(monitor.dockerHistory, event, now)
+        monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
       }
     }
     onExited: {
-      health.markUnknown("container", "docker events stream ended")
+      monitor.markUnknown("container", "docker events stream ended")
       dockerRetry.restart()
     }
   }
 
-  Timer { id: dockerRetry; interval: 30000; onTriggered: health.startDocker() }
+  Timer { id: dockerRetry; interval: 30000; onTriggered: monitor.startDocker() }
 
   // ---------------------------------------------------- schedule
 
   Timer {
     interval: 30000; repeat: true; running: true
     onTriggered: {
-      health.checkUnits()
+      monitor.checkUnits()
       // Restart-loop windows drain with time, not only with events.
-      if (health.known.container === true) {
+      if (monitor.known.container === true) {
         var now = Date.now()
-        health.dockerHistory = HealthLogic.pruneDockerHistory(health.dockerHistory, now)
-        health.setProblems("container", HealthLogic.containerProblems(health.dockerHistory, now))
+        monitor.dockerHistory = HealthLogic.pruneDockerHistory(monitor.dockerHistory, now)
+        monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
       }
     }
   }
-  Timer { interval: 60000; repeat: true; running: true; onTriggered: health.checkDisk() }
-  Timer { interval: 300000; repeat: true; running: true; onTriggered: health.checkReboot() }
-
-  // ---------------------------------------------------- mutes
-
-  FileView {
-    id: muteFile
-    path: health.muteFilePath
-    printErrors: false
-    atomicWrites: true
-    onLoaded: health.finishMuteLoad(text())
-    // Only a missing file means "no mutes"; any other read error is retried,
-    // so a transient failure never brings back dismissed problems.
-    onLoadFailed: function(error) {
-      if (error === FileViewError.FileNotFound) {
-        health.finishMuteLoad("")
-        return
-      }
-      console.warn("health: cannot read " + health.muteFilePath + ": " + FileViewError.toString(error))
-      muteRetry.restart()
-    }
-  }
-
-  Timer { id: muteRetry; interval: 5000; onTriggered: muteFile.reload() }
-
-  function finishMuteLoad(raw: string): void {
-    if (muteLoaded) return
-    muted = HealthLogic.parseMuteFile(raw)
-    muteLoaded = true
-    reconcileNow()
-  }
+  Timer { interval: 60000; repeat: true; running: true; onTriggered: monitor.checkDisk() }
+  Timer { interval: 300000; repeat: true; running: true; onTriggered: monitor.checkReboot() }
 
   Component.onCompleted: {
-    mkdirProc.running = true
-  }
-
-  Process {
-    id: mkdirProc
-    command: ["mkdir", "-p", health.stateRoot]
-    onExited: {
-      muteFile.reload()
-      terminalProbe.running = true
-    }
+    terminalProbe.running = true
+    startChecks()
   }
 
   Process {
     id: terminalProbe
     command: ["which", "xdg-terminal-exec"]
     onExited: function(code) {
-      health.tools = ({ terminal: code === 0 })
-      health.reconcileNow()
+      monitor.tools = ({ terminal: code === 0 })
+      monitor.reconcileNow()
     }
   }
 }
