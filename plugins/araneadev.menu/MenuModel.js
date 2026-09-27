@@ -1,9 +1,55 @@
+// Pure helpers for the Aranea menu (Menu.qml): JSONC parsing, item merging,
+// routing, visibility, search scoring and the batched guard script.
+
+/**
+ * One menu row: a JSONC entry, an app, or a provider-generated action.
+ * @typedef {object} MenuItemFields
+ * @property {string} id - dotted id such as `setup.power`
+ * @property {string} parent - parent id ("" for root)
+ * @property {string} kind - "menu", "link", "action" or "app"
+ * @property {string} icon - glyph shown before the label
+ * @property {string} [iconFont] - font for the glyph
+ * @property {string} label - display label
+ * @property {string} [title] - optional title text
+ * @property {string} [target] - menu id a link opens
+ * @property {string} [description] - secondary text, also searched
+ * @property {string} [action] - shell command an action runs
+ * @property {string} [provider] - provider key that fills this submenu
+ * @property {Array<string>} [aliases] - extra route names and search words
+ * @property {string} [when] - bash visibility guard
+ * @property {string} [checked] - bash guard for the ✓ marker
+ * @property {number} [order] - position in the merged item order
+ * @property {string} [appId] - desktop id, for app rows
+ * @property {string} [appIcon] - desktop icon, for app rows
+ * @property {string} [providerMenu] - submenu whose provider made this row
+ */
+
+/**
+ * A menu item: the known fields plus any extra keys carried over from JSONC.
+ * @typedef {MenuItemFields & {[key: string]: *}} MenuItem
+ */
+
+/**
+ * Menu items keyed by id.
+ * @typedef {{[key: string]: MenuItem}} ItemMap
+ */
+
+/**
+ * Strips whole-line `//` comments and trailing commas so JSONC parses as JSON.
+ * @param {*} raw - JSONC text; null or undefined is treated as empty
+ * @returns {string} the JSON text
+ */
 function stripJsonc(raw) {
   return String(raw || "")
     .replace(/^\s*\/\/[^\n]*(\n|$)/gm, "")
     .replace(/,(\s*[}\]])/g, "$1")
 }
 
+/**
+ * Coerces an `aliases` value to a list of non-empty strings.
+ * @param {*} value - an array, a single string, or anything else (yields [])
+ * @returns {Array<string>} the aliases
+ */
 function normalizeAliases(value) {
   if (Array.isArray(value))
     return value
@@ -17,11 +63,23 @@ function normalizeAliases(value) {
   return []
 }
 
+/**
+ * Stringifies a value, falling back when it is null or undefined.
+ * @param {*} value - the value to stringify
+ * @param {*} fallback - returned as is when value is null or undefined
+ * @returns {*} String(value), or the fallback unchanged
+ */
 function textValue(value, fallback) {
   if (value === undefined || value === null) return fallback
   return String(value)
 }
 
+/**
+ * Trims and de-duplicates app ids, keeping at most `limit` of them in order.
+ * @param {*} values - list of app ids; a non-array yields []
+ * @param {*} limit - maximum count; a negative or non-finite value means 12
+ * @returns {Array<string>} the normalized ids
+ */
 function normalizeAppIds(values, limit) {
   var max = Number(limit)
   if (!isFinite(max) || max < 0) max = 12
@@ -34,6 +92,13 @@ function normalizeAppIds(values, limit) {
   return out
 }
 
+/**
+ * Pins an app at the front of the favorites, or unpins it if already pinned.
+ * @param {*} values - current favorite ids
+ * @param {*} appId - app to toggle; empty leaves the list as is (normalized)
+ * @param {*} limit - maximum number of favorites
+ * @returns {Array<string>} the new favorite ids
+ */
 function toggleFavoriteApp(values, appId, limit) {
   var id = String(appId || "").trim()
   var current = normalizeAppIds(values, limit)
@@ -46,15 +111,31 @@ function toggleFavoriteApp(values, appId, limit) {
   return normalizeAppIds([id].concat(current), limit)
 }
 
+/**
+ * Moves an app to the front of the recent list, trimming it to `limit`.
+ * @param {*} values - current recent ids
+ * @param {*} appId - app just launched; empty leaves the list as is (normalized)
+ * @param {*} limit - maximum number of recent entries
+ * @returns {Array<string>} the new recent ids
+ */
 function recordRecentApp(values, appId, limit) {
   var id = String(appId || "").trim()
   if (!id) return normalizeAppIds(values, limit)
   return normalizeAppIds([id].concat(Array.isArray(values) ? values : []), limit)
 }
 
+/**
+ * Copies the app rows named by `ids`, in that order, re-parented under `parent`.
+ * @param {Array<MenuItem>} appRows - all app rows (non-arrays are treated as empty)
+ * @param {*} ids - app ids to pick; unknown ids are skipped
+ * @param {string} parent - parent id for the copies ("root" when empty)
+ * @param {string} prefix - id prefix for the copies (the parent when empty)
+ * @returns {Array<{[key: string]: *}>} shallow copies of the rows with fresh id, parent and order
+ */
 function appRowsForIds(appRows, ids, parent, prefix) {
   var source = Array.isArray(appRows) ? appRows : []
   var wanted = normalizeAppIds(ids, source.length)
+  /** @type {ItemMap} */
   var byId = {}
   for (var i = 0; i < source.length; i++) {
     var row = source[i]
@@ -67,6 +148,7 @@ function appRowsForIds(appRows, ids, parent, prefix) {
   for (var j = 0; j < wanted.length; j++) {
     var sourceRow = byId[wanted[j]]
     if (!sourceRow) continue
+    /** @type {{[key: string]: *}} */
     var copy = {}
     for (var key in sourceRow) copy[key] = sourceRow[key]
     copy.id = targetPrefix + "." + sourceRow.appId
@@ -77,8 +159,17 @@ function appRowsForIds(appRows, ids, parent, prefix) {
   return out
 }
 
+/**
+ * Picks the root menu's dynamic tile: the first pinned app, else the first recent app, else the workspace.
+ * @param {Array<MenuItem>} appRows - all app rows
+ * @param {*} favoriteIds - pinned app ids
+ * @param {*} recentIds - recently launched app ids
+ * @param {*} workspaceId - focused workspace id, shown when no app matches
+ * @returns {object} the tile (id, appId, label, detail, source, icon, appIcon)
+ */
 function dynamicTileForAppRows(appRows, favoriteIds, recentIds, workspaceId) {
   var source = Array.isArray(appRows) ? appRows : []
+  /** @type {ItemMap} */
   var byId = {}
   for (var i = 0; i < source.length; i++) {
     var row = source[i]
@@ -118,10 +209,17 @@ function dynamicTileForAppRows(appRows, favoriteIds, recentIds, workspaceId) {
   }
 }
 
+/**
+ * Returns the fixed tagline for a top-level section (Apps, Learn, ...), else `detail`.
+ * @param {*} entry - the menu item
+ * @param {*} detail - fallback detail text
+ * @returns {string} the tagline, or the detail ("" when null or undefined)
+ */
 function semanticDetail(entry, detail) {
   var value = entry && typeof entry === "object" ? entry : {}
   if (String(value.parent || "") !== "root") return textValue(detail, "")
 
+  /** @type {{[key: string]: string}} */
   var labels = {
     Apps: "FIND // LAUNCH // MANAGE",
     Learn: "DOCUMENTATION // GUIDES // IDEAS",
@@ -134,6 +232,12 @@ function semanticDetail(entry, detail) {
   return labels[label] || textValue(detail, "")
 }
 
+/**
+ * Builds a full menu item from one JSONC entry, deriving parent and kind.
+ * @param {*} id - the entry's key (dotted path such as `setup.power`)
+ * @param {*} raw - the entry object; anything else is treated as {}
+ * @returns {MenuItem} the normalized item
+ */
 function normalizeItem(id, raw) {
   var value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
   var itemId = textValue(id, "")
@@ -162,6 +266,11 @@ function normalizeItem(id, raw) {
   }
 }
 
+/**
+ * Parses a JSONC menu file (top-level map or an `items` map) into normalized items.
+ * @param {*} raw - JSONC text
+ * @returns {Array<MenuItem>} the items, or [] when the text is empty or invalid
+ */
 function parseMenuJsonc(raw) {
   var stripped = stripJsonc(raw)
   if (!stripped.trim()) return []
@@ -187,7 +296,14 @@ function parseMenuJsonc(raw) {
   return out
 }
 
+/**
+ * Merges user items over default items key by key, adding a root item if missing.
+ * @param {Array<MenuItem>} defaultItems - items from the shipped menu
+ * @param {Array<MenuItem>} userItems - items from the user extension file
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} items by id and their order
+ */
 function mergeMenuSources(defaultItems, userItems) {
+  /** @type {{[key: string]: *}} */
   var nextItems = {}
   var nextOrder = []
   var sources = [defaultItems || [], userItems || []]
@@ -198,7 +314,9 @@ function mergeMenuSources(defaultItems, userItems) {
       var entry = src[i]
       if (!entry || !entry.id) continue
       if (!nextItems[entry.id]) nextOrder.push(entry.id)
+      /** @type {{[key: string]: *}} */
       var prior = nextItems[entry.id] || {}
+      /** @type {{[key: string]: *}} */
       var merged = {}
       for (var k in prior) merged[k] = prior[k]
       for (var k2 in entry) merged[k2] = entry[k2]
@@ -244,10 +362,18 @@ function mergeMenuSources(defaultItems, userItems) {
 
 // Swaps every app row for the current set. Rows keep the order they arrive in;
 // ids already claimed (including duplicate desktop ids) are listed once.
+/**
+ * Replaces all app rows with a new set, returning fresh maps.
+ * @param {ItemMap} items - current items by id (not modified)
+ * @param {Array<string>} itemOrder - current item order
+ * @param {Array<MenuItem>} appRows - the new app rows (their `order` is overwritten)
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
+ */
 function mergeAppRows(items, itemOrder, appRows) {
   var source = items || {}
   var order = Array.isArray(itemOrder) ? itemOrder : []
   var rows = Array.isArray(appRows) ? appRows : []
+  /** @type {ItemMap} */
   var nextItems = {}
   var nextOrder = []
 
@@ -276,10 +402,19 @@ function mergeAppRows(items, itemOrder, appRows) {
 // Rows carry the id of the submenu that produced them, so a provider that runs
 // again drops its previous batch — a plugin that was just enabled disappears
 // from the Enable list — without disturbing static children declared in JSONC.
+/**
+ * Replaces the rows one provider produced for a submenu, returning fresh maps.
+ * @param {ItemMap} items - current items by id (not modified)
+ * @param {Array<string>} itemOrder - current item order
+ * @param {string} menuId - id of the submenu whose provider produced the rows
+ * @param {Array<MenuItem>} rows - the new rows (`providerMenu` and `order` are overwritten)
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
+ */
 function swapProviderRows(items, itemOrder, menuId, rows) {
   var source = items || {}
   var order = Array.isArray(itemOrder) ? itemOrder : []
   var incoming = Array.isArray(rows) ? rows : []
+  /** @type {ItemMap} */
   var nextItems = {}
   var nextOrder = []
 
@@ -303,6 +438,12 @@ function swapProviderRows(items, itemOrder, menuId, rows) {
   return { items: nextItems, itemOrder: nextOrder }
 }
 
+/**
+ * Looks up an item by id.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the id to find
+ * @returns {?MenuItem} the item, or null
+ */
 function item(items, id) {
   return items && items[id] ? items[id] : null
 }
@@ -313,6 +454,13 @@ function item(items, id) {
 // for search, so an installed application could otherwise shadow a menu route
 // (htop ships `Keywords=system;...`). Unknown strings fall through as the
 // literal input so misspellings still attempt to open that id.
+/**
+ * Resolves a route name (id or alias) to a menu item id.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order, searched for aliases
+ * @param {*} input - the requested route
+ * @returns {string} the matching id, "root" for empty/go/menu, else the normalized input
+ */
 function resolveRoute(items, itemOrder, input) {
   var raw = String(input || "")
     .toLowerCase()
@@ -333,6 +481,11 @@ function resolveRoute(items, itemOrder, input) {
   return raw
 }
 
+/**
+ * Lower-cases a value and joins its alphanumeric runs with dashes.
+ * @param {*} value - the text to slugify
+ * @returns {string} the slug, or "item" when nothing is left
+ */
 function slugify(value) {
   return (
     String(value || "")
@@ -342,6 +495,12 @@ function slugify(value) {
   )
 }
 
+/**
+ * Counts how many menus lie between an item and the root (0 for top-level items).
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item
+ * @returns {number} the depth, capped at 32
+ */
 function depthFor(items, id) {
   var depth = 0
   var current = item(items, id)
@@ -356,6 +515,12 @@ function depthFor(items, id) {
   return depth
 }
 
+/**
+ * Joins the labels from the root down to an item with ` › `.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item
+ * @returns {string} the breadcrumb path
+ */
 function pathFor(items, id) {
   var labels = []
   var current = item(items, id)
@@ -370,12 +535,25 @@ function pathFor(items, id) {
   return labels.join(" › ")
 }
 
+/**
+ * Returns the breadcrumb path of an item's parent, or "" for top-level items.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item
+ * @returns {string} the parent's path
+ */
 function parentPathFor(items, id) {
   var entry = item(items, id)
   if (!entry || !entry.parent || entry.parent === "root") return ""
   return pathFor(items, entry.parent)
 }
 
+/**
+ * Tells whether an item sits anywhere below `ancestorId` (everything but root is below root).
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item
+ * @param {string} ancestorId - the candidate ancestor
+ * @returns {boolean} true when it is a descendant
+ */
 function isDescendantOf(items, id, ancestorId) {
   if (ancestorId === "root") return id !== "root"
 
@@ -390,6 +568,13 @@ function isDescendantOf(items, id, ancestorId) {
   return false
 }
 
+/**
+ * Counts the direct children of an item.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {string} id - the parent item
+ * @returns {number} the number of children
+ */
 function childCount(items, itemOrder, id) {
   var count = 0
   var order = Array.isArray(itemOrder) ? itemOrder : []
@@ -400,6 +585,15 @@ function childCount(items, itemOrder, id) {
   return count
 }
 
+/**
+ * Tells whether an item should be listed: its `when:` did not fail and, for static menus and links, some descendant is visible.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {{[key: string]: boolean}} whenResults - `when:` results by id
+ * @param {MenuItem} entry - the item to test
+ * @param {number} [depth] - recursion depth, stops at 32
+ * @returns {boolean} true when visible
+ */
 function isVisible(items, itemOrder, whenResults, entry, depth) {
   if (!entry) return false
   if (entry.when && whenResults && whenResults[entry.id] === false) return false
@@ -424,21 +618,42 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
   return false
 }
 
+/**
+ * Returns an item's label with ` ✓` appended when its `checked:` held.
+ * @param {MenuItem} entry - the item
+ * @param {{[key: string]: boolean}} checkedResults - `checked:` results by id
+ * @returns {string} the display label ("" for no item)
+ */
 function labelFor(entry, checkedResults) {
   if (!entry) return ""
   if (entry.checked && checkedResults && checkedResults[entry.id]) return entry.label + " ✓"
   return entry.label
 }
 
+/**
+ * Replaces dots, underscores and dashes with spaces so ids split into words.
+ * @param {*} value - the token
+ * @returns {string} the spaced text
+ */
 function searchableToken(value) {
   return String(value || "").replace(/[._-]+/g, " ")
 }
 
+/**
+ * Returns the last dotted segment of an id.
+ * @param {*} id - the item id
+ * @returns {string} the leaf segment
+ */
 function leafIdFor(id) {
   var parts = String(id || "").split(".")
   return parts.length > 0 ? parts[parts.length - 1] : id
 }
 
+/**
+ * Builds the lower-cased text a query is matched against: label, leaf id and aliases.
+ * @param {MenuItem} entry - the item
+ * @returns {string} the search text ("" for no item)
+ */
 function nameSearchText(entry) {
   if (!entry) return ""
   var aliases = []
@@ -449,6 +664,12 @@ function nameSearchText(entry) {
     .toLowerCase()
 }
 
+/**
+ * Tells whether `term` equals one whitespace-separated word of `text`.
+ * @param {string} term - a lower-cased search term
+ * @param {*} text - the text to split
+ * @returns {boolean} true on a whole-word match
+ */
 function termInSearchWords(term, text) {
   var words = String(text || "")
     .toLowerCase()
@@ -459,6 +680,12 @@ function termInSearchWords(term, text) {
   return false
 }
 
+/**
+ * Tells whether every term of the query is a whole word of `text`.
+ * @param {*} query - the search query
+ * @param {*} text - the description text
+ * @returns {boolean} true when all terms match
+ */
 function descriptionTextMatches(query, text) {
   var terms = String(query || "")
     .toLowerCase()
@@ -470,6 +697,13 @@ function descriptionTextMatches(query, text) {
   return true
 }
 
+/**
+ * Tells whether a visible item matches every query term, by name substring or description word.
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @param {boolean} visible - whether the item is visible (invisible items never match)
+ * @returns {boolean} true when it matches
+ */
 function matchesQuery(entry, query, visible) {
   if (!entry || entry.id === "root") return false
   if (!visible) return false
@@ -491,6 +725,13 @@ function matchesQuery(entry, query, visible) {
   return true
 }
 
+/**
+ * Scores a search hit (lower sorts first): match tier, then depth, then declared order.
+ * @param {ItemMap} items - items by id
+ * @param {MenuItem} entry - the matching item
+ * @param {*} query - the search query
+ * @returns {number} the sort score
+ */
 function searchScore(items, entry, query) {
   var needle = String(query || "")
     .toLowerCase()
@@ -517,6 +758,17 @@ function searchScore(items, entry, query) {
   return score * 1000 + depthFor(items, entry.id) * 25 + entry.order
 }
 
+/**
+ * Builds the list-model row the menu renders for an item.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {{[key: string]: boolean}} checkedResults - `checked:` results by id
+ * @param {MenuItem} entry - the item
+ * @param {*} detail - secondary text (replaced by a tagline for top-level sections)
+ * @param {number} [score] - sort score (default 0)
+ * @param {string} [section] - list section such as "drilldown" (default "")
+ * @returns {object} the display row
+ */
 function displayRow(items, itemOrder, checkedResults, entry, detail, score, section) {
   var target = entry.kind === "link" ? entry.target : entry.id
   return {
@@ -574,6 +826,10 @@ var GUARD_READERS = [
 // is set in the environment, which a login shell may well have done, so the
 // parser follows the indented lines rather than reading the first one and
 // dropping half of what is installed.
+/**
+ * Returns the bash helpers that answer package and command checks in-process.
+ * @returns {string} bash defining the package set and the omarchy-pkg-/cmd-present/missing shadows
+ */
 function guardHelpers() {
   return (
     "declare -A __omarchy_pkgs=()\n" +
@@ -597,6 +853,11 @@ function guardHelpers() {
 // same way unquoted -- while a function would also catch `command -v reader`,
 // `VAR=x reader`, and every other form, and answer those wrong. Anything but
 // the plain substitution is left alone to run the real command.
+/**
+ * Returns the helpers plus eager captures of the readers the guards use.
+ * @param {string} guards - the guard lines, already substituted
+ * @returns {string} the helpers plus a capture line for each reader the guards use
+ */
 function guardPrelude(guards) {
   var prelude = guardHelpers()
 
@@ -612,10 +873,20 @@ function guardPrelude(guards) {
   return prelude
 }
 
+/**
+ * Returns the bash variable that holds a reader's captured output.
+ * @param {number} index - index into GUARD_READERS
+ * @returns {string} the `${__omarchy_read_N}` expansion
+ */
 function guardReaderSlot(index) {
   return "${__omarchy_read_" + index + "}"
 }
 
+/**
+ * Replaces each plain `$(reader)` in an expression with that reader's captured variable.
+ * @param {string} expression - a `when:` or `checked:` bash expression
+ * @returns {string} the substituted expression
+ */
 function substituteGuardReaders(expression) {
   for (var i = 0; i < GUARD_READERS.length; i++)
     expression = expression.split("$(" + GUARD_READERS[i] + ")").join(guardReaderSlot(i))
@@ -623,6 +894,13 @@ function substituteGuardReaders(expression) {
   return expression
 }
 
+/**
+ * Wraps one guard expression in a bash `if` that prints `<id>:<tag>:<0|1>`.
+ * @param {string} id - the item id
+ * @param {string} tag - "w" for `when:`, "c" for `checked:`
+ * @param {string} expression - the bash expression
+ * @returns {string} one line of bash
+ */
 function guardLine(id, tag, expression) {
   return (
     "if { " +
@@ -643,6 +921,11 @@ function guardLine(id, tag, expression) {
 // `<id>:<w|c>:<0|1>` per line. Speed is the whole point: the menu opens on
 // the last evaluation's answers, so however long this takes is how long a row
 // can contradict the state it describes.
+/**
+ * Builds the batch bash script that evaluates every `when:` and `checked:` guard.
+ * @param {ItemMap} items - items by id
+ * @returns {string} the script, or "" when no item has a guard
+ */
 function guardScript(items) {
   var guards = ""
   var ids = Object.keys(items || {})

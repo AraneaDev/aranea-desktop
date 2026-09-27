@@ -1,3 +1,6 @@
+// Aranea menu: the plugin's "menu" entry point (manifest.json), summoned by
+// omarchy-shell. Renders the JSONC command menu with app launcher, providers
+// and guards, and also serves dmenu-style select/input requests.
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
@@ -12,13 +15,16 @@ Item {
 
   // Injected by omarchy-shell when this plugin is summoned.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  // Scoped shell object from the host; supplies the shared appLibrary when present.
   property var shell: null
+  // Public copy of this plugin's manifest, set by the host.
   property var manifest: null
 
   // Plugin lifecycle hooks. The host calls open(payloadJson) after
   // `omarchy-shell shell summon omarchy.menu ...` and close() when hidden.
   property string pendingInitialMenu: "root"
 
+  // Opens the menu at the payload's route, or as a dmenu picker when mode is select/input.
   function open(payloadJson: string): void {
     var payload = ({})
     try {
@@ -38,60 +44,100 @@ Item {
     }
   }
 
+  // Hides the menu, answering a pending dmenu request as cancelled.
   function close(): void {
     root.cancel()
   }
 
+  // Reloads both JSONC menu files and returns "ok".
   function refresh(): string {
     defaultMenuFile.reload()
     userMenuFile.reload()
     return "ok"
   }
 
+  // Liveness check: always returns "ok".
   function ping(): string {
     return "ok"
   }
 
+  // Font for all menu text; a payload's fontFamily overrides it.
   property string fontFamily: Style.font.menuFamily
+  // Directory of the current theme's branding marks (the header logo).
   readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
+  // Directory of the current theme's branding motifs (header art, dividers).
   readonly property string brandingMotifsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/motifs/"
+  // Directory of the current theme's branding glyphs (status icons).
   readonly property string brandingGlyphsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/glyphs/"
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.
   property string defaultMenuPath: omarchyPath + "/default/omarchy/omarchy-menu.jsonc"
+  // User extension file merged over the defaults.
   property string userMenuPath: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
+  // Items parsed from the default JSONC file.
   property var defaultMenuItems: []
+  // Items parsed from the user JSONC file ([] when it is missing).
   property var userMenuItems: []
+  // Whether the menu is showing; clearing it closes the panel.
   property bool opened: false
+  // "menu" for the command menu, "select" or "input" for a dmenu request.
   property string mode: "menu"
+  // True while serving a dmenu (select or input) request.
   readonly property bool dmenuActive: mode === "select" || mode === "input"
+  // Prompt text shown in the header for a dmenu request.
   property string dmenuPrompt: ""
+  // Raw dmenu option strings ("label", "glyph\tlabel" or "glyph\tlabel\tsubtext").
   property var dmenuOptions: []
+  // File a dmenu request's answer is written to.
   property string selectionFile: ""
+  // File touched when a dmenu request finishes (answered or cancelled).
   property string doneFile: ""
+  // Requested dmenu card width, in unscaled units.
   property int dmenuWidth: 300
+  // Requested dmenu row-list height cap, in unscaled units (0 for none).
   property int dmenuMaxHeight: 0
+  // Whether a dmenu request is still waiting for its answer.
   property bool requestActive: false
+  // True while a bash provider is running.
   property bool providerLoading: false
+  // True when the last bash provider exited nonzero.
   property bool providerError: false
+  // Set once the JSONC sources have been merged; the panel stays hidden until then.
   property bool rowsLoaded: false
+  // Id of the submenu being shown.
   property string activeMenu: "root"
+  // Current search text (or the typed value in input mode).
   property string filterText: ""
+  // Index of the cursor row in displayModel.
   property int selectedIndex: 0
+  // Whether the cursor row is highlighted and Enter activates it.
   property bool cursorActive: false
+  // Bumped on every open; compared with applySerial when a result write finishes.
   property int requestSerial: 0
+  // requestSerial at the time a selection was applied.
   property int applySerial: 0
+  // All menu items by id (JSONC, app and provider rows).
   property var items: ({})
+  // Item ids in declaration order.
   property var itemOrder: []
+  // Previously visited submenu ids, popped by goBack().
   property var navStack: []
+  // Submenu ids whose provider has run (or started) since the last rebuild.
   property var providersLoaded: ({})
+  // Submenu ids waiting for providerProc to become free.
   property var providerQueue: []
+  // Bumped on each rebuild so output from an older provider run is discarded.
   property int providerRevision: 0
+  // Maximum number of pinned apps kept.
   readonly property int favoriteAppLimit: 12
+  // Maximum number of recent apps kept.
   readonly property int recentAppLimit: 12
+  // Pinned app ids, persisted across reloads.
   property var favoriteAppIds: []
+  // Recently launched app ids, newest first, persisted across reloads.
   property var recentAppIds: []
+  // Last generated Apps rows, including the Favorites and Recent submenus.
   property var appRows: []
 
   PersistentProperties {
@@ -162,7 +208,9 @@ Item {
         Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
     }
   }
+  // Whether the uninstall confirmation dialog is showing.
   property bool deleteConfirmOpen: false
+  // App awaiting uninstall confirmation ({appId, label}), or null.
   property var deleteTarget: null
   onOpenedChanged: {
     if (!opened) {
@@ -179,6 +227,7 @@ Item {
   }
   Component.onCompleted: root.loadAppHistory()
 
+  // Restores pinned and recent app ids from PersistentProperties.
   function loadAppHistory(): void {
     try {
       root.favoriteAppIds = MenuModel.normalizeAppIds(JSON.parse(persisted.favoriteAppIdsJson), root.favoriteAppLimit)
@@ -192,17 +241,20 @@ Item {
     }
   }
 
+  // Writes pinned and recent app ids to PersistentProperties.
   function saveAppHistory(): void {
     persisted.favoriteAppIdsJson = JSON.stringify(MenuModel.normalizeAppIds(root.favoriteAppIds, root.favoriteAppLimit))
     persisted.recentAppIdsJson = JSON.stringify(MenuModel.normalizeAppIds(root.recentAppIds, root.recentAppLimit))
   }
 
+  // Pins or unpins an app, saves, and regenerates the Apps rows.
   function toggleFavoriteApp(appId: string): void {
     root.favoriteAppIds = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit)
     root.saveAppHistory()
     root.mergeAppRows()
   }
 
+  // Moves an app to the front of Recent, saves, and regenerates the Apps rows.
   function recordRecentApp(appId: string): void {
     root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)
     root.saveAppHistory()
@@ -212,52 +264,85 @@ Item {
   // Each color already includes its alpha companion (composed in the
   // singleton), so consumers can drop them straight into a Rectangle.
   property color background: Color.menu.background
+  // Menu text color.
   property color foreground: Color.menu.text
+  // Card border color.
   property color border: Color.menu.border
+  // Border spec for the card, from the shell's menu border settings.
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(1)))
+  // Full-screen backdrop color behind the card.
   property color scrim: Color.menu.scrim
   // Keep the new ornamentation derived from the stable shell palette.  The
   // shell's menu parser intentionally exposes only the established surface
   // tokens, so these are composited here instead of reaching for ad-hoc
   // Color.menu members that older shells do not publish.
   property color contextText: Util.alpha(foreground, 0.58)
+  // Faint fill for root tiles (currently unused in this file).
   property color tileBackground: Util.alpha(foreground, 0.045)
+  // Root tile fill: tinted with the selection color when hovered.
   function hoveredTileBackground(hovered: bool): color {
     return hovered ? Util.alpha(selectedText, 0.10) : Util.alpha(foreground, 0.028)
   }
+  // Root tile border color, stronger when hovered (currently unused in this file).
   function hoveredTileBorder(hovered: bool): color {
     return hovered ? Util.alpha(selectedText, 0.72) : Util.alpha(foreground, 0.16)
   }
+  // Color of the root footer text.
   property color footerText: Util.alpha(foreground, 0.58)
+  // Opacity of the node-divider motif above the footer.
   property real nodeAlpha: 0.35
+  // Background of the cursor row.
   property color selectedBackground: Color.menu.selectedBackground
+  // Text color of the cursor row; also tints hovered tiles and the cursor bar.
   property color selectedText: Color.menu.selectedText
+  // Border color of the cursor row.
   property color selectedBorder: Color.menu.selectedBorder
+  // Border spec for the cursor row.
   property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", selectedBorder, 0)
+  // Left border width of the cursor row, added to every row's content inset.
   readonly property real rowReservedBorderLeft: Border.left(selectedBorderSpec)
+  // Right border width of the cursor row (currently unused in this file).
   readonly property real rowReservedBorderRight: Border.right(selectedBorderSpec)
+  // Corner radius of the card and its header.
   readonly property int cornerRadius: Math.max(8, Style.space(8))
+  // Scale applied to shell font sizes by menuFontSize().
   readonly property real menuFontScale: 1.10
+  // Letter spacing for menu labels.
   readonly property real menuLetterSpacing: 0.20
+  // Scales a shell font size by menuFontScale, rounded, at least 1.
   function menuFontSize(size: real): int {
     return Math.max(1, Math.round(size * root.menuFontScale))
   }
+  // Padding inside the card.
   property int contentMargin: Style.spacing.panelPadding
+  // Header height for submenus and dmenu requests.
   property int headerHeight: Math.max(Style.space(46), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  // Alternative compact header height (currently unused in this file).
   property int compactHeaderHeight: Math.max(Style.space(64), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  // Header height on the unfiltered root menu.
   property int rootHeaderHeight: Math.max(Style.space(68), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  // Height of the root tile row.
   property int rootTileHeight: Style.space(96)
+  // Height of the root context band (status, workspace, clock).
   property int rootContextHeight: Style.space(20)
+  // Height of the root footer.
   property int footerHeight: Style.space(26)
+  // Extra card height for the root context band, tiles and footer (0 elsewhere).
   property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  // State file whose "off" content disables animations.
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  // Set a turn after opening so the root header mark can fade in.
   property bool headerMarkSettled: false
+  // True on the unfiltered root menu, which shows the large header, tiles and footer.
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
+  // Focused workspace label for the root context band.
   readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
+  // HH:mm time shown in the root context band, captured on open.
   property string clockContext: Qt.formatDateTime(new Date(), "HH:mm")
+  // Fixed tiles (Files, Terminal, Setup) shown on the root menu.
   readonly property var rootTiles: [({
         id: "tile.files",
         label: "Files",
@@ -278,22 +363,35 @@ Item {
         source: "fixed"
       })]
 
+  // Section spacing on the root menu; also used in the card height math.
   property int contentSpacing: Style.space(12)
+  // Vertical spacing between card sections elsewhere.
   property int compactContentSpacing: Style.space(8)
+  // Height of a row without a detail line.
   property int baseRowHeight: Math.max(Style.space(40), root.menuFontSize(Style.font.bodySmall) + Style.space(6) * 2)
+  // Row-list height when nothing matches.
   property int emptyStateHeight: Style.space(112)
+  // Height of a row that shows a detail line.
   property int detailRowHeight: Math.max(Style.space(58), root.menuFontSize(Style.font.bodySmall) + root.menuFontSize(Style.font.caption) + Style.space(7) * 2)
   // How much of the first hidden row stays visible at the fold — enough to
   // read as a cut-off row rather than a bottom border.
   property int rowPeek: Math.round(baseRowHeight * 0.55)
+  // Gap between rows.
   property int rowSpacing: Style.space(4)
+  // Height of the divider before drilldown search results.
   property int dividerHeight: Style.space(20)
+  // Whether search results are split into current-menu and drilldown sections.
   property bool searchDivider: false
+  // Bumped after each display rebuild so row-height bindings recompute.
   property int layoutSerial: 0
+  // Card width: depends on mode and menu, capped to the screen.
   property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(root.dmenuWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), panel.width - Style.gapsOut * 2)
+  // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
+  // Total card height, capped to the screen.
   property int cardHeight: root.dmenuActive ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), panel.height - Style.gapsOut * 2) : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, panel.height - Style.gapsOut * 2)
 
+  // Answers a pending dmenu request: writes the selection (unless null) and touches the done file.
   function finishRequest(selection) {
     if (!root.requestActive || !root.doneFile) {
       root.opened = false
@@ -314,6 +412,7 @@ Item {
     resultProc.running = true
   }
 
+  // Runs a shell command detached; empty commands are ignored.
   function runAction(action: string): void {
     var command = String(action || "")
     if (!command)
@@ -321,6 +420,7 @@ Item {
     Util.execDetached(command)
   }
 
+  // Handles a root tile click: open Files, a terminal, Setup, or launch the tile's app.
   function activateTile(tile): void {
     if (!tile)
       return
@@ -390,6 +490,7 @@ Item {
     return totals[full - 1] + root.rowSpacing + peek
   }
 
+  // Row-list height for the menu (arguments are unused; they only make the binding re-evaluate).
   function rowListHeight(_serial: int, _count: int, _filter: string, _divider: bool): int {
     if (displayModel.count === 0)
       return root.emptyStateHeight
@@ -412,6 +513,7 @@ Item {
     return foldedListHeight(totals, availableRowsHeight())
   }
 
+  // Row-list height for a dmenu request (arguments only trigger re-evaluation).
   function dmenuRowListHeight(_serial: int, _count: int, _filter: string): int {
     if (root.mode === "input")
       return 0
@@ -434,6 +536,7 @@ Item {
     return foldedListHeight(totals, available)
   }
 
+  // Returns the item with this id, or null.
   function item(id: string): var {
     return root.items[id] || null
   }
@@ -443,18 +546,22 @@ Item {
   // the on-disk authoring format stays untouched.
   // ------------------------------------------------------------------
 
+  // Wrapper for MenuModel.stripJsonc.
   function stripJsonc(raw: string): string {
     return MenuModel.stripJsonc(raw)
   }
 
+  // Wrapper for MenuModel.normalizeAliases.
   function normalizeAliases(value) {
     return MenuModel.normalizeAliases(value)
   }
 
+  // Wrapper for MenuModel.normalizeItem.
   function normalizeItem(id: string, raw): var {
     return MenuModel.normalizeItem(id, raw)
   }
 
+  // Wrapper for MenuModel.parseMenuJsonc.
   function parseMenuJsonc(raw: string): var {
     return MenuModel.parseMenuJsonc(raw)
   }
@@ -505,6 +612,7 @@ Item {
       }
     })
 
+  // Wrapper for MenuModel.slugify.
   function slugify(value: string): string {
     return MenuModel.slugify(value)
   }
@@ -599,6 +707,7 @@ Item {
       root.rebuildDisplay()
   }
 
+  // Runs the provider of submenu `id` unless it already ran; apps merge inline, others start providerProc.
   function startProviderForMenu(id) {
     var entry = root.item(id)
     if (!entry || !entry.provider || root.providersLoaded[id])
@@ -622,6 +731,7 @@ Item {
     providerProc.running = true
   }
 
+  // Turns a provider's tab-separated output into action rows under `menuId` and swaps them in.
   function mergeProviderRows(rows, menuId, providerKey) {
     var spec = root.providers[providerKey]
     if (!spec)
@@ -671,6 +781,7 @@ Item {
       root.rebuildDisplay()
   }
 
+  // Starts the next queued provider once providerProc is free.
   function startNextProvider(): void {
     if (providerProc.running)
       return
@@ -694,6 +805,7 @@ Item {
       root.providersLoaded[id] = false
   }
 
+  // Loads submenu `id`'s provider, queueing it when providerProc is busy.
   function loadProviderForMenu(id) {
     var entry = root.item(id)
     if (!entry || !entry.provider || root.providersLoaded[id])
@@ -714,6 +826,7 @@ Item {
     root.startProviderForMenu(id)
   }
 
+  // Loads every not-yet-run provider under the active menu so search can see its rows.
   function loadProvidersForSearch() {
     var active = root.item(root.activeMenu) ? root.activeMenu : "root"
 
@@ -727,22 +840,27 @@ Item {
     }
   }
 
+  // Wrapper for MenuModel.depthFor on the current items.
   function depthFor(id: string): int {
     return MenuModel.depthFor(root.items, id)
   }
 
+  // Wrapper for MenuModel.pathFor on the current items.
   function pathFor(id: string): string {
     return MenuModel.pathFor(root.items, id)
   }
 
+  // Wrapper for MenuModel.parentPathFor on the current items.
   function parentPathFor(id: string): string {
     return MenuModel.parentPathFor(root.items, id)
   }
 
+  // Wrapper for MenuModel.isDescendantOf on the current items.
   function isDescendantOf(id: string, ancestorId: string): bool {
     return MenuModel.isDescendantOf(root.items, id, ancestorId)
   }
 
+  // Wrapper for MenuModel.childCount on the current items.
   function childCount(id: string): int {
     return MenuModel.childCount(root.items, root.itemOrder, id)
   }
@@ -759,38 +877,47 @@ Item {
     return MenuModel.labelFor(entry, root.checkedResults)
   }
 
+  // Wrapper for MenuModel.searchableToken.
   function searchableToken(value: string): string {
     return MenuModel.searchableToken(value)
   }
 
+  // Wrapper for MenuModel.leafIdFor.
   function leafIdFor(id: string): string {
     return MenuModel.leafIdFor(id)
   }
 
+  // Wrapper for MenuModel.nameSearchText.
   function nameSearchText(entry): string {
     return MenuModel.nameSearchText(entry)
   }
 
+  // Wrapper for MenuModel.termInSearchWords.
   function termInSearchWords(term: string, text: string): bool {
     return MenuModel.termInSearchWords(term, text)
   }
 
+  // Wrapper for MenuModel.descriptionTextMatches.
   function descriptionTextMatches(query: string, text: string): bool {
     return MenuModel.descriptionTextMatches(query, text)
   }
 
+  // Whether a visible item matches the query (MenuModel.matchesQuery).
   function matchesQuery(entry, query: string): bool {
     return MenuModel.matchesQuery(entry, query, root.isVisible(entry))
   }
 
+  // Sort score for a search hit (MenuModel.searchScore).
   function searchScore(entry, query: string): real {
     return MenuModel.searchScore(root.items, entry, query)
   }
 
+  // Builds a displayModel row for an item (MenuModel.displayRow).
   function displayRow(entry, detail, score, section) {
     return MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, entry, detail, score, section)
   }
 
+  // Refills displayModel with the dmenu options that match the filter.
   function rebuildDmenuDisplay(): void {
     displayModel.clear()
     root.searchDivider = false
@@ -846,6 +973,7 @@ Item {
     })
   }
 
+  // Refills displayModel with the active menu's visible children, or the ranked search hits.
   function rebuildDisplay(): void {
     if (root.dmenuActive) {
       root.rebuildDmenuDisplay()
@@ -969,6 +1097,7 @@ Item {
     }
   }
 
+  // Moves the cursor by `delta` rows, wrapping; the first move activates the cursor.
   function select(delta: int): void {
     if (displayModel.count === 0)
       return
@@ -982,6 +1111,7 @@ Item {
     revealCursor()
   }
 
+  // Sets the search text, resets the cursor and rebuilds the rows.
   function setFilter(nextFilter: string): void {
     panel.freezeCardTop()
     root.filterText = nextFilter
@@ -993,6 +1123,7 @@ Item {
     root.rebuildDisplay()
   }
 
+  // Shows submenu `id` (root if unknown), optionally pushing the current one onto navStack.
   function setActiveMenu(id: string, pushHistory: bool, fromPointer: bool): void {
     panel.freezeCardTop()
     if (!root.item(id))
@@ -1012,6 +1143,7 @@ Item {
     root.loadProviderForMenu(id)
   }
 
+  // Returns to the previous submenu (or the parent); does nothing on root.
   function goBack(): void {
     if (root.activeMenu === "root")
       return false
@@ -1028,6 +1160,7 @@ Item {
     return true
   }
 
+  // Activates row `index`: open a submenu, launch an app, run an action, or answer a dmenu request.
   function activateIndex(index: int, fromPointer: bool): void {
     if (root.deleteConfirmOpen)
       return
@@ -1062,6 +1195,7 @@ Item {
     }
   }
 
+  // Asks to uninstall the app under the cursor (app rows only).
   function requestDeleteSelected() {
     if (!root.cursorActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
       return
@@ -1076,6 +1210,7 @@ Item {
     root.deleteConfirmOpen = true
   }
 
+  // Dismisses the uninstall dialog and gives focus back to the menu.
   function cancelDelete() {
     root.deleteConfirmOpen = false
     root.deleteTarget = null
@@ -1086,6 +1221,7 @@ Item {
     })
   }
 
+  // Closes the menu and uninstalls the app picked in the dialog.
   function confirmDelete() {
     var target = root.deleteTarget
     root.deleteConfirmOpen = false
@@ -1097,6 +1233,7 @@ Item {
       root.appLibrary.remove(target.appId, target.label)
   }
 
+  // Closes the menu and answers the dmenu request with `value`.
   function applyDmenuSelection(value: string): void {
     applySerial = requestSerial
     opened = false
@@ -1104,6 +1241,7 @@ Item {
     root.finishRequest(value)
   }
 
+  // Closes the menu and runs the selected action; an empty id just cancels.
   function applySelected(id, action) {
     if (!id) {
       cancel()
@@ -1116,6 +1254,7 @@ Item {
     root.runAction(action)
   }
 
+  // Closes the menu, answering a dmenu request as cancelled.
   function cancel(): void {
     if (root.dmenuActive)
       root.finishRequest(null)
@@ -1123,6 +1262,7 @@ Item {
     filterText = ""
   }
 
+  // Opens the menu at `initialMenu` (root if unknown) and starts its provider.
   function openExistingMenu(initialMenu) {
     requestSerial += 1
     mode = "menu"
@@ -1150,6 +1290,7 @@ Item {
     })
   }
 
+  // Opens a dmenu select/input request from the payload's prompt, options and result files.
   function openDmenu(payload) {
     requestSerial += 1
     mode = payload.mode === "input" ? "input" : "select"
@@ -1188,6 +1329,7 @@ Item {
     return MenuModel.resolveRoute(root.items, root.itemOrder, input)
   }
 
+  // Opens a route: runs an action alias directly, follows links, else opens that menu.
   function openRoute(initialMenu: string): void {
     // Favorites and Recent are injected by the Apps provider, so resolve
     // them after that provider has merged its generated submenu entries.
@@ -1213,6 +1355,7 @@ Item {
     root.openExistingMenu(id)
   }
 
+  // Opens apps.favorites or apps.recent, retrying for up to 12 turns before falling back to Apps.
   function openGeneratedAppsMenu(initialMenu: string, attempt: int): void {
     // AppLibrary can finish its first desktop-entry refresh after the summon
     // request. Retry briefly so direct screenshot/shortcut routes never fall
@@ -1231,10 +1374,12 @@ Item {
     root.openExistingMenu("apps")
   }
 
+  // Ignores the pointer until it actually moves, so a still mouse cannot steal the cursor.
   function disarmPointer() {
     pointerGate.reset()
   }
 
+  // Moves the cursor to row `index` when the pointer has really moved over it.
   function selectFromPointer(index, item, mouse) {
     if (!pointerGate.moved(item, mouse))
       return
@@ -1341,10 +1486,14 @@ Item {
   // batches them into one bash subprocess per (re)load so the open path
   // never has to wait on them.
 
+  // Latest `when:` results by id (false hides the item).
   property var whenResults: ({})       // id → true|false (allow visibility)
+  // Latest `checked:` results by id (true adds the check mark).
   property var checkedResults: ({})    // id → true|false (show ✓)
+  // Set when an evaluation was requested while one was running; it reruns afterwards.
   property bool guardsPending: false
 
+  // Runs every `when:` and `checked:` guard in one bash batch (deferred if one is in flight).
   function evaluateGuards() {
     // Process ignores a command change while it is running, and `collected`
     // belongs to the run in flight, so a second evaluation cannot overwrite
