@@ -1490,8 +1490,9 @@ Item {
       implicitWidth: Math.ceil(tooltipBubble.implicitWidth)
       implicitHeight: Math.ceil(tooltipBubble.implicitHeight)
 
+      // No id inside the grouped property (qmllint rejects it); the anchor is
+      // reached through its window instead.
       anchor {
-        id: tooltipAnchor
         window: barWindow
         adjustment: PopupAdjustment.Slide
         edges: Edges.Top | Edges.Left
@@ -1519,8 +1520,8 @@ Item {
           }
 
           var point = barWindow.contentItem.mapFromItem(target, localX, localY)
-          tooltipAnchor.rect.x = Math.round(point.x)
-          tooltipAnchor.rect.y = Math.round(point.y)
+          tooltipWindow.anchor.rect.x = Math.round(point.x)
+          tooltipWindow.anchor.rect.y = Math.round(point.y)
         }
       }
 

@@ -14,6 +14,7 @@ mkdir -p tools/lib tools/baselines docs
 cp "$repo_root/tools/check" tools/
 cp "$repo_root"/tools/lib/check-*.sh tools/lib/
 cp "$repo_root/tools/baselines/em-dash-allow.txt" tools/baselines/
+: >tools/baselines/qmllint.txt
 for config in .prettierrc.json .prettierignore .editorconfig .qmlformat.ini eslint.config.js .markdownlint-cli2.jsonc; do cp "$repo_root/$config" .; done
 export ARANEA_CHECK_NODE_MODULES="$repo_root/node_modules"
 ln -s "$repo_root/node_modules" node_modules # the configs resolve their plugins from here
@@ -116,4 +117,69 @@ for needle in plugins/x/a.js docs/jump.md w.yml; do grep -Fq "$needle" "$ARANEA_
   exit 1
 }; done
 git reset -q --hard
+# qml: a syntax error always fails.
+mkdir -p plugins/q
+printf 'import QtQuick\nItem {\n  width: 10 +\n}\n' >plugins/q/Bad.qml
+git add -A
+if run_check --only qml; then
+  echo "qml passed a syntax error" >&2
+  exit 1
+fi
+grep -Fq 'plugins/q/Bad.qml' "$ARANEA_TEST_SANDBOX/out" || {
+  cat "$ARANEA_TEST_SANDBOX/out"
+  exit 1
+}
+git reset -q --hard
+# The baseline needs strict mode (Omarchy Commons/Ui and Quickshell present).
+if [[ -f /usr/share/omarchy/shell/Commons/qmldir && -d /usr/lib/qt6/qml/Quickshell ]]; then
+  mkdir -p plugins/q
+  printf 'import QtQuick\nItem {\n  property int a: undefinedName\n}\n' >plugins/q/Warn.qml
+  git add -A
+  # A new warning fails, and --update-baselines refuses to add it.
+  if run_check --only qml; then
+    echo "qml passed a new warning" >&2
+    exit 1
+  fi
+  grep -Fq 'new warning' "$ARANEA_TEST_SANDBOX/out" || {
+    cat "$ARANEA_TEST_SANDBOX/out"
+    exit 1
+  }
+  if run_check --only qml --update-baselines; then
+    echo "--update-baselines accepted a new warning" >&2
+    exit 1
+  fi
+  [[ ! -s tools/baselines/qmllint.txt ]] || {
+    echo "--update-baselines added an entry" >&2
+    exit 1
+  }
+  # A hand-added baseline entry makes it pass (Review Focus 3: moving the
+  # code to another line keeps the same entry).
+  grep -F 'new warning' "$ARANEA_TEST_SANDBOX/out" | sed 's/^new warning: //' >tools/baselines/qmllint.txt
+  run_check --only qml || {
+    cat "$ARANEA_TEST_SANDBOX/out"
+    exit 1
+  }
+  printf 'import QtQuick\nItem {\n\n\n  property int a: undefinedName\n}\n' >plugins/q/Warn.qml
+  git add -A
+  run_check --only qml || {
+    echo "a moved warning counted as new" >&2
+    cat "$ARANEA_TEST_SANDBOX/out"
+    exit 1
+  }
+  # Fixing it leaves a stale entry, which fails until the baseline shrinks.
+  printf 'import QtQuick\nItem {\n  property int a: 1\n}\n' >plugins/q/Warn.qml
+  git add -A
+  if run_check --only qml; then
+    echo "stale baseline entry passed" >&2
+    exit 1
+  fi
+  run_check --only qml --update-baselines
+  [[ ! -s tools/baselines/qmllint.txt ]] || {
+    echo "baseline did not shrink" >&2
+    exit 1
+  }
+  git reset -q --hard
+else
+  echo "SKIP: qmllint baseline cases need Omarchy's shell and Quickshell"
+fi
 echo "check contract passed"

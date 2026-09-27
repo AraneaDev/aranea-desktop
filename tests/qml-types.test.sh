@@ -38,46 +38,7 @@ for qml_file in "${qml_files[@]}"; do
   }
 done
 
-qmllint_bin="$(command -v qmllint 2>/dev/null || true)"
-if [[ -z "$qmllint_bin" && -x /usr/lib/qt6/bin/qmllint ]]; then
-  qmllint_bin=/usr/lib/qt6/bin/qmllint
-fi
-[[ -n "$qmllint_bin" ]] || {
-  echo 'qmllint is required for QML validation' >&2
-  exit 1
-}
-
-shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
-import_root=""
-cleanup() {
-  if [[ -n "$import_root" ]]; then rm -rf "$import_root"; fi
-}
-sandbox_on_exit cleanup
-
-qml_args=(--ignore-settings)
-validation_mode=strict
-if [[ -d "$shell_dir/Commons" && -f "$shell_dir/Commons/qmldir" &&
-  -d "$shell_dir/Ui" && -f "$shell_dir/Ui/qmldir" ]]; then
-  import_root="$(mktemp -d)"
-  mkdir "$import_root/qs"
-  ln -s "$shell_dir/Commons" "$import_root/qs/Commons"
-  ln -s "$shell_dir/Ui" "$import_root/qs/Ui"
-  qml_args+=(-I "$import_root")
-else
-  # CI does not ship Omarchy/Quickshell modules. Keep qmllint mandatory and
-  # parse every file without pretending external types are available.
-  validation_mode=syntax-and-local-types
-  qml_args+=(--bare)
-fi
-
-if [[ "$validation_mode" == strict ]]; then
-  "$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}"
-else
-  qml_status=0
-  qml_output="$("$qmllint_bin" "${qml_args[@]}" "${qml_files[@]}" 2>&1)" || qml_status=$?
-  echo "$qml_output"
-  if grep -Eq '^Error:|: Error:' <<<"$qml_output"; then
-    exit "$qml_status"
-  fi
-fi
-echo "QML validation passed ($("$qmllint_bin" --version); mode: $validation_mode; import root: ${import_root:-default})"
+# The QML contract is the tools/check qml stage: strict qmllint against the
+# shrink-only baseline when Omarchy and Quickshell are present, syntax-only
+# otherwise. Every tracked QML file is linted (not just the entry points).
+"$repo_root/tools/check" --only qml
