@@ -50,7 +50,10 @@ stage_qml() {
     echo "qmllint is required (qt6-declarative)"
     return 1
   }
-  mapfile -t files < <(check_files '\.qml$')
+  # tests/qml files are behaviour tests: their imports ("lib", "plugins/...")
+  # only exist in the config tests/qml-behaviour.test.sh builds, and they
+  # are checked by running them (qmltest stage).
+  mapfile -t files < <(check_files '\.qml$' | grep -v '^tests/qml/')
   ((${#files[@]})) || return 0
 
   local shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}" mode=bare import_root=""

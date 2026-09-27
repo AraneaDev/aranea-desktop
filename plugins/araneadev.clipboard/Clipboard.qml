@@ -8,10 +8,8 @@
 
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs.Commons
-import qs.Ui
 import "ClipboardLogic.js" as ClipboardLogic
 
 Item {
@@ -31,6 +29,31 @@ Item {
   property bool clearConfirmOpen: false
   // All history entries (ClipboardLogic entries), newest first, as saved to historyPath.
   property var history: []
+  // The rows shown in the picker (display order), read by the window.
+  readonly property alias displayModel: rowsModel
+  // Whether to create the on-screen window (ClipboardWindow.qml); tests
+  // switch it off to run the picker offscreen.
+  property bool windowEnabled: true
+  // Whether to record the clipboard (wl-paste watchers); tests switch it off.
+  property bool captureEnabled: true
+  // The window, once created; null offscreen.
+  property var view: null
+  // Runs a detached command (argv); tests replace it with a recorder.
+  property var run: function (argv) {
+    Quickshell.execDetached(argv)
+  }
+
+  // Gives the window's key handler the keyboard focus (no-op offscreen).
+  function focusKeys(): void {
+    if (root.view)
+      root.view.focusKeys()
+  }
+
+  // Scrolls the row at index into view (no-op offscreen).
+  function reveal(index: int): void {
+    if (root.view)
+      root.view.reveal(index)
+  }
 
   // History file shared with the stock Omarchy picker.
   property string historyPath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-history.json"
@@ -58,10 +81,6 @@ Item {
   property string fontFamily: Style.font.menuFamily
   // Inner padding of the card and the preview pane.
   property int contentMargin: Style.spacing.panelPadding
-  // Card width: up to 875 scaled px, inside the screen gaps.
-  property int cardWidth: Math.min(Style.space(875), panel.width - Style.gapsOut * 2)
-  // Card height: up to 600 scaled px, inside the screen gaps.
-  property int cardHeight: Math.min(Style.space(600), panel.height - Style.gapsOut * 2)
   // Height of one history row (title plus detail line).
   property int rowHeight: Math.max(Style.space(50), Style.font.body + Style.font.caption + Style.spacing.rowPaddingX * 2)
   // Unpinned entries kept in history; pinned ones do not count.
@@ -95,7 +114,7 @@ Item {
     root.expireNow()
     root.rebuildDisplay()
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      root.focusKeys()
     })
   }
 
@@ -230,7 +249,8 @@ Item {
   function requestClearHistory() {
     if (root.history.length === 0)
       return
-    clearConfirm.selectedIndex = 1
+    if (root.view)
+      root.view.resetClearConfirm()
     root.clearConfirmOpen = true
   }
 
@@ -239,7 +259,7 @@ Item {
     root.clearConfirmOpen = false
     root.disarmPointer()
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      root.focusKeys()
     })
   }
 
@@ -254,7 +274,7 @@ Item {
     root.clearConfirmOpen = false
     root.rebuildDisplay()
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      root.focusKeys()
     })
   }
 
@@ -314,7 +334,7 @@ Item {
 
     Qt.callLater(function () {
       if (displayModel.count > 0)
-        resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+        root.reveal(root.selectedIndex)
     })
   }
 
@@ -330,7 +350,7 @@ Item {
     } else {
       selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count
     }
-    resultList.positionViewAtIndex(selectedIndex, ListView.Contain)
+    root.reveal(selectedIndex)
   }
 
   // Puts the cursor on index, clamped to the list, and scrolls to it.
@@ -340,7 +360,7 @@ Item {
     root.disarmPointer()
     root.cursorActive = true
     root.selectedIndex = Math.max(0, Math.min(index, displayModel.count - 1))
-    resultList.positionViewAtIndex(root.selectedIndex, ListView.Contain)
+    root.reveal(root.selectedIndex)
   }
 
   // Sets the search text, resets the cursor to the top and rebuilds the list.
@@ -354,12 +374,13 @@ Item {
 
   // Makes the mouse ignore hover until it really moves, so a still pointer does not steal the cursor.
   function disarmPointer() {
-    pointerGate.reset()
+    if (root.view)
+      root.view.disarmPointer()
   }
 
   // Moves the cursor to the hovered row, but only after real pointer movement.
   function selectFromPointer(index, item, mouse) {
-    if (!pointerGate.moved(item, mouse))
+    if (!root.view || !root.view.pointerMoved(item, mouse))
       return
     root.cursorActive = true
     root.selectedIndex = index
@@ -409,10 +430,10 @@ Item {
   // (by history index) for text; copyOnly only puts it on the clipboard.
   function pasteRow(row, copyOnly) {
     if (row.entryType === "image") {
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-file"].concat(copyOnly ? ["--copy-only"] : []).concat([row.mime, row.path]))
+      root.run([root.omarchyPath + "/bin/omarchy-clipboard-paste-file"].concat(copyOnly ? ["--copy-only"] : []).concat([row.mime, row.path]))
     } else {
       // Secrets have no display text; the script reads the entry by index.
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-paste-text", copyOnly ? "--copy-only" : "--shift-insert", "--history-index", String(row.historyIndex)])
+      root.run([root.omarchyPath + "/bin/omarchy-clipboard-paste-text", copyOnly ? "--copy-only" : "--shift-insert", "--history-index", String(row.historyIndex)])
     }
   }
 
@@ -446,11 +467,23 @@ Item {
     root.opened = false
     var plain = root.plainRow(row)
     root.whenSaved(function () {
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-clipboard-open", "--history-index", String(plain.historyIndex)])
+      root.run([root.omarchyPath + "/bin/omarchy-clipboard-open", "--history-index", String(plain.historyIndex)])
     })
   }
 
-  Component.onCompleted: initProc.running = true
+  Component.onCompleted: {
+    if (root.windowEnabled) {
+      var windowComponent = Qt.createComponent(Qt.resolvedUrl("ClipboardWindow.qml"))
+      if (windowComponent.status === Component.Ready)
+        root.view = windowComponent.createObject(root, {
+          root: root
+        })
+      else
+        console.warn("clipboard: window failed to load:", windowComponent.errorString())
+    }
+    if (root.captureEnabled)
+      initProc.running = true
+  }
 
   Timer {
     interval: 60000
@@ -482,12 +515,7 @@ Item {
   }
 
   ListModel {
-    id: displayModel
-  }
-
-  PointerMoveGate {
-    id: pointerGate
-    referenceItem: card
+    id: rowsModel
   }
 
   FileView {
@@ -584,27 +612,6 @@ Item {
     onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
     onFileChanged: reload()
   }
-  onOpenedChanged: if (opened && root.motionEnabled)
-    openAnimation.restart()
-  ParallelAnimation {
-    id: openAnimation
-    NumberAnimation {
-      target: card
-      property: "opacity"
-      from: 0
-      to: 1
-      duration: 180
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: card
-      property: "scale"
-      from: 0.97
-      to: 1
-      duration: 180
-      easing.type: Easing.OutCubic
-    }
-  }
 
   // Nerd Font icon for a row kind (link, path, code, image; text otherwise).
   function kindGlyph(kind) {
@@ -633,454 +640,5 @@ Item {
       parts.push("^S " + (row.secret ? "NOT SECRET" : "SECRET"))
     parts.push("DEL DROP")
     return parts.join("  ·  ")
-  }
-
-  PanelWindow {
-    id: panel
-    visible: root.opened
-    anchors {
-      top: true
-      bottom: true
-      left: true
-      right: true
-    }
-    color: "transparent"
-    WlrLayershell.namespace: "omarchy-clipboard"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-    exclusionMode: ExclusionMode.Ignore
-
-    Rectangle {
-      anchors.fill: parent
-      color: root.scrim
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.close()
-    }
-
-    BorderSurface {
-      id: card
-      width: root.cardWidth
-      height: root.cardHeight
-      radius: root.cornerRadius
-      anchors.centerIn: parent
-      color: root.background
-      borderSpec: root.borderSpec
-      padding: root.contentMargin
-
-      MouseArea {
-        anchors.fill: parent
-        onClicked: {}
-      }
-
-      Item {
-        id: keyCatcher
-        anchors.fill: parent
-        z: root.clearConfirmOpen ? 20 : 0
-        focus: true
-
-        Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function (event) {
-          if (root.clearConfirmOpen) {
-            if (clearConfirm.handleKey(event))
-              event.accepted = true
-            return
-          }
-
-          var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
-          if (event.key === Qt.Key_Escape) {
-            if (root.filterText)
-              root.setFilter("")
-            else
-              root.close()
-            event.accepted = true
-          } else if (ctrl && event.key === Qt.Key_P) {
-            root.togglePinnedIndex(root.selectedIndex)
-            event.accepted = true
-          } else if (ctrl && event.key === Qt.Key_S) {
-            root.toggleSecretIndex(root.selectedIndex)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Delete) {
-            if (ctrl && (event.modifiers & Qt.ShiftModifier))
-              root.requestClearHistory()
-            else
-              root.removeDisplayIndex(root.selectedIndex)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Space && !root.filterText && displayModel.count > 0 && displayModel.get(root.selectedIndex).secret) {
-            root.revealIndex(root.selectedIndex)
-            event.accepted = true
-          } else if (Util.editsFilter(event, root.filterText)) {
-            root.setFilter(Util.editedFilter(event, root.filterText))
-            event.accepted = true
-          } else if (event.key === Qt.Key_Up) {
-            root.select(-1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Down) {
-            root.select(1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_PageUp) {
-            root.select(-6)
-            event.accepted = true
-          } else if (event.key === Qt.Key_PageDown) {
-            root.select(6)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Home) {
-            root.selectAbsolute(0)
-            event.accepted = true
-          } else if (event.key === Qt.Key_End) {
-            root.selectAbsolute(displayModel.count - 1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.cursorActive && (event.modifiers & Qt.AltModifier))
-              root.openIndex(root.selectedIndex)
-            else if (root.cursorActive && (event.modifiers & Qt.ShiftModifier))
-              root.copyIndex(root.selectedIndex)
-            else if (root.cursorActive)
-              root.activateIndex(root.selectedIndex)
-            else if (displayModel.count > 0)
-              root.cursorActive = true
-            event.accepted = true
-          } else if (!ctrl && event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127) {
-            root.setFilter(root.filterText + event.text)
-            event.accepted = true
-          }
-        }
-
-        ConfirmDialog {
-          id: clearConfirm
-
-          anchors.fill: parent
-          opened: root.clearConfirmOpen
-          z: 10
-          message: "Delete all unpinned clipboard items?"
-          confirmText: "Delete"
-          background: root.background
-          foreground: root.foreground
-          scrim: root.scrim
-          selectedBackground: root.selectedBackground
-          selectedText: root.selectedText
-          fontFamily: root.fontFamily
-          cornerRadius: root.cornerRadius
-          onCanceled: root.cancelClearHistory()
-          onConfirmed: root.confirmClearHistory()
-        }
-      }
-
-      OverlayChrome {
-        anchors.fill: parent
-        anchors.topMargin: card.contentTopInset
-        anchors.rightMargin: card.contentRightInset
-        anchors.bottomMargin: card.contentBottomInset
-        anchors.leftMargin: card.contentLeftInset
-        title: "CLIPBOARD"
-        subtitle: "HISTORY // PASTE // PIN"
-        counts: root.history.length + " ITEMS" + (root.pinnedCount > 0 ? "  ·  " + root.pinnedCount + " 📌" : "")
-        searchText: root.filterText
-        searchPlaceholder: "Search clipboard…"
-        hints: root.opened ? root.hintText() : ""
-        fontFamily: root.fontFamily
-        foreground: root.foreground
-        accent: root.selectedText
-
-        Row {
-          anchors.fill: parent
-          spacing: 0
-
-          Item {
-            width: Math.round(parent.width * 0.48)
-            height: parent.height
-            clip: true
-
-            ListView {
-              id: resultList
-              anchors.fill: parent
-              anchors.rightMargin: root.contentMargin
-              model: displayModel
-              clip: true
-              spacing: Style.space(2)
-              boundsBehavior: Flickable.StopAtBounds
-
-              section.property: "section"
-              section.delegate: Item {
-                required property string section
-                width: ListView.view.width
-                height: Style.space(26)
-                // Hairline after the caption, as in the Aranea menu.
-                Rectangle {
-                  anchors.left: sectionCaption.right
-                  anchors.leftMargin: Style.space(8)
-                  anchors.right: parent.right
-                  anchors.rightMargin: Style.space(6)
-                  anchors.verticalCenter: sectionCaption.verticalCenter
-                  height: 1
-                  color: Util.alpha(root.foreground, 0.10)
-                }
-                Text {
-                  id: sectionCaption
-                  anchors.left: parent.left
-                  anchors.leftMargin: Style.space(6)
-                  anchors.bottom: parent.bottom
-                  anchors.bottomMargin: Style.space(4)
-                  textFormat: Text.PlainText
-                  text: parent.section === "pinned" ? "PINNED" : "RECENT"
-                  color: Util.alpha(root.foreground, 0.58)
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  font.weight: Font.Medium
-                  font.letterSpacing: 0.20
-                }
-              }
-
-              delegate: Rectangle {
-                id: row
-                required property int index
-                required property string kind
-                required property bool secret
-                required property bool pinned
-                required property string title
-                required property string detail
-                required property string previewImage
-                required property string colour
-                required property string swatch
-
-                readonly property bool hasCursor: root.cursorActive && index === root.selectedIndex
-
-                width: ListView.view.width
-                height: root.rowHeight
-                radius: root.cornerRadius
-                color: hasCursor ? root.selectedBackground : "transparent"
-
-                Behavior on color {
-                  ColorAnimation {
-                    duration: 120
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                // Mint rail on the selected row, as in the Aranea menu.
-                Rectangle {
-                  visible: row.hasCursor
-                  width: Style.space(2)
-                  height: parent.height - Style.space(14)
-                  radius: Style.space(1)
-                  color: root.selectedText
-                  opacity: 0.9
-                  anchors.left: parent.left
-                  anchors.leftMargin: Style.space(4)
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Row {
-                  anchors.fill: parent
-                  anchors.leftMargin: Style.space(14)
-                  anchors.rightMargin: Style.space(10)
-                  spacing: Style.space(10)
-
-                  Item {
-                    width: Style.space(22)
-                    height: parent.height
-
-                    Image {
-                      visible: row.previewImage.length > 0
-                      anchors.centerIn: parent
-                      width: parent.width
-                      height: parent.width
-                      source: row.previewImage
-                      sourceSize: Qt.size(44, 44)
-                      fillMode: Image.PreserveAspectCrop
-                      asynchronous: true
-                    }
-                    Rectangle {
-                      visible: row.swatch.length > 0
-                      anchors.centerIn: parent
-                      width: Style.space(14)
-                      height: Style.space(14)
-                      radius: Style.space(3)
-                      color: row.swatch.length > 0 ? row.swatch : "transparent"
-                      border.width: 1
-                      border.color: Util.alpha(root.foreground, 0.25)
-                    }
-                    Text {
-                      visible: row.previewImage.length === 0 && row.colour.length === 0
-                      anchors.centerIn: parent
-                      textFormat: Text.PlainText
-                      text: row.secret ? "󰌾" : root.kindGlyph(row.kind)
-                      color: row.hasCursor ? root.selectedText : Util.alpha(root.foreground, 0.7)
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.icon
-                    }
-                  }
-
-                  Text {
-                    width: parent.width - Style.space(22) - detailText.width - parent.spacing * 2
-                    height: parent.height
-                    textFormat: Text.PlainText
-                    text: row.title
-                    color: row.hasCursor ? root.selectedText : root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    elide: Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    verticalAlignment: Text.AlignVCenter
-                  }
-
-                  Text {
-                    id: detailText
-                    height: parent.height
-                    textFormat: Text.PlainText
-                    text: (row.pinned ? "📌 " : "") + row.detail
-                    color: Util.alpha(root.foreground, 0.5)
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    verticalAlignment: Text.AlignVCenter
-                  }
-                }
-
-                MouseArea {
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onPositionChanged: function (mouse) {
-                    root.selectFromPointer(row.index, row, mouse)
-                  }
-                  onClicked: {
-                    root.cursorActive = true
-                    root.selectedIndex = row.index
-                    root.activateIndex(row.index)
-                  }
-                }
-              }
-            }
-          }
-
-          // Preview of the selected item.
-          Item {
-            id: preview
-            width: parent.width - Math.round(parent.width * 0.48)
-            height: parent.height
-            clip: true
-
-            property var activeRow: displayModel.count > 0 && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count ? displayModel.get(root.selectedIndex) : null
-            readonly property bool masked: !!activeRow && activeRow.secret && root.revealedIndex !== root.selectedIndex
-
-            Rectangle {
-              anchors.left: parent.left
-              anchors.top: parent.top
-              anchors.bottom: parent.bottom
-              width: Style.normalBorderWidth
-              color: Util.alpha(root.border, 0.28)
-            }
-
-            // Secret: masked until revealed with Space for this selection.
-            Column {
-              visible: preview.masked
-              anchors.left: parent.left
-              anchors.leftMargin: root.contentMargin
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(8)
-              Text {
-                textFormat: Text.PlainText
-                text: "•••••••••••••••• · secret"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.title
-              }
-              Text {
-                textFormat: Text.PlainText
-                text: {
-                  var left = preview.activeRow ? ClipboardLogic.secretExpiryText(root.history[preview.activeRow.historyIndex], root.nowMs, root.secretTtlMs) : ""
-                  return "SPACE TO REVEAL" + (left ? "  ·  " + left.toUpperCase() : "")
-                }
-                color: Util.alpha(root.foreground, 0.5)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.letterSpacing: 0.20
-              }
-            }
-
-            // Colour swatch.
-            Column {
-              visible: !preview.masked && !!preview.activeRow && preview.activeRow.colour.length > 0
-              anchors.left: parent.left
-              anchors.leftMargin: root.contentMargin
-              anchors.top: parent.top
-              spacing: Style.space(10)
-              Rectangle {
-                visible: !!preview.activeRow && preview.activeRow.swatch.length > 0
-                width: Style.space(120)
-                height: Style.space(80)
-                radius: root.cornerRadius
-                color: preview.activeRow && preview.activeRow.swatch.length > 0 ? preview.activeRow.swatch : "transparent"
-                border.width: 1
-                border.color: Util.alpha(root.foreground, 0.25)
-              }
-              Text {
-                textFormat: Text.PlainText
-                text: preview.activeRow ? preview.activeRow.colour : ""
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.title
-              }
-            }
-
-            // Text, code, links and paths (revealed secrets fetch their text
-            // from history by index: display rows never carry it).
-            Text {
-              visible: !preview.masked && !!preview.activeRow && !preview.activeRow.previewImage && preview.activeRow.colour.length === 0
-              anchors.fill: parent
-              anchors.leftMargin: root.contentMargin
-              textFormat: Text.PlainText
-              text: !preview.activeRow ? "" : (preview.activeRow.secret ? ClipboardLogic.fullText(root.history[preview.activeRow.historyIndex]) : preview.activeRow.fullText)
-              color: root.foreground
-              font.family: preview.activeRow && preview.activeRow.kind === "code" ? "monospace" : root.fontFamily
-              font.pixelSize: preview.activeRow && preview.activeRow.kind === "code" ? Style.font.body : Style.font.title
-              wrapMode: Text.WrapAnywhere
-              elide: Text.ElideRight
-              verticalAlignment: Text.AlignTop
-            }
-
-            Image {
-              visible: !preview.masked && !!preview.activeRow && preview.activeRow.previewImage.length > 0
-              anchors.fill: parent
-              anchors.leftMargin: root.contentMargin
-              source: preview.activeRow ? preview.activeRow.previewImage : ""
-              fillMode: Image.PreserveAspectFit
-              verticalAlignment: Image.AlignTop
-              asynchronous: true
-              smooth: true
-            }
-          }
-        }
-
-        Column {
-          anchors.centerIn: parent
-          spacing: Style.space(8)
-          visible: displayModel.count === 0
-
-          Text {
-            text: "󰅌"
-            color: root.selectedText
-            opacity: 0.8
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.displayLarge
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            text: root.history.length === 0 ? "Clipboard is empty" : "No matches for “" + root.filterText + "”"
-            color: root.foreground
-            opacity: 0.7
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.title
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
-          }
-        }
-      }
-    }
   }
 }
