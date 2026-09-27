@@ -41,6 +41,7 @@ var GLYPH_CONTAINER = "󰡨"
  * @property {Array<number>} exits - times (ms) of non-zero exits
  * @property {string} last - last action seen: "die" or "start"
  * @property {number} lastExit - exit code of the last die (0 when running)
+ * @property {boolean} [oomKilled] - the kernel killed it for memory since its last start
  */
 
 /**
@@ -250,7 +251,8 @@ function parseDockerEvent(line) {
   var attrs = e && e.Actor && e.Actor.Attributes
   if (!attrs || !attrs.name) return null
   var action = String(e.Action || e.status || "")
-  if (action !== "die" && action !== "start" && action !== "destroy") return null
+  if (action !== "die" && action !== "start" && action !== "destroy" && action !== "oom")
+    return null
   return {
     action: action,
     name: String(attrs.name),
@@ -260,10 +262,25 @@ function parseDockerEvent(line) {
   }
 }
 
-// history: name -> { image, exits: [ms], last: "die"|"start", lastExit: int }
+/**
+ * Whether a container's last exit is a failure: nonzero, except 137
+ * (SIGKILL) and 143 (SIGTERM), which `docker stop` produces, unless the
+ * kernel killed it for memory (oomKilled).
+ * @param {{lastExit: number, oomKilled?: boolean}} entry - the container's history entry
+ * @returns {boolean} true when the exit should be reported
+ */
+function isFailedExit(entry) {
+  var code = Number(entry && entry.lastExit) || 0
+  if (code === 0) return false
+  if ((code === 137 || code === 143) && !(entry && entry.oomKilled)) return false
+  return true
+}
+
+// history: name -> { image, exits: [ms], last: "die"|"start", lastExit: int, oomKilled }
 /**
  * Applies one docker event to a copy of the history: destroy forgets the
- * container, a non-zero die records an exit, exits older than the loop window drop.
+ * container, oom marks it killed for memory (until its next start), a failed
+ * die (see isFailedExit) records an exit, exits older than the loop window drop.
  * @param {?{[key: string]: DockerHistoryEntry}} history - current history by container name
  * @param {?DockerEvent} event - the event; null returns an unchanged copy
  * @param {number} now - current time in ms
@@ -278,16 +295,37 @@ function recordDockerEvent(history, event, now) {
     delete next[event.name]
     return next
   }
-  var prev = next[event.name] || { image: event.image, exits: [], last: "start", lastExit: 0 }
+  var prev = next[event.name] || {
+    image: event.image,
+    exits: [],
+    last: "start",
+    lastExit: 0,
+    oomKilled: false
+  }
+  if (event.action === "oom") {
+    // The die event that follows reports the kill (usually 137); remember
+    // why, so it is not taken for a `docker stop`.
+    next[event.name] = {
+      image: prev.image,
+      exits: prev.exits,
+      last: prev.last,
+      lastExit: prev.lastExit,
+      oomKilled: true
+    }
+    return next
+  }
+  var oomKilled = event.action === "start" ? false : !!prev.oomKilled
   var exits = prev.exits.filter(function (t) {
     return now - t <= LOOP_WINDOW_MS
   })
-  if (event.action === "die" && event.exitCode !== 0) exits.push(now)
+  if (event.action === "die" && isFailedExit({ lastExit: event.exitCode, oomKilled: oomKilled }))
+    exits.push(now)
   next[event.name] = {
     image: event.image || prev.image,
     exits: exits,
     last: event.action,
-    lastExit: event.action === "die" ? event.exitCode : prev.lastExit
+    lastExit: event.action === "die" ? event.exitCode : prev.lastExit,
+    oomKilled: oomKilled
   }
   return next
 }
@@ -347,7 +385,8 @@ function seedDockerHistory(history, containers, now) {
       image: c.image || (prev && prev.image) || "",
       exits: exits,
       last: c.running ? "start" : "die",
-      lastExit: c.running ? 0 : c.exitCode
+      lastExit: c.running ? 0 : c.exitCode,
+      oomKilled: prev ? !!prev.oomKilled && !c.running : false
     }
   }
   return next
@@ -369,7 +408,7 @@ function pruneDockerHistory(history, now) {
     var recent = h.exits.filter(function (t) {
       return now - t <= LOOP_WINDOW_MS
     }).length
-    if (recent > 0 || (h.last === "die" && h.lastExit !== 0)) next[name] = h
+    if (recent > 0 || (h.last === "die" && isFailedExit(h))) next[name] = h
   }
   return next
 }
@@ -389,7 +428,7 @@ function containerProblems(history, now) {
       return now - t <= LOOP_WINDOW_MS
     }).length
     var loop = exits >= LOOP_EXITS
-    if (!loop && !(h.last === "die" && h.lastExit !== 0)) continue
+    if (!loop && !(h.last === "die" && isFailedExit(h))) continue
     out.push({
       key: "container:" + name,
       check: "container",
@@ -563,6 +602,7 @@ function moveCursorKey(rows, key, delta) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    isFailedExit: isFailedExit,
     indexOfKey: indexOfKey,
     moveCursorKey: moveCursorKey,
     checkOf: checkOf,

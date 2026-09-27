@@ -99,4 +99,10 @@ if grep -Fq 'root.problems[root.cursor]' "$hpanel"; then
 fi
 grep -Fq 'onServiceChanged:' "$hpanel"
 
+# --- 4c: docker OOM events are watched; a failed `docker ps` never clears problems
+mon="$repo_root/plugins/araneadev.health/Monitor.qml"
+grep -Fq '"--filter", "event=oom"' "$mon"
+grep -Fq 'function finishDockerPs(): void' "$mon"
+grep -Fq 'if (monitor.dockerPsCode !== 0)' "$mon"
+
 echo "health contract passed"

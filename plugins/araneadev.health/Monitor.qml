@@ -210,40 +210,75 @@ Item {
       dockerInfo.running = true
   }
 
+  // `docker info` prints the server version only when the daemon answered,
+  // so a non-empty answer means docker is up (no exit-code handler needed).
   Process {
     id: dockerInfo
     command: ["timeout", "10", "docker", "info", "--format", "{{.ServerVersion}}"]
-    onExited: function (code) {
-      if (code === 0) {
-        dockerPs.running = true
-      } else {
-        monitor.markUnknown("container", "docker not running")
-        dockerRetry.restart()
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (text.trim()) {
+          monitor.dockerPsText = null
+          monitor.dockerPsCode = null
+          dockerPs.running = true
+        } else {
+          monitor.markUnknown("container", "docker not running")
+          dockerRetry.restart()
+        }
       }
     }
   }
 
+  // Output of the running `docker ps`, null until it arrives.
+  property var dockerPsText: null
+  // Exit code of the running `docker ps`, null until it exits.
+  property var dockerPsCode: null
+
   // On every (re)connect the current container states are the truth: they
   // cover a shell restart (empty history) and events missed while the stream
-  // was down. The stream then continues from the snapshot time.
+  // was down. The stream then continues from the snapshot time. Seeds only
+  // once `docker ps` has both finished its output and exited (either may come
+  // first); a nonzero exit (including timeout's 124) marks docker unknown and
+  // leaves the existing container problems alone.
+  function finishDockerPs(): void {
+    if (monitor.dockerPsText === null || monitor.dockerPsCode === null)
+      return
+    if (monitor.dockerPsCode !== 0) {
+      monitor.dockerPsText = null
+      monitor.dockerPsCode = null
+      monitor.markUnknown("container", "docker ps failed")
+      dockerRetry.restart()
+      return
+    }
+    var containers = HealthLogic.parseDockerPs(monitor.dockerPsText)
+    monitor.dockerPsText = null
+    monitor.dockerPsCode = null
+    if (containers === null) {
+      monitor.markUnknown("container", "docker ps failed")
+      dockerRetry.restart()
+      return
+    }
+    var now = Date.now()
+    monitor.dockerHistory = HealthLogic.seedDockerHistory(monitor.dockerHistory, containers, now)
+    dockerEvents.command = ["docker", "events", "--since", String(Math.floor(now / 1000)), "--filter", "type=container", "--filter", "event=die", "--filter", "event=oom", "--filter", "event=start", "--filter", "event=destroy", "--format", "{{json .}}"]
+    dockerEvents.running = true
+    monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
+  }
+
   Process {
     id: dockerPs
     command: ["timeout", "10", "docker", "ps", "-a", "--format", "{{json .}}"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var containers = HealthLogic.parseDockerPs(text)
-        if (containers === null) {
-          monitor.markUnknown("container", "docker ps failed")
-          dockerRetry.restart()
-          return
-        }
-        var now = Date.now()
-        monitor.dockerHistory = HealthLogic.seedDockerHistory(monitor.dockerHistory, containers, now)
-        dockerEvents.command = ["docker", "events", "--since", String(Math.floor(now / 1000)), "--filter", "type=container", "--filter", "event=die", "--filter", "event=start", "--filter", "event=destroy", "--format", "{{json .}}"]
-        dockerEvents.running = true
-        monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
+        monitor.dockerPsText = text
+        monitor.finishDockerPs()
       }
+    }
+    onExited: function (code) {
+      monitor.dockerPsCode = code
+      monitor.finishDockerPs()
     }
   }
 

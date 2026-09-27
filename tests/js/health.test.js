@@ -296,3 +296,54 @@ test("health cursor by key (4c)", () => {
   const resorted = [{ key: "reboot" }].concat(rows)
   eq(h.indexOfKey(resorted, "unit:user:x"), 2, "follows its row")
 })
+
+test("docker stops, OOM and failed ps (4c)", () => {
+  const h = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/HealthLogic.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const now = 10000000
+  const ps = (status) =>
+    h.parseDockerPs(JSON.stringify({ Names: "db", Image: "pg", State: "exited", Status: status }))
+  const problems = (hist) => h.containerProblems(hist, now).map((p) => p.key)
+  eq(
+    problems(h.seedDockerHistory({}, ps("Exited (143) 1 minute ago"), now)),
+    [],
+    "SIGTERM stop is clean"
+  )
+  eq(
+    problems(h.seedDockerHistory({}, ps("Exited (137) 1 minute ago"), now)),
+    [],
+    "SIGKILL stop is clean"
+  )
+  eq(
+    problems(h.seedDockerHistory({}, ps("Exited (1) 1 minute ago"), now)),
+    ["container:db"],
+    "real failure"
+  )
+  const ev = (action, exitCode) =>
+    h.parseDockerEvent(
+      JSON.stringify({
+        Action: action,
+        time: now / 1000,
+        Actor: { Attributes: { name: "db", image: "pg", exitCode: String(exitCode || 0) } }
+      })
+    )
+  eq(ev("oom").action, "oom", "oom events are parsed")
+  let hist = h.recordDockerEvent({}, ev("start"), now)
+  hist = h.recordDockerEvent(hist, ev("oom"), now)
+  hist = h.recordDockerEvent(hist, ev("die", 137), now)
+  eq(problems(hist), ["container:db"], "OOM kill is flagged")
+  eq(h.pruneDockerHistory(hist, now).db !== undefined, true, "OOM kill kept by pruning")
+  hist = h.recordDockerEvent(hist, ev("start"), now)
+  eq(hist.db.oomKilled, false, "start clears the OOM mark")
+  let stops = h.recordDockerEvent({}, ev("die", 143), now)
+  stops = h.recordDockerEvent(stops, ev("start"), now)
+  stops = h.recordDockerEvent(stops, ev("die", 143), now)
+  stops = h.recordDockerEvent(stops, ev("start"), now)
+  stops = h.recordDockerEvent(stops, ev("die", 143), now)
+  eq(stops.db.exits.length, 0, "clean stops never count toward a restart loop")
+  eq(h.isFailedExit({ lastExit: 143 }), false, "143")
+  eq(h.isFailedExit({ lastExit: 137, oomKilled: true }), true, "137 with OOM")
+  eq(h.isFailedExit({ lastExit: 2 }), true, "2")
+})
