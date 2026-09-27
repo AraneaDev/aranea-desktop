@@ -358,3 +358,26 @@ test("body sanitizing, argv and image persistence (4c)", () => {
   eq(n.parseSettings('{"version":3,"dnd":true}').dnd, true, "settings")
   eq(n.parseSettings("{").error, true, "broken settings")
 })
+
+test("center images after a write (4c final review)", () => {
+  const n = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const live = { image: "image://qsimage/42", appIcon: "/tmp/.org.chromium/icon.png" }
+  const record = { image: "", appIcon: "file:///S/images/5-3-appIcon" }
+  // image:// cannot be copied: the live avatar stays while the sender lives
+  eq(
+    n.shownImages(record, live, ["/S/images/5-3-appIcon"]),
+    { appIcon: "file:///S/images/5-3-appIcon", image: "image://qsimage/42" },
+    "copied roles switch, others stay live"
+  )
+  // a refused copy (too big, FIFO, source gone) keeps the live value
+  eq(
+    n.shownImages(record, live, []),
+    { appIcon: "/tmp/.org.chromium/icon.png", image: "image://qsimage/42" },
+    "failed copy keeps the live path"
+  )
+})

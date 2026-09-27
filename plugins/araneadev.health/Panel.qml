@@ -48,6 +48,9 @@ Panel {
   property string cursorKey: ""
   // Index of cursorKey's row in problems, -1 when none.
   readonly property int cursor: HealthLogic.indexOfKey(root.problems, root.cursorKey)
+  // A problem that went away takes the cursor with it.
+  onCursorChanged: if (root.cursor < 0 && root.cursorKey)
+    root.cursorKey = ""
 
   // Colour for a usage level: urgent, amber, or the normal text colour.
   function levelColor(level: string): color {

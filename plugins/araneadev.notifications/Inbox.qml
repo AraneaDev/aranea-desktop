@@ -120,22 +120,24 @@ Item {
       inboxModel.insert(0, row)
     }
     revision++
-    writeFile(entry, function (record) {
-      inbox.showPersisted(record)
+    writeFile(entry, function (record, output) {
+      inbox.showPersisted(record, entry, output)
     })
     prune()
   }
 
-  // After a write, shows the persisted image copies instead of the sender's
-  // temporary paths (which vanish when the sender cleans up).
-  function showPersisted(record): void {
+  // After a write, shows the image copies that were made instead of the
+  // sender's temporary paths (which vanish when the sender cleans up); see
+  // NotificationLogic.shownImages.
+  function showPersisted(record, live, copied): void {
     if (!record)
       return
     var i = indexOf(NotificationLogic.popupFileName(record))
     if (i < 0)
       return
-    inboxModel.setProperty(i, "image", record.image || "")
-    inboxModel.setProperty(i, "appIcon", record.appIcon || "")
+    var shown = NotificationLogic.shownImages(record, live, copied || [])
+    inboxModel.setProperty(i, "image", shown.image || "")
+    inboxModel.setProperty(i, "appIcon", shown.appIcon || "")
     revision++
   }
 
@@ -192,13 +194,15 @@ Item {
   // Consumes the remaining args as from/to pairs. Bounded read into a temp
   // file, validated, then renamed into place: the source path is
   // sender-controlled and may grow, block, or become a FIFO mid-copy, and
-  // must neither hang the serialized queue nor fill the state dir.
-  readonly property string copyImagesScript: "while (( $# >= 2 )); do\n" + "  if [[ -f $1 ]] && timeout 5 head -c 5242881 -- \"$1\" > \"$2.tmp\" 2>/dev/null &&\n" + "     (( $(stat -c%s -- \"$2.tmp\") <= 5242880 )); then mv -f -- \"$2.tmp\" \"$2\"; else rm -f -- \"$2.tmp\"; fi\n" + "  shift 2\n" + "done\n"
+  // must neither hang the serialized queue nor fill the state dir. It
+  // prints each copied target, so the center only shows copies that exist.
+  readonly property string copyImagesScript: "while (( $# >= 2 )); do\n" + "  if [[ -f $1 ]] && timeout 5 head -c 5242881 -- \"$1\" > \"$2.tmp\" 2>/dev/null &&\n" + "     (( $(stat -c%s -- \"$2.tmp\") <= 5242880 )); then mv -f -- \"$2.tmp\" \"$2\" && printf '%s\\n' \"$2\"; else rm -f -- \"$2.tmp\"; fi\n" + "  shift 2\n" + "done\n"
 
   // The JSON travels on stdin (one line; serializePopup is compact), never as
   // an argument (argv is limited to 128 KiB per argument) or through shell
   // interpolation. Image copies run before the JSON that references them.
-  // done, when given, receives the persisted record once the write finished.
+  // done, when given, receives the persisted record and the job's output
+  // lines (the copied image targets) once the write finished.
   function writeFile(entry, done) {
     if (!entry) {
       if (done)
@@ -210,8 +214,8 @@ Item {
     var command = ["bash", "-c", "IFS= read -r json || exit 0\n" + "mkdir -p \"$1\" \"$2\" || exit 0\n" + "dir=\"$1\" name=\"$3\"\n" + "shift 3\n" + copyImagesScript + "printf '%s\\n' \"$json\" > \"$dir/$name.tmp\" && mv -f -- \"$dir/$name.tmp\" \"$dir/$name\"", "--", inboxDir, imagesDir, NotificationLogic.popupFileName(record)]
     for (var i = 0; i < persistable.copies.length; i++)
       command.push(persistable.copies[i].from, persistable.copies[i].to)
-    enqueue(command, done ? function () {
-      done(record)
+    enqueue(command, done ? function (output) {
+      done(record, output)
     } : null, NotificationLogic.serializePopup(record, normalUrgency))
   }
 
@@ -225,6 +229,8 @@ Item {
   property string runningStdin: ""
   // Whether the running job's process started (a failed start never exits).
   property bool runningStarted: false
+  // Lines the running job printed (the write job prints its copied images).
+  property var runningOutput: []
 
   // Queues an argv to run after every job already queued, with an optional done
   // callback and an optional line for its stdin.
@@ -250,17 +256,20 @@ Item {
     inbox.runningStdin = job.stdin
     inbox.runningDone = job.done
     inbox.runningStarted = false
+    inbox.runningOutput = []
     fileProc.running = true
   }
 
   // Calls the running job's done callback once and starts the next job.
   function finishJob(): void {
     var done = inbox.runningDone
+    var output = inbox.runningOutput
     inbox.runningDone = null
     inbox.runningStdin = ""
+    inbox.runningOutput = []
     if (done) {
       try {
-        done()
+        done(output)
       } catch (e) {
         console.warn("notifications: inbox job callback failed:", e)
       }
@@ -271,6 +280,11 @@ Item {
   Process {
     id: fileProc
     running: false
+    stdout: SplitParser {
+      onRead: function (line) {
+        inbox.runningOutput = inbox.runningOutput.concat([line])
+      }
+    }
     onStarted: {
       inbox.runningStarted = true
       if (inbox.runningStdin)
@@ -336,8 +350,6 @@ Item {
     var rows = InboxLogic.mergeLoaded(diskRows, liveRows, removedDuringLoad, clearedDuringLoad)
     var dropped = clearedDuringLoad ? ({}) : removedDuringLoad
     var cleared = clearedDuringLoad
-    removedDuringLoad = ({})
-    clearedDuringLoad = false
     inboxModel.clear()
     for (var k = 0; k < rows.length; k++)
       inboxModel.append(rows[k])
@@ -350,12 +362,15 @@ Item {
       if (cleared || dropped[oldName])
         continue
       var fixed = Object.assign({}, future[f])
-      fixed.timestamp = now
+      // Distinct and in their original order (future is newest first).
+      fixed.timestamp = now - f
       // Write first: the new write copies the old persisted images, and the
       // queue runs in order, so the old files are deleted only afterwards.
       upsert(fixed)
       remove(oldName)
     }
+    removedDuringLoad = ({})
+    clearedDuringLoad = false
     prune()
     sweepOrphanImages()
     var done = loadDone

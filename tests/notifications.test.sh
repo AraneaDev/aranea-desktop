@@ -104,7 +104,6 @@ grep -Fq 'InboxLogic.mergeLoaded(' "$inbox_qml"
 grep -Fq 'NotificationLogic.clampTimestamp(' "$inbox_qml"
 grep -Fq 'service.releaseInboxRef(fileName)' "$svc"
 grep -Fq 'onPruned' "$svc"
-grep -Fq 'NotificationLogic.persistablePopup(updated, inbox.imagesDir).entry' "$svc"
 grep -Fq 'critical notifications stay until dismissed' "$repo_root/README.md"
 
 # --- 4c: quiet hours follow a minute-aligned clock; a pending DND save is flushed
@@ -132,5 +131,18 @@ if grep -Eq 'accentColor|property double timestamp' "$card_qml"; then
   echo "unused card properties are back" >&2
   exit 1
 fi
+
+# --- 4c final review: updates compare live snapshots; only copied images are
+# swapped in; new art under the same persisted path is not served from cache
+grep -Fq 'property var liveSnapshots: ({})' "$svc"
+grep -Fq 'NotificationLogic.shownImages(' "$inbox_qml"
+grep -Fq 'prints each copied target' "$inbox_qml"
+grep -Fq 'cache: false' "$card_qml"
+grep -Fq 'settingsFile.blockWrites = true' "$svc"
+
+# --- 4c final review: after Delete/Enter expands a group the cursor lands on
+# the first revealed entry; migrated future entries keep distinct times
+grep -Fq 'function expandAt(index: int): void' "$panel_qml"
+grep -Fq 'fixed.timestamp = now - f' "$inbox_qml"
 
 echo "notifications contract passed"

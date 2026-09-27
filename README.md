@@ -307,8 +307,9 @@ opens btop. Health problems never go to the notification center.
 - **Failed services** (system or user) — critical; click opens its journal.
 - **Disk almost full** — from 90 %, critical from 97 %; clears below 88 %.
 - **Reboot needed** — after a kernel update removed the running kernel's modules.
-- **Containers exiting** — a non-zero exit, or critical when a container keeps
-  restarting (3 exits in 5 minutes).
+- **Containers exiting** — a non-zero exit (137 or 143 from a `docker stop`
+  only when the container was killed for memory), or critical when a
+  container keeps restarting (3 exits in 5 minutes).
 
 Problems appear and clear with the condition itself; `aranea-doctor` lists
 which checks are on.

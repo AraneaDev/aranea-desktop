@@ -78,6 +78,9 @@ Item {
   // sender's own action. Empty after a shell restart: those entries fall back
   // to execArgv / focusing the app.
   property var inboxRefs: ({})
+  // The last snapshot each live sender gave for its inbox entry (by file
+  // name), so refreshInbox can tell a real update from a repeat signal.
+  property var liveSnapshots: ({})
 
   // Pause holds per toast (key: timestamp-originalId); a hover or drag on any
   // screen's copy holds it, so no screen can expire a toast being read.
@@ -277,11 +280,14 @@ Item {
   function storeInInbox(notification, snapshot) {
     var fileName = NotificationLogic.popupFileName(snapshot)
     inboxRefs[fileName] = notification
+    liveSnapshots[fileName] = snapshot
     // The sender closing its notification (it was read elsewhere, the app
     // quit) only ends the live link; the entry waits until the user clears it.
     notification.closed.connect(function () {
-      if (service.inboxRefs[fileName] === notification)
+      if (service.inboxRefs[fileName] === notification) {
         delete service.inboxRefs[fileName]
+        delete service.liveSnapshots[fileName]
+      }
     })
     inbox.upsert(snapshot)
     var refresh = function () {
@@ -305,11 +311,13 @@ Item {
     } catch (e) {
       return
     }
-    var current = inbox.get(fileName)
-    // The model shows the persisted image copies (Inbox.showPersisted), so
-    // compare against the persisted form, or every update would rewrite.
-    if (current && !NotificationLogic.popupRowChanged(current, NotificationLogic.persistablePopup(updated, inbox.imagesDir).entry))
+    // Compare with what the sender sent last time, not with the model: the
+    // model shows persisted copies, which reuse one path per entry, so a
+    // change of image alone would look like no change.
+    var previous = service.liveSnapshots[fileName]
+    if (previous && !NotificationLogic.popupRowChanged(previous, updated))
       return
+    service.liveSnapshots[fileName] = updated
     inbox.upsert(updated)
   }
 
@@ -429,6 +437,7 @@ Item {
   function releaseInboxRef(fileName: string): void {
     var ref = inboxRefs[fileName]
     delete inboxRefs[fileName]
+    delete liveSnapshots[fileName]
     if (!ref)
       return
     try {
@@ -614,8 +623,11 @@ Item {
 
   Component.onDestruction: {
     // A toggle less than 200 ms old would otherwise be lost with the timer.
-    if (settingsSaveTimer.running)
+    if (settingsSaveTimer.running) {
+      // Write synchronously: this object is about to go.
+      settingsFile.blockWrites = true
       service.flushSettings()
+    }
     ServiceBridge.retract(service)
   }
 

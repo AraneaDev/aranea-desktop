@@ -676,6 +676,29 @@ function isWithinQuietHours(window, date) {
 }
 
 /**
+ * The image values the center shows for an entry after its write: a role
+ * whose copy into the state dir succeeded shows the copy; every other role
+ * (an image:// value, which cannot be copied, or a refused copy) keeps the
+ * sender's live value.
+ * @param {Dict} record - the persisted record (persistablePopup(...).entry)
+ * @param {Dict} live - the entry as the sender gave it
+ * @param {Array<string>} copied - target paths the write reported as copied
+ * @returns {{[key: string]: string}} the image and appIcon values to show
+ */
+function shownImages(record, live, copied) {
+  /** @type {{[key: string]: string}} */
+  var out = {}
+  for (var i = 0; i < PERSISTED_IMAGE_ROLES.length; i++) {
+    var role = PERSISTED_IMAGE_ROLES[i]
+    var persisted = String((record || {})[role] || "")
+    var path = persisted.indexOf("file://") === 0 ? persisted.slice(7) : ""
+    out[role] =
+      path && (copied || []).indexOf(path) >= 0 ? persisted : String((live || {})[role] || "")
+  }
+  return out
+}
+
+/**
  * Caps a timestamp at now, so an entry dated in the future neither sorts
  * first nor outlives the age limit.
  * @param {*} ts - the timestamp in ms
@@ -709,6 +732,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     holdPopup: holdPopup,
     clampTimestamp: clampTimestamp,
+    shownImages: shownImages,
     isChromiumDerived: isChromiumDerived,
     sanitizeBody: sanitizeBody,
     styledBody: styledBody,

@@ -113,4 +113,8 @@ if grep -Fq 'var now = Date.now()' "$metrics_qml"; then
   exit 1
 fi
 
+# --- 4c final review: a cursor whose problem is gone is cleared
+grep -Fq 'onCursorChanged: if (root.cursor < 0 && root.cursorKey)' "$hpanel"
+grep -Fq '137 or 143' "$repo_root/README.md"
+
 echo "health contract passed"

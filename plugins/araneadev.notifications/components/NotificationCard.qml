@@ -261,6 +261,9 @@ BorderSurface {
           id: smallIconImage
           anchors.fill: parent
           source: root.smallIconSource
+          // An updated image is copied to the same persisted path; never serve
+          // the previous picture from Qt's image cache.
+          cache: false
           sourceSize.width: smallIconSlot.width * Screen.devicePixelRatio
           sourceSize.height: smallIconSlot.height * Screen.devicePixelRatio
           fillMode: Image.PreserveAspectFit

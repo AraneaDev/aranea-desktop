@@ -119,6 +119,18 @@ Panel {
     root.expanded = next
   }
 
+  // Expands the "+N more" row at index and puts the cursor on the first
+  // entry it revealed (the more row itself is gone after the expand).
+  function expandAt(index: int): void {
+    var row = rows[index]
+    if (!row)
+      return
+    toggleGroup(row.app)
+    var revealed = rows[index]
+    if (revealed && revealed.kind === "entry")
+      root.cursorKey = InboxLogic.rowKey(revealed)
+  }
+
   // Enter on a row: runs an entry's action, or toggles a group or "more" row.
   function activate(index: int): void {
     var row = rows[index]
@@ -126,7 +138,9 @@ Panel {
       return
     if (row.kind === "entry")
       service.invokeInbox(row.entry.fileName)
-    else if (row.kind === "more" || row.kind === "group")
+    else if (row.kind === "more")
+      expandAt(index)
+    else if (row.kind === "group")
       toggleGroup(row.app)
   }
 
@@ -135,7 +149,7 @@ Panel {
     var row = rows[index]
     var action = InboxLogic.dismissAction(row, wholeGroup)
     if (action === "expand")
-      toggleGroup(row.app)
+      expandAt(index)
     else if (action === "group")
       service.dismissGroup(row.app)
     else if (action === "dismiss")
