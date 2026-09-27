@@ -118,22 +118,33 @@ if ((capture_all)); then
   batch_swapped=1
   omarchy restart shell >/dev/null 2>&1 || true
   sleep 3
-  # Captures one surface in a child run; fails only when no PNG was written.
+  # Captures one surface in a child run; fails when it wrote no PNG (an old
+  # PNG from an earlier run is removed first, so it never counts).
   capture_one() {
     local all_surface="$1"
-    if ! "$0" --surface "$all_surface" --output "$output"; then
-      printf 'capture warning: %s failed; continuing batch\n' "$all_surface" >&2
-      [[ -f "$output/$all_surface.png" ]] || return 1
-    fi
+    rm -f -- "$output/$all_surface.png"
+    "$0" --surface "$all_surface" --output "$output" || true
+    [[ -f "$output/$all_surface.png" ]]
   }
+  # A failed surface is reported at the end; the batch captures the rest.
+  failed_surfaces=()
   for all_surface in "${all_surfaces[@]}"; do
-    capture_one "$all_surface"
+    capture_one "$all_surface" || failed_surfaces+=("$all_surface")
   done
-  build_hero_showcase
+  # The hero GIF needs every frame; with failures it is left as it was.
+  if ((${#failed_surfaces[@]} == 0)); then
+    build_hero_showcase
+  else
+    printf '%s\n' 'hero showcase not rebuilt: some surfaces failed' >&2
+  fi
   # Normal completion restores explicitly; the trap only covers a batch that
   # stops early.
   trap - EXIT
   finish_batch
+  if ((${#failed_surfaces[@]})); then
+    printf 'capture failed: %s\n' "${failed_surfaces[*]}" >&2
+    exit 1
+  fi
   exit 0
 fi
 

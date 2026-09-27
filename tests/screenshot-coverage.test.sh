@@ -131,4 +131,10 @@ for index in "${!expected_hero_frames[@]}"; do
   awk -v metric="$normalized_metric" 'BEGIN { exit !(metric < 0.03) }'
 done
 
+# --- 4d: --all captures every surface, lists failures and exits 1 on any
+capture="$repo_root/scripts/capture-screenshots"
+grep -Fq "capture_one \"\$all_surface\" || failed_surfaces+=(\"\$all_surface\")" "$capture"
+grep -Fq "rm -f -- \"\$output/\$all_surface.png\"" "$capture"
+grep -Fq "printf 'capture failed: %s\\n' \"\${failed_surfaces[*]}\"" "$capture"
+
 echo "screenshot coverage contract passed (${#surfaces[@]} surfaces)"
