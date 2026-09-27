@@ -4,19 +4,21 @@ set -euo pipefail
 # Captures screenshots of Aranea surfaces into an output directory. --surface
 # captures one; --all (only on workspace 2, needs hyprctl) captures every
 # surface with the real notification inbox parked, then builds
-# hero-showcase.gif. Surfaces without a built-in capture use
-# ARANEA_SCREENSHOT_COMMAND.
+# hero-showcase.gif. --hero rebuilds hero-showcase.gif from the PNGs already
+# in the output directory (no captures, no shell restart). Surfaces without a
+# built-in capture use ARANEA_SCREENSHOT_COMMAND.
 #
-# Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir>
+# Never captured: the keyboard-layout and system-update bar widgets (no popup
+# to summon) and wifiqr (it would put the Wi-Fi password in a screenshot).
+#
+# Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir> | --hero --output <dir>
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
 capture_all=0
-# These are the surfaces currently summonable on this installation. The
-# first-party Bluetooth, keyboard-layout, and system-update ids are retained
-# in aranea-showcase for direct diagnostics, but their shell API returns
-# "unknown" here and they must not poison a complete batch with blank PNGs.
+build_hero_only=0
+# The surfaces --all captures.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
@@ -60,6 +62,7 @@ while (($#)); do
       shift
       ;;
     --all) capture_all=1 ;;
+    --hero) build_hero_only=1 ;;
     *)
       echo "Unknown option: $1" >&2
       exit 2
@@ -67,6 +70,15 @@ while (($#)); do
   esac
   shift
 done
+
+if ((build_hero_only)); then
+  [[ -n "$output" ]] || {
+    echo 'Usage: scripts/capture-screenshots --hero --output <dir>' >&2
+    exit 2
+  }
+  build_hero_showcase
+  exit 0
+fi
 
 if ((capture_all)); then
   [[ -n "$output" ]] || {
@@ -246,7 +258,7 @@ capture_terminal_surface() {
 
 # Summons shell popup TARGET, grabs the screen, then hides it.
 capture_popup_surface() {
-  local target="$1"
+  local target="$1" payload="${2:-}"
   command -v omarchy-shell >/dev/null 2>&1 || {
     echo "omarchy-shell is required to capture $surface" >&2
     exit 3
@@ -259,7 +271,11 @@ capture_popup_surface() {
   hyprctl dismissnotify >/dev/null 2>&1 || true
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
   local summon_result
-  summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+  if [[ -n "$payload" ]]; then
+    summon_result="$(omarchy-shell shell summon "$target" "$payload" 2>&1)"
+  else
+    summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+  fi
   if [[ "$summon_result" != "ok" ]]; then
     echo "Unable to summon popup $target: $summon_result" >&2
     exit 3
@@ -565,12 +581,44 @@ case "$surface" in
     capture_popup_surface omarchy.monitor
     exit 0
     ;;
-  keyboard-layout)
-    capture_popup_surface omarchy.keyboard-layout
+  clock)
+    capture_popup_surface omarchy.clock
     exit 0
     ;;
-  system-update)
-    capture_popup_surface omarchy.system-update
+  weather)
+    # The dropdown names the configured town: show a demo city instead of the
+    # user's own, and put their location back however the capture ends.
+    weather_file="$HOME/.local/state/omarchy/settings/weather.json"
+    weather_backup=""
+    # Puts the user's weather location back (or removes the demo one).
+    restore_weather() {
+      if [[ -n "$weather_backup" ]]; then
+        mv -f -- "$weather_backup" "$weather_file"
+      else
+        rm -f -- "$weather_file"
+      fi
+    }
+    mkdir -p "$(dirname "$weather_file")" "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+    if [[ -f "$weather_file" ]]; then
+      weather_backup="$(mktemp "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/weather-backup.XXXXXX")"
+      cp -- "$weather_file" "$weather_backup"
+    fi
+    trap restore_weather EXIT
+    jq -n --arg name "${ARANEA_CAPTURE_WEATHER_CITY:-Amsterdam}" \
+      --argjson latitude "${ARANEA_CAPTURE_WEATHER_LATITUDE:-52.37}" \
+      --argjson longitude "${ARANEA_CAPTURE_WEATHER_LONGITUDE:-4.90}" \
+      '{name: $name, latitude: $latitude, longitude: $longitude}' >"$weather_file"
+    # The dropdown reloads the location and fetches the forecast first.
+    sleep "${ARANEA_WEATHER_DELAY:-6}"
+    capture_popup_surface omarchy.weather
+    # A failed capture exits inside capture_popup_surface; the trap restores then.
+    trap - EXIT
+    restore_weather
+    exit 0
+    ;;
+  image-picker)
+    # Aranea's own backgrounds, so no personal pictures appear.
+    capture_popup_surface omarchy.image-picker "$(jq -cn --arg dirs "$repo_root/backgrounds" '{imageDirs: $dirs, showLabels: true}')"
     exit 0
     ;;
   file-manager)

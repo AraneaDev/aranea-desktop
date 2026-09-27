@@ -12,6 +12,18 @@ for surface in desktop menu menu-submenu menu-search menu-input ceremony notific
   grep -Fq "$surface" <<<"$list_output"
 done
 
+# --- 4e: the capturable dropdowns are listed; widgets without a popup and
+# the Wi-Fi QR (it shows the password) are not
+for surface in clock weather image-picker; do
+  grep -Fxq "$surface" <<<"$list_output"
+done
+for surface in keyboard-layout system-update wifiqr; do
+  if grep -Fxq "$surface" <<<"$list_output"; then
+    echo "$surface must not be a showcase surface" >&2
+    exit 1
+  fi
+done
+
 if "$repo_root/scripts/aranea-showcase" surface unknown 2>"$ARANEA_TEST_SANDBOX/showcase-error"; then
   echo "unknown showcase surface unexpectedly succeeded" >&2
   exit 1

@@ -138,4 +138,27 @@ grep -Fq "if [[ -f \"\$png\" ]]; then mv -- \"\$png\" \"\$previous\"; fi" "$capt
 grep -Fq "if [[ -f \"\$previous\" ]]; then mv -- \"\$previous\" \"\$png\"; fi" "$capture"
 grep -Fq "printf 'capture failed: %s\\n' \"\${failed_surfaces[*]}\"" "$capture"
 
+# --- 4e: the weather capture shows a demo city and always restores the user's
+# location; there is no wifiqr capture; --hero rebuilds the GIF from stills
+grep -Fq 'trap restore_weather EXIT' "$capture"
+grep -Fq 'ARANEA_CAPTURE_WEATHER_CITY:-Amsterdam' "$capture"
+if grep -Eq '^  wifiqr\)' "$capture"; then
+  echo "wifiqr must never be captured" >&2
+  exit 1
+fi
+hero_dir="$(mktemp -d)"
+hero_bin="$hero_dir/bin"
+mkdir -p "$hero_bin"
+cat >"$hero_bin/magick" <<'SH'
+#!/usr/bin/env bash
+touch "${@: -1}"
+SH
+chmod +x "$hero_bin/magick"
+while read -r frame; do
+  : >"$hero_dir/$frame.png"
+done < <(sed -n 's/^  local frames=(\(.*\))$/\1/p' "$capture" | tr ' ' '\n')
+PATH="$hero_bin:$PATH" "$capture" --hero --output "$hero_dir" >/dev/null
+test -f "$hero_dir/hero-showcase.gif"
+rm -rf "$hero_dir"
+
 echo "screenshot coverage contract passed (${#surfaces[@]} surfaces)"
