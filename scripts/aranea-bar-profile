@@ -24,6 +24,9 @@ case "${1:-current}" in
     [[ -f "$config_file" ]] || { printf 'Shell config not found: %s\n' "$config_file" >&2; exit 1; }
     command -v jq >/dev/null 2>&1 || { printf 'jq is required to set the bar profile\n' >&2; exit 1; }
 
+    # Write through a symlinked shell.json instead of replacing the link.
+    resolved_config="$(readlink -f -- "$config_file" 2>/dev/null || true)"
+    [[ -n "$resolved_config" ]] && config_file="$resolved_config"
     config_dir="$(dirname "$config_file")"
     tmp_file="$(mktemp "$config_dir/.shell.json.aranea-profile.XXXXXX")"
     backup_file="$config_file.aranea-profile.bak"

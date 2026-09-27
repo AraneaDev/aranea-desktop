@@ -233,4 +233,46 @@ test ! -e "$handover"
 grep -Fq 'finish-polkit-handover' "$repo_root/hooks/post-boot"
 grep -Fq 'polkit-handover' "$repo_root/scripts/deploy-plugins-safely"
 
+# --- lock and OSD: exactly one provider each way (spec A1, Review Focus 3)
+lock_cfg="$test_root/lock.json"; printf '{"plugins": []}\n' > "$lock_cfg"
+"$repo_root/scripts/repair-shell-config" "$lock_cfg"
+jq -e '(.cloneSourceRestores | index("araneadev.lock")) != null and (.cloneSourceRestores | index("araneadev.osd")) != null' "$lock_cfg" >/dev/null
+"$repo_root/scripts/release-shell-config" "$lock_cfg"
+jq -e '([.plugins[]? | (if type == "string" then . else .id end)] | (index("araneadev.lock") == null and index("araneadev.osd") == null))
+  and ((.disabledPlugins // []) | (index("omarchy.lock") == null and index("omarchy.osd") == null))' "$lock_cfg" >/dev/null
+
+# --- string plugin entries, order kept (spec C1)
+str_cfg="$test_root/strings.json"
+printf '{"plugins": ["zeta.widget", {"id": "alpha.widget", "x": 1}, "araneadev.lock"]}\n' > "$str_cfg"
+"$repo_root/scripts/repair-shell-config" "$str_cfg"
+jq -e '.plugins[0] == "zeta.widget" and .plugins[1] == {"id": "alpha.widget", "x": 1}
+  and ([.plugins[] | (if type == "string" then . else .id end)] | map(select(. == "araneadev.lock")) | length) == 1' "$str_cfg" >/dev/null
+
+# --- a symlinked shell.json stays a symlink (spec C2, Review Focus 5)
+real_cfg="$test_root/dotfiles/shell.json"; mkdir -p "$(dirname "$real_cfg")"
+printf '{"plugins": []}\n' > "$real_cfg"
+link_cfg="$test_root/linked/shell.json"; mkdir -p "$(dirname "$link_cfg")"; ln -s "$real_cfg" "$link_cfg"
+"$repo_root/scripts/repair-shell-config" "$link_cfg"; test -L "$link_cfg"
+jq -e '[.plugins[] | .id] | index("araneadev.lock") != null' "$real_cfg" >/dev/null
+"$repo_root/scripts/release-shell-config" "$link_cfg"; test -L "$link_cfg"
+
+# --- release writes its markers only after a successful edit (spec C3):
+# a jq that fails on release's main program must leave no parked marker.
+real_jq="$(command -v jq)"
+failing_jq="$test_root/failing-jq"; mkdir -p "$failing_jq"
+cat > "$failing_jq/jq" <<EOF
+#!/usr/bin/env bash
+case "\$*" in *"def ours"*) exit 5 ;; esac
+exec "$real_jq" "\$@"
+EOF
+chmod +x "$failing_jq/jq"
+bell_cfg="$test_root/bell.json"
+printf '{"bar": {"layout": {"right": ["araneadev.notifications"]}}}\n' > "$bell_cfg"
+rm -f "$state_root/notifications-widget-parked"
+if PATH="$failing_jq:$PATH" "$repo_root/scripts/release-shell-config" "$bell_cfg" >/dev/null 2>&1; then
+  echo "release succeeded although jq failed" >&2; exit 1
+fi
+if [[ -e "$state_root/notifications-widget-parked" ]]; then echo "marker written although the release failed" >&2; exit 1; fi
+jq -e '.bar.layout.right == ["araneadev.notifications"]' "$bell_cfg" >/dev/null
+
 echo "shell config contract passed"

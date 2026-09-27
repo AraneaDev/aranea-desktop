@@ -21,6 +21,11 @@ command -v jq >/dev/null 2>&1 || {
   exit 1
 }
 
+# Write through a symlinked shell.json (dotfile managers) instead of
+# replacing the link with a plain file.
+resolved_config="$(readlink -f -- "$config_file" 2>/dev/null || true)"
+[[ -n "$resolved_config" ]] && config_file="$resolved_config"
+
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 parked_marker="$state_root/notifications-widget-parked"
 health_parked="$state_root/health-widget-parked"
@@ -44,22 +49,12 @@ note_polkit_handover() {
   fi
 }
 
-if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' \
-    "$config_file" >/dev/null 2>&1; then
-  mkdir -p "$state_root"
-  : > "$parked_marker"
-fi
-if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") != null' \
-    "$config_file" >/dev/null 2>&1; then
-  mkdir -p "$state_root"
-  : > "$health_parked"
-fi
 
 jq '
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
-  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit"];
-  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit"];
+  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd"];
+  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit", "omarchy.lock", "omarchy.osd"];
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(
       .value |= (if type == "array" then map(select(entry_id as $id | ours | index($id) | not)) else . end))
@@ -71,6 +66,19 @@ jq '
       | if (.cloneSourceRestores | length) == 0 then del(.cloneSourceRestores) else . end
     else . end
 ' "$config_file" > "$tmp_file"
+
+# Park the bell and health icon for the return to Aranea — only now that the
+# release itself succeeded (a failing jq exits above under set -e).
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' \
+    "$config_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : > "$parked_marker"
+fi
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") != null' \
+    "$config_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : > "$health_parked"
+fi
 
 note_polkit_handover
 

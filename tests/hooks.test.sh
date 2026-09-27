@@ -49,6 +49,9 @@ if grep -Fq 'omarchy plugin disable araneadev.lock' "$ARANEA_TEST_SANDBOX/guard.
   echo "leaving must not disable the lock over IPC" >&2; exit 1
 fi
 test -e "$session_link"   # stable links survive leaving
+# Lock and OSD are handed back to Omarchy (spec A1, Review Focus 3).
+jq -e '((.disabledPlugins // []) | (index("omarchy.lock") == null and index("omarchy.osd") == null))
+  and ([.plugins[]? | (if type == "string" then . else .id end)] | (index("araneadev.lock") == null and index("araneadev.osd") == null))' "$cfg" >/dev/null || { cat "$cfg"; exit 1; }
 
 # Returning brings the schedule units back.
 "$repo_root/hooks/theme-set" aranea

@@ -12,6 +12,11 @@ command -v jq >/dev/null 2>&1 || {
   exit 1
 }
 
+# Write through a symlinked shell.json (dotfile managers) instead of
+# replacing the link with a plain file.
+resolved_config="$(readlink -f -- "$config_file" 2>/dev/null || true)"
+[[ -n "$resolved_config" ]] && config_file="$resolved_config"
+
 config_dir="$(dirname "$config_file")"
 tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 backup_file="$config_file.aranea.bak"
@@ -45,6 +50,9 @@ note_polkit_handover() {
 }
 
 jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
+  def entry_id: if type == "string" then . else .id? end;
+  # Drops later duplicates by id (string or {id} entries), keeping order.
+  def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
       {id: "araneadev.lock"},
@@ -54,7 +62,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       {id: "araneadev.emojis"},
       {id: "araneadev.osd"},
       {id: "araneadev.polkit"}
-    ] | unique_by(.id))
+    ] | dedupe_by_id)
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
       "omarchy.clipboard",
@@ -68,7 +76,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
   # an Aranea clone by hand (host bookkeeping for cloned plugins; for polkit
   # this keeps an agent registered).
   | .cloneSourceRestores = ((if (.cloneSourceRestores | type) == "array" then .cloneSourceRestores else [] end)
-      + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit"] | unique)
+      + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd"] | unique)
   # Place the notification bell once. Layout entries may be plain id strings
   # or {id: ...} objects; both count. Only a layout the user already owns is
   # touched: writing a partial layout would replace the host defaults.
