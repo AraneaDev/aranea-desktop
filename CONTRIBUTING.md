@@ -30,7 +30,7 @@ Branch protection enforces the same rule server-side regardless.
 ## Checks
 
 ```bash
-tools/check            # everything: format lint validate qml test smoke
+tools/check            # everything: format lint docs validate qml test smoke
 tools/check --fix      # rewrite formatting (shfmt, prettier, qmlformat)
 tools/check --fast     # skip the runtime smoke test and the slow bash tests
 tools/check --only qml # one stage (or a comma-separated list); --skip works too
@@ -42,6 +42,9 @@ The stages:
   for QML (`.qmlformat.ini`). `tools/check --fix` writes the fixes.
 - **lint**: ShellCheck (pinned 0.11.0), ESLint (`eslint.config.js`),
   markdownlint (`.markdownlint-cli2.jsonc`) and actionlint.
+- **docs**: every piece of code is documented inline (see below), checked by
+  ESLint's jsdoc rules, TypeScript (`tsconfig.json`, `checkJs`) and
+  `tools/check-docs`.
 - **validate**: every JSON, TOML, SVG, image and Lua file parses, relative
   Markdown links resolve, and no new em dashes (house style).
 - **qml**: qmllint on every QML file. With Omarchy's shell and Quickshell
@@ -61,6 +64,26 @@ edit that shows up in review. Formatting-only commits are listed in
 `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`);
 merging rewrites commit hashes, so after merging a formatting commit, update
 the list with the hashes it got on `master`.
+
+### Inline documentation
+
+Everything is documented where it lives, and the docs stage fails otherwise:
+
+- **JS** (`plugins/**/*.js`): every top-level function has a JSDoc block with a
+  description, `@param {Type} name - what` and `@returns {Type} what`.
+  TypeScript checks those types against the code, so they cannot drift.
+  Shared object shapes get a `@typedef`; `{}` locals that are used as maps
+  get an inline `/** @type {{[key: string]: T}} */`.
+- **Shell**: a header comment after the shebang saying what the file does
+  (with a `Usage:` line for scripts you run under `scripts/` and `tools/`),
+  and a `#` comment directly above every function.
+- **QML**: a `//` header before the imports saying what the component is and
+  where it is used, and a `//` comment directly above every root-level
+  property, signal and function. Members whose name starts with `_` are
+  private and exempt.
+
+Comments say what the code does. `tools/check-docs FILE...` checks shell and
+QML files on their own.
 
 `tests/run` on its own runs every `tests/*.test.sh` (including the JS suites
 through `tests/js.test.sh`); pass bare names to run a subset
