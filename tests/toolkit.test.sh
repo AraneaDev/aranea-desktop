@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 grep -Fq 'Name=Aranea' "$repo_root/integrations/cursor/index.theme"
 grep -Fq 'Inherits=' "$repo_root/integrations/cursor/index.theme"

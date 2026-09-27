@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 [[ -x "$repo_root/scripts/ensure-shell-running" ]]
 grep -Fq 'ensure-shell-running' "$repo_root/hooks/theme-set"

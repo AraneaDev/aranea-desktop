@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 plugin="$repo_root/plugins/araneadev.polkit"
 stock="/usr/share/omarchy/shell/plugins/polkit/PolkitModel.js"
 

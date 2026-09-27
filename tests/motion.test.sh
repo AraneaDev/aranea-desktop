@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 state_root="$(mktemp -d)"
-trap 'rm -rf "$state_root"' EXIT
 hyprctl_log="$state_root/hyprctl.log"
 test_path="$repo_root/tests/fake-bin:$PATH"
 

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]
 grep -Fq 'deploy-plugins-safely' "$repo_root/hooks/theme-set"
@@ -18,7 +19,6 @@ bash -n "$repo_root/scripts/deploy-plugins-safely"
 # self-heals on the very next boot or theme-set instead of staying silently
 # disabled indefinitely.
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
 export ARANEA_STATE_ROOT="$work_dir/state"
 config_dir="$work_dir/config"
 plugins_dir="$config_dir/plugins"

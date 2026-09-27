@@ -2,13 +2,14 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
-if "$repo_root/scripts/install-integration" --dry-run missing-integration 2>"$repo_root/tests/.integration-error"; then
+if "$repo_root/scripts/install-integration" --dry-run missing-integration 2>"$ARANEA_TEST_SANDBOX/integration-error"; then
   echo "unknown integration unexpectedly succeeded" >&2
   exit 1
 fi
-grep -Fq 'Unknown integration' "$repo_root/tests/.integration-error"
-rm -f "$repo_root/tests/.integration-error"
+grep -Fq 'Unknown integration' "$ARANEA_TEST_SANDBOX/integration-error"
+rm -f "$ARANEA_TEST_SANDBOX/integration-error"
 
 for file in integrations/terminal/alacritty.toml integrations/terminal/kitty.conf integrations/terminal/foot.ini; do
   test -f "$repo_root/$file"

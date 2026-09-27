@@ -2,10 +2,10 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/scripts/lib/ownership.sh"
 
 test_root="$(mktemp -d)"
-trap 'rm -rf "$test_root"' EXIT
 
 export ARANEA_OWNERSHIP_ROOT="$test_root/state"
 target="$test_root/config/example.conf"

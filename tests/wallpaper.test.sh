@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 grep -Fq 'id = "day"' "$repo_root/backgrounds/manifest.toml"
 grep -Fq 'id = "dawn"' "$repo_root/backgrounds/manifest.toml"
@@ -16,15 +17,14 @@ grep -Fq 'day' <<<"$list_output"
 grep -Fq 'dawn' <<<"$list_output"
 grep -Fq 'monochrome' <<<"$list_output"
 
-if "$repo_root/scripts/aranea-wallpaper" set invalid 2>"$repo_root/tests/.wallpaper-error"; then
+if "$repo_root/scripts/aranea-wallpaper" set invalid 2>"$ARANEA_TEST_SANDBOX/wallpaper-error"; then
   echo "invalid wallpaper unexpectedly succeeded" >&2
   exit 1
 fi
-grep -Fq 'Unknown wallpaper' "$repo_root/tests/.wallpaper-error"
-rm -f "$repo_root/tests/.wallpaper-error"
+grep -Fq 'Unknown wallpaper' "$ARANEA_TEST_SANDBOX/wallpaper-error"
+rm -f "$ARANEA_TEST_SANDBOX/wallpaper-error"
 
 state_root="$(mktemp -d)"
-trap 'rm -rf "$state_root"' EXIT
 motion_output="$(ARANEA_STATE_ROOT="$state_root" "$repo_root/scripts/aranea-wallpaper" motion off)"
 grep -Fq 'motion: off' <<<"$motion_output"
 

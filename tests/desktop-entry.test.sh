@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 test_root="$(mktemp -d)"
-trap 'rm -rf "$test_root"' EXIT
 
 source_file="$test_root/teams-for-linux.desktop"
 target_file="$test_root/applications/teams-for-linux.desktop"

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 output="$(mktemp)"
-trap 'rm -f "$output"' EXIT
 
 PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
@@ -23,7 +23,6 @@ if PATH="$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 "$repo_root/s
 fi
 
 minimal_output="$(mktemp)"
-trap 'rm -f "$output" "$minimal_output"' EXIT
 PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
   "$repo_root/scripts/install.sh" --dry-run --yes --profile no_apps >"$minimal_output"
@@ -39,7 +38,6 @@ grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
 # (the default URL ends in aranea-desktop.git, which Omarchy names
 # "aranea-desktop"; `omarchy theme set aranea` must not activate a stale copy).
 name_root="$(mktemp -d)"
-trap 'rm -f "$output" "$minimal_output"; rm -rf "$name_root"' EXIT
 mkdir -p "$name_root/bin" "$name_root/home/.config/omarchy/themes/aranea"
 printf 'stale\n' > "$name_root/home/.config/omarchy/themes/aranea/VERSION"
 cat > "$name_root/bin/omarchy" <<'EOF'

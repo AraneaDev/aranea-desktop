@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 manifest="$repo_root/theme-manifest.toml"
 source "$repo_root/scripts/lib/manifest.sh"
 

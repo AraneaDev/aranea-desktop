@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 capture_script="$repo_root/scripts/capture-screenshots"
 readme="$repo_root/README.md"
 
@@ -74,7 +75,6 @@ hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]
 
 hero_tmp="$(mktemp -d)"
-trap 'rm -rf "$hero_tmp"' EXIT
 # Use the classic convert/compare binaries rather than the unified `magick`
 # wrapper: CI's apt-get imagemagick package is ImageMagick 6, which has no
 # `magick` command at all, while `convert`/`compare` work on both IM6 and

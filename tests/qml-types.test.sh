@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 qml_files=(
   "$repo_root/plugins/araneadev.bar/Bar.qml"
   "$repo_root/plugins/araneadev.notifications/Service.qml"
@@ -51,7 +52,7 @@ import_root=""
 cleanup() {
   if [[ -n "$import_root" ]]; then rm -rf "$import_root"; fi
 }
-trap cleanup EXIT
+sandbox_on_exit cleanup
 
 qml_args=(--ignore-settings)
 validation_mode=strict

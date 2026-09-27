@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 test_root="$(mktemp -d)"
-trap 'rm -rf "$test_root"' EXIT
 state="$test_root/state"; config="$test_root/config"; mkdir -p "$state" "$config"
 status="$({ XDG_CONFIG_HOME="$config" ARANEA_OWNERSHIP_ROOT="$state" "$repo_root/scripts/aranea-integrations" status --json; })"
 grep -Fq '"id":"terminal"' <<<"$status"

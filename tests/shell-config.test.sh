@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 test_root="$(mktemp -d)"
-trap 'rm -rf "$test_root"' EXIT
 # Markers go to a scratch state dir from the very first repair, never the
 # real ~/.local/state/aranea (a stray polkit-handover marker there would
 # restart the live shell on the next hook run).

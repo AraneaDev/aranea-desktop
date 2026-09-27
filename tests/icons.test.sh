@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 theme_root="$repo_root/integrations/icons/aranea"
 theme_file="$theme_root/index.theme"
 generator="$repo_root/scripts/generate-font-icon-theme"

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 config_root="$(mktemp -d)"
-trap 'rm -rf "$config_root"' EXIT
 config_file="$config_root/shell.json"
 printf '%s\n' '{"bar":{"id":"araneadev.bar"},"plugins":[]}' > "$config_file"
 

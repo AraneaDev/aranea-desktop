@@ -2,10 +2,10 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 hook_root="$(mktemp -d)"
 ownership_root="$(mktemp -d)"
-trap 'rm -rf "$hook_root" "$ownership_root"' EXIT
 mkdir -p "$hook_root/theme-set.d" "$hook_root/post-boot.d"
 mkdir -p "$ownership_root/icons/scalable/places"
 ln -s "$ownership_root/icons/missing/folder.svg" "$ownership_root/icons/scalable/places/folder.svg"
@@ -57,7 +57,6 @@ done <<<"$output"
 # (and everything else theme-set/post-boot drive) stops silently drifting
 # after an update. Start from an empty hook_root: neither file exists yet.
 fix_hook_root="$(mktemp -d)"
-trap 'rm -rf "$hook_root" "$ownership_root" "$fix_hook_root"' EXIT
 
 fix_output="$(
   ARANEA_DOCTOR_THEME='Aranea Pulse' \
@@ -78,7 +77,6 @@ cmp -s "$repo_root/hooks/post-boot" "$fix_hook_root/post-boot.d/post-boot"
 
 # --- notification inbox health
 inbox_root="$(mktemp -d)"
-trap 'rm -rf "$hook_root" "$ownership_root" "$fix_hook_root" "$inbox_root"' EXIT
 printf '%s\n' '{"id":1,"originalId":1,"app":"A","timestamp":1,"onScreen":false}' > "$inbox_root/1-1.json"
 printf '%s\n' '{"id":2,' > "$inbox_root/2-2.json"
 inbox_output="$(

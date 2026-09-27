@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck unavailable; skipped"; exit 0; }
 # CI installs the version pinned in tools/install-shellcheck; a different
 # local version can disagree with CI, so say so instead of drifting silently.
