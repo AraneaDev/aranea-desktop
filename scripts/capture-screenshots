@@ -64,7 +64,7 @@ if (( capture_all )); then
   omarchy restart shell >/dev/null 2>&1 || true
   sleep 3
   # Called from the EXIT trap string below, which ShellCheck cannot see.
-  # shellcheck disable=SC2329
+  # shellcheck disable=SC2317,SC2329
   restore_batch_inbox() {
     omarchy-shell notifications clear >/dev/null 2>&1 || true
     sleep 1
