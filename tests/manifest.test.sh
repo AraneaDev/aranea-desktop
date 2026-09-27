@@ -63,4 +63,38 @@ if manifest_integration_exists '.*'; then
 fi
 [[ -z "$(manifest_integration_field '.*' optional_command)" ]]
 
+# --- 4d: a field lookup never leaks from a later section; commented headers count
+odd_manifest="$(mktemp)"
+cat >"$odd_manifest" <<'TOML'
+[profiles.full] # everything
+integrations = ["a"]
+
+[[integrations]]
+id = "a"
+
+[other]
+optional_command = "leak"
+TOML
+(
+  export ARANEA_MANIFEST_FILE="$odd_manifest"
+  source "$repo_root/scripts/lib/manifest.sh"
+  [[ -z "$(manifest_integration_field a optional_command)" ]] || {
+    echo "field leaked from [other]" >&2
+    exit 1
+  }
+  manifest_profile_exists full || {
+    echo "commented profile header not found" >&2
+    exit 1
+  }
+  [[ "$(manifest_profile_integrations full)" == a ]] || {
+    echo "commented profile integrations" >&2
+    exit 1
+  }
+  [[ -z "$(manifest_integration_field a 'opt.*')" ]] || {
+    echo "field name matched as a regex" >&2
+    exit 1
+  }
+)
+rm -f "$odd_manifest"
+
 echo "manifest contract passed"
