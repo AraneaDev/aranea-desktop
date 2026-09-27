@@ -216,3 +216,28 @@ restore_managed_files() {
   done <"$record"
   mv -- "$kept_file" "$record"
 }
+
+# Deletes TARGET (the Teams desktop-entry override older Aranea versions
+# wrote) when it is exactly what Aranea generated from SOURCE: the system
+# entry without its Version= line and without the Application category. A
+# copy the user edited, or a missing SOURCE, leaves TARGET alone.
+remove_teams_override() {
+  local source="$1" target="$2" generated
+  [[ -f "$source" && -f "$target" ]] || return 0
+  generated="$(awk '
+    /^Version=/ { next }
+    /^Categories=/ {
+      value = $0
+      sub(/^Categories=/, "", value)
+      gsub(/(^|;)Application(;|$)/, ";", value)
+      gsub(/;;+/, ";", value)
+      sub(/^;/, "", value)
+      sub(/;$/, "", value)
+      print "Categories=" value ";"
+      next
+    }
+    { print }
+  ' "$source")"
+  [[ "$generated" == "$(<"$target")" ]] && rm -f -- "$target"
+  return 0
+}

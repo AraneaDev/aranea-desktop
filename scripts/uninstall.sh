@@ -171,6 +171,7 @@ remove_timer
 [[ -f "$(ownership_record)" ]] && restore_managed_files
 restore_gsettings
 find "$data_root/icons/Aranea" "$data_root/icons/Aranea-icons" -depth -type d -empty -delete 2>/dev/null || true
+remove_teams_override /usr/share/applications/teams-for-linux.desktop "$data_root/applications/teams-for-linux.desktop"
 # Aranea's own settings (the wallpaper schedule).
 rm -rf -- "$config_root/aranea"
 remove_state

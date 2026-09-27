@@ -57,10 +57,14 @@ if [[ -x "$integration_scripts/install-integration" ]]; then
   fi
 fi
 
-if [[ -f /usr/share/applications/teams-for-linux.desktop && -x "$theme_root/scripts/repair-desktop-entry" ]]; then
-  "$theme_root/scripts/repair-desktop-entry" \
-    /usr/share/applications/teams-for-linux.desktop \
-    "$HOME/.local/share/applications/teams-for-linux.desktop" >/dev/null 2>&1 || true
+# Older versions wrote a Teams desktop-entry override; remove it when it is
+# still exactly Aranea's (a copy the user edited stays).
+if [[ -f "$installed_theme/scripts/lib/ownership.sh" ]]; then
+  (
+    source "$installed_theme/scripts/lib/ownership.sh"
+    remove_teams_override /usr/share/applications/teams-for-linux.desktop \
+      "$HOME/.local/share/applications/teams-for-linux.desktop"
+  ) >/dev/null 2>&1 || true
 fi
 
 if [[ -x "$theme_root/scripts/deploy-plugins-safely" ]]; then
