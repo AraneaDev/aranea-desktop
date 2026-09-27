@@ -31,8 +31,6 @@ BorderSurface {
   property string glyph: ""
   // NotificationUrgency: Low=0, Normal=1, Critical=2 (upstream).
   property int urgency: 1
-  // Arrival time in ms; the card does not read it (callers pass timeLabel).
-  property double timestamp: 0
   // Card corner radius.
   property int cornerRadius: 0
   // Center rows: one-line summary, two-line body, relative time and a close
@@ -99,8 +97,6 @@ BorderSurface {
   readonly property color dimColor: Qt.darker(Color.notifications.text, 1.4)
   // Body text color, slightly darker than the summary.
   readonly property color bodyColor: Qt.darker(Color.notifications.text, 1.15)
-  // Urgency accent (red, dim or countdown color); nothing in this file reads it.
-  readonly property color accentColor: urgency === 2 ? Color.urgent : (urgency === 0 ? dimColor : Color.notifications.countdown)
   // Color of the urgency rail on the card's left edge.
   readonly property color railColor: urgency === 2 ? Color.urgent : (urgency === 0 ? Color.notifications.border : Color.notifications.countdown)
   // Card fill: red-tinted for critical, a light tint on hover, else the theme's.
@@ -248,7 +244,7 @@ BorderSurface {
         // Hide the slot when the icon failed to resolve (themed-icon name
         // not in the user's icon theme) AND we don't have a glyph fallback
         // — prevents rendering Qt's pink broken-image placeholder.
-        visible: !root.collapseRedundantIcon && !root.compactGlyph && (root.hasSmallIcon || root.hasGlyph || (!root.hasSmallIcon && !root.hasGlyph)) && (root.hasGlyph || !root.hasSmallIcon || smallIconImage.status !== Image.Error)
+        visible: !root.collapseRedundantIcon && !root.compactGlyph && (root.hasGlyph || !root.hasSmallIcon || smallIconImage.status !== Image.Error)
 
         Image {
           anchors.fill: parent

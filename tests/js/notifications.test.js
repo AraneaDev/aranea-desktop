@@ -27,46 +27,23 @@ test("notifications logic", () => {
   )
   assert(inbox.shouldStore(false, 1, true) === false, "transient hint must never be stored")
 
-  // --- lifecycle outcome
-  assert(inbox.removesFromInbox("expire") === false, "expired toast must stay in the inbox")
-  assert(inbox.removesFromInbox("dismiss") === true, "dismissed toast must leave the inbox")
-  assert(inbox.removesFromInbox("invoke") === true, "invoked toast must leave the inbox")
-
-  // --- replaces_id keeps one entry (Review Focus 2)
-  let rows = [{ fileName: "b" }, { fileName: "a" }]
-  rows = inbox.upsertOrder(rows, { fileName: "a", summary: "v2" })
-  assert(rows.length === 2 && rows[1].summary === "v2", "same fileName must update in place")
-  rows = inbox.upsertOrder(rows, { fileName: "c" })
-  assert(rows.length === 3 && rows[0].fileName === "c", "new fileName must be prepended")
-
   // --- pruning
   const now = 1000 * DAY
-  const e = (name, ageDays, urgency, onScreen) => ({
+  const e = (name, ageDays, urgency) => ({
     fileName: name,
     timestamp: now - ageDays * DAY,
-    urgency: urgency,
-    onScreen: !!onScreen
+    urgency: urgency
   })
-  let pruned = inbox.pruneInbox(
-    [e("old", 8, 1), e("oldCrit", 8, 2), e("fresh", 1, 1), e("oldLive", 9, 1, true)],
-    now
-  )
-  assert(
-    pruned.drop.map((x) => x.fileName).join() === "old",
-    "only non-critical, off-screen entries age out"
-  )
-  assert(
-    pruned.keep.map((x) => x.fileName).join() === "fresh,oldCrit,oldLive",
-    "keep must be newest-first"
-  )
+  let pruned = inbox.pruneInbox([e("old", 8, 1), e("oldCrit", 8, 2), e("fresh", 1, 1)], now)
+  assert(pruned.drop.map((x) => x.fileName).join() === "old", "only non-critical entries age out")
+  assert(pruned.keep.map((x) => x.fileName).join() === "fresh,oldCrit", "keep must be newest-first")
 
   const many = []
   for (let i = 0; i < 103; i++)
     many.push({
       fileName: "n" + i,
       timestamp: now - i * 1000,
-      urgency: i === 102 ? 2 : 1,
-      onScreen: false
+      urgency: i === 102 ? 2 : 1
     })
   pruned = inbox.pruneInbox(many, now)
   assert(pruned.keep.length === 100, "cap must hold 100 entries")
@@ -84,7 +61,7 @@ test("notifications logic", () => {
 
   const crits = []
   for (let i = 0; i < 101; i++)
-    crits.push({ fileName: "c" + i, timestamp: now - i * 1000, urgency: 2, onScreen: false })
+    crits.push({ fileName: "c" + i, timestamp: now - i * 1000, urgency: 2 })
   pruned = inbox.pruneInbox(crits, now)
   assert(
     pruned.keep.length === 100 && pruned.drop[0].fileName === "c100",
@@ -150,29 +127,7 @@ test("notifications logic", () => {
   assert(inbox.relativeTime(now - 3 * 3600000, now) === "3h", "hours")
   assert(inbox.relativeTime(now - 2 * DAY, now) === "2d", "days")
 
-  // --- onScreen round-trip through the persisted format (Review Focus 1, 3)
   const logic = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
-  const live = logic.popupEntry(
-    { id: 3, originalId: 3, app: "Slack", timestamp: 5, onScreen: true, deadline: 99 },
-    1
-  )
-  assert(
-    live.onScreen === true && live.deadline === 99,
-    "onScreen and deadline must survive popupEntry"
-  )
-  const parsed = logic.parsePopupFiles(
-    logic.serializePopup({ id: 4, originalId: 4, timestamp: 6, onScreen: false }, 1),
-    1
-  )
-  assert(
-    parsed.length === 1 && parsed[0].onScreen === false,
-    "onScreen=false must survive serialize/parse"
-  )
-  const legacy = logic.popupEntry({ id: 5, originalId: 5, timestamp: 7 }, 1)
-  assert(
-    legacy.onScreen === undefined,
-    "legacy entries carry no onScreen; Inbox.qml treats them as on screen"
-  )
   assert(typeof logic.historyRows === "undefined", "history replay helper must be gone")
 
   // --- service bridge: the Aranea bar hands widgets a service-less facade, so
@@ -334,4 +289,72 @@ test("dismiss actions (4c)", () => {
   )
   eq(inbox.dismissAction({ kind: "group" }, false), "group", "group header")
   eq(inbox.dismissAction(null, false), "", "no row")
+})
+
+test("notification dead code stays gone (4c)", () => {
+  const root = path.join(__dirname, "..", "..", "plugins/araneadev.notifications")
+  const n = require(`${root}/NotificationLogic.js`)
+  const inbox = require(`${root}/InboxLogic.js`)
+  for (const gone of ["popupExpired", "groupNotifications", "collapseQuietHours", "limitHistory"])
+    if (n[gone] !== undefined) throw new Error("dead helper still exported: " + gone)
+  for (const gone of ["removesFromInbox", "upsertOrder"])
+    if (inbox[gone] !== undefined) throw new Error("dead helper still exported: " + gone)
+  const e = n.popupEntry({ id: 1, originalId: 1, timestamp: 5, onScreen: true, deadline: 9 }, 1)
+  if ("onScreen" in e || "deadline" in e)
+    throw new Error("popupEntry still carries onScreen/deadline")
+})
+
+test("body sanitizing, argv and image persistence (4c)", () => {
+  const n = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  // image tags never reach StyledText (they could load local files)
+  eq(
+    n.styledBody("a<img src=x>b<b>c</b><IMG\nsrc=y>d", "app", ""),
+    "ab<b>c</b>d",
+    "img tags stripped"
+  )
+  eq(n.styledBody("x<img src=", "app", ""), "x", "unterminated img tag stripped")
+  eq(n.styledBody("line1\nline2\r\nline3", "app", ""), "line1<br/>line2<br/>line3", "line breaks")
+  // Chromium prefixes bodies with the site; only its own notifications lose it
+  eq(
+    n.sanitizeBody('<a href="https://example.com">example.com</a> Hello', "Google Chrome", ""),
+    "Hello",
+    "chromium link"
+  )
+  eq(n.sanitizeBody("www.example.com Hello there", "chromium", ""), "Hello there", "chromium host")
+  eq(
+    n.sanitizeBody("www.example.com Hello there", "Slack", ""),
+    "www.example.com Hello there",
+    "others untouched"
+  )
+  // click commands are argv vectors of strings, never flags first
+  eq(n.parseExecArgv('["omarchy-launch","x"]'), ["omarchy-launch", "x"], "argv")
+  for (const bad of ['["-rf"]', '["a",1]', "rm -rf", "[]", ""])
+    eq(n.parseExecArgv(bad), null, "rejects " + bad)
+  // images are copied into the state dir; image:// cannot be copied
+  eq(
+    n.persistablePopup(
+      { timestamp: 5, originalId: 3, image: "/tmp/a.png", appIcon: "image://icon/x" },
+      "/S/images/"
+    ),
+    {
+      entry: { timestamp: 5, originalId: 3, image: "file:///S/images/5-3-image", appIcon: "" },
+      copies: [{ from: "/tmp/a.png", to: "/S/images/5-3-image" }]
+    },
+    "persist"
+  )
+  eq(
+    n.persistablePopup(
+      { timestamp: 5, originalId: 3, image: "file:///S/images/5-3-image" },
+      "/S/images/"
+    ).copies,
+    [],
+    "an already persisted image is not copied onto itself"
+  )
+  eq(n.parseSettings('{"version":3,"dnd":true}').dnd, true, "settings")
+  eq(n.parseSettings("{").error, true, "broken settings")
 })

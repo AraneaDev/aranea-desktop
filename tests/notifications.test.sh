@@ -122,4 +122,15 @@ panel_qml="$repo_root/plugins/araneadev.notifications/Panel.qml"
 grep -Fq 'InboxLogic.dismissAction(' "$panel_qml"
 grep -Fq 'ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP' "$panel_qml"
 
+# --- 4c: dead restore code and unused card properties stay gone
+if grep -Eq 'restoredPopups|isRestoredRow|keepFileName' "$svc"; then
+  echo "dead restored-popup code is back" >&2
+  exit 1
+fi
+card_qml="$repo_root/plugins/araneadev.notifications/components/NotificationCard.qml"
+if grep -Eq 'accentColor|property double timestamp' "$card_qml"; then
+  echo "unused card properties are back" >&2
+  exit 1
+fi
+
 echo "notifications contract passed"

@@ -33,37 +33,6 @@ function shouldStore(ephemeralApp, urgency, transient) {
 }
 
 /**
- * Whether closing a toast removes its inbox entry.
- *
- * A toast that simply ran out of time was missed, so it waits in the center.
- * Any deliberate action on it means the user has seen it.
- * @param {string} reason - why the toast closed, e.g. "expire" or "dismiss"
- * @returns {boolean} false only for "expire"
- */
-function removesFromInbox(reason) {
-  return String(reason) !== "expire"
-}
-
-/**
- * Replaces the entry with the same fileName in a copy of the list, or puts the
- * entry first when it is new.
- * @param {Array<Dict>} entries - inbox entries
- * @param {Dict} entry - the entry to insert or replace
- * @returns {Array<Dict>} a new array
- */
-function upsertOrder(entries, entry) {
-  var rows = Array.isArray(entries) ? entries.slice() : []
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i] && rows[i].fileName === entry.fileName) {
-      rows[i] = entry
-      return rows
-    }
-  }
-  rows.unshift(entry)
-  return rows
-}
-
-/**
  * Sort comparator that puts the larger timestamp first.
  * @param {Dict} a - an entry
  * @param {Dict} b - another entry
@@ -77,8 +46,6 @@ function newestFirst(a, b) {
  * Splits the inbox into entries to keep and to delete: non-critical entries
  * older than MAX_AGE_MS go, then the oldest beyond MAX_ITEMS (non-critical
  * ones first).
- *
- * Entries on screen are never pruned: their toast still owns the file.
  * @param {Array<Dict>} entries - inbox entries
  * @param {number} now - current time in ms
  * @returns {Dict} {keep, drop}; keep is sorted newest first
@@ -95,19 +62,19 @@ function pruneInbox(entries, now) {
   for (var i = 0; i < rows.length; i++) {
     var e = rows[i]
     var aged = (Number(e.timestamp) || 0) < cutoff
-    if (aged && !e.onScreen && Number(e.urgency) !== CRITICAL) drop.push(e)
+    if (aged && Number(e.urgency) !== CRITICAL) drop.push(e)
     else keep.push(e)
   }
   keep.sort(newestFirst)
 
   /**
-   * Moves the oldest off-screen entries that match the predicate from keep to
+   * Moves the oldest entries that match the predicate from keep to
    * drop until keep fits MAX_ITEMS.
    * @param {function(Dict): boolean} predicate - which entries may go
    */
   function dropOldest(predicate) {
     for (var j = keep.length - 1; j >= 0 && keep.length > MAX_ITEMS; j--) {
-      if (!keep[j].onScreen && predicate(keep[j])) drop.push(keep.splice(j, 1)[0])
+      if (predicate(keep[j])) drop.push(keep.splice(j, 1)[0])
     }
   }
   dropOldest(function (x) {
@@ -383,8 +350,6 @@ if (typeof module !== "undefined") {
     SWIPE_FLICK_VELOCITY: SWIPE_FLICK_VELOCITY,
     CLICK_SUPPRESS_PX: CLICK_SUPPRESS_PX,
     shouldStore: shouldStore,
-    removesFromInbox: removesFromInbox,
-    upsertOrder: upsertOrder,
     pruneInbox: pruneInbox,
     swipeOutcome: swipeOutcome,
     suppressesClick: suppressesClick,

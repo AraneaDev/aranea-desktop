@@ -93,12 +93,6 @@ Item {
     return (service.popupHolds[key] || 0) > 0
   }
 
-  // Popups restored from a previous shell process, keyed by their file
-  // name (timestamp-originalId) since ids alone repeat across server
-  // generations. The replaces_id handling and liveRefs lookups must not
-  // match these rows against fresh notifications.
-  property var restoredPopups: ({})
-
   // PersistentProperties handles in-process QML reloads. The on-disk
   // notifications.json file is the cross-restart backstop — its `dnd` key
   // is hydrated into persisted.doNotDisturb on startup and written back via
@@ -269,7 +263,7 @@ Item {
     // Qt.callLater avoids "QV4::Object::insertMember" crashes when a
     // Repeater is mid-incubation while we mutate its model.
     Qt.callLater(function () {
-      removePopupsByOriginalId(snapshot.originalId, NotificationLogic.popupFileName(snapshot))
+      removePopupsByOriginalId(snapshot.originalId)
       popupModel.insert(0, snapshot)
       // An update that arrived while the insert was deferred found no row to
       // write to, and a property that already changed will not change again.
@@ -369,32 +363,12 @@ Item {
     }
   }
 
-  // A restored row carries an id from the previous server generation, and
-  // the new server hands out ids from 1 again — so a fresh notification
-  // with the same originalId is a coincidence, not the same notification.
-  // The timestamp (via the file name) disambiguates: it travels with the
-  // row through every model and file round-trip.
-  function isRestoredRow(row) {
-    return !!row && !!restoredPopups[NotificationLogic.popupFileName(row)]
-  }
-
-  // A notification arriving under an originalId a popup on screen already
-  // holds supersedes it, so that row leaves the screen. Its file is deleted
-  // rather than archived: the row taking its place archives itself when it
-  // goes, and history would otherwise hold two entries for what the sender
-  // means as one notification.
-  // keepFileName is the replacement's own file: a same-millisecond
-  // replacement shares the replaced row's filename, and the new write is
-  // already queued — deleting that path here would erase the replacement's
-  // only file.
-  function removePopupsByOriginalId(originalId, keepFileName) {
+  // A notification arriving under an originalId a toast on screen already
+  // holds supersedes it, so that toast leaves the screen.
+  function removePopupsByOriginalId(originalId) {
     for (var i = popupModel.count - 1; i >= 0; i--) {
       var row = popupModel.get(i)
       if (!row || row.originalId !== originalId)
-        continue
-      // Not a replaces_id match — see isRestoredRow. Removing it here
-      // would silently kill a restored critical alert on an unrelated ping.
-      if (isRestoredRow(row))
         continue
       popupModel.remove(i)
     }
@@ -417,13 +391,7 @@ Item {
       return
     var entry = popupModel.get(index)
     var originalId = entry ? entry.originalId : -1
-    // A restored row has no live server object, and its old-generation id
-    // may meanwhile belong to a fresh notification — resolving liveRefs by
-    // id would dismiss that unrelated notification at the server.
-    var restored = isRestoredRow(entry)
-    var ref = !restored && originalId >= 0 ? liveRefs[originalId] : null
-    if (entry && restored)
-      delete restoredPopups[NotificationLogic.popupFileName(entry)]
+    var ref = originalId >= 0 ? liveRefs[originalId] : null
     popupModel.remove(index)
     if (ref) {
       try {
@@ -536,8 +504,7 @@ Item {
   }
 
   // Run the popup's click action, then dismiss. Omarchy's own toasts carry the
-  // action as an argv vector in the `execArgv` role (see execArgvFromHints),
-  // which the persistence files preserve, so restored toasts stay clickable.
+  // action as an argv vector in the `execArgv` role (see execArgvFromHints).
   // Third-party clients register a libnotify action under the canonical
   // identifier "default" instead; that one only works while the sender is live.
   function invokePopupDefault(index) {
@@ -553,9 +520,7 @@ Item {
       removePopup(index, "invoke")
       return
     }
-    // Restored rows have no live actions, and looking up liveRefs by their
-    // old-generation id could fire an unrelated fresh notification's action.
-    var ref = entry && !isRestoredRow(entry) ? liveRefs[entry.originalId] : null
+    var ref = entry ? liveRefs[entry.originalId] : null
     var invoked = invokeDefaultAction(ref)
     // Chat apps (Slack, Discord, Vesktop, etc.) rarely register a "default"
     // libnotify action — they just expect clicking the notification to
@@ -911,7 +876,6 @@ Item {
               body: cardSlot.body
               image: cardSlot.image
               urgency: cardSlot.urgency
-              timestamp: cardSlot.timestamp
               cornerRadius: cardSlot.svc.cornerRadius
               fontFamily: cardSlot.svc.shell && cardSlot.svc.shell.bar ? cardSlot.svc.shell.bar.fontFamily : ""
               glyph: cardSlot.glyph

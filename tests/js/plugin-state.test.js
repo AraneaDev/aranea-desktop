@@ -48,18 +48,6 @@ test("plugin-state logic", () => {
   if (bar.barTransparent({ transparent: "false" }) !== true)
     throw new Error("only the boolean false is opaque")
 
-  const grouped = notifications.groupNotifications([
-    { app: "browser", summary: "One" },
-    { app: "browser", summary: "Two" },
-    { app: "terminal", summary: "Three" }
-  ])
-  if (grouped.length !== 2 || grouped[0].count !== 2)
-    throw new Error("notifications were not grouped by app")
-
-  const collapsed = notifications.collapseQuietHours([{ id: 1 }, { id: 2 }], true)
-  if (collapsed.visible.length !== 0 || collapsed.count !== 2)
-    throw new Error("quiet-hours collapse failed")
-
   const normalized = notifications.normalizeNotification({
     id: "not-a-number",
     appName: null,
@@ -148,9 +136,6 @@ test("plugin-state logic", () => {
   if (menu.semanticDetail({ parent: "apps", label: "Apps" }, "Applications") !== "Applications") {
     throw new Error("submenu detail was unexpectedly rewritten")
   }
-
-  const bounded = notifications.limitHistory([{ id: 1 }, { id: 2 }, { id: 3 }], 2)
-  if (bounded.length !== 2 || bounded[0].id !== 1) throw new Error("history was not bounded")
 
   const late = new Date(2026, 8, 22, 23, 15)
   const early = new Date(2026, 8, 23, 6, 45)

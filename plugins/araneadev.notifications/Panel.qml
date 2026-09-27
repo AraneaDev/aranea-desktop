@@ -439,7 +439,6 @@ Panel {
                   image: rowLoader.modelData.entry.image
                   glyph: rowLoader.modelData.entry.glyph
                   urgency: rowLoader.modelData.entry.urgency
-                  timestamp: rowLoader.modelData.entry.timestamp
                   timeLabel: InboxLogic.relativeTime(rowLoader.modelData.entry.timestamp, root.now)
                   cornerRadius: root.service ? root.service.cornerRadius : 0
                   fontFamily: root.bar ? root.bar.fontFamily : ""

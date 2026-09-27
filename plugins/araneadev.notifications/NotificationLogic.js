@@ -472,18 +472,14 @@ function parseSettings(raw) {
   }
 }
 
-// ---------------------------------------------------- popup persistence
+// ---------------------------------------------------- inbox files
 //
-// Each on-screen popup is mirrored to its own file under
-// ~/.local/state/omarchy/notifications/ so toasts survive shell restarts
-// (e.g. the restart `omarchy-update` performs). The file exists exactly as
-// long as the popup is on screen: it is written when the toast appears and
-// moved into the history/ subdirectory when the toast expires, is dismissed,
-// or its action is invoked. History is those moved files, newest last-10.
+// Each stored notification is one JSON file under
+// ~/.local/state/omarchy/notifications/inbox/ (see Inbox.qml); it lives until
+// the user dismisses or acts on it, or the inbox prunes it.
 
 /**
- * The historyEntry form of a persisted popup, keeping its expireTimeout and,
- * when set, its deadline and onScreen flag.
+ * The historyEntry form of a stored notification, plus its expireTimeout.
  * @param {?Dict} value - the popup row or parsed file
  * @param {number} normalUrgency - the host's normal urgency value
  * @returns {Dict} the normalized popup entry
@@ -493,14 +489,6 @@ function popupEntry(value, normalUrgency) {
   var expire = Number((value || {}).expireTimeout || 0)
   if (!isFinite(expire) || expire < 0) expire = 0
   entry.expireTimeout = expire
-  // Absolute expiry deadline, set only when a restore resets a surviving
-  // popup's display lifetime. Kept out of the entry entirely when unset so
-  // restored rows match the roles of freshly received ones.
-  var deadline = Number((value || {}).deadline || 0)
-  if (isFinite(deadline) && deadline > 0) entry.deadline = deadline
-  // Inbox files record whether their toast is still on screen. Files written
-  // before the inbox existed have no flag; the loader treats them as live.
-  if (value && typeof value.onScreen === "boolean") entry.onScreen = value.onScreen
   return entry
 }
 
@@ -630,26 +618,6 @@ function parsePopupFiles(raw, normalUrgency) {
 }
 
 /**
- * A persisted popup whose lifetime already ran out would have expired on
- * screen had the shell kept running, so it is not restored. duration 0 means
- * the popup never expires (critical urgency) and always survives restarts.
- * A restore-reset deadline outranks the original timestamp: without it, a
- * second restart would judge a re-shown toast by a clock that no longer
- * governs its display and drop it while it is still on screen.
- * @param {?Dict} entry - the persisted popup entry
- * @param {number} duration - display lifetime in ms; 0 means never expires
- * @param {number} now - current time in ms
- * @returns {boolean} true when the popup's time on screen is over
- */
-function popupExpired(entry, duration, now) {
-  var deadline = Number((entry || {}).deadline || 0)
-  if (isFinite(deadline) && deadline > 0) return Number(now) >= deadline
-  var lifetime = Number(duration || 0)
-  if (!isFinite(lifetime) || lifetime <= 0) return false
-  return Number(now) - Number((entry || {}).timestamp || 0) >= lifetime
-}
-
-/**
  * Anchors and margins for the toast window: always the top-right corner, with
  * the bar's clearance on its own edge (top or right) and the gap elsewhere.
  * @param {?string} barPosition - bar edge; "top" when empty
@@ -673,57 +641,6 @@ function popupPlacement(barPosition, barClearance, gapsOut) {
       right: position === "right" ? clearance : gap
     }
   }
-}
-
-/**
- * Groups entries by app in first-seen order (only the tests call this).
- * @param {Array<Dict>} entries - notification rows
- * @returns {Array<Dict>} groups of {app, count, entries}
- */
-function groupNotifications(entries) {
-  /** @type {Array<{app: string, count: number, entries: Array<Dict>}>} */
-  var groups = []
-  /** @type {{[key: string]: number}} */
-  var indexes = {}
-  var rows = Array.isArray(entries) ? entries : []
-  for (var i = 0; i < rows.length; i++) {
-    var entry = rows[i] || {}
-    var key = String(entry.app || "unknown")
-    if (indexes[key] === undefined) {
-      indexes[key] = groups.length
-      groups.push({ app: key, count: 0, entries: [] })
-    }
-    var group = groups[indexes[key]]
-    group.entries.push(entry)
-    group.count++
-  }
-  return groups
-}
-
-/**
- * During quiet hours hides every entry and reports how many; otherwise shows
- * them all (only the tests call this).
- * @param {Array<Dict>} entries - notification rows
- * @param {boolean} quietHours - whether quiet hours are on
- * @returns {Dict} {visible, count}
- */
-function collapseQuietHours(entries, quietHours) {
-  var rows = Array.isArray(entries) ? entries : []
-  return quietHours ? { visible: [], count: rows.length } : { visible: rows.slice(), count: 0 }
-}
-
-/**
- * The first `limit` entries; a non-numeric or negative limit means 10 (only
- * the tests call this).
- * @param {Array<Dict>} entries - history rows
- * @param {number} limit - maximum number of rows
- * @returns {Array<Dict>} at most `limit` rows
- */
-function limitHistory(entries, limit) {
-  var rows = Array.isArray(entries) ? entries : []
-  var max = Number(limit)
-  if (!isFinite(max) || max < 0) max = 10
-  return rows.slice(0, Math.floor(max))
 }
 
 /**
@@ -817,11 +734,7 @@ if (typeof module !== "undefined") {
     persistablePopup: persistablePopup,
     serializePopup: serializePopup,
     parsePopupFiles: parsePopupFiles,
-    popupExpired: popupExpired,
     popupPlacement: popupPlacement,
-    groupNotifications: groupNotifications,
-    collapseQuietHours: collapseQuietHours,
-    limitHistory: limitHistory,
     isWithinQuietHours: isWithinQuietHours
   }
 }
