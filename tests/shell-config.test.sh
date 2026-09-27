@@ -132,7 +132,7 @@ cat > "$config" <<'EOF'
 {"bar": {"layout": {"right": [{"id": "omarchy.tray"}, {"id": "omarchy.network"}]}}}
 EOF
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[].id] == ["araneadev.notifications", "araneadev.health", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+jq -e '[.bar.layout.right[].id] == ["araneadev.health", "araneadev.notifications", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
 test -f "$hmarker"
 # Bell removed by hand, health kept: nothing moves, nothing re-added (Review Focus 4)
 jq '.bar.layout.right |= map(select(.id != "araneadev.notifications"))' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
