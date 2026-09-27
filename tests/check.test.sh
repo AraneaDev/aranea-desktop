@@ -16,8 +16,8 @@ cp "$repo_root"/tools/lib/check-*.sh tools/lib/
 cp "$repo_root/tools/baselines/em-dash-allow.txt" tools/baselines/
 for config in .prettierrc.json .prettierignore .editorconfig .qmlformat.ini eslint.config.js .markdownlint-cli2.jsonc; do cp "$repo_root/$config" .; done
 export ARANEA_CHECK_NODE_MODULES="$repo_root/node_modules"
-ln -s "$repo_root/node_modules" node_modules   # the configs resolve their plugins from here
-printf 'node_modules\n' > .gitignore
+ln -s "$repo_root/node_modules" node_modules # the configs resolve their plugins from here
+printf 'node_modules\n' >.gitignore
 printf '{"ok": true}\n' >data.json
 printf 'a = 1\n' >conf.toml
 printf '# Title\n\nSee [data](../data.json).\n' >docs/readme.md
@@ -96,9 +96,9 @@ if tools/check --staged --fix --only format >/dev/null 2>&1; then
 fi
 # lint: an undefined JS name, a markdown heading jump and a workflow typo fail.
 mkdir -p plugins/x .github/workflows
-printf 'function f() {\n  return missingName\n}\n' > plugins/x/a.js
-printf '# T\n\n### Jump\n' > docs/jump.md
-cat > .github/workflows/w.yml <<'EOF'
+printf 'function f() {\n  return missingName\n}\n' >plugins/x/a.js
+printf '# T\n\n### Jump\n' >docs/jump.md
+cat >.github/workflows/w.yml <<'EOF'
 on: push
 jobs:
   a:
@@ -107,7 +107,13 @@ jobs:
       - run: echo ${{ matrix.nope }}
 EOF
 git add -A
-if run_check --only lint; then echo "lint passed bad files" >&2; exit 1; fi
-for needle in plugins/x/a.js docs/jump.md w.yml; do grep -Fq "$needle" "$ARANEA_TEST_SANDBOX/out" || { cat "$ARANEA_TEST_SANDBOX/out"; exit 1; }; done
+if run_check --only lint; then
+  echo "lint passed bad files" >&2
+  exit 1
+fi
+for needle in plugins/x/a.js docs/jump.md w.yml; do grep -Fq "$needle" "$ARANEA_TEST_SANDBOX/out" || {
+  cat "$ARANEA_TEST_SANDBOX/out"
+  exit 1
+}; done
 git reset -q --hard
 echo "check contract passed"

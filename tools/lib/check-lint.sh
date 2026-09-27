@@ -7,10 +7,22 @@ repo_root="${repo_root:?tools/check sets repo_root}"
 # lint stage entry point.
 stage_lint() {
   local status=0 files
-  command -v shellcheck >/dev/null || { echo "shellcheck is required: sudo tools/install-shellcheck"; return 1; }
-  [[ -x "$(node_bin)/eslint" ]] || { echo "eslint is required: npm ci"; return 1; }
-  [[ -x "$(node_bin)/markdownlint-cli2" ]] || { echo "markdownlint-cli2 is required: npm ci"; return 1; }
-  command -v actionlint >/dev/null || { echo "actionlint is required: tools/install-actionlint ~/.local/bin"; return 1; }
+  command -v shellcheck >/dev/null || {
+    echo "shellcheck is required: sudo tools/install-shellcheck"
+    return 1
+  }
+  [[ -x "$(node_bin)/eslint" ]] || {
+    echo "eslint is required: npm ci"
+    return 1
+  }
+  [[ -x "$(node_bin)/markdownlint-cli2" ]] || {
+    echo "markdownlint-cli2 is required: npm ci"
+    return 1
+  }
+  command -v actionlint >/dev/null || {
+    echo "actionlint is required: tools/install-actionlint ~/.local/bin"
+    return 1
+  }
 
   mapfile -t files < <(shell_files)
   if ((${#files[@]})); then
