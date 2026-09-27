@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.1.0...v2.2.0) (2026-09-27)
+
+
+### Features
+
+* Aranea clipboard and emoji pickers ([#49](https://github.com/AraneaDev/aranea-desktop/issues/49)) ([71b8729](https://github.com/AraneaDev/aranea-desktop/commit/71b87294d50dd9ec9e1520d95de694a2cd22d00d))
+
 ## [2.1.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.0.0...v2.1.0) (2026-09-27)
 
 
