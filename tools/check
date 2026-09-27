@@ -122,6 +122,7 @@ check_files() {
 # Shared helpers, then the stage libraries (each defines stage_<name>).
 source "$repo_root/tools/lib/check-common.sh"
 source "$repo_root/tools/lib/check-format.sh"
+source "$repo_root/tools/lib/check-lint.sh"
 source "$repo_root/tools/lib/check-validate.sh"
 
 # Runs one stage function (defined by the libraries above).

@@ -139,7 +139,10 @@ function stringHint(hints, name) {
       var value = hints[name]
       if (value !== undefined && value !== null) return String(value)
     }
-  } catch (e) {}
+  } catch (e) {
+    // A hints object from a misbehaving sender can throw on access; treat
+    // that the same as a missing hint.
+  }
   return ""
 }
 
@@ -380,7 +383,9 @@ function localImageFile(value) {
     s = s.slice(7)
     try {
       s = decodeURIComponent(s)
-    } catch (e) {}
+    } catch (e) {
+      // Not valid percent-encoding: keep the path as written.
+    }
   }
   return s.charAt(0) === "/" ? s : ""
 }

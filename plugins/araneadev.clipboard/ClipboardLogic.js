@@ -224,7 +224,7 @@ function isSecretText(value) {
   if (text.length < 16) return false
   // Dotted, slashed, colon or @ strings are identifiers, paths, versions,
   // emails or hashes with a prefix -- developer text, not passwords.
-  if (/[.\/:@\\()]/.test(text)) return false
+  if (/[./:@\\()]/.test(text)) return false
   // `-` and `_` join words; they do not make a string look random.
   var classes =
     (/[a-z]/.test(text) ? 1 : 0) +
@@ -373,7 +373,7 @@ function relativeAge(ms, now) {
 }
 
 function linkParts(text) {
-  var m = /^https?:\/\/([^\/?#]+)([^?#]*)/i.exec(String(text || "").trim())
+  var m = /^https?:\/\/([^/?#]+)([^?#]*)/i.exec(String(text || "").trim())
   if (!m) return { domain: "", path: "" }
   return { domain: m[1].replace(/^www\./, ""), path: m[2] === "/" ? "" : m[2] }
 }

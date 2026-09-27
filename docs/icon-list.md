@@ -2,7 +2,7 @@
 
 The compact Aranea icon core uses the same solid, bright-green glyph language as the Command Center. Unsupported long-tail icons inherit from the host theme.
 
-### Actions
+## Actions
 
 | Icon                                                                                     | Preview                                                                                                                      |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -21,7 +21,7 @@ The compact Aranea icon core uses the same solid, bright-green glyph language as
 | [`view-list`](../integrations/icons/aranea/scalable/actions/view-list.svg)               | <img src="../integrations/icons/aranea/scalable/actions/view-list.svg" width="32" height="32" alt="view-list">               |
 | [`view-refresh`](../integrations/icons/aranea/scalable/actions/view-refresh.svg)         | <img src="../integrations/icons/aranea/scalable/actions/view-refresh.svg" width="32" height="32" alt="view-refresh">         |
 
-### Apps
+## Apps
 
 | Icon                                                                                                | Preview                                                                                                                                 |
 | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -31,7 +31,7 @@ The compact Aranea icon core uses the same solid, bright-green glyph language as
 | [`utilities-terminal`](../integrations/icons/aranea/scalable/apps/utilities-terminal.svg)           | <img src="../integrations/icons/aranea/scalable/apps/utilities-terminal.svg" width="32" height="32" alt="utilities-terminal">           |
 | [`web-browser`](../integrations/icons/aranea/scalable/apps/web-browser.svg)                         | <img src="../integrations/icons/aranea/scalable/apps/web-browser.svg" width="32" height="32" alt="web-browser">                         |
 
-### Devices
+## Devices
 
 | Icon                                                                                               | Preview                                                                                                                                |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ The compact Aranea icon core uses the same solid, bright-green glyph language as
 | [`network-server`](../integrations/icons/aranea/scalable/devices/network-server.svg)               | <img src="../integrations/icons/aranea/scalable/devices/network-server.svg" width="32" height="32" alt="network-server">               |
 | [`network-wireless`](../integrations/icons/aranea/scalable/devices/network-wireless.svg)           | <img src="../integrations/icons/aranea/scalable/devices/network-wireless.svg" width="32" height="32" alt="network-wireless">           |
 
-### Mimetypes
+## Mimetypes
 
 | Icon                                                                                                       | Preview                                                                                                                                        |
 | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -65,7 +65,7 @@ The compact Aranea icon core uses the same solid, bright-green glyph language as
 | [`text-x-script`](../integrations/icons/aranea/scalable/mimetypes/text-x-script.svg)                       | <img src="../integrations/icons/aranea/scalable/mimetypes/text-x-script.svg" width="32" height="32" alt="text-x-script">                       |
 | [`video-x-generic`](../integrations/icons/aranea/scalable/mimetypes/video-x-generic.svg)                   | <img src="../integrations/icons/aranea/scalable/mimetypes/video-x-generic.svg" width="32" height="32" alt="video-x-generic">                   |
 
-### Places
+## Places
 
 | Icon                                                                                    | Preview                                                                                                                     |
 | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -83,7 +83,7 @@ The compact Aranea icon core uses the same solid, bright-green glyph language as
 | [`user-trash-full`](../integrations/icons/aranea/scalable/places/user-trash-full.svg)   | <img src="../integrations/icons/aranea/scalable/places/user-trash-full.svg" width="32" height="32" alt="user-trash-full">   |
 | [`user-trash`](../integrations/icons/aranea/scalable/places/user-trash.svg)             | <img src="../integrations/icons/aranea/scalable/places/user-trash.svg" width="32" height="32" alt="user-trash">             |
 
-### Status
+## Status
 
 | Icon                                                                                  | Preview                                                                                                                   |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
