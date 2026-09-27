@@ -272,6 +272,7 @@ Panel {
             spacing: Style.space(8)
 
             Text {
+              id: titleText
               Layout.fillWidth: true
               text: "Notifications"
               color: Color.popups.text
@@ -315,10 +316,10 @@ Panel {
             Layout.fillWidth: true
             textFormat: Text.PlainText
             text: "ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP"
-            color: Color.popups.text
+            color: titleText.color
             opacity: 0.5
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
+            font.family: titleText.font.family
+            font.pixelSize: badgeText.font.pixelSize
             elide: Text.ElideRight
           }
 
