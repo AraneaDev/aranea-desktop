@@ -328,24 +328,34 @@ case "$surface" in
     command -v wtype >/dev/null 2>&1 || { echo "wtype is required to capture $surface" >&2; exit 3; }
     pkexec /usr/bin/true >/dev/null 2>&1 &
     pkexec_pid=$!
+    prompt_visible() {
+      hyprctl layers -j 2>/dev/null | jq -e '[.. | objects | select(.namespace? == "omarchy-polkit")] | length > 0' >/dev/null 2>&1
+    }
+    # Escape goes only to the prompt (it holds the keyboard while visible);
+    # a pkexec still running after that is killed, never waited on forever.
     finish_polkit() {
-      if kill -0 "$pkexec_pid" 2>/dev/null; then
+      if prompt_visible; then
         wtype -k Escape >/dev/null 2>&1 || true
         sleep 1
       fi
+      if kill -0 "$pkexec_pid" 2>/dev/null; then kill "$pkexec_pid" 2>/dev/null || true; fi
       wait "$pkexec_pid" 2>/dev/null || true
     }
     trap finish_polkit EXIT
+    shown=0
     for _ in $(seq 1 20); do
-      hyprctl layers -j 2>/dev/null | jq -e '[.. | objects | select(.namespace? == "omarchy-polkit")] | length > 0' >/dev/null 2>&1 && break
+      if prompt_visible; then shown=1; break; fi
       sleep 0.5
     done
+    if (( ! shown )); then
+      echo "polkit prompt never appeared; is a polkit agent registered?" >&2
+      exit 3
+    fi
     # Give the pkaction lookup a moment, then open the details.
     sleep 1
     wtype -k Tab
     sleep 0.5
     grim "$output/$surface.png"
-    wtype -k Escape
     finish_polkit
     trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"

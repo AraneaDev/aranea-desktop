@@ -55,6 +55,8 @@ const hm = p.requestMarkup(hostile, '#3bff9e')
 assert(!hm.includes('<b>') && hm.includes('&lt;b&gt;x&lt;/b&gt;&amp;y'), 'hostile command escaped: ' + hm)
 const hm2 = p.requestMarkup('Install <i>pkg</i> & more', '#fff')
 eq(hm2, 'Install &lt;i&gt;pkg&lt;/i&gt; &amp; more', 'hostile fallback escaped')
+// final review m6: line breaks in a non-pkexec message become spaces
+eq(p.requestMarkup('Line one\nline two\r\nthree', '#fff'), 'Line one line two three', 'newlines collapse')
 assert(!p.requestMarkup(root1, '"><script>').includes('"><script>'), 'accent escaped')
 
 // --- action ids
@@ -139,7 +141,7 @@ grep -Fq 'ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL' "$agent"
 grep -Fq 'Math.max(Color.polkit.scrim.a, 0.72)' "$agent"
 grep -Fq 'aranea/motion' "$agent"
 # Review Focus 5: the card never exceeds the screen
-grep -Fq 'Math.min(Style.space(380), Math.max(Style.space(260), panel.width - Style.gapsOut * 2))' "$agent"
+grep -Fq 'Math.max(Style.space(120), Math.min(Style.space(380), panel.width - Style.gapsOut * 2))' "$agent"
 # Action lookup: argv only, validated id, one request's result only (Review Focus 1)
 grep -Fq '["timeout", "2", "pkaction", "--action-id", id, "--verbose"]' "$agent"
 grep -Fq 'PolkitLogic.validActionId(id)' "$agent"
@@ -154,5 +156,15 @@ grep -Fq 'Qt.Key_Backtab' "$agent"
 grep -Fq 'flow.selectedIdentity = flow.identities[' "$agent"
 # The old pill above the card is gone (the request lives in the card now)
 if grep -Fq 'justificationText' "$agent"; then echo "stock justification pill should be gone" >&2; exit 1; fi
+
+# --- final review fixes
+# m1: a pkaction result rebuilds the details; keep keys working afterwards
+grep -Fq 'if (root.detailsOpen) Qt.callLater(root.refocus)' "$agent"
+# m2: content never spills past the card on very short screens
+grep -Fq 'clip: true  // content never spills past the card' "$agent"
+# m4: doctor reports whether a polkit prompt is enabled
+grep -Fq 'ARANEA_DOCTOR_POLKIT_STATUS' "$repo_root/scripts/aranea-doctor"
+# README tells a hand-disabler to restart the shell
+grep -Fq 'omarchy plugin disable araneadev.polkit' "$repo_root/README.md"
 
 echo "polkit contract passed"

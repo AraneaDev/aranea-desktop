@@ -4,6 +4,10 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
+# Markers go to a scratch state dir from the very first repair, never the
+# real ~/.local/state/aranea (a stray polkit-handover marker there would
+# restart the live shell on the next hook run).
+export ARANEA_STATE_ROOT="$test_root/state"
 
 config="$test_root/shell.json"
 cat > "$config" <<'EOF'
@@ -179,5 +183,54 @@ jq -e '.cloneSourceRestores | index("araneadev.polkit") != null' "$config" >/dev
 jq -e '[.plugins[]?.id] | index("araneadev.polkit") == null' "$config" >/dev/null
 jq -e '(.disabledPlugins // []) | index("omarchy.polkit") == null' "$config" >/dev/null
 jq -e '(.cloneSourceRestores // []) | index("araneadev.polkit") == null' "$config" >/dev/null
+
+# --- polkit handover (final review I1): an agent registers once per shell
+# process, so the running shell must restart whenever the prompt changes
+# hands. The config scripts only leave a marker; finish-polkit-handover acts.
+handover="$state_root/polkit-handover"
+"$repo_root/scripts/repair-shell-config" "$config"
+rm -f "$handover"
+"$repo_root/scripts/repair-shell-config" "$config"
+test ! -e "$handover"
+"$repo_root/scripts/release-shell-config" "$config"
+test -e "$handover"
+rm -f "$handover"
+"$repo_root/scripts/release-shell-config" "$config"
+test ! -e "$handover"
+"$repo_root/scripts/repair-shell-config" "$config"
+test -e "$handover"
+
+stub_bin="$test_root/bin"
+mkdir -p "$stub_bin"
+cat > "$stub_bin/omarchy-shell" <<'EOF'
+#!/usr/bin/env bash
+[[ "$*" == "shell ping" && -e "$STUB_SHELL_UP" ]]
+EOF
+cat > "$stub_bin/omarchy" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$STUB_LOG"
+EOF
+chmod +x "$stub_bin/omarchy-shell" "$stub_bin/omarchy"
+export STUB_LOG="$test_root/omarchy.log" STUB_SHELL_UP="$test_root/shell-up"
+: > "$STUB_LOG"
+# No marker: nothing to do.
+rm -f "$handover"
+PATH="$stub_bin:$PATH" "$repo_root/scripts/finish-polkit-handover"
+test ! -s "$STUB_LOG"
+# Marker and a running shell: restart it, consume the marker.
+: > "$handover"; : > "$STUB_SHELL_UP"
+PATH="$stub_bin:$PATH" "$repo_root/scripts/finish-polkit-handover"
+grep -Fxq 'restart shell' "$STUB_LOG"
+test ! -e "$handover"
+# Marker but no shell: the next start registers fresh; just consume it.
+: > "$STUB_LOG"; rm -f "$STUB_SHELL_UP"; : > "$handover"
+PATH="$stub_bin:$PATH" "$repo_root/scripts/finish-polkit-handover"
+test ! -s "$STUB_LOG"
+test ! -e "$handover"
+# Both hook paths (leaving and arriving) and post-boot finish the handover;
+# a deploy that restarts the shell itself consumes the marker.
+[[ "$(grep -c 'finish-polkit-handover' "$repo_root/hooks/theme-set")" -ge 2 ]]
+grep -Fq 'finish-polkit-handover' "$repo_root/hooks/post-boot"
+grep -Fq 'polkit-handover' "$repo_root/scripts/deploy-plugins-safely"
 
 echo "shell config contract passed"

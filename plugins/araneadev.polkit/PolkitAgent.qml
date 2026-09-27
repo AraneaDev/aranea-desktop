@@ -69,7 +69,8 @@ Item {
   // a password — including immediately when the lid is shut and the clamshell
   // gate skips pam_fprintd — we switch to the password field instead.
   readonly property bool fingerprintMode: fingerprintConfigured && !laptopClosed && dialogVisible && !responseRequired && !submitted && !errorFlash
-  readonly property int cardWidth: Math.min(Style.space(380), Math.max(Style.space(260), panel.width - Style.gapsOut * 2))
+  // Never wider than the screen (minus gaps), even on a very narrow one.
+  readonly property int cardWidth: Math.max(Style.space(120), Math.min(Style.space(380), panel.width - Style.gapsOut * 2))
 
   function loadPamConfig(raw) {
     fingerprintConfigured = PolkitLogic.fingerprintConfiguredFromPamConfig(raw)
@@ -290,6 +291,9 @@ Item {
         var info = PolkitLogic.parseActionInfo(actionLookupOut.text)
         root.actionDescription = info.description
         root.actionVendor = info.vendor
+        // The details rows were rebuilt; a clicked value that held focus is
+        // gone, so hand focus back to the field or key catcher.
+        if (root.detailsOpen) Qt.callLater(root.refocus)
       }
       if (root.lookupQueued) Qt.callLater(root.startActionLookup)
     }
@@ -373,6 +377,7 @@ Item {
       color: root.background
       borderSpec: root.borderSpec
       padding: root.contentMargin
+      clip: true  // content never spills past the card on very short screens
 
       MouseArea { anchors.fill: parent; onClicked: root.refocus() }
 

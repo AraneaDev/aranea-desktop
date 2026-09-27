@@ -66,6 +66,10 @@ grep -Fq 'omarchy-polkit' "$capture_script"
 # Only single named keys (Tab, Escape) are ever sent; no text.
 if grep -E '^\s*wtype |[;&|(] *wtype ' "$capture_script" | grep -Ev 'wtype -k (Tab|Escape)( |$)'; then echo "capture must never type text" >&2; exit 1; fi
 
+# Final review I2: no keys are sent unless the prompt is on screen, and a
+# pkexec left running is killed.
+grep -Fq 'polkit prompt never appeared' "$capture_script"
+grep -Fq "kill \"\$pkexec_pid\"" "$capture_script"
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]
 

@@ -40,7 +40,8 @@ function parsePkexec(message) {
 }
 
 function summaryParts(message) {
-  var text = String(message || "").trim()
+  // One logical line: StyledText would otherwise decide how breaks render.
+  var text = String(message || "").replace(/\s*[\r\n]+\s*/g, " ").trim()
   var parsed = parsePkexec(text)
   if (parsed) return { prefix: "Run '", command: parsed.command, suffix: "' as " + parsed.target }
   return { prefix: text || "Authentication is needed", command: "", suffix: "" }

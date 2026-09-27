@@ -339,6 +339,12 @@ vendor, command and the raw polkit message — and `Shift+Tab` switches account
 when more than one may authorise. Fingerprint login and the closed-lid
 fallback work as in Omarchy.
 
+Only one prompt can be registered per shell, and it registers when the shell
+starts. Switching themes restarts the shell for you. If you turn the Aranea
+prompt off by hand (`omarchy plugin disable araneadev.polkit`), run
+`omarchy restart shell` so Omarchy's own prompt can take over; until then,
+privileged actions have no password prompt.
+
 ## Palette
 
 | Role | Value |

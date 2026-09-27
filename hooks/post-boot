@@ -51,6 +51,11 @@ fi
 if [[ -x "$theme_root/scripts/deploy-plugins-safely" ]]; then
   "$theme_root/scripts/deploy-plugins-safely" "$theme_root"
 fi
+# Aranea's polkit agent can only register in a fresh shell process (a
+# deploy that restarted the shell has already done this).
+if [[ -x "$theme_root/scripts/finish-polkit-handover" ]]; then
+  "$theme_root/scripts/finish-polkit-handover" || true
+fi
 if [[ -x "$theme_root/scripts/ensure-shell-running" ]]; then
   "$theme_root/scripts/ensure-shell-running"
 fi

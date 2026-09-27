@@ -29,6 +29,21 @@ place_health=true
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
+# Which polkit agent this config enables. An agent registers once per shell
+# process, so a change of owner needs a shell restart: leave a marker for
+# finish-polkit-handover (the hooks run it) instead of restarting from here.
+polkit_owner() {
+  jq -r 'if ([.plugins[]? | (if type == "string" then . else .id? end)] | index("araneadev.polkit")) != null
+            and (((.disabledPlugins // []) | index("omarchy.polkit")) != null)
+         then "aranea" else "stock" end' "$1" 2>/dev/null || echo unknown
+}
+note_polkit_handover() {
+  if [[ "$(polkit_owner "$config_file")" != "$(polkit_owner "$tmp_file")" ]]; then
+    mkdir -p "$state_root"
+    : > "$state_root/polkit-handover"
+  fi
+}
+
 jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
@@ -90,6 +105,8 @@ if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id?
   : > "$health_marker"
   rm -f "$health_parked"
 fi
+
+note_polkit_handover
 
 if cmp -s "$config_file" "$tmp_file"; then
   printf 'shell config already repaired: %s\n' "$config_file"

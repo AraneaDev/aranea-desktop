@@ -19,6 +19,7 @@ bash -n "$repo_root/scripts/deploy-plugins-safely"
 # disabled indefinitely.
 work_dir="$(mktemp -d)"
 trap 'rm -rf "$work_dir"' EXIT
+export ARANEA_STATE_ROOT="$work_dir/state"
 config_dir="$work_dir/config"
 plugins_dir="$config_dir/plugins"
 mkdir -p "$plugins_dir"

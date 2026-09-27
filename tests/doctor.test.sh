@@ -105,12 +105,14 @@ inbox_output="$(
   ARANEA_DOCTOR_OWNERSHIP_ROOT="$ownership_root" \
   ARANEA_DOCTOR_SHELL_STATUS=skipped \
   ARANEA_DOCTOR_PLUGINS_STATUS=skipped \
+  ARANEA_DOCTOR_POLKIT_STATUS=skipped \
   ARANEA_DOCTOR_RUNTIME_ROOT="$hook_root/no-runtime" \
   ARANEA_DOCTOR_QMLLINT_STATUS=ok \
   ARANEA_DOCTOR_INBOX_ROOT="$inbox_root" \
   "$repo_root/scripts/aranea-doctor" --json
 )"
 grep -Fq '"id":"notifications","status":"ok","message":"inbox holds 1 entries"' <<<"$inbox_output"
+grep -Fq '"id":"polkit","status":"skipped"' <<<"$inbox_output"
 
 # A deliberately disabled health plugin is not a broken install.
 if grep -Fq 'select(.id == "araneadev.health")' "$repo_root/scripts/aranea-doctor"; then echo "health plugin must be optional in the plugins check" >&2; exit 1; fi
