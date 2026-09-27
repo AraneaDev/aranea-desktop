@@ -48,6 +48,8 @@ Item {
   property var lastNet: null
   // Time (ms) of lastNet.
   property real lastNetAt: 0
+  // CPU cores (cpuN lines in /proc/stat), for the TOP percentage cap.
+  property int cores: 1
   // Previous /proc/<pid>/stat dump, for the per-process CPU delta.
   property var lastPs: null
   // Kernel page size and clock tick rate, read once (x86_64 defaults until
@@ -109,7 +111,9 @@ Item {
 
   // Takes the 2 s sample: CPU, load, memory, default interface and rates.
   function sample(): void {
-    var stat = MetricsLogic.parseCpuStat(read(statFile))
+    var statText = read(statFile)
+    cores = MetricsLogic.countCores(statText)
+    var stat = MetricsLogic.parseCpuStat(statText)
     if (stat) {
       var pct = MetricsLogic.cpuPercent(lastCpu, stat)
       lastCpu = stat
@@ -128,7 +132,10 @@ Item {
       lastNet = null
     }
     var net = MetricsLogic.parseNetDev(read(devFile), iface)
-    var now = Date.now()
+    // Elapsed time from the boot clock: a wall-clock step or a suspend must
+    // not distort the rates. Unreadable uptime means no rate this sample.
+    var uptime = MetricsLogic.uptimeMs(read(uptimeFile))
+    var now = uptime === null ? lastNetAt : uptime
     rates = MetricsLogic.netRates(lastNet, net, now - lastNetAt)
     lastNet = net
     lastNetAt = now
@@ -188,7 +195,8 @@ Item {
         if (!metrics.topActive)
           return
         var list = MetricsLogic.parseProcStat(text, metrics.pageSize)
-        var now = Date.now()
+        var uptime = MetricsLogic.uptimeMs(metrics.read(uptimeFile))
+        var now = uptime === null ? metrics.lastPsAt : uptime
         if (!list || list.length === 0) {
           metrics.topProcs = ({
               cpu: [],
@@ -197,7 +205,7 @@ Item {
           return
         }
         if (metrics.lastPs)
-          metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, metrics.clockTicks)
+          metrics.topProcs = MetricsLogic.topProcesses(metrics.lastPs, list, now - metrics.lastPsAt, 3, metrics.clockTicks, metrics.cores)
         metrics.lastPs = list
         metrics.lastPsAt = now
       }

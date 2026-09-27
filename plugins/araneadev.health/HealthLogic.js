@@ -185,7 +185,7 @@ function alertableFsType(fstype) {
 /**
  * Classifies disk usage with hysteresis: once alerted, a disk stays alerted
  * until it drops below DISK_CLEAR.
- * @param {?string} previous - the mount's previous level ("ok", "normal", "critical"), undefined if unseen
+ * @param {string} previous - the mount's previous level ("ok", "normal" or "critical")
  * @param {number} percent - current use percentage
  * @returns {string} "critical", "normal" (alert) or "ok"
  */
@@ -193,7 +193,7 @@ function diskLevel(previous, percent) {
   var p = Number(percent)
   if (p >= DISK_CRITICAL) return "critical"
   if (p >= DISK_ALERT) return "normal"
-  if (previous !== "ok" && previous !== undefined && p >= DISK_CLEAR) return "normal"
+  if (previous !== "ok" && p >= DISK_CLEAR) return "normal"
   return "ok"
 }
 

@@ -117,3 +117,18 @@ test("metrics logic", () => {
 
   console.log("metrics logic contract passed")
 })
+
+test("monotonic rates and CPU clamp (4c)", () => {
+  const m = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/MetricsLogic.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  eq(m.uptimeMs("12345.67 9999.00\n"), 12345670, "uptime in ms")
+  eq(m.uptimeMs(""), null, "no uptime")
+  eq(m.countCores("cpu  1 2 3\ncpu0 1 2\ncpu1 1 2\nintr 5\n"), 2, "cores")
+  eq(m.countCores(""), 1, "at least one core")
+  const prev = [{ pid: 1, comm: "a", ticks: 0, rss: 1 }]
+  const next = [{ pid: 1, comm: "a", ticks: 1000, rss: 1 }]
+  eq(m.topProcesses(prev, next, 1000, 3, 100, 2).cpu[0].percent, 200, "capped at 100 x cores")
+  eq(m.topProcesses(prev, next, 1000, 3, 100).cpu[0].percent, 1000, "no cap without a core count")
+})

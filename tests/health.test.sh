@@ -105,4 +105,12 @@ grep -Fq '"--filter", "event=oom"' "$mon"
 grep -Fq 'function finishDockerPs(): void' "$mon"
 grep -Fq 'if (monitor.dockerPsCode !== 0)' "$mon"
 
+# --- 4c: rates use the uptime clock
+metrics_qml="$repo_root/plugins/araneadev.health/Metrics.qml"
+grep -Fq 'MetricsLogic.uptimeMs(' "$metrics_qml"
+if grep -Fq 'var now = Date.now()' "$metrics_qml"; then
+  echo "rates must not use the wall clock" >&2
+  exit 1
+fi
+
 echo "health contract passed"

@@ -347,3 +347,9 @@ test("docker stops, OOM and failed ps (4c)", () => {
   eq(h.isFailedExit({ lastExit: 137, oomKilled: true }), true, "137 with OOM")
   eq(h.isFailedExit({ lastExit: 2 }), true, "2")
 })
+
+test("disk level from a known previous level (4c)", () => {
+  const h = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/HealthLogic.js"))
+  if (h.diskLevel("ok", 89) !== "ok") throw new Error("89% from ok stays ok")
+  if (h.diskLevel("normal", 89) !== "normal") throw new Error("hysteresis")
+})

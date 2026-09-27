@@ -226,9 +226,10 @@ function parseProcStat(text, pageSize) {
  * @param {number} elapsedMs - time between the dumps in ms
  * @param {number} [count] - entries per list, 3 when omitted
  * @param {number} [ticksPerSecond] - clock ticks per second, 100 when omitted
+ * @param {number} [cores] - CPU cores; each share is capped at 100 x cores (no cap when omitted)
  * @returns {{cpu: Array<{comm: string, percent: number}>, mem: Array<{comm: string, rss: number}>}} the top entries of each list
  */
-function topProcesses(prev, next, elapsedMs, count, ticksPerSecond) {
+function topProcesses(prev, next, elapsedMs, count, ticksPerSecond, cores) {
   var n = count || 3
   var hz = ticksPerSecond || 100
   /** @type {{[key: number]: ProcSample}} */
@@ -241,6 +242,8 @@ function topProcesses(prev, next, elapsedMs, count, ticksPerSecond) {
     var old = before[p.pid]
     if (!old || !(s > 0)) continue
     var percent = Math.round(((p.ticks - old.ticks) * 100) / hz / s)
+    // A clock hiccup or a short sample can overshoot; no process uses more than every core.
+    if (cores > 0) percent = Math.min(percent, 100 * cores)
     if (percent > 0) cpu.push({ comm: p.comm, percent: percent })
   }
   cpu.sort(function (a, b) {
@@ -308,8 +311,31 @@ function formatRate(bytesPerSec) {
   return humanBytes(bytesPerSec) + "/s"
 }
 
+/**
+ * Milliseconds since boot from /proc/uptime (CLOCK_BOOTTIME: never jumps,
+ * counts suspend), the elapsed-time source for rates.
+ * @param {string} text - /proc/uptime contents
+ * @returns {?number} the uptime in ms, null when unreadable
+ */
+function uptimeMs(text) {
+  var s = parseFloat(String(text || "").split(" ")[0])
+  return isFinite(s) ? Math.round(s * 1000) : null
+}
+
+/**
+ * Number of CPU cores listed in /proc/stat (cpuN lines).
+ * @param {string} text - /proc/stat contents
+ * @returns {number} the core count, at least 1
+ */
+function countCores(text) {
+  var n = (String(text || "").match(/^cpu\d+ /gm) || []).length
+  return n > 0 ? n : 1
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    uptimeMs: uptimeMs,
+    countCores: countCores,
     parseCpuStat: parseCpuStat,
     cpuPercent: cpuPercent,
     pushHistory: pushHistory,
