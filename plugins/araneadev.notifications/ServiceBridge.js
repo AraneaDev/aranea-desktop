@@ -7,16 +7,29 @@
 
 var service = null
 
+/**
+ * Stores the live notification service for the bar widget to find.
+ * @param {?object} value - the Service.qml root object; a falsy value clears the slot
+ */
 function publish(value) {
   service = value || null
 }
 
-// Only the instance that published may clear the slot: during a reload the
-// new service can publish before the old one is destroyed.
+/**
+ * Clears the slot, but only when it still holds this service.
+ *
+ * Only the instance that published may clear the slot: during a reload the
+ * new service can publish before the old one is destroyed.
+ * @param {?object} value - the Service.qml root object being destroyed
+ */
 function retract(value) {
   if (service === value) service = null
 }
 
+/**
+ * The published notification service.
+ * @returns {?object} the Service.qml root object, or null when none is live
+ */
 function current() {
   return service
 }

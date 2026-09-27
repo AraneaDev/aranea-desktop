@@ -1,6 +1,7 @@
-// The notification inbox: one JSON file per stored notification under
-// inbox/, mirrored into a newest-first ListModel. A file lives until the user
-// dismisses or acts on it from the center.
+// The notification inbox, instantiated once by Service.qml (service.inbox):
+// one JSON file per stored notification under inbox/, mirrored into a
+// newest-first ListModel. A file lives until the user dismisses or acts on it
+// from the center.
 //
 // Every write, delete and read goes through one serialized Process queue: a
 // burst of replaces_id updates must not race a reused Process, and a delete
@@ -15,23 +16,32 @@ import "InboxLogic.js" as InboxLogic
 Item {
   id: inbox
 
+  // Plugin state directory, with a trailing slash; set by Service.qml.
   required property string stateDir      // ~/.local/state/omarchy/notifications/
+  // The host's normal urgency value, the default for entries without one.
   required property int normalUrgency
+  // Where the entry files live.
   readonly property string inboxDir: stateDir + "inbox/"
+  // Where the entries' image copies live (see NotificationLogic.persistablePopup).
   readonly property string imagesDir: stateDir + "images/"
 
+  // Inbox rows, newest first; each row carries its fileName.
   property alias model: inboxModel
+  // Number of inbox entries.
   readonly property int count: inboxModel.count
+  // Bumped on every model change, so bindings that read rows re-evaluate.
   property int revision: 0
   // True once the first directory read has been merged in.
   property bool loadedOnce: false
 
+  // Emitted after each directory read has been merged into the model.
   signal loaded
 
   ListModel {
     id: inboxModel
   }
 
+  // Model index of the entry with this file name, or -1.
   function indexOf(fileName: string): int {
     for (var i = 0; i < inboxModel.count; i++) {
       if (inboxModel.get(i).fileName === fileName)
@@ -40,10 +50,12 @@ Item {
     return -1
   }
 
+  // Whether an entry with this file name is in the model.
   function has(fileName: string): bool {
     return indexOf(fileName) >= 0
   }
 
+  // A plain copy of the entry with this file name, or null.
   function get(fileName: string): var {
     var i = indexOf(fileName)
     if (i < 0)
@@ -67,6 +79,7 @@ Item {
     }
   }
 
+  // Normalizes an entry (NotificationLogic.popupEntry) into a model row with its fileName.
   function modelRow(entry) {
     var e = NotificationLogic.popupEntry(entry, normalUrgency)
     return {
@@ -87,6 +100,8 @@ Item {
     }
   }
 
+  // Adds an entry or updates the one with the same file name, writes its file and
+  // prunes the inbox.
   function upsert(entry: var): void {
     if (!entry)
       return
@@ -103,6 +118,7 @@ Item {
     prune()
   }
 
+  // Removes an entry from the model and deletes its file and image copies.
   function remove(fileName: string): void {
     var i = indexOf(fileName)
     if (i >= 0) {
@@ -112,12 +128,14 @@ Item {
     enqueue(["bash", "-c", "rm -f \"$1/$2\" \"$3/${2%.json}\"-*", "--", inboxDir, fileName, imagesDir])
   }
 
+  // Empties the model and deletes every entry file with its image copies.
   function clear(): void {
     inboxModel.clear()
     revision++
     enqueue(["bash", "-c", "for f in \"$1\"/*.json; do\n" + "  [[ -e $f ]] || continue\n" + "  stale=\"${f##*/}\"\n" + "  rm -f \"$f\" \"$2/${stale%.json}\"-*\n" + "done", "--", inboxDir, imagesDir])
   }
 
+  // Removes the entries InboxLogic.pruneInbox drops (too old or over the limit).
   function prune(): void {
     var rows = []
     for (var i = 0; i < inboxModel.count; i++) {
@@ -160,9 +178,13 @@ Item {
 
   // ---------------------------------------------------- queue
 
+  // Pending file jobs, each {command, done}, run one at a time by fileProc.
   property var queue: []
+  // Callback of the job fileProc is running, called when it exits.
   property var runningDone: null
 
+  // Queues an argv to run after every job already queued, with an optional done
+  // callback.
   function enqueue(command, done) {
     queue = queue.concat([
       {
@@ -173,6 +195,7 @@ Item {
     runNext()
   }
 
+  // Starts the next queued job unless a job or the directory read is running.
   function runNext(): void {
     if (fileProc.running || readProc.running || queue.length === 0)
       return
@@ -202,6 +225,7 @@ Item {
 
   // ---------------------------------------------------- load
 
+  // Callback of the pending load(), called with the parsed entries.
   property var loadDone: null
 
   // Popup files from before the inbox (top-level *.json in stateDir) are

@@ -1,6 +1,7 @@
 // Notification bell + center. The bell shows the inbox count; the dropdown
 // lists inbox entries grouped by app. All state lives in the plugin's own
 // service (Service.qml); this file only renders it and forwards actions.
+// Loaded by the Aranea bar as this plugin's bar widget (manifest.json).
 
 import QtQuick
 import QtQuick.Layouts
@@ -32,10 +33,15 @@ Panel {
         root.service = next
     }
   }
+  // True when the service and its inbox are reachable.
   readonly property bool available: !!(service && service.inbox)
+  // Number of inbox entries (0 while unavailable).
   readonly property int count: available ? service.inbox.count : 0
+  // The service's Do Not Disturb state.
   readonly property bool dnd: service ? !!service.doNotDisturb : false
+  // True while the service's quiet hours are active.
   readonly property bool quiet: service ? !!service.quietHours : false
+  // Number of critical (urgency 2) inbox entries.
   readonly property int criticalCount: {
     if (!available)
       return 0
@@ -54,14 +60,20 @@ Panel {
   // Violet focus accent (colors.toml accent_secondary) for scheduled quiet hours.
   readonly property color focusAccent: "#7a5cff"
 
+  // Per-app expand overrides set by toggleGroup, fed to InboxLogic.groupView.
   property var expanded: ({})
   // The keyboard cursor follows its item (InboxLogic.rowKey), so an arrival
   // that shifts the list never redirects Enter/Delete to another entry.
   property string cursorKey: ""
+  // Index of cursorKey's row in rows, or -1 when there is no cursor.
   readonly property int cursor: cursorKey ? InboxLogic.indexOfKey(rows, cursorKey) : -1
+  // True while "Clear all" waits for its confirming click (reset after 4 s).
   property bool confirmingClear: false
+  // Clock for the relative time labels: set on open, then every 30 s while open.
   property real now: Date.now()
 
+  // Center rows: inbox entries sorted critical first, grouped by app and
+  // flattened into group, entry and "more" rows (InboxLogic).
   readonly property var rows: {
     if (!available)
       return []
@@ -74,11 +86,14 @@ Panel {
     return InboxLogic.flattenGroups(InboxLogic.groupView(InboxLogic.sortForCenter(entries), root.expanded))
   }
 
+  // Whether the row at index can hold the keyboard cursor (entry and "more" rows).
   function selectable(index: int): bool {
     var row = rows[index]
     return !!row && (row.kind === "entry" || row.kind === "more")
   }
 
+  // Moves the cursor by delta to the next selectable row, wrapping around, and
+  // scrolls it into view.
   function moveCursor(delta: int): void {
     if (rows.length === 0)
       return
@@ -93,6 +108,7 @@ Panel {
     }
   }
 
+  // Expands a collapsed app group, or collapses an expanded one.
   function toggleGroup(app: string): void {
     var next = Object.assign({}, root.expanded)
     var group = null
@@ -103,6 +119,7 @@ Panel {
     root.expanded = next
   }
 
+  // Enter on a row: runs an entry's action, or toggles a group or "more" row.
   function activate(index: int): void {
     var row = rows[index]
     if (!row)
@@ -113,6 +130,8 @@ Panel {
       toggleGroup(row.app)
   }
 
+  // Dismisses the row's entry, or its whole app group for a group or "more" row
+  // or when wholeGroup is set.
   function dismissAt(index: int, wholeGroup: bool): void {
     var row = rows[index]
     if (!row)
@@ -123,6 +142,8 @@ Panel {
       service.dismissInbox(row.entry.fileName)
   }
 
+  // Clears the inbox; above InboxLogic's confirm threshold the first call only
+  // asks for confirmation.
   function clearAll(): void {
     if (InboxLogic.needsClearConfirm(root.count) && !root.confirmingClear) {
       root.confirmingClear = true

@@ -1,4 +1,7 @@
-// Notification service for the omarchy shell.
+// Notification service for the omarchy shell: the freedesktop notification
+// server, the feedback toast stack, the inbox (Inbox.qml), DND and quiet
+// hours, and the `notifications` IPC target. omarchy-shell loads it as this
+// plugin's service entry point (manifest.json); Panel.qml renders its state.
 
 import QtQuick
 import QtQuick.Layouts
@@ -19,16 +22,20 @@ Item {
   // Injected by omarchy-shell (the first-party service loader).
   property var shell: null
 
+  // Omarchy install root ($OMARCHY_PATH), for omarchy-hyprland-focus-app.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
+  // The user's home directory ($HOME).
   readonly property string home: Quickshell.env("HOME")
   // History + DND live under XDG_STATE_HOME: they're persistent user state
   // (the notifications received, the last-set DND preference), not
   // regeneratable cache that a `rm -rf ~/.cache` should wipe.
   readonly property string stateDir: home + "/.local/state/omarchy/"
+  // JSON file holding the last-set DND preference.
   readonly property string settingsPath: stateDir + "notifications.json"
   // Inbox files, image copies and (legacy) popup files live here. See Inbox.qml.
   readonly property string popupStateDir: stateDir + "notifications/"
 
+  // The stored notifications; Panel.qml reads its model, count and revision.
   property alias inbox: inbox
   Inbox {
     id: inbox
@@ -45,9 +52,13 @@ Item {
   // Falls back to the bar's default size (26 horizontal / 28 vertical) when
   // shell.bar isn't reachable so the popup never lands on top of the bar.
   readonly property string barPosition: shell && shell.barConfig ? String(shell.barConfig.position || "top") : "top"
+  // True when the bar sits on the left or right edge.
   readonly property bool barVertical: barPosition === "left" || barPosition === "right"
+  // Style's default bar thickness for the bar's orientation.
   readonly property int defaultBarSize: barVertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
+  // The live bar's size, or defaultBarSize when shell.bar is missing or hidden.
   readonly property int liveBarSize: shell && shell.bar && !shell.bar.barHidden ? Math.max(0, shell.bar.barSize) : defaultBarSize
+  // Distance toasts keep from the bar's edge: bar size plus the outer gap.
   readonly property int barClearance: liveBarSize + Style.gapsOut
 
   // Live Notification objects by originalId, kept OUT of the ListModels: a
@@ -90,12 +101,15 @@ Item {
   // hydration assignment doesn't immediately schedule a write-back.
   property bool _hydrating: false
 
+  // Do Not Disturb: drops feedback toasts unless shouldBypassDnd lets them through.
   readonly property alias doNotDisturb: persisted.doNotDisturb
   // Optional quiet-hours window, for example `22:00-07:00`. Suppressed
   // notifications still enter history through the same path as DND, while
   // critical CLI alerts retain the existing explicit bypass rule.
   readonly property string quietHoursWindow: Quickshell.env("ARANEA_QUIET_HOURS")
+  // Bumped every minute while a window is set, so quietHours re-evaluates.
   property int quietHoursTick: 0
+  // True while the current time is inside quietHoursWindow; acts like DND.
   readonly property bool quietHours: quietHoursTick >= 0 && NotificationLogic.isWithinQuietHours(quietHoursWindow, new Date())
 
   Timer {
@@ -105,6 +119,7 @@ Item {
     onTriggered: service.quietHoursTick++
   }
 
+  // Turns DND on or off; the change is persisted to settingsPath.
   function setDoNotDisturb(value: bool): void {
     persisted.doNotDisturb = !!value
   }
@@ -122,6 +137,7 @@ Item {
   // Aranea motion preference, shared with the OSD: `off` in the state file
   // (or ARANEA_REDUCED_MOTION=1) removes the swipe slide animation.
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  // Shared Aranea motion state file ($XDG_STATE_HOME/aranea/motion).
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")) + "/aranea/motion"
 
   FileView {
@@ -133,14 +149,19 @@ Item {
     onFileChanged: reload()
   }
 
+  // Minimum on-screen time of a low-urgency toast, in ms.
   readonly property int lowPopupDuration: 5000
+  // Minimum on-screen time of a normal-urgency toast, in ms.
   readonly property int normalPopupDuration: 8000
+  // Upper bound for a sender-requested toast lifetime, in ms.
   readonly property int maxPopupDuration: 30000
   // Critical toasts (e.g. browser "requireInteraction" web notifications)
   // otherwise never auto-expire; still give them their own screen time,
   // just capped so they can't sit there indefinitely.
   readonly property int criticalPopupDuration: 60000
 
+  // A toast's lifetime in ms: criticalPopupDuration for critical urgency, else the
+  // sender's expireTimeout clamped between the urgency's minimum and maxPopupDuration.
   function durationFor(urgency: int, expireTimeout: int): int {
     switch (urgency) {
     case NotificationUrgency.Critical:
@@ -152,6 +173,7 @@ Item {
     }
   }
 
+  // The sender's expireTimeout in whole ms, or 0 when unset or invalid.
   function requestedDuration(expireTimeout: int): int {
     // FreeDesktop notification spec (and Quickshell) report expireTimeout in
     // milliseconds, so pass it through directly.
@@ -174,10 +196,12 @@ Item {
     return NotificationLogic.shouldBypassDnd(notification, NotificationUrgency.Critical)
   }
 
+  // Plain model row for a notification, stamped with the current time.
   function snapshotOf(notification): var {
     return NotificationLogic.snapshotOf(notification, Date.now())
   }
 
+  // Whether the sender set the freedesktop `transient` hint (show, never store).
   function isTransient(notification): bool {
     try {
       return !!(notification.hints && notification.hints["transient"])
@@ -186,10 +210,13 @@ Item {
     }
   }
 
+  // Whether a notification goes to the inbox (see InboxLogic.shouldStore).
   function shouldStore(notification, snapshot): bool {
     return InboxLogic.shouldStore(NotificationLogic.isEphemeralApp(snapshot.app), snapshot.urgency, isTransient(notification))
   }
 
+  // Entry point for every new notification: stores it in the inbox, drops it
+  // under DND/quiet hours, or shows it as a feedback toast.
   function handleNotification(notification) {
     // Without `tracked = true` the Notification object is destroyed as soon
     // as this signal handler returns, which would null out the `ref` we just
@@ -231,6 +258,8 @@ Item {
     })
   }
 
+  // Adds a notification to the inbox and keeps its live object, so later
+  // replaces_id updates rewrite the same entry.
   function storeInInbox(notification, snapshot) {
     var fileName = NotificationLogic.popupFileName(snapshot)
     inboxRefs[fileName] = notification
@@ -290,6 +319,8 @@ Item {
     }
   }
 
+  // Copies an updated notification object into its toast row when anything the
+  // card draws changed.
   function refreshPopup(notification, originalId, timestamp) {
     // A newer notification may have taken this id over, and the object may
     // outlive its popup — in both cases there is nothing here to refresh.
@@ -347,14 +378,18 @@ Item {
     }
   }
 
+  // Removes the toast at index and dismisses its notification at the server.
   function dismissPopup(index: int): void {
     removePopup(index, "dismiss")
   }
 
+  // Removes the toast at index and reports it expired to the server.
   function expirePopup(index: int): void {
     removePopup(index, "expire")
   }
 
+  // Removes the toast at index; a live notification is expired or dismissed at
+  // the server depending on reason ("expire", "dismiss", "invoke").
   function removePopup(index: int, reason: string): void {
     if (index < 0 || index >= popupModel.count)
       return
@@ -382,16 +417,19 @@ Item {
     }
   }
 
+  // Dismisses every toast on screen.
   function clearPopups(): void {
     while (popupModel.count > 0)
       dismissPopup(0)
   }
 
+  // Opens or closes the notification center through the host shell.
   function toggleCenter(): void {
     if (service.shell && typeof service.shell.toggle === "function")
       service.shell.toggle("araneadev.notifications")
   }
 
+  // Opens the notification center through the host shell.
   function openCenter(): void {
     if (service.shell && typeof service.shell.summon === "function")
       service.shell.summon("araneadev.notifications", "")
@@ -411,17 +449,20 @@ Item {
     }
   }
 
+  // Empties the inbox, dismissing every entry still live at its sender.
   function clearInbox(): void {
     for (var i = 0; i < inbox.model.count; i++)
       releaseInboxRef(inbox.model.get(i).fileName)
     inbox.clear()
   }
 
+  // Removes one inbox entry by file name and dismisses it at its sender.
   function dismissInbox(fileName: string): void {
     releaseInboxRef(fileName)
     inbox.remove(fileName)
   }
 
+  // Removes every inbox entry from one app ("unknown" for an empty app name).
   function dismissGroup(app: string): void {
     var names = []
     for (var i = 0; i < inbox.model.count; i++) {
@@ -447,10 +488,13 @@ Item {
     dismissInbox(fileName)
   }
 
+  // File name of the newest inbox entry, or "" when the inbox is empty.
   function newestInboxFile(): string {
     return inbox.model.count > 0 ? inbox.model.get(0).fileName : ""
   }
 
+  // Invokes the "default" action of a live notification object.
+  // Returns true when one was found and invoked.
   function invokeDefaultAction(ref): bool {
     try {
       if (ref && ref.actions) {
@@ -537,14 +581,18 @@ Item {
     onTriggered: service.flushSettings()
   }
 
+  // Debounces a settings write (200 ms); a no-op until settings have loaded.
   function scheduleSettingsSave(): void {
     if (!service.settingsLoaded)
       return
     settingsSaveTimer.restart()
   }
 
+  // True once settingsPath has been read (or found missing); gates writes.
   property bool settingsLoaded: false
 
+  // Applies notifications.json once: hydrates DND and schedules a rewrite when
+  // the file still holds legacy history arrays.
   function loadSettings(raw: string): void {
     // FileView can fire onLoaded more than once during startup — the implicit
     // preload when `path` resolves, plus the explicit `settingsFile.reload()`
@@ -569,6 +617,7 @@ Item {
       service.scheduleSettingsSave()
   }
 
+  // Writes {version: 3, dnd} to settingsPath.
   function flushSettings(): void {
     settingsFile.setText(JSON.stringify({
       version: 3,
