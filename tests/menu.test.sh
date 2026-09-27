@@ -2,7 +2,7 @@
 # Contract for the araneadev.menu plugin's Menu.qml: favourites and recents
 # persist to the Aranea state file, the favourite limit is enforced with a
 # notice, and pinning works from the keyboard. Logic contract:
-# tests/js/plugin-state.test.js (MenuModel).
+# tests/js/menu-model.test.js, menu-tree.test.js and menu-guards.test.js.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

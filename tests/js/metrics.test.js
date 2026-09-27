@@ -3,13 +3,17 @@
 const path = require("node:path")
 const { test } = require("node:test")
 
-test("metrics logic", () => {
-  const root = path.join(__dirname, "..", "..")
-  const m = require(`${root}/plugins/araneadev.health/MetricsLogic.js`)
-  const assert = (cond, msg) => {
-    if (!cond) throw new Error(msg)
-  }
+const root = path.join(__dirname, "..", "..")
+const m = require(`${root}/plugins/araneadev.health/MetricsLogic.js`)
 
+const assert = (cond, msg) => {
+  if (!cond) throw new Error(msg)
+}
+const eq = (a, b, msg) => {
+  if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+}
+
+test("parseCpuStat and cpuPercent read busy/total from the first line", () => {
   // fixtures captured on this machine (2026-09-27)
   const stat1 =
     "cpu  644372 1410 171944 36311509 108470 67995 49168 0 0 0\ncpu0 1 2 3 4 5 6 7 0 0 0\n"
@@ -24,10 +28,15 @@ test("metrics logic", () => {
   assert(m.cpuPercent(null, b) === null, "first sample has no percent")
   assert(m.cpuPercent(b, a) === 0, "counter going backwards is 0, never negative")
   assert(m.parseCpuStat("garbage") === null, "bad stat is unknown")
+})
+
+test("pushHistory keeps only the newest entries", () => {
   let hist = []
   for (let i = 0; i < 65; i++) hist = m.pushHistory(hist, i, 60)
   assert(hist.length === 60 && hist[0] === 5 && hist[59] === 64, "history keeps the newest 60")
+})
 
+test("parseLoadavg and parseMeminfo read /proc text", () => {
   assert(m.parseLoadavg("0.84 0.71 0.66 2/1234 5678\n").join() === "0.84,0.71,0.66", "loadavg")
   const mem = m.parseMeminfo(
     "MemTotal:       16088900 kB\nMemFree: 1 kB\nMemAvailable:   11529640 kB\nSwapTotal:      32177440 kB\nSwapFree:       32177440 kB\n"
@@ -39,7 +48,9 @@ test("metrics logic", () => {
     "meminfo in bytes, used = total - available"
   )
   assert(m.parseMeminfo("") === null, "empty meminfo is unknown")
+})
 
+test("defaultInterface and parseNetDev read network counters and rates", () => {
   const route =
     "Iface\tDestination\tGateway\tFlags\nwlp2s0\t0000A8C0\t00000000\t0001\nwlp2s0\t00000000\t0100A8C0\t0003\n"
   assert(m.defaultInterface(route) === "wlp2s0", "default route interface")
@@ -54,7 +65,9 @@ test("metrics logic", () => {
   assert(rates.down === 174000 && rates.up === 12000, "rates per second")
   assert(m.netRates(n2, n1, 2000).down === 0, "counter reset is 0")
   assert(m.parseNetDev(dev1, "eth9") === null, "missing interface is unknown")
+})
 
+test("parseProcStat and topProcesses rank cpu and memory by pid", () => {
   // /proc/<pid>/stat: comm may contain spaces and parens; utime+stime in ticks
   const st1 = [
     "94371 (claude) S 1 2 3 0 -1 0 0 0 0 0 5000 900 0 0 20 0 1 0 1 1 115283 0 0",
@@ -99,7 +112,9 @@ test("metrics logic", () => {
     m.topProcesses(p1, p2, 2000, 3, 250).cpu[0].percent === 80,
     "clock tick rate is a parameter"
   )
+})
 
+test("formatUptime, usageLevel, humanBytes and formatRate format for display", () => {
   assert(m.formatUptime(46583) === "up 12h 56m", "hours and minutes")
   assert(m.formatUptime(3 * 86400 + 4 * 3600 + 5) === "up 3d 4h", "days and hours")
   assert(m.formatUptime(125) === "up 2m", "minutes")
@@ -114,15 +129,9 @@ test("metrics logic", () => {
     "human bytes"
   )
   assert(m.formatRate(348000) === "340 KB/s" && m.formatRate(0) === "0 B/s", "rates")
-
-  console.log("metrics logic contract passed")
 })
 
 test("monotonic rates and CPU clamp (4c)", () => {
-  const m = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/MetricsLogic.js"))
-  const eq = (a, b, msg) => {
-    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   eq(m.uptimeMs("12345.67 9999.00\n"), 12345670, "uptime in ms")
   eq(m.uptimeMs(""), null, "no uptime")
   eq(m.countCores("cpu  1 2 3\ncpu0 1 2\ncpu1 1 2\nintr 5\n"), 2, "cores")

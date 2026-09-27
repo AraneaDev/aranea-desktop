@@ -3,14 +3,20 @@
 const path = require("node:path")
 const { test } = require("node:test")
 
-test("health logic", () => {
-  const root = path.join(__dirname, "..", "..")
-  const h = require(`${root}/plugins/araneadev.health/HealthLogic.js`)
-  const assert = (cond, msg) => {
-    if (!cond) throw new Error(msg)
-  }
+const root = path.join(__dirname, "..", "..")
+const h = require(`${root}/plugins/araneadev.health/HealthLogic.js`)
 
-  // --- failed units
+const assert = (cond, msg) => {
+  if (!cond) throw new Error(msg)
+}
+const eq = (a, b, msg) => {
+  if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+}
+const deepEq = (a, b, msg) => {
+  if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+}
+
+test("parseFailedUnits keys failed units by scope", () => {
   assert(h.parseFailedUnits("[]", "system").length === 0, "empty failed list")
   const units = h.parseFailedUnits(
     '[{"unit":"nginx.service","load":"loaded","active":"failed","sub":"failed","description":"nginx"}]',
@@ -21,8 +27,10 @@ test("health logic", () => {
     "failed unit keyed by scope"
   )
   assert(h.parseFailedUnits("garbage", "system") === null, "unparsable output is unknown")
+})
 
-  // --- df (fixture captured on this machine: btrfs subvolumes share a source)
+test("parseDf collapses btrfs subvolumes to one row per source", () => {
+  // fixture captured on this machine: btrfs subvolumes share a source
   const df = [
     "Filesystem                  Mounted on            Type      1B-blocks        Used        Avail Use%",
     "/dev/mapper/root            /                     btrfs 1022042832896 930000000000 92042832896  91%",
@@ -34,14 +42,24 @@ test("health logic", () => {
   assert(rows.length === 2, "btrfs subvolumes collapse to one row per source")
   assert(rows[0].target === "/" && rows[0].percent === 91, "shortest mount point wins")
   assert(h.parseDf("") === null, "empty df output is unknown")
+})
 
-  // --- disk thresholds and hysteresis
+test("diskLevel applies thresholds with hysteresis", () => {
   assert(h.diskLevel("ok", 89) === "ok", "below 90 is fine")
   assert(h.diskLevel("ok", 90) === "normal", "90 alerts")
   assert(h.diskLevel("normal", 97) === "critical", "97 is critical")
   assert(h.diskLevel("critical", 95) === "normal", "back below 97 is normal")
   assert(h.diskLevel("normal", 88) === "normal", "stays alerting down to 88")
   assert(h.diskLevel("normal", 87) === "ok", "clears below 88")
+})
+
+test("diskProblems keys a problem by mount point", () => {
+  const df = [
+    "Filesystem                  Mounted on            Type      1B-blocks        Used        Avail Use%",
+    "/dev/mapper/root            /                     btrfs 1022042832896 930000000000 92042832896  91%",
+    "/dev/nvme0n1p1              /boot                 vfat     2143281152  1670791168   472489984  78%"
+  ].join("\n")
+  const rows = h.parseDf(df)
   const disk = h.diskProblems(rows, {})
   assert(
     disk.problems.length === 1 &&
@@ -49,12 +67,14 @@ test("health logic", () => {
       disk.levels["/"] === "normal",
     "disk problem keyed by mount"
   )
+})
 
-  // --- reboot
+test("rebootProblem fires only when kernel modules are missing", () => {
   assert(h.rebootProblem(true, "7.2.5").length === 0, "modules present: no reboot")
   assert(h.rebootProblem(false, "7.2.5")[0].key === "reboot", "modules missing: reboot needed")
+})
 
-  // --- docker
+test("docker events feed restart-loop detection", () => {
   const ev = (action, name, code, t) =>
     JSON.stringify({
       Type: "container",
@@ -97,8 +117,34 @@ test("health logic", () => {
   )
   hist = h.recordDockerEvent(hist, h.parseDockerEvent(ev("destroy", "pg", 0, 202)), 202000)
   assert(h.containerProblems(hist, 202000).length === 0, "destroy forgets the container")
+})
 
-  // --- copy
+test("itemFor builds notification copy for units, disk, reboot and loops", () => {
+  const units = h.parseFailedUnits(
+    '[{"unit":"nginx.service","load":"loaded","active":"failed","sub":"failed","description":"nginx"}]',
+    "user"
+  )
+  const df = [
+    "Filesystem                  Mounted on            Type      1B-blocks        Used        Avail Use%",
+    "/dev/mapper/root            /                     btrfs 1022042832896 930000000000 92042832896  91%",
+    "/dev/nvme0n1p1              /boot                 vfat     2143281152  1670791168   472489984  78%"
+  ].join("\n")
+  const disk = h.diskProblems(h.parseDf(df), {})
+  const ev = (action, name, code, t) =>
+    JSON.stringify({
+      Type: "container",
+      Action: action,
+      time: t,
+      Actor: { Attributes: { name: name, image: "postgres:16", exitCode: String(code) } }
+    })
+  let hist = h.recordDockerEvent({}, h.parseDockerEvent(ev("die", "pg", 1, 100)), 100000)
+  hist = h.recordDockerEvent(hist, h.parseDockerEvent(ev("start", "pg", 0, 101)), 101000)
+  hist = h.recordDockerEvent(hist, h.parseDockerEvent(ev("die", "pg", 1, 150)), 150000)
+  hist = h.recordDockerEvent(hist, h.parseDockerEvent(ev("start", "pg", 0, 151)), 151000)
+  hist = h.recordDockerEvent(hist, h.parseDockerEvent(ev("die", "pg", 1, 200)), 200000)
+  hist = h.recordDockerEvent(hist, h.parseDockerEvent(ev("start", "pg", 0, 201)), 201000)
+  const loop = h.containerProblems(hist, 201000)
+
   assert(
     h.humanBytes(92042832896) === "86 GB" &&
       h.humanBytes(472489984) === "451 MB" &&
@@ -134,16 +180,18 @@ test("health logic", () => {
       h.itemFor(loop[0]).urgency === 2,
     "loop copy"
   )
+})
 
-  // --- Revision 1: health lives only in the dropdown (no center items, no mutes)
+test("health lives only in the dropdown: no center items, no mutes (Revision 1)", () => {
   for (const gone of ["reconcile", "parseMuteFile", "serializeMuteFile", "seedDiskLevels"]) {
     assert(
       typeof h[gone] === "undefined",
       gone + " must be gone: health no longer posts to the center"
     )
   }
+})
 
-  // --- review fixes: container state survives restarts and stream gaps
+test("container state survives restarts and stream gaps (review fixes)", () => {
   const ps = [
     JSON.stringify({
       Names: "pg",
@@ -200,8 +248,9 @@ test("health logic", () => {
     h.containerProblems(seeded, 1000).length === 0,
     "a container that came back during the gap clears"
   )
+})
 
-  // --- review fixes: pseudo and read-only filesystems never alert
+test("pseudo and read-only filesystems never alert (review fixes)", () => {
   const dfPseudo = [
     "Filesystem Mounted on Type 1B-blocks Used Avail Use%",
     "/dev/sda1 / ext4 1000 500 500 50%",
@@ -214,9 +263,9 @@ test("health logic", () => {
     pseudoRows.map((r) => r.target).join() === "/,/run/media/tim/NTFS",
     "fuse.* and iso9660 skipped, fuseblk kept"
   )
+})
 
-  // --- minor fixes
-  // mount points with spaces are parsed from the numeric columns at the end
+test("mount points with spaces are parsed from the numeric columns at the end (minor fixes)", () => {
   const dfSpaces = [
     "Filesystem Mounted on Type 1B-blocks Used Avail Use%",
     "/dev/sdc1 /run/media/tim/My Drive ext4 1000 950 50 95%"
@@ -228,8 +277,9 @@ test("health logic", () => {
       spaced[0].percent === 95,
     "mount point with spaces is monitored"
   )
+})
 
-  // cleanly exited or running containers with no recent exits are forgotten
+test("pruneDockerHistory keeps only problems and recent exits (minor fixes)", () => {
   const stale = {
     old: { image: "a", exits: [], last: "die", lastExit: 0 },
     up: { image: "b", exits: [], last: "start", lastExit: 0 },
@@ -241,8 +291,9 @@ test("health logic", () => {
     Object.keys(pruned).sort().join() === "bad,busy",
     "history keeps only problems and recent exits"
   )
+})
 
-  // actions that need a terminal are left out when xdg-terminal-exec is missing
+test("actions that need a terminal are left out when xdg-terminal-exec is missing (minor fixes)", () => {
   const noTerm = h.itemFor(
     { key: "unit:system:a.service", check: "unit", unit: "a.service", scope: "system" },
     { terminal: false }
@@ -253,8 +304,9 @@ test("health logic", () => {
       .execArgv[0] === "xdg-terminal-exec",
     "terminal assumed by default"
   )
+})
 
-  // --- dropdown status and rows
+test("statusFor and annotateProblems produce dropdown status and rows", () => {
   const unitP = { key: "unit:system:a.service", check: "unit", unit: "a.service", scope: "system" }
   const diskP = {
     key: "disk:/",
@@ -276,15 +328,9 @@ test("health logic", () => {
     "critical rows first, no mute state"
   )
   assert(rowsA[1].key === "disk:/" && rowsA[1].summary === "/ is 92% full", "row copy")
-
-  console.log("health logic contract passed")
 })
 
 test("health cursor by key (4c)", () => {
-  const h = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/HealthLogic.js"))
-  const eq = (a, b, msg) => {
-    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   const rows = [{ key: "disk:/" }, { key: "unit:user:x" }, { key: "container:db" }]
   eq(h.indexOfKey(rows, "unit:user:x"), 1, "index")
   eq(h.indexOfKey(rows, "gone"), -1, "missing")
@@ -298,25 +344,21 @@ test("health cursor by key (4c)", () => {
 })
 
 test("docker stops, OOM and failed ps (4c)", () => {
-  const h = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/HealthLogic.js"))
-  const eq = (a, b, msg) => {
-    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   const now = 10000000
   const ps = (status) =>
     h.parseDockerPs(JSON.stringify({ Names: "db", Image: "pg", State: "exited", Status: status }))
   const problems = (hist) => h.containerProblems(hist, now).map((p) => p.key)
-  eq(
+  deepEq(
     problems(h.seedDockerHistory({}, ps("Exited (143) 1 minute ago"), now)),
     [],
     "SIGTERM stop is clean"
   )
-  eq(
+  deepEq(
     problems(h.seedDockerHistory({}, ps("Exited (137) 1 minute ago"), now)),
     [],
     "SIGKILL stop is clean"
   )
-  eq(
+  deepEq(
     problems(h.seedDockerHistory({}, ps("Exited (1) 1 minute ago"), now)),
     ["container:db"],
     "real failure"
@@ -329,27 +371,26 @@ test("docker stops, OOM and failed ps (4c)", () => {
         Actor: { Attributes: { name: "db", image: "pg", exitCode: String(exitCode || 0) } }
       })
     )
-  eq(ev("oom").action, "oom", "oom events are parsed")
+  deepEq(ev("oom").action, "oom", "oom events are parsed")
   let hist = h.recordDockerEvent({}, ev("start"), now)
   hist = h.recordDockerEvent(hist, ev("oom"), now)
   hist = h.recordDockerEvent(hist, ev("die", 137), now)
-  eq(problems(hist), ["container:db"], "OOM kill is flagged")
-  eq(h.pruneDockerHistory(hist, now).db !== undefined, true, "OOM kill kept by pruning")
+  deepEq(problems(hist), ["container:db"], "OOM kill is flagged")
+  deepEq(h.pruneDockerHistory(hist, now).db !== undefined, true, "OOM kill kept by pruning")
   hist = h.recordDockerEvent(hist, ev("start"), now)
-  eq(hist.db.oomKilled, false, "start clears the OOM mark")
+  deepEq(hist.db.oomKilled, false, "start clears the OOM mark")
   let stops = h.recordDockerEvent({}, ev("die", 143), now)
   stops = h.recordDockerEvent(stops, ev("start"), now)
   stops = h.recordDockerEvent(stops, ev("die", 143), now)
   stops = h.recordDockerEvent(stops, ev("start"), now)
   stops = h.recordDockerEvent(stops, ev("die", 143), now)
-  eq(stops.db.exits.length, 0, "clean stops never count toward a restart loop")
-  eq(h.isFailedExit({ lastExit: 143 }), false, "143")
-  eq(h.isFailedExit({ lastExit: 137, oomKilled: true }), true, "137 with OOM")
-  eq(h.isFailedExit({ lastExit: 2 }), true, "2")
+  deepEq(stops.db.exits.length, 0, "clean stops never count toward a restart loop")
+  deepEq(h.isFailedExit({ lastExit: 143 }), false, "143")
+  deepEq(h.isFailedExit({ lastExit: 137, oomKilled: true }), true, "137 with OOM")
+  deepEq(h.isFailedExit({ lastExit: 2 }), true, "2")
 })
 
 test("disk level from a known previous level (4c)", () => {
-  const h = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/HealthLogic.js"))
   if (h.diskLevel("ok", 89) !== "ok") throw new Error("89% from ok stays ok")
   if (h.diskLevel("normal", 89) !== "normal") throw new Error("hysteresis")
 })

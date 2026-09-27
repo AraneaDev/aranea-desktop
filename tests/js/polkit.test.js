@@ -2,19 +2,19 @@
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
 const path = require("node:path")
 const { test } = require("node:test")
+const fs = require("fs")
 
-test("polkit logic", () => {
-  const root = path.join(__dirname, "..", "..")
-  const stock = "/usr/share/omarchy/shell/plugins/polkit/PolkitModel.js"
-  const fs = require("fs")
-  const p = require(`${root}/plugins/araneadev.polkit/PolkitLogic.js`)
-  const assert = (cond, msg) => {
-    if (!cond) throw new Error(msg)
-  }
-  const eq = (a, b, msg) =>
-    assert(JSON.stringify(a) === JSON.stringify(b), `${msg}: got ${JSON.stringify(a)}`)
+const root = path.join(__dirname, "..", "..")
+const stock = "/usr/share/omarchy/shell/plugins/polkit/PolkitModel.js"
+const p = require(`${root}/plugins/araneadev.polkit/PolkitLogic.js`)
 
-  // --- stock helpers keep their behaviour
+const assert = (cond, msg) => {
+  if (!cond) throw new Error(msg)
+}
+const eq = (a, b, msg) =>
+  assert(JSON.stringify(a) === JSON.stringify(b), `${msg}: got ${JSON.stringify(a)}`)
+
+test("stock helpers detect fingerprint config and prompts", () => {
   const pam = "auth sufficient pam_fprintd.so\nauth include system-auth"
   assert(p.fingerprintConfiguredFromPamConfig(pam) === true, "pam fprintd")
   assert(
@@ -38,6 +38,10 @@ test("polkit logic", () => {
     "Authorize running '/usr/bin/true'",
     "authorizationLabel"
   )
+})
+
+test("stock parity for authorizationLabel, prompts and pam config", () => {
+  const pam = "auth sufficient pam_fprintd.so\nauth include system-auth"
   if (fs.existsSync(stock)) {
     const s = require(stock)
     for (const m of [
@@ -58,8 +62,9 @@ test("polkit logic", () => {
   } else {
     console.log("SKIP: stock Omarchy sources not present; parity checks not run")
   }
+})
 
-  // --- request summary and command
+test("summaryParts, requestSummary and commandFromMessage read pkexec messages", () => {
   const root1 = "Authentication is needed to run `/usr/bin/true' as the super user"
   const user1 = "Authentication is required to run '/usr/bin/btop' as user Tim Schipper (tim)"
   eq(
@@ -79,8 +84,9 @@ test("polkit logic", () => {
   eq(p.commandFromMessage(root1), "/usr/bin/true", "command")
   eq(p.commandFromMessage(user1), "/usr/bin/btop", "command named user")
   eq(p.commandFromMessage("Authentication is required to mount /dev/sdb1"), "", "no command")
+})
 
-  // --- long commands (Review Focus 5)
+test("shortenMiddle truncates long commands (Review Focus 5)", () => {
   eq(p.shortenMiddle("short", 64), "short", "short kept")
   const long = "/usr/lib/" + "a".repeat(100) + "/bin/tool"
   const cut = p.shortenMiddle(long, 64)
@@ -91,8 +97,10 @@ test("polkit logic", () => {
       cut.endsWith("/bin/tool"),
     "middle shortened: " + cut
   )
+})
 
-  // --- markup is escaped (Review Focus 2)
+test("markup is escaped against hostile pkexec messages (Review Focus 2)", () => {
+  const root1 = "Authentication is needed to run `/usr/bin/true' as the super user"
   eq(p.escapeHtml('<b>&"x"</b>'), "&lt;b&gt;&amp;&quot;x&quot;&lt;/b&gt;", "escapeHtml")
   eq(
     p.requestMarkup(root1, "#3bff9e"),
@@ -114,8 +122,9 @@ test("polkit logic", () => {
     "newlines collapse"
   )
   assert(!p.requestMarkup(root1, '"><script>').includes('"><script>'), "accent escaped")
+})
 
-  // --- action ids
+test("validActionId accepts polkit-shaped ids and rejects the rest", () => {
   for (const id of [
     "org.freedesktop.policykit.exec",
     "org.freedesktop.udisks2.filesystem-mount",
@@ -124,8 +133,9 @@ test("polkit logic", () => {
     assert(p.validActionId(id), "valid id " + id)
   for (const id of ["", "a b", "a;b", "$(id)", "a/b", "-".repeat(256), null, undefined])
     assert(!p.validActionId(id), "invalid id " + id)
+})
 
-  // --- pkaction output
+test("parseActionInfo reads pkaction output", () => {
   const pkaction = [
     "org.freedesktop.policykit.exec:",
     "  description:       Run a program as another user",
@@ -151,8 +161,9 @@ test("polkit logic", () => {
     { description: "", vendor: "" },
     "vendor_url is not vendor"
   )
+})
 
-  // --- identities
+test("identityLabel, indexOfIdentity, identityPosition and nextIdentityIndex", () => {
   eq(p.identityLabel({ displayName: "tim", string: "unix-user:tim" }), "tim", "displayName")
   eq(
     p.identityLabel({ displayName: "", string: "unix-user:tim" }),
@@ -173,8 +184,9 @@ test("polkit logic", () => {
   eq(p.nextIdentityIndex(2, 1), 0, "wrap")
   eq(p.nextIdentityIndex(2, -1), 0, "unknown current")
   eq(p.nextIdentityIndex(0, 0), -1, "no identities")
+})
 
-  // --- context line
+test("contextLine combines description, identity and position", () => {
   eq(
     p.contextLine("Run a program as another user", "tim", ""),
     "Run a program as another user · as tim",
@@ -188,8 +200,9 @@ test("polkit logic", () => {
   eq(p.contextLine("", "tim", ""), "as tim", "identity only")
   eq(p.contextLine("Mount a filesystem", "", ""), "Mount a filesystem", "description only")
   eq(p.contextLine("", "", " (1 of 2)"), "", "nothing")
+})
 
-  // --- details
+test("detailRows and promptPlaceholder build the details panel", () => {
   eq(
     p.detailRows("org.x", "The polkit project", "/usr/bin/true", "msg"),
     [
@@ -208,8 +221,6 @@ test("polkit logic", () => {
     ],
     "empty rows hidden"
   )
-
-  // --- placeholder
   eq(p.promptPlaceholder("Password:"), "Enter password", "Password:")
   eq(p.promptPlaceholder("password: "), "Enter password", "password: ")
   eq(p.promptPlaceholder(""), "Enter password", "empty prompt")
@@ -217,10 +228,6 @@ test("polkit logic", () => {
 })
 
 test("polkit spoofing (4a)", () => {
-  const p = require(path.join(__dirname, "..", "..", "plugins/araneadev.polkit/PolkitLogic.js"))
-  const eq = (a, b, msg) => {
-    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   const spoof = "Authentication is needed to run `/tmp/x' as user tim (tim)' as the super user"
   eq(p.commandFromMessage(spoof), "/tmp/x' as user tim (tim)", "command keeps the fake tail")
   eq(p.targetLine(spoof), "as root", "real target wins")
@@ -251,10 +258,6 @@ test("polkit spoofing (4a)", () => {
 })
 
 test("polkit hint line (4a)", () => {
-  const p = require(path.join(__dirname, "..", "..", "plugins/araneadev.polkit/PolkitLogic.js"))
-  const eq = (a, b, msg) => {
-    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   eq(p.hintLine(false, 1), "ENTER AUTHORIZE · TAB DETAILS · ESC CANCEL", "password, one identity")
   eq(p.hintLine(true, 0), "TAB DETAILS · ESC CANCEL", "fingerprint")
   eq(
@@ -266,10 +269,6 @@ test("polkit hint line (4a)", () => {
 })
 
 test("polkit final review fixes (4a)", () => {
-  const p = require(path.join(__dirname, "..", "..", "plugins/araneadev.polkit/PolkitLogic.js"))
-  const eq = (a, b, msg) => {
-    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   // C1: a line or paragraph separator in the command still parses; the fallback is escaped too
   const sep = "Authentication is needed to run `/tmp/x' as user tim (tim)⠀⠀ ' as the super user"
   eq(p.targetLine(sep), "as root", "separator in command")

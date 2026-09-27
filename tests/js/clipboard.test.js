@@ -2,19 +2,23 @@
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
 const path = require("node:path")
 const { test } = require("node:test")
+const fs = require("fs")
 
-test("clipboard logic", () => {
-  const root = path.join(__dirname, "..", "..")
-  const stock = "/usr/share/omarchy/shell/plugins/clipboard/ClipboardHistory.js"
-  const fs = require("fs")
-  const c = require(`${root}/plugins/araneadev.clipboard/ClipboardLogic.js`)
-  const assert = (cond, msg) => {
-    if (!cond) throw new Error(msg)
-  }
-  const now = 1000000000000
-  const MIN = 60000
+const root = path.join(__dirname, "..", "..")
+const stock = "/usr/share/omarchy/shell/plugins/clipboard/ClipboardHistory.js"
+const c = require(`${root}/plugins/araneadev.clipboard/ClipboardLogic.js`)
 
-  // --- kinds
+const assert = (cond, msg) => {
+  if (!cond) throw new Error(msg)
+}
+const eq = (a, b, msg) => {
+  if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+}
+
+const now = 1000000000000
+const MIN = 60000
+
+test("detectKind recognises links, paths, colours, code, text and images", () => {
   const k = (t) => c.detectKind({ type: "text", text: t })
   assert(k("https://github.com/AraneaDev/aranea-desktop/pull/47") === "link", "link")
   assert(k("/home/tim/Work/file.txt") === "path" && k("~/notes.md\n/etc/hosts") === "path", "paths")
@@ -33,8 +37,9 @@ test("clipboard logic", () => {
     c.detectKind({ type: "image", path: "/tmp/a.png", mime: "image/png" }) === "image",
     "image"
   )
+})
 
-  // --- secrets (Review Focus 1)
+test("isSecretText finds credential and token patterns (Review Focus 1)", () => {
   for (const s of [
     "ghp_0123456789abcdefghijABCDEFGHIJ0123",
     "github_pat_11ABCDEFG0123456789_abcdefghijklmnopqrstuvwxyz",
@@ -60,8 +65,9 @@ test("clipboard logic", () => {
   ]) {
     assert(!c.isSecretText(s), "false secret: " + s)
   }
+})
 
-  // --- enrich / override / normalise keeps fields
+test("enrich, override and normalizeEntry keep entry fields", () => {
   let e = c.enrich({ type: "text", text: "ghp_0123456789abcdefghijABCDEFGHIJ0123" }, now)
   assert(e.secret === true && e.kind === "text" && e.capturedAtMs === now, "enrich")
   e = c.enrich(
@@ -82,8 +88,9 @@ test("clipboard logic", () => {
     kept.pinned === true && kept.capturedAtMs === 5 && kept.secretOverride === true,
     "normalize keeps fields"
   )
+})
 
-  // --- history: add, limit, pins, indexes (Review Focus 2, 5)
+test("addEntry enforces the history limit, keeps pins and dedupes (Review Focus 2, 5)", () => {
   let h = []
   for (let i = 0; i < 305; i++) h = c.addEntry(h, { type: "text", text: "item " + i }, 300, now + i)
   assert(h.length === 300 && h[0].text === "item 304", "limit 300 newest first")
@@ -103,8 +110,9 @@ test("clipboard logic", () => {
       h.filter((x) => x.text === "item 5").length === 1,
     "re-copy keeps pin, dedupes"
   )
+})
 
-  // --- expiry
+test("expire drops old unpinned secrets", () => {
   let s = [
     c.enrich({ type: "text", text: "ghp_0123456789abcdefghijABCDEFGHIJ0123" }, now - 11 * MIN),
     c.enrich(
@@ -124,8 +132,9 @@ test("clipboard logic", () => {
     "pinned and non-secrets stay"
   )
   assert(!c.expire(ex.history, now, 10 * MIN).changed, "nothing more to expire")
+})
 
-  // --- display rows: masking, sections, real indexes, search
+test("displayRows mask secrets, sort pinned first and support search", () => {
   const hist = [
     c.enrich({ type: "text", text: "https://github.com/AraneaDev" }, now - MIN),
     c.enrich({ type: "text", text: "ghp_0123456789abcdefghijABCDEFGHIJ0123" }, now - 3 * MIN),
@@ -151,16 +160,18 @@ test("clipboard logic", () => {
     rows.find((r) => r.kind === "link").title === "github.com/AraneaDev",
     "link title is domain + path"
   )
+})
 
-  // --- ages
+test("relativeAge formats durations", () => {
   assert(
     c.relativeAge(now - 30000, now) === "now" &&
       c.relativeAge(now - 3 * MIN, now) === "3m" &&
       c.relativeAge(now - 2 * 3600000, now) === "2h",
     "ages"
   )
+})
 
-  // --- stock compatibility (Review Focus 3)
+test("stock compatibility: history round-trips with the stock parser (Review Focus 3)", () => {
   const stockRaw = JSON.stringify([
     { type: "text", text: "a" },
     { type: "image", path: "/tmp/x.png", mime: "image/png", capturedAt: "Sunday 10:00" }
@@ -175,9 +186,9 @@ test("clipboard logic", () => {
   } else {
     console.log("SKIP: stock Omarchy sources not present; parity checks not run")
   }
+})
 
-  // --- final-review fixes
-  // I2: ordinary developer text is not a secret (paths, identifiers, emails, versions)
+test("ordinary developer text is not flagged as a secret (final review I2)", () => {
   for (const s of [
     "src/components/Button.tsx",
     "AraneaDev/omarchy-aranea-theme",
@@ -192,22 +203,27 @@ test("clipboard logic", () => {
   ]) {
     assert(!c.isSecretText(s), "developer text flagged as secret: " + s)
   }
-  // ...while real secrets still are (pattern tokens and random passwords)
+})
+
+test("real secrets are still detected next to developer text (final review I2)", () => {
   for (const s of [
     "Marjonekke123!Q9",
     "Tr0ub4dor&3xK9#pQ",
     "ghp_0123456789abcdefghijABCDEFGHIJ0123"
   ])
     assert(c.isSecretText(s), "lost secret " + s)
-  // m5: PGP private key blocks
+})
+
+test("isSecretText recognises PGP private key blocks (final review m5)", () => {
   assert(
     c.isSecretText(
       "-----BEGIN PGP PRIVATE KEY BLOCK-----\nabc\n-----END PGP PRIVATE KEY BLOCK-----"
     ),
     "PGP private key"
   )
+})
 
-  // I5: PINNED is most recently pinned first
+test("togglePinned keeps the most recently pinned entry first (final review I5)", () => {
   let ph = [
     c.enrich({ type: "text", text: "first" }, now - 3 * MIN),
     c.enrich({ type: "text", text: "second" }, now - 2 * MIN)
@@ -217,45 +233,42 @@ test("clipboard logic", () => {
   const pr = c.displayRows(ph, "", 50, now).filter((r) => r.section === "pinned")
   assert(pr[0].historyIndex === 0 && pr[1].historyIndex === 1, "most recently pinned first")
   assert(c.togglePinned(ph, 0, now)[0].pinned === false, "unpin")
+})
 
-  // m1: images can't be marked secret
+test("toggleSecret is a no-op for images (final review m1)", () => {
   const img = [c.enrich({ type: "image", path: "/tmp/a.png", mime: "image/png" }, now)]
   assert(
     c.toggleSecret(img, 0)[0].secret === false &&
       c.toggleSecret(img, 0)[0].secretOverride === undefined,
     "image secret toggle is a no-op"
   )
+})
 
-  // m2: a large code paste keeps its kind in the row title
+test("displayRows keeps kind and first line for a large code paste (final review m2)", () => {
   const big = "function f() {\n" + "  x()\n".repeat(3000) + "}"
   const bigRow = c.displayRows([c.enrich({ type: "text", text: big }, now)], "", 50, now)[0]
   assert(
     bigRow.kind === "code" && bigRow.title === "function f() {",
     "capped code keeps kind and first line"
   )
+})
 
-  // m3: stored kind is reused, not recomputed
+test("enrich reuses a stored kind instead of recomputing it (final review m3)", () => {
   assert(
     c.enrich({ type: "text", text: "plain words here", kind: "code" }, now).kind === "code",
     "stored kind reused"
   )
+})
 
-  // m4: stock entries without a timestamp are reported so they get saved once
+test("hadUnstamped reports history saved without a timestamp (final review m4)", () => {
   assert(c.hadUnstamped('[{"type":"text","text":"a"}]') === true, "unstamped detected")
   assert(
     c.hadUnstamped('[{"type":"text","text":"a","capturedAtMs":5}]') === false,
     "stamped history"
   )
-
-  console.log("clipboard logic contract passed")
 })
 
 test("secret detection (4a)", () => {
-  const root = path.join(__dirname, "..", "..")
-  const c = require(`${root}/plugins/araneadev.clipboard/ClipboardLogic.js`)
-  const assert = (cond, msg) => {
-    if (!cond) throw new Error(msg)
-  }
   for (const s of [
     "P@ssw0rd123456789",
     "x7Kp2mQ9vL4nR8sT",
@@ -283,18 +296,12 @@ test("secret detection (4a)", () => {
 })
 
 test("secrets cannot be opened (4a)", () => {
-  const c = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
-  )
   if (c.canOpen({ secret: true }) !== false) throw new Error("secret opened")
   if (c.canOpen({ secret: false }) !== true) throw new Error("plain refused")
   if (c.canOpen(null) !== false) throw new Error("null opened")
 })
 
 test("unstamped entries are detected (4a)", () => {
-  const c = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
-  )
   const t = (raw, want, msg) => {
     if (c.hadUnstamped(raw) !== want) throw new Error(msg)
   }
@@ -306,14 +313,6 @@ test("unstamped entries are detected (4a)", () => {
 })
 
 test("secret expiry (4a)", () => {
-  const c = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
-  )
-  const eq = (a, b, msg) => {
-    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
-  const now = 1000000000000
-  const MIN = 60000
   const TTL = 10 * MIN
   const s = (at, extra) =>
     Object.assign({ type: "text", text: "x", secret: true, capturedAtMs: at }, extra)
@@ -334,12 +333,6 @@ test("secret expiry (4a)", () => {
 })
 
 test("colour swatches (4a)", () => {
-  const c = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
-  )
-  const eq = (a, b, msg) => {
-    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   eq(c.swatchColor("#7a5cff"), "#7a5cff", "rgb hex")
   eq(c.swatchColor("#ABC"), "#abc", "short hex")
   eq(c.swatchColor("#11223380"), "#80112233", "RRGGBBAA becomes AARRGGBB")
@@ -360,12 +353,6 @@ test("colour swatches (4a)", () => {
 })
 
 test("final review fixes (4a)", () => {
-  const c = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
-  )
-  const eq = (a, b, msg) => {
-    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
-  }
   // I1: random mixed case is not "word-like"
   for (const s of [
     "iBRM4eugfjt0LbuX",

@@ -1,5 +1,5 @@
 // Emoji search for the picker: parses emojis.json and filters it by keyword
-// substring. Loaded by Emojis.qml; tests/emojis.test.sh runs it under Node.
+// substring. Loaded by Emojis.qml; tests/js/emoji-search.test.js runs it under Node.
 
 /**
  * One emojis.json entry.

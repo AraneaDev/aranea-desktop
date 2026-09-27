@@ -381,3 +381,48 @@ test("center images after a write (4c final review)", () => {
     "failed copy keeps the live path"
   )
 })
+
+test("NotificationLogic normalizes malformed notification fields and stabilizes malformed snapshots", () => {
+  const root = path.join(__dirname, "..", "..")
+  const notifications = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+
+  const normalized = notifications.normalizeNotification({
+    id: "not-a-number",
+    appName: null,
+    summary: 42,
+    body: null,
+    urgency: 99,
+    expireTimeout: "not-a-number",
+    hints: null
+  })
+  if (normalized.id !== 0 || normalized.appName !== "" || normalized.summary !== "42")
+    throw new Error("notification fields were not normalized")
+  if (normalized.urgency !== 1 || normalized.expireTimeout !== 0)
+    throw new Error("invalid notification values were not defaulted")
+  if (!normalized.hints || typeof normalized.hints !== "object")
+    throw new Error("notification hints were not normalized")
+
+  const malformedSnapshot = notifications.snapshotOf({ urgency: -1, hints: null }, "invalid")
+  if (
+    malformedSnapshot.urgency !== 1 ||
+    typeof malformedSnapshot.timestamp !== "number" ||
+    !Number.isFinite(malformedSnapshot.timestamp)
+  ) {
+    throw new Error("malformed notification snapshot was not stabilized")
+  }
+})
+
+test("NotificationLogic isWithinQuietHours handles the overnight window", () => {
+  const root = path.join(__dirname, "..", "..")
+  const notifications = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+
+  const late = new Date(2026, 8, 22, 23, 15)
+  const early = new Date(2026, 8, 23, 6, 45)
+  const day = new Date(2026, 8, 22, 12, 0)
+  if (!notifications.isWithinQuietHours("22:00-07:00", late))
+    throw new Error("quiet hours missed late window")
+  if (!notifications.isWithinQuietHours("22:00-07:00", early))
+    throw new Error("quiet hours missed overnight window")
+  if (notifications.isWithinQuietHours("22:00-07:00", day))
+    throw new Error("quiet hours captured daytime")
+})

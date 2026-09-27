@@ -1,10 +1,13 @@
 plugins/araneadev.bar/BarModel.js 80
 plugins/araneadev.clipboard/ClipboardLogic.js 89
 plugins/araneadev.emojis/EmojiLogic.js 100
+plugins/araneadev.emojis/EmojiSearch.js 100
+plugins/araneadev.health/HealthBridge.js 100
 plugins/araneadev.health/HealthLogic.js 96
 plugins/araneadev.health/MetricsLogic.js 100
-plugins/araneadev.menu/MenuModel.js 44
+plugins/araneadev.menu/MenuModel.js 100
 plugins/araneadev.notifications/InboxLogic.js 100
-plugins/araneadev.notifications/NotificationLogic.js 73
+plugins/araneadev.notifications/NotificationLogic.js 97
+plugins/araneadev.notifications/ServiceBridge.js 100
 plugins/araneadev.osd/OsdModel.js 100
 plugins/araneadev.polkit/PolkitLogic.js 100
