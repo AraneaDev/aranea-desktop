@@ -4,8 +4,9 @@ set -euo pipefail
 # Runs the Aranea health checks (theme, hooks, manifest, icons, fonts,
 # ownership, shell, plugins, polkit, notifications, health, runtime log,
 # qmllint, optional commands) and prints one "id status message" line per
-# check, or one JSON object per line with --json. --fix first reinstalls the
-# hooks and redeploys the plugins. ARANEA_DOCTOR_* variables override inputs
+# check, or one JSON object per line with --json. --fix reinstalls missing or
+# stale hooks and, when omarchy-shell is available, redeploys the plugins
+# before the plugin check. ARANEA_DOCTOR_* variables override inputs
 # and individual checks (used by the tests).
 #
 # Usage: scripts/aranea-doctor [--json] [--fix]

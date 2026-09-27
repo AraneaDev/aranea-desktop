@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-set -uo pipefail
+# Runs the bash contract tests (tests/*.test.sh), each in its own sandbox, and
+# prints a pass/fail summary with timings. ARANEA_TESTS_SKIP=a,b skips tests
+# by name (tools/check uses it for tests it runs itself).
+#
+# Usage: tests/run [-v|--verbose] [name...]
+#
 # No 'set -e': a failing test must not stop the runner from reporting the
 # rest, and the runner controls its own exit status at the end instead.
+set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root" || exit 1

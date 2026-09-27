@@ -345,11 +345,12 @@ function entropy(text) {
 }
 
 /**
- * Guesses whether copied text is a secret: a PEM private key, a known token
- * format (GitHub, OpenAI-style sk-, Slack, AWS key id, JWT), or a single
- * word of 16+ characters with at least three character classes and entropy
- * of 3.5 bits or more. URLs, paths, git hashes, UUIDs and strings with
- * whitespace or . / : @ \ ( ) are never secrets (except the PEM key).
+ * Guesses whether copied text is a secret. Checked in order: a PEM private
+ * key block is one; text with whitespace, URLs, paths, git hashes and UUIDs
+ * are not; known token formats (GitHub, OpenAI-style sk-, Slack, AWS key id,
+ * JWT) are; anything else shorter than 16 characters or containing
+ * . / : @ \ ( ) is not; the rest is one when it has at least three character
+ * classes and an entropy of 3.5 bits or more.
  * @param {*} value - The text.
  * @returns {boolean} True when the text looks like a secret.
  */
@@ -401,10 +402,12 @@ function enrich(value, now) {
 }
 
 // True when some entry has no capture time yet (written by the stock picker):
-// the loader then saves once, so the stamped time -- and secret expiry --
+// the loader then saves once, so the stamped time (and secret expiry)
 // survives restarts.
 /**
- * Checks the raw history JSON for an object entry without a numeric capturedAtMs.
+ * Checks the raw history JSON for an object entry whose capturedAtMs is not a
+ * finite number. A null capturedAtMs becomes 0 and so counts as stamped, and
+ * plain string entries are not checked.
  * @param {*} raw - The history file contents; empty means "[]".
  * @returns {boolean} True when some entry lacks a capture time; false for invalid JSON or a non-array.
  */

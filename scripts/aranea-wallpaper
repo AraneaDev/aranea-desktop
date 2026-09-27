@@ -5,7 +5,11 @@ set -euo pipefail
 # phase wallpaper (dawn, day, dusk or night) for the current time, and
 # manages the systemd user timer that switches phases on a schedule.
 #
-# Usage: scripts/aranea-wallpaper [list|set <id>|set-phase|set-day-night|schedule on|off|status|configure DAWN DAY DUSK NIGHT|motion on|off]
+# Usage: scripts/aranea-wallpaper list
+#        scripts/aranea-wallpaper set <id> | set-phase | set-day-night
+#        scripts/aranea-wallpaper schedule on|off|status
+#        scripts/aranea-wallpaper schedule configure DAWN DAY DUSK NIGHT
+#        scripts/aranea-wallpaper motion on|off
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 manifest="$repo_root/backgrounds/manifest.toml"

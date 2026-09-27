@@ -523,8 +523,9 @@ Item {
     }
   }
 
-  // Menu-like entrance (fade + slight scale), unless Aranea motion is off
-  // (`off` in ~/.local/state/aranea/motion, or ARANEA_REDUCED_MOTION=1).
+  // Menu-like entrance (fade + slight scale), unless Aranea motion is off.
+  // Starts from ARANEA_REDUCED_MOTION (1 = off); once
+  // ~/.local/state/aranea/motion loads, its content decides ("off" = off).
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
   FileView {
     path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"

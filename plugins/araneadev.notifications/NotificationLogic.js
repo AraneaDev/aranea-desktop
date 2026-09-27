@@ -313,7 +313,7 @@ function normalizedHints(value) {
  * the QML model and card delegates. The protocol is intentionally dynamic;
  * the rest of the UI should not have to defend every optional field again.
  * @param {*} notification - the server's notification object
- * @returns {Dict} id, appName, appIcon, summary, body, image, urgency, expireTimeout, hints and tracked, all with safe types
+ * @returns {{id: number, appName: string, appIcon: string, summary: string, body: string, image: string, urgency: number, expireTimeout: number, hints: Dict, tracked: boolean}} the fields with safe types
  */
 function normalizeNotification(notification) {
   var source = notification && typeof notification === "object" ? notification : {}
@@ -335,8 +335,10 @@ function normalizeNotification(notification) {
 }
 
 /**
- * The plain row for a live notification: its normalized fields plus glyph,
- * execArgv and a timestamp.
+ * The plain row for a live notification: id and originalId (both the
+ * notification id), app (the app name), appIcon, summary, body, image, glyph
+ * and execArgv (read from the hints), urgency, expireTimeout and the
+ * timestamp. The hints themselves and the tracking state are not kept.
  * @param {*} notification - the server's notification object
  * @param {number} timestamp - arrival time in ms; now when not finite
  * @returns {Dict} the row the model and the popup file store
@@ -452,7 +454,7 @@ function historyEntry(value, normalUrgency) {
  * (and, older still, `entries`) arrays in there; their presence is reported
  * so the service can rewrite the file without the dead payload.
  * @param {?string} raw - contents of notifications.json
- * @returns {Dict} {error, dnd, legacy}, plus errorMessage when the JSON is invalid
+ * @returns {{error: boolean, dnd: ?boolean, legacy: boolean, errorMessage?: string}} the settings, with errorMessage when the JSON is invalid
  */
 function parseSettings(raw) {
   var text = String(raw || "").trim()
@@ -559,7 +561,7 @@ function localImageFile(value) {
  * values map onto themselves and produce no copy, keeping restores no-ops.
  * @param {?Dict} entry - the popup entry
  * @param {?string} imagesDir - directory for image copies, with a trailing slash
- * @returns {Dict} {entry, copies}, copies being {from, to} path pairs
+ * @returns {{entry: Dict, copies: Array<{from: string, to: string}>}} the entry to write and the image copies to make
  */
 function persistablePopup(entry, imagesDir) {
   var e = entry || {}
@@ -653,7 +655,7 @@ function popupExpired(entry, duration, now) {
  * @param {?string} barPosition - bar edge; "top" when empty
  * @param {number} barClearance - space the bar takes on its edge
  * @param {number} gapsOut - outer window gap
- * @returns {Dict} {anchors, margins} for the layer window
+ * @returns {{anchors: {top: boolean, bottom: boolean, left: boolean, right: boolean}, margins: {top: number, bottom: number, left: number, right: number}}} anchors and margins for the layer window
  */
 function popupPlacement(barPosition, barClearance, gapsOut) {
   var position = String(barPosition || "top")

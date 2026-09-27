@@ -115,7 +115,8 @@ Item {
       laptopClosedProc.running = true
   }
 
-  // Clears every per-request field and the password text.
+  // Clears the request fields shown on the card and the password text (the
+  // pkaction lookup state and the closing flag are left as they are).
   function resetSnapshot() {
     currentMessage = ""
     currentPrompt = ""
@@ -321,8 +322,8 @@ Item {
   }
 
   // Lock-like entrance (scrim fade, card fade + slight scale), unless Aranea
-  // motion is off (`off` in ~/.local/state/aranea/motion, or
-  // ARANEA_REDUCED_MOTION=1).
+  // motion is off. Starts from ARANEA_REDUCED_MOTION (1 = off); once
+  // ~/.local/state/aranea/motion loads, its content decides ("off" = off).
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
   FileView {
     path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"

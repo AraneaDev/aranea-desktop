@@ -71,7 +71,9 @@ Everything is documented where it lives, and the docs stage fails otherwise:
 
 - **JS** (`plugins/**/*.js`): every top-level function has a JSDoc block with a
   description, `@param {Type} name - what` and `@returns {Type} what`.
-  TypeScript checks those types against the code, so they cannot drift.
+  TypeScript checks those types against the code (without null checks,
+  and not for `*` or the two `.pragma library` bridges), so wrong types are
+  caught.
   Shared object shapes get a `@typedef`; `{}` locals that are used as maps
   get an inline `/** @type {{[key: string]: T}} */`.
 - **Shell**: a header comment after the shebang saying what the file does

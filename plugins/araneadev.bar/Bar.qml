@@ -108,7 +108,8 @@ Item {
   property color barForeground: useTransparentForeground ? transparentForeground : themeForeground
   // Turned off briefly so a foreground switch jumps instead of animating.
   property bool foregroundAnimationEnabled: true
-  // False when motion is off (the motion state file says "off", or ARANEA_REDUCED_MOTION=1).
+  // Whether Aranea motion is on. Starts from ARANEA_REDUCED_MOTION (1 = off);
+  // once the motion state file loads, its content decides ("off" = off).
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
   // State file ($XDG_STATE_HOME/aranea/motion) whose "off" content disables bar animations.
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"

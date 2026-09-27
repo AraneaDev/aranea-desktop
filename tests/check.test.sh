@@ -407,4 +407,30 @@ plant_docs scripts/fn $'#!/usr/bin/env bash\n# Tool.\n# Usage: scripts/fn\nhelpe
 plant_docs plugins/d/NoHead.qml $'import QtQuick\nItem {}\n' 'plugins/d/NoHead.qml:1: missing header comment'
 plant_docs plugins/d/Prop.qml $'// h\nimport QtQuick\nItem {\n  property int count: 0\n}\n' 'plugins/d/Prop.qml:4: missing comment for property count'
 plant_docs plugins/d/Gap.qml $'// h\nimport QtQuick\nItem {\n  // Count.\n\n  property int count: 0\n}\n' 'plugins/d/Gap.qml:6: missing comment for property count'
+# docs, final review: parse failures are loud, never silent.
+plant_docs scripts/digits $'#!/usr/bin/env bash\n# Tool.\n# Usage: scripts/digits\ncat <<EOF2\ndata\nEOF2\nundoc() {\n  :\n}\n' 'scripts/digits:7: missing comment for function undoc'
+plant_docs scripts/arith $'#!/usr/bin/env bash\n# Tool.\n# Usage: scripts/arith\necho $((1<<2))\n# cat <<EOF\necho "a << b"\nundoc() {\n  :\n}\n' 'scripts/arith:7: missing comment for function undoc'
+plant_docs scripts/open $'#!/usr/bin/env bash\n# Tool.\n# Usage: scripts/open\ncat <<EOF\nnever closed\n' 'unterminated heredoc'
+plant_docs scripts/kw $'#!/usr/bin/env bash\n# Tool.\n# Usage: scripts/kw\nfunction helper {\n  :\n}\n' 'scripts/kw:4: missing comment for function helper'
+printf '#!/usr/bin/env bash\n# Tool without usage.\necho x\n' >scripts/nousage && chmod +x scripts/nousage && git add -A
+if run_check --only docs; then
+  echo "missing Usage passed" >&2
+  exit 1
+fi
+grep -Fq 'Usage: line in the header' "$ARANEA_TEST_SANDBOX/out" || {
+  cat "$ARANEA_TEST_SANDBOX/out" >&2
+  exit 1
+}
+git reset -q --hard
+# A shellcheck directive before the header is not the header.
+printf '#!/usr/bin/env bash\n# shellcheck shell=bash\n# Tool.\n# Usage: scripts/sc\necho x\n' >scripts/sc && chmod +x scripts/sc && git add -A
+run_check --only docs || {
+  echo "shellcheck-first header rejected" >&2
+  cat "$ARANEA_TEST_SANDBOX/out" >&2
+  exit 1
+}
+git reset -q --hard
+plant_docs plugins/d/Block.qml $'// h\nimport QtQuick\nItem {\n  /* { */\n\n  property int count: 0\n}\n' 'plugins/d/Block.qml:6: missing comment for property count'
+plant_docs plugins/d/Trail.qml $'// h\nimport QtQuick\nItem {\n  // A.\n  property int a: 0 /* x */\n  property int b: 0\n}\n' 'plugins/d/Trail.qml:6: missing comment for property b'
+plant_docs plugins/d/Same.qml $'// h\nimport QtQuick\nItem { property int a: 0\n}\n' 'plugins/d/Same.qml:3: missing comment for property a'
 echo "check contract passed"
