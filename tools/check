@@ -4,13 +4,13 @@
 #
 # Usage: tools/check [--fix] [--fast] [--staged] [--only STAGES] [--skip STAGES] [--update-baselines]
 #
-# Stages run in order: format lint docs validate qml test smoke. Each prints one
+# Stages run in order: format lint docs validate qml qmltest test smoke. Each prints one
 # result line; a summary follows, and the exit status is non-zero when any
 # stage failed. See CONTRIBUTING.md.
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-all_stages=(format lint docs validate qml test smoke)
+all_stages=(format lint docs validate qml qmltest test smoke)
 
 # Prints the usage text.
 usage() {
@@ -152,7 +152,7 @@ note_stage() {
 
 # Shared helpers, then the stage libraries (each defines stage_<name>). A
 # missing library is an error, not a stage that quietly does not run.
-for lib in common format lint docs validate qml test smoke; do
+for lib in common format lint docs validate qml qmltest test smoke; do
   [[ -r "$repo_root/tools/lib/check-$lib.sh" ]] || {
     echo "missing tools/lib/check-$lib.sh" >&2
     exit 2
@@ -164,6 +164,7 @@ source "$repo_root/tools/lib/check-lint.sh"
 source "$repo_root/tools/lib/check-docs.sh"
 source "$repo_root/tools/lib/check-validate.sh"
 source "$repo_root/tools/lib/check-qml.sh"
+source "$repo_root/tools/lib/check-qmltest.sh"
 source "$repo_root/tools/lib/check-test.sh"
 source "$repo_root/tools/lib/check-smoke.sh"
 
@@ -175,6 +176,7 @@ run_stage() {
     docs) stage_docs ;;
     validate) stage_validate ;;
     qml) stage_qml ;;
+    qmltest) stage_qmltest ;;
     test) stage_test ;;
     smoke) stage_smoke ;;
   esac

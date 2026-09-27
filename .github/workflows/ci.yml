@@ -100,4 +100,4 @@ jobs:
       - name: QML format, strict QML and runtime smoke
         env:
           ARANEA_CHECK_REQUIRE_ALL: "1"
-        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tools/check --only format,qml,smoke
+        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tools/check --only format,qml,qmltest,smoke

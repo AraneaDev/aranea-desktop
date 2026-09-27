@@ -30,7 +30,7 @@ Branch protection enforces the same rule server-side regardless.
 ## Checks
 
 ```bash
-tools/check            # everything: format lint docs validate qml test smoke
+tools/check            # everything: format lint docs validate qml qmltest test smoke
 tools/check --fix      # rewrite formatting (shfmt, prettier, qmlformat)
 tools/check --fast     # skip the runtime smoke test and the slow bash tests
 tools/check --only qml # one stage (or a comma-separated list); --skip works too
@@ -50,6 +50,11 @@ The stages:
 - **qml**: qmllint on every QML file. With Omarchy's shell and Quickshell
   installed it is strict and compared with `tools/baselines/qmllint.txt`;
   otherwise only syntax errors fail.
+- **qmltest**: the behaviour tests in `tests/qml/`, run by
+  `tests/qml-behaviour.test.sh` in an offscreen Quickshell (no Wayland, no
+  windows). Plugins keep their state and logic in a non-visual entry file and
+  load their window from a separate file, so these tests drive the real QML.
+  Skipped without `quickshell` and Omarchy's shell.
 - **test**: `tests/run` (every bash contract test, each in a sandbox that
   cannot touch your session) and the `node:test` suites in `tests/js/`,
   with per-module function coverage floors in `tools/baselines/coverage.txt`.

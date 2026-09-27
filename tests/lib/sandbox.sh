@@ -16,8 +16,11 @@
 
 sandbox_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Start from the defaults: no inherited ARANEA_* overrides.
+# Start from the defaults: no inherited ARANEA_* overrides. The values are
+# kept for a test that deliberately honours one (see sandbox_inherited_value).
+declare -gA sandbox_inherited=()
 for sandbox_var in $(compgen -e | grep '^ARANEA_' || true); do
+  sandbox_inherited[$sandbox_var]="${!sandbox_var}"
   unset "$sandbox_var"
 done
 unset sandbox_var
@@ -41,6 +44,13 @@ sandbox_guard_bin="$(cd "$sandbox_lib_dir/../guard-bin" && pwd)"
 export PATH="$sandbox_guard_bin:$PATH"
 
 sandbox_exit_commands=()
+
+# Prints the value NAME (an ARANEA_* variable) had before the sandbox cleared
+# it, or nothing; for tests that deliberately honour a setting (the QML
+# behaviour runner reads ARANEA_QML_SHELL_DIR and ARANEA_CHECK_REQUIRE_ALL).
+sandbox_inherited_value() {
+  printf '%s' "${sandbox_inherited[$1]:-}"
+}
 
 # Registers a command to run when the test exits, before the sandbox root is
 # removed. Commands run in registration order.

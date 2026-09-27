@@ -443,4 +443,41 @@ out="$("$repo_root/tools/check" --skip 2>&1)" || rc=$?
 [[ $rc -eq 2 ]] || exit 1
 grep -Fq 'Usage:' <<<"$out"
 
+# --- 4f: the qmltest stage runs the offscreen QML behaviour tests
+mkdir -p tests/lib tests/qml/lib
+cp "$repo_root/tests/qml-behaviour.test.sh" tests/
+cp "$repo_root"/tests/lib/*.sh tests/lib/
+cp "$repo_root"/tests/qml/lib/* tests/qml/lib/
+cp -r "$repo_root/tests/guard-bin" tests/
+printf '// Always fails.\nimport QtQuick\nimport Quickshell\nimport "lib"\nShellRoot {\n  QmlTest {\n    id: t\n    Component.onCompleted: {\n      t.check(false, "planted")\n      t.done()\n    }\n  }\n}\n' >tests/qml/fail.qml
+git add -A
+if ARANEA_QML_SHELL_DIR=/nonexistent run_check --only qmltest; then
+  grep -Fq 'qmltest: skipped' "$ARANEA_TEST_SANDBOX/out"
+else
+  echo "qmltest must skip without the Omarchy shell" >&2
+  exit 1
+fi
+if ARANEA_QML_SHELL_DIR=/nonexistent ARANEA_CHECK_REQUIRE_ALL=1 run_check --only qmltest; then
+  echo "a required qmltest stage was allowed to skip" >&2
+  exit 1
+fi
+if command -v quickshell >/dev/null && [[ -d /usr/share/omarchy/shell/Commons ]]; then
+  if run_check --only qmltest; then
+    echo "qmltest missed a failing check" >&2
+    exit 1
+  fi
+  grep -Fq 'QMLTEST FAIL planted' "$ARANEA_TEST_SANDBOX/out"
+  printf 'import QtQuick\nShellRoot {\n  this is not qml\n}\n' >tests/qml/fail.qml
+  git add -A
+  if run_check --only qmltest; then
+    echo "qmltest passed a test that does not load" >&2
+    exit 1
+  fi
+  grep -Fq 'did not load' "$ARANEA_TEST_SANDBOX/out"
+else
+  echo "SKIP: qmltest sensitivity (no quickshell or Omarchy shell here)"
+fi
+git reset -q --hard
+git clean -qfd tests
+
 echo "check contract passed"
