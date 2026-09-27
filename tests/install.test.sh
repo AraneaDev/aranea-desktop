@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for scripts/install.sh --dry-run: reports every planned step and
+# profile, rejects a missing --source, and (for a real run) always installs
+# and activates the theme as "aranea" regardless of the source clone's name,
+# leaving no stale or duplicate theme directory behind.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

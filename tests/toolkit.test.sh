@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Contract for the cursor/GTK/Kvantum integrations and the dev/CI tooling
+# around them: cursor theme wiring and artwork (no leftover stock colours or
+# eye dots, hyprcursor copies matching the SVG source), the generated icon
+# theme's index and install wiring, pinned dev tooling (package.json,
+# lockfile, Node version, tool checksums), and the CI/release/git-hook setup
+# (tools/check invocations, SHA-pinned actions, commit style, license and
+# contributing docs, a live README badge).
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

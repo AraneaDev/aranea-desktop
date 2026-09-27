@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Contract for scripts/repair-shell-config and scripts/release-shell-config:
+# repair swaps in the Aranea bar/plugins/clones and places the bell/health
+# icons idempotently, release hands everything back to Omarchy and parks
+# state for a clean return, polkit/lock/osd/menu/bar each end up with
+# exactly one provider either way, a polkit handover marker drives a running
+# shell restart, and string plugin entries / a symlinked shell.json survive.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for theme-manifest.toml and scripts/lib/manifest.sh: every profile
+# and integration is well-formed and every field present, the manifest
+# helpers match ids and profiles literally (never as patterns), and
+# colors.toml/shell.toml carry the tokens the manifest depends on.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
+# Fake omarchy CLI for the test sandbox: swallows any omarchy subcommand
+# (theme set, plugin enable/disable, restart shell, ...) and succeeds, so
+# scripts that shell out to omarchy can run without a real installation.
 exit 0

@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.notifications plugin: inbox-only design (no
+# toast/history-replay/centerOpen/source-item era code left), the swipe and
+# grouping wiring in NotificationCard/Panel/Service, health notifications
+# stay out of this plugin (including migrating legacy inbox items), and the
+# manifest declares both the bar-widget and service entry points.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

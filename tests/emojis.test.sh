@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.emojis plugin's manifest and Emojis.qml:
+# manifest shape, overlay wiring to EmojiLogic, the shared OverlayChrome.qml
+# copy matches the clipboard plugin's, and the final-review fixes below.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

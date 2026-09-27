@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.osd plugin: manifest id, Osd.qml targets the
+# "osd" surface, and deploy-plugins-safely/repair-shell-config know about it.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

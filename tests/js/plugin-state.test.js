@@ -218,6 +218,7 @@ test("plugin-state logic", () => {
     throw new Error("lock clock is not anchored to the live field")
   if (!lockViewQml.includes("y: parent.height - height - 34"))
     throw new Error("lock footer is not anchored to the live viewport")
+  /** Throws with a labelled message unless source contains the given typed function signature. */
   function requiresSignature(source, signature, name) {
     if (!source.includes(signature)) throw new Error(`missing typed scalar contract: ${name}`)
   }

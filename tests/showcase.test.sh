@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-showcase: `list` names every known surface,
+# and both aranea-showcase and capture-screenshots reject an unknown
+# surface with a clear error instead of silently doing nothing.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

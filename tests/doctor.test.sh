@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-doctor: --json reports the right status per
+# check (theme, hooks, manifest, icons, fonts, ownership, shell, plugins,
+# runtime, qmllint, health, notifications, polkit), --fix reinstalls a
+# stale/missing hook, optional plugins (health/pickers/polkit) are never
+# flagged, customised managed files are reported not repaired, every --json
+# line is valid JSON even with odd characters in paths, and the runtime
+# check is skipped (not "ok") without rg.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

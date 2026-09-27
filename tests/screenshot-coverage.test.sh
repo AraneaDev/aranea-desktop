@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Contract for scripts/capture-screenshots and the screenshots it produces:
+# every declared surface has a PNG referenced from the README, the hero
+# showcase GIF has the right frame count and each frame matches its still,
+# the capture never disables the notifications plugin or types real text,
+# the real inbox/clipboard/picker state is always restored (trap ordering
+# and swap-flag guards checked directly in the script), and the polkit shot
+# is a harmless cancelled request.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

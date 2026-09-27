@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for scripts/deploy-plugins-safely: it is wired into both hooks,
+# stops quickshell and restarts the shell, calls repair-shell-config, and
+# repairs shell.json even when every plugin is already deployed on disk (a
+# plugin present but never registered must not stay silently disabled).
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

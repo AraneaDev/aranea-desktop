@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-bar-profile: lists the known profiles, reads
+# the current one, sets a new one (backing up shell.json and keeping a
+# symlinked config a symlink), and rejects an unknown profile name.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

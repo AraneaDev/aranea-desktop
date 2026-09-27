@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
+# Fake chromium for the test sandbox: makes `command -v chromium` succeed so
+# install-integration plans the chromium integration, without launching a
+# browser.
 exit 0

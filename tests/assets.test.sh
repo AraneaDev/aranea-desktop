@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for repo assets: every background in the manifest and every link
+# in the README exists, the hero showcase GIF has the right size and frame
+# count, SVGs are well-formed XML, and images are readable.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

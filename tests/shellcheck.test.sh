@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for the shell scripts: shellcheck is installed at the version
+# pinned in tools/install-shellcheck (matching CI), both workflow files
+# reference that pin, and every shell script under scripts, hooks, tests,
+# tools and .githooks passes `shellcheck -x`.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"

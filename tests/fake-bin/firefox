@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
+# Fake firefox for the test sandbox: makes `command -v firefox` succeed so
+# install-integration plans the firefox integration, without launching a
+# browser.
 exit 0

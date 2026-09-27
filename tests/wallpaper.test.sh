@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-wallpaper: every manifest variant exists and
+# is listed, an unknown wallpaper is rejected, set/motion apply through the
+# configured applier, and the day/night schedule writes and removes its
+# systemd timer/service and honours a configured time window when picking
+# the current phase.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

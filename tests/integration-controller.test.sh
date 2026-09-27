@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-integrations: activate/deactivate link and
+# unlink targets, update the state file and ownership ledger, deactivate
+# also covers targets linked outside activate (installer/hooks), an unknown
+# integration id fails, and a target shared with another active integration
+# survives deactivation.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"

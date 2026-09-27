@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.clipboard plugin's manifest and Clipboard.qml:
+# manifest shape, overlay wiring to ClipboardLogic, secret reveal/expiry,
+# pin/paste behaviour and the final-review fixes below.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-motion: status/set/toggle persist to the state
+# file and drive hyprctl's animations keyword and named animation curves,
+# a missing hyprctl defers instead of failing, aranea-wallpaper motion
+# forwards to the same state, and the hooks/plugins read the same state path.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

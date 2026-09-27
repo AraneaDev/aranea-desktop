@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Contract for scripts/lib/ownership.sh: first adoption backs up and links a
+# pre-existing file, Aranea-owned links are recognised, a customised target
+# is kept not overwritten, uninstall restores backups and empties the
+# ledger while leaving customisations alone, forget_managed_file is exact,
+# and the final-review fixes below.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

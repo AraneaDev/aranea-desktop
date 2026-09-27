@@ -29,6 +29,7 @@ chmod +x "$fake/omarchy"
 export PATH="$fake:$PATH"
 
 session_link="$XDG_CONFIG_HOME/omarchy/session/aranea.css"
+# Prints shell.json's plugin ids as a JSON array, string and object entries alike.
 plugin_ids() { jq -c '[.plugins[]? | (if type == "string" then . else .id end)]' "$cfg"; }
 
 # Aranea branch: integrations link from the stable installed theme (spec B3).

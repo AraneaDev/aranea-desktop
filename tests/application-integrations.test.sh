@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for the application integrations (browser, session, media) and
+# branding assets: every referenced file exists, carries Aranea branding,
+# and scripts/install-integration --dry-run plans the right files per target.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

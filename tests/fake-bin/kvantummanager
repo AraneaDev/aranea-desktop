@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
+# Fake kvantummanager for the test sandbox: makes `command -v kvantummanager`
+# succeed so install-integration plans the Qt/Kvantum integration, without
+# touching real Qt settings.
 exit 0

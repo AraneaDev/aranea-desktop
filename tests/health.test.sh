@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.health plugin: every check command is timeout
+# bounded and never a shell string, service/panel/metrics wiring stay split
+# by responsibility (no cross-posting to notifications), the top-process
+# sampler tracks open panels rather than a shared boolean, and the
+# final-review minors below.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

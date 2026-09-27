@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
+# Fake pavucontrol for the test sandbox: makes `command -v pavucontrol`
+# succeed so install-integration plans the media integration, without
+# launching a real volume control window.
 exit 0

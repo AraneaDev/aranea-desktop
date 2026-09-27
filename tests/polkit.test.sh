@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.polkit plugin: it is a clone of the stock agent
+# that keeps the stock behaviour (D-Bus path, layer namespace, PAM path,
+# laptop-lid trigger, cancel-on-close, never logging the password) while
+# wearing the Aranea card (styling, keyboard routing, action lookup via
+# argv-only pkaction, collapsed details, size clamped to the screen) and the
+# final-review fixes below.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

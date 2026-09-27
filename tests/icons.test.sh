@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# Contract for the generated font icon theme: index.theme wiring, every
+# required icon present as a real file with the brand fill colour and a
+# generation metadata comment, install-integration --dry-run/--yes plans and
+# installs the whole set, and a stale icon is removed from disk and from the
+# ownership ledger together.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for the QML surface: the bar window is transparent, every plugin
+# entry point listed below exists and is repo-owned (not a system copy), and
+# (when qmllint is available) tools/check --only qml passes strict lint
+# against the shrink-only baseline for every tracked QML file.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

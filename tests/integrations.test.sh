@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# Contract for scripts/install-integration: an unknown integration id fails
+# with a clear message, each integration's files exist and --dry-run plans
+# the right targets, and an optional app that isn't installed never fails
+# the integration.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

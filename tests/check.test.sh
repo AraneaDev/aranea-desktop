@@ -27,6 +27,7 @@ printf 'a = 1\n' >conf.toml
 printf '# Title\n\nSee [data](../data.json).\n' >docs/readme.md
 git add -A && git commit -qm init
 
+# Runs tools/check in the scratch repo, tests skipped, capturing combined output.
 run_check() { ARANEA_CHECK_NO_TESTS=1 tools/check "$@" >"$ARANEA_TEST_SANDBOX/out" 2>&1; }
 
 # Clean tree passes the validate stage.

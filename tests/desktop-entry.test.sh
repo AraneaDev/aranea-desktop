@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for scripts/repair-desktop-entry: Name and Exec are kept, but
+# Version and the trailing Application; category are stripped from the
+# repaired .desktop file.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

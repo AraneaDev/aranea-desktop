@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Contract for scripts/deploy-plugin: the target ends up with exactly the
+# source's files (stale files removed) and no staging directory is left
+# behind.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
