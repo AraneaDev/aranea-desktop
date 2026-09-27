@@ -146,4 +146,8 @@ rg_out="$(ARANEA_DOCTOR_THEME='Aranea Pulse' ARANEA_DOCTOR_RUNTIME_ROOT="$odd_ro
   ARANEA_DOCTOR_QMLLINT_STATUS=ok "$repo_root/scripts/aranea-doctor" --json)"
 grep -Fq '"id":"runtime","status":"skipped"' <<<"$rg_out"
 
+# The plain-text row format stays on one source line (no literal newline).
+grep -Fq "printf '%-14s %-8s %s\\n'" "$repo_root/scripts/aranea-doctor"
+grep -Fq 'jq is required for --json' "$repo_root/scripts/aranea-doctor"
+
 echo "doctor contract passed"

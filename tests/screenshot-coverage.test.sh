@@ -85,6 +85,10 @@ grep -Fq 'if (( picker_swapped )); then' "$capture_script"
 grep -Fq '&& (( clipboard_swapped )); then' "$capture_script"
 (( $(line_of 'inbox_swapped=1') > $(line_of "mv -t \"\$inbox_backup\"") ))
 grep -Fq 'if (( ! inbox_swapped )); then return 0; fi' "$capture_script"
+# The --all batch also sets its restore trap before parking the inbox, and a
+# clipboard that cannot be saved is never replaced.
+(( $(line_of 'trap finish_batch EXIT') < $(line_of "-exec mv -t \"\$batch_inbox_backup\"") ))
+grep -Fq 'could not save the clipboard' "$capture_script"
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]
 

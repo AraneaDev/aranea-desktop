@@ -111,7 +111,7 @@ jq '.cloneSourceRestores = ["araneadev.menu", "araneadev.notifications"]' "$conf
 jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.notifications") == null' "$config" >/dev/null
 jq -e '[.plugins[]?.id] | index("araneadev.notifications") == null' "$config" >/dev/null
 jq -e '(.disabledPlugins | index("omarchy.notifications")) == null' "$config" >/dev/null
-jq -e '.cloneSourceRestores == ["araneadev.menu"]' "$config" >/dev/null
+jq -e '((.cloneSourceRestores // []) | index("araneadev.menu")) == null' "$config" >/dev/null   # the menu is handed back too
 test -f "$parked"
 
 "$repo_root/scripts/repair-shell-config" "$config"
@@ -274,5 +274,19 @@ if PATH="$failing_jq:$PATH" "$repo_root/scripts/release-shell-config" "$bell_cfg
 fi
 if [[ -e "$state_root/notifications-widget-parked" ]]; then echo "marker written although the release failed" >&2; exit 1; fi
 jq -e '.bar.layout.right == ["araneadev.notifications"]' "$bell_cfg" >/dev/null
+
+# --- the bar and menu go back to Omarchy too, and come back on return
+bar_cfg="$test_root/bar.json"
+printf '{"bar": {"position": "top", "layout": {"left": ["omarchy.menu", "omarchy.workspaces"], "right": ["omarchy.tray"]}}}\n' > "$bar_cfg"
+"$repo_root/scripts/repair-shell-config" "$bar_cfg" >/dev/null
+jq -e '.bar.id == "araneadev.bar" and .bar.layout.left[0] == "araneadev.menu"
+  and (.disabledPlugins | index("omarchy.menu")) != null and (.disabledPlugins | index("omarchy.bar")) != null
+  and (.cloneSourceRestores | index("araneadev.menu")) != null' "$bar_cfg" >/dev/null || { cat "$bar_cfg"; exit 1; }
+"$repo_root/scripts/release-shell-config" "$bar_cfg" >/dev/null
+jq -e '(.bar | has("id") | not) and .bar.position == "top" and .bar.layout.left[0] == "omarchy.menu"
+  and ((.disabledPlugins // []) | (index("omarchy.menu") == null and index("omarchy.bar") == null))
+  and ([.plugins[]? | (if type == "string" then . else .id end)] | index("araneadev.menu") == null)' "$bar_cfg" >/dev/null || { cat "$bar_cfg"; exit 1; }
+"$repo_root/scripts/repair-shell-config" "$bar_cfg" >/dev/null
+jq -e '.bar.id == "araneadev.bar" and .bar.layout.left[0] == "araneadev.menu"' "$bar_cfg" >/dev/null || { cat "$bar_cfg"; exit 1; }
 
 echo "shell config contract passed"

@@ -15,14 +15,17 @@ for arg in "$@"; do
     --fix) fix=1 ;;
   esac
 done
+if (( json )) && ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' 'jq is required for --json' >&2
+  exit 2
+fi
 
 emit() {
   local id="$1" status="$2" message="$3"
   if (( json )); then
     jq -cn --arg id "$id" --arg status "$status" --arg message "$message" '{id: $id, status: $status, message: $message}'
   else
-    printf '%-14s %-8s %s
-' "$id" "$status" "$message"
+    printf '%-14s %-8s %s\n' "$id" "$status" "$message"
   fi
 }
 

@@ -53,8 +53,19 @@ note_polkit_handover() {
 jq '
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
-  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd"];
-  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit", "omarchy.lock", "omarchy.osd"];
+  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu"];
+  def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit", "omarchy.lock", "omarchy.osd", "omarchy.bar", "omarchy.menu"];
+  def retarget($from; $to):
+    if type == "string" then (if . == $from then $to else . end)
+    elif type == "object" and .id == $from then .id = $to
+    else . end;
+  # The bar goes back to Omarchy: no bar id means its own bar. The Aranea
+  # menu entry becomes the stock menu entry, keeping its place and settings.
+  (if (.bar | type) == "object" and .bar.id == "araneadev.bar" then .bar |= del(.id) else . end)
+  | (if (.bar.layout | type) == "object" then
+       .bar.layout |= with_entries(.value |= (if type == "array" then map(retarget("araneadev.menu"; "omarchy.menu")) else . end))
+     else . end)
+  |
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(
       .value |= (if type == "array" then map(select(entry_id as $id | ours | index($id) | not)) else . end))

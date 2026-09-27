@@ -19,6 +19,17 @@ available() {
   for command_name in "${commands[@]}"; do command -v "$command_name" >/dev/null 2>&1 && return 0; done
   return 1
 }
+# True when TARGET is also listed by another active integration.
+shared_with_active() {
+  local id="$1" target="$2" other_files other
+  for other_files in "$state_root"/*.files; do
+    [[ -e "$other_files" ]] || continue
+    other="$(basename "$other_files" .files)"
+    [[ "$other" != "$id" && "$(cat "$state_root/$other" 2>/dev/null)" == active ]] || continue
+    grep -Fqx -- "$target" "$other_files" && return 0
+  done
+  return 1
+}
 emit_status() {
   local id="$1" state=inactive availability=unavailable
   [[ -f "$state_root/$id" ]] && state="$(<"$state_root/$id")"
@@ -39,23 +50,32 @@ case "$command_name" in
     known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
     available "$id" || { printf 'Integration unavailable: %s\n' "$id" >&2; exit 1; }
     mkdir -p "$state_root"
-    output="$("$repo_root/scripts/install-integration" "$id" --yes)"
+    install_status=0
+    output="$("$repo_root/scripts/install-integration" "$id" --yes)" || install_status=$?
     printf '%s\n' "$output"
-    # Exactly the targets this integration manages now.
+    # Exactly the targets this integration manages now — recorded even when
+    # the install stopped partway, so deactivate can still undo them.
     sed -n 's/^\(linked\|copied\) .* -> //p' <<<"$output" > "$state_root/$id.files"
+    (( install_status == 0 )) || exit "$install_status"
     printf active > "$state_root/$id"; printf 'integration: %s active\n' "$id"
     ;;
   deactivate)
     id="${2:-}"; known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
     mkdir -p "$state_root"
     files="$state_root/$id.files"
-    if [[ -f "$files" ]]; then
-      while IFS= read -r target; do
-        [[ -n "$target" ]] || continue
-        restore_one_target "$target"
-        forget_managed_file "$target"
-      done < "$files"
-    fi
+    # What activate recorded, plus everything this integration would link or
+    # copy (the installer and hooks link without recording per-integration).
+    targets="$(
+      { [[ -f "$files" ]] && cat "$files"
+        "$repo_root/scripts/install-integration" --dry-run "$id" 2>/dev/null | sed -n 's/^would \(link\|copy\) .* -> //p'
+      } | sort -u
+    )"
+    while IFS= read -r target; do
+      [[ -n "$target" ]] || continue
+      shared_with_active "$id" "$target" && continue
+      restore_one_target "$target"
+      [[ "$(last_ownership_action)" == restored ]] && forget_managed_file "$target"
+    done <<<"$targets"
     rm -f "$files"
     # "inactive" (not just no file) tells the hooks to leave it off.
     printf inactive > "$state_root/$id"; printf 'integration: %s inactive\n' "$id"

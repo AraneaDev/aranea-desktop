@@ -36,6 +36,12 @@ is_aranea_target() {
     while IFS= read -r root; do
       [[ "$destination" == "$root"/* ]] && return 0
     done < <(aranea_link_roots)
+    # Any other Aranea checkout (the README has users run the integration
+    # controller from one): an .../integrations/<path> that this theme ships,
+    # even when that checkout is gone and the link dangles.
+    if [[ "$destination" == */integrations/* ]]; then
+      [[ -e "$ownership_lib_repo/integrations/${destination##*/integrations/}" ]] && return 0
+    fi
     return 1
   fi
   local data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -85,24 +91,41 @@ forget_managed_file() {
 }
 
 # Points TARGET at SOURCE and records it. A pre-Aranea file is backed up
-# first; a managed target the user has since replaced (customised) is left
-# alone. Sets ownership_last_action to "linked" or "kept".
+# first (an older backup is kept under a timestamped name, never lost); a
+# managed target the user has since replaced (customised), or a directory,
+# is left alone. Sets ownership_last_action to "linked" or "kept".
 link_managed_file() {
   local target="$1"
   local source="$2"
+  local backup
+  backup="$(backup_path "$target")"
   mkdir -p "$(dirname "$target")"
   if [[ -L "$target" && "$(readlink -- "$target")" == "$source" ]]; then
     record_managed_file "$target"
     ownership_last_action=linked
     return 0
   fi
+  if [[ -d "$target" && ! -L "$target" ]]; then
+    ownership_last_action=kept
+    return 0
+  fi
   if [[ -e "$target" || -L "$target" ]]; then
     if ! is_aranea_target "$target"; then
       if is_recorded_target "$target"; then
-        ownership_last_action=kept
-        return 0
+        # Still managed but no longer ours: customised, unless it is exactly
+        # the original an older uninstall restored (identical to its backup).
+        if ! { [[ -f "$target" && -f "$backup" ]] && cmp -s -- "$target" "$backup"; }; then
+          ownership_last_action=kept
+          return 0
+        fi
+      else
+        # First adoption. A backup left from an earlier install must not
+        # stop this file from being backed up.
+        if [[ -e "$backup" || -L "$backup" ]] && ! { [[ -f "$target" && -f "$backup" ]] && cmp -s -- "$target" "$backup"; }; then
+          mv -- "$backup" "$backup.$(date +%Y%m%d%H%M%S)"
+        fi
+        backup_target "$target"
       fi
-      backup_target "$target"
     fi
     rm -f -- "$target"
   fi
@@ -111,19 +134,23 @@ link_managed_file() {
   ownership_last_action=linked
 }
 
-# Prints what the last link_managed_file call did: "linked" or "kept".
+# Prints what the last link_managed_file / restore_one_target call did:
+# "linked", "restored" or "kept".
 last_ownership_action() {
   printf '%s\n' "$ownership_last_action"
 }
 
 # Hands one managed TARGET back: Aranea's (or missing) is removed and its
 # backup restored and deleted; a customised one is left as it is, with its
-# backup kept, and reported as "kept your <target>".
+# backup kept, and reported as "kept your <target>". Sets
+# ownership_last_action to "restored" or "kept".
 restore_one_target() {
   local target="$1" backup
   backup="$(backup_path "$target")"
   if [[ -e "$target" || -L "$target" ]] && ! is_aranea_target "$target"; then
-    printf 'kept your %s\n' "$target"
+    printf 'kept your %s
+' "$target"
+    ownership_last_action=kept
     return 0
   fi
   rm -f -- "$target"
@@ -132,17 +159,22 @@ restore_one_target() {
     cp -a -- "$backup" "$target"
     rm -rf -- "$backup"
   fi
+  ownership_last_action=restored
 }
 
-# Hands every managed target back (uninstall) and empties the ledger, so a
-# second run is a no-op and a later reinstall starts clean.
+# Hands every managed target back (uninstall). Customised targets stay in
+# the ledger, so a later reinstall keeps them too; everything else leaves it,
+# so a second run is a no-op and a reinstall starts clean.
 restore_managed_files() {
-  local record target
+  local record target kept_file
   record="$(ownership_record)"
   [[ -f "$record" ]] || return 0
+  kept_file="$(mktemp "$(dirname "$record")/.managed-files.XXXXXX")"
   while IFS= read -r target; do
     [[ -n "$target" ]] || continue
     restore_one_target "$target"
+    if [[ "$ownership_last_action" == kept ]]; then printf '%s
+' "$target" >> "$kept_file"; fi
   done < "$record"
-  : > "$record"
+  mv -- "$kept_file" "$record"
 }

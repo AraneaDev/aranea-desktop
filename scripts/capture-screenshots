@@ -60,16 +60,17 @@ if (( capture_all )); then
   batch_inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
   mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
   batch_inbox_backup="$(mktemp -d "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/capture-backup.XXXXXX")"
-  mkdir -p "$batch_inbox_dir"
-  find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
-  omarchy restart shell >/dev/null 2>&1 || true
-  sleep 3
   # Restore the real inbox, leave the finished capture set visible on the
-  # intentionally empty workspace for a moment, then return focus.
+  # intentionally empty workspace for a moment, then return focus. Set
+  # before the inbox is parked; the capture inbox is only cleared once the
+  # real one has actually been moved aside.
+  batch_swapped=0
   finish_batch() {
-    omarchy-shell notifications clear >/dev/null 2>&1 || true
-    sleep 1
-    find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+    if (( batch_swapped )); then
+      omarchy-shell notifications clear >/dev/null 2>&1 || true
+      sleep 1
+      find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+    fi
     rmdir "$batch_inbox_backup" 2>/dev/null || true
     omarchy restart shell >/dev/null 2>&1 || true
     sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
@@ -77,6 +78,11 @@ if (( capture_all )); then
   }
   # A batch that stops early (set -e) still restores the inbox and focus.
   trap finish_batch EXIT
+  mkdir -p "$batch_inbox_dir"
+  find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
+  batch_swapped=1
+  omarchy restart shell >/dev/null 2>&1 || true
+  sleep 3
   capture_one() {
     local all_surface="$1"
     if ! "$0" --surface "$all_surface" --output "$output"; then
@@ -320,7 +326,10 @@ case "$surface" in
       # The picker records the live clipboard when the shell starts: save it
       # (never a password manager's marker type) and seed fixture text.
       clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
-      if [[ -n "$clip_type" ]]; then wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null || clip_type=""; fi
+      if [[ -n "$clip_type" ]] && ! wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null; then
+        echo "could not save the clipboard; not replacing it" >&2
+        exit 3
+      fi
       clipboard_swapped=1
       printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
     fi
