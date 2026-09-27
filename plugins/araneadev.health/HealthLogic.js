@@ -533,8 +533,38 @@ function annotateProblems(open, tools) {
   return rows
 }
 
+/**
+ * Position of the row with this key.
+ * @param {?Array<{key: string}>} rows - dropdown rows
+ * @param {string} key - the row key, e.g. "disk:/"
+ * @returns {number} its index, or -1
+ */
+function indexOfKey(rows, key) {
+  var list = rows || []
+  for (var i = 0; i < list.length; i++) if (list[i] && list[i].key === key) return i
+  return -1
+}
+
+/**
+ * Key of the row delta steps from the row with this key, wrapping; the first
+ * (delta > 0) or last row when the key is empty or gone.
+ * @param {?Array<{key: string}>} rows - dropdown rows
+ * @param {string} key - the current cursor key, or ""
+ * @param {number} delta - rows to move (sign matters)
+ * @returns {string} the new cursor key, or "" when there are no rows
+ */
+function moveCursorKey(rows, key, delta) {
+  var list = rows || []
+  if (list.length === 0) return ""
+  var i = key ? indexOfKey(list, key) : -1
+  if (i < 0) return list[delta < 0 ? list.length - 1 : 0].key
+  return list[(i + delta + list.length) % list.length].key
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    indexOfKey: indexOfKey,
+    moveCursorKey: moveCursorKey,
     checkOf: checkOf,
     parseFailedUnits: parseFailedUnits,
     parseDf: parseDf,

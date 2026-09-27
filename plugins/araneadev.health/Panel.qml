@@ -9,6 +9,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "HealthBridge.js" as HealthBridge
+import "HealthLogic.js" as HealthLogic
 import "MetricsLogic.js" as MetricsLogic
 
 Panel {
@@ -42,8 +43,11 @@ Panel {
   readonly property color amber: "#ffbd2e"
   // Icon colour for the current status.
   readonly property color statusColor: status === "critical" ? Color.urgent : (status === "attention" ? amber : Color.notifications.countdown)
-  // Keyboard-selected problem row, -1 for none; reset when the dropdown opens.
-  property int cursor: -1
+  // Key of the keyboard-selected problem ("" for none); rows re-sort as
+  // checks run, so the cursor follows the problem, not a position.
+  property string cursorKey: ""
+  // Index of cursorKey's row in problems, -1 when none.
+  readonly property int cursor: HealthLogic.indexOfKey(root.problems, root.cursorKey)
 
   // Colour for a usage level: urgent, amber, or the normal text colour.
   function levelColor(level: string): color {
@@ -62,9 +66,24 @@ Panel {
   property var countedService: null
   // Tells the counted service this panel closed and forgets it.
   function releaseCount(): void {
-    if (countedService)
-      countedService.panelClosed()
+    if (countedService) {
+      try {
+        countedService.panelClosed()
+      } catch (e) {
+        // The old service may already be gone (a reload replaced it).
+      }
+    }
     countedService = null
+  }
+
+  // A reloaded health service replaces the one this open panel counted
+  // itself on: move the count over so TOP sampling stays on.
+  onServiceChanged: if (root.opened) {
+    root.releaseCount()
+    if (root.service) {
+      root.countedService = root.service
+      root.service.panelOpened()
+    }
   }
   Component.onDestruction: releaseCount()
 
@@ -84,7 +103,7 @@ Panel {
     if (opened && service) {
       service.metrics.refreshSlow()
       service.monitor.checkDisk()
-      root.cursor = -1
+      root.cursorKey = ""
     }
   }
 
@@ -163,10 +182,10 @@ Panel {
       onMoveRequested: function (dx, dy) {
         if (root.problems.length === 0 || dy === 0)
           return
-        root.cursor = root.cursor < 0 ? 0 : (root.cursor + dy + root.problems.length) % root.problems.length
+        root.cursorKey = HealthLogic.moveCursorKey(root.problems, root.cursorKey, dy)
       }
       onActivateRequested: if (root.cursor >= 0)
-        root.runRow(root.problems[root.cursor])
+        root.runRow(root.problems[HealthLogic.indexOfKey(root.problems, root.cursorKey)])
 
       ColumnLayout {
         id: content

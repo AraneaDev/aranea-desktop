@@ -89,4 +89,14 @@ fi
 grep -Fq 'function refresh(): string' "$plugin/Service.qml"
 grep -Fq 'samples: service.metrics.cpuHistory.length' "$plugin/Service.qml"
 
+# --- 4c: the cursor follows its problem; a reloaded service is counted again
+hpanel="$repo_root/plugins/araneadev.health/Panel.qml"
+grep -Fq 'property string cursorKey: ""' "$hpanel"
+grep -Fq 'HealthLogic.moveCursorKey(' "$hpanel"
+if grep -Fq 'root.problems[root.cursor]' "$hpanel"; then
+  echo "Enter must run the row under cursorKey" >&2
+  exit 1
+fi
+grep -Fq 'onServiceChanged:' "$hpanel"
+
 echo "health contract passed"

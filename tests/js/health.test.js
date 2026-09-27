@@ -279,3 +279,20 @@ test("health logic", () => {
 
   console.log("health logic contract passed")
 })
+
+test("health cursor by key (4c)", () => {
+  const h = require(path.join(__dirname, "..", "..", "plugins/araneadev.health/HealthLogic.js"))
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const rows = [{ key: "disk:/" }, { key: "unit:user:x" }, { key: "container:db" }]
+  eq(h.indexOfKey(rows, "unit:user:x"), 1, "index")
+  eq(h.indexOfKey(rows, "gone"), -1, "missing")
+  eq(h.moveCursorKey(rows, "", 1), "disk:/", "first")
+  eq(h.moveCursorKey(rows, "", -1), "container:db", "last")
+  eq(h.moveCursorKey(rows, "container:db", 1), "disk:/", "wraps")
+  eq(h.moveCursorKey(rows, "gone", 1), "disk:/", "stale key restarts")
+  eq(h.moveCursorKey([], "x", 1), "", "no rows")
+  const resorted = [{ key: "reboot" }].concat(rows)
+  eq(h.indexOfKey(resorted, "unit:user:x"), 2, "follows its row")
+})
