@@ -71,7 +71,7 @@ render_group F1F8 places/user-trash.svg places/user-trash-symbolic.svg places/us
 render_group F0F6 mimetypes/text-x-generic.svg mimetypes/text-plain.svg mimetypes/text-markdown.svg \
   mimetypes/application-json.svg mimetypes/application-schema+json.svg mimetypes/application-toml.svg \
   mimetypes/x-office-document.svg mimetypes/application-x-desktop.svg
-render_group F15B actions/document-new.svg mimetypes/text-x-generic.svg
+render_group F15B actions/document-new.svg
 render_group F489 apps/utilities-terminal.svg
 render_group E615 apps/preferences-system.svg
 render_group F002 actions/edit-find.svg

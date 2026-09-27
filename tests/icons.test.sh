@@ -105,4 +105,13 @@ if grep -Fqx -- "$stale_icon" "$state_tmp/managed-files"; then
 fi
 rm -rf "$install_tmp" "$state_tmp"
 
+# --- 4d: each icon is rendered by exactly one group; text-x-generic uses its family's glyph
+dups="$(sed -n '/^render_group [0-9A-F]/,/[^\\]$/p' "$repo_root/scripts/generate-font-icon-theme" |
+  grep -o '[a-z-]*/[A-Za-z0-9+._-]*\.svg' | sort | uniq -d)"
+[[ -z "$dups" ]] || {
+  echo "rendered twice: $dups" >&2
+  exit 1
+}
+grep -Fq 'Source glyph U+F0F6 ' "$repo_root/integrations/icons/aranea/scalable/mimetypes/text-x-generic.svg"
+
 echo "icon theme contract passed (${#contexts[@]} contexts)"
