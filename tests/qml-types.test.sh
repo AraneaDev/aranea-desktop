@@ -26,6 +26,13 @@ qml_files=(
   "$repo_root/plugins/araneadev.menu/Menu.qml"
   "$repo_root/plugins/araneadev.menu/BarWidget.qml"
   "$repo_root/plugins/araneadev.osd/Osd.qml"
+  # The windows and services the non-visual entries create (4f).
+  "$repo_root/plugins/araneadev.clipboard/ClipboardWindow.qml"
+  "$repo_root/plugins/araneadev.polkit/PolkitWindow.qml"
+  "$repo_root/plugins/araneadev.polkit/PolkitAgentService.qml"
+  "$repo_root/plugins/araneadev.menu/MenuWindow.qml"
+  "$repo_root/plugins/araneadev.notifications/Toasts.qml"
+  "$repo_root/plugins/araneadev.notifications/NotificationDaemon.qml"
 )
 
 grep -Fq 'color: "transparent"' "$repo_root/plugins/araneadev.bar/Bar.qml"

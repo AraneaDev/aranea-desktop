@@ -64,10 +64,12 @@ run_test() {
   cp "$test_file" "$run_dir/cfg/shell.qml"
   # No display, compositor, session bus or desktop platform theme (the gtk3
   # theme aborts without a display).
-  env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
+  # From the run directory, so a relative path in a test can never write
+  # into the repository.
+  (cd "$run_dir" && exec env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
-    "$quickshell_bin" -p "$run_dir/cfg" >"$run_dir/log" 2>&1 &
+    "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!
   while ((waited < timeout_s * 5)); do
     grep -q 'QMLTEST DONE' "$run_dir/log" && break

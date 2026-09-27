@@ -1,17 +1,15 @@
 // Notification service for the omarchy shell: the freedesktop notification
-// server, the feedback toast stack, the inbox (Inbox.qml), DND and quiet
-// hours, and the `notifications` IPC target. omarchy-shell loads it as this
-// plugin's service entry point (manifest.json); Panel.qml renders its state.
+// server (NotificationDaemon.qml), the feedback toast stack (Toasts.qml), the
+// inbox (Inbox.qml), DND and quiet hours, and the `notifications` IPC target.
+// omarchy-shell loads it as this plugin's service entry point (manifest.json);
+// Panel.qml renders its state.
 
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.Commons
 
-import "components"
 import "NotificationLogic.js" as NotificationLogic
 import "InboxLogic.js" as InboxLogic
 import "ServiceBridge.js" as ServiceBridge
@@ -22,6 +20,16 @@ Item {
   // Injected by omarchy-shell (the first-party service loader).
   property var shell: null
 
+  // Whether to create the toast windows (Toasts.qml); tests switch it off.
+  property bool windowEnabled: true
+  // Whether to register the notification server (NotificationDaemon.qml);
+  // tests switch it off so they never take over the desktop's notifications.
+  property bool serverEnabled: true
+  // The toast windows, once created; null offscreen.
+  property var toasts: null
+  // The notification server, once created; null in tests.
+  property var server: null
+
   // Omarchy install root ($OMARCHY_PATH), for omarchy-hyprland-focus-app.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH")
   // The user's home directory ($HOME).
@@ -29,7 +37,7 @@ Item {
   // History + DND live under XDG_STATE_HOME: they're persistent user state
   // (the notifications received, the last-set DND preference), not
   // regeneratable cache that a `rm -rf ~/.cache` should wipe.
-  readonly property string stateDir: home + "/.local/state/omarchy/"
+  property string stateDir: home + "/.local/state/omarchy/"
   // JSON file holding the last-set DND preference.
   readonly property string settingsPath: stateDir + "notifications.json"
   // Inbox files, image copies and (legacy) popup files live here. See Inbox.qml.
@@ -631,7 +639,24 @@ Item {
     ServiceBridge.retract(service)
   }
 
+  // Creates one part of the service (Toasts.qml, NotificationDaemon.qml)
+  // with this service as its `root`, or null (with a warning) when it cannot load.
+  function createPart(file: string): var {
+    var component = Qt.createComponent(Qt.resolvedUrl(file))
+    if (component.status !== Component.Ready) {
+      console.warn("notifications: " + file + " failed to load:", component.errorString())
+      return null
+    }
+    return component.createObject(service, {
+      root: service
+    })
+  }
+
   Component.onCompleted: {
+    if (service.windowEnabled)
+      service.toasts = service.createPart("Toasts.qml")
+    if (service.serverEnabled)
+      service.server = service.createPart("NotificationDaemon.qml")
     // The bar widget (Panel.qml) finds this service here; see ServiceBridge.js.
     ServiceBridge.publish(service)
     Qt.callLater(function () {
@@ -746,161 +771,6 @@ Item {
 
     function ping(): string {
       return "ok"
-    }
-  }
-
-  // ---------------------------------------------------- server
-
-  NotificationServer {
-    id: server
-    keepOnReload: false
-    imageSupported: true
-    actionsSupported: true
-    bodyMarkupSupported: true
-    bodyHyperlinksSupported: true
-    persistenceSupported: true
-
-    onNotification: function (notification) {
-      service.handleNotification(notification)
-    }
-  }
-
-  // -------------------------------------------------------------- popup UI
-  //
-  // One PanelWindow per output (Variants on Quickshell.screens) holding the
-  // stacked toast cards. Layer is Overlay, exclusionMode Ignore, no
-  // keyboard focus — popups are passive surfaces and must never steal input
-  // from the focused application.
-
-  Variants {
-    model: Quickshell.screens
-
-    PanelWindow {
-      id: popupWindow
-      required property var modelData
-      screen: modelData
-      visible: popupModel.count > 0
-
-      WlrLayershell.namespace: "omarchy-notifications"
-      WlrLayershell.layer: WlrLayer.Overlay
-      WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-      exclusionMode: ExclusionMode.Ignore
-      color: "transparent"
-
-      readonly property var popupPlacement: NotificationLogic.popupPlacement(service.barPosition, service.barClearance, Style.gapsOut)
-
-      // Full-screen, fixed-size surface (like the OSD overlay). Adding or
-      // removing a toast changes only the content inside; the Wayland surface
-      // never resizes, so the compositor can't briefly scale a stale buffer --
-      // which is what stretched/squished the cards during count changes.
-      anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-      }
-
-      // Keep the surface click-through except over the toast column, so the
-      // rest of the (invisible) full-screen overlay never eats input.
-      mask: Region {
-        item: popupColumn
-      }
-
-      ColumnLayout {
-        id: popupColumn
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: popupWindow.popupPlacement.margins.top
-        anchors.rightMargin: popupWindow.popupPlacement.margins.right
-        spacing: Style.space(8)
-
-        Repeater {
-          model: popupModel
-
-          // The delegate is a slot Item that owns lifetime timer state. The
-          // actual visuals live in NotificationCard, which the history panel
-          // also reuses.
-          delegate: Item {
-            id: cardSlot
-            required property int index
-            required property string app
-            required property string appIcon
-            required property string summary
-            required property string body
-            required property string image
-            required property string glyph
-            required property int urgency
-            required property double expireTimeout
-            required property double timestamp
-            required property int originalId
-            // The notification service, read once so the delegate's calls are
-            // qualified (qmllint flags every unqualified service access).
-            readonly property var svc: service
-
-            // Each card sizes itself based on mode (text vs media); the slot
-            // tracks the card so the column auto-fits to whichever is widest.
-            Layout.preferredWidth: card.implicitWidth
-            Layout.alignment: Qt.AlignRight
-            implicitHeight: card.implicitHeight
-
-            readonly property real lifetime: cardSlot.svc.durationFor(cardSlot.urgency, cardSlot.expireTimeout)
-            property real remainingLifetime: 1.0
-            // Key shared by this toast's copies on every screen.
-            readonly property string holdKey: String(cardSlot.timestamp) + "-" + String(cardSlot.originalId)
-            // This copy is hovered or dragged.
-            readonly property bool held: card.hovered || card.dragging
-            onHeldChanged: cardSlot.svc.holdPopup(cardSlot.holdKey, cardSlot.held)
-            Component.onDestruction: if (cardSlot.held)
-              cardSlot.svc.holdPopup(cardSlot.holdKey, false)
-            readonly property bool ticking: cardSlot.lifetime > 0 && !cardSlot.svc.popupHeld(cardSlot.holdKey)
-
-            // A client updating this notification in place rewrites the row
-            // under the card (see refreshPopup). New text deserves a full look,
-            // so the countdown starts over instead of running out the clock the
-            // superseded text was already most of the way through. Delegates
-            // keep their own row as the model changes around them, so only a
-            // real content change lands here.
-            onSummaryChanged: cardSlot.remainingLifetime = 1.0
-            onBodyChanged: cardSlot.remainingLifetime = 1.0
-            onImageChanged: cardSlot.remainingLifetime = 1.0
-
-            Timer {
-              interval: 50
-              repeat: true
-              running: cardSlot.ticking
-              onTriggered: {
-                if (cardSlot.lifetime <= 0)
-                  return
-                cardSlot.remainingLifetime -= 50.0 / cardSlot.lifetime
-                if (cardSlot.remainingLifetime <= 0) {
-                  cardSlot.remainingLifetime = 0
-                  cardSlot.svc.expirePopup(cardSlot.index)
-                }
-              }
-            }
-
-            NotificationCard {
-              id: card
-              anchors.right: parent.right
-              app: cardSlot.app
-              appIcon: cardSlot.appIcon
-              summary: cardSlot.summary
-              body: cardSlot.body
-              image: cardSlot.image
-              urgency: cardSlot.urgency
-              cornerRadius: cardSlot.svc.cornerRadius
-              fontFamily: cardSlot.svc.shell && cardSlot.svc.shell.bar ? cardSlot.svc.shell.bar.fontFamily : ""
-              glyph: cardSlot.glyph
-
-              motionEnabled: cardSlot.svc.motionEnabled
-
-              onCloseRequested: cardSlot.svc.dismissPopup(cardSlot.index)
-              onSwipeDismissed: cardSlot.svc.dismissPopup(cardSlot.index)
-              onCardClicked: cardSlot.svc.invokePopupDefault(cardSlot.index)
-            }
-          }
-        }
-      }
     }
   }
 }

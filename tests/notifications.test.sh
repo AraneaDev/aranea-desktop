@@ -78,12 +78,25 @@ if grep -Eq 'upsertSourceItem|resolveSourceItem|sourceItemKeys|sourceFileName' "
 fi
 grep -Fq 'legacy health item' "$plugin/Inbox.qml"
 
-# --- 4c: a hold on any screen pauses every copy of a toast
+# --- 4f: the service is non-visual; the toasts and the notification server
+# are separate parts it creates, so tests run it offscreen and off the bus.
+# Behaviour (holds on two screens, clear during load, prune releases the
+# sender, DND flushed on destruction): tests/qml/notifications.qml, run
+# offscreen by tests/qml-behaviour.test.sh.
 svc="$repo_root/plugins/araneadev.notifications/Service.qml"
-grep -Fq 'property var popupHolds: ({})' "$svc"
-grep -Fq 'function holdPopup(key: string, on: bool): void' "$svc"
-grep -Fq '!cardSlot.svc.popupHeld(cardSlot.holdKey)' "$svc"
-grep -Fq 'Component.onDestruction: if (cardSlot.held)' "$svc"
+toasts_qml="$repo_root/plugins/araneadev.notifications/Toasts.qml"
+if grep -Eq 'PanelWindow|NotificationServer \{' "$svc"; then
+  echo "Service.qml must stay non-visual; windows go in Toasts.qml" >&2
+  exit 1
+fi
+grep -Fq 'service.toasts = service.createPart("Toasts.qml")' "$svc"
+grep -Fq 'service.server = service.createPart("NotificationDaemon.qml")' "$svc"
+grep -Fq 'server.root.handleNotification(notification)' "$repo_root/plugins/araneadev.notifications/NotificationDaemon.qml"
+grep -Fq 'WlrLayershell.keyboardFocus: WlrKeyboardFocus.None' "$toasts_qml"
+
+# --- 4c: a hold on any screen pauses every copy of a toast (the window wiring)
+grep -Fq '!cardSlot.svc.popupHeld(cardSlot.holdKey)' "$toasts_qml"
+grep -Fq 'Component.onDestruction: if (cardSlot.held)' "$toasts_qml"
 
 # --- 4c: the JSON goes through stdin (argv is limited to 128 KiB per arg);
 # a job whose process never starts still finishes and the queue moves on
@@ -98,11 +111,11 @@ grep -Fq 'if (!running && !inbox.runningStarted)' "$inbox_qml"
 
 # --- 4c: pruning is timed and releases senders; the model shows persisted images;
 # changes during the startup read are applied after it; timestamps are capped
+# (the release and the clear during load: tests/qml/notifications.qml)
 grep -Fq 'signal pruned(string fileName)' "$inbox_qml"
 grep -Fq 'interval: 3600000' "$inbox_qml"
 grep -Fq 'InboxLogic.mergeLoaded(' "$inbox_qml"
 grep -Fq 'NotificationLogic.clampTimestamp(' "$inbox_qml"
-grep -Fq 'service.releaseInboxRef(fileName)' "$svc"
 grep -Fq 'onPruned' "$svc"
 grep -Fq 'critical notifications stay until dismissed' "$repo_root/README.md"
 
@@ -113,7 +126,6 @@ if grep -Fq 'quietHoursTick' "$svc"; then
   echo "quiet hours must not use the unaligned tick" >&2
   exit 1
 fi
-grep -Fq 'if (settingsSaveTimer.running)' "$svc"
 grep -Fq 'onReloaded: service.reloadedSettings = true' "$svc"
 
 # --- 4c: Delete on "+N more" expands; Shift+Delete clears the group; the panel says so
@@ -138,7 +150,6 @@ grep -Fq 'property var liveSnapshots: ({})' "$svc"
 grep -Fq 'NotificationLogic.shownImages(' "$inbox_qml"
 grep -Fq 'prints each copied target' "$inbox_qml"
 grep -Fq 'cache: false' "$card_qml"
-grep -Fq 'settingsFile.blockWrites = true' "$svc"
 
 # --- 4c final review: after Delete/Enter expands a group the cursor lands on
 # the first revealed entry; migrated future entries keep distinct times
