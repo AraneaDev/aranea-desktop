@@ -10,7 +10,7 @@ mapfile -t surfaces < <(
 )
 expected_surfaces=(
   menu menu-submenu menu-search menu-input desktop health lock plymouth
-  btop file-manager neovim notifications notifications-empty clipboard emojis
+  btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network audio bluetooth agents
   power monitor apps favorites recent
   dawn osd
@@ -57,6 +57,14 @@ grep -Fq 'wl-copy --clear' "$capture_script"
 # The health shot waits for enough CPU history to draw a real sparkline.
 grep -Fq '.samples' "$capture_script"
 grep -Fq 'omarchy-shell health status' "$capture_script"
+
+# The polkit shot is a harmless pkexec request that is always cancelled with
+# Escape: nothing is ever typed into the password field.
+grep -Fq 'pkexec /usr/bin/true' "$capture_script"
+grep -Fq 'wtype -k Escape' "$capture_script"
+grep -Fq 'omarchy-polkit' "$capture_script"
+# Only single named keys (Tab, Escape) are ever sent; no text.
+if grep -E '^\s*wtype |[;&|(] *wtype ' "$capture_script" | grep -Ev 'wtype -k (Tab|Escape)( |$)'; then echo "capture must never type text" >&2; exit 1; fi
 
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 [[ "$hero_frames" -eq "${#expected_hero_frames[@]}" ]]

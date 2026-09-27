@@ -508,7 +508,7 @@ Item {
                 text: detailRow.modelData.value
                 readOnly: true
                 selectByMouse: true
-                wrapMode: TextEdit.WrapAnywhere
+                wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
                 color: root.foreground
                 selectionColor: Util.alpha(root.accent, 0.45)
                 selectedTextColor: root.foreground

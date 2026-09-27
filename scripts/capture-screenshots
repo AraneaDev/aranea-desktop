@@ -9,7 +9,7 @@ capture_all=0
 # first-party Bluetooth, keyboard-layout, and system-update ids are retained
 # in aranea-showcase for direct diagnostics, but their shell API returns
 # "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis network audio bluetooth agents power monitor apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor apps favorites recent dawn osd)
 
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
@@ -318,6 +318,36 @@ case "$surface" in
     grim "$output/$surface.png"
     trap - EXIT
     finish_picker
+    printf 'captured: %s\n' "$output/$surface.png"
+    exit 0
+    ;;
+  polkit)
+    # A harmless request (pkexec /usr/bin/true) with the details open. It is
+    # always cancelled with Escape; nothing is ever typed into the field.
+    command -v pkexec >/dev/null 2>&1 || { echo "pkexec is required to capture $surface" >&2; exit 3; }
+    command -v wtype >/dev/null 2>&1 || { echo "wtype is required to capture $surface" >&2; exit 3; }
+    pkexec /usr/bin/true >/dev/null 2>&1 &
+    pkexec_pid=$!
+    finish_polkit() {
+      if kill -0 "$pkexec_pid" 2>/dev/null; then
+        wtype -k Escape >/dev/null 2>&1 || true
+        sleep 1
+      fi
+      wait "$pkexec_pid" 2>/dev/null || true
+    }
+    trap finish_polkit EXIT
+    for _ in $(seq 1 20); do
+      hyprctl layers -j 2>/dev/null | jq -e '[.. | objects | select(.namespace? == "omarchy-polkit")] | length > 0' >/dev/null 2>&1 && break
+      sleep 0.5
+    done
+    # Give the pkaction lookup a moment, then open the details.
+    sleep 1
+    wtype -k Tab
+    sleep 0.5
+    grim "$output/$surface.png"
+    wtype -k Escape
+    finish_polkit
+    trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
