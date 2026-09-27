@@ -175,17 +175,6 @@ test("notifications logic", () => {
   )
   assert(typeof logic.historyRows === "undefined", "history replay helper must be gone")
 
-  // --- the bell must survive the default (minimal) Aranea bar profile
-  const barModel = require(`${root}/plugins/araneadev.bar/BarModel.js`)
-  assert(
-    barModel.profileAllows("minimal", "araneadev.notifications") === true,
-    "minimal bar profile must allow the notification bell"
-  )
-  assert(
-    barModel.profileAllows("minimal", "araneadev.health") === true,
-    "minimal bar profile must allow the health icon"
-  )
-
   // --- service bridge: the Aranea bar hands widgets a service-less facade, so
   // the panel finds its own plugin's service through a shared library module.
   const bridgeSrc = require("fs").readFileSync(

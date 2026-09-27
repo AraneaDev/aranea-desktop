@@ -12,16 +12,8 @@ the shell for its whole session.
 - The bar receives its config from the host shell as a `barConfig` property; the host loads it from `~/.config/omarchy/shell.json` (or `config/omarchy/shell.json` when the user has no file).
 - `omarchy bar position` updates only the user shell.json file.
 
-Aranea adds a profile filter on top of this host layout. Set
-`ARANEA_BAR_PROFILE=minimal|diagnostic|ceremony`, or add `"profile"` under
-`bar` in shell.json. `minimal` is the default and removes secondary telemetry
-such as weather, update, agent, and Bluetooth modules; the other profiles keep
-the complete configured layout.
-
-Use `scripts/aranea-bar-profile list` to see the choices and
-`scripts/aranea-bar-profile set diagnostic` to change the profile safely. The
-helper preserves the previous shell configuration as
-`shell.json.aranea-profile.bak`; `scripts/aranea-doctor --json` reports the
+The bar shows exactly the modules listed in `shell.json`; there are no
+profiles. `scripts/aranea-doctor --json` reports the
 runtime and QML health checks alongside the active shell/plugin state.
 
 ## Customizing

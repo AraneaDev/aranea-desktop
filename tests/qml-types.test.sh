@@ -42,6 +42,21 @@ for qml_file in "${qml_files[@]}"; do
   }
 done
 
+# --- 4b: the bar renders exactly the configured layout
+bar_qml="$repo_root/plugins/araneadev.bar/Bar.qml"
+if grep -Eq 'property string profile|filterProfile|normalizeProfile|ARANEA_BAR_PROFILE' "$bar_qml"; then
+  echo "bar profiles must not filter the layout" >&2
+  exit 1
+fi
+[[ ! -e "$repo_root/scripts/aranea-bar-profile" ]] || {
+  echo "aranea-bar-profile must be gone" >&2
+  exit 1
+}
+if grep -Fq 'Bar profile' "$repo_root/scripts/aranea-about"; then
+  echo "aranea-about must not report a bar profile" >&2
+  exit 1
+fi
+
 # The QML contract is the tools/check qml stage: strict qmllint against the
 # shrink-only baseline when Omarchy and Quickshell are present, syntax-only
 # otherwise. Every tracked QML file is linted (not just the entry points).

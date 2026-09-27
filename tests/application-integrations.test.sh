@@ -51,7 +51,6 @@ else
 fi
 printf '%s\n' "$about_output"
 grep -Fq 'Theme version:' <<<"$about_output"
-grep -Fq 'Bar profile:' <<<"$about_output"
 grep -Fq 'Health:' <<<"$about_output"
 
 browser_output="$("$repo_root/scripts/install-integration" browser --dry-run)"

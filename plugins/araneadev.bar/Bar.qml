@@ -1,7 +1,7 @@
 // Aranea bar: the araneadev.bar plugin's `bar` entry point (manifest.json),
 // loaded by the omarchy-shell host in place of the stock omarchy.bar. Builds
-// one bar surface per monitor from the host's barConfig, filtered by the
-// Aranea profile, and handles popouts, tooltips, drag-reorder and bar moves.
+// one bar surface per monitor from the host's barConfig (showing exactly the
+// configured layout), and handles popouts, tooltips, drag-reorder and bar moves.
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
@@ -27,8 +27,6 @@ Item {
   // the bar just renders whatever it's handed. The bar font follows the
   // OS-level fontconfig monospace binding; it is not stored in shell.json.
   property var barConfig: ({})
-  // Active bar profile (minimal, diagnostic or ceremony); set by applyBarConfig from bar.profile or ARANEA_BAR_PROFILE.
-  property string profile: "minimal"
   // Injected by the host shell. Used for shell-wide actions such as opening
   // settings and persisting inline widget state.
   property var shell: null
@@ -807,12 +805,11 @@ Item {
     return BarModel.pinTrayToInner(entries, section)
   }
 
-  // Apply barConfig: position, profile, transparency, center anchor and layout (patched in place when only settings changed).
+  // Apply barConfig: position, transparency, center anchor and layout (patched in place when only settings changed).
   function applyBarConfig(): void {
     var config = Util.isPlainObject(barConfig) ? barConfig : fallbackBarConfig
 
     position = normalizePosition(config.position)
-    profile = BarModel.normalizeProfile(config.profile || Quickshell.env("ARANEA_BAR_PROFILE"))
     // Custom theme bars default to the transparent treatment; an explicit
     // false remains available for bars that intentionally need a slab.
     // Aranea uses a fully glass bar, including the module regions.
@@ -852,11 +849,12 @@ Item {
 
   onBarConfigChanged: applyBarConfig()
 
-  // Profile-filtered entries of one region; re-evaluated whenever barConfigSerial changes.
+  // The configured entries of one region, as a copy (the bar shows exactly
+  // what shell.json lists); re-evaluated whenever barConfigSerial changes.
   function layoutEntries(region) {
     var serial = barConfigSerial
     var entries = layoutConfig ? layoutConfig[region] : null
-    return BarModel.filterProfile(entries, profile)
+    return Array.isArray(entries) ? entries.slice() : []
   }
 
   // Tab order for the panels in one bar region. Scoped to a single bar surface

@@ -76,67 +76,6 @@ function semanticColor(state) {
 }
 
 /**
- * Normalize a bar profile name to minimal, diagnostic or ceremony (default minimal).
- * @param {?string} value - raw profile name from config or the environment
- * @returns {string} the lowercased known profile, or "minimal"
- */
-function normalizeProfile(value) {
-  var profile = String(value || "")
-    .trim()
-    .toLowerCase()
-  return /^(minimal|diagnostic|ceremony)$/.test(profile) ? profile : "minimal"
-}
-
-/**
- * Tell whether a module id is shown under a profile: only minimal restricts to an allowlist.
- * @param {?string} profile - profile name (normalized here)
- * @param {?string} id - module id such as "omarchy.clock"
- * @returns {boolean} true when the module may be shown
- */
-function profileAllows(profile, id) {
-  var selected = normalizeProfile(profile)
-  var moduleId = String(id || "")
-  if (selected !== "minimal") return true
-  return (
-    [
-      "omarchy.indicators",
-      "omarchy.idle",
-      "omarchy.clock",
-      "omarchy.keyboard-layout",
-      "omarchy.system-update",
-      "omarchy.workspaces",
-      "omarchy.tray",
-      "omarchy.network",
-      "omarchy.audio",
-      "omarchy.microphone",
-      "omarchy.monitor",
-      "omarchy.power",
-      "omarchy.bluetooth",
-      "omarchy.agents",
-      "araneadev.menu",
-      "araneadev.notifications",
-      "araneadev.health"
-    ].indexOf(moduleId) !== -1
-  )
-}
-
-/**
- * Return a copy of a layout region's entries keeping only those the profile allows.
- * @param {Array<(string|EntryObject)>} entries - region entries (id strings or entry objects); non-arrays count as empty
- * @param {?string} profile - profile name
- * @returns {Array<(string|EntryObject)>} the allowed entries, in order
- */
-function filterProfile(entries, profile) {
-  var values = Array.isArray(entries) ? entries : []
-  var selected = normalizeProfile(profile)
-  if (selected !== "minimal") return values.slice()
-  return values.filter(function (entry) {
-    var id = typeof entry === "string" ? entry : entry && entry.id
-    return profileAllows(selected, id)
-  })
-}
-
-/**
  * Normalize a bar position to top, bottom, left or right (default top).
  * @param {?string} value - raw position from config
  * @returns {string} a valid position
@@ -491,9 +430,6 @@ if (typeof module !== "undefined") {
     customModuleType: customModuleType,
     customModulePath: customModulePath,
     semanticColor: semanticColor,
-    normalizeProfile: normalizeProfile,
-    profileAllows: profileAllows,
-    filterProfile: filterProfile,
     normalizeLayout: normalizeLayout
   }
 }

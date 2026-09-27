@@ -24,10 +24,6 @@ test("plugin-state logic", () => {
   }
   if (bar.semanticColor("unknown") !== "dark_foreground")
     throw new Error("unknown state must be muted")
-  if (bar.normalizeProfile("diagnostic") !== "diagnostic")
-    throw new Error("diagnostic profile missing")
-  if (bar.normalizeProfile("invalid") !== "minimal")
-    throw new Error("invalid profile must fall back to minimal")
   if (bar.normalizePosition("left") !== "left") throw new Error("bar position normalization failed")
   if (bar.normalizePosition("diagonal") !== "top")
     throw new Error("invalid bar position must fall back to top")
@@ -41,18 +37,9 @@ test("plugin-state logic", () => {
     throw new Error("center layout fallback failed")
   if (!Array.isArray(normalizedLayout.right) || normalizedLayout.right.length !== 0)
     throw new Error("right layout fallback failed")
-  if (!bar.profileAllows("minimal", "omarchy.clock"))
-    throw new Error("minimal profile hid the clock")
-  if (!bar.profileAllows("minimal", "omarchy.microphone"))
-    throw new Error("minimal profile hid microphone state")
-  if (bar.profileAllows("minimal", "omarchy.weather"))
-    throw new Error("minimal profile kept weather telemetry")
-  if (!bar.profileAllows("diagnostic", "omarchy.weather"))
-    throw new Error("diagnostic profile hid weather telemetry")
-  if (
-    bar.filterProfile([{ id: "omarchy.clock" }, { id: "omarchy.weather" }], "minimal").length !== 1
-  )
-    throw new Error("profile filter failed")
+  // 4b: no profile filtering; the bar shows every configured module
+  for (const gone of ["normalizeProfile", "profileAllows", "filterProfile"])
+    if (bar[gone] !== undefined) throw new Error("bar profile helper still exported: " + gone)
 
   const grouped = notifications.groupNotifications([
     { app: "browser", summary: "One" },
@@ -422,4 +409,40 @@ test("plugin-state logic", () => {
     "function refreshTransparentForeground(): void",
     "bar refreshTransparentForeground"
   )
+})
+
+test("bar model layout helpers (4b)", () => {
+  const bar = require(path.join(__dirname, "..", "..", "plugins/araneadev.bar/BarModel.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const layout = ["omarchy.a", { id: "omarchy.clock", format: "HH:mm" }, { id: "omarchy.b" }]
+  eq(bar.entryId("omarchy.a"), "omarchy.a", "string id")
+  eq(bar.entryId({ id: 7 }), "7", "object id")
+  eq(bar.entryId({}), "", "no id")
+  eq(bar.entrySettings({ id: "x", format: "y" }), { format: "y" }, "settings without id")
+  eq(bar.moduleString(layout[1], "format", "?"), "HH:mm", "module string")
+  eq(bar.moduleString(layout[1], "missing", "?"), "?", "module string fallback")
+  eq(bar.entryIndex(layout, "omarchy.clock"), 1, "index")
+  eq(bar.entriesBefore(layout, "omarchy.clock"), ["omarchy.a"], "before anchor")
+  eq(bar.entriesAfter(layout, "omarchy.clock"), [{ id: "omarchy.b" }], "after anchor")
+  eq(bar.entriesAfter(layout, "missing"), [], "after missing anchor")
+  eq(
+    bar.pinTrayToInner(["omarchy.tray", "a", "b"], "left"),
+    ["a", "b", "omarchy.tray"],
+    "tray inner on the left"
+  )
+  eq(bar.pinTrayToInner(["a", "omarchy.tray"], "right"), ["omarchy.tray", "a"], "tray inner right")
+  eq(bar.expandPath("~/x", "/home/u"), "/home/u/x", "tilde")
+  eq(bar.expandPath("$HOME/x", "/home/u"), "/home/u/x", "$HOME")
+  eq(bar.customModuleSafeName("../evil"), false, "unsafe name")
+  eq(bar.customModuleType({ id: "x", exec: "date" }), "command", "command module")
+  eq(bar.customModuleType({ id: "x", source: "a.qml" }), "qml", "qml module")
+  eq(
+    bar.customModulePath({ id: "clock2" }, "/h", "/c"),
+    "/c/bar/modules/clock2.qml",
+    "default path"
+  )
+  eq(bar.isDrawnSlot({ visible: true, width: 2, height: 2 }), true, "drawn slot")
+  eq(bar.isDrawnSlot({ visible: false, width: 2, height: 2 }), false, "hidden slot")
 })
