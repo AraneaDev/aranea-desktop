@@ -134,8 +134,10 @@ the Aranea state directory before changes are made.
 - **Tooling layer:** installer, doctor, deployment helpers, screenshot capture, and validation.
 
 The command menu uses a hybrid command-center layout: the root view adds
-Aranea identity, fixed Files and Terminal tiles, and a favorite/recent action;
-submenus retain a compact mark and breadcrumb. The primary, reduced, and
+Aranea identity and fixed Files, Terminal and Setup tiles (`Ctrl+1`, `Ctrl+2`,
+`Ctrl+3`); submenus retain a compact mark and breadcrumb. Apps holds Favorites
+and Recent: right-click or `Ctrl+P` pins the app under the cursor (up to 12),
+and both lists are kept in `~/.local/state/aranea/menu.json`. The primary, reduced, and
 ceremony marks live under [`branding/marks`](branding/marks/aranea-primary.svg)
 alongside their reduced and ceremony variants. Shared ready/active/attention
 state glyphs and the menu’s network, node, and edge motifs live under

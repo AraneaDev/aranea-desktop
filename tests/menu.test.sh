@@ -56,5 +56,14 @@ if grep -Eq 'root\.setActiveMenu\([^,()]+, (true|false)\)|root\.activateIndex\([
   echo "setActiveMenu/activateIndex must receive every declared argument" >&2
   exit 1
 fi
+# --- 4b final review: state loads before use; stale routes never reopen; clock only when open
+block_grep "$menu_qml" 'id: appHistoryFile' 'blockLoading: true'
+block_grep "$menu_qml" 'id: menuClock' 'enabled: root.opened'
+[[ "$(grep -c 'root.pendingInitialMenu = ""' "$menu_qml")" -ge 4 ]] || {
+  echo "every other open/cancel path must drop a pending Favorites/Recent route" >&2
+  exit 1
+}
+grep -Fq 'menu.json' "$repo_root/README.md"
+grep -Fq 'Ctrl+P' "$repo_root/README.md"
 
 echo "menu contract passed"

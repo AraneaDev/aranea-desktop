@@ -76,7 +76,7 @@ function textValue(value, fallback) {
 
 /**
  * Trims and de-duplicates app ids, keeping at most `limit` of them in order.
- * @param {*} values - list of app ids; a non-array yields []
+ * @param {*} values - list of app ids (strings or finite numbers; anything else is skipped); a non-array yields []
  * @param {*} limit - maximum count; a negative or non-finite value means 12
  * @returns {Array<string>} the normalized ids
  */
@@ -86,7 +86,10 @@ function normalizeAppIds(values, limit) {
   var rows = Array.isArray(values) ? values : []
   var out = []
   for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
-    var id = String(rows[i] || "").trim()
+    var raw = rows[i]
+    // Only strings and finite numbers are ids; objects would become "[object Object]".
+    if (!(typeof raw === "string" || (typeof raw === "number" && isFinite(raw)))) continue
+    var id = String(raw).trim()
     if (id && out.indexOf(id) === -1) out.push(id)
   }
   return out
@@ -118,10 +121,11 @@ function toggleFavoriteApp(values, appId, limit) {
 /**
  * Reads the menu state file: {"favorites": [ids], "recent": [ids]}.
  * @param {*} text - the file contents; anything unparsable gives empty lists
- * @param {number} limit - most ids kept per list
+ * @param {number} favoriteLimit - most favorite ids kept
+ * @param {number} [recentLimit] - most recent ids kept (favoriteLimit when omitted)
  * @returns {{favorites: Array<string>, recent: Array<string>}} the normalized lists
  */
-function parseAppHistory(text, limit) {
+function parseAppHistory(text, favoriteLimit, recentLimit) {
   var parsed
   try {
     parsed = JSON.parse(String(text || ""))
@@ -130,8 +134,14 @@ function parseAppHistory(text, limit) {
   }
   var value = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
   return {
-    favorites: normalizeAppIds(Array.isArray(value.favorites) ? value.favorites : [], limit),
-    recent: normalizeAppIds(Array.isArray(value.recent) ? value.recent : [], limit)
+    favorites: normalizeAppIds(
+      Array.isArray(value.favorites) ? value.favorites : [],
+      favoriteLimit
+    ),
+    recent: normalizeAppIds(
+      Array.isArray(value.recent) ? value.recent : [],
+      recentLimit === undefined ? favoriteLimit : recentLimit
+    )
   }
 }
 
@@ -139,13 +149,17 @@ function parseAppHistory(text, limit) {
  * Writes the menu state file contents (pretty JSON with a trailing newline).
  * @param {*} favorites - pinned app ids
  * @param {*} recent - recently launched app ids
- * @param {number} limit - most ids kept per list
+ * @param {number} favoriteLimit - most favorite ids kept
+ * @param {number} [recentLimit] - most recent ids kept (favoriteLimit when omitted)
  * @returns {string} the file text
  */
-function serializeAppHistory(favorites, recent, limit) {
+function serializeAppHistory(favorites, recent, favoriteLimit, recentLimit) {
   return (
     JSON.stringify(
-      { favorites: normalizeAppIds(favorites, limit), recent: normalizeAppIds(recent, limit) },
+      {
+        favorites: normalizeAppIds(favorites, favoriteLimit),
+        recent: normalizeAppIds(recent, recentLimit === undefined ? favoriteLimit : recentLimit)
+      },
       null,
       2
     ) + "\n"
@@ -167,15 +181,25 @@ function pruneAppIds(ids, installed) {
 }
 
 /**
- * Keeps the first row per app id among rows of kind "app"; other rows are kept, order unchanged.
+ * Shows each app once among rows of kind "app": the real `apps.<appId>` row
+ * when present (at its own position), else the first Favorites/Recent copy.
+ * Other rows are kept; order is unchanged.
  * @param {Array<{[key: string]: *}>} rows - display rows
  * @returns {Array<{[key: string]: *}>} the rows without repeated apps
  */
 function dedupeAppRows(rows) {
+  var list = Array.isArray(rows) ? rows : []
+  /** @type {{[key: string]: boolean}} */
+  var hasReal = {}
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i]
+    if (r && r.kind === "app" && r.appId && r.itemId === "apps." + r.appId) hasReal[r.appId] = true
+  }
   /** @type {{[key: string]: boolean}} */
   var seen = {}
-  return (Array.isArray(rows) ? rows : []).filter(function (row) {
+  return list.filter(function (row) {
     if (!row || row.kind !== "app" || !row.appId) return true
+    if (hasReal[row.appId]) return row.itemId === "apps." + row.appId
     if (seen[row.appId]) return false
     seen[row.appId] = true
     return true
@@ -183,8 +207,8 @@ function dedupeAppRows(rows) {
 }
 
 /**
- * Orders the Apps menu: menu rows (Favorites, Recent) first in their order,
- * then apps by label (case-insensitive), then by item id.
+ * Orders the Apps menu: menu rows (Favorites, Recent) first, then apps;
+ * each group by label (case-insensitive), then by item id.
  * @param {Array<{[key: string]: *}>} rows - display rows of the Apps menu
  * @returns {Array<{[key: string]: *}>} a new, sorted array
  */
@@ -193,7 +217,6 @@ function sortAppsMenu(rows) {
     var aApp = a.kind === "app" ? 1 : 0
     var bApp = b.kind === "app" ? 1 : 0
     if (aApp !== bApp) return aApp - bApp
-    if (!aApp) return (Number(a.order) || 0) - (Number(b.order) || 0)
     var aLabel = String(a.label || "").toLowerCase()
     var bLabel = String(b.label || "").toLowerCase()
     if (aLabel !== bLabel) return aLabel < bLabel ? -1 : 1

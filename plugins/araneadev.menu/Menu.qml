@@ -169,6 +169,8 @@ Item {
   FileView {
     id: appHistoryFile
     path: root.appHistoryPath
+    // Load before anything can pin or launch, so the file never overwrites newer changes.
+    blockLoading: true
     atomicWrites: true
     printErrors: false
     onLoaded: root.applyAppHistory(text())
@@ -269,15 +271,15 @@ Item {
 
   // Applies the state file's favourites and recents and regenerates the Apps rows.
   function applyAppHistory(raw: string): void {
-    var history = MenuModel.parseAppHistory(raw, root.favoriteAppLimit)
+    var history = MenuModel.parseAppHistory(raw, root.favoriteAppLimit, root.recentAppLimit)
     root.favoriteAppIds = history.favorites
-    root.recentAppIds = MenuModel.normalizeAppIds(history.recent, root.recentAppLimit)
+    root.recentAppIds = history.recent
     root.mergeAppRows()
   }
 
   // Writes pinned and recent app ids to the state file.
   function saveAppHistory(): void {
-    appHistoryFile.setText(MenuModel.serializeAppHistory(root.favoriteAppIds, root.recentAppIds, root.favoriteAppLimit))
+    appHistoryFile.setText(MenuModel.serializeAppHistory(root.favoriteAppIds, root.recentAppIds, root.favoriteAppLimit, root.recentAppLimit))
   }
 
   // Whether the cursor row is an app (the hint line then offers ^P PIN).
@@ -388,6 +390,7 @@ Item {
   SystemClock {
     id: menuClock
     precision: SystemClock.Minutes
+    enabled: root.opened
   }
   // Fixed tiles (Files, Terminal, Setup) shown on the root menu.
   readonly property var rootTiles: [({
@@ -1315,6 +1318,7 @@ Item {
 
   // Closes the menu, answering a dmenu request as cancelled.
   function cancel(): void {
+    root.pendingInitialMenu = ""
     if (root.dmenuActive)
       root.finishRequest(null)
     opened = false
@@ -1351,6 +1355,7 @@ Item {
 
   // Opens a dmenu select/input request from the payload's prompt, options and result files.
   function openDmenu(payload) {
+    root.pendingInitialMenu = ""
     requestSerial += 1
     mode = payload.mode === "input" ? "input" : "select"
     dmenuPrompt = String(payload.prompt || (mode === "input" ? "Input" : "Select"))
@@ -1398,6 +1403,8 @@ Item {
       root.resolvePendingAppsRoute()
       return
     }
+    // Any other route replaces a Favorites/Recent route still waiting at startup.
+    root.pendingInitialMenu = ""
     var id = root.resolveRoute(initialMenu)
     var entry = root.items[id]
     // If the resolved id is an action (i.e. the user invoked an alias for

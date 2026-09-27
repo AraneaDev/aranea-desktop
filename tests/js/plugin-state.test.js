@@ -470,8 +470,8 @@ test("menu model (4b)", () => {
   ]
   eq(
     menu.dedupeAppRows(rows).map((r) => r.itemId),
-    ["apps.recent.firefox", "apps.favorites", "setup.x", "apps.files"],
-    "dedupe keeps first per app"
+    ["apps.favorites", "apps.firefox", "setup.x", "apps.files"],
+    "dedupe keeps the real row per app"
   )
   // Apps: menus first in their order, apps by label
   eq(
@@ -483,7 +483,7 @@ test("menu model (4b)", () => {
         { kind: "menu", label: "Favorites", itemId: "apps.favorites", order: 1 }
       ])
       .map((r) => r.itemId),
-    ["apps.recent", "apps.favorites", "apps.alpha", "apps.zed"],
+    ["apps.favorites", "apps.recent", "apps.alpha", "apps.zed"],
     "apps sort"
   )
   // hints
@@ -536,4 +536,32 @@ test("menu model (4b)", () => {
   menu.swapProviderRows({}, [], "fonts", provided)
   eq(provided[0].providerMenu, undefined, "swapProviderRows mutated its input")
   eq(menu.dynamicTileForAppRows, undefined, "dead tile helper removed")
+})
+
+test("menu model final review fixes (4b)", () => {
+  const menu = require(path.join(__dirname, "..", "..", "plugins/araneadev.menu/MenuModel.js"))
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  // I1: the real apps.<id> row wins even when a Recent/Favorites copy ranks higher
+  eq(
+    menu
+      .dedupeAppRows([
+        { kind: "app", appId: "zen", itemId: "apps.recent.zen" },
+        { kind: "app", appId: "zen", itemId: "apps.favorites.zen" },
+        { kind: "app", appId: "vim", itemId: "apps.recent.vim" },
+        { kind: "app", appId: "zen", itemId: "apps.zen" }
+      ])
+      .map((r) => r.itemId),
+    ["apps.recent.vim", "apps.zen"],
+    "real row preferred, copies without a real row kept once"
+  )
+  // m4: each list has its own limit
+  const long = Array.from({ length: 20 }, (_, i) => "a" + i)
+  const parsed = menu.parseAppHistory(JSON.stringify({ favorites: long, recent: long }), 12, 16)
+  eq([parsed.favorites.length, parsed.recent.length], [12, 16], "separate parse limits")
+  const saved = JSON.parse(menu.serializeAppHistory(long, long, 12, 16))
+  eq([saved.favorites.length, saved.recent.length], [12, 16], "separate save limits")
+  // m5: only strings and finite numbers are ids
+  eq(menu.normalizeAppIds(["a", {}, [], null, NaN, 7, true], 12), ["a", "7"], "id types")
 })
