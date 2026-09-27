@@ -45,13 +45,13 @@ bar, menus, lock screen, boot splash, idle branding, and fastfetch surfaces.
 From a checkout:
 
 ```bash
-./scripts/install.sh
+scripts/install.sh
 ```
 
 For a non-interactive full install:
 
 ```bash
-./scripts/install.sh --yes
+scripts/install.sh --yes
 ```
 
 The installer installs Aranea Desktop, registers the `aranea` theme hooks, and
@@ -61,9 +61,9 @@ selected terminal integration (Alacritty, Kitty, or Foot).
 Choose an installation profile when needed:
 
 ```bash
-./scripts/install.sh --profile minimal --yes
-./scripts/install.sh --profile full --yes
-./scripts/install.sh --profile no_apps --yes
+scripts/install.sh --profile minimal --yes
+scripts/install.sh --profile full --yes
+scripts/install.sh --profile no_apps --yes
 ```
 
 Omit `--profile` in an interactive terminal and the installer prompts for one
@@ -75,7 +75,7 @@ To install the exact checkout you are testing instead of fetching the default
 remote repository, pass a local source explicitly:
 
 ```bash
-./scripts/install.sh --source "$PWD" --yes
+scripts/install.sh --source "$PWD" --yes
 ```
 
 If installation fails after a previous theme was detected, the installer prints
@@ -89,13 +89,13 @@ stored in `~/.local/state/aranea/profile`.
 Preview or diagnose without changing the system:
 
 ```bash
-./scripts/install.sh --dry-run --yes
-./scripts/aranea-doctor --json
+scripts/install.sh --dry-run --yes
+scripts/aranea-doctor --json
 ```
 
 If a check reports `repair` for `hooks` or `plugins` (for example after an
 update that landed a new plugin like the OSD but never re-ran theme-set), run
-`./scripts/aranea-doctor --fix` to reinstall the theme-set/post-boot hooks and
+`scripts/aranea-doctor --fix` to reinstall the theme-set/post-boot hooks and
 re-run plugin deployment, which also re-registers any plugin in
 `shell.json` that exists on disk but was never enabled.
 
@@ -105,8 +105,8 @@ After installation, select the theme and a wallpaper with Omarchy:
 
 ```bash
 omarchy theme set aranea
-./scripts/aranea-wallpaper list
-./scripts/aranea-wallpaper set day
+scripts/aranea-wallpaper list
+scripts/aranea-wallpaper set day
 ```
 
 The wallpaper picker also exposes `night`, `dawn`, `sparse`, `dense`, `dusk`,
@@ -125,6 +125,24 @@ Integrations can be activated and rolled back individually with
 `scripts/aranea-integrations activate <id> --yes` and
 `scripts/aranea-integrations deactivate <id>`; managed files are backed up in
 the Aranea state directory before changes are made.
+
+### Helper scripts
+
+The helpers are not on your `PATH`. Run them as `scripts/<name>` from a
+checkout, or as `~/.config/omarchy/themes/aranea/scripts/<name>` from the
+installed theme.
+
+| Script                        | What it does                                                                                                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/install.sh`          | Installs or updates Aranea (see Install).                                                                                                                                                      |
+| `scripts/uninstall.sh`        | Removes Aranea's hooks, shell plugins, wallpaper timer, managed files (restoring what they replaced), saved desktop settings and state. The theme folder stays: `omarchy theme remove aranea`. |
+| `scripts/aranea-doctor`       | Checks the installation; `--json`, `--fix`.                                                                                                                                                    |
+| `scripts/aranea-integrations` | `status`, `activate <id>`, `deactivate <id>`.                                                                                                                                                  |
+| `scripts/aranea-wallpaper`    | `list`, `set <id>`, and the day/night `schedule`.                                                                                                                                              |
+| `scripts/aranea-motion`       | `status`, `set on`/`set off`, `toggle`: animations in Hyprland and the Aranea shell.                                                                                                           |
+| `scripts/aranea-about`        | Prints the version, active theme and a health summary.                                                                                                                                         |
+| `scripts/aranea-showcase`     | Lists the documented surfaces.                                                                                                                                                                 |
+| `scripts/capture-screenshots` | Captures the README screenshots and hero GIF.                                                                                                                                                  |
 
 ### Project layers
 
@@ -251,7 +269,7 @@ notification, health, and application surfaces are captured from the
 running session, while lock and Plymouth use canonical artwork renders:
 
 ```bash
-./scripts/capture-screenshots --all --output screenshots
+scripts/capture-screenshots --all --output screenshots
 ```
 
 Lock and Plymouth entries use canonical artwork renders, so refreshing the

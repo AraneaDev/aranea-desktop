@@ -67,4 +67,13 @@ media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
 printf '%s\n' "$media_output"
 grep -Fq 'media/pavucontrol.css' <<<"$media_output"
 
+# --- 4d: the README says how to run the helper scripts
+for script in aranea-motion aranea-doctor aranea-integrations aranea-wallpaper aranea-about uninstall.sh; do
+  grep -Fq "scripts/$script" "$repo_root/README.md" || {
+    echo "README misses scripts/$script" >&2
+    exit 1
+  }
+done
+grep -Fq '.config/omarchy/themes/aranea/scripts/<name>' "$repo_root/README.md"
+
 echo "application integration contract passed"
