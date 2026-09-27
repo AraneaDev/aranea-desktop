@@ -61,4 +61,25 @@ test ! -e "$unit_root/aranea-wallpaper-day-night.timer"
 test ! -e "$unit_root/aranea-wallpaper-day-night.service"
 rm -rf "$unit_root" "$schedule_state" "$config_root"
 
+# --- 4d: only [[wallpapers]] blocks count, and ids are compared as text
+wp_manifest="$(mktemp)"
+cat >"$wp_manifest" <<'TOML'
+[[wallpapers]]
+id="day"
+path = "backgrounds/day.png"
+
+[other]
+path = "not-a-wallpaper.png"
+TOML
+listed="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" "$repo_root/scripts/aranea-wallpaper" list)"
+[[ "$listed" == $'day\tbackgrounds/day.png' ]] || {
+  echo "list: $listed" >&2
+  exit 1
+}
+regex_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set 'd.*' 2>&1 || true)"
+grep -Fq 'Unknown wallpaper: d.*' <<<"$regex_out"
+exact_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set day 2>&1 || true)"
+grep -Fq "backgrounds/day.png" <<<"$exact_out"
+rm -f "$wp_manifest"
+
 echo "wallpaper contract passed"

@@ -4,6 +4,7 @@ set -euo pipefail
 # Lists and applies the wallpapers in backgrounds/manifest.toml, applies the
 # phase wallpaper (dawn, day, dusk or night) for the current time, and
 # manages the systemd user timer that switches phases on a schedule.
+# ARANEA_WALLPAPER_MANIFEST overrides the manifest path.
 #
 # Usage: scripts/aranea-wallpaper list
 #        scripts/aranea-wallpaper set <id> | set-phase | set-day-night
@@ -12,7 +13,7 @@ set -euo pipefail
 #        scripts/aranea-wallpaper motion on|off
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-manifest="$repo_root/backgrounds/manifest.toml"
+manifest="${ARANEA_WALLPAPER_MANIFEST:-$repo_root/backgrounds/manifest.toml}"
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 config_root="${ARANEA_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}}/aranea"
 schedule_config="$config_root/wallpaper-schedule.conf"
@@ -82,11 +83,25 @@ Persistent=true
 WantedBy=timers.target
 UNIT
 }
+# Prints "id<TAB>path" for every [[wallpapers]] block of the manifest (other
+# sections are ignored; any spacing around = is accepted).
+wallpaper_rows() {
+  awk '
+    # The value of a key = value line, without quotes.
+    function value(line) { sub(/^[^=]*=[[:space:]]*/, "", line); gsub(/^"|"[[:space:]]*$/, "", line); return line }
+    # Prints the block just read when it has both an id and a path.
+    function flush() { if (in_block && id != "" && path != "") print id "\t" path; id = ""; path = "" }
+    /^\[\[wallpapers\]\][[:space:]]*$/ { flush(); in_block = 1; next }
+    /^\[/ { flush(); in_block = 0; next }
+    in_block && /^id[[:space:]]*=/ { id = value($0) }
+    in_block && /^path[[:space:]]*=/ { path = value($0) }
+    END { flush() }
+  ' "$manifest"
+}
 # Prints the absolute path of wallpaper ID from the manifest (nothing when
-# the id is unknown).
+# the id is unknown); the id is compared as text, never as a pattern.
 wallpaper_path() {
-  local id="$1"
-  awk -v wanted="$id" -v root="$repo_root/" '/^\[\[wallpapers\]\]$/ { in_block = 1; match_id = 0; next } in_block && /^\[/ { in_block = 0 } in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { match_id = 1; next } match_id && /^path[[:space:]]*=/ { line = $0; sub(/^[^=]*=[[:space:]]*/, "", line); gsub(/^"|"$/, "", line); print root line; exit }' "$manifest"
+  wallpaper_rows | awk -F '\t' -v wanted="$1" -v root="$repo_root/" '$1 == wanted { print root $2; exit }'
 }
 # Prints the phase (dawn, day, dusk or night) that time NOW (HH:MM) falls in.
 phase_for_now() {
@@ -108,7 +123,7 @@ phase_for_now() {
 }
 
 case "${1:-list}" in
-  list) awk '/^id = / { id=$0; sub(/^id = /, "", id); gsub(/"/, "", id) } /^path = / { path=$0; sub(/^path = /, "", path); gsub(/"/, "", path); print id "\t" path }' "$manifest" ;;
+  list) wallpaper_rows ;;
   set)
     id="${2:-}"
     path="$(wallpaper_path "$id")"
