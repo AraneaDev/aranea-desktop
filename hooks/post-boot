@@ -15,8 +15,20 @@ current_theme="$HOME/.local/state/omarchy/current/theme"
 installed_theme="$HOME/.config/omarchy/themes/aranea"
 state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 
-mkdir -p ~/.config/omarchy/branding
-ln -nsf ~/.local/state/omarchy/current/theme/branding/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
+# The screensaver text follows the theme, unless the user put their own there.
+screensaver_link="$HOME/.config/omarchy/branding/screensaver.txt"
+screensaver_source="$HOME/.local/state/omarchy/current/theme/branding/screensaver.txt"
+if [[ ! -e "$screensaver_link" && ! -L "$screensaver_link" ]] ||
+  [[ "$(readlink "$screensaver_link" 2>/dev/null)" == "$screensaver_source" ]]; then
+  mkdir -p "$(dirname "$screensaver_link")"
+  ln -nsf "$screensaver_source" "$screensaver_link"
+  if [[ -f "$installed_theme/scripts/lib/ownership.sh" ]]; then
+    (
+      source "$installed_theme/scripts/lib/ownership.sh"
+      record_managed_file "$screensaver_link"
+    )
+  fi
+fi
 
 theme_root="$current_theme"
 profile_file="$state_home/aranea/profile"

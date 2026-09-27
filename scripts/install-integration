@@ -99,6 +99,18 @@ install_generated() {
   fi
 }
 
+# Saves the current value of gsettings SCHEMA KEY once (the value from before
+# Aranea), so uninstall can put it back; later installs keep the first save.
+save_gsetting() {
+  local schema="$1" key="$2" saved value
+  saved="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/gsettings/$schema.$key"
+  [[ -e "$saved" ]] && return 0
+  value="$(gsettings get "$schema" "$key" 2>/dev/null)" || return 0
+  [[ -n "$value" ]] || return 0
+  mkdir -p "$(dirname "$saved")"
+  printf '%s\n' "$value" >"$saved"
+}
+
 case "$integration" in
   terminal)
     if command -v alacritty >/dev/null 2>&1; then
@@ -198,8 +210,10 @@ case "$integration" in
           printf '32 %s %s %s\n' "$hotspot_x" "$hotspot_y" "$raster_png" >>"$cursor_cfg"
         fi
         xcursorgen "$cursor_cfg" "$cursor_root/cursors/$cursor_name"
+        record_managed_file "$cursor_root/cursors/$cursor_name"
       done
       if command -v gsettings >/dev/null 2>&1; then
+        save_gsetting org.gnome.desktop.interface cursor-theme
         gsettings set org.gnome.desktop.interface cursor-theme Aranea >/dev/null 2>&1 || true
       fi
       if command -v hyprctl >/dev/null 2>&1; then
@@ -240,6 +254,7 @@ case "$integration" in
         printf 'would refresh GTK icon cache at %s\n' "$icon_root"
       else
         gtk-update-icon-cache -f -t "$icon_root" >/dev/null 2>&1 || true
+        [[ -e "$icon_root/icon-theme.cache" ]] && record_managed_file "$icon_root/icon-theme.cache"
       fi
     fi
     if command -v gsettings >/dev/null 2>&1; then
@@ -247,6 +262,7 @@ case "$integration" in
         printf 'would set desktop icon theme to %s\n' "$icon_theme"
         printf 'would set Nautilus icon/list zoom to small\n'
       else
+        save_gsetting org.gnome.desktop.interface icon-theme
         gsettings set org.gnome.desktop.interface icon-theme "$icon_theme" >/dev/null 2>&1 || true
         gsettings set org.gnome.nautilus.icon-view default-zoom-level small >/dev/null 2>&1 || true
         gsettings set org.gnome.nautilus.list-view default-zoom-level small >/dev/null 2>&1 || true

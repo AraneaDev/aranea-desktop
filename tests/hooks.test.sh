@@ -83,4 +83,16 @@ rm "$XDG_STATE_HOME/aranea/integrations/session"
 "$repo_root/hooks/post-boot"
 [[ "$(readlink "$session_link")" == "$stable/integrations/session/omarchy.css" ]]
 
+# --- 4d: post-boot links the screensaver text only when it is missing or
+# already Aranea's, and never replaces a user's own file
+screensaver="$HOME/.config/omarchy/branding/screensaver.txt"
+rm -f "$screensaver"
+"$repo_root/hooks/post-boot"
+[[ "$(readlink "$screensaver")" == "$HOME/.local/state/omarchy/current/theme/branding/screensaver.txt" ]]
+grep -Fqx "$screensaver" "$XDG_STATE_HOME/aranea/managed-files"
+rm -f "$screensaver"
+printf 'mine\n' >"$screensaver"
+"$repo_root/hooks/post-boot"
+[[ ! -L "$screensaver" && "$(<"$screensaver")" == mine ]]
+
 echo "hooks contract passed"

@@ -114,4 +114,49 @@ dups="$(sed -n '/^render_group [0-9A-F]/,/[^\\]$/p' "$repo_root/scripts/generate
 }
 grep -Fq 'Source glyph U+F0F6 ' "$repo_root/integrations/icons/aranea/scalable/mimetypes/text-x-generic.svg"
 
+# --- 4d: generated cursor/icon files are in the ledger; gsettings are saved
+# once, before Aranea's first change
+gen_tmp="$(mktemp -d)"
+gen_bin="$gen_tmp/bin"
+mkdir -p "$gen_bin"
+cat >"$gen_bin/gsettings" <<'SH'
+#!/usr/bin/env bash
+if [[ $1 == get ]]; then cat "$GEN_TMP/current-$3" 2>/dev/null; fi
+exit 0
+SH
+cat >"$gen_bin/gtk-update-icon-cache" <<'SH'
+#!/usr/bin/env bash
+touch "$3/icon-theme.cache"
+SH
+cat >"$gen_bin/magick" <<'SH'
+#!/usr/bin/env bash
+touch "${@: -1}"
+SH
+cat >"$gen_bin/xcursorgen" <<'SH'
+#!/usr/bin/env bash
+touch "$2"
+SH
+chmod +x "$gen_bin"/*
+printf "'Adwaita'\n" >"$gen_tmp/current-icon-theme"
+printf "'Adwaita'\n" >"$gen_tmp/current-cursor-theme"
+# Runs install-integration INTEGRATION against the throwaway dirs and stubs.
+gen_run() {
+  GEN_TMP="$gen_tmp" XDG_DATA_HOME="$gen_tmp/data" XDG_STATE_HOME="$gen_tmp/state" \
+    ARANEA_OWNERSHIP_ROOT="$gen_tmp/state/aranea" PATH="$gen_bin:$PATH" \
+    bash "$repo_root/scripts/install-integration" --yes "$1" >/dev/null
+}
+gen_run icons
+gen_run cursor
+gen_ledger="$gen_tmp/state/aranea/managed-files"
+grep -Fqx "$gen_tmp/data/icons/Aranea-icons/icon-theme.cache" "$gen_ledger"
+grep -Fqx "$gen_tmp/data/icons/Aranea/cursors/left_ptr" "$gen_ledger"
+saved="$gen_tmp/state/aranea/gsettings"
+[[ "$(<"$saved/org.gnome.desktop.interface.icon-theme")" == "'Adwaita'" ]]
+[[ "$(<"$saved/org.gnome.desktop.interface.cursor-theme")" == "'Adwaita'" ]]
+# a reinstall keeps the pre-Aranea values
+printf "'Aranea-icons'\n" >"$gen_tmp/current-icon-theme"
+gen_run icons
+[[ "$(<"$saved/org.gnome.desktop.interface.icon-theme")" == "'Adwaita'" ]]
+rm -rf "$gen_tmp"
+
 echo "icon theme contract passed (${#contexts[@]} contexts)"
