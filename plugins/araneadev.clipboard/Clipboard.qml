@@ -86,6 +86,7 @@ Item {
   // is ignored.
   function open(payloadJson) {
     root.opened = true
+    root.notice = ""
     root.filterText = ""
     root.selectedIndex = 0
     root.cursorActive = true
@@ -462,16 +463,18 @@ Item {
   }
 
   // Safety net: if a write never reports back (FileView may merge quick
-  // writes), release the queue instead of holding pastes forever.
+  // writes), release the queue instead of holding pastes forever. Long
+  // enough that a slow disk finishes first.
   Timer {
     id: saveWatchdog
-    interval: 2000
+    interval: 5000
     onTriggered: {
       root.pendingSaves = 0
       root.finishSave()
     }
   }
 
+  // Clears the hint-line notice three seconds after showNotice.
   Timer {
     id: noticeTimer
     interval: 3000
@@ -499,7 +502,12 @@ Item {
         return
       root.loadHistory(raw)
     }
-    onLoadFailed: root.loadHistory("[]")
+    onLoadFailed: {
+      // A failed reload while our own write is pending must not wipe history.
+      if (root.pendingSaves > 0)
+        return
+      root.loadHistory("[]")
+    }
     onSaved: root.finishSave()
     onSaveFailed: root.finishSave()
     onFileChanged: reload()

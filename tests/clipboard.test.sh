@@ -64,5 +64,10 @@ if grep -Eq 'property int (headerHeight|contentSpacing)' "$plugin/Clipboard.qml"
   echo "unused headerHeight/contentSpacing" >&2
   exit 1
 fi
+# --- 4a final review: failed reloads respect pending saves; notice resets on open
+grep -Fq 'onLoadFailed: {' "$plugin/Clipboard.qml"
+block_grep "$plugin/Clipboard.qml" 'onLoadFailed: {' 'if (root.pendingSaves > 0)'
+block_grep "$plugin/Clipboard.qml" 'function open(payloadJson)' 'root.notice = ""'
+block_grep "$plugin/Clipboard.qml" 'id: saveWatchdog' 'interval: 5000'
 
 echo "clipboard contract passed"

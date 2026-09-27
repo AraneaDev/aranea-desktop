@@ -358,3 +358,47 @@ test("colour swatches (4a)", () => {
   eq(rows[0].colour, "#11223380", "row keeps the text")
   eq(rows[0].swatch, "#80112233", "row carries the Qt colour")
 })
+
+test("final review fixes (4a)", () => {
+  const c = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.clipboard/ClipboardLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (a !== b) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  // I1: random mixed case is not "word-like"
+  for (const s of [
+    "iBRM4eugfjt0LbuX",
+    "VpsxyytpEFVl1jaj",
+    "2iTldxBGKXwSqPHVVacp",
+    "bJQBIaaMdal7RcsfLhvhDHxa"
+  ])
+    eq(c.isSecretText(s), true, "random token " + s)
+  // I2: a dot is not enough to make a password a name or a file
+  for (const s of [
+    "Kx9Qm7Zp.aB3xQ9pL",
+    "P4ssword.Secur1ty",
+    "Qwerty123.Zxcvbn456",
+    "aB3xQ9pL2mZ7kR4t.q",
+    "kX9qM7zP2wL4.txt",
+    "Kx9Qm7@Zp9Wq.aBcD"
+  ])
+    eq(c.isSecretText(s), true, "dotted password " + s)
+  // m8: a random token that starts with / is not a path
+  eq(c.isSecretText("/aB3xQ9pL2mZ7kR4tWq8/Zy5Nc1Vb6Hj2Gf9Ds4Kp"), true, "slash token")
+  // ...while developer text with dots and slashes stays plain
+  for (const s of [
+    "/dev/disk/by-uuid/550e8400-e29b-41d4-a716-446655440000",
+    "/etc/pam.d/polkit-1",
+    "os.path.join",
+    "mail.example.co.uk",
+    "someone@yieldergroup.com",
+    "docs/superpowers/specs/2026-09-27-design.md",
+    "parseHTTPResponse2Async"
+  ])
+    eq(c.isSecretText(s), false, "developer text " + s)
+  // m1: hsl follows CSS Color 4
+  eq(c.swatchColor("hsl(120 100 50)"), "#00ff00", "space syntax unitless is %")
+  eq(c.swatchColor("hsl(120, 50, 50)"), "", "legacy syntax needs %")
+  eq(c.swatchColor("hsl(0.5turn, 100%, 50%)"), "", "unsupported hue unit")
+})

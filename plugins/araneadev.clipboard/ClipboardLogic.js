@@ -346,16 +346,20 @@ function entropy(text) {
 }
 
 /**
- * Share of a string's letters and digits that sit in word runs of three or
- * more letters (runs split at case changes: "getUserById2Async" gives get,
- * User, By, Id, Async).
+ * Share of a string's letters and digits that sit in real-looking words:
+ * letter runs (split at case changes, so "getUserById2Async" gives get, User,
+ * By, Id, Async) of three or more letters that contain a vowel and no two
+ * capitals in a row. Random mixed case rarely forms such runs.
  * @param {string} text - The text.
  * @returns {number} A value from 0 to 1; 0 when there are no letters or digits.
  */
 function wordShare(text) {
   var runs = text.match(/[A-Z]?[a-z]+|[A-Z]+(?![a-z])/g) || []
   var inWords = 0
-  for (var i = 0; i < runs.length; i++) if (runs[i].length >= 3) inWords += runs[i].length
+  for (var i = 0; i < runs.length; i++) {
+    var run = runs[i]
+    if (run.length >= 3 && /[aeiou]/i.test(run) && !/[A-Z]{2}/.test(run)) inWords += run.length
+  }
   var alnum = (text.match(/[A-Za-z0-9]/g) || []).length
   return alnum ? inWords / alnum : 0
 }
@@ -370,31 +374,75 @@ function wordLike(text) {
 }
 
 /**
- * Recognises developer text that is never a secret: URLs, Unix, home and
- * Windows paths, git hashes, UUIDs, emails, dotted names (optionally ending
- * in "()"), file:line, versions, algo:hex digests, slash-separated word-like
- * names such as owner/repo, and file names with a lowercase extension.
+ * Tells whether one piece of a name (split at . _ - and /) looks written by
+ * a person: digits only, one to three lowercase letters, or word-like.
+ * @param {string} part - The piece.
+ * @returns {boolean} True when it looks like part of a name.
+ */
+function namePart(part) {
+  return /^\d+$/.test(part) || /^[a-z]{1,3}$/.test(part) || wordLike(part)
+}
+
+/**
+ * Splits text at . _ - and / into its non-empty pieces.
+ * @param {string} text - The text.
+ * @returns {Array<string>} The pieces.
+ */
+function nameParts(text) {
+  return text.split(/[._\-/]+/).filter(function (p) {
+    return p.length > 0
+  })
+}
+
+/**
+ * Tells whether every piece of a name looks written by a person (see namePart).
+ * @param {string} text - The name.
+ * @returns {boolean} True when all pieces are name-like.
+ */
+function allNameParts(text) {
+  return nameParts(text).every(namePart)
+}
+
+/**
+ * Tells whether at least half of the pieces of a path look written by a
+ * person; paths hold ids like sdb1 or UUIDs, random tokens hold none.
+ * @param {string} text - The path.
+ * @returns {boolean} True when most pieces are name-like.
+ */
+function mostlyNameParts(text) {
+  var parts = nameParts(text)
+  var ok = parts.filter(namePart).length
+  return parts.length > 0 && ok * 2 >= parts.length
+}
+
+/**
+ * Recognises developer text that is never a secret: URLs, Unix and home
+ * paths (most pieces name-like), Windows paths, git hashes, UUIDs, emails
+ * (name-like domain), dotted names (optionally ending in "()"), file:line,
+ * versions, algo:hex digests, slash-separated names such as owner/repo and
+ * file names with a lowercase extension (all pieces name-like).
  * @param {string} text - Trimmed text without whitespace.
  * @returns {boolean} True when the text is one of those shapes.
  */
 function isDeveloperText(text) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text) || /^https?:/i.test(text)) return true
-  if (text.charAt(0) === "/" || text.indexOf("~/") === 0 || /^[A-Za-z]:\\/.test(text)) return true
+  if (
+    (text.charAt(0) === "/" || text.indexOf("~/") === 0) &&
+    mostlyNameParts(text.replace(/^~/, ""))
+  )
+    return true
+  if (/^[A-Za-z]:\\/.test(text)) return true
   if (/^[0-9a-f]{7,40}$/.test(text)) return true
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return true
-  if (/^[\w.+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(text)) return true
-  if (/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)+(\(\))?$/.test(text)) return true
+  var email = /^[\w.+-]+@([A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})$/.exec(text)
+  if (email && allNameParts(email[1])) return true
+  var dotted = /^([A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)+)(\(\))?$/.exec(text)
+  if (dotted && allNameParts(dotted[1].replace(/\$/g, ""))) return true
   if (/^[\w.-]+\.[A-Za-z0-9]{1,6}:\d+(:\d+)?$/.test(text)) return true
   if (/^v?\d+(\.\d+)+([-+][0-9A-Za-z.+-]*)?$/.test(text)) return true
   if (/^[a-z0-9]+:[0-9a-f]{16,}$/i.test(text)) return true
-  if (
-    /^[\w.-]+(\/[\w.-]+)+$/.test(text) &&
-    text.split("/").every(function (s) {
-      return s.length < 3 || wordLike(s)
-    })
-  )
-    return true
-  if (/^[\w-][\w.-]*\.[a-z][a-z0-9]{0,5}$/.test(text)) return true
+  if (/^[\w.-]+(\/[\w.-]+)+$/.test(text) && allNameParts(text)) return true
+  if (/^[\w-][\w.-]*\.[a-z][a-z0-9]{0,5}$/.test(text) && allNameParts(text)) return true
   return false
 }
 
@@ -751,9 +799,23 @@ function swatchColor(text) {
     g = cssNumber(parts[1], 255)
     b = cssNumber(parts[2], 255)
   } else {
-    var h = (((cssNumber(parts[0], 360) % 360) + 360) % 360) / 360
-    var s = cssNumber(parts[1], 1)
-    var l = cssNumber(parts[2], 1)
+    // Legacy comma syntax needs % for saturation and lightness; the space
+    // syntax (CSS Color 4) also reads plain numbers as percentages.
+    var spaced = fn[2].indexOf(",") < 0
+    /**
+     * Saturation or lightness as 0 to 1, NaN when the syntax does not allow the token.
+     * @param {string} part - The token.
+     * @returns {number} The fraction.
+     */
+    var fraction = function (part) {
+      if (/%$/.test(part)) return cssNumber(part, 1)
+      return spaced ? cssNumber(part, 100) / 100 : NaN
+    }
+    var hueDeg = cssNumber(parts[0], 360)
+    var s = fraction(parts[1])
+    var l = fraction(parts[2])
+    if (isNaN(hueDeg) || isNaN(s) || isNaN(l)) return ""
+    var h = (((hueDeg % 360) + 360) % 360) / 360
     var q = l < 0.5 ? l * (1 + s) : l + s - l * s
     var p = 2 * l - q
     /**
@@ -869,6 +931,7 @@ if (typeof module !== "undefined") {
     detectKind: detectKind,
     isSecretText: isSecretText,
     wordShare: wordShare,
+    namePart: namePart,
     isDeveloperText: isDeveloperText,
     enrich: enrich,
     parseHistory: parseHistory,
