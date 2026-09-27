@@ -78,4 +78,11 @@ if grep -Eq 'upsertSourceItem|resolveSourceItem|sourceItemKeys|sourceFileName' "
 fi
 grep -Fq 'legacy health item' "$plugin/Inbox.qml"
 
+# --- 4c: a hold on any screen pauses every copy of a toast
+svc="$repo_root/plugins/araneadev.notifications/Service.qml"
+grep -Fq 'property var popupHolds: ({})' "$svc"
+grep -Fq 'function holdPopup(key: string, on: bool): void' "$svc"
+grep -Fq '!cardSlot.svc.popupHeld(cardSlot.holdKey)' "$svc"
+grep -Fq 'Component.onDestruction: if (cardSlot.held)' "$svc"
+
 echo "notifications contract passed"

@@ -257,3 +257,20 @@ test("notifications logic", () => {
 
   console.log("inbox logic contract passed")
 })
+
+test("toast holds (4c)", () => {
+  const n = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
+  )
+  const eq = (a, b, msg) => {
+    if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
+  }
+  const a = n.holdPopup({}, "5-1", true)
+  eq(a, { "5-1": 1 }, "first hold")
+  const b = n.holdPopup(a, "5-1", true)
+  eq(b, { "5-1": 2 }, "second screen holds too")
+  eq(a, { "5-1": 1 }, "input not mutated")
+  eq(n.holdPopup(b, "5-1", false), { "5-1": 1 }, "one screen lets go")
+  eq(n.holdPopup({ "5-1": 1 }, "5-1", false), {}, "last hold removes the key")
+  eq(n.holdPopup({}, "5-1", false), {}, "never negative")
+})

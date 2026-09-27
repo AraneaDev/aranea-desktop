@@ -122,7 +122,7 @@
 1	plugins/araneadev.notifications/Service.qml:missing-property:Member "sizeHorizontal" not found on type "QObject"
 1	plugins/araneadev.notifications/Service.qml:missing-property:Member "sizeVertical" not found on type "QObject"
 1	plugins/araneadev.notifications/Service.qml:uncreatable-type:Type PanelWindow is not creatable.
-14	plugins/araneadev.notifications/Service.qml:unqualified:Unqualified access
+5	plugins/araneadev.notifications/Service.qml:unqualified:Unqualified access
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "body" not found on type "QObject"
 2	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "border" not found on type "QObject"

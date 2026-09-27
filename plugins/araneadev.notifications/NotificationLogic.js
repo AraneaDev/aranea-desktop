@@ -758,8 +758,27 @@ function isWithinQuietHours(window, date) {
   return start < end ? current >= start && current < end : current >= start || current < end
 }
 
+/**
+ * Counts pause holds per toast: every screen's copy of a toast that is
+ * hovered or dragged adds one, and the toast only counts down at zero.
+ * @param {*} holds - current counts by toast key (not modified)
+ * @param {string} key - the toast key (timestamp-originalId)
+ * @param {boolean} on - true to add a hold, false to release one
+ * @returns {{[key: string]: number}} the new counts; a key at zero is removed
+ */
+function holdPopup(holds, key, on) {
+  /** @type {{[key: string]: number}} */
+  var next = {}
+  for (var k in holds || {}) next[k] = holds[k]
+  var count = (next[key] || 0) + (on ? 1 : -1)
+  if (count > 0) next[key] = count
+  else delete next[key]
+  return next
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    holdPopup: holdPopup,
     isChromiumDerived: isChromiumDerived,
     sanitizeBody: sanitizeBody,
     styledBody: styledBody,

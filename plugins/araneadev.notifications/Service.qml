@@ -75,6 +75,20 @@ Item {
   // to execArgv / focusing the app.
   property var inboxRefs: ({})
 
+  // Pause holds per toast (key: timestamp-originalId); a hover or drag on any
+  // screen's copy holds it, so no screen can expire a toast being read.
+  property var popupHolds: ({})
+
+  // Adds or releases one pause hold on the toast with this key.
+  function holdPopup(key: string, on: bool): void {
+    service.popupHolds = NotificationLogic.holdPopup(service.popupHolds, key, on)
+  }
+
+  // Whether any screen holds the toast with this key.
+  function popupHeld(key: string): bool {
+    return (service.popupHolds[key] || 0) > 0
+  }
+
   // Popups restored from a previous shell process, keyed by their file
   // name (timestamp-originalId) since ids alone repeat across server
   // generations. The replaces_id handling and liveRefs lookups must not
@@ -828,6 +842,10 @@ Item {
             required property int urgency
             required property double expireTimeout
             required property double timestamp
+            required property int originalId
+            // The notification service, read once so the delegate's calls are
+            // qualified (qmllint flags every unqualified service access).
+            readonly property var svc: service
 
             // Each card sizes itself based on mode (text vs media); the slot
             // tracks the card so the column auto-fits to whichever is widest.
@@ -835,9 +853,16 @@ Item {
             Layout.alignment: Qt.AlignRight
             implicitHeight: card.implicitHeight
 
-            readonly property real lifetime: service.durationFor(cardSlot.urgency, cardSlot.expireTimeout)
+            readonly property real lifetime: cardSlot.svc.durationFor(cardSlot.urgency, cardSlot.expireTimeout)
             property real remainingLifetime: 1.0
-            readonly property bool ticking: cardSlot.lifetime > 0 && !card.hovered && !card.dragging
+            // Key shared by this toast's copies on every screen.
+            readonly property string holdKey: String(cardSlot.timestamp) + "-" + String(cardSlot.originalId)
+            // This copy is hovered or dragged.
+            readonly property bool held: card.hovered || card.dragging
+            onHeldChanged: cardSlot.svc.holdPopup(cardSlot.holdKey, cardSlot.held)
+            Component.onDestruction: if (cardSlot.held)
+              cardSlot.svc.holdPopup(cardSlot.holdKey, false)
+            readonly property bool ticking: cardSlot.lifetime > 0 && !cardSlot.svc.popupHeld(cardSlot.holdKey)
 
             // A client updating this notification in place rewrites the row
             // under the card (see refreshPopup). New text deserves a full look,
@@ -859,7 +884,7 @@ Item {
                 cardSlot.remainingLifetime -= 50.0 / cardSlot.lifetime
                 if (cardSlot.remainingLifetime <= 0) {
                   cardSlot.remainingLifetime = 0
-                  service.expirePopup(cardSlot.index)
+                  cardSlot.svc.expirePopup(cardSlot.index)
                 }
               }
             }
@@ -874,15 +899,15 @@ Item {
               image: cardSlot.image
               urgency: cardSlot.urgency
               timestamp: cardSlot.timestamp
-              cornerRadius: service.cornerRadius
-              fontFamily: service.shell && service.shell.bar ? service.shell.bar.fontFamily : ""
+              cornerRadius: cardSlot.svc.cornerRadius
+              fontFamily: cardSlot.svc.shell && cardSlot.svc.shell.bar ? cardSlot.svc.shell.bar.fontFamily : ""
               glyph: cardSlot.glyph
 
-              motionEnabled: service.motionEnabled
+              motionEnabled: cardSlot.svc.motionEnabled
 
-              onCloseRequested: service.dismissPopup(cardSlot.index)
-              onSwipeDismissed: service.dismissPopup(cardSlot.index)
-              onCardClicked: service.invokePopupDefault(cardSlot.index)
+              onCloseRequested: cardSlot.svc.dismissPopup(cardSlot.index)
+              onSwipeDismissed: cardSlot.svc.dismissPopup(cardSlot.index)
+              onCardClicked: cardSlot.svc.invokePopupDefault(cardSlot.index)
             }
           }
         }
