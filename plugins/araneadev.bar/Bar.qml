@@ -1691,68 +1691,24 @@ Item {
       Item {
         anchors.fill: parent
 
-        BorderSurface {
-          id: leftSurface
-          visible: false
-          anchors.left: parent.left
-          anchors.leftMargin: Style.space(8)
-          anchors.verticalCenter: parent.verticalCenter
-          width: leftModules.width + Style.space(12)
-          height: root.barSize - Style.space(8)
-          color: Color.background
-          borderSpec: Border.none()
-          radius: height / 2
-          opacity: 0.62
+        // Declared first so the side modules sit above it: gestures and the
+        // center hover work on all empty bar space, as in the stock bar.
+        CenterModules {
+          anchors.fill: parent
         }
 
         LeftModules {
           id: leftModules
-          anchors.left: leftSurface.left
-          anchors.leftMargin: Style.space(7)
+          anchors.left: parent.left
+          anchors.leftMargin: Style.space(15)
           anchors.verticalCenter: parent.verticalCenter
-        }
-
-        BorderSurface {
-          id: rightSurface
-          visible: false
-          anchors.right: parent.right
-          anchors.rightMargin: Style.space(8)
-          anchors.verticalCenter: parent.verticalCenter
-          width: rightModules.width + Style.space(12)
-          height: root.barSize - Style.space(8)
-          color: Color.background
-          borderSpec: Border.none()
-          radius: height / 2
-          opacity: 0.62
         }
 
         RightModules {
           id: rightModules
-          anchors.right: rightSurface.right
-          anchors.rightMargin: Style.space(7)
+          anchors.right: parent.right
+          anchors.rightMargin: Style.space(15)
           anchors.verticalCenter: parent.verticalCenter
-        }
-
-        BorderSurface {
-          id: centerSurface
-          visible: false
-          anchors.centerIn: parent
-          width: Style.space(190)
-          height: root.barSize - Style.space(8)
-          color: Color.background
-          borderSpec: Border.none()
-          radius: height / 2
-          opacity: 0.62
-        }
-
-        Item {
-          id: centerModules
-          anchors.centerIn: parent
-          width: centerSurface.width
-          height: centerSurface.height
-          CenterModules {
-            anchors.fill: parent
-          }
         }
       }
     }

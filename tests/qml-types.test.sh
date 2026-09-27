@@ -57,6 +57,17 @@ if grep -Fq 'Bar profile' "$repo_root/scripts/aranea-about"; then
   exit 1
 fi
 grep -Fq 'setRequestedTransparency(BarModel.barTransparent(config))' "$bar_qml"
+# CenterModules (gestures + hover) fills the horizontal bar under the side lists, as stock
+horizontal="$(awk '/id: horizontalBar/ { on = 1 } on { print } on && /^    }$/ { exit }' "$bar_qml")"
+grep -Fq 'CenterModules {' <<<"$horizontal"
+if grep -Eq 'Style\.space\(190\)|id: (left|right|center)Surface' <<<"$horizontal"; then
+  echo "the center gesture strip and invisible surfaces must be gone" >&2
+  exit 1
+fi
+[[ "$(grep -n 'CenterModules {' <<<"$horizontal" | head -1 | cut -d: -f1)" -lt "$(grep -n 'LeftModules {' <<<"$horizontal" | cut -d: -f1)" ]] || {
+  echo "CenterModules must come first so the side modules sit above it" >&2
+  exit 1
+}
 
 # The QML contract is the tools/check qml stage: strict qmllint against the
 # shrink-only baseline when Omarchy and Quickshell are present, syntax-only
