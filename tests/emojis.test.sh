@@ -26,4 +26,7 @@ grep -Fq 'EmojiLogic.keywordsFor' "$plugin/Emojis.qml"
 grep -Fq 'Math.floor(resultGrid.width / root.cellWidth)' "$plugin/Emojis.qml"
 grep -Fq 'lastRowStart' "$plugin/Emojis.qml"
 
+# --- 4d: without a manifest the picker hides itself, not the stock one
+grep -Fq '|| "araneadev.emojis")' "$plugin/Emojis.qml"
+
 echo "emojis contract passed"

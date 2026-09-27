@@ -346,7 +346,6 @@ Item {
         fingerprintConfigured: root.fingerprintConfigured
         authenticatingPassword: root.authenticatingPassword
         failureMessage: root.failureMessage
-        failedAttempts: root.failedAttempts
         inputEnabled: root.lockRequested
         loadBackground: root.locked
         passwordText: root.enteredPassword
@@ -384,7 +383,6 @@ Item {
       fingerprintConfigured: root.fingerprintConfigured
       authenticatingPassword: false
       failureMessage: ""
-      failedAttempts: 0
       inputEnabled: false
       loadBackground: root.previewVisible
       passwordText: ""

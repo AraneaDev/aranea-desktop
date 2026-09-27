@@ -124,7 +124,7 @@ Item {
   function dismiss() {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function")
-      root.shell.hide((root.manifest && root.manifest.id) || "omarchy.emojis")
+      root.shell.hide((root.manifest && root.manifest.id) || "araneadev.emojis")
   }
 
   // Dismisses the overlay when open, otherwise opens it with an empty payload.

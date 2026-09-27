@@ -69,6 +69,19 @@ fi
   exit 1
 }
 
+# --- 4d: the lock date ticks with the clock; one state root for the lock
+lock_view="$repo_root/plugins/araneadev.lock/LockView.qml"
+grep -Fq 'text: root.dateText' "$lock_view"
+grep -A6 -F 'function updateClock(): void' "$lock_view" | grep -Fq 'dateText = Qt.formatDate('
+if grep -Fq 'XDG_STATE_HOME' "$lock_view"; then
+  echo "LockView must use Omarchy's fixed state path, like Service.qml" >&2
+  exit 1
+fi
+if grep -Eq 'function clearPassword|property int failedAttempts' "$lock_view"; then
+  echo "dead LockView members are back" >&2
+  exit 1
+fi
+
 # The QML contract is the tools/check qml stage: strict qmllint against the
 # shrink-only baseline when Omarchy and Quickshell are present, syntax-only
 # otherwise. Every tracked QML file is linted (not just the entry points).

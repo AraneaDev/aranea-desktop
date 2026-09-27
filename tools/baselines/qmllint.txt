@@ -84,7 +84,7 @@
 1	plugins/araneadev.lock/LockView.qml:unqualified:Unqualified access
 2	plugins/araneadev.lock/Service.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.lock/Service.qml:uncreatable-type:Type PanelWindow is not creatable.
-13	plugins/araneadev.lock/Service.qml:unqualified:Unqualified access
+12	plugins/araneadev.lock/Service.qml:unqualified:Unqualified access
 1	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "barSize" not found on type "QObject"
 2	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "run" not found on type "QObject"
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "background" not found on type "QObject"

@@ -22,8 +22,6 @@ Item {
   property bool authenticatingPassword: false
   // Last authentication error; shown as the placeholder and switches the border to the error colour.
   property string failureMessage: ""
-  // Number of failed password attempts so far (passed in by the service; not rendered here).
-  property int failedAttempts: 0
   // Whether the password field accepts input; focus is forced into it whenever this turns true.
   property bool inputEnabled: true
   // Whether to load and blur the wallpaper at all; false leaves the plain background colour.
@@ -34,11 +32,15 @@ Item {
   property bool syncingPasswordText: false
   // Current time as HH:mm, refreshed every second by updateClock().
   property string clockText: ""
+  // Current date (weekday, day, month), refreshed with the clock so a lock
+  // left up past midnight shows the right day.
+  property string dateText: ""
 
   // Placeholder shown in the empty field when nothing else needs saying.
   readonly property string placeholderText: "Enter Password"
-  // XDG state directory ($XDG_STATE_HOME, else ~/.local/state).
-  readonly property string stateHome: Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")
+  // Omarchy's fixed state path (~/.local/state; Omarchy ignores the XDG
+  // state variable), the same root Service.qml uses.
+  readonly property string stateHome: Quickshell.env("HOME") + "/.local/state"
   // Directory of the active Omarchy theme; the spider logo (unlock.png) is loaded from here.
   readonly property string themeAssetRoot: stateHome + "/omarchy/current/theme"
   // Password field width in pixels.
@@ -90,11 +92,6 @@ Item {
     passwordInput.forceActiveFocus()
   }
 
-  // Asks the owner to clear the password by emitting passwordTextEdited("").
-  function clearPassword() {
-    passwordTextEdited("")
-  }
-
   // Copies passwordText into the field if they differ, flagging the write so it is not re-emitted.
   function syncPasswordText() {
     if (passwordInput.text === passwordText)
@@ -116,9 +113,11 @@ Item {
       Qt.callLater(forcePasswordFocus)
   }
 
-  // Sets clockText to the current time as HH:mm.
+  // Sets clockText (HH:mm) and dateText to now.
   function updateClock(): void {
-    clockText = Qt.formatDateTime(new Date(), "HH:mm")
+    var now = new Date()
+    clockText = Qt.formatDateTime(now, "HH:mm")
+    dateText = Qt.formatDate(now, "dddd  •  dd MMMM")
   }
 
   Timer {
@@ -353,7 +352,7 @@ Item {
 
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: Qt.formatDate(new Date(), "dddd  •  dd MMMM")
+        text: root.dateText
         color: Color.lock.placeholder
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall
