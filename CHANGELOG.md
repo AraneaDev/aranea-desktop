@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.3.1...v2.4.0) (2026-09-28)
+
+
+### Features
+
+* add installer TUI and JSON CLI ([#60](https://github.com/AraneaDev/aranea-desktop/issues/60)) ([51056b2](https://github.com/AraneaDev/aranea-desktop/commit/51056b26d908ace8297061b686b6c30957508502))
+
 ## [2.3.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.3.0...v2.3.1) (2026-09-28)
 
 
