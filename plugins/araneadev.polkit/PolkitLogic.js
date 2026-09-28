@@ -1,17 +1,45 @@
-// Text rules for the Aranea polkit prompt. The first three functions are
-// Omarchy's PolkitModel.js (shell/plugins/polkit), unchanged; the rest build
+// Text rules for the Aranea polkit prompt. The first two functions are
+// Omarchy's PolkitModel.js (shell/plugins/polkit), unchanged;
+// authorizationLabel keeps the stock name and output for ordinary pkexec
+// messages but uses the stricter end-anchored parse below; the rest build
 // the request summary, context line and details from what polkit gives the
 // agent (message, action id, identities) plus `pkaction --verbose` output.
 // No QML, no I/O; tests/polkit.test.sh runs this under Node.
 
+/**
+ * A polkit identity as the QML passes it (a Quickshell Identity object).
+ * @typedef {object} PolkitIdentity
+ * @property {string} [displayName] - the human name, e.g. "Tim Schipper"
+ * @property {string} [string] - the identity string, e.g. "unix-user:tim"
+ */
+
+/**
+ * The request line split around the command.
+ * @typedef {object} SummaryParts
+ * @property {string} prefix - text before the command (the whole message when not pkexec)
+ * @property {string} command - the pkexec command, or ""
+ * @property {string} suffix - the closing quote after the command ("'"), or ""
+ * @property {string} target - who the command runs as ("root" or the user label), or ""
+ */
+
+/**
+ * Tells whether a PAM prompt is asking for a fingerprint (mentions "finger", "fprint" or "swipe", any case).
+ * @param {?string} text - the PAM prompt text; null or empty counts as not fingerprint
+ * @returns {boolean} true when the prompt looks like a fingerprint prompt
+ */
 function promptLooksFingerprint(text) {
   var s = String(text || "").toLowerCase()
   return s.indexOf("finger") !== -1 || s.indexOf("fprint") !== -1 || s.indexOf("swipe") !== -1
 }
 
+/**
+ * Tells whether a PAM config enables fingerprint auth: any uncommented `auth` line loads pam_fprintd.so.
+ * @param {?string} raw - contents of a PAM config file such as /etc/pam.d/polkit-1
+ * @returns {boolean} true when pam_fprintd.so appears in the auth stack
+ */
 function fingerprintConfiguredFromPamConfig(raw) {
   // Fingerprint is available whenever pam_fprintd appears anywhere in the auth
-  // stack — it need not be the first module. A clamshell gate (pam_exec) may
+  // stack; it need not be the first module. A clamshell gate (pam_exec) may
   // legitimately precede it to skip fingerprint while the lid is closed.
   var lines = String(raw || "").split("\n")
   for (var i = 0; i < lines.length; i++) {
@@ -23,40 +51,81 @@ function fingerprintConfiguredFromPamConfig(raw) {
   return false
 }
 
-function authorizationLabel(message) {
-  var text = String(message || "")
-  var match = text.match(/^Authentication is (?:needed|required) to run [`']([^`']+)[`'] as /i)
-  return match ? "Authorize running '" + match[1] + "'" : text
-}
-
 // pkexec's messages: "Authentication is needed to run `/usr/bin/true' as the
-// super user" and "... as user Tim Schipper (tim)".
-var PKEXEC_MESSAGE = /^Authentication is (?:needed|required) to run [`']([^`']+)[`'] as (?:(the super user)|user (.+))$/i
+// super user" and "... as user Tim Schipper (tim)". The command is matched
+// greedily and the target only at the very end, so a command (a file name the
+// caller controls) that contains "' as the super user" or "' as user x" can
+// never change the target shown. [\s\S] rather than . so a line or
+// paragraph separator (U+2028/U+2029) in the command cannot break the parse.
+var PKEXEC_MESSAGE =
+  /^Authentication is (?:needed|required) to run [`']([\s\S]+)[`'] as (?:(the super user)|user ([\s\S]+))$/i
 
+/**
+ * Parses a pkexec message into the command and the target user ("root" for the super user).
+ * @param {?string} message - the polkit request message
+ * @returns {?{command: string, target: string}} the parts, or null when it is not a pkexec message
+ */
 function parsePkexec(message) {
-  var match = String(message || "").trim().match(PKEXEC_MESSAGE)
+  var match = String(message || "")
+    .trim()
+    .match(PKEXEC_MESSAGE)
   if (!match) return null
   return { command: match[1], target: match[2] ? "root" : match[3].trim() }
 }
 
+/**
+ * Turns pkexec's "Authentication is needed to run `cmd' as ..." into "Authorize running 'cmd'"; other text is returned as is.
+ * @param {?string} message - the polkit request message
+ * @returns {string} the short label, or the message unchanged
+ */
+function authorizationLabel(message) {
+  var parsed = parsePkexec(message)
+  return parsed ? "Authorize running '" + parsed.command + "'" : String(message || "")
+}
+
+/**
+ * Splits the request message, flattened to one line, into prefix, command, suffix and target;
+ * non-pkexec messages come back whole as the prefix ("Authentication is needed" when empty).
+ * @param {?string} message - the polkit request message
+ * @returns {SummaryParts} the pieces of the request line
+ */
 function summaryParts(message) {
   // One logical line: StyledText would otherwise decide how breaks render.
-  var text = String(message || "").replace(/\s*[\r\n]+\s*/g, " ").trim()
+  var text = String(message || "")
+    .replace(/\s*[\r\n]+\s*/g, " ")
+    .trim()
   var parsed = parsePkexec(text)
-  if (parsed) return { prefix: "Run '", command: parsed.command, suffix: "' as " + parsed.target }
-  return { prefix: text || "Authentication is needed", command: "", suffix: "" }
+  if (parsed)
+    return { prefix: "Run '", command: parsed.command, suffix: "'", target: parsed.target }
+  return { prefix: text || "Authentication is needed", command: "", suffix: "", target: "" }
 }
 
+/**
+ * Builds the plain-text request line, e.g. "Run '/usr/bin/true' as root".
+ * @param {?string} message - the polkit request message
+ * @returns {string} the request summary
+ */
 function requestSummary(message) {
   var parts = summaryParts(message)
-  return parts.prefix + parts.command + parts.suffix
+  return parts.prefix + parts.command + parts.suffix + (parts.target ? " as " + parts.target : "")
 }
 
+/**
+ * Extracts the command from a pkexec message.
+ * @param {?string} message - the polkit request message
+ * @returns {string} the command, or "" when it is not a pkexec message
+ */
 function commandFromMessage(message) {
   var parsed = parsePkexec(message)
   return parsed ? parsed.command : ""
 }
 
+/**
+ * Shortens text to at most `max` characters by replacing its middle with "…".
+ * @param {?string} text - the text to shorten
+ * @param {?number} max - the maximum length; 0 or missing means 64, values below 5 become 5
+ * @returns {string} the text, shortened when longer than the limit
+ */
 function shortenMiddle(text, max) {
   var s = String(text || "")
   var limit = Math.max(5, max || 64)
@@ -66,26 +135,120 @@ function shortenMiddle(text, max) {
   return s.slice(0, head) + "…" + s.slice(s.length - (keep - head))
 }
 
+/**
+ * Escapes &, <, > and " so the text is shown literally in StyledText.
+ * @param {*} text - the value to escape; falsy values give ""
+ * @returns {string} the escaped text
+ */
 function escapeHtml(text) {
-  return String(text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
+// Characters that render blank or reorder text: C0/C1 controls, no-break
+// and other spaces, soft hyphen, combining grapheme joiner, Arabic letter
+// mark, Hangul fillers, Mongolian vowel separator, zero-width and direction
+// marks, line/paragraph separators, bidi embeddings and isolates, word
+// joiners, braille blank, ideographic space, variation selectors, the BOM,
+// tag characters and supplementary variation selectors.
+var INVISIBLE_RANGES = [
+  [0x00, 0x1f],
+  [0x7f, 0xa0],
+  [0xad, 0xad],
+  [0x34f, 0x34f],
+  [0x61c, 0x61c],
+  [0x115f, 0x1160],
+  [0x180e, 0x180e],
+  [0x2000, 0x200f],
+  [0x2028, 0x202f],
+  [0x205f, 0x2064],
+  [0x2066, 0x2069],
+  [0x2800, 0x2800],
+  [0x3000, 0x3000],
+  [0x3164, 0x3164],
+  [0xfe00, 0xfe0f],
+  [0xfeff, 0xfeff],
+  [0xffa0, 0xffa0],
+  [0xe0000, 0xe007f],
+  [0xe0100, 0xe01ef]
+]
+
+/**
+ * Replaces characters that render blank or reorder text with visible escapes
+ * (\uXXXX, or \u{XXXXX} beyond the BMP), so padding cannot push part of a
+ * command out of view.
+ * @param {*} text - the text; falsy values give ""
+ * @returns {string} the text with those characters escaped
+ */
+function visibleCommand(text) {
+  var s = String(text || "")
+  var out = ""
+  for (var i = 0; i < s.length; i++) {
+    var code = /** @type {number} */ (s.codePointAt(i))
+    var ch = String.fromCodePoint(code)
+    if (code > 0xffff) i++
+    var hidden = INVISIBLE_RANGES.some(function (r) {
+      return code >= r[0] && code <= r[1]
+    })
+    if (!hidden) out += ch
+    else if (code > 0xffff) out += "\\u{" + code.toString(16).toUpperCase() + "}"
+    else out += "\\u" + ("000" + code.toString(16).toUpperCase()).slice(-4)
+  }
+  return out
+}
+
+/**
+ * The line saying who a pkexec command runs as, e.g. "as root" or "as Tim Schipper (tim)".
+ * @param {?string} message - the polkit request message
+ * @returns {string} the line (invisible characters escaped), or "" when it is not a pkexec message
+ */
+function targetLine(message) {
+  var target = summaryParts(message).target
+  return target ? "as " + visibleCommand(target) : ""
 }
 
 // StyledText for the request line: the command in the accent colour, every
 // piece of polkit-supplied text escaped so it is shown, never interpreted.
+/**
+ * Builds the StyledText request line (without the target, which targetLine gives) with the command,
+ * invisible characters escaped and middle-shortened, wrapped in an accent-coloured font tag.
+ * @param {?string} message - the polkit request message
+ * @param {string} accent - the accent colour as a string, e.g. "#ff00aa"
+ * @returns {string} the escaped StyledText markup
+ */
 function requestMarkup(message, accent) {
   var parts = summaryParts(message)
-  var out = escapeHtml(parts.prefix)
+  var out = escapeHtml(visibleCommand(parts.prefix))
   if (parts.command)
-    out += '<font color="' + escapeHtml(accent) + '">' + escapeHtml(shortenMiddle(parts.command, 64)) + "</font>"
+    out +=
+      '<font color="' +
+      escapeHtml(accent) +
+      '">' +
+      escapeHtml(shortenMiddle(visibleCommand(parts.command), 64)) +
+      "</font>"
   return out + escapeHtml(parts.suffix)
 }
 
+/**
+ * Tells whether a polkit action id is safe to pass to pkaction: 1 to 255 characters of letters, digits, ".", "_" or "-".
+ * @param {*} id - the action id; null and undefined are invalid
+ * @returns {boolean} true when the id is valid
+ */
 function validActionId(id) {
   var s = id === undefined || id === null ? "" : String(id)
   return s.length >= 1 && s.length <= 255 && /^[A-Za-z0-9._-]+$/.test(s)
 }
 
+/**
+ * Reads the first `description:` and `vendor:` values from `pkaction --verbose` output.
+ * @param {?string} text - the pkaction output
+ * @returns {{[key: string]: string}} `description` and `vendor` keys, "" when missing
+ */
 function parseActionInfo(text) {
+  /** @type {{[key: string]: string}} */
   var info = { description: "", vendor: "" }
   var lines = String(text || "").split("\n")
   for (var i = 0; i < lines.length; i++) {
@@ -97,6 +260,11 @@ function parseActionInfo(text) {
 
 // Polkit's Identity type is not declared to qmllint, so the QML passes
 // identities here as plain values and reads nothing from them itself.
+/**
+ * Returns the display name of a polkit identity, falling back to its string form (e.g. "unix-user:tim").
+ * @param {?PolkitIdentity} identity - the identity; null gives ""
+ * @returns {string} the label, trimmed
+ */
 function identityLabel(identity) {
   if (!identity) return ""
   var name = String(identity.displayName || "").trim()
@@ -104,6 +272,12 @@ function identityLabel(identity) {
   return String(identity.string || "").trim()
 }
 
+/**
+ * Finds the position of the selected identity in the list by identity (===).
+ * @param {?Array<*>} identities - the flow's identities
+ * @param {*} selected - the selected identity
+ * @returns {number} its index, or -1 when either is missing or it is not in the list
+ */
 function indexOfIdentity(identities, selected) {
   if (!identities || !selected) return -1
   for (var i = 0; i < identities.length; i++) {
@@ -112,6 +286,12 @@ function indexOfIdentity(identities, selected) {
   return -1
 }
 
+/**
+ * Builds the " (n of m)" suffix for the selected identity; empty with fewer than two identities or no match.
+ * @param {?Array<*>} identities - the flow's identities
+ * @param {*} selected - the selected identity
+ * @returns {string} the suffix, or ""
+ */
 function identityPosition(identities, selected) {
   var count = identities ? identities.length : 0
   if (count < 2) return ""
@@ -119,11 +299,24 @@ function identityPosition(identities, selected) {
   return index < 0 ? "" : " (" + (index + 1) + " of " + count + ")"
 }
 
+/**
+ * Returns the index of the next identity, wrapping around; starts at 0 when nothing is selected.
+ * @param {number} count - the number of identities
+ * @param {number} current - the current index, or -1 for none
+ * @returns {number} the next index, or -1 when count is below 1
+ */
 function nextIdentityIndex(count, current) {
   if (count < 1) return -1
   return current < 0 ? 0 : (current + 1) % count
 }
 
+/**
+ * Joins the action description and "as <identity><position>" with " · ", skipping empty parts.
+ * @param {?string} description - the polkit action's description
+ * @param {?string} identity - the identity label
+ * @param {?string} position - the " (n of m)" suffix, or ""
+ * @returns {string} the context line, "" when both description and identity are empty
+ */
 function contextLine(description, identity, position) {
   var parts = []
   if (description) parts.push(description)
@@ -131,20 +324,55 @@ function contextLine(description, identity, position) {
   return parts.join(" · ")
 }
 
+/**
+ * Builds the details rows (ACTION, VENDOR, COMMAND, MESSAGE), leaving out empty values;
+ * command and message have invisible characters escaped.
+ * @param {?string} actionId - the polkit action id
+ * @param {?string} vendor - the action's vendor from pkaction
+ * @param {?string} command - the pkexec command
+ * @param {?string} message - the polkit request message
+ * @returns {Array<{key: string, value: string}>} the non-empty rows in that order
+ */
 function detailRows(actionId, vendor, command, message) {
   var rows = [
     { key: "ACTION", value: String(actionId || "") },
     { key: "VENDOR", value: String(vendor || "") },
-    { key: "COMMAND", value: String(command || "") },
-    { key: "MESSAGE", value: String(message || "") }
+    { key: "COMMAND", value: visibleCommand(command) },
+    { key: "MESSAGE", value: visibleCommand(message) }
   ]
-  return rows.filter(function(row) { return row.value.length > 0 })
+  return rows.filter(function (row) {
+    return row.value.length > 0
+  })
 }
 
+/**
+ * Turns a PAM prompt into the password field placeholder: trailing colon removed, "Enter password" for empty or "Password".
+ * @param {?string} prompt - the PAM input prompt
+ * @returns {string} the placeholder text
+ */
 function promptPlaceholder(prompt) {
-  var s = String(prompt || "").trim().replace(/:\s*$/, "").trim()
+  var s = String(prompt || "")
+    .trim()
+    .replace(/:\s*$/, "")
+    .trim()
   if (!s || /^password$/i.test(s)) return "Enter password"
   return s
+}
+
+/**
+ * The key hint line: Enter only when a password is asked (not in fingerprint
+ * mode), Shift+Tab only when there are several identities to switch between.
+ * @param {boolean} fingerprintMode - the dialog is waiting on the fingerprint reader
+ * @param {number} identityTotal - how many identities the request offers
+ * @returns {string} the hints joined with " · "
+ */
+function hintLine(fingerprintMode, identityTotal) {
+  var parts = []
+  if (!fingerprintMode) parts.push("ENTER AUTHORIZE")
+  parts.push("TAB DETAILS")
+  if (identityTotal > 1) parts.push("⇧TAB SWITCH IDENTITY")
+  parts.push("ESC CANCEL")
+  return parts.join(" · ")
 }
 
 if (typeof module !== "undefined") {
@@ -158,6 +386,8 @@ if (typeof module !== "undefined") {
     shortenMiddle: shortenMiddle,
     escapeHtml: escapeHtml,
     requestMarkup: requestMarkup,
+    visibleCommand: visibleCommand,
+    targetLine: targetLine,
     validActionId: validActionId,
     parseActionInfo: parseActionInfo,
     identityLabel: identityLabel,
@@ -166,6 +396,7 @@ if (typeof module !== "undefined") {
     nextIdentityIndex: nextIdentityIndex,
     contextLine: contextLine,
     detailRows: detailRows,
-    promptPlaceholder: promptPlaceholder
+    promptPlaceholder: promptPlaceholder,
+    hintLine: hintLine
   }
 }

@@ -9,62 +9,101 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch or pull request supersedes a running check.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate:
-    name: validate
+  check:
+    name: tools/check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - name: Install validation tools
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes libxml2-utils imagemagick ripgrep qt6-declarative-dev qt6-declarative-dev-tools
-          # ShellCheck is pinned (not Ubuntu's package) to match local development.
+          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick python3 lua5.4
+          # Pinned binaries, the same versions as local development.
           sudo tools/install-shellcheck
+          sudo tools/install-shfmt
+          sudo tools/install-actionlint
+          npm ci
 
-      - name: Validate shell syntax
-        run: |
-          find scripts hooks tests tools .githooks -type f -print0 |
-            xargs -0 grep -lI '^#!.*sh' |
-            xargs -r -n1 bash -n
-
-      - name: Validate QML types
-        run: bash tests/qml-types.test.sh
-
-      - name: Run contract tests
-        run: ./tests/run
+      # Everything that does not depend on the Qt version: Ubuntu's Qt is
+      # far older than the Qt 6.11 the QML is formatted and linted with, so
+      # QML formatting, qmllint and the runtime smoke test run in the Arch
+      # job below (the format stage notes the skipped QML part).
+      - name: Run tools/check
+        run: tools/check --skip smoke,qml
 
       - name: Exercise installer profiles
         env:
-          OMARCHY_INSTALLER_TEST: '1'
+          OMARCHY_INSTALLER_TEST: "1"
         run: |
           for profile in minimal full no_apps; do
             PATH="$GITHUB_WORKSPACE/tests/fake-bin:$PATH" \
               scripts/install.sh --dry-run --yes --profile "$profile"
           done
 
-      - name: Validate SVG artwork
-        run: |
-          find integrations -type f -name '*.svg' -print0 | xargs -0 -n1 xmllint --noout
-
-      - name: Validate raster artwork
-        run: |
-          find backgrounds screenshots -type f \( -name '*.png' -o -name '*.jpg' \) -print0 | xargs -0 -n1 identify
-
-      - name: Run ShellCheck
-        run: |
-          find scripts hooks tests tools .githooks -type f -print0 |
-            xargs -0 grep -lI '^#!.*sh' |
-            xargs -r shellcheck -x
-
       - name: Upload diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: validation-diagnostics
+          name: check-diagnostics
           if-no-files-found: ignore
-          path: |
-            tests/.*-error
-            /tmp/aranea-*.log
+          path: coverage/
+
+  check-arch:
+    name: QML format, strict QML and smoke (Arch)
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 30
+    steps:
+      - name: Install packages
+        run: pacman -Syu --noconfirm --needed git curl jq python nodejs npm quickshell qt6-declarative imagemagick libxml2 lua sway dbus libcap
+
+      # Arch's sway carries cap_sys_nice as a file capability, and a container
+      # that may not grant it cannot exec sway at all ("Operation not
+      # permitted"). The headless smoke compositor does not need it.
+      - name: Let sway run in the container
+        run: setcap -r /usr/bin/sway
+
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # The container runs as root on a workspace owned by the runner user.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Omarchy's shell sources at the tag in .omarchy-version: the Commons
+      # and Ui modules the plugins import.
+      - name: Fetch the Omarchy shell
+        run: git clone --depth 1 --branch "$(cat .omarchy-version)" https://github.com/basecamp/omarchy "$RUNNER_TEMP/omarchy"
+
+      - name: Install JS tooling and shfmt
+        run: |
+          npm ci
+          tools/install-shfmt /usr/local/bin
+
+      # QML formatting, strict QML against the shrink-only baseline and the
+      # runtime smoke test, with Arch's current Qt; skipping is not allowed.
+      # The Omarchy path is built from $RUNNER_TEMP here: in container jobs
+      # ${{ runner.temp }} is the host path, not the container's.
+      - name: QML format, strict QML and runtime smoke
+        env:
+          ARANEA_CHECK_REQUIRE_ALL: "1"
+        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tools/check --only format,qml,qmltest,smoke

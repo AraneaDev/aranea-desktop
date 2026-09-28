@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Lists integration states and activates or deactivates one. activate runs
+# install-integration and records the targets it linked or copied;
+# deactivate restores those targets (except ones another active integration
+# shares) and marks the integration inactive so the hooks leave it off.
+#
+# Usage: scripts/aranea-integrations status [--json] | activate <id> [--yes] | deactivate <id>
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/manifest.sh"
@@ -8,9 +15,14 @@ source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
 state_root="${ARANEA_INTEGRATION_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea/integrations}"
 
+# Prints the usage line.
 usage() { printf '%s\n' "Usage: $0 status [--json] | activate <id> [--yes] | deactivate <id>"; }
+# Prints every integration id in theme-manifest.toml.
 known_ids() { awk -F'"' '/^id = / { print $2 }' "$repo_root/theme-manifest.toml"; }
+# True when ID is an integration in the manifest.
 known() { manifest_integration_exists "$1"; }
+# True when integration ID has no optional_command, or one of its
+# |-separated optional commands is installed.
 available() {
   local optional command_name
   optional="$(manifest_integration_field "$1" optional_command || true)"
@@ -19,11 +31,28 @@ available() {
   for command_name in "${commands[@]}"; do command -v "$command_name" >/dev/null 2>&1 && return 0; done
   return 1
 }
+# True when TARGET is also listed by another active integration.
+shared_with_active() {
+  local id="$1" target="$2" other_files other
+  for other_files in "$state_root"/*.files; do
+    [[ -e "$other_files" ]] || continue
+    other="$(basename "$other_files" .files)"
+    [[ "$other" != "$id" && "$(cat "$state_root/$other" 2>/dev/null)" == active ]] || continue
+    grep -Fqx -- "$target" "$other_files" && return 0
+  done
+  return 1
+}
+# Prints the state (active or inactive) and availability of integration ID,
+# as text or as JSON when json=1.
 emit_status() {
   local id="$1" state=inactive availability=unavailable
   [[ -f "$state_root/$id" ]] && state="$(<"$state_root/$id")"
+  # Anything but "active" (a hand-edited or corrupt state file) is inactive.
+  [[ "$state" == active ]] || state=inactive
   available "$id" && availability=available
-  if (( json )); then printf '{"id":"%s","status":"%s","availability":"%s"}\n' "$id" "$state" "$availability"
+  if ((json)); then
+    jq -cn --arg id "$id" --arg status "$state" --arg availability "$availability" \
+      '{id: $id, status: $status, availability: $availability}'
   else printf '%-14s %-10s %s\n' "$id" "$state" "$availability"; fi
 }
 
@@ -32,25 +61,66 @@ command_name="${1:-}"
 case "$command_name" in
   status)
     [[ "${2:-}" == --json ]] && json=1
+    if ((json)) && ! command -v jq >/dev/null 2>&1; then
+      printf '%s\n' 'jq is required for --json' >&2
+      exit 2
+    fi
     while read -r id; do [[ -n "$id" ]] && emit_status "$id"; done < <(known_ids)
     ;;
   activate)
-    id="${2:-}"; [[ "${3:-}" == --yes || -z "${3:-}" ]] || { usage >&2; exit 2; }
-    known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
-    available "$id" || { printf 'Integration unavailable: %s\n' "$id" >&2; exit 1; }
-    mkdir -p "$state_root"; before="$(mktemp)"; trap 'rm -f "$before" "$after"' EXIT
-    ownership_record > /dev/null
-    if [[ -f "$(ownership_record)" ]]; then cp "$(ownership_record)" "$before"; fi
-    "$repo_root/scripts/install-integration" "$id" --yes
-    after="$(mktemp)"
-    if [[ -f "$(ownership_record)" ]]; then cp "$(ownership_record)" "$after"; fi
-    comm -13 <(sort -u "$before") <(sort -u "$after") > "$state_root/$id.files"
-    printf active > "$state_root/$id"; printf 'integration: %s active\n' "$id"
+    id="${2:-}"
+    [[ "${3:-}" == --yes || -z "${3:-}" ]] || {
+      usage >&2
+      exit 2
+    }
+    known "$id" || {
+      printf 'Unknown integration: %s\n' "$id" >&2
+      exit 1
+    }
+    available "$id" || {
+      printf 'Integration unavailable: %s\n' "$id" >&2
+      exit 1
+    }
+    mkdir -p "$state_root"
+    install_status=0
+    output="$("$repo_root/scripts/install-integration" "$id" --yes)" || install_status=$?
+    printf '%s\n' "$output"
+    # Exactly the targets this integration manages now, recorded even when
+    # the install stopped partway, so deactivate can still undo them.
+    sed -n 's/^\(linked\|copied\) .* -> //p' <<<"$output" >"$state_root/$id.files"
+    ((install_status == 0)) || exit "$install_status"
+    printf active >"$state_root/$id"
+    printf 'integration: %s active\n' "$id"
     ;;
   deactivate)
-    id="${2:-}"; known "$id" || { printf 'Unknown integration: %s\n' "$id" >&2; exit 1; }
-    files="$state_root/$id.files"; if [[ -f "$files" ]]; then while IFS= read -r target; do [[ -n "$target" ]] || continue; backup="$(backup_path "$target")"; rm -f -- "$target"; if [[ -e "$backup" || -L "$backup" ]]; then mkdir -p "$(dirname "$target")"; cp -a "$backup" "$target"; fi; done < "$files"; fi
-    rm -f "$state_root/$id" "$files"; printf 'integration: %s inactive\n' "$id"
+    id="${2:-}"
+    known "$id" || {
+      printf 'Unknown integration: %s\n' "$id" >&2
+      exit 1
+    }
+    mkdir -p "$state_root"
+    files="$state_root/$id.files"
+    # What activate recorded, plus everything this integration would link or
+    # copy (the installer and hooks link without recording per-integration).
+    targets="$(
+      {
+        [[ -f "$files" ]] && cat "$files"
+        "$repo_root/scripts/install-integration" --dry-run "$id" 2>/dev/null | sed -n 's/^would \(link\|copy\) .* -> //p'
+      } | sort -u
+    )"
+    while IFS= read -r target; do
+      [[ -n "$target" ]] || continue
+      shared_with_active "$id" "$target" && continue
+      restore_one_target "$target"
+      [[ "$(last_ownership_action)" == restored ]] && forget_managed_file "$target"
+    done <<<"$targets"
+    rm -f "$files"
+    # "inactive" (not just no file) tells the hooks to leave it off.
+    printf inactive >"$state_root/$id"
+    printf 'integration: %s inactive\n' "$id"
     ;;
-  *) usage >&2; exit 2 ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
 esac

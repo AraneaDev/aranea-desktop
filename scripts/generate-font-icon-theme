@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Regenerates the Aranea-icons SVGs under integrations/icons/aranea/scalable
+# by tracing JetBrainsMono Nerd Font glyphs with magick and potrace
+# (ARANEA_ICON_FONT and ARANEA_ICON_POINT_SIZE override font and size).
+#
+# Usage: scripts/generate-font-icon-theme
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 icon_root="$repo_root/integrations/icons/aranea/scalable"
 font="${ARANEA_ICON_FONT:-/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Regular.ttf}"
@@ -8,10 +14,21 @@ point_size="${ARANEA_ICON_POINT_SIZE:-96}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-[[ -f "$font" ]] || { printf 'Font not found: %s\n' "$font" >&2; exit 1; }
-command -v magick >/dev/null 2>&1 || { echo 'magick is required' >&2; exit 1; }
-command -v potrace >/dev/null 2>&1 || { echo 'potrace is required' >&2; exit 1; }
+[[ -f "$font" ]] || {
+  printf 'Font not found: %s\n' "$font" >&2
+  exit 1
+}
+command -v magick >/dev/null 2>&1 || {
+  echo 'magick is required' >&2
+  exit 1
+}
+command -v potrace >/dev/null 2>&1 || {
+  echo 'potrace is required' >&2
+  exit 1
+}
 
+# Traces the glyph at hex CODEPOINT once and writes it, recoloured, to each
+# icon path given after it (relative to the scalable dir).
 render_group() {
   local codepoint="$1"
   shift
@@ -29,10 +46,10 @@ render_group() {
       printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s" preserveAspectRatio="xMidYMid meet">\n' "$viewbox"
       printf '<title>Aranea Command Center %s glyph</title>\n' "$label"
       printf '<metadata>Source glyph U+%s from JetBrainsMono Nerd Font</metadata>\n' "$codepoint"
-      sed -n '/<g transform=/,/<\/g>/p' "$tmp_dir/raw.svg" \
-        | sed 's/fill="#000000" stroke="none"/fill="#3bff9e"/'
+      sed -n '/<g transform=/,/<\/g>/p' "$tmp_dir/raw.svg" |
+        sed 's/fill="#000000" stroke="none"/fill="#3bff9e"/'
       printf '</svg>\n'
-    } > "$output"
+    } >"$output"
   done
 }
 
@@ -54,7 +71,7 @@ render_group F1F8 places/user-trash.svg places/user-trash-symbolic.svg places/us
 render_group F0F6 mimetypes/text-x-generic.svg mimetypes/text-plain.svg mimetypes/text-markdown.svg \
   mimetypes/application-json.svg mimetypes/application-schema+json.svg mimetypes/application-toml.svg \
   mimetypes/x-office-document.svg mimetypes/application-x-desktop.svg
-render_group F15B actions/document-new.svg mimetypes/text-x-generic.svg
+render_group F15B actions/document-new.svg
 render_group F489 apps/utilities-terminal.svg
 render_group E615 apps/preferences-system.svg
 render_group F002 actions/edit-find.svg

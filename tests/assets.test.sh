@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# Contract for repo assets: every background in the manifest and every link
+# in the README exists, the hero showcase GIF has the right size and frame
+# count, SVGs are well-formed XML, and images are readable.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 while IFS= read -r path; do
   test -n "$path"
@@ -11,7 +15,7 @@ done < <(sed -n 's/^path = "\(.*\)"$/\1/p' "$repo_root/backgrounds/manifest.toml
 test -f "$repo_root/screenshots/hero-showcase.gif"
 hero_dimensions="$(identify -format '%wx%h' "$repo_root/screenshots/hero-showcase.gif[0]")"
 hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
-[[ "$hero_dimensions" == '1280x720' && "$hero_frames" -eq 21 ]] || {
+[[ "$hero_dimensions" == '1280x720' && "$hero_frames" -eq 28 ]] || {
   hero_info="$hero_dimensions $hero_frames"
   echo "unexpected hero showcase metadata: $hero_info" >&2
   exit 1

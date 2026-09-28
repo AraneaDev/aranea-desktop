@@ -12,21 +12,13 @@ the shell for its whole session.
 - The bar receives its config from the host shell as a `barConfig` property; the host loads it from `~/.config/omarchy/shell.json` (or `config/omarchy/shell.json` when the user has no file).
 - `omarchy bar position` updates only the user shell.json file.
 
-Aranea adds a profile filter on top of this host layout. Set
-`ARANEA_BAR_PROFILE=minimal|diagnostic|ceremony`, or add `"profile"` under
-`bar` in shell.json. `minimal` is the default and removes secondary telemetry
-such as weather, update, agent, and Bluetooth modules; the other profiles keep
-the complete configured layout.
-
-Use `scripts/aranea-bar-profile list` to see the choices and
-`scripts/aranea-bar-profile set diagnostic` to change the profile safely. The
-helper preserves the previous shell configuration as
-`shell.json.aranea-profile.bak`; `scripts/aranea-doctor --json` reports the
+The bar shows exactly the modules listed in `shell.json`; there are no
+profiles. `scripts/aranea-doctor --json` reports the
 runtime and QML health checks alongside the active shell/plugin state.
 
 ## Customizing
 
-The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
+The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](https://github.com/basecamp/omarchy/blob/v4.0.4/config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
 
 The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable widgets with `omarchy plugin enable` and `omarchy plugin disable` (widget ids come from `omarchy plugin list`).
 
@@ -45,14 +37,8 @@ Example `shell.json` (bar subtree only shown):
         { "id": "omarchy.spacer", "size": 12 },
         { "id": "omarchy.workspaces" }
       ],
-      "center": [
-        { "id": "omarchy.media" },
-        { "id": "omarchy.clock", "format": "HH:mm" }
-      ],
-      "right": [
-        { "id": "omarchy.audio" },
-        { "id": "omarchy.power" }
-      ]
+      "center": [{ "id": "omarchy.media" }, { "id": "omarchy.clock", "format": "HH:mm" }],
+      "right": [{ "id": "omarchy.audio" }, { "id": "omarchy.power" }]
     }
   }
 }
@@ -64,17 +50,17 @@ Example `shell.json` (bar subtree only shown):
 
 ### First-party interactive widgets
 
-| Name | What it does | Interactions |
-|---|---|---|
-| `omarchy.menu` | Omarchy menu launcher | left = menu · right = terminal |
-| `omarchy.workspaces` | Hyprland workspace switcher | left = focus workspace |
-| `omarchy.clock` | Date/time label + popup with a month grid, ISO week numbers, and month stepping | left = popup · right = cycle label format · middle = timezone selector |
-| `omarchy.media` | MPRIS now-playing — scrolling track + artist, cover-art popup | left = play/pause · middle = next · scroll = prev/next · right = popup |
-| `omarchy.indicators` | Manual state indicators | left = indicator action |
-| `omarchy.system-update` | Available update indicator | left = update |
-| `omarchy.tray` | System tray | hover = reveal drawer · right on chevron = manage |
-| `omarchy.weather` | Weather icon + popup with forecast | left = popup · right = full notification |
-| `omarchy.microphone` | Mic icon + scroll volume | left = mute toggle · middle = audio panel · scroll = source volume |
+| Name                    | What it does                                                                    | Interactions                                                           |
+| ----------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `omarchy.menu`          | Omarchy menu launcher                                                           | left = menu · right = terminal                                         |
+| `omarchy.workspaces`    | Hyprland workspace switcher                                                     | left = focus workspace                                                 |
+| `omarchy.clock`         | Date/time label + popup with a month grid, ISO week numbers, and month stepping | left = popup · right = cycle label format · middle = timezone selector |
+| `omarchy.media`         | MPRIS now-playing — scrolling track + artist, cover-art popup                   | left = play/pause · middle = next · scroll = prev/next · right = popup |
+| `omarchy.indicators`    | Manual state indicators                                                         | left = indicator action                                                |
+| `omarchy.system-update` | Available update indicator                                                      | left = update                                                          |
+| `omarchy.tray`          | System tray                                                                     | hover = reveal drawer · right on chevron = manage                      |
+| `omarchy.weather`       | Weather icon + popup with forecast                                              | left = popup · right = full notification                               |
+| `omarchy.microphone`    | Mic icon + scroll volume                                                        | left = mute toggle · middle = audio panel · scroll = source volume     |
 
 | `omarchy.audio` | Volume icon + popup with master slider, output-device picker, per-app mixer | left = popup · right = mute · middle = popup · scroll = volume |
 | `omarchy.network` | Wi-Fi/Ethernet icon + popup with Wi-Fi scan, signal, connect, DNS provider selection | left = popup |
@@ -103,7 +89,14 @@ Command module:
     "layout": {
       "right": [
         { "id": "omarchy.tray" },
-        { "id": "vpn", "type": "command", "exec": "~/.config/omarchy/bar/scripts/vpn-status", "interval": 5, "tooltip": "VPN", "onClick": "nm-connection-editor" },
+        {
+          "id": "vpn",
+          "type": "command",
+          "exec": "~/.config/omarchy/bar/scripts/vpn-status",
+          "interval": 5,
+          "tooltip": "VPN",
+          "onClick": "nm-connection-editor"
+        },
         { "id": "omarchy.audio" }
       ]
     }
@@ -114,7 +107,7 @@ Command module:
 The command may print plain text or Waybar-style JSON, for example:
 
 ```json
-{"text":"󰌆","tooltip":"Work VPN","class":"active"}
+{ "text": "󰌆", "tooltip": "Work VPN", "class": "active" }
 ```
 
 QML module:
@@ -124,10 +117,7 @@ QML module:
   "version": 1,
   "bar": {
     "layout": {
-      "right": [
-        { "id": "gpu", "type": "qml" },
-        { "id": "omarchy.audio" }
-      ]
+      "right": [{ "id": "gpu", "type": "qml" }, { "id": "omarchy.audio" }]
     }
   }
 }

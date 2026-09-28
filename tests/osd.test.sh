@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
+# Contract for the araneadev.osd plugin: manifest id, Osd.qml targets the
+# "osd" surface, and deploy-plugins-safely/repair-shell-config know about it.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
-node - "$repo_root" <<'NODE'
-const root = process.argv[2]
-const model = require(`${root}/plugins/araneadev.osd/OsdModel.js`)
-
-const progress = model.stateForShow('volume', '', '150', '100', '', '1200')
-if (!progress.hasProgress || progress.value !== 100 || progress.message !== '100%') throw new Error('progress payload was not clamped')
-if (model.progressFraction(progress) !== 1) throw new Error('progress fraction was not normalized')
-
-const message = model.stateForShow('media-play', 'Playing', '', '100', '', 'not-a-number')
-if (message.hasProgress || message.message !== 'Playing' || message.duration !== 1200) throw new Error('message payload was not normalized')
-
-const zero = model.stateForShow('volume', '', '0', '0', '', '-1')
-if (zero.maxValue !== 1 || model.progressFraction(zero) !== 0 || zero.duration !== 0) throw new Error('zero/max duration edge case failed')
-if (model.iconFor('brightness', 50) !== '󰍹') throw new Error('icon mapping changed')
-
-console.log('osd model contract passed')
-NODE
+# Logic contract: tests/js/osd.test.js (node:test; run by tests/js.test.sh).
 
 test -f "$repo_root/plugins/araneadev.osd/manifest.json"
 grep -Fq '"id": "araneadev.osd"' "$repo_root/plugins/araneadev.osd/manifest.json"
 grep -Fq 'target: "osd"' "$repo_root/plugins/araneadev.osd/Osd.qml"
 grep -Fq 'araneadev.osd' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'araneadev.osd' "$repo_root/scripts/repair-shell-config"
+
+# --- 4d: unused OSD members stay gone
+if grep -Eq 'mediaOsd|iconKey' "$repo_root/plugins/araneadev.osd/Osd.qml"; then
+  echo "unused mediaOsd/iconKey are back" >&2
+  exit 1
+fi

@@ -5,9 +5,7 @@
   "version": "1.0.0",
   "author": "AraneaDev",
   "description": "Emoji search with recents, insert and copy",
-  "kinds": [
-    "overlay"
-  ],
+  "kinds": ["overlay"],
   "keepLoaded": true,
   "entryPoints": {
     "overlay": "Emojis.qml"

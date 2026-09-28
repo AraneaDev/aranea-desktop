@@ -11,12 +11,15 @@
 # therefore checks the title, and the commit-msg hook checks what you type
 # locally. Both call this one script, so neither can drift from the other.
 #
+# Usage: tools/check-commit-style.sh <subject> | --file <path>
+#
 #   tools/check-commit-style.sh "fix: stop the folder icon from clashing"
 #   tools/check-commit-style.sh --file .git/COMMIT_EDITMSG
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Prints the usage line to stderr and exits 2.
 usage() {
   printf 'usage: check-commit-style.sh <subject> | --file <path>\n' >&2
   exit 2
@@ -71,6 +74,8 @@ if command -v jq >/dev/null 2>&1 && [ -f "$config" ]; then
   [ -n "$from_config" ] && types="$from_config"
 fi
 
+# Prints reason $1, the subject, examples and the accepted types to stderr,
+# then exits 1.
 fail() {
   printf '\n  %s\n\n' "$1" >&2
   printf '    %s\n\n' "$subject" >&2

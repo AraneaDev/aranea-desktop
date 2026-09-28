@@ -1,0 +1,168 @@
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "active" not found on type "QObject"
+2	plugins/araneadev.bar/Bar.qml:missing-property:Member "background" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "implicitHeight" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "implicitWidth" not found on type "QObject"
+2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeHorizontal" not found on type "QObject"
+2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeVertical" not found on type "QObject"
+3	plugins/araneadev.bar/Bar.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "xs" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "adjustment". This may be due to a missing import statement or incomplete qmltypes files.
+1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "edges". This may be due to a missing import statement or incomplete qmltypes files.
+1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "gravity". This may be due to a missing import statement or incomplete qmltypes files.
+3	plugins/araneadev.bar/Bar.qml:uncreatable-type:Type PanelWindow is not creatable.
+186	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access
+1	plugins/araneadev.bar/Bar.qml:unqualified:unknown grouped property scope margins.
+2	plugins/araneadev.bar/Bar.qml:unresolved-type:Type "PopupAnchor" of property "anchor" not found. This is likely due to a missing dependency entry or a type not being exposed declaratively.
+1	plugins/araneadev.bar/Bar.qml:unresolved-type:Type margins is used but it is not resolved
+1	plugins/araneadev.bar/Bar.qml:unused-imports:Unused import
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "background" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "menuFamily" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "panelPadding" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "rowPaddingX" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "scrim" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "selectedBackground" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "selectedText" not found on type "QObject"
+1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "text" not found on type "QObject"
+3	plugins/araneadev.clipboard/Clipboard.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+2	plugins/araneadev.clipboard/ClipboardWindow.qml:missing-property:Member "body" not found on type "QObject"
+3	plugins/araneadev.clipboard/ClipboardWindow.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.clipboard/ClipboardWindow.qml:missing-property:Member "displayLarge" not found on type "QObject"
+1	plugins/araneadev.clipboard/ClipboardWindow.qml:missing-property:Member "icon" not found on type "QObject"
+4	plugins/araneadev.clipboard/ClipboardWindow.qml:missing-property:Member "title" not found on type "QObject"
+1	plugins/araneadev.clipboard/ClipboardWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+23	plugins/araneadev.clipboard/ClipboardWindow.qml:unqualified:Unqualified access
+3	plugins/araneadev.clipboard/OverlayChrome.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.clipboard/OverlayChrome.qml:missing-property:Member "menuFamily" not found on type "QObject"
+1	plugins/araneadev.clipboard/OverlayChrome.qml:missing-property:Member "selectedText" not found on type "QObject"
+2	plugins/araneadev.clipboard/OverlayChrome.qml:missing-property:Member "subtitle" not found on type "QObject"
+1	plugins/araneadev.clipboard/OverlayChrome.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.clipboard/OverlayChrome.qml:missing-property:Member "title" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "background" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "caption" not found on type "QObject"
+3	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "display" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "displayLarge" not found on type "QObject"
+2	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "md" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "menuFamily" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "panelPadding" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "scrim" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "selectedBackground" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "selectedText" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "title" not found on type "QObject"
+1	plugins/araneadev.emojis/Emojis.qml:uncreatable-type:Type PanelWindow is not creatable.
+17	plugins/araneadev.emojis/Emojis.qml:unqualified:Unqualified access
+3	plugins/araneadev.emojis/OverlayChrome.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.emojis/OverlayChrome.qml:missing-property:Member "menuFamily" not found on type "QObject"
+1	plugins/araneadev.emojis/OverlayChrome.qml:missing-property:Member "selectedText" not found on type "QObject"
+2	plugins/araneadev.emojis/OverlayChrome.qml:missing-property:Member "subtitle" not found on type "QObject"
+1	plugins/araneadev.emojis/OverlayChrome.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.emojis/OverlayChrome.qml:missing-property:Member "title" not found on type "QObject"
+4	plugins/araneadev.health/Monitor.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+2	plugins/araneadev.health/Panel.qml:missing-property:Member "body" not found on type "QObject"
+2	plugins/araneadev.health/Panel.qml:missing-property:Member "caption" not found on type "QObject"
+4	plugins/araneadev.health/Panel.qml:missing-property:Member "countdown" not found on type "QObject"
+1	plugins/araneadev.health/Panel.qml:missing-property:Member "family" not found on type "QObject"
+9	plugins/araneadev.health/Panel.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.health/Panel.qml:missing-property:Member "title" not found on type "QObject"
+28	plugins/araneadev.health/Panel.qml:unqualified:Unqualified access
+1	plugins/araneadev.lock/LockView.qml:missing-property:Member "background" not found on type "QObject"
+3	plugins/araneadev.lock/LockView.qml:missing-property:Member "bodySmall" not found on type "QObject"
+1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderActive" not found on type "QObject"
+1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderError" not found on type "QObject"
+9	plugins/araneadev.lock/LockView.qml:missing-property:Member "family" not found on type "QObject"
+5	plugins/araneadev.lock/LockView.qml:missing-property:Member "heading" not found on type "QObject"
+5	plugins/araneadev.lock/LockView.qml:missing-property:Member "placeholder" not found on type "QObject"
+1	plugins/araneadev.lock/LockView.qml:missing-property:Member "selection" not found on type "QObject"
+6	plugins/araneadev.lock/LockView.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.lock/LockView.qml:missing-property:Member "textError" not found on type "QObject"
+1	plugins/araneadev.lock/LockView.qml:unqualified:Unqualified access
+2	plugins/araneadev.lock/Service.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+1	plugins/araneadev.lock/Service.qml:uncreatable-type:Type PanelWindow is not creatable.
+12	plugins/araneadev.lock/Service.qml:unqualified:Unqualified access
+1	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "barSize" not found on type "QObject"
+2	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "run" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "background" not found on type "QObject"
+2	plugins/araneadev.menu/Menu.qml:missing-property:Member "bodySmall" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.menu/Menu.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "menuFamily" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "panelPadding" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "scrim" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "selectedBackground" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "selectedBorder" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "selectedText" not found on type "QObject"
+1	plugins/araneadev.menu/Menu.qml:missing-property:Member "text" not found on type "QObject"
+2	plugins/araneadev.menu/Menu.qml:missing-property:Member "title" not found on type "QObject"
+3	plugins/araneadev.menu/Menu.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "body" not found on type "QObject"
+3	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "bodySmall" not found on type "QObject"
+8	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "displayLarge" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "hairline" not found on type "QObject"
+4	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "iconLarge" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "md" not found on type "QObject"
+2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "title" not found on type "QObject"
+2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "xs" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+65	plugins/araneadev.menu/MenuWindow.qml:unqualified:Unqualified access
+2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+1	plugins/araneadev.notifications/Inbox.qml:unused-imports:Unused import
+5	plugins/araneadev.notifications/Panel.qml:missing-property:Member "body" not found on type "QObject"
+2	plugins/araneadev.notifications/Panel.qml:missing-property:Member "caption" not found on type "QObject"
+5	plugins/araneadev.notifications/Panel.qml:missing-property:Member "countdown" not found on type "QObject"
+9	plugins/araneadev.notifications/Panel.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "subtitle" not found on type "QObject"
+7	plugins/araneadev.notifications/Panel.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "title" not found on type "QObject"
+37	plugins/araneadev.notifications/Panel.qml:unqualified:Unqualified access
+1	plugins/araneadev.notifications/Service.qml:missing-property:Member "sizeHorizontal" not found on type "QObject"
+1	plugins/araneadev.notifications/Service.qml:missing-property:Member "sizeVertical" not found on type "QObject"
+1	plugins/araneadev.notifications/Toasts.qml:uncreatable-type:Type PanelWindow is not creatable.
+5	plugins/araneadev.notifications/Toasts.qml:unqualified:Unqualified access
+1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "background" not found on type "QObject"
+1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "body" not found on type "QObject"
+2	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "caption" not found on type "QObject"
+4	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "countdown" not found on type "QObject"
+1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "displayLarge" not found on type "QObject"
+4	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "icon" not found on type "QObject"
+5	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "text" not found on type "QObject"
+2	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "title" not found on type "QObject"
+3	plugins/araneadev.osd/Osd.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.osd/Osd.qml:missing-property:Member "border" not found on type "QObject"
+4	plugins/araneadev.osd/Osd.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.osd/Osd.qml:missing-property:Member "hairline" not found on type "QObject"
+1	plugins/araneadev.osd/Osd.qml:missing-property:Member "sm" not found on type "QObject"
+4	plugins/araneadev.osd/Osd.qml:missing-property:Member "text" not found on type "QObject"
+2	plugins/araneadev.osd/Osd.qml:missing-property:Member "title" not found on type "QObject"
+1	plugins/araneadev.osd/Osd.qml:uncreatable-type:Type PanelWindow is not creatable.
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "accent" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "background" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "borderError" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "controlHeight" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "menuFamily" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "panelPadding" not found on type "QObject"
+4	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "scrim" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "text" not found on type "QObject"
+2	plugins/araneadev.polkit/PolkitAgent.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+2	plugins/araneadev.polkit/PolkitAgent.qml:unqualified:Unqualified access
+1	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "bodySmall" not found on type "QObject"
+7	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "family" not found on type "QObject"
+2	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "iconLarge" not found on type "QObject"
+2	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "subtitle" not found on type "QObject"
+6	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "textError" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "title" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+7	plugins/araneadev.polkit/PolkitWindow.qml:unqualified:Unqualified access

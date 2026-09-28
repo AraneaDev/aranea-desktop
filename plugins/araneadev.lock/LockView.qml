@@ -1,3 +1,8 @@
+// Aranea lock screen view: blurred wallpaper, spider logo, password field,
+// clock and hint line. Purely presentational; all state comes in through
+// properties and user actions go out through signals. Instantiated by
+// Service.qml twice: inside the WlSessionLockSurface (the real lock) and in
+// the preview PanelWindow (input disabled).
 import QtQuick
 import QtQuick.Effects
 import Quickshell
@@ -7,65 +12,90 @@ import qs.Ui
 Item {
   id: root
 
+  // Absolute path of the wallpaper to show behind the lock (empty for none).
   property string backgroundPath: ""
+  // Bumped by the service when the wallpaper changes; appended to image URLs to force a reload.
   property int backgroundVersion: 0
+  // True when a fingerprint is enrolled: shows the fingerprint icon and changes the hint text.
   property bool fingerprintConfigured: false
+  // True while PAM checks a password: shows "Checking..." and makes the field read-only.
   property bool authenticatingPassword: false
+  // Last authentication error; shown as the placeholder and switches the border to the error colour.
   property string failureMessage: ""
-  property int failedAttempts: 0
+  // Whether the password field accepts input; focus is forced into it whenever this turns true.
   property bool inputEnabled: true
+  // Whether to load and blur the wallpaper at all; false leaves the plain background colour.
   property bool loadBackground: true
+  // Password text owned by the service; copied into the field whenever it changes.
   property string passwordText: ""
+  // Set while syncPasswordText() writes the field, so the resulting edit is not echoed back.
   property bool syncingPasswordText: false
+  // Current time as HH:mm, refreshed every second by updateClock().
   property string clockText: ""
+  // Current date (weekday, day, month), refreshed with the clock so a lock
+  // left up past midnight shows the right day.
+  property string dateText: ""
 
+  // Placeholder shown in the empty field when nothing else needs saying.
   readonly property string placeholderText: "Enter Password"
-  readonly property string stateHome: Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")
+  // Omarchy's fixed state path (~/.local/state; Omarchy ignores the XDG
+  // state variable), the same root Service.qml uses.
+  readonly property string stateHome: Quickshell.env("HOME") + "/.local/state"
+  // Directory of the active Omarchy theme; the spider logo (unlock.png) is loaded from here.
   readonly property string themeAssetRoot: stateHome + "/omarchy/current/theme"
+  // Password field width in pixels.
   readonly property int fieldWidth: 381
+  // Password field height in pixels.
   readonly property int fieldHeight: 67
+  // Password field border thickness in pixels.
   readonly property int outlineThickness: 3
+  // Font size of the placeholder and messages in the field.
   readonly property int fieldFontSize: Math.round(Style.font.heading * 1.125)
+  // Full-size font size of the password dots, before passwordDotScale shrinks them.
   readonly property int passwordDotFontSize: Math.round(Style.font.heading * 1.33)
+  // Full-size letter spacing between password dots.
   readonly property int passwordDotLetterSpacing: Math.round(Style.font.heading * 0.19)
   // Space to keep clear on each side of the field for the fingerprint icon
   // (icon width plus a gap) so the centered dots never run under it.
   readonly property real fingerprintReserve: fingerprintConfigured ? Math.round(fingerprintIcon.implicitWidth + 12) : 0
   // Shrink the dots to fit once the password outgrows the field, so every
-  // keystroke stays visible — otherwise long passwords clip with no feedback.
-  readonly property real passwordDotScale: dotMetrics.advanceWidth > 0
-    ? Math.min(1, (passwordInput.width - 4) / dotMetrics.advanceWidth)
-    : 1
+  // keystroke stays visible; otherwise long passwords clip with no feedback.
+  readonly property real passwordDotScale: dotMetrics.advanceWidth > 0 ? Math.min(1, (passwordInput.width - 4) / dotMetrics.advanceWidth) : 1
+  // Whether the text cursor may show: input enabled, no check running and no error shown.
   readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
+  // True while a failure message is shown.
   readonly property bool errorState: failureMessage.length > 0
-  readonly property var inputBorderSpec: errorState
-    ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha")
-    : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
+  // Border spec for the field: the lock surface's error border in errorState, its active border otherwise.
+  readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha") : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
 
+  // Emitted on Enter with the typed password (only when it is non-empty).
   signal submitPassword(string password)
+  // Emitted when the user edits the field, or with "" to clear it (Enter, Escape, Ctrl+U).
   signal passwordTextEdited(string password)
-  signal clearFailureRequested()
-  signal wakeRequested()
+  // Emitted when the user starts typing while a failure message is shown.
+  signal clearFailureRequested
+  // Emitted on pointer movement, clicks, key presses and typing so the service can wake the display.
+  signal wakeRequested
 
   // Cache-busts the lock background by appending `?v=`. Adding a query
   // string keeps Image's loader happy while forcing it to reload when the
   // user picks a new background mid-session.
   function fileUrl(path: string): string {
-    if (!path) return ""
+    if (!path)
+      return ""
     var encoded = String(path).split("/").map(encodeURIComponent).join("/")
     return "file://" + encoded + "?v=" + backgroundVersion
   }
 
+  // Gives keyboard focus to the password field.
   function forcePasswordFocus() {
     passwordInput.forceActiveFocus()
   }
 
-  function clearPassword() {
-    passwordTextEdited("")
-  }
-
+  // Copies passwordText into the field if they differ, flagging the write so it is not re-emitted.
   function syncPasswordText() {
-    if (passwordInput.text === passwordText) return
+    if (passwordInput.text === passwordText)
+      return
     syncingPasswordText = true
     passwordInput.text = passwordText
     syncingPasswordText = false
@@ -73,16 +103,21 @@ Item {
 
   onPasswordTextChanged: syncPasswordText()
   onInputEnabledChanged: {
-    if (inputEnabled) Qt.callLater(forcePasswordFocus)
+    if (inputEnabled)
+      Qt.callLater(forcePasswordFocus)
   }
   Component.onCompleted: {
     syncPasswordText()
     updateClock()
-    if (inputEnabled) Qt.callLater(forcePasswordFocus)
+    if (inputEnabled)
+      Qt.callLater(forcePasswordFocus)
   }
 
+  // Sets clockText (HH:mm) and dateText to now.
   function updateClock(): void {
-    clockText = Qt.formatDateTime(new Date(), "HH:mm")
+    var now = new Date()
+    clockText = Qt.formatDateTime(now, "HH:mm")
+    dateText = Qt.formatDate(now, "dddd  •  dd MMMM")
   }
 
   Timer {
@@ -136,16 +171,28 @@ Item {
     Rectangle {
       anchors.fill: parent
       gradient: Gradient {
-        GradientStop { position: 0.0; color: "#4406090d" }
-        GradientStop { position: 0.48; color: "#1806090d" }
-        GradientStop { position: 1.0; color: "#7006090d" }
+        GradientStop {
+          position: 0.0
+          color: "#4406090d"
+        }
+        GradientStop {
+          position: 0.48
+          color: "#1806090d"
+        }
+        GradientStop {
+          position: 1.0
+          color: "#7006090d"
+        }
       }
     }
 
     MouseArea {
       anchors.fill: parent
       hoverEnabled: true
-      onClicked: { root.wakeRequested(); root.forcePasswordFocus() }
+      onClicked: {
+        root.wakeRequested()
+        root.forcePasswordFocus()
+      }
       onPositionChanged: root.wakeRequested()
     }
 
@@ -192,20 +239,23 @@ Item {
         }
 
         onTextChanged: {
-          if (!root.syncingPasswordText) root.passwordTextEdited(text)
+          if (!root.syncingPasswordText)
+            root.passwordTextEdited(text)
           if (text.length > 0) {
             root.wakeRequested()
           }
-          if (text.length > 0 && root.failureMessage.length > 0) root.clearFailureRequested()
+          if (text.length > 0 && root.failureMessage.length > 0)
+            root.clearFailureRequested()
         }
 
         onAccepted: {
           var submitted = root.passwordText
           root.passwordTextEdited("")
-          if (submitted.length > 0) root.submitPassword(submitted)
+          if (submitted.length > 0)
+            root.submitPassword(submitted)
         }
 
-        Keys.onPressed: function(event) {
+        Keys.onPressed: function (event) {
           root.wakeRequested()
           if (event.key === Qt.Key_Escape || (event.modifiers & Qt.ControlModifier && event.key === Qt.Key_U)) {
             root.passwordTextEdited("")
@@ -302,7 +352,7 @@ Item {
 
       Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: Qt.formatDate(new Date(), "dddd  •  dd MMMM")
+        text: root.dateText
         color: Color.lock.placeholder
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall

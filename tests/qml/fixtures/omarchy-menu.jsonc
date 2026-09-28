@@ -1,0 +1,9 @@
+// A small stand-in for Omarchy's default menu, so tests/qml/menu.qml does not
+// depend on the Omarchy installed on the machine running it.
+{
+  "apps": {"icon":"A","label":"Apps","aliases":["app","applications"],"provider":"apps"},
+  "setup": {"icon":"S","label":"Setup","aliases":["settings"]},
+  "setup.power": {"icon":"P","label":"Power Profile","action":"omarchy-launch-power"},
+  "system": {"icon":"Y","label":"System","aliases":["power-menu"]},
+  "system.lock": {"icon":"L","label":"Lock","action":"omarchy-lock-screen"}
+}

@@ -1,0 +1,13 @@
+// markdownlint for the repository's Markdown. Rules are the defaults except:
+{
+  "config": {
+    "default": true,
+    // Long lines: prose and tables are wrapped by hand or not at all.
+    "MD013": false,
+    // Inline HTML: the README centres its hero image with <p align>.
+    "MD033": false,
+    // First line: the README opens with badges, not a heading.
+    "MD041": false
+  },
+  "ignores": ["CHANGELOG.md", "docs/superpowers/**", "node_modules/**"]
+}

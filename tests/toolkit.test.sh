@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
+# Contract for the cursor/GTK/Kvantum integrations and the dev/CI tooling
+# around them: cursor theme wiring and artwork (no leftover stock colours or
+# eye dots, hyprcursor copies matching the SVG source), the generated icon
+# theme's index and install wiring, pinned dev tooling (package.json,
+# lockfile, Node version, tool checksums), and the CI/release/git-hook setup
+# (tools/check invocations, SHA-pinned actions, commit style, license and
+# contributing docs, a live README badge).
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 grep -Fq 'Name=Aranea' "$repo_root/integrations/cursor/index.theme"
 grep -Fq 'Inherits=' "$repo_root/integrations/cursor/index.theme"
@@ -54,4 +62,47 @@ grep -Fq 'icon_theme=Aranea-icons' "$repo_root/scripts/install-integration"
 grep -Fq 'org.gnome.desktop.interface icon-theme' "$repo_root/scripts/install-integration"
 grep -Fq 'nautilus.icon-view default-zoom-level small' "$repo_root/scripts/install-integration"
 
+# Dev tooling is pinned: private package, lockfile, Node version, binary pins.
+jq -e '.private == true and (.dependencies // {} | length) == 0
+  and (.devDependencies | has("eslint") and has("@eslint/js") and has("globals") and has("prettier") and has("markdownlint-cli2"))' \
+  "$repo_root/package.json" >/dev/null
+test -f "$repo_root/package-lock.json"
+[[ "$(<"$repo_root/.nvmrc")" == 26 ]]
+grep -Fq 'version="3.14.1"' "$repo_root/tools/install-shfmt"
+grep -Fq '76e77641faa025814b77f153b29796b8e6fa2fca03e0c76a691608b86c7ea7bf' "$repo_root/tools/install-shfmt"
+grep -Fq 'version="1.7.12"' "$repo_root/tools/install-actionlint"
+grep -Fq '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' "$repo_root/tools/install-actionlint"
+grep -Fxq 'node_modules/' "$repo_root/.gitignore"
+grep -Fxq 'coverage/' "$repo_root/.gitignore"
+
+# CI runs tools/check; release checks before tagging; actions pinned by SHA.
+grep -Fq 'tools/check --skip smoke' "$repo_root/.github/workflows/ci.yml"
+grep -Fq 'ARANEA_CHECK_REQUIRE_ALL' "$repo_root/.github/workflows/ci.yml"
+grep -Fq 'container: archlinux' "$repo_root/.github/workflows/ci.yml"
+[[ "$(<"$repo_root/.omarchy-version")" == v4.0.4 ]]
+if grep -hE '^\s*-?\s*uses: [^@]+@v[0-9]' "$repo_root"/.github/workflows/*.yml; then
+  echo "action pinned by tag, not SHA" >&2
+  exit 1
+fi
+grep -Fq 'persist-credentials: false' "$repo_root/.github/workflows/release-please.yml"
+grep -Fq 'tools/check --staged --fast' "$repo_root/.githooks/pre-commit"
+grep -Fq 'tools/check --fast' "$repo_root/.githooks/pre-push"
+grep -Fq 'package-ecosystem: npm' "$repo_root/.github/dependabot.yml"
+# build: and revert: are real commit types here (this branch uses build:).
+"$repo_root/tools/check-commit-style.sh" "build: pin a tool"
+"$repo_root/tools/check-commit-style.sh" "revert: undo a change"
+# The release only tags after tools/check passed on the merged commit.
+grep -Fq 'needs: verify' "$repo_root/.github/workflows/release-please.yml"
+grep -Fq 'MIT License' "$repo_root/LICENSE"
+test -f "$repo_root/SECURITY.md" && test -f "$repo_root/.github/pull_request_template.md"
+grep -Fq 'tools/check' "$repo_root/CONTRIBUTING.md"
+grep -Fq 'tools/check' "$repo_root/.github/pull_request_template.md"
+if grep -Fq 'tests-27%20passing' "$repo_root/README.md"; then
+  echo "static test badge" >&2
+  exit 1
+fi
+grep -Fq 'actions/workflow/status/AraneaDev/aranea-desktop/ci.yml' "$repo_root/README.md"
+# Hooks do nothing on branches that predate tools/check.
+grep -Fq '[ -x tools/check ] || exit 0' "$repo_root/.githooks/pre-commit"
+grep -Fq '[ -x tools/check ] || exit 0' "$repo_root/.githooks/pre-push"
 echo "toolkit contract passed"

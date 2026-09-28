@@ -1,3 +1,8 @@
+// Aranea on-screen display (the araneadev.osd plugin's "panel" entry point,
+// replacing the stock Omarchy OSD): a bottom-centre card with an icon, a
+// filament progress strand and a value or message. Driven through the "osd"
+// IPC target (show/close/state/ping); display rules live in OsdModel.js.
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -9,32 +14,52 @@ import "OsdModel.js" as OsdModel
 Item {
   id: root
 
+  // Whether the card is shown; cleared by the hide timer or close().
   property bool opened: false
+  // Glyph shown in the icon column.
   property string icon: ""
-  property string iconKey: ""
+  // Value text (progress) or message text.
   property string message: ""
+  // Progress value, 0..maxValue.
   property int value: 0
+  // Progress maximum.
   property int maxValue: 100
+  // Show a progress strand and value; false shows a short strand and message.
   property bool hasProgress: true
+  // Ms before the card hides; 0 keeps it open.
   property int duration: 1200
+  // Animate the card; follows the aranea motion state file, else
+  // ARANEA_REDUCED_MOTION.
   property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
+  // $XDG_STATE_HOME/aranea/motion ("off" disables motion).
   readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
-  readonly property real fraction: OsdModel.progressFraction({ hasProgress: root.hasProgress, value: root.value, maxValue: root.maxValue })
-  readonly property bool mediaOsd: root.iconKey.indexOf("media") === 0 || root.iconKey.indexOf("player") === 0
+  // Filled part of the strand, 0..1.
+  readonly property real fraction: OsdModel.progressFraction({
+    hasProgress: root.hasProgress,
+    value: root.value,
+    maxValue: root.maxValue
+  })
+  // Padding between the card border and its content.
   readonly property int pad: Style.space(14)
+  // Spacing between the icon, strand and text.
   readonly property int gap: Style.space(12)
+  // Strand width: long with progress, short without.
   readonly property int strandWidth: root.hasProgress ? Style.space(180) : Style.space(80)
+  // Width of the icon column.
   readonly property int iconWidth: Style.space(28)
   // Keep the percentage/message slot wide enough for the largest normal
   // value at the active font size; a fixed 42px slot clipped `71%` to `7...`
   // on 4K captures.
   readonly property int valueWidth: Math.max(Style.space(56), messageMetrics.advanceWidth + Style.space(8))
+  // Message column width: the message's width, capped.
   readonly property int messageWidth: Math.min(Style.space(220), messageMetrics.advanceWidth)
+  // Width of the card content between the paddings.
   readonly property int contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
 
+  // Applies a request (OsdModel.stateForShow), opens the card and
+  // (re)starts the hide timer, or stops it for duration 0.
   function show(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration) {
     var next = OsdModel.stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration)
-    root.iconKey = next.iconKey
     root.icon = next.icon
     root.message = next.message
     root.value = next.value
@@ -42,10 +67,14 @@ Item {
     root.hasProgress = next.hasProgress
     root.duration = next.duration
     root.opened = true
-    if (root.duration > 0) hideTimer.restart()
-    else hideTimer.stop()
+    if (root.duration > 0)
+      hideTimer.restart()
+    else
+      hideTimer.stop()
   }
 
+  // Parses a JSON payload {icon, message, value, max, progressText,
+  // duration} and shows it; invalid JSON is ignored.
   function open(payloadJson: string): void {
     try {
       var payload = JSON.parse(payloadJson || "{}")
@@ -53,13 +82,16 @@ Item {
     } catch (error) {}
   }
 
-  function close(): void { root.opened = false }
+  // Hides the card.
+  function close(): void {
+    root.opened = false
+  }
 
   FileView {
     path: root.motionStatePath
     watchChanges: true
     printErrors: false
-    onLoaded: root.motionEnabled = String(text || "").trim() !== "off"
+    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
     onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
     onFileChanged: reload()
   }
@@ -80,16 +112,31 @@ Item {
 
   IpcHandler {
     target: "osd"
-    function show(payloadJson: string): string { root.open(payloadJson); return "ok" }
-    function close(): string { root.close(); return "ok" }
-    function state(): string { return root.opened ? "open" : "closed" }
-    function ping(): string { return "ok" }
+    function show(payloadJson: string): string {
+      root.open(payloadJson)
+      return "ok"
+    }
+    function close(): string {
+      root.close()
+      return "ok"
+    }
+    function state(): string {
+      return root.opened ? "open" : "closed"
+    }
+    function ping(): string {
+      return "ok"
+    }
   }
 
   PanelWindow {
     id: panel
     visible: root.opened || card.opacity > 0
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors {
+      top: true
+      bottom: true
+      left: true
+      right: true
+    }
     color: "transparent"
     WlrLayershell.namespace: "omarchy-osd"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -109,15 +156,23 @@ Item {
       borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(1)))
       radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
-      transform: Translate { y: card.revealOffset }
+      transform: Translate {
+        y: card.revealOffset
+      }
 
       Behavior on opacity {
         enabled: root.motionEnabled
-        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 160
+          easing.type: Easing.OutCubic
+        }
       }
       Behavior on revealOffset {
         enabled: root.motionEnabled
-        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 160
+          easing.type: Easing.OutCubic
+        }
       }
 
       Row {
@@ -159,7 +214,10 @@ Item {
             color: Color.accent
             Behavior on width {
               enabled: root.motionEnabled
-              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+              NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+              }
             }
           }
           Rectangle {
@@ -171,7 +229,10 @@ Item {
             color: Color.accent
             Behavior on x {
               enabled: root.motionEnabled
-              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+              NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+              }
             }
           }
         }

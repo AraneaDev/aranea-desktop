@@ -7,6 +7,8 @@ set -euo pipefail
 # plugin cannot register while the outgoing one holds the session, and once
 # that one is gone nothing is registered, so privileged actions get no prompt.
 # A restart lets the enabled agent register cleanly.
+#
+# Usage: scripts/finish-polkit-handover
 
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 marker="$state_root/polkit-handover"

@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
+# Contract for scripts/deploy-plugin: the target ends up with exactly the
+# source's files (stale files removed) and no staging directory is left
+# behind.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
 
 source_dir="$work_dir/source"
 target_dir="$work_dir/target"
 mkdir -p "$source_dir" "$target_dir"
-printf '%s\n' manifest > "$source_dir/manifest.json"
-printf '%s\n' qml > "$source_dir/Widget.qml"
-printf '%s\n' stale > "$target_dir/stale.txt"
+printf '%s\n' manifest >"$source_dir/manifest.json"
+printf '%s\n' qml >"$source_dir/Widget.qml"
+printf '%s\n' stale >"$target_dir/stale.txt"
 
 "$repo_root/scripts/deploy-plugin" "$source_dir" "$target_dir"
 

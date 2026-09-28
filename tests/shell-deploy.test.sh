@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
+# Contract for scripts/deploy-plugins-safely: it is wired into both hooks,
+# stops quickshell and restarts the shell, calls repair-shell-config, and
+# repairs shell.json even when every plugin is already deployed on disk (a
+# plugin present but never registered must not stay silently disabled).
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]
 grep -Fq 'deploy-plugins-safely' "$repo_root/hooks/theme-set"
@@ -18,12 +23,11 @@ bash -n "$repo_root/scripts/deploy-plugins-safely"
 # self-heals on the very next boot or theme-set instead of staying silently
 # disabled indefinitely.
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
 export ARANEA_STATE_ROOT="$work_dir/state"
 config_dir="$work_dir/config"
 plugins_dir="$config_dir/plugins"
 mkdir -p "$plugins_dir"
-cat > "$config_dir/shell.json" <<'EOF'
+cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
 for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd; do
@@ -34,5 +38,15 @@ done
 
 jq -e '.bar.id == "araneadev.bar"' "$config_dir/shell.json" >/dev/null
 jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit"] | sort)' "$config_dir/shell.json" >/dev/null
+
+# --- 4d: a missing argument prints a usage line and exits 2
+rc=0
+out="$("$repo_root/scripts/deploy-plugins-safely" 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'Usage: scripts/deploy-plugins-safely <theme-root> [target-root]' <<<"$out"
+rc=0
+out="$("$repo_root/scripts/deploy-plugin" 2>&1)" || rc=$?
+[[ $rc -eq 2 ]] || exit 1
+grep -Fq 'Usage: scripts/deploy-plugin <source-dir> <target-dir>' <<<"$out"
 
 echo "shell deployment lifecycle contract passed"

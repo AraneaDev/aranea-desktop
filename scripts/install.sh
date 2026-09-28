@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Installs Aranea Desktop: saves the profile, installs the theme with
+# `omarchy theme install`, adopts it as "aranea", installs the theme-set and
+# post-boot hooks, applies the theme and links the profile's integrations.
+# Asks for the profile with gum when interactive without --profile or --yes.
+#
+# Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes]
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
 theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/aranea-desktop.git}"
@@ -10,6 +17,7 @@ assume_yes=0
 profile="full"
 profile_explicit=0
 
+# Prints the usage text.
 usage() {
   cat <<'EOF'
 Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes]
@@ -18,10 +26,12 @@ Installs Aranea Desktop and its Omarchy theme/hooks.
 EOF
 }
 
+# Prints its arguments as one line.
 say() { printf '%s\n' "$*"; }
 
+# Runs the command, or only prints it in dry-run.
 run() {
-  if (( dry_run )); then
+  if ((dry_run)); then
     say "would run: $*"
   else
     "$@"
@@ -48,7 +58,10 @@ adopt_installed_theme() {
   name="$(installed_theme_name "$1")"
   [[ "$name" == aranea ]] && return 0
   themes_dir="$HOME/.config/omarchy/themes"
-  [[ -d "$themes_dir/$name" ]] || { say "installed theme not found: $themes_dir/$name" >&2; return 1; }
+  [[ -d "$themes_dir/$name" ]] || {
+    say "installed theme not found: $themes_dir/$name" >&2
+    return 1
+  }
   rm -rf "$themes_dir/aranea"
   mv "$themes_dir/$name" "$themes_dir/aranea"
 }
@@ -66,25 +79,38 @@ while (($#)); do
     --dry-run) dry_run=1 ;;
     --yes) assume_yes=1 ;;
     --source)
-      (($# >= 2)) || { say "--source requires a path or URL" >&2; exit 2; }
+      (($# >= 2)) || {
+        say "--source requires a path or URL" >&2
+        exit 2
+      }
       theme_source="$2"
       shift
       ;;
     --profile)
-      (($# >= 2)) || { say "--profile requires a value" >&2; exit 2; }
+      (($# >= 2)) || {
+        say "--profile requires a value" >&2
+        exit 2
+      }
       profile="$2"
       profile_explicit=1
       shift
       ;;
-    -h|--help) usage; exit 0 ;;
-    *) say "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      say "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
   esac
   shift
 done
 
 # An explicit --profile, --yes, or no interactive terminal all keep the
 # "full" default silent, exactly as before gum was ever in the picture.
-if (( ! profile_explicit )) && (( ! assume_yes )) && [[ -t 0 ]] && has_gum; then
+if ((! profile_explicit)) && ((! assume_yes)) && [[ -t 0 ]] && has_gum; then
   if profile_choice="$(gum choose \
     --header 'Choose an installation profile:' \
     'full       Every supported application integration' \
@@ -115,7 +141,7 @@ if ! command -v omarchy >/dev/null 2>&1 && [[ "${OMARCHY_INSTALLER_TEST:-}" != 1
   exit 1
 fi
 
-if (( dry_run )); then
+if ((dry_run)); then
   say "would persist profile: $profile"
   say "would install theme from: $theme_source"
   say "would install theme hooks"
@@ -129,11 +155,12 @@ if (( dry_run )); then
   fi
 else
   previous_theme="$(omarchy theme current 2>/dev/null || true)"
+  # EXIT trap: on failure, tells the user how to restore the previous theme.
   install_failure_handler() {
     local status=$?
-    if (( status != 0 )); then
+    if ((status != 0)); then
       if [[ -n "$previous_theme" ]]; then
-        say "Aranea install failed. Restore the previous theme with: omarchy theme set $previous_theme" >&2
+        say "Aranea install failed. Restore the previous theme with: omarchy theme set \"$previous_theme\"" >&2
       else
         say "Aranea install failed before a previous theme could be detected." >&2
       fi
@@ -143,14 +170,16 @@ else
   trap install_failure_handler EXIT
   profile_state="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
   install -Dm644 /dev/null "$profile_state"
-  printf '%s\n' "$profile" > "$profile_state"
+  printf '%s\n' "$profile" >"$profile_state"
   run omarchy theme install "$theme_source"
   adopt_installed_theme "$theme_source"
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"
   run omarchy theme set aranea
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
-    theme_root="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/current/theme"
+    # Link integrations from the stable installed theme, which survives theme
+    # switches (Omarchy's current-theme copy is replaced on every switch).
+    theme_root="$HOME/.config/omarchy/themes/aranea"
     run "$theme_root/scripts/install-integration" cursor --yes
     run "$theme_root/scripts/install-integration" icons --yes
     if [[ "$profile" == full ]]; then

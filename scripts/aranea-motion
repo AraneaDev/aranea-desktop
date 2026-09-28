@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Reads, sets or toggles the Aranea motion setting (Hyprland animations on
+# or off), kept in the Aranea state dir, and applies it through hyprctl.
+#
+# Usage: scripts/aranea-motion [status|set on|off|toggle|apply]
+
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 state_file="$state_root/motion"
 
+# Prints "off" when the state file says off, else "on".
 motion_status() {
   if [[ -f "$state_file" && "$(<"$state_file")" == off ]]; then
     printf '%s\n' off
@@ -12,6 +18,8 @@ motion_status() {
   fi
 }
 
+# Applies the stored mode to Hyprland (animations off, or on with Aranea's
+# curves) and prints it; only prints it when hyprctl is missing.
 apply_motion() {
   local mode hyprctl_bin
   mode="$(motion_status)"
@@ -40,7 +48,7 @@ case "${1:-status}" in
       exit 2
     }
     mkdir -p "$state_root"
-    printf '%s\n' "$mode" > "$state_file"
+    printf '%s\n' "$mode" >"$state_file"
     apply_motion
     ;;
   toggle)

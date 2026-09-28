@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
+# Contract for scripts/install.sh --dry-run: reports every planned step and
+# profile, rejects a missing --source, and (for a real run) always installs
+# and activates the theme as "aranea" regardless of the source clone's name,
+# leaving no stale or duplicate theme directory behind.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 output="$(mktemp)"
-trap 'rm -f "$output"' EXIT
 
 PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
@@ -23,7 +27,6 @@ if PATH="$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 "$repo_root/s
 fi
 
 minimal_output="$(mktemp)"
-trap 'rm -f "$output" "$minimal_output"' EXIT
 PATH="$repo_root/tests/fake-bin:$PATH" \
   OMARCHY_INSTALLER_TEST=1 \
   "$repo_root/scripts/install.sh" --dry-run --yes --profile no_apps >"$minimal_output"
@@ -39,10 +42,9 @@ grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
 # (the default URL ends in aranea-desktop.git, which Omarchy names
 # "aranea-desktop"; `omarchy theme set aranea` must not activate a stale copy).
 name_root="$(mktemp -d)"
-trap 'rm -f "$output" "$minimal_output"; rm -rf "$name_root"' EXIT
 mkdir -p "$name_root/bin" "$name_root/home/.config/omarchy/themes/aranea"
-printf 'stale\n' > "$name_root/home/.config/omarchy/themes/aranea/VERSION"
-cat > "$name_root/bin/omarchy" <<'EOF'
+printf 'stale\n' >"$name_root/home/.config/omarchy/themes/aranea/VERSION"
+cat >"$name_root/bin/omarchy" <<'EOF'
 #!/usr/bin/env bash
 # Mimics omarchy-theme-install's naming: basename, no .git, no omarchy-/-theme.
 if [[ "$1 $2" == "theme install" ]]; then
@@ -62,8 +64,14 @@ HOME="$name_root/home" XDG_STATE_HOME="$name_root/home/.local/state" \
   --source "https://example.invalid/AraneaDev/aranea-desktop.git" >/dev/null
 
 themes="$name_root/home/.config/omarchy/themes"
-[[ "$(cat "$themes/aranea/VERSION")" == fresh ]] || { echo "installer activated a stale aranea copy" >&2; exit 1; }
-[[ ! -e "$themes/aranea-desktop" ]] || { echo "installer left the aranea-desktop clone behind" >&2; exit 1; }
+[[ "$(cat "$themes/aranea/VERSION")" == fresh ]] || {
+  echo "installer activated a stale aranea copy" >&2
+  exit 1
+}
+[[ ! -e "$themes/aranea-desktop" ]] || {
+  echo "installer left the aranea-desktop clone behind" >&2
+  exit 1
+}
 grep -Fxq 'theme set aranea' "$name_root/home/omarchy-calls"
 
 echo "installer dry-run contract passed"

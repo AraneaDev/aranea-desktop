@@ -1,6 +1,7 @@
 // Notification bell + center. The bell shows the inbox count; the dropdown
 // lists inbox entries grouped by app. All state lives in the plugin's own
 // service (Service.qml); this file only renders it and forwards actions.
+// Loaded by the Aranea bar as this plugin's bar widget (manifest.json).
 
 import QtQuick
 import QtQuick.Layouts
@@ -28,19 +29,29 @@ Panel {
     running: true
     onTriggered: {
       var next = ServiceBridge.current()
-      if (next !== root.service) root.service = next
+      if (next !== root.service)
+        root.service = next
     }
   }
+  // True when the service and its inbox are reachable.
   readonly property bool available: !!(service && service.inbox)
+  // Number of inbox entries (0 while unavailable).
   readonly property int count: available ? service.inbox.count : 0
+  // The service's Do Not Disturb state.
   readonly property bool dnd: service ? !!service.doNotDisturb : false
+  // True while the service's quiet hours are active.
   readonly property bool quiet: service ? !!service.quietHours : false
+  // Number of critical (urgency 2) inbox entries.
   readonly property int criticalCount: {
-    if (!available) return 0
-    var revision = service.inbox.revision   // re-evaluate on every inbox change
+    if (!available)
+      return 0
+    var revision = service.inbox.revision
+    // re-evaluate on every inbox change
     var n = 0
     var model = service.inbox.model
-    for (var i = 0; i < model.count; i++) if (model.get(i).urgency === 2) n++
+    for (var i = 0; i < model.count; i++)
+      if (model.get(i).urgency === 2)
+        n++
     return n
   }
   // Red with the critical count when anything critical waits; otherwise mint
@@ -49,59 +60,104 @@ Panel {
   // Violet focus accent (colors.toml accent_secondary) for scheduled quiet hours.
   readonly property color focusAccent: "#7a5cff"
 
+  // Per-app expand overrides set by toggleGroup, fed to InboxLogic.groupView.
   property var expanded: ({})
   // The keyboard cursor follows its item (InboxLogic.rowKey), so an arrival
   // that shifts the list never redirects Enter/Delete to another entry.
   property string cursorKey: ""
+  // Index of cursorKey's row in rows, or -1 when there is no cursor.
   readonly property int cursor: cursorKey ? InboxLogic.indexOfKey(rows, cursorKey) : -1
+  // True while "Clear all" waits for its confirming click (reset after 4 s).
   property bool confirmingClear: false
+  // Clock for the relative time labels: set on open, then every 30 s while open.
   property real now: Date.now()
 
+  // Center rows: inbox entries sorted critical first, grouped by app and
+  // flattened into group, entry and "more" rows (InboxLogic).
   readonly property var rows: {
-    if (!available) return []
-    var revision = service.inbox.revision   // re-evaluate on every inbox change
+    if (!available)
+      return []
+    var revision = service.inbox.revision
+    // re-evaluate on every inbox change
     var entries = []
     var model = service.inbox.model
-    for (var i = 0; i < model.count; i++) entries.push(model.get(i))
+    for (var i = 0; i < model.count; i++)
+      entries.push(model.get(i))
     return InboxLogic.flattenGroups(InboxLogic.groupView(InboxLogic.sortForCenter(entries), root.expanded))
   }
 
+  // Whether the row at index can hold the keyboard cursor (entry and "more" rows).
   function selectable(index: int): bool {
     var row = rows[index]
     return !!row && (row.kind === "entry" || row.kind === "more")
   }
 
+  // Moves the cursor by delta to the next selectable row, wrapping around, and
+  // scrolls it into view.
   function moveCursor(delta: int): void {
-    if (rows.length === 0) return
+    if (rows.length === 0)
+      return
     var i = root.cursor
     for (var step = 0; step < rows.length; step++) {
       i = i < 0 ? (delta > 0 ? 0 : rows.length - 1) : (i + delta + rows.length) % rows.length
-      if (selectable(i)) { root.cursorKey = InboxLogic.rowKey(rows[i]); list.positionViewAtIndex(i, ListView.Contain); return }
+      if (selectable(i)) {
+        root.cursorKey = InboxLogic.rowKey(rows[i])
+        list.positionViewAtIndex(i, ListView.Contain)
+        return
+      }
     }
   }
 
+  // Expands a collapsed app group, or collapses an expanded one.
   function toggleGroup(app: string): void {
     var next = Object.assign({}, root.expanded)
     var group = null
-    for (var i = 0; i < rows.length; i++) if (rows[i].kind === "group" && rows[i].app === app) group = rows[i]
+    for (var i = 0; i < rows.length; i++)
+      if (rows[i].kind === "group" && rows[i].app === app)
+        group = rows[i]
     next[app] = group ? group.collapsed : true
     root.expanded = next
   }
 
+  // Expands the "+N more" row at index and puts the cursor on the first
+  // entry it revealed (the more row itself is gone after the expand).
+  function expandAt(index: int): void {
+    var row = rows[index]
+    if (!row)
+      return
+    toggleGroup(row.app)
+    var revealed = rows[index]
+    if (revealed && revealed.kind === "entry")
+      root.cursorKey = InboxLogic.rowKey(revealed)
+  }
+
+  // Enter on a row: runs an entry's action, or toggles a group or "more" row.
   function activate(index: int): void {
     var row = rows[index]
-    if (!row) return
-    if (row.kind === "entry") service.invokeInbox(row.entry.fileName)
-    else if (row.kind === "more" || row.kind === "group") toggleGroup(row.app)
+    if (!row)
+      return
+    if (row.kind === "entry")
+      service.invokeInbox(row.entry.fileName)
+    else if (row.kind === "more")
+      expandAt(index)
+    else if (row.kind === "group")
+      toggleGroup(row.app)
   }
 
+  // Delete on a row (Shift sets wholeGroup): see InboxLogic.dismissAction.
   function dismissAt(index: int, wholeGroup: bool): void {
     var row = rows[index]
-    if (!row) return
-    if (wholeGroup || row.kind === "group" || row.kind === "more") service.dismissGroup(row.app)
-    else service.dismissInbox(row.entry.fileName)
+    var action = InboxLogic.dismissAction(row, wholeGroup)
+    if (action === "expand")
+      expandAt(index)
+    else if (action === "group")
+      service.dismissGroup(row.app)
+    else if (action === "dismiss")
+      service.dismissInbox(row.entry.fileName)
   }
 
+  // Clears the inbox; above InboxLogic's confirm threshold the first call only
+  // asks for confirmation.
   function clearAll(): void {
     if (InboxLogic.needsClearConfirm(root.count) && !root.confirmingClear) {
       root.confirmingClear = true
@@ -121,10 +177,20 @@ Panel {
   }
 
   // The item under the cursor was dismissed: drop the cursor.
-  onRowsChanged: if (root.cursorKey && root.cursor < 0) root.cursorKey = ""
+  onRowsChanged: if (root.cursorKey && root.cursor < 0)
+    root.cursorKey = ""
 
-  Timer { id: confirmTimer; interval: 4000; onTriggered: root.confirmingClear = false }
-  Timer { interval: 30000; repeat: true; running: root.opened; onTriggered: root.now = Date.now() }
+  Timer {
+    id: confirmTimer
+    interval: 4000
+    onTriggered: root.confirmingClear = false
+  }
+  Timer {
+    interval: 30000
+    repeat: true
+    running: root.opened
+    onTriggered: root.now = Date.now()
+  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -137,11 +203,15 @@ Panel {
     foreground: root.quiet ? root.focusAccent : root.barForeground
     dimmed: !root.available || root.count === 0
     tooltipText: root.available ? InboxLogic.tooltipText(root.count, root.criticalCount, root.dnd, root.quiet) : "Notifications unavailable"
-    onPressed: function(b) {
-      if (!root.available) return
-      if (b === Qt.RightButton) root.service.setDoNotDisturb(!root.dnd)
-      else if (b === Qt.MiddleButton) root.service.clearInbox()
-      else root.toggle()
+    onPressed: function (b) {
+      if (!root.available)
+        return
+      if (b === Qt.RightButton)
+        root.service.setDoNotDisturb(!root.dnd)
+      else if (b === Qt.MiddleButton)
+        root.service.clearInbox()
+      else
+        root.toggle()
     }
 
     Rectangle {
@@ -181,8 +251,9 @@ Panel {
       anchors.fill: parent
       // Delete / Shift+Delete are not PanelKeyCatcher signals; they propagate
       // here unaccepted.
-      Keys.onPressed: function(event) {
-        if (event.key !== Qt.Key_Delete || root.cursor < 0) return
+      Keys.onPressed: function (event) {
+        if (event.key !== Qt.Key_Delete || root.cursor < 0)
+          return
         root.dismissAt(root.cursor, (event.modifiers & Qt.ShiftModifier) !== 0)
         event.accepted = true
       }
@@ -190,11 +261,18 @@ Panel {
       PanelKeyCatcher {
         id: keyCatcher
         anchors.fill: parent
-        onMoveRequested: function(dx, dy) { if (dy !== 0) root.moveCursor(dy) }
-        onActivateRequested: if (root.cursor >= 0) root.activate(root.cursor)
-        onDeleteRequested: if (root.cursor >= 0) root.dismissAt(root.cursor, false)
+        onMoveRequested: function (dx, dy) {
+          if (dy !== 0)
+            root.moveCursor(dy)
+        }
+        onActivateRequested: if (root.cursor >= 0)
+          root.activate(root.cursor)
+        onDeleteRequested: if (root.cursor >= 0)
+          root.dismissAt(root.cursor, false)
         onCloseRequested: root.close()
-        onTabRequested: function(direction) { root.switchPanel(direction) }
+        onTabRequested: function (direction) {
+          root.switchPanel(direction)
+        }
 
         ColumnLayout {
           id: content
@@ -208,6 +286,7 @@ Panel {
             spacing: Style.space(8)
 
             Text {
+              id: titleText
               Layout.fillWidth: true
               text: "Notifications"
               color: Color.popups.text
@@ -244,6 +323,18 @@ Panel {
                 onClicked: root.clearAll()
               }
             }
+          }
+
+          // Key hints for the center list.
+          Text {
+            Layout.fillWidth: true
+            textFormat: Text.PlainText
+            text: "ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP"
+            color: titleText.color
+            opacity: 0.5
+            font.family: titleText.font.family
+            font.pixelSize: badgeText.font.pixelSize
+            elide: Text.ElideRight
           }
 
           Text {
@@ -296,8 +387,7 @@ Panel {
               required property var modelData
               required property int index
               width: list.width
-              sourceComponent: modelData.kind === "group" ? groupRow
-                : (modelData.kind === "more" ? moreRow : entryRow)
+              sourceComponent: modelData.kind === "group" ? groupRow : (modelData.kind === "more" ? moreRow : entryRow)
 
               Component {
                 id: groupRow
@@ -363,7 +453,6 @@ Panel {
                   image: rowLoader.modelData.entry.image
                   glyph: rowLoader.modelData.entry.glyph
                   urgency: rowLoader.modelData.entry.urgency
-                  timestamp: rowLoader.modelData.entry.timestamp
                   timeLabel: InboxLogic.relativeTime(rowLoader.modelData.entry.timestamp, root.now)
                   cornerRadius: root.service ? root.service.cornerRadius : 0
                   fontFamily: root.bar ? root.bar.fontFamily : ""

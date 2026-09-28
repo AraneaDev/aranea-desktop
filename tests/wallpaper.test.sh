@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
+# Contract for scripts/aranea-wallpaper: every manifest variant exists and
+# is listed, an unknown wallpaper is rejected, set/motion apply through the
+# configured applier, and the day/night schedule writes and removes its
+# systemd timer/service and honours a configured time window when picking
+# the current phase.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 grep -Fq 'id = "day"' "$repo_root/backgrounds/manifest.toml"
 grep -Fq 'id = "dawn"' "$repo_root/backgrounds/manifest.toml"
@@ -16,15 +22,14 @@ grep -Fq 'day' <<<"$list_output"
 grep -Fq 'dawn' <<<"$list_output"
 grep -Fq 'monochrome' <<<"$list_output"
 
-if "$repo_root/scripts/aranea-wallpaper" set invalid 2>"$repo_root/tests/.wallpaper-error"; then
+if "$repo_root/scripts/aranea-wallpaper" set invalid 2>"$ARANEA_TEST_SANDBOX/wallpaper-error"; then
   echo "invalid wallpaper unexpectedly succeeded" >&2
   exit 1
 fi
-grep -Fq 'Unknown wallpaper' "$repo_root/tests/.wallpaper-error"
-rm -f "$repo_root/tests/.wallpaper-error"
+grep -Fq 'Unknown wallpaper' "$ARANEA_TEST_SANDBOX/wallpaper-error"
+rm -f "$ARANEA_TEST_SANDBOX/wallpaper-error"
 
 state_root="$(mktemp -d)"
-trap 'rm -rf "$state_root"' EXIT
 motion_output="$(ARANEA_STATE_ROOT="$state_root" "$repo_root/scripts/aranea-wallpaper" motion off)"
 grep -Fq 'motion: off' <<<"$motion_output"
 
@@ -55,5 +60,28 @@ ARANEA_SYSTEMD_USER_DIR="$unit_root" ARANEA_STATE_ROOT="$schedule_state" XDG_CON
 test ! -e "$unit_root/aranea-wallpaper-day-night.timer"
 test ! -e "$unit_root/aranea-wallpaper-day-night.service"
 rm -rf "$unit_root" "$schedule_state" "$config_root"
+
+# --- 4d: only [[wallpapers]] blocks count, and ids are compared as text
+wp_manifest="$(mktemp)"
+cat >"$wp_manifest" <<'TOML'
+[[wallpapers]]
+id="day"
+path = "backgrounds/day.png"
+
+[other]
+path = "not-a-wallpaper.png"
+TOML
+listed="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" "$repo_root/scripts/aranea-wallpaper" list)"
+[[ "$listed" == $'day\tbackgrounds/day.png' ]] || {
+  echo "list: $listed" >&2
+  exit 1
+}
+regex_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set 'd.*' 2>&1 || true)"
+grep -Fq 'Unknown wallpaper: d.*' <<<"$regex_out"
+exact_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set day 2>&1 || true)"
+grep -Fq "backgrounds/day.png" <<<"$exact_out"
+bs_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$repo_root/scripts/aranea-wallpaper" set 'da\y' 2>&1 || true)"
+grep -Fq 'Unknown wallpaper: da\y' <<<"$bs_out"
+rm -f "$wp_manifest"
 
 echo "wallpaper contract passed"

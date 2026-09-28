@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Checks the inline documentation rules for shell and QML files (JS is
+# checked by ESLint's jsdoc rules and TypeScript). Prints
+# "file:line: missing ..." for each gap and exits 1 when there is any.
+#
+# Usage: tools/check-docs [--root DIR] FILE...
+#
+# Shell: a header comment right after the shebang (or at the top of a sourced
+# file; `set` lines and blank lines may come first), with a "Usage:" line for
+# executables under scripts/ and tools/ (not their lib/) and tests/run; a "#" comment
+# directly above every function definition (heredoc bodies are ignored).
+# QML: a "//" header before the imports; a "//" comment directly above every
+# root-level property, signal and function, unless its name starts with "_".
+set -euo pipefail
+
+root="."
+if [[ "${1:-}" == --root ]]; then
+  root="$2"
+  shift 2
+fi
+
+# Prints the gaps of one shell FILE (path relative to $root).
+check_shell() {
+  local file="$1" executable=0 needs_usage=0
+  [[ -x "$root/$file" ]] && executable=1
+  if ((executable)) && { [[ "$file" =~ ^(scripts|tools)/ && ! "$file" =~ /lib/ ]] || [[ "$file" == tests/run ]]; }; then needs_usage=1; fi
+  awk -v file="$file" -v needs_usage="$needs_usage" '
+    function report(line, what) { printf "%s:%d: missing %s\n", file, line, what; bad = 1 }
+    NR == 1 && /^#!/ { next }
+    # Header: the first comment block. Blank lines, `set` lines and
+    # shellcheck directives may come before it; directives inside it are fine.
+    !header_done {
+      if ($0 ~ /^#[[:space:]]*shellcheck[[:space:]]/) next
+      if ($0 ~ /^#/) { in_header = 1; if ($0 ~ /Usage:/) usage = 1; next }
+      if (!in_header && ($0 ~ /^[[:space:]]*$/ || $0 ~ /^set /)) next
+      if (!in_header) report(NR, "header comment")
+      header_done = 1
+      if (in_header && needs_usage && !usage) report(NR - 1, "Usage: line in the header")
+      prev = ""   # the file header does not document the next function
+    }
+    # Heredoc bodies are data, not code.
+    in_heredoc {
+      if ($0 ~ "^[[:space:]]*" heredoc_end "$") in_heredoc = 0
+      prev = ""
+      next
+    }
+    {
+      # A heredoc starts at << TAG on a code line; not in comments, quoted
+      # text or $(( )) arithmetic.
+      code = $0
+      if (code !~ /^[[:space:]]*#/) {
+        gsub(/"([^"\\]|\\.)*"/, "\"\"", code); gsub(/\047[^\047]*\047/, "\047\047", code)
+        gsub(/\$\(\([^)]*\)\)/, "", code)
+        if (match(code, /<<-?[[:space:]]*["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?/)) {
+          tag = substr(code, RSTART, RLENGTH); sub(/^<<-?[[:space:]]*["\047]?/, "", tag); sub(/["\047]$/, "", tag)
+          heredoc_end = tag; in_heredoc = 1; heredoc_line = NR
+        }
+      }
+      # Also match the unquoted quote-stripped form: <<"EOF" became <<"".
+      if (!in_heredoc && $0 !~ /^[[:space:]]*#/ && match($0, /<<-?[[:space:]]*["\047][A-Za-z_][A-Za-z0-9_]*["\047]/)) {
+        tag = substr($0, RSTART, RLENGTH); sub(/^<<-?[[:space:]]*["\047]/, "", tag); sub(/["\047]$/, "", tag)
+        heredoc_end = tag; in_heredoc = 1; heredoc_line = NR
+      }
+      is_function = 0
+      if ($0 ~ /^[[:space:]]*(function[[:space:]]+)?[A-Za-z_][A-Za-z0-9_:-]*[[:space:]]*\(\)[[:space:]]*\{?/) is_function = 1
+      if ($0 ~ /^[[:space:]]*function[[:space:]]+[A-Za-z_][A-Za-z0-9_:-]*[[:space:]]*\{/) is_function = 1
+      if (is_function && prev !~ /^[[:space:]]*#/) {
+        name = $0; sub(/^[[:space:]]*(function[[:space:]]+)?/, "", name); sub(/[[:space:]]*[({].*/, "", name)
+        report(NR, "comment for function " name)
+      }
+      if ($0 !~ /^[[:space:]]*$/) prev = $0; else prev = ""
+    }
+    END {
+      if (!header_done && !in_header) report(1, "header comment")
+      if (in_heredoc) report(heredoc_line, "end of the heredoc started here (unterminated heredoc; checker cannot parse the rest)")
+      exit bad
+    }
+  ' "$root/$file"
+}
+
+# Prints the gaps of one QML FILE (path relative to $root).
+check_qml() {
+  local file="$1"
+  awk -v file="$file" '
+    function report(line, what) { printf "%s:%d: missing %s\n", file, line, what; bad = 1 }
+    # Removes string literals and comments so braces in them do not count
+    # (block comments may span lines: in_block carries the state).
+    function code_of(s) {
+      if (in_block) {
+        if (s !~ /\*\//) return ""
+        sub(/^.*\*\//, "", s); in_block = 0
+      }
+      gsub(/"([^"\\]|\\.)*"/, "\"\"", s); gsub(/\047([^\047\\]|\\.)*\047/, "\047\047", s)
+      gsub(/\/\*([^*]|\*[^\/])*\*\//, "", s)
+      if (s ~ /\/\*/) { sub(/\/\*.*$/, "", s); in_block = 1 }
+      sub(/\/\/.*$/, "", s)
+      return s
+    }
+    !seen_code {
+      if ($0 ~ /^[[:space:]]*$/) next
+      seen_code = 1
+      if ($0 !~ /^[[:space:]]*\/\//) report(NR, "header comment")
+    }
+    {
+      line = $0
+      code = code_of(line)
+      member = "^[[:space:]]*((readonly|required|default)[[:space:]]+)*(property[[:space:]]|signal[[:space:]]|function[[:space:]])"
+      text = code
+      # A root member written on the root brace line: check what follows it.
+      if (depth == 0 && text ~ /\{/) { sub(/^[^{]*\{/, "", text); at_root_line = 1 } else at_root_line = 0
+      if ((depth == 1 || at_root_line) && text ~ member) {
+        name = text; sub(/^[[:space:]]*((readonly|required|default)[[:space:]]+)*/, "", name)
+        kind = name; sub(/[[:space:]].*/, "", kind)
+        if (kind == "property") { sub(/^property[[:space:]]+[^[:space:]]+[[:space:]]+/, "", name) } else { sub(/^[a-z]+[[:space:]]+/, "", name) }
+        sub(/[^A-Za-z0-9_].*$/, "", name)
+        # Only a comment line documents the member (not a trailing comment
+        # on the previous code line).
+        documented = (!at_root_line && prev ~ /^[[:space:]]*(\/\/|\/\*|\*)/)
+        if (name !~ /^_/ && !documented) report(NR, "comment for " kind " " name)
+      }
+      opens = gsub(/\{/, "{", code); closes = gsub(/\}/, "}", code)
+      depth += opens - closes
+      if (line !~ /^[[:space:]]*$/) prev = line; else prev = ""
+    }
+    END {
+      if (depth != 0 || in_block) report(NR, "balanced braces (checker cannot parse this file: unbalanced { } or an open /* comment)")
+      exit bad
+    }
+  ' "$root/$file"
+}
+
+status=0
+for file in "$@"; do
+  case "$file" in
+    *.qml) check_qml "$file" || status=1 ;;
+    *) check_shell "$file" || status=1 ;;
+  esac
+done
+exit "$status"

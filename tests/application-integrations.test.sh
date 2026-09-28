@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# Contract for the application integrations (browser, session, media) and
+# branding assets: every referenced file exists, carries Aranea branding,
+# and scripts/install-integration --dry-run plans the right files per target.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
 
 for file in \
   "$repo_root/integrations/browser/README.md" \
@@ -26,8 +30,9 @@ done
 
 grep -Fq 'Aranea' "$repo_root/branding/about-card.txt"
 test -s "$repo_root/branding/screensaver.txt"
-grep -Fq 'branding/screensaver.txt' "$repo_root/hooks/theme-set"
-grep -Fq 'branding/screensaver.txt' "$repo_root/hooks/post-boot"
+grep -Fq 'branding/screensaver.txt' "$repo_root/scripts/lib/ownership.sh"
+grep -Fq 'link_theme_files' "$repo_root/hooks/theme-set"
+grep -Fq 'link_theme_files' "$repo_root/hooks/post-boot"
 grep -Fq 'fall back' "$repo_root/integrations/browser/README.md"
 grep -Fq 'unsupported' "$repo_root/integrations/session/README.md"
 grep -Fq 'native' "$repo_root/integrations/media/README.md"
@@ -47,26 +52,29 @@ else
 fi
 printf '%s\n' "$about_output"
 grep -Fq 'Theme version:' <<<"$about_output"
-grep -Fq 'Bar profile:' <<<"$about_output"
 grep -Fq 'Health:' <<<"$about_output"
 
 browser_output="$("$repo_root/scripts/install-integration" browser --dry-run)"
 printf '%s\n' "$browser_output"
-if command -v firefox >/dev/null 2>&1; then
-  grep -Fq 'browser/firefox/userChrome.css' <<<"$browser_output"
-fi
-if command -v chromium >/dev/null 2>&1; then
-  grep -Fq 'browser/chromium/new-tab/index.html' <<<"$browser_output"
-fi
+# firefox and chromium are guard stubs, so both are always planned.
+grep -Fq 'browser/firefox/userChrome.css' <<<"$browser_output"
+grep -Fq 'browser/chromium/new-tab/index.html' <<<"$browser_output"
 
 session_output="$("$repo_root/scripts/install-integration" session --dry-run)"
 printf '%s\n' "$session_output"
 grep -Fq 'session/omarchy.css' <<<"$session_output"
 
-if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
-  media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
-  printf '%s\n' "$media_output"
-  grep -Fq 'media/pavucontrol.css' <<<"$media_output"
-fi
+media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
+printf '%s\n' "$media_output"
+grep -Fq 'media/pavucontrol.css' <<<"$media_output"
+
+# --- 4d: the README says how to run the helper scripts
+for script in aranea-motion aranea-doctor aranea-integrations aranea-wallpaper aranea-about uninstall.sh; do
+  grep -Fq "scripts/$script" "$repo_root/README.md" || {
+    echo "README misses scripts/$script" >&2
+    exit 1
+  }
+done
+grep -Fq '.config/omarchy/themes/aranea/scripts/<name>' "$repo_root/README.md"
 
 echo "application integration contract passed"

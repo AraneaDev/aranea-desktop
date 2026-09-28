@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Runs the Aranea health checks (theme, hooks, manifest, icons, fonts,
+# ownership, shell, plugins, polkit, notifications, health, runtime log,
+# qmllint, optional commands) and prints one "id status message" line per
+# check, or one JSON object per line with --json. --fix reinstalls missing or
+# stale hooks and, when omarchy-shell is available, redeploys the plugins
+# before the plugin check. ARANEA_DOCTOR_* variables override inputs
+# and individual checks (used by the tests).
+#
+# Usage: scripts/aranea-doctor [--json] [--fix]
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/manifest.sh"
@@ -15,16 +25,30 @@ for arg in "$@"; do
     --fix) fix=1 ;;
   esac
 done
+# jq reads the shell's plugin list and the inbox files; ARANEA_DOCTOR_JQ
+# overrides it (tests point it at a missing path).
+jq_bin="${ARANEA_DOCTOR_JQ:-jq}"
+have_jq=0
+command -v "$jq_bin" >/dev/null 2>&1 && have_jq=1
+if ((json)) && ((! have_jq)); then
+  printf '%s\n' 'jq is required for --json' >&2
+  exit 2
+fi
 
+# Prints one check result: ID, STATUS (ok, repair or skipped) and MESSAGE,
+# as text or as JSON with --json.
 emit() {
   local id="$1" status="$2" message="$3"
-  if (( json )); then
-    printf '{"id":"%s","status":"%s","message":"%s"}\n' "$id" "$status" "$message"
+  if ((json)); then
+    # JSON mode already requires jq (checked above).
+    jq -cn --arg id "$id" --arg status "$status" --arg message "$message" '{id: $id, status: $status, message: $message}'
   else
     printf '%-14s %-8s %s\n' "$id" "$status" "$message"
   fi
 }
 
+# Emits check ID with the status held in environment VARIABLE and returns 0
+# when it is set; returns 1 otherwise so the real check runs.
 emit_override() {
   local id="$1" variable="$2"
   local value="${!variable:-}"
@@ -45,7 +69,8 @@ else
   emit theme repair 'Aranea is not the active theme'
 fi
 
-hook_root="${ARANEA_DOCTOR_HOOK_ROOT:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/hooks}"
+# omarchy-hook installs under $HOME/.config regardless of XDG_CONFIG_HOME.
+hook_root="${ARANEA_DOCTOR_HOOK_ROOT:-$HOME/.config/omarchy/hooks}"
 theme_hook="$hook_root/theme-set.d/theme-set"
 post_boot_hook="$hook_root/post-boot.d/post-boot"
 
@@ -54,22 +79,22 @@ post_boot_hook="$hook_root/post-boot.d/post-boot"
 # update: theme-set/post-boot never fire, so nothing re-runs
 # repair-shell-config. Reinstalling the hook files directly is safe to redo
 # unconditionally.
-if (( fix )) && [[ -z "${ARANEA_DOCTOR_HOOKS:-}" ]]; then
+if ((fix)) && [[ -z "${ARANEA_DOCTOR_HOOKS:-}" ]]; then
   install -Dm755 "$repo_root/hooks/theme-set" "$theme_hook" 2>/dev/null || true
   install -Dm755 "$repo_root/hooks/post-boot" "$post_boot_hook" 2>/dev/null || true
 fi
 
 if [[ "${ARANEA_DOCTOR_HOOKS:-}" == ok ]]; then
   hooks_ok=1
-elif [[ -f "$theme_hook" && -f "$post_boot_hook" ]] \
-  && cmp -s "$repo_root/hooks/theme-set" "$theme_hook" \
-  && cmp -s "$repo_root/hooks/post-boot" "$post_boot_hook"; then
+elif [[ -f "$theme_hook" && -f "$post_boot_hook" ]] &&
+  cmp -s "$repo_root/hooks/theme-set" "$theme_hook" &&
+  cmp -s "$repo_root/hooks/post-boot" "$post_boot_hook"; then
   hooks_ok=1
 else
   hooks_ok=0
 fi
 
-if (( hooks_ok )); then
+if ((hooks_ok)); then
   emit hooks ok 'theme-set and post-boot hooks reported healthy'
 else
   emit hooks repair 'theme-set or post-boot hook is missing or stale'
@@ -92,7 +117,7 @@ if [[ -d "$icon_root/scalable" ]]; then
   broken_icon_count="$(find "$icon_root/scalable" -xtype l -name '*.svg' -print 2>/dev/null | wc -l)"
   linked_icon_count="$(find "$icon_root/scalable" -type l -name '*.svg' -print 2>/dev/null | wc -l)"
 fi
-if [[ -f "$icon_root/index.theme" ]] && (( installed_icon_count == expected_icon_count )) && (( broken_icon_count == 0 )) && (( linked_icon_count == 0 )); then
+if [[ -f "$icon_root/index.theme" ]] && ((installed_icon_count == expected_icon_count)) && ((broken_icon_count == 0)) && ((linked_icon_count == 0)); then
   emit icons ok "Aranea-icons has $installed_icon_count standalone SVGs"
 else
   emit icons repair "Aranea-icons is incomplete or linked to a missing checkout; run scripts/install-integration --yes icons"
@@ -108,6 +133,7 @@ fi
 ownership_record_file="$(ownership_record)"
 ownership_ok=1
 ownership_count=0
+ownership_customised=()
 if [[ -f "$ownership_record_file" ]]; then
   while IFS= read -r managed_target; do
     [[ -n "$managed_target" ]] || continue
@@ -116,13 +142,17 @@ if [[ -f "$ownership_record_file" ]]; then
       ownership_ok=0
     elif [[ -L "$managed_target" && ! -e "$(readlink -f "$managed_target")" ]]; then
       ownership_ok=0
+    elif ! is_aranea_target "$managed_target"; then
+      ownership_customised+=("$managed_target")
     fi
-  done < "$ownership_record_file"
+  done <"$ownership_record_file"
 fi
-if (( ownership_ok )); then
-  emit ownership ok "${ownership_count} managed targets are present"
-else
+if ((! ownership_ok)); then
   emit ownership repair 'one or more managed targets are missing or stale'
+elif ((${#ownership_customised[@]} > 0)); then
+  emit ownership ok "${ownership_count} managed targets, ${#ownership_customised[@]} customised and left alone: ${ownership_customised[*]:0:3}"
+else
+  emit ownership ok "${ownership_count} managed targets are present"
 fi
 
 if ! emit_override shell ARANEA_DOCTOR_SHELL_STATUS; then
@@ -142,12 +172,14 @@ if ! emit_override plugins ARANEA_DOCTOR_PLUGINS_STATUS; then
   # directories actually exist on disk even when no plugin file changed, so
   # it also repairs the "deployed but never enabled" drift this doctor check
   # exists to catch.
-  if (( fix )) && command -v omarchy-shell >/dev/null 2>&1 && [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]; then
+  if ((fix)) && command -v omarchy-shell >/dev/null 2>&1 && [[ -x "$repo_root/scripts/deploy-plugins-safely" ]]; then
     "$repo_root/scripts/deploy-plugins-safely" "$repo_root" >/dev/null 2>&1 || true
   fi
-  if command -v omarchy-shell >/dev/null 2>&1; then
+  if ((! have_jq)); then
+    emit plugins skipped 'jq is not installed'
+  elif command -v omarchy-shell >/dev/null 2>&1; then
     plugin_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
-    if jq -e '
+    if "$jq_bin" -e '
       ([.[] | select(.id == "araneadev.bar") | .enabled] | any) and
       ([.[] | select(.id == "araneadev.lock") | .enabled] | any) and
       ([.[] | select(.id == "araneadev.menu") | .enabled] | any) and
@@ -167,9 +199,11 @@ fi
 # the Aranea one is turned off. Without either, privileged actions cannot
 # ask for a password. (Which one is a choice, so neither is required.)
 if ! emit_override polkit ARANEA_DOCTOR_POLKIT_STATUS; then
-  if command -v omarchy-shell >/dev/null 2>&1; then
+  if ((! have_jq)); then
+    emit polkit skipped 'jq is not installed'
+  elif command -v omarchy-shell >/dev/null 2>&1; then
     polkit_json="$(omarchy-shell shell listPlugins 2>/dev/null || true)"
-    polkit_owner="$(jq -r '[.[] | select((.id == "araneadev.polkit" or .id == "omarchy.polkit") and .enabled) | .id] | first // ""' <<<"$polkit_json" 2>/dev/null || true)"
+    polkit_owner="$("$jq_bin" -r '[.[] | select((.id == "araneadev.polkit" or .id == "omarchy.polkit") and .enabled) | .id] | first // ""' <<<"$polkit_json" 2>/dev/null || true)"
     case "$polkit_owner" in
       araneadev.polkit) emit polkit ok 'Aranea polkit prompt is enabled' ;;
       omarchy.polkit) emit polkit ok 'Omarchy polkit prompt is enabled' ;;
@@ -182,7 +216,9 @@ fi
 
 if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
   inbox_root="${ARANEA_DOCTOR_INBOX_ROOT:-$HOME/.local/state/omarchy/notifications/inbox}"
-  if [[ ! -d "$inbox_root" ]]; then
+  if ((! have_jq)); then
+    emit notifications skipped 'jq is not installed'
+  elif [[ ! -d "$inbox_root" ]]; then
     emit notifications skipped 'no notification inbox yet'
   else
     inbox_total=0
@@ -190,9 +226,9 @@ if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
     for inbox_file in "$inbox_root"/*.json; do
       [[ -e "$inbox_file" ]] || continue
       inbox_total=$((inbox_total + 1))
-      jq -e 'type == "object"' "$inbox_file" >/dev/null 2>&1 || inbox_bad=$((inbox_bad + 1))
+      "$jq_bin" -e 'type == "object"' "$inbox_file" >/dev/null 2>&1 || inbox_bad=$((inbox_bad + 1))
     done
-    if (( inbox_bad > 0 )); then
+    if ((inbox_bad > 0)); then
       emit notifications repair "inbox holds $inbox_total entries, $inbox_bad unreadable"
     else
       emit notifications ok "inbox holds $inbox_total entries"
@@ -201,7 +237,10 @@ if ! emit_override notifications ARANEA_DOCTOR_NOTIFICATIONS_STATUS; then
 fi
 
 if ! emit_override health ARANEA_DOCTOR_HEALTH_STATUS; then
-  health_units=off; health_disk=off; health_reboot=off; health_docker='off (docker not installed)'
+  health_units=off
+  health_disk=off
+  health_reboot=off
+  health_docker='off (docker not installed)'
   command -v systemctl >/dev/null 2>&1 && health_units=on
   command -v df >/dev/null 2>&1 && health_disk=on
   [[ -d /usr/lib/modules ]] && health_reboot=on
@@ -226,12 +265,20 @@ fi
 if ! emit_override runtime ARANEA_DOCTOR_RUNTIME_STATUS; then
   log_root="${ARANEA_DOCTOR_RUNTIME_ROOT:-${XDG_RUNTIME_DIR:-/run/user/$UID}/quickshell/by-id}"
   log_file="$(find "$log_root" -type f -name log.log -printf '%T@ %p\n' 2>/dev/null | sort -nr | sed -n '1s/^[^ ]* //p' || true)"
-  if [[ -z "$log_file" ]]; then
+  rg_bin="${ARANEA_DOCTOR_RG:-rg}"
+  if ! command -v "$rg_bin" >/dev/null 2>&1; then
+    emit runtime skipped 'rg is not installed'
+  elif [[ -z "$log_file" ]]; then
     emit runtime skipped 'no QuickShell runtime log is available'
-  elif rg -qi 'TypeError|ReferenceError|duplicate.*target|coerced to void' "$log_file"; then
-    emit runtime repair "recent QuickShell runtime warnings found in $log_file"
   else
-    emit runtime ok 'recent QuickShell log has no Aranea runtime errors'
+    # rg exits 0 on a match, 1 on none, and 2 when it could not read the log.
+    rg_status=0
+    "$rg_bin" -qi 'TypeError|ReferenceError|duplicate.*target|coerced to void' "$log_file" || rg_status=$?
+    case "$rg_status" in
+      0) emit runtime repair "recent QuickShell runtime warnings found in $log_file" ;;
+      1) emit runtime ok 'recent QuickShell log has no Aranea runtime errors' ;;
+      *) emit runtime skipped 'rg failed' ;;
+    esac
   fi
 fi
 

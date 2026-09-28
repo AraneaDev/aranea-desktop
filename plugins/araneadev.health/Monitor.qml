@@ -12,22 +12,42 @@ Item {
 
   // Last known problems per check; a check that errors keeps its previous
   // list until it can report again.
-  property var problems: ({ unit: [], disk: [], reboot: [], container: [] })
+  property var problems: ({
+      unit: [],
+      disk: [],
+      reboot: [],
+      container: []
+    })
+  // Per check: true once it reported, false while it is unavailable.
   property var known: ({})
+  // parseFailedUnits results per scope ("system", "user") until both arrived.
   property var unitParts: ({})
+  // Alert level per mount point, fed back into diskProblems for hysteresis.
   property var diskLevels: ({})
+  // Container history by name (HealthLogic DockerHistoryEntry).
   property var dockerHistory: ({})
+  // Running kernel release from `uname -r`; "" until read.
   property string release: ""
+  // Set by startChecks so the checks start only once.
   property bool checksStarted: false
   // Tools the item actions need; assume present until `which` says otherwise.
-  property var tools: ({ terminal: true })
+  property var tools: ({
+      terminal: true
+    })
   // Annotated open problems for the dropdown (HealthLogic.annotateProblems).
   property var openProblems: []
   // Latest df rows (HealthLogic.parseDf), shared with the metrics view.
   property var diskRows: []
+  // Whether the checks start by themselves on creation; tests switch it off
+  // and call the checks they need.
+  property bool autoStart: true
+  // The docker command (argv prefix); tests replace it with a shell function.
+  property var dockerCommand: ["docker"]
 
+  // Runs every check once and starts the docker connection (first call only).
   function startChecks(): void {
-    if (checksStarted) return
+    if (checksStarted)
+      return
     checksStarted = true
     checkUnits()
     checkDisk()
@@ -35,6 +55,7 @@ Item {
     startDocker()
   }
 
+  // Replaces one check's problems, marks it known and rebuilds openProblems.
   function setProblems(check: string, list: var): void {
     var next = Object.assign({}, problems)
     next[check] = list
@@ -45,33 +66,43 @@ Item {
     reconcileNow()
   }
 
+  // Marks a check unavailable (warns once per outage); its last problems stay.
   function markUnknown(check: string, reason: string): void {
-    if (known[check] === false) return
+    if (known[check] === false)
+      return
     console.warn("health: " + check + " check unavailable: " + reason)
     var k = Object.assign({}, known)
     k[check] = false
     known = k
   }
 
+  // Rebuilds openProblems from all checks' problems and the current tools.
   function reconcileNow(): void {
     var open = []
-    for (var check in problems) open = open.concat(problems[check])
+    for (var check in problems)
+      open = open.concat(problems[check])
     openProblems = HealthLogic.annotateProblems(open, tools)
   }
 
   // ---------------------------------------------------- failed units
 
+  // Starts the system and user failed-unit queries unless already running.
   function checkUnits(): void {
-    if (!systemUnits.running) systemUnits.running = true
-    if (!userUnits.running) userUnits.running = true
+    if (!systemUnits.running)
+      systemUnits.running = true
+    if (!userUnits.running)
+      userUnits.running = true
   }
 
+  // Collects one scope's systemctl output; once both scopes are in, sets the
+  // unit problems, or marks the check unknown if either failed to parse.
   function unitResult(scope: string, text: string): void {
     var parsed = HealthLogic.parseFailedUnits(text, scope)
     var parts = Object.assign({}, unitParts)
     parts[scope] = parsed
     unitParts = parts
-    if (parts.system === undefined || parts.user === undefined) return
+    if (parts.system === undefined || parts.user === undefined)
+      return
     if (parts.system === null || parts.user === null) {
       markUnknown("unit", "systemctl failed")
       unitParts = ({})
@@ -89,19 +120,27 @@ Item {
   Process {
     id: systemUnits
     command: ["timeout", "10", "systemctl", "list-units", "--failed", "--output=json", "--no-pager"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: monitor.unitResult("system", text) }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: monitor.unitResult("system", text)
+    }
   }
 
   Process {
     id: userUnits
     command: ["timeout", "10", "systemctl", "--user", "list-units", "--failed", "--output=json", "--no-pager"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: monitor.unitResult("user", text) }
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: monitor.unitResult("user", text)
+    }
   }
 
   // ---------------------------------------------------- disk
 
+  // Starts df unless it is already running.
   function checkDisk(): void {
-    if (!dfProc.running) dfProc.running = true
+    if (!dfProc.running)
+      dfProc.running = true
   }
 
   Process {
@@ -109,8 +148,7 @@ Item {
     // -l: local filesystems only (a stale network mount cannot hang df, and
     // sshfs/NFS usage is not this machine's disk). timeout: a hang becomes
     // "unknown" instead of freezing the check.
-    command: ["timeout", "10", "df", "-l", "--output=source,target,fstype,size,used,avail,pcent", "-B1",
-      "-x", "tmpfs", "-x", "devtmpfs", "-x", "efivarfs", "-x", "squashfs", "-x", "overlay"]
+    command: ["timeout", "10", "df", "-l", "--output=source,target,fstype,size,used,avail,pcent", "-B1", "-x", "tmpfs", "-x", "devtmpfs", "-x", "efivarfs", "-x", "squashfs", "-x", "overlay"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
@@ -129,13 +167,17 @@ Item {
 
   // ---------------------------------------------------- reboot
 
+  // Reads the kernel release first if needed, then tests whether its module
+  // directory still exists.
   function checkReboot(): void {
     if (!release) {
-      if (!unameProc.running) unameProc.running = true
+      if (!unameProc.running)
+        unameProc.running = true
       return
     }
     modulesProc.command = ["test", "-d", "/usr/lib/modules/" + release]
-    if (!modulesProc.running) modulesProc.running = true
+    if (!modulesProc.running)
+      modulesProc.running = true
   }
 
   Process {
@@ -145,15 +187,17 @@ Item {
       waitForEnd: true
       onStreamFinished: {
         monitor.release = text.trim()
-        if (monitor.release) monitor.checkReboot()
-        else monitor.markUnknown("reboot", "uname failed")
+        if (monitor.release)
+          monitor.checkReboot()
+        else
+          monitor.markUnknown("reboot", "uname failed")
       }
     }
   }
 
   Process {
     id: modulesProc
-    onExited: function(code) {
+    onExited: function (code) {
       if (code !== 0 && code !== 1) {
         monitor.markUnknown("reboot", "test failed")
         return
@@ -164,56 +208,92 @@ Item {
 
   // ---------------------------------------------------- containers
 
+  // Connects to docker (info, then ps snapshot, then the events stream)
+  // unless a step is already running; retried every 30 s on failure.
   function startDocker(): void {
-    if (!dockerInfo.running && !dockerPs.running && !dockerEvents.running) dockerInfo.running = true
+    if (!dockerInfo.running && !dockerPs.running && !dockerEvents.running)
+      dockerInfo.running = true
   }
 
+  // `docker info` prints the server version only when the daemon answered,
+  // so a non-empty answer means docker is up (no exit-code handler needed).
   Process {
     id: dockerInfo
-    command: ["timeout", "10", "docker", "info", "--format", "{{.ServerVersion}}"]
-    onExited: function(code) {
-      if (code === 0) {
-        dockerPs.running = true
-      } else {
-        monitor.markUnknown("container", "docker not running")
-        dockerRetry.restart()
+    command: ["timeout", "10"].concat(monitor.dockerCommand, ["info", "--format", "{{.ServerVersion}}"])
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        if (text.trim()) {
+          monitor.dockerPsText = null
+          monitor.dockerPsCode = null
+          dockerPs.running = true
+        } else {
+          monitor.markUnknown("container", "docker not running")
+          dockerRetry.restart()
+        }
       }
     }
   }
 
+  // Output of the running `docker ps`, null until it arrives.
+  property var dockerPsText: null
+  // Exit code of the running `docker ps`, null until it exits.
+  property var dockerPsCode: null
+
   // On every (re)connect the current container states are the truth: they
   // cover a shell restart (empty history) and events missed while the stream
-  // was down. The stream then continues from the snapshot time.
+  // was down. The stream then continues from the snapshot time. Seeds only
+  // once `docker ps` has both finished its output and exited (either may come
+  // first); a nonzero exit (including timeout's 124) marks docker unknown and
+  // leaves the existing container problems alone.
+  function finishDockerPs(): void {
+    if (monitor.dockerPsText === null || monitor.dockerPsCode === null)
+      return
+    if (monitor.dockerPsCode !== 0) {
+      monitor.dockerPsText = null
+      monitor.dockerPsCode = null
+      monitor.markUnknown("container", "docker ps failed")
+      dockerRetry.restart()
+      return
+    }
+    var containers = HealthLogic.parseDockerPs(monitor.dockerPsText)
+    monitor.dockerPsText = null
+    monitor.dockerPsCode = null
+    if (containers === null) {
+      monitor.markUnknown("container", "docker ps failed")
+      dockerRetry.restart()
+      return
+    }
+    var now = Date.now()
+    monitor.dockerHistory = HealthLogic.seedDockerHistory(monitor.dockerHistory, containers, now)
+    dockerEvents.command = monitor.dockerCommand.concat(["events", "--since", String(Math.floor(now / 1000)), "--filter", "type=container", "--filter", "event=die", "--filter", "event=oom", "--filter", "event=start", "--filter", "event=destroy", "--format", "{{json .}}"])
+    dockerEvents.running = true
+    monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
+  }
+
   Process {
     id: dockerPs
-    command: ["timeout", "10", "docker", "ps", "-a", "--format", "{{json .}}"]
+    command: ["timeout", "10"].concat(monitor.dockerCommand, ["ps", "-a", "--format", "{{json .}}"])
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var containers = HealthLogic.parseDockerPs(text)
-        if (containers === null) {
-          monitor.markUnknown("container", "docker ps failed")
-          dockerRetry.restart()
-          return
-        }
-        var now = Date.now()
-        monitor.dockerHistory = HealthLogic.seedDockerHistory(monitor.dockerHistory, containers, now)
-        dockerEvents.command = ["docker", "events", "--since", String(Math.floor(now / 1000)),
-          "--filter", "type=container",
-          "--filter", "event=die", "--filter", "event=start", "--filter", "event=destroy",
-          "--format", "{{json .}}"]
-        dockerEvents.running = true
-        monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
+        monitor.dockerPsText = text
+        monitor.finishDockerPs()
       }
+    }
+    onExited: function (code) {
+      monitor.dockerPsCode = code
+      monitor.finishDockerPs()
     }
   }
 
   Process {
     id: dockerEvents
     stdout: SplitParser {
-      onRead: function(line) {
+      onRead: function (line) {
         var event = HealthLogic.parseDockerEvent(line)
-        if (!event) return
+        if (!event)
+          return
         var now = Date.now()
         monitor.dockerHistory = HealthLogic.recordDockerEvent(monitor.dockerHistory, event, now)
         monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
@@ -225,12 +305,18 @@ Item {
     }
   }
 
-  Timer { id: dockerRetry; interval: 30000; onTriggered: monitor.startDocker() }
+  Timer {
+    id: dockerRetry
+    interval: 30000
+    onTriggered: monitor.startDocker()
+  }
 
   // ---------------------------------------------------- schedule
 
   Timer {
-    interval: 30000; repeat: true; running: true
+    interval: 30000
+    repeat: true
+    running: true
     onTriggered: {
       monitor.checkUnits()
       // Restart-loop windows drain with time, not only with events.
@@ -241,10 +327,22 @@ Item {
       }
     }
   }
-  Timer { interval: 60000; repeat: true; running: true; onTriggered: monitor.checkDisk() }
-  Timer { interval: 300000; repeat: true; running: true; onTriggered: monitor.checkReboot() }
+  Timer {
+    interval: 60000
+    repeat: true
+    running: true
+    onTriggered: monitor.checkDisk()
+  }
+  Timer {
+    interval: 300000
+    repeat: true
+    running: true
+    onTriggered: monitor.checkReboot()
+  }
 
   Component.onCompleted: {
+    if (!monitor.autoStart)
+      return
     terminalProbe.running = true
     startChecks()
   }
@@ -252,8 +350,10 @@ Item {
   Process {
     id: terminalProbe
     command: ["which", "xdg-terminal-exec"]
-    onExited: function(code) {
-      monitor.tools = ({ terminal: code === 0 })
+    onExited: function (code) {
+      monitor.tools = ({
+          terminal: code === 0
+        })
       monitor.reconcileNow()
     }
   }

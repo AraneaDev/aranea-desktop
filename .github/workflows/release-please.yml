@@ -4,14 +4,14 @@ on:
   push:
     branches: [master]
     paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '**/docs/**'
-      - 'tests/**'
-      - '**/tests/**'
-      - '**/*.test.sh'
-      - '.github/**'
-      - 'release-please-config.json'
+      - "**.md"
+      - "docs/**"
+      - "**/docs/**"
+      - "tests/**"
+      - "**/tests/**"
+      - "**/*.test.sh"
+      - ".github/**"
+      - "release-please-config.json"
   # release-please only ever runs on a push to master, so a release PR that
   # goes stale, or a run that failed, has no way back without a new commit.
   # This gives it one.
@@ -21,17 +21,48 @@ permissions:
   contents: write
   pull-requests: write
 
-# One run per branch. A second push cancels the first, because whoever pushed
-# again has already answered the question the running job was asked. The runs
-# long enough to be overtaken are the expensive ones, so this is worth more
-# than the share of runs it cancels suggests.
+# One run per branch at a time. Runs are queued, never cancelled: a run that
+# is tagging a release must finish, and the next push is handled right after.
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: false
 
 jobs:
+  # The same gate as CI, on the commit being released: release-please below
+  # only opens or merges into a release (and tags) once this passed.
+  verify:
+    name: tools/check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick python3 lua5.4
+          sudo tools/install-shellcheck
+          sudo tools/install-shfmt
+          sudo tools/install-actionlint
+          npm ci
+
+      - name: Run tools/check
+        run: tools/check --skip smoke,qml
+
   release-please:
     name: Release PR + tag/release on merge
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -50,34 +81,19 @@ jobs:
       # closed and reopened once to start its checks. See CONTRIBUTING.md.
       - name: Run release-please
         id: release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      # Everything below runs only on the merge that cut a release. The tag is
-      # made with GITHUB_TOKEN, so no tag-triggered workflow would fire; the
-      # verification lives here instead. There is nothing to publish, so this
-      # checks that what was just released actually works.
+      # On the merge that cut a release: the tag must match the version in
+      # theme-manifest.toml. (tools/check already ran in the verify job.)
       - name: Checkout
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v4
-
-      - name: Install validation tools
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes libxml2-utils imagemagick ripgrep qt6-declarative-dev qt6-declarative-dev-tools
-          # ShellCheck is pinned (not Ubuntu's package) to match local development.
-          sudo tools/install-shellcheck
-
-      - name: Run contract tests
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          for test in tests/*.test.sh; do
-            bash "$test"
-          done
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: The released version is the one in theme-manifest.toml
         if: ${{ steps.release.outputs.release_created }}

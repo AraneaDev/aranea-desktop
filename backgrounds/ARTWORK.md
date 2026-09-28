@@ -20,16 +20,16 @@ files, not native 4K generated detail.** No crop, retouching, artificial
 sharpening, or added logo was applied. The tiny 16:9 rounding discrepancy in
 the source is normalized to the exact delivery aspect ratio.
 
-| ID | Original source | Shipped file | Composition |
-| --- | --- | --- | --- |
-| day | `sources/day.png` | `background-day.png` | Mint silk, brighter charcoal, lower-left weight |
-| night | `sources/night.png` | `background-night.png` | Mint/violet silk, dark field, lower-right weight |
-| sparse | `sources/sparse.png` | `variants/sparse.png` | Small lower-left cluster, almost empty field |
-| dense | `sources/dense.png` | `variants/dense.png` | Richer right-edge strands and dimensional junctions |
-| dusk | `sources/dusk.png` | `variants/dusk.png` | Soft violet atmosphere and left-edge silk |
-| dawn | generated source retained with the release artifact | `variants/dawn.png` | Quiet mint dawn light, dew-lit silk and a dark working center |
-| monochrome | `sources/monochrome.png` | `variants/monochrome.png` | Silver silk on black, right-edge weight |
-| ultrawide | `sources/ultrawide.png` | `variants/ultrawide.png` | Dedicated 3:1 composition, mint left/violet right |
+| ID         | Original source                                     | Shipped file              | Composition                                                   |
+| ---------- | --------------------------------------------------- | ------------------------- | ------------------------------------------------------------- |
+| day        | `sources/day.png`                                   | `background-day.png`      | Mint silk, brighter charcoal, lower-left weight               |
+| night      | `sources/night.png`                                 | `background-night.png`    | Mint/violet silk, dark field, lower-right weight              |
+| sparse     | `sources/sparse.png`                                | `variants/sparse.png`     | Small lower-left cluster, almost empty field                  |
+| dense      | `sources/dense.png`                                 | `variants/dense.png`      | Richer right-edge strands and dimensional junctions           |
+| dusk       | `sources/dusk.png`                                  | `variants/dusk.png`       | Soft violet atmosphere and left-edge silk                     |
+| dawn       | generated source retained with the release artifact | `variants/dawn.png`       | Quiet mint dawn light, dew-lit silk and a dark working center |
+| monochrome | `sources/monochrome.png`                            | `variants/monochrome.png` | Silver silk on black, right-edge weight                       |
+| ultrawide  | `sources/ultrawide.png`                             | `variants/ultrawide.png`  | Dedicated 3:1 composition, mint left/violet right             |
 
 ## Export workflow
 

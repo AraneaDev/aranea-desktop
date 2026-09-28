@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Lists and applies the wallpapers in backgrounds/manifest.toml, applies the
+# phase wallpaper (dawn, day, dusk or night) for the current time, and
+# manages the systemd user timer that switches phases on a schedule.
+# ARANEA_WALLPAPER_MANIFEST overrides the manifest path.
+#
+# Usage: scripts/aranea-wallpaper list
+#        scripts/aranea-wallpaper set <id> | set-phase | set-day-night
+#        scripts/aranea-wallpaper schedule on|off|status
+#        scripts/aranea-wallpaper schedule configure DAWN DAY DUSK NIGHT
+#        scripts/aranea-wallpaper motion on|off
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-manifest="$repo_root/backgrounds/manifest.toml"
+manifest="${ARANEA_WALLPAPER_MANIFEST:-$repo_root/backgrounds/manifest.toml}"
 state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
 config_root="${ARANEA_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}}/aranea"
 schedule_config="$config_root/wallpaper-schedule.conf"
@@ -10,24 +21,46 @@ systemd_user_dir="${ARANEA_SYSTEMD_USER_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/s
 timer_unit="aranea-wallpaper-day-night.timer"
 service_unit="aranea-wallpaper-day-night.service"
 
+# Runs systemctl --user (ARANEA_SYSTEMCTL overrides the binary).
 systemctl_user() { "${ARANEA_SYSTEMCTL:-systemctl}" --user "$@"; }
+# Sets dawn, day, dusk and night to the defaults, then sources the user's
+# schedule config over them when it exists.
 load_schedule() {
-  dawn=06:00; day=08:00; dusk=18:00; night=20:00
+  dawn=06:00
+  day=08:00
+  dusk=18:00
+  night=20:00
   if [[ -f "$schedule_config" ]]; then
     # shellcheck disable=SC1090
     source "$schedule_config"
   fi
 }
+# True when $1 is a 24-hour HH:MM time.
 valid_time() { [[ "$1" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; }
+# Fails with a message unless the four phase times are valid and strictly
+# ascending.
 validate_schedule() {
   local value
-  for value in "$dawn" "$day" "$dusk" "$night"; do valid_time "$value" || { printf 'Invalid schedule time: %s\n' "$value" >&2; return 1; }; done
-  ((10#${dawn/:/} < 10#${day/:/} && 10#${day/:/} < 10#${dusk/:/} && 10#${dusk/:/} < 10#${night/:/})) || { printf 'Schedule times must be strictly ascending (dawn day dusk night).\n' >&2; return 1; }
+  for value in "$dawn" "$day" "$dusk" "$night"; do valid_time "$value" || {
+    printf 'Invalid schedule time: %s\n' "$value" >&2
+    return 1
+  }; done
+  ((10#${dawn/:/} < 10#${day/:/} && 10#${day/:/} < 10#${dusk/:/} && 10#${dusk/:/} < 10#${night/:/})) || {
+    printf 'Schedule times must be strictly ascending (dawn day dusk night).\n' >&2
+    return 1
+  }
 }
-write_schedule_config() { mkdir -p "$config_root"; printf 'dawn=%s\nday=%s\ndusk=%s\nnight=%s\n' "$dawn" "$day" "$dusk" "$night" > "$schedule_config"; }
+# Writes the current phase times to the schedule config file.
+write_schedule_config() {
+  mkdir -p "$config_root"
+  printf 'dawn=%s\nday=%s\ndusk=%s\nnight=%s\n' "$dawn" "$day" "$dusk" "$night" >"$schedule_config"
+}
+# Writes the systemd user service and a timer that fires at each phase time.
 write_schedule_units() {
-  load_schedule; validate_schedule; mkdir -p "$systemd_user_dir"
-  cat > "$systemd_user_dir/$service_unit" <<'UNIT'
+  load_schedule
+  validate_schedule
+  mkdir -p "$systemd_user_dir"
+  cat >"$systemd_user_dir/$service_unit" <<'UNIT'
 [Unit]
 Description=Apply the Aranea phase wallpaper
 
@@ -35,7 +68,7 @@ Description=Apply the Aranea phase wallpaper
 Type=oneshot
 ExecStart=%h/.config/omarchy/themes/aranea/scripts/aranea-wallpaper set-phase
 UNIT
-  cat > "$systemd_user_dir/$timer_unit" <<UNIT
+  cat >"$systemd_user_dir/$timer_unit" <<UNIT
 [Unit]
 Description=Schedule the Aranea phase wallpaper
 
@@ -50,38 +83,138 @@ Persistent=true
 WantedBy=timers.target
 UNIT
 }
-wallpaper_path() {
-  local id="$1"
-  awk -v wanted="$id" -v root="$repo_root/" '/^\[\[wallpapers\]\]$/ { in_block = 1; match_id = 0; next } in_block && /^\[/ { in_block = 0 } in_block && $0 ~ "^id[[:space:]]*=[[:space:]]*\"" wanted "\"$" { match_id = 1; next } match_id && /^path[[:space:]]*=/ { line = $0; sub(/^[^=]*=[[:space:]]*/, "", line); gsub(/^"|"$/, "", line); print root line; exit }' "$manifest"
+# Prints "id<TAB>path" for every [[wallpapers]] block of the manifest (other
+# sections are ignored; any spacing around = is accepted).
+wallpaper_rows() {
+  awk '
+    # The value of a key = value line, without quotes.
+    function value(line) { sub(/^[^=]*=[[:space:]]*/, "", line); gsub(/^"|"[[:space:]]*$/, "", line); return line }
+    # Prints the block just read when it has both an id and a path.
+    function flush() { if (in_block && id != "" && path != "") print id "\t" path; id = ""; path = "" }
+    /^\[\[wallpapers\]\][[:space:]]*$/ { flush(); in_block = 1; next }
+    /^\[/ { flush(); in_block = 0; next }
+    in_block && /^id[[:space:]]*=/ { id = value($0) }
+    in_block && /^path[[:space:]]*=/ { path = value($0) }
+    END { flush() }
+  ' "$manifest"
 }
+# Prints the absolute path of the wallpaper whose id is $WANTED (below $ROOT),
+# comparing ids as text.
+wallpaper_rows_lookup() {
+  wallpaper_rows | awk -F '\t' '$1 == ENVIRON["WANTED"] { print ENVIRON["ROOT"] $2; exit }'
+}
+# Prints the absolute path of wallpaper ID from the manifest (nothing when
+# the id is unknown); the id is compared as text, never as a pattern.
+wallpaper_path() {
+  # Passed through the environment: awk -v would expand backslashes.
+  WANTED="$1" ROOT="$repo_root/" wallpaper_rows_lookup
+}
+# Prints the phase (dawn, day, dusk or night) that time NOW (HH:MM) falls in.
 phase_for_now() {
-  local now="$1"; local dawn_minutes=$((10#${dawn/:/})); local day_minutes=$((10#${day/:/})); local dusk_minutes=$((10#${dusk/:/})); local night_minutes=$((10#${night/:/})); local now_minutes=$((10#${now/:/}))
-  if ((now_minutes >= night_minutes || now_minutes < dawn_minutes)); then printf night
-  elif ((now_minutes < day_minutes)); then printf dawn
-  elif ((now_minutes < dusk_minutes)); then printf day
-  else printf dusk
+  local now="$1"
+  local dawn_minutes=$((10#${dawn/:/}))
+  local day_minutes=$((10#${day/:/}))
+  local dusk_minutes=$((10#${dusk/:/}))
+  local night_minutes=$((10#${night/:/}))
+  local now_minutes=$((10#${now/:/}))
+  if ((now_minutes >= night_minutes || now_minutes < dawn_minutes)); then
+    printf night
+  elif ((now_minutes < day_minutes)); then
+    printf dawn
+  elif ((now_minutes < dusk_minutes)); then
+    printf day
+  else
+    printf dusk
   fi
 }
 
 case "${1:-list}" in
-  list) awk '/^id = / { id=$0; sub(/^id = /, "", id); gsub(/"/, "", id) } /^path = / { path=$0; sub(/^path = /, "", path); gsub(/"/, "", path); print id "\t" path }' "$manifest" ;;
+  list) wallpaper_rows ;;
   set)
-    id="${2:-}"; path="$(wallpaper_path "$id")"; [[ -n "$path" ]] || { printf 'Unknown wallpaper: %s\n' "$id" >&2; exit 1; }; [[ -f "$path" ]] || { printf 'Wallpaper asset is missing: %s\n' "$path" >&2; exit 1; }
+    id="${2:-}"
+    path="$(wallpaper_path "$id")"
+    [[ -n "$path" ]] || {
+      printf 'Unknown wallpaper: %s\n' "$id" >&2
+      exit 1
+    }
+    [[ -f "$path" ]] || {
+      printf 'Wallpaper asset is missing: %s\n' "$path" >&2
+      exit 1
+    }
     if [[ -n "${ARANEA_WALLPAPER_APPLIER:-}" ]]; then "$ARANEA_WALLPAPER_APPLIER" "$path"; elif [[ "${ARANEA_WALLPAPER_DRY_RUN:-0}" != 1 ]] && command -v omarchy >/dev/null 2>&1; then omarchy theme bg set "$path"; fi
-    printf 'wallpaper: %s\npath: %s\n' "$id" "$path" ;;
-  set-phase) load_schedule; validate_schedule; now="${ARANEA_NOW:-$(date +%H:%M)}"; valid_time "$now" || { printf 'Invalid ARANEA_NOW: %s\n' "$now" >&2; exit 1; }; exec "$0" set "$(phase_for_now "$now")" ;;
+    printf 'wallpaper: %s\npath: %s\n' "$id" "$path"
+    ;;
+  set-phase)
+    load_schedule
+    validate_schedule
+    now="${ARANEA_NOW:-$(date +%H:%M)}"
+    valid_time "$now" || {
+      printf 'Invalid ARANEA_NOW: %s\n' "$now" >&2
+      exit 1
+    }
+    exec "$0" set "$(phase_for_now "$now")"
+    ;;
   set-day-night) exec "$0" set-phase ;;
   schedule)
     mode="${2:-}"
     if [[ "$mode" == configure ]]; then
-      [[ $# -eq 6 ]] || { printf 'Usage: %s schedule configure DAWN DAY DUSK NIGHT\n' "$0" >&2; exit 2; }; dawn="$3"; day="$4"; dusk="$5"; night="$6"; validate_schedule; write_schedule_config
-      if [[ -f "$state_root/wallpaper-schedule" ]] && [[ "$(<"$state_root/wallpaper-schedule")" == on ]]; then write_schedule_units; systemctl_user daemon-reload; systemctl_user enable --now "$timer_unit"; fi
-      printf 'wallpaper schedule: configured\n'; exit 0
+      [[ $# -eq 6 ]] || {
+        printf 'Usage: %s schedule configure DAWN DAY DUSK NIGHT\n' "$0" >&2
+        exit 2
+      }
+      dawn="$3"
+      day="$4"
+      dusk="$5"
+      night="$6"
+      validate_schedule
+      write_schedule_config
+      if [[ -f "$state_root/wallpaper-schedule" ]] && [[ "$(<"$state_root/wallpaper-schedule")" == on ]]; then
+        write_schedule_units
+        systemctl_user daemon-reload
+        systemctl_user enable --now "$timer_unit"
+      fi
+      printf 'wallpaper schedule: configured\n'
+      exit 0
     fi
-    [[ "$mode" == on || "$mode" == off || "$mode" == status ]] || { printf 'Usage: %s schedule on|off|status|configure\n' "$0" >&2; exit 2; }; mkdir -p "$state_root"
-    if [[ "$mode" == status ]]; then state=off; [[ -f "$state_root/wallpaper-schedule" ]] && state="$(<"$state_root/wallpaper-schedule")"; load_schedule; printf 'wallpaper schedule: %s\nphases: %s %s %s %s\n' "$state" "$dawn" "$day" "$dusk" "$night"; exit 0; fi
-    if [[ "$mode" == on ]]; then load_schedule; validate_schedule; [[ -f "$schedule_config" ]] || write_schedule_config; write_schedule_units; systemctl_user daemon-reload; systemctl_user enable --now "$timer_unit"; printf on > "$state_root/wallpaper-schedule"; printf 'wallpaper schedule: on\n'
-    else systemctl_user disable --now "$timer_unit" >/dev/null 2>&1 || true; systemctl_user daemon-reload >/dev/null 2>&1 || true; rm -f "$systemd_user_dir/$timer_unit" "$systemd_user_dir/$service_unit"; printf off > "$state_root/wallpaper-schedule"; printf 'wallpaper schedule: off\n'; fi ;;
-  motion) mode="${2:-}"; [[ "$mode" == on || "$mode" == off ]] || { printf 'Usage: %s motion on|off\n' "$0" >&2; exit 2; }; exec "$repo_root/scripts/aranea-motion" set "$mode" ;;
-  *) printf 'Usage: %s list|set <id>|set-phase|set-day-night|schedule on|off|status|configure|motion on|off\n' "$0" >&2; exit 2 ;;
+    [[ "$mode" == on || "$mode" == off || "$mode" == status ]] || {
+      printf 'Usage: %s schedule on|off|status|configure\n' "$0" >&2
+      exit 2
+    }
+    mkdir -p "$state_root"
+    if [[ "$mode" == status ]]; then
+      state=off
+      [[ -f "$state_root/wallpaper-schedule" ]] && state="$(<"$state_root/wallpaper-schedule")"
+      load_schedule
+      printf 'wallpaper schedule: %s\nphases: %s %s %s %s\n' "$state" "$dawn" "$day" "$dusk" "$night"
+      exit 0
+    fi
+    if [[ "$mode" == on ]]; then
+      load_schedule
+      validate_schedule
+      [[ -f "$schedule_config" ]] || write_schedule_config
+      write_schedule_units
+      systemctl_user daemon-reload
+      systemctl_user enable --now "$timer_unit"
+      printf on >"$state_root/wallpaper-schedule"
+      printf 'wallpaper schedule: on\n'
+    else
+      systemctl_user disable --now "$timer_unit" >/dev/null 2>&1 || true
+      systemctl_user daemon-reload >/dev/null 2>&1 || true
+      rm -f "$systemd_user_dir/$timer_unit" "$systemd_user_dir/$service_unit"
+      printf off >"$state_root/wallpaper-schedule"
+      printf 'wallpaper schedule: off\n'
+    fi
+    ;;
+  motion)
+    mode="${2:-}"
+    [[ "$mode" == on || "$mode" == off ]] || {
+      printf 'Usage: %s motion on|off\n' "$0" >&2
+      exit 2
+    }
+    exec "$repo_root/scripts/aranea-motion" set "$mode"
+    ;;
+  *)
+    printf 'Usage: %s list|set <id>|set-phase|set-day-night|schedule on|off|status|configure|motion on|off\n' "$0" >&2
+    exit 2
+    ;;
 esac

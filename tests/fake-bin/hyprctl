@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Fake hyprctl for the test sandbox: records its arguments to
+# ARANEA_HYPRCTL_LOG (required) instead of touching a real compositor, so
+# tests can assert on exactly which hyprctl keywords a script issued.
 set -euo pipefail
 
-printf '%s\n' "$*" >> "${ARANEA_HYPRCTL_LOG:?}"
+printf '%s\n' "$*" >>"${ARANEA_HYPRCTL_LOG:?}"

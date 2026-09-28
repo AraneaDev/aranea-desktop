@@ -1,2 +1,5 @@
 #!/usr/bin/env bash
+# Fake paru for the test sandbox: makes `command -v paru` succeed so
+# install-related scripts treat an AUR helper as present, without installing
+# any package.
 exit 0

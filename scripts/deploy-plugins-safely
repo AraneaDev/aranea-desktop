@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme_root=${1:?theme root is required}
+# Deploys Aranea's plugins from <theme-root>/plugins into the Omarchy plugin
+# dir (default ~/.config/omarchy/plugins) when any of them changed, stopping
+# the shell for the swap and restarting it after. Skips the deploy while the
+# session is locked. Always reconciles shell.json via repair-shell-config.
+#
+# Usage: scripts/deploy-plugins-safely <theme-root> [target-root]
+
+[[ $# -ge 1 && -n "$1" ]] || {
+  echo "Usage: scripts/deploy-plugins-safely <theme-root> [target-root]" >&2
+  exit 2
+}
+theme_root="$1"
 target_root=${2:-$HOME/.config/omarchy/plugins}
 deploy_plugin="$theme_root/scripts/deploy-plugin"
 
@@ -37,15 +48,15 @@ repair_shell_config() {
   fi
 }
 
-if (( ! needs_deploy )); then
+if ((! needs_deploy)); then
   repair_shell_config
   exit 0
 fi
 
 # A live directory swap makes QuickShell reload plugins. Stop it first so its
 # stock panels never observe the short interval between plugin generations.
-if command -v omarchy-hyprland-session-locked >/dev/null 2>&1 \
-    && omarchy-hyprland-session-locked; then
+if command -v omarchy-hyprland-session-locked >/dev/null 2>&1 &&
+  omarchy-hyprland-session-locked; then
   echo "Skipping plugin deployment while the session is locked." >&2
   repair_shell_config
   exit 0
@@ -58,8 +69,10 @@ if omarchy-shell shell ping >/dev/null 2>&1; then
 fi
 
 restart_needed=$shell_was_running
+# Restarts the shell when this run stopped it, and clears the polkit
+# handover marker that the restart completes.
 finish() {
-  if (( restart_needed )); then
+  if ((restart_needed)); then
     restart_needed=0
     omarchy restart shell >/dev/null 2>&1 || true
     # This restart also completes any polkit agent handover.

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Restarts the Omarchy shell when its IPC does not answer a ping.
+#
+# Usage: scripts/ensure-shell-running
+
 if omarchy-shell shell ping >/dev/null 2>&1; then
   exit 0
 fi

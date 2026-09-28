@@ -1,22 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Captures screenshots of Aranea surfaces into an output directory. --surface
+# captures one; --all (only on workspace 2, needs hyprctl) captures every
+# surface with the real notification inbox parked, then builds
+# hero-showcase.gif. --hero rebuilds hero-showcase.gif from the PNGs already
+# in the output directory (no captures, no shell restart). Surfaces without a
+# built-in capture use ARANEA_SCREENSHOT_COMMAND.
+#
+# Never captured: the keyboard-layout and system-update bar widgets (no popup
+# to summon) and wifiqr (it would put the Wi-Fi password in a screenshot).
+#
+# ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
+# --all: it is run as `<command> <surface> <output dir>` (tests use it).
+#
+# Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir> | --hero --output <dir>
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 surface=""
 output=""
 capture_all=0
-# These are the surfaces currently summonable on this installation. The
-# first-party Bluetooth, keyboard-layout, and system-update ids are retained
-# in aranea-showcase for direct diagnostics, but their shell API returns
-# "unknown" here and they must not poison a complete batch with blank PNGs.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor apps favorites recent dawn osd)
+build_hero_only=0
+# The surfaces --all captures.
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd)
 
+# Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
+# magick or a frame is missing.
 build_hero_showcase() {
   command -v magick >/dev/null 2>&1 || {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications health network audio bluetooth agents power monitor btop file-manager neovim lock osd)
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty clipboard emojis image-picker polkit health network audio bluetooth agents power monitor clock weather btop file-manager neovim lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -33,17 +48,50 @@ build_hero_showcase() {
 
 while (($#)); do
   case "$1" in
-    --surface) (($# >= 2)) || { echo '--surface requires a value' >&2; exit 2; }; surface="$2"; shift ;;
-    --output) (($# >= 2)) || { echo '--output requires a directory' >&2; exit 2; }; output="$2"; shift ;;
+    --surface)
+      (($# >= 2)) || {
+        echo '--surface requires a value' >&2
+        exit 2
+      }
+      surface="$2"
+      shift
+      ;;
+    --output)
+      (($# >= 2)) || {
+        echo '--output requires a directory' >&2
+        exit 2
+      }
+      output="$2"
+      shift
+      ;;
     --all) capture_all=1 ;;
-    *) echo "Unknown option: $1" >&2; exit 2 ;;
+    --hero) build_hero_only=1 ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
   esac
   shift
 done
 
-if (( capture_all )); then
-  [[ -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --all --output <dir>' >&2; exit 2; }
-  command -v hyprctl >/dev/null 2>&1 || { echo '--all requires hyprctl so captures cannot silently run on the wrong workspace' >&2; exit 3; }
+if ((build_hero_only)); then
+  [[ -n "$output" ]] || {
+    echo 'Usage: scripts/capture-screenshots --hero --output <dir>' >&2
+    exit 2
+  }
+  build_hero_showcase
+  exit 0
+fi
+
+if ((capture_all)); then
+  [[ -n "$output" ]] || {
+    echo 'Usage: scripts/capture-screenshots --all --output <dir>' >&2
+    exit 2
+  }
+  command -v hyprctl >/dev/null 2>&1 || {
+    echo '--all requires hyprctl so captures cannot silently run on the wrong workspace' >&2
+    exit 3
+  }
   active_workspace="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id' 2>/dev/null || true)"
   [[ -n "$active_workspace" && "$active_workspace" != "null" ]] || {
     echo 'Unable to verify the active workspace; refusing --all capture' >&2
@@ -58,17 +106,21 @@ if (( capture_all )); then
   # the real inbox is parked for the whole batch and restored afterwards;
   # badges then show capture data only, never the user's own count.
   batch_inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
-  batch_inbox_backup="$(mktemp -d)"
-  mkdir -p "$batch_inbox_dir"
-  find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
-  omarchy restart shell >/dev/null 2>&1 || true
-  sleep 3
+  mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+  batch_inbox_backup="$(mktemp -d "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/capture-backup.XXXXXX")"
   # Restore the real inbox, leave the finished capture set visible on the
-  # intentionally empty workspace for a moment, then return focus.
+  # intentionally empty workspace for a moment, then return focus. Set
+  # before the inbox is parked; the capture inbox is only cleared once the
+  # real one has actually been moved aside.
+  batch_swapped=0
+  # Moves the real inbox back (when it was parked), restarts the shell, waits,
+  # then focuses workspace 1.
   finish_batch() {
-    omarchy-shell notifications clear >/dev/null 2>&1 || true
-    sleep 1
-    find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+    if ((batch_swapped)); then
+      omarchy-shell notifications clear >/dev/null 2>&1 || true
+      sleep 1
+      find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+    fi
     rmdir "$batch_inbox_backup" 2>/dev/null || true
     omarchy restart shell >/dev/null 2>&1 || true
     sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
@@ -76,25 +128,57 @@ if (( capture_all )); then
   }
   # A batch that stops early (set -e) still restores the inbox and focus.
   trap finish_batch EXIT
+  mkdir -p "$batch_inbox_dir"
+  find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
+  batch_swapped=1
+  omarchy restart shell >/dev/null 2>&1 || true
+  sleep 3
+  # Captures one surface in a child run; fails when it wrote no new PNG. The
+  # previous PNG is set aside first (so it never counts as a new capture) and
+  # put back when the capture fails, so the README keeps its old screenshot.
   capture_one() {
     local all_surface="$1"
-    if ! "$0" --surface "$all_surface" --output "$output"; then
-      printf 'capture warning: %s failed; continuing batch\n' "$all_surface" >&2
-      [[ -f "$output/$all_surface.png" ]] || return 1
+    local png="$output/$all_surface.png" previous="$output/.$all_surface.png.previous"
+    rm -f -- "$previous"
+    if [[ -f "$png" ]]; then mv -- "$png" "$previous"; fi
+    if [[ -n "${ARANEA_CAPTURE_SURFACE_COMMAND:-}" ]]; then
+      "$ARANEA_CAPTURE_SURFACE_COMMAND" "$all_surface" "$output" || true
+    else
+      "$0" --surface "$all_surface" --output "$output" || true
     fi
+    if [[ -f "$png" ]]; then
+      rm -f -- "$previous"
+      return 0
+    fi
+    if [[ -f "$previous" ]]; then mv -- "$previous" "$png"; fi
+    return 1
   }
+  # A failed surface is reported at the end; the batch captures the rest.
+  failed_surfaces=()
   for all_surface in "${all_surfaces[@]}"; do
-    capture_one "$all_surface"
+    capture_one "$all_surface" || failed_surfaces+=("$all_surface")
   done
-  build_hero_showcase
+  # The hero GIF needs every frame; with failures it is left as it was.
+  if ((${#failed_surfaces[@]} == 0)); then
+    build_hero_showcase
+  else
+    printf '%s\n' 'hero showcase not rebuilt: some surfaces failed' >&2
+  fi
   # Normal completion restores explicitly; the trap only covers a batch that
   # stops early.
   trap - EXIT
   finish_batch
+  if ((${#failed_surfaces[@]})); then
+    printf 'capture failed: %s\n' "${failed_surfaces[*]}" >&2
+    exit 1
+  fi
   exit 0
 fi
 
-[[ -n "$surface" && -n "$output" ]] || { echo 'Usage: scripts/capture-screenshots --surface <name> --output <dir>' >&2; exit 2; }
+[[ -n "$surface" && -n "$output" ]] || {
+  echo 'Usage: scripts/capture-screenshots --surface <name> --output <dir>' >&2
+  exit 2
+}
 showcase_surface="$surface"
 case "$surface" in
   plymouth) showcase_surface=boot ;;
@@ -105,6 +189,7 @@ esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
 
+# Opens the Aranea menu page for $surface and grabs the screen with grim.
 capture_menu_surface() {
   command -v omarchy-shell >/dev/null 2>&1 || {
     echo "omarchy-shell is required to capture $surface" >&2
@@ -131,20 +216,29 @@ capture_menu_surface() {
   omarchy-shell shell toggle araneadev.menu "$payload"
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  # Terminal applications can exit non-zero after the compositor frame is
-  # already captured (Neovim emits a harmless terminal escape warning on some
-  # builds). Keep the frame and continue the batch when the file exists.
-  local capture_status=0
-  grim "$output/$surface.png" || capture_status=$?
+  # A grim error after the frame was written is not fatal; no frame is.
+  grim "$output/$surface.png" || true
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
+  if [[ ! -f "$output/$surface.png" ]]; then
+    echo "capture failed: $output/$surface.png was not written" >&2
+    return 3
+  fi
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Opens kitty with the Aranea config running COMMAND in a window titled
+# TITLE, grabs the screen, then closes the window.
 capture_terminal_surface() {
   local title="$1"
   local command_name="$2"
-  command -v kitty >/dev/null 2>&1 || { echo "kitty is required to capture $surface" >&2; exit 3; }
-  command -v "$command_name" >/dev/null 2>&1 || { echo "$command_name is required to capture $surface" >&2; exit 3; }
+  command -v kitty >/dev/null 2>&1 || {
+    echo "kitty is required to capture $surface" >&2
+    exit 3
+  }
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "$command_name is required to capture $surface" >&2
+    exit 3
+  }
 
   kitty --config "$repo_root/integrations/terminal/kitty.conf" \
     --class "aranea-screenshot-$surface" --title "$title" \
@@ -159,21 +253,36 @@ capture_terminal_surface() {
   hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
   kill "$child_pid" >/dev/null 2>&1 || true
   wait "$child_pid" >/dev/null 2>&1 || true
+  # Terminal applications can exit non-zero after the compositor frame is
+  # already captured (Neovim emits a harmless terminal escape warning on some
+  # builds). Keep the frame and continue the batch when the file exists.
   if [[ ! -f "$output/$surface.png" ]]; then
-    return "$capture_status"
+    echo "capture failed: $output/$surface.png was not written" >&2
+    return 3
   fi
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Summons shell popup TARGET, grabs the screen, then hides it.
 capture_popup_surface() {
-  local target="$1"
-  command -v omarchy-shell >/dev/null 2>&1 || { echo "omarchy-shell is required to capture $surface" >&2; exit 3; }
-  command -v grim >/dev/null 2>&1 || { echo "grim is required to capture $surface" >&2; exit 3; }
+  local target="$1" payload="${2:-}"
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo "omarchy-shell is required to capture $surface" >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo "grim is required to capture $surface" >&2
+    exit 3
+  }
 
   hyprctl dismissnotify >/dev/null 2>&1 || true
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
   local summon_result
-  summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+  if [[ -n "$payload" ]]; then
+    summon_result="$(omarchy-shell shell summon "$target" "$payload" 2>&1)"
+  else
+    summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+  fi
   if [[ "$summon_result" != "ok" ]]; then
     echo "Unable to summon popup $target: $summon_result" >&2
     exit 3
@@ -185,9 +294,16 @@ capture_popup_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Shows a sample volume OSD on workspace 2 and grabs the screen.
 capture_osd_surface() {
-  command -v omarchy-shell >/dev/null 2>&1 || { echo 'omarchy-shell is required to capture osd' >&2; exit 3; }
-  command -v grim >/dev/null 2>&1 || { echo 'grim is required to capture osd' >&2; exit 3; }
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo 'omarchy-shell is required to capture osd' >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo 'grim is required to capture osd' >&2
+    exit 3
+  }
 
   # OSD captures must always be taken on the clean showcase workspace.  This
   # avoids terminal/chat text leaking into the reference frame.
@@ -208,7 +324,7 @@ capture_osd_surface() {
 }
 
 case "$surface" in
-  menu|menu-submenu|menu-search|menu-input|apps|favorites|recent)
+  menu | menu-submenu | menu-search | menu-input | apps | favorites | recent)
     capture_menu_surface
     exit 0
     ;;
@@ -218,12 +334,32 @@ case "$surface" in
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  notifications|notifications-empty)
-    inbox_backup="$(mktemp -d)"
+  notifications | notifications-empty)
+    state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+    mkdir -p "$state_home/aranea"
+    inbox_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
     inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
+    # Put the real inbox back however this ends (set by the move below).
+    # Only undo what was done: before the move, the inbox is the real one and
+    # must not be cleared.
+    inbox_swapped=0
+    # Hides the notification center; when the inbox was parked, clears the
+    # capture notifications, moves the real inbox back and restarts the shell.
+    restore_inbox() {
+      omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
+      if ((! inbox_swapped)); then return 0; fi
+      omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
+      omarchy-shell notifications clear >/dev/null 2>&1 || true
+      sleep 1
+      find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
+      rmdir "$inbox_backup" 2>/dev/null || true
+      omarchy restart shell >/dev/null 2>&1 || true
+    }
+    trap restore_inbox EXIT
     # Sanitized fixtures: park the real inbox, show only capture notifications.
     mkdir -p "$inbox_dir"
     find "$inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_backup" {} + 2>/dev/null || true
+    inbox_swapped=1
     omarchy restart shell >/dev/null 2>&1 || true
     sleep 2
     case "$surface" in
@@ -243,17 +379,12 @@ case "$surface" in
     esac
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
-    omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
-    omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
-    omarchy-shell notifications clear >/dev/null 2>&1 || true
-    sleep 1
-    find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
-    rmdir "$inbox_backup" 2>/dev/null || true
-    omarchy restart shell >/dev/null 2>&1 || true
+    restore_inbox
+    trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
-  clipboard|emojis)
+  clipboard | emojis)
     # Fixture data only: the real clipboard history (or emoji recents) is set
     # aside for the capture and put back afterwards, so no real clipboard
     # content can reach a screenshot. Files are swapped only while the shell
@@ -267,6 +398,7 @@ case "$surface" in
       picker_file="$state_home/aranea/emoji-recent.json"
       picker_id=omarchy.emojis
     fi
+    # Stops the running shell and waits a second.
     stop_shell() {
       quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null 2>&1 || true
       sleep 1
@@ -276,26 +408,40 @@ case "$surface" in
     mkdir -p "$state_home/aranea"
     picker_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
     clip_type=""
-    stop_shell
-    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
-    if [[ "$surface" == clipboard ]]; then
-      # The picker records the live clipboard when the shell starts: save it
-      # (never a password manager's marker type) and seed fixture text.
-      clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
-      if [[ -n "$clip_type" ]]; then wl-paste --type "$clip_type" > "$picker_backup/clipboard" 2>/dev/null || clip_type=""; fi
-      printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
-    fi
+    # Put everything back however this ends (set before anything is moved).
+    # Only undo what was actually done: a run that stops before the real file
+    # was moved aside must not delete it, nor clear an untouched clipboard.
+    picker_swapped=0
+    clipboard_swapped=0
+    # Stops the shell, restores the picker file and clipboard (only what was
+    # swapped), deletes the backup dir and restarts the shell.
     finish_picker() {
       stop_shell
-      rm -f "$picker_file"
-      if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
-      if [[ "$surface" == clipboard ]]; then
-        if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" < "$picker_backup/clipboard"; else wl-copy --clear; fi
+      if ((picker_swapped)); then
+        rm -f "$picker_file"
+        if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
+      fi
+      if [[ "$surface" == clipboard ]] && ((clipboard_swapped)); then
+        if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" <"$picker_backup/clipboard"; else wl-copy --clear; fi
       fi
       rm -rf "$picker_backup"
       omarchy restart shell >/dev/null 2>&1 || true
     }
     trap finish_picker EXIT
+    stop_shell
+    [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
+    picker_swapped=1
+    if [[ "$surface" == clipboard ]]; then
+      # The picker records the live clipboard when the shell starts: save it
+      # (never a password manager's marker type) and seed fixture text.
+      clip_type="$(wl-paste --list-types 2>/dev/null | grep -vx 'x-kde-passwordManagerHint' | head -n 1 || true)"
+      if [[ -n "$clip_type" ]] && ! wl-paste --type "$clip_type" >"$picker_backup/clipboard" 2>/dev/null; then
+        echo "could not save the clipboard; not replacing it" >&2
+        exit 3
+      fi
+      clipboard_swapped=1
+      printf '%s' "https://github.com/AraneaDev/aranea-desktop" | wl-copy
+    fi
     mkdir -p "$(dirname "$picker_file")"
     now_ms="$(date +%s%3N)"
     if [[ "$surface" == clipboard ]]; then
@@ -307,9 +453,9 @@ case "$surface" in
         {type:"text", text:"~/Work/AraneaDev/aranea-desktop/README.md", capturedAtMs:($now - 1500000)},
         {type:"image", path:$img, mime:"image/png", capturedAt:"Sunday 11:20", capturedAtMs:($now - 2400000)},
         {type:"text", text:"A quiet obsidian desktop with a living network of light.", capturedAtMs:($now - 3600000)}
-      ]' > "$picker_file"
+      ]' >"$picker_file"
     else
-      printf '%s\n' '{"version":1,"recent":["🚀","✅","👍","🎉","🔥","🕷️","💚","✨"]}' > "$picker_file"
+      printf '%s\n' '{"version":1,"recent":["🚀","✅","👍","🎉","🔥","🕷️","💚","✨"]}' >"$picker_file"
     fi
     omarchy restart shell >/dev/null 2>&1 || true
     sleep 5
@@ -324,10 +470,17 @@ case "$surface" in
   polkit)
     # A harmless request (pkexec /usr/bin/true) with the details open. It is
     # always cancelled with Escape; nothing is ever typed into the field.
-    command -v pkexec >/dev/null 2>&1 || { echo "pkexec is required to capture $surface" >&2; exit 3; }
-    command -v wtype >/dev/null 2>&1 || { echo "wtype is required to capture $surface" >&2; exit 3; }
+    command -v pkexec >/dev/null 2>&1 || {
+      echo "pkexec is required to capture $surface" >&2
+      exit 3
+    }
+    command -v wtype >/dev/null 2>&1 || {
+      echo "wtype is required to capture $surface" >&2
+      exit 3
+    }
     pkexec /usr/bin/true >/dev/null 2>&1 &
     pkexec_pid=$!
+    # True when the omarchy-polkit layer is on screen.
     prompt_visible() {
       hyprctl layers -j 2>/dev/null | jq -e '[.. | objects | select(.namespace? == "omarchy-polkit")] | length > 0' >/dev/null 2>&1
     }
@@ -344,10 +497,13 @@ case "$surface" in
     trap finish_polkit EXIT
     shown=0
     for _ in $(seq 1 20); do
-      if prompt_visible; then shown=1; break; fi
+      if prompt_visible; then
+        shown=1
+        break
+      fi
       sleep 0.5
     done
-    if (( ! shown )); then
+    if ((! shown)); then
       echo "polkit prompt never appeared; is a polkit agent registered?" >&2
       exit 3
     fi
@@ -380,7 +536,7 @@ case "$surface" in
     # A fresh shell has no CPU history yet; wait for ~100 s of it (50
     # samples at 2 s) so the sparkline is a real graph.
     for _ in $(seq 1 120); do
-      (( $(omarchy-shell health metrics 2>/dev/null | jq -r '.samples // 0' 2>/dev/null || echo 0) >= 50 )) && break
+      (($(omarchy-shell health metrics 2>/dev/null | jq -r '.samples // 0' 2>/dev/null || echo 0) >= 50)) && break
       sleep 2
     done
     systemd-run --user --unit=aranea-capture-probe false >/dev/null 2>&1 || true
@@ -432,16 +588,51 @@ case "$surface" in
     capture_popup_surface omarchy.monitor
     exit 0
     ;;
-  keyboard-layout)
-    capture_popup_surface omarchy.keyboard-layout
+  clock)
+    capture_popup_surface omarchy.clock
     exit 0
     ;;
-  system-update)
-    capture_popup_surface omarchy.system-update
+  weather)
+    # The dropdown names the configured town: show a demo city instead of the
+    # user's own, and put their location back however the capture ends.
+    weather_file="$HOME/.local/state/omarchy/settings/weather.json"
+    weather_backup=""
+    # Puts the user's weather location back (or removes the demo one).
+    restore_weather() {
+      if [[ -n "$weather_backup" ]]; then
+        mv -f -- "$weather_backup" "$weather_file"
+      else
+        rm -f -- "$weather_file"
+      fi
+    }
+    mkdir -p "$(dirname "$weather_file")" "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+    if [[ -f "$weather_file" ]]; then
+      weather_backup="$(mktemp "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/weather-backup.XXXXXX")"
+      cp -- "$weather_file" "$weather_backup"
+    fi
+    trap restore_weather EXIT
+    jq -n --arg name "${ARANEA_CAPTURE_WEATHER_CITY:-Amsterdam}" \
+      --argjson latitude "${ARANEA_CAPTURE_WEATHER_LATITUDE:-52.37}" \
+      --argjson longitude "${ARANEA_CAPTURE_WEATHER_LONGITUDE:-4.90}" \
+      '{name: $name, latitude: $latitude, longitude: $longitude}' >"$weather_file"
+    # The dropdown reloads the location and fetches the forecast first.
+    sleep "${ARANEA_WEATHER_DELAY:-6}"
+    capture_popup_surface omarchy.weather
+    # A failed capture exits inside capture_popup_surface; the trap restores then.
+    trap - EXIT
+    restore_weather
+    exit 0
+    ;;
+  image-picker)
+    # Aranea's own backgrounds, so no personal pictures appear.
+    capture_popup_surface omarchy.image-picker "$(jq -cn --arg dirs "$repo_root/backgrounds" '{imageDirs: $dirs, showLabels: true}')"
     exit 0
     ;;
   file-manager)
-    command -v nautilus >/dev/null 2>&1 || { echo 'nautilus is required to capture file-manager' >&2; exit 3; }
+    command -v nautilus >/dev/null 2>&1 || {
+      echo 'nautilus is required to capture file-manager' >&2
+      exit 3
+    }
     nautilus --new-window "$repo_root" >/dev/null 2>&1 &
     child_pid=$!
     sleep 1

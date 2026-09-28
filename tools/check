@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+# Runs every quality gate for this repository, the same way locally, in CI,
+# before a release and from the git hooks.
+#
+# Usage: tools/check [--fix] [--fast] [--staged] [--only STAGES] [--skip STAGES] [--update-baselines]
+#
+# Stages run in order: format lint docs validate qml qmltest test smoke. Each prints one
+# result line; a summary follows, and the exit status is non-zero when any
+# stage failed. See CONTRIBUTING.md.
+set -uo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+all_stages=(format lint docs validate qml qmltest test smoke)
+
+# Prints the usage text.
+usage() {
+  cat <<'EOF'
+Usage: tools/check [--fix] [--fast] [--staged] [--only STAGES] [--skip STAGES] [--update-baselines]
+
+  --fix               write formatting fixes instead of only checking
+  --fast              skip smoke and the slow bash tests
+  --staged            check the staged (index) content of staged files
+  --only a,b          run only these stages
+  --skip a,b          skip these stages
+  --update-baselines  shrink the qmllint baseline and raise coverage floors
+Stages: format lint docs validate qml test smoke
+EOF
+}
+
+fix=0 fast=0 staged=0 update_baselines=0 only="" skip=""
+while (($#)); do
+  case "$1" in
+    --fix) fix=1 ;;
+    --fast) fast=1 ;;
+    --staged) staged=1 ;;
+    --update-baselines) update_baselines=1 ;;
+    --only)
+      [[ $# -ge 2 && -n "$2" ]] || {
+        usage >&2
+        exit 2
+      }
+      only="$2"
+      shift
+      ;;
+    --skip)
+      [[ $# -ge 2 && -n "$2" ]] || {
+        usage >&2
+        exit 2
+      }
+      skip="$2"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+export fix fast staged update_baselines
+if ((staged && fix)); then
+  echo "--fix cannot be combined with --staged (it would only rewrite a snapshot)" >&2
+  exit 2
+fi
+
+# True when NAME is one of the known stages.
+known_stage() {
+  local name="$1" stage
+  for stage in "${all_stages[@]}"; do [[ "$stage" == "$name" ]] && return 0; done
+  return 1
+}
+for list in "$only" "$skip"; do
+  IFS=',' read -r -a names <<<"$list"
+  for name in "${names[@]}"; do
+    known_stage "$name" || {
+      printf 'Unknown stage: %s\n' "$name" >&2
+      exit 2
+    }
+  done
+done
+
+# True when STAGE should run given --only/--skip (and --fast, which drops the
+# runtime smoke test unless it is asked for by name).
+wanted() {
+  local stage="$1"
+  [[ "$stage" == smoke && "$fast" == 1 && ",$only," != *",smoke,"* ]] && return 1
+  [[ -n "$only" && ",$only," != *",$stage,"* ]] && return 1
+  [[ ",$skip," == *",$stage,"* ]] && return 1
+  return 0
+}
+
+# The files to check, read once. Paths are unquoted (core.quotePath off) so
+# non-ASCII names work; a failing git is a failure, never "no files".
+file_list="$(mktemp)"
+trap 'rm -f "$file_list"' EXIT
+if ((staged)); then
+  git -C "$repo_root" -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$file_list" || {
+    echo "git could not list the staged files" >&2
+    exit 2
+  }
+else
+  git -C "$repo_root" -c core.quotePath=false ls-files >"$file_list" || {
+    echo "git could not list the tracked files" >&2
+    exit 2
+  }
+fi
+
+# The tree being checked: the repository, or (with --staged) a snapshot of
+# the whole index, so staged files are checked with the repo's configs,
+# their siblings and their link targets as staged.
+check_root="$repo_root"
+if ((staged)); then
+  check_root="$(mktemp -d)"
+  trap 'rm -f "$file_list"; rm -rf "$check_root"' EXIT
+  git -C "$repo_root" checkout-index -a --prefix="$check_root/" || {
+    echo "git could not snapshot the index" >&2
+    exit 2
+  }
+  # The JS tools and their plugins, resolved from the snapshot.
+  [[ -d "$repo_root/node_modules" ]] && ln -s "$repo_root/node_modules" "$check_root/node_modules"
+fi
+export check_root repo_root file_list
+
+# Prints the files to check, optionally filtered by extended regular
+# expressions matched against the whole path (e.g. '\.json$').
+check_files() {
+  if (($# == 0)); then
+    cat "$file_list"
+    return
+  fi
+  local file regex
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    for regex in "$@"; do
+      if [[ "$file" =~ $regex ]]; then
+        printf '%s\n' "$file"
+        break
+      fi
+    done
+  done <"$file_list"
+}
+
+# Lets a stage add a note to its summary line (e.g. "bare, syntax only").
+note_stage() {
+  stage_note="$1"
+}
+
+# Shared helpers, then the stage libraries (each defines stage_<name>). A
+# missing library is an error, not a stage that quietly does not run.
+for lib in common format lint docs validate qml qmltest test smoke; do
+  [[ -r "$repo_root/tools/lib/check-$lib.sh" ]] || {
+    echo "missing tools/lib/check-$lib.sh" >&2
+    exit 2
+  }
+done
+source "$repo_root/tools/lib/check-common.sh"
+source "$repo_root/tools/lib/check-format.sh"
+source "$repo_root/tools/lib/check-lint.sh"
+source "$repo_root/tools/lib/check-docs.sh"
+source "$repo_root/tools/lib/check-validate.sh"
+source "$repo_root/tools/lib/check-qml.sh"
+source "$repo_root/tools/lib/check-qmltest.sh"
+source "$repo_root/tools/lib/check-test.sh"
+source "$repo_root/tools/lib/check-smoke.sh"
+
+# Runs one stage function (defined by the libraries above).
+run_stage() {
+  case "$1" in
+    format) stage_format ;;
+    lint) stage_lint ;;
+    docs) stage_docs ;;
+    validate) stage_validate ;;
+    qml) stage_qml ;;
+    qmltest) stage_qmltest ;;
+    test) stage_test ;;
+    smoke) stage_smoke ;;
+  esac
+}
+
+results=()
+failed=0
+for stage in "${all_stages[@]}"; do
+  wanted "$stage" || continue
+  if ! declare -F "stage_$stage" >/dev/null; then
+    results+=("$stage: FAILED (not available)")
+    failed=1
+    continue
+  fi
+  printf '== %s\n' "$stage"
+  stage_note=""
+  run_stage "$stage"
+  status=$?
+  case "$status" in
+    0) results+=("$stage: ok${stage_note:+ ($stage_note)}") ;;
+    77)
+      results+=("$stage: skipped${stage_note:+ ($stage_note)}")
+      if [[ "${ARANEA_CHECK_REQUIRE_ALL:-0}" == 1 ]]; then
+        results[-1]="$stage: FAILED (skip not allowed)"
+        failed=1
+      fi
+      ;;
+    *)
+      results+=("$stage: FAILED")
+      failed=1
+      ;;
+  esac
+done
+
+printf '\n'
+printf '%s\n' "${results[@]}"
+exit "$failed"

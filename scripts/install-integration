@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Installs one integration's files from integrations/ into the user's config
+# and data dirs through the ownership ledger (a user's own file is backed up
+# first, a customised one kept). Skips an integration whose optional command
+# is not installed. --dry-run prints the plan; --yes is accepted for parity
+# with install.sh.
+#
+# Usage: scripts/install-integration [--dry-run] [--yes] <integration-id>
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
@@ -13,11 +21,14 @@ while (($#)); do
   case "$1" in
     --dry-run) dry_run=1 ;;
     --yes) assume_yes=1 ;;
-    -h|--help)
+    -h | --help)
       printf '%s\n' 'Usage: scripts/install-integration [--dry-run] [--yes] <integration-id>'
       exit 0
       ;;
-    -*) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+    -*)
+      printf 'Unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
     *) integration="$1" ;;
   esac
   shift
@@ -42,28 +53,42 @@ if [[ -n "$optional_command" ]]; then
   available=0
   IFS='|' read -r -a commands <<<"$optional_command"
   for command_name in "${commands[@]}"; do
-    if command -v "$command_name" >/dev/null 2>&1; then available=1; break; fi
+    if command -v "$command_name" >/dev/null 2>&1; then
+      available=1
+      break
+    fi
   done
-  if (( ! available )); then
+  if ((! available)); then
     printf 'Skipping %s: optional command is not installed.\n' "$integration"
     exit 0
   fi
 fi
 
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+# Temp dirs made below; removed however the script exits.
+cleanup_dirs=()
+trap 'rm -rf -- "${cleanup_dirs[@]}"' EXIT
+# Links TARGET to SOURCE via link_managed_file and reports it, or prints
+# the plan in dry-run.
 install_one() {
   local source="$1" target="$2"
-  if (( dry_run )); then
+  if ((dry_run)); then
     printf 'would link %s -> %s\n' "$source" "$target"
+    return 0
+  fi
+  link_managed_file "$target" "$source"
+  if [[ "$(last_ownership_action)" == kept ]]; then
+    printf 'kept your %s\n' "$target"
   else
-    link_managed_file "$target" "$source"
     printf 'linked %s -> %s\n' "$source" "$target"
   fi
 }
 
+# Copies generated SOURCE to TARGET (mode 644), backing up and recording
+# the target, or prints the plan in dry-run.
 install_generated() {
   local source="$1" target="$2"
-  if (( dry_run )); then
+  if ((dry_run)); then
     printf 'would copy %s -> %s\n' "$source" "$target"
   else
     backup_target "$target"
@@ -72,6 +97,19 @@ install_generated() {
     record_managed_file "$target"
     printf 'copied %s -> %s\n' "$source" "$target"
   fi
+}
+
+# Saves the current value of gsettings SCHEMA KEY once (the value from before
+# Aranea), so uninstall can put it back; later installs keep the first save,
+# and Aranea's own values (an install from before this was saved) never count.
+save_gsetting() {
+  local schema="$1" key="$2" saved value
+  saved="$(aranea_ownership_root)/gsettings/$schema.$key"
+  [[ -e "$saved" ]] && return 0
+  value="$(gsettings get "$schema" "$key" 2>/dev/null)" || return 0
+  [[ -n "$value" && "$value" != "'Aranea'" && "$value" != "'Aranea-icons'" ]] || return 0
+  mkdir -p "$(dirname "$saved")"
+  printf '%s\n' "$value" >"$saved"
 }
 
 case "$integration" in
@@ -85,11 +123,11 @@ case "$integration" in
     fi
     ;;
   developer)
-    command -v nvim >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/neovim.lua" "$config_root/nvim/lua/plugins/aranea-theme.lua"
-    command -v starship >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/starship.toml" "$config_root/starship.toml"
-    command -v tmux >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/tmux.conf" "$config_root/tmux/themes/aranea.conf"
-    command -v btop >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"
-    command -v lazygit >/dev/null 2>&1 && install_one "$repo_root/integrations/developer/lazygit.yml" "$config_root/lazygit/themes/aranea.yml"
+    if command -v nvim >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/neovim.lua" "$config_root/nvim/lua/plugins/aranea-theme.lua"; fi
+    if command -v starship >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/starship.toml" "$config_root/starship.toml"; fi
+    if command -v tmux >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/tmux.conf" "$config_root/tmux/themes/aranea.conf"; fi
+    if command -v btop >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/btop.theme" "$config_root/btop/themes/aranea.theme"; fi
+    if command -v lazygit >/dev/null 2>&1; then install_one "$repo_root/integrations/developer/lazygit.yml" "$config_root/lazygit/themes/aranea.yml"; fi
     ;;
   qt)
     if command -v kvantummanager >/dev/null 2>&1; then
@@ -115,11 +153,11 @@ case "$integration" in
     install_one "$repo_root/integrations/cursor/index.theme" "$cursor_root/index.theme"
     install_one "$repo_root/integrations/cursor/uwsm-env" "$config_root/uwsm/env.d/aranea-cursor"
     if [[ -d "$repo_root/integrations/cursor/hyprcursor" ]]; then
-      if (( dry_run )); then
+      if ((dry_run)); then
         printf 'would link %s -> %s\n' "$repo_root/integrations/cursor/hyprcursor" "$cursor_root"
       else
         hyprcursor_tmp="$(mktemp -d)"
-        trap 'rm -rf -- "$hyprcursor_tmp"' RETURN
+        cleanup_dirs+=("$hyprcursor_tmp")
         mkdir -p "$hyprcursor_tmp/out"
         if command -v hyprcursor-util >/dev/null 2>&1; then
           hyprcursor-util --create "$repo_root/integrations/cursor/hyprcursor" \
@@ -139,10 +177,10 @@ case "$integration" in
     # SVG files are useful source artwork but are not loadable Xcursor assets.
     # Compile them when the host has the standard Xcursor helper, then select
     # the theme in both the desktop settings and the running Hyprland session.
-    if ! (( dry_run )) && command -v xcursorgen >/dev/null 2>&1 &&
-       { command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1; }; then
+    if ! ((dry_run)) && command -v xcursorgen >/dev/null 2>&1 &&
+      { command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1; }; then
       cursor_tmp="$(mktemp -d)"
-      trap 'rm -rf -- "$cursor_tmp"' RETURN
+      cleanup_dirs+=("$cursor_tmp")
       for cursor_spec in \
         "left_ptr 2 2" \
         "hand2 16 16" \
@@ -173,8 +211,10 @@ case "$integration" in
           printf '32 %s %s %s\n' "$hotspot_x" "$hotspot_y" "$raster_png" >>"$cursor_cfg"
         fi
         xcursorgen "$cursor_cfg" "$cursor_root/cursors/$cursor_name"
+        record_managed_file "$cursor_root/cursors/$cursor_name"
       done
       if command -v gsettings >/dev/null 2>&1; then
+        save_gsetting org.gnome.desktop.interface cursor-theme
         gsettings set org.gnome.desktop.interface cursor-theme Aranea >/dev/null 2>&1 || true
       fi
       if command -v hyprctl >/dev/null 2>&1; then
@@ -195,7 +235,7 @@ case "$integration" in
         icon_relative="${managed_icon#"$icon_root/"}"
         [[ "$icon_relative" == scalable/*.svg ]] || continue
         [[ -f "$repo_root/integrations/icons/aranea/$icon_relative" ]] && continue
-        if (( dry_run )); then
+        if ((dry_run)); then
           printf 'would remove stale managed icon %s\n' "$managed_icon"
         elif [[ -e "$managed_icon" || -L "$managed_icon" ]]; then
           backup_target "$managed_icon"
@@ -211,17 +251,19 @@ case "$integration" in
       install_generated "$icon_source" "$icon_root/$icon_relative"
     done < <(find "$repo_root/integrations/icons/aranea/scalable" -type f -name '*.svg' -print | sort)
     if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-      if (( dry_run )); then
+      if ((dry_run)); then
         printf 'would refresh GTK icon cache at %s\n' "$icon_root"
       else
         gtk-update-icon-cache -f -t "$icon_root" >/dev/null 2>&1 || true
+        [[ -e "$icon_root/icon-theme.cache" ]] && record_managed_file "$icon_root/icon-theme.cache"
       fi
     fi
     if command -v gsettings >/dev/null 2>&1; then
-      if (( dry_run )); then
+      if ((dry_run)); then
         printf 'would set desktop icon theme to %s\n' "$icon_theme"
         printf 'would set Nautilus icon/list zoom to small\n'
       else
+        save_gsetting org.gnome.desktop.interface icon-theme
         gsettings set org.gnome.desktop.interface icon-theme "$icon_theme" >/dev/null 2>&1 || true
         gsettings set org.gnome.nautilus.icon-view default-zoom-level small >/dev/null 2>&1 || true
         gsettings set org.gnome.nautilus.list-view default-zoom-level small >/dev/null 2>&1 || true
