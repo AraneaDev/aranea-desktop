@@ -8,6 +8,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dry_run=0
 gum_bin="${ARANEA_INSTALLER_GUM_BIN:-gum}"
 
+# Prints the TUI usage and the equivalent automation entry points.
 usage() {
   cat <<'USAGE'
 Aranea Installer
@@ -47,6 +48,7 @@ command -v jq >/dev/null 2>&1 || {
   exit 4
 }
 
+# Renders one validated JSONL event stream for a delegated operation.
 render_events() {
   local stream_file="$1"
   local line event status id message
@@ -90,6 +92,7 @@ render_events() {
   done <"$stream_file"
 }
 
+# Runs an operation in JSON mode and returns its exact exit code.
 run_json() {
   local output_file status=0
   output_file="$(mktemp "${TMPDIR:-/tmp}/aranea-installer.XXXXXX")"
@@ -103,6 +106,7 @@ run_json() {
   return "$status"
 }
 
+# Reads the final doctor status without rendering every diagnostic event.
 doctor_status() {
   local output_file status=0 result
   output_file="$(mktemp "${TMPDIR:-/tmp}/aranea-doctor.XXXXXX")"
@@ -115,6 +119,7 @@ doctor_status() {
   rm -f -- "$output_file"
 }
 
+# Confirms a destructive action or exits with the cancellation status.
 confirm() {
   "$gum_bin" confirm "$1" || {
     "$gum_bin" style --foreground 214 'Cancelled.'

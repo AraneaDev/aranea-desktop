@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Contract for the shared installer JSONL event helpers.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

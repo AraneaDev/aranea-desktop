@@ -6,15 +6,15 @@ part of the interface.
 
 ## Choose a path
 
-| If you are... | Start here |
-| --- | --- |
-| Installing Aranea | [Getting started](getting-started.md) |
-| Exploring the experience | [Features](features.md) |
-| Changing behavior | [Configuration](configuration.md) |
-| Fixing an installation | [Troubleshooting](troubleshooting.md) |
+| If you are...                  | Start here                            |
+| ------------------------------ | ------------------------------------- |
+| Installing Aranea              | [Getting started](getting-started.md) |
+| Exploring the experience       | [Features](features.md)               |
+| Changing behavior              | [Configuration](configuration.md)     |
+| Fixing an installation         | [Troubleshooting](troubleshooting.md) |
 | Writing automation or an agent | [Agent interface](agent-interface.md) |
-| Looking for icons | [Icon gallery](icons.md) |
-| Working on the project | [Development](development.md) |
+| Looking for icons              | [Icon gallery](icons.md)              |
+| Working on the project         | [Development](development.md)         |
 
 ## Command map
 

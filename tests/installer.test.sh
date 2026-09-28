@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Contract for the root installer TUI and its JSON-backed operation routing.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -22,11 +22,11 @@ shape without changing the system.
 Every non-empty stdout line is one JSON object with `schema: 1`, `event`,
 `operation`, and UTC `timestamp`. Event types are:
 
-- `started` — operation and selected options in `data`;
-- `step` — stable `id` and lifecycle `status`;
-- `prompt` — an input is required for safe continuation;
-- `recovery` — an actionable recovery instruction;
-- `completed` — final status and summary.
+- `started`: operation and selected options in `data`;
+- `step`: stable `id` and lifecycle `status`;
+- `prompt`: an input is required for safe continuation;
+- `recovery`: an actionable recovery instruction;
+- `completed`: final status and summary.
 
 Use `id`, `status`, and `code` for decisions. `message` is for display and
 should not be parsed as a contract.
@@ -40,13 +40,13 @@ and `remove-theme`. Doctor step IDs are its check IDs, such as `theme`,
 
 ## Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| `0` | Completed; doctor may still report a warning in its final event |
-| `1` | Operation failure |
-| `2` | Invalid usage |
-| `3` | Cancelled or missing required decision |
-| `4` | Missing dependency, normally `jq` |
+| Code | Meaning                                                         |
+| ---- | --------------------------------------------------------------- |
+| `0`  | Completed; doctor may still report a warning in its final event |
+| `1`  | Operation failure                                               |
+| `2`  | Invalid usage                                                   |
+| `3`  | Cancelled or missing required decision                          |
+| `4`  | Missing dependency, normally `jq`                               |
 
 Treat the process exit code as authoritative and use the final event for the
 explanation.

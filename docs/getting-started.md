@@ -13,9 +13,9 @@ available on `PATH`. The guided installer also uses `gum` and `jq`.
 
 Choose a profile:
 
-- `minimal` — core theme and GTK experience;
-- `full` — every supported application integration;
-- `no_apps` — theme, cursor, icons, wallpaper, and branding without app integrations.
+- `minimal`: core theme and GTK experience;
+- `full`: every supported application integration;
+- `no_apps`: theme, cursor, icons, wallpaper, and branding without app integrations.
 
 The direct CLI is useful for scripts and agents:
 

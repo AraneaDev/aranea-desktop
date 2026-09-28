@@ -4,10 +4,10 @@
 
 Profiles control application integrations during installation:
 
-| Profile | Includes |
-| --- | --- |
-| `minimal` | Core theme and GTK experience |
-| `full` | All supported application integrations |
+| Profile   | Includes                                         |
+| --------- | ------------------------------------------------ |
+| `minimal` | Core theme and GTK experience                    |
+| `full`    | All supported application integrations           |
 | `no_apps` | Theme assets, cursor, icons, wallpaper, branding |
 
 The profile is persisted in `~/.local/state/aranea/profile` and read by the
@@ -63,9 +63,9 @@ in the ownership ledger.
 
 Aranea state normally lives under:
 
-- `~/.local/state/aranea/` — profile, ownership ledger, backups, and saved settings;
-- `~/.config/aranea/` — user-facing Aranea settings such as wallpaper schedule;
-- `~/.config/omarchy/` — hooks, shell configuration, and deployed plugins.
+- `~/.local/state/aranea/`: profile, ownership ledger, backups, and saved settings;
+- `~/.config/aranea/`: user-facing Aranea settings such as wallpaper schedule;
+- `~/.config/omarchy/`: hooks, shell configuration, and deployed plugins.
 
 Do not delete the ownership ledger while Aranea integrations are installed.
 Use the uninstall command so restoration decisions remain safe.
@@ -74,13 +74,13 @@ Use the uninstall command so restoration decisions remain safe.
 
 Useful overrides include:
 
-| Variable | Purpose |
-| --- | --- |
-| `ARANEA_THEME_SOURCE` | Default source passed to the installer |
-| `ARANEA_THEME_REPO_URL` | Default remote theme source |
-| `ARANEA_INSTALL_PROFILE` | Profile read by activation hooks |
-| `ARANEA_CLIPBOARD_SECRET_TTL_MS` | Clipboard secret retention time |
-| `ARANEA_OSD_CAPTURE_COMMAND` | Live OSD capture command for showcase work |
+| Variable                         | Purpose                                    |
+| -------------------------------- | ------------------------------------------ |
+| `ARANEA_THEME_SOURCE`            | Default source passed to the installer     |
+| `ARANEA_THEME_REPO_URL`          | Default remote theme source                |
+| `ARANEA_INSTALL_PROFILE`         | Profile read by activation hooks           |
+| `ARANEA_CLIPBOARD_SECRET_TTL_MS` | Clipboard secret retention time            |
+| `ARANEA_OSD_CAPTURE_COMMAND`     | Live OSD capture command for showcase work |
 
 Most scripts also expose `--dry-run`, `--json`, or `--help`. Prefer those
 interfaces over relying on internal paths.

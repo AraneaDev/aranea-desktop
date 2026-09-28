@@ -2,16 +2,16 @@
 
 ## Repository map
 
-| Directory | Responsibility |
-| --- | --- |
-| `backgrounds/` | Wallpaper artwork and manifest IDs |
-| `branding/` | Marks, glyphs, motifs, fastfetch, and idle artwork |
-| `integrations/` | Cursor, icons, terminal, browser, Qt, media, session, and app styling |
-| `plugins/` | Aranea bar, menu, lock, notifications, health, pickers, and OSD |
-| `hooks/` | Theme activation and post-boot behavior |
-| `scripts/` | Installer, doctor, wallpaper, integrations, deployment, and capture tools |
-| `tests/` | Shell contracts, QML behavior, screenshots, and JavaScript tests |
-| `screenshots/` | README showcase captures |
+| Directory       | Responsibility                                                            |
+| --------------- | ------------------------------------------------------------------------- |
+| `backgrounds/`  | Wallpaper artwork and manifest IDs                                        |
+| `branding/`     | Marks, glyphs, motifs, fastfetch, and idle artwork                        |
+| `integrations/` | Cursor, icons, terminal, browser, Qt, media, session, and app styling     |
+| `plugins/`      | Aranea bar, menu, lock, notifications, health, pickers, and OSD           |
+| `hooks/`        | Theme activation and post-boot behavior                                   |
+| `scripts/`      | Installer, doctor, wallpaper, integrations, deployment, and capture tools |
+| `tests/`        | Shell contracts, QML behavior, screenshots, and JavaScript tests          |
+| `screenshots/`  | README showcase captures                                                  |
 
 ## Local checks
 
