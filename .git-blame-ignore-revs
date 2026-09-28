@@ -1,7 +1,6 @@
 # Formatting-only commits (git config blame.ignoreRevsFile .git-blame-ignore-revs)
-# style: format shell files with shfmt
-66e770872282aab5bb4588f17ce944ef3924e225
-# style: format JS, JSON, Markdown and YAML with prettier
-d4c94aeb990e9e9f4f7c5b1a2ff80fb5c2760bdf
-# style: format QML with qmlformat
-7ef2132004a41f51662e4eed6bddc8a7240e94e4
+#
+# List a commit here only when it changes formatting and nothing else, after
+# it lands on master (squash and rebase merges change the hash). The first
+# formatting pass arrived inside the squashed quality-hardening merge (#53)
+# together with real changes, so it cannot be listed without hiding those.
