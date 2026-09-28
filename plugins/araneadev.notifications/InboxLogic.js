@@ -70,7 +70,7 @@ function pruneInbox(entries, now) {
   /**
    * Moves the oldest entries that match the predicate from keep to
    * drop until keep fits MAX_ITEMS.
-   * @param {function(Dict): boolean} predicate - which entries may go
+   * @param {(entry: Dict) => boolean} predicate - which entries may go
    */
   function dropOldest(predicate) {
     for (var j = keep.length - 1; j >= 0 && keep.length > MAX_ITEMS; j--) {

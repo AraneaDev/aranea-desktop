@@ -621,7 +621,7 @@ function expire(history, now, ttlMs) {
  * shallow copy that change() has modified; an invalid index gives an unchanged copy.
  * @param {*} history - The history array (anything else counts as empty).
  * @param {*} index - The position of the entry, coerced with Number().
- * @param {function({[key: string]: *}): void} change - Mutates the copied entry.
+ * @param {(entry: {[key: string]: *}) => void} change - Mutates the copied entry.
  * @returns {Array<ClipboardEntry>} The new history array.
  */
 function withEntry(history, index, change) {

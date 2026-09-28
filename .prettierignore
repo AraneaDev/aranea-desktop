@@ -1,6 +1,8 @@
 node_modules/
 coverage/
 CHANGELOG.md
+# Written by release-please on every release, in its own compact style.
+.release-please-manifest.json
 docs/superpowers/
 plugins/araneadev.emojis/emojis.json
 package-lock.json
