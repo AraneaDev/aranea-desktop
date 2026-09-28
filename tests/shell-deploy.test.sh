@@ -30,14 +30,14 @@ mkdir -p "$plugins_dir"
 cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
-for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd; do
+for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates; do
   cp -a "$repo_root/plugins/$plugin_id" "$plugins_dir/$plugin_id"
 done
 
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
 
 jq -e '.bar.id == "araneadev.bar"' "$config_dir/shell.json" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit"] | sort)' "$config_dir/shell.json" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
 
 # --- 4d: a missing argument prints a usage line and exits 2
 rc=0

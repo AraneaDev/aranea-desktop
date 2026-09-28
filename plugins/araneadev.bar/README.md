@@ -16,11 +16,18 @@ The bar shows exactly the modules listed in `shell.json`; there are no
 profiles. `scripts/aranea-doctor --json` reports the
 runtime and QML health checks alongside the active shell/plugin state.
 
+Menubar visibility is controlled centrally by `bar.layout` in
+`~/.config/omarchy/shell.json`: remove a widget entry from `left`, `center`, or
+`right` to hide it, and add the entry back to show it. This is separate from
+the top-level `plugins` list, which controls whether a plugin is installed and
+available. For example, removing `{ "id": "omarchy.agents" }` hides the agents
+widget without disabling agents support; adding it back restores the widget.
+
 ## Customizing
 
 The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](https://github.com/basecamp/omarchy/blob/v4.0.4/config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
 
-The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable widgets with `omarchy plugin enable` and `omarchy plugin disable` (widget ids come from `omarchy plugin list`).
+The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable plugin availability with `omarchy plugin enable` and `omarchy plugin disable` (ids come from `omarchy plugin list`); use the `bar.layout` arrays for the less destructive per-widget visibility choice.
 
 Example `shell.json` (bar subtree only shown):
 
@@ -69,6 +76,17 @@ Example `shell.json` (bar subtree only shown):
 | `omarchy.power` | Battery/AC icon + popup with battery stats, power profiles, and system info | left = popup · right = toggle percentage |
 | `omarchy.bluetooth` | Bluetooth icon + popup with device list, connect/disconnect, battery | left = popup · right = toggle radio |
 | `omarchy.monitor` | Brightness and laptop display controls | left = popup |
+
+Aranea replaces the stock workspace and update entries with two compact
+widgets when the shell configuration is repaired:
+
+| Name                   | What it does                                                                                                                   | Interactions                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `araneadev.workspaces` | Standard workspaces 1–5 in the bar, with meaningful workspaces in the overview; urgent workspaces use the active warning color | icon = overview · number = focus workspace · middle = focus active · scroll = previous/next |
+| `araneadev.updates`    | Available update count with grouped sources and reboot state in its native panel                                               | left = panel · right = open updater                                                         |
+
+The update center delegates installation to `omarchy-update`; it does not
+install packages inside the bar.
 
 The `omarchy.indicators` widget loads individual bar indicators from `indicators/`. Omit `items` (or set it to an empty array) to show all indicators in the default order, or set `items` to a subset such as `["Dnd", "Reminder", "NightLight"]`. Set `alwaysShow` to `true` to keep inactive indicators visible instead of revealing them only on hover. Multiple `omarchy.indicators` instances are allowed, so different sections can show different subsets.
 

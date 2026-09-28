@@ -8,8 +8,9 @@ set -euo pipefail
 # in the output directory (no captures, no shell restart). Surfaces without a
 # built-in capture use ARANEA_SCREENSHOT_COMMAND.
 #
-# Never captured: the keyboard-layout and system-update bar widgets (no popup
-# to summon) and wifiqr (it would put the Wi-Fi password in a screenshot).
+# Never captured: the keyboard-layout widget and wifiqr (it would put the
+# Wi-Fi password in a screenshot). Workspace and update bar popovers expose
+# explicit IPC capture targets below.
 #
 # ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
 # --all: it is run as `<command> <surface> <output dir>` (tests use it).
@@ -21,8 +22,12 @@ surface=""
 output=""
 capture_all=0
 build_hero_only=0
+bar_capture_target=""
+bar_capture_previous_workspace=""
+bar_capture_update_marker_created=0
+bar_capture_update_marker="$HOME/.local/state/omarchy/reboot-required"
 # The surfaces --all captures.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
 # magick or a frame is missing.
@@ -31,7 +36,11 @@ build_hero_showcase() {
     echo 'magick is required to build screenshots/hero-showcase.gif' >&2
     exit 3
   }
-  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty clipboard emojis image-picker polkit health network audio bluetooth agents power monitor clock weather btop file-manager neovim lock osd)
+  # Keep the hero narrative grouped by context: desktop/menu navigation,
+  # application launchers, notifications and panels, then system controls and
+  # the workspace/update finish. Terminal-heavy captures stay in the gallery
+  # but are omitted from the short showcase loop.
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network audio bluetooth agents power monitor clock weather lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -291,6 +300,55 @@ capture_popup_surface() {
   hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  printf 'captured: %s\n' "$output/$surface.png"
+}
+
+# Opens a bar-owned popover through its IPC target, grabs the screen, then
+# closes it. These widgets are bar entries rather than standalone shell
+# panels, so they cannot use `shell summon`.
+capture_bar_widget_surface() {
+  bar_capture_target="$1"
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo "omarchy-shell is required to capture $surface" >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo "grim is required to capture $surface" >&2
+    exit 3
+  }
+
+  bar_capture_previous_workspace="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // empty' 2>/dev/null || true)"
+  # Restores the workspace, temporary update marker and shell after capture.
+  restore_bar_capture_workspace() {
+    [[ -n "$bar_capture_target" ]] && omarchy-shell -q "$bar_capture_target" close || true
+    if ((bar_capture_update_marker_created)); then
+      rm -f -- "$bar_capture_update_marker"
+      omarchy restart shell >/dev/null 2>&1 || true
+      sleep 3
+      bar_capture_update_marker_created=0
+    fi
+    if [[ -n "$bar_capture_previous_workspace" ]]; then
+      hyprctl dispatch "hl.dsp.focus({ workspace = \"$bar_capture_previous_workspace\" })" >/dev/null 2>&1 || true
+    fi
+  }
+  trap restore_bar_capture_workspace EXIT
+  hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || true
+  if [[ "$bar_capture_target" == araneadev.updates && ! -e "$bar_capture_update_marker" ]]; then
+    mkdir -p "${bar_capture_update_marker%/*}"
+    touch "$bar_capture_update_marker"
+    bar_capture_update_marker_created=1
+    omarchy restart shell >/dev/null 2>&1 || true
+    sleep 3
+  fi
+  sleep 1
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell -q "$bar_capture_target" close || true
+  omarchy-shell "$bar_capture_target" open >/dev/null
+  sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  grim "$output/$surface.png"
+  trap - EXIT
+  restore_bar_capture_workspace
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
@@ -586,6 +644,14 @@ case "$surface" in
     ;;
   monitor)
     capture_popup_surface omarchy.monitor
+    exit 0
+    ;;
+  workspaces)
+    capture_bar_widget_surface araneadev.workspaces
+    exit 0
+    ;;
+  updates)
+    capture_bar_widget_surface araneadev.updates
     exit 0
     ;;
   clock)

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.updates",
+  "name": "Update center",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Compact update status and updater launcher",
+  "kinds": ["service", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Update center",
+    "description": "Available updates, reboot state, and updater launcher",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

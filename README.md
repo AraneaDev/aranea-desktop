@@ -122,6 +122,10 @@ the Aranea state directory before changes are made.
 | --------------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
 | ![OSD](screenshots/osd.png) | ![Wallpaper picker](screenshots/image-picker.png) | ![Empty notifications](screenshots/notifications-empty.png) |
 
+| Workspace overview                                | Update center                             |
+| ------------------------------------------------- | ----------------------------------------- |
+| ![Workspace overview](screenshots/workspaces.png) | ![Update center](screenshots/updates.png) |
+
 ### Pickers and application styling
 
 | Clipboard                               | Emoji                            | File manager                                  |
@@ -292,7 +296,7 @@ Omarchy's fallback prompt can take over.
 
 The complete capture inventory remains explicit for tooling and maintainers:
 
-`screenshots/menu.png` `screenshots/menu-submenu.png` `screenshots/menu-search.png` `screenshots/menu-input.png` `screenshots/desktop.png` `screenshots/health.png` `screenshots/lock.png` `screenshots/plymouth.png` `screenshots/btop.png` `screenshots/file-manager.png` `screenshots/neovim.png` `screenshots/notifications.png` `screenshots/notifications-empty.png` `screenshots/clipboard.png` `screenshots/emojis.png` `screenshots/polkit.png` `screenshots/network.png` `screenshots/audio.png` `screenshots/bluetooth.png` `screenshots/agents.png` `screenshots/power.png` `screenshots/monitor.png` `screenshots/clock.png` `screenshots/weather.png` `screenshots/image-picker.png` `screenshots/apps.png` `screenshots/favorites.png` `screenshots/recent.png` `screenshots/dawn.png` `screenshots/osd.png` `screenshots/hero-showcase.gif`
+`screenshots/menu.png` `screenshots/menu-submenu.png` `screenshots/menu-search.png` `screenshots/menu-input.png` `screenshots/desktop.png` `screenshots/health.png` `screenshots/lock.png` `screenshots/plymouth.png` `screenshots/btop.png` `screenshots/file-manager.png` `screenshots/neovim.png` `screenshots/notifications.png` `screenshots/notifications-empty.png` `screenshots/clipboard.png` `screenshots/emojis.png` `screenshots/polkit.png` `screenshots/network.png` `screenshots/audio.png` `screenshots/bluetooth.png` `screenshots/agents.png` `screenshots/power.png` `screenshots/monitor.png` `screenshots/clock.png` `screenshots/weather.png` `screenshots/image-picker.png` `screenshots/apps.png` `screenshots/favorites.png` `screenshots/recent.png` `screenshots/dawn.png` `screenshots/osd.png` `screenshots/workspaces.png` `screenshots/updates.png` `screenshots/hero-showcase.gif`
 
 Refresh the set with `scripts/capture-screenshots --all --output screenshots`.
 

@@ -21,13 +21,12 @@ expected_surfaces=(
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network audio bluetooth agents
   power monitor clock weather image-picker apps favorites recent
-  dawn osd
+  dawn osd workspaces updates
 )
 expected_hero_frames=(
   desktop menu menu-submenu menu-search menu-input apps favorites recent
-  notifications notifications-empty clipboard emojis image-picker polkit health
-  network audio bluetooth agents power monitor clock weather btop
-  file-manager neovim lock osd
+  notifications notifications-empty health updates workspaces clipboard emojis
+  image-picker network audio bluetooth agents power monitor clock weather lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
 
