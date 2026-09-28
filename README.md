@@ -1,38 +1,70 @@
+<div align="center">
+
 # Aranea Desktop
 
-![Aranea Desktop](screenshots/desktop.png)
+**A quiet, obsidian Omarchy desktop experience with a living network of light.**
 
-Aranea is a cinematic Omarchy desktop theme built around obsidian surfaces,
-mint signal lines, violet identity, and quiet atmospheric wallpapers. It turns
-the shell, notifications, health, secure prompts, cursors, icons, and
-application styling into one coherent desktop.
+Deep black surfaces, mint activity, violet focus, atmospheric wallpapers, and
+the AraneaDev mark carried consistently from boot to desktop.
 
-> A calm control surface for a busy system.
+[![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
+[![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
+[![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
+[![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
 
-[Install](#install) · [Explore the showcase](#showcase) · [Read the docs](#documentation) · [Contribute](CONTRIBUTING.md)
+[Omarchy](https://omarchy.org) · [AraneaDev](https://aranea-development.nl)
+
+</div>
+
+![Aranea desktop showcase](screenshots/hero-showcase.gif)
+
+Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GIF](screenshots/hero-showcase.gif)
+
+## What it feels like
+
+Aranea Desktop is designed as one calm visual system rather than a collection
+of unrelated tweaks:
+
+- transparent, interactive shell bar with spider menu and native controls;
+- obsidian surfaces with mint activity states and violet focus states;
+- day, night, and atmospheric wallpaper variants built around edge topology;
+- matching lock, idle, boot, terminal, editor, browser, cursor, and media art;
+- live system health in the bar and application integrations that stay out of the way.
+
+Aranea is still installed by Omarchy as the `aranea` theme, but the project is
+larger than a theme: it combines the shell surface, custom plugins, artwork,
+desktop integrations, cursors, Plymouth, installer, system health, and showcase
+tooling into one cohesive desktop experience.
+
+The wallpaper is intentionally mark-free. The spider identity belongs to the
+bar, menus, lock screen, boot splash, idle branding, and fastfetch surfaces.
 
 ## Install
 
-From a checkout, start the guided installer:
+For a guided human installation from this checkout, run:
 
 ```bash
 ./installer
 ```
 
-The TUI can install/update Aranea, select a profile, diagnose and repair the
-installation, remove the integration, or remove everything including the
-installed theme directory.
+The TUI supports install/update, profile selection, diagnosis/repair, and two
+explicit removal choices: remove Aranea's integration while keeping the theme
+directory, or remove everything including the installed theme. It uses the
+same CLI operations documented below.
 
 For direct CLI and agent use:
 
 ```bash
+scripts/install.sh
 scripts/install.sh --profile full --yes
 scripts/install.sh --dry-run --yes
 scripts/install.sh --json --yes --profile full
 ```
 
-Aranea expects Omarchy. The TUI uses `gum` and `jq`; the direct human CLI only
-needs the dependencies required by the selected operation. JSON mode requires
+The installer installs Aranea Desktop, registers the `aranea` theme hooks, and
+installs managed integrations. Aranea expects Omarchy. The TUI uses
+[`gum`](https://github.com/charmbracelet/gum) and `jq`; JSON mode requires
 `jq`.
 
 After installation:
@@ -42,6 +74,21 @@ omarchy theme set aranea
 scripts/aranea-wallpaper list
 scripts/aranea-wallpaper set day
 ```
+
+The wallpaper picker also exposes `night`, `dawn`, `sparse`, `dense`, `dusk`,
+`monochrome`, and `ultrawide`. Aranea Pulse adds an opt-in four-phase schedule
+and a filament OSD:
+
+```bash
+scripts/aranea-wallpaper schedule configure 06:00 08:00 18:00 20:00
+scripts/aranea-wallpaper schedule on
+scripts/aranea-integrations status --json
+```
+
+Integrations can be activated and rolled back individually with
+`scripts/aranea-integrations activate <id> --yes` and
+`scripts/aranea-integrations deactivate <id>`; managed files are backed up in
+the Aranea state directory before changes are made.
 
 ## What you get
 
@@ -92,6 +139,49 @@ scripts/aranea-wallpaper set day
 | ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
 
 The visual system is described in [Visual language](docs/visual-language.md).
+
+### The full visual system
+
+The showcase GIF is the quick impression; these are the individual interaction
+states and application surfaces behind it.
+
+| Network                                   | Audio                                 | Bluetooth                                     |
+| ----------------------------------------- | ------------------------------------- | --------------------------------------------- |
+| ![Network popup](screenshots/network.png) | ![Audio popup](screenshots/audio.png) | ![Bluetooth popup](screenshots/bluetooth.png) |
+
+| Agents                                  | Power                                 | Displays                                  |
+| --------------------------------------- | ------------------------------------- | ----------------------------------------- |
+| ![Agents popup](screenshots/agents.png) | ![Power popup](screenshots/power.png) | ![Display popup](screenshots/monitor.png) |
+
+| Calendar                                 | Weather                                   | Wallpaper picker                                  |
+| ---------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
+| ![Calendar popup](screenshots/clock.png) | ![Weather popup](screenshots/weather.png) | ![Wallpaper picker](screenshots/image-picker.png) |
+
+| Lock screen                          | Plymouth boot screen                              | OSD                                  |
+| ------------------------------------ | ------------------------------------------------- | ------------------------------------ |
+| ![Lock screen](screenshots/lock.png) | ![Plymouth boot screen](screenshots/plymouth.png) | ![Filament OSD](screenshots/osd.png) |
+
+| Sparse wallpaper                                     | Dense wallpaper                                    | Dawn wallpaper                                   |
+| ---------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
+| ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dawn wallpaper](backgrounds/variants/dawn.png) |
+
+| Monochrome wallpaper                                         | Ultrawide wallpaper                                        | Desktop capture                     |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------- |
+| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Desktop](screenshots/desktop.png) |
+
+| Btop                          | File manager                                  | Neovim                            |
+| ----------------------------- | --------------------------------------------- | --------------------------------- |
+| ![Btop](screenshots/btop.png) | ![File manager](screenshots/file-manager.png) | ![Neovim](screenshots/neovim.png) |
+
+| Apps                          | Favorites                               | Recent                            |
+| ----------------------------- | --------------------------------------- | --------------------------------- |
+| ![Apps](screenshots/apps.png) | ![Favorites](screenshots/favorites.png) | ![Recent](screenshots/recent.png) |
+
+Refresh the complete capture set in one pass:
+
+```bash
+scripts/capture-screenshots --all --output screenshots
+```
 
 ## Documentation
 
@@ -183,44 +273,28 @@ tools/check
 See [Development](docs/development.md) and [CONTRIBUTING.md](CONTRIBUTING.md)
 for the full workflow.
 
-## Complete surface gallery
+## Interaction notes
 
-The compact showcase above highlights the most useful views. The repository
-also includes captures for every supported surface:
+The command menu keeps Favorites and Recent in `~/.local/state/aranea/menu.json`;
+`Ctrl+P` pins the app under the cursor. Notifications go to the center rather
+than interruptive popups. The center keeps up to 100 items for 7 days.
 
-`screenshots/menu.png` · `screenshots/menu-submenu.png` ·
-`screenshots/menu-search.png` · `screenshots/menu-input.png` ·
-`screenshots/desktop.png` · `screenshots/health.png` ·
-`screenshots/lock.png` · `screenshots/plymouth.png` ·
-`screenshots/btop.png` · `screenshots/file-manager.png` ·
-`screenshots/neovim.png` · `screenshots/notifications.png` ·
-`screenshots/notifications-empty.png` · `screenshots/clipboard.png` ·
-`screenshots/emojis.png` · `screenshots/polkit.png` ·
-`screenshots/network.png` · `screenshots/audio.png` ·
-`screenshots/bluetooth.png` · `screenshots/agents.png` ·
-`screenshots/power.png` · `screenshots/monitor.png` ·
-`screenshots/clock.png` · `screenshots/weather.png` ·
-`screenshots/image-picker.png` · `screenshots/apps.png` ·
-`screenshots/favorites.png` · `screenshots/recent.png` ·
-`screenshots/dawn.png` · `screenshots/osd.png` ·
-`screenshots/hero-showcase.gif`
+- critical notifications stay until dismissed.
 
-Refresh them with:
-
-```bash
-scripts/capture-screenshots --all --output screenshots
-```
-
-Notifications go to the center rather than interruptive popups. The center
-keeps up to 100 items for 7 days; critical notifications stay until dismissed.
 The health surface reports failed services, disk pressure, reboot state, and
-containers; an exit code of 137 or 143 is treated as a memory-kill signal only
+containers. An exit code of 137 or 143 is treated as a memory-kill signal only
 when the container was stopped for that reason. Clipboard secrets are masked
 and expire according to `ARANEA_CLIPBOARD_SECRET_TTL_MS`.
 
 If the polkit prompt is disabled manually with
 `omarchy plugin disable araneadev.polkit`, run `omarchy restart shell` so
 Omarchy's fallback prompt can take over.
+
+The complete capture inventory remains explicit for tooling and maintainers:
+
+`screenshots/menu.png` `screenshots/menu-submenu.png` `screenshots/menu-search.png` `screenshots/menu-input.png` `screenshots/desktop.png` `screenshots/health.png` `screenshots/lock.png` `screenshots/plymouth.png` `screenshots/btop.png` `screenshots/file-manager.png` `screenshots/neovim.png` `screenshots/notifications.png` `screenshots/notifications-empty.png` `screenshots/clipboard.png` `screenshots/emojis.png` `screenshots/polkit.png` `screenshots/network.png` `screenshots/audio.png` `screenshots/bluetooth.png` `screenshots/agents.png` `screenshots/power.png` `screenshots/monitor.png` `screenshots/clock.png` `screenshots/weather.png` `screenshots/image-picker.png` `screenshots/apps.png` `screenshots/favorites.png` `screenshots/recent.png` `screenshots/dawn.png` `screenshots/osd.png` `screenshots/hero-showcase.gif`
+
+Refresh the set with `scripts/capture-screenshots --all --output screenshots`.
 
 The project publishes its CI status from
 `actions/workflow/status/AraneaDev/aranea-desktop/ci.yml`.
