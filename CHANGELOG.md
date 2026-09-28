@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.4.0...v2.5.0) (2026-09-28)
+
+
+### Features
+
+* rebuild workspace and update panels ([#64](https://github.com/AraneaDev/aranea-desktop/issues/64)) ([700c8b2](https://github.com/AraneaDev/aranea-desktop/commit/700c8b2e9ae41acfcf341398921b4782736f15e0))
+
 ## [2.4.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.3.1...v2.4.0) (2026-09-28)
 
 
