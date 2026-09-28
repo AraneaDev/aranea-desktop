@@ -89,5 +89,8 @@ test("renderIntegrationCss projects semantic palette variables", async () => {
 
 test("renderTemplate supports format-specific projections", async () => {
   const { renderTemplate } = await generatorPromise
-  assert.equal(renderTemplate("fg={{colors.accent}} raw={{colors.accent|hex}}", fixture), "fg=#3bff9e raw=3bff9e")
+  assert.equal(
+    renderTemplate("fg={{colors.accent}} raw={{colors.accent|hex}}", fixture),
+    "fg=#3bff9e raw=3bff9e"
+  )
 })

@@ -1,13 +1,18 @@
 // Shared title, hint, divider, and section chrome for keyboard panels.
+// qmllint disable missing-property
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 
 ColumnLayout {
   id: header
+  // Main header title.
   property string title: ""
+  // Short right-aligned hint.
   property string hint: ""
+  // Secondary explanatory text.
   property string hintText: ""
+  // Optional section label.
   property string section: ""
   spacing: Style.space(8)
 

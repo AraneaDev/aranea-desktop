@@ -1,4 +1,4 @@
-/* Aranea — GTK3/GTK4/Adwaita color overrides, matching colors.toml */
+/* Aranea - GTK3/GTK4/Adwaita color overrides, matching colors.toml */
 
 @define-color background {{colors.background}};
 @define-color dark_background {{colors.dark_background}};

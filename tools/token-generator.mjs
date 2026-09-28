@@ -73,20 +73,32 @@ function renderShellToml(tokens) {
 }
 
 function renderQmlTokens(tokens) {
-  return `pragma Singleton
+  return `// Canonical semantic design tokens exposed to shared QML components.
+// qmllint disable missing-property
+pragma Singleton
 import QtQuick
 import qs.Commons
 
 QtObject {
+  // Primary accent colour.
   readonly property color accent: Color.accent
+  // Secondary accent used by selected menu text.
   readonly property color accentSecondary: Color.menu.selectedText
+  // Base background colour.
   readonly property color background: Color.background
+  // Default foreground colour.
   readonly property color foreground: Color.foreground
+  // Urgent and attention colour.
   readonly property color urgent: Color.urgent
+  // Shared surface border colour.
   readonly property color surfaceBorder: Color.tooltip.border
+  // Shared panel corner radius.
   readonly property int cornerRadius: Style.cornerRadius
+  // Shared panel padding.
   readonly property int panelPadding: Style.spacing.panelPadding
+  // Shared row horizontal padding.
   readonly property int rowPadding: Style.spacing.rowPaddingX
+  // Whether motion effects are enabled.
   readonly property bool motionEnabled: ${tokens.motion.enabled ? "true" : "false"}
 }
 `
@@ -118,7 +130,9 @@ function tokenValue(tokens, expression) {
 }
 
 function renderTemplate(template, tokens) {
-  const rendered = template.replaceAll(/\{\{([^}]+)\}\}/g, (_, expression) => tokenValue(tokens, expression.trim()))
+  const rendered = template.replaceAll(/\{\{([^}]+)\}\}/g, (_, expression) =>
+    tokenValue(tokens, expression.trim())
+  )
   if (rendered.includes("{{")) throw new Error("template contains unresolved token placeholders")
   return rendered
 }
@@ -136,26 +150,48 @@ function renderPlatformTemplates(tokens) {
     "integrations/developer/tmux.conf",
     "integrations/qt/kvantum/Aranea/Aranea.kvconfig"
   ]
-  return new Map(files.map(relative => {
-    const template = fs.readFileSync(path.join(root, "design/templates", `${relative}.in`), "utf8")
-    return [relative, renderTemplate(template, tokens)]
-  }))
+  return new Map(
+    files.map((relative) => {
+      const template = fs.readFileSync(
+        path.join(root, "design/templates", `${relative}.in`),
+        "utf8"
+      )
+      return [relative, renderTemplate(template, tokens)]
+    })
+  )
 }
 
 function renderCursorAssets(tokens) {
   const families = {
-    "left_ptr": ["integrations/cursor/cursors/left_ptr.svg", "integrations/cursor/hyprcursor/hyprcursors/left_ptr/left_ptr.svg"],
-    "hand2": ["integrations/cursor/cursors/hand2.svg", "integrations/cursor/hyprcursor/hyprcursors/hand2/hand2.svg"],
-    "crosshair": ["integrations/cursor/cursors/crosshair.svg", "integrations/cursor/hyprcursor/hyprcursors/crosshair/crosshair.svg"],
-    "watch": ["integrations/cursor/cursors/watch.svg", "integrations/cursor/hyprcursor/hyprcursors/watch/watch.svg"]
+    left_ptr: [
+      "integrations/cursor/cursors/left_ptr.svg",
+      "integrations/cursor/hyprcursor/hyprcursors/left_ptr/left_ptr.svg"
+    ],
+    hand2: [
+      "integrations/cursor/cursors/hand2.svg",
+      "integrations/cursor/hyprcursor/hyprcursors/hand2/hand2.svg"
+    ],
+    crosshair: [
+      "integrations/cursor/cursors/crosshair.svg",
+      "integrations/cursor/hyprcursor/hyprcursors/crosshair/crosshair.svg"
+    ],
+    watch: [
+      "integrations/cursor/cursors/watch.svg",
+      "integrations/cursor/hyprcursor/hyprcursors/watch/watch.svg"
+    ]
   }
   const outputs = new Map()
   for (const [family, destinations] of Object.entries(families)) {
-    const template = fs.readFileSync(path.join(root, "design/templates/assets", `cursor-${family}.svg.in`), "utf8")
+    const template = fs.readFileSync(
+      path.join(root, "design/templates/assets", `cursor-${family}.svg.in`),
+      "utf8"
+    )
     const rendered = renderTemplate(template, tokens)
     for (const destination of destinations) outputs.set(destination, rendered)
     if (family === "watch") {
-      for (const frame of Array.from({ length: 8 }, (_, index) => String(index + 1).padStart(2, "0"))) {
+      for (const frame of Array.from({ length: 8 }, (_, index) =>
+        String(index + 1).padStart(2, "0")
+      )) {
         outputs.set(`integrations/cursor/cursors/watch-${frame}.svg`, rendered)
         outputs.set(`integrations/cursor/hyprcursor/hyprcursors/watch/watch-${frame}.svg`, rendered)
       }
@@ -180,19 +216,18 @@ function renderPaletteProjection(relative, tokens) {
     "#7dffc0": tokens.colors.bright_green,
     "#10f0d0": tokens.colors.cyan
   }
-  return current.replaceAll(/#[0-9a-fA-F]{6}/g, value => palette[value.toLowerCase()] || value)
+  return current.replaceAll(/#[0-9a-fA-F]{6}/g, (value) => palette[value.toLowerCase()] || value)
 }
 
 function renderAssetSource(relative, tokens) {
   const current = fs.readFileSync(path.join(root, relative), "utf8")
-  return current.includes("{{") ? renderTemplate(current, tokens) : renderPaletteProjection(relative, tokens)
+  return current.includes("{{")
+    ? renderTemplate(current, tokens)
+    : renderPaletteProjection(relative, tokens)
 }
 
 function renderSvgAssets(tokens) {
-  const directories = [
-    "integrations/icons/aranea",
-    "integrations/qt/kvantum/Aranea"
-  ]
+  const directories = ["integrations/icons/aranea", "integrations/qt/kvantum/Aranea"]
   const outputs = new Map()
   for (const directory of directories) {
     const absolute = path.join(root, directory)

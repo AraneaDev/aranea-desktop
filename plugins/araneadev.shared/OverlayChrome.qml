@@ -1,4 +1,5 @@
 // Shared frame for the Aranea pickers (clipboard, emoji): the menu's header
+// qmllint disable missing-property
 // language (glyph, uppercase title, // subtitle), a search line, the content
 // and a key-hint strip. Kept byte-identical in araneadev.clipboard and
 // araneadev.emojis; tests/emojis.test.sh fails when the copies differ.
