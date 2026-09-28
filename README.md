@@ -1,115 +1,132 @@
-<div align="center">
-
 # Aranea Desktop
 
-**A quiet, obsidian Omarchy desktop experience with a living network of light.**
+![Aranea Desktop](screenshots/desktop.png)
 
-Deep black surfaces, mint activity, violet focus, atmospheric wallpapers, and
-the AraneaDev mark carried consistently from boot to desktop.
+Aranea is a cinematic Omarchy desktop theme built around obsidian surfaces,
+mint signal lines, violet identity, and quiet atmospheric wallpapers. It turns
+the shell, notifications, health, secure prompts, cursors, icons, and
+application styling into one coherent desktop.
 
-[![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
-[![Language](https://img.shields.io/github/languages/top/AraneaDev/aranea-desktop)](https://github.com/AraneaDev/aranea-desktop)
-[![Last commit](https://img.shields.io/github/last-commit/AraneaDev/aranea-desktop?label=last%20commit)](https://github.com/AraneaDev/aranea-desktop/commits/master)
-[![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
+> A calm control surface for a busy system.
 
-[Omarchy](https://omarchy.org) · [AraneaDev](https://aranea-development.nl)
-
-</div>
-
-![Aranea desktop showcase](screenshots/hero-showcase.gif)
-
-Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GIF](screenshots/hero-showcase.gif)
-
-## What it feels like
-
-Aranea Desktop is designed as one calm visual system rather than a collection
-of unrelated tweaks:
-
-- transparent, interactive shell bar with spider menu and native controls;
-- obsidian surfaces with mint activity states and violet focus states;
-- day, night, and atmospheric wallpaper variants built around edge topology;
-- matching lock, idle, boot, terminal, editor, browser, cursor, and media art;
-- live system health in the bar and application integrations that stay out of the way.
-
-Aranea is still installed by Omarchy as the `aranea` theme, but the project is
-larger than a theme: it combines the shell surface, custom plugins, artwork,
-desktop integrations, cursors, Plymouth, installer, system health, and showcase
-tooling into one cohesive desktop experience.
-
-The wallpaper is intentionally mark-free. The spider identity belongs to the
-bar, menus, lock screen, boot splash, idle branding, and fastfetch surfaces.
+[Install](#install) · [Explore the showcase](#showcase) · [Read the docs](#documentation) · [Contribute](CONTRIBUTING.md)
 
 ## Install
 
-For a guided human installation from this checkout, run:
+From a checkout, start the guided installer:
 
 ```bash
 ./installer
 ```
 
-The TUI supports install/update, profile selection, diagnosis/repair, and two
-explicit removal choices: remove Aranea's integration while keeping the theme
-directory, or remove everything including the installed theme. It uses the
-same CLI operations documented below.
+The TUI can install/update Aranea, select a profile, diagnose and repair the
+installation, remove the integration, or remove everything including the
+installed theme directory.
 
-From a checkout:
-
-```bash
-scripts/install.sh
-```
-
-For a non-interactive full install:
+For direct CLI and agent use:
 
 ```bash
-scripts/install.sh --yes
-```
-
-The installer installs Aranea Desktop, registers the `aranea` theme hooks, and
-installs the managed integrations. On a full profile it also installs the
-selected terminal integration (Alacritty, Kitty, or Foot).
-
-Choose an installation profile when needed:
-
-```bash
-scripts/install.sh --profile minimal --yes
 scripts/install.sh --profile full --yes
-scripts/install.sh --profile no_apps --yes
-```
-
-Omit `--profile` in an interactive terminal and the installer prompts for one
-with [`gum`](https://github.com/charmbracelet/gum) when it's available
-(already an Omarchy-ecosystem dependency), falling back to the `full`
-default otherwise, same as `--yes` or a non-interactive shell.
-
-To install the exact checkout you are testing instead of fetching the default
-remote repository, pass a local source explicitly:
-
-```bash
-scripts/install.sh --source "$PWD" --yes
-```
-
-If installation fails after a previous theme was detected, the installer prints
-the exact `omarchy theme set ...` command needed to restore it.
-
-`minimal` keeps the core and GTK experience, `full` enables every supported
-application integration, and `no_apps` keeps the theme, cursor, icon, wallpaper,
-and branding assets without application integrations. The selected profile is
-stored in `~/.local/state/aranea/profile`.
-
-Preview or diagnose without changing the system:
-
-```bash
 scripts/install.sh --dry-run --yes
+scripts/install.sh --json --yes --profile full
+```
+
+Aranea expects Omarchy. The TUI uses `gum` and `jq`; the direct human CLI only
+needs the dependencies required by the selected operation. JSON mode requires
+`jq`.
+
+After installation:
+
+```bash
+omarchy theme set aranea
+scripts/aranea-wallpaper list
+scripts/aranea-wallpaper set day
+```
+
+## What you get
+
+| Surface | Experience |
+| --- | --- |
+| Command center | A compact Omarchy menu with Aranea identity, Files, Terminal, Setup, Favorites, and Recent |
+| Notifications | A quiet center with critical-state emphasis instead of interruptive popups |
+| System health | Live CPU, memory, disk, network, process, service, reboot, and container status |
+| Clipboard and emoji | Fast pickers with secret masking, recent history, pinning, and keyboard actions |
+| Secure prompts | A consistent polkit card for privileged actions |
+| Wallpapers | Day, night, dawn, sparse, dense, dusk, monochrome, and ultrawide compositions |
+| Integrations | Cursor, icons, terminal, browser, media, Qt, session, developer, and application styling |
+
+## Showcase
+
+### Command center
+
+![Aranea command menu](screenshots/menu.png)
+
+| System submenu | Search | Input |
+| --- | --- | --- |
+| ![System submenu](screenshots/menu-submenu.png) | ![Menu search](screenshots/menu-search.png) | ![Menu input](screenshots/menu-input.png) |
+
+### System surfaces
+
+| Notifications | Health | Authentication |
+| --- | --- | --- |
+| ![Notifications](screenshots/notifications.png) | ![Health](screenshots/health.png) | ![Authentication](screenshots/polkit.png) |
+
+| Filament OSD | Wallpaper picker | Empty notification center |
+| --- | --- | --- |
+| ![OSD](screenshots/osd.png) | ![Wallpaper picker](screenshots/image-picker.png) | ![Empty notifications](screenshots/notifications-empty.png) |
+
+### Pickers and application styling
+
+| Clipboard | Emoji | File manager |
+| --- | --- | --- |
+| ![Clipboard](screenshots/clipboard.png) | ![Emoji](screenshots/emojis.png) | ![File manager](screenshots/file-manager.png) |
+
+| Neovim | Btop | Apps |
+| --- | --- | --- |
+| ![Neovim](screenshots/neovim.png) | ![Btop](screenshots/btop.png) | ![Apps](screenshots/apps.png) |
+
+### Wallpapers
+
+| Day | Night | Dusk |
+| --- | --- | --- |
+| ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
+
+The visual system is described in [Visual language](docs/visual-language.md).
+
+## Documentation
+
+| You want to... | Read |
+| --- | --- |
+| Install, update, activate, or remove Aranea | [Getting started](docs/getting-started.md) |
+| See what the theme includes | [Features](docs/features.md) |
+| Configure profiles, wallpapers, motion, and integrations | [Configuration](docs/configuration.md) |
+| Repair an installation or recover safely | [Troubleshooting](docs/troubleshooting.md) |
+| Automate the installer as an agent | [Agent interface](docs/agent-interface.md) |
+| Browse the icon families | [Icon gallery](docs/icons.md) |
+| Understand the design system | [Visual language](docs/visual-language.md) |
+| Develop, test, or refresh screenshots | [Development](docs/development.md) |
+
+The [documentation hub](docs/README.md) is the best place to start when you
+already know what kind of information you need.
+
+## Agent-friendly CLI
+
+The CLI stays human-readable by default and emits JSONL when `--json` is
+explicit:
+
+```bash
+scripts/install.sh --json --yes --profile minimal
+scripts/uninstall.sh --json --yes --scope integration
 scripts/aranea-doctor --json
 ```
 
-For agent and automation use, pass `--json` to the install, uninstall, or
-doctor command. This emits one versioned JSON object per line, with stable
-event types, step IDs, and exit codes. See
-[`docs/installer-jsonl.md`](docs/installer-jsonl.md) for the protocol.
+Every JSON line is a versioned event with stable step IDs and the process exit
+code remains authoritative. Read the complete contract in
+[Agent interface](docs/agent-interface.md).
 
-Uninstall integration while leaving the theme directory:
+## Uninstall
+
+Keep the theme directory and remove Aranea's integration:
 
 ```bash
 scripts/uninstall.sh --scope integration --yes
@@ -121,317 +138,31 @@ Remove the integration and the installed theme directory:
 scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
 ```
 
-If a check reports `repair` for `hooks` or `plugins` (for example after an
-update that landed a new plugin like the OSD but never re-ran theme-set), run
-`scripts/aranea-doctor --fix` to reinstall the theme-set/post-boot hooks and
-re-run plugin deployment, which also re-registers any plugin in
-`shell.json` that exists on disk but was never enabled.
+Use `--dry-run` before either operation when inspecting an unfamiliar system.
 
-## Activate
+## Repository
 
-After installation, select the theme and a wallpaper with Omarchy:
-
-```bash
-omarchy theme set aranea
-scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set day
+```text
+backgrounds/       wallpapers and stable picker IDs
+branding/          identity marks, glyphs, motifs, and idle artwork
+integrations/      cursor, icons, terminal, browser, Qt, media, and session
+plugins/           bar, menu, lock, notifications, health, pickers, and OSD
+hooks/             theme activation and post-boot behavior
+scripts/           installer, doctor, integrations, wallpaper, and tooling
+tests/              shell, QML, JavaScript, asset, and screenshot contracts
 ```
 
-The wallpaper picker also exposes `night`, `dawn`, `sparse`, `dense`, `dusk`,
-`monochrome`, and `ultrawide`. The bar remains transparent so the network art
-can breathe behind it.
-
-Aranea Pulse adds an opt-in four-phase wallpaper schedule and a filament OSD:
+## Development
 
 ```bash
-scripts/aranea-wallpaper schedule configure 06:00 08:00 18:00 20:00
-scripts/aranea-wallpaper schedule on
-scripts/aranea-integrations status --json
+tests/run json-events install uninstall doctor installer
+tools/check
 ```
 
-Integrations can be activated and rolled back individually with
-`scripts/aranea-integrations activate <id> --yes` and
-`scripts/aranea-integrations deactivate <id>`; managed files are backed up in
-the Aranea state directory before changes are made.
-
-### Helper scripts
-
-The helpers are not on your `PATH`. Run them as `scripts/<name>` from a
-checkout, or as `~/.config/omarchy/themes/aranea/scripts/<name>` from the
-installed theme.
-
-| Script                        | What it does                                                                                                                                                                                   |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/install.sh`          | Installs or updates Aranea (see Install).                                                                                                                                                      |
-| `scripts/uninstall.sh`        | Removes Aranea's hooks, shell plugins, wallpaper timer, managed files (restoring what they replaced), saved desktop settings and state. The theme folder stays: `omarchy theme remove aranea`. |
-| `scripts/aranea-doctor`       | Checks the installation; `--json`, `--fix`.                                                                                                                                                    |
-| `scripts/aranea-integrations` | `status [--json]`, `activate <id> [--yes]`, `deactivate <id>`.                                                                                                                                 |
-| `scripts/aranea-wallpaper`    | `list`, `set <id>`, `set-phase`, the four-phase `schedule` (`on`, `off`, `status`, `configure`) and `motion on\|off`.                                                                          |
-| `scripts/aranea-motion`       | `status`, `set on`/`set off`, `toggle`: animations in Hyprland and the Aranea shell.                                                                                                           |
-| `scripts/aranea-about`        | Prints the version, active theme and a health summary.                                                                                                                                         |
-| `scripts/aranea-showcase`     | Lists the documented surfaces.                                                                                                                                                                 |
-| `scripts/capture-screenshots` | Captures the README screenshots and hero GIF.                                                                                                                                                  |
-
-### Project layers
-
-- **Theme layer:** Omarchy colors, wallpapers, GTK, terminal, cursor, lock, and Plymouth assets.
-- **Shell layer:** Aranea bar, menu, lock, and notification plugins.
-- **Integration layer:** browser, media, developer, Qt, session, and application styling.
-- **Tooling layer:** installer, doctor, deployment helpers, screenshot capture, and validation.
-
-The command menu uses a hybrid command-center layout: the root view adds
-Aranea identity and fixed Files, Terminal and Setup tiles (`Ctrl+1`, `Ctrl+2`,
-`Ctrl+3`); submenus retain a compact mark and breadcrumb. Apps holds Favorites
-and Recent: right-click or `Ctrl+P` pins the app under the cursor (up to 12),
-and both lists are kept in `~/.local/state/aranea/menu.json`. The primary, reduced, and
-ceremony marks live under [`branding/marks`](branding/marks/aranea-primary.svg)
-alongside their reduced and ceremony variants. Shared ready/active/attention
-state glyphs and the menu’s network, node, and edge motifs live under
-[`branding/glyphs`](branding/glyphs/ready.svg) and
-[`branding/motifs`](branding/motifs/menu-network.svg).
-
-## Artwork
-
-### Desktop and shell
-
-The hero above is the primary desktop view; the capture set below focuses on
-interaction states rather than repeating the same wallpaper.
-
-| Command center                               |
-| -------------------------------------------- |
-| ![Aranea command menu](screenshots/menu.png) |
-
-| System submenu                                         | Menu search                                                  | Menu input                                                 |
-| ------------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| ![Aranea System submenu](screenshots/menu-submenu.png) | ![Aranea command menu — search](screenshots/menu-search.png) | ![Aranea command menu — input](screenshots/menu-input.png) |
-
-| Health                                            | OSD                                         |
-| ------------------------------------------------- | ------------------------------------------- |
-| ![Aranea health dropdown](screenshots/health.png) | ![Aranea filament OSD](screenshots/osd.png) |
-
-| Notification center                                          | All caught up                                                            |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| ![Aranea notification center](screenshots/notifications.png) | ![Aranea empty notification center](screenshots/notifications-empty.png) |
-
-| Clipboard                                             | Emoji                                          |
-| ----------------------------------------------------- | ---------------------------------------------- |
-| ![Aranea clipboard picker](screenshots/clipboard.png) | ![Aranea emoji picker](screenshots/emojis.png) |
-
-| Authentication                                  | Wallpaper picker                                         |
-| ----------------------------------------------- | -------------------------------------------------------- |
-| ![Aranea polkit prompt](screenshots/polkit.png) | ![Aranea wallpaper picker](screenshots/image-picker.png) |
-
-### System popups
-
-| Network                                          | Audio                                        | Bluetooth                                            |
-| ------------------------------------------------ | -------------------------------------------- | ---------------------------------------------------- |
-| ![Aranea network popup](screenshots/network.png) | ![Aranea audio popup](screenshots/audio.png) | ![Aranea Bluetooth popup](screenshots/bluetooth.png) |
-
-| Agents                                        | Power                                        | Displays                                         |
-| --------------------------------------------- | -------------------------------------------- | ------------------------------------------------ |
-| ![Aranea agent popup](screenshots/agents.png) | ![Aranea power popup](screenshots/power.png) | ![Aranea display popup](screenshots/monitor.png) |
-
-| Calendar                                        | Weather                                          |
-| ----------------------------------------------- | ------------------------------------------------ |
-| ![Aranea calendar popup](screenshots/clock.png) | ![Aranea weather popup](screenshots/weather.png) |
-
-### Wallpaper collection
-
-The day/night pair anchors the collection. The variants keep the same fine silk
-topology, edge-weighted composition, and quiet center while changing density,
-color, contrast, or aspect ratio.
-
-| Day                                              | Night                                                |
-| ------------------------------------------------ | ---------------------------------------------------- |
-| ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) |
-
-| Sparse                                               | Dense                                              | Dusk                                             |
-| ---------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
-| ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
-
-| Monochrome                                                   | Ultrawide                                                  | Dawn                                             |
-| ------------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------ |
-| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) | ![Dawn wallpaper](backgrounds/variants/dawn.png) |
-
-The canonical OSD reference is captured at [screenshots/osd.png](screenshots/osd.png).
-On a live Omarchy session, set `ARANEA_OSD_CAPTURE_COMMAND` to a compositor
-capture command to replace the static reference with a live frame.
-
-### Secure and boot surfaces
-
-| Lock screen                                 | Plymouth boot screen                                     |
-| ------------------------------------------- | -------------------------------------------------------- |
-| ![Aranea lock screen](screenshots/lock.png) | ![Aranea Plymouth boot screen](screenshots/plymouth.png) |
-
-Apply the boot splash separately; rebuilding the initramfs requires `sudo`:
-
-```bash
-omarchy plymouth set-by-theme aranea
-```
-
-### Cursor artwork
-
-| Pointer                                                            | Hand                                                                | Activity                                                             | Crosshair                                                             |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| ![Aranea pointer cursor](integrations/cursor/cursors/left_ptr.svg) | ![Aranea spider hand cursor](integrations/cursor/cursors/hand2.svg) | ![Aranea web activity cursor](integrations/cursor/cursors/watch.svg) | ![Aranea crosshair cursor](integrations/cursor/cursors/crosshair.svg) |
-
-The busy cursor animation is shipped as eight matching SVG frames:
-
-[`watch-01.svg`](integrations/cursor/cursors/watch-01.svg) ·
-[`watch-02.svg`](integrations/cursor/cursors/watch-02.svg) ·
-[`watch-03.svg`](integrations/cursor/cursors/watch-03.svg) ·
-[`watch-04.svg`](integrations/cursor/cursors/watch-04.svg) ·
-[`watch-05.svg`](integrations/cursor/cursors/watch-05.svg) ·
-[`watch-06.svg`](integrations/cursor/cursors/watch-06.svg) ·
-[`watch-07.svg`](integrations/cursor/cursors/watch-07.svg) ·
-[`watch-08.svg`](integrations/cursor/cursors/watch-08.svg)
-
-### Application surfaces
-
-| Btop                                 | File manager                                         | Neovim                                   |
-| ------------------------------------ | ---------------------------------------------------- | ---------------------------------------- |
-| ![Aranea btop](screenshots/btop.png) | ![Aranea file manager](screenshots/file-manager.png) | ![Aranea Neovim](screenshots/neovim.png) |
-
-| Apps                                          | Favorites                                      | Recent                                   |
-| --------------------------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| ![Aranea Apps launcher](screenshots/apps.png) | ![Aranea Favorites](screenshots/favorites.png) | ![Aranea Recent](screenshots/recent.png) |
-
-Refresh the complete README capture set in one pass. Menu, desktop,
-notification, health, and application surfaces are captured from the
-running session, while lock and Plymouth use canonical artwork renders:
-
-```bash
-scripts/capture-screenshots --all --output screenshots
-```
-
-Lock and Plymouth entries use canonical artwork renders, so refreshing the
-capture set does not lock or reboot the session.
-
-The repository also ships matching Cava, browser/session, Qt, media, cursor,
-and icon integrations.
-
-## Interaction
-
-- Click the spider to open the Omarchy command menu.
-- Right-click the spider to open a terminal.
-- Click workspaces to switch sessions.
-- Use the center indicators for idle and status controls.
-- Use the right-side widgets for network, audio, Bluetooth, displays, power,
-  tray, and agent controls.
-
-### Notifications
-
-Notifications never pop up: every one goes straight to the notification
-center behind the bell in the bar.
-
-- **Bell:** a mint badge counts what's waiting. A **red** badge counts the
-  critical notifications (alarms, low battery, failed jobs) whenever any are
-  waiting. Left-click opens the center, middle-click clears it, right-click
-  toggles Do Not Disturb, which hides the mint badge (critical still shows red).
-- **Center:** critical first, then grouped by app, newest first. Click an item
-  to open it (the app's own action when it is still running), ✕ dismisses an
-  item or a whole group, swipe right to dismiss. Arrow keys, Enter, Delete and
-  Shift+Delete work while it is open: Delete on a "+N more" row expands the
-  group, Shift+Delete clears it.
-- **Feedback toasts:** Omarchy's short confirmations for things you just did
-  ("Screenshot saved", "Copied") still appear briefly and are not kept.
-- **Keys (Omarchy defaults):** `Super+,` dismiss the newest item,
-  `Super+Shift+,` open the center, `Super+Alt+,` open the newest item,
-  `Super+Shift+Alt+,` toggle the center.
-
-A notification an app updates in place stays one entry. The center keeps at
-most 100 items for up to 7 days; critical notifications stay until dismissed.
-
-Switching to another theme hands notifications back to Omarchy's own toasts
-and takes the bell out of the bar; switching back to Aranea restores both
-(unless you had removed the bell yourself).
-
-#### System health
-
-The heart icon next to the bell shows the system's state — mint when
-healthy, amber when something needs attention, red when something is
-critical. Click it for live metrics (CPU with a two-minute history, memory,
-disk, network, top processes, uptime) and the open problems; right-click
-opens btop. Health problems never go to the notification center.
-
-- **Failed services** (system or user) — critical; click opens its journal.
-- **Disk almost full** — from 90 %, critical from 97 %; clears below 88 %.
-- **Reboot needed** — after a kernel update removed the running kernel's modules.
-- **Containers exiting** — a non-zero exit (137 or 143 from a `docker stop`
-  only when the container was killed for memory), or critical when a
-  container keeps restarting (3 exits in 5 minutes).
-
-Problems appear and clear with the condition itself; `aranea-doctor` lists
-which checks are on.
-
-### Pickers
-
-**Clipboard** (`Super+Ctrl+V`) keeps pinned items above the recent history
-and labels each item by kind — link, path, colour (with a swatch), code,
-image or text. Anything that looks like a secret (GitHub, OpenAI, Slack or AWS
-tokens, JWTs, private keys, random-looking strings of 16+ characters) is
-masked in the list and the preview, and removed from history 10 minutes (by
-default; set `ARANEA_CLIPBOARD_SECRET_TTL_MS` to change it) after it was
-copied or marked secret, unless pinned; the preview shows the time left. Copies a password manager marks as secret are
-never stored at all.
-
-`Enter` pastes, `Shift+Enter` copies, `Alt+Enter` opens an item in the editor
-(never a secret), `Ctrl+P` pins, `Space` reveals a masked secret, `Ctrl+S`
-marks or unmarks a secret, `Delete` removes an item and `Ctrl+Shift+Delete`
-clears everything that is not pinned.
-
-**Emoji** (`Super+Ctrl+E`) shows your recent emojis above the full set and
-names the emoji under the cursor. `Enter` inserts it into the focused window,
-`Shift+Enter` only copies it.
-
-### Authentication prompt
-
-Privileged actions (`pkexec`, mounting, system settings) ask for your password
-on an Aranea card over a dimmed desktop. It names the request ("Run
-'/usr/bin/true' as root"), the polkit action's own description and the
-account you are authenticating as. `Tab` shows the details — action id,
-vendor, command and the raw polkit message — and `Shift+Tab` switches account
-when more than one may authorise. Fingerprint login and the closed-lid
-fallback work as in Omarchy.
-
-Only one prompt can be registered per shell, and it registers when the shell
-starts. Switching themes restarts the shell for you. If you turn the Aranea
-prompt off by hand (`omarchy plugin disable araneadev.polkit`), run
-`omarchy restart shell` so Omarchy's own prompt can take over; until then,
-privileged actions have no password prompt.
-
-## Palette
-
-| Role             | Value     |
-| ---------------- | --------- |
-| Background       | `#08090b` |
-| Mint accent      | `#3bff9e` |
-| Violet accent    | `#7a5cff` |
-| Foreground       | `#e7ecf3` |
-| Muted foreground | `#8b96a6` |
-
-The source tokens are in [`colors.toml`](colors.toml) and
-[`shell.toml`](shell.toml). Wallpaper metadata and stable picker IDs are in
-[`backgrounds/manifest.toml`](backgrounds/manifest.toml).
-
-## Repository map
-
-- `backgrounds/` — day/night artwork and the named wallpaper collection.
-- `branding/` — identity marks, semantic glyphs, motifs, fastfetch, and idle artwork.
-- `integrations/` — terminal, editor, browser, cursor, Qt, media, session, and
-  icon integrations.
-- `plugins/` — the Aranea bar, menu, lock, and notification surfaces.
-- `hooks/` — theme activation and post-boot integration hooks.
-- `scripts/` — installer, doctor, wallpaper, showcase, and health tools.
-- `screenshots/` — representative captures used throughout this README.
-
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local git hooks, the test suite,
-commit message conventions, and how releases are cut.
+See [Development](docs/development.md) and [CONTRIBUTING.md](CONTRIBUTING.md)
+for the full workflow.
 
 ## License
 
-The code is released under the [MIT License](LICENSE). See the upstream
-project and asset licenses before redistributing modified branding or
-wallpapers.
+The code is released under the [MIT License](LICENSE). Check the upstream
+project and asset licenses before redistributing modified branding or artwork.
