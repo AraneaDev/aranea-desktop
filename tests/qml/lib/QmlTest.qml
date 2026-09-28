@@ -48,6 +48,41 @@ Item {
     timer.start()
   }
 
+  // Polls COND every 50 ms and runs FN once it returns true (file loads,
+  // processes, Qt.callLater work), however slow the machine. After TIMEOUT
+  // ms without it, NAME fails and the run ends. An exception in FN fails
+  // the test like in step().
+  function waitFor(cond, timeout, name, fn) {
+    var started = Date.now()
+    var timer = Qt.createQmlObject('import QtQuick; Timer { interval: 50; repeat: true }', t)
+    timer.triggered.connect(function () {
+      var ready = false
+      try {
+        ready = !!cond()
+      } catch (e) {
+        ready = false
+      }
+      if (!ready && Date.now() - started < timeout)
+        return
+      timer.stop()
+      timer.destroy()
+      if (!ready) {
+        failures += 1
+        console.log("QMLTEST FAIL " + name + " (timed out after " + timeout + " ms)")
+        done()
+        return
+      }
+      try {
+        fn()
+      } catch (e) {
+        failures += 1
+        console.log("QMLTEST FAIL exception: " + e)
+        done()
+      }
+    })
+    timer.start()
+  }
+
   // Ends the test run; the runner stops quickshell when it sees this line.
   function done() {
     console.log("QMLTEST DONE " + failures)

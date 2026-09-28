@@ -34,12 +34,13 @@ fi
 
 run_dir=""
 qs_pid=""
-# Stops a still-running quickshell and removes the current run directory.
+# Stops quickshell and every process it started (it leads its own process
+# group, see run_test) and removes the current run directory.
 cleanup() {
-  if [[ -n "$qs_pid" ]] && kill -0 "$qs_pid" 2>/dev/null; then
-    kill "$qs_pid" 2>/dev/null || true
+  if [[ -n "$qs_pid" ]]; then
+    kill -- "-$qs_pid" 2>/dev/null || true
     sleep 0.5
-    kill -9 "$qs_pid" 2>/dev/null || true
+    kill -9 -- "-$qs_pid" 2>/dev/null || true
   fi
   qs_pid=""
   [[ -n "$run_dir" ]] && rm -rf "$run_dir"
@@ -66,8 +67,9 @@ run_test() {
   # No display, compositor, session bus or desktop platform theme (the gtk3
   # theme aborts without a display).
   # From the run directory, so a relative path in a test can never write
-  # into the repository.
-  (cd "$run_dir" && exec env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
+  # into the repository; setsid makes it lead its own process group, so
+  # cleanup also stops the commands a test started.
+  (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
     XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &

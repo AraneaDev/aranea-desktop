@@ -57,6 +57,15 @@ ShellRoot {
     blockLoading: true
   }
 
+  // The second service's settings file, parsed; {} while missing or torn.
+  function savedSettings() {
+    try {
+      return JSON.parse(settingsReader.text())
+    } catch (e) {
+      return {}
+    }
+  }
+
   Component.onCompleted: {
     // A toast hovered on two screens: paused until both copies let go.
     svc.holdPopup("1-1", true)
@@ -78,7 +87,9 @@ ShellRoot {
     }) + "\n")
     t.equal(svc.inbox.count, 0, "a clear during load wins over the loaded entries")
 
-    t.step(800, function () {
+    t.waitFor(function () {
+      return svc.inbox.loadedOnce && svc.settingsLoaded
+    }, 10000, "the first service loads", function () {
       // An entry older than a week is pruned and dismissed at its sender.
       var old = {
         timestamp: testRoot.now - 8 * 24 * 3600 * 1000,
@@ -95,19 +106,18 @@ ShellRoot {
 
       // DND on, then the service goes before its debounced save fires.
       var second = serviceComponent.createObject(testRoot)
-      t.step(800, function () {
+      t.waitFor(function () {
+        return second.settingsLoaded
+      }, 10000, "the second service loads its settings", function () {
         t.check(second.settingsLoaded, "second service loaded its settings")
         second.setDoNotDisturb(true)
         second.destroy()
-        t.step(300, function () {
-          settingsReader.path = testRoot.stateRoot + "b/notifications.json"
-          var saved = {}
-          try {
-            saved = JSON.parse(settingsReader.text())
-          } catch (e) {
-            saved = {}
-          }
-          t.equal(saved.dnd, true, "DND written when the service goes away")
+        settingsReader.path = testRoot.stateRoot + "b/notifications.json"
+        t.waitFor(function () {
+          settingsReader.reload()
+          return testRoot.savedSettings().dnd !== undefined
+        }, 5000, "the settings file is written", function () {
+          t.equal(testRoot.savedSettings().dnd, true, "DND written when the service goes away")
           t.done()
         })
       })

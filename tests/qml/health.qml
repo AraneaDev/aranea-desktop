@@ -75,7 +75,9 @@ ShellRoot {
     newService.panelOpened()
     oldService.destroy()
 
-    t.step(1500, function () {
+    t.waitFor(function () {
+      return failing.known.container === false && crashed.known.container === true
+    }, 10000, "both docker checks report", function () {
       t.equal(keys(failing), ["container:db"], "a failed docker ps keeps the container problems")
       t.equal(failing.known.container, false, "the container check is marked unavailable")
       t.equal(keys(crashed), ["container:web"], "a crashed container is reported")

@@ -112,7 +112,9 @@ ShellRoot {
     t.check(clip.pendingSaves > 0, "saves are pending")
     clip.activateIndex(0)
     t.equal(ranNamed("omarchy-clipboard-paste-text").length, 0, "paste waits for the writes")
-    t.step(1500, function () {
+    t.waitFor(function () {
+      return clip.pendingSaves === 0 && ranNamed("omarchy-clipboard-paste-text").length > 0
+    }, 10000, "the writes finish and the paste runs", function () {
       t.equal(clip.pendingSaves, 0, "writes finished")
       t.equal(ranNamed("omarchy-clipboard-paste-text").length, 1, "paste ran after the writes")
       t.equal(clip.history.length, 2, "history keeps the newest state")

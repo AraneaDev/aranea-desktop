@@ -1,7 +1,9 @@
 // Behaviour of the polkit prompt's non-visual entry (PolkitAgent.qml) with
 // no window and no system-bus agent: a fake request (flow) and a fake view
-// record what the prompt does. Empty Enter nudges without submitting, Enter
-// sends the typed password, Shift+Tab cycles identities, the hint names the
+// record what the prompt does. Keys go through handleKey like the window's:
+// empty Enter nudges without submitting, Enter sends the typed password,
+// Tab opens the details, Shift+Tab cycles identities and Esc cancels. The
+// flow's signals drive the failure shake and the close. The hint names the
 // keys, and a spoofed path never changes who the command runs as.
 import QtQuick
 import Quickshell
@@ -30,6 +32,11 @@ ShellRoot {
     property string cookie: "c1"
     property var submitted: []
     property int cancelled: 0
+
+    // The authentication flow's outcome signals.
+    signal authenticationFailed
+    signal authenticationSucceeded
+    signal authenticationRequestCancelled
 
     // Records a submitted response.
     function submit(text) {
@@ -92,36 +99,62 @@ ShellRoot {
     agentActive: true
   }
 
+  // Sends a key through the prompt's key map; returns whether it was taken.
+  function press(code, modifiers) {
+    var event = {
+      key: code,
+      modifiers: modifiers || Qt.NoModifier,
+      text: "",
+      accepted: false
+    }
+    prompt.handleKey(event)
+    return event.accepted
+  }
+
   Component.onCompleted: {
     prompt.syncFromFlow()
     t.equal(prompt.identityTotal, 3, "identities counted")
 
     // Empty Enter: nudge, nothing submitted.
     fakeView.password = ""
-    prompt.submitResponse()
+    t.check(press(Qt.Key_Return), "Enter is taken")
     t.equal(fakeFlow.submitted, [], "empty Enter submits nothing")
     t.check(fakeView.calls.indexOf("nudge") >= 0, "empty Enter nudges")
 
     // With reduced motion the empty Enter does not animate.
     prompt.motionEnabled = false
     fakeView.calls = []
-    prompt.submitResponse()
+    press(Qt.Key_Return)
     t.equal(fakeView.calls.indexOf("nudge"), -1, "no nudge with reduced motion")
     t.equal(fakeFlow.submitted, [], "still nothing submitted")
     prompt.motionEnabled = true
 
     // Enter with a password sends it and clears the field.
     fakeView.password = "hunter2"
-    prompt.submitResponse()
+    press(Qt.Key_Enter)
     t.equal(fakeFlow.submitted, ["hunter2"], "Enter sends the typed password")
     t.check(prompt.submitted, "prompt waits for PAM")
     t.equal(fakeView.password, "", "field cleared after submit")
 
+    // A failed attempt: error flash, shake, field cleared, ready to retry.
+    fakeView.password = "typed-after"
+    fakeView.calls = []
+    fakeFlow.authenticationFailed()
+    t.check(prompt.errorFlash, "a failure flashes the error border")
+    t.check(fakeView.calls.indexOf("shake") >= 0, "a failure shakes the card")
+    t.equal(fakeView.password, "", "a failure clears the field")
+    t.check(!prompt.submitted, "a failure ends the wait for PAM")
+
+    // Tab opens the details.
+    t.check(!prompt.detailsOpen, "details start collapsed")
+    press(Qt.Key_Tab)
+    t.check(prompt.detailsOpen, "Tab opens the details")
+
     // Shift+Tab cycles identities and wraps.
-    prompt.cycleIdentity()
+    press(Qt.Key_Backtab, Qt.ShiftModifier)
     t.equal(fakeFlow.selectedIdentity, "unix-user:root", "next identity")
-    prompt.cycleIdentity()
-    prompt.cycleIdentity()
+    press(Qt.Key_Backtab, Qt.ShiftModifier)
+    press(Qt.Key_Backtab, Qt.ShiftModifier)
     t.equal(fakeFlow.selectedIdentity, "unix-user:tim", "identity wraps around")
 
     // Hint names Shift+Tab when there are several identities.
@@ -130,9 +163,17 @@ ShellRoot {
     // The spoofed path stays in the command; the target is the real one.
     t.equal(prompt.targetText, "as root", "spoof cannot change the target")
 
-    // Esc cancels the request.
-    prompt.cancelRequest()
-    t.equal(fakeFlow.cancelled, 1, "Esc cancels the request")
-    t.done()
+    // Success closes the prompt after the close delay.
+    fakeFlow.authenticationSucceeded()
+    t.check(prompt.closing, "success starts closing")
+    t.waitFor(function () {
+      return !prompt.closing
+    }, 5000, "the close delay ends", function () {
+      // Esc cancels the request.
+      t.check(press(Qt.Key_Escape), "Esc is taken")
+      t.equal(fakeFlow.cancelled, 1, "Esc cancels the request")
+      t.check(prompt.closing, "Esc starts closing")
+      t.done()
+    })
   }
 }

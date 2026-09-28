@@ -103,7 +103,9 @@ ShellRoot {
     })
     shell.apps = list
     menu.openRoute("apps.favorites")
-    t.step(800, function () {
+    t.waitFor(function () {
+      return menu.rowsLoaded && menu.opened
+    }, 10000, "menu sources load and the route opens", function () {
       t.check(menu.rowsLoaded, "menu sources loaded")
       t.check(menu.opened, "Favorites route opened once rows existed")
       t.equal(menu.activeMenu, "apps.favorites", "the Favorites list is shown")

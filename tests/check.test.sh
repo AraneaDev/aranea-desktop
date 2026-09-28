@@ -510,6 +510,27 @@ if command -v quickshell >/dev/null && [[ -d /usr/share/omarchy/shell/Commons ]]
     exit 1
   fi
   grep -Fq 'runtime error' "$ARANEA_TEST_SANDBOX/out"
+  # A wait whose condition never holds fails when it times out.
+  printf 'import QtQuick\nimport Quickshell\nimport "lib"\nShellRoot {\n  QmlTest {\n    id: t\n    Component.onCompleted: t.waitFor(function () {\n      return false\n    }, 300, "never", function () {\n      t.done()\n    })\n  }\n}\n' >tests/qml/fail.qml
+  git add -A
+  if run_check --only qmltest; then
+    echo "qmltest passed a wait that timed out" >&2
+    exit 1
+  fi
+  grep -Fq 'QMLTEST FAIL never (timed out after 300 ms)' "$ARANEA_TEST_SANDBOX/out"
+  # Children a test started (a fake command still running) go with it.
+  printf 'import QtQuick\nimport Quickshell\nimport Quickshell.Io\nimport "lib"\nShellRoot {\n  QmlTest {\n    id: t\n  }\n  Process {\n    running: true\n    command: ["sh", "-c", "sleep 313; :"]\n  }\n  Component.onCompleted: t.step(300, function () {\n    t.check(true, "started")\n    t.done()\n  })\n}\n' >tests/qml/fail.qml
+  git add -A
+  run_check --only qmltest || {
+    cat "$ARANEA_TEST_SANDBOX/out"
+    exit 1
+  }
+  sleep 1
+  if pgrep -f 'sleep 31[3]' >/dev/null; then
+    pkill -f 'sleep 31[3]' || true
+    echo "a QML test left its child processes running" >&2
+    exit 1
+  fi
 else
   echo "SKIP: qmltest sensitivity (no quickshell or Omarchy shell here)"
 fi
