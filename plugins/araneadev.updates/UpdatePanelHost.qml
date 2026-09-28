@@ -13,7 +13,10 @@ KeyboardPanel {
   signal openUpdater
   // Request a status refresh.
   signal refresh
-  open: owner ? owner.opened : false
+  // Wait for the layer-shell anchor geometry before revealing the card; opening
+  // on the first zero-sized frame makes cardOrigin visibly settle sideways.
+  open: owner ? owner.opened && anchorWindow !== null && screenW > 0 : false
+  centerOnBar: true
   gap: Style.gapsOut
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(380))

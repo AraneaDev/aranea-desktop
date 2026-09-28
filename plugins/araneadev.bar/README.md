@@ -16,11 +16,18 @@ The bar shows exactly the modules listed in `shell.json`; there are no
 profiles. `scripts/aranea-doctor --json` reports the
 runtime and QML health checks alongside the active shell/plugin state.
 
+Menubar visibility is controlled centrally by `bar.layout` in
+`~/.config/omarchy/shell.json`: remove a widget entry from `left`, `center`, or
+`right` to hide it, and add the entry back to show it. This is separate from
+the top-level `plugins` list, which controls whether a plugin is installed and
+available. For example, removing `{ "id": "omarchy.agents" }` hides the agents
+widget without disabling agents support; adding it back restores the widget.
+
 ## Customizing
 
 The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](https://github.com/basecamp/omarchy/blob/v4.0.4/config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
 
-The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable widgets with `omarchy plugin enable` and `omarchy plugin disable` (widget ids come from `omarchy plugin list`).
+The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable plugin availability with `omarchy plugin enable` and `omarchy plugin disable` (ids come from `omarchy plugin list`); use the `bar.layout` arrays for the less destructive per-widget visibility choice.
 
 Example `shell.json` (bar subtree only shown):
 

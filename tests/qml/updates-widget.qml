@@ -22,6 +22,7 @@ ShellRoot {
     property string fontFamily: "monospace"
     property bool foregroundAnimationEnabled: false
     property color urgent: "#ff6688"
+    property bool centerSectionRevealHeld: false
     property var activePopout: null
     function hideTooltip(target) {
     }
@@ -60,14 +61,38 @@ ShellRoot {
       })
   }
 
+  Updates.BarWidget {
+    id: inactiveWidget
+    bar: fakeBar
+    testStatus: ({
+        updates: []
+      })
+  }
+
   Component.onCompleted: {
     t.check(widget.status.count === 2, "update count is exposed")
     t.equal(widget.status.groups.length, 2, "sources are grouped")
     t.check(widget.display.visible, "available updates are visible")
     t.equal(widget.display.countText, "2", "count is rendered compactly")
     t.equal(widget.display.severity, "warning", "reboot state is a warning")
-    widget.openUpdater()
-    t.equal(testRoot.lastCommand, "omarchy-launch-floating-terminal-with-presentation omarchy-update", "updater action delegates to Omarchy")
-    t.done()
+    t.check(!widget.iconDimmed, "active update icon is not dimmed")
+    t.equal(widget.iconTooltip, "Updates available · reboot required", "active update icon has warning tooltip")
+    t.check(!inactiveWidget.iconVisible, "inactive update icon is hidden before center hover")
+    fakeBar.centerSectionRevealHeld = true
+    t.check(inactiveWidget.hoverRevealed, "inactive update widget sees center hover")
+    t.check(inactiveWidget.iconVisible, "inactive update widget should show on center hover")
+    t.check(inactiveWidget.iconDimmed, "inactive update icon is dimmed")
+    t.equal(inactiveWidget.iconTooltip, "No updates available", "inactive update icon has empty-state tooltip")
+    t.step(0, function () {
+      t.equal(inactiveWidget.iconVisible, true, "inactive update icon is revealed while center bar is hovered")
+      inactiveWidget.panelOpen = true
+      fakeBar.centerSectionRevealHeld = false
+      t.check(inactiveWidget.iconVisible, "inactive update icon keeps its slot while panel is open")
+      inactiveWidget.panelOpen = false
+      t.check(!inactiveWidget.iconVisible, "inactive update icon hides after center hover")
+      widget.openUpdater()
+      t.equal(testRoot.lastCommand, "omarchy-launch-floating-terminal-with-presentation omarchy-update", "updater action delegates to Omarchy")
+      t.done()
+    })
   }
 }

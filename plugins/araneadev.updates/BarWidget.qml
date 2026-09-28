@@ -24,6 +24,14 @@ Item {
   readonly property var status: service.status
   // Compact visibility and severity state.
   readonly property var display: UpdateLogic.displayState(status)
+  // Reveal the inactive icon while the center section is being hovered.
+  readonly property bool hoverRevealed: !!(bar && bar.centerSectionRevealHeld === true)
+  // Whether the compact update button should occupy and paint its slot.
+  readonly property bool iconVisible: root.display.visible || root.hoverRevealed || root.panelOpen
+  // Inactive hover previews use the same subdued treatment as other indicators.
+  readonly property bool iconDimmed: !root.display.visible
+  // Tooltip text distinguishes the inactive hover preview from actionable state.
+  readonly property string iconTooltip: root.display.visible ? (root.status.rebootRequired ? "Updates available · reboot required" : "Updates available") : "No updates available"
 
   IpcHandler {
     target: root.moduleName
@@ -42,8 +50,8 @@ Item {
     autoStart: root.testStatus === null
     testStatus: root.testStatus
   }
-  visible: display.visible
-  implicitWidth: button.implicitWidth
+  visible: true
+  implicitWidth: iconVisible ? button.implicitWidth : 0
   implicitHeight: button.implicitHeight
 
   // Open the update panel.
@@ -84,7 +92,9 @@ Item {
     anchors.fill: parent
     bar: root.bar
     text: "↥" + root.display.countText
-    tooltipText: root.status.rebootRequired ? "Updates available · reboot required" : "Updates available"
+    visible: root.iconVisible
+    dimmed: root.iconDimmed
+    tooltipText: root.iconTooltip
     active: root.panelOpen
     horizontalMargin: 7
     onPressed: function (mouseButton) {
