@@ -39,6 +39,10 @@ grep -Fq '"id":"manifest","status":"ok"' <<<"$output"
 grep -Fq '"id":"icons","status":"repair"' <<<"$output"
 grep -Fq '"id":"fonts","status":"ok"' <<<"$output"
 grep -Fq '"id":"ownership","status":"ok"' <<<"$output"
+first_doctor_event="$(head -n 1 <<<"$output")"
+jq -e '.event == "started" and .operation == "doctor" and .schema == 1' <<<"$first_doctor_event" >/dev/null
+last_doctor_event="$(tail -n 1 <<<"$output")"
+jq -e '.event == "completed" and .operation == "doctor" and .status == "warning"' <<<"$last_doctor_event" >/dev/null
 grep -Fq '"id":"shell","status":"skipped"' <<<"$output"
 grep -Fq '"id":"plugins","status":"skipped"' <<<"$output"
 grep -Fq '"id":"runtime","status":"skipped"' <<<"$output"

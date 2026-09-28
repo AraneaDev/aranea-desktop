@@ -38,6 +38,31 @@ grep -Fq "would persist profile: no_apps" "$minimal_output"
 grep -Fq 'profile_file=' "$repo_root/hooks/theme-set"
 grep -Fq 'profile_file=' "$repo_root/hooks/post-boot"
 
+json_output="$(PATH="$repo_root/tests/fake-bin:$PATH" \
+  OMARCHY_INSTALLER_TEST=1 \
+  "$repo_root/scripts/install.sh" --json --dry-run --yes --profile full)"
+first_event=1
+last_event=''
+while IFS= read -r event; do
+  [[ -n "$event" ]] || continue
+  jq -e '.schema == 1 and .operation == "install" and .timestamp and .event' <<<"$event" >/dev/null
+  if ((first_event)); then
+    jq -e '.event == "started" and .data.profile == "full" and .data.dry_run == true' <<<"$event" >/dev/null
+    first_event=0
+  fi
+  last_event="$event"
+done <<<"$json_output"
+jq -e '.event == "completed" and .status == "ok"' <<<"$last_event" >/dev/null
+
+missing_json_status=0
+PATH="$repo_root/tests/fake-bin:$PATH" OMARCHY_INSTALLER_TEST=1 \
+  "$repo_root/scripts/install.sh" --json --dry-run --yes \
+  --source "$repo_root/tests/missing-local-source" >/dev/null 2>&1 || missing_json_status=$?
+[[ "$missing_json_status" == 1 ]] || {
+  echo "missing local source did not return JSON operation failure" >&2
+  exit 1
+}
+
 # --- the theme is always installed as `aranea`, whatever the source is called
 # (the default URL ends in aranea-desktop.git, which Omarchy names
 # "aranea-desktop"; `omarchy theme set aranea` must not activate a stale copy).

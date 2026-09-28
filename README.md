@@ -42,6 +42,17 @@ bar, menus, lock screen, boot splash, idle branding, and fastfetch surfaces.
 
 ## Install
 
+For a guided human installation from this checkout, run:
+
+```bash
+./installer
+```
+
+The TUI supports install/update, profile selection, diagnosis/repair, and two
+explicit removal choices: remove Aranea's integration while keeping the theme
+directory, or remove everything including the installed theme. It uses the
+same CLI operations documented below.
+
 From a checkout:
 
 ```bash
@@ -91,6 +102,23 @@ Preview or diagnose without changing the system:
 ```bash
 scripts/install.sh --dry-run --yes
 scripts/aranea-doctor --json
+```
+
+For agent and automation use, pass `--json` to the install, uninstall, or
+doctor command. This emits one versioned JSON object per line, with stable
+event types, step IDs, and exit codes. See
+[`docs/installer-jsonl.md`](docs/installer-jsonl.md) for the protocol.
+
+Uninstall integration while leaving the theme directory:
+
+```bash
+scripts/uninstall.sh --scope integration --yes
+```
+
+Remove the integration and the installed theme directory:
+
+```bash
+scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
 ```
 
 If a check reports `repair` for `hooks` or `plugins` (for example after an

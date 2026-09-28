@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Human-facing Aranea installer. Operations stay in scripts/*.sh; this file
+# only collects choices and renders their JSONL event stream.
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+dry_run=0
+gum_bin="${ARANEA_INSTALLER_GUM_BIN:-gum}"
+
+usage() {
+  cat <<'USAGE'
+Aranea Installer
+
+Usage: ./installer [--dry-run]
+
+Launches the guided terminal installer. The underlying commands remain
+available for automation with --json:
+  scripts/install.sh --json
+  scripts/uninstall.sh --json
+  scripts/aranea-doctor --json
+USAGE
+}
+
+while (($#)); do
+  case "$1" in
+    --dry-run) dry_run=1 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+command -v "$gum_bin" >/dev/null 2>&1 || {
+  printf '%s\n' 'Aranea Installer: gum is required for the TUI.' >&2
+  exit 4
+}
+command -v jq >/dev/null 2>&1 || {
+  printf '%s\n' 'Aranea Installer: jq is required for the TUI.' >&2
+  exit 4
+}
+
+render_events() {
+  local stream_file="$1"
+  local line event status id message
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    if ! jq -e . >/dev/null <<<"$line"; then
+      printf '%s\n' 'Aranea Installer: received malformed JSONL from an operation.' >&2
+      return 1
+    fi
+    event="$(jq -r '.event // ""' <<<"$line")"
+    status="$(jq -r '.status // ""' <<<"$line")"
+    id="$(jq -r '.id // ""' <<<"$line")"
+    message="$(jq -r '.message // ""' <<<"$line")"
+    case "$event:$status" in
+      started:*)
+        profile="$(jq -r '.data.profile // empty' <<<"$line")"
+        [[ -n "$profile" ]] && "$gum_bin" style "profile: $profile"
+        ;;
+      step:running)
+        "$gum_bin" style --foreground 212 "... ${message:-$id}"
+        ;;
+      step:ok)
+        "$gum_bin" style --foreground 42 "ok  ${message:-$id}"
+        ;;
+      step:warning | completed:warning)
+        "$gum_bin" style --foreground 214 "!   ${message:-$id}"
+        ;;
+      step:failed | completed:failed)
+        "$gum_bin" style --foreground 196 "x   ${message:-$id}"
+        ;;
+      recovery:*)
+        "$gum_bin" style --foreground 214 "Recovery: $message"
+        ;;
+      prompt:*)
+        "$gum_bin" style --foreground 214 "$message"
+        ;;
+      completed:ok)
+        "$gum_bin" style --foreground 42 "$message"
+        ;;
+    esac
+  done <"$stream_file"
+}
+
+run_json() {
+  local output_file status=0
+  output_file="$(mktemp "${TMPDIR:-/tmp}/aranea-installer.XXXXXX")"
+  if "$@" >"$output_file"; then
+    status=0
+  else
+    status=$?
+  fi
+  render_events "$output_file" || status=1
+  rm -f -- "$output_file"
+  return "$status"
+}
+
+doctor_status() {
+  local output_file status=0 result
+  output_file="$(mktemp "${TMPDIR:-/tmp}/aranea-doctor.XXXXXX")"
+  "$repo_root/scripts/aranea-doctor" --json >"$output_file" 2>/dev/null || status=$?
+  if ((status == 0)) && result="$(tail -n 1 "$output_file" | jq -r '.status // "unknown"' 2>/dev/null)"; then
+    printf '%s' "$result"
+  else
+    printf '%s' 'unknown'
+  fi
+  rm -f -- "$output_file"
+}
+
+confirm() {
+  "$gum_bin" confirm "$1" || {
+    "$gum_bin" style --foreground 214 'Cancelled.'
+    exit 3
+  }
+}
+
+printf '%s\n' 'Aranea Installer'
+printf 'Current status: %s\n' "$(doctor_status)"
+
+action="$("$gum_bin" choose \
+  --header 'Choose an action:' \
+  'install Install or update Aranea' \
+  'reconfigure Reconfigure installation profile' \
+  'doctor Diagnose or repair' \
+  'remove-integration Remove Aranea integration' \
+  'remove-complete Remove Aranea completely' \
+  'exit Exit')" || exit 3
+action="${action%% *}"
+
+case "$action" in
+  install | reconfigure)
+    profile_choice="$("$gum_bin" choose \
+      --header 'Choose an installation profile:' \
+      'minimal Core and GTK experience only' \
+      'full Every supported application integration' \
+      'no_apps Theme assets without application integrations')" || exit 3
+    profile="${profile_choice%% *}"
+    confirm "Install Aranea with the $profile profile?"
+    args=(--json --yes --profile "$profile")
+    ((dry_run)) && args+=(--dry-run)
+    run_json "$repo_root/scripts/install.sh" "${args[@]}"
+    ;;
+  doctor)
+    fix=0
+    if "$gum_bin" confirm 'Repair detected issues?'; then
+      fix=1
+    fi
+    args=(--json)
+    ((fix)) && args+=(--fix)
+    run_json "$repo_root/scripts/aranea-doctor" "${args[@]}"
+    ;;
+  remove-integration | remove-complete)
+    scope=integration
+    [[ "$action" == remove-complete ]] && scope=complete
+    confirm "Remove Aranea ($scope)?"
+    args=(--json --yes --scope "$scope")
+    if [[ "$scope" == complete && "$dry_run" == 0 ]]; then
+      current_theme="$(omarchy theme current 2>/dev/null || true)"
+      if [[ "$current_theme" == Aranea || "$current_theme" == aranea ]]; then
+        replacement="$("$gum_bin" input --placeholder 'Replacement theme (for example: Omarchy)')" || exit 3
+        [[ -n "$replacement" ]] || exit 3
+        args+=(--replacement-theme "$replacement")
+      fi
+    fi
+    ((dry_run)) && args+=(--dry-run)
+    run_json "$repo_root/scripts/uninstall.sh" "${args[@]}"
+    ;;
+  exit)
+    exit 0
+    ;;
+  *)
+    printf 'Unknown action: %s\n' "$action" >&2
+    exit 2
+    ;;
+esac
