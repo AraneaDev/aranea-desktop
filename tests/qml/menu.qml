@@ -64,6 +64,8 @@ ShellRoot {
     id: menu
     windowEnabled: false
     shell: fakeShell
+    // The test's own menu, never the installed Omarchy's.
+    defaultMenuPath: Qt.resolvedUrl("fixtures/omarchy-menu.jsonc").toString().replace("file://", "")
     run: function (command) {
       shell.ran = shell.ran.concat([command])
     }

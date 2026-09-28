@@ -58,6 +58,7 @@ run_test() {
   ln -s "$shell_dir/Commons" "$run_dir/cfg/Commons"
   ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
   ln -s "$repo_root/tests/qml/lib" "$run_dir/cfg/lib"
+  ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] && ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
   done
@@ -90,6 +91,15 @@ run_test() {
   if ! grep -q 'QMLTEST DONE' <<<"$log"; then
     echo "qmltest: $name FAILED (no QMLTEST DONE within ${timeout_s}s)"
     grep -E 'ERROR|TypeError|ReferenceError' <<<"$log" | grep -v 'quickshell.ipc' | sed 's/^/  /' | head -20
+    return 1
+  fi
+  # A runtime error fails the test even when every check passed: it means
+  # some code path the test drove threw.
+  local errors
+  errors="$(grep -E 'TypeError|ReferenceError|is not a function|Cannot read property|Unable to assign' <<<"$log" | grep -v 'quickshell.ipc' || true)"
+  if [[ -n "$errors" ]]; then
+    echo "qmltest: $name FAILED (runtime error)"
+    head -20 <<<"$errors" | sed 's/^/  /'
     return 1
   fi
   if ((status)); then

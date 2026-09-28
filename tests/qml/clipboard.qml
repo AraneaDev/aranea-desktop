@@ -91,6 +91,7 @@ ShellRoot {
     clip.openIndex(secret)
     t.equal(clip.notice, "SECRETS CAN'T BE OPENED IN THE EDITOR", "secret open refused with a notice")
     t.equal(ranNamed("omarchy-clipboard-open").length, 0, "no open command for a secret")
+    t.equal(clip.hintText(), "SECRETS CAN'T BE OPENED IN THE EDITOR", "the hint shows the notice")
 
     // Colour rows carry the Qt colour.
     var colour = rowIndex("#11223380")
@@ -105,6 +106,7 @@ ShellRoot {
 
     // Two quick deletes, then a paste: it waits for both writes.
     clip.open("{}")
+    t.equal(clip.notice, "", "opening again clears the notice")
     clip.removeDisplayIndex(0)
     clip.removeDisplayIndex(0)
     t.check(clip.pendingSaves > 0, "saves are pending")

@@ -70,10 +70,12 @@ EOF
 }
 
 # Prints the runtime problems in a Quickshell log, normalized for the
-# allowlist: repo-relative paths, no line or column numbers.
+# allowlist: repo-relative paths, no line or column numbers. Entries that
+# create their window or agent at runtime only warn "failed to load" when it
+# breaks, so that counts as a problem too.
 smoke_problems() {
   sed 's/\x1b\[[0-9;]*m//g' "$1" |
-    grep -E 'SMOKE-ERROR|TypeError|ReferenceError|Unable to assign|is not a function|Cannot read property|Binding loop' |
+    grep -E 'SMOKE-ERROR|TypeError|ReferenceError|Unable to assign|is not a function|Cannot read property|Binding loop|failed to load|Required property' |
     sed -E "s#file://##g; s#${check_root}/##g; s#:[0-9]+(:-?[0-9]+)?:#:#g; s#\[[0-9]+:-?[0-9]+\]##g; s/^[[:space:]]*(WARN|ERROR|DEBUG)[[:space:]]+[a-z.]*:?[[:space:]]*//" |
     LC_ALL=C sort -u
 }

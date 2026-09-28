@@ -102,6 +102,14 @@ ShellRoot {
     t.equal(fakeFlow.submitted, [], "empty Enter submits nothing")
     t.check(fakeView.calls.indexOf("nudge") >= 0, "empty Enter nudges")
 
+    // With reduced motion the empty Enter does not animate.
+    prompt.motionEnabled = false
+    fakeView.calls = []
+    prompt.submitResponse()
+    t.equal(fakeView.calls.indexOf("nudge"), -1, "no nudge with reduced motion")
+    t.equal(fakeFlow.submitted, [], "still nothing submitted")
+    prompt.motionEnabled = true
+
     // Enter with a password sends it and clears the field.
     fakeView.password = "hunter2"
     prompt.submitResponse()

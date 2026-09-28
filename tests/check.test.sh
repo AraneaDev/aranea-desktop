@@ -328,6 +328,34 @@ else
   }
 fi
 git reset -q --hard
+# A window, toast or agent part that fails to load is only logged as a
+# warning by its entry (the split plugins create parts at runtime), so the
+# smoke log filter must report those lines too; a clean line is not reported.
+smoke_log="$ARANEA_TEST_SANDBOX/smoke.log"
+cat >"$smoke_log" <<'LOG'
+  WARN qml: clipboard: window failed to load: file:///x/ClipboardWindow.qml:3 Type Foo unavailable
+  WARN qml: Required property root was not initialized
+  INFO qml: all good
+LOG
+# Runs smoke_problems from tools/lib/check-smoke.sh: <root> <log>.
+cat >"$ARANEA_TEST_SANDBOX/smoke-filter" <<'SH'
+check_root="$1" repo_root="$1"
+source "$1/tools/lib/check-smoke.sh"
+smoke_problems "$2"
+SH
+problems="$(bash "$ARANEA_TEST_SANDBOX/smoke-filter" "$repo_root" "$smoke_log")"
+grep -Fq 'clipboard: window failed to load' <<<"$problems" || {
+  echo "smoke ignores a part that failed to load" >&2
+  exit 1
+}
+grep -Fq 'Required property root was not initialized' <<<"$problems" || {
+  echo "smoke ignores an uninitialized required property" >&2
+  exit 1
+}
+if grep -Fq 'all good' <<<"$problems"; then
+  echo "smoke reports clean lines" >&2
+  exit 1
+fi
 # docs: undocumented code fails, documented code passes.
 mkdir -p plugins/d scripts
 cat >plugins/d/Logic.js <<'EOF'
@@ -474,6 +502,14 @@ if command -v quickshell >/dev/null && [[ -d /usr/share/omarchy/shell/Commons ]]
     exit 1
   fi
   grep -Fq 'did not load' "$ARANEA_TEST_SANDBOX/out"
+  # A runtime error fails the test even when every check passed.
+  printf 'import QtQuick\nimport Quickshell\nimport "lib"\nShellRoot {\n  QmlTest {\n    id: t\n    Component.onCompleted: {\n      t.check(true, "fine")\n      undefinedThing.x = 1\n    }\n  }\n  Component.onCompleted: t.done()\n}\n' >tests/qml/fail.qml
+  git add -A
+  if run_check --only qmltest; then
+    echo "qmltest passed a test with a runtime error" >&2
+    exit 1
+  fi
+  grep -Fq 'runtime error' "$ARANEA_TEST_SANDBOX/out"
 else
   echo "SKIP: qmltest sensitivity (no quickshell or Omarchy shell here)"
 fi
