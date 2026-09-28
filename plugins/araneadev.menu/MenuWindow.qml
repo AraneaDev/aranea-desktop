@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 PanelWindow {
   id: panel
@@ -122,16 +123,16 @@ PanelWindow {
     onClicked: panel.root.cancel()
   }
 
-  BorderSurface {
+  Aranea.SurfaceCard {
     id: card
     width: panel.root.cardWidth
     height: Math.min(panel.root.cardHeight, panel.height - Style.gapsOut - panel.effectiveCardTop)
-    radius: panel.root.cornerRadius
+    cornerRadius: panel.root.cornerRadius
     anchors.horizontalCenter: parent.horizontalCenter
     y: panel.effectiveCardTop
-    color: panel.root.background
-    borderSpec: panel.root.borderSpec
-    padding: panel.root.contentMargin
+    fillColor: panel.root.background
+    borderSpecOverride: panel.root.borderSpec
+    contentPadding: panel.root.contentMargin
 
     MouseArea {
       anchors.fill: parent

@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: panel
@@ -30,47 +31,12 @@ Item {
     anchors.fill: parent
     spacing: Style.space(8)
 
-    RowLayout {
+    Aranea.PanelHeader {
       Layout.fillWidth: true
-
-      Text {
-        text: "Update center"
-        color: Color.popups.text
-        font.pixelSize: Style.font.title
-        font.bold: true
-        font.family: Style.font.family
-        Layout.fillWidth: true
-      }
-
-      Text {
-        text: panel.status.error ? "CHECK FAILED" : "REFRESH"
-        color: panel.status.error ? Color.accent : Color.popups.text
-        opacity: 0.75
-        font.pixelSize: Style.font.caption
-        font.family: Style.font.family
-      }
-    }
-
-    Text {
-      text: "ENTER OPEN UPDATER  ·  R REFRESH  ·  ESC CLOSE"
-      color: Color.popups.text
-      opacity: 0.5
-      font.pixelSize: Style.font.caption
-      font.family: Style.font.family
-    }
-
-    Rectangle {
-      Layout.fillWidth: true
-      Layout.preferredHeight: 1
-      color: Util.alpha(Color.popups.text, 0.16)
-    }
-
-    Text {
-      text: "SYSTEM STATUS"
-      color: Color.popups.text
-      opacity: 0.7
-      font.pixelSize: Style.font.caption
-      font.family: Style.font.family
+      title: "Update center"
+      hint: panel.status.error ? "CHECK FAILED" : "REFRESH"
+      hintText: "ENTER OPEN UPDATER  ·  R REFRESH  ·  ESC CLOSE"
+      section: "SYSTEM STATUS"
     }
 
     Rectangle {
@@ -78,11 +44,10 @@ Item {
       Layout.preferredHeight: Style.space(62)
       color: "transparent"
 
-      Rectangle {
-        width: Style.space(2)
+      Aranea.StatusRail {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        color: panel.status.error || panel.status.rebootRequired ? Color.accent : Util.alpha(Color.popups.text, 0.25)
+        railColor: panel.status.error || panel.status.rebootRequired ? Color.accent : Util.alpha(Color.popups.text, 0.25)
       }
 
       RowLayout {
@@ -90,25 +55,11 @@ Item {
         anchors.leftMargin: Style.space(16)
         anchors.rightMargin: Style.space(14)
 
-        ColumnLayout {
+        Aranea.StatusTextPair {
           Layout.fillWidth: true
-          spacing: 0
-
-          Text {
-            text: panel.status.error ? "CHECK FAILED" : (panel.status.rebootRequired ? "REBOOT REQUIRED" : "UP TO DATE")
-            color: panel.status.error || panel.status.rebootRequired ? Color.accent : Color.popups.text
-            font.bold: true
-            font.pixelSize: Style.font.subtitle
-            font.family: Style.font.family
-          }
-
-          Text {
-            text: panel.status.count + (panel.status.count === 1 ? " update available" : " updates available")
-            color: Color.popups.text
-            opacity: 0.55
-            font.pixelSize: Style.font.body
-            font.family: Style.font.family
-          }
+          title: panel.status.error ? "CHECK FAILED" : (panel.status.rebootRequired ? "REBOOT REQUIRED" : "UP TO DATE")
+          titleColor: panel.status.error || panel.status.rebootRequired ? Color.accent : Color.popups.text
+          subtitle: panel.status.count + (panel.status.count === 1 ? " update available" : " updates available")
         }
 
         Text {

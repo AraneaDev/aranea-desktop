@@ -8,7 +8,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
-import qs.Ui
+import "../araneadev.shared" as Aranea
 import "OsdModel.js" as OsdModel
 
 Item {
@@ -144,7 +144,7 @@ Item {
     exclusionMode: ExclusionMode.Ignore
     mask: Region {}
 
-    BorderSurface {
+    Aranea.SurfaceCard {
       id: card
       property real revealOffset: root.opened ? 0 : Style.space(8)
       width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
@@ -152,8 +152,10 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.bottom: parent.bottom
       anchors.bottomMargin: Style.space(62)
-      color: Util.alpha(Color.background, 0.9)
-      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(1)))
+      fillColor: Util.alpha(Color.background, 0.9)
+      surface: "popups"
+      borderColor: Color.popups.border
+      borderWidth: Math.max(1, Style.space(1))
       radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
       transform: Translate {

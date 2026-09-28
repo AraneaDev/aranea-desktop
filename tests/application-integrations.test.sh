@@ -9,6 +9,7 @@ source "$repo_root/tests/lib/sandbox.sh"
 
 for file in \
   "$repo_root/integrations/browser/README.md" \
+  "$repo_root/integrations/aranea-colors.css" \
   "$repo_root/integrations/browser/firefox/userChrome.css" \
   "$repo_root/integrations/browser/firefox/userContent.css" \
   "$repo_root/integrations/browser/chromium/new-tab/index.html" \
@@ -40,8 +41,9 @@ grep -Fq 'Aranea' "$repo_root/integrations/browser/chromium/new-tab/index.html"
 grep -Fq 'aranea-primary.svg' "$repo_root/integrations/session/omarchy.css"
 grep -Fq 'aranea-glyph.svg' "$repo_root/integrations/browser/aranea.css"
 grep -Fq 'CEREMONY' "$repo_root/branding/glyphs/theme-change.txt"
-grep -Fq '#3bff9e' "$repo_root/integrations/session/omarchy.css"
-grep -Fq '#7a5cff' "$repo_root/integrations/media/pavucontrol.css"
+grep -Fq '@import "aranea-colors.css"' "$repo_root/integrations/session/omarchy.css"
+grep -Fq 'var(--aranea-focus)' "$repo_root/integrations/media/pavucontrol.css"
+grep -Fq -- '--aranea-accent: #3bff9e;' "$repo_root/integrations/aranea-colors.css"
 if about_output="$("$repo_root/scripts/aranea-about" 2>&1)"; then
   :
 else
@@ -59,14 +61,17 @@ printf '%s\n' "$browser_output"
 # firefox and chromium are guard stubs, so both are always planned.
 grep -Fq 'browser/firefox/userChrome.css' <<<"$browser_output"
 grep -Fq 'browser/chromium/new-tab/index.html' <<<"$browser_output"
+grep -Fq 'integrations/aranea-colors.css' <<<"$browser_output"
 
 session_output="$("$repo_root/scripts/install-integration" session --dry-run)"
 printf '%s\n' "$session_output"
 grep -Fq 'session/omarchy.css' <<<"$session_output"
+grep -Fq 'integrations/aranea-colors.css' <<<"$session_output"
 
 media_output="$("$repo_root/scripts/install-integration" media --dry-run)"
 printf '%s\n' "$media_output"
 grep -Fq 'media/pavucontrol.css' <<<"$media_output"
+grep -Fq 'integrations/aranea-colors.css' <<<"$media_output"
 
 # --- 4d: the README says how to run the helper scripts
 for script in aranea-motion aranea-doctor aranea-integrations aranea-wallpaper aranea-about uninstall.sh; do

@@ -1,0 +1,16 @@
+[General]
+Name=Aranea
+Comment=Obsidian surfaces with mint activity and violet focus
+Author=AraneaDev
+
+[Colors]
+BackgroundNormal={{colors.background}}
+ForegroundNormal={{colors.bright_foreground}}
+BackgroundAlternate={{colors.surface_raised}}
+ForegroundInactive={{colors.dark_foreground}}
+Highlight={{colors.selection}}
+HighlightedText={{colors.accent}}
+FocusColor={{colors.accent_secondary}}
+PositiveText={{colors.accent}}
+NegativeText={{colors.red}}
+WarningText={{colors.yellow}}

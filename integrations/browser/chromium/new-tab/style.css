@@ -1,11 +1,13 @@
+@import "../../../aranea-colors.css";
+
 :root {
   color-scheme: dark;
-  --background: #08090b;
-  --surface: #141821;
-  --foreground: #e7ecf3;
-  --muted: #8b96a6;
-  --accent: #3bff9e;
-  --focus: #7a5cff;
+  --background: var(--aranea-background);
+  --surface: var(--aranea-surface);
+  --foreground: var(--aranea-foreground);
+  --muted: var(--aranea-muted);
+  --accent: var(--aranea-accent);
+  --focus: var(--aranea-focus);
 }
 
 * { box-sizing: border-box; }

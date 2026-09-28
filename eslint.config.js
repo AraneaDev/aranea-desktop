@@ -53,6 +53,11 @@ module.exports = [
     languageOptions: { ecmaVersion: 2023, sourceType: "commonjs", globals: { ...globals.node } },
     rules: { ...js.configs.recommended.rules }
   },
+  {
+    files: ["tools/**/*.mjs"],
+    languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
+    rules: { ...js.configs.recommended.rules }
+  },
   ...(docs
     ? [
         {
@@ -73,7 +78,7 @@ module.exports = [
           }
         },
         {
-          files: ["tests/js/**/*.js", "tools/**/*.js", "eslint.config.js"],
+          files: ["tests/js/**/*.js", "tools/**/*.js", "tools/**/*.mjs", "eslint.config.js"],
           plugins: { jsdoc },
           rules: {
             "jsdoc/require-jsdoc": ["error", { require: { FunctionDeclaration: true } }],

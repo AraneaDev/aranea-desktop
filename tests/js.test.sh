@@ -7,5 +7,5 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 
 cd "$repo_root"
-node --test tests/js/
+node --test --test-concurrency=1 tests/js/
 echo "js logic contract passed"

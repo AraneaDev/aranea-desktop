@@ -1,0 +1,18 @@
+# Aranea Starship prompt. Keep prompt structure quiet; accents carry state.
+format = "$directory$git_branch$git_status$cmd_duration$line_break$character"
+[directory]
+style = "fg:{{colors.accent}}"
+[git_branch]
+style = "fg:{{colors.accent_secondary}}"
+format = " [$symbol$branch]($style)"
+[git_status]
+style = "fg:{{colors.yellow}}"
+format = "([$all_status$ahead_behind]($style))"
+[cmd_duration]
+min_time = 2000
+style = "fg:{{colors.dark_foreground}}"
+format = " [$duration]($style)"
+[character]
+success_symbol = "[❯](fg:{{colors.accent}})"
+error_symbol = "[❯](fg:{{colors.red}})"
+vimcmd_symbol = "[❮](fg:{{colors.accent_secondary}})"

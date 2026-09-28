@@ -1,0 +1,29 @@
+# Aranea lazygit colors
+gui:
+  theme:
+    activeBorderColor:
+      - "{{colors.accent}}"
+      - bold
+    inactiveBorderColor:
+      - "{{colors.muted}}"
+    searchingActiveBorderColor:
+      - "{{colors.accent_secondary}}"
+      - bold
+    optionsTextColor:
+      - "{{colors.cyan}}"
+    selectedLineBgColor:
+      - "{{colors.selection}}"
+    inactiveViewSelectedLineBgColor:
+      - "{{colors.lighter_background}}"
+    cherryPickedCommitBgColor:
+      - "{{colors.selection}}"
+    cherryPickedCommitFgColor:
+      - "{{colors.accent}}"
+    markedBaseCommitBgColor:
+      - "{{colors.lighter_background}}"
+    markedBaseCommitFgColor:
+      - "{{colors.accent_secondary}}"
+    unstagedChangesColor:
+      - "{{colors.yellow}}"
+    defaultFgColor:
+      - "{{colors.foreground}}"

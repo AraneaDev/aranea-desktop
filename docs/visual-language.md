@@ -37,5 +37,11 @@ active, and attention glyphs use the same visual grammar as menu motifs and
 network lines. Keep the mark optically consistent across branding, cursor,
 lock, idle, and boot surfaces.
 
-The source tokens live in `colors.toml` and `shell.toml`; stable wallpaper IDs
-live in `backgrounds/manifest.toml`.
+The canonical design tokens live in `design/tokens.toml`. The checked-in
+`colors.toml`, `shell.toml`, and shared QML token projection are generated
+outputs; update the source and run `scripts/generate-tokens --write` instead
+of editing those projections directly. GTK, terminal, developer-tool, Cava,
+cursor, icon, and Qt palette outputs follow the same generation path. Cursor
+families intentionally share one geometry source so Xcursor and Hyprcursor
+variants stay visually identical. Stable wallpaper IDs live in
+`backgrounds/manifest.toml`.

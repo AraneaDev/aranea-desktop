@@ -6,8 +6,8 @@
   </g>
   <defs>
     <linearGradient id="g" x1="0" y1="1" x2="1" y2="0">
-      <stop stop-color="#7DFFC0"/>
-      <stop offset="1" stop-color="#10F0D0"/>
+      <stop stop-color="#7dffc0"/>
+      <stop offset="1" stop-color="#5ce0c6"/>
     </linearGradient>
   </defs>
   <!-- Same silhouette as branding/marks/aranea-primary.svg, recentered into

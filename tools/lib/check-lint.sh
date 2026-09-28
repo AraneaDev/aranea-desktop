@@ -28,7 +28,7 @@ stage_lint() {
   if ((${#files[@]})); then
     (cd "$check_root" && shellcheck -x -- "${files[@]}") || status=1
   fi
-  mapfile -t files < <(check_files '\.js$')
+  mapfile -t files < <(check_files '\.js$' '\.mjs$')
   if ((${#files[@]})); then
     (cd "$check_root" && "$(node_bin)/eslint" --no-warn-ignored -c "$repo_root/eslint.config.js" -- "${files[@]}") || status=1
   fi
