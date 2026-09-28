@@ -29,8 +29,10 @@ EOF
 
 jq -e '.bar.id == "araneadev.bar"' "$config" >/dev/null
 jq -e '([.disabledPlugins[]] | sort) == (["omarchy.bar", "omarchy.clipboard", "omarchy.emojis", "omarchy.lock", "omarchy.menu", "omarchy.notifications", "omarchy.osd", "omarchy.polkit"] | sort)' "$config" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit"] | sort)' "$config" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config" >/dev/null
 grep -Fq 'araneadev.health' "$repo_root/scripts/deploy-plugins-safely"
+grep -Fq 'araneadev.updates' "$repo_root/scripts/deploy-plugins-safely"
+grep -Fq 'araneadev.workspaces' "$repo_root/scripts/deploy-plugins-safely"
 jq -e '.bar.position == "top" and .unrelated.keep == true' "$config" >/dev/null
 
 grep -Fq 'repair-shell-config' "$repo_root/hooks/theme-set"
@@ -169,6 +171,15 @@ test -f "$hparked"
 "$repo_root/scripts/repair-shell-config" "$config"
 jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.health") != null' "$config" >/dev/null
 test ! -e "$hparked"
+
+# --- workspace overview and update center replace their stock bar entries
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"left": ["omarchy.menu", "omarchy.workspaces"], "right": [{"id": "omarchy.system-update"}, {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.left[1] == "araneadev.workspaces" and .bar.layout.right[0].id == "araneadev.updates"' "$config" >/dev/null
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.left[1] == "omarchy.workspaces" and .bar.layout.right[0].id == "omarchy.system-update"' "$config" >/dev/null
 
 # --- pickers: stock pickers stay disabled on Aranea and come back elsewhere
 "$repo_root/scripts/repair-shell-config" "$config"

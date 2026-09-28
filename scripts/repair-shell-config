@@ -66,11 +66,16 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
-  # The Aranea menu takes the place of the stock menu entry (release hands it back).
+  # Aranea bar widgets take the place of their stock entries (release hands
+  # them back), while preserving the user layout position and inline settings.
   | (if (.bar.layout | type) == "object" then
        .bar.layout |= with_entries(.value |= (if type == "array" then
          map(if type == "string" then (if . == "omarchy.menu" then "araneadev.menu" else . end)
+             | if . == "omarchy.workspaces" then "araneadev.workspaces" else . end
+             | if . == "omarchy.system-update" then "araneadev.updates" else . end
              elif type == "object" and .id == "omarchy.menu" then .id = "araneadev.menu"
+             elif type == "object" and .id == "omarchy.workspaces" then .id = "araneadev.workspaces"
+             elif type == "object" and .id == "omarchy.system-update" then .id = "araneadev.updates"
              else . end)
        else . end))
      else . end)
@@ -81,7 +86,9 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
       {id: "araneadev.clipboard"},
       {id: "araneadev.emojis"},
       {id: "araneadev.osd"},
-      {id: "araneadev.polkit"}
+      {id: "araneadev.polkit"},
+      {id: "araneadev.workspaces"},
+      {id: "araneadev.updates"}
     ] | dedupe_by_id)
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",

@@ -70,6 +70,17 @@ Example `shell.json` (bar subtree only shown):
 | `omarchy.bluetooth` | Bluetooth icon + popup with device list, connect/disconnect, battery | left = popup · right = toggle radio |
 | `omarchy.monitor` | Brightness and laptop display controls | left = popup |
 
+Aranea replaces the stock workspace and update entries with two compact
+widgets when the shell configuration is repaired:
+
+| Name                   | What it does                                                                                                                   | Interactions                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `araneadev.workspaces` | Standard workspaces 1–5 in the bar, with meaningful workspaces in the overview; urgent workspaces use the active warning color | icon = overview · number = focus workspace · middle = focus active · scroll = previous/next |
+| `araneadev.updates`    | Available update count with grouped sources and reboot state in its native panel                                               | left = panel · right = open updater                                                         |
+
+The update center delegates installation to `omarchy-update`; it does not
+install packages inside the bar.
+
 The `omarchy.indicators` widget loads individual bar indicators from `indicators/`. Omit `items` (or set it to an empty array) to show all indicators in the default order, or set `items` to a subset such as `["Dnd", "Reminder", "NightLight"]`. Set `alwaysShow` to `true` to keep inactive indicators visible instead of revealing them only on hover. Multiple `omarchy.indicators` instances are allowed, so different sections can show different subsets.
 
 ## Orientation

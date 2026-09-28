@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.workspaces",
+  "name": "Workspace overview",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Compact active and occupied workspace overview",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Workspace overview",
+    "description": "Active workspace and occupied workspace dots",
+    "category": "Compositor",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}

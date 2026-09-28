@@ -166,3 +166,26 @@
 1	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
 7	plugins/araneadev.polkit/PolkitWindow.qml:unqualified:Unqualified access
+2	plugins/araneadev.updates/BarWidget.qml:unqualified:Unqualified access
+2	plugins/araneadev.updates/BarWidget.qml:unused-imports:Unused import
+1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "cursorIndex" not found on type "QQuickItem"
+1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "workspaceStates" not found on type "QQuickItem"
+1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "focusWorkspace" not found on type "QQuickItem"
+1	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "subtitle" not found on type "QObject"
+2	plugins/araneadev.updates/Service.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+1	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "title" not found on type "QObject"
+1	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "title" not found on type "QObject"
+8	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "family" not found on type "QObject"
+11	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "family" not found on type "QObject"
+6	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "caption" not found on type "QObject"
+3	plugins/araneadev.updates/UpdatePanel.qml:unqualified:Unqualified access
+8	plugins/araneadev.workspaces/BarWidget.qml:unqualified:Unqualified access
+1	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "subtitle" not found on type "QObject"
+1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.workspaces/WorkspacePanelHost.qml:unqualified:Unqualified access
+15	plugins/araneadev.workspaces/WorkspacePanel.qml:unqualified:Unqualified access
+13	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "text" not found on type "QObject"
+10	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "text" not found on type "QObject"
+4	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "title" not found on type "QObject"
+5	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "body" not found on type "QObject"
