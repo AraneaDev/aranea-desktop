@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.5.0...v2.6.0) (2026-09-28)
+
+
+### Features
+
+* centralize design tokens and shared UI ([5c9b3d0](https://github.com/AraneaDev/aranea-desktop/commit/5c9b3d0dce9c9efe6621e138a32b8f915a654895))
+
 ## [2.5.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.4.0...v2.5.0) (2026-09-28)
 
 
