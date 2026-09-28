@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.3.0...v2.3.1) (2026-09-28)
+
+
+### Fixes
+
+* quality hardening of plugins, scripts, tooling, docs and tests ([#53](https://github.com/AraneaDev/aranea-desktop/issues/53)) ([f4df70d](https://github.com/AraneaDev/aranea-desktop/commit/f4df70d723ce17c6b89e0b24352e8183e0103bbe))
+* release PRs pass the format check; JSDoc types work with TypeScript 7 ([0b4a728](https://github.com/AraneaDev/aranea-desktop/commit/0b4a7281f1ecdee009de35307b8b3ff0a1f974a8))
+
 ## [2.3.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.2.0...v2.3.0) (2026-09-27)
 
 
