@@ -123,6 +123,12 @@ EOF
   local status=0
   if [[ ! -s "$run/client.log" ]] || ! grep -q 'SMOKE-LOADED\|SMOKE-ERROR' "$run/client.log"; then
     echo "smoke harness did not run (sway exit $sway_status); logs kept in $run (rm -rf it when done)"
+    # The logs stay on the machine, which in CI means they are lost: show
+    # why the compositor did not start.
+    if [[ -s "$run/sway.log" ]]; then
+      echo "last lines of sway.log:"
+      tail -n 15 "$run/sway.log" | sed 's/^/  /'
+    fi
     return 1
   fi
   local client_exit

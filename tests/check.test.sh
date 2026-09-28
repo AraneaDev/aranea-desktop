@@ -121,7 +121,8 @@ for needle in plugins/x/a.js docs/jump.md w.yml; do grep -Fq "$needle" "$ARANEA_
   exit 1
 }; done
 git reset -q --hard
-# qml: a syntax error always fails.
+# qml: a syntax error always fails, naming the file; without qmllint (the
+# Ubuntu CI job) the stage fails loudly instead of passing.
 mkdir -p plugins/q
 printf 'import QtQuick\nItem {\n  width: 10 +\n}\n' >plugins/q/Bad.qml
 git add -A
@@ -129,7 +130,11 @@ if run_check --only qml; then
   echo "qml passed a syntax error" >&2
   exit 1
 fi
-grep -Fq 'plugins/q/Bad.qml' "$ARANEA_TEST_SANDBOX/out" || {
+qml_expect='plugins/q/Bad.qml'
+if ! command -v qmllint >/dev/null && [[ ! -x /usr/lib/qt6/bin/qmllint ]]; then
+  qml_expect='qmllint is required'
+fi
+grep -Fq "$qml_expect" "$ARANEA_TEST_SANDBOX/out" || {
   cat "$ARANEA_TEST_SANDBOX/out"
   exit 1
 }
