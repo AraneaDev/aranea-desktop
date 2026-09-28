@@ -36,6 +36,28 @@ jq -e '.bar.id != "araneadev.bar"' "$HOME/.config/omarchy/shell.json" >/dev/null
 grep -Fq "gsettings set org.gnome.desktop.interface icon-theme 'Adwaita'" "$ARANEA_TEST_SANDBOX/guard.log"
 grep -Fq 'systemctl --user disable --now aranea-wallpaper-day-night.timer' "$ARANEA_TEST_SANDBOX/guard.log"
 
+json_output="$("$repo_root/scripts/uninstall.sh" --json --dry-run --yes --scope integration)"
+first_event=1
+last_event=''
+while IFS= read -r event; do
+  [[ -n "$event" ]] || continue
+  jq -e '.schema == 1 and .operation == "uninstall" and .timestamp and .event' <<<"$event" >/dev/null
+  if ((first_event)); then
+    jq -e '.event == "started" and .data.scope == "integration" and .data.dry_run == true' <<<"$event" >/dev/null
+    first_event=0
+  fi
+  last_event="$event"
+done <<<"$json_output"
+jq -e '.event == "completed" and .status == "ok"' <<<"$last_event" >/dev/null
+
+mkdir -p "$HOME/.config/omarchy/themes/aranea"
+"$repo_root/scripts/uninstall.sh" --json --yes --scope complete >/dev/null
+grep -Fq 'omarchy theme remove aranea' "$ARANEA_TEST_SANDBOX/guard.log"
+
+invalid_scope_status=0
+"$repo_root/scripts/uninstall.sh" --json --scope invalid >/dev/null 2>&1 || invalid_scope_status=$?
+[[ "$invalid_scope_status" == 2 ]]
+
 # A second run finds nothing to do and still succeeds.
 "$repo_root/scripts/uninstall.sh" --yes >/dev/null
 
