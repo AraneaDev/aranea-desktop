@@ -1,0 +1,22 @@
+# Aranea Kitty palette
+foreground {{colors.foreground}}
+background {{colors.background}}
+selection_foreground {{colors.foreground}}
+selection_background {{colors.selection}}
+cursor {{colors.accent}}
+color0 {{colors.darker_background}}
+color1 {{colors.red}}
+color2 {{colors.green}}
+color3 {{colors.yellow}}
+color4 {{colors.blue}}
+color5 {{colors.accent_secondary}}
+color6 {{colors.cyan}}
+color7 {{colors.light_foreground}}
+color8 {{colors.muted}}
+color9 {{colors.bright_red}}
+color10 {{colors.bright_green}}
+color11 {{colors.bright_yellow}}
+color12 {{colors.bright_blue}}
+color13 {{colors.bright_magenta}}
+color14 {{colors.bright_cyan}}
+color15 {{colors.bright_foreground}}

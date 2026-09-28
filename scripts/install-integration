@@ -70,18 +70,27 @@ cleanup_dirs=()
 trap 'rm -rf -- "${cleanup_dirs[@]}"' EXIT
 # Links TARGET to SOURCE via link_managed_file and reports it, or prints
 # the plan in dry-run.
+report_install() {
+  local action="$1" source="$2" target="$3"
+  if ((dry_run)); then
+    printf 'would %s %s -> %s\n' "$action" "$source" "$target"
+  elif [[ "$(last_ownership_action)" == kept ]]; then
+    printf 'kept your %s\n' "$target"
+  else
+    printf '%s %s -> %s\n' "$action" "$source" "$target"
+  fi
+}
+
+# Links TARGET to SOURCE via link_managed_file and reports it, or prints
+# the plan in dry-run.
 install_one() {
   local source="$1" target="$2"
   if ((dry_run)); then
-    printf 'would link %s -> %s\n' "$source" "$target"
+    report_install link "$source" "$target"
     return 0
   fi
   link_managed_file "$target" "$source"
-  if [[ "$(last_ownership_action)" == kept ]]; then
-    printf 'kept your %s\n' "$target"
-  else
-    printf 'linked %s -> %s\n' "$source" "$target"
-  fi
+  report_install linked "$source" "$target"
 }
 
 # Copies generated SOURCE to TARGET (mode 644), backing up and recording
@@ -89,13 +98,14 @@ install_one() {
 install_generated() {
   local source="$1" target="$2"
   if ((dry_run)); then
-    printf 'would copy %s -> %s\n' "$source" "$target"
+    report_install copy "$source" "$target"
   else
     backup_target "$target"
     mkdir -p "$(dirname "$target")"
     install -m644 "$source" "$target"
     record_managed_file "$target"
-    printf 'copied %s -> %s\n' "$source" "$target"
+    ownership_last_action=copied
+    report_install copied "$source" "$target"
   fi
 }
 
@@ -136,6 +146,7 @@ case "$integration" in
     fi
     ;;
   browser)
+    install_one "$repo_root/integrations/aranea-colors.css" "$config_root/aranea/aranea-colors.css"
     if command -v firefox >/dev/null 2>&1; then
       install_one "$repo_root/integrations/browser/firefox/userChrome.css" "$config_root/aranea/browser/firefox/userChrome.css"
       install_one "$repo_root/integrations/browser/firefox/userContent.css" "$config_root/aranea/browser/firefox/userContent.css"
@@ -146,6 +157,7 @@ case "$integration" in
     fi
     ;;
   session)
+    install_one "$repo_root/integrations/aranea-colors.css" "$config_root/omarchy/session/aranea-colors.css"
     install_one "$repo_root/integrations/session/omarchy.css" "$config_root/omarchy/session/aranea.css"
     ;;
   cursor)
@@ -272,6 +284,7 @@ case "$integration" in
     fi
     ;;
   media)
+    install_one "$repo_root/integrations/aranea-colors.css" "$config_root/aranea/media/aranea-colors.css"
     if command -v pavucontrol >/dev/null 2>&1 || command -v pwvucontrol >/dev/null 2>&1; then
       install_one "$repo_root/integrations/media/pavucontrol.css" "$config_root/aranea/media/pavucontrol.css"
     fi

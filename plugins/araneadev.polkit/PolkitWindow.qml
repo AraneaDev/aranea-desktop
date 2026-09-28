@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "PolkitLogic.js" as PolkitLogic
 
 PanelWindow {
@@ -155,17 +156,18 @@ PanelWindow {
     onClicked: panel.root.refocus()
   }
 
-  BorderSurface {
+  Aranea.SurfaceCard {
     id: card
     width: panel.cardWidth
     height: Math.min(content.implicitHeight + card.contentTopInset + card.contentBottomInset, panel.height - Style.gapsOut * 2)
-    radius: panel.root.cornerRadius
+    cornerRadius: panel.root.cornerRadius
     anchors.centerIn: parent
     anchors.horizontalCenterOffset: panel.root.shakeOffset
-    color: panel.root.background
-    borderSpec: panel.root.borderSpec
-    padding: panel.root.contentMargin
-    clip: true  // content never spills past the card on very short screens
+    fillColor: panel.root.background
+    borderSpecOverride: panel.root.borderSpec
+    contentPadding: panel.root.contentMargin
+    clipContent: true  // content never spills past the card on very short screens
+    clip: true
 
     MouseArea {
       anchors.fill: parent

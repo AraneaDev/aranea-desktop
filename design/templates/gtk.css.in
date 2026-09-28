@@ -1,0 +1,144 @@
+/* Aranea - GTK3/GTK4/Adwaita color overrides, matching colors.toml */
+
+@define-color background {{colors.background}};
+@define-color dark_background {{colors.dark_background}};
+@define-color darker_background {{colors.darker_background}};
+@define-color lighter_background {{colors.lighter_background}};
+@define-color surface {{colors.surface}};
+@define-color surface_raised {{colors.surface_raised}};
+@define-color surface_highlight {{colors.surface_highlight}};
+@define-color foreground {{colors.foreground}};
+@define-color dark_foreground {{colors.dark_foreground}};
+@define-color light_foreground {{colors.light_foreground}};
+@define-color accent {{colors.accent}};
+@define-color accent2 {{colors.accent_secondary}};
+@define-color ceremony {{colors.ceremony}};
+@define-color selection {{colors.selection}};
+@define-color red {{colors.red}};
+@define-color yellow {{colors.yellow}};
+@define-color green {{colors.green}};
+
+@define-color accent_bg_color @accent;
+@define-color accent_fg_color @background;
+@define-color accent_color @accent;
+@define-color window_bg_color @background;
+@define-color window_fg_color @foreground;
+@define-color view_bg_color @darker_background;
+@define-color view_fg_color @foreground;
+@define-color sidebar_bg_color @dark_background;
+@define-color sidebar_fg_color @foreground;
+@define-color sidebar_backdrop_color @dark_background;
+@define-color sidebar_shade_color @darker_background;
+@define-color headerbar_bg_color @background;
+@define-color headerbar_fg_color @foreground;
+@define-color headerbar_backdrop_color @dark_background;
+@define-color headerbar_shade_color @darker_background;
+@define-color card_bg_color @lighter_background;
+@define-color card_fg_color @foreground;
+@define-color popover_bg_color @dark_background;
+@define-color popover_fg_color @foreground;
+@define-color dialog_bg_color @background;
+@define-color dialog_fg_color @foreground;
+@define-color destructive_bg_color @red;
+@define-color destructive_fg_color @foreground;
+@define-color success_bg_color @green;
+@define-color success_fg_color @background;
+@define-color warning_bg_color @yellow;
+@define-color warning_fg_color @background;
+@define-color error_bg_color @red;
+@define-color error_fg_color @foreground;
+@define-color borders alpha(@surface_highlight, 0.72);
+@define-color unfocused_borders alpha(@foreground, 0.06);
+@define-color theme_fg_color @foreground;
+@define-color theme_text_color @foreground;
+@define-color theme_bg_color @background;
+@define-color theme_base_color @darker_background;
+@define-color theme_selected_bg_color @selection;
+@define-color theme_selected_fg_color @accent;
+@define-color theme_unfocused_fg_color @dark_foreground;
+@define-color theme_unfocused_bg_color @background;
+@define-color theme_unfocused_base_color @darker_background;
+@define-color theme_unfocused_selected_bg_color @selection;
+@define-color theme_unfocused_selected_fg_color @accent;
+@define-color insensitive_fg_color @dark_foreground;
+@define-color insensitive_bg_color @background;
+@define-color insensitive_base_color @darker_background;
+@define-color link_color @accent2;
+@define-color visited_link_color @accent2;
+
+messagedialog, alertdialog.background {
+  background-color: @dialog_bg_color;
+  color: @dialog_fg_color;
+}
+
+alertdialog .titlebar,
+messagedialog .titlebar {
+  background-color: @headerbar_bg_color;
+  color: @headerbar_fg_color;
+}
+
+toast {
+  background-color: @dark_background;
+  color: @foreground;
+  border: 1px solid alpha(@foreground, 0.16);
+  box-shadow: 0 8px 24px alpha(#000000, 0.34);
+}
+
+button,
+togglebutton,
+spinbutton,
+entry,
+dropdown,
+combobox button,
+scale trough {
+  border-radius: 8px;
+}
+
+button:hover,
+togglebutton:hover,
+entry:focus,
+spinbutton:focus,
+dropdown:focus,
+combobox button:focus {
+  outline: 1px solid alpha(@accent, 0.58);
+  outline-offset: -1px;
+}
+
+button.suggested-action,
+button:checked,
+togglebutton:checked {
+  background-color: @accent;
+  color: @background;
+}
+
+button.destructive-action {
+  background-color: alpha(@red, 0.18);
+  color: @bright_red;
+}
+
+selection,
+*:selected,
+row:selected,
+.view:selected,
+treeview.view:selected {
+  background-color: @selection;
+  color: @accent;
+}
+
+button.destructive-action:hover,
+button.destructive-action:focus {
+  background-color: alpha(@red, 0.28);
+  outline-color: @red;
+}
+
+popover.emoji-picker,
+popover.emoji-picker > contents,
+popover.emoji-picker > contents > box {
+  border: none;
+  box-shadow: none;
+}
+
+/* Sharp corners, matching the theme's Hyprland border style */
+* {
+  border-radius: 0;
+}

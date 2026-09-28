@@ -39,7 +39,7 @@ stage_format() {
     fi
   fi
 
-  mapfile -t files < <(check_files '\.js$' '\.json$' '\.md$' '\.ya?ml$')
+  mapfile -t files < <(check_files '\.js$' '\.mjs$' '\.json$' '\.md$' '\.ya?ml$')
   if ((${#files[@]})); then
     if ((fix)); then
       (cd "$check_root" && "$(node_bin)/prettier" --write --ignore-unknown --log-level warn -- "${files[@]}") || status=1

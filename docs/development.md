@@ -27,9 +27,36 @@ Run the repository quality gates:
 tools/check
 ```
 
+### Design tokens
+
+Edit `design/tokens.toml` to change the shared palette, shell surfaces,
+spacing, typography, or motion defaults. Regenerate the committed projections
+with `scripts/generate-tokens --write`; platform projections are templated in
+`design/templates/`, and `scripts/generate-tokens --check` is the drift check
+used by the token contract test.
+
+The GTK stylesheet and cursor families have explicit tokenized templates under
+`design/templates/gtk.css.in` and `design/templates/assets/`. The generator
+renders matching Xcursor and Hyprcursor files from the same cursor family
+source. Font-derived icon geometry remains owned by
+`scripts/generate-font-icon-theme`; its accent placeholder is resolved by the
+token generator before the committed SVG outputs are installed.
+
 The checks cover formatting, ShellCheck, Markdown, assets, QML, QML tests,
 shell contracts, JavaScript behavior, and smoke validation. Some visual or
 runtime checks require the Omarchy tooling available on the development host.
+
+### Shared QML components
+
+Use `plugins/araneadev.shared` for visual contracts that are identical across
+plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`, `StatusTextPair`, and
+`KeyboardPanelFrame`. Keep lifecycle, cursor, and plugin-specific interaction
+logic in the owning plugin rather than adding it to shared components.
+
+Generated asset outputs must not be edited directly. Change
+`design/tokens.toml` or the relevant template, run
+`scripts/generate-tokens --write`, and verify with
+`scripts/generate-tokens --check`.
 
 ## Showcase captures
 

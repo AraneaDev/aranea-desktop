@@ -1,0 +1,23 @@
+# Aranea Foot palette
+[colors]
+foreground={{colors.bright_foreground|hex}}
+background={{colors.background|hex}}
+selection-foreground={{colors.bright_foreground|hex}}
+selection-background={{colors.selection|hex}}
+cursor={{colors.background|hex}} {{colors.accent|hex}}
+regular0={{colors.darker_background|hex}}
+regular1={{colors.red|hex}}
+regular2={{colors.green|hex}}
+regular3={{colors.yellow|hex}}
+regular4={{colors.blue|hex}}
+regular5={{colors.accent_secondary|hex}}
+regular6={{colors.cyan|hex}}
+regular7={{colors.light_foreground|hex}}
+bright0={{colors.muted|hex}}
+bright1={{colors.bright_red|hex}}
+bright2={{colors.bright_green|hex}}
+bright3={{colors.bright_yellow|hex}}
+bright4={{colors.bright_blue|hex}}
+bright5={{colors.bright_magenta|hex}}
+bright6={{colors.bright_cyan|hex}}
+bright7={{colors.bright_foreground|hex}}

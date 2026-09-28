@@ -47,7 +47,7 @@ render_group() {
       printf '<title>Aranea Command Center %s glyph</title>\n' "$label"
       printf '<metadata>Source glyph U+%s from JetBrainsMono Nerd Font</metadata>\n' "$codepoint"
       sed -n '/<g transform=/,/<\/g>/p' "$tmp_dir/raw.svg" |
-        sed 's/fill="#000000" stroke="none"/fill="#3bff9e"/'
+        sed 's/fill="#000000" stroke="none"/fill="{{colors.accent}}"/'
       printf '</svg>\n'
     } >"$output"
   done

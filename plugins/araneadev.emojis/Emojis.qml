@@ -12,6 +12,7 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "EmojiSearch.js" as EmojiSearch
 import "EmojiLogic.js" as EmojiLogic
 
@@ -376,15 +377,15 @@ Item {
       onClicked: root.dismiss()
     }
 
-    BorderSurface {
+    Aranea.SurfaceCard {
       id: card
       width: root.cardWidth
       height: root.cardHeight
-      radius: root.cornerRadius
+      cornerRadius: root.cornerRadius
       anchors.centerIn: parent
-      color: root.background
-      borderSpec: root.borderSpec
-      padding: root.contentMargin
+      fillColor: root.background
+      borderSpecOverride: root.borderSpec
+      contentPadding: root.contentMargin
 
       MouseArea {
         anchors.fill: parent

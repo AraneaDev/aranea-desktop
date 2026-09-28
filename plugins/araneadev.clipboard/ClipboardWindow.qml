@@ -8,6 +8,7 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "ClipboardLogic.js" as ClipboardLogic
 
 PanelWindow {
@@ -102,15 +103,15 @@ PanelWindow {
     onClicked: panel.root.close()
   }
 
-  BorderSurface {
+  Aranea.SurfaceCard {
     id: card
     width: panel.cardWidth
     height: panel.cardHeight
-    radius: panel.root.cornerRadius
+    cornerRadius: panel.root.cornerRadius
     anchors.centerIn: parent
-    color: panel.root.background
-    borderSpec: panel.root.borderSpec
-    padding: panel.root.contentMargin
+    fillColor: panel.root.background
+    borderSpecOverride: panel.root.borderSpec
+    contentPadding: panel.root.contentMargin
 
     MouseArea {
       anchors.fill: parent

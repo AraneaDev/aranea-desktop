@@ -1,44 +1,42 @@
-# Aranea shell surfaces: a quiet, high-contrast instrument panel.
-
 [bar]
-background       = "#06090d"
+background = "#06090d"
 background-alpha = 0.82
-text             = "#edf3f6"
-active           = "#3bff9e"
-scale-with-font  = true
-size-horizontal  = 34
-size-vertical    = 34
+text = "#edf3f6"
+active = "#3bff9e"
+scale-with-font = true
+size-horizontal = 34
+size-vertical = 34
 
 [hyprland]
-active-border            = "rgba(3bff9ed0) rgba(7a5cffb0) 45deg"
+active-border = "rgba(3bff9ed0) rgba(7a5cffb0) 45deg"
 active-border-foreground = "rgba(3bff9ed0) rgba(7a5cffb0) 45deg"
 
 [controls]
-normal-color        = "#edf3f6"
-normal-fill-alpha   = 0.025
-normal-border       = "#edf3f6"
+normal-color = "#edf3f6"
+normal-fill-alpha = 0.025
+normal-border = "#edf3f6"
 normal-border-width = 1
 normal-border-alpha = 0.22
-hover-cursor-color        = "#edf3f6"
-hover-cursor-fill-alpha   = 0.08
-hover-cursor-border       = "#3bff9e"
+hover-cursor-color = "#edf3f6"
+hover-cursor-fill-alpha = 0.08
+hover-cursor-border = "#3bff9e"
 hover-cursor-border-width = 1
 hover-cursor-border-alpha = 0.55
-focus-color        = "#edf3f6"
-focus-fill-alpha   = 0.08
-focus-border       = "#3bff9e"
+focus-color = "#edf3f6"
+focus-fill-alpha = 0.08
+focus-border = "#3bff9e"
 focus-border-width = 1
 focus-border-alpha = 0.55
-selected-color        = "#edf3f6"
-selected-fill-alpha   = 0.16
-selected-border       = "#3bff9e"
+selected-color = "#edf3f6"
+selected-fill-alpha = 0.16
+selected-border = "#3bff9e"
 selected-border-width = 0
-selected-border-alpha = 1.0
-pressed-fill-alpha   = 0.22
+selected-border-alpha = 1
+pressed-fill-alpha = 0.22
 selection-fill-alpha = 0.35
 
 [spacing]
-scale = 1.0
+scale = 1
 scale-with-font = true
 control-gap = 8
 control-padding-x = 9
@@ -57,88 +55,88 @@ icon = 14
 icon-large = 18
 
 [popups]
-background       = "#0b1016"
+background = "#0b1016"
 background-alpha = 0.97
-text             = "#edf3f6"
-border           = "hyprland.active-border"
-border-alpha     = 1.0
+text = "#edf3f6"
+border = "hyprland.active-border"
+border-alpha = 1
 
 [tooltip]
-background       = "#0b1016"
+background = "#0b1016"
 background-alpha = 0.98
-text             = "#edf3f6"
-border           = "#33424b"
-border-alpha     = 0.86
+text = "#edf3f6"
+border = "#33424b"
+border-alpha = 0.86
 
 [notifications]
-background       = "#0b1016"
-background-alpha = 1.0
-text             = "#edf3f6"
-border           = "#33424b"
-border-alpha     = 0.9
-countdown        = "#3bff9e"
+background = "#0b1016"
+background-alpha = 1
+text = "#edf3f6"
+border = "#33424b"
+border-alpha = 0.9
+countdown = "#3bff9e"
 
 [launcher]
-background                = "#0b1016"
-background-alpha          = 0.98
-text                      = "#edf3f6"
-border                    = "#33424b"
-border-alpha              = 0.82
-scrim                     = "#06090d"
-scrim-alpha               = 0.5
-selected-background       = "#edf3f6"
+background = "#0b1016"
+background-alpha = 0.98
+text = "#edf3f6"
+border = "#33424b"
+border-alpha = 0.82
+scrim = "#06090d"
+scrim-alpha = 0.5
+selected-background = "#edf3f6"
 selected-background-alpha = 0.08
-selected-text             = "#3bff9e"
-selected-border           = "hyprland.active-border-foreground"
-selected-border-alpha     = 0.25
+selected-text = "#3bff9e"
+selected-border = "hyprland.active-border-foreground"
+selected-border-alpha = 0.25
 
 [menu]
-background                = "#0b1016"
-background-alpha          = 0.98
-text                      = "#edf3f6"
-border                    = "hyprland.active-border"
-border-alpha              = 1.0
-scrim                     = "#06090d"
-scrim-alpha               = 0.5
-context-text              = "#8b96a6"
-tile-background           = "#121a20"
-footer-text               = "#8b96a6"
-node-alpha                = 0.35
-selected-background       = "#edf3f6"
+background = "#0b1016"
+background-alpha = 0.98
+text = "#edf3f6"
+border = "hyprland.active-border"
+border-alpha = 1
+scrim = "#06090d"
+scrim-alpha = 0.5
+context-text = "#8b96a6"
+tile-background = "#121a20"
+footer-text = "#8b96a6"
+node-alpha = 0.35
+selected-background = "#edf3f6"
 selected-background-alpha = 0.08
-selected-text             = "#3bff9e"
-selected-border           = "hyprland.active-border-foreground"
-selected-border-alpha     = 0.25
+selected-text = "#3bff9e"
+selected-border = "hyprland.active-border-foreground"
+selected-border-alpha = 0.25
 
 [polkit]
-background       = "#0b1016"
-background-alpha = 1.0
-text             = "#edf3f6"
-text-error       = "#ff5f56"
-border           = "hyprland.active-border"
-border-error     = "#ff5f56"
-border-alpha     = 1.0
-scrim            = "#06090d"
-scrim-alpha      = 0.5
+background = "#0b1016"
+background-alpha = 1
+text = "#edf3f6"
+text-error = "#ff5f56"
+border = "hyprland.active-border"
+border-error = "#ff5f56"
+border-alpha = 1
+scrim = "#06090d"
+scrim-alpha = 0.5
 
 [lock]
-background       = "#06090d"
+background = "#06090d"
 background-alpha = 0.86
-text             = "#edf3f6"
-placeholder      = "#8b96a6"
-text-error       = "#ff5f56"
-border           = "#33424b"
-border-active    = "#3bff9e"
-border-error     = "#ff5f56"
-border-alpha     = 1.0
-selection        = "#3bff9e"
-selection-alpha  = 0.45
+text = "#edf3f6"
+placeholder = "#8b96a6"
+text-error = "#ff5f56"
+border = "#33424b"
+border-active = "#3bff9e"
+border-error = "#ff5f56"
+border-alpha = 1
+selection = "#3bff9e"
+selection-alpha = 0.45
 
 [image-picker]
-scrim                   = "#06090d"
-scrim-alpha             = 0.5
-text                    = "#edf3f6"
-selected-border         = "#3bff9e"
-selected-border-alpha   = 1.0
-unselected-border       = "#edf3f6"
+scrim = "#06090d"
+scrim-alpha = 0.5
+text = "#edf3f6"
+selected-border = "#3bff9e"
+selected-border-alpha = 1
+unselected-border = "#edf3f6"
 unselected-border-alpha = 0.28

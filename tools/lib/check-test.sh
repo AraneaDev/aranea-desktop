@@ -74,7 +74,7 @@ stage_test() {
     local lcov floors="$repo_root/tools/baselines/coverage.txt" current
     lcov="$(mktemp)"
     current="$(mktemp)"
-    (cd "$check_root" && node --test --experimental-test-coverage \
+    (cd "$check_root" && node --test --test-concurrency=1 --experimental-test-coverage \
       --test-reporter=spec --test-reporter-destination=stdout \
       --test-reporter=lcov --test-reporter-destination="$lcov" tests/js/) || status=1
     coverage_by_module "$lcov" >"$current"

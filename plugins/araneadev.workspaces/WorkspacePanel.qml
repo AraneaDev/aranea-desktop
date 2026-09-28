@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: panel
@@ -28,47 +29,12 @@ Item {
     anchors.fill: parent
     spacing: Style.space(8)
 
-    RowLayout {
+    Aranea.PanelHeader {
       Layout.fillWidth: true
-
-      Text {
-        text: "Workspace overview"
-        color: Color.popups.text
-        font.pixelSize: Style.font.title
-        font.bold: true
-        font.family: Style.font.family
-        Layout.fillWidth: true
-      }
-
-      Text {
-        text: "CYCLE  ·  FOCUS"
-        color: Color.popups.text
-        opacity: 0.75
-        font.pixelSize: Style.font.caption
-        font.family: Style.font.family
-      }
-    }
-
-    Text {
-      text: "ENTER FOCUS  ·  WHEEL CYCLE  ·  ESC CLOSE"
-      color: Color.popups.text
-      opacity: 0.5
-      font.pixelSize: Style.font.caption
-      font.family: Style.font.family
-    }
-
-    Rectangle {
-      Layout.fillWidth: true
-      Layout.preferredHeight: 1
-      color: Util.alpha(Color.popups.text, 0.16)
-    }
-
-    Text {
-      text: "WORKSPACES  ·  " + panel.workspaceStates.length
-      color: Color.popups.text
-      opacity: 0.7
-      font.pixelSize: Style.font.caption
-      font.family: Style.font.family
+      title: "Workspace overview"
+      hint: "CYCLE  ·  FOCUS"
+      hintText: "ENTER FOCUS  ·  WHEEL CYCLE  ·  ESC CLOSE"
+      section: "WORKSPACES  ·  " + panel.workspaceStates.length
     }
 
     Repeater {
@@ -80,11 +46,10 @@ Item {
         Layout.preferredHeight: Style.space(50)
         color: panel.cursorIndex === index || rowArea.containsMouse ? Util.alpha(Color.popups.text, 0.06) : "transparent"
 
-        Rectangle {
-          width: Style.space(2)
+        Aranea.StatusRail {
           anchors.top: parent.top
           anchors.bottom: parent.bottom
-          color: modelData.urgent ? Color.accent : (modelData.active ? Color.accent : Util.alpha(Color.popups.text, 0.25))
+          railColor: modelData.urgent ? Color.accent : (modelData.active ? Color.accent : Util.alpha(Color.popups.text, 0.25))
         }
 
         RowLayout {
@@ -93,27 +58,14 @@ Item {
           anchors.rightMargin: Style.space(14)
           spacing: Style.space(12)
 
-          ColumnLayout {
+          Aranea.StatusTextPair {
             Layout.fillWidth: true
-            spacing: 0
-
-            Text {
-              text: "WORKSPACE " + modelData.name
-              color: modelData.active ? Color.accent : Color.popups.text
-              font.bold: modelData.active
-              font.pixelSize: Style.font.subtitle
-              font.family: Style.font.family
-            }
-
-            Text {
-              text: modelData.windowLabels && modelData.windowLabels.length > 0 ? modelData.windowLabels.join("  ·  ") : (modelData.windows > 0 ? "OPEN WINDOWS" : "EMPTY")
-              color: Color.popups.text
-              opacity: 0.55
-              font.pixelSize: Style.font.caption
-              font.family: Style.font.family
-              elide: Text.ElideRight
-              Layout.fillWidth: true
-            }
+            title: "WORKSPACE " + modelData.name
+            titleColor: modelData.active ? Color.accent : Color.popups.text
+            titleBold: modelData.active
+            subtitle: modelData.windowLabels && modelData.windowLabels.length > 0 ? modelData.windowLabels.join("  ·  ") : (modelData.windows > 0 ? "OPEN WINDOWS" : "EMPTY")
+            subtitleSize: Style.font.caption
+            subtitleElide: Text.ElideRight
           }
 
           Text {

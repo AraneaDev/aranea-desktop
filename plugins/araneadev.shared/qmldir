@@ -1,0 +1,7 @@
+singleton DesignTokens 1.0 DesignTokens.qml
+OverlayChrome 1.0 OverlayChrome.qml
+SurfaceCard 1.0 SurfaceCard.qml
+PanelHeader 1.0 PanelHeader.qml
+StatusRail 1.0 StatusRail.qml
+StatusTextPair 1.0 StatusTextPair.qml
+KeyboardPanelFrame 1.0 KeyboardPanelFrame.qml

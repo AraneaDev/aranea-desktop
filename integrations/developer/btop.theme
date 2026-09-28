@@ -1,5 +1,5 @@
 # Aranea btop theme
-theme[main_bg]="#080b0f"
+theme[main_bg]="#08090b"
 theme[main_fg]="#edf3f6"
 theme[title]="#3bff9e"
 theme[hi_fg]="#7dffc0"

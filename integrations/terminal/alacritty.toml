@@ -1,18 +1,15 @@
 # Aranea terminal palette; link this file into an Alacritty import list.
 [colors.primary]
-background = '#080b0f'
+background = '#08090b'
 foreground = '#edf3f6'
-
 [colors.cursor]
-text = '#080b0f'
+text = '#08090b'
 cursor = '#3bff9e'
-
 [colors.selection]
 text = '#edf3f6'
 background = '#163326'
-
 [colors.normal]
-black = '#050609'
+black = '#030405'
 red = '#ff5f56'
 green = '#3bff9e'
 yellow = '#ffbd2e'
@@ -20,7 +17,6 @@ blue = '#5b8cff'
 magenta = '#7a5cff'
 cyan = '#5ce0c6'
 white = '#c7d0db'
-
 [colors.bright]
 black = '#3a4250'
 red = '#ff8a80'
