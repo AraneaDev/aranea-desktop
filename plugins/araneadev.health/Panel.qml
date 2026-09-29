@@ -233,7 +233,9 @@ Panel {
           cursor: root.cursor
           statusColor: root.statusColor
           amber: root.amber
-          onProblemActivated: function (problem) { root.runRow(problem) }
+          onProblemActivated: function (problem) {
+            root.runRow(problem)
+          }
         }
 
         // CPU
