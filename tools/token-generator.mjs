@@ -9,6 +9,26 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const sourcePath = path.join(root, "design/tokens.toml")
 const brandSourcePath = path.join(root, "design/brand.toml")
 const rasterizer = process.env.ARANEA_RSVG_CONVERT || "rsvg-convert"
+const pngSignature = Buffer.from("89504e470d0a1a0a", "hex")
+
+function canonicalPng(png) {
+  if (!png.subarray(0, pngSignature.length).equals(pngSignature))
+    throw new Error("cannot canonicalize a non-PNG image")
+  const chunks = [pngSignature]
+  let offset = pngSignature.length
+  while (offset < png.length) {
+    if (offset + 12 > png.length) throw new Error("truncated PNG chunk")
+    const length = png.readUInt32BE(offset)
+    const end = offset + 12 + length
+    if (end > png.length) throw new Error("truncated PNG data")
+    const type = png.subarray(offset + 4, offset + 8)
+    // Keep critical chunks (whose first type byte is uppercase) and drop
+    // rasterizer-specific ancillary metadata such as bKGD and tIME.
+    if ((type[0] & 0x20) === 0) chunks.push(png.subarray(offset, end))
+    offset = end
+  }
+  return Buffer.concat(chunks)
+}
 
 function flattenTokens(value, prefix = "", output = {}) {
   for (const [key, child] of Object.entries(value)) {
@@ -255,7 +275,7 @@ function renderBrandRaster(brand, tokens, markSvg, width, height, filename) {
     execFileSync(rasterizer, ["-w", String(width), "-h", String(height), "-o", output, input], {
       stdio: "ignore"
     })
-    return fs.readFileSync(output)
+    return canonicalPng(fs.readFileSync(output))
   } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true })
   }
@@ -273,7 +293,7 @@ function renderBrandAssets(brand, tokens) {
     })
     return new Map([
       ["branding/brand.svg", markSvg],
-      ["unlock.png", fs.readFileSync(output)],
+      ["unlock.png", canonicalPng(fs.readFileSync(output))],
       [
         "branding/screens/lock.png",
         renderBrandRaster(brand, tokens, markSvg, 3840, 2160, "lock.png")
@@ -534,6 +554,7 @@ export {
   renderBrandQml,
   renderBrandText,
   renderBrandAssets,
+  canonicalPng,
   validateBrand,
   renderShellToml,
   validateTokens

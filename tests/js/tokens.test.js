@@ -119,6 +119,17 @@ test("renderBrandShellEnv produces shell-safe visible identity values", async ()
   assert.match(output, /^BRAND_SHORT_NAME='EXAMPLE'$/m)
 })
 
+test("canonicalPng removes rasterizer-specific ancillary chunks", async () => {
+  const { canonicalPng } = await generatorPromise
+  const fs = require("node:fs")
+  const png = fs.readFileSync("branding/screens/plymouth.png")
+  const ancillary = Buffer.from("0000000662474b4400ff00ff00ff00000000", "hex")
+  const withMetadata = Buffer.concat([png.subarray(0, 33), ancillary, png.subarray(33)])
+  const canonical = canonicalPng(withMetadata)
+  assert.equal(canonical.includes(Buffer.from("bKGD")), false)
+  assert.equal(canonical.subarray(0, 8).equals(png.subarray(0, 8)), true)
+})
+
 test("renderTemplate supports format-specific projections", async () => {
   const { renderTemplate } = await generatorPromise
   assert.equal(
