@@ -129,6 +129,31 @@ scripts/capture-screenshots --all --output screenshots
 Lock and Plymouth use canonical artwork renders; the capture workflow should
 not lock the active session or reboot the machine.
 
+## Tracking upstream
+
+Eight plugins are forks of Omarchy's first-party shell plugins (their
+manifests set `omarchy.clonedFrom`), and every plugin depends on Omarchy's
+shell modules. `.omarchy-version` pins the Omarchy release they were last
+brought up to date with. `tools/upstream-drift` reports what changed upstream
+since that pin:
+
+```bash
+tools/upstream-drift                # Markdown: commits and diffstat per path
+tools/upstream-drift --diff         # with the full upstream diff per path
+tools/upstream-drift --json         # one JSON document, "drift" true or false
+tools/upstream-drift --to quattro   # against a branch (Omarchy develops on quattro) or tag
+```
+
+It watches `shell/plugins/<name>` for each fork and `shell/Commons`,
+`shell/Ui`, `shell/services` and `shell/shell.qml` for everyone. The forks
+are decomposed differently from upstream, so there is no merge: read each
+commit, port its intent into the matching Aranea files, run `tools/check`,
+and bump `.omarchy-version` in the same pull request.
+
+The `Upstream drift` workflow runs the report every Monday and keeps one
+issue labelled `upstream-drift` open while there is anything to port. It
+updates that issue as upstream moves and closes it once the pin is current.
+
 ## Contributions
 
 Keep user-facing behavior documented in `README.md` or `docs/`. Keep agent
