@@ -297,42 +297,15 @@ Item {
       }
     }
 
-    Column {
+    LockBranding {
+      width: parent.width
       anchors.horizontalCenter: parent.horizontalCenter
       y: Math.max(32, inputField.y - height - 42)
-      spacing: 14
       z: 1
-
-      Image {
-        width: Math.min(260, parent.parent.width * 0.2)
-        height: width
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.horizontalCenterOffset: -2
-        // Use the canonical Plymouth/lock spider so both surfaces cannot drift.
-        source: root.fileUrl(root.themeAssetRoot + "/unlock.png")
-        fillMode: Image.PreserveAspectFit
-        asynchronous: true
-        smooth: true
-      }
-
-      Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "ARANEA"
-        color: Color.lock.text
-        font.family: Style.font.family
-        font.pixelSize: Math.max(16, Math.round(Style.font.heading * 0.9))
-        font.letterSpacing: 5
-        font.bold: true
-      }
-
-      Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "SECURE SESSION"
-        color: Color.lock.placeholder
-        font.family: Style.font.family
-        font.pixelSize: Style.font.bodySmall
-        font.letterSpacing: 3
-      }
+      logoSource: root.fileUrl(root.themeAssetRoot + "/unlock.png")
+      fontFamily: Style.font.family
+      textColor: Color.lock.text
+      placeholderColor: Color.lock.placeholder
     }
 
     Column {
