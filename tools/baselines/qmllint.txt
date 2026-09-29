@@ -11,7 +11,7 @@
 1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "edges". This may be due to a missing import statement or incomplete qmltypes files.
 1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "gravity". This may be due to a missing import statement or incomplete qmltypes files.
 3	plugins/araneadev.bar/Bar.qml:uncreatable-type:Type PanelWindow is not creatable.
-176	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access
+172	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access
 1	plugins/araneadev.bar/Bar.qml:unqualified:unknown grouped property scope margins.
 2	plugins/araneadev.bar/Bar.qml:unresolved-type:Type "PopupAnchor" of property "anchor" not found. This is likely due to a missing dependency entry or a type not being exposed declaratively.
 1	plugins/araneadev.bar/Bar.qml:unresolved-type:Type margins is used but it is not resolved

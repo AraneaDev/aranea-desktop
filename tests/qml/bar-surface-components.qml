@@ -23,6 +23,12 @@ ShellRoot {
   BarComponents.CenterGestureArea {
     id: gesture
   }
+  BarComponents.CustomCommandModule {
+    id: custom
+    entry: ({
+        id: "custom"
+      })
+  }
 
   Component.onCompleted: {
     t.equal(slot.moduleId, "clock", "bar slots expose module identity")
@@ -30,6 +36,7 @@ ShellRoot {
     t.equal(drag.active, true, "bar drag overlays expose active state")
     t.equal(drag.barPosition, "top", "bar drag overlays expose bar position")
     t.equal(gesture.dragThreshold > 0, true, "center gesture areas expose a drag threshold")
+    t.equal(custom.moduleName, "custom", "custom command modules expose their entry identity")
     t.done()
   }
 }
