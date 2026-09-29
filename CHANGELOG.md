@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.6.0...v2.6.1) (2026-09-29)
+
+
+### Refactoring
+
+* centralize design tokens and decompose shared UI ([#69](https://github.com/AraneaDev/aranea-desktop/issues/69)) ([bb1e232](https://github.com/AraneaDev/aranea-desktop/commit/bb1e2326a9d9bec0f8acd46bb96bb39a74cdc6e0))
+
 ## [2.6.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.5.0...v2.6.0) (2026-09-28)
 
 
