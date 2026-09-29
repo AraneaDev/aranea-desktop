@@ -14,7 +14,7 @@ plugin="$repo_root/plugins/araneadev.polkit"
 # The entry (state, logic), its window and the system-bus agent; text checks
 # look in all three. Behaviour (empty Enter, submit, identities, hint, spoofed
 # target): tests/qml/polkit.qml, run offscreen by tests/qml-behaviour.test.sh.
-polkit_files=("$plugin/PolkitAgent.qml" "$plugin/PolkitWindow.qml" "$plugin/PolkitDetails.qml" "$plugin/PolkitAgentService.qml")
+polkit_files=("$plugin/PolkitAgent.qml" "$plugin/PolkitWindow.qml" "$plugin/PolkitPromptCard.qml" "$plugin/PolkitDetails.qml" "$plugin/PolkitAgentService.qml")
 
 # Logic contract: tests/js/polkit.test.js (node:test; run by tests/js.test.sh).
 
@@ -44,7 +44,7 @@ grep -Fq 'PolkitPromptCard {' "$plugin/PolkitWindow.qml"
 grep -Fq 'AUTHENTICATION REQUIRED' "$plugin/PolkitPromptCard.qml"
 grep -Fq 'SYSTEM // PRIVILEGED' "${polkit_files[@]}"
 grep -Fq 'RuntimePaths.glyphUrl' "${polkit_files[@]}"
-grep -Fq 'PolkitLogic.requestMarkup(panel.root.currentMessage' "${polkit_files[@]}"
+grep -Fq 'PolkitLogic.requestMarkup(root.currentMessage' "${polkit_files[@]}"
 grep -Fq 'textFormat: Text.StyledText' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.contextLine(' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.detailRows(' "${polkit_files[@]}"
@@ -85,8 +85,8 @@ grep -Fq 'ARANEA_DOCTOR_POLKIT_STATUS' "$repo_root/scripts/aranea-doctor"
 # README tells a hand-disabler to restart the shell
 grep -Fq 'omarchy plugin disable araneadev.polkit' "$repo_root/README.md"
 # --- 4a: the target has its own line that is never elided
-target_block="$(awk '/The target, never elided/ { on = 1 } on { print } on && /^      }$/ { exit }' "$plugin/PolkitWindow.qml")"
-grep -Fq 'text: panel.root.targetText' <<<"$target_block"
+target_block="$(grep -A6 -B3 -F 'text: root.targetText' "$plugin/PolkitPromptCard.qml")"
+grep -Fq 'text: root.targetText' <<<"$target_block"
 grep -Fq 'readonly property string targetText: PolkitLogic.targetLine(root.currentMessage)' "$agent"
 grep -Fq 'wrapMode: Text.Wrap' <<<"$target_block"
 if grep -Eq 'elide:|maximumLineCount' <<<"$target_block"; then

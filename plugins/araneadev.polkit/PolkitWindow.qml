@@ -2,13 +2,13 @@
 // request, details and password field. PolkitAgent.qml (the non-visual plugin
 // entry, which holds all state and logic) creates it and passes itself as
 // `root`; tests leave it out and use a fake view instead.
+// qmllint disable missing-property
 
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
-import qs.Ui
 import "../araneadev.shared" as Aranea
 import "PolkitLogic.js" as PolkitLogic
 
@@ -22,17 +22,17 @@ PanelWindow {
 
   // Returns the typed password.
   function passwordText(): string {
-    return passwordInput.text
+    return authField.passwordText
   }
 
   // Clears the typed password.
   function clearPassword(): void {
-    passwordInput.text = ""
+    authField.clearPassword()
   }
 
   // Gives the password field the keyboard focus.
   function focusField(): void {
-    passwordInput.forceActiveFocus()
+    authField.focusField()
   }
 
   // Gives the key catcher the keyboard focus (fingerprint mode, after submit).
@@ -219,102 +219,24 @@ PanelWindow {
       }
 
       // Password field (or the sensor in fingerprint mode).
-      Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: panel.root.fieldHeight
-        radius: panel.root.cornerRadius
-        color: Util.alpha(panel.root.foreground, 0.04)
-        border.width: 1
-        border.color: panel.root.errorFlash ? Color.polkit.textError : Util.alpha(panel.root.foreground, passwordInput.activeFocus ? 0.22 : 0.10)
-
-        Row {
-          visible: panel.root.fingerprintMode
-          anchors.centerIn: parent
-          spacing: Style.space(10)
-          OpticalGlyph {
-            width: Math.round(panel.root.fieldHeight * 0.55)
-            height: width
-            text: "󰈷"
-            fontFamily: panel.root.fontFamily
-            fontSize: Math.round(panel.root.fieldHeight * 0.55)
-            color: panel.root.errorFlash ? Color.polkit.textError : panel.root.accent
-          }
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: "TOUCH THE SENSOR"
-            color: panel.root.foreground
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.Medium
-            font.letterSpacing: panel.root.letterSpacing
-          }
-        }
-
-        Row {
-          visible: !panel.root.fingerprintMode
-          anchors.fill: parent
-          anchors.leftMargin: Style.space(12)
-          anchors.rightMargin: Style.space(12)
-          spacing: Style.space(10)
-
-          Text {
-            text: ""
-            color: panel.root.errorFlash ? Color.polkit.textError : panel.root.accent
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.iconLarge
-            width: Style.space(20)
-            height: panel.root.fieldHeight
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-          }
-
-          Item {
-            width: parent.width - Style.space(30)
-            height: panel.root.fieldHeight
-
-            TextInput {
-              id: passwordInput
-              anchors.fill: parent
-              verticalAlignment: TextInput.AlignVCenter
-              activeFocusOnPress: true
-              clip: true
-              selectionColor: Util.alpha(panel.root.accent, 0.45)
-              selectedTextColor: panel.root.foreground
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.iconLarge
-              echoMode: panel.root.responseVisible ? TextInput.Normal : TextInput.Password
-              passwordCharacter: "•"
-              color: panel.root.errorFlash ? Color.polkit.textError : panel.root.foreground
-              cursorVisible: activeFocus && !panel.root.submitted && !panel.root.errorFlash
-              readOnly: panel.root.submitted || panel.root.errorFlash
-              enabled: panel.root.dialogVisible
-              Keys.priority: Keys.BeforeItem
-              Keys.onPressed: function (event) {
-                panel.root.handleKey(event)
-              }
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              text: panel.root.errorFlash ? "Wrong" : (panel.root.submitted ? "Checking..." : PolkitLogic.promptPlaceholder(panel.root.currentPrompt))
-              color: panel.root.errorFlash ? Color.polkit.textError : panel.root.foreground
-              opacity: panel.root.errorFlash ? 1 : 0.36
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.subtitle
-              elide: Text.ElideRight
-              visible: passwordInput.text.length === 0
-            }
-
-            MouseArea {
-              anchors.fill: parent
-              acceptedButtons: Qt.LeftButton
-              onClicked: passwordInput.forceActiveFocus()
-            }
-          }
+      PolkitAuthField {
+        id: authField
+        fingerprintMode: panel.root.fingerprintMode
+        fieldHeight: panel.root.fieldHeight
+        cornerRadius: panel.root.cornerRadius
+        foreground: panel.root.foreground
+        accent: panel.root.accent
+        errorColor: Color.polkit.textError
+        errorFlash: panel.root.errorFlash
+        responseVisible: panel.root.responseVisible
+        submitted: panel.root.submitted
+        dialogVisible: panel.root.dialogVisible
+        currentPrompt: panel.root.currentPrompt
+        placeholderText: PolkitLogic.promptPlaceholder(panel.root.currentPrompt)
+        fontFamily: panel.root.fontFamily
+        letterSpacing: panel.root.letterSpacing
+        onKeyPressed: function (event) {
+          panel.root.handleKey(event)
         }
       }
 

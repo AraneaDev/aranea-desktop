@@ -125,10 +125,6 @@
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "text" not found on type "QObject"
 2	plugins/araneadev.polkit/PolkitAgent.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.polkit/PolkitAgent.qml:unqualified:Unqualified access
-3	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "iconLarge" not found on type "QObject"
-1	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "subtitle" not found on type "QObject"
-6	plugins/araneadev.polkit/PolkitWindow.qml:missing-property:Member "textError" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
 2	plugins/araneadev.updates/BarWidget.qml:unqualified:Unqualified access
 2	plugins/araneadev.updates/BarWidget.qml:unused-imports:Unused import
