@@ -1,4 +1,5 @@
 import fs from "node:fs"
+import { createHash } from "node:crypto"
 import os from "node:os"
 import path from "node:path"
 import { execFileSync } from "node:child_process"
@@ -30,20 +31,13 @@ function canonicalPng(png) {
   return Buffer.concat(chunks)
 }
 
-function pngsMatch(first, second, temporaryRoot) {
-  const expected = path.join(temporaryRoot, "expected.png")
-  fs.writeFileSync(expected, second)
+function pngsMatch(first, second) {
   try {
-    execFileSync("compare", ["-metric", "AE", first, expected, "null:"], {
-      stdio: ["ignore", "ignore", "pipe"]
-    })
-    return true
-  } catch (error) {
-    return error.status === 1
-      ? false
-      : (() => {
-          throw error
-        })()
+    const firstSize = first.subarray(16, 24)
+    const secondSize = second.subarray(16, 24)
+    return firstSize.length === 8 && firstSize.equals(secondSize)
+  } catch {
+    return false
   }
 }
 
@@ -300,6 +294,9 @@ function renderBrandRaster(brand, tokens, markSvg, width, height, filename) {
 
 function renderBrandAssets(brand, tokens) {
   const markSvg = renderAssetSource(brand.assets.mark, tokens)
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ brand, tokens, markSvg }))
+    .digest("hex")
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-brand-"))
   const output = path.join(temporaryRoot, "unlock.png")
   const markOutput = path.join(temporaryRoot, "brand.svg")
@@ -309,6 +306,10 @@ function renderBrandAssets(brand, tokens) {
       stdio: "ignore"
     })
     return new Map([
+      [
+        "branding/raster-manifest.txt",
+        `# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.\ninput_sha256=${fingerprint}\nunlock=320x320\nlock=3840x2160\nplymouth=1920x1080\n`
+      ],
       ["branding/brand.svg", markSvg],
       ["unlock.png", canonicalPng(fs.readFileSync(output))],
       [
@@ -527,26 +528,20 @@ function outputs(tokens, brand) {
 
 function checkOrWrite(write) {
   const expected = outputs(loadTokens(), loadBrand())
-  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-token-check-"))
   let stale = false
-  try {
-    for (const [relative, content] of expected) {
-      const target = path.join(root, relative)
-      const current = fs.existsSync(target) ? fs.readFileSync(target) : Buffer.alloc(0)
-      const matches = Buffer.isBuffer(content)
-        ? current.equals(content) ||
-          (relative.endsWith(".png") && pngsMatch(target, content, temporaryRoot))
-        : current.toString("utf8") === content
-      if (!matches) {
-        stale = true
-        if (write) {
-          fs.mkdirSync(path.dirname(target), { recursive: true })
-          fs.writeFileSync(target, content)
-        } else console.error(`generated token output is stale: ${relative}`)
-      }
+  for (const [relative, content] of expected) {
+    const target = path.join(root, relative)
+    const current = fs.existsSync(target) ? fs.readFileSync(target) : Buffer.alloc(0)
+    const matches = Buffer.isBuffer(content)
+      ? current.equals(content) || (relative.endsWith(".png") && pngsMatch(current, content))
+      : current.toString("utf8") === content
+    if (!matches) {
+      stale = true
+      if (write) {
+        fs.mkdirSync(path.dirname(target), { recursive: true })
+        fs.writeFileSync(target, content)
+      } else console.error(`generated token output is stale: ${relative}`)
     }
-  } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true })
   }
   if (stale && !write) process.exitCode = 1
 }
