@@ -1,5 +1,5 @@
 // Presentational result row for the clipboard picker.
-// qmllint disable missing-property
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 
