@@ -308,29 +308,15 @@ Item {
       placeholderColor: Color.lock.placeholder
     }
 
-    Column {
+    LockClock {
       anchors.horizontalCenter: parent.horizontalCenter
       y: inputField.y + inputField.height + 28
-      spacing: 5
       z: 1
-
-      Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: root.clockText
-        color: Color.lock.text
-        font.family: Style.font.family
-        font.pixelSize: Math.max(28, Math.round(Style.font.heading * 1.45))
-        font.bold: true
-      }
-
-      Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: root.dateText
-        color: Color.lock.placeholder
-        font.family: Style.font.family
-        font.pixelSize: Style.font.bodySmall
-        font.letterSpacing: 1
-      }
+      clockText: root.clockText
+      dateText: root.dateText
+      fontFamily: Style.font.family
+      textColor: Color.lock.text
+      placeholderColor: Color.lock.placeholder
     }
 
     Text {
