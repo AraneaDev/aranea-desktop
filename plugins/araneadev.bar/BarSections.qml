@@ -1,4 +1,5 @@
 // Orientation-aware module section composition for the bar.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 

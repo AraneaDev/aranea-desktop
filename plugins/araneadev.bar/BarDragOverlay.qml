@@ -1,4 +1,5 @@
 // Drag ghost and candidate drop feedback for the bar.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 

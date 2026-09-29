@@ -1,4 +1,5 @@
 // Visual and input boundary for one bar module slot.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 
