@@ -1654,25 +1654,10 @@ Item {
         }
       }
 
-      BorderSurface {
+      TooltipBubble {
         id: tooltipBubble
-        implicitWidth: tooltipLabel.implicitWidth + 20
-        implicitHeight: tooltipLabel.implicitHeight + 14
-        color: Color.tooltip.background
-        borderSpec: Border.surfaceSpec("tooltip", "border", Color.tooltip.border, 1)
-        radius: Style.cornerRadius
-
-        Text {
-          id: tooltipLabel
-          textFormat: Text.PlainText
-          anchors.centerIn: parent
-          text: root.tooltipText
-          color: Color.tooltip.text
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-        }
+        text: root.tooltipText
+        fontFamily: root.fontFamily
       }
     }
 

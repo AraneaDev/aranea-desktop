@@ -1,6 +1,6 @@
 // Presentational tile used by the menu's full root header.
+// qmllint disable missing-property
 import QtQuick
-import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 

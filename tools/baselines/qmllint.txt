@@ -1,13 +1,11 @@
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "active" not found on type "QObject"
-2	plugins/araneadev.bar/Bar.qml:missing-property:Member "background" not found on type "QObject"
-1	plugins/araneadev.bar/Bar.qml:missing-property:Member "body" not found on type "QObject"
-1	plugins/araneadev.bar/Bar.qml:missing-property:Member "border" not found on type "QObject"
+1	plugins/araneadev.bar/Bar.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "implicitHeight" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "implicitWidth" not found on type "QObject"
 2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeHorizontal" not found on type "QObject"
 2	plugins/araneadev.bar/Bar.qml:missing-property:Member "sizeVertical" not found on type "QObject"
-3	plugins/araneadev.bar/Bar.qml:missing-property:Member "text" not found on type "QObject"
+2	plugins/araneadev.bar/Bar.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "xs" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "adjustment". This may be due to a missing import statement or incomplete qmltypes files.
 1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "edges". This may be due to a missing import statement or incomplete qmltypes files.
