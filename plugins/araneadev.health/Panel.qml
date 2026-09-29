@@ -10,7 +10,6 @@ import qs.Ui
 import "../araneadev.shared"
 import "HealthBridge.js" as HealthBridge
 import "HealthLogic.js" as HealthLogic
-import "MetricsLogic.js" as MetricsLogic
 
 Panel {
   id: root
@@ -238,163 +237,11 @@ Panel {
           }
         }
 
-        // CPU
-        ColumnLayout {
+        HealthResourceSection {
           Layout.fillWidth: true
-          spacing: Style.space(4)
-          RowLayout {
-            Layout.fillWidth: true
-            Rail {
-              color: Color.notifications.countdown
-            }
-            Label {
-              text: "CPU"
-              font.bold: true
-            }
-            Label {
-              text: root.m && root.m.cpu !== null ? root.m.cpu + "%" : "—"
-              Layout.fillWidth: true
-            }
-            Label {
-              text: root.m && root.m.load ? "load " + root.m.load.map(function (v) {
-                return v.toFixed(2)
-              }).join(" ") : ""
-              color: Qt.darker(Color.popups.text, 1.3)
-            }
-          }
-          Canvas {
-            id: spark
-            Layout.fillWidth: true
-            Layout.preferredHeight: Style.space(28)
-            property var values: root.m ? root.m.cpuHistory : []
-            // History changes every 2 s; only draw it while it can be seen.
-            onValuesChanged: if (root.opened)
-              requestPaint()
-            Connections {
-              target: root
-              function onOpenedChanged() {
-                if (root.opened)
-                  spark.requestPaint()
-              }
-            }
-            onPaint: {
-              var ctx = getContext("2d")
-              ctx.reset()
-              var v = values || []
-              if (v.length < 2)
-                return
-              ctx.strokeStyle = Color.notifications.countdown
-              ctx.lineWidth = 1.5
-              ctx.beginPath()
-              for (var i = 0; i < v.length; i++) {
-                var x = (width - 1) * (i + 60 - v.length) / 59
-                var y = height - 1 - (height - 2) * Math.min(100, v[i]) / 100
-                if (i === 0)
-                  ctx.moveTo(x, y)
-                else
-                  ctx.lineTo(x, y)
-              }
-              ctx.stroke()
-            }
-          }
-        }
-
-        // Memory
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: Style.space(4)
-          readonly property real pct: root.m && root.m.mem ? root.m.mem.memUsed * 100 / root.m.mem.memTotal : 0
-          RowLayout {
-            Layout.fillWidth: true
-            Rail {
-              color: "#7a5cff"
-            }
-            Label {
-              text: "MEM"
-              font.bold: true
-              Layout.fillWidth: true
-            }
-            Label {
-              text: root.m && root.m.mem ? MetricsLogic.humanBytes(root.m.mem.memUsed) + " / " + MetricsLogic.humanBytes(root.m.mem.memTotal) : "—"
-            }
-          }
-          UsageBar {
-            Layout.fillWidth: true
-            fraction: parent.pct / 100
-            level: MetricsLogic.usageLevel(parent.pct)
-            base: "#7a5cff"
-          }
-          Label {
-            visible: !!(root.m && root.m.mem && root.m.mem.swapUsed > 0)
-            text: root.m && root.m.mem ? "swap " + MetricsLogic.humanBytes(root.m.mem.swapUsed) + " / " + MetricsLogic.humanBytes(root.m.mem.swapTotal) : ""
-            color: Qt.darker(Color.popups.text, 1.3)
-            font.pixelSize: Style.font.caption
-          }
-        }
-
-        // Disk
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: Style.space(4)
-          RowLayout {
-            Layout.fillWidth: true
-            Rail {
-              color: "#d6a483"
-            }
-            Label {
-              text: "DISK"
-              font.bold: true
-            }
-          }
-          Repeater {
-            model: root.m ? root.m.diskRows : []
-            delegate: ColumnLayout {
-              required property var modelData
-              Layout.fillWidth: true
-              spacing: Style.space(2)
-              RowLayout {
-                Layout.fillWidth: true
-                Label {
-                  text: modelData.target
-                  Layout.fillWidth: true
-                  elide: Text.ElideMiddle
-                }
-                Label {
-                  text: modelData.percent + "%"
-                }
-                Label {
-                  text: MetricsLogic.humanBytes(modelData.avail) + " free"
-                  color: Qt.darker(Color.popups.text, 1.3)
-                }
-              }
-              UsageBar {
-                Layout.fillWidth: true
-                fraction: modelData.percent / 100
-                level: MetricsLogic.usageLevel(modelData.percent)
-                base: "#d6a483"
-              }
-            }
-          }
-        }
-
-        // Network
-        RowLayout {
-          Layout.fillWidth: true
-          Rail {
-            color: "#5b8cff"
-          }
-          Label {
-            text: "NET"
-            font.bold: true
-          }
-          Label {
-            text: root.m && root.m.iface ? root.m.iface : "offline"
-            Layout.fillWidth: true
-            color: Qt.darker(Color.popups.text, 1.3)
-          }
-          Label {
-            text: root.m ? "↑ " + MetricsLogic.formatRate(root.m.rates.up) + "   ↓ " + MetricsLogic.formatRate(root.m.rates.down) : "—"
-          }
+          metrics: root.m
+          active: root.opened
+          foreground: Color.popups.text
         }
 
         HealthProcessSection {

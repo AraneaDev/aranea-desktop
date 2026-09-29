@@ -78,7 +78,8 @@ if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then
   exit 1
 fi
 # 4: the sparkline repaints only while the dropdown is open
-grep -A1 -F 'onValuesChanged: if (root.opened)' "$plugin/Panel.qml" | grep -Fq 'requestPaint()'
+grep -Fq 'HealthResourceSection {' "$plugin/Panel.qml"
+grep -A1 -F 'onValuesChanged: if (root.active)' "$plugin/HealthResourceSection.qml" | grep -Fq 'requestPaint()'
 # 5: opening without a service closes again instead of sticking open
 grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
 # 9: branding paths honour XDG_STATE_HOME everywhere

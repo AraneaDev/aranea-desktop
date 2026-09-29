@@ -38,6 +38,8 @@ ShellRoot {
 
   HealthComponents.HealthResourceSection {
     id: resources
+    metrics: ({})
+    active: true
     cpu: 42
     memoryPercent: 55
     diskRows: [
@@ -56,6 +58,8 @@ ShellRoot {
     t.equal(processes.memoryProcesses.length, 1, "health process sections expose memory rows")
     t.equal(resources.cpu, 42, "health resource sections expose CPU state")
     t.equal(resources.diskRows.length, 1, "health resource sections expose disk rows")
+    t.equal(resources.active, true, "health resource sections expose active state")
+    t.equal(resources.metrics.cpu, undefined, "health resource sections expose metrics state")
     t.done()
   }
 }
