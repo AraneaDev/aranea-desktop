@@ -14,6 +14,12 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 upstream_repo="${ARANEA_UPSTREAM_REPO:-https://github.com/basecamp/omarchy}"
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/aranea/upstream-omarchy"
 platform_paths=(shell/Commons shell/Ui shell/services shell/shell.qml)
+# owner/name of a GitHub upstream, used to qualify "#N" in the Markdown report
+# so an issue in this repository does not link them to its own issues.
+upstream_slug=""
+if [[ "$upstream_repo" =~ ^https://github\.com/([^/]+/[^/]+)$ ]]; then
+  upstream_slug="${BASH_REMATCH[1]%.git}"
+fi
 
 target=""
 with_diff=false
@@ -76,9 +82,13 @@ fork_paths() {
   done
 }
 
-# Writes the JSON commit list for PATH ($1) in base..target to FILE ($2).
+# Writes the JSON commit list for PATH ($1) to FILE ($2): commits on the
+# target side of base...target, without those the base already has as
+# cherry-picks. Omarchy tags releases on side branches with backports, so a
+# plain base..target would list those fixes again.
 write_commits() {
-  upstream_git log --format='%h%x09%ad%x09%s' --date=short "$base..$target" -- "$1" |
+  upstream_git log --cherry-pick --right-only --format='%h%x09%ad%x09%s' --date=short \
+    "$base...$target" -- "$1" |
     jq -R -s 'split("\n") | map(select(length > 0) | split("\t")
       | {hash: .[0], date: .[1], subject: (.[2:] | join("\t"))})' >"$2"
 }
@@ -123,14 +133,16 @@ path_entry() {
 
 # Renders the JSON report on stdin as Markdown: changed paths with their
 # commits (forks first), then the missing and unchanged ones on one line each.
+# "#N" in subjects becomes "owner/name#N" for a GitHub upstream.
 render_markdown() {
-  jq -r '
+  jq -r --arg slug "$upstream_slug" '
+    def qualified: if $slug == "" then . else gsub("(?<![\\w/])#(?<n>[0-9]+)"; "\($slug)#\(.n)") end;
     def heading: if .kind == "fork" then "\(.plugin) (`\(.upstream)`)" else "Platform: `\(.upstream)`" end;
     def total(k): [.paths[] | select(.kind == k)] | length;
     def changed(k): [.paths[] | select(.kind == k and .status == "changed")] | length;
     def section:
       "## \(heading)\n\n\(.stat.files) files, +\(.stat.insertions) -\(.stat.deletions)\n\n"
-      + (.commits | map("- `\(.hash)` \(.date) \(.subject)") | join("\n"))
+      + (.commits | map("- `\(.hash)` \(.date) \(.subject | qualified)") | join("\n"))
       + (if has("diff") then "\n\n````diff\n\(.diff)````" else "" end)
       + "\n";
     "# Upstream Omarchy drift: \(.base) → \(.target)\n",
@@ -170,12 +182,19 @@ done
 
 command -v git >/dev/null 2>&1 || die 4 "git is required"
 command -v jq >/dev/null 2>&1 || die 4 "jq is required"
+command -v flock >/dev/null 2>&1 || die 4 "flock is required"
 
 base="$(tr -d '[:space:]' <"$repo_root/.omarchy-version" 2>/dev/null || true)"
 [[ -n "$base" ]] || die 1 ".omarchy-version is missing or empty"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+
+# One run at a time per cache: a reclone deletes the cache, which would break
+# a parallel run that is cloning or reading it.
+mkdir -p "$(dirname "$cache_dir")"
+exec {lock_fd}>"$cache_dir.lock"
+flock "$lock_fd"
 
 sync_cache
 upstream_git rev-parse --verify --quiet "$base^{commit}" >/dev/null ||

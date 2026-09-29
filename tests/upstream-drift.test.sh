@@ -57,6 +57,12 @@ upstream_commit docs/README.md more 'Unrelated docs change'
 upstream_git tag v1.1.0
 upstream_commit shell/plugins/lock/Lock.qml beta 'Beta lock change'
 upstream_git tag v1.2.0-beta1
+# A release cut on a side branch from v1.0.0 that backports the bar fix, the
+# way Omarchy tags releases: v1.0.1 is not an ancestor of v1.1.0.
+upstream_git switch -q -c v1-0-1 v1.0.0
+upstream_git cherry-pick -x "$(upstream_git log --format=%H --grep='Fix "bar"' master)" >/dev/null
+upstream_git tag v1.0.1
+upstream_git switch -q master
 
 # --- fake Aranea checkout: bar and lock forks, a fork with no upstream, and a
 # plugin that is not a fork.
@@ -151,6 +157,34 @@ test ! -e "$cache"
 ARANEA_UPSTREAM_REPO="file://$upstream"
 "$drift" --json >/dev/null
 test -d "$cache"
+
+# --- a backport already in the pin is not listed again; the stat agrees
+printf 'v1.0.1\n' >"$aranea/.omarchy-version"
+json="$("$drift" --json --to v1.1.0)"
+jq -e '.paths[] | select(.plugin == "araneadev.bar")
+  | [.commits[].subject] == ["Add a large bar asset"] and .stat.files == 1' <<<"$json" >/dev/null
+printf 'v1.0.0\n' >"$aranea/.omarchy-version"
+
+# --- parallel runs on a cold cache all succeed
+rm -rf "$cache"
+pids=()
+for _ in 1 2 3 4 5; do
+  "$drift" --json >/dev/null 2>&1 &
+  pids+=("$!")
+done
+for pid in "${pids[@]}"; do
+  wait "$pid"
+done
+
+# --- upstream issue references in Markdown point at the upstream repository,
+# so a GitHub issue in this repository does not link them to its own issues.
+upstream_commit shell/Commons/Util.js linked 'Keep overlays sharp (#13419)'
+upstream_git tag v1.1.1
+git config --global url."file://$upstream".insteadOf https://github.com/basecamp/omarchy
+md="$(ARANEA_UPSTREAM_REPO=https://github.com/basecamp/omarchy "$drift")"
+grep -Eq '^- `[0-9a-f]{7,}` [0-9-]{10} Keep overlays sharp \(basecamp/omarchy#13419\)$' <<<"$md"
+json="$(ARANEA_UPSTREAM_REPO=https://github.com/basecamp/omarchy "$drift" --json)"
+jq -e 'any(.paths[].commits[]; .subject == "Keep overlays sharp (#13419)")' <<<"$json" >/dev/null
 
 # --- the weekly workflow: least privilege, pinned checkout, one issue
 workflow="$repo_root/.github/workflows/upstream-drift.yml"
