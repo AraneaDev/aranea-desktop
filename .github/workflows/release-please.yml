@@ -10,7 +10,6 @@ on:
       - "tests/**"
       - "**/tests/**"
       - "**/*.test.sh"
-      - ".github/**"
       - "release-please-config.json"
   # release-please only ever runs on a push to master, so a release PR that
   # goes stale, or a run that failed, has no way back without a new commit.
@@ -51,7 +50,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick python3 lua5.4
+          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick librsvg2-bin ripgrep python3 lua5.4
           sudo tools/install-shellcheck
           sudo tools/install-shfmt
           sudo tools/install-actionlint
