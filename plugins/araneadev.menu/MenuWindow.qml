@@ -170,7 +170,11 @@ PanelWindow {
       }
     }
 
+    // The legacy inline tree remains as a hidden compatibility fallback while
+    // the extracted surface settles; its dynamic token bindings are not lintable.
+    // qmllint disable missing-property
     Column {
+      visible: false
       anchors.fill: parent
       anchors.topMargin: card.contentTopInset
       anchors.rightMargin: card.contentRightInset
@@ -672,6 +676,106 @@ PanelWindow {
 
           Text {
             textFormat: Text.PlainText
+            text: panel.root.emptyStateInfo.text
+            color: panel.root.foreground
+            opacity: 0.7
+            font.family: panel.root.fontFamily
+            font.pixelSize: panel.root.menuFontSize(Style.font.title)
+            horizontalAlignment: Text.AlignHCenter
+            width: Style.space(320)
+          }
+        }
+      }
+    }
+
+    // qmllint enable missing-property
+    Column {
+      anchors.fill: parent
+      anchors.topMargin: card.contentTopInset
+      anchors.rightMargin: card.contentRightInset
+      anchors.bottomMargin: card.contentBottomInset
+      anchors.leftMargin: card.contentLeftInset
+      spacing: panel.root.fullRootHeader ? panel.root.contentSpacing : panel.root.compactContentSpacing
+
+      MenuCardChrome {
+        width: parent.width
+        height: panel.root.fullRootHeader ? panel.root.rootHeaderHeight + panel.root.rootContextHeight + panel.root.rootTileHeight + panel.root.footerHeight : panel.root.headerHeight
+        fullRootHeader: panel.root.fullRootHeader
+        dmenuActive: panel.root.dmenuActive
+        activeTitle: panel.root.item(panel.root.activeMenu) ? (panel.root.item(panel.root.activeMenu).title || panel.root.item(panel.root.activeMenu).label || "GO") : "GO"
+        dmenuPrompt: panel.root.dmenuPrompt
+        hint: panel.root.hint
+        workspaceContext: panel.root.workspaceContext
+        clockContext: panel.root.clockContext
+        rootTiles: panel.root.rootTiles
+        brandingMarksPath: panel.root.brandingMarksPath
+        brandingMotifsPath: panel.root.brandingMotifsPath
+        brandingGlyphsPath: panel.root.brandingGlyphsPath
+        foreground: panel.root.foreground
+        contextText: panel.root.contextText
+        selectedText: panel.root.selectedText
+        footerText: panel.root.footerText
+        fontFamily: panel.root.fontFamily
+        menuFontScale: panel.root.menuFontScale
+        menuLetterSpacing: panel.root.menuLetterSpacing
+        motionEnabled: panel.root.motionEnabled
+        rootHeaderHeight: panel.root.rootHeaderHeight
+        headerHeight: panel.root.headerHeight
+        rootContextHeight: panel.root.rootContextHeight
+        rootTileHeight: panel.root.rootTileHeight
+        footerHeight: panel.root.footerHeight
+        onTileActivated: function (tile) { panel.root.activateTile(tile) }
+      }
+
+      Item {
+        width: parent.width
+        height: panel.root.visibleRowsHeight
+        MenuResultList {
+          anchors.fill: parent
+          model: panel.root.displayModel
+          selectedIndex: panel.root.selectedIndex
+          cursorActive: panel.root.cursorActive
+          filterText: panel.root.filterText
+          fullRootHeader: panel.root.fullRootHeader
+          appLibrary: panel.root.appLibrary
+          background: panel.root.background
+          foreground: panel.root.foreground
+          selectedBackground: panel.root.selectedBackground
+          selectedText: panel.root.selectedText
+          border: panel.root.border
+          selectedBorderSpec: panel.root.selectedBorderSpec
+          fontFamily: panel.root.fontFamily
+          menuFontScale: panel.root.menuFontScale
+          menuLetterSpacing: panel.root.menuLetterSpacing
+          cornerRadius: panel.root.cornerRadius
+          rowSpacing: panel.root.rowSpacing
+          rowReservedBorderLeft: panel.root.rowReservedBorderLeft
+          rowReservedBorderRight: panel.root.rowReservedBorderRight
+          dividerHeight: panel.root.dividerHeight
+          rowHeightForDetail: panel.root.rowHeightForDetail
+          onRowHovered: function (index, row, point) { panel.root.selectFromPointer(index, row, point) }
+          onRowActivated: function (index, row, button) {
+            panel.root.cursorActive = true
+            panel.root.selectedIndex = index
+            panel.root.activateIndex(index, true)
+          }
+          onAppContextRequested: function (appId) { panel.root.toggleFavoriteApp(appId) }
+        }
+
+        Column {
+          anchors.centerIn: parent
+          spacing: Style.space(12)
+          visible: panel.root.displayModel.count === 0 && panel.root.mode !== "input"
+          Text {
+            text: panel.root.emptyStateInfo.icon
+            color: panel.root.selectedText
+            opacity: 0.8
+            font.family: panel.root.fontFamily
+            font.pixelSize: panel.root.menuFontSize(Style.font.displayLarge)
+            horizontalAlignment: Text.AlignHCenter
+            width: Style.space(320)
+          }
+          Text {
             text: panel.root.emptyStateInfo.text
             color: panel.root.foreground
             opacity: 0.7

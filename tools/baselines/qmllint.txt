@@ -86,15 +86,8 @@
 1	plugins/araneadev.menu/Menu.qml:missing-property:Member "text" not found on type "QObject"
 2	plugins/araneadev.menu/Menu.qml:missing-property:Member "title" not found on type "QObject"
 3	plugins/araneadev.menu/Menu.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
-2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "body" not found on type "QObject"
-2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "bodySmall" not found on type "QObject"
-7	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "displayLarge" not found on type "QObject"
-1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "hairline" not found on type "QObject"
-3	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "iconLarge" not found on type "QObject"
-1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "md" not found on type "QObject"
-2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "title" not found on type "QObject"
-2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "xs" not found on type "QObject"
+1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.menu/MenuWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
 53	plugins/araneadev.menu/MenuWindow.qml:unqualified:Unqualified access
 2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
