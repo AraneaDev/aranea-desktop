@@ -515,6 +515,33 @@ function replacementSnapshot(notification, originalId, timestamp) {
   return updated
 }
 
+/* @aranea-facade-start: plugins/araneadev.notifications/NotificationSettings.js */
+// Pure persistence helpers for the notification service settings file.
+
+/**
+ * Reads the current DND preference and detects legacy history payloads.
+ * @param {*} raw - contents of notifications.json
+ * @returns {{error: boolean, dnd: ?boolean, legacy: boolean, errorMessage?: string}}
+ */
+function parseSettings(raw) {
+  var text = String(raw || "").trim()
+  if (!text) return { error: false, dnd: null, legacy: false }
+
+  try {
+    var parsed = JSON.parse(text)
+    return {
+      error: false,
+      dnd: parsed && typeof parsed.dnd === "boolean" ? parsed.dnd : null,
+      legacy: !!(parsed && (parsed.pending || parsed.past || parsed.entries))
+    }
+  } catch (e) {
+    return { error: true, errorMessage: String(e), dnd: null, legacy: false }
+  }
+}
+
+if (typeof module !== "undefined") module.exports = { parseSettings: parseSettings }
+/* @aranea-facade-end */
+
 /**
  * Normalizes a stored entry into a complete row with defaults; expireTimeout
  * is always 0 and a non-numeric urgency becomes normalUrgency.
@@ -539,30 +566,6 @@ function historyEntry(value, normalUrgency) {
     timestamp: e.timestamp || 0,
     // Only set on legacy 1.7.0 health items, which Inbox.qml deletes on load.
     sourceKey: typeof e.sourceKey === "string" ? e.sourceKey : ""
-  }
-}
-
-/**
- * notifications.json holds nothing but the last-set DND preference now that
- * history is a directory of files. Older versions kept `pending`/`past`
- * (and, older still, `entries`) arrays in there; their presence is reported
- * so the service can rewrite the file without the dead payload.
- * @param {?string} raw - contents of notifications.json
- * @returns {{error: boolean, dnd: ?boolean, legacy: boolean, errorMessage?: string}} the settings, with errorMessage when the JSON is invalid
- */
-function parseSettings(raw) {
-  var text = String(raw || "").trim()
-  if (!text) return { error: false, dnd: null, legacy: false }
-
-  try {
-    var parsed = JSON.parse(text)
-    return {
-      error: false,
-      dnd: parsed && typeof parsed.dnd === "boolean" ? parsed.dnd : null,
-      legacy: !!(parsed && (parsed.pending || parsed.past || parsed.entries))
-    }
-  } catch (e) {
-    return { error: true, errorMessage: String(e), dnd: null, legacy: false }
   }
 }
 

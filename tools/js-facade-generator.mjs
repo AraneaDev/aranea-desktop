@@ -19,6 +19,10 @@ const specs = [
     "plugins/araneadev.notifications/NotificationLogic.js",
     "plugins/araneadev.notifications/NotificationPresentation.js"
   ],
+  [
+    "plugins/araneadev.notifications/NotificationLogic.js",
+    "plugins/araneadev.notifications/NotificationSettings.js"
+  ],
   ["plugins/araneadev.health/HealthBridge.js", "plugins/araneadev.shared/ServiceRegistry.js"],
   [
     "plugins/araneadev.notifications/ServiceBridge.js",
