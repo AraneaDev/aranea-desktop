@@ -7,11 +7,24 @@ import "plugins/araneadev.emojis" as EmojiComponents
 import "plugins/araneadev.polkit" as PolkitComponents
 
 ShellRoot {
-  QmlTest { id: t }
+  QmlTest {
+    id: t
+  }
 
-  LockComponents.LockAuthPanel { id: lockAuth; failureMessage: "Wrong" }
-  EmojiComponents.EmojiPickerChrome { id: emojiChrome; hintText: "ENTER INSERT"; selectedName: "smile" }
-  PolkitComponents.PolkitPromptCard { id: polkitCard; currentPrompt: "Password"; detailsOpen: true }
+  LockComponents.LockAuthPanel {
+    id: lockAuth
+    failureMessage: "Wrong"
+  }
+  EmojiComponents.EmojiPickerChrome {
+    id: emojiChrome
+    hintText: "ENTER INSERT"
+    selectedName: "smile"
+  }
+  PolkitComponents.PolkitPromptCard {
+    id: polkitCard
+    currentPrompt: "Password"
+    detailsOpen: true
+  }
 
   Component.onCompleted: {
     t.equal(lockAuth.failureMessage, "Wrong", "lock auth panels expose failure state")

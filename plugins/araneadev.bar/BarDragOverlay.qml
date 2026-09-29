@@ -5,17 +5,29 @@ import qs.Commons
 
 Item {
   id: overlay
+  // Public contract member.
   property bool active: false
+  // Public contract member.
   property url dragImageUrl: ""
+  // Public contract member.
   property string barPosition: "top"
+  // Public contract member.
   property bool vertical: barPosition === "left" || barPosition === "right"
+  // Public contract member.
   property real sceneX: 0
+  // Public contract member.
   property real sceneY: 0
+  // Public contract member.
   property real targetX: 0
+  // Public contract member.
   property real targetY: 0
+  // Public contract member.
   property real targetWidth: 0
+  // Public contract member.
   property real targetHeight: 0
+  // Public contract member.
   property bool dropAfter: false
+  // Public contract member.
   property color accent: Color.bar.active
 
   visible: active

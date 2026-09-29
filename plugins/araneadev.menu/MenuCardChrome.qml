@@ -5,33 +5,61 @@ import qs.Commons
 
 Item {
   id: chrome
+  // Public contract member.
   property bool fullRootHeader: false
+  // Public contract member.
   property bool dmenuActive: false
+  // Public contract member.
   property string activeTitle: ""
+  // Public contract member.
   property string dmenuPrompt: ""
+  // Public contract member.
   property string hint: ""
+  // Public contract member.
   property string workspaceContext: ""
+  // Public contract member.
   property string clockContext: ""
+  // Public contract member.
   property var rootTiles: []
+  // Public contract member.
   property string brandingMarksPath: ""
+  // Public contract member.
   property string brandingMotifsPath: ""
+  // Public contract member.
   property string brandingGlyphsPath: ""
+  // Public contract member.
   property color foreground: Color.menu.text
+  // Public contract member.
   property color contextText: Util.alpha(foreground, 0.58)
+  // Public contract member.
   property color selectedText: Color.menu.selectedText
+  // Public contract member.
   property color footerText: contextText
+  // Public contract member.
   property string fontFamily: Style.font.menuFamily
+  // Public contract member.
   property real menuFontScale: 1
+  // Public contract member.
   property real menuLetterSpacing: 0
+  // Public contract member.
   property bool motionEnabled: true
+  // Public contract member.
   property int rootHeaderHeight: Style.space(68)
+  // Public contract member.
   property int headerHeight: Style.space(44)
+  // Public contract member.
   property int rootContextHeight: Style.space(24)
+  // Public contract member.
   property int rootTileHeight: Style.space(72)
+  // Public contract member.
   property int footerHeight: Style.space(30)
+  // Public contract member.
   signal tileActivated(var tile)
 
-  function scaled(size) { return size * menuFontScale }
+  // Public contract member.
+  function scaled(size) {
+    return size * menuFontScale
+  }
 
   Column {
     anchors.fill: parent
@@ -125,9 +153,27 @@ Item {
         font.pixelSize: scaled(Style.font.caption)
         anchors.verticalCenter: parent.verticalCenter
       }
-      Text { text: workspaceContext; color: contextText; font.family: fontFamily; font.pixelSize: scaled(Style.font.caption); verticalAlignment: Text.AlignVCenter }
-      Text { text: "SYSTEM READY"; color: contextText; font.family: fontFamily; font.pixelSize: scaled(Style.font.caption); verticalAlignment: Text.AlignVCenter }
-      Text { text: clockContext; color: contextText; font.family: fontFamily; font.pixelSize: scaled(Style.font.caption); verticalAlignment: Text.AlignVCenter }
+      Text {
+        text: workspaceContext
+        color: contextText
+        font.family: fontFamily
+        font.pixelSize: scaled(Style.font.caption)
+        verticalAlignment: Text.AlignVCenter
+      }
+      Text {
+        text: "SYSTEM READY"
+        color: contextText
+        font.family: fontFamily
+        font.pixelSize: scaled(Style.font.caption)
+        verticalAlignment: Text.AlignVCenter
+      }
+      Text {
+        text: clockContext
+        color: contextText
+        font.family: fontFamily
+        font.pixelSize: scaled(Style.font.caption)
+        verticalAlignment: Text.AlignVCenter
+      }
     }
 
     Row {
@@ -158,8 +204,24 @@ Item {
       visible: fullRootHeader
       width: parent.width
       height: footerHeight
-      Text { anchors.left: parent.left; anchors.bottom: parent.bottom; text: "COMMANDS  ·  QUICK ACCESS  ·  ENTER TO OPEN"; color: footerText; font.family: fontFamily; font.pixelSize: scaled(Style.font.bodySmall); elide: Text.ElideRight }
-      Text { anchors.right: parent.right; anchors.bottom: parent.bottom; text: "ARANEA"; color: selectedText; opacity: 0.7; font.family: fontFamily; font.pixelSize: scaled(Style.font.caption) }
+      Text {
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        text: "COMMANDS  ·  QUICK ACCESS  ·  ENTER TO OPEN"
+        color: footerText
+        font.family: fontFamily
+        font.pixelSize: scaled(Style.font.bodySmall)
+        elide: Text.ElideRight
+      }
+      Text {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        text: "ARANEA"
+        color: selectedText
+        opacity: 0.7
+        font.family: fontFamily
+        font.pixelSize: scaled(Style.font.caption)
+      }
     }
   }
 }

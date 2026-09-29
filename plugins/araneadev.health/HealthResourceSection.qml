@@ -6,10 +6,15 @@ import qs.Commons
 
 Item {
   id: root
+  // Public contract member.
   property real cpu: 0
+  // Public contract member.
   property real memoryPercent: 0
+  // Public contract member.
   property var diskRows: []
+  // Public contract member.
   property string networkLabel: "offline"
+  // Public contract member.
   property string networkRateText: ""
   implicitHeight: content.implicitHeight
   ColumnLayout {
@@ -18,17 +23,46 @@ Item {
     spacing: Style.space(6)
     RowLayout {
       Layout.fillWidth: true
-      Text { text: "CPU"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-      Text { text: Math.round(root.cpu) + "%"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body; Layout.fillWidth: true }
+      Text {
+        text: "CPU"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        font.bold: true
+      }
+      Text {
+        text: Math.round(root.cpu) + "%"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        Layout.fillWidth: true
+      }
     }
     RowLayout {
       Layout.fillWidth: true
-      Text { text: "MEM"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-      Text { text: Math.round(root.memoryPercent) + "%"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body }
+      Text {
+        text: "MEM"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        font.bold: true
+      }
+      Text {
+        text: Math.round(root.memoryPercent) + "%"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+      }
     }
     ColumnLayout {
       Layout.fillWidth: true
-      Text { text: "DISK"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
+      Text {
+        text: "DISK"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        font.bold: true
+      }
       Repeater {
         model: root.diskRows
         delegate: Text {
@@ -42,9 +76,26 @@ Item {
     }
     RowLayout {
       Layout.fillWidth: true
-      Text { text: "NET"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-      Text { text: root.networkLabel; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.caption; Layout.fillWidth: true }
-      Text { text: root.networkRateText; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+      Text {
+        text: "NET"
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.body
+        font.bold: true
+      }
+      Text {
+        text: root.networkLabel
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+        Layout.fillWidth: true
+      }
+      Text {
+        text: root.networkRateText
+        color: Color.popups.text
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+      }
     }
   }
 }

@@ -724,7 +724,9 @@ PanelWindow {
         rootContextHeight: panel.root.rootContextHeight
         rootTileHeight: panel.root.rootTileHeight
         footerHeight: panel.root.footerHeight
-        onTileActivated: function (tile) { panel.root.activateTile(tile) }
+        onTileActivated: function (tile) {
+          panel.root.activateTile(tile)
+        }
       }
 
       Item {
@@ -753,13 +755,17 @@ PanelWindow {
           rowReservedBorderRight: panel.root.rowReservedBorderRight
           dividerHeight: panel.root.dividerHeight
           rowHeightForDetail: panel.root.rowHeightForDetail
-          onRowHovered: function (index, row, point) { panel.root.selectFromPointer(index, row, point) }
+          onRowHovered: function (index, row, point) {
+            panel.root.selectFromPointer(index, row, point)
+          }
           onRowActivated: function (index, row, button) {
             panel.root.cursorActive = true
             panel.root.selectedIndex = index
             panel.root.activateIndex(index, true)
           }
-          onAppContextRequested: function (appId) { panel.root.toggleFavoriteApp(appId) }
+          onAppContextRequested: function (appId) {
+            panel.root.toggleFavoriteApp(appId)
+          }
         }
 
         Column {

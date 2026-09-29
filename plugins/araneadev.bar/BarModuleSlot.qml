@@ -5,17 +5,29 @@ import qs.Commons
 
 Item {
   id: slot
+  // Public contract member.
   property string moduleId: ""
+  // Public contract member.
   property var widget: null
+  // Public contract member.
   property bool vertical: false
+  // Public contract member.
   property string position: "top"
+  // Public contract member.
   property bool openIndicatorVisible: false
+  // Public contract member.
   property real openIndicatorPosition: 0.5
+  // Public contract member.
   property color foreground: Color.bar.text
+  // Public contract member.
   property color urgent: Color.bar.active
+  // Public contract member.
   signal pressed(var slot)
+  // Public contract member.
   signal hoverChanged(bool hovered)
+  // Public contract member.
   signal dragStarted(var slot, var event)
+  // Public contract member.
   signal dragMoved(var slot, var event)
 
   implicitWidth: widget ? widget.implicitWidth : Style.space(24)
@@ -42,6 +54,9 @@ Item {
     onEntered: slot.hoverChanged(true)
     onExited: slot.hoverChanged(false)
     onPressed: slot.pressed(slot)
-    onPositionChanged: function (event) { if (pressed) slot.dragMoved(slot, event) }
+    onPositionChanged: function (event) {
+      if (pressed)
+        slot.dragMoved(slot, event)
+    }
   }
 }

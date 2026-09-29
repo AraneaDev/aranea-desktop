@@ -5,7 +5,9 @@ import "lib"
 import "plugins/araneadev.bar" as BarComponents
 
 ShellRoot {
-  QmlTest { id: t }
+  QmlTest {
+    id: t
+  }
 
   BarComponents.BarModuleSlot {
     id: slot

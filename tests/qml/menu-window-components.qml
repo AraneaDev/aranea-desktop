@@ -5,14 +5,22 @@ import "lib"
 import "plugins/araneadev.menu" as MenuComponents
 
 ShellRoot {
-  QmlTest { id: t }
+  QmlTest {
+    id: t
+  }
 
   MenuComponents.MenuCardChrome {
     id: chrome
     fullRootHeader: true
     activeTitle: "SYSTEM"
     hint: "ENTER OPEN"
-    rootTiles: [{ label: "Apps", detail: "Launch", icon: "▦" }]
+    rootTiles: [
+      {
+        label: "Apps",
+        detail: "Launch",
+        icon: "▦"
+      }
+    ]
   }
 
   MenuComponents.MenuResultList {

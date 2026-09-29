@@ -6,31 +6,56 @@ import qs.Ui
 
 Item {
   id: results
+  // Public contract member.
   property var model: null
+  // Public contract member.
   property var appLibrary: null
+  // Public contract member.
   property int selectedIndex: -1
+  // Public contract member.
   property bool cursorActive: false
+  // Public contract member.
   property string filterText: ""
+  // Public contract member.
   property bool fullRootHeader: false
+  // Public contract member.
   property color background: Color.menu.background
+  // Public contract member.
   property color foreground: Color.menu.text
+  // Public contract member.
   property color selectedBackground: Color.menu.selectedBackground
+  // Public contract member.
   property color selectedText: Color.menu.selectedText
+  // Public contract member.
   property color border: Color.menu.border
+  // Public contract member.
   property var selectedBorderSpec: Border.none()
+  // Public contract member.
   property string fontFamily: Style.font.menuFamily
+  // Public contract member.
   property real menuFontScale: 1
+  // Public contract member.
   property real menuLetterSpacing: 0
+  // Public contract member.
   property int cornerRadius: Style.cornerRadius
+  // Public contract member.
   property int rowSpacing: Style.spacing.xs
+  // Public contract member.
   property int rowReservedBorderLeft: 0
+  // Public contract member.
   property int rowReservedBorderRight: 0
+  // Public contract member.
   property int dividerHeight: Style.spacing.md
+  // Public contract member.
   property var rowHeightForDetail: null
+  // Public contract member.
   signal rowHovered(int index, var row, var point)
+  // Public contract member.
   signal rowActivated(int index, var row, int button)
+  // Public contract member.
   signal appContextRequested(string appId)
 
+  // Public contract member.
   readonly property alias list: resultList
 
   ListView {
@@ -135,8 +160,13 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onEntered: results.rowHovered(row.index, row, { x: mouseX, y: mouseY })
-        onPositionChanged: function (mouse) { results.rowHovered(row.index, row, mouse) }
+        onEntered: results.rowHovered(row.index, row, {
+          x: mouseX,
+          y: mouseY
+        })
+        onPositionChanged: function (mouse) {
+          results.rowHovered(row.index, row, mouse)
+        }
         onClicked: function (mouse) {
           if (mouse.button === Qt.RightButton && row.isApp) {
             results.appContextRequested(row.appId)
@@ -149,17 +179,39 @@ Item {
   }
 
   Rectangle {
-    anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
     height: Math.min(Style.space(28), parent.height / 2)
     visible: opacity > 0
     opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.contentY - resultList.originY) / height)) : 0
-    gradient: Gradient { GradientStop { position: 0; color: results.background } GradientStop { position: 1; color: Util.alpha(results.background, 0) } }
+    gradient: Gradient {
+      GradientStop {
+        position: 0
+        color: results.background
+      }
+      GradientStop {
+        position: 1
+        color: Util.alpha(results.background, 0)
+      }
+    }
   }
   Rectangle {
-    anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
     height: Math.min(Style.space(28), parent.height / 2)
     visible: opacity > 0
     opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.originY + resultList.contentHeight - resultList.height - resultList.contentY) / height)) : 0
-    gradient: Gradient { GradientStop { position: 0; color: Util.alpha(results.background, 0) } GradientStop { position: 1; color: results.background } }
+    gradient: Gradient {
+      GradientStop {
+        position: 0
+        color: Util.alpha(results.background, 0)
+      }
+      GradientStop {
+        position: 1
+        color: results.background
+      }
+    }
   }
 }

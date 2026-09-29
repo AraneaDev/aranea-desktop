@@ -5,24 +5,48 @@ import "lib"
 import "plugins/araneadev.health" as HealthComponents
 
 ShellRoot {
-  QmlTest { id: t }
+  QmlTest {
+    id: t
+  }
 
   HealthComponents.HealthProblemsSection {
     id: problems
-    problems: [{ glyph: "!", summary: "Disk", urgency: 2 }]
+    problems: [
+      {
+        glyph: "!",
+        summary: "Disk",
+        urgency: 2
+      }
+    ]
   }
 
   HealthComponents.HealthProcessSection {
     id: processes
-    cpuProcesses: [{ comm: "shell", percent: 2 }]
-    memoryProcesses: [{ comm: "shell", rss: 1000 }]
+    cpuProcesses: [
+      {
+        comm: "shell",
+        percent: 2
+      }
+    ]
+    memoryProcesses: [
+      {
+        comm: "shell",
+        rss: 1000
+      }
+    ]
   }
 
   HealthComponents.HealthResourceSection {
     id: resources
     cpu: 42
     memoryPercent: 55
-    diskRows: [{ target: "/", percent: 40, avail: 1000 }]
+    diskRows: [
+      {
+        target: "/",
+        percent: 40,
+        avail: 1000
+      }
+    ]
     networkLabel: "eth0"
   }
 
