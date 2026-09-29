@@ -107,7 +107,15 @@ test("menu QML exposes its typed function signatures", () => {
     throw new Error("recent app history must refresh visible rows immediately")
   }
   requiresSignature(menuQml, "id: localAppLibrary", "menu local app-library fallback")
-  requiresSignature(menuQml, "DesktopEntries.applications.values", "menu DesktopEntries fallback")
+  const menuAppLibraryQml = fs.readFileSync(
+    `${root}/plugins/araneadev.menu/MenuAppLibrary.qml`,
+    "utf8"
+  )
+  requiresSignature(
+    menuAppLibraryQml,
+    "DesktopEntries.applications.values",
+    "menu DesktopEntries fallback"
+  )
   requiresSignature(menuQml, "function openRoute(initialMenu: string): void", "menu openRoute")
   requiresSignature(menuQml, "function goBack(): bool", "menu goBack")
   requiresSignature(menuQml, "function runAction(action): void", "menu runAction")

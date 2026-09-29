@@ -323,59 +323,9 @@ Item {
   // Older Omarchy shells inject a scoped shell object without its AppLibrary
   // capability. Keep the menu usable on those hosts by reading the same
   // DesktopEntries source locally instead of turning Apps into an empty page.
-  QtObject {
+  MenuAppLibrary {
     id: localAppLibrary
-    signal appsChanged
-
-    function entryName(entry) {
-      return String((entry && entry.name) || (entry && entry.id) || "")
-    }
-    function entrySubtext(entry) {
-      return String((entry && entry.genericName) || "")
-    }
-    function sortedEntries(query) {
-      var needle = String(query || "").trim().toLowerCase()
-      var values = DesktopEntries.applications.values || []
-      var rows = []
-      for (var i = 0; i < values.length; i++) {
-        var entry = values[i]
-        if (!entry || entry.noDisplay || !entryName(entry))
-          continue
-        var text = [entryName(entry), entrySubtext(entry), entry.comment, entry.id].join(" ").toLowerCase()
-        if (needle && text.indexOf(needle) < 0)
-          continue
-        rows.push({
-          entry: entry,
-          score: needle ? 1 : 0,
-          key: entryName(entry).toLowerCase(),
-          name: entryName(entry).toLowerCase()
-        })
-      }
-      rows.sort(function (a, b) {
-        return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0)
-      })
-      return rows
-    }
-    function iconSource(icon) {
-      var value = String(icon || "")
-      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0)
-        return value
-      if (value.charAt(0) === "/")
-        return Util.fileUrl(value)
-      return Quickshell.iconPath(value || "application-x-executable", true)
-    }
-    function refreshIcons() {
-    }
-    function launch(desktopId, name) {
-      var id = String(desktopId || "")
-      if (id)
-        root.run("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
-    }
-    function remove(desktopId, name) {
-      var id = String(desktopId || "")
-      if (id)
-        root.run(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
-    }
+    owner: root
   }
   // Whether the uninstall confirmation dialog is showing.
   property bool deleteConfirmOpen: false
