@@ -78,7 +78,7 @@ fi
 
 # --- 4d: the lock date ticks with the clock; one state root for the lock
 lock_view="$repo_root/plugins/araneadev.lock/LockView.qml"
-grep -Fq 'text: root.dateText' "$lock_view"
+grep -Fq 'dateText: root.dateText' "$lock_view"
 grep -A6 -F 'function updateClock(): void' "$lock_view" | grep -Fq 'dateText = Qt.formatDate('
 if grep -Fq 'XDG_STATE_HOME' "$lock_view"; then
   echo "LockView must use Omarchy's fixed state path, like Service.qml" >&2

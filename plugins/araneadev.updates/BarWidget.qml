@@ -5,6 +5,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "UpdateLogic.js" as UpdateLogic
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
@@ -131,7 +132,7 @@ Item {
     signal refresh
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight
-    PanelKeyCatcher {
+    Aranea.KeyboardInputFrame {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()

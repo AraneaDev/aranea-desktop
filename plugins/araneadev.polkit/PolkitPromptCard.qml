@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "PolkitLogic.js" as PolkitLogic
+import "../araneadev.shared" as Aranea
 
 ColumnLayout {
   id: root
@@ -54,45 +55,15 @@ ColumnLayout {
 
   spacing: Style.space(10)
 
-  RowLayout {
+  Aranea.BrandHeader {
     Layout.fillWidth: true
-    spacing: Style.space(10)
-
-    Image {
-      Layout.preferredWidth: Style.space(22)
-      Layout.preferredHeight: Style.space(22)
-      source: root.glyphSource
-      sourceSize: Qt.size(44, 44)
-      fillMode: Image.PreserveAspectFit
-      smooth: true
-    }
-
-    ColumnLayout {
-      Layout.fillWidth: true
-      spacing: Style.space(2)
-      Text {
-        Layout.fillWidth: true
-        textFormat: Text.PlainText
-        text: "AUTHENTICATION REQUIRED"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.title
-        font.weight: Font.Medium
-        font.letterSpacing: root.letterSpacing
-        elide: Text.ElideRight
-      }
-      Text {
-        Layout.fillWidth: true
-        textFormat: Text.PlainText
-        text: "SYSTEM // PRIVILEGED"
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        font.weight: Font.Medium
-        font.letterSpacing: root.letterSpacing
-        elide: Text.ElideRight
-      }
-    }
+    title: "AUTHENTICATION REQUIRED"
+    subtitle: "SYSTEM // PRIVILEGED"
+    glyphSource: root.glyphSource
+    fontFamily: root.fontFamily
+    foreground: root.foreground
+    accent: root.accent
+    letterSpacing: root.letterSpacing
   }
 
   Text {

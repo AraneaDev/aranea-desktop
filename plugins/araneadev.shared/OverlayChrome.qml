@@ -46,56 +46,16 @@ Item {
     spacing: Style.space(10)
 
     // Header: glyph, title and subtitle, counts.
-    RowLayout {
+    BrandHeader {
       Layout.fillWidth: true
-      spacing: Style.space(10)
-
-      Image {
-        Layout.preferredWidth: Style.space(22)
-        Layout.preferredHeight: Style.space(22)
-        source: chrome.glyphSource
-        sourceSize: Qt.size(44, 44)
-        fillMode: Image.PreserveAspectFit
-        smooth: true
-      }
-
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: Style.space(2)
-        Text {
-          Layout.fillWidth: true
-          textFormat: Text.PlainText
-          text: chrome.title
-          color: chrome.foreground
-          font.family: chrome.fontFamily
-          font.pixelSize: Style.font.title
-          font.weight: Font.Medium
-          font.letterSpacing: chrome.letterSpacing
-          elide: Text.ElideRight
-        }
-        Text {
-          Layout.fillWidth: true
-          textFormat: Text.PlainText
-          text: chrome.subtitle
-          color: chrome.dim
-          font.family: chrome.fontFamily
-          font.pixelSize: Style.font.caption
-          font.weight: Font.Medium
-          font.letterSpacing: chrome.letterSpacing
-          elide: Text.ElideRight
-        }
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: chrome.counts
-        color: chrome.accent
-        opacity: 0.8
-        font.family: chrome.fontFamily
-        font.pixelSize: Style.font.caption
-        font.weight: Font.Medium
-        font.letterSpacing: chrome.letterSpacing
-      }
+      title: chrome.title
+      subtitle: chrome.subtitle
+      counts: chrome.counts
+      fontFamily: chrome.fontFamily
+      foreground: chrome.foreground
+      accent: chrome.accent
+      letterSpacing: chrome.letterSpacing
+      glyphSource: chrome.glyphSource
     }
 
     // Search line.

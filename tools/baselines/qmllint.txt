@@ -136,7 +136,7 @@
 8	plugins/araneadev.workspaces/BarWidget.qml:unqualified:Unqualified access
 3	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "family" not found on type "QObject"
-4	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "text" not found on type "QObject"
-15	plugins/araneadev.workspaces/WorkspacePanel.qml:unqualified:Unqualified access
+3	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "text" not found on type "QObject"
+5	plugins/araneadev.workspaces/WorkspacePanel.qml:unqualified:Unqualified access
 1	plugins/araneadev.workspaces/WorkspacePanelHost.qml:unqualified:Unqualified access
 1	plugins/araneadev.workspaces/WorkspacePanelHost.qml:unused-imports:Unused import

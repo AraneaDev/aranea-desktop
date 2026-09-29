@@ -48,10 +48,13 @@ runtime checks require the Omarchy tooling available on the development host.
 
 ### Shared QML components
 
-Use `plugins/araneadev.shared` for visual contracts that are identical across
-plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`, `StatusTextPair`, and
-`KeyboardPanelFrame`. Keep lifecycle, cursor, and plugin-specific interaction
-logic in the owning plugin rather than adding it to shared components.
+Use `plugins/araneadev.shared` for visual and input contracts that are
+identical across plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`,
+`StatusTextPair`, `StatusRow`, `BrandHeader`, `KeyboardInputFrame`, and
+`KeyboardPanelFrame`. `KeyboardInputFrame` owns only key forwarding;
+`KeyboardPanelFrame` adds the layer-shell panel. Keep lifecycle, cursor, and
+plugin-specific interaction logic in the owning plugin rather than adding it
+to shared components.
 
 Generated asset outputs must not be edited directly. Change
 `design/tokens.toml` or the relevant template, run
@@ -88,9 +91,11 @@ settings parsing lives in `NotificationSettings.js`. New extractions must add
 direct module tests and preserve the facade's exported function names.
 
 Shared QML primitives may own visual contracts, tokens, and layout defaults,
-but not plugin lifecycle, cursor state, IPC, or process management. Keep a
-large QML entry point as a composition root while moving one responsibility at
-a time behind tested properties and signals.
+but not plugin lifecycle, cursor state, IPC, or process management. `BrandHeader`
+and `StatusRow` are intentionally presentational: callers provide text,
+colors, trailing content, and click policy through properties and signals.
+Keep a large QML entry point as a composition root while moving one
+responsibility at a time behind tested properties and signals.
 
 Presentational picker components follow the same boundary: `EmojiCell` owns
 cell rendering and click emission, while `EmojiGrid` owns result rendering and

@@ -8,3 +8,6 @@ StatusRail 1.0 StatusRail.qml
 StatusTextPair 1.0 StatusTextPair.qml
 EmptyState 1.0 EmptyState.qml
 KeyboardPanelFrame 1.0 KeyboardPanelFrame.qml
+KeyboardInputFrame 1.0 KeyboardInputFrame.qml
+BrandHeader 1.0 BrandHeader.qml
+StatusRow 1.0 StatusRow.qml

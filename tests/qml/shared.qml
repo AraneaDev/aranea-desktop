@@ -37,6 +37,27 @@ ShellRoot {
     message: "No matches"
   }
 
+  Shared.KeyboardInputFrame {
+    id: keyboardInput
+    width: 120
+    height: 80
+  }
+
+  Shared.BrandHeader {
+    id: brandHeader
+    title: "TITLE"
+    subtitle: "SUBTITLE"
+    counts: "3 ITEMS"
+  }
+
+  Shared.StatusRow {
+    id: statusRow
+    title: "STATUS"
+    subtitle: "DETAIL"
+    highlighted: true
+    clickable: true
+  }
+
   Component.onCompleted: {
     t.check(Shared.RuntimePaths.home.length > 0, "runtime paths expose the home directory")
     t.equal(Shared.RuntimePaths.motionStatePath, Shared.RuntimePaths.araneaStateRoot + "/motion", "motion path derives from the Aranea state root")
@@ -60,6 +81,13 @@ ShellRoot {
     t.equal(pair.subtitle, "SUBTITLE", "status text pairs expose their subtitle")
     t.equal(empty.icon, "󰈉", "empty states expose their icon")
     t.equal(empty.message, "No matches", "empty states expose their message")
+    t.equal(brandHeader.title, "TITLE", "brand headers expose their title")
+    t.equal(brandHeader.subtitle, "SUBTITLE", "brand headers expose their subtitle")
+    t.equal(brandHeader.counts, "3 ITEMS", "brand headers expose optional counts")
+    t.equal(statusRow.title, "STATUS", "status rows expose their title")
+    t.equal(statusRow.subtitle, "DETAIL", "status rows expose their subtitle")
+    t.check(statusRow.highlighted, "status rows expose highlight state")
+    t.check(statusRow.clickable, "status rows expose click capability")
     t.done()
   }
 }
