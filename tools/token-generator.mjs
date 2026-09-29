@@ -155,13 +155,21 @@ pragma Singleton
 import QtQuick
 
 QtObject {
+  // Full visible product name.
   readonly property string name: ${q(i.name)}
+  // Compact visible product name used in shell surfaces.
   readonly property string shortName: ${q(i.short_name)}
+  // Visible product tagline.
   readonly property string tagline: ${q(i.tagline)}
+  // Human-readable palette label.
   readonly property string paletteName: ${q(i.palette_name)}
+  // Subtitle shown on the lock screen.
   readonly property string lockSubtitle: ${q(i.lock_subtitle)}
+  // Title used by the theme-change ceremony.
   readonly property string ceremonyTitle: ${q(i.ceremony_title)}
+  // Detail line used by the theme-change ceremony.
   readonly property string ceremonyDetail: ${q(i.ceremony_detail)}
+  // Generated runtime mark filename.
   readonly property string markFile: ${q(markFile)}
 }
 `

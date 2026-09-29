@@ -6,11 +6,11 @@ do not edit generated assets by hand.
 
 ## The three customization sources
 
-| Source | Change it to update |
-| --- | --- |
-| `design/brand.toml` | Product name, short name, tagline, palette label, lock subtitle, and ceremony copy |
-| `design/tokens.toml` | Colors, shell surfaces, dimensions, motion, and integration values |
-| `branding/marks/aranea-primary.svg` | The canonical brand mark used across the desktop |
+| Source                              | Change it to update                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| `design/brand.toml`                 | Product name, short name, tagline, palette label, lock subtitle, and ceremony copy |
+| `design/tokens.toml`                | Colors, shell surfaces, dimensions, motion, and integration values                 |
+| `branding/marks/aranea-primary.svg` | The canonical brand mark used across the desktop                                   |
 
 The primary SVG should keep its existing SVG structure and two semantic mark
 colors: `#7DFFC0` for the bright gradient stop and `#10F0D0` for the cyan
