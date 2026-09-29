@@ -610,10 +610,23 @@ function labelFor(entry, checkedResults) {
 /* @aranea-facade-start: plugins/araneadev.menu/MenuTree.js */
 // Pure menu tree helpers: route resolution, ancestry, breadcrumbs and visibility.
 
+/**
+ * Looks up an item by id.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the id to find
+ * @returns {?MenuItem} the item, or null
+ */
 function item(items, id) {
   return items && items[id] ? items[id] : null
 }
 
+/**
+ * Resolves a route name to a menu item id.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {*} input - the requested route
+ * @returns {string} the matching route id
+ */
 function resolveRoute(items, itemOrder, input) {
   var raw = String(input || "")
     .toLowerCase()
@@ -634,6 +647,12 @@ function resolveRoute(items, itemOrder, input) {
   return raw
 }
 
+/**
+ * Counts how many menus lie between an item and the root.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {number} the depth
+ */
 function depthFor(items, id) {
   var depth = 0
   var current = item(items, id)
@@ -646,6 +665,12 @@ function depthFor(items, id) {
   return depth
 }
 
+/**
+ * Joins labels from the root down to an item.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {string} the breadcrumb path
+ */
 function pathFor(items, id) {
   var labels = []
   var current = item(items, id)
@@ -658,12 +683,25 @@ function pathFor(items, id) {
   return labels.join(" › ")
 }
 
+/**
+ * Returns the breadcrumb path of an item's parent.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {string} the parent path
+ */
 function parentPathFor(items, id) {
   var entry = item(items, id)
   if (!entry || !entry.parent || entry.parent === "root") return ""
   return pathFor(items, entry.parent)
 }
 
+/**
+ * Tells whether an item sits below an ancestor.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @param {string} ancestorId - the candidate ancestor
+ * @returns {boolean} true when it is a descendant
+ */
 function isDescendantOf(items, id, ancestorId) {
   if (ancestorId === "root") return id !== "root"
   var current = item(items, id)
@@ -676,6 +714,13 @@ function isDescendantOf(items, id, ancestorId) {
   return false
 }
 
+/**
+ * Counts an item's direct children.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {string} id - the parent id
+ * @returns {number} the child count
+ */
 function childCount(items, itemOrder, id) {
   var count = 0
   var order = Array.isArray(itemOrder) ? itemOrder : []
@@ -686,6 +731,15 @@ function childCount(items, itemOrder, id) {
   return count
 }
 
+/**
+ * Tells whether an item should be listed.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {{[key: string]: boolean}} whenResults - guard results
+ * @param {MenuItem} entry - the item to test
+ * @param {number} [depth] - recursion depth
+ * @returns {boolean} true when visible
+ */
 function isVisible(items, itemOrder, whenResults, entry, depth) {
   if (!entry) return false
   if (entry.when && whenResults && whenResults[entry.id] === false) return false
@@ -758,18 +812,30 @@ function displayRow(items, itemOrder, checkedResults, entry, detail, score, sect
 /* @aranea-facade-start: plugins/araneadev.menu/MenuSearch.js */
 // Pure search helpers for MenuModel.js: tokenization, matching and ranking.
 
-/** Replaces route separators with spaces so ids split into words. */
+/**
+ * Replaces route separators with spaces so ids split into words.
+ * @param {*} value - the token to normalize
+ * @returns {string} the spaced token
+ */
 function searchableToken(value) {
   return String(value || "").replace(/[._-]+/g, " ")
 }
 
-/** Returns the final segment of a dotted route id. */
+/**
+ * Returns the final segment of a dotted route id.
+ * @param {*} id - the item id
+ * @returns {string} the leaf segment
+ */
 function leafIdFor(id) {
   var parts = String(id || "").split(".")
   return parts.length > 0 ? parts[parts.length - 1] : id
 }
 
-/** Builds the lower-cased text matched for an item's name. */
+/**
+ * Builds the lower-cased text matched for an item's name.
+ * @param {MenuItem} entry - the item
+ * @returns {string} the searchable text
+ */
 function nameSearchText(entry) {
   if (!entry) return ""
   var aliases = []
@@ -780,7 +846,12 @@ function nameSearchText(entry) {
     .toLowerCase()
 }
 
-/** Tells whether a term equals a whitespace-separated word. */
+/**
+ * Tells whether a term equals a whitespace-separated word.
+ * @param {string} term - a lower-cased search term
+ * @param {*} text - the text to split
+ * @returns {boolean} true on a whole-word match
+ */
 function termInSearchWords(term, text) {
   var words = String(text || "")
     .toLowerCase()
@@ -791,7 +862,12 @@ function termInSearchWords(term, text) {
   return false
 }
 
-/** Tells whether every query term is a whole word in the supplied text. */
+/**
+ * Tells whether every query term is a whole word in the supplied text.
+ * @param {*} query - the search query
+ * @param {*} text - the description text
+ * @returns {boolean} true when all terms match
+ */
 function descriptionTextMatches(query, text) {
   var terms = String(query || "")
     .toLowerCase()
@@ -803,7 +879,13 @@ function descriptionTextMatches(query, text) {
   return true
 }
 
-/** Tells whether a visible item matches every query term. */
+/**
+ * Tells whether a visible item matches every query term.
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @param {boolean} visible - whether the item is visible
+ * @returns {boolean} true when it matches
+ */
 function matchesQuery(entry, query, visible) {
   if (!entry || entry.id === "root") return false
   if (!visible) return false
@@ -825,10 +907,16 @@ function matchesQuery(entry, query, visible) {
   return true
 }
 
-/** Finds an item's depth without depending on MenuModel's other helpers. */
+/**
+ * Finds an item's depth without depending on MenuModel's other helpers.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {number} the depth
+ */
 function searchDepthFor(items, id) {
   var depth = 0
   var current = items && items[id]
+  /** @type {{[key: string]: boolean}} */
   var seen = {}
   while (current && current.parent && current.parent !== "root" && !seen[current.id]) {
     seen[current.id] = true
@@ -838,7 +926,13 @@ function searchDepthFor(items, id) {
   return depth
 }
 
-/** Scores a search hit by match tier, depth and declared order. */
+/**
+ * Scores a search hit by match tier, depth and declared order.
+ * @param {ItemMap} items - items by id
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @returns {number} the sortable score
+ */
 function searchScore(items, entry, query) {
   var needle = String(query || "")
     .toLowerCase()

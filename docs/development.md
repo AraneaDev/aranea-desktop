@@ -73,6 +73,25 @@ Generated files remain plain QML-compatible JavaScript: do not add `require`,
 ES module imports, or QML-only nested `.import` statements. The generator check
 runs as part of `tools/check` and fails when a facade is stale.
 
+### Extraction boundaries
+
+Shared runtime paths belong in `plugins/araneadev.shared/RuntimePaths.qml`.
+Use its branding URLs and state-root properties instead of rebuilding
+`XDG_STATE_HOME`, `HOME`, or the current-theme branding path in a plugin. Keep
+lock-screen paths fixed to Omarchy's documented state root where that behavior
+is intentional.
+
+Large JavaScript facades should expose a stable compatibility surface while
+delegating focused pure domains to sibling modules. The menu model keeps
+search in `MenuSearch.js` and route/tree traversal in `MenuTree.js`; notification
+settings parsing lives in `NotificationSettings.js`. New extractions must add
+direct module tests and preserve the facade's exported function names.
+
+Shared QML primitives may own visual contracts, tokens, and layout defaults,
+but not plugin lifecycle, cursor state, IPC, or process management. Keep a
+large QML entry point as a composition root while moving one responsibility at
+a time behind tested properties and signals.
+
 ## Showcase captures
 
 The README is a visual showcase as well as a project introduction. Refresh

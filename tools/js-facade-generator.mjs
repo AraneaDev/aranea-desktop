@@ -14,6 +14,10 @@ const specs = [
     "plugins/araneadev.clipboard/ClipboardLogic.js",
     "plugins/araneadev.clipboard/ClipboardPresentation.js"
   ],
+  [
+    "plugins/araneadev.clipboard/ClipboardLogic.js",
+    "plugins/araneadev.clipboard/ClipboardNormalization.js"
+  ],
   ["plugins/araneadev.health/HealthLogic.js", "plugins/araneadev.health/HealthPresentation.js"],
   [
     "plugins/araneadev.notifications/NotificationLogic.js",
@@ -35,7 +39,10 @@ function marker(target, source) {
 }
 
 function generatedRegion(target, source) {
-  const sourceText = fs.readFileSync(path.join(root, source), "utf8").trim()
+  const sourceText = fs
+    .readFileSync(path.join(root, source), "utf8")
+    .replace(/^\/\*\* @typedef .* (?:MenuItem|ItemMap|ClipboardEntry) \*\/\n/gm, "")
+    .trim()
   return `${marker(target, source)}\n${sourceText}\n/* @aranea-facade-end */`
 }
 

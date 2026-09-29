@@ -1,9 +1,24 @@
 // Pure menu tree helpers: route resolution, ancestry, breadcrumbs and visibility.
 
+/** @typedef {{id: string, label: string, kind?: string, parent?: string, target?: string, aliases?: Array<*>, provider?: string, when?: string}} MenuItem */
+/** @typedef {{[key: string]: MenuItem}} ItemMap */
+/**
+ * Looks up an item by id.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the id to find
+ * @returns {?MenuItem} the item, or null
+ */
 function item(items, id) {
   return items && items[id] ? items[id] : null
 }
 
+/**
+ * Resolves a route name to a menu item id.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {*} input - the requested route
+ * @returns {string} the matching route id
+ */
 function resolveRoute(items, itemOrder, input) {
   var raw = String(input || "")
     .toLowerCase()
@@ -24,6 +39,12 @@ function resolveRoute(items, itemOrder, input) {
   return raw
 }
 
+/**
+ * Counts how many menus lie between an item and the root.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {number} the depth
+ */
 function depthFor(items, id) {
   var depth = 0
   var current = item(items, id)
@@ -36,6 +57,12 @@ function depthFor(items, id) {
   return depth
 }
 
+/**
+ * Joins labels from the root down to an item.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {string} the breadcrumb path
+ */
 function pathFor(items, id) {
   var labels = []
   var current = item(items, id)
@@ -48,12 +75,25 @@ function pathFor(items, id) {
   return labels.join(" › ")
 }
 
+/**
+ * Returns the breadcrumb path of an item's parent.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {string} the parent path
+ */
 function parentPathFor(items, id) {
   var entry = item(items, id)
   if (!entry || !entry.parent || entry.parent === "root") return ""
   return pathFor(items, entry.parent)
 }
 
+/**
+ * Tells whether an item sits below an ancestor.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @param {string} ancestorId - the candidate ancestor
+ * @returns {boolean} true when it is a descendant
+ */
 function isDescendantOf(items, id, ancestorId) {
   if (ancestorId === "root") return id !== "root"
   var current = item(items, id)
@@ -66,6 +106,13 @@ function isDescendantOf(items, id, ancestorId) {
   return false
 }
 
+/**
+ * Counts an item's direct children.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {string} id - the parent id
+ * @returns {number} the child count
+ */
 function childCount(items, itemOrder, id) {
   var count = 0
   var order = Array.isArray(itemOrder) ? itemOrder : []
@@ -76,6 +123,15 @@ function childCount(items, itemOrder, id) {
   return count
 }
 
+/**
+ * Tells whether an item should be listed.
+ * @param {ItemMap} items - items by id
+ * @param {Array<string>} itemOrder - item order
+ * @param {{[key: string]: boolean}} whenResults - guard results
+ * @param {MenuItem} entry - the item to test
+ * @param {number} [depth] - recursion depth
+ * @returns {boolean} true when visible
+ */
 function isVisible(items, itemOrder, whenResults, entry, depth) {
   if (!entry) return false
   if (entry.when && whenResults && whenResults[entry.id] === false) return false

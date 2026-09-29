@@ -1,17 +1,31 @@
 // Pure search helpers for MenuModel.js: tokenization, matching and ranking.
 
-/** Replaces route separators with spaces so ids split into words. */
+/** @typedef {{id: string, label: string, kind?: string, parent?: string, aliases?: Array<*>, description?: string, order?: number}} MenuItem */
+/** @typedef {{[key: string]: MenuItem}} ItemMap */
+/**
+ * Replaces route separators with spaces so ids split into words.
+ * @param {*} value - the token to normalize
+ * @returns {string} the spaced token
+ */
 function searchableToken(value) {
   return String(value || "").replace(/[._-]+/g, " ")
 }
 
-/** Returns the final segment of a dotted route id. */
+/**
+ * Returns the final segment of a dotted route id.
+ * @param {*} id - the item id
+ * @returns {string} the leaf segment
+ */
 function leafIdFor(id) {
   var parts = String(id || "").split(".")
   return parts.length > 0 ? parts[parts.length - 1] : id
 }
 
-/** Builds the lower-cased text matched for an item's name. */
+/**
+ * Builds the lower-cased text matched for an item's name.
+ * @param {MenuItem} entry - the item
+ * @returns {string} the searchable text
+ */
 function nameSearchText(entry) {
   if (!entry) return ""
   var aliases = []
@@ -22,7 +36,12 @@ function nameSearchText(entry) {
     .toLowerCase()
 }
 
-/** Tells whether a term equals a whitespace-separated word. */
+/**
+ * Tells whether a term equals a whitespace-separated word.
+ * @param {string} term - a lower-cased search term
+ * @param {*} text - the text to split
+ * @returns {boolean} true on a whole-word match
+ */
 function termInSearchWords(term, text) {
   var words = String(text || "")
     .toLowerCase()
@@ -33,7 +52,12 @@ function termInSearchWords(term, text) {
   return false
 }
 
-/** Tells whether every query term is a whole word in the supplied text. */
+/**
+ * Tells whether every query term is a whole word in the supplied text.
+ * @param {*} query - the search query
+ * @param {*} text - the description text
+ * @returns {boolean} true when all terms match
+ */
 function descriptionTextMatches(query, text) {
   var terms = String(query || "")
     .toLowerCase()
@@ -45,7 +69,13 @@ function descriptionTextMatches(query, text) {
   return true
 }
 
-/** Tells whether a visible item matches every query term. */
+/**
+ * Tells whether a visible item matches every query term.
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @param {boolean} visible - whether the item is visible
+ * @returns {boolean} true when it matches
+ */
 function matchesQuery(entry, query, visible) {
   if (!entry || entry.id === "root") return false
   if (!visible) return false
@@ -67,10 +97,16 @@ function matchesQuery(entry, query, visible) {
   return true
 }
 
-/** Finds an item's depth without depending on MenuModel's other helpers. */
+/**
+ * Finds an item's depth without depending on MenuModel's other helpers.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {number} the depth
+ */
 function searchDepthFor(items, id) {
   var depth = 0
   var current = items && items[id]
+  /** @type {{[key: string]: boolean}} */
   var seen = {}
   while (current && current.parent && current.parent !== "root" && !seen[current.id]) {
     seen[current.id] = true
@@ -80,7 +116,13 @@ function searchDepthFor(items, id) {
   return depth
 }
 
-/** Scores a search hit by match tier, depth and declared order. */
+/**
+ * Scores a search hit by match tier, depth and declared order.
+ * @param {ItemMap} items - items by id
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @returns {number} the sortable score
+ */
 function searchScore(items, entry, query) {
   var needle = String(query || "")
     .toLowerCase()

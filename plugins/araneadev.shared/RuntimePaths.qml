@@ -23,6 +23,8 @@ QtObject {
 
   // Root directory for the active theme's branding assets.
   readonly property string themeRoot: omarchyStateRoot + "/current/theme"
+
+  // Root directory for branding assets within the active theme.
   readonly property string brandingRoot: themeRoot + "/branding"
 
   // Directory containing branding marks.

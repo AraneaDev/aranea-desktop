@@ -80,12 +80,15 @@ if (typeof module !== "undefined")
  * @property {number} [pinnedAtMs] - Sort key for pinned rows (pin time, else capture time); set on every row right after it is built.
  */
 
+/* @aranea-facade-start: plugins/araneadev.clipboard/ClipboardNormalization.js */
+/*
+ * Pure normalization helpers for clipboard entries. The QML facade keeps the
+ * public API stable while this module owns the input-shape rules.
+ */
 /**
- * Validates the base fields of a history entry: a non-blank string or text
- * entry becomes {type:"text", text}, an image entry with a path becomes
- * {type:"image", path, mime, capturedAt?}; the extra fields are dropped.
- * @param {*} value - A raw string or parsed entry object.
- * @returns {?ClipboardEntry} The base entry, or null when the value is not a usable entry.
+ * Validates and reduces a raw clipboard value to its base entry shape.
+ * @param {*} value - a raw string or parsed entry
+ * @returns {?ClipboardEntry} the base entry, or null
  */
 function normalizeBase(value) {
   if (typeof value === "string")
@@ -117,10 +120,9 @@ function normalizeBase(value) {
 }
 
 /**
- * Normalizes an entry like normalizeBase and keeps the Aranea extras (kind,
- * secret, secretOverride, pinned, pinnedAtMs, capturedAtMs) when they have the right type.
- * @param {*} value - A raw string or parsed entry object.
- * @returns {?ClipboardEntry} The normalized entry, or null when the value is not a usable entry.
+ * Normalizes an entry while preserving supported Aranea metadata.
+ * @param {*} value - a raw string or parsed entry
+ * @returns {?ClipboardEntry} the normalized entry, or null
  */
 function normalizeEntry(value) {
   var entry = normalizeBase(value)
@@ -137,6 +139,11 @@ function normalizeEntry(value) {
     entry.capturedAtMs = at
   return entry
 }
+
+if (typeof module !== "undefined") {
+  module.exports = { normalizeBase: normalizeBase, normalizeEntry: normalizeEntry }
+}
+/* @aranea-facade-end */
 
 /**
  * Builds the identity used to de-duplicate entries: "image:<path>" or "text:<text>".

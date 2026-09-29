@@ -42,7 +42,7 @@ fi
 agent="$plugin/PolkitAgent.qml"
 grep -Fq 'AUTHENTICATION REQUIRED' "${polkit_files[@]}"
 grep -Fq 'SYSTEM // PRIVILEGED' "${polkit_files[@]}"
-grep -Fq 'aranea-glyph.svg' "${polkit_files[@]}"
+grep -Fq 'RuntimePaths.glyphUrl' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.requestMarkup(panel.root.currentMessage' "${polkit_files[@]}"
 grep -Fq 'textFormat: Text.StyledText' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.contextLine(' "${polkit_files[@]}"

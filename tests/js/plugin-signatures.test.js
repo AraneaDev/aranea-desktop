@@ -37,7 +37,7 @@ test("notification quiet-hours markers are wired into Service.qml", () => {
 test("bar and notification surfaces use the reduced Aranea glyph, lock surface keeps its spider art", () => {
   if (!menuBarWidgetQml.includes("aranea-glyph.svg"))
     throw new Error("bar menu trigger is missing reduced Aranea glyph")
-  if (!notificationCardQml.includes("aranea-glyph.svg"))
+  if (!notificationCardQml.includes("RuntimePaths.glyphUrl"))
     throw new Error("notification card is missing reduced Aranea glyph")
   if (!lockViewQml.includes("unlock.png"))
     throw new Error("lock surface is missing canonical Aranea spider")

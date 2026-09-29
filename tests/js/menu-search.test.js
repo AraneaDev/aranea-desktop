@@ -34,5 +34,8 @@ test("menu search scores exact labels ahead of descriptions", () => {
     }
   }
 
-  assert.ok(search.searchScore(items, items.exact, "power") < search.searchScore(items, items.description, "power"))
+  assert.ok(
+    search.searchScore(items, items.exact, "power") <
+      search.searchScore(items, items.description, "power")
+  )
 })

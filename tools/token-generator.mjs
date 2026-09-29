@@ -72,7 +72,7 @@ function renderShellToml(tokens) {
   return `${lines.join("\n").trimEnd()}\n`
 }
 
-function renderQmlTokens(tokens) {
+function renderQmlTokens() {
   return `// Canonical semantic design tokens exposed to shared QML components.
 // qmllint disable missing-property
 pragma Singleton
@@ -250,7 +250,7 @@ function outputs(tokens) {
   return new Map([
     ["colors.toml", renderColorsToml(tokens)],
     ["shell.toml", renderShellToml(tokens)],
-    ["plugins/araneadev.shared/DesignTokens.qml", renderQmlTokens(tokens)],
+    ["plugins/araneadev.shared/DesignTokens.qml", renderQmlTokens()],
     ["integrations/aranea-colors.css", renderIntegrationCss(tokens)],
     ...renderPlatformTemplates(tokens),
     ...renderCursorAssets(tokens),
