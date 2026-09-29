@@ -92,6 +92,13 @@ but not plugin lifecycle, cursor state, IPC, or process management. Keep a
 large QML entry point as a composition root while moving one responsibility at
 a time behind tested properties and signals.
 
+Presentational picker components follow the same boundary: `EmojiCell` owns
+cell rendering and click emission, while `EmojiGrid` owns result rendering and
+selection reporting; `Emojis.qml` retains filtering, recents, persistence, and
+insertion. New components should expose explicit properties and signals, keep
+their defaults tied to shared tokens, and receive dynamic state from the
+composition root instead of reaching into root-only ids.
+
 ## Showcase captures
 
 The README is a visual showcase as well as a project introduction. Refresh

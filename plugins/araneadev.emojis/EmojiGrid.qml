@@ -1,4 +1,5 @@
 // Result grid for the emoji picker. Selection and insertion remain owned by Emojis.qml.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 
