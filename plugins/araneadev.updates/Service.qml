@@ -1,7 +1,7 @@
 // Update status service and updater process coordination.
 import QtQuick
-import Quickshell
 import Quickshell.Io
+import "../araneadev.shared" as Aranea
 import "UpdateLogic.js" as UpdateLogic
 
 Item {
@@ -16,9 +16,9 @@ Item {
     updates: []
   })
   // State directory containing the reboot marker.
-  property string stateHome: Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")
+  property string stateHome: Aranea.RuntimePaths.xdgStateHome
   // Path to the reboot-required marker.
-  readonly property string rebootPath: stateHome + "/omarchy/reboot-required"
+  readonly property string rebootPath: Aranea.RuntimePaths.rebootRequiredPath
   // Raw updater output.
   property string updateOutput: ""
   // Whether the update process has completed.

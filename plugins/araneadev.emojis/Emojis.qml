@@ -51,9 +51,9 @@ Item {
   property var recents: []
 
   // Aranea state directory: $XDG_STATE_HOME/aranea (default ~/.local/state/aranea).
-  readonly property string stateRoot: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea"
+  readonly property string stateRoot: Aranea.RuntimePaths.araneaStateRoot
   // File that stores the recent list (emoji-recent.json under stateRoot).
-  readonly property string recentsPath: stateRoot + "/emoji-recent.json"
+  readonly property string recentsPath: Aranea.RuntimePaths.emojiRecentsPath
   // The RECENT row shows only with an empty search and at least one recent.
   readonly property bool showRecents: !root.filterText && root.recents.length > 0
 

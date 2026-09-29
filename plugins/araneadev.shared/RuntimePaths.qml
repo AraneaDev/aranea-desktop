@@ -39,4 +39,10 @@ QtObject {
 
   // File storing the shared reduced-motion preference.
   readonly property string motionStatePath: araneaStateRoot + "/motion"
+
+  // Persistent emoji recents owned by the Aranea picker.
+  readonly property string emojiRecentsPath: araneaStateRoot + "/emoji-recent.json"
+
+  // Omarchy's reboot-required marker consumed by the updates widget.
+  readonly property string rebootRequiredPath: omarchyStateRoot + "/reboot-required"
 }

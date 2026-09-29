@@ -1413,7 +1413,7 @@ Item {
   }
 
   FileView {
-    path: root.stateHome + "/omarchy/current"
+    path: Aranea.RuntimePaths.omarchyStateRoot + "/current"
     watchChanges: true
     printErrors: false
     onFileChanged: root.scheduleTransparentForegroundRefresh()
