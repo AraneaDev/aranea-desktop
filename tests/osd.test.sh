@@ -10,6 +10,9 @@ source "$repo_root/tests/lib/sandbox.sh"
 
 test -f "$repo_root/plugins/araneadev.osd/manifest.json"
 grep -Fq '"id": "araneadev.osd"' "$repo_root/plugins/araneadev.osd/manifest.json"
+# Declared as a fork of the stock OSD, so the registry replaces it and
+# tools/upstream-drift watches shell/plugins/osd.
+jq -e '.omarchy.clonedFrom == "omarchy.osd"' "$repo_root/plugins/araneadev.osd/manifest.json" >/dev/null
 grep -Fq 'target: "osd"' "$repo_root/plugins/araneadev.osd/Osd.qml"
 grep -Fq 'araneadev.osd' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'araneadev.osd' "$repo_root/scripts/repair-shell-config"

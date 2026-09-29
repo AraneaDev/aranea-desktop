@@ -6,5 +6,10 @@
   "description": "Aranea on-screen display with a responsive filament gauge.",
   "kinds": ["panel"],
   "keepLoaded": true,
-  "entryPoints": { "panel": "Osd.qml" }
+  "entryPoints": {
+    "panel": "Osd.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.osd"
+  }
 }
