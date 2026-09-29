@@ -296,43 +296,15 @@ PanelWindow {
       ColumnLayout {
         Layout.fillWidth: true
         visible: panel.root.detailsOpen
-        spacing: Style.space(4)
-        Repeater {
-          model: PolkitLogic.detailRows(panel.root.currentActionId, panel.root.actionVendor, PolkitLogic.commandFromMessage(panel.root.currentMessage), panel.root.currentMessage)
-          delegate: RowLayout {
-            id: detailRow
-            required property var modelData
-            Layout.fillWidth: true
-            spacing: Style.space(10)
-            Text {
-              Layout.preferredWidth: Style.space(64)
-              Layout.alignment: Qt.AlignTop
-              textFormat: Text.PlainText
-              text: detailRow.modelData.key
-              color: panel.root.dim
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.weight: Font.Medium
-              font.letterSpacing: panel.root.letterSpacing
-            }
-            TextEdit {
-              Layout.fillWidth: true
-              textFormat: TextEdit.PlainText
-              text: detailRow.modelData.value
-              readOnly: true
-              selectByMouse: true
-              activeFocusOnPress: false
-              wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
-              color: panel.root.foreground
-              selectionColor: Util.alpha(panel.root.accent, 0.45)
-              selectedTextColor: panel.root.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.bodySmall
-              Keys.priority: Keys.BeforeItem
-              Keys.onPressed: function (event) {
-                panel.root.handleKey(event)
-              }
-            }
+        PolkitDetails {
+          rows: PolkitLogic.detailRows(panel.root.currentActionId, panel.root.actionVendor, PolkitLogic.commandFromMessage(panel.root.currentMessage), panel.root.currentMessage)
+          fontFamily: panel.root.fontFamily
+          foreground: panel.root.foreground
+          dim: panel.root.dim
+          accent: panel.root.accent
+          letterSpacing: panel.root.letterSpacing
+          onKeyPressed: function (event) {
+            panel.root.handleKey(event)
           }
         }
       }

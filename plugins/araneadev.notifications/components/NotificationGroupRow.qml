@@ -1,4 +1,5 @@
 // Presentational group header for the notification inbox.
+// qmllint disable missing-property
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons

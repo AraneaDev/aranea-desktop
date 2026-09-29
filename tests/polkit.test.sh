@@ -14,7 +14,7 @@ plugin="$repo_root/plugins/araneadev.polkit"
 # The entry (state, logic), its window and the system-bus agent; text checks
 # look in all three. Behaviour (empty Enter, submit, identities, hint, spoofed
 # target): tests/qml/polkit.qml, run offscreen by tests/qml-behaviour.test.sh.
-polkit_files=("$plugin/PolkitAgent.qml" "$plugin/PolkitWindow.qml" "$plugin/PolkitAgentService.qml")
+polkit_files=("$plugin/PolkitAgent.qml" "$plugin/PolkitWindow.qml" "$plugin/PolkitDetails.qml" "$plugin/PolkitAgentService.qml")
 
 # Logic contract: tests/js/polkit.test.js (node:test; run by tests/js.test.sh).
 
@@ -64,7 +64,8 @@ fi
 # Details start collapsed for every request
 grep -Fq 'detailsOpen = false' "${polkit_files[@]}"
 # Review Focus 4: every focus holder routes keys through one handler
-[[ "$(grep -c 'root.handleKey(event)' "$plugin/PolkitWindow.qml")" -ge 3 ]]
+key_handler_count="$(grep -h -c 'root.handleKey(event)' "$plugin/PolkitWindow.qml" "$plugin/PolkitDetails.qml" | awk '{ total += $1 } END { print total }')"
+[[ "$key_handler_count" -ge 3 ]]
 grep -Fq 'Qt.Key_Backtab' "${polkit_files[@]}"
 grep -Fq 'flow.selectedIdentity = flow.identities[' "${polkit_files[@]}"
 # The old pill above the card is gone (the request lives in the card now)
@@ -92,7 +93,7 @@ if grep -Eq 'elide:|maximumLineCount' <<<"$target_block"; then
   exit 1
 fi
 # --- 4a: clicking the details never takes focus from the password field
-block_grep "$plugin/PolkitWindow.qml" 'TextEdit {' 'activeFocusOnPress: false'
+block_grep "$plugin/PolkitDetails.qml" 'TextEdit {' 'activeFocusOnPress: false'
 # --- 4a: an empty Enter never submits (no wasted attempt), it nudges
 grep -Fq 'id: nudgeAnimation' "${polkit_files[@]}"
 # --- 4a: the identity count feeds the hint; the unused failed mirror is gone
