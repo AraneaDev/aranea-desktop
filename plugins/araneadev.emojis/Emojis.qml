@@ -461,7 +461,7 @@ Item {
             width: parent.width
             Repeater {
               model: root.showRecents ? root.recents : []
-              delegate: Cell {
+              delegate: EmojiCell {
                 required property string modelData
                 required property int index
                 glyph: modelData
@@ -485,7 +485,7 @@ Item {
             cellHeight: root.cellHeight
             boundsBehavior: Flickable.StopAtBounds
 
-            delegate: Cell {
+            delegate: EmojiCell {
               required property int index
               required property string emoji
               glyph: emoji
@@ -548,34 +548,5 @@ Item {
     font.pixelSize: Style.font.caption
     font.weight: Font.Medium
     font.letterSpacing: 0.20
-  }
-
-  component Cell: Rectangle {
-    id: cell
-    property string glyph: ""
-    property bool hasCursor: false
-    signal picked
-    width: root.cellWidth
-    height: root.cellHeight
-    radius: root.cornerRadius
-    color: hasCursor ? root.selectedBackground : "transparent"
-    // Mint ring on the selected cell (the menu's rail does not fit a grid).
-    border.width: hasCursor ? 1.5 : 0
-    border.color: root.selectedText
-
-    Text {
-      anchors.centerIn: parent
-      textFormat: Text.PlainText
-      text: cell.glyph
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.display
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onClicked: cell.picked()
-    }
   }
 }
