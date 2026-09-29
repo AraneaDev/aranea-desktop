@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# Reports what Omarchy changed upstream since the version Aranea is pinned to
+# in .omarchy-version: for every forked plugin (a manifest whose
+# omarchy.clonedFrom is omarchy.NAME, watched at shell/plugins/NAME) and for
+# the shell platform modules every plugin depends on, the upstream commits
+# and a diffstat. Markdown by default, one JSON document with --json, the
+# full diff per changed path with --diff. Exits 0 whether or not there is
+# drift; callers read "drift" from the JSON.
+#
+# Usage: tools/upstream-drift [--to REF] [--diff] [--json]
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+upstream_repo="${ARANEA_UPSTREAM_REPO:-https://github.com/basecamp/omarchy}"
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/aranea/upstream-omarchy"
+platform_paths=(shell/Commons shell/Ui shell/services shell/shell.qml)
+
+target=""
+with_diff=false
+as_json=false
+
+# Prints the usage line to stderr and exits 2.
+usage() {
+  printf 'Usage: tools/upstream-drift [--to REF] [--diff] [--json]\n' >&2
+  exit 2
+}
+
+# Prints "upstream-drift: MESSAGE" ($2) to stderr and exits with CODE ($1).
+die() {
+  printf 'upstream-drift: %s\n' "$2" >&2
+  exit "$1"
+}
+
+# Runs git against the cached upstream clone.
+upstream_git() {
+  git -C "$cache_dir" "$@"
+}
+
+# Makes cache_dir a bare, blobless clone of upstream_repo with current tags
+# and branches. A cache that is missing, not a bare repository or pointing at
+# another remote is recloned; a fetch failure on a good cache exits 1 and
+# keeps the cache.
+sync_cache() {
+  local log="$work/git.log"
+  if [[ "$(upstream_git rev-parse --is-bare-repository 2>/dev/null)" == true &&
+  "$(upstream_git config --get remote.origin.url 2>/dev/null)" == "$upstream_repo" ]]; then
+    upstream_git fetch --quiet --tags --force origin '+refs/heads/*:refs/heads/*' >"$log" 2>&1 || {
+      cat "$log" >&2
+      die 1 "cannot fetch $upstream_repo"
+    }
+    return 0
+  fi
+  rm -rf "$cache_dir"
+  mkdir -p "$(dirname "$cache_dir")"
+  git clone --quiet --bare --filter=blob:none "$upstream_repo" "$cache_dir" >"$log" 2>&1 || {
+    cat "$log" >&2
+    rm -rf "$cache_dir"
+    die 1 "cannot clone $upstream_repo"
+  }
+}
+
+# Prints the newest stable vX.Y.Z tag in the cache; pre-releases never count.
+latest_tag() {
+  upstream_git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1
+}
+
+# Prints "PLUGIN-ID<TAB>shell/plugins/NAME" for every manifest whose
+# omarchy.clonedFrom is "omarchy.NAME", in plugin directory order.
+fork_paths() {
+  local manifest
+  for manifest in "$repo_root"/plugins/*/manifest.json; do
+    [[ -f "$manifest" ]] || continue
+    jq -r '(.omarchy.clonedFrom // "") as $source
+      | select($source | startswith("omarchy."))
+      | [.id, "shell/plugins/" + ($source | ltrimstr("omarchy."))] | @tsv' "$manifest"
+  done
+}
+
+# Writes the JSON commit list for PATH ($1) in base..target to FILE ($2).
+write_commits() {
+  upstream_git log --format='%h%x09%ad%x09%s' --date=short "$base..$target" -- "$1" |
+    jq -R -s 'split("\n") | map(select(length > 0) | split("\t")
+      | {hash: .[0], date: .[1], subject: (.[2:] | join("\t"))})' >"$2"
+}
+
+# Prints the JSON diffstat {files, insertions, deletions} for PATH ($1);
+# binary files count as files with no line changes.
+path_stat() {
+  upstream_git diff --numstat "$base" "$target" -- "$1" |
+    awk '{ files++; if ($1 != "-") ins += $1; if ($2 != "-") del += $2 }
+      END { printf "{\"files\":%d,\"insertions\":%d,\"deletions\":%d}\n", files, ins, del }'
+}
+
+# Prints one JSON path entry for KIND ($1, fork or platform), PLUGIN ($2,
+# empty for platform paths) and upstream PATH ($3). Commits and the diff go
+# through files so a large report never becomes a single argument.
+path_entry() {
+  local kind="$1" plugin="$2" path="$3" status stat=null
+  local commits="$work/commits.json" diff="$work/diff.txt"
+  printf '[]\n' >"$commits"
+  : >"$diff"
+  if [[ -z "$(upstream_git ls-tree "$base" -- "$path")" ]]; then
+    status=missing-upstream
+  else
+    write_commits "$path" "$commits"
+    if [[ "$(jq 'length' "$commits")" == 0 ]]; then
+      status=unchanged
+    else
+      status=changed
+      stat="$(path_stat "$path")"
+      if [[ "$with_diff" == true ]]; then
+        upstream_git diff "$base" "$target" -- "$path" >"$diff"
+      fi
+    fi
+  fi
+  jq -n --arg kind "$kind" --arg plugin "$plugin" --arg path "$path" --arg status "$status" \
+    --slurpfile commits "$commits" --argjson stat "$stat" --rawfile diff "$diff" \
+    --argjson with_diff "$with_diff" \
+    '{kind: $kind} + (if $plugin == "" then {} else {plugin: $plugin} end)
+      + {upstream: $path, status: $status, commits: $commits[0], stat: $stat}
+      + (if $with_diff and $status == "changed" then {diff: $diff} else {} end)'
+}
+
+# Renders the JSON report on stdin as Markdown: changed paths with their
+# commits (forks first), then the missing and unchanged ones on one line each.
+render_markdown() {
+  jq -r '
+    def heading: if .kind == "fork" then "\(.plugin) (`\(.upstream)`)" else "Platform: `\(.upstream)`" end;
+    def total(k): [.paths[] | select(.kind == k)] | length;
+    def changed(k): [.paths[] | select(.kind == k and .status == "changed")] | length;
+    def section:
+      "## \(heading)\n\n\(.stat.files) files, +\(.stat.insertions) -\(.stat.deletions)\n\n"
+      + (.commits | map("- `\(.hash)` \(.date) \(.subject)") | join("\n"))
+      + (if has("diff") then "\n\n````diff\n\(.diff)````" else "" end)
+      + "\n";
+    "# Upstream Omarchy drift: \(.base) → \(.target)\n",
+    (if .drift
+      then "Changed: \(changed("fork")) of \(total("fork")) forks, \(changed("platform")) of \(total("platform")) platform paths.\n"
+      else "No upstream changes since \(.base).\n" end),
+    (.paths[] | select(.status == "changed") | section),
+    ([.paths[] | select(.status == "missing-upstream") | .plugin] | select(length > 0)
+      | "Missing upstream: \(join(", "))\n"),
+    ([.paths[] | select(.status == "unchanged") | .plugin // .upstream] | select(length > 0)
+      | "No upstream changes: \(join(", "))")
+  '
+}
+
+while (($#)); do
+  case "$1" in
+    --to)
+      [[ $# -ge 2 && -n "$2" ]] || usage
+      target="$2"
+      shift 2
+      ;;
+    --diff)
+      with_diff=true
+      shift
+      ;;
+    --json)
+      as_json=true
+      shift
+      ;;
+    -h | --help)
+      printf 'Usage: tools/upstream-drift [--to REF] [--diff] [--json]\n'
+      exit 0
+      ;;
+    *) usage ;;
+  esac
+done
+
+command -v git >/dev/null 2>&1 || die 4 "git is required"
+command -v jq >/dev/null 2>&1 || die 4 "jq is required"
+
+base="$(tr -d '[:space:]' <"$repo_root/.omarchy-version" 2>/dev/null || true)"
+[[ -n "$base" ]] || die 1 ".omarchy-version is missing or empty"
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+
+sync_cache
+upstream_git rev-parse --verify --quiet "$base^{commit}" >/dev/null ||
+  die 1 "pinned version $base (.omarchy-version) is not an upstream ref"
+if [[ -z "$target" ]]; then
+  target="$(latest_tag || true)"
+  [[ -n "$target" ]] || die 1 "no vX.Y.Z release tags found upstream"
+elif ! upstream_git rev-parse --verify --quiet "$target^{commit}" >/dev/null; then
+  die 2 "unknown upstream ref: $target"
+fi
+
+entries="$work/entries.json"
+: >"$entries"
+while IFS=$'\t' read -r plugin path; do
+  path_entry fork "$plugin" "$path" >>"$entries"
+done < <(fork_paths)
+for path in "${platform_paths[@]}"; do
+  path_entry platform "" "$path" >>"$entries"
+done
+
+report="$work/report.json"
+jq -s --arg base "$base" --arg target "$target" \
+  '{schema: 1, base: $base, target: $target, drift: any(.[]; .status == "changed"), paths: .}' \
+  "$entries" >"$report"
+
+if [[ "$as_json" == true ]]; then
+  cat "$report"
+else
+  render_markdown <"$report"
+fi
