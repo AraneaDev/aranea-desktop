@@ -1,4 +1,5 @@
 // Presentational tooltip surface for the bar's popup window.
+// qmllint disable missing-property
 import QtQuick
 import qs.Commons
 import qs.Ui

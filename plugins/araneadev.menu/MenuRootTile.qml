@@ -7,20 +7,34 @@ import qs.Ui
 BorderSurface {
   id: tile
 
+  // Menu data object containing icon, label and detail fields.
   required property var tileData
+  // Primary tile label.
   property string label: tileData && tileData.label ? tileData.label : ""
+  // Tile icon glyph.
   property string icon: tileData && tileData.icon ? tileData.icon : ""
+  // Secondary tile detail text.
   property string detail: tileData && tileData.detail ? tileData.detail : ""
+  // External selection state.
   property bool selected: false
+  // Font family used for all tile text.
   property string fontFamily: Style.font.menuFamily
+  // Main tile text colour.
   property color foreground: Color.menu.text
+  // Secondary tile text colour.
   property color contextText: Util.alpha(foreground, 0.58)
+  // Accent colour for the icon and edge marks.
   property color selectedText: Color.menu.selectedText
+  // Scale applied to the shell font sizes.
   property real menuFontScale: 1.0
+  // Letter spacing applied to tile text.
   property real menuLetterSpacing: 0.2
+  // Whether parent animations are enabled.
   property bool motionEnabled: true
+  // Whether the pointer is currently over the tile.
   property bool hovered: false
 
+  // Emitted when the tile is clicked.
   signal activated
 
   implicitHeight: Style.space(96)

@@ -11,7 +11,11 @@ ShellRoot {
 
   MenuComponents.MenuRootTile {
     id: tile
-    tileData: ({ label: "Applications", detail: "Open apps", icon: "▦" })
+    tileData: ({
+        label: "Applications",
+        detail: "Open apps",
+        icon: "▦"
+      })
     selected: true
   }
 
