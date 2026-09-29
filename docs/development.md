@@ -27,13 +27,26 @@ Run the repository quality gates:
 tools/check
 ```
 
-### Design tokens
+### Design tokens and branding
 
 Edit `design/tokens.toml` to change the shared palette, shell surfaces,
 spacing, typography, or motion defaults. Regenerate the committed projections
-with `scripts/generate-tokens --write`; platform projections are templated in
+with `scripts/generate-tokens --write`. Edit `design/brand.toml` for visible
+identity strings and replace `branding/marks/aranea-primary.svg` for the source
+mark. The generator color-projects that source into the runtime
+`branding/brand.svg`, lock compatibility asset, static Plymouth/lock artwork,
+the motif/status glyph family, the Kvantum splash artwork, and
+`branding/brand.env` for shell scripts. The source templates for those
+projections live under `design/templates/assets/branding/`; edit the templates
+only when changing the shape or semantic role of an asset.
+Platform projections are templated in
 `design/templates/`, and `scripts/generate-tokens --check` is the drift check
 used by the token contract test.
+
+The source SVG and both TOML files are the customization surface. Generated
+files, including `branding/brand.svg`, `unlock.png`, and the PNG artwork under
+`branding/screens/`, must not be edited directly. `rsvg-convert` is required
+when regenerating the raster outputs.
 
 The GTK stylesheet and cursor families have explicit tokenized templates under
 `design/templates/gtk.css.in` and `design/templates/assets/`. The generator

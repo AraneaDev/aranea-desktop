@@ -15,6 +15,12 @@ QtObject {
   readonly property color foreground: Color.foreground
   // Urgent and attention colour.
   readonly property color urgent: Color.urgent
+  // Semantic colors used by branding glyphs and lock overlays.
+  readonly property color ceremony: Color.notifications.countdown
+  // Attention color used by health status surfaces.
+  readonly property color attention: Color.notifications.countdown
+  // Base color used by the lock scrim.
+  readonly property color lockOverlay: Color.lock.background
   // Shared surface border colour.
   readonly property color surfaceBorder: Color.tooltip.border
   // Shared panel corner radius.

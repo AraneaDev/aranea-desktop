@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 112" fill="none">
+  <title>Brand menu network motif</title>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 82h76l28-28h68l28-28h152" stroke="{{colors.accent}}" stroke-opacity=".38" stroke-width="1"/>
+    <path d="M58 8 108 54l54 0 42 42h102" stroke="{{colors.accent_secondary}}" stroke-opacity=".28" stroke-width="1"/>
+    <path d="M172 4v50M252 26v70" stroke="{{colors.light_foreground}}" stroke-opacity=".16" stroke-width="1"/>
+  </g>
+  <g>
+    <circle cx="80" cy="82" r="1.5" fill="{{colors.accent}}" fill-opacity=".65"/>
+    <circle cx="108" cy="54" r="2" fill="{{colors.foreground}}" fill-opacity=".4"/>
+    <circle cx="176" cy="54" r="1.5" fill="{{colors.accent_secondary}}" fill-opacity=".65"/>
+    <circle cx="204" cy="26" r="1.5" fill="{{colors.accent}}" fill-opacity=".5"/>
+    <circle cx="252" cy="96" r="2" fill="{{colors.accent_secondary}}" fill-opacity=".45"/>
+  </g>
+</svg>

@@ -34,13 +34,13 @@ test("notification quiet-hours markers are wired into Service.qml", () => {
     throw new Error("quiet-hours state is not used by notification handling")
 })
 
-test("bar and notification surfaces use the reduced Aranea glyph, lock surface keeps its spider art", () => {
-  if (!menuBarWidgetQml.includes("aranea-glyph.svg"))
-    throw new Error("bar menu trigger is missing reduced Aranea glyph")
+test("bar and notification surfaces use the shared brand mark, lock surface keeps its spider art", () => {
+  if (!menuBarWidgetQml.includes("RuntimePaths.brandUrl"))
+    throw new Error("bar menu trigger is missing the shared brand mark")
   if (!notificationCardQml.includes("RuntimePaths.glyphUrl"))
-    throw new Error("notification card is missing reduced Aranea glyph")
-  if (!lockViewQml.includes("unlock.png"))
-    throw new Error("lock surface is missing canonical Aranea spider")
+    throw new Error("notification card is missing the shared brand mark")
+  if (!lockViewQml.includes("RuntimePaths.brandUrl"))
+    throw new Error("lock surface is missing the canonical brand mark")
   if (!lockViewQml.includes("y: Math.max(32, inputField.y - height - 42)"))
     throw new Error("lock branding is not anchored to the live field")
   if (!lockViewQml.includes("y: inputField.y + inputField.height + 28"))

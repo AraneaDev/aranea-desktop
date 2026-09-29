@@ -181,12 +181,6 @@ states and application surfaces behind it.
 | ----------------------------- | --------------------------------------- | --------------------------------- |
 | ![Apps](screenshots/apps.png) | ![Favorites](screenshots/favorites.png) | ![Recent](screenshots/recent.png) |
 
-Refresh the complete capture set in one pass:
-
-```bash
-scripts/capture-screenshots --all --output screenshots
-```
-
 ## Documentation
 
 | You want to...                                           | Read                                       |
@@ -194,11 +188,11 @@ scripts/capture-screenshots --all --output screenshots
 | Install, update, activate, or remove Aranea              | [Getting started](docs/getting-started.md) |
 | See what the theme includes                              | [Features](docs/features.md)               |
 | Configure profiles, wallpapers, motion, and integrations | [Configuration](docs/configuration.md)     |
+| Rebrand the visual identity                              | [Rebranding guide](docs/rebranding.md)     |
 | Repair an installation or recover safely                 | [Troubleshooting](docs/troubleshooting.md) |
 | Automate the installer as an agent                       | [Agent interface](docs/agent-interface.md) |
 | Browse the icon families                                 | [Icon gallery](docs/icons.md)              |
 | Understand the design system                             | [Visual language](docs/visual-language.md) |
-| Develop, test, or refresh screenshots                    | [Development](docs/development.md)         |
 
 The [documentation hub](docs/README.md) is the best place to start when you
 already know what kind of information you need.
@@ -218,7 +212,6 @@ The helpers are available as `scripts/<name>` from a checkout or as
 | `scripts/aranea-motion`       | Inspect or toggle Hyprland and shell animations.  |
 | `scripts/aranea-about`        | Print version, active theme, and health summary.  |
 | `scripts/aranea-showcase`     | List documented surfaces.                         |
-| `scripts/capture-screenshots` | Refresh the README capture set and hero GIF.      |
 
 The command menu keeps Favorites and Recent in `~/.local/state/aranea/menu.json`;
 `Ctrl+P` pins the app under the cursor. The complete icon and mark inventory is
@@ -267,16 +260,6 @@ scripts/           installer, doctor, integrations, wallpaper, and tooling
 tests/              shell, QML, JavaScript, asset, and screenshot contracts
 ```
 
-## Development
-
-```bash
-tests/run json-events install uninstall doctor installer
-tools/check
-```
-
-See [Development](docs/development.md) and [CONTRIBUTING.md](CONTRIBUTING.md)
-for the full workflow.
-
 ## Interaction notes
 
 The command menu keeps Favorites and Recent in `~/.local/state/aranea/menu.json`;
@@ -293,12 +276,6 @@ and expire according to `ARANEA_CLIPBOARD_SECRET_TTL_MS`.
 If the polkit prompt is disabled manually with
 `omarchy plugin disable araneadev.polkit`, run `omarchy restart shell` so
 Omarchy's fallback prompt can take over.
-
-The complete capture inventory remains explicit for tooling and maintainers:
-
-`screenshots/menu.png` `screenshots/menu-submenu.png` `screenshots/menu-search.png` `screenshots/menu-input.png` `screenshots/desktop.png` `screenshots/health.png` `screenshots/lock.png` `screenshots/plymouth.png` `screenshots/btop.png` `screenshots/file-manager.png` `screenshots/neovim.png` `screenshots/notifications.png` `screenshots/notifications-empty.png` `screenshots/clipboard.png` `screenshots/emojis.png` `screenshots/polkit.png` `screenshots/network.png` `screenshots/audio.png` `screenshots/bluetooth.png` `screenshots/agents.png` `screenshots/power.png` `screenshots/monitor.png` `screenshots/clock.png` `screenshots/weather.png` `screenshots/image-picker.png` `screenshots/apps.png` `screenshots/favorites.png` `screenshots/recent.png` `screenshots/dawn.png` `screenshots/osd.png` `screenshots/workspaces.png` `screenshots/updates.png` `screenshots/hero-showcase.gif`
-
-Refresh the set with `scripts/capture-screenshots --all --output screenshots`.
 
 The project publishes its CI status from
 `actions/workflow/status/AraneaDev/aranea-desktop/ci.yml`.

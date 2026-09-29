@@ -14,7 +14,9 @@ const fixture = {
     surface_raised: "#151c24",
     foreground: "#edf3f6",
     dark_foreground: "#8b96a6",
-    red: "#ff5f56"
+    red: "#ff5f56",
+    bright_green: "#abcdef",
+    cyan: "#123456"
   },
   dimensions: {
     cornerRadius: 10
@@ -44,6 +46,8 @@ test("flattenTokens exposes canonical dotted token paths", async () => {
     "colors.foreground": "#edf3f6",
     "colors.dark_foreground": "#8b96a6",
     "colors.red": "#ff5f56",
+    "colors.bright_green": "#abcdef",
+    "colors.cyan": "#123456",
     "dimensions.cornerRadius": 10,
     "motion.enabled": true,
     "motion.reduced_motion_fallback": "static",
@@ -86,6 +90,44 @@ test("renderIntegrationCss projects semantic palette variables", async () => {
   assert.match(output, /--aranea-accent: #3bff9e;/)
   assert.match(output, /--aranea-background: #08090b;/)
   assert.match(output, /--aranea-error: #ff5f56;/)
+  assert.match(output, /--aranea-ceremony: #e6c98a;/)
+})
+
+test("renderQmlTokens exposes semantic colors used by branding consumers", async () => {
+  const { renderQmlTokens } = await generatorPromise
+  const output = renderQmlTokens(fixture)
+  assert.match(output, /readonly property color ceremony: Color\.notifications\.countdown/)
+  assert.match(output, /readonly property color attention: Color\.notifications\.countdown/)
+  assert.match(output, /readonly property color lockOverlay: Color\.lock\.background/)
+})
+
+test("renderBrandShellEnv produces shell-safe visible identity values", async () => {
+  const { renderBrandShellEnv } = await generatorPromise
+  const output = renderBrandShellEnv({
+    identity: {
+      name: "Example Desktop",
+      short_name: "EXAMPLE",
+      tagline: "A different signal.",
+      palette_name: "ink / lime",
+      lock_subtitle: "PRIVATE SESSION",
+      ceremony_title: "EXAMPLE THEME CHANGE",
+      ceremony_detail: "CEREMONY: example mark"
+    },
+    assets: { mark: "branding/marks/aranea-primary.svg" }
+  })
+  assert.match(output, /^BRAND_NAME='Example Desktop'$/m)
+  assert.match(output, /^BRAND_SHORT_NAME='EXAMPLE'$/m)
+})
+
+test("canonicalPng removes rasterizer-specific ancillary chunks", async () => {
+  const { canonicalPng } = await generatorPromise
+  const fs = require("node:fs")
+  const png = fs.readFileSync("branding/screens/plymouth.png")
+  const ancillary = Buffer.from("0000000662474b4400ff00ff00ff00000000", "hex")
+  const withMetadata = Buffer.concat([png.subarray(0, 33), ancillary, png.subarray(33)])
+  const canonical = canonicalPng(withMetadata)
+  assert.equal(canonical.includes(Buffer.from("bKGD")), false)
+  assert.equal(canonical.subarray(0, 8).equals(png.subarray(0, 8)), true)
 })
 
 test("renderTemplate supports format-specific projections", async () => {
@@ -94,4 +136,25 @@ test("renderTemplate supports format-specific projections", async () => {
     renderTemplate("fg={{colors.accent}} raw={{colors.accent|hex}}", fixture),
     "fg=#3bff9e raw=3bff9e"
   )
+})
+
+test("brand projections use the configured identity and tokenized mark colors", async () => {
+  const { renderAssetSource, renderBrandQml } = await generatorPromise
+  const brand = {
+    identity: {
+      name: "Example",
+      short_name: "EXAMPLE",
+      tagline: "A different signal.",
+      palette_name: "ink / lime",
+      lock_subtitle: "PRIVATE SESSION",
+      ceremony_title: "EXAMPLE THEME CHANGE",
+      ceremony_detail: "CEREMONY: example mark"
+    },
+    assets: { mark: "branding/marks/aranea-primary.svg" }
+  }
+  const mark = renderAssetSource(brand.assets.mark, fixture)
+  assert.match(mark, /#abcdef/)
+  assert.match(mark, /#123456/)
+  assert.match(renderBrandQml(brand), /shortName: "EXAMPLE"/)
+  assert.match(renderBrandQml(brand), /lockSubtitle: "PRIVATE SESSION"/)
 })

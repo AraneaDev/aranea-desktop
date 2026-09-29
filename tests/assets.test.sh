@@ -30,6 +30,7 @@ find "$repo_root/integrations" -type f -name '*.svg' -print0 |
   xargs -0 -n1 xmllint --noout
 
 for path in \
+  branding/brand.svg \
   branding/marks/aranea-primary.svg \
   branding/marks/aranea-glyph.svg \
   branding/marks/aranea-ceremony.svg \

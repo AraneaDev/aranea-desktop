@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate or verify the committed projections of the Aranea design tokens.
+# Generate or verify the committed projections of the Aranea design tokens and branding.
 # Usage: scripts/generate-tokens [--check]
 set -euo pipefail
 
