@@ -8,6 +8,7 @@ const root = process.cwd()
 const specs = [
   ["plugins/araneadev.menu/MenuModel.js", "plugins/araneadev.menu/MenuPresentation.js"],
   ["plugins/araneadev.menu/MenuModel.js", "plugins/araneadev.menu/MenuHistory.js"],
+  ["plugins/araneadev.menu/MenuModel.js", "plugins/araneadev.menu/MenuSearch.js"],
   [
     "plugins/araneadev.clipboard/ClipboardLogic.js",
     "plugins/araneadev.clipboard/ClipboardPresentation.js"

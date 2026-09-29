@@ -779,134 +779,6 @@ function labelFor(entry, checkedResults) {
 }
 
 /**
- * Replaces dots, underscores and dashes with spaces so ids split into words.
- * @param {*} value - the token
- * @returns {string} the spaced text
- */
-function searchableToken(value) {
-  return String(value || "").replace(/[._-]+/g, " ")
-}
-
-/**
- * Returns the last dotted segment of an id.
- * @param {*} id - the item id
- * @returns {string} the leaf segment
- */
-function leafIdFor(id) {
-  var parts = String(id || "").split(".")
-  return parts.length > 0 ? parts[parts.length - 1] : id
-}
-
-/**
- * Builds the lower-cased text a query is matched against: label, leaf id and aliases.
- * @param {MenuItem} entry - the item
- * @returns {string} the search text ("" for no item)
- */
-function nameSearchText(entry) {
-  if (!entry) return ""
-  var aliases = []
-  var values = Array.isArray(entry.aliases) ? entry.aliases : []
-  for (var i = 0; i < values.length; i++) aliases.push(searchableToken(values[i]))
-  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")]
-    .join(" ")
-    .toLowerCase()
-}
-
-/**
- * Tells whether `term` equals one whitespace-separated word of `text`.
- * @param {string} term - a lower-cased search term
- * @param {*} text - the text to split
- * @returns {boolean} true on a whole-word match
- */
-function termInSearchWords(term, text) {
-  var words = String(text || "")
-    .toLowerCase()
-    .split(/\s+/)
-  for (var i = 0; i < words.length; i++) {
-    if (words[i] === term) return true
-  }
-  return false
-}
-
-/**
- * Tells whether every term of the query is a whole word of `text`.
- * @param {*} query - the search query
- * @param {*} text - the description text
- * @returns {boolean} true when all terms match
- */
-function descriptionTextMatches(query, text) {
-  var terms = String(query || "")
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-  for (var i = 0; i < terms.length; i++) {
-    if (terms[i] && !termInSearchWords(terms[i], text)) return false
-  }
-  return true
-}
-
-/**
- * Tells whether a visible item matches every query term, by name substring or description word.
- * @param {MenuItem} entry - the item
- * @param {*} query - the search query
- * @param {boolean} visible - whether the item is visible (invisible items never match)
- * @returns {boolean} true when it matches
- */
-function matchesQuery(entry, query, visible) {
-  if (!entry || entry.id === "root") return false
-  if (!visible) return false
-
-  var nameText = nameSearchText(entry)
-  var descriptionText = String(entry.description || "").toLowerCase()
-  var terms = String(query || "")
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-
-  for (var i = 0; i < terms.length; i++) {
-    if (!terms[i]) continue
-    if (nameText.indexOf(terms[i]) >= 0) continue
-    if (termInSearchWords(terms[i], descriptionText)) continue
-    return false
-  }
-
-  return true
-}
-
-/**
- * Scores a search hit (lower sorts first): match tier, then depth, then declared order.
- * @param {ItemMap} items - items by id
- * @param {MenuItem} entry - the matching item
- * @param {*} query - the search query
- * @returns {number} the sort score
- */
-function searchScore(items, entry, query) {
-  var needle = String(query || "")
-    .toLowerCase()
-    .trim()
-  var label = entry.label.toLowerCase()
-  var nameText = nameSearchText(entry)
-  var descriptionText = String(entry.description || "").toLowerCase()
-  var score = 80
-
-  if (label === needle) score = entry.parent === "root" ? 2 : 0
-  // An installed app whose name contains the query as a whole word ("zen"
-  // for Zen Browser) beats exact-labeled menu entries like Install > Zen.
-  else if (entry.kind === "app" && label.split(/\s+/).indexOf(needle) >= 0) score = 0
-  else if (label.indexOf(needle) === 0) score = 10
-  else if (label.indexOf(needle) >= 0) score = 30
-  else if (nameText.indexOf(needle) >= 0) score = 40
-  else if (descriptionTextMatches(needle, descriptionText)) score = 60
-
-  if (entry.kind === "menu" || entry.kind === "link") score -= 2
-  // App rows sort after all menu items, so they lose the tiebreak below to an
-  // equal match. Outrank those, but stay inside the tier so better ones win.
-  if (entry.kind === "app") score -= 5
-
-  return score * 1000 + depthFor(items, entry.id) * 25 + entry.order
-}
-
-/**
  * Builds the list-model row the menu renders for an item.
  * @param {ItemMap} items - items by id
  * @param {Array<string>} itemOrder - item order
@@ -938,6 +810,125 @@ function displayRow(items, itemOrder, checkedResults, entry, detail, score, sect
     section: section || ""
   }
 }
+
+/* @aranea-facade-start: plugins/araneadev.menu/MenuSearch.js */
+// Pure search helpers for MenuModel.js: tokenization, matching and ranking.
+
+/** Replaces route separators with spaces so ids split into words. */
+function searchableToken(value) {
+  return String(value || "").replace(/[._-]+/g, " ")
+}
+
+/** Returns the final segment of a dotted route id. */
+function leafIdFor(id) {
+  var parts = String(id || "").split(".")
+  return parts.length > 0 ? parts[parts.length - 1] : id
+}
+
+/** Builds the lower-cased text matched for an item's name. */
+function nameSearchText(entry) {
+  if (!entry) return ""
+  var aliases = []
+  var values = Array.isArray(entry.aliases) ? entry.aliases : []
+  for (var i = 0; i < values.length; i++) aliases.push(searchableToken(values[i]))
+  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")]
+    .join(" ")
+    .toLowerCase()
+}
+
+/** Tells whether a term equals a whitespace-separated word. */
+function termInSearchWords(term, text) {
+  var words = String(text || "")
+    .toLowerCase()
+    .split(/\s+/)
+  for (var i = 0; i < words.length; i++) {
+    if (words[i] === term) return true
+  }
+  return false
+}
+
+/** Tells whether every query term is a whole word in the supplied text. */
+function descriptionTextMatches(query, text) {
+  var terms = String(query || "")
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+  for (var i = 0; i < terms.length; i++) {
+    if (terms[i] && !termInSearchWords(terms[i], text)) return false
+  }
+  return true
+}
+
+/** Tells whether a visible item matches every query term. */
+function matchesQuery(entry, query, visible) {
+  if (!entry || entry.id === "root") return false
+  if (!visible) return false
+
+  var nameText = nameSearchText(entry)
+  var descriptionText = String(entry.description || "").toLowerCase()
+  var terms = String(query || "")
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+
+  for (var i = 0; i < terms.length; i++) {
+    if (!terms[i]) continue
+    if (nameText.indexOf(terms[i]) >= 0) continue
+    if (termInSearchWords(terms[i], descriptionText)) continue
+    return false
+  }
+
+  return true
+}
+
+/** Finds an item's depth without depending on MenuModel's other helpers. */
+function searchDepthFor(items, id) {
+  var depth = 0
+  var current = items && items[id]
+  var seen = {}
+  while (current && current.parent && current.parent !== "root" && !seen[current.id]) {
+    seen[current.id] = true
+    depth++
+    current = items[current.parent]
+  }
+  return depth
+}
+
+/** Scores a search hit by match tier, depth and declared order. */
+function searchScore(items, entry, query) {
+  var needle = String(query || "")
+    .toLowerCase()
+    .trim()
+  var label = entry.label.toLowerCase()
+  var nameText = nameSearchText(entry)
+  var descriptionText = String(entry.description || "").toLowerCase()
+  var score = 80
+
+  if (label === needle) score = entry.parent === "root" ? 2 : 0
+  else if (entry.kind === "app" && label.split(/\s+/).indexOf(needle) >= 0) score = 0
+  else if (label.indexOf(needle) === 0) score = 10
+  else if (label.indexOf(needle) >= 0) score = 30
+  else if (nameText.indexOf(needle) >= 0) score = 40
+  else if (descriptionTextMatches(needle, descriptionText)) score = 60
+
+  if (entry.kind === "menu" || entry.kind === "link") score -= 2
+  if (entry.kind === "app") score -= 5
+
+  return score * 1000 + searchDepthFor(items, entry.id) * 25 + entry.order
+}
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    searchableToken: searchableToken,
+    leafIdFor: leafIdFor,
+    nameSearchText: nameSearchText,
+    termInSearchWords: termInSearchWords,
+    descriptionTextMatches: descriptionTextMatches,
+    matchesQuery: matchesQuery,
+    searchScore: searchScore
+  }
+}
+/* @aranea-facade-end */
 
 // Commands a `checked:` expression reads a value out of. Every sibling row
 // asks the same one -- Defaults > Browser has seven rows all comparing

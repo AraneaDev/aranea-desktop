@@ -6,17 +6,22 @@ const { test } = require("node:test")
 
 const root = path.join(__dirname, "..", "..")
 
-test("facades contain generator-owned source regions", () => {
-  for (const file of [
-    "plugins/araneadev.menu/MenuModel.js",
-    "plugins/araneadev.clipboard/ClipboardLogic.js",
-    "plugins/araneadev.health/HealthLogic.js",
-    "plugins/araneadev.notifications/NotificationLogic.js",
-    "plugins/araneadev.health/HealthBridge.js",
-    "plugins/araneadev.notifications/ServiceBridge.js"
-  ]) {
+test("facades contain every generator-owned source region", () => {
+  const expected = {
+    "plugins/araneadev.menu/MenuModel.js": [
+      "MenuPresentation.js",
+      "MenuHistory.js",
+      "MenuSearch.js"
+    ],
+    "plugins/araneadev.clipboard/ClipboardLogic.js": ["ClipboardPresentation.js"],
+    "plugins/araneadev.health/HealthLogic.js": ["HealthPresentation.js"],
+    "plugins/araneadev.notifications/NotificationLogic.js": ["NotificationPresentation.js"],
+    "plugins/araneadev.health/HealthBridge.js": ["ServiceRegistry.js"],
+    "plugins/araneadev.notifications/ServiceBridge.js": ["ServiceRegistry.js"]
+  }
+  for (const [file, sources] of Object.entries(expected)) {
     const source = fs.readFileSync(path.join(root, file), "utf8")
-    assert.match(source, /@aranea-facade-start:/)
-    assert.match(source, /@aranea-facade-end/)
+    for (const name of sources)
+      assert.match(source, new RegExp(`@aranea-facade-start: .*${name.replace(".", "\\.")}`))
   }
 })
