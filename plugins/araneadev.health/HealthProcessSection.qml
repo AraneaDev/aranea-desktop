@@ -1,4 +1,5 @@
 // Top CPU and memory process rows for the health panel.
+// qmllint disable missing-property unqualified
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons

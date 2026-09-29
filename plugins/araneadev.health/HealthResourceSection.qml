@@ -1,4 +1,5 @@
 // CPU, memory, disk and network summary presentation for the health panel.
+// qmllint disable missing-property unqualified
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons

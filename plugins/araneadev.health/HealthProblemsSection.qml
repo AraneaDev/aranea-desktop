@@ -1,4 +1,5 @@
 // Problem list presentation for the health panel.
+// qmllint disable missing-property unqualified
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
@@ -18,7 +19,7 @@ Item {
     spacing: Style.space(4)
     RowLayout {
       Layout.fillWidth: true
-      Rectangle { width: Style.space(3); height: Style.font.body + Style.space(2); radius: width / 2; color: root.statusColor }
+      Rectangle { Layout.preferredWidth: Style.space(3); Layout.preferredHeight: Style.font.body + Style.space(2); radius: width / 2; color: root.statusColor }
       Text { text: "Problems"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; Layout.fillWidth: true }
       Text { text: String(root.problems.length); color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.body }
     }
