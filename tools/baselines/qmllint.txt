@@ -50,12 +50,12 @@
 1	plugins/araneadev.emojis/Emojis.qml:unused-imports:Unused import
 4	plugins/araneadev.health/Monitor.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.health/Panel.qml:missing-property:Member "body" not found on type "QObject"
-2	plugins/araneadev.health/Panel.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.health/Panel.qml:missing-property:Member "caption" not found on type "QObject"
 4	plugins/araneadev.health/Panel.qml:missing-property:Member "countdown" not found on type "QObject"
 1	plugins/araneadev.health/Panel.qml:missing-property:Member "family" not found on type "QObject"
-9	plugins/araneadev.health/Panel.qml:missing-property:Member "text" not found on type "QObject"
+8	plugins/araneadev.health/Panel.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.health/Panel.qml:missing-property:Member "title" not found on type "QObject"
-28	plugins/araneadev.health/Panel.qml:unqualified:Unqualified access
+6	plugins/araneadev.health/Panel.qml:unqualified:Unqualified access
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "bodySmall" not found on type "QObject"
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderActive" not found on type "QObject"

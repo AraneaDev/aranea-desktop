@@ -227,62 +227,13 @@ Panel {
             color: Color.notifications.countdown
           }
         }
-        ColumnLayout {
-          visible: root.problems.length > 0
+        HealthProblemsSection {
           Layout.fillWidth: true
-          spacing: Style.space(4)
-          RowLayout {
-            Layout.fillWidth: true
-            Rail {
-              color: root.statusColor
-            }
-            Label {
-              text: "Problems"
-              font.bold: true
-              Layout.fillWidth: true
-            }
-            Label {
-              text: String(root.problems.length)
-            }
-          }
-          Repeater {
-            model: root.problems
-            delegate: Rectangle {
-              required property var modelData
-              required property int index
-              Layout.fillWidth: true
-              implicitHeight: problemRow.implicitHeight + Style.space(8)
-              radius: Style.space(6)
-              color: root.cursor === index || rowArea.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
-              RowLayout {
-                id: problemRow
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(8)
-                anchors.rightMargin: Style.space(8)
-                spacing: Style.space(8)
-                Label {
-                  text: modelData.glyph
-                }
-                Label {
-                  text: modelData.summary
-                  elide: Text.ElideRight
-                  Layout.fillWidth: true
-                }
-                Label {
-                  text: modelData.urgency === 2 ? "critical" : "attention"
-                  color: modelData.urgency === 2 ? Color.urgent : root.amber
-                  font.pixelSize: Style.font.caption
-                }
-              }
-              MouseArea {
-                id: rowArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.runRow(modelData)
-              }
-            }
-          }
+          problems: root.problems
+          cursor: root.cursor
+          statusColor: root.statusColor
+          amber: root.amber
+          onProblemActivated: function (problem) { root.runRow(problem) }
         }
 
         // CPU
@@ -444,53 +395,11 @@ Panel {
           }
         }
 
-        // Top processes
-        ColumnLayout {
+        HealthProcessSection {
           visible: !!(root.m && (root.m.topProcs.cpu.length > 0 || root.m.topProcs.mem.length > 0))
           Layout.fillWidth: true
-          spacing: Style.space(2)
-          RowLayout {
-            Layout.fillWidth: true
-            Rail {
-              color: Qt.darker(Color.popups.text, 1.3)
-            }
-            Label {
-              text: "TOP"
-              font.bold: true
-            }
-          }
-          Repeater {
-            model: root.m ? Math.max(root.m.topProcs.cpu.length, root.m.topProcs.mem.length) : 0
-            delegate: RowLayout {
-              required property int index
-              Layout.fillWidth: true
-              // The service can vanish during a plugin reload before the
-              // Repeater's model drops to 0; read defensively.
-              readonly property var c: root.m && root.m.topProcs ? root.m.topProcs.cpu[index] : null
-              readonly property var mm: root.m && root.m.topProcs ? root.m.topProcs.mem[index] : null
-              Label {
-                text: c ? c.comm : ""
-                Layout.preferredWidth: Style.space(110)
-                elide: Text.ElideRight
-              }
-              Label {
-                text: c ? c.percent + "%" : ""
-                Layout.preferredWidth: Style.space(50)
-                horizontalAlignment: Text.AlignRight
-              }
-              Item {
-                Layout.preferredWidth: Style.space(16)
-              }
-              Label {
-                text: mm ? mm.comm : ""
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-              }
-              Label {
-                text: mm ? MetricsLogic.humanBytes(mm.rss) : ""
-              }
-            }
-          }
+          cpuProcesses: root.m && root.m.topProcs ? root.m.topProcs.cpu : []
+          memoryProcesses: root.m && root.m.topProcs ? root.m.topProcs.mem : []
         }
       }
     }
