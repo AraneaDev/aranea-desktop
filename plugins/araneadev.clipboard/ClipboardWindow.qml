@@ -10,6 +10,7 @@ import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "ClipboardLogic.js" as ClipboardLogic
+import "components"
 
 PanelWindow {
   id: panel
@@ -276,123 +277,23 @@ PanelWindow {
               }
             }
 
-            delegate: Rectangle {
-              id: row
-              required property int index
-              required property string kind
-              required property bool secret
-              required property bool pinned
-              required property string title
-              required property string detail
-              required property string previewImage
-              required property string colour
-              required property string swatch
-
-              readonly property bool hasCursor: panel.root.cursorActive && index === panel.root.selectedIndex
-
+            delegate: ClipboardResultRow {
+              hasCursor: panel.root.cursorActive && index === panel.root.selectedIndex
               width: ListView.view.width
               height: panel.root.rowHeight
-              radius: panel.root.cornerRadius
-              color: hasCursor ? panel.root.selectedBackground : "transparent"
-
-              Behavior on color {
-                ColorAnimation {
-                  duration: 120
-                  easing.type: Easing.OutCubic
-                }
+              glyph: panel.root.kindGlyph(kind)
+              fontFamily: panel.root.fontFamily
+              foreground: panel.root.foreground
+              selectedText: panel.root.selectedText
+              selectedBackground: panel.root.selectedBackground
+              cornerRadius: panel.root.cornerRadius
+              onPointerMoved: function (rowIndex, item, mouse) {
+                panel.root.selectFromPointer(rowIndex, item, mouse)
               }
-
-              // Mint rail on the selected row, as in the Aranea menu.
-              Rectangle {
-                visible: row.hasCursor
-                width: Style.space(2)
-                height: parent.height - Style.space(14)
-                radius: Style.space(1)
-                color: panel.root.selectedText
-                opacity: 0.9
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(4)
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Row {
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(14)
-                anchors.rightMargin: Style.space(10)
-                spacing: Style.space(10)
-
-                Item {
-                  width: Style.space(22)
-                  height: parent.height
-
-                  Image {
-                    visible: row.previewImage.length > 0
-                    anchors.centerIn: parent
-                    width: parent.width
-                    height: parent.width
-                    source: row.previewImage
-                    sourceSize: Qt.size(44, 44)
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                  }
-                  Rectangle {
-                    visible: row.swatch.length > 0
-                    anchors.centerIn: parent
-                    width: Style.space(14)
-                    height: Style.space(14)
-                    radius: Style.space(3)
-                    color: row.swatch.length > 0 ? row.swatch : "transparent"
-                    border.width: 1
-                    border.color: Util.alpha(panel.root.foreground, 0.25)
-                  }
-                  Text {
-                    visible: row.previewImage.length === 0 && row.colour.length === 0
-                    anchors.centerIn: parent
-                    textFormat: Text.PlainText
-                    text: row.secret ? "󰌾" : panel.root.kindGlyph(row.kind)
-                    color: row.hasCursor ? panel.root.selectedText : Util.alpha(panel.root.foreground, 0.7)
-                    font.family: panel.root.fontFamily
-                    font.pixelSize: Style.font.icon
-                  }
-                }
-
-                Text {
-                  width: parent.width - Style.space(22) - detailText.width - parent.spacing * 2
-                  height: parent.height
-                  textFormat: Text.PlainText
-                  text: row.title
-                  color: row.hasCursor ? panel.root.selectedText : panel.root.foreground
-                  font.family: panel.root.fontFamily
-                  font.pixelSize: Style.font.body
-                  elide: Text.ElideRight
-                  wrapMode: Text.NoWrap
-                  verticalAlignment: Text.AlignVCenter
-                }
-
-                Text {
-                  id: detailText
-                  height: parent.height
-                  textFormat: Text.PlainText
-                  text: (row.pinned ? "📌 " : "") + row.detail
-                  color: Util.alpha(panel.root.foreground, 0.5)
-                  font.family: panel.root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  verticalAlignment: Text.AlignVCenter
-                }
-              }
-
-              MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onPositionChanged: function (mouse) {
-                  panel.root.selectFromPointer(row.index, row, mouse)
-                }
-                onClicked: {
-                  panel.root.cursorActive = true
-                  panel.root.selectedIndex = row.index
-                  panel.root.activateIndex(row.index)
-                }
+              onActivated: function (rowIndex) {
+                panel.root.cursorActive = true
+                panel.root.selectedIndex = rowIndex
+                panel.root.activateIndex(rowIndex)
               }
             }
           }

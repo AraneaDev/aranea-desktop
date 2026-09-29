@@ -11,7 +11,12 @@ ShellRoot {
 
   PolkitComponents.PolkitDetails {
     id: details
-    rows: [{ key: "Action", value: "org.example.test" }]
+    rows: [
+      {
+        key: "Action",
+        value: "org.example.test"
+      }
+    ]
   }
 
   Component.onCompleted: {

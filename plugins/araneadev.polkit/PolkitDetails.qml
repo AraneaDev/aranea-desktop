@@ -1,5 +1,5 @@
 // Presentational, selectable details list for the polkit prompt.
-// qmllint disable missing-property
+// qmllint disable missing-property unqualified
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
