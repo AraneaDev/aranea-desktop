@@ -9,6 +9,8 @@ set -euo pipefail
 # Usage: scripts/install.sh [--profile minimal|full|no_apps] [--source PATH|URL] [--dry-run] [--yes]
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/json-events.sh"
 theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/aranea-desktop.git}"
@@ -130,7 +132,7 @@ while (($#)); do
 done
 
 if ((json_mode)) && ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' 'Aranea installer: --json requires jq.' >&2
+  printf '%s\n' "$BRAND_NAME installer: --json requires jq." >&2
   exit 4
 fi
 
@@ -158,7 +160,7 @@ if ((! profile_explicit)) && ((! assume_yes)) && [[ -t 0 ]] && has_gum; then
     'no_apps    Theme, cursor, icons, wallpaper, and branding, without application integrations')"; then
     profile="${profile_choice%% *}"
   else
-    say "Aranea installer: profile selection cancelled." >&2
+    say "$BRAND_NAME installer: profile selection cancelled." >&2
     exit 1
   fi
 fi
@@ -168,7 +170,7 @@ if ! manifest_profile_exists "$profile"; then
 fi
 
 if [[ "$theme_source" == /* && ! -d "$theme_source" ]]; then
-  fail_install 1 "Aranea installer: local theme source does not exist: $theme_source" missing_source
+  fail_install 1 "$BRAND_NAME installer: local theme source does not exist: $theme_source" missing_source
 fi
 
 if ((json_mode)); then
@@ -179,7 +181,7 @@ else
 fi
 
 if ! command -v omarchy >/dev/null 2>&1 && [[ "${OMARCHY_INSTALLER_TEST:-}" != 1 ]]; then
-  fail_install 4 'Aranea installer: Omarchy is required but was not found.' missing_dependency
+  fail_install 4 "$BRAND_NAME installer: Omarchy is required but was not found." missing_dependency
 fi
 
 if ((dry_run)); then
@@ -225,13 +227,13 @@ else
           json_recovery install restore-theme "restore previous theme with: omarchy theme set \"$previous_theme\""
         fi
         if ((json_completed_sent == 0)); then
-          json_completed install failed operation_failed 'Aranea install failed.'
+          json_completed install failed operation_failed "$BRAND_NAME install failed."
           json_completed_sent=1
         fi
       elif [[ -n "$previous_theme" ]]; then
-        say "Aranea install failed. Restore the previous theme with: omarchy theme set \"$previous_theme\"" >&2
+        say "$BRAND_NAME install failed. Restore the previous theme with: omarchy theme set \"$previous_theme\"" >&2
       else
-        say "Aranea install failed before a previous theme could be detected." >&2
+        say "$BRAND_NAME install failed before a previous theme could be detected." >&2
       fi
     fi
     return "$status"
@@ -273,9 +275,9 @@ else
     fi
   fi
   if ((json_mode)); then
-    json_completed install ok '' 'Aranea installed.'
+    json_completed install ok '' "$BRAND_NAME installed."
     json_completed_sent=1
   else
-    say "Aranea installed."
+    say "$BRAND_NAME installed."
   fi
 fi

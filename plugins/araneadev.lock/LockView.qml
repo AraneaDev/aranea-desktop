@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
@@ -40,7 +41,7 @@ Item {
   // Omarchy's fixed state path (~/.local/state; Omarchy ignores the XDG
   // state variable), the same root Service.qml uses.
   readonly property string stateHome: Quickshell.env("HOME") + "/.local/state"
-  // Directory of the active Omarchy theme; the spider logo (unlock.png) is loaded from here.
+  // Directory of the active Omarchy theme.
   readonly property string themeAssetRoot: stateHome + "/omarchy/current/theme"
   // Password field width in pixels.
   readonly property int fieldWidth: 381
@@ -150,7 +151,7 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      color: "#a006090d"
+      color: Util.alpha(Aranea.DesignTokens.lockOverlay, 0.63)
     }
 
     Rectangle {
@@ -158,15 +159,15 @@ Item {
       gradient: Gradient {
         GradientStop {
           position: 0.0
-          color: "#4406090d"
+          color: Util.alpha(Aranea.DesignTokens.lockOverlay, 0.27)
         }
         GradientStop {
           position: 0.48
-          color: "#1806090d"
+          color: Util.alpha(Aranea.DesignTokens.lockOverlay, 0.09)
         }
         GradientStop {
           position: 1.0
-          color: "#7006090d"
+          color: Util.alpha(Aranea.DesignTokens.lockOverlay, 0.44)
         }
       }
     }
@@ -221,7 +222,7 @@ Item {
       anchors.horizontalCenter: parent.horizontalCenter
       y: Math.max(32, inputField.y - height - 42)
       z: 1
-      logoSource: root.fileUrl(root.themeAssetRoot + "/unlock.png")
+      logoSource: Aranea.RuntimePaths.brandUrl
       fontFamily: Style.font.family
       textColor: Color.lock.text
       placeholderColor: Color.lock.placeholder

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 16" fill="none">
+  <title>Brand node divider</title>
+  <path d="M0 8h256" stroke="{{colors.foreground}}" stroke-opacity=".16"/>
+  <path d="M24 8h32" stroke="{{colors.accent}}" stroke-opacity=".35"/>
+  <circle cx="32" cy="8" r="1.5" fill="{{colors.accent}}" fill-opacity=".7"/>
+  <circle cx="224" cy="8" r="1.5" fill="{{colors.accent_secondary}}" fill-opacity=".65"/>
+  <circle cx="128" cy="8" r="1" fill="{{colors.foreground}}" fill-opacity=".4"/>
+</svg>

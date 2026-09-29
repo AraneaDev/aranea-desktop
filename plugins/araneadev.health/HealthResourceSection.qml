@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "MetricsLogic.js" as MetricsLogic
 
 Item {
@@ -28,7 +29,7 @@ Item {
 
   // Maps metric severity to the panel's semantic foreground colour.
   function levelColor(level: string): color {
-    return level === "critical" ? Color.urgent : (level === "attention" ? "#ffbd2e" : root.foreground)
+    return level === "critical" ? Color.urgent : (level === "attention" ? Aranea.DesignTokens.attention : root.foreground)
   }
 
   implicitHeight: content.implicitHeight

@@ -13,6 +13,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
+source "$repo_root/branding/brand.env"
+# shellcheck disable=SC1091
 source "$repo_root/scripts/lib/manifest.sh"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/ownership.sh"
@@ -77,9 +79,9 @@ if [[ -z "$theme" ]] && command -v omarchy >/dev/null 2>&1; then
   theme="$(omarchy theme current 2>/dev/null || true)"
 fi
 if [[ "$theme" == "Aranea" || "$theme" == "Aranea Pulse" || "$theme" == "aranea" || "$theme" == "aranea-pulse" ]]; then
-  emit theme ok 'Aranea is the active theme'
+  emit theme ok "$BRAND_NAME is the active theme"
 else
-  emit theme repair 'Aranea is not the active theme'
+  emit theme repair "$BRAND_NAME is not the active theme"
 fi
 
 # omarchy-hook installs under $HOME/.config regardless of XDG_CONFIG_HOME.
@@ -131,9 +133,9 @@ if [[ -d "$icon_root/scalable" ]]; then
   linked_icon_count="$(find "$icon_root/scalable" -type l -name '*.svg' -print 2>/dev/null | wc -l)"
 fi
 if [[ -f "$icon_root/index.theme" ]] && ((installed_icon_count == expected_icon_count)) && ((broken_icon_count == 0)) && ((linked_icon_count == 0)); then
-  emit icons ok "Aranea-icons has $installed_icon_count standalone SVGs"
+  emit icons ok "$BRAND_NAME-icons has $installed_icon_count standalone SVGs"
 else
-  emit icons repair "Aranea-icons is incomplete or linked to a missing checkout; run scripts/install-integration --yes icons"
+  emit icons repair "$BRAND_NAME-icons is incomplete or linked to a missing checkout; run scripts/install-integration --yes icons"
 fi
 
 font_name="${ARANEA_DOCTOR_FONT:-monospace}"

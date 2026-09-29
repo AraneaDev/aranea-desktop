@@ -1,10 +1,45 @@
 import fs from "node:fs"
+import { createHash } from "node:crypto"
+import os from "node:os"
 import path from "node:path"
+import { execFileSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { parse } from "smol-toml"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const sourcePath = path.join(root, "design/tokens.toml")
+const brandSourcePath = path.join(root, "design/brand.toml")
+const rasterizer = process.env.ARANEA_RSVG_CONVERT || "rsvg-convert"
+const pngSignature = Buffer.from("89504e470d0a1a0a", "hex")
+
+function canonicalPng(png) {
+  if (!png.subarray(0, pngSignature.length).equals(pngSignature))
+    throw new Error("cannot canonicalize a non-PNG image")
+  const chunks = [pngSignature]
+  let offset = pngSignature.length
+  while (offset < png.length) {
+    if (offset + 12 > png.length) throw new Error("truncated PNG chunk")
+    const length = png.readUInt32BE(offset)
+    const end = offset + 12 + length
+    if (end > png.length) throw new Error("truncated PNG data")
+    const type = png.subarray(offset + 4, offset + 8)
+    // Keep critical chunks (whose first type byte is uppercase) and drop
+    // rasterizer-specific ancillary metadata such as bKGD and tIME.
+    if ((type[0] & 0x20) === 0) chunks.push(png.subarray(offset, end))
+    offset = end
+  }
+  return Buffer.concat(chunks)
+}
+
+function pngsMatch(first, second) {
+  try {
+    const firstSize = first.subarray(16, 24)
+    const secondSize = second.subarray(16, 24)
+    return firstSize.length === 8 && firstSize.equals(secondSize)
+  } catch {
+    return false
+  }
+}
 
 function flattenTokens(value, prefix = "", output = {}) {
   for (const [key, child] of Object.entries(value)) {
@@ -27,6 +62,29 @@ function validateTokens(tokens) {
   if (!Number.isFinite(tokens.dimensions.corner_radius))
     throw new Error("dimensions.corner_radius must be numeric")
   return tokens
+}
+
+function validateBrand(brand) {
+  if (!brand || typeof brand !== "object") throw new Error("brand config must be a table")
+  for (const name of ["identity", "assets"])
+    if (!(name in brand)) throw new Error(`brand missing required section: ${name}`)
+  for (const name of [
+    "name",
+    "short_name",
+    "tagline",
+    "palette_name",
+    "lock_subtitle",
+    "ceremony_title",
+    "ceremony_detail"
+  ]) {
+    if (typeof brand.identity[name] !== "string" || brand.identity[name].length === 0)
+      throw new Error(`brand.identity.${name} must be a non-empty string`)
+  }
+  if (typeof brand.assets.mark !== "string" || brand.assets.mark.length === 0)
+    throw new Error("brand.assets.mark must be a non-empty string")
+  if (!fs.existsSync(path.join(root, brand.assets.mark)))
+    throw new Error(`brand asset does not exist: ${brand.assets.mark}`)
+  return brand
 }
 
 function quote(value) {
@@ -90,6 +148,12 @@ QtObject {
   readonly property color foreground: Color.foreground
   // Urgent and attention colour.
   readonly property color urgent: Color.urgent
+  // Semantic colors used by branding glyphs and lock overlays.
+  readonly property color ceremony: Color.notifications.countdown
+  // Attention color used by health status surfaces.
+  readonly property color attention: Color.notifications.countdown
+  // Base color used by the lock scrim.
+  readonly property color lockOverlay: Color.lock.background
   // Shared surface border colour.
   readonly property color surfaceBorder: Color.tooltip.border
   // Shared panel corner radius.
@@ -104,6 +168,164 @@ QtObject {
 `
 }
 
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`
+}
+
+function renderBrandShellEnv(brand) {
+  const i = brand.identity
+  return `# Generated from design/brand.toml. Do not edit directly.\nBRAND_NAME=${shellQuote(i.name)}\nBRAND_SHORT_NAME=${shellQuote(i.short_name)}\nBRAND_TAGLINE=${shellQuote(i.tagline)}\nBRAND_PALETTE_NAME=${shellQuote(i.palette_name)}\nBRAND_LOCK_SUBTITLE=${shellQuote(i.lock_subtitle)}\nBRAND_CEREMONY_TITLE=${shellQuote(i.ceremony_title)}\nBRAND_CEREMONY_DETAIL=${shellQuote(i.ceremony_detail)}\n`
+}
+
+function renderBrandQml(brand) {
+  const i = brand.identity
+  const markFile = "brand.svg"
+  const q = (value) => JSON.stringify(value)
+  return `// Generated from design/brand.toml. Do not edit directly.
+pragma Singleton
+import QtQuick
+
+QtObject {
+  // Full visible product name.
+  readonly property string name: ${q(i.name)}
+  // Compact visible product name used in shell surfaces.
+  readonly property string shortName: ${q(i.short_name)}
+  // Visible product tagline.
+  readonly property string tagline: ${q(i.tagline)}
+  // Human-readable palette label.
+  readonly property string paletteName: ${q(i.palette_name)}
+  // Subtitle shown on the lock screen.
+  readonly property string lockSubtitle: ${q(i.lock_subtitle)}
+  // Title used by the theme-change ceremony.
+  readonly property string ceremonyTitle: ${q(i.ceremony_title)}
+  // Detail line used by the theme-change ceremony.
+  readonly property string ceremonyDetail: ${q(i.ceremony_detail)}
+  // Generated runtime mark filename.
+  readonly property string markFile: ${q(markFile)}
+}
+`
+}
+
+function renderBrandText(brand) {
+  const i = brand.identity
+  return new Map([
+    [
+      "branding/about.txt",
+      `${i.short_name} IDENTITY\nSource mark: ${brand.assets.mark}\nTagline: ${i.tagline}\n`
+    ],
+    [
+      "branding/about-card.txt",
+      `${i.short_name}\n=======\n\nTheme: ${i.name}\nPalette: ${i.palette_name}\nSource mark: ${brand.assets.mark}\nTagline: ${i.tagline}\n`
+    ],
+    ["branding/screensaver.txt", `${i.short_name}\n${i.tagline}\n`],
+    ["branding/glyphs/theme-change.txt", `${i.ceremony_title}\n${i.ceremony_detail}\n`],
+    ["branding/brand.env", renderBrandShellEnv(brand)]
+  ])
+}
+
+function htmlEscape(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+}
+
+function renderBrowserIndex(brand) {
+  const i = brand.identity
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${htmlEscape(i.name)}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <img class="mark" src="../../../branding/brand.svg" alt="">
+    <h1>${htmlEscape(i.name)}</h1>
+    <p>${htmlEscape(i.tagline)}</p>
+  </main>
+</body>
+</html>
+`
+}
+
+function xmlEscape(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+}
+
+function renderBrandRaster(brand, tokens, markSvg, width, height, filename) {
+  const markData = Buffer.from(markSvg).toString("base64")
+  const i = brand.identity
+  const c = tokens.colors
+  const markWidth = Math.round(width * 0.18)
+  const markHeight = Math.round(height * 0.42)
+  const markX = Math.round((width - markWidth) / 2)
+  const markY = Math.round(height * 0.18)
+  const textY = Math.round(height * 0.72)
+  const subtitleY = Math.round(height * 0.78)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs><radialGradient id="bg"><stop stop-color="${c.surface_raised}"/><stop offset="1" stop-color="${c.darker_background}"/></radialGradient></defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <image href="data:image/svg+xml;base64,${markData}" x="${markX}" y="${markY}" width="${markWidth}" height="${markHeight}" preserveAspectRatio="xMidYMid meet"/>
+  <text x="${width / 2}" y="${textY}" fill="${c.foreground}" text-anchor="middle" font-family="sans-serif" font-size="${Math.max(24, Math.round(height * 0.035))}" letter-spacing="${Math.max(2, Math.round(height * 0.008))}">${xmlEscape(i.short_name)}</text>
+  <text x="${width / 2}" y="${subtitleY}" fill="${c.dark_foreground}" text-anchor="middle" font-family="sans-serif" font-size="${Math.max(14, Math.round(height * 0.018))}">${xmlEscape(i.tagline)}</text>
+</svg>
+`
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-brand-"))
+  const input = path.join(temporaryRoot, "brand.svg")
+  const output = path.join(temporaryRoot, filename)
+  try {
+    fs.writeFileSync(input, svg)
+    execFileSync(rasterizer, ["-w", String(width), "-h", String(height), "-o", output, input], {
+      stdio: "ignore"
+    })
+    return canonicalPng(fs.readFileSync(output))
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+}
+
+function renderBrandAssets(brand, tokens) {
+  const markSvg = renderAssetSource(brand.assets.mark, tokens)
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ brand, tokens, markSvg }))
+    .digest("hex")
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-brand-"))
+  const output = path.join(temporaryRoot, "unlock.png")
+  const markOutput = path.join(temporaryRoot, "brand.svg")
+  try {
+    fs.writeFileSync(markOutput, markSvg)
+    execFileSync(rasterizer, ["-w", "320", "-h", "320", "-o", output, markOutput], {
+      stdio: "ignore"
+    })
+    return new Map([
+      [
+        "branding/raster-manifest.txt",
+        `# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.\ninput_sha256=${fingerprint}\nunlock=320x320\nlock=3840x2160\nplymouth=1920x1080\n`
+      ],
+      ["branding/brand.svg", markSvg],
+      ["unlock.png", canonicalPng(fs.readFileSync(output))],
+      [
+        "branding/screens/lock.png",
+        renderBrandRaster(brand, tokens, markSvg, 3840, 2160, "lock.png")
+      ],
+      [
+        "branding/screens/plymouth.png",
+        renderBrandRaster(brand, tokens, markSvg, 1920, 1080, "plymouth.png")
+      ]
+    ])
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+}
+
 function renderIntegrationCss(tokens) {
   const c = tokens.colors
   return `/* Generated from design/tokens.toml. Do not edit directly. */
@@ -111,12 +333,14 @@ function renderIntegrationCss(tokens) {
   --aranea-background: ${c.background};
   --aranea-surface: ${c.lighter_background};
   --aranea-surface-raised: ${c.surface_raised};
+  --aranea-surface-glass: ${c.surface_glass};
   --aranea-foreground: ${c.foreground};
   --aranea-muted: ${c.dark_foreground};
   --aranea-accent: ${c.accent};
   --aranea-focus: ${c.accent_secondary};
   --aranea-error: ${c.red};
   --aranea-ceremony: ${c.ceremony};
+  --aranea-attention: ${c.yellow};
 }
 `
 }
@@ -242,29 +466,76 @@ function renderSvgAssets(tokens) {
   return outputs
 }
 
+function renderBrandSvgAssets(tokens) {
+  const outputs = new Map()
+  const templateRoot = path.join(root, "design/templates/assets/branding")
+  for (const entry of fs.readdirSync(templateRoot)) {
+    if (!entry.endsWith(".svg.in")) continue
+    const name = entry.slice(0, -7)
+    const family = ["active", "ready", "power", "sleep", "warning", "attention", "error"].includes(
+      name
+    )
+      ? "glyphs"
+      : "motifs"
+    outputs.set(
+      `branding/${family}/${name}.svg`,
+      renderTemplate(fs.readFileSync(path.join(templateRoot, entry), "utf8"), tokens)
+    )
+  }
+  return outputs
+}
+
+function renderKvantumBrand(tokens, brand) {
+  const markSvg = renderAssetSource(brand.assets.mark, tokens)
+  const markData = Buffer.from(markSvg).toString("base64")
+  const c = tokens.colors
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <rect width="256" height="256" fill="${c.background}"/>
+  <g opacity=".28" stroke="${c.accent_secondary}" stroke-width="1">
+    <path d="M0 32 64 96 128 32 192 96 256 32M0 224 64 160 128 224 192 160 256 224"/>
+    <path d="M32 0 96 64 32 128 96 192 32 256M224 0 160 64 224 128 160 192 224 256"/>
+  </g>
+  <image href="data:image/svg+xml;base64,${markData}" x="38" y="24" width="180" height="208" preserveAspectRatio="xMidYMid meet"/>
+</svg>
+`
+}
+
 function loadTokens() {
   return validateTokens(parse(fs.readFileSync(sourcePath, "utf8")))
 }
 
-function outputs(tokens) {
+function loadBrand() {
+  return validateBrand(parse(fs.readFileSync(brandSourcePath, "utf8")))
+}
+
+function outputs(tokens, brand) {
   return new Map([
     ["colors.toml", renderColorsToml(tokens)],
     ["shell.toml", renderShellToml(tokens)],
     ["plugins/araneadev.shared/DesignTokens.qml", renderQmlTokens()],
+    ["plugins/araneadev.shared/BrandConfig.qml", renderBrandQml(brand)],
     ["integrations/aranea-colors.css", renderIntegrationCss(tokens)],
+    ["integrations/browser/chromium/new-tab/index.html", renderBrowserIndex(brand)],
+    ...renderBrandText(brand),
     ...renderPlatformTemplates(tokens),
     ...renderCursorAssets(tokens),
-    ...renderSvgAssets(tokens)
+    ...renderSvgAssets(tokens),
+    ...renderBrandSvgAssets(tokens),
+    ["integrations/qt/kvantum/Aranea/Aranea.svg", renderKvantumBrand(tokens, brand)],
+    ...renderBrandAssets(brand, tokens)
   ])
 }
 
 function checkOrWrite(write) {
-  const expected = outputs(loadTokens())
+  const expected = outputs(loadTokens(), loadBrand())
   let stale = false
   for (const [relative, content] of expected) {
     const target = path.join(root, relative)
-    const current = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : ""
-    if (current !== content) {
+    const current = fs.existsSync(target) ? fs.readFileSync(target) : Buffer.alloc(0)
+    const matches = Buffer.isBuffer(content)
+      ? current.equals(content) || (relative.endsWith(".png") && pngsMatch(current, content))
+      : current.toString("utf8") === content
+    if (!matches) {
       stale = true
       if (write) {
         fs.mkdirSync(path.dirname(target), { recursive: true })
@@ -293,8 +564,16 @@ export {
   renderPaletteProjection,
   renderAssetSource,
   renderSvgAssets,
+  renderBrandSvgAssets,
+  renderBrandShellEnv,
+  renderKvantumBrand,
   renderTemplate,
   renderQmlTokens,
+  renderBrandQml,
+  renderBrandText,
+  renderBrandAssets,
+  canonicalPng,
+  validateBrand,
   renderShellToml,
   validateTokens
 }
