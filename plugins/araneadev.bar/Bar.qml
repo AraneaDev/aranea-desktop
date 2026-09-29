@@ -1777,17 +1777,21 @@ Item {
       }
     }
 
-    Rectangle {
+    // qmllint disable unqualified
+    BarDragOverlay {
       readonly property var targetRect: root.barDragTargetGeometry
 
-      visible: ghostWindow.active && targetRect !== null
-      x: targetRect ? Math.round(targetRect.x) : 0
-      y: targetRect ? Math.round(targetRect.y) : 0
-      width: targetRect ? targetRect.width : 0
-      height: targetRect ? targetRect.height : 0
-      color: Color.accent
-      radius: Math.min(width, height) / 2
+      anchors.fill: parent
+      active: ghostWindow.active && targetRect !== null
+      barPosition: root.position
+      targetX: targetRect ? Math.round(targetRect.x) : 0
+      targetY: targetRect ? Math.round(targetRect.y) : 0
+      targetWidth: targetRect ? targetRect.width : 0
+      targetHeight: targetRect ? targetRect.height : 0
+      dropAfter: root.barDragAfter
+      accent: Color.accent
     }
+    // qmllint enable unqualified
   }
 
   component BarMoveGhostPanel: PanelWindow {
