@@ -12,6 +12,8 @@ Item {
   // Public contract member.
   property string hintText: ""
   // Public contract member.
+  property bool showFilter: true
+  // Public contract member.
   property bool cursorActive: false
   // Public contract member.
   property bool recentVisible: false
@@ -29,6 +31,7 @@ Item {
     anchors.fill: parent
     spacing: Style.space(8)
     TextInput {
+      visible: root.showFilter
       width: parent.width
       text: root.filterText
       color: root.foreground

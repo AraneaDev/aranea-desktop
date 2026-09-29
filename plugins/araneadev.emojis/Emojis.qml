@@ -499,15 +499,14 @@ Item {
           }
 
           // Name of the emoji under the cursor.
-          Text {
+          EmojiPickerChrome {
             id: nameLine
             width: parent.width
-            textFormat: Text.PlainText
-            text: root.selectedEmoji ? root.selectedEmoji + "  " + root.selectedName : " "
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            elide: Text.ElideRight
+            selectedName: root.selectedEmoji ? root.selectedEmoji + "  " + root.selectedName : " "
+            hintText: root.hintText()
+            showFilter: false
+            fontFamily: root.fontFamily
+            foreground: root.foreground
           }
         }
       }
