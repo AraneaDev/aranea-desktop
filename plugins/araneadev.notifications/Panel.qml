@@ -281,7 +281,23 @@ Panel {
           anchors.top: parent.top
           spacing: Style.space(10)
 
+          NotificationCenterContent {
+            Layout.fillWidth: true
+            count: root.count
+            dnd: root.dnd
+            confirmingClear: root.confirmingClear
+            quiet: root.quiet
+            quietUntil: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
+            fontFamily: Style.font.family
+            foreground: Color.popups.text
+            focusAccent: root.focusAccent
+            onToggleDnd: root.service.setDoNotDisturb(!root.dnd)
+            onClearAll: root.clearAll()
+          }
+
+          // qmllint disable missing-property
           RowLayout {
+            visible: false
             Layout.fillWidth: true
             spacing: Style.space(8)
 
@@ -327,6 +343,7 @@ Panel {
 
           // Key hints for the center list.
           Text {
+            visible: false
             Layout.fillWidth: true
             textFormat: Text.PlainText
             text: "ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP"
@@ -338,7 +355,7 @@ Panel {
           }
 
           Text {
-            visible: root.quiet && InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "") !== ""
+            visible: false
             text: "Quiet until " + InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
             color: root.focusAccent
             font.family: Style.font.family
@@ -347,7 +364,7 @@ Panel {
 
           // Empty state.
           Column {
-            visible: root.count === 0
+            visible: false
             Layout.fillWidth: true
             Layout.topMargin: Style.space(12)
             Layout.bottomMargin: Style.space(12)
@@ -372,6 +389,7 @@ Panel {
             }
           }
 
+          // qmllint enable missing-property
           ListView {
             id: list
             visible: root.count > 0
