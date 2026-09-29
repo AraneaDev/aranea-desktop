@@ -56,10 +56,10 @@ Item {
   readonly property int passwordDotLetterSpacing: Math.round(Style.font.heading * 0.19)
   // Space to keep clear on each side of the field for the fingerprint icon
   // (icon width plus a gap) so the centered dots never run under it.
-  readonly property real fingerprintReserve: authPanel.fingerprintReserve
+  readonly property real fingerprintReserve: inputField.fingerprintReserve
   // Shrink the dots to fit once the password outgrows the field, so every
   // keystroke stays visible; otherwise long passwords clip with no feedback.
-  readonly property real passwordDotScale: authPanel.passwordDotScale
+  readonly property real passwordDotScale: inputField.passwordDotScale
   // Whether the text cursor may show: input enabled, no check running and no error shown.
   readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
   // True while a failure message is shown.
@@ -88,12 +88,12 @@ Item {
 
   // Gives keyboard focus to the password field.
   function forcePasswordFocus() {
-    authPanel.forcePasswordFocus()
+    inputField.forcePasswordFocus()
   }
 
   // Copies passwordText into the field if they differ, flagging the write so it is not re-emitted.
   function syncPasswordText() {
-    authPanel.syncPasswordText()
+    inputField.syncPasswordText()
   }
 
   onPasswordTextChanged: syncPasswordText()
@@ -182,7 +182,7 @@ Item {
     }
 
     LockAuthPanel {
-      id: authPanel
+      id: inputField
       width: root.fieldWidth
       height: root.fieldHeight
       anchors.centerIn: parent
@@ -219,7 +219,7 @@ Item {
     LockBranding {
       width: parent.width
       anchors.horizontalCenter: parent.horizontalCenter
-      y: Math.max(32, authPanel.y - height - 42)
+      y: Math.max(32, inputField.y - height - 42)
       z: 1
       logoSource: root.fileUrl(root.themeAssetRoot + "/unlock.png")
       fontFamily: Style.font.family
@@ -229,7 +229,7 @@ Item {
 
     LockClock {
       anchors.horizontalCenter: parent.horizontalCenter
-      y: authPanel.y + authPanel.height + 28
+      y: inputField.y + inputField.height + 28
       z: 1
       clockText: root.clockText
       dateText: root.dateText
