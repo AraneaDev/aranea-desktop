@@ -1,0 +1,60 @@
+name: Upstream drift
+
+# Weekly report of what Omarchy changed upstream since .omarchy-version, for
+# the forked plugins and the shell platform modules (tools/upstream-drift).
+# Keeps at most one open issue labelled upstream-drift: opened or updated
+# while there is drift, closed once the pin is current again.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # GitHub caps an issue body at 65536 characters: a longer report is cut
+      # at a whole line and points at the local command.
+      - name: Build the drift report
+        run: |
+          tools/upstream-drift --json >"$RUNNER_TEMP/drift.json"
+          tools/upstream-drift >"$RUNNER_TEMP/drift-full.md"
+          if (($(wc -c <"$RUNNER_TEMP/drift-full.md") > 60000)); then
+            {
+              head -c 60000 "$RUNNER_TEMP/drift-full.md" | head -n -1
+              printf '\n\n(Report truncated; run tools/upstream-drift locally for the full list.)\n'
+            } >"$RUNNER_TEMP/drift.md"
+          else
+            cp "$RUNNER_TEMP/drift-full.md" "$RUNNER_TEMP/drift.md"
+          fi
+
+      - name: Open, update or close the drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          drift="$(jq -r .drift "$RUNNER_TEMP/drift.json")"
+          base="$(jq -r .base "$RUNNER_TEMP/drift.json")"
+          target="$(jq -r .target "$RUNNER_TEMP/drift.json")"
+          open="$(gh issue list --label upstream-drift --state open --json number --jq '.[0].number // empty')"
+          if [[ "$drift" == true ]]; then
+            gh label create upstream-drift --force --color 7a5cff \
+              --description "Omarchy changed upstream since .omarchy-version"
+            title="Upstream Omarchy drift: $base → $target"
+            if [[ -n "$open" ]]; then
+              gh issue edit "$open" --title "$title" --body-file "$RUNNER_TEMP/drift.md"
+            else
+              gh issue create --title "$title" --label upstream-drift --body-file "$RUNNER_TEMP/drift.md"
+            fi
+          elif [[ -n "$open" ]]; then
+            gh issue close "$open" --comment "The pin in .omarchy-version ($base) is current; nothing left to port."
+          fi

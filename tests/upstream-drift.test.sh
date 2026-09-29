@@ -151,3 +151,19 @@ test ! -e "$cache"
 ARANEA_UPSTREAM_REPO="file://$upstream"
 "$drift" --json >/dev/null
 test -d "$cache"
+
+# --- the weekly workflow: least privilege, pinned checkout, one issue
+workflow="$repo_root/.github/workflows/upstream-drift.yml"
+test -f "$workflow"
+grep -Fq 'workflow_dispatch:' "$workflow"
+grep -Eq '^\s+- cron: ' "$workflow"
+grep -Fq 'issues: write' "$workflow"
+grep -Fq 'contents: read' "$workflow"
+grep -Fq 'persist-credentials: false' "$workflow"
+grep -Fq 'tools/upstream-drift --json' "$workflow"
+grep -Fq -- '--label upstream-drift' "$workflow"
+grep -Fq 'gh issue close' "$workflow"
+if grep -Eq 'pull-requests:|contents: write' "$workflow"; then
+  echo "upstream-drift workflow asks for more than it needs" >&2
+  exit 1
+fi
