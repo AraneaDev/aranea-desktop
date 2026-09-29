@@ -2,6 +2,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: chrome
@@ -74,7 +75,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: fullRootHeader ? Style.space(48) : Style.space(28)
         height: width
-        source: "file://" + brandingMarksPath + (fullRootHeader ? "aranea-primary.svg" : "aranea-glyph.svg")
+        source: Aranea.RuntimePaths.brandUrl
         fillMode: Image.PreserveAspectFit
         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
         smooth: true
@@ -105,7 +106,7 @@ Item {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: fullRootHeader ? "ARANEA" : (dmenuActive ? dmenuPrompt : "ARANEA / " + activeTitle)
+          text: fullRootHeader ? Aranea.BrandConfig.shortName : (dmenuActive ? dmenuPrompt : Aranea.BrandConfig.shortName + " / " + activeTitle)
           color: foreground
           font.family: fontFamily
           font.pixelSize: scaled(fullRootHeader ? Style.font.title : Style.font.body)
@@ -216,7 +217,7 @@ Item {
       Text {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        text: "ARANEA"
+        text: Aranea.BrandConfig.shortName
         color: selectedText
         opacity: 0.7
         font.family: fontFamily

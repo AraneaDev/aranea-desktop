@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "InboxLogic.js" as InboxLogic
 import "ServiceBridge.js" as ServiceBridge
 
@@ -56,7 +57,7 @@ Panel {
   // with the total; DND hides the non-critical badge.
   readonly property var badge: InboxLogic.badgeState(count, criticalCount, dnd || quiet)
   // Violet focus accent (colors.toml accent_secondary) for scheduled quiet hours.
-  readonly property color focusAccent: "#7a5cff"
+  readonly property color focusAccent: Aranea.DesignTokens.accentSecondary
 
   // Per-app expand overrides set by toggleGroup, fed to InboxLogic.groupView.
   property var expanded: ({})

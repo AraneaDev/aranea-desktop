@@ -2,6 +2,7 @@
 // qmllint disable missing-property
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Column {
   id: branding
@@ -30,7 +31,7 @@ Column {
 
   Text {
     anchors.horizontalCenter: parent.horizontalCenter
-    text: "ARANEA"
+    text: Aranea.BrandConfig.shortName
     color: branding.textColor
     font.family: branding.fontFamily
     font.pixelSize: Math.max(16, Math.round(Style.font.heading * 0.9))
@@ -40,7 +41,7 @@ Column {
 
   Text {
     anchors.horizontalCenter: parent.horizontalCenter
-    text: "SECURE SESSION"
+    text: Aranea.BrandConfig.lockSubtitle
     color: branding.placeholderColor
     font.family: branding.fontFamily
     font.pixelSize: Style.font.bodySmall

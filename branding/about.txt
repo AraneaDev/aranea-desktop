@@ -1,15 +1,3 @@
-     /           \
-    /             \
-   /      /\       \        ██
-    \    /  \      /       ██ ██
-   \  \  / /\ \  /  /     ██  ██ ██ ██  ███  ████   ███   ███
-    \__\/ /__\ \/__/      ██  ██ ███       █ █   █ █   █     █
-   ____/ /____\ \____     ██████ ██     ████ █   █ █████  ████
-   /   /\      /\   \     ██  ██ ██    █   █ █   █ █     █   █
-  /   /  \    /  \   \    ██  ██ ██     ████ █   █  ████  ████
-     /    \  /    \
-    /      \/      \
 ARANEA IDENTITY
-Primary mark: branding/marks/aranea-primary.svg
-Reduced glyph: branding/marks/aranea-glyph.svg
-Ceremony mark: branding/marks/aranea-ceremony.svg
+Source mark: branding/marks/aranea-primary.svg
+Tagline: Quiet systems. Connected focus.

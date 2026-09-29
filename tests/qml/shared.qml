@@ -64,7 +64,7 @@ ShellRoot {
     t.equal(Shared.RuntimePaths.themeRoot, Shared.RuntimePaths.omarchyStateRoot + "/current/theme", "theme paths derive from the Omarchy state root")
     t.check(Shared.RuntimePaths.brandingMarksPath.endsWith("/omarchy/current/theme/branding/marks/"), "branding marks use the current theme path")
     t.check(Shared.RuntimePaths.glyphUrl.startsWith("file://"), "branding glyph exposes a file URL")
-    t.equal(Shared.RuntimePaths.glyphUrl, "file://" + Shared.RuntimePaths.brandingMarksPath + "aranea-glyph.svg", "branding glyph URL uses the shared marks path")
+    t.equal(Shared.RuntimePaths.glyphUrl, "file://" + Shared.RuntimePaths.brandingRoot + "/brand.svg", "branding glyph URL uses the generated brand asset")
     t.equal(Shared.RuntimePaths.emojiRecentsPath, Shared.RuntimePaths.araneaStateRoot + "/emoji-recent.json", "emoji recents use the shared Aranea state root")
     t.equal(Shared.RuntimePaths.rebootRequiredPath, Shared.RuntimePaths.omarchyStateRoot + "/reboot-required", "reboot marker uses the shared Omarchy state root")
     t.equal(Shared.MotionState.statePath, Shared.RuntimePaths.motionStatePath, "motion state uses the shared runtime path")

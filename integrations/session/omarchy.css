@@ -3,5 +3,5 @@
 @import "aranea-colors.css";
 
 :root {
-  --aranea-primary-mark: url("../../branding/marks/aranea-primary.svg");
+  --aranea-primary-mark: url("../../branding/brand.svg");
 }

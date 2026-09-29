@@ -10,6 +10,8 @@ set -euo pipefail
 # Usage: scripts/uninstall.sh [--dry-run] [--yes]
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/ownership.sh"
 source "$repo_root/scripts/lib/json-events.sh"
 
@@ -86,7 +88,7 @@ while (($#)); do
 done
 
 if ((json_mode)) && ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' 'Aranea uninstall: --json requires jq.' >&2
+  printf '%s\n' "$BRAND_NAME uninstall: --json requires jq." >&2
   exit 4
 fi
 
@@ -288,11 +290,11 @@ if [[ "$scope" == complete ]]; then
 fi
 
 if ((json_mode)); then
-  json_completed uninstall ok '' 'Aranea removed.'
+  json_completed uninstall ok '' "$BRAND_NAME removed."
 else
   if [[ "$scope" == complete ]]; then
-    printf '%s\n' 'Aranea removed completely.'
+    printf '%s\n' "$BRAND_NAME removed completely."
   else
-    printf '%s\n' 'Aranea removed. The theme folder stays; remove it with: omarchy theme remove aranea'
+    printf '%s\n' "$BRAND_NAME removed. The theme folder stays; remove it with: omarchy theme remove aranea"
   fi
 fi

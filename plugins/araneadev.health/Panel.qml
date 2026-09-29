@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared"
+import "../araneadev.shared" as Aranea
 import "HealthBridge.js" as HealthBridge
 import "HealthLogic.js" as HealthLogic
 
@@ -39,7 +40,7 @@ Panel {
   // The service's Metrics.qml, or null while unavailable.
   readonly property var m: available ? service.metrics : null
   // Colour of the "attention" status and levels.
-  readonly property color amber: "#ffbd2e"
+  readonly property color amber: Aranea.DesignTokens.attention
   // Icon colour for the current status.
   readonly property color statusColor: status === "critical" ? Color.urgent : (status === "attention" ? amber : Color.notifications.countdown)
   // Key of the keyboard-selected problem ("" for none); rows re-sort as

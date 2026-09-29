@@ -11,7 +11,7 @@ BarWidget {
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
-  // Directory of the current theme's branding marks; the button shows aranea-glyph.svg from it.
+  // Directory of the current theme's branding marks.
   readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
 
   WidgetButton {
@@ -24,13 +24,13 @@ BarWidget {
     fixedHeight: root.bar ? root.bar.barSize : 32
     horizontalMargin: 0
     verticalPadding: 0
-    tooltipText: "Aranea menu"
+    tooltipText: Aranea.BrandConfig.name + " menu"
 
     Image {
       anchors.centerIn: parent
       width: Style.space(16)
       height: Style.space(16)
-      source: "file://" + root.brandingMarksPath + "aranea-glyph.svg"
+      source: Aranea.RuntimePaths.brandUrl
       fillMode: Image.PreserveAspectFit
       sourceSize.width: width * Screen.devicePixelRatio
       sourceSize.height: height * Screen.devicePixelRatio

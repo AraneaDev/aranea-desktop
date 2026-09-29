@@ -1,0 +1,11 @@
+[identity]
+name = "Aranea"
+short_name = "ARANEA"
+tagline = "Quiet systems. Connected focus."
+palette_name = "obsidian / mint / violet"
+lock_subtitle = "SECURE SESSION"
+ceremony_title = "ARANEA THEME CHANGE"
+ceremony_detail = "CEREMONY: branding/marks/aranea-ceremony.svg / champagne accent"
+
+[assets]
+mark = "branding/marks/aranea-primary.svg"

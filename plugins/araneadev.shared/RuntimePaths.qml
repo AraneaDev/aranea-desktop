@@ -36,8 +36,11 @@ QtObject {
   // Directory containing branding glyphs.
   readonly property string brandingGlyphsPath: brandingRoot + "/glyphs/"
 
-  // File URL for the primary Aranea branding glyph.
-  readonly property string glyphUrl: "file://" + brandingMarksPath + "aranea-glyph.svg"
+  // File URL for the canonical branding mark.
+  readonly property string brandUrl: "file://" + brandingRoot + "/" + BrandConfig.markFile
+
+  // Compatibility alias for components that still call this a glyph.
+  readonly property string glyphUrl: brandUrl
 
   // File storing the shared reduced-motion preference.
   readonly property string motionStatePath: araneaStateRoot + "/motion"

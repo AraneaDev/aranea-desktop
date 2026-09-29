@@ -27,6 +27,21 @@ scripts/install.sh --dry-run --yes
 
 The selected profile is stored in `~/.local/state/aranea/profile`.
 
+## Rebrand a theme fork
+
+Edit `design/brand.toml` for visible identity text and replace
+`branding/marks/aranea-primary.svg` with the fork's source mark. Change colors
+in `design/tokens.toml`, then regenerate every projection:
+
+```bash
+scripts/generate-tokens --write
+scripts/generate-tokens --check
+```
+
+The generated mark is used by the shell and lock screen. The same source also
+produces the static lock/Plymouth artwork, raster compatibility asset, motif
+and status glyph colors, Kvantum artwork, and shell-readable brand values.
+
 ## Activate the theme
 
 ```bash
