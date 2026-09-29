@@ -309,91 +309,24 @@ PanelWindow {
           property var activeRow: panel.root.displayModel.count > 0 && panel.root.selectedIndex >= 0 && panel.root.selectedIndex < panel.root.displayModel.count ? panel.root.displayModel.get(panel.root.selectedIndex) : null
           readonly property bool masked: !!activeRow && activeRow.secret && panel.root.revealedIndex !== panel.root.selectedIndex
 
-          Rectangle {
-            anchors.left: parent.left
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            width: Style.normalBorderWidth
-            color: Util.alpha(panel.root.border, 0.28)
-          }
-
-          // Secret: masked until revealed with Space for this selection.
-          Column {
-            visible: preview.masked
-            anchors.left: parent.left
-            anchors.leftMargin: panel.root.contentMargin
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(8)
-            Text {
-              textFormat: Text.PlainText
-              text: "•••••••••••••••• · secret"
-              color: panel.root.foreground
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.title
-            }
-            Text {
-              textFormat: Text.PlainText
-              text: {
-                var left = preview.activeRow ? ClipboardLogic.secretExpiryText(panel.root.history[preview.activeRow.historyIndex], panel.root.nowMs, panel.root.secretTtlMs) : ""
-                return "SPACE TO REVEAL" + (left ? "  ·  " + left.toUpperCase() : "")
-              }
-              color: Util.alpha(panel.root.foreground, 0.5)
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.letterSpacing: 0.20
-            }
-          }
-
-          // Colour swatch.
-          Column {
-            visible: !preview.masked && !!preview.activeRow && preview.activeRow.colour.length > 0
-            anchors.left: parent.left
-            anchors.leftMargin: panel.root.contentMargin
-            anchors.top: parent.top
-            spacing: Style.space(10)
-            Rectangle {
-              visible: !!preview.activeRow && preview.activeRow.swatch.length > 0
-              width: Style.space(120)
-              height: Style.space(80)
-              radius: panel.root.cornerRadius
-              color: preview.activeRow && preview.activeRow.swatch.length > 0 ? preview.activeRow.swatch : "transparent"
-              border.width: 1
-              border.color: Util.alpha(panel.root.foreground, 0.25)
-            }
-            Text {
-              textFormat: Text.PlainText
-              text: preview.activeRow ? preview.activeRow.colour : ""
-              color: panel.root.foreground
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.title
-            }
-          }
-
-          // Text, code, links and paths (revealed secrets fetch their text
-          // from history by index: display rows never carry it).
-          Text {
-            visible: !preview.masked && !!preview.activeRow && !preview.activeRow.previewImage && preview.activeRow.colour.length === 0
+          ClipboardPreview {
             anchors.fill: parent
-            anchors.leftMargin: panel.root.contentMargin
-            textFormat: Text.PlainText
-            text: !preview.activeRow ? "" : (preview.activeRow.secret ? ClipboardLogic.fullText(panel.root.history[preview.activeRow.historyIndex]) : preview.activeRow.fullText)
-            color: panel.root.foreground
-            font.family: preview.activeRow && preview.activeRow.kind === "code" ? "monospace" : panel.root.fontFamily
-            font.pixelSize: preview.activeRow && preview.activeRow.kind === "code" ? Style.font.body : Style.font.title
-            wrapMode: Text.WrapAnywhere
-            elide: Text.ElideRight
-            verticalAlignment: Text.AlignTop
-          }
-
-          Image {
-            visible: !preview.masked && !!preview.activeRow && preview.activeRow.previewImage.length > 0
-            anchors.fill: parent
-            anchors.leftMargin: panel.root.contentMargin
-            source: preview.activeRow ? preview.activeRow.previewImage : ""
-            fillMode: Image.PreserveAspectFit
-            verticalAlignment: Image.AlignTop
-            asynchronous: true
-            smooth: true
+            masked: preview.masked
+            secretHint: "SPACE TO REVEAL"
+            secretExpiry: {
+              var left = preview.activeRow ? ClipboardLogic.secretExpiryText(panel.root.history[preview.activeRow.historyIndex], panel.root.nowMs, panel.root.secretTtlMs) : ""
+              return left
+            }
+            textValue: !preview.activeRow ? "" : (preview.activeRow.secret ? ClipboardLogic.fullText(panel.root.history[preview.activeRow.historyIndex]) : preview.activeRow.fullText)
+            imageSource: preview.activeRow ? preview.activeRow.previewImage : ""
+            colourText: preview.activeRow ? preview.activeRow.colour : ""
+            swatch: preview.activeRow ? preview.activeRow.swatch : ""
+            isCode: !!preview.activeRow && preview.activeRow.kind === "code"
+            contentMargin: panel.root.contentMargin
+            fontFamily: panel.root.fontFamily
+            foreground: panel.root.foreground
+            borderColor: panel.root.border
+            cornerRadius: panel.root.cornerRadius
           }
         }
       }
