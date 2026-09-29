@@ -327,34 +327,20 @@ PanelWindow {
         Repeater {
           model: panel.root.rootTiles
 
-          delegate: BorderSurface {
+          delegate: MenuRootTile {
             required property var modelData
-            property bool hovered: false
 
             opacity: panel.root.fullRootHeader ? 1 : 0
             width: (parent.width - Style.spacing.xs * 2) / 3
             height: panel.root.rootTileHeight
-            radius: Style.space(5)
-            color: panel.root.hoveredTileBackground(hovered)
-            borderSpec: Border.none()
-
-            Rectangle {
-              anchors.left: parent.left
-              anchors.top: parent.top
-              width: Style.space(18)
-              height: Style.space(2)
-              color: panel.root.selectedText
-              opacity: hovered ? 0.9 : 0.25
-            }
-
-            Rectangle {
-              anchors.right: parent.right
-              anchors.bottom: parent.bottom
-              width: Style.space(18)
-              height: Style.space(2)
-              color: panel.root.selectedText
-              opacity: hovered ? 0.9 : 0.25
-            }
+            tileData: modelData
+            fontFamily: panel.root.fontFamily
+            foreground: panel.root.foreground
+            contextText: panel.root.contextText
+            selectedText: panel.root.selectedText
+            menuFontScale: panel.root.menuFontScale
+            menuLetterSpacing: panel.root.menuLetterSpacing
+            motionEnabled: panel.root.motionEnabled
 
             Behavior on opacity {
               enabled: panel.root.motionEnabled
@@ -364,52 +350,7 @@ PanelWindow {
               }
             }
 
-            Column {
-              width: parent.width - Style.space(28)
-              anchors.centerIn: parent
-              spacing: Style.space(11)
-
-              Text {
-                width: parent.width
-                text: modelData.icon
-                color: panel.root.selectedText
-                font.family: panel.root.fontFamily
-                font.pixelSize: Style.font.iconLarge
-                horizontalAlignment: Text.AlignHCenter
-              }
-
-              Text {
-                width: parent.width
-                text: modelData.label
-                color: panel.root.foreground
-                font.family: panel.root.fontFamily
-                font.pixelSize: panel.root.menuFontSize(Style.font.bodySmall)
-                font.letterSpacing: panel.root.menuLetterSpacing
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-              }
-
-              Text {
-                width: parent.width
-                text: modelData.detail
-                color: panel.root.contextText
-                font.family: panel.root.fontFamily
-                font.pixelSize: panel.root.menuFontSize(Style.font.caption)
-                font.weight: Font.Medium
-                font.letterSpacing: panel.root.menuLetterSpacing
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-              }
-            }
-
-            MouseArea {
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: panel.root.activateTile(modelData)
-              onEntered: parent.hovered = true
-              onExited: parent.hovered = false
-            }
+            onActivated: panel.root.activateTile(modelData)
           }
         }
       }
