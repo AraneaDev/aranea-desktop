@@ -30,6 +30,23 @@ function canonicalPng(png) {
   return Buffer.concat(chunks)
 }
 
+function pngsMatch(first, second, temporaryRoot) {
+  const expected = path.join(temporaryRoot, "expected.png")
+  fs.writeFileSync(expected, second)
+  try {
+    execFileSync("compare", ["-metric", "AE", first, expected, "null:"], {
+      stdio: ["ignore", "ignore", "pipe"]
+    })
+    return true
+  } catch (error) {
+    return error.status === 1
+      ? false
+      : (() => {
+          throw error
+        })()
+  }
+}
+
 function flattenTokens(value, prefix = "", output = {}) {
   for (const [key, child] of Object.entries(value)) {
     const name = prefix ? `${prefix}.${key}` : key
@@ -510,20 +527,26 @@ function outputs(tokens, brand) {
 
 function checkOrWrite(write) {
   const expected = outputs(loadTokens(), loadBrand())
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-token-check-"))
   let stale = false
-  for (const [relative, content] of expected) {
-    const target = path.join(root, relative)
-    const current = fs.existsSync(target) ? fs.readFileSync(target) : Buffer.alloc(0)
-    const matches = Buffer.isBuffer(content)
-      ? current.equals(content)
-      : current.toString("utf8") === content
-    if (!matches) {
-      stale = true
-      if (write) {
-        fs.mkdirSync(path.dirname(target), { recursive: true })
-        fs.writeFileSync(target, content)
-      } else console.error(`generated token output is stale: ${relative}`)
+  try {
+    for (const [relative, content] of expected) {
+      const target = path.join(root, relative)
+      const current = fs.existsSync(target) ? fs.readFileSync(target) : Buffer.alloc(0)
+      const matches = Buffer.isBuffer(content)
+        ? current.equals(content) ||
+          (relative.endsWith(".png") && pngsMatch(target, content, temporaryRoot))
+        : current.toString("utf8") === content
+      if (!matches) {
+        stale = true
+        if (write) {
+          fs.mkdirSync(path.dirname(target), { recursive: true })
+          fs.writeFileSync(target, content)
+        } else console.error(`generated token output is stale: ${relative}`)
+      }
     }
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true })
   }
   if (stale && !write) process.exitCode = 1
 }
