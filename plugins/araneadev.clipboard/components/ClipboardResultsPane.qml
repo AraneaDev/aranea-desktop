@@ -5,6 +5,7 @@
 import QtQuick
 import qs.Commons
 import "../ClipboardLogic.js" as ClipboardLogic
+import "../../araneadev.shared" as Aranea
 
 Item {
   id: pane
@@ -159,30 +160,13 @@ Item {
     }
   }
 
-  Column {
-    anchors.centerIn: parent
-    spacing: Style.space(8)
+  Aranea.EmptyState {
+    anchors.fill: parent
     visible: !pane.model || pane.model.count === 0
-
-    Text {
-      text: "󰅌"
-      color: pane.selectedText
-      opacity: 0.8
-      font.family: pane.fontFamily
-      font.pixelSize: Style.font.displayLarge
-      horizontalAlignment: Text.AlignHCenter
-      width: parent.width
-    }
-
-    Text {
-      textFormat: Text.PlainText
-      text: pane.emptyMessage
-      color: pane.foreground
-      opacity: 0.7
-      font.family: pane.fontFamily
-      font.pixelSize: Style.font.title
-      horizontalAlignment: Text.AlignHCenter
-      width: parent.width
-    }
+    icon: "󰅌"
+    message: pane.emptyMessage
+    fontFamily: pane.fontFamily
+    iconColor: pane.selectedText
+    foreground: pane.foreground
   }
 }

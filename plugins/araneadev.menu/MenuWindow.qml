@@ -250,28 +250,16 @@ PanelWindow {
           }
         }
 
-        Column {
-          anchors.centerIn: parent
-          spacing: Style.space(12)
+        Aranea.EmptyState {
+          anchors.fill: parent
           visible: panel.root.displayModel.count === 0 && panel.root.mode !== "input"
-          Text {
-            text: panel.root.emptyStateInfo.icon
-            color: panel.root.selectedText
-            opacity: 0.8
-            font.family: panel.root.fontFamily
-            font.pixelSize: panel.root.menuFontSize(Style.font.displayLarge)
-            horizontalAlignment: Text.AlignHCenter
-            width: Style.space(320)
-          }
-          Text {
-            text: panel.root.emptyStateInfo.text
-            color: panel.root.foreground
-            opacity: 0.7
-            font.family: panel.root.fontFamily
-            font.pixelSize: panel.root.menuFontSize(Style.font.title)
-            horizontalAlignment: Text.AlignHCenter
-            width: Style.space(320)
-          }
+          icon: panel.root.emptyStateInfo.icon
+          message: panel.root.emptyStateInfo.text
+          fontFamily: panel.root.fontFamily
+          iconColor: panel.root.selectedText
+          foreground: panel.root.foreground
+          iconSize: panel.root.menuFontSize(Style.font.displayLarge)
+          messageSize: panel.root.menuFontSize(Style.font.title)
         }
       }
     }

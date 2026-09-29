@@ -2,6 +2,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 GridView {
   id: grid
@@ -47,30 +48,13 @@ GridView {
     onPicked: grid.picked(emoji, index)
   }
 
-  Column {
-    anchors.centerIn: parent
-    spacing: Style.space(8)
+  Aranea.EmptyState {
+    anchors.fill: parent
     visible: grid.count === 0
-
-    Text {
-      text: "󰈉"
-      color: grid.selectedText
-      opacity: 0.8
-      font.family: grid.fontFamily
-      font.pixelSize: Style.font.displayLarge
-      horizontalAlignment: Text.AlignHCenter
-      width: parent.width
-    }
-
-    Text {
-      textFormat: Text.PlainText
-      text: "No matches for “" + grid.filterText + "”"
-      color: grid.foreground
-      opacity: 0.7
-      font.family: grid.fontFamily
-      font.pixelSize: Style.font.title
-      horizontalAlignment: Text.AlignHCenter
-      width: parent.width
-    }
+    icon: "󰈉"
+    message: "No matches for “" + grid.filterText + "”"
+    fontFamily: grid.fontFamily
+    iconColor: grid.selectedText
+    foreground: grid.foreground
   }
 }

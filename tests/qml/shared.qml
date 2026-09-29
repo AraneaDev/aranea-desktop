@@ -31,6 +31,12 @@ ShellRoot {
     subtitleElide: Text.ElideRight
   }
 
+  Shared.EmptyState {
+    id: empty
+    icon: "󰈉"
+    message: "No matches"
+  }
+
   Component.onCompleted: {
     t.check(Shared.RuntimePaths.home.length > 0, "runtime paths expose the home directory")
     t.equal(Shared.RuntimePaths.motionStatePath, Shared.RuntimePaths.araneaStateRoot + "/motion", "motion path derives from the Aranea state root")
@@ -52,6 +58,8 @@ ShellRoot {
     t.equal(rail.implicitWidth, Style.space(2), "status rails use the shared compact width")
     t.equal(pair.title, "TITLE", "status text pairs expose their title")
     t.equal(pair.subtitle, "SUBTITLE", "status text pairs expose their subtitle")
+    t.equal(empty.icon, "󰈉", "empty states expose their icon")
+    t.equal(empty.message, "No matches", "empty states expose their message")
     t.done()
   }
 }
