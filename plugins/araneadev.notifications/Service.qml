@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 import "NotificationLogic.js" as NotificationLogic
 import "InboxLogic.js" as InboxLogic
@@ -161,18 +162,9 @@ Item {
 
   // Aranea motion preference, shared with the OSD: `off` in the state file
   // (or ARANEA_REDUCED_MOTION=1) removes the swipe slide animation.
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  // Shared Aranea motion state file ($XDG_STATE_HOME/aranea/motion).
-  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")) + "/aranea/motion"
-
-  FileView {
-    path: service.motionStatePath
-    watchChanges: true
-    printErrors: false
-    onLoaded: service.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: service.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
+  // Shared Aranea motion state file.
+  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
 
   // Minimum on-screen time of a low-urgency toast, in ms.
   readonly property int lowPopupDuration: 5000

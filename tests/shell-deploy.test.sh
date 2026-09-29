@@ -14,6 +14,7 @@ grep -Fq 'deploy-plugins-safely' "$repo_root/hooks/post-boot"
 grep -Fq 'quickshell kill' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'omarchy restart shell' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'repair-shell-config' "$repo_root/scripts/deploy-plugins-safely"
+grep -Fq 'araneadev.shared' "$repo_root/scripts/deploy-plugins-safely"
 bash -n "$repo_root/scripts/deploy-plugins-safely"
 
 # A plugin can end up deployed on disk without ever being registered in

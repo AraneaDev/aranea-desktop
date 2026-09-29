@@ -10,6 +10,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "BarModel.js" as BarModel
 
 Item {
@@ -108,9 +109,9 @@ Item {
   property bool foregroundAnimationEnabled: true
   // Whether Aranea motion is on. Starts from ARANEA_REDUCED_MOTION (1 = off);
   // once the motion state file loads, the env var wins; otherwise the file's content decides ("off" = off).
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  // State file ($XDG_STATE_HOME/aranea/motion) whose "off" content disables bar animations.
-  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
+  // Shared state file whose "off" content disables bar animations.
+  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Bar background color, from the Color singleton.
   property color background: Color.bar.background
   // Accent color for urgent or active states, from the Color singleton.
@@ -1412,17 +1413,7 @@ Item {
   }
 
   FileView {
-    id: motionStateFile
-    path: root.motionStatePath
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
-
-  FileView {
-    path: root.stateHome + "/omarchy/current"
+    path: Aranea.RuntimePaths.omarchyStateRoot + "/current"
     watchChanges: true
     printErrors: false
     onFileChanged: root.scheduleTransparentForegroundRefresh()
@@ -1663,25 +1654,10 @@ Item {
         }
       }
 
-      BorderSurface {
+      TooltipBubble {
         id: tooltipBubble
-        implicitWidth: tooltipLabel.implicitWidth + 20
-        implicitHeight: tooltipLabel.implicitHeight + 14
-        color: Color.tooltip.background
-        borderSpec: Border.surfaceSpec("tooltip", "border", Color.tooltip.border, 1)
-        radius: Style.cornerRadius
-
-        Text {
-          id: tooltipLabel
-          textFormat: Text.PlainText
-          anchors.centerIn: parent
-          text: root.tooltipText
-          color: Color.tooltip.text
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-        }
+        text: root.tooltipText
+        fontFamily: root.fontFamily
       }
     }
 
@@ -1801,17 +1777,21 @@ Item {
       }
     }
 
-    Rectangle {
+    // qmllint disable unqualified
+    BarDragOverlay {
       readonly property var targetRect: root.barDragTargetGeometry
 
-      visible: ghostWindow.active && targetRect !== null
-      x: targetRect ? Math.round(targetRect.x) : 0
-      y: targetRect ? Math.round(targetRect.y) : 0
-      width: targetRect ? targetRect.width : 0
-      height: targetRect ? targetRect.height : 0
-      color: Color.accent
-      radius: Math.min(width, height) / 2
+      anchors.fill: parent
+      active: ghostWindow.active && targetRect !== null
+      barPosition: root.position
+      targetX: targetRect ? Math.round(targetRect.x) : 0
+      targetY: targetRect ? Math.round(targetRect.y) : 0
+      targetWidth: targetRect ? targetRect.width : 0
+      targetHeight: targetRect ? targetRect.height : 0
+      dropAfter: root.barDragAfter
+      accent: Color.accent
     }
+    // qmllint enable unqualified
   }
 
   component BarMoveGhostPanel: PanelWindow {
@@ -1905,6 +1885,7 @@ Item {
         anchors.fill: parent
 
         CenterGestureArea {
+          bar: root
           anchors.fill: parent
         }
 
@@ -1927,8 +1908,9 @@ Item {
           anchors.verticalCenter: centerAnchorModule.verticalCenter
         }
 
-        ModuleSlot {
+        BarModuleSlot {
           id: centerAnchorModule
+          owner: root
           visible: centerRoot.hasAnchor
           entry: centerRoot.anchorEntry
           region: "center"
@@ -1952,6 +1934,7 @@ Item {
         anchors.fill: parent
 
         CenterGestureArea {
+          bar: root
           anchors.fill: parent
         }
 
@@ -1974,8 +1957,9 @@ Item {
           anchors.horizontalCenter: verticalCenterAnchorModule.horizontalCenter
         }
 
-        ModuleSlot {
+        BarModuleSlot {
           id: verticalCenterAnchorModule
+          owner: root
           visible: centerRoot.hasAnchor
           entry: centerRoot.anchorEntry
           region: "center"
@@ -1989,92 +1973,6 @@ Item {
           anchors.top: verticalCenterAnchorModule.bottom
           anchors.horizontalCenter: verticalCenterAnchorModule.horizontalCenter
         }
-      }
-    }
-  }
-
-  component CenterGestureArea: MouseArea {
-    id: gestureArea
-
-    property bool dragging: false
-    property bool suppressClick: false
-    property real pressedX: 0
-    property real pressedY: 0
-    readonly property real dragThreshold: Style.space(4)
-
-    acceptedButtons: Qt.LeftButton
-    cursorShape: dragging ? Qt.ClosedHandCursor : Qt.ArrowCursor
-    pressAndHoldInterval: 200
-
-    function startDrag(x, y) {
-      if (dragging)
-        return
-      dragging = true
-      root.beginBarMove(root.targetWindow(gestureArea))
-      var scenePoint = gestureArea.mapToItem(null, x, y)
-      root.updateBarMove(root.windowScreenPoint(scenePoint, root.barMoveWindow))
-    }
-
-    onPressed: function (mouse) {
-      dragging = false
-      suppressClick = false
-      pressedX = mouse.x
-      pressedY = mouse.y
-    }
-
-    onPressAndHold: function (mouse) {
-      // A widget above us propagates its composed press-and-hold down here without
-      // ever handing over the grab, so we'd get no release or cancel to end the move.
-      if (!gestureArea.pressed)
-        return
-      startDrag(mouse.x, mouse.y)
-    }
-
-    onPositionChanged: function (mouse) {
-      if (!(mouse.buttons & Qt.LeftButton))
-        return
-      if (!dragging) {
-        var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
-        if (distance < dragThreshold)
-          return
-        startDrag(mouse.x, mouse.y)
-        return
-      }
-
-      var scenePoint = gestureArea.mapToItem(null, mouse.x, mouse.y)
-      root.updateBarMove(root.windowScreenPoint(scenePoint, root.barMoveWindow))
-    }
-
-    onReleased: function (mouse) {
-      if (!dragging)
-        return
-      dragging = false
-      suppressClick = true
-      root.finishBarMove()
-      mouse.accepted = true
-    }
-
-    onCanceled: {
-      dragging = false
-      suppressClick = false
-      root.clearBarMove()
-    }
-
-    onClicked: function (mouse) {
-      if (suppressClick) {
-        suppressClick = false
-        mouse.accepted = true
-      }
-    }
-
-    onDoubleClicked: function (mouse) {
-      if (suppressClick) {
-        suppressClick = false
-        return
-      }
-      if (mouse.button === Qt.LeftButton) {
-        root.toggleTransparency()
-        mouse.accepted = true
       }
     }
   }
@@ -2105,8 +2003,9 @@ Item {
         Repeater {
           model: moduleListRoot.entries
 
-          ModuleSlot {
+          BarModuleSlot {
             required property var modelData
+            owner: root
             entry: modelData
             region: moduleListRoot.region
           }
@@ -2123,331 +2022,14 @@ Item {
         Repeater {
           model: moduleListRoot.entries
 
-          ModuleSlot {
+          BarModuleSlot {
             required property var modelData
+            owner: root
             entry: modelData
             region: moduleListRoot.region
           }
         }
       }
-    }
-  }
-
-  component ModuleSlot: Item {
-    id: slot
-
-    required property var entry
-    property string region: ""
-    readonly property string moduleName: root.entryId(entry)
-    readonly property var moduleSettings: root.entrySettings(entry)
-    readonly property string customType: root.customModuleType(entry)
-    readonly property var registryMetadata: root.barWidgetRegistry.metadataFor(root.canonicalWidgetId(moduleName))
-    readonly property bool firstParty: registryMetadata && registryMetadata.firstParty === true
-    readonly property string pluginApiId: registered ? root.canonicalWidgetId(moduleName) : "bar-entry:" + moduleName
-    // Re-evaluate when the registry mutates (Component reference changes,
-    // plugin enabled/disabled, etc.). Reading the `widgets` property creates
-    // the binding dependency — the wrapped function call alone wouldn't.
-    readonly property var registryComponent: {
-      var w = root.barWidgetRegistry.widgets
-      if (customType)
-        return null
-      var registryName = root.canonicalWidgetId(moduleName)
-      return w[registryName] ? w[registryName].component : null
-    }
-    readonly property bool qmlCustom: customType === "qml"
-    readonly property bool commandCustom: customType === "command"
-    readonly property bool registered: registryComponent !== null
-    readonly property var activeItem: {
-      if (registered)
-        return registryLoader.item
-      if (qmlCustom)
-        return qmlLoader.item
-      return componentLoader.item
-    }
-    readonly property bool hovered: moduleHover.hovered
-    readonly property bool dragSource: root.barDragSource === slot
-    readonly property bool panelOpen: root.activePopout === slot.activeItem
-    // Modules bigger than the mark they want (a text label in a padded slot,
-    // a multi-line stack on a vertical bar) can say how long the open-panel
-    // dot should be along the bar, so it tracks what the module paints
-    // instead of a fraction of whatever slot it happens to fill.
-    readonly property real panelIndicatorExtent: {
-      var key = root.vertical ? "openPanelIndicatorHeight" : "openPanelIndicatorWidth"
-      var hint = activeItem && key in activeItem ? activeItem[key] : undefined
-      if (hint !== undefined && hint !== null && hint > 0)
-        return Math.round(hint)
-      return Math.max(Style.space(10), Math.round((root.vertical ? slot.height : slot.width) * 0.55))
-    }
-    implicitWidth: activeItem && activeItem.visible ? (root.vertical ? root.barSize : activeItem.implicitWidth) : 0
-    implicitHeight: activeItem && activeItem.visible ? activeItem.implicitHeight : 0
-    width: implicitWidth
-    height: implicitHeight
-    z: modulePointer.dragging ? 100 : 0
-
-    Component.onCompleted: root.registerModuleSlot(slot)
-    Component.onDestruction: {
-      if (root.barDragSource === slot)
-        root.clearBarDrag()
-      root.unregisterModuleSlot(slot)
-    }
-
-    HoverHandler {
-      id: moduleHover
-    }
-
-    BorderSurface {
-      visible: slot.dragSource
-      anchors.fill: parent
-      anchors.margins: Style.space(1)
-      color: root.transparent ? "transparent" : root.background
-      borderSpec: Border.flat(root.barForeground, 1)
-      radius: Math.min(Style.cornerRadius, height / 2)
-      opacity: root.transparent ? 0.22 : 0.32
-    }
-
-    Loader {
-      id: componentLoader
-      active: !slot.qmlCustom && !slot.registered
-      sourceComponent: slot.commandCustom ? customCommandModuleComponent : emptyModuleComponent
-      anchors.fill: parent
-      opacity: slot.dragSource ? 0.22 : 1.0
-      onLoaded: {
-        slot.injectProps()
-        Qt.callLater(slot.injectProps)
-      }
-    }
-
-    Loader {
-      id: registryLoader
-      active: slot.registered
-      sourceComponent: slot.registered ? slot.registryComponent : null
-      anchors.fill: parent
-      opacity: slot.dragSource ? 0.22 : 1.0
-      onLoaded: {
-        slot.injectProps()
-        Qt.callLater(slot.injectProps)
-      }
-    }
-
-    Loader {
-      id: qmlLoader
-      active: slot.qmlCustom
-      source: slot.qmlCustom ? root.customModuleSource(slot.entry) : ""
-      anchors.fill: parent
-      opacity: slot.dragSource ? 0.22 : 1.0
-      onLoaded: {
-        slot.injectProps()
-        Qt.callLater(slot.injectProps)
-      }
-    }
-
-    Rectangle {
-      id: openPanelIndicator
-
-      readonly property int inset: Style.space(2)
-
-      visible: opacity > 0
-      opacity: slot.panelOpen && !slot.dragSource ? 0.9 : 0
-      color: Color.accent
-      radius: Math.min(width, height) / 2
-      width: root.vertical ? Style.space(2) : slot.panelIndicatorExtent
-      height: root.vertical ? slot.panelIndicatorExtent : Style.space(2)
-      // The mark sits on the module's inner edge — the one facing the
-      // desktop — so it underlines a top bar, overlines a bottom one, and
-      // points inward from a left or right one. It reads as pointing at the
-      // panel that opens on that side.
-      x: root.vertical ? (root.position === "left" ? parent.width - width - inset : inset) : Math.round((parent.width - width) / 2)
-      y: root.vertical ? Math.round((parent.height - height) / 2) : (root.position === "top" ? parent.height - height - inset : inset)
-      z: 50
-
-      Behavior on opacity {
-        NumberAnimation {
-          duration: 120
-          easing.type: Easing.OutCubic
-        }
-      }
-    }
-
-    MouseArea {
-      id: modulePointer
-
-      property bool dragging: false
-      property bool suppressClick: false
-      property real pressedX: 0
-      property real pressedY: 0
-      readonly property bool canReorder: root.shell && typeof root.shell.mutateShellConfig === "function"
-      readonly property real dragThreshold: Style.space(4)
-
-      anchors.fill: parent
-      acceptedButtons: Qt.LeftButton
-      enabled: slot.visible && slot.width > 0 && slot.height > 0
-      propagateComposedEvents: true
-      cursorShape: root.moduleClickTargetAt(slot, mouseX, mouseY) ? Qt.PointingHandCursor : Qt.ArrowCursor
-      // Do not assign drag.target here: ModuleSlot is owned by Row/Column
-      // positioners, and mutating slot.x/slot.y can leave stale offsets that
-      // make neighboring modules overlap after a small aborted drag.
-
-      onPressed: function (mouse) {
-        dragging = false
-        suppressClick = false
-        pressedX = mouse.x
-        pressedY = mouse.y
-        root.clearBarDrag()
-      }
-
-      onPositionChanged: function (mouse) {
-        if (!canReorder || !(mouse.buttons & Qt.LeftButton))
-          return
-        var distance = Math.abs(mouse.x - pressedX) + Math.abs(mouse.y - pressedY)
-        if (distance >= dragThreshold) {
-          if (!dragging) {
-            root.barDragWindow = root.targetWindow(slot.activeItem) || root.targetWindow(slot)
-            root.barDragScreen = root.barDragWindow ? root.barDragWindow.screen : null
-            root.barDragOffsetX = pressedX
-            root.barDragOffsetY = pressedY
-            root.captureBarDragGhost(slot)
-            root.barDragSource = slot
-          }
-          dragging = true
-          root.hideTooltip(slot.activeItem)
-        }
-
-        if (dragging) {
-          var scenePoint = slot.mapToItem(null, mouse.x, mouse.y)
-          var screenPoint = root.barDragScreenPoint(scenePoint)
-          root.barDragSceneX = scenePoint.x
-          root.barDragSceneY = scenePoint.y
-          root.barDragScreenX = screenPoint.x
-          root.barDragScreenY = screenPoint.y
-
-          var drop = root.moduleDropAtScene(scenePoint, slot)
-          root.barDragTarget = drop ? drop.slot : null
-          root.barDragAfter = drop ? drop.after : false
-          root.barDragTargetGeometry = drop ? root.dropMarkerRect(drop.slot, drop.after) : null
-        }
-      }
-
-      onReleased: function (mouse) {
-        var wasDragging = dragging
-        var targetSlot = root.barDragTarget
-        var afterTarget = root.barDragAfter
-
-        if (wasDragging)
-          suppressClick = true
-
-        dragging = false
-        root.clearBarDrag()
-
-        if (wasDragging && targetSlot) {
-          root.dropBarModuleAtTarget(slot, targetSlot, afterTarget)
-          mouse.accepted = true
-        } else if (!wasDragging) {
-          mouse.accepted = false
-        }
-      }
-
-      onCanceled: {
-        dragging = false
-        suppressClick = false
-        root.clearBarDrag()
-      }
-
-      onClicked: function (mouse) {
-        if (suppressClick) {
-          suppressClick = false
-          mouse.accepted = true
-          return
-        }
-
-        if (!root.pressModuleClickTarget(slot, mouse.button, mouse.x, mouse.y))
-          mouse.accepted = false
-      }
-    }
-
-    onActiveItemChanged: Qt.callLater(injectProps)
-    onModuleSettingsChanged: injectProps()
-
-    function injectProps() {
-      var target = activeItem
-      if (!target)
-        return
-      if ("bar" in target)
-        target.bar = firstParty ? root : root.pluginBarApiFor(pluginApiId, moduleName, registered)
-      if ("moduleName" in target)
-        target.moduleName = moduleName
-      if ("settings" in target)
-        target.settings = moduleSettings
-    }
-
-    Component {
-      id: customCommandModuleComponent
-      CustomCommandModule {
-        entry: slot.entry
-      }
-    }
-  }
-
-  component CustomCommandModule: WidgetButton {
-    id: customRoot
-
-    required property var entry
-    readonly property string moduleName: root.entryId(entry)
-    readonly property var settings: root.entrySettings(entry)
-    property string outputText: ""
-    property string outputTooltip: ""
-    property bool outputActive: false
-
-    function setting(name, fallback) {
-      var value = settings ? settings[name] : undefined
-      return value === undefined || value === null ? fallback : value
-    }
-
-    function update(raw) {
-      var data = Util.parseModuleJson(raw)
-      var klass = data.class || data.alt || ""
-
-      outputText = data.text || String(raw || "").trim()
-      outputTooltip = data.tooltip || String(setting("tooltip", ""))
-      outputActive = klass === "active" || (Array.isArray(klass) && klass.indexOf("active") !== -1)
-    }
-
-    bar: root
-    text: outputText || String(setting("text", ""))
-    tooltipText: outputTooltip || String(setting("tooltip", ""))
-    active: outputActive
-    keepSpace: setting("keepSpace", false) === true
-    horizontalMargin: Number(setting("horizontalMargin", 7.5))
-    verticalPadding: Number(setting("verticalPadding", 6))
-    fontSize: Number(setting("fontSize", 12))
-
-    onPressed: function (button) {
-      var command = ""
-      if (button === Qt.RightButton)
-        command = String(setting("onRightClick", ""))
-      else if (button === Qt.MiddleButton)
-        command = String(setting("onMiddleClick", ""))
-      else
-        command = String(setting("onClick", ""))
-
-      if (command)
-        root.run(command)
-    }
-
-    Process {
-      id: customProc
-      command: ["bash", "-lc", String(customRoot.setting("exec", ""))]
-      stdout: StdioCollector {
-        waitForEnd: true
-        onStreamFinished: customRoot.update(text)
-      }
-    }
-
-    Timer {
-      interval: Math.max(1, Number(customRoot.setting("interval", 5))) * 1000
-      running: String(customRoot.setting("exec", "")) !== ""
-      repeat: true
-      triggeredOnStart: true
-      onTriggered: root.runProcess(customProc)
     }
   }
 }

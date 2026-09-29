@@ -5,7 +5,7 @@ import qs.Commons
 
 Rectangle {
   // Colour of the status rail.
-  property color railColor: Color.popups.text
+  property color railColor: DesignTokens.foreground
   implicitWidth: Style.space(2)
   color: railColor
 }

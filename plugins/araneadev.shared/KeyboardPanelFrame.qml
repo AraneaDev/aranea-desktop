@@ -16,11 +16,11 @@ KeyboardPanel {
   // Emitted when the focused item is activated.
   signal activateRequested
   // Content rendered inside the keyboard frame.
-  default property alias panelContent: body.data
-  focusTarget: keyCatcher
+  default property alias panelContent: input.content
+  focusTarget: input.focusTarget
 
-  PanelKeyCatcher {
-    id: keyCatcher
+  KeyboardInputFrame {
+    id: input
     anchors.fill: parent
     onCloseRequested: frame.closeRequested()
     onTabRequested: function (direction) {
@@ -33,10 +33,5 @@ KeyboardPanel {
       frame.textKey(text)
     }
     onActivateRequested: frame.activateRequested()
-
-    Item {
-      id: body
-      anchors.fill: parent
-    }
   }
 }

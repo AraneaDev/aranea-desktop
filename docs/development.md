@@ -48,15 +48,61 @@ runtime checks require the Omarchy tooling available on the development host.
 
 ### Shared QML components
 
-Use `plugins/araneadev.shared` for visual contracts that are identical across
-plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`, `StatusTextPair`, and
-`KeyboardPanelFrame`. Keep lifecycle, cursor, and plugin-specific interaction
-logic in the owning plugin rather than adding it to shared components.
+Use `plugins/araneadev.shared` for visual and input contracts that are
+identical across plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`,
+`StatusTextPair`, `StatusRow`, `BrandHeader`, `KeyboardInputFrame`, and
+`KeyboardPanelFrame`. `KeyboardInputFrame` owns only key forwarding;
+`KeyboardPanelFrame` adds the layer-shell panel. Keep lifecycle, cursor, and
+plugin-specific interaction logic in the owning plugin rather than adding it
+to shared components.
 
 Generated asset outputs must not be edited directly. Change
 `design/tokens.toml` or the relevant template, run
 `scripts/generate-tokens --write`, and verify with
 `scripts/generate-tokens --check`.
+
+### JavaScript facades
+
+Large plugin logic files are generated compatibility facades. Put new logic in
+the focused source module for its domain, keep existing exported function names
+stable, and regenerate with:
+
+```bash
+node tools/js-facade-generator.mjs --write
+node tools/js-facade-generator.mjs --check
+```
+
+Generated files remain plain QML-compatible JavaScript: do not add `require`,
+ES module imports, or QML-only nested `.import` statements. The generator check
+runs as part of `tools/check` and fails when a facade is stale.
+
+### Extraction boundaries
+
+Shared runtime paths belong in `plugins/araneadev.shared/RuntimePaths.qml`.
+Use its branding URLs and state-root properties instead of rebuilding
+`XDG_STATE_HOME`, `HOME`, or the current-theme branding path in a plugin. Keep
+lock-screen paths fixed to Omarchy's documented state root where that behavior
+is intentional.
+
+Large JavaScript facades should expose a stable compatibility surface while
+delegating focused pure domains to sibling modules. The menu model keeps
+search in `MenuSearch.js` and route/tree traversal in `MenuTree.js`; notification
+settings parsing lives in `NotificationSettings.js`. New extractions must add
+direct module tests and preserve the facade's exported function names.
+
+Shared QML primitives may own visual contracts, tokens, and layout defaults,
+but not plugin lifecycle, cursor state, IPC, or process management. `BrandHeader`
+and `StatusRow` are intentionally presentational: callers provide text,
+colors, trailing content, and click policy through properties and signals.
+Keep a large QML entry point as a composition root while moving one
+responsibility at a time behind tested properties and signals.
+
+Presentational picker components follow the same boundary: `EmojiCell` owns
+cell rendering and click emission, while `EmojiGrid` owns result rendering and
+selection reporting; `Emojis.qml` retains filtering, recents, persistence, and
+insertion. New components should expose explicit properties and signals, keep
+their defaults tied to shared tokens, and receive dynamic state from the
+composition root instead of reaching into root-only ids.
 
 ## Showcase captures
 

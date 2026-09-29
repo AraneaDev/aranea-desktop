@@ -7,9 +7,9 @@
 // /org/omarchy/PolkitAgent and shows a full-screen overlay per request.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "PolkitLogic.js" as PolkitLogic
 
 Item {
@@ -36,7 +36,7 @@ Item {
   // Letter spacing for the uppercase labels.
   readonly property real letterSpacing: 0.20
   // file:// URL of the Aranea glyph from the current theme's branding, shown in the header.
-  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string glyphSource: Aranea.RuntimePaths.glyphUrl
   // Corner radius of the card and the password field.
   readonly property int cornerRadius: Style.cornerRadius
   // Padding inside the card.
@@ -379,15 +379,7 @@ Item {
   // Lock-like entrance (scrim fade, card fade + slight scale), unless Aranea
   // motion is off. Starts from ARANEA_REDUCED_MOTION (1 = off); once
   // ~/.local/state/aranea/motion loads, the env var wins; otherwise the file's content decides ("off" = off).
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  FileView {
-    path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
 
   FileView {
     path: "/etc/pam.d/polkit-1"

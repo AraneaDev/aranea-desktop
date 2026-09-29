@@ -6,6 +6,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "MenuModel.js" as MenuModel
 
 Item {
@@ -190,11 +191,11 @@ Item {
   // Font for all menu text; a payload's fontFamily overrides it.
   property string fontFamily: Style.font.menuFamily
   // Directory of the current theme's branding marks (the header logo).
-  readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
+  readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
   // Directory of the current theme's branding motifs (header art, dividers).
-  readonly property string brandingMotifsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/motifs/"
+  readonly property string brandingMotifsPath: Aranea.RuntimePaths.brandingMotifsPath
   // Directory of the current theme's branding glyphs (status icons).
-  readonly property string brandingGlyphsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/glyphs/"
+  readonly property string brandingGlyphsPath: Aranea.RuntimePaths.brandingGlyphsPath
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.
@@ -322,59 +323,9 @@ Item {
   // Older Omarchy shells inject a scoped shell object without its AppLibrary
   // capability. Keep the menu usable on those hosts by reading the same
   // DesktopEntries source locally instead of turning Apps into an empty page.
-  QtObject {
+  MenuAppLibrary {
     id: localAppLibrary
-    signal appsChanged
-
-    function entryName(entry) {
-      return String((entry && entry.name) || (entry && entry.id) || "")
-    }
-    function entrySubtext(entry) {
-      return String((entry && entry.genericName) || "")
-    }
-    function sortedEntries(query) {
-      var needle = String(query || "").trim().toLowerCase()
-      var values = DesktopEntries.applications.values || []
-      var rows = []
-      for (var i = 0; i < values.length; i++) {
-        var entry = values[i]
-        if (!entry || entry.noDisplay || !entryName(entry))
-          continue
-        var text = [entryName(entry), entrySubtext(entry), entry.comment, entry.id].join(" ").toLowerCase()
-        if (needle && text.indexOf(needle) < 0)
-          continue
-        rows.push({
-          entry: entry,
-          score: needle ? 1 : 0,
-          key: entryName(entry).toLowerCase(),
-          name: entryName(entry).toLowerCase()
-        })
-      }
-      rows.sort(function (a, b) {
-        return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0)
-      })
-      return rows
-    }
-    function iconSource(icon) {
-      var value = String(icon || "")
-      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0)
-        return value
-      if (value.charAt(0) === "/")
-        return Util.fileUrl(value)
-      return Quickshell.iconPath(value || "application-x-executable", true)
-    }
-    function refreshIcons() {
-    }
-    function launch(desktopId, name) {
-      var id = String(desktopId || "")
-      if (id)
-        root.run("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
-    }
-    function remove(desktopId, name) {
-      var id = String(desktopId || "")
-      if (id)
-        root.run(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
-    }
+    owner: root
   }
   // Whether the uninstall confirmation dialog is showing.
   property bool deleteConfirmOpen: false
@@ -499,9 +450,9 @@ Item {
   property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  // State file whose "off" content disables animations.
-  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
+  // Shared state file whose "off" content disables animations.
+  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Set a turn after opening so the root header mark can fade in.
   property bool headerMarkSettled: false
   // True on the unfiltered root menu, which shows the large header, tiles and footer.
@@ -1602,16 +1553,6 @@ Item {
   // The JSONC sources are watched so live edits to the default file (or the
   // user extension at ~/.config/omarchy/extensions/omarchy-menu.jsonc) take
   // effect without restarting the shell.
-  FileView {
-    id: motionStateFile
-    path: root.motionStatePath
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
-
   FileView {
     id: defaultMenuFile
     path: root.defaultMenuPath

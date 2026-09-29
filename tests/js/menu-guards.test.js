@@ -8,8 +8,11 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const menu = require(path.join(__dirname, "..", "..", "plugins/araneadev.menu/MenuModel.js"))
+const serialTest = (name, body) => test(name, { concurrency: false }, body)
+
+const menu = loadPragma("plugins/araneadev.menu/MenuModel.js")
 
 /**
  * Runs a guard script with stub commands first on PATH.
@@ -25,10 +28,16 @@ function runGuards(script, stubs) {
       fs.writeFileSync(file, `#!/usr/bin/env bash\necho ${name} >>"${dir}/calls"\n${body}\n`)
       fs.chmodSync(file, 0o755)
     }
-    const out = execFileSync("bash", ["-c", script], {
-      env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir },
-      encoding: "utf8"
-    })
+    let out
+    try {
+      out = execFileSync("bash", ["-c", script], {
+        env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, TMPDIR: dir },
+        encoding: "utf8"
+      })
+    } catch (error) {
+      console.error(error.stderr || error.stdout || error)
+      throw error
+    }
     const callsFile = path.join(dir, "calls")
     const calls = fs.existsSync(callsFile)
       ? fs.readFileSync(callsFile, "utf8").trim().split("\n")
@@ -47,12 +56,12 @@ const browserRows = {
   "plain.row": { label: "no guards" }
 }
 
-test("guardScript is empty when no item has a guard", () => {
+serialTest("guardScript is empty when no item has a guard", () => {
   assert.equal(menu.guardScript({ a: { label: "A" } }), "")
   assert.equal(menu.guardScript(null), "")
 })
 
-test("the guard batch answers every when: and checked: as id:tag:result", () => {
+serialTest("the guard batch answers every when: and checked: as id:tag:result", () => {
   const { lines } = runGuards(menu.guardScript(browserRows), {
     "omarchy-default-browser": "echo firefox",
     pacman: "[[ $1 == -Qq ]] && echo vim; exit 0"
@@ -65,7 +74,7 @@ test("the guard batch answers every when: and checked: as id:tag:result", () => 
   ])
 })
 
-test("a reader shared by several rows runs once", () => {
+serialTest("a reader shared by several rows runs once", () => {
   const { calls } = runGuards(menu.guardScript(browserRows), {
     "omarchy-default-browser": "echo firefox",
     pacman: "exit 0"
@@ -73,7 +82,7 @@ test("a reader shared by several rows runs once", () => {
   assert.equal(calls.filter((c) => c === "omarchy-default-browser").length, 1)
 })
 
-test("package checks see provided names and fall back to pacman for versions", () => {
+serialTest("package checks see provided names and fall back to pacman for versions", () => {
   const rows = {
     provided: { when: "omarchy-pkg-present vim" },
     versioned: { when: "omarchy-pkg-present 'bash>=1'" },
@@ -91,7 +100,7 @@ test("package checks see provided names and fall back to pacman for versions", (
   assert.deepEqual(lines.sort(), ["none:w:0", "provided:w:1", "versioned:w:1"])
 })
 
-test("only the plain $(reader) form is substituted", () => {
+serialTest("only the plain $(reader) form is substituted", () => {
   const script = menu.guardScript({
     a: { when: "command -v omarchy-default-editor && [[ $(omarchy-default-editor) ]]" }
   })

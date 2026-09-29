@@ -73,6 +73,9 @@ stage_validate() {
     echo "SKIP: luac is not installed; Lua files are not checked (install lua)"
   fi
   check_files '\.md$' | validate_each 'Markdown links' markdown_links || status=1
+  if [[ -f "$check_root/tools/js-facade-generator.mjs" ]]; then
+    (cd "$check_root" && node tools/js-facade-generator.mjs --check) || status=1
+  fi
   # House rule: no em dash outside the allowlist (one path per line).
   local allow="$repo_root/tools/baselines/em-dash-allow.txt" file
   local em_dash=$'\xe2\x80\x94'

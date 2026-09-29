@@ -1,5 +1,24 @@
 // Pure helpers for the Aranea menu (Menu.qml): JSONC parsing, item merging,
 // routing, visibility, search scoring and the batched guard script.
+/* @aranea-facade-start: plugins/araneadev.menu/MenuPresentation.js */
+// Presentation helpers for menu labels and stable route ids.
+
+/**
+ * Creates a stable route id from display text.
+ * @param {*} value - Display text.
+ * @returns {string} Stable route id.
+ */
+function slugify(value) {
+  return (
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "item"
+  )
+}
+
+if (typeof module !== "undefined") module.exports = { slugify: slugify }
+/* @aranea-facade-end */
 
 /**
  * One menu row: a JSONC entry, an app, or a provider-generated action.
@@ -266,11 +285,44 @@ function emptyState(state) {
  * @param {*} limit - maximum number of recent entries
  * @returns {Array<string>} the new recent ids
  */
+/* @aranea-facade-start: plugins/araneadev.menu/MenuHistory.js */
+// Menu history behavior extracted from the generated MenuModel facade.
+
+/**
+ * Records an app id at the front of recent history.
+ * @param {*} values - Existing recent ids.
+ * @param {*} appId - App id to record.
+ * @param {*} limit - Maximum number of ids.
+ * @returns {Array<string>} Updated recent ids.
+ */
 function recordRecentApp(values, appId, limit) {
   var id = String(appId || "").trim()
-  if (!id) return normalizeAppIds(values, limit)
-  return normalizeAppIds([id].concat(Array.isArray(values) ? values : []), limit)
+  if (!id) return normalizeHistoryIds(values, limit)
+  return normalizeHistoryIds([id].concat(Array.isArray(values) ? values : []), limit)
 }
+
+if (typeof module !== "undefined") module.exports = { recordRecentApp: recordRecentApp }
+
+/**
+ * Normalizes recent ids for the standalone history module.
+ * @param {*} values - Candidate ids.
+ * @param {*} limit - Maximum number of ids.
+ * @returns {Array<string>} Normalized ids.
+ */
+function normalizeHistoryIds(values, limit) {
+  var max = Number(limit)
+  if (!isFinite(max) || max < 0) max = 12
+  var rows = Array.isArray(values) ? values : []
+  var out = []
+  for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
+    var raw = rows[i]
+    if (!(typeof raw === "string" || (typeof raw === "number" && isFinite(raw)))) continue
+    var id = String(raw).trim()
+    if (id && out.indexOf(id) === -1) out.push(id)
+  }
+  return out
+}
+/* @aranea-facade-end */
 
 /**
  * Copies the app rows named by `ids`, in that order, re-parented under `parent`.
@@ -544,6 +596,21 @@ function swapProviderRows(items, itemOrder, menuId, rows) {
 }
 
 /**
+ * Returns an item's label with ` ✓` appended when its `checked:` held.
+ * @param {MenuItem} entry - the item
+ * @param {{[key: string]: boolean}} checkedResults - `checked:` results by id
+ * @returns {string} the display label ("" for no item)
+ */
+function labelFor(entry, checkedResults) {
+  if (!entry) return ""
+  if (entry.checked && checkedResults && checkedResults[entry.id]) return entry.label + " ✓"
+  return entry.label
+}
+
+/* @aranea-facade-start: plugins/araneadev.menu/MenuTree.js */
+// Pure menu tree helpers: route resolution, ancestry, breadcrumbs and visibility.
+
+/**
  * Looks up an item by id.
  * @param {ItemMap} items - items by id
  * @param {string} id - the id to find
@@ -553,18 +620,12 @@ function item(items, id) {
   return items && items[id] ? items[id] : null
 }
 
-// Routes may name a real id (`system`, `setup.power`) or an alias declared in
-// JSONC (`power-menu`, `settings`). An exact id beats any alias, and app rows
-// are never routable: their aliases carry .desktop Keywords and GenericName
-// for search, so an installed application could otherwise shadow a menu route
-// (htop ships `Keywords=system;...`). Unknown strings fall through as the
-// literal input so misspellings still attempt to open that id.
 /**
- * Resolves a route name (id or alias) to a menu item id.
+ * Resolves a route name to a menu item id.
  * @param {ItemMap} items - items by id
- * @param {Array<string>} itemOrder - item order, searched for aliases
+ * @param {Array<string>} itemOrder - item order
  * @param {*} input - the requested route
- * @returns {string} the matching id, "root" for empty/go/menu, else the normalized input
+ * @returns {string} the matching route id
  */
 function resolveRoute(items, itemOrder, input) {
   var raw = String(input || "")
@@ -587,64 +648,46 @@ function resolveRoute(items, itemOrder, input) {
 }
 
 /**
- * Lower-cases a value and joins its alphanumeric runs with dashes.
- * @param {*} value - the text to slugify
- * @returns {string} the slug, or "item" when nothing is left
- */
-function slugify(value) {
-  return (
-    String(value || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "item"
-  )
-}
-
-/**
- * Counts how many menus lie between an item and the root (0 for top-level items).
+ * Counts how many menus lie between an item and the root.
  * @param {ItemMap} items - items by id
- * @param {string} id - the item
- * @returns {number} the depth, capped at 32
+ * @param {string} id - the item id
+ * @returns {number} the depth
  */
 function depthFor(items, id) {
   var depth = 0
   var current = item(items, id)
   var guard = 0
-
   while (current && current.parent && current.parent !== "root" && guard < 32) {
     depth += 1
     current = item(items, current.parent)
     guard += 1
   }
-
   return depth
 }
 
 /**
- * Joins the labels from the root down to an item with ` › `.
+ * Joins labels from the root down to an item.
  * @param {ItemMap} items - items by id
- * @param {string} id - the item
+ * @param {string} id - the item id
  * @returns {string} the breadcrumb path
  */
 function pathFor(items, id) {
   var labels = []
   var current = item(items, id)
   var guard = 0
-
   while (current && current.id !== "root" && guard < 32) {
     labels.unshift(current.label)
     current = item(items, current.parent)
     guard += 1
   }
-
   return labels.join(" › ")
 }
 
 /**
- * Returns the breadcrumb path of an item's parent, or "" for top-level items.
+ * Returns the breadcrumb path of an item's parent.
  * @param {ItemMap} items - items by id
- * @param {string} id - the item
- * @returns {string} the parent's path
+ * @param {string} id - the item id
+ * @returns {string} the parent path
  */
 function parentPathFor(items, id) {
   var entry = item(items, id)
@@ -653,15 +696,14 @@ function parentPathFor(items, id) {
 }
 
 /**
- * Tells whether an item sits anywhere below `ancestorId` (everything but root is below root).
+ * Tells whether an item sits below an ancestor.
  * @param {ItemMap} items - items by id
- * @param {string} id - the item
+ * @param {string} id - the item id
  * @param {string} ancestorId - the candidate ancestor
  * @returns {boolean} true when it is a descendant
  */
 function isDescendantOf(items, id, ancestorId) {
   if (ancestorId === "root") return id !== "root"
-
   var current = item(items, id)
   var guard = 0
   while (current && current.parent && guard < 32) {
@@ -669,16 +711,15 @@ function isDescendantOf(items, id, ancestorId) {
     current = item(items, current.parent)
     guard += 1
   }
-
   return false
 }
 
 /**
- * Counts the direct children of an item.
+ * Counts an item's direct children.
  * @param {ItemMap} items - items by id
  * @param {Array<string>} itemOrder - item order
- * @param {string} id - the parent item
- * @returns {number} the number of children
+ * @param {string} id - the parent id
+ * @returns {number} the child count
  */
 function childCount(items, itemOrder, id) {
   var count = 0
@@ -691,12 +732,12 @@ function childCount(items, itemOrder, id) {
 }
 
 /**
- * Tells whether an item should be listed: its `when:` did not fail and, for static menus and links, some descendant is visible.
+ * Tells whether an item should be listed.
  * @param {ItemMap} items - items by id
  * @param {Array<string>} itemOrder - item order
- * @param {{[key: string]: boolean}} whenResults - `when:` results by id
+ * @param {{[key: string]: boolean}} whenResults - guard results
  * @param {MenuItem} entry - the item to test
- * @param {number} [depth] - recursion depth, stops at 32
+ * @param {number} [depth] - recursion depth
  * @returns {boolean} true when visible
  */
 function isVisible(items, itemOrder, whenResults, entry, depth) {
@@ -707,7 +748,6 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
 
   var guard = depth || 0
   if (guard >= 32) return false
-
   var target = entry.kind === "link" ? entry.target : entry.id
   var order = Array.isArray(itemOrder) ? itemOrder : []
   for (var i = 0; i < order.length; i++) {
@@ -719,149 +759,22 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
     )
       return true
   }
-
   return false
 }
 
-/**
- * Returns an item's label with ` ✓` appended when its `checked:` held.
- * @param {MenuItem} entry - the item
- * @param {{[key: string]: boolean}} checkedResults - `checked:` results by id
- * @returns {string} the display label ("" for no item)
- */
-function labelFor(entry, checkedResults) {
-  if (!entry) return ""
-  if (entry.checked && checkedResults && checkedResults[entry.id]) return entry.label + " ✓"
-  return entry.label
-}
-
-/**
- * Replaces dots, underscores and dashes with spaces so ids split into words.
- * @param {*} value - the token
- * @returns {string} the spaced text
- */
-function searchableToken(value) {
-  return String(value || "").replace(/[._-]+/g, " ")
-}
-
-/**
- * Returns the last dotted segment of an id.
- * @param {*} id - the item id
- * @returns {string} the leaf segment
- */
-function leafIdFor(id) {
-  var parts = String(id || "").split(".")
-  return parts.length > 0 ? parts[parts.length - 1] : id
-}
-
-/**
- * Builds the lower-cased text a query is matched against: label, leaf id and aliases.
- * @param {MenuItem} entry - the item
- * @returns {string} the search text ("" for no item)
- */
-function nameSearchText(entry) {
-  if (!entry) return ""
-  var aliases = []
-  var values = Array.isArray(entry.aliases) ? entry.aliases : []
-  for (var i = 0; i < values.length; i++) aliases.push(searchableToken(values[i]))
-  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")]
-    .join(" ")
-    .toLowerCase()
-}
-
-/**
- * Tells whether `term` equals one whitespace-separated word of `text`.
- * @param {string} term - a lower-cased search term
- * @param {*} text - the text to split
- * @returns {boolean} true on a whole-word match
- */
-function termInSearchWords(term, text) {
-  var words = String(text || "")
-    .toLowerCase()
-    .split(/\s+/)
-  for (var i = 0; i < words.length; i++) {
-    if (words[i] === term) return true
+if (typeof module !== "undefined") {
+  module.exports = {
+    item: item,
+    resolveRoute: resolveRoute,
+    depthFor: depthFor,
+    pathFor: pathFor,
+    parentPathFor: parentPathFor,
+    isDescendantOf: isDescendantOf,
+    childCount: childCount,
+    isVisible: isVisible
   }
-  return false
 }
-
-/**
- * Tells whether every term of the query is a whole word of `text`.
- * @param {*} query - the search query
- * @param {*} text - the description text
- * @returns {boolean} true when all terms match
- */
-function descriptionTextMatches(query, text) {
-  var terms = String(query || "")
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-  for (var i = 0; i < terms.length; i++) {
-    if (terms[i] && !termInSearchWords(terms[i], text)) return false
-  }
-  return true
-}
-
-/**
- * Tells whether a visible item matches every query term, by name substring or description word.
- * @param {MenuItem} entry - the item
- * @param {*} query - the search query
- * @param {boolean} visible - whether the item is visible (invisible items never match)
- * @returns {boolean} true when it matches
- */
-function matchesQuery(entry, query, visible) {
-  if (!entry || entry.id === "root") return false
-  if (!visible) return false
-
-  var nameText = nameSearchText(entry)
-  var descriptionText = String(entry.description || "").toLowerCase()
-  var terms = String(query || "")
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-
-  for (var i = 0; i < terms.length; i++) {
-    if (!terms[i]) continue
-    if (nameText.indexOf(terms[i]) >= 0) continue
-    if (termInSearchWords(terms[i], descriptionText)) continue
-    return false
-  }
-
-  return true
-}
-
-/**
- * Scores a search hit (lower sorts first): match tier, then depth, then declared order.
- * @param {ItemMap} items - items by id
- * @param {MenuItem} entry - the matching item
- * @param {*} query - the search query
- * @returns {number} the sort score
- */
-function searchScore(items, entry, query) {
-  var needle = String(query || "")
-    .toLowerCase()
-    .trim()
-  var label = entry.label.toLowerCase()
-  var nameText = nameSearchText(entry)
-  var descriptionText = String(entry.description || "").toLowerCase()
-  var score = 80
-
-  if (label === needle) score = entry.parent === "root" ? 2 : 0
-  // An installed app whose name contains the query as a whole word ("zen"
-  // for Zen Browser) beats exact-labeled menu entries like Install > Zen.
-  else if (entry.kind === "app" && label.split(/\s+/).indexOf(needle) >= 0) score = 0
-  else if (label.indexOf(needle) === 0) score = 10
-  else if (label.indexOf(needle) >= 0) score = 30
-  else if (nameText.indexOf(needle) >= 0) score = 40
-  else if (descriptionTextMatches(needle, descriptionText)) score = 60
-
-  if (entry.kind === "menu" || entry.kind === "link") score -= 2
-  // App rows sort after all menu items, so they lose the tiebreak below to an
-  // equal match. Outrank those, but stay inside the tier so better ones win.
-  if (entry.kind === "app") score -= 5
-
-  return score * 1000 + depthFor(items, entry.id) * 25 + entry.order
-}
+/* @aranea-facade-end */
 
 /**
  * Builds the list-model row the menu renders for an item.
@@ -895,6 +808,165 @@ function displayRow(items, itemOrder, checkedResults, entry, detail, score, sect
     section: section || ""
   }
 }
+
+/* @aranea-facade-start: plugins/araneadev.menu/MenuSearch.js */
+// Pure search helpers for MenuModel.js: tokenization, matching and ranking.
+
+/**
+ * Replaces route separators with spaces so ids split into words.
+ * @param {*} value - the token to normalize
+ * @returns {string} the spaced token
+ */
+function searchableToken(value) {
+  return String(value || "").replace(/[._-]+/g, " ")
+}
+
+/**
+ * Returns the final segment of a dotted route id.
+ * @param {*} id - the item id
+ * @returns {string} the leaf segment
+ */
+function leafIdFor(id) {
+  var parts = String(id || "").split(".")
+  return parts.length > 0 ? parts[parts.length - 1] : id
+}
+
+/**
+ * Builds the lower-cased text matched for an item's name.
+ * @param {MenuItem} entry - the item
+ * @returns {string} the searchable text
+ */
+function nameSearchText(entry) {
+  if (!entry) return ""
+  var aliases = []
+  var values = Array.isArray(entry.aliases) ? entry.aliases : []
+  for (var i = 0; i < values.length; i++) aliases.push(searchableToken(values[i]))
+  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")]
+    .join(" ")
+    .toLowerCase()
+}
+
+/**
+ * Tells whether a term equals a whitespace-separated word.
+ * @param {string} term - a lower-cased search term
+ * @param {*} text - the text to split
+ * @returns {boolean} true on a whole-word match
+ */
+function termInSearchWords(term, text) {
+  var words = String(text || "")
+    .toLowerCase()
+    .split(/\s+/)
+  for (var i = 0; i < words.length; i++) {
+    if (words[i] === term) return true
+  }
+  return false
+}
+
+/**
+ * Tells whether every query term is a whole word in the supplied text.
+ * @param {*} query - the search query
+ * @param {*} text - the description text
+ * @returns {boolean} true when all terms match
+ */
+function descriptionTextMatches(query, text) {
+  var terms = String(query || "")
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+  for (var i = 0; i < terms.length; i++) {
+    if (terms[i] && !termInSearchWords(terms[i], text)) return false
+  }
+  return true
+}
+
+/**
+ * Tells whether a visible item matches every query term.
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @param {boolean} visible - whether the item is visible
+ * @returns {boolean} true when it matches
+ */
+function matchesQuery(entry, query, visible) {
+  if (!entry || entry.id === "root") return false
+  if (!visible) return false
+
+  var nameText = nameSearchText(entry)
+  var descriptionText = String(entry.description || "").toLowerCase()
+  var terms = String(query || "")
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+
+  for (var i = 0; i < terms.length; i++) {
+    if (!terms[i]) continue
+    if (nameText.indexOf(terms[i]) >= 0) continue
+    if (termInSearchWords(terms[i], descriptionText)) continue
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Finds an item's depth without depending on MenuModel's other helpers.
+ * @param {ItemMap} items - items by id
+ * @param {string} id - the item id
+ * @returns {number} the depth
+ */
+function searchDepthFor(items, id) {
+  var depth = 0
+  var current = items && items[id]
+  /** @type {{[key: string]: boolean}} */
+  var seen = {}
+  while (current && current.parent && current.parent !== "root" && !seen[current.id]) {
+    seen[current.id] = true
+    depth++
+    current = items[current.parent]
+  }
+  return depth
+}
+
+/**
+ * Scores a search hit by match tier, depth and declared order.
+ * @param {ItemMap} items - items by id
+ * @param {MenuItem} entry - the item
+ * @param {*} query - the search query
+ * @returns {number} the sortable score
+ */
+function searchScore(items, entry, query) {
+  var needle = String(query || "")
+    .toLowerCase()
+    .trim()
+  var label = entry.label.toLowerCase()
+  var nameText = nameSearchText(entry)
+  var descriptionText = String(entry.description || "").toLowerCase()
+  var score = 80
+
+  if (label === needle) score = entry.parent === "root" ? 2 : 0
+  else if (entry.kind === "app" && label.split(/\s+/).indexOf(needle) >= 0) score = 0
+  else if (label.indexOf(needle) === 0) score = 10
+  else if (label.indexOf(needle) >= 0) score = 30
+  else if (nameText.indexOf(needle) >= 0) score = 40
+  else if (descriptionTextMatches(needle, descriptionText)) score = 60
+
+  if (entry.kind === "menu" || entry.kind === "link") score -= 2
+  if (entry.kind === "app") score -= 5
+
+  return score * 1000 + searchDepthFor(items, entry.id) * 25 + entry.order
+}
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    searchableToken: searchableToken,
+    leafIdFor: leafIdFor,
+    nameSearchText: nameSearchText,
+    termInSearchWords: termInSearchWords,
+    descriptionTextMatches: descriptionTextMatches,
+    matchesQuery: matchesQuery,
+    searchScore: searchScore
+  }
+}
+/* @aranea-facade-end */
 
 // Commands a `checked:` expression reads a value out of. Every sibling row
 // asks the same one -- Defaults > Browser has seven rows all comparing

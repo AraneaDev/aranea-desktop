@@ -6,6 +6,26 @@ const assert = require("node:assert/strict")
 const { test } = require("node:test")
 const { loadPragma } = require("./lib/load-pragma.js")
 
+const registry = loadPragma("plugins/araneadev.shared/ServiceRegistry.js")
+
+test("shared service registry creates isolated publish slots", () => {
+  const health = registry.create()
+  const notifications = registry.create()
+  const healthService = { name: "health" }
+  const notificationService = { name: "notifications" }
+
+  assert.equal(health.current(), null)
+  assert.equal(notifications.current(), null)
+  health.publish(healthService)
+  notifications.publish(notificationService)
+  assert.equal(health.current(), healthService)
+  assert.equal(notifications.current(), notificationService)
+  health.retract(notificationService)
+  assert.equal(health.current(), healthService)
+  health.retract(healthService)
+  assert.equal(health.current(), null)
+})
+
 const bridges = [
   "plugins/araneadev.health/HealthBridge.js",
   "plugins/araneadev.notifications/ServiceBridge.js"

@@ -2,6 +2,7 @@
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
 const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
 test("notifications logic", () => {
   const root = path.join(__dirname, "..", "..")
@@ -127,7 +128,7 @@ test("notifications logic", () => {
   assert(inbox.relativeTime(now - 3 * 3600000, now) === "3h", "hours")
   assert(inbox.relativeTime(now - 2 * DAY, now) === "2d", "days")
 
-  const logic = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+  const logic = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
   assert(typeof logic.historyRows === "undefined", "history replay helper must be gone")
 
   // --- service bridge: the Aranea bar hands widgets a service-less facade, so
@@ -137,12 +138,11 @@ test("notifications logic", () => {
     "utf8"
   )
   assert(bridgeSrc.startsWith(".pragma library"), "bridge must be a shared library module")
-  const bridge = {}
-  new Function(
-    "exports",
-    bridgeSrc.replace(".pragma library", "") +
-      "\nexports.publish = publish; exports.current = current; exports.retract = retract"
-  )(bridge)
+  assert(
+    bridgeSrc.includes("@aranea-facade-start: plugins/araneadev.shared/ServiceRegistry.js"),
+    "bridge must use the generated registry facade"
+  )
+  const bridge = loadPragma("plugins/araneadev.notifications/ServiceBridge.js")
   const svcA = { name: "a" },
     svcB = { name: "b" }
   assert(bridge.current() === null, "no service before publish")
@@ -214,9 +214,7 @@ test("notifications logic", () => {
 })
 
 test("toast holds (4c)", () => {
-  const n = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
-  )
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
   const eq = (a, b, msg) => {
     if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
   }
@@ -232,7 +230,7 @@ test("toast holds (4c)", () => {
 
 test("inbox consistency (4c)", () => {
   const root = path.join(__dirname, "..", "..", "plugins/araneadev.notifications")
-  const n = require(`${root}/NotificationLogic.js`)
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
   const inbox = require(`${root}/InboxLogic.js`)
   const eq = (a, b, msg) => {
     if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
@@ -293,7 +291,7 @@ test("dismiss actions (4c)", () => {
 
 test("notification dead code stays gone (4c)", () => {
   const root = path.join(__dirname, "..", "..", "plugins/araneadev.notifications")
-  const n = require(`${root}/NotificationLogic.js`)
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
   const inbox = require(`${root}/InboxLogic.js`)
   for (const gone of ["popupExpired", "groupNotifications", "collapseQuietHours", "limitHistory"])
     if (n[gone] !== undefined) throw new Error("dead helper still exported: " + gone)
@@ -305,9 +303,7 @@ test("notification dead code stays gone (4c)", () => {
 })
 
 test("body sanitizing, argv and image persistence (4c)", () => {
-  const n = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
-  )
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
   const eq = (a, b, msg) => {
     if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
   }
@@ -360,9 +356,7 @@ test("body sanitizing, argv and image persistence (4c)", () => {
 })
 
 test("center images after a write (4c final review)", () => {
-  const n = require(
-    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
-  )
+  const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
   const eq = (a, b, msg) => {
     if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg}: got ${JSON.stringify(a)}`)
   }
@@ -383,8 +377,7 @@ test("center images after a write (4c final review)", () => {
 })
 
 test("NotificationLogic normalizes malformed notification fields and stabilizes malformed snapshots", () => {
-  const root = path.join(__dirname, "..", "..")
-  const notifications = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+  const notifications = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
 
   const normalized = notifications.normalizeNotification({
     id: "not-a-number",
@@ -413,8 +406,7 @@ test("NotificationLogic normalizes malformed notification fields and stabilizes 
 })
 
 test("NotificationLogic isWithinQuietHours handles the overnight window", () => {
-  const root = path.join(__dirname, "..", "..")
-  const notifications = require(`${root}/plugins/araneadev.notifications/NotificationLogic.js`)
+  const notifications = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
 
   const late = new Date(2026, 8, 22, 23, 15)
   const early = new Date(2026, 8, 23, 6, 45)

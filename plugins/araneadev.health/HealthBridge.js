@@ -1,35 +1,43 @@
 .pragma library
-// One instance per QML engine, shared by every file of this plugin that
-// imports it. The Aranea bar is a replacement bar, so the host hands its
-// widgets a facade without service lookup; Service.qml publishes itself here
-// and Panel.qml (the bar widget) reads it back. Nothing outside this plugin
-// imports this module.
-
-// The published Service.qml item, or null while none is live.
-var service = null
+// Compatibility facade for the health plugin's existing imports.
+/* @aranea-facade-start: plugins/araneadev.shared/ServiceRegistry.js */
+// Creates an isolated service publication slot for a QML plugin bridge.
 
 /**
- * Stores the health service so the bar widgets can find it.
- * @param {?object} value - the Service.qml root item; a falsy value clears the slot
+ * Creates a publish/retract/current service registry.
+ * @returns {object} Registry with publish, retract and current methods.
  */
-function publish(value) {
-  service = value || null
+function create() {
+  /** @type {*} */
+  var service = null
+  return {
+    publish: function (/** @type {*} */ value) {
+      service = value || null
+    },
+    retract: function (/** @type {*} */ value) {
+      if (service === value) service = null
+    },
+    current: function () {
+      return service
+    }
+  }
 }
 
-// Only the instance that published may clear the slot: during a reload the
-// new service can publish before the old one is destroyed.
+if (typeof module !== "undefined") module.exports = { create: create }
+/* @aranea-facade-end */
+var registry = create()
 /**
- * Clears the slot, but only when `value` is the service currently published.
- * @param {?object} value - the Service.qml item that is going away
+ * Publishes the live health service.
+ * @param {*} value - Service object.
  */
-function retract(value) {
-  if (service === value) service = null
-}
-
+function publish(value) { registry.publish(value) }
 /**
- * Returns the published health service.
- * @returns {?object} the Service.qml root item, or null if none is published
+ * Retracts the service when it is still current.
+ * @param {*} value - Service object.
  */
-function current() {
-  return service
-}
+function retract(value) { registry.retract(value) }
+/**
+ * Returns the current health service.
+ * @returns {*} Service object or null.
+ */
+function current() { return registry.current() }

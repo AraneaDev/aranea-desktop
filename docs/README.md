@@ -6,15 +6,17 @@ part of the interface.
 
 ## Choose a path
 
-| If you are...                  | Start here                            |
-| ------------------------------ | ------------------------------------- |
-| Installing Aranea              | [Getting started](getting-started.md) |
-| Exploring the experience       | [Features](features.md)               |
-| Changing behavior              | [Configuration](configuration.md)     |
-| Fixing an installation         | [Troubleshooting](troubleshooting.md) |
-| Writing automation or an agent | [Agent interface](agent-interface.md) |
-| Looking for icons              | [Icon gallery](icons.md)              |
-| Working on the project         | [Development](development.md)         |
+| If you are...                  | Start here                                      |
+| ------------------------------ | ----------------------------------------------- |
+| Installing Aranea              | [Getting started](getting-started.md)           |
+| Exploring the experience       | [Features](features.md)                         |
+| Changing behavior              | [Configuration](configuration.md)               |
+| Fixing an installation         | [Troubleshooting](troubleshooting.md)           |
+| Writing automation or an agent | [Agent interface](agent-interface.md)           |
+| Developing with an agent       | [Agent development guide](agent-development.md) |
+| Looking for icons              | [Icon gallery](icons.md)                        |
+| Working on the project         | [Development](development.md)                   |
+| Understanding the architecture | [Architecture](architecture.md)                 |
 
 ## Command map
 
@@ -36,4 +38,5 @@ codes.
 
 The public visual principles are collected in [Visual language](visual-language.md).
 The implementation is organized into theme, shell, integration, and tooling
-layers; see [Development](development.md) for the repository map.
+layers; see [Architecture](architecture.md) for dependency boundaries and
+[Development](development.md) for the repository map.

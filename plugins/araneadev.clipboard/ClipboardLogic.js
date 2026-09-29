@@ -4,6 +4,46 @@
 // extra fields (kind, secret, secretOverride, pinned, capturedAtMs); Omarchy's
 // own parser ignores them, so the file stays readable by the stock picker.
 // No QML, no I/O; tests/clipboard.test.sh runs this under Node.
+/* @aranea-facade-start: plugins/araneadev.clipboard/ClipboardPresentation.js */
+// Display-only formatting for clipboard rows.
+
+/** @typedef {{secret?: boolean, pinned?: boolean, capturedAtMs?: number}} ClipboardPresentationEntry */
+
+/**
+ * Formats an elapsed timestamp for a clipboard row.
+ * @param {*} ms - Captured timestamp.
+ * @param {*} now - Current timestamp.
+ * @returns {string} Short elapsed age.
+ */
+function relativeAge(ms, now) {
+  var s = Math.max(0, Math.floor((Number(now) - Number(ms)) / 1000))
+  if (s < 60) return "now"
+  var m = Math.floor(s / 60)
+  if (m < 60) return m + "m"
+  var h = Math.floor(m / 60)
+  if (h < 24) return h + "h"
+  return Math.floor(h / 24) + "d"
+}
+
+/**
+ * Formats the remaining lifetime of an unpinned secret entry.
+ * @param {?ClipboardPresentationEntry} entry - Clipboard entry.
+ * @param {*} now - Current timestamp.
+ * @param {*} ttlMs - Secret lifetime.
+ * @returns {string} Expiry label or an empty string.
+ */
+function secretExpiryText(entry, now, ttlMs) {
+  if (!entry || !entry.secret || entry.pinned) return ""
+  var left = Number(entry.capturedAtMs) + Number(ttlMs) - Number(now)
+  var minutes = Math.floor(left / 60000)
+  if (!(minutes >= 1)) return "expires in <1m"
+  if (minutes >= 60) return "expires in " + Math.floor(minutes / 60) + "h"
+  return "expires in " + minutes + "m"
+}
+
+if (typeof module !== "undefined")
+  module.exports = { relativeAge: relativeAge, secretExpiryText: secretExpiryText }
+/* @aranea-facade-end */
 
 /**
  * A clipboard history entry as stored in the history file.
@@ -40,12 +80,15 @@
  * @property {number} [pinnedAtMs] - Sort key for pinned rows (pin time, else capture time); set on every row right after it is built.
  */
 
+/* @aranea-facade-start: plugins/araneadev.clipboard/ClipboardNormalization.js */
+/*
+ * Pure normalization helpers for clipboard entries. The QML facade keeps the
+ * public API stable while this module owns the input-shape rules.
+ */
 /**
- * Validates the base fields of a history entry: a non-blank string or text
- * entry becomes {type:"text", text}, an image entry with a path becomes
- * {type:"image", path, mime, capturedAt?}; the extra fields are dropped.
- * @param {*} value - A raw string or parsed entry object.
- * @returns {?ClipboardEntry} The base entry, or null when the value is not a usable entry.
+ * Validates and reduces a raw clipboard value to its base entry shape.
+ * @param {*} value - a raw string or parsed entry
+ * @returns {?ClipboardEntry} the base entry, or null
  */
 function normalizeBase(value) {
   if (typeof value === "string")
@@ -77,10 +120,9 @@ function normalizeBase(value) {
 }
 
 /**
- * Normalizes an entry like normalizeBase and keeps the Aranea extras (kind,
- * secret, secretOverride, pinned, pinnedAtMs, capturedAtMs) when they have the right type.
- * @param {*} value - A raw string or parsed entry object.
- * @returns {?ClipboardEntry} The normalized entry, or null when the value is not a usable entry.
+ * Normalizes an entry while preserving supported Aranea metadata.
+ * @param {*} value - a raw string or parsed entry
+ * @returns {?ClipboardEntry} the normalized entry, or null
  */
 function normalizeEntry(value) {
   var entry = normalizeBase(value)
@@ -97,6 +139,11 @@ function normalizeEntry(value) {
     entry.capturedAtMs = at
   return entry
 }
+
+if (typeof module !== "undefined") {
+  module.exports = { normalizeBase: normalizeBase, normalizeEntry: normalizeEntry }
+}
+/* @aranea-facade-end */
 
 /**
  * Builds the identity used to de-duplicate entries: "image:<path>" or "text:<text>".
@@ -693,39 +740,6 @@ function canOpen(entry) {
 }
 
 // ---------------------------------------------------- display
-
-/**
- * Formats the time since ms as "now" (under a minute), "Nm", "Nh" or "Nd".
- * @param {*} ms - The past time in ms.
- * @param {*} now - The current time in ms.
- * @returns {string} The short age.
- */
-function relativeAge(ms, now) {
-  var s = Math.max(0, Math.floor((Number(now) - Number(ms)) / 1000))
-  if (s < 60) return "now"
-  var m = Math.floor(s / 60)
-  if (m < 60) return m + "m"
-  var h = Math.floor(m / 60)
-  if (h < 24) return h + "h"
-  return Math.floor(h / 24) + "d"
-}
-
-/**
- * Time left before an unpinned secret leaves history: "expires in Nm",
- * "expires in Nh" from an hour on, or "expires in <1m".
- * @param {?ClipboardEntry} entry - The entry.
- * @param {*} now - The current time in ms.
- * @param {*} ttlMs - How long a secret is kept, in ms.
- * @returns {string} The text, or "" for a missing, pinned or non-secret entry.
- */
-function secretExpiryText(entry, now, ttlMs) {
-  if (!entry || !entry.secret || entry.pinned) return ""
-  var left = Number(entry.capturedAtMs) + Number(ttlMs) - Number(now)
-  var minutes = Math.floor(left / 60000)
-  if (!(minutes >= 1)) return "expires in <1m"
-  if (minutes >= 60) return "expires in " + Math.floor(minutes / 60) + "h"
-  return "expires in " + minutes + "m"
-}
 
 /**
  * Splits an http(s) URL into its host (without "www.") and its path (without query or fragment; "" for a bare "/").

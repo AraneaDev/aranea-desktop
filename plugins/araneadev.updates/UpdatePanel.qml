@@ -39,36 +39,20 @@ Item {
       section: "SYSTEM STATUS"
     }
 
-    Rectangle {
+    Aranea.StatusRow {
       Layout.fillWidth: true
-      Layout.preferredHeight: Style.space(62)
-      color: "transparent"
+      rowHeight: Style.space(62)
+      railColor: panel.status.error || panel.status.rebootRequired ? Color.accent : Util.alpha(Color.popups.text, 0.25)
+      title: panel.status.error ? "CHECK FAILED" : (panel.status.rebootRequired ? "REBOOT REQUIRED" : "UP TO DATE")
+      titleColor: panel.status.error || panel.status.rebootRequired ? Color.accent : Color.popups.text
+      subtitle: panel.status.count + (panel.status.count === 1 ? " update available" : " updates available")
 
-      Aranea.StatusRail {
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        railColor: panel.status.error || panel.status.rebootRequired ? Color.accent : Util.alpha(Color.popups.text, 0.25)
-      }
-
-      RowLayout {
-        anchors.fill: parent
-        anchors.leftMargin: Style.space(16)
-        anchors.rightMargin: Style.space(14)
-
-        Aranea.StatusTextPair {
-          Layout.fillWidth: true
-          title: panel.status.error ? "CHECK FAILED" : (panel.status.rebootRequired ? "REBOOT REQUIRED" : "UP TO DATE")
-          titleColor: panel.status.error || panel.status.rebootRequired ? Color.accent : Color.popups.text
-          subtitle: panel.status.count + (panel.status.count === 1 ? " update available" : " updates available")
-        }
-
-        Text {
-          text: panel.status.error ? "ERROR" : (panel.status.rebootRequired ? "WARN" : "OK")
-          color: panel.status.error || panel.status.rebootRequired ? Color.accent : Color.popups.text
-          font.bold: true
-          font.pixelSize: Style.font.body
-          font.family: Style.font.family
-        }
+      Text {
+        text: panel.status.error ? "ERROR" : (panel.status.rebootRequired ? "WARN" : "OK")
+        color: panel.status.error || panel.status.rebootRequired ? Color.accent : Color.popups.text
+        font.bold: true
+        font.pixelSize: Style.font.body
+        font.family: Style.font.family
       }
     }
 

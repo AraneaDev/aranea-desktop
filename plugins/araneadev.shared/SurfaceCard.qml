@@ -23,7 +23,7 @@ BorderSurface {
   // Padding applied around card content.
   property int contentPadding: 0
   // Card corner radius.
-  property real cornerRadius: Style.cornerRadius
+  property real cornerRadius: DesignTokens.cornerRadius
   // Whether card content is clipped to its bounds.
   property bool clipContent: false
   // Content rendered inside the card.

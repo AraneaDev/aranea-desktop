@@ -37,7 +37,7 @@ test("notification quiet-hours markers are wired into Service.qml", () => {
 test("bar and notification surfaces use the reduced Aranea glyph, lock surface keeps its spider art", () => {
   if (!menuBarWidgetQml.includes("aranea-glyph.svg"))
     throw new Error("bar menu trigger is missing reduced Aranea glyph")
-  if (!notificationCardQml.includes("aranea-glyph.svg"))
+  if (!notificationCardQml.includes("RuntimePaths.glyphUrl"))
     throw new Error("notification card is missing reduced Aranea glyph")
   if (!lockViewQml.includes("unlock.png"))
     throw new Error("lock surface is missing canonical Aranea spider")
@@ -107,7 +107,15 @@ test("menu QML exposes its typed function signatures", () => {
     throw new Error("recent app history must refresh visible rows immediately")
   }
   requiresSignature(menuQml, "id: localAppLibrary", "menu local app-library fallback")
-  requiresSignature(menuQml, "DesktopEntries.applications.values", "menu DesktopEntries fallback")
+  const menuAppLibraryQml = fs.readFileSync(
+    `${root}/plugins/araneadev.menu/MenuAppLibrary.qml`,
+    "utf8"
+  )
+  requiresSignature(
+    menuAppLibraryQml,
+    "DesktopEntries.applications.values",
+    "menu DesktopEntries fallback"
+  )
   requiresSignature(menuQml, "function openRoute(initialMenu: string): void", "menu openRoute")
   requiresSignature(menuQml, "function goBack(): bool", "menu goBack")
   requiresSignature(menuQml, "function runAction(action): void", "menu runAction")

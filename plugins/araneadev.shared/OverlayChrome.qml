@@ -6,7 +6,6 @@
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import qs.Commons
 
 Item {
@@ -36,7 +35,7 @@ Item {
   readonly property real letterSpacing: 0.20
   // file:// URL of the Aranea glyph in the current theme's branding
   // ($XDG_STATE_HOME, falling back to ~/.local/state).
-  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string glyphSource: RuntimePaths.glyphUrl
 
   // Children declared inside OverlayChrome land in the content area between
   // the search line and the hint strip.
@@ -47,56 +46,16 @@ Item {
     spacing: Style.space(10)
 
     // Header: glyph, title and subtitle, counts.
-    RowLayout {
+    BrandHeader {
       Layout.fillWidth: true
-      spacing: Style.space(10)
-
-      Image {
-        Layout.preferredWidth: Style.space(22)
-        Layout.preferredHeight: Style.space(22)
-        source: chrome.glyphSource
-        sourceSize: Qt.size(44, 44)
-        fillMode: Image.PreserveAspectFit
-        smooth: true
-      }
-
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: Style.space(2)
-        Text {
-          Layout.fillWidth: true
-          textFormat: Text.PlainText
-          text: chrome.title
-          color: chrome.foreground
-          font.family: chrome.fontFamily
-          font.pixelSize: Style.font.title
-          font.weight: Font.Medium
-          font.letterSpacing: chrome.letterSpacing
-          elide: Text.ElideRight
-        }
-        Text {
-          Layout.fillWidth: true
-          textFormat: Text.PlainText
-          text: chrome.subtitle
-          color: chrome.dim
-          font.family: chrome.fontFamily
-          font.pixelSize: Style.font.caption
-          font.weight: Font.Medium
-          font.letterSpacing: chrome.letterSpacing
-          elide: Text.ElideRight
-        }
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: chrome.counts
-        color: chrome.accent
-        opacity: 0.8
-        font.family: chrome.fontFamily
-        font.pixelSize: Style.font.caption
-        font.weight: Font.Medium
-        font.letterSpacing: chrome.letterSpacing
-      }
+      title: chrome.title
+      subtitle: chrome.subtitle
+      counts: chrome.counts
+      fontFamily: chrome.fontFamily
+      foreground: chrome.foreground
+      accent: chrome.accent
+      letterSpacing: chrome.letterSpacing
+      glyphSource: chrome.glyphSource
     }
 
     // Search line.

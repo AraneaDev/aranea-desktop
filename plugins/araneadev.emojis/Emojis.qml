@@ -11,7 +11,6 @@ import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import qs.Commons
-import qs.Ui
 import "../araneadev.shared" as Aranea
 import "EmojiSearch.js" as EmojiSearch
 import "EmojiLogic.js" as EmojiLogic
@@ -51,9 +50,9 @@ Item {
   property var recents: []
 
   // Aranea state directory: $XDG_STATE_HOME/aranea (default ~/.local/state/aranea).
-  readonly property string stateRoot: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea"
+  readonly property string stateRoot: Aranea.RuntimePaths.araneaStateRoot
   // File that stores the recent list (emoji-recent.json under stateRoot).
-  readonly property string recentsPath: stateRoot + "/emoji-recent.json"
+  readonly property string recentsPath: Aranea.RuntimePaths.emojiRecentsPath
   // The RECENT row shows only with an empty search and at least one recent.
   readonly property bool showRecents: !root.filterText && root.recents.length > 0
 
@@ -88,7 +87,7 @@ Item {
   property int cellHeight: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
   // From the real grid width (inside the chrome insets), so Up/Down move
   // straight rather than drifting diagonally.
-  property int columns: Math.max(1, Math.floor(resultGrid.width / root.cellWidth))
+  property int columns: Math.max(1, Math.floor((root.cardWidth - root.contentMargin * 2) / root.cellWidth))
 
   // The emoji under the cursor, from the RECENT row or the grid; "" when none.
   readonly property string selectedEmoji: {
@@ -175,7 +174,7 @@ Item {
 
     Qt.callLater(function () {
       if (displayModel.count > 0 && !root.inRecents)
-        resultGrid.positionViewAtIndex(root.selectedIndex, GridView.Contain)
+        pickerContent.reveal(root.selectedIndex)
     })
   }
 
@@ -195,7 +194,7 @@ Item {
     } else {
       selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count
     }
-    resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
+    pickerContent.reveal(selectedIndex)
   }
 
   // Moves the cursor by delta rows, crossing between the RECENT row and the
@@ -212,7 +211,7 @@ Item {
           return
         root.inRecents = false
         root.selectedIndex = Math.min(column, displayModel.count - 1)
-        resultGrid.positionViewAtIndex(root.selectedIndex, GridView.Contain)
+        pickerContent.reveal(root.selectedIndex)
       } else if (delta > 0) {
         root.recentIndex = Math.min(root.recentIndex + columns, count - 1)
       } else if (row > 0) {
@@ -225,7 +224,7 @@ Item {
     if (!cursorActive) {
       cursorActive = true
       selectedIndex = delta < 0 ? displayModel.count - 1 : 0
-      resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
+      pickerContent.reveal(selectedIndex)
       return
     }
     var newIndex = selectedIndex + delta * columns
@@ -242,7 +241,7 @@ Item {
     if (newIndex >= displayModel.count)
       newIndex = displayModel.count - 1
     selectedIndex = newIndex
-    resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
+    pickerContent.reveal(selectedIndex)
   }
 
   // Moves the grid cursor by delta pages (the rows visible in the grid),
@@ -250,14 +249,14 @@ Item {
   function selectPage(delta) {
     if (root.inRecents || displayModel.count === 0)
       return
-    var visibleRows = Math.max(1, Math.floor(resultGrid.height / cellHeight))
+    var visibleRows = Math.max(1, Math.floor(pickerContent.resultHeight / cellHeight))
     var newIndex = selectedIndex + delta * columns * visibleRows
     if (newIndex < 0)
       newIndex = 0
     if (newIndex >= displayModel.count)
       newIndex = displayModel.count - 1
     selectedIndex = newIndex
-    resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain)
+    pickerContent.reveal(selectedIndex)
   }
 
   // Sets the search text, resets the cursor to the first grid cell and
@@ -298,15 +297,7 @@ Item {
   // Menu-like entrance (fade + slight scale), unless Aranea motion is off.
   // Starts from ARANEA_REDUCED_MOTION (1 = off); once
   // ~/.local/state/aranea/motion loads, the env var wins; otherwise the file's content decides ("off" = off).
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  FileView {
-    path: root.stateRoot + "/motion"
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
   onOpenedChanged: if (opened && root.motionEnabled)
     openAnimation.restart()
   ParallelAnimation {
@@ -439,151 +430,40 @@ Item {
         }
       }
 
-      OverlayChrome {
+      EmojiPickerContent {
+        id: pickerContent
         anchors.fill: parent
         anchors.topMargin: card.contentTopInset
         anchors.rightMargin: card.contentRightInset
         anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
-        title: "EMOJI"
-        subtitle: "SEARCH // INSERT // COPY"
-        counts: String(displayModel.count)
-        searchText: root.filterText
-        searchPlaceholder: "Search emojis…"
-        hints: root.opened ? root.hintText() : ""
+        filterText: root.filterText
+        resultModel: displayModel
+        recentModel: root.recents
+        showRecents: root.showRecents
+        selectedIndex: root.selectedIndex
+        cursorActive: root.cursorActive
+        inRecents: root.inRecents
+        recentIndex: root.recentIndex
+        selectedEmoji: root.selectedEmoji
+        selectedName: root.selectedName
+        hintText: root.opened ? root.hintText() : ""
         fontFamily: root.fontFamily
         foreground: root.foreground
-        accent: root.selectedText
-
-        Column {
-          anchors.fill: parent
-          spacing: Style.space(6)
-
-          Caption {
-            visible: root.showRecents
-            text: "RECENT"
-          }
-
-          Flow {
-            visible: root.showRecents
-            width: parent.width
-            Repeater {
-              model: root.showRecents ? root.recents : []
-              delegate: Cell {
-                required property string modelData
-                required property int index
-                glyph: modelData
-                hasCursor: root.inRecents && root.recentIndex === index
-                onPicked: root.applySelected(modelData, false)
-              }
-            }
-          }
-
-          Caption {
-            text: root.filterText ? "RESULTS  ·  " + displayModel.count : "ALL"
-          }
-
-          GridView {
-            id: resultGrid
-            width: parent.width
-            height: parent.height - y - nameLine.height - parent.spacing
-            model: displayModel
-            clip: true
-            cellWidth: root.cellWidth
-            cellHeight: root.cellHeight
-            boundsBehavior: Flickable.StopAtBounds
-
-            delegate: Cell {
-              required property int index
-              required property string emoji
-              glyph: emoji
-              hasCursor: root.cursorActive && !root.inRecents && index === root.selectedIndex
-              onPicked: {
-                root.inRecents = false
-                root.selectedIndex = index
-                root.applySelected(emoji, false)
-              }
-            }
-
-            Column {
-              anchors.centerIn: parent
-              spacing: Style.space(8)
-              visible: displayModel.count === 0
-
-              Text {
-                text: "󰈉"
-                color: root.selectedText
-                opacity: 0.8
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.displayLarge
-                horizontalAlignment: Text.AlignHCenter
-                width: parent.width
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                text: "No matches for “" + root.filterText + "”"
-                color: root.foreground
-                opacity: 0.7
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.title
-                horizontalAlignment: Text.AlignHCenter
-                width: parent.width
-              }
-            }
-          }
-
-          // Name of the emoji under the cursor.
-          Text {
-            id: nameLine
-            width: parent.width
-            textFormat: Text.PlainText
-            text: root.selectedEmoji ? root.selectedEmoji + "  " + root.selectedName : " "
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            elide: Text.ElideRight
-          }
+        cellWidth: root.cellWidth
+        cellHeight: root.cellHeight
+        cornerRadius: root.cornerRadius
+        selectedBackground: root.selectedBackground
+        selectedText: root.selectedText
+        onRecentPicked: function (emoji) {
+          root.applySelected(emoji, false)
+        }
+        onResultPicked: function (emoji, index) {
+          root.inRecents = false
+          root.selectedIndex = index
+          root.applySelected(emoji, false)
         }
       }
-    }
-  }
-
-  component Caption: Text {
-    textFormat: Text.PlainText
-    color: Util.alpha(root.foreground, 0.58)
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.caption
-    font.weight: Font.Medium
-    font.letterSpacing: 0.20
-  }
-
-  component Cell: Rectangle {
-    id: cell
-    property string glyph: ""
-    property bool hasCursor: false
-    signal picked
-    width: root.cellWidth
-    height: root.cellHeight
-    radius: root.cornerRadius
-    color: hasCursor ? root.selectedBackground : "transparent"
-    // Mint ring on the selected cell (the menu's rail does not fit a grid).
-    border.width: hasCursor ? 1.5 : 0
-    border.color: root.selectedText
-
-    Text {
-      anchors.centerIn: parent
-      textFormat: Text.PlainText
-      text: cell.glyph
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.display
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onClicked: cell.picked()
     }
   }
 }

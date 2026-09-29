@@ -14,7 +14,7 @@ plugin="$repo_root/plugins/araneadev.polkit"
 # The entry (state, logic), its window and the system-bus agent; text checks
 # look in all three. Behaviour (empty Enter, submit, identities, hint, spoofed
 # target): tests/qml/polkit.qml, run offscreen by tests/qml-behaviour.test.sh.
-polkit_files=("$plugin/PolkitAgent.qml" "$plugin/PolkitWindow.qml" "$plugin/PolkitAgentService.qml")
+polkit_files=("$plugin/PolkitAgent.qml" "$plugin/PolkitWindow.qml" "$plugin/PolkitPromptCard.qml" "$plugin/PolkitDetails.qml" "$plugin/PolkitAgentService.qml")
 
 # Logic contract: tests/js/polkit.test.js (node:test; run by tests/js.test.sh).
 
@@ -40,10 +40,11 @@ fi
 
 # --- Aranea card
 agent="$plugin/PolkitAgent.qml"
-grep -Fq 'AUTHENTICATION REQUIRED' "${polkit_files[@]}"
+grep -Fq 'PolkitPromptCard {' "$plugin/PolkitWindow.qml"
+grep -Fq 'AUTHENTICATION REQUIRED' "$plugin/PolkitPromptCard.qml"
 grep -Fq 'SYSTEM // PRIVILEGED' "${polkit_files[@]}"
-grep -Fq 'aranea-glyph.svg' "${polkit_files[@]}"
-grep -Fq 'PolkitLogic.requestMarkup(panel.root.currentMessage' "${polkit_files[@]}"
+grep -Fq 'RuntimePaths.glyphUrl' "${polkit_files[@]}"
+grep -Fq 'PolkitLogic.requestMarkup(root.currentMessage' "${polkit_files[@]}"
 grep -Fq 'textFormat: Text.StyledText' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.contextLine(' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.detailRows(' "${polkit_files[@]}"
@@ -64,7 +65,8 @@ fi
 # Details start collapsed for every request
 grep -Fq 'detailsOpen = false' "${polkit_files[@]}"
 # Review Focus 4: every focus holder routes keys through one handler
-[[ "$(grep -c 'root.handleKey(event)' "$plugin/PolkitWindow.qml")" -ge 3 ]]
+key_handler_count="$(grep -h -c 'root.handleKey(event)' "$plugin/PolkitWindow.qml" "$plugin/PolkitDetails.qml" | awk '{ total += $1 } END { print total }')"
+[[ "$key_handler_count" -ge 3 ]]
 grep -Fq 'Qt.Key_Backtab' "${polkit_files[@]}"
 grep -Fq 'flow.selectedIdentity = flow.identities[' "${polkit_files[@]}"
 # The old pill above the card is gone (the request lives in the card now)
@@ -83,8 +85,8 @@ grep -Fq 'ARANEA_DOCTOR_POLKIT_STATUS' "$repo_root/scripts/aranea-doctor"
 # README tells a hand-disabler to restart the shell
 grep -Fq 'omarchy plugin disable araneadev.polkit' "$repo_root/README.md"
 # --- 4a: the target has its own line that is never elided
-target_block="$(awk '/The target, never elided/ { on = 1 } on { print } on && /^      }$/ { exit }' "$plugin/PolkitWindow.qml")"
-grep -Fq 'text: panel.root.targetText' <<<"$target_block"
+target_block="$(grep -A6 -B3 -F 'text: root.targetText' "$plugin/PolkitPromptCard.qml")"
+grep -Fq 'text: root.targetText' <<<"$target_block"
 grep -Fq 'readonly property string targetText: PolkitLogic.targetLine(root.currentMessage)' "$agent"
 grep -Fq 'wrapMode: Text.Wrap' <<<"$target_block"
 if grep -Eq 'elide:|maximumLineCount' <<<"$target_block"; then
@@ -92,7 +94,7 @@ if grep -Eq 'elide:|maximumLineCount' <<<"$target_block"; then
   exit 1
 fi
 # --- 4a: clicking the details never takes focus from the password field
-block_grep "$plugin/PolkitWindow.qml" 'TextEdit {' 'activeFocusOnPress: false'
+block_grep "$plugin/PolkitDetails.qml" 'TextEdit {' 'activeFocusOnPress: false'
 # --- 4a: an empty Enter never submits (no wasted attempt), it nudges
 grep -Fq 'id: nudgeAnimation' "${polkit_files[@]}"
 # --- 4a: the identity count feeds the hint; the unused failed mirror is gone

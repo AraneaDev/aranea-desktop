@@ -21,7 +21,7 @@ ColumnLayout {
 
     Text {
       text: header.title
-      color: Color.popups.text
+      color: DesignTokens.foreground
       font.pixelSize: Style.font.title
       font.bold: true
       font.family: Style.font.family
@@ -30,7 +30,7 @@ ColumnLayout {
 
     Text {
       text: header.hint
-      color: Color.popups.text
+      color: DesignTokens.foreground
       opacity: 0.75
       font.pixelSize: Style.font.caption
       font.family: Style.font.family
@@ -39,7 +39,7 @@ ColumnLayout {
 
   Text {
     text: header.hintText
-    color: Color.popups.text
+    color: DesignTokens.foreground
     opacity: 0.5
     font.pixelSize: Style.font.caption
     font.family: Style.font.family
@@ -49,12 +49,12 @@ ColumnLayout {
   Rectangle {
     Layout.fillWidth: true
     Layout.preferredHeight: 1
-    color: Util.alpha(Color.popups.text, 0.16)
+    color: Util.alpha(DesignTokens.foreground, 0.16)
   }
 
   Text {
     text: header.section
-    color: Color.popups.text
+    color: DesignTokens.foreground
     opacity: 0.7
     font.pixelSize: Style.font.caption
     font.family: Style.font.family

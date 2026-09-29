@@ -2,13 +2,13 @@
 // request, details and password field. PolkitAgent.qml (the non-visual plugin
 // entry, which holds all state and logic) creates it and passes itself as
 // `root`; tests leave it out and use a fake view instead.
+// qmllint disable missing-property
 
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
-import qs.Ui
 import "../araneadev.shared" as Aranea
 import "PolkitLogic.js" as PolkitLogic
 
@@ -22,17 +22,17 @@ PanelWindow {
 
   // Returns the typed password.
   function passwordText(): string {
-    return passwordInput.text
+    return authField.passwordText
   }
 
   // Clears the typed password.
   function clearPassword(): void {
-    passwordInput.text = ""
+    authField.clearPassword()
   }
 
   // Gives the password field the keyboard focus.
   function focusField(): void {
-    passwordInput.forceActiveFocus()
+    authField.focusField()
   }
 
   // Gives the key catcher the keyboard focus (fingerprint mode, after submit).
@@ -195,245 +195,48 @@ PanelWindow {
       anchors.rightMargin: card.contentRightInset
       spacing: Style.space(10)
 
-      // Header: the mark says this is the system asking.
-      RowLayout {
+      PolkitPromptCard {
         Layout.fillWidth: true
-        spacing: Style.space(10)
-
-        Image {
-          Layout.preferredWidth: Style.space(22)
-          Layout.preferredHeight: Style.space(22)
-          source: panel.root.glyphSource
-          sourceSize: Qt.size(44, 44)
-          fillMode: Image.PreserveAspectFit
-          smooth: true
-        }
-
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: Style.space(2)
-          Text {
-            Layout.fillWidth: true
-            textFormat: Text.PlainText
-            text: "AUTHENTICATION REQUIRED"
-            color: panel.root.foreground
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.title
-            font.weight: Font.Medium
-            font.letterSpacing: panel.root.letterSpacing
-            elide: Text.ElideRight
-          }
-          Text {
-            Layout.fillWidth: true
-            textFormat: Text.PlainText
-            text: "SYSTEM // PRIVILEGED"
-            color: panel.root.dim
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.Medium
-            font.letterSpacing: panel.root.letterSpacing
-            elide: Text.ElideRight
-          }
-        }
-      }
-
-      // The request, command in the accent colour (polkit text escaped).
-      Text {
-        id: requestLine
-        Layout.fillWidth: true
-        textFormat: Text.StyledText
-        text: PolkitLogic.requestMarkup(panel.root.currentMessage, panel.root.accent.toString())
-        color: panel.root.foreground
-        font.family: panel.root.fontFamily
-        font.pixelSize: Style.font.subtitle
-        wrapMode: Text.Wrap
-        maximumLineCount: 2
-        elide: Text.ElideRight
-      }
-
-      // The target, never elided: who the command runs as always shows in full.
-      Text {
-        Layout.fillWidth: true
-        visible: text.length > 0
-        textFormat: Text.PlainText
-        text: panel.root.targetText
-        color: panel.root.accent
-        font.family: panel.root.fontFamily
-        font.pixelSize: requestLine.font.pixelSize
-        wrapMode: Text.Wrap
-      }
-
-      // What polkit says the action is, and who is authenticating.
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: Style.space(8)
-        Text {
-          Layout.fillWidth: true
-          textFormat: Text.PlainText
-          text: PolkitLogic.contextLine(panel.root.actionDescription, panel.root.identityText, panel.root.identityCount)
-          color: panel.root.dim
-          font.family: panel.root.fontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-        }
-        Text {
-          textFormat: Text.PlainText
-          text: (panel.root.detailsOpen ? "▴" : "▾") + " DETAILS"
-          color: panel.root.accent
-          font.family: panel.root.fontFamily
-          font.pixelSize: Style.font.caption
-          font.weight: Font.Medium
-          font.letterSpacing: panel.root.letterSpacing
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: panel.root.toggleDetails()
-          }
-        }
-      }
-
-      // Details: raw polkit data, selectable, hidden rows when empty.
-      ColumnLayout {
-        Layout.fillWidth: true
-        visible: panel.root.detailsOpen
-        spacing: Style.space(4)
-        Repeater {
-          model: PolkitLogic.detailRows(panel.root.currentActionId, panel.root.actionVendor, PolkitLogic.commandFromMessage(panel.root.currentMessage), panel.root.currentMessage)
-          delegate: RowLayout {
-            id: detailRow
-            required property var modelData
-            Layout.fillWidth: true
-            spacing: Style.space(10)
-            Text {
-              Layout.preferredWidth: Style.space(64)
-              Layout.alignment: Qt.AlignTop
-              textFormat: Text.PlainText
-              text: detailRow.modelData.key
-              color: panel.root.dim
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.weight: Font.Medium
-              font.letterSpacing: panel.root.letterSpacing
-            }
-            TextEdit {
-              Layout.fillWidth: true
-              textFormat: TextEdit.PlainText
-              text: detailRow.modelData.value
-              readOnly: true
-              selectByMouse: true
-              activeFocusOnPress: false
-              wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
-              color: panel.root.foreground
-              selectionColor: Util.alpha(panel.root.accent, 0.45)
-              selectedTextColor: panel.root.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.bodySmall
-              Keys.priority: Keys.BeforeItem
-              Keys.onPressed: function (event) {
-                panel.root.handleKey(event)
-              }
-            }
-          }
+        currentMessage: panel.root.currentMessage
+        currentPrompt: panel.root.currentPrompt
+        identityText: panel.root.identityText
+        identityCount: panel.root.identityCount
+        targetText: panel.root.targetText
+        actionDescription: panel.root.actionDescription
+        currentActionId: panel.root.currentActionId
+        actionVendor: panel.root.actionVendor
+        detailsOpen: panel.root.detailsOpen
+        glyphSource: panel.root.glyphSource
+        fontFamily: panel.root.fontFamily
+        foreground: panel.root.foreground
+        dim: panel.root.dim
+        accent: panel.root.accent
+        letterSpacing: panel.root.letterSpacing
+        onDetailsToggled: panel.root.toggleDetails()
+        onKeyPressed: function (event) {
+          panel.root.handleKey(event)
         }
       }
 
       // Password field (or the sensor in fingerprint mode).
-      Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: panel.root.fieldHeight
-        radius: panel.root.cornerRadius
-        color: Util.alpha(panel.root.foreground, 0.04)
-        border.width: 1
-        border.color: panel.root.errorFlash ? Color.polkit.textError : Util.alpha(panel.root.foreground, passwordInput.activeFocus ? 0.22 : 0.10)
-
-        Row {
-          visible: panel.root.fingerprintMode
-          anchors.centerIn: parent
-          spacing: Style.space(10)
-          OpticalGlyph {
-            width: Math.round(panel.root.fieldHeight * 0.55)
-            height: width
-            text: "󰈷"
-            fontFamily: panel.root.fontFamily
-            fontSize: Math.round(panel.root.fieldHeight * 0.55)
-            color: panel.root.errorFlash ? Color.polkit.textError : panel.root.accent
-          }
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: "TOUCH THE SENSOR"
-            color: panel.root.foreground
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.Medium
-            font.letterSpacing: panel.root.letterSpacing
-          }
-        }
-
-        Row {
-          visible: !panel.root.fingerprintMode
-          anchors.fill: parent
-          anchors.leftMargin: Style.space(12)
-          anchors.rightMargin: Style.space(12)
-          spacing: Style.space(10)
-
-          Text {
-            text: ""
-            color: panel.root.errorFlash ? Color.polkit.textError : panel.root.accent
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.iconLarge
-            width: Style.space(20)
-            height: panel.root.fieldHeight
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-          }
-
-          Item {
-            width: parent.width - Style.space(30)
-            height: panel.root.fieldHeight
-
-            TextInput {
-              id: passwordInput
-              anchors.fill: parent
-              verticalAlignment: TextInput.AlignVCenter
-              activeFocusOnPress: true
-              clip: true
-              selectionColor: Util.alpha(panel.root.accent, 0.45)
-              selectedTextColor: panel.root.foreground
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.iconLarge
-              echoMode: panel.root.responseVisible ? TextInput.Normal : TextInput.Password
-              passwordCharacter: "•"
-              color: panel.root.errorFlash ? Color.polkit.textError : panel.root.foreground
-              cursorVisible: activeFocus && !panel.root.submitted && !panel.root.errorFlash
-              readOnly: panel.root.submitted || panel.root.errorFlash
-              enabled: panel.root.dialogVisible
-              Keys.priority: Keys.BeforeItem
-              Keys.onPressed: function (event) {
-                panel.root.handleKey(event)
-              }
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              text: panel.root.errorFlash ? "Wrong" : (panel.root.submitted ? "Checking..." : PolkitLogic.promptPlaceholder(panel.root.currentPrompt))
-              color: panel.root.errorFlash ? Color.polkit.textError : panel.root.foreground
-              opacity: panel.root.errorFlash ? 1 : 0.36
-              font.family: panel.root.fontFamily
-              font.pixelSize: Style.font.subtitle
-              elide: Text.ElideRight
-              visible: passwordInput.text.length === 0
-            }
-
-            MouseArea {
-              anchors.fill: parent
-              acceptedButtons: Qt.LeftButton
-              onClicked: passwordInput.forceActiveFocus()
-            }
-          }
+      PolkitAuthField {
+        id: authField
+        fingerprintMode: panel.root.fingerprintMode
+        fieldHeight: panel.root.fieldHeight
+        cornerRadius: panel.root.cornerRadius
+        foreground: panel.root.foreground
+        accent: panel.root.accent
+        errorColor: Color.polkit.textError
+        errorFlash: panel.root.errorFlash
+        responseVisible: panel.root.responseVisible
+        submitted: panel.root.submitted
+        dialogVisible: panel.root.dialogVisible
+        currentPrompt: panel.root.currentPrompt
+        placeholderText: PolkitLogic.promptPlaceholder(panel.root.currentPrompt)
+        fontFamily: panel.root.fontFamily
+        letterSpacing: panel.root.letterSpacing
+        onKeyPressed: function (event) {
+          panel.root.handleKey(event)
         }
       }
 

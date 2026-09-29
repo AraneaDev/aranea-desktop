@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
@@ -245,7 +246,7 @@ Item {
         return
       cursorIndex = cursorIndex < 0 ? (delta > 0 ? 0 : workspaceStates.length - 1) : (cursorIndex + delta + workspaceStates.length) % workspaceStates.length
     }
-    PanelKeyCatcher {
+    Aranea.KeyboardInputFrame {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()

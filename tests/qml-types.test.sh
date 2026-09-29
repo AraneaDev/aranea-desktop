@@ -16,7 +16,7 @@ qml_files=(
   "$repo_root/plugins/araneadev.health/Metrics.qml"
   "$repo_root/plugins/araneadev.health/Panel.qml"
   "$repo_root/plugins/araneadev.clipboard/Clipboard.qml"
-  "$repo_root/plugins/araneadev.clipboard/OverlayChrome.qml"
+  "$repo_root/plugins/araneadev.shared/OverlayChrome.qml"
   "$repo_root/plugins/araneadev.emojis/Emojis.qml"
   "$repo_root/plugins/araneadev.polkit/PolkitAgent.qml"
   "$repo_root/plugins/araneadev.notifications/Panel.qml"
@@ -78,7 +78,7 @@ fi
 
 # --- 4d: the lock date ticks with the clock; one state root for the lock
 lock_view="$repo_root/plugins/araneadev.lock/LockView.qml"
-grep -Fq 'text: root.dateText' "$lock_view"
+grep -Fq 'dateText: root.dateText' "$lock_view"
 grep -A6 -F 'function updateClock(): void' "$lock_view" | grep -Fq 'dateText = Qt.formatDate('
 if grep -Fq 'XDG_STATE_HOME' "$lock_view"; then
   echo "LockView must use Omarchy's fixed state path, like Service.qml" >&2
