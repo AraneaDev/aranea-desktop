@@ -11,7 +11,8 @@ test("facades contain every generator-owned source region", () => {
     "plugins/araneadev.menu/MenuModel.js": [
       "MenuPresentation.js",
       "MenuHistory.js",
-      "MenuSearch.js"
+      "MenuSearch.js",
+      "MenuTree.js"
     ],
     "plugins/araneadev.clipboard/ClipboardLogic.js": ["ClipboardPresentation.js"],
     "plugins/araneadev.health/HealthLogic.js": ["HealthPresentation.js"],

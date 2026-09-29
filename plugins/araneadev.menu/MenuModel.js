@@ -596,28 +596,24 @@ function swapProviderRows(items, itemOrder, menuId, rows) {
 }
 
 /**
- * Looks up an item by id.
- * @param {ItemMap} items - items by id
- * @param {string} id - the id to find
- * @returns {?MenuItem} the item, or null
+ * Returns an item's label with ` ✓` appended when its `checked:` held.
+ * @param {MenuItem} entry - the item
+ * @param {{[key: string]: boolean}} checkedResults - `checked:` results by id
+ * @returns {string} the display label ("" for no item)
  */
+function labelFor(entry, checkedResults) {
+  if (!entry) return ""
+  if (entry.checked && checkedResults && checkedResults[entry.id]) return entry.label + " ✓"
+  return entry.label
+}
+
+/* @aranea-facade-start: plugins/araneadev.menu/MenuTree.js */
+// Pure menu tree helpers: route resolution, ancestry, breadcrumbs and visibility.
+
 function item(items, id) {
   return items && items[id] ? items[id] : null
 }
 
-// Routes may name a real id (`system`, `setup.power`) or an alias declared in
-// JSONC (`power-menu`, `settings`). An exact id beats any alias, and app rows
-// are never routable: their aliases carry .desktop Keywords and GenericName
-// for search, so an installed application could otherwise shadow a menu route
-// (htop ships `Keywords=system;...`). Unknown strings fall through as the
-// literal input so misspellings still attempt to open that id.
-/**
- * Resolves a route name (id or alias) to a menu item id.
- * @param {ItemMap} items - items by id
- * @param {Array<string>} itemOrder - item order, searched for aliases
- * @param {*} input - the requested route
- * @returns {string} the matching id, "root" for empty/go/menu, else the normalized input
- */
 function resolveRoute(items, itemOrder, input) {
   var raw = String(input || "")
     .toLowerCase()
@@ -638,73 +634,38 @@ function resolveRoute(items, itemOrder, input) {
   return raw
 }
 
-/**
- * Lower-cases a value and joins its alphanumeric runs with dashes.
- * @param {*} value - the text to slugify
- * @returns {string} the slug, or "item" when nothing is left
- */
-/**
- * Counts how many menus lie between an item and the root (0 for top-level items).
- * @param {ItemMap} items - items by id
- * @param {string} id - the item
- * @returns {number} the depth, capped at 32
- */
 function depthFor(items, id) {
   var depth = 0
   var current = item(items, id)
   var guard = 0
-
   while (current && current.parent && current.parent !== "root" && guard < 32) {
     depth += 1
     current = item(items, current.parent)
     guard += 1
   }
-
   return depth
 }
 
-/**
- * Joins the labels from the root down to an item with ` › `.
- * @param {ItemMap} items - items by id
- * @param {string} id - the item
- * @returns {string} the breadcrumb path
- */
 function pathFor(items, id) {
   var labels = []
   var current = item(items, id)
   var guard = 0
-
   while (current && current.id !== "root" && guard < 32) {
     labels.unshift(current.label)
     current = item(items, current.parent)
     guard += 1
   }
-
   return labels.join(" › ")
 }
 
-/**
- * Returns the breadcrumb path of an item's parent, or "" for top-level items.
- * @param {ItemMap} items - items by id
- * @param {string} id - the item
- * @returns {string} the parent's path
- */
 function parentPathFor(items, id) {
   var entry = item(items, id)
   if (!entry || !entry.parent || entry.parent === "root") return ""
   return pathFor(items, entry.parent)
 }
 
-/**
- * Tells whether an item sits anywhere below `ancestorId` (everything but root is below root).
- * @param {ItemMap} items - items by id
- * @param {string} id - the item
- * @param {string} ancestorId - the candidate ancestor
- * @returns {boolean} true when it is a descendant
- */
 function isDescendantOf(items, id, ancestorId) {
   if (ancestorId === "root") return id !== "root"
-
   var current = item(items, id)
   var guard = 0
   while (current && current.parent && guard < 32) {
@@ -712,17 +673,9 @@ function isDescendantOf(items, id, ancestorId) {
     current = item(items, current.parent)
     guard += 1
   }
-
   return false
 }
 
-/**
- * Counts the direct children of an item.
- * @param {ItemMap} items - items by id
- * @param {Array<string>} itemOrder - item order
- * @param {string} id - the parent item
- * @returns {number} the number of children
- */
 function childCount(items, itemOrder, id) {
   var count = 0
   var order = Array.isArray(itemOrder) ? itemOrder : []
@@ -733,15 +686,6 @@ function childCount(items, itemOrder, id) {
   return count
 }
 
-/**
- * Tells whether an item should be listed: its `when:` did not fail and, for static menus and links, some descendant is visible.
- * @param {ItemMap} items - items by id
- * @param {Array<string>} itemOrder - item order
- * @param {{[key: string]: boolean}} whenResults - `when:` results by id
- * @param {MenuItem} entry - the item to test
- * @param {number} [depth] - recursion depth, stops at 32
- * @returns {boolean} true when visible
- */
 function isVisible(items, itemOrder, whenResults, entry, depth) {
   if (!entry) return false
   if (entry.when && whenResults && whenResults[entry.id] === false) return false
@@ -750,7 +694,6 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
 
   var guard = depth || 0
   if (guard >= 32) return false
-
   var target = entry.kind === "link" ? entry.target : entry.id
   var order = Array.isArray(itemOrder) ? itemOrder : []
   for (var i = 0; i < order.length; i++) {
@@ -762,21 +705,22 @@ function isVisible(items, itemOrder, whenResults, entry, depth) {
     )
       return true
   }
-
   return false
 }
 
-/**
- * Returns an item's label with ` ✓` appended when its `checked:` held.
- * @param {MenuItem} entry - the item
- * @param {{[key: string]: boolean}} checkedResults - `checked:` results by id
- * @returns {string} the display label ("" for no item)
- */
-function labelFor(entry, checkedResults) {
-  if (!entry) return ""
-  if (entry.checked && checkedResults && checkedResults[entry.id]) return entry.label + " ✓"
-  return entry.label
+if (typeof module !== "undefined") {
+  module.exports = {
+    item: item,
+    resolveRoute: resolveRoute,
+    depthFor: depthFor,
+    pathFor: pathFor,
+    parentPathFor: parentPathFor,
+    isDescendantOf: isDescendantOf,
+    childCount: childCount,
+    isVisible: isVisible
+  }
 }
+/* @aranea-facade-end */
 
 /**
  * Builds the list-model row the menu renders for an item.
