@@ -117,8 +117,24 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
       }
 
+      Image {
+        id: appIconImage
+        visible: row.isApp
+        width: Style.font.iconLarge
+        height: Style.font.iconLarge
+        fillMode: Image.PreserveAspectFit
+        // Decode at physical pixels so desktop icons remain sharp on HiDPI.
+        sourceSize.width: width * Screen.devicePixelRatio
+        sourceSize.height: height * Screen.devicePixelRatio
+        source: row.isApp && results.appLibrary && results.appLibrary.iconSource ? results.appLibrary.iconSource(row.appIcon) : ""
+        asynchronous: true
+        anchors.left: parent.left
+        anchors.leftMargin: results.rowReservedBorderLeft + Style.space(8) + (Style.space(36) - width) / 2
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
       Column {
-        anchors.left: row.hasIcon ? iconText.right : parent.left
+        anchors.left: row.isApp ? appIconImage.right : (row.hasIcon ? iconText.right : parent.left)
         anchors.leftMargin: row.hasIcon ? Style.space(6) : results.rowReservedBorderLeft + Style.space(18)
         anchors.right: parent.right
         anchors.rightMargin: results.rowReservedBorderRight + Style.space(22)

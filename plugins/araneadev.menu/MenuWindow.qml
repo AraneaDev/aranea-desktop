@@ -51,22 +51,22 @@ PanelWindow {
   function revealCursor(): void {
     if (panel.root.displayModel.count === 0)
       return
-    resultList.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
+    resultListComponent.list.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
 
-    var item = resultList.itemAtIndex(panel.root.selectedIndex)
+    var item = resultListComponent.list.itemAtIndex(panel.root.selectedIndex)
     if (!item)
       return
     var reach = panel.root.rowPeek + panel.root.rowSpacing
     if (panel.root.selectedIndex < panel.root.displayModel.count - 1) {
-      var maxY = Math.max(resultList.originY, resultList.originY + resultList.contentHeight - resultList.height)
-      var overhang = item.y + item.height + reach - (resultList.contentY + resultList.height)
+      var maxY = Math.max(resultListComponent.list.originY, resultListComponent.list.originY + resultListComponent.list.contentHeight - resultListComponent.list.height)
+      var overhang = item.y + item.height + reach - (resultListComponent.list.contentY + resultListComponent.list.height)
       if (overhang > 0)
-        resultList.contentY = Math.min(resultList.contentY + overhang, maxY)
+        resultListComponent.list.contentY = Math.min(resultListComponent.list.contentY + overhang, maxY)
     }
     if (panel.root.selectedIndex > 0) {
-      var underhang = resultList.contentY - (item.y - reach)
+      var underhang = resultListComponent.list.contentY - (item.y - reach)
       if (underhang > 0)
-        resultList.contentY = Math.max(resultList.contentY - underhang, resultList.originY)
+        resultListComponent.list.contentY = Math.max(resultListComponent.list.contentY - underhang, resultListComponent.list.originY)
     }
   }
 
@@ -215,6 +215,7 @@ PanelWindow {
         width: parent.width
         height: panel.root.visibleRowsHeight
         MenuResultList {
+          id: resultListComponent
           anchors.fill: parent
           model: panel.root.displayModel
           selectedIndex: panel.root.selectedIndex

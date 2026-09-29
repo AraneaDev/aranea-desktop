@@ -10,6 +10,7 @@ source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/assert.sh"
 menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
 menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
+menu_results="$repo_root/plugins/araneadev.menu/MenuResultList.qml"
 # Behaviour (pin limit and notice, search dedupe, hints, Ctrl+P, Ctrl+1..3,
 # Favorites route after the menu files load): tests/qml/menu.qml, run
 # offscreen by tests/qml-behaviour.test.sh.
@@ -21,6 +22,10 @@ if grep -Eq 'PanelWindow|import Quickshell.Wayland' "$menu_qml"; then
 fi
 grep -Fq 'Qt.createComponent(Qt.resolvedUrl("MenuWindow.qml"))' "$menu_qml"
 grep -Fq 'panel.root.handleKey(event)' "$menu_window"
+# App rows must render their desktop-entry icon through the shared app-library
+# resolver; carrying appIcon in the model alone is not enough.
+grep -Fq 'id: appIconImage' "$menu_results"
+grep -Fq 'results.appLibrary.iconSource(row.appIcon)' "$menu_results"
 
 # --- 4b: favourites and recents persist to $XDG_STATE_HOME/aranea/menu.json
 grep -Fq '"/menu.json"' "$menu_qml"
