@@ -7,8 +7,6 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
-import "../araneadev.shared" as Aranea
-import "components"
 import "InboxLogic.js" as InboxLogic
 import "ServiceBridge.js" as ServiceBridge
 
@@ -288,175 +286,35 @@ Panel {
             confirmingClear: root.confirmingClear
             quiet: root.quiet
             quietUntil: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
-            fontFamily: Style.font.family
             foreground: Color.popups.text
             focusAccent: root.focusAccent
             onToggleDnd: root.service.setDoNotDisturb(!root.dnd)
             onClearAll: root.clearAll()
           }
 
-          // qmllint disable missing-property
-          RowLayout {
-            visible: false
-            Layout.fillWidth: true
-            spacing: Style.space(8)
-
-            Text {
-              id: titleText
-              Layout.fillWidth: true
-              text: "Notifications"
-              color: Color.popups.text
-              font.family: Style.font.family
-              font.pixelSize: Style.font.title
-              font.bold: true
-            }
-
-            Text {
-              text: (root.dnd ? "DND ◉" : "DND ○")
-              color: dndArea.containsMouse ? Color.notifications.countdown : Color.popups.text
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              MouseArea {
-                id: dndArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.service.setDoNotDisturb(!root.dnd)
-              }
-            }
-
-            Text {
-              visible: root.count > 0
-              text: root.confirmingClear ? "Confirm clear (" + root.count + ")" : "Clear all"
-              color: root.confirmingClear || clearAllArea.containsMouse ? Color.notifications.countdown : Color.popups.text
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              MouseArea {
-                id: clearAllArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.clearAll()
-              }
-            }
-          }
-
-          // Key hints for the center list.
-          Text {
-            visible: false
-            Layout.fillWidth: true
-            textFormat: Text.PlainText
-            text: "ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP"
-            color: titleText.color
-            opacity: 0.5
-            font.family: titleText.font.family
-            font.pixelSize: badgeText.font.pixelSize
-            elide: Text.ElideRight
-          }
-
-          Text {
-            visible: false
-            text: "Quiet until " + InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
-            color: root.focusAccent
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-          }
-
-          // Empty state.
-          Column {
-            visible: false
-            Layout.fillWidth: true
-            Layout.topMargin: Style.space(12)
-            Layout.bottomMargin: Style.space(12)
-            spacing: Style.space(8)
-
-            Image {
-              anchors.horizontalCenter: parent.horizontalCenter
-              width: Style.space(28)
-              height: Style.space(28)
-              source: Aranea.RuntimePaths.glyphUrl
-              sourceSize.width: width * Screen.devicePixelRatio
-              sourceSize.height: height * Screen.devicePixelRatio
-              fillMode: Image.PreserveAspectFit
-              opacity: 0.6
-            }
-            Text {
-              anchors.horizontalCenter: parent.horizontalCenter
-              text: "All caught up"
-              color: Qt.darker(Color.popups.text, 1.4)
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-            }
-          }
-
-          // qmllint enable missing-property
-          ListView {
+          NotificationList {
             id: list
-            visible: root.count > 0
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(contentHeight, panel.screenH * 0.6 - Style.space(80))
-            clip: true
-            spacing: Style.space(6)
-            model: root.rows
-            boundsBehavior: Flickable.StopAtBounds
-
-            delegate: Loader {
-              id: rowLoader
-              required property var modelData
-              required property int index
-              width: list.width
-              sourceComponent: modelData.kind === "group" ? groupRow : (modelData.kind === "more" ? moreRow : entryRow)
-
-              Component {
-                id: groupRow
-                NotificationGroupRow {
-                  app: rowLoader.modelData.app
-                  count: rowLoader.modelData.count
-                  collapsed: rowLoader.modelData.collapsed
-                  fontFamily: Style.font.family
-                  onGroupClicked: root.toggleGroup(rowLoader.modelData.app)
-                  onCloseRequested: root.service.dismissGroup(rowLoader.modelData.app)
-                }
-              }
-
-              Component {
-                id: moreRow
-                Text {
-                  leftPadding: Style.space(12)
-                  text: "+" + rowLoader.modelData.hidden + " more"
-                  color: root.cursor === rowLoader.index ? Color.notifications.countdown : Qt.darker(Color.popups.text, 1.3)
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.body
-                  MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.toggleGroup(rowLoader.modelData.app)
-                  }
-                }
-              }
-
-              Component {
-                id: entryRow
-                NotificationCard {
-                  width: list.width
-                  compact: true
-                  selected: root.cursor === rowLoader.index
-                  motionEnabled: root.service ? root.service.motionEnabled : true
-                  app: rowLoader.modelData.entry.app
-                  appIcon: rowLoader.modelData.entry.appIcon
-                  summary: rowLoader.modelData.entry.summary
-                  body: rowLoader.modelData.entry.body
-                  image: rowLoader.modelData.entry.image
-                  glyph: rowLoader.modelData.entry.glyph
-                  urgency: rowLoader.modelData.entry.urgency
-                  timeLabel: InboxLogic.relativeTime(rowLoader.modelData.entry.timestamp, root.now)
-                  cornerRadius: root.service ? root.service.cornerRadius : 0
-                  fontFamily: root.bar ? root.bar.fontFamily : ""
-                  onCardClicked: root.service.invokeInbox(rowLoader.modelData.entry.fileName)
-                  onCloseRequested: root.service.dismissInbox(rowLoader.modelData.entry.fileName)
-                  onSwipeDismissed: root.service.dismissInbox(rowLoader.modelData.entry.fileName)
-                }
-              }
+            Layout.preferredHeight: Math.min(list.contentHeight, panel.screenH * 0.6 - Style.space(80))
+            visible: root.count > 0
+            rows: root.rows
+            cursor: root.cursor
+            now: root.now
+            service: root.service
+            bar: root.bar
+            motionEnabled: root.service ? root.service.motionEnabled : true
+            cornerRadius: root.service ? root.service.cornerRadius : 0
+            onActivated: function (index, row) {
+              root.activate(index)
+            }
+            onDismissed: function (index, row) {
+              root.dismissAt(index, false)
+            }
+            onGroupToggled: function (app) {
+              root.toggleGroup(app)
+            }
+            onGroupDismissed: function (app) {
+              root.service.dismissGroup(app)
             }
           }
         }

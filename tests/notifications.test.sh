@@ -37,7 +37,10 @@ jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml"' "$
 test -f "$plugin/Panel.qml"
 grep -Fq 'KeyboardPanel' "$plugin/Panel.qml"
 grep -Fq 'InboxLogic.flattenGroups' "$plugin/Panel.qml"
-grep -Fq 'All caught up' "$plugin/Panel.qml"
+grep -Fq 'NotificationCenterContent {' "$plugin/Panel.qml"
+grep -Fq 'All caught up' "$plugin/NotificationCenterContent.qml"
+grep -Fq 'NotificationList {' "$plugin/Panel.qml"
+grep -Fq 'NotificationCard {' "$plugin/NotificationList.qml"
 grep -Fq 'ServiceBridge.current()' "$plugin/Panel.qml"
 grep -Fq 'ServiceBridge.publish(service)' "$plugin/Service.qml"
 grep -Fq 'ServiceBridge.retract(service)' "$plugin/Service.qml"
@@ -131,7 +134,7 @@ grep -Fq 'onReloaded: service.reloadedSettings = true' "$svc"
 # --- 4c: Delete on "+N more" expands; Shift+Delete clears the group; the panel says so
 panel_qml="$repo_root/plugins/araneadev.notifications/Panel.qml"
 grep -Fq 'InboxLogic.dismissAction(' "$panel_qml"
-grep -Fq 'ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP' "$panel_qml"
+grep -Fq 'ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP' "$plugin/NotificationCenterContent.qml"
 
 # --- 4c: dead restore code and unused card properties stay gone
 if grep -Eq 'restoredPopups|isRestoredRow|keepFileName' "$svc"; then
