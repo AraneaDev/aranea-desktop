@@ -1,10 +1,18 @@
 // Logic contract for the MenuModel module (split from plugin-state.test.js).
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
-const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const root = path.join(__dirname, "..", "..")
-const menu = require(`${root}/plugins/araneadev.menu/MenuModel.js`)
+const menu = loadPragma("plugins/araneadev.menu/MenuModel.js")
+const history = loadPragma("plugins/araneadev.menu/MenuHistory.js")
+
+test("menu history owns recent-app ordering", () => {
+  if (
+    JSON.stringify(history.recordRecentApp(["two", "one"], "three", 3)) !==
+    JSON.stringify(["three", "two", "one"])
+  )
+    throw new Error("recent-app ordering")
+})
 
 test("menu model normalizeItem coerces mismatched types and falls back for invalid items", () => {
   const normalizedItem = menu.normalizeItem("tools.editor", {

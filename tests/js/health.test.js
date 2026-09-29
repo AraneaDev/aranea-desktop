@@ -1,10 +1,14 @@
 // Logic contract for the health modules (moved from tests/health.test.sh).
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
-const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const root = path.join(__dirname, "..", "..")
-const h = require(`${root}/plugins/araneadev.health/HealthLogic.js`)
+const h = loadPragma("plugins/araneadev.health/HealthLogic.js")
+const presentation = loadPragma("plugins/araneadev.health/HealthPresentation.js")
+
+test("health presentation owns byte formatting", () => {
+  if (presentation.humanBytes(1536) !== "1.5 KB") throw new Error("byte formatting")
+})
 
 const assert = (cond, msg) => {
   if (!cond) throw new Error(msg)

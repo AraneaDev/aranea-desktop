@@ -10,6 +10,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "ClipboardLogic.js" as ClipboardLogic
 
 Item {
@@ -603,15 +604,7 @@ Item {
   // Menu-like entrance (fade + slight scale), unless Aranea motion is off.
   // Starts from ARANEA_REDUCED_MOTION (1 = off); once
   // ~/.local/state/aranea/motion loads, the env var wins; otherwise the file's content decides ("off" = off).
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  FileView {
-    path: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
 
   // Nerd Font icon for a row kind (link, path, code, image; text otherwise).
   function kindGlyph(kind) {

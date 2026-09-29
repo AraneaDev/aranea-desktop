@@ -8,8 +8,9 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const menu = require(path.join(__dirname, "..", "..", "plugins/araneadev.menu/MenuModel.js"))
+const menu = loadPragma("plugins/araneadev.menu/MenuModel.js")
 
 /**
  * Runs a guard script with stub commands first on PATH.

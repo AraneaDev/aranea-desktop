@@ -1,5 +1,24 @@
 // Pure helpers for the Aranea menu (Menu.qml): JSONC parsing, item merging,
 // routing, visibility, search scoring and the batched guard script.
+/* @aranea-facade-start: plugins/araneadev.menu/MenuPresentation.js */
+// Presentation helpers for menu labels and stable route ids.
+
+/**
+ * Creates a stable route id from display text.
+ * @param {*} value - Display text.
+ * @returns {string} Stable route id.
+ */
+function slugify(value) {
+  return (
+    String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "item"
+  )
+}
+
+if (typeof module !== "undefined") module.exports = { slugify: slugify }
+/* @aranea-facade-end */
 
 /**
  * One menu row: a JSONC entry, an app, or a provider-generated action.
@@ -266,11 +285,44 @@ function emptyState(state) {
  * @param {*} limit - maximum number of recent entries
  * @returns {Array<string>} the new recent ids
  */
+/* @aranea-facade-start: plugins/araneadev.menu/MenuHistory.js */
+// Menu history behavior extracted from the generated MenuModel facade.
+
+/**
+ * Records an app id at the front of recent history.
+ * @param {*} values - Existing recent ids.
+ * @param {*} appId - App id to record.
+ * @param {*} limit - Maximum number of ids.
+ * @returns {Array<string>} Updated recent ids.
+ */
 function recordRecentApp(values, appId, limit) {
   var id = String(appId || "").trim()
-  if (!id) return normalizeAppIds(values, limit)
-  return normalizeAppIds([id].concat(Array.isArray(values) ? values : []), limit)
+  if (!id) return normalizeHistoryIds(values, limit)
+  return normalizeHistoryIds([id].concat(Array.isArray(values) ? values : []), limit)
 }
+
+if (typeof module !== "undefined") module.exports = { recordRecentApp: recordRecentApp }
+
+/**
+ * Normalizes recent ids for the standalone history module.
+ * @param {*} values - Candidate ids.
+ * @param {*} limit - Maximum number of ids.
+ * @returns {Array<string>} Normalized ids.
+ */
+function normalizeHistoryIds(values, limit) {
+  var max = Number(limit)
+  if (!isFinite(max) || max < 0) max = 12
+  var rows = Array.isArray(values) ? values : []
+  var out = []
+  for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
+    var raw = rows[i]
+    if (!(typeof raw === "string" || (typeof raw === "number" && isFinite(raw)))) continue
+    var id = String(raw).trim()
+    if (id && out.indexOf(id) === -1) out.push(id)
+  }
+  return out
+}
+/* @aranea-facade-end */
 
 /**
  * Copies the app rows named by `ids`, in that order, re-parented under `parent`.
@@ -591,15 +643,6 @@ function resolveRoute(items, itemOrder, input) {
  * @param {*} value - the text to slugify
  * @returns {string} the slug, or "item" when nothing is left
  */
-function slugify(value) {
-  return (
-    String(value || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "item"
-  )
-}
-
 /**
  * Counts how many menus lie between an item and the root (0 for top-level items).
  * @param {ItemMap} items - items by id

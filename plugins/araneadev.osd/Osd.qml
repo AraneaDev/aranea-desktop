@@ -30,9 +30,9 @@ Item {
   property int duration: 1200
   // Animate the card; follows the aranea motion state file, else
   // ARANEA_REDUCED_MOTION.
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  // $XDG_STATE_HOME/aranea/motion ("off" disables motion).
-  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
+  // Shared motion state file ("off" disables motion).
+  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Filled part of the strand, 0..1.
   readonly property real fraction: OsdModel.progressFraction({
     hasProgress: root.hasProgress,
@@ -85,15 +85,6 @@ Item {
   // Hides the card.
   function close(): void {
     root.opened = false
-  }
-
-  FileView {
-    path: root.motionStatePath
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
   }
 
   Timer {

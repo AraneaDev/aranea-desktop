@@ -1,3 +1,5 @@
+singleton RuntimePaths 1.0 RuntimePaths.qml
+singleton MotionState 1.0 MotionState.qml
 singleton DesignTokens 1.0 DesignTokens.qml
 OverlayChrome 1.0 OverlayChrome.qml
 SurfaceCard 1.0 SurfaceCard.qml

@@ -32,6 +32,12 @@ ShellRoot {
   }
 
   Component.onCompleted: {
+    t.check(Shared.RuntimePaths.home.length > 0, "runtime paths expose the home directory")
+    t.equal(Shared.RuntimePaths.motionStatePath, Shared.RuntimePaths.araneaStateRoot + "/motion", "motion path derives from the Aranea state root")
+    t.check(Shared.RuntimePaths.brandingMarksPath.endsWith("/omarchy/current/theme/branding/marks/"), "branding marks use the current theme path")
+    t.check(Shared.RuntimePaths.glyphUrl.startsWith("file://"), "branding glyph exposes a file URL")
+    t.equal(Shared.MotionState.statePath, Shared.RuntimePaths.motionStatePath, "motion state uses the shared runtime path")
+    t.check(typeof Shared.MotionState.motionEnabled === "boolean", "motion state exposes a boolean preference")
     t.equal(card.radius, Style.cornerRadius, "surface cards use the shared corner radius")
     t.equal(card.borderWidth, 1, "surface cards keep a one-pixel border")
     t.equal(card.contentPadding, 0, "surface cards default to no content padding")

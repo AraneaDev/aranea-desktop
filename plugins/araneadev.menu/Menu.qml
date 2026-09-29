@@ -6,6 +6,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "MenuModel.js" as MenuModel
 
 Item {
@@ -499,9 +500,9 @@ Item {
   property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  // State file whose "off" content disables animations.
-  readonly property string motionStatePath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea/motion"
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
+  // Shared state file whose "off" content disables animations.
+  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Set a turn after opening so the root header mark can fade in.
   property bool headerMarkSettled: false
   // True on the unfiltered root menu, which shows the large header, tiles and footer.
@@ -1602,16 +1603,6 @@ Item {
   // The JSONC sources are watched so live edits to the default file (or the
   // user extension at ~/.config/omarchy/extensions/omarchy-menu.jsonc) take
   // effect without restarting the shell.
-  FileView {
-    id: motionStateFile
-    path: root.motionStatePath
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
-
   FileView {
     id: defaultMenuFile
     path: root.defaultMenuPath

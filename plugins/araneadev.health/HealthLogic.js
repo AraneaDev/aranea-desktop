@@ -1,7 +1,6 @@
 // Pure rules for the System health monitor (Monitor.qml): parse command
 // output, derive open problems and word them for the health dropdown.
 // No QML, no I/O; tests/health.test.sh runs this under Node.
-
 var DISK_ALERT = 90
 var DISK_CRITICAL = 97
 var DISK_CLEAR = 88
@@ -12,6 +11,29 @@ var GLYPH_UNIT = "󰒓"
 var GLYPH_DISK = "󰋊"
 var GLYPH_REBOOT = "󰜉"
 var GLYPH_CONTAINER = "󰡨"
+
+/* @aranea-facade-start: plugins/araneadev.health/HealthPresentation.js */
+// Presentation helpers for health problem rows.
+
+/**
+ * Formats a byte count with 1024-based units.
+ * @param {number} n - bytes; negative or non-numeric counts as 0
+ * @returns {string} the formatted size
+ */
+function humanBytes(n) {
+  var units = ["B", "KB", "MB", "GB", "TB", "PB"]
+  var v = Math.max(0, Number(n) || 0)
+  var i = 0
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  var text = v >= 10 || i === 0 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "")
+  return text + " " + units[i]
+}
+
+if (typeof module !== "undefined") module.exports = { humanBytes: humanBytes }
+/* @aranea-facade-end */
 
 /**
  * One filesystem row from `df` (parseDf).
@@ -440,23 +462,6 @@ function containerProblems(history, now) {
     })
   }
   return out
-}
-
-/**
- * Formats a byte count with 1024-based units ("1.5 GB", "12 MB").
- * @param {number} n - bytes; negative or non-numeric counts as 0
- * @returns {string} the formatted size
- */
-function humanBytes(n) {
-  var units = ["B", "KB", "MB", "GB", "TB", "PB"]
-  var v = Math.max(0, Number(n) || 0)
-  var i = 0
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024
-    i++
-  }
-  var text = v >= 10 || i === 0 ? String(Math.round(v)) : v.toFixed(1).replace(/\.0$/, "")
-  return text + " " + units[i]
 }
 
 // tools.terminal: whether xdg-terminal-exec exists (default true). Without it

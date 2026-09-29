@@ -2,12 +2,10 @@
 // feedback senders, compact glyph cards, in-place updates and placement.
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
 const assert = require("node:assert/strict")
-const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const n = require(
-  path.join(__dirname, "..", "..", "plugins/araneadev.notifications/NotificationLogic.js")
-)
+const n = loadPragma("plugins/araneadev.notifications/NotificationLogic.js")
 
 const CRITICAL = 2
 
@@ -80,22 +78,23 @@ test("an update through replaces_id keeps the replaced popup's id and time", () 
 })
 
 test("toasts sit top-right, clearing the bar only on its own edge", () => {
+  const same = (actual, expected) => assert.equal(JSON.stringify(actual), JSON.stringify(expected))
   const top = n.popupPlacement("top", 40, 10)
-  assert.deepEqual(top.anchors, { top: true, bottom: false, left: false, right: true })
-  assert.deepEqual(top.margins, { top: 40, bottom: 10, left: 10, right: 10 })
-  assert.deepEqual(n.popupPlacement("right", 40, 10).margins, {
+  same(top.anchors, { top: true, bottom: false, left: false, right: true })
+  same(top.margins, { top: 40, bottom: 10, left: 10, right: 10 })
+  same(n.popupPlacement("right", 40, 10).margins, {
     top: 10,
     bottom: 10,
     left: 10,
     right: 40
   })
-  assert.deepEqual(n.popupPlacement("left", 40, 10).margins, {
+  same(n.popupPlacement("left", 40, 10).margins, {
     top: 10,
     bottom: 10,
     left: 10,
     right: 10
   })
-  assert.deepEqual(n.popupPlacement("", "wide", NaN).margins, {
+  same(n.popupPlacement("", "wide", NaN).margins, {
     top: 0,
     bottom: 0,
     left: 0,

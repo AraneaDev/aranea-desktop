@@ -25,7 +25,7 @@ fi
 grep -Fq 'Qt.createComponent(Qt.resolvedUrl("ClipboardWindow.qml"))' "$entry"
 grep -Fq 'property bool windowEnabled: true' "$entry"
 grep -Fq 'if (root.captureEnabled)' "$entry"
-grep -Fq 'OverlayChrome {' "$window"
+grep -Fq 'Aranea.OverlayChrome {' "$window"
 
 grep -Fq 'ClipboardLogic.displayRows' "$entry"
 grep -Fq '"--history-index", String(row.historyIndex)' "$entry"

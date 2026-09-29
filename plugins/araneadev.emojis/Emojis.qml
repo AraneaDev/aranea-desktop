@@ -298,15 +298,7 @@ Item {
   // Menu-like entrance (fade + slight scale), unless Aranea motion is off.
   // Starts from ARANEA_REDUCED_MOTION (1 = off); once
   // ~/.local/state/aranea/motion loads, the env var wins; otherwise the file's content decides ("off" = off).
-  property bool motionEnabled: Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-  FileView {
-    path: root.stateRoot + "/motion"
-    watchChanges: true
-    printErrors: false
-    onLoaded: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1" && String(text() || "").trim() !== "off"
-    onLoadFailed: root.motionEnabled = Quickshell.env("ARANEA_REDUCED_MOTION") !== "1"
-    onFileChanged: reload()
-  }
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
   onOpenedChanged: if (opened && root.motionEnabled)
     openAnimation.restart()
   ParallelAnimation {
@@ -439,7 +431,7 @@ Item {
         }
       }
 
-      OverlayChrome {
+      Aranea.OverlayChrome {
         anchors.fill: parent
         anchors.topMargin: card.contentTopInset
         anchors.rightMargin: card.contentRightInset

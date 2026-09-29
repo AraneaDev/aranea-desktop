@@ -12,10 +12,22 @@ const vm = require("node:vm")
  */
 function loadPragma(file) {
   const absolute = path.join(__dirname, "..", "..", "..", file)
-  const source = fs.readFileSync(absolute, "utf8").replace(/^\.pragma library$/m, "")
-  const context = vm.createContext({})
-  vm.runInContext(source, context, { filename: absolute })
+  const context = vm.createContext({ Date })
+  loadIntoContext(absolute, context)
   return context
+}
+
+/** Evaluates one QML JS module and its relative `.import` dependencies. */
+function loadIntoContext(absolute, context) {
+  let source = fs.readFileSync(absolute, "utf8").replace(/^\.pragma library$/m, "")
+  const imports = [...source.matchAll(/^\.import\s+"([^"]+)"\s+as\s+(\w+)$/gm)]
+  for (const [, relative, name] of imports) {
+    const dependency = vm.createContext({ Date })
+    loadIntoContext(path.resolve(path.dirname(absolute), relative), dependency)
+    context[name] = dependency
+  }
+  source = source.replace(/^\.import.*$/gm, "")
+  vm.runInContext(source, context, { filename: absolute })
 }
 
 module.exports = { loadPragma }

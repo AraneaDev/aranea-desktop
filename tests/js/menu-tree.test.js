@@ -2,10 +2,10 @@
 // files, resolving routes, walking the tree, search and the display rows.
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
 const assert = require("node:assert/strict")
-const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const menu = require(path.join(__dirname, "..", "..", "plugins/araneadev.menu/MenuModel.js"))
+const menu = loadPragma("plugins/araneadev.menu/MenuModel.js")
 
 // A small menu: a shipped file and a user file overriding one label.
 const shipped = `{
@@ -35,9 +35,9 @@ test("stripJsonc drops whole-line comments and trailing commas", () => {
 
 test("parseMenuJsonc reads an items map or a top-level map and skips non-objects", () => {
   const parsed = menu.parseMenuJsonc(shipped)
-  assert.deepEqual(
-    parsed.map((x) => x.id),
-    [
+  assert.equal(
+    JSON.stringify(parsed.map((x) => x.id)),
+    JSON.stringify([
       "system",
       "system.lock",
       "setup",
@@ -46,7 +46,7 @@ test("parseMenuJsonc reads an items map or a top-level map and skips non-objects
       "setup.wifi",
       "shortcut",
       "empty"
-    ]
+    ])
   )
   assert.deepEqual(menu.parseMenuJsonc(user)[0].label, "Battery Saver")
 })
@@ -58,13 +58,13 @@ test("parseMenuJsonc derives parents from dotted ids and kinds from the fields",
   assert.equal(byId["system.lock"].kind, "action")
   assert.equal(byId.shortcut.kind, "link")
   assert.equal(byId.setup.kind, "menu")
-  assert.deepEqual(byId.setup.aliases, ["settings"])
+  assert.equal(JSON.stringify(byId.setup.aliases), JSON.stringify(["settings"]))
 })
 
 test("parseMenuJsonc returns nothing for empty, invalid or non-object text", () => {
-  assert.deepEqual(menu.parseMenuJsonc(""), [])
-  assert.deepEqual(menu.parseMenuJsonc("{ not json"), [])
-  assert.deepEqual(menu.parseMenuJsonc("42"), [])
+  assert.equal(JSON.stringify(menu.parseMenuJsonc("")), "[]")
+  assert.equal(JSON.stringify(menu.parseMenuJsonc("{ not json")), "[]")
+  assert.equal(JSON.stringify(menu.parseMenuJsonc("42")), "[]")
 })
 
 test("mergeMenuSources lets the user file override a shipped item and adds a root", () => {

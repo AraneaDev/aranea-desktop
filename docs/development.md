@@ -58,6 +58,21 @@ Generated asset outputs must not be edited directly. Change
 `scripts/generate-tokens --write`, and verify with
 `scripts/generate-tokens --check`.
 
+### JavaScript facades
+
+Large plugin logic files are generated compatibility facades. Put new logic in
+the focused source module for its domain, keep existing exported function names
+stable, and regenerate with:
+
+```bash
+node tools/js-facade-generator.mjs --write
+node tools/js-facade-generator.mjs --check
+```
+
+Generated files remain plain QML-compatible JavaScript: do not add `require`,
+ES module imports, or QML-only nested `.import` statements. The generator check
+runs as part of `tools/check` and fails when a facade is stale.
+
 ## Showcase captures
 
 The README is a visual showcase as well as a project introduction. Refresh

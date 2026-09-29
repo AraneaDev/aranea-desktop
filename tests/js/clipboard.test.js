@@ -1,12 +1,17 @@
 // Logic contract for the clipboard modules (moved from tests/clipboard.test.sh).
 // Run with `node --test tests/js/` (tools/check runs it with coverage).
-const path = require("node:path")
 const { test } = require("node:test")
 const fs = require("fs")
+const { loadPragma } = require("./lib/load-pragma.js")
 
-const root = path.join(__dirname, "..", "..")
 const stock = "/usr/share/omarchy/shell/plugins/clipboard/ClipboardHistory.js"
-const c = require(`${root}/plugins/araneadev.clipboard/ClipboardLogic.js`)
+const c = loadPragma("plugins/araneadev.clipboard/ClipboardLogic.js")
+const presentation = loadPragma("plugins/araneadev.clipboard/ClipboardPresentation.js")
+
+test("clipboard presentation owns age formatting", () => {
+  if (presentation.relativeAge(1000000000000 - 60000, 1000000000000) !== "1m")
+    throw new Error("age formatting")
+})
 
 const assert = (cond, msg) => {
   if (!cond) throw new Error(msg)
