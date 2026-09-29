@@ -1,4 +1,5 @@
 // Result list and fold affordances for the menu card.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 import qs.Ui

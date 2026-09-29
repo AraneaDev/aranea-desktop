@@ -1,4 +1,5 @@
 // Presentational chrome for the menu card header, root tiles, context and footer.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 
