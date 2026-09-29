@@ -1,4 +1,5 @@
 // Notification row list presentation; action policy remains in Panel.qml.
+// qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 

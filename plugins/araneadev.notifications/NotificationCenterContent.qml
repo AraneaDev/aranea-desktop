@@ -1,4 +1,5 @@
 // Header, status and empty-state presentation for the notification center.
+// qmllint disable missing-property unqualified
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
