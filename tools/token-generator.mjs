@@ -99,7 +99,7 @@ QtObject {
   // Shared row horizontal padding.
   readonly property int rowPadding: Style.spacing.rowPaddingX
   // Whether motion effects are enabled.
-  readonly property bool motionEnabled: ${tokens.motion.enabled ? "true" : "false"}
+  readonly property bool motionEnabled: MotionState.motionEnabled
 }
 `
 }

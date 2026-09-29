@@ -77,6 +77,7 @@ test("renderQmlTokens exposes stable shared token aliases", async () => {
   const output = renderQmlTokens(fixture)
   assert.match(output, /readonly property color accent: Color\.accent/)
   assert.match(output, /readonly property int cornerRadius: Style\.cornerRadius/)
+  assert.match(output, /readonly property bool motionEnabled: MotionState\.motionEnabled/)
 })
 
 test("renderIntegrationCss projects semantic palette variables", async () => {

@@ -48,6 +48,7 @@ ShellRoot {
     t.equal(card.cornerRadius, Style.cornerRadius, "surface cards expose configurable corner radius")
     t.equal(Shared.DesignTokens.cornerRadius, Style.cornerRadius, "design tokens expose the canonical corner radius")
     t.equal(Shared.DesignTokens.foreground, Color.foreground, "design tokens expose the canonical foreground")
+    t.equal(Shared.DesignTokens.motionEnabled, Shared.MotionState.motionEnabled, "design tokens follow the shared motion state")
     t.equal(rail.implicitWidth, Style.space(2), "status rails use the shared compact width")
     t.equal(pair.title, "TITLE", "status text pairs expose their title")
     t.equal(pair.subtitle, "SUBTITLE", "status text pairs expose their subtitle")
