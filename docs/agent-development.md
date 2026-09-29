@@ -21,14 +21,14 @@ ownership boundaries.
 
 ## Choose the correct source of truth
 
-| Change requested | Edit first | Regenerate or verify |
-| --- | --- | --- |
-| Palette, spacing, typography, motion | `design/tokens.toml` | `scripts/generate-tokens --write` |
-| CSS, shell, or asset projection | `design/templates/` | `scripts/generate-tokens --check` |
-| Generated QML JS behavior | Focused module beside the facade | `node tools/js-facade-generator.mjs --write` |
-| Repeated QML chrome | `plugins/araneadev.shared/` | Register in `qmldir`, add QML checks |
-| Plugin-specific lifecycle | Owning plugin entry point | Plugin behavior tests |
-| Installer or repair behavior | `scripts/`, `hooks/`, or `tools/` | Shell contract and JSON tests |
+| Change requested                     | Edit first                        | Regenerate or verify                         |
+| ------------------------------------ | --------------------------------- | -------------------------------------------- |
+| Palette, spacing, typography, motion | `design/tokens.toml`              | `scripts/generate-tokens --write`            |
+| CSS, shell, or asset projection      | `design/templates/`               | `scripts/generate-tokens --check`            |
+| Generated QML JS behavior            | Focused module beside the facade  | `node tools/js-facade-generator.mjs --write` |
+| Repeated QML chrome                  | `plugins/araneadev.shared/`       | Register in `qmldir`, add QML checks         |
+| Plugin-specific lifecycle            | Owning plugin entry point         | Plugin behavior tests                        |
+| Installer or repair behavior         | `scripts/`, `hooks/`, or `tools/` | Shell contract and JSON tests                |
 
 Never hand-edit generated projections or facade regions. If a generated diff
 looks wrong, fix the input or generator and regenerate it.

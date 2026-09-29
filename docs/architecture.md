@@ -36,14 +36,14 @@ flowchart TD
 The arrows describe ownership and data flow, not import syntax. The important
 boundaries are:
 
-| Layer | Owns | Must not own |
-| --- | --- | --- |
-| Tokens and templates | Palette, spacing, typography, motion, and asset projections | Plugin state or host detection |
-| Shared QML | Reusable visual and input contracts | Plugin lifecycle, IPC, cursor state, or process management |
-| Plugin entry points | Composition, lifecycle, and plugin-specific interaction | Duplicated global chrome or token literals |
-| Focused JS modules | Pure domain logic and normalization | QML window lifecycle or generated facade structure |
-| Generated facades | Stable compatibility exports for QML | Hand-edited business logic |
-| Hooks and scripts | Installation, activation, repair, and host integration | Presentation decisions that belong in QML or templates |
+| Layer                | Owns                                                        | Must not own                                               |
+| -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| Tokens and templates | Palette, spacing, typography, motion, and asset projections | Plugin state or host detection                             |
+| Shared QML           | Reusable visual and input contracts                         | Plugin lifecycle, IPC, cursor state, or process management |
+| Plugin entry points  | Composition, lifecycle, and plugin-specific interaction     | Duplicated global chrome or token literals                 |
+| Focused JS modules   | Pure domain logic and normalization                         | QML window lifecycle or generated facade structure         |
+| Generated facades    | Stable compatibility exports for QML                        | Hand-edited business logic                                 |
+| Hooks and scripts    | Installation, activation, repair, and host integration      | Presentation decisions that belong in QML or templates     |
 
 ## Token flow
 

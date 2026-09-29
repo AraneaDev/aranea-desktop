@@ -1,4 +1,5 @@
 // Shared glyph, title, subtitle, and optional count header.
+// qmllint disable missing-property
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
@@ -6,16 +7,27 @@ import qs.Commons
 RowLayout {
   id: header
 
+  // Primary heading text.
   property string title: ""
+  // Secondary heading text.
   property string subtitle: ""
+  // Optional trailing count or status text.
   property string counts: ""
+  // Font family for all header text.
   property string fontFamily: Style.font.menuFamily
+  // Main header text color.
   property color foreground: Color.menu.text
+  // Accent color for the count text.
   property color accent: Color.menu.selectedText
+  // Letter spacing applied to header text.
   property real letterSpacing: 0.20
+  // Glyph image shown before the heading.
   property url glyphSource: RuntimePaths.glyphUrl
+  // Logical glyph size.
   property int glyphSize: Style.space(22)
+  // Heading font size.
   property int titleSize: Style.font.title
+  // Subtitle font size.
   property int subtitleSize: Style.font.caption
 
   spacing: Style.space(10)

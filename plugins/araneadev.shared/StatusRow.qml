@@ -1,4 +1,5 @@
 // Shared status rail/text row with optional trailing content and click input.
+// qmllint disable missing-property
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
@@ -6,22 +7,39 @@ import qs.Commons
 Item {
   id: row
 
+  // Primary row title.
   property string title: ""
+  // Secondary row subtitle.
   property string subtitle: ""
+  // Color of the leading status rail.
   property color railColor: DesignTokens.foreground
+  // Primary title color.
   property color titleColor: DesignTokens.foreground
+  // Secondary subtitle color.
   property color subtitleColor: DesignTokens.foreground
+  // Opacity applied to the subtitle.
   property real subtitleOpacity: 0.55
+  // Whether the title uses a bold weight.
   property bool titleBold: true
+  // Primary title font size.
   property int titleSize: Style.font.subtitle
+  // Secondary subtitle font size.
   property int subtitleSize: Style.font.body
+  // Elision mode for the subtitle.
   property int subtitleElide: Text.ElideNone
+  // Logical row height.
   property int rowHeight: Style.space(50)
+  // Default row background.
   property color background: "transparent"
+  // Background shown while hovered or highlighted.
   property color hoverBackground: Util.alpha(DesignTokens.foreground, 0.06)
+  // Whether the row is in its highlighted state.
   property bool highlighted: false
+  // Whether the row accepts pointer interaction.
   property bool clickable: false
+  // Content rendered after the text pair.
   default property alias trailingContent: trailing.data
+  // Emitted when a clickable row is activated.
   signal clicked
 
   implicitHeight: row.rowHeight

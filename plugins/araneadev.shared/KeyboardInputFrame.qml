@@ -5,12 +5,19 @@ import qs.Ui
 Item {
   id: frame
 
+  // Requests that the input frame close.
   signal closeRequested
+  // Requests tab navigation by direction.
   signal tabRequested(int direction)
+  // Requests cursor movement by x/y delta.
   signal moveRequested(int dx, int dy)
+  // Emits printable text input.
   signal textKey(string text)
+  // Requests activation of the current value.
   signal activateRequested
+  // Item receiving keyboard focus.
   property alias focusTarget: keyCatcher
+  // Content rendered inside the frame.
   default property alias content: body.data
 
   PanelKeyCatcher {
