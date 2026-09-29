@@ -40,7 +40,8 @@ fi
 
 # --- Aranea card
 agent="$plugin/PolkitAgent.qml"
-grep -Fq 'AUTHENTICATION REQUIRED' "${polkit_files[@]}"
+grep -Fq 'PolkitPromptCard {' "$plugin/PolkitWindow.qml"
+grep -Fq 'AUTHENTICATION REQUIRED' "$plugin/PolkitPromptCard.qml"
 grep -Fq 'SYSTEM // PRIVILEGED' "${polkit_files[@]}"
 grep -Fq 'RuntimePaths.glyphUrl' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.requestMarkup(panel.root.currentMessage' "${polkit_files[@]}"

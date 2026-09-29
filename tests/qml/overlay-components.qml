@@ -22,6 +22,7 @@ ShellRoot {
   }
   PolkitComponents.PolkitPromptCard {
     id: polkitCard
+    currentMessage: "Authentication required for pkexec"
     currentPrompt: "Password"
     detailsOpen: true
   }
@@ -30,6 +31,7 @@ ShellRoot {
     t.equal(lockAuth.failureMessage, "Wrong", "lock auth panels expose failure state")
     t.equal(emojiChrome.selectedName, "smile", "emoji chrome exposes selection label")
     t.equal(polkitCard.currentPrompt, "Password", "polkit cards expose prompt state")
+    t.equal(polkitCard.currentMessage, "Authentication required for pkexec", "polkit cards expose request state")
     t.equal(polkitCard.detailsOpen, true, "polkit cards expose details state")
     t.done()
   }

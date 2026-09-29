@@ -195,117 +195,26 @@ PanelWindow {
       anchors.rightMargin: card.contentRightInset
       spacing: Style.space(10)
 
-      // Header: the mark says this is the system asking.
-      RowLayout {
+      PolkitPromptCard {
         Layout.fillWidth: true
-        spacing: Style.space(10)
-
-        Image {
-          Layout.preferredWidth: Style.space(22)
-          Layout.preferredHeight: Style.space(22)
-          source: panel.root.glyphSource
-          sourceSize: Qt.size(44, 44)
-          fillMode: Image.PreserveAspectFit
-          smooth: true
-        }
-
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: Style.space(2)
-          Text {
-            Layout.fillWidth: true
-            textFormat: Text.PlainText
-            text: "AUTHENTICATION REQUIRED"
-            color: panel.root.foreground
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.title
-            font.weight: Font.Medium
-            font.letterSpacing: panel.root.letterSpacing
-            elide: Text.ElideRight
-          }
-          Text {
-            Layout.fillWidth: true
-            textFormat: Text.PlainText
-            text: "SYSTEM // PRIVILEGED"
-            color: panel.root.dim
-            font.family: panel.root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.weight: Font.Medium
-            font.letterSpacing: panel.root.letterSpacing
-            elide: Text.ElideRight
-          }
-        }
-      }
-
-      // The request, command in the accent colour (polkit text escaped).
-      Text {
-        id: requestLine
-        Layout.fillWidth: true
-        textFormat: Text.StyledText
-        text: PolkitLogic.requestMarkup(panel.root.currentMessage, panel.root.accent.toString())
-        color: panel.root.foreground
-        font.family: panel.root.fontFamily
-        font.pixelSize: Style.font.subtitle
-        wrapMode: Text.Wrap
-        maximumLineCount: 2
-        elide: Text.ElideRight
-      }
-
-      // The target, never elided: who the command runs as always shows in full.
-      Text {
-        Layout.fillWidth: true
-        visible: text.length > 0
-        textFormat: Text.PlainText
-        text: panel.root.targetText
-        color: panel.root.accent
-        font.family: panel.root.fontFamily
-        font.pixelSize: requestLine.font.pixelSize
-        wrapMode: Text.Wrap
-      }
-
-      // What polkit says the action is, and who is authenticating.
-      RowLayout {
-        Layout.fillWidth: true
-        spacing: Style.space(8)
-        Text {
-          Layout.fillWidth: true
-          textFormat: Text.PlainText
-          text: PolkitLogic.contextLine(panel.root.actionDescription, panel.root.identityText, panel.root.identityCount)
-          color: panel.root.dim
-          font.family: panel.root.fontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-        }
-        Text {
-          textFormat: Text.PlainText
-          text: (panel.root.detailsOpen ? "▴" : "▾") + " DETAILS"
-          color: panel.root.accent
-          font.family: panel.root.fontFamily
-          font.pixelSize: Style.font.caption
-          font.weight: Font.Medium
-          font.letterSpacing: panel.root.letterSpacing
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: panel.root.toggleDetails()
-          }
-        }
-      }
-
-      // Details: raw polkit data, selectable, hidden rows when empty.
-      ColumnLayout {
-        Layout.fillWidth: true
-        visible: panel.root.detailsOpen
-        PolkitDetails {
-          rows: PolkitLogic.detailRows(panel.root.currentActionId, panel.root.actionVendor, PolkitLogic.commandFromMessage(panel.root.currentMessage), panel.root.currentMessage)
-          fontFamily: panel.root.fontFamily
-          foreground: panel.root.foreground
-          dim: panel.root.dim
-          accent: panel.root.accent
-          letterSpacing: panel.root.letterSpacing
-          onKeyPressed: function (event) {
-            panel.root.handleKey(event)
-          }
+        currentMessage: panel.root.currentMessage
+        currentPrompt: panel.root.currentPrompt
+        identityText: panel.root.identityText
+        identityCount: panel.root.identityCount
+        targetText: panel.root.targetText
+        actionDescription: panel.root.actionDescription
+        currentActionId: panel.root.currentActionId
+        actionVendor: panel.root.actionVendor
+        detailsOpen: panel.root.detailsOpen
+        glyphSource: panel.root.glyphSource
+        fontFamily: panel.root.fontFamily
+        foreground: panel.root.foreground
+        dim: panel.root.dim
+        accent: panel.root.accent
+        letterSpacing: panel.root.letterSpacing
+        onDetailsToggled: panel.root.toggleDetails()
+        onKeyPressed: function (event) {
+          panel.root.handleKey(event)
         }
       }
 
