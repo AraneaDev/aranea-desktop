@@ -5,9 +5,9 @@
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared"
 import "HealthBridge.js" as HealthBridge
 import "HealthLogic.js" as HealthLogic
 import "MetricsLogic.js" as MetricsLogic
@@ -219,7 +219,7 @@ Panel {
           Image {
             Layout.preferredWidth: Style.space(16)
             Layout.preferredHeight: Style.space(16)
-            source: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+            source: RuntimePaths.glyphUrl
             sourceSize: Qt.size(32, 32)
           }
           Label {

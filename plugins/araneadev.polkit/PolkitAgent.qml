@@ -7,7 +7,6 @@
 // /org/omarchy/PolkitAgent and shows a full-screen overlay per request.
 
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.Commons
 import "../araneadev.shared" as Aranea
@@ -37,7 +36,7 @@ Item {
   // Letter spacing for the uppercase labels.
   readonly property real letterSpacing: 0.20
   // file:// URL of the Aranea glyph from the current theme's branding, shown in the header.
-  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string glyphSource: Aranea.RuntimePaths.glyphUrl
   // Corner radius of the card and the password field.
   readonly property int cornerRadius: Style.cornerRadius
   // Padding inside the card.

@@ -6,7 +6,6 @@
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import qs.Commons
 
 Item {
@@ -36,7 +35,7 @@ Item {
   readonly property real letterSpacing: 0.20
   // file:// URL of the Aranea glyph in the current theme's branding
   // ($XDG_STATE_HOME, falling back to ~/.local/state).
-  readonly property string glyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string glyphSource: RuntimePaths.glyphUrl
 
   // Children declared inside OverlayChrome land in the content area between
   // the search line and the hint strip.

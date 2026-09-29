@@ -191,11 +191,11 @@ Item {
   // Font for all menu text; a payload's fontFamily overrides it.
   property string fontFamily: Style.font.menuFamily
   // Directory of the current theme's branding marks (the header logo).
-  readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
+  readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
   // Directory of the current theme's branding motifs (header art, dividers).
-  readonly property string brandingMotifsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/motifs/"
+  readonly property string brandingMotifsPath: Aranea.RuntimePaths.brandingMotifsPath
   // Directory of the current theme's branding glyphs (status icons).
-  readonly property string brandingGlyphsPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/glyphs/"
+  readonly property string brandingGlyphsPath: Aranea.RuntimePaths.brandingGlyphsPath
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.

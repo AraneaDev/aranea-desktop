@@ -1,9 +1,9 @@
 // Bar button for the Aranea menu: the plugin's "barWidget" entry point, placed
 // in the omarchy-shell bar. Left click toggles the menu, right click opens a terminal.
-import Quickshell
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 BarWidget {
   id: root
@@ -12,7 +12,7 @@ BarWidget {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
   // Directory of the current theme's branding marks; the button shows aranea-glyph.svg from it.
-  readonly property string brandingMarksPath: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/"
+  readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
 
   WidgetButton {
     id: button

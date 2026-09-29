@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import Quickshell
 import qs.Commons
 import qs.Ui
+import "../../araneadev.shared" as Aranea
 import "../NotificationLogic.js" as NotificationLogic
 import "../InboxLogic.js" as InboxLogic
 
@@ -73,7 +74,7 @@ BorderSurface {
   // The `check` flag avoids Qt's missing-texture placeholder for unknown names.
   readonly property string smallIconSource: image.length > 0 ? image : iconSource(appIcon)
   // The theme's Aranea mark, drawn when there is neither an icon nor a glyph.
-  readonly property string araneaGlyphSource: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+  readonly property string araneaGlyphSource: Aranea.RuntimePaths.glyphUrl
   // True when an omarchy-glyph is set.
   readonly property bool hasGlyph: glyph.length > 0
   // Draw the glyph inline beside the text instead of in the icon slot.

@@ -5,9 +5,9 @@
 
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "components"
 import "InboxLogic.js" as InboxLogic
 import "ServiceBridge.js" as ServiceBridge
@@ -357,7 +357,7 @@ Panel {
               anchors.horizontalCenter: parent.horizontalCenter
               width: Style.space(28)
               height: Style.space(28)
-              source: "file://" + (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/omarchy/current/theme/branding/marks/aranea-glyph.svg"
+              source: Aranea.RuntimePaths.glyphUrl
               sourceSize.width: width * Screen.devicePixelRatio
               sourceSize.height: height * Screen.devicePixelRatio
               fillMode: Image.PreserveAspectFit

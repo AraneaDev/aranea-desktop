@@ -22,7 +22,8 @@ QtObject {
   readonly property string omarchyPath: Quickshell.env("OMARCHY_PATH")
 
   // Root directory for the active theme's branding assets.
-  readonly property string brandingRoot: omarchyStateRoot + "/current/theme/branding"
+  readonly property string themeRoot: omarchyStateRoot + "/current/theme"
+  readonly property string brandingRoot: themeRoot + "/branding"
 
   // Directory containing branding marks.
   readonly property string brandingMarksPath: brandingRoot + "/marks/"

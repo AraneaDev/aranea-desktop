@@ -11,9 +11,9 @@ ColumnLayout {
   // Secondary row subtitle.
   property string subtitle: ""
   // Title colour.
-  property color titleColor: Color.popups.text
+  property color titleColor: DesignTokens.foreground
   // Subtitle colour.
-  property color subtitleColor: Color.popups.text
+  property color subtitleColor: DesignTokens.foreground
   // Subtitle opacity.
   property real subtitleOpacity: 0.55
   // Whether the title uses a bold weight.
