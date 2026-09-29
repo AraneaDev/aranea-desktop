@@ -475,53 +475,26 @@ Item {
             text: root.filterText ? "RESULTS  ·  " + displayModel.count : "ALL"
           }
 
-          GridView {
+          EmojiGrid {
             id: resultGrid
             width: parent.width
             height: parent.height - y - nameLine.height - parent.spacing
             model: displayModel
-            clip: true
+            filterText: root.filterText
+            selectedIndex: root.selectedIndex
+            cursorActive: root.cursorActive
+            inRecents: root.inRecents
+            fontFamily: root.fontFamily
             cellWidth: root.cellWidth
             cellHeight: root.cellHeight
-            boundsBehavior: Flickable.StopAtBounds
-
-            delegate: EmojiCell {
-              required property int index
-              required property string emoji
-              glyph: emoji
-              hasCursor: root.cursorActive && !root.inRecents && index === root.selectedIndex
-              onPicked: {
-                root.inRecents = false
-                root.selectedIndex = index
-                root.applySelected(emoji, false)
-              }
-            }
-
-            Column {
-              anchors.centerIn: parent
-              spacing: Style.space(8)
-              visible: displayModel.count === 0
-
-              Text {
-                text: "󰈉"
-                color: root.selectedText
-                opacity: 0.8
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.displayLarge
-                horizontalAlignment: Text.AlignHCenter
-                width: parent.width
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                text: "No matches for “" + root.filterText + "”"
-                color: root.foreground
-                opacity: 0.7
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.title
-                horizontalAlignment: Text.AlignHCenter
-                width: parent.width
-              }
+            cornerRadius: root.cornerRadius
+            selectedBackground: root.selectedBackground
+            selectedText: root.selectedText
+            foreground: root.foreground
+            onPicked: function (emoji, index) {
+              root.inRecents = false
+              root.selectedIndex = index
+              root.applySelected(emoji, false)
             }
           }
 

@@ -42,7 +42,6 @@
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "border" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "display" not found on type "QObject"
-1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "displayLarge" not found on type "QObject"
 2	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "md" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "menuFamily" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "panelPadding" not found on type "QObject"
@@ -50,9 +49,8 @@
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "selectedBackground" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "selectedText" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "text" not found on type "QObject"
-1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:uncreatable-type:Type PanelWindow is not creatable.
-11	plugins/araneadev.emojis/Emojis.qml:unqualified:Unqualified access
+5	plugins/araneadev.emojis/Emojis.qml:unqualified:Unqualified access
 1	plugins/araneadev.emojis/Emojis.qml:unused-imports:Unused import
 4	plugins/araneadev.health/Monitor.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.health/Panel.qml:missing-property:Member "body" not found on type "QObject"
