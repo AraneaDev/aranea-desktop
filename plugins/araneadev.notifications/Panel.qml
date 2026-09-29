@@ -391,35 +391,13 @@ Panel {
 
               Component {
                 id: groupRow
-                RowLayout {
-                  spacing: Style.space(6)
-                  Text {
-                    text: (rowLoader.modelData.collapsed ? "▸ " : "▾ ") + rowLoader.modelData.app + " · " + rowLoader.modelData.count
-                    color: Color.popups.text
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.subtitle
-                    font.bold: true
-                    Layout.fillWidth: true
-                    MouseArea {
-                      anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: root.toggleGroup(rowLoader.modelData.app)
-                    }
-                  }
-                  Text {
-                    text: "✕"
-                    color: groupClose.containsMouse ? Color.notifications.countdown : Qt.darker(Color.popups.text, 1.4)
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    MouseArea {
-                      id: groupClose
-                      anchors.fill: parent
-                      anchors.margins: -Style.space(4)
-                      hoverEnabled: true
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: root.service.dismissGroup(rowLoader.modelData.app)
-                    }
-                  }
+                NotificationGroupRow {
+                  app: rowLoader.modelData.app
+                  count: rowLoader.modelData.count
+                  collapsed: rowLoader.modelData.collapsed
+                  fontFamily: Style.font.family
+                  onGroupClicked: root.toggleGroup(rowLoader.modelData.app)
+                  onCloseRequested: root.service.dismissGroup(rowLoader.modelData.app)
                 }
               }
 
