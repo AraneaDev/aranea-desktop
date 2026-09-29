@@ -9,7 +9,6 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
-import "ClipboardLogic.js" as ClipboardLogic
 import "components"
 
 PanelWindow {
@@ -29,7 +28,7 @@ PanelWindow {
 
   // Scrolls the row at index into view.
   function reveal(index: int): void {
-    resultList.positionViewAtIndex(index, ListView.Contain)
+    resultPane.reveal(index)
   }
 
   // Makes the mouse ignore hover until it really moves.
@@ -228,133 +227,33 @@ PanelWindow {
       foreground: panel.root.foreground
       accent: panel.root.selectedText
 
-      Row {
+      ClipboardResultsPane {
+        id: resultPane
         anchors.fill: parent
-        spacing: 0
-
-        Item {
-          width: Math.round(parent.width * 0.48)
-          height: parent.height
-          clip: true
-
-          ListView {
-            id: resultList
-            anchors.fill: parent
-            anchors.rightMargin: panel.root.contentMargin
-            model: panel.root.displayModel
-            clip: true
-            spacing: Style.space(2)
-            boundsBehavior: Flickable.StopAtBounds
-
-            section.property: "section"
-            section.delegate: Item {
-              required property string section
-              width: ListView.view.width
-              height: Style.space(26)
-              // Hairline after the caption, as in the Aranea menu.
-              Rectangle {
-                anchors.left: sectionCaption.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: sectionCaption.verticalCenter
-                height: 1
-                color: Util.alpha(panel.root.foreground, 0.10)
-              }
-              Text {
-                id: sectionCaption
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(6)
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: Style.space(4)
-                textFormat: Text.PlainText
-                text: parent.section === "pinned" ? "PINNED" : "RECENT"
-                color: Util.alpha(panel.root.foreground, 0.58)
-                font.family: panel.root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.weight: Font.Medium
-                font.letterSpacing: 0.20
-              }
-            }
-
-            delegate: ClipboardResultRow {
-              hasCursor: panel.root.cursorActive && index === panel.root.selectedIndex
-              width: ListView.view.width
-              height: panel.root.rowHeight
-              glyph: panel.root.kindGlyph(kind)
-              fontFamily: panel.root.fontFamily
-              foreground: panel.root.foreground
-              selectedText: panel.root.selectedText
-              selectedBackground: panel.root.selectedBackground
-              cornerRadius: panel.root.cornerRadius
-              onPointerMoved: function (rowIndex, item, mouse) {
-                panel.root.selectFromPointer(rowIndex, item, mouse)
-              }
-              onActivated: function (rowIndex) {
-                panel.root.cursorActive = true
-                panel.root.selectedIndex = rowIndex
-                panel.root.activateIndex(rowIndex)
-              }
-            }
-          }
+        model: panel.root.displayModel
+        history: panel.root.history
+        nowMs: panel.root.nowMs
+        secretTtlMs: panel.root.secretTtlMs
+        selectedIndex: panel.root.selectedIndex
+        cursorActive: panel.root.cursorActive
+        revealedIndex: panel.root.revealedIndex
+        rowHeight: panel.root.rowHeight
+        contentMargin: panel.root.contentMargin
+        fontFamily: panel.root.fontFamily
+        foreground: panel.root.foreground
+        selectedText: panel.root.selectedText
+        selectedBackground: panel.root.selectedBackground
+        borderColor: panel.root.border
+        cornerRadius: panel.root.cornerRadius
+        emptyMessage: panel.root.history.length === 0 ? "Clipboard is empty" : "No matches for “" + panel.root.filterText + "”"
+        kindGlyph: panel.root.kindGlyph
+        onPointerMoved: function (rowIndex, item, mouse) {
+          panel.root.selectFromPointer(rowIndex, item, mouse)
         }
-
-        // Preview of the selected item.
-        Item {
-          id: preview
-          width: parent.width - Math.round(parent.width * 0.48)
-          height: parent.height
-          clip: true
-
-          property var activeRow: panel.root.displayModel.count > 0 && panel.root.selectedIndex >= 0 && panel.root.selectedIndex < panel.root.displayModel.count ? panel.root.displayModel.get(panel.root.selectedIndex) : null
-          readonly property bool masked: !!activeRow && activeRow.secret && panel.root.revealedIndex !== panel.root.selectedIndex
-
-          ClipboardPreview {
-            anchors.fill: parent
-            masked: preview.masked
-            secretHint: "SPACE TO REVEAL"
-            secretExpiry: {
-              var left = preview.activeRow ? ClipboardLogic.secretExpiryText(panel.root.history[preview.activeRow.historyIndex], panel.root.nowMs, panel.root.secretTtlMs) : ""
-              return left
-            }
-            textValue: !preview.activeRow ? "" : (preview.activeRow.secret ? ClipboardLogic.fullText(panel.root.history[preview.activeRow.historyIndex]) : preview.activeRow.fullText)
-            imageSource: preview.activeRow ? preview.activeRow.previewImage : ""
-            colourText: preview.activeRow ? preview.activeRow.colour : ""
-            swatch: preview.activeRow ? preview.activeRow.swatch : ""
-            isCode: !!preview.activeRow && preview.activeRow.kind === "code"
-            contentMargin: panel.root.contentMargin
-            fontFamily: panel.root.fontFamily
-            foreground: panel.root.foreground
-            borderColor: panel.root.border
-            cornerRadius: panel.root.cornerRadius
-          }
-        }
-      }
-
-      Column {
-        anchors.centerIn: parent
-        spacing: Style.space(8)
-        visible: panel.root.displayModel.count === 0
-
-        Text {
-          text: "󰅌"
-          color: panel.root.selectedText
-          opacity: 0.8
-          font.family: panel.root.fontFamily
-          font.pixelSize: Style.font.displayLarge
-          horizontalAlignment: Text.AlignHCenter
-          width: parent.width
-        }
-
-        Text {
-          textFormat: Text.PlainText
-          text: panel.root.history.length === 0 ? "Clipboard is empty" : "No matches for “" + panel.root.filterText + "”"
-          color: panel.root.foreground
-          opacity: 0.7
-          font.family: panel.root.fontFamily
-          font.pixelSize: Style.font.title
-          horizontalAlignment: Text.AlignHCenter
-          width: parent.width
+        onActivated: function (rowIndex) {
+          panel.root.cursorActive = true
+          panel.root.selectedIndex = rowIndex
+          panel.root.activateIndex(rowIndex)
         }
       }
     }
