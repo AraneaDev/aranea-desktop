@@ -23,11 +23,17 @@ Item {
   // Request a status refresh.
   signal refresh
 
-  // Maximum popup height a long update list may grow the panel to; the
-  // group list scrolls past this instead of pushing the panel off-screen.
-  readonly property real maxHeight: Style.space(520)
+  // Maximum height this panel's content (this Item, not the host's card) may
+  // grow to; the caller owns this number. The host passes down its real cap
+  // (KeyboardPanel's availableCardHeight/verticalContentInset), since only it
+  // knows how much of the popup's height is card padding and border versus
+  // content; a second, independently-guessed cap here previously let a long
+  // list overflow the card by the padding+border amount. Unbounded by
+  // default so a standalone panel (previews, tests without a host) isn't
+  // artificially capped.
+  property real maxContentHeight: Infinity
   // Height left for the group list once the fixed chrome is accounted for.
-  readonly property real maxListHeight: Math.max(0, maxHeight - (header.implicitHeight + statusRow.implicitHeight + footer.implicitHeight + layout.spacing * 3))
+  readonly property real maxListHeight: Math.max(0, maxContentHeight - (header.implicitHeight + statusRow.implicitHeight + footer.implicitHeight + layout.spacing * 3))
 
   implicitWidth: Style.space(500)
   // Sized by its content: the gaps stay the layout spacing.
@@ -70,7 +76,7 @@ Item {
     }
 
     // Scrolls when the group list would otherwise grow the panel past
-    // panel.maxHeight; a no-op sizing pass-through for a short list.
+    // panel.maxContentHeight; a no-op sizing pass-through for a short list.
     Flickable {
       id: groupList
       Layout.fillWidth: true

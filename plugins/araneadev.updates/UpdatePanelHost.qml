@@ -39,6 +39,11 @@ Aranea.KeyboardPanelFrame {
     anchors.fill: parent
     status: host.status
     cursorIndex: host.cursorIndex
+    // The one true cap: the card's own maximum (Style.space(520) or a
+    // smaller screen, whichever binds) minus the padding and border the
+    // card always reserves around the content, so a capped panel can never
+    // exceed the space contentHolder actually gives it.
+    maxContentHeight: Math.max(0, Math.min(Style.space(520), host.availableCardHeight) - host.verticalContentInset)
     onOpenUpdater: host.openUpdater()
     onRefresh: host.refresh()
   }

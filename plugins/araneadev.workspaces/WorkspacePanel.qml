@@ -20,17 +20,55 @@ Item {
   // Request focus for a workspace row.
   signal focusWorkspace(int id)
 
-  // Maximum popup height a long workspace list may grow the panel to; the
-  // row list scrolls past this instead of pushing the panel off-screen.
-  readonly property real maxHeight: Style.space(520)
+  // Maximum height this panel's content (this Item, not the host's card) may
+  // grow to; the caller owns this number. The host passes down its real cap
+  // (KeyboardPanel's availableCardHeight/verticalContentInset), since only it
+  // knows how much of the popup's height is card padding and border versus
+  // content; a second, independently-guessed cap here previously let a long
+  // list overflow the card by the padding+border amount. Unbounded by
+  // default so a standalone panel (previews, tests without a host) isn't
+  // artificially capped.
+  property real maxContentHeight: Infinity
   // Height left for the row list once the fixed chrome is accounted for.
-  readonly property real maxListHeight: Math.max(0, maxHeight - (header.implicitHeight + layout.spacing))
+  readonly property real maxListHeight: Math.max(0, maxContentHeight - (header.implicitHeight + layout.spacing))
 
   implicitWidth: Style.space(500)
   // Sized by its content: the gaps stay the layout spacing.
   implicitHeight: layout.implicitHeight
   width: implicitWidth
   height: implicitHeight
+
+  // Keeps the keyboard-selected row inside the (possibly capped/scrolled)
+  // viewport: moveCursor() only changes cursorIndex, it never touches
+  // rowList's contentY, so without this a capped list could select a row
+  // that's scrolled out of view.
+  onCursorIndexChanged: ensureCursorVisible()
+
+  // Scrolls rowList the minimum amount needed to bring the row at
+  // cursorIndex fully into view; a no-op when it's already visible or there
+  // is no cursor row.
+  function ensureCursorVisible() {
+    if (panel.cursorIndex < 0)
+      return
+    var item = rowRepeater.itemAt(panel.cursorIndex)
+    if (!item)
+      return
+    var maxContentY = Math.max(0, rowList.contentHeight - rowList.height)
+    if (item.y < rowList.contentY)
+      rowList.contentY = Math.max(0, item.y)
+    else if (item.y + item.height > rowList.contentY + rowList.height)
+      rowList.contentY = Math.min(maxContentY, item.y + item.height - rowList.height)
+  }
+
+  // True when the row at INDEX is fully within the scrolled viewport (used
+  // by callers/tests to confirm keyboard navigation keeps the cursor row
+  // visible).
+  function isRowVisible(index) {
+    var item = rowRepeater.itemAt(index)
+    if (!item)
+      return false
+    return item.y >= rowList.contentY && item.y + item.height <= rowList.contentY + rowList.height
+  }
 
   ColumnLayout {
     id: layout
@@ -49,7 +87,7 @@ Item {
     }
 
     // Scrolls when the row list would otherwise grow the panel past
-    // panel.maxHeight; a no-op sizing pass-through for a short list.
+    // panel.maxContentHeight; a no-op sizing pass-through for a short list.
     Flickable {
       id: rowList
       Layout.fillWidth: true
@@ -67,6 +105,7 @@ Item {
         spacing: Style.space(8)
 
         Repeater {
+          id: rowRepeater
           model: panel.workspaceStates
           delegate: Aranea.StatusRow {
             required property var modelData
