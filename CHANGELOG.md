@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.1...v2.7.2) (2026-09-30)
+
+
+### Fixes
+
+* flag plugins that need branding files the installed theme lacks ([#77](https://github.com/AraneaDev/aranea-desktop/issues/77)) ([96b9897](https://github.com/AraneaDev/aranea-desktop/commit/96b9897609f80a0866914c1300d1b62658f80a07))
+
 ## [2.7.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.0...v2.7.1) (2026-09-30)
 
 
