@@ -160,11 +160,9 @@ Item {
     id: popupModel
   }
 
-  // Aranea motion preference, shared with the OSD: `off` in the state file
-  // (or ARANEA_REDUCED_MOTION=1) removes the swipe slide animation.
+  // Aranea motion preference (shared Aranea.MotionState); off removes the
+  // swipe slide animation.
   property bool motionEnabled: Aranea.MotionState.motionEnabled
-  // Shared Aranea motion state file.
-  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
 
   // Minimum on-screen time of a low-urgency toast, in ms.
   readonly property int lowPopupDuration: 5000

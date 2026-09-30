@@ -107,11 +107,8 @@ Item {
   property color barForeground: useTransparentForeground ? transparentForeground : themeForeground
   // Turned off briefly so a foreground switch jumps instead of animating.
   property bool foregroundAnimationEnabled: true
-  // Whether Aranea motion is on. Starts from ARANEA_REDUCED_MOTION (1 = off);
-  // once the motion state file loads, the env var wins; otherwise the file's content decides ("off" = off).
+  // Whether Aranea motion is on (shared Aranea.MotionState preference).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
-  // Shared state file whose "off" content disables bar animations.
-  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Bar background color, from the Color singleton.
   property color background: Color.bar.background
   // Accent color for urgent or active states, from the Color singleton.

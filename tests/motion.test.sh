@@ -43,8 +43,6 @@ grep -Fq 'keyword animations:enabled true' "$hyprctl_log"
 
 grep -Fq 'aranea-motion" apply' "$repo_root/hooks/theme-set"
 grep -Fq 'aranea-motion" apply' "$repo_root/hooks/post-boot"
-grep -Fq 'motionStatePath' "$repo_root/plugins/araneadev.menu/Menu.qml"
-grep -Fq 'motionStatePath' "$repo_root/plugins/araneadev.bar/Bar.qml"
 grep -Fq 'root.motionEnabled && root.foregroundAnimationEnabled' "$repo_root/plugins/araneadev.bar/Bar.qml"
 
 # --- 4b: every QML consumer reads the shared motion singleton.
@@ -61,8 +59,9 @@ for qml in \
     echo "$qml: motion must come from the shared MotionState singleton" >&2
     exit 1
   }
-  if grep -Eq '^[[:space:]]*path:.*(/aranea/motion|motionStatePath)' "$file"; then
-    echo "$qml: motion file ownership must live in MotionState.qml" >&2
+  # Only araneadev.shared knows where the motion preference is stored.
+  if grep -Eq 'motionStatePath|aranea/motion' "$file"; then
+    echo "$qml: the motion file belongs to MotionState.qml; bind MotionState.motionEnabled only" >&2
     exit 1
   fi
 done

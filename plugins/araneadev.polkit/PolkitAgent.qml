@@ -377,8 +377,7 @@ Item {
   }
 
   // Lock-like entrance (scrim fade, card fade + slight scale), unless Aranea
-  // motion is off. Starts from ARANEA_REDUCED_MOTION (1 = off); once
-  // ~/.local/state/aranea/motion loads, the env var wins; otherwise the file's content decides ("off" = off).
+  // motion is off (shared Aranea.MotionState).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
 
   FileView {

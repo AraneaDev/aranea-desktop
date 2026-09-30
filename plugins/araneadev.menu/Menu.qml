@@ -451,8 +451,6 @@ Item {
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
   property bool motionEnabled: Aranea.MotionState.motionEnabled
-  // Shared state file whose "off" content disables animations.
-  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Set a turn after opening so the root header mark can fade in.
   property bool headerMarkSettled: false
   // True on the unfiltered root menu, which shows the large header, tiles and footer.
