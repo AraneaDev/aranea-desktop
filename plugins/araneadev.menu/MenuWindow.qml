@@ -98,8 +98,14 @@ PanelWindow {
   property int cardTop: -1
   // Rows height frozen with cardTop (the starting menu's height), or -1.
   property int maxRowsHeight: -1
-  // Top edge that centres the card vertically.
-  readonly property int centeredTop: Math.max(Style.gapsOut, Math.round((height - panel.root.cardHeight) / 2))
+  // Top edge that centres the card vertically. Reads panel.root.screenHeight
+  // (screen size, falling back to the window's own size, then a fixed
+  // default; see MenuLayout.screenExtent) rather than this window's own
+  // height, which layer-shell windows report as 0 until the compositor
+  // configures them, the same class of bug the frozen-top fix above solves
+  // for cardTop. The window is anchored to all edges with
+  // ExclusionMode.Ignore, so once configured the two are equal.
+  readonly property int centeredTop: Math.max(Style.gapsOut, Math.round((panel.root.screenHeight - panel.root.cardHeight) / 2))
   // Where the card's top edge is: frozen, or centred until the first move.
   readonly property int effectiveCardTop: cardTop >= 0 ? cardTop : centeredTop
   // Freezes the card top and rows height at their current values.
