@@ -16,7 +16,8 @@ function menuRowTotals(rows, metrics) {
   var previousSection = ""
   for (var i = 0; i < rows.length; i++) {
     if (i > 0) total += metrics.rowSpacing
-    if (rows[i].section === "drilldown" && previousSection !== "drilldown") total += metrics.dividerHeight
+    if (rows[i].section === "drilldown" && previousSection !== "drilldown")
+      total += metrics.dividerHeight
     total += rows[i].height
     previousSection = rows[i].section
     totals.push(total)
@@ -52,7 +53,13 @@ function plainRowTotals(rows, rowSpacing) {
 function availableRowsHeight(input) {
   var top = input.cardTop >= 0 ? input.cardTop : input.gapsOut
   var available =
-    input.screenHeight - top - input.gapsOut - input.contentMargin * 2 - input.headerHeight - input.contentSpacing - input.rootExtrasHeight
+    input.screenHeight -
+    top -
+    input.gapsOut -
+    input.contentMargin * 2 -
+    input.headerHeight -
+    input.contentSpacing -
+    input.rootExtrasHeight
   if (input.maxRowsHeight >= 0) available = Math.min(available, input.maxRowsHeight)
   return Math.min(available, input.ceiling)
 }
