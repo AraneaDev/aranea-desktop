@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.6.1...v2.7.0) (2026-09-30)
+
+
+### Features
+
+* track upstream Omarchy drift ([#73](https://github.com/AraneaDev/aranea-desktop/issues/73)) ([fba51d8](https://github.com/AraneaDev/aranea-desktop/commit/fba51d8492b40fdd75faa1b7df5dfb1b5758e4f6))
+
 ## [2.6.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.6.0...v2.6.1) (2026-09-29)
 
 
