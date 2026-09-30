@@ -94,7 +94,11 @@ test("menu QML exposes its typed function signatures", () => {
     "function recordRecentApp(appId: string): void {\n    history.recordRecent(appId)",
     "menu recent history forwards to MenuAppHistory"
   )
-  if (!menuHistoryQml.includes("history.saveAppHistory()\n    history.updated()"))
+  if (
+    !menuHistoryQml.includes(
+      "history.recentAppIds = MenuModel.recordRecentApp(history.recentAppIds, appId, history.recentAppLimit)\n    history.saveAppHistory()\n    history.updated()"
+    )
+  )
     throw new Error("recent app history must refresh visible rows immediately")
   requiresSignature(menuHistoryQml, "function rowsFor(library: var): var", "menu app rows")
   requiresSignature(menuQml, "id: localAppLibrary", "menu local app-library fallback")
