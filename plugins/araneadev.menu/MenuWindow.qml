@@ -185,7 +185,7 @@ PanelWindow {
         fullRootHeader: panel.root.fullRootHeader
         dmenuActive: panel.root.dmenuActive
         activeTitle: panel.root.item(panel.root.activeMenu) ? (panel.root.item(panel.root.activeMenu).title || panel.root.item(panel.root.activeMenu).label || "GO") : "GO"
-        dmenuPrompt: panel.root.dmenuPrompt
+        dmenuPrompt: panel.root.dmenu.prompt
         hint: panel.root.hint
         workspaceContext: panel.root.style.workspaceContext
         clockContext: panel.root.style.clockContext

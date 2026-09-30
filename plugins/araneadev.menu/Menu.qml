@@ -2,7 +2,6 @@
 // omarchy-shell. Renders the JSONC command menu with app launcher, providers
 // and guards, and also serves dmenu-style select/input requests.
 import Quickshell
-import Quickshell.Io
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
@@ -190,20 +189,6 @@ Item {
   property string mode: "menu"
   // True while serving a dmenu (select or input) request.
   readonly property bool dmenuActive: mode === "select" || mode === "input"
-  // Prompt text shown in the header for a dmenu request.
-  property string dmenuPrompt: ""
-  // Raw dmenu option strings ("label", "glyph\tlabel" or "glyph\tlabel\tsubtext").
-  property var dmenuOptions: []
-  // File a dmenu request's answer is written to.
-  property string selectionFile: ""
-  // File touched when a dmenu request finishes (answered or cancelled).
-  property string doneFile: ""
-  // Requested dmenu card width, in unscaled units.
-  property int dmenuWidth: 300
-  // Requested dmenu row-list height cap, in unscaled units (0 for none).
-  property int dmenuMaxHeight: 0
-  // Whether a dmenu request is still waiting for its answer.
-  property bool requestActive: false
   // What the empty list shows for the active menu (its own provider only).
   readonly property var emptyStateInfo: MenuModel.emptyState({
     loading: !!providers.loadingMenus[root.activeMenu],
@@ -320,31 +305,42 @@ Item {
   // Bumped after each display rebuild so row-height bindings recompute.
   property int layoutSerial: 0
   // Card width: depends on mode and menu, capped to the screen.
-  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(root.dmenuWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), root.screenWidth - Style.gapsOut * 2)
+  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), root.screenWidth - Style.gapsOut * 2)
   // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   // Total card height, capped to the screen.
   property int cardHeight: root.dmenuActive ? Math.min(root.style.contentMargin * 2 + root.style.headerHeight + (mode === "input" ? 0 : root.style.contentSpacing + visibleRowsHeight), root.screenHeight - Style.gapsOut * 2) : Math.min(root.style.contentMargin * 2 + (root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight) + root.style.contentSpacing + root.style.rootExtrasHeight + visibleRowsHeight, root.screenHeight - Style.gapsOut * 2)
 
-  // Answers a pending dmenu request: writes the selection (unless null) and touches the done file.
-  function finishRequest(selection) {
-    if (!root.requestActive || !root.doneFile) {
+  // The dmenu (select or input) request being served.
+  MenuDmenu {
+    id: dmenuRequest
+    onFinished: {
+      if (root.applySerial === root.requestSerial)
+        root.opened = false
+    }
+  }
+  // The dmenu request (the window reads its prompt).
+  readonly property alias dmenu: dmenuRequest
+
+  // Answers a pending dmenu request (null cancels); with none pending, just closes.
+  function finishRequest(selection): void {
+    if (!dmenuRequest.finish(selection))
       root.opened = false
-      return
-    }
+  }
 
-    var activeSelectionFile = root.selectionFile
-    var activeDoneFile = root.doneFile
-    root.requestActive = false
-    root.selectionFile = ""
-    root.doneFile = ""
-
-    if (selection === null || selection === undefined) {
-      resultProc.command = ["bash", "-c", ": > " + Util.shellQuote(activeDoneFile)]
-    } else {
-      resultProc.command = ["bash", "-c", "printf '%s\\n' " + Util.shellQuote(selection) + " > " + Util.shellQuote(activeSelectionFile) + "; : > " + Util.shellQuote(activeDoneFile)]
-    }
-    resultProc.running = true
+  // Ends a display rebuild: bumps layoutSerial, keeps the cursor in range and reveals it.
+  function finishDisplayRebuild(): void {
+    layoutSerial += 1
+    if (displayModel.count === 0)
+      selectedIndex = 0
+    else if (selectedIndex >= displayModel.count)
+      selectedIndex = displayModel.count - 1
+    else if (selectedIndex < 0)
+      selectedIndex = 0
+    Qt.callLater(function () {
+      if (displayModel.count > 0)
+        root.revealCursor()
+    })
   }
 
   // Runs a shell command detached; anything but a non-empty string is ignored.
@@ -437,8 +433,8 @@ Item {
     if (displayModel.count === 0)
       return root.style.baseRowHeight
     var available = root.availableRowsHeight()
-    if (root.dmenuMaxHeight > 0)
-      available = Math.min(available, Style.space(root.dmenuMaxHeight))
+    if (dmenuRequest.requestedMaxHeight > 0)
+      available = Math.min(available, Style.space(dmenuRequest.requestedMaxHeight))
     var metrics = root.layoutMetrics()
     return MenuLayout.foldedListHeight(MenuLayout.plainRowTotals(root.displayRowMetrics(), metrics.rowSpacing), available, metrics)
   }
@@ -503,56 +499,12 @@ Item {
   function rebuildDmenuDisplay(): void {
     displayModel.clear()
     root.searchDivider = false
-
-    if (root.mode === "input") {
-      layoutSerial += 1
-      return
+    if (root.mode !== "input") {
+      var rows = dmenuRequest.rowsFor(root.filterText)
+      for (var i = 0; i < rows.length; i++)
+        displayModel.append(rows[i])
     }
-
-    var query = root.filterText.trim().toLowerCase()
-    for (var i = 0; i < root.dmenuOptions.length; i++) {
-      // An option is "<label>", "<glyph>\t<label>", or
-      // "<glyph>\t<label>\t<subtext>". The glyph never comes back with the
-      // selection; the subtext renders under the label, filters alongside it,
-      // and returns with the selection as a stable key for same-named rows.
-      var parts = String(root.dmenuOptions[i] || "").split("\t")
-      var icon = parts.length > 1 ? parts.shift() : ""
-      var label = parts.shift() || ""
-      var detail = parts.join("\t")
-      if (query && label.toLowerCase().indexOf(query) < 0 && detail.toLowerCase().indexOf(query) < 0)
-        continue
-      displayModel.append({
-        itemId: "dmenu." + i,
-        kind: "dmenu",
-        icon: icon,
-        iconFont: "",
-        appIcon: "",
-        appId: "",
-        label: label,
-        target: "",
-        detail: detail,
-        path: "",
-        childCount: 0,
-        action: "",
-        provider: "",
-        score: i,
-        section: ""
-      })
-    }
-
-    layoutSerial += 1
-
-    if (displayModel.count === 0)
-      selectedIndex = 0
-    else if (selectedIndex >= displayModel.count)
-      selectedIndex = displayModel.count - 1
-    else if (selectedIndex < 0)
-      selectedIndex = 0
-
-    Qt.callLater(function () {
-      if (displayModel.count > 0)
-        root.revealCursor()
-    })
+    root.finishDisplayRebuild()
   }
 
   // Refills displayModel with the active menu's visible children, or the ranked search hits.
@@ -636,19 +588,7 @@ Item {
 
     for (var k = 0; k < rows.length; k++)
       displayModel.append(rows[k])
-    layoutSerial += 1
-
-    if (displayModel.count === 0)
-      selectedIndex = 0
-    else if (selectedIndex >= displayModel.count)
-      selectedIndex = displayModel.count - 1
-    else if (selectedIndex < 0)
-      selectedIndex = 0
-
-    Qt.callLater(function () {
-      if (displayModel.count > 0)
-        root.revealCursor()
-    })
+    root.finishDisplayRebuild()
   }
 
   // Moves the cursor by `delta` rows, wrapping; the first move activates the cursor.
@@ -816,9 +756,7 @@ Item {
   function openExistingMenu(initialMenu) {
     requestSerial += 1
     mode = "menu"
-    requestActive = false
-    selectionFile = ""
-    doneFile = ""
+    dmenuRequest.reset()
     activeMenu = root.item(initialMenu) ? initialMenu : "root"
     navStack = []
     filterText = ""
@@ -844,14 +782,7 @@ Item {
   function openDmenu(payload) {
     root.pendingInitialMenu = ""
     requestSerial += 1
-    mode = payload.mode === "input" ? "input" : "select"
-    dmenuPrompt = String(payload.prompt || (mode === "input" ? "Input" : "Select"))
-    dmenuOptions = Array.isArray(payload.options) ? payload.options : []
-    selectionFile = String(payload.selectionFile || "")
-    doneFile = String(payload.doneFile || "")
-    requestActive = !!doneFile
-    dmenuWidth = Math.max(1, Number(payload.width || 300))
-    dmenuMaxHeight = Math.max(0, Number(payload.maxHeight || 0))
+    mode = dmenuRequest.begin(payload)
     activeMenu = "root"
     navStack = []
     filterText = ""
@@ -931,14 +862,6 @@ Item {
       return
     root.cursorActive = true
     root.selectedIndex = index
-  }
-
-  Process {
-    id: resultProc
-    onExited: {
-      if (root.applySerial === root.requestSerial)
-        root.opened = false
-    }
   }
 
   Connections {

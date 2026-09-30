@@ -28,6 +28,7 @@ qml_files=(
   "$repo_root/plugins/araneadev.menu/MenuProviders.qml"
   "$repo_root/plugins/araneadev.menu/MenuSources.qml"
   "$repo_root/plugins/araneadev.menu/MenuAppHistory.qml"
+  "$repo_root/plugins/araneadev.menu/MenuDmenu.qml"
   "$repo_root/plugins/araneadev.menu/MenuStyle.qml"
   "$repo_root/plugins/araneadev.menu/BarWidget.qml"
   "$repo_root/plugins/araneadev.osd/Osd.qml"
