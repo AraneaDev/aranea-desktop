@@ -63,7 +63,7 @@ Item {
   // Card border colour; feeds borderSpec.
   property color border: Color.menu.border
   // Border description handed to the card, from the menu surface style.
-  property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
+  property var borderSpec: Border.surfaceSpec("menu", "border", border, Aranea.DesignTokens.borderWidth)
   // Colour of the full-screen backdrop behind the card.
   property color scrim: Color.menu.scrim
   // Fill of the selected cell.
@@ -71,7 +71,7 @@ Item {
   // Accent colour: selected-cell ring, section labels and chrome accent.
   property color selectedText: Color.menu.selectedText
   // Corner radius of the card and of each cell.
-  readonly property int cornerRadius: Style.cornerRadius
+  readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Font for all text in the picker (menu family).
   property string fontFamily: Style.font.menuFamily
   // Inner padding of the card.

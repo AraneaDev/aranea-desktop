@@ -73,7 +73,7 @@ Item {
       Image {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        width: fullRootHeader ? Style.space(48) : Style.space(28)
+        width: fullRootHeader ? Style.space(48) : Style.space(22)
         height: width
         source: Aranea.RuntimePaths.brandUrl
         fillMode: Image.PreserveAspectFit
@@ -98,7 +98,8 @@ Item {
 
       Column {
         anchors.left: parent.left
-        anchors.leftMargin: fullRootHeader ? Style.space(62) : Style.space(38)
+        // Glyph plus BrandHeader's 10 px gap; the root mark keeps 48 + 14.
+        anchors.leftMargin: fullRootHeader ? Style.space(62) : Style.space(32)
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         spacing: Style.space(4)

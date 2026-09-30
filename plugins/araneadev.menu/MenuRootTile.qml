@@ -3,6 +3,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 BorderSurface {
   id: tile
@@ -38,7 +39,7 @@ BorderSurface {
   signal activated
 
   implicitHeight: Style.space(96)
-  radius: Style.space(5)
+  radius: Aranea.DesignTokens.cornerRadius
   color: tile.selected || tile.hovered ? Util.alpha(tile.selectedText, 0.12) : "transparent"
   borderSpec: Border.none()
 

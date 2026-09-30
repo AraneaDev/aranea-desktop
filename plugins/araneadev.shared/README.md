@@ -9,8 +9,9 @@ service contracts to the feature plugins.
 - `DesignTokens`, `MotionState`, and `RuntimePaths` expose canonical runtime
   values and paths.
 - `SurfaceCard`, `PanelHeader`, `BrandHeader`, `StatusRail`,
-  `StatusTextPair`, `StatusRow`, and `EmptyState` provide presentational
-  contracts.
+  `StatusTextPair`, `StatusRow`, `EmptyState`, and `InkText` provide
+  presentational contracts.
+- `InkText` aligns glyph ink rather than advance width.
 - `KeyboardInputFrame` owns key forwarding and focus targeting.
 - `KeyboardPanelFrame` adds the layer-shell panel contract around keyboard
   input.

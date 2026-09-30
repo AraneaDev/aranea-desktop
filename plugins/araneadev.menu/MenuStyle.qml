@@ -33,7 +33,7 @@ QtObject {
   // Card border color.
   property color border: Color.menu.border
   // Border spec for the card, from the shell's menu border settings.
-  property var borderSpec: Border.surfaceSpec("menu", "border", style.border, Math.max(1, Style.space(1)))
+  property var borderSpec: Border.surfaceSpec("menu", "border", style.border, Aranea.DesignTokens.borderWidth)
   // Full-screen backdrop color behind the card.
   property color scrim: Color.menu.scrim
   // Keep the new ornamentation derived from the stable shell palette.  The
@@ -56,7 +56,7 @@ QtObject {
   // Space the row reserves on its right edge for the selection border.
   readonly property real rowReservedBorderRight: Border.right(style.selectedBorderSpec)
   // Corner radius of the card and its header.
-  readonly property int cornerRadius: Math.max(8, Style.space(8))
+  readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Scale applied to shell font sizes by menuFontSize().
   readonly property real menuFontScale: 1.10
   // Letter spacing for menu labels.

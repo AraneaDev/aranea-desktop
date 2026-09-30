@@ -143,8 +143,6 @@ Item {
       fillColor: Util.alpha(Color.background, 0.9)
       surface: "popups"
       borderColor: Color.popups.border
-      borderWidth: Math.max(1, Style.space(1))
-      radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
       transform: Translate {
         y: card.revealOffset

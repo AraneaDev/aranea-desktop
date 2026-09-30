@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
@@ -52,7 +53,7 @@ Item {
         required property int index
         Layout.fillWidth: true
         implicitHeight: Style.space(32)
-        radius: Style.space(6)
+        radius: Aranea.DesignTokens.cornerRadius
         color: root.cursor === index ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
         RowLayout {
           anchors.fill: parent
