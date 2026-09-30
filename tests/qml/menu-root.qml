@@ -31,17 +31,20 @@ ShellRoot {
     }
     // Two apps, as the library's sorted rows.
     function sortedEntries(query) {
-      return [{
+      return [
+        {
           entry: {
             id: "firefox",
             name: "Firefox"
           }
-        }, {
+        },
+        {
           entry: {
             id: "gimp",
             name: "GIMP"
           }
-        }]
+        }
+      ]
     }
     // Nothing to refresh offscreen.
     function refreshIcons() {
