@@ -4,6 +4,7 @@
 // pruned, and closing the menu clears the uninstall prompt.
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "lib"
 import "plugins/araneadev.menu" as Menu
 
@@ -57,6 +58,14 @@ ShellRoot {
     onNoticeRequested: function (text) {
       shell.notices = shell.notices.concat([text])
     }
+  }
+
+  // Reads menu.json as written, so the restart check waits for the save to land.
+  FileView {
+    id: stateFileView
+    path: shell.stateRoot + "/menu.json"
+    blockLoading: true
+    printErrors: false
   }
 
   // Creates a second history on the same state file.
@@ -115,14 +124,22 @@ ShellRoot {
     t.equal(history.takeDeleteTarget().appId, "gimp", "confirm takes the target")
     t.equal(history.deleteConfirmOpen, false, "and closes the prompt")
 
-    var reloaded = historyComponent.createObject(shell, {
-      stateRoot: shell.stateRoot
-    })
+    // The atomic write can land after this turn; a restart comes later, so wait for the file.
     t.waitFor(function () {
-      return reloaded.favoriteAppIds.length === 1
-    }, 10000, "a new history reads the state file", function () {
-      t.equal(JSON.stringify(reloaded.recentAppIds), JSON.stringify(["gimp"]), "recents survive a restart")
-      t.done()
+      stateFileView.reload()
+      var text = stateFileView.text()
+      return text.indexOf("firefox") >= 0 && text.indexOf("gimp") >= 0
+    }, 10000, "the pins and recents reach menu.json", function () {
+      var reloaded = historyComponent.createObject(shell, {
+        stateRoot: shell.stateRoot
+      })
+      t.waitFor(function () {
+        return reloaded.favoriteAppIds.length === 1
+      }, 10000, "a new history reads the state file", function () {
+        t.equal(JSON.stringify(reloaded.favoriteAppIds), JSON.stringify(["firefox"]), "a new history reads the pins")
+        t.equal(JSON.stringify(reloaded.recentAppIds), JSON.stringify(["gimp"]), "recents survive a restart")
+        t.done()
+      })
     })
   }
 }
