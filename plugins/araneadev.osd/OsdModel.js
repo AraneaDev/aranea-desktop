@@ -61,6 +61,43 @@ function iconFor(name, percent) {
   return ""
 }
 
+// Canonical icon names, one per distinct glyph iconFor can return; alias
+// names that resolve to the same glyph (e.g. "restart" for "reboot") are
+// left out. Used by allIconGlyphs to size the OSD's icon column to the
+// widest glyph it can show.
+var iconNames = [
+  "volume-muted",
+  "volume-low",
+  "volume-medium",
+  "volume-high",
+  "microphone-muted",
+  "microphone",
+  "keyboard",
+  "brightness",
+  "touchpad",
+  "touch",
+  "reboot",
+  "shutdown",
+  "logout",
+  "media",
+  "media-play",
+  "media-pause",
+  "media-next",
+  "media-previous"
+]
+
+/**
+ * Every glyph the OSD can show: one call to iconFor per name in iconNames.
+ * The percent-only fallback glyphs (no icon name given) reuse the
+ * volume-* glyphs, so they need no separate entries here.
+ * @returns {string[]} the glyphs, one per known icon
+ */
+function allIconGlyphs() {
+  return iconNames.map(function (name) {
+    return iconFor(name, -1)
+  })
+}
+
 /**
  * Turns the raw strings of an OSD request into display state.
  * @param {string} iconName - icon name for iconFor
@@ -105,5 +142,5 @@ function progressFraction(state) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { iconFor, stateForShow, progressFraction }
+  module.exports = { iconFor, stateForShow, progressFraction, allIconGlyphs }
 }

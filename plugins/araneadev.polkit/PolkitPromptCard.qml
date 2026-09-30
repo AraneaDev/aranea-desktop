@@ -66,27 +66,34 @@ ColumnLayout {
     letterSpacing: root.letterSpacing
   }
 
-  Text {
+  // The request and who it runs as read as one sentence: line spacing, not
+  // a section gap.
+  ColumnLayout {
     Layout.fillWidth: true
-    textFormat: Text.StyledText
-    text: PolkitLogic.requestMarkup(root.currentMessage, root.accent.toString())
-    color: root.foreground
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.subtitle
-    wrapMode: Text.Wrap
-    maximumLineCount: 2
-    elide: Text.ElideRight
-  }
+    spacing: 0
 
-  Text {
-    Layout.fillWidth: true
-    visible: text.length > 0
-    textFormat: Text.PlainText
-    text: root.targetText
-    color: root.accent
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.subtitle
-    wrapMode: Text.Wrap
+    Text {
+      Layout.fillWidth: true
+      textFormat: Text.StyledText
+      text: PolkitLogic.requestMarkup(root.currentMessage, root.accent.toString())
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.subtitle
+      wrapMode: Text.Wrap
+      maximumLineCount: 2
+      elide: Text.ElideRight
+    }
+
+    Text {
+      Layout.fillWidth: true
+      visible: text.length > 0
+      textFormat: Text.PlainText
+      text: root.targetText
+      color: root.accent
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.subtitle
+      wrapMode: Text.Wrap
+    }
   }
 
   RowLayout {

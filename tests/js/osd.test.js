@@ -49,3 +49,24 @@ test("only a real value shows a bar, and zero is a value", () => {
   eq(model.stateForShow("", "", "0", "", "", "").hasProgress, true, "zero is a value")
   eq(model.widestIcon, undefined, "unused export removed")
 })
+
+test("allIconGlyphs covers every glyph the OSD can show, no duplicates", () => {
+  const glyphs = model.allIconGlyphs()
+  eq(Array.isArray(glyphs), true, "allIconGlyphs returns an array")
+  eq(glyphs.length > 0, true, "allIconGlyphs is not empty")
+  eq(
+    glyphs.every((glyph) => typeof glyph === "string" && glyph.length > 0),
+    true,
+    "every glyph is a non-empty string"
+  )
+  eq(new Set(glyphs).size, glyphs.length, "allIconGlyphs has no duplicate glyphs")
+  // The percent-only fallback (no icon name) reuses the volume-* glyphs, so
+  // it needs no separate entries in allIconGlyphs to be covered.
+  ;[0, 20, 50, 80, 100].forEach((percent) => {
+    eq(
+      glyphs.includes(model.iconFor("", percent)),
+      true,
+      `percent fallback glyph for ${percent}% is covered`
+    )
+  })
+})

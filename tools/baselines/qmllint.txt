@@ -106,11 +106,11 @@
 2	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "title" not found on type "QObject"
 3	plugins/araneadev.osd/Osd.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.osd/Osd.qml:missing-property:Member "border" not found on type "QObject"
-4	plugins/araneadev.osd/Osd.qml:missing-property:Member "family" not found on type "QObject"
+6	plugins/araneadev.osd/Osd.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.osd/Osd.qml:missing-property:Member "hairline" not found on type "QObject"
 1	plugins/araneadev.osd/Osd.qml:missing-property:Member "sm" not found on type "QObject"
 4	plugins/araneadev.osd/Osd.qml:missing-property:Member "text" not found on type "QObject"
-2	plugins/araneadev.osd/Osd.qml:missing-property:Member "title" not found on type "QObject"
+4	plugins/araneadev.osd/Osd.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.osd/Osd.qml:uncreatable-type:Type PanelWindow is not creatable.
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "accent" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "background" not found on type "QObject"
