@@ -192,6 +192,13 @@ function appRowsForIds(appRows, ids, parent, prefix) {
 
 // Swaps every app row for the current set. Rows keep the order they arrive in;
 // ids already claimed (including duplicate desktop ids) are listed once.
+// Returns fresh items/itemOrder objects for the caller to assign in one go;
+// never writes into the maps it is handed, since those live in QML `var`
+// properties, and an in-place write into such an object is occasionally
+// dropped by the engine (the key lands with an undefined value). A lost write
+// used to leave an id in itemOrder with no item behind it, and the next merge
+// then kept that orphan and appended a second row for the same app, so the
+// launcher listed it twice (and again on every later rescan).
 /**
  * Replaces all app rows with a new set, returning fresh maps.
  * @param {ItemMap} items - current items by id (not modified)

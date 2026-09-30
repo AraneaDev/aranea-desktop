@@ -86,14 +86,6 @@ function emptyState(state) {
   return { icon: "󰈉", text: "Nothing here yet" }
 }
 
-// Both merges below return fresh items/itemOrder objects for the caller to
-// assign in one go. They must never write into the maps they are handed: those
-// live in QML `var` properties, and an in-place write into such an object is
-// occasionally dropped by the engine — the key lands with an undefined value.
-// A lost write used to leave an id in itemOrder with no item behind it, and
-// the next merge then kept that orphan and appended a second row for the same
-// app, so the launcher listed it twice (and again on every later rescan).
-
 /**
  * Returns an item's label with ` ✓` appended when its `checked:` held.
  * @param {MenuItem} entry - the item
@@ -660,6 +652,13 @@ function appRowsForIds(appRows, ids, parent, prefix) {
 
 // Swaps every app row for the current set. Rows keep the order they arrive in;
 // ids already claimed (including duplicate desktop ids) are listed once.
+// Returns fresh items/itemOrder objects for the caller to assign in one go;
+// never writes into the maps it is handed, since those live in QML `var`
+// properties, and an in-place write into such an object is occasionally
+// dropped by the engine (the key lands with an undefined value). A lost write
+// used to leave an id in itemOrder with no item behind it, and the next merge
+// then kept that orphan and appended a second row for the same app, so the
+// launcher listed it twice (and again on every later rescan).
 /**
  * Replaces all app rows with a new set, returning fresh maps.
  * @param {ItemMap} items - current items by id (not modified)
@@ -919,6 +918,11 @@ function mergeMenuSources(defaultItems, userItems) {
 // Rows carry the id of the submenu that produced them, so a provider that runs
 // again drops its previous batch (a plugin that was just enabled disappears
 // from the Enable list), without disturbing static children declared in JSONC.
+// Returns fresh items/itemOrder objects for the caller to assign in one go;
+// never writes into the maps it is handed, since those live in QML `var`
+// properties, and an in-place write into such an object is occasionally
+// dropped by the engine (the key lands with an undefined value), which used
+// to leave an orphaned id in itemOrder that the next swap kept and duplicated.
 /**
  * Replaces the rows one provider produced for a submenu, returning fresh maps.
  * @param {ItemMap} items - current items by id (not modified)
