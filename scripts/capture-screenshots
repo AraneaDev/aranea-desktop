@@ -18,6 +18,8 @@ set -euo pipefail
 # Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir> | --hero --output <dir>
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
 surface=""
 output=""
 capture_all=0
@@ -115,8 +117,8 @@ if ((capture_all)); then
   # the real inbox is parked for the whole batch and restored afterwards;
   # badges then show capture data only, never the user's own count.
   batch_inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
-  mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
-  batch_inbox_backup="$(mktemp -d "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/capture-backup.XXXXXX")"
+  mkdir -p "$(aranea_state_root)"
+  batch_inbox_backup="$(mktemp -d "$(aranea_state_root)/capture-backup.XXXXXX")"
   # Restore the real inbox, leave the finished capture set visible on the
   # intentionally empty workspace for a moment, then return focus. Set
   # before the inbox is parked; the capture inbox is only cleared once the
@@ -393,7 +395,7 @@ case "$surface" in
     exit 0
     ;;
   notifications | notifications-empty)
-    state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+    state_home="$(xdg_state_home)"
     mkdir -p "$state_home/aranea"
     inbox_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
     inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
@@ -448,7 +450,7 @@ case "$surface" in
     # content can reach a screenshot. Files are swapped only while the shell
     # is stopped, so a running picker can neither capture into the fixture nor
     # write its in-memory history over the restored file.
-    state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+    state_home="$(xdg_state_home)"
     if [[ "$surface" == clipboard ]]; then
       picker_file="$HOME/.local/state/omarchy/clipboard-history.json"
       picker_id=omarchy.clipboard
@@ -671,9 +673,9 @@ case "$surface" in
         rm -f -- "$weather_file"
       fi
     }
-    mkdir -p "$(dirname "$weather_file")" "${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+    mkdir -p "$(dirname "$weather_file")" "$(aranea_state_root)"
     if [[ -f "$weather_file" ]]; then
-      weather_backup="$(mktemp "${XDG_STATE_HOME:-$HOME/.local/state}/aranea/weather-backup.XXXXXX")"
+      weather_backup="$(mktemp "$(aranea_state_root)/weather-backup.XXXXXX")"
       cp -- "$weather_file" "$weather_backup"
     fi
     trap restore_weather EXIT

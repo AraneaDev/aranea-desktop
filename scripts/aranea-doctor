@@ -13,6 +13,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
+# shellcheck disable=SC1091
 source "$repo_root/branding/brand.env"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/manifest.sh"
@@ -122,7 +124,7 @@ else
   emit manifest repair 'theme-manifest.toml is missing'
 fi
 
-icon_root="${ARANEA_DOCTOR_ICON_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/icons/Aranea-icons}"
+icon_root="${ARANEA_DOCTOR_ICON_ROOT:-$(xdg_data_home)/icons/Aranea-icons}"
 expected_icon_count="$(find "$repo_root/integrations/icons/aranea/scalable" -type f -name '*.svg' 2>/dev/null | wc -l)"
 installed_icon_count=0
 broken_icon_count=0

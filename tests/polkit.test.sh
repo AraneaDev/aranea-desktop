@@ -50,7 +50,7 @@ grep -Fq 'PolkitLogic.contextLine(' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.detailRows(' "${polkit_files[@]}"
 grep -Fq 'PolkitLogic.hintLine(root.fingerprintMode, root.identityTotal)' "${polkit_files[@]}"
 grep -Fq 'Math.max(Color.polkit.scrim.a, 0.72)' "${polkit_files[@]}"
-grep -Fq 'aranea/motion' "${polkit_files[@]}"
+grep -Fq 'Aranea.MotionState.motionEnabled' "${polkit_files[@]}"
 # Review Focus 5: the card never exceeds the screen
 grep -Fq 'Math.max(Style.space(120), Math.min(Style.space(380), panel.width - Style.gapsOut * 2))' "${polkit_files[@]}"
 # Action lookup: argv only, validated id, one request's result only (Review Focus 1)

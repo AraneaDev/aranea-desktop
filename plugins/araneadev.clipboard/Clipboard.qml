@@ -601,9 +601,8 @@ Item {
     }
   }
 
-  // Menu-like entrance (fade + slight scale), unless Aranea motion is off.
-  // Starts from ARANEA_REDUCED_MOTION (1 = off); once
-  // ~/.local/state/aranea/motion loads, the env var wins; otherwise the file's content decides ("off" = off).
+  // Menu-like entrance (fade + slight scale), unless Aranea motion is off
+  // (shared Aranea.MotionState).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
 
   // Nerd Font icon for a row kind (link, path, code, image; text otherwise).

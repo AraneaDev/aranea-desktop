@@ -10,7 +10,9 @@ set -euo pipefail
 #
 # Usage: scripts/finish-polkit-handover
 
-state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/paths.sh"
+state_root="$(aranea_state_root)"
 marker="$state_root/polkit-handover"
 
 [[ -e "$marker" ]] || exit 0

@@ -21,7 +21,7 @@ if [[ -e "$plugin/OverlayChrome.qml" || -e "$repo_root/plugins/araneadev.clipboa
 fi
 
 # --- final-review fixes (Emojis.qml)
-grep -Fq 'aranea/motion' "$plugin/Emojis.qml"
+grep -Fq 'Aranea.MotionState.motionEnabled' "$plugin/Emojis.qml"
 grep -Fq 'EmojiLogic.keywordsFor' "$plugin/Emojis.qml"
 # m7: columns follow the real grid width; Up from the grid lands in the last recent row
 grep -Fq 'Math.floor((root.cardWidth - root.contentMargin * 2) / root.cellWidth)' "$plugin/Emojis.qml"

@@ -28,11 +28,8 @@ Item {
   property bool hasProgress: true
   // Ms before the card hides; 0 keeps it open.
   property int duration: 1200
-  // Animate the card; follows the aranea motion state file, else
-  // ARANEA_REDUCED_MOTION.
+  // Animate the card unless Aranea motion is off (shared Aranea.MotionState).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
-  // Shared motion state file ("off" disables motion).
-  readonly property string motionStatePath: Aranea.RuntimePaths.motionStatePath
   // Filled part of the strand, 0..1.
   readonly property real fraction: OsdModel.progressFraction({
     hasProgress: root.hasProgress,

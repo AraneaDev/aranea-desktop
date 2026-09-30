@@ -11,6 +11,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
+# shellcheck disable=SC1091
 source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/ownership.sh"
 source "$repo_root/scripts/lib/json-events.sh"
@@ -21,10 +23,10 @@ json_mode=0
 scope=integration
 replacement_theme=''
 json_started_sent=0
-config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+config_root="$(xdg_config_home)"
 # Omarchy, its hooks and deploy-plugins-safely use this fixed path.
 omarchy_config="$HOME/.config/omarchy"
-data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
+data_root="$(xdg_data_home)"
 state_root="$(aranea_ownership_root)"
 hook_files=("$omarchy_config/hooks/theme-set.d/theme-set" "$omarchy_config/hooks/post-boot.d/post-boot")
 # The desktop settings Aranea changes (install-integration save_gsetting).
