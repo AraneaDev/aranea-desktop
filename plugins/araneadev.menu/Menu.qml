@@ -335,13 +335,6 @@ Item {
     if (!opened) {
       deleteConfirmOpen = false
       deleteTarget = null
-      headerMarkSettled = false
-    } else if (!motionEnabled) {
-      headerMarkSettled = true
-    } else {
-      Qt.callLater(function () {
-        headerMarkSettled = true
-      })
     }
   }
 
@@ -404,14 +397,8 @@ Item {
   // tokens, so these are composited here instead of reaching for ad-hoc
   // Color.menu members that older shells do not publish.
   property color contextText: Util.alpha(foreground, 0.58)
-  // Root tile fill: tinted with the selection color when hovered.
-  function hoveredTileBackground(hovered: bool): color {
-    return hovered ? Util.alpha(selectedText, 0.10) : Util.alpha(foreground, 0.028)
-  }
   // Color of the root footer text.
   property color footerText: Util.alpha(foreground, 0.58)
-  // Opacity of the node-divider motif above the footer.
-  property real nodeAlpha: 0.35
   // Background of the cursor row.
   property color selectedBackground: Color.menu.selectedBackground
   // Text color of the cursor row; also tints hovered tiles and the cursor bar.
@@ -451,8 +438,6 @@ Item {
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
   property bool motionEnabled: Aranea.MotionState.motionEnabled
-  // Set a turn after opening so the root header mark can fade in.
-  property bool headerMarkSettled: false
   // True on the unfiltered root menu, which shows the large header, tiles and footer.
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
   // Focused workspace label for the root context band.
@@ -661,31 +646,6 @@ Item {
     return root.items[id] || null
   }
 
-  // ------------------------------------------------------------------
-  // JSONC → normalized item array. Mirrors the bash bin's jq pipeline so
-  // the on-disk authoring format stays untouched.
-  // ------------------------------------------------------------------
-
-  // Wrapper for MenuModel.stripJsonc.
-  function stripJsonc(raw: string): string {
-    return MenuModel.stripJsonc(raw)
-  }
-
-  // Wrapper for MenuModel.normalizeAliases.
-  function normalizeAliases(value) {
-    return MenuModel.normalizeAliases(value)
-  }
-
-  // Wrapper for MenuModel.normalizeItem.
-  function normalizeItem(id: string, raw): var {
-    return MenuModel.normalizeItem(id, raw)
-  }
-
-  // Wrapper for MenuModel.parseMenuJsonc.
-  function parseMenuJsonc(raw: string): var {
-    return MenuModel.parseMenuJsonc(raw)
-  }
-
   // Merge defaults + user extension. Later entries override earlier ones
   // on a per-key basis (so the user can tweak label/icon/action without
   // re-declaring the whole row).
@@ -742,11 +702,6 @@ Item {
         }
       }
     })
-
-  // Wrapper for MenuModel.slugify.
-  function slugify(value: string): string {
-    return MenuModel.slugify(value)
-  }
 
   // The apps provider is QML-native: rows come from the shared AppLibrary
   // (DesktopEntries) instead of a bash enumeration, so they carry image
@@ -896,7 +851,7 @@ Item {
       // Distinct values can slugify alike — Fira Code and Fira-Code both give
       // fira-code — and a repeated id is dropped, which would silently lose a
       // row from the list. Nudge it until it is the row's own.
-      var rowId = menuId + "." + root.slugify(value)
+      var rowId = menuId + "." + MenuModel.slugify(value)
       while (takenIds[rowId])
         rowId += "-"
       takenIds[rowId] = true
@@ -978,87 +933,10 @@ Item {
       var entry = root.item(root.itemOrder[i])
       if (!entry || !entry.provider || root.providersLoaded[entry.id])
         continue
-      if (active !== "root" && entry.id !== active && !root.isDescendantOf(entry.id, active))
+      if (active !== "root" && entry.id !== active && !MenuModel.isDescendantOf(root.items, entry.id, active))
         continue
       root.loadProviderForMenu(entry.id)
     }
-  }
-
-  // Wrapper for MenuModel.depthFor on the current items.
-  function depthFor(id: string): int {
-    return MenuModel.depthFor(root.items, id)
-  }
-
-  // Wrapper for MenuModel.pathFor on the current items.
-  function pathFor(id: string): string {
-    return MenuModel.pathFor(root.items, id)
-  }
-
-  // Wrapper for MenuModel.parentPathFor on the current items.
-  function parentPathFor(id: string): string {
-    return MenuModel.parentPathFor(root.items, id)
-  }
-
-  // Wrapper for MenuModel.isDescendantOf on the current items.
-  function isDescendantOf(id: string, ancestorId: string): bool {
-    return MenuModel.isDescendantOf(root.items, id, ancestorId)
-  }
-
-  // Wrapper for MenuModel.childCount on the current items.
-  function childCount(id: string): int {
-    return MenuModel.childCount(root.items, root.itemOrder, id)
-  }
-
-  // Guarded items are hidden when their `when:` evaluates false. Static
-  // submenus are also hidden when none of their descendants are visible;
-  // provider-backed menus stay visible because their rows load on demand.
-  function isVisible(entry): bool {
-    return MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry)
-  }
-
-  // Label with the ✓ marker baked in when `checked:` evaluated truthy.
-  function labelFor(entry): string {
-    return MenuModel.labelFor(entry, root.checkedResults)
-  }
-
-  // Wrapper for MenuModel.searchableToken.
-  function searchableToken(value: string): string {
-    return MenuModel.searchableToken(value)
-  }
-
-  // Wrapper for MenuModel.leafIdFor.
-  function leafIdFor(id: string): string {
-    return MenuModel.leafIdFor(id)
-  }
-
-  // Wrapper for MenuModel.nameSearchText.
-  function nameSearchText(entry): string {
-    return MenuModel.nameSearchText(entry)
-  }
-
-  // Wrapper for MenuModel.termInSearchWords.
-  function termInSearchWords(term: string, text: string): bool {
-    return MenuModel.termInSearchWords(term, text)
-  }
-
-  // Wrapper for MenuModel.descriptionTextMatches.
-  function descriptionTextMatches(query: string, text: string): bool {
-    return MenuModel.descriptionTextMatches(query, text)
-  }
-
-  // Whether a visible item matches the query (MenuModel.matchesQuery).
-  function matchesQuery(entry, query: string): bool {
-    return MenuModel.matchesQuery(entry, query, root.isVisible(entry))
-  }
-
-  // Sort score for a search hit (MenuModel.searchScore).
-  function searchScore(entry, query: string): real {
-    return MenuModel.searchScore(root.items, entry, query)
-  }
-
-  // Builds a displayModel row for an item (MenuModel.displayRow).
-  function displayRow(entry, detail, score, section) {
-    return MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, entry, detail, score, section)
   }
 
   // Refills displayModel with the dmenu options that match the filter.
@@ -1142,12 +1020,12 @@ Item {
         var entry = root.item(root.itemOrder[i])
         if (!entry || entry.id === "root")
           continue
-        if (!root.isDescendantOf(entry.id, active))
+        if (!MenuModel.isDescendantOf(root.items, entry.id, active))
           continue
-        if (!root.matchesQuery(entry, query))
+        if (!MenuModel.matchesQuery(entry, query, MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry)))
           continue
-        var detail = root.parentPathFor(entry.id)
-        var row = root.displayRow(entry, detail, root.searchScore(entry, query))
+        var detail = MenuModel.parentPathFor(root.items, entry.id)
+        var row = MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
         if (entry.parent === active)
           currentRows.push(row)
         else
@@ -1184,9 +1062,9 @@ Item {
         var child = root.item(root.itemOrder[j])
         if (!child || child.parent !== active)
           continue
-        if (!root.isVisible(child))
+        if (!MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, child))
           continue
-        rows.push(root.displayRow(child, child.description, child.order))
+        rows.push(MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, child, child.description, child.order))
       }
 
       // DesktopEntries can reorder its values when an application starts.
@@ -1557,7 +1435,7 @@ Item {
     watchChanges: true
     printErrors: false
     onLoaded: {
-      root.defaultMenuItems = root.parseMenuJsonc(text())
+      root.defaultMenuItems = MenuModel.parseMenuJsonc(text())
       root.defaultMenuSeen = true
       root.rebuildItemsFromSources()
     }
@@ -1574,7 +1452,7 @@ Item {
     watchChanges: true
     printErrors: false
     onLoaded: {
-      root.userMenuItems = root.parseMenuJsonc(text())
+      root.userMenuItems = MenuModel.parseMenuJsonc(text())
       root.userMenuSeen = true
       root.rebuildItemsFromSources()
     }
