@@ -4,7 +4,7 @@ const { test } = require("node:test")
 const { loadPragma } = require("./lib/load-pragma.js")
 
 const menu = loadPragma("plugins/araneadev.menu/MenuModel.js")
-const history = loadPragma("plugins/araneadev.menu/MenuHistory.js")
+const history = loadPragma("plugins/araneadev.menu/MenuAppRows.js")
 
 test("menu history owns recent-app ordering", () => {
   if (
