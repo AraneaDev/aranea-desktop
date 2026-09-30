@@ -94,7 +94,7 @@ ShellRoot {
     t.check(childIds(rows, "apps").indexOf("apps.firefox") >= 0, "Apps lists every app")
     t.equal(childIds(rows, "apps.favorites").length, 1, "Favorites holds the pinned app")
     t.equal(childIds(rows, "apps.recent").length, 1, "Recent holds the launched app")
-    t.equal(rowById(rows, "apps.favorites").icon, "", "Favorites keeps its star icon")
+    t.equal(rowById(rows, "apps.favorites").icon, String.fromCodePoint(0xF005), "Favorites keeps its star icon")
     t.equal(rowById(rows, "apps.recent").icon, String.fromCodePoint(0xF02DA), "Recent keeps its history icon")
 
     for (var i = 0; i < 12; i++)

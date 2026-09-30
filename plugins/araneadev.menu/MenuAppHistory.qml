@@ -149,7 +149,7 @@ Item {
       id: "apps.favorites",
       parent: "apps",
       kind: "menu",
-      icon: "",
+      icon: "\uF005",
       appIcon: "",
       appId: "",
       label: "Favorites",

@@ -105,13 +105,13 @@ QtObject {
         id: "tile.terminal",
         label: "Terminal",
         detail: "EXECUTE  ·  ^2",
-        icon: "",
+        icon: "\uF489",
         source: "fixed"
       }), ({
         id: "tile.setup",
         label: "Setup",
         detail: "CONFIGURE  ·  ^3",
-        icon: "",
+        icon: "\uE615",
         source: "fixed"
       })]
 
