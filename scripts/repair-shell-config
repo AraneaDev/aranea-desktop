@@ -42,6 +42,12 @@ health_marker="$state_root/health-widget-placed"
 health_parked="$state_root/health-widget-parked"
 place_health=true
 [[ -e "$health_marker" && ! -e "$health_parked" ]] && place_health=false
+# araneadev.audio only takes over the bar entry once it is actually deployed
+# beside this config (deploy-plugins-safely writes its manifest there); a
+# repair that runs before that (a bare hook, a partial install) must not
+# retarget the id to a plugin that does not exist on disk yet.
+audio_installed=false
+[[ -f "$config_dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
 # Removes the temp file on exit.
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
@@ -63,7 +69,7 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
+jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -75,9 +81,11 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
          map(if type == "string" then (if . == "omarchy.menu" then "araneadev.menu" else . end)
              | if . == "omarchy.workspaces" then "araneadev.workspaces" else . end
              | if . == "omarchy.system-update" then "araneadev.updates" else . end
+             | if $audio and . == "omarchy.audio" then "araneadev.audio" else . end
              elif type == "object" and .id == "omarchy.menu" then .id = "araneadev.menu"
              elif type == "object" and .id == "omarchy.workspaces" then .id = "araneadev.workspaces"
              elif type == "object" and .id == "omarchy.system-update" then .id = "araneadev.updates"
+             elif $audio and type == "object" and .id == "omarchy.audio" then .id = "araneadev.audio"
              else . end)
        else . end))
      else . end)
@@ -106,7 +114,8 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" '
   # an Aranea clone by hand (host bookkeeping for cloned plugins; for polkit
   # this keeps an agent registered).
   | .cloneSourceRestores = ((if (.cloneSourceRestores | type) == "array" then .cloneSourceRestores else [] end)
-      + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu"] | unique)
+      + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu"]
+      + (if $audio then ["araneadev.audio"] else [] end) | unique)
   # Place the notification bell once. Layout entries may be plain id strings
   # or {id: ...} objects; both count. Only a layout the user already owns is
   # touched: writing a partial layout would replace the host defaults.

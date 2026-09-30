@@ -31,7 +31,7 @@ mkdir -p "$plugins_dir"
 cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
-for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates; do
+for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates araneadev.audio; do
   cp -a "$repo_root/plugins/$plugin_id" "$plugins_dir/$plugin_id"
 done
 

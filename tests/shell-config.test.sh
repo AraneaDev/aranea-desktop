@@ -330,4 +330,27 @@ jq -e '.bar.id == "araneadev.bar" and .bar.layout.left[0] == "araneadev.menu"' "
   exit 1
 }
 
+# --- audio dropdown: only retargeted once araneadev.audio is installed
+# (guard: $(dirname "$config_file")/plugins/araneadev.audio/manifest.json)
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.audio", {"id": "omarchy.audio", "x": 1}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.audio", {"id": "omarchy.audio", "x": 1}]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.audio"
+: >"$(dirname "$config")/plugins/araneadev.audio/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["araneadev.audio", {"id": "araneadev.audio", "x": 1}]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.audio", {"id": "omarchy.audio", "x": 1}]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
 echo "shell config contract passed"

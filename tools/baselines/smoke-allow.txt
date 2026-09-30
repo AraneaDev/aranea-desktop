@@ -1,0 +1,2 @@
+plugins/araneadev.audio/Panel.qml: TypeError: Cannot read property 'fontFamily' of null
+plugins/araneadev.audio/Panel.qml: TypeError: Cannot read property 'foreground' of null
