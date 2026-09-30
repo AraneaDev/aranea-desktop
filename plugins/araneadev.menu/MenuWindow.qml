@@ -56,7 +56,7 @@ PanelWindow {
     var item = resultListComponent.list.itemAtIndex(panel.root.selectedIndex)
     if (!item)
       return
-    var reach = panel.root.rowPeek + panel.root.rowSpacing
+    var reach = panel.root.style.rowPeek + panel.root.style.rowSpacing
     if (panel.root.selectedIndex < panel.root.displayModel.count - 1) {
       var maxY = Math.max(resultListComponent.list.originY, resultListComponent.list.originY + resultListComponent.list.contentHeight - resultListComponent.list.height)
       var overhang = item.y + item.height + reach - (resultListComponent.list.contentY + resultListComponent.list.height)
@@ -115,7 +115,7 @@ PanelWindow {
 
   Rectangle {
     anchors.fill: parent
-    color: panel.root.scrim
+    color: panel.root.style.scrim
   }
 
   MouseArea {
@@ -127,12 +127,12 @@ PanelWindow {
     id: card
     width: panel.root.cardWidth
     height: Math.min(panel.root.cardHeight, panel.height - Style.gapsOut - panel.effectiveCardTop)
-    cornerRadius: panel.root.cornerRadius
+    cornerRadius: panel.root.style.cornerRadius
     anchors.horizontalCenter: parent.horizontalCenter
     y: panel.effectiveCardTop
-    fillColor: panel.root.background
-    borderSpecOverride: panel.root.borderSpec
-    contentPadding: panel.root.contentMargin
+    fillColor: panel.root.style.background
+    borderSpecOverride: panel.root.style.borderSpec
+    contentPadding: panel.root.style.contentMargin
 
     MouseArea {
       anchors.fill: parent
@@ -158,13 +158,13 @@ PanelWindow {
         z: 10
         message: "Do you want to uninstall " + ((panel.root.deleteTarget && panel.root.deleteTarget.label) || "") + "?"
         confirmText: "Uninstall"
-        background: panel.root.background
-        foreground: panel.root.foreground
-        scrim: panel.root.scrim
-        selectedBackground: panel.root.selectedBackground
-        selectedText: panel.root.selectedText
-        fontFamily: panel.root.fontFamily
-        cornerRadius: panel.root.cornerRadius
+        background: panel.root.style.background
+        foreground: panel.root.style.foreground
+        scrim: panel.root.style.scrim
+        selectedBackground: panel.root.style.selectedBackground
+        selectedText: panel.root.style.selectedText
+        fontFamily: panel.root.style.fontFamily
+        cornerRadius: panel.root.style.cornerRadius
         onCanceled: panel.root.cancelDelete()
         onConfirmed: panel.root.confirmDelete()
       }
@@ -177,35 +177,35 @@ PanelWindow {
       anchors.rightMargin: card.contentRightInset
       anchors.bottomMargin: card.contentBottomInset
       anchors.leftMargin: card.contentLeftInset
-      spacing: panel.root.fullRootHeader ? panel.root.contentSpacing : panel.root.compactContentSpacing
+      spacing: panel.root.fullRootHeader ? panel.root.style.contentSpacing : panel.root.style.compactContentSpacing
 
       MenuCardChrome {
         width: parent.width
-        height: panel.root.fullRootHeader ? panel.root.rootHeaderHeight + panel.root.rootContextHeight + panel.root.rootTileHeight + panel.root.footerHeight : panel.root.headerHeight
+        height: panel.root.fullRootHeader ? panel.root.style.rootHeaderHeight + panel.root.style.rootContextHeight + panel.root.style.rootTileHeight + panel.root.style.footerHeight : panel.root.style.headerHeight
         fullRootHeader: panel.root.fullRootHeader
         dmenuActive: panel.root.dmenuActive
         activeTitle: panel.root.item(panel.root.activeMenu) ? (panel.root.item(panel.root.activeMenu).title || panel.root.item(panel.root.activeMenu).label || "GO") : "GO"
         dmenuPrompt: panel.root.dmenuPrompt
         hint: panel.root.hint
-        workspaceContext: panel.root.workspaceContext
-        clockContext: panel.root.clockContext
-        rootTiles: panel.root.rootTiles
-        brandingMarksPath: panel.root.brandingMarksPath
-        brandingMotifsPath: panel.root.brandingMotifsPath
-        brandingGlyphsPath: panel.root.brandingGlyphsPath
-        foreground: panel.root.foreground
-        contextText: panel.root.contextText
-        selectedText: panel.root.selectedText
-        footerText: panel.root.footerText
-        fontFamily: panel.root.fontFamily
-        menuFontScale: panel.root.menuFontScale
-        menuLetterSpacing: panel.root.menuLetterSpacing
-        motionEnabled: panel.root.motionEnabled
-        rootHeaderHeight: panel.root.rootHeaderHeight
-        headerHeight: panel.root.headerHeight
-        rootContextHeight: panel.root.rootContextHeight
-        rootTileHeight: panel.root.rootTileHeight
-        footerHeight: panel.root.footerHeight
+        workspaceContext: panel.root.style.workspaceContext
+        clockContext: panel.root.style.clockContext
+        rootTiles: panel.root.style.rootTiles
+        brandingMarksPath: panel.root.style.brandingMarksPath
+        brandingMotifsPath: panel.root.style.brandingMotifsPath
+        brandingGlyphsPath: panel.root.style.brandingGlyphsPath
+        foreground: panel.root.style.foreground
+        contextText: panel.root.style.contextText
+        selectedText: panel.root.style.selectedText
+        footerText: panel.root.style.footerText
+        fontFamily: panel.root.style.fontFamily
+        menuFontScale: panel.root.style.menuFontScale
+        menuLetterSpacing: panel.root.style.menuLetterSpacing
+        motionEnabled: panel.root.style.motionEnabled
+        rootHeaderHeight: panel.root.style.rootHeaderHeight
+        headerHeight: panel.root.style.headerHeight
+        rootContextHeight: panel.root.style.rootContextHeight
+        rootTileHeight: panel.root.style.rootTileHeight
+        footerHeight: panel.root.style.footerHeight
         onTileActivated: function (tile) {
           panel.root.activateTile(tile)
         }
@@ -223,20 +223,20 @@ PanelWindow {
           filterText: panel.root.filterText
           fullRootHeader: panel.root.fullRootHeader
           appLibrary: panel.root.appLibrary
-          background: panel.root.background
-          foreground: panel.root.foreground
-          selectedBackground: panel.root.selectedBackground
-          selectedText: panel.root.selectedText
-          border: panel.root.border
-          selectedBorderSpec: panel.root.selectedBorderSpec
-          fontFamily: panel.root.fontFamily
-          menuFontScale: panel.root.menuFontScale
-          menuLetterSpacing: panel.root.menuLetterSpacing
-          cornerRadius: panel.root.cornerRadius
-          rowSpacing: panel.root.rowSpacing
-          rowReservedBorderLeft: panel.root.rowReservedBorderLeft
-          rowReservedBorderRight: panel.root.rowReservedBorderRight
-          dividerHeight: panel.root.dividerHeight
+          background: panel.root.style.background
+          foreground: panel.root.style.foreground
+          selectedBackground: panel.root.style.selectedBackground
+          selectedText: panel.root.style.selectedText
+          border: panel.root.style.border
+          selectedBorderSpec: panel.root.style.selectedBorderSpec
+          fontFamily: panel.root.style.fontFamily
+          menuFontScale: panel.root.style.menuFontScale
+          menuLetterSpacing: panel.root.style.menuLetterSpacing
+          cornerRadius: panel.root.style.cornerRadius
+          rowSpacing: panel.root.style.rowSpacing
+          rowReservedBorderLeft: panel.root.style.rowReservedBorderLeft
+          rowReservedBorderRight: panel.root.style.rowReservedBorderRight
+          dividerHeight: panel.root.style.dividerHeight
           rowHeightForDetail: panel.root.rowHeightForDetail
           onRowHovered: function (index, row, point) {
             panel.root.selectFromPointer(index, row, point)
@@ -256,11 +256,11 @@ PanelWindow {
           visible: panel.root.displayModel.count === 0 && panel.root.mode !== "input"
           icon: panel.root.emptyStateInfo.icon
           message: panel.root.emptyStateInfo.text
-          fontFamily: panel.root.fontFamily
-          iconColor: panel.root.selectedText
-          foreground: panel.root.foreground
-          iconSize: panel.root.menuFontSize(Style.font.displayLarge)
-          messageSize: panel.root.menuFontSize(Style.font.title)
+          fontFamily: panel.root.style.fontFamily
+          iconColor: panel.root.style.selectedText
+          foreground: panel.root.style.foreground
+          iconSize: panel.root.style.menuFontSize(Style.font.displayLarge)
+          messageSize: panel.root.style.menuFontSize(Style.font.title)
         }
       }
     }

@@ -2,11 +2,9 @@
 // omarchy-shell. Renders the JSONC command menu with app launcher, providers
 // and guards, and also serves dmenu-style select/input requests.
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
 import qs.Commons
-import "../araneadev.shared" as Aranea
 import "MenuModel.js" as MenuModel
 
 Item {
@@ -95,7 +93,7 @@ Item {
         root.cancel()
       event.accepted = true
     } else if ((event.modifiers & Qt.ControlModifier) && event.key >= Qt.Key_1 && event.key <= Qt.Key_3 && !root.dmenuActive) {
-      root.activateTile(root.rootTiles[event.key - Qt.Key_1])
+      root.activateTile(root.style.rootTiles[event.key - Qt.Key_1])
       event.accepted = true
     } else if (event.key === Qt.Key_P && (event.modifiers & Qt.ControlModifier) && !root.dmenuActive) {
       if (root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count) {
@@ -162,7 +160,7 @@ Item {
     }
 
     if (payload.fontFamily)
-      root.fontFamily = payload.fontFamily
+      root.style.fontFamily = payload.fontFamily
 
     if (payload.mode === "select" || payload.mode === "input") {
       root.openDmenu(payload)
@@ -188,14 +186,6 @@ Item {
     return "ok"
   }
 
-  // Font for all menu text; a payload's fontFamily overrides it.
-  property string fontFamily: Style.font.menuFamily
-  // Directory of the current theme's branding marks (the header logo).
-  readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
-  // Directory of the current theme's branding motifs (header art, dividers).
-  readonly property string brandingMotifsPath: Aranea.RuntimePaths.brandingMotifsPath
-  // Directory of the current theme's branding glyphs (status icons).
-  readonly property string brandingGlyphsPath: Aranea.RuntimePaths.brandingGlyphsPath
   // JSONC menu definitions. The shell parses both at startup and merges
   // the user file on top of the defaults, so the keybind → IPC → visible
   // path doesn't have to shell out to bash + jq on every open.
@@ -380,115 +370,17 @@ Item {
     root.saveAppHistory()
     root.mergeAppRows()
   }
-  // Bound to the central [menu] section in shell.toml via Color.qml.
-  // Each color already includes its alpha companion (composed in the
-  // singleton), so consumers can drop them straight into a Rectangle.
-  property color background: Color.menu.background
-  // Menu text color.
-  property color foreground: Color.menu.text
-  // Card border color.
-  property color border: Color.menu.border
-  // Border spec for the card, from the shell's menu border settings.
-  property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(1)))
-  // Full-screen backdrop color behind the card.
-  property color scrim: Color.menu.scrim
-  // Keep the new ornamentation derived from the stable shell palette.  The
-  // shell's menu parser intentionally exposes only the established surface
-  // tokens, so these are composited here instead of reaching for ad-hoc
-  // Color.menu members that older shells do not publish.
-  property color contextText: Util.alpha(foreground, 0.58)
-  // Color of the root footer text.
-  property color footerText: Util.alpha(foreground, 0.58)
-  // Background of the cursor row.
-  property color selectedBackground: Color.menu.selectedBackground
-  // Text color of the cursor row; also tints hovered tiles and the cursor bar.
-  property color selectedText: Color.menu.selectedText
-  // Border color of the cursor row.
-  property color selectedBorder: Color.menu.selectedBorder
-  // Border spec for the cursor row.
-  property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", selectedBorder, 0)
-  // Left border width of the cursor row, added to every row's content inset.
-  readonly property real rowReservedBorderLeft: Border.left(selectedBorderSpec)
-  // Space the row reserves on its right edge for the selection border.
-  readonly property real rowReservedBorderRight: Border.right(selectedBorderSpec)
-  // Corner radius of the card and its header.
-  readonly property int cornerRadius: Math.max(8, Style.space(8))
-  // Scale applied to shell font sizes by menuFontSize().
-  readonly property real menuFontScale: 1.10
-  // Letter spacing for menu labels.
-  readonly property real menuLetterSpacing: 0.20
-  // Scales a shell font size by menuFontScale, rounded, at least 1.
-  function menuFontSize(size: real): int {
-    return Math.max(1, Math.round(size * root.menuFontScale))
-  }
-  // Padding inside the card.
-  property int contentMargin: Style.spacing.panelPadding
-  // Header height for submenus and dmenu requests.
-  property int headerHeight: Math.max(Style.space(46), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
-  // Header height on the unfiltered root menu.
-  property int rootHeaderHeight: Math.max(Style.space(68), root.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
-  // Height of the root tile row.
-  property int rootTileHeight: Style.space(96)
-  // Height of the root context band (status, workspace, clock).
-  property int rootContextHeight: Style.space(20)
-  // Height of the root footer.
-  property int footerHeight: Style.space(26)
-  // Extra card height for the root context band, tiles and footer (0 elsewhere).
-  property int rootExtrasHeight: root.fullRootHeader ? root.rootContextHeight + root.rootTileHeight + root.footerHeight + root.contentSpacing * 3 : 0
-  // Keep the polished default, while allowing a session-wide reduced-motion
-  // override for accessibility and deterministic testing.
-  property bool motionEnabled: Aranea.MotionState.motionEnabled
   // True on the unfiltered root menu, which shows the large header, tiles and footer.
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
-  // Focused workspace label for the root context band.
-  readonly property string workspaceContext: Hyprland.focusedWorkspace ? "WORKSPACE " + Hyprland.focusedWorkspace.id : "WORKSPACE —"
-  // HH:mm time shown in the root context band; ticks every minute.
-  readonly property string clockContext: Qt.formatDateTime(menuClock.date, "HH:mm")
 
-  // Minute clock for clockContext.
-  SystemClock {
-    id: menuClock
-    precision: SystemClock.Minutes
-    enabled: root.opened
+  // Colors, fonts, metrics, branding paths, root tiles and the context band.
+  MenuStyle {
+    id: menuStyle
+    opened: root.opened
+    fullRootHeader: root.fullRootHeader
   }
-  // Fixed tiles (Files, Terminal, Setup) shown on the root menu.
-  readonly property var rootTiles: [({
-        id: "tile.files",
-        label: "Files",
-        detail: "BROWSE  ·  ^1",
-        icon: "󰉋",
-        source: "fixed"
-      }), ({
-        id: "tile.terminal",
-        label: "Terminal",
-        detail: "EXECUTE  ·  ^2",
-        icon: "",
-        source: "fixed"
-      }), ({
-        id: "tile.setup",
-        label: "Setup",
-        detail: "CONFIGURE  ·  ^3",
-        icon: "",
-        source: "fixed"
-      })]
-
-  // Section spacing on the root menu; also used in the card height math.
-  property int contentSpacing: Style.space(12)
-  // Vertical spacing between card sections elsewhere.
-  property int compactContentSpacing: Style.space(8)
-  // Height of a row without a detail line.
-  property int baseRowHeight: Math.max(Style.space(40), root.menuFontSize(Style.font.bodySmall) + Style.space(6) * 2)
-  // Row-list height when nothing matches.
-  property int emptyStateHeight: Style.space(112)
-  // Height of a row that shows a detail line.
-  property int detailRowHeight: Math.max(Style.space(58), root.menuFontSize(Style.font.bodySmall) + root.menuFontSize(Style.font.caption) + Style.space(7) * 2)
-  // How much of the first hidden row stays visible at the fold — enough to
-  // read as a cut-off row rather than a bottom border.
-  property int rowPeek: Math.round(baseRowHeight * 0.55)
-  // Gap between rows.
-  property int rowSpacing: Style.space(4)
-  // Height of the divider before drilldown search results.
-  property int dividerHeight: Style.space(20)
+  // The menu's style (read by the window as root.style.x).
+  readonly property alias style: menuStyle
   // Whether search results are split into current-menu and drilldown sections.
   property bool searchDivider: false
   // Bumped after each display rebuild so row-height bindings recompute.
@@ -498,7 +390,7 @@ Item {
   // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   // Total card height, capped to the screen.
-  property int cardHeight: root.dmenuActive ? Math.min(contentMargin * 2 + headerHeight + (mode === "input" ? 0 : contentSpacing + visibleRowsHeight), root.screenHeight - Style.gapsOut * 2) : Math.min(contentMargin * 2 + (root.fullRootHeader ? root.rootHeaderHeight : headerHeight) + contentSpacing + root.rootExtrasHeight + visibleRowsHeight, root.screenHeight - Style.gapsOut * 2)
+  property int cardHeight: root.dmenuActive ? Math.min(root.style.contentMargin * 2 + root.style.headerHeight + (mode === "input" ? 0 : root.style.contentSpacing + visibleRowsHeight), root.screenHeight - Style.gapsOut * 2) : Math.min(root.style.contentMargin * 2 + (root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight) + root.style.contentSpacing + root.style.rootExtrasHeight + visibleRowsHeight, root.screenHeight - Style.gapsOut * 2)
 
   // Answers a pending dmenu request: writes the selection (unless null) and touches the done file.
   function finishRequest(selection) {
@@ -551,7 +443,7 @@ Item {
   // Menu rows only surface their detail while a search is narrowing them;
   // dmenu rows carry caller-supplied subtext that must always be visible.
   function rowHeightForDetail(detail: string): int {
-    return (root.fullRootHeader || root.filterText || root.dmenuActive) && detail ? root.detailRowHeight : root.baseRowHeight
+    return (root.fullRootHeader || root.filterText || root.dmenuActive) && detail ? root.style.detailRowHeight : root.style.baseRowHeight
   }
 
   // Height the card can devote to rows before running off the screen — or
@@ -560,8 +452,8 @@ Item {
   // derived from the card height, which this value feeds.
   function availableRowsHeight(): int {
     var top = root.viewCardTop >= 0 ? root.viewCardTop : Style.gapsOut
-    var headerHeight = root.fullRootHeader ? root.rootHeaderHeight : root.headerHeight
-    var available = root.screenHeight - top - Style.gapsOut - root.contentMargin * 2 - headerHeight - root.contentSpacing - root.rootExtrasHeight
+    var headerHeight = root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight
+    var available = root.screenHeight - top - Style.gapsOut - root.style.contentMargin * 2 - headerHeight - root.style.contentSpacing - root.style.rootExtrasHeight
     // The starting menu sets the ceiling along with the offset: drilling into
     // a longer submenu scrolls behind the fold instead of growing the card.
     if (root.viewMaxRowsHeight >= 0)
@@ -579,26 +471,26 @@ Item {
   function foldedListHeight(totals: var, available: int): int {
     var count = totals.length
     if (count === 0)
-      return root.baseRowHeight
+      return root.style.baseRowHeight
     if (totals[count - 1] <= available)
       return totals[count - 1]
 
-    var peek = root.rowPeek
+    var peek = root.style.rowPeek
     var full = 0
     while (full < count && totals[full] <= available)
       full++
-    while (full > 1 && totals[full - 1] + root.rowSpacing + peek > available)
+    while (full > 1 && totals[full - 1] + root.style.rowSpacing + peek > available)
       full--
     if (full < 1)
-      return Math.max(available, root.baseRowHeight)
+      return Math.max(available, root.style.baseRowHeight)
 
-    return totals[full - 1] + root.rowSpacing + peek
+    return totals[full - 1] + root.style.rowSpacing + peek
   }
 
   // Row-list height for the menu (arguments are unused; they only make the binding re-evaluate).
   function rowListHeight(_serial: int, _count: int, _filter: string, _divider: bool): int {
     if (displayModel.count === 0)
-      return root.emptyStateHeight
+      return root.style.emptyStateHeight
 
     var totals = []
     var total = 0
@@ -607,9 +499,9 @@ Item {
     for (var i = 0; i < displayModel.count; i++) {
       var row = displayModel.get(i)
       if (i > 0)
-        total += root.rowSpacing
+        total += root.style.rowSpacing
       if (row.section === "drilldown" && previousSection !== "drilldown")
-        total += root.dividerHeight
+        total += root.style.dividerHeight
       total += root.rowHeightForDetail(row.detail)
       previousSection = row.section
       totals.push(total)
@@ -623,7 +515,7 @@ Item {
     if (root.mode === "input")
       return 0
     if (displayModel.count === 0)
-      return root.baseRowHeight
+      return root.style.baseRowHeight
 
     var available = availableRowsHeight()
     if (root.dmenuMaxHeight > 0)
@@ -633,7 +525,7 @@ Item {
     var total = 0
     for (var i = 0; i < displayModel.count; i++) {
       if (i > 0)
-        total += root.rowSpacing
+        total += root.style.rowSpacing
       total += root.rowHeightForDetail(displayModel.get(i).detail)
       totals.push(total)
     }

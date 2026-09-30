@@ -48,7 +48,7 @@ grep -Fq 'root.motionEnabled && root.foregroundAnimationEnabled' "$repo_root/plu
 # --- 4b: every QML consumer reads the shared motion singleton.
 for qml in \
   plugins/araneadev.bar/Bar.qml \
-  plugins/araneadev.menu/Menu.qml \
+  plugins/araneadev.menu/MenuStyle.qml \
   plugins/araneadev.notifications/Service.qml \
   plugins/araneadev.osd/Osd.qml \
   plugins/araneadev.clipboard/Clipboard.qml \

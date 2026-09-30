@@ -9,6 +9,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/assert.sh"
 menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
+menu_style="$repo_root/plugins/araneadev.menu/MenuStyle.qml"
 menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
 menu_results="$repo_root/plugins/araneadev.menu/MenuResultList.qml"
 # Behaviour (pin limit and notice, search dedupe, hints, Ctrl+P, Ctrl+1..3,
@@ -46,8 +47,8 @@ if grep -Fq '"ESC BACK  ·  ENTER OPEN"' "$menu_qml"; then
   echo "stale ESC BACK hint" >&2
   exit 1
 fi
-grep -Fq 'precision: SystemClock.Minutes' "$menu_qml"
-grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_qml"
+grep -Fq 'precision: SystemClock.Minutes' "$menu_style"
+grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_style"
 # --- 4b: provider state per menu; routes resolve when the rows exist
 grep -Fq 'property var providerLoadingMenus: ({})' "$menu_qml"
 grep -Fq 'property var providerErrorMenus: ({})' "$menu_qml"
@@ -61,7 +62,7 @@ grep -Fq 'function resolvePendingAppsRoute(): void' "$menu_qml"
 block_grep "$menu_qml" 'function runAction(action): void' 'if (typeof action !== "string" || !action.trim())'
 block_grep "$repo_root/plugins/araneadev.bar/Bar.qml" 'function run(command): void' 'if (typeof command !== "string" || !command.trim())'
 grep -Fq 'fixedWidth: Style.space(30)' "$repo_root/plugins/araneadev.menu/BarWidget.qml"
-if grep -Eq 'tileBackground|TileBackground|hoveredTileBorder|compactHeaderHeight|nodeAlpha|headerMarkSettled|summon omarchy\.menu|text: row\.childCount|tile\.appId' "$menu_qml"; then
+if grep -Eq 'tileBackground|TileBackground|hoveredTileBorder|compactHeaderHeight|nodeAlpha|headerMarkSettled|summon omarchy\.menu|text: row\.childCount|tile\.appId' "$menu_qml" "$menu_style"; then
   echo "menu dead code or stale comments are back" >&2
   exit 1
 fi
@@ -71,7 +72,7 @@ if grep -Eq 'root\.setActiveMenu\([^,()]+, (true|false)\)|root\.activateIndex\([
 fi
 # --- 4b final review: state loads before use; stale routes never reopen; clock only when open
 block_grep "$menu_qml" 'id: appHistoryFile' 'blockLoading: true'
-block_grep "$menu_qml" 'id: menuClock' 'enabled: root.opened'
+block_grep "$menu_style" 'id: menuClock' 'enabled: style.opened'
 [[ "$(grep -c 'root.pendingInitialMenu = ""' "$menu_qml")" -ge 4 ]] || {
   echo "every other open/cancel path must drop a pending Favorites/Recent route" >&2
   exit 1
