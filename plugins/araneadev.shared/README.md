@@ -11,6 +11,13 @@ service contracts to the feature plugins.
 - `SurfaceCard`, `PanelHeader`, `BrandHeader`, `StatusRail`,
   `StatusTextPair`, `StatusRow`, `EmptyState`, and `InkText` provide
   presentational contracts.
+- `FilamentSlider` is the Filament-style hairline slider/handle used by
+  volume and level controls.
+- `FilamentSwitch` is the Filament-style compact on/off switch.
+- `NodeDeviceRow` is the Filament-style selectable device row with glyph,
+  label, and detail slots.
+- `DropdownHeader` is the Filament-style dropdown header with a glyph,
+  title/caption pair, and a trailing slot.
 - `InkText` aligns glyph ink rather than advance width.
 - `KeyboardInputFrame` owns key forwarding and focus targeting.
 - `KeyboardPanelFrame` adds the layer-shell panel contract around keyboard

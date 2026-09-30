@@ -13,3 +13,7 @@ KeyboardPanelFrame 1.0 KeyboardPanelFrame.qml
 KeyboardInputFrame 1.0 KeyboardInputFrame.qml
 BrandHeader 1.0 BrandHeader.qml
 StatusRow 1.0 StatusRow.qml
+FilamentSlider 1.0 FilamentSlider.qml
+FilamentSwitch 1.0 FilamentSwitch.qml
+NodeDeviceRow 1.0 NodeDeviceRow.qml
+DropdownHeader 1.0 DropdownHeader.qml
