@@ -13,13 +13,16 @@ ShellRoot {
   // Notices the history asked for.
   property var notices: []
   // Apps the fake library lists.
-  property var apps: [{
+  property var apps: [
+    {
       id: "firefox",
       name: "Firefox"
-    }, {
+    },
+    {
       id: "gimp",
       name: "GIMP"
-    }]
+    }
+  ]
   // State directory for this run (the sandbox creates it; menu.json goes straight in).
   readonly property string stateRoot: Quickshell.env("XDG_STATE_HOME")
 
@@ -71,6 +74,14 @@ ShellRoot {
     })
   }
 
+  // The row in ROWS with id ID, or null.
+  function rowById(rows, id) {
+    for (var i = 0; i < rows.length; i++)
+      if (rows[i].id === id)
+        return rows[i]
+    return null
+  }
+
   Component.onCompleted: {
     history.toggleFavorite("firefox")
     history.recordRecent("gimp")
@@ -83,6 +94,8 @@ ShellRoot {
     t.check(childIds(rows, "apps").indexOf("apps.firefox") >= 0, "Apps lists every app")
     t.equal(childIds(rows, "apps.favorites").length, 1, "Favorites holds the pinned app")
     t.equal(childIds(rows, "apps.recent").length, 1, "Recent holds the launched app")
+    t.equal(rowById(rows, "apps.favorites").icon, "", "Favorites keeps its star icon")
+    t.equal(rowById(rows, "apps.recent").icon, String.fromCodePoint(0xF02DA), "Recent keeps its history icon")
 
     for (var i = 0; i < 12; i++)
       history.toggleFavorite("extra" + i)

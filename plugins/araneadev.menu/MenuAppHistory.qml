@@ -2,7 +2,6 @@
 // (MenuAppHistory): pinned and recent app ids persist to menu.json in the
 // Aranea state directory, and rowsFor() builds the generated Apps rows.
 // Menu.qml owns one as `appHistory`.
-import Quickshell
 import Quickshell.Io
 import QtQuick
 import "MenuModel.js" as MenuModel
@@ -150,7 +149,7 @@ Item {
       id: "apps.favorites",
       parent: "apps",
       kind: "menu",
-      icon: "",
+      icon: "",
       appIcon: "",
       appId: "",
       label: "Favorites",
