@@ -2,6 +2,7 @@
 // stream, each with a mute glyph, label, percentage and its own filament
 // slider (streams can boost past 100%). Pure view: plain inputs in,
 // signals out.
+pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
@@ -49,7 +50,6 @@ Column {
       font.bold: true
     }
   }
-  // qmllint disable unqualified
   Repeater {
     model: section.streams
     Column {
@@ -58,71 +58,85 @@ Column {
       required property int index
       objectName: "streamRow"
       width: section.width
-      spacing: Style.space(2)
 
+      // A wrapping Item, so the cursor outline and hover can cover both
+      // lines: Column manages its direct children's y, which anchors.fill
+      // would conflict with.
       Item {
+        id: card
         width: parent.width
-        height: Math.max(muteGlyph.implicitHeight, labelText.implicitHeight, percentText.implicitHeight)
-        Text {
-          id: muteGlyph
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          text: row.modelData.muted ? String.fromCodePoint(0xF075F) : String.fromCodePoint(0xF057E)
-          color: Aranea.DesignTokens.foreground
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: section.muteToggled(row.index)
-          }
-        }
-        Text {
-          id: labelText
-          anchors.left: muteGlyph.right
-          anchors.leftMargin: Style.space(8)
-          anchors.right: percentText.left
-          anchors.rightMargin: Style.space(8)
-          anchors.verticalCenter: parent.verticalCenter
-          elide: Text.ElideRight
-          text: row.modelData.label
-          color: row.modelData.current ? Aranea.DesignTokens.accent : Aranea.DesignTokens.foreground
-          font.family: Style.font.family
-          font.pixelSize: Style.font.body
-        }
-        Text {
-          id: percentText
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          text: row.modelData.muted ? "muted" : Math.round((streamSlider.dragging ? streamSlider.liveValue : row.modelData.volume) * 100) + "%"
-          color: Aranea.DesignTokens.foreground
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
-          font.bold: true
-        }
-      }
-      Item {
-        width: parent.width
-        height: streamSlider.implicitHeight + Style.space(6)
+        implicitHeight: content.implicitHeight
+
         Rectangle {
           anchors.fill: parent
           color: "transparent"
           border.width: section.cursor === row.index ? 1 : 0
           border.color: Aranea.DesignTokens.accent
         }
-        Aranea.FilamentSlider {
-          id: streamSlider
-          objectName: "streamSlider"
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          maximum: 1.5
-          value: row.modelData.volume
-          muted: row.modelData.muted
-          onMoved: function (value) {
-            section.volumeMoved(row.index, value)
+        Column {
+          id: content
+          width: parent.width
+          spacing: Style.space(2)
+
+          Item {
+            width: parent.width
+            height: Math.max(muteGlyph.implicitHeight, labelText.implicitHeight, percentText.implicitHeight)
+            Text {
+              id: muteGlyph
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              text: row.modelData.muted ? String.fromCodePoint(0xF075F) : String.fromCodePoint(0xF057E)
+              color: Aranea.DesignTokens.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: section.muteToggled(row.index)
+              }
+            }
+            Text {
+              id: labelText
+              anchors.left: muteGlyph.right
+              anchors.leftMargin: Style.space(8)
+              anchors.right: percentText.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              elide: Text.ElideRight
+              text: row.modelData.label
+              color: row.modelData.current ? Aranea.DesignTokens.accent : Aranea.DesignTokens.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.body
+            }
+            Text {
+              id: percentText
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              text: row.modelData.muted ? "muted" : Math.round((streamSlider.dragging ? streamSlider.liveValue : row.modelData.volume) * 100) + "%"
+              color: Aranea.DesignTokens.foreground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
           }
-          onRightClicked: section.muteToggled(row.index)
+          Item {
+            width: parent.width
+            height: streamSlider.implicitHeight + Style.space(6)
+            Aranea.FilamentSlider {
+              id: streamSlider
+              objectName: "streamSlider"
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              maximum: 1.5
+              value: row.modelData.volume
+              muted: row.modelData.muted
+              onMoved: function (value) {
+                section.volumeMoved(row.index, value)
+              }
+              onRightClicked: section.muteToggled(row.index)
+            }
+          }
         }
         HoverHandler {
           onHoveredChanged: if (hovered)
@@ -131,5 +145,4 @@ Column {
       }
     }
   }
-  // qmllint enable unqualified
 }

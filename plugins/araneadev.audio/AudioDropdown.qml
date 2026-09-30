@@ -53,7 +53,10 @@ Column {
     caption: "OUTPUT"
     emptyText: "No output device"
     channel: dropdown.view.output || ({
-        present: false
+        present: false,
+        volume: 0,
+        muted: false,
+        level: 0
       })
     devices: dropdown.view.outputDevices || []
     cursor: dropdown.cursorIn("output")
@@ -85,7 +88,10 @@ Column {
     caption: "INPUT"
     emptyText: "No input device"
     channel: dropdown.view.input || ({
-        present: false
+        present: false,
+        volume: 0,
+        muted: false,
+        level: 0
       })
     devices: dropdown.view.inputDevices || []
     cursor: dropdown.cursorIn("input")
@@ -140,7 +146,15 @@ Column {
     id: nowPlayingStrip
     width: parent.width
     info: dropdown.view.nowPlaying || ({
-        visible: false
+        visible: false,
+        player: "",
+        title: "",
+        artist: "",
+        album: "",
+        progress: -1,
+        playing: false,
+        canPrevious: false,
+        canNext: false
       })
     hasCursor: dropdown.cursorIn("nowplaying") >= 0
     onPreviousRequested: dropdown.action("previous", null)

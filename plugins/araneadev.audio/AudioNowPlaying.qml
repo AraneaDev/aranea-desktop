@@ -45,7 +45,6 @@ Column {
 
     Rectangle {
       anchors.fill: parent
-      anchors.margins: -Style.space(4)
       color: "transparent"
       border.width: strip.hasCursor ? 1 : 0
       border.color: Aranea.DesignTokens.accent

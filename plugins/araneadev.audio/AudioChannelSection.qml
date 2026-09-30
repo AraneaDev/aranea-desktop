@@ -1,6 +1,7 @@
 // One audio channel (Output or Input) in the Aranea audio dropdown: the
 // caption and level, a filament slider with the live signal glow, and
 // the device list. Pure view: plain inputs in, signals out.
+pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
@@ -99,7 +100,6 @@ Column {
         section.rowHovered(-1)
     }
   }
-  // qmllint disable unqualified
   Repeater {
     model: section.devices
     Aranea.NodeDeviceRow {
@@ -117,5 +117,4 @@ Column {
       onEntered: section.rowHovered(index)
     }
   }
-  // qmllint enable unqualified
 }
