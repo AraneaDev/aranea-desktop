@@ -9,8 +9,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/assert.sh"
 menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
+menu_providers="$repo_root/plugins/araneadev.menu/MenuProviders.qml"
+menu_style="$repo_root/plugins/araneadev.menu/MenuStyle.qml"
 menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
 menu_results="$repo_root/plugins/araneadev.menu/MenuResultList.qml"
+menu_history="$repo_root/plugins/araneadev.menu/MenuAppHistory.qml"
 # Behaviour (pin limit and notice, search dedupe, hints, Ctrl+P, Ctrl+1..3,
 # Favorites route after the menu files load): tests/qml/menu.qml, run
 # offscreen by tests/qml-behaviour.test.sh.
@@ -28,11 +31,11 @@ grep -Fq 'id: appIconImage' "$menu_results"
 grep -Fq 'results.appLibrary.iconSource(row.appIcon)' "$menu_results"
 
 # --- 4b: favourites and recents persist to $XDG_STATE_HOME/aranea/menu.json
-grep -Fq '"/menu.json"' "$menu_qml"
-grep -Fq 'MenuModel.parseAppHistory(' "$menu_qml"
-grep -Fq 'MenuModel.serializeAppHistory(' "$menu_qml"
-grep -Fq 'MenuModel.pruneAppIds(' "$menu_qml"
-if grep -Fq 'PersistentProperties' "$menu_qml"; then
+grep -Fq '"/menu.json"' "$menu_history"
+grep -Fq 'MenuModel.parseAppHistory(' "$menu_history"
+grep -Fq 'MenuModel.serializeAppHistory(' "$menu_history"
+grep -Fq 'MenuModel.pruneAppIds(' "$menu_history"
+if grep -Fq 'PersistentProperties' "$menu_history"; then
   echo "menu state must live in the state file" >&2
   exit 1
 fi
@@ -46,13 +49,13 @@ if grep -Fq '"ESC BACK  ·  ENTER OPEN"' "$menu_qml"; then
   echo "stale ESC BACK hint" >&2
   exit 1
 fi
-grep -Fq 'precision: SystemClock.Minutes' "$menu_qml"
-grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_qml"
+grep -Fq 'precision: SystemClock.Minutes' "$menu_style"
+grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_style"
 # --- 4b: provider state per menu; routes resolve when the rows exist
-grep -Fq 'property var providerLoadingMenus: ({})' "$menu_qml"
-grep -Fq 'property var providerErrorMenus: ({})' "$menu_qml"
+grep -Fq 'property var loadingMenus: ({})' "$menu_providers"
+grep -Fq 'property var errorMenus: ({})' "$menu_providers"
 grep -Fq 'MenuModel.emptyState(' "$menu_qml"
-if grep -Eq 'property bool provider(Loading|Error)|openGeneratedAppsMenu|attempt < 12' "$menu_qml"; then
+if grep -Eq 'provider(Loading|Error)|openGeneratedAppsMenu|attempt < 12' "$menu_qml" "$menu_providers"; then
   echo "global provider flags and the route retry loop must be gone" >&2
   exit 1
 fi
@@ -61,7 +64,7 @@ grep -Fq 'function resolvePendingAppsRoute(): void' "$menu_qml"
 block_grep "$menu_qml" 'function runAction(action): void' 'if (typeof action !== "string" || !action.trim())'
 block_grep "$repo_root/plugins/araneadev.bar/Bar.qml" 'function run(command): void' 'if (typeof command !== "string" || !command.trim())'
 grep -Fq 'fixedWidth: Style.space(30)' "$repo_root/plugins/araneadev.menu/BarWidget.qml"
-if grep -Eq 'tileBackground|hoveredTileBorder|compactHeaderHeight|summon omarchy\.menu|text: row\.childCount|tile\.appId' "$menu_qml"; then
+if grep -Eq 'tileBackground|TileBackground|hoveredTileBorder|compactHeaderHeight|nodeAlpha|headerMarkSettled|summon omarchy\.menu|text: row\.childCount|tile\.appId' "$menu_qml" "$menu_style"; then
   echo "menu dead code or stale comments are back" >&2
   exit 1
 fi
@@ -70,8 +73,8 @@ if grep -Eq 'root\.setActiveMenu\([^,()]+, (true|false)\)|root\.activateIndex\([
   exit 1
 fi
 # --- 4b final review: state loads before use; stale routes never reopen; clock only when open
-block_grep "$menu_qml" 'id: appHistoryFile' 'blockLoading: true'
-block_grep "$menu_qml" 'id: menuClock' 'enabled: root.opened'
+block_grep "$menu_history" 'id: appHistoryFile' 'blockLoading: true'
+block_grep "$menu_style" 'id: menuClock' 'enabled: style.opened'
 [[ "$(grep -c 'root.pendingInitialMenu = ""' "$menu_qml")" -ge 4 ]] || {
   echo "every other open/cancel path must drop a pending Favorites/Recent route" >&2
   exit 1

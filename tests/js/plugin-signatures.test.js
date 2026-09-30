@@ -60,15 +60,6 @@ test("menu QML exposes its typed function signatures", () => {
     "function dmenuRowListHeight(_serial: int, _count: int, _filter: string): int",
     "menu dmenuRowListHeight"
   )
-  requiresSignature(menuQml, "function depthFor(id: string): int", "menu depthFor")
-  requiresSignature(menuQml, "function pathFor(id: string): string", "menu pathFor")
-  requiresSignature(
-    menuQml,
-    "function isDescendantOf(id: string, ancestorId: string): bool",
-    "menu isDescendantOf"
-  )
-  requiresSignature(menuQml, "function childCount(id: string): int", "menu childCount")
-  requiresSignature(menuQml, "function searchScore(entry, query: string): real", "menu searchScore")
   requiresSignature(menuQml, "function setFilter(nextFilter: string)", "menu setFilter")
   requiresSignature(menuQml, "function open(payloadJson: string): void", "menu open")
   requiresSignature(menuQml, "function select(delta: int): void", "menu select")
@@ -94,18 +85,22 @@ test("menu QML exposes its typed function signatures", () => {
     "menu favorite toggle"
   )
   requiresSignature(menuQml, "function recordRecentApp(appId: string): void", "menu recent history")
+  const menuHistoryQml = fs.readFileSync(
+    `${root}/plugins/araneadev.menu/MenuAppHistory.qml`,
+    "utf8"
+  )
   requiresSignature(
     menuQml,
-    "function recordRecentApp(appId: string): void {\n    root.recentAppIds",
-    "menu recent history implementation"
+    "function recordRecentApp(appId: string): void {\n    history.recordRecent(appId)",
+    "menu recent history forwards to MenuAppHistory"
   )
   if (
-    !menuQml.includes(
-      "root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)\n    root.saveAppHistory()\n    root.mergeAppRows()"
+    !menuHistoryQml.includes(
+      "history.recentAppIds = MenuModel.recordRecentApp(history.recentAppIds, appId, history.recentAppLimit)\n    history.saveAppHistory()\n    history.updated()"
     )
-  ) {
+  )
     throw new Error("recent app history must refresh visible rows immediately")
-  }
+  requiresSignature(menuHistoryQml, "function rowsFor(library: var): var", "menu app rows")
   requiresSignature(menuQml, "id: localAppLibrary", "menu local app-library fallback")
   const menuAppLibraryQml = fs.readFileSync(
     `${root}/plugins/araneadev.menu/MenuAppLibrary.qml`,
@@ -126,9 +121,43 @@ test("menu QML exposes its typed function signatures", () => {
     "function rebuildItemsFromSources(): void",
     "menu rebuildItemsFromSources"
   )
-  requiresSignature(menuQml, "function startNextProvider(): void", "menu startNextProvider")
+  const menuProvidersQml = fs.readFileSync(
+    `${root}/plugins/araneadev.menu/MenuProviders.qml`,
+    "utf8"
+  )
+  requiresSignature(
+    menuProvidersQml,
+    "function startNextProvider(): void",
+    "menu providers startNextProvider"
+  )
   requiresSignature(menuQml, "function rebuildDmenuDisplay(): void", "menu rebuildDmenuDisplay")
   requiresSignature(menuQml, "function cancel(): void", "menu cancel")
+
+  for (const wrapper of [
+    "stripJsonc",
+    "normalizeAliases",
+    "normalizeItem",
+    "parseMenuJsonc",
+    "slugify",
+    "depthFor",
+    "pathFor",
+    "parentPathFor",
+    "isDescendantOf",
+    "childCount",
+    "isVisible",
+    "labelFor",
+    "searchableToken",
+    "leafIdFor",
+    "nameSearchText",
+    "termInSearchWords",
+    "descriptionTextMatches",
+    "matchesQuery",
+    "searchScore",
+    "displayRow"
+  ]) {
+    if (menuQml.includes(`function ${wrapper}(`))
+      throw new Error(`menu wrapper ${wrapper} is back; call MenuModel.${wrapper} directly`)
+  }
 })
 
 test("lock and lock-view QML expose their typed function signatures", () => {

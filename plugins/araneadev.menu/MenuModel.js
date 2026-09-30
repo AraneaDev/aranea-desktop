@@ -54,198 +54,6 @@ if (typeof module !== "undefined") module.exports = { slugify: slugify }
  */
 
 /**
- * Strips whole-line `//` comments and trailing commas so JSONC parses as JSON.
- * @param {*} raw - JSONC text; null or undefined is treated as empty
- * @returns {string} the JSON text
- */
-function stripJsonc(raw) {
-  return String(raw || "")
-    .replace(/^\s*\/\/[^\n]*(\n|$)/gm, "")
-    .replace(/,(\s*[}\]])/g, "$1")
-}
-
-/**
- * Coerces an `aliases` value to a list of non-empty strings.
- * @param {*} value - an array, a single string, or anything else (yields [])
- * @returns {Array<string>} the aliases
- */
-function normalizeAliases(value) {
-  if (Array.isArray(value))
-    return value
-      .map(function (v) {
-        return String(v || "")
-      })
-      .filter(function (v) {
-        return v
-      })
-  if (typeof value === "string" && value) return [value]
-  return []
-}
-
-/**
- * Stringifies a value, falling back when it is null or undefined.
- * @param {*} value - the value to stringify
- * @param {*} fallback - returned as is when value is null or undefined
- * @returns {*} String(value), or the fallback unchanged
- */
-function textValue(value, fallback) {
-  if (value === undefined || value === null) return fallback
-  return String(value)
-}
-
-/**
- * Trims and de-duplicates app ids, keeping at most `limit` of them in order.
- * @param {*} values - list of app ids (strings or finite numbers; anything else is skipped); a non-array yields []
- * @param {*} limit - maximum count; a negative or non-finite value means 12
- * @returns {Array<string>} the normalized ids
- */
-function normalizeAppIds(values, limit) {
-  var max = Number(limit)
-  if (!isFinite(max) || max < 0) max = 12
-  var rows = Array.isArray(values) ? values : []
-  var out = []
-  for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
-    var raw = rows[i]
-    // Only strings and finite numbers are ids; objects would become "[object Object]".
-    if (!(typeof raw === "string" || (typeof raw === "number" && isFinite(raw)))) continue
-    var id = String(raw).trim()
-    if (id && out.indexOf(id) === -1) out.push(id)
-  }
-  return out
-}
-
-/**
- * Pins an app at the front of the favorites, or unpins it if already pinned;
- * a pin beyond the limit is refused (the list is left as it is).
- * @param {*} values - current favorite ids
- * @param {*} appId - app to toggle; empty leaves the list as is (normalized)
- * @param {*} limit - maximum number of favorites
- * @returns {{ids: Array<string>, refused: boolean}} the new favorite ids, and whether a pin was refused
- */
-function toggleFavoriteApp(values, appId, limit) {
-  var id = String(appId || "").trim()
-  var current = normalizeAppIds(values, limit)
-  if (!id) return { ids: current, refused: false }
-  var index = current.indexOf(id)
-  if (index >= 0) {
-    current.splice(index, 1)
-    return { ids: current, refused: false }
-  }
-  var max = Number(limit)
-  if (isFinite(max) && max >= 0 && current.length >= Math.floor(max))
-    return { ids: current, refused: true }
-  return { ids: normalizeAppIds([id].concat(current), limit), refused: false }
-}
-
-/**
- * Reads the menu state file: {"favorites": [ids], "recent": [ids]}.
- * @param {*} text - the file contents; anything unparsable gives empty lists
- * @param {number} favoriteLimit - most favorite ids kept
- * @param {number} [recentLimit] - most recent ids kept (favoriteLimit when omitted)
- * @returns {{favorites: Array<string>, recent: Array<string>}} the normalized lists
- */
-function parseAppHistory(text, favoriteLimit, recentLimit) {
-  var parsed
-  try {
-    parsed = JSON.parse(String(text || ""))
-  } catch (e) {
-    parsed = null
-  }
-  var value = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
-  return {
-    favorites: normalizeAppIds(
-      Array.isArray(value.favorites) ? value.favorites : [],
-      favoriteLimit
-    ),
-    recent: normalizeAppIds(
-      Array.isArray(value.recent) ? value.recent : [],
-      recentLimit === undefined ? favoriteLimit : recentLimit
-    )
-  }
-}
-
-/**
- * Writes the menu state file contents (pretty JSON with a trailing newline).
- * @param {*} favorites - pinned app ids
- * @param {*} recent - recently launched app ids
- * @param {number} favoriteLimit - most favorite ids kept
- * @param {number} [recentLimit] - most recent ids kept (favoriteLimit when omitted)
- * @returns {string} the file text
- */
-function serializeAppHistory(favorites, recent, favoriteLimit, recentLimit) {
-  return (
-    JSON.stringify(
-      {
-        favorites: normalizeAppIds(favorites, favoriteLimit),
-        recent: normalizeAppIds(recent, recentLimit === undefined ? favoriteLimit : recentLimit)
-      },
-      null,
-      2
-    ) + "\n"
-  )
-}
-
-/**
- * Drops ids of apps that are not installed, so they do not use up slots.
- * @param {*} ids - app ids
- * @param {*} installed - ids of installed apps; not an array means unknown (nothing dropped)
- * @returns {Array<string>} the kept ids, in order
- */
-function pruneAppIds(ids, installed) {
-  var list = normalizeAppIds(ids, Array.isArray(ids) ? ids.length : 0)
-  if (!Array.isArray(installed)) return list
-  return list.filter(function (id) {
-    return installed.indexOf(id) >= 0
-  })
-}
-
-/**
- * Shows each app once among rows of kind "app": the real `apps.<appId>` row
- * when present (at its own position), else the first Favorites/Recent copy.
- * Other rows are kept; order is unchanged.
- * @param {Array<{[key: string]: *}>} rows - display rows
- * @returns {Array<{[key: string]: *}>} the rows without repeated apps
- */
-function dedupeAppRows(rows) {
-  var list = Array.isArray(rows) ? rows : []
-  /** @type {{[key: string]: boolean}} */
-  var hasReal = {}
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i]
-    if (r && r.kind === "app" && r.appId && r.itemId === "apps." + r.appId) hasReal[r.appId] = true
-  }
-  /** @type {{[key: string]: boolean}} */
-  var seen = {}
-  return list.filter(function (row) {
-    if (!row || row.kind !== "app" || !row.appId) return true
-    if (hasReal[row.appId]) return row.itemId === "apps." + row.appId
-    if (seen[row.appId]) return false
-    seen[row.appId] = true
-    return true
-  })
-}
-
-/**
- * Orders the Apps menu: menu rows (Favorites, Recent) first, then apps;
- * each group by label (case-insensitive), then by item id.
- * @param {Array<{[key: string]: *}>} rows - display rows of the Apps menu
- * @returns {Array<{[key: string]: *}>} a new, sorted array
- */
-function sortAppsMenu(rows) {
-  return (Array.isArray(rows) ? rows.slice() : []).sort(function (a, b) {
-    var aApp = a.kind === "app" ? 1 : 0
-    var bApp = b.kind === "app" ? 1 : 0
-    if (aApp !== bApp) return aApp - bApp
-    var aLabel = String(a.label || "").toLowerCase()
-    var bLabel = String(b.label || "").toLowerCase()
-    if (aLabel !== bLabel) return aLabel < bLabel ? -1 : 1
-    var aId = String(a.itemId || "")
-    var bId = String(b.itemId || "")
-    return aId < bId ? -1 : aId > bId ? 1 : 0
-  })
-}
-
-/**
  * The key hint line for the menu's current state.
  * @param {{root: boolean, filter: boolean, dmenu: boolean, input: boolean, count: number, appRow: boolean}} state - root: root menu without a search; filter: a search is typed; dmenu/input: a dmenu request and its input mode; count: rows shown; appRow: the cursor row is an app
  * @returns {string} the hints
@@ -276,323 +84,6 @@ function emptyState(state) {
   if (s.loading) return { icon: "󰑐", text: "Loading…" }
   if (s.error) return { icon: "󰀦", text: "Couldn’t load this list" }
   return { icon: "󰈉", text: "Nothing here yet" }
-}
-
-/**
- * Moves an app to the front of the recent list, trimming it to `limit`.
- * @param {*} values - current recent ids
- * @param {*} appId - app just launched; empty leaves the list as is (normalized)
- * @param {*} limit - maximum number of recent entries
- * @returns {Array<string>} the new recent ids
- */
-/* @aranea-facade-start: plugins/araneadev.menu/MenuHistory.js */
-// Menu history behavior extracted from the generated MenuModel facade.
-
-/**
- * Records an app id at the front of recent history.
- * @param {*} values - Existing recent ids.
- * @param {*} appId - App id to record.
- * @param {*} limit - Maximum number of ids.
- * @returns {Array<string>} Updated recent ids.
- */
-function recordRecentApp(values, appId, limit) {
-  var id = String(appId || "").trim()
-  if (!id) return normalizeHistoryIds(values, limit)
-  return normalizeHistoryIds([id].concat(Array.isArray(values) ? values : []), limit)
-}
-
-if (typeof module !== "undefined") module.exports = { recordRecentApp: recordRecentApp }
-
-/**
- * Normalizes recent ids for the standalone history module.
- * @param {*} values - Candidate ids.
- * @param {*} limit - Maximum number of ids.
- * @returns {Array<string>} Normalized ids.
- */
-function normalizeHistoryIds(values, limit) {
-  var max = Number(limit)
-  if (!isFinite(max) || max < 0) max = 12
-  var rows = Array.isArray(values) ? values : []
-  var out = []
-  for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
-    var raw = rows[i]
-    if (!(typeof raw === "string" || (typeof raw === "number" && isFinite(raw)))) continue
-    var id = String(raw).trim()
-    if (id && out.indexOf(id) === -1) out.push(id)
-  }
-  return out
-}
-/* @aranea-facade-end */
-
-/**
- * Copies the app rows named by `ids`, in that order, re-parented under `parent`.
- * @param {Array<MenuItem>} appRows - all app rows (non-arrays are treated as empty)
- * @param {*} ids - app ids to pick; unknown ids are skipped
- * @param {string} parent - parent id for the copies ("root" when empty)
- * @param {string} prefix - id prefix for the copies (the parent when empty)
- * @returns {Array<{[key: string]: *}>} shallow copies of the rows with fresh id, parent and order
- */
-function appRowsForIds(appRows, ids, parent, prefix) {
-  var source = Array.isArray(appRows) ? appRows : []
-  var wanted = normalizeAppIds(ids, source.length)
-  /** @type {ItemMap} */
-  var byId = {}
-  for (var i = 0; i < source.length; i++) {
-    var row = source[i]
-    if (row && row.appId) byId[String(row.appId)] = row
-  }
-
-  var out = []
-  var targetParent = String(parent || "root")
-  var targetPrefix = String(prefix || targetParent)
-  for (var j = 0; j < wanted.length; j++) {
-    var sourceRow = byId[wanted[j]]
-    if (!sourceRow) continue
-    /** @type {{[key: string]: *}} */
-    var copy = {}
-    for (var key in sourceRow) copy[key] = sourceRow[key]
-    copy.id = targetPrefix + "." + sourceRow.appId
-    copy.parent = targetParent
-    copy.order = out.length
-    out.push(copy)
-  }
-  return out
-}
-
-/**
- * Returns the fixed tagline for a top-level section, keyed by the entry's id
- * (or its lowercased label when it has none), else `detail`.
- * @param {*} entry - the menu item
- * @param {*} detail - fallback detail text
- * @returns {string} the tagline, or the detail ("" when null or undefined)
- */
-function semanticDetail(entry, detail) {
-  var value = entry && typeof entry === "object" ? entry : {}
-  if (String(value.parent || "") !== "root") return textValue(detail, "")
-
-  /** @type {{[key: string]: string}} */
-  var taglines = {
-    apps: "FIND // LAUNCH // MANAGE",
-    learn: "DOCUMENTATION // GUIDES // IDEAS",
-    trigger: "AUTOMATE // SCRIPTS // WORKFLOWS",
-    style: "APPEARANCE // THEMES // BEHAVIOR",
-    setup: "SYSTEM // DEVICES // PREFERENCES",
-    system: "SLEEP // RESTART // SHUTDOWN"
-  }
-  var key = textValue(value.id, textValue(value.label, "").toLowerCase())
-  return taglines[key] || textValue(detail, "")
-}
-
-/**
- * Builds a full menu item from one JSONC entry, deriving parent and kind.
- * @param {*} id - the entry's key (dotted path such as `setup.power`)
- * @param {*} raw - the entry object; anything else is treated as {}
- * @returns {MenuItem} the normalized item
- */
-function normalizeItem(id, raw) {
-  var value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
-  var itemId = textValue(id, "")
-  var aliases = normalizeAliases(value.aliases)
-  var parent = textValue(value.parent, "")
-  if (!parent) parent = itemId.indexOf(".") >= 0 ? itemId.split(".").slice(0, -1).join(".") : "root"
-  if (itemId === "root") parent = ""
-
-  var kind = value.action ? "action" : value.target ? "link" : "menu"
-
-  return {
-    id: itemId,
-    parent: parent,
-    kind: kind,
-    icon: textValue(value.icon, ""),
-    iconFont: textValue(value.iconFont, ""),
-    label: textValue(value.label, itemId),
-    title: textValue(value.title, ""),
-    target: textValue(value.target, ""),
-    description: textValue(value.description, ""),
-    action: textValue(value.action, ""),
-    provider: textValue(value.provider, ""),
-    aliases: aliases,
-    when: textValue(value.when, ""),
-    checked: textValue(value.checked, "")
-  }
-}
-
-/**
- * Parses a JSONC menu file (top-level map or an `items` map) into normalized items.
- * @param {*} raw - JSONC text
- * @returns {Array<MenuItem>} the items, or [] when the text is empty or invalid
- */
-function parseMenuJsonc(raw) {
-  var stripped = stripJsonc(raw)
-  if (!stripped.trim()) return []
-
-  var parsed
-  try {
-    parsed = JSON.parse(stripped)
-  } catch (e) {
-    return []
-  }
-  if (typeof parsed !== "object" || parsed === null) return []
-
-  var source =
-    parsed.items && typeof parsed.items === "object" && !Array.isArray(parsed.items)
-      ? parsed.items
-      : parsed
-  var out = []
-  for (var id in source) {
-    var entry = source[id]
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue
-    out.push(normalizeItem(id, entry))
-  }
-  return out
-}
-
-/**
- * Merges user items over default items key by key, adding a root item if missing.
- * @param {Array<MenuItem>} defaultItems - items from the shipped menu
- * @param {Array<MenuItem>} userItems - items from the user extension file
- * @returns {{items: ItemMap, itemOrder: Array<string>}} items by id and their order
- */
-function mergeMenuSources(defaultItems, userItems) {
-  /** @type {{[key: string]: *}} */
-  var nextItems = {}
-  var nextOrder = []
-  var sources = [defaultItems || [], userItems || []]
-
-  for (var s = 0; s < sources.length; s++) {
-    var src = sources[s]
-    for (var i = 0; i < src.length; i++) {
-      var entry = src[i]
-      if (!entry || !entry.id) continue
-      if (!nextItems[entry.id]) nextOrder.push(entry.id)
-      /** @type {{[key: string]: *}} */
-      var prior = nextItems[entry.id] || {}
-      /** @type {{[key: string]: *}} */
-      var merged = {}
-      for (var k in prior) merged[k] = prior[k]
-      for (var k2 in entry) merged[k2] = entry[k2]
-      merged.id = entry.id
-      nextItems[entry.id] = merged
-    }
-  }
-
-  if (!nextItems.root) {
-    nextItems.root = {
-      id: "root",
-      parent: "",
-      kind: "menu",
-      icon: "",
-      iconFont: "",
-      label: "Go",
-      title: "",
-      target: "",
-      description: "",
-      aliases: [],
-      when: "",
-      checked: "",
-      action: "",
-      provider: ""
-    }
-    nextOrder.unshift("root")
-  }
-  for (var k3 = 0; k3 < nextOrder.length; k3++) nextItems[nextOrder[k3]].order = k3
-
-  return {
-    items: nextItems,
-    itemOrder: nextOrder
-  }
-}
-
-// Both merges below return fresh items/itemOrder objects for the caller to
-// assign in one go. They must never write into the maps they are handed: those
-// live in QML `var` properties, and an in-place write into such an object is
-// occasionally dropped by the engine — the key lands with an undefined value.
-// A lost write used to leave an id in itemOrder with no item behind it, and
-// the next merge then kept that orphan and appended a second row for the same
-// app, so the launcher listed it twice (and again on every later rescan).
-
-// Swaps every app row for the current set. Rows keep the order they arrive in;
-// ids already claimed (including duplicate desktop ids) are listed once.
-/**
- * Replaces all app rows with a new set, returning fresh maps.
- * @param {ItemMap} items - current items by id (not modified)
- * @param {Array<string>} itemOrder - current item order
- * @param {Array<MenuItem>} appRows - the new app rows (not modified; copies get `order`)
- * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
- */
-function mergeAppRows(items, itemOrder, appRows) {
-  var source = items || {}
-  var order = Array.isArray(itemOrder) ? itemOrder : []
-  var rows = Array.isArray(appRows) ? appRows : []
-  /** @type {ItemMap} */
-  var nextItems = {}
-  var nextOrder = []
-
-  for (var i = 0; i < order.length; i++) {
-    var id = order[i]
-    var existing = source[id]
-    // Orphans (an id with no item) are dropped rather than carried forward,
-    // so a single lost write cannot compound into a duplicate row.
-    if (!existing || existing.kind === "app") continue
-    nextItems[id] = existing
-    nextOrder.push(id)
-  }
-
-  for (var j = 0; j < rows.length; j++) {
-    var row = rows[j]
-    if (!row || !row.id || nextItems[row.id]) continue
-    /** @type {{[key: string]: *}} */
-    var copy = {}
-    for (var key in row) copy[key] = row[key]
-    copy.order = nextOrder.length
-    nextItems[row.id] = /** @type {MenuItem} */ (copy)
-    nextOrder.push(row.id)
-  }
-
-  return { items: nextItems, itemOrder: nextOrder }
-}
-
-// Swaps the rows one provider contributed, leaving every other item untouched.
-// Rows carry the id of the submenu that produced them, so a provider that runs
-// again drops its previous batch — a plugin that was just enabled disappears
-// from the Enable list — without disturbing static children declared in JSONC.
-/**
- * Replaces the rows one provider produced for a submenu, returning fresh maps.
- * @param {ItemMap} items - current items by id (not modified)
- * @param {Array<string>} itemOrder - current item order
- * @param {string} menuId - id of the submenu whose provider produced the rows
- * @param {Array<MenuItem>} rows - the new rows (not modified; copies get `providerMenu` and `order`)
- * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
- */
-function swapProviderRows(items, itemOrder, menuId, rows) {
-  var source = items || {}
-  var order = Array.isArray(itemOrder) ? itemOrder : []
-  var incoming = Array.isArray(rows) ? rows : []
-  /** @type {ItemMap} */
-  var nextItems = {}
-  var nextOrder = []
-
-  for (var i = 0; i < order.length; i++) {
-    var id = order[i]
-    var existing = source[id]
-    if (!existing || existing.providerMenu === menuId) continue
-    nextItems[id] = existing
-    nextOrder.push(id)
-  }
-
-  for (var j = 0; j < incoming.length; j++) {
-    var row = incoming[j]
-    if (!row || !row.id || nextItems[row.id]) continue
-    /** @type {{[key: string]: *}} */
-    var copy = {}
-    for (var key in row) copy[key] = row[key]
-    copy.providerMenu = menuId
-    copy.order = nextOrder.length
-    nextItems[row.id] = /** @type {MenuItem} */ (copy)
-    nextOrder.push(row.id)
-  }
-
-  return { items: nextItems, itemOrder: nextOrder }
 }
 
 /**
@@ -968,6 +459,525 @@ if (typeof module !== "undefined") {
 }
 /* @aranea-facade-end */
 
+/* @aranea-facade-start: plugins/araneadev.menu/MenuAppRows.js */
+// App history and the generated Apps rows: favourite and recent ids, the
+// state file format, pruning, and the rows merged into the menu items.
+
+/**
+ * Trims and de-duplicates app ids, keeping at most `limit` of them in order.
+ * @param {*} values - list of app ids (strings or finite numbers; anything else is skipped); a non-array yields []
+ * @param {*} limit - maximum count; a negative or non-finite value means 12
+ * @returns {Array<string>} the normalized ids
+ */
+function normalizeAppIds(values, limit) {
+  var max = Number(limit)
+  if (!isFinite(max) || max < 0) max = 12
+  var rows = Array.isArray(values) ? values : []
+  var out = []
+  for (var i = 0; i < rows.length && out.length < Math.floor(max); i++) {
+    var raw = rows[i]
+    // Only strings and finite numbers are ids; objects would become "[object Object]".
+    if (!(typeof raw === "string" || (typeof raw === "number" && isFinite(raw)))) continue
+    var id = String(raw).trim()
+    if (id && out.indexOf(id) === -1) out.push(id)
+  }
+  return out
+}
+
+/**
+ * Pins an app at the front of the favorites, or unpins it if already pinned;
+ * a pin beyond the limit is refused (the list is left as it is).
+ * @param {*} values - current favorite ids
+ * @param {*} appId - app to toggle; empty leaves the list as is (normalized)
+ * @param {*} limit - maximum number of favorites
+ * @returns {{ids: Array<string>, refused: boolean}} the new favorite ids, and whether a pin was refused
+ */
+function toggleFavoriteApp(values, appId, limit) {
+  var id = String(appId || "").trim()
+  var current = normalizeAppIds(values, limit)
+  if (!id) return { ids: current, refused: false }
+  var index = current.indexOf(id)
+  if (index >= 0) {
+    current.splice(index, 1)
+    return { ids: current, refused: false }
+  }
+  var max = Number(limit)
+  if (isFinite(max) && max >= 0 && current.length >= Math.floor(max))
+    return { ids: current, refused: true }
+  return { ids: normalizeAppIds([id].concat(current), limit), refused: false }
+}
+
+/**
+ * Reads the menu state file: {"favorites": [ids], "recent": [ids]}.
+ * @param {*} text - the file contents; anything unparsable gives empty lists
+ * @param {number} favoriteLimit - most favorite ids kept
+ * @param {number} [recentLimit] - most recent ids kept (favoriteLimit when omitted)
+ * @returns {{favorites: Array<string>, recent: Array<string>}} the normalized lists
+ */
+function parseAppHistory(text, favoriteLimit, recentLimit) {
+  var parsed
+  try {
+    parsed = JSON.parse(String(text || ""))
+  } catch (e) {
+    parsed = null
+  }
+  var value = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
+  return {
+    favorites: normalizeAppIds(
+      Array.isArray(value.favorites) ? value.favorites : [],
+      favoriteLimit
+    ),
+    recent: normalizeAppIds(
+      Array.isArray(value.recent) ? value.recent : [],
+      recentLimit === undefined ? favoriteLimit : recentLimit
+    )
+  }
+}
+
+/**
+ * Writes the menu state file contents (pretty JSON with a trailing newline).
+ * @param {*} favorites - pinned app ids
+ * @param {*} recent - recently launched app ids
+ * @param {number} favoriteLimit - most favorite ids kept
+ * @param {number} [recentLimit] - most recent ids kept (favoriteLimit when omitted)
+ * @returns {string} the file text
+ */
+function serializeAppHistory(favorites, recent, favoriteLimit, recentLimit) {
+  return (
+    JSON.stringify(
+      {
+        favorites: normalizeAppIds(favorites, favoriteLimit),
+        recent: normalizeAppIds(recent, recentLimit === undefined ? favoriteLimit : recentLimit)
+      },
+      null,
+      2
+    ) + "\n"
+  )
+}
+
+/**
+ * Drops ids of apps that are not installed, so they do not use up slots.
+ * @param {*} ids - app ids
+ * @param {*} installed - ids of installed apps; not an array means unknown (nothing dropped)
+ * @returns {Array<string>} the kept ids, in order
+ */
+function pruneAppIds(ids, installed) {
+  var list = normalizeAppIds(ids, Array.isArray(ids) ? ids.length : 0)
+  if (!Array.isArray(installed)) return list
+  return list.filter(function (id) {
+    return installed.indexOf(id) >= 0
+  })
+}
+
+/**
+ * Shows each app once among rows of kind "app": the real `apps.<appId>` row
+ * when present (at its own position), else the first Favorites/Recent copy.
+ * Other rows are kept; order is unchanged.
+ * @param {Array<{[key: string]: *}>} rows - display rows
+ * @returns {Array<{[key: string]: *}>} the rows without repeated apps
+ */
+function dedupeAppRows(rows) {
+  var list = Array.isArray(rows) ? rows : []
+  /** @type {{[key: string]: boolean}} */
+  var hasReal = {}
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i]
+    if (r && r.kind === "app" && r.appId && r.itemId === "apps." + r.appId) hasReal[r.appId] = true
+  }
+  /** @type {{[key: string]: boolean}} */
+  var seen = {}
+  return list.filter(function (row) {
+    if (!row || row.kind !== "app" || !row.appId) return true
+    if (hasReal[row.appId]) return row.itemId === "apps." + row.appId
+    if (seen[row.appId]) return false
+    seen[row.appId] = true
+    return true
+  })
+}
+
+/**
+ * Orders the Apps menu: menu rows (Favorites, Recent) first, then apps;
+ * each group by label (case-insensitive), then by item id.
+ * @param {Array<{[key: string]: *}>} rows - display rows of the Apps menu
+ * @returns {Array<{[key: string]: *}>} a new, sorted array
+ */
+function sortAppsMenu(rows) {
+  return (Array.isArray(rows) ? rows.slice() : []).sort(function (a, b) {
+    var aApp = a.kind === "app" ? 1 : 0
+    var bApp = b.kind === "app" ? 1 : 0
+    if (aApp !== bApp) return aApp - bApp
+    var aLabel = String(a.label || "").toLowerCase()
+    var bLabel = String(b.label || "").toLowerCase()
+    if (aLabel !== bLabel) return aLabel < bLabel ? -1 : 1
+    var aId = String(a.itemId || "")
+    var bId = String(b.itemId || "")
+    return aId < bId ? -1 : aId > bId ? 1 : 0
+  })
+}
+
+/**
+ * Copies the app rows named by `ids`, in that order, re-parented under `parent`.
+ * @param {Array<MenuItem>} appRows - all app rows (non-arrays are treated as empty)
+ * @param {*} ids - app ids to pick; unknown ids are skipped
+ * @param {string} parent - parent id for the copies ("root" when empty)
+ * @param {string} prefix - id prefix for the copies (the parent when empty)
+ * @returns {Array<{[key: string]: *}>} shallow copies of the rows with fresh id, parent and order
+ */
+function appRowsForIds(appRows, ids, parent, prefix) {
+  var source = Array.isArray(appRows) ? appRows : []
+  var wanted = normalizeAppIds(ids, source.length)
+  /** @type {ItemMap} */
+  var byId = {}
+  for (var i = 0; i < source.length; i++) {
+    var row = source[i]
+    if (row && row.appId) byId[String(row.appId)] = row
+  }
+
+  var out = []
+  var targetParent = String(parent || "root")
+  var targetPrefix = String(prefix || targetParent)
+  for (var j = 0; j < wanted.length; j++) {
+    var sourceRow = byId[wanted[j]]
+    if (!sourceRow) continue
+    /** @type {{[key: string]: *}} */
+    var copy = {}
+    for (var key in sourceRow) copy[key] = sourceRow[key]
+    copy.id = targetPrefix + "." + sourceRow.appId
+    copy.parent = targetParent
+    copy.order = out.length
+    out.push(copy)
+  }
+  return out
+}
+
+// Swaps every app row for the current set. Rows keep the order they arrive in;
+// ids already claimed (including duplicate desktop ids) are listed once.
+// Returns fresh items/itemOrder objects for the caller to assign in one go;
+// never writes into the maps it is handed, since those live in QML `var`
+// properties, and an in-place write into such an object is occasionally
+// dropped by the engine (the key lands with an undefined value). A lost write
+// used to leave an id in itemOrder with no item behind it, and the next merge
+// then kept that orphan and appended a second row for the same app, so the
+// launcher listed it twice (and again on every later rescan).
+/**
+ * Replaces all app rows with a new set, returning fresh maps.
+ * @param {ItemMap} items - current items by id (not modified)
+ * @param {Array<string>} itemOrder - current item order
+ * @param {Array<MenuItem>} appRows - the new app rows (not modified; copies get `order`)
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
+ */
+function mergeAppRows(items, itemOrder, appRows) {
+  var source = items || {}
+  var order = Array.isArray(itemOrder) ? itemOrder : []
+  var rows = Array.isArray(appRows) ? appRows : []
+  /** @type {ItemMap} */
+  var nextItems = {}
+  var nextOrder = []
+
+  for (var i = 0; i < order.length; i++) {
+    var id = order[i]
+    var existing = source[id]
+    // Orphans (an id with no item) are dropped rather than carried forward,
+    // so a single lost write cannot compound into a duplicate row.
+    if (!existing || existing.kind === "app") continue
+    nextItems[id] = existing
+    nextOrder.push(id)
+  }
+
+  for (var j = 0; j < rows.length; j++) {
+    var row = rows[j]
+    if (!row || !row.id || nextItems[row.id]) continue
+    /** @type {{[key: string]: *}} */
+    var copy = {}
+    for (var key in row) copy[key] = row[key]
+    copy.order = nextOrder.length
+    nextItems[row.id] = /** @type {MenuItem} */ (copy)
+    nextOrder.push(row.id)
+  }
+
+  return { items: nextItems, itemOrder: nextOrder }
+}
+
+/**
+ * Moves an app to the front of the recent list, trimming it to `limit`.
+ * @param {*} values - current recent ids
+ * @param {*} appId - app just launched; empty leaves the list as is (normalized)
+ * @param {*} limit - maximum number of recent entries
+ * @returns {Array<string>} the new recent ids
+ */
+function recordRecentApp(values, appId, limit) {
+  var id = String(appId || "").trim()
+  if (!id) return normalizeAppIds(values, limit)
+  return normalizeAppIds([id].concat(Array.isArray(values) ? values : []), limit)
+}
+
+if (typeof module !== "undefined")
+  module.exports = {
+    normalizeAppIds: normalizeAppIds,
+    toggleFavoriteApp: toggleFavoriteApp,
+    parseAppHistory: parseAppHistory,
+    serializeAppHistory: serializeAppHistory,
+    pruneAppIds: pruneAppIds,
+    dedupeAppRows: dedupeAppRows,
+    sortAppsMenu: sortAppsMenu,
+    appRowsForIds: appRowsForIds,
+    mergeAppRows: mergeAppRows,
+    recordRecentApp: recordRecentApp
+  }
+/* @aranea-facade-end */
+
+/* @aranea-facade-start: plugins/araneadev.menu/MenuItemParsing.js */
+// Menu sources: JSONC parsing, item normalization, merging the default and
+// user files, and swapping provider rows into the items.
+
+/**
+ * Strips whole-line `//` comments and trailing commas so JSONC parses as JSON.
+ * @param {*} raw - JSONC text; null or undefined is treated as empty
+ * @returns {string} the JSON text
+ */
+function stripJsonc(raw) {
+  return String(raw || "")
+    .replace(/^\s*\/\/[^\n]*(\n|$)/gm, "")
+    .replace(/,(\s*[}\]])/g, "$1")
+}
+
+/**
+ * Coerces an `aliases` value to a list of non-empty strings.
+ * @param {*} value - an array, a single string, or anything else (yields [])
+ * @returns {Array<string>} the aliases
+ */
+function normalizeAliases(value) {
+  if (Array.isArray(value))
+    return value
+      .map(function (v) {
+        return String(v || "")
+      })
+      .filter(function (v) {
+        return v
+      })
+  if (typeof value === "string" && value) return [value]
+  return []
+}
+
+/**
+ * Stringifies a value, falling back when it is null or undefined.
+ * @param {*} value - the value to stringify
+ * @param {*} fallback - returned as is when value is null or undefined
+ * @returns {*} String(value), or the fallback unchanged
+ */
+function textValue(value, fallback) {
+  if (value === undefined || value === null) return fallback
+  return String(value)
+}
+
+/**
+ * Returns the fixed tagline for a top-level section, keyed by the entry's id
+ * (or its lowercased label when it has none), else `detail`.
+ * @param {*} entry - the menu item
+ * @param {*} detail - fallback detail text
+ * @returns {string} the tagline, or the detail ("" when null or undefined)
+ */
+function semanticDetail(entry, detail) {
+  var value = entry && typeof entry === "object" ? entry : {}
+  if (String(value.parent || "") !== "root") return textValue(detail, "")
+
+  /** @type {{[key: string]: string}} */
+  var taglines = {
+    apps: "FIND // LAUNCH // MANAGE",
+    learn: "DOCUMENTATION // GUIDES // IDEAS",
+    trigger: "AUTOMATE // SCRIPTS // WORKFLOWS",
+    style: "APPEARANCE // THEMES // BEHAVIOR",
+    setup: "SYSTEM // DEVICES // PREFERENCES",
+    system: "SLEEP // RESTART // SHUTDOWN"
+  }
+  var key = textValue(value.id, textValue(value.label, "").toLowerCase())
+  return taglines[key] || textValue(detail, "")
+}
+
+/**
+ * Builds a full menu item from one JSONC entry, deriving parent and kind.
+ * @param {*} id - the entry's key (dotted path such as `setup.power`)
+ * @param {*} raw - the entry object; anything else is treated as {}
+ * @returns {MenuItem} the normalized item
+ */
+function normalizeItem(id, raw) {
+  var value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
+  var itemId = textValue(id, "")
+  var aliases = normalizeAliases(value.aliases)
+  var parent = textValue(value.parent, "")
+  if (!parent) parent = itemId.indexOf(".") >= 0 ? itemId.split(".").slice(0, -1).join(".") : "root"
+  if (itemId === "root") parent = ""
+
+  var kind = value.action ? "action" : value.target ? "link" : "menu"
+
+  return {
+    id: itemId,
+    parent: parent,
+    kind: kind,
+    icon: textValue(value.icon, ""),
+    iconFont: textValue(value.iconFont, ""),
+    label: textValue(value.label, itemId),
+    title: textValue(value.title, ""),
+    target: textValue(value.target, ""),
+    description: textValue(value.description, ""),
+    action: textValue(value.action, ""),
+    provider: textValue(value.provider, ""),
+    aliases: aliases,
+    when: textValue(value.when, ""),
+    checked: textValue(value.checked, "")
+  }
+}
+
+/**
+ * Parses a JSONC menu file (top-level map or an `items` map) into normalized items.
+ * @param {*} raw - JSONC text
+ * @returns {Array<MenuItem>} the items, or [] when the text is empty or invalid
+ */
+function parseMenuJsonc(raw) {
+  var stripped = stripJsonc(raw)
+  if (!stripped.trim()) return []
+
+  var parsed
+  try {
+    parsed = JSON.parse(stripped)
+  } catch (e) {
+    return []
+  }
+  if (typeof parsed !== "object" || parsed === null) return []
+
+  var source =
+    parsed.items && typeof parsed.items === "object" && !Array.isArray(parsed.items)
+      ? parsed.items
+      : parsed
+  var out = []
+  for (var id in source) {
+    var entry = source[id]
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue
+    out.push(normalizeItem(id, entry))
+  }
+  return out
+}
+
+/**
+ * Merges user items over default items key by key, adding a root item if missing.
+ * @param {Array<MenuItem>} defaultItems - items from the shipped menu
+ * @param {Array<MenuItem>} userItems - items from the user extension file
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} items by id and their order
+ */
+function mergeMenuSources(defaultItems, userItems) {
+  /** @type {{[key: string]: *}} */
+  var nextItems = {}
+  var nextOrder = []
+  var sources = [defaultItems || [], userItems || []]
+
+  for (var s = 0; s < sources.length; s++) {
+    var src = sources[s]
+    for (var i = 0; i < src.length; i++) {
+      var entry = src[i]
+      if (!entry || !entry.id) continue
+      if (!nextItems[entry.id]) nextOrder.push(entry.id)
+      /** @type {{[key: string]: *}} */
+      var prior = nextItems[entry.id] || {}
+      /** @type {{[key: string]: *}} */
+      var merged = {}
+      for (var k in prior) merged[k] = prior[k]
+      for (var k2 in entry) merged[k2] = entry[k2]
+      merged.id = entry.id
+      nextItems[entry.id] = merged
+    }
+  }
+
+  if (!nextItems.root) {
+    nextItems.root = {
+      id: "root",
+      parent: "",
+      kind: "menu",
+      icon: "",
+      iconFont: "",
+      label: "Go",
+      title: "",
+      target: "",
+      description: "",
+      aliases: [],
+      when: "",
+      checked: "",
+      action: "",
+      provider: ""
+    }
+    nextOrder.unshift("root")
+  }
+  for (var k3 = 0; k3 < nextOrder.length; k3++) nextItems[nextOrder[k3]].order = k3
+
+  return {
+    items: nextItems,
+    itemOrder: nextOrder
+  }
+}
+
+// Swaps the rows one provider contributed, leaving every other item untouched.
+// Rows carry the id of the submenu that produced them, so a provider that runs
+// again drops its previous batch (a plugin that was just enabled disappears
+// from the Enable list), without disturbing static children declared in JSONC.
+// Returns fresh items/itemOrder objects for the caller to assign in one go;
+// never writes into the maps it is handed, since those live in QML `var`
+// properties, and an in-place write into such an object is occasionally
+// dropped by the engine (the key lands with an undefined value), which used
+// to leave an orphaned id in itemOrder that the next swap kept and duplicated.
+/**
+ * Replaces the rows one provider produced for a submenu, returning fresh maps.
+ * @param {ItemMap} items - current items by id (not modified)
+ * @param {Array<string>} itemOrder - current item order
+ * @param {string} menuId - id of the submenu whose provider produced the rows
+ * @param {Array<MenuItem>} rows - the new rows (not modified; copies get `providerMenu` and `order`)
+ * @returns {{items: ItemMap, itemOrder: Array<string>}} the merged items and order
+ */
+function swapProviderRows(items, itemOrder, menuId, rows) {
+  var source = items || {}
+  var order = Array.isArray(itemOrder) ? itemOrder : []
+  var incoming = Array.isArray(rows) ? rows : []
+  /** @type {ItemMap} */
+  var nextItems = {}
+  var nextOrder = []
+
+  for (var i = 0; i < order.length; i++) {
+    var id = order[i]
+    var existing = source[id]
+    if (!existing || existing.providerMenu === menuId) continue
+    nextItems[id] = existing
+    nextOrder.push(id)
+  }
+
+  for (var j = 0; j < incoming.length; j++) {
+    var row = incoming[j]
+    if (!row || !row.id || nextItems[row.id]) continue
+    /** @type {{[key: string]: *}} */
+    var copy = {}
+    for (var key in row) copy[key] = row[key]
+    copy.providerMenu = menuId
+    copy.order = nextOrder.length
+    nextItems[row.id] = /** @type {MenuItem} */ (copy)
+    nextOrder.push(row.id)
+  }
+
+  return { items: nextItems, itemOrder: nextOrder }
+}
+
+if (typeof module !== "undefined")
+  module.exports = {
+    stripJsonc: stripJsonc,
+    normalizeAliases: normalizeAliases,
+    textValue: textValue,
+    semanticDetail: semanticDetail,
+    normalizeItem: normalizeItem,
+    parseMenuJsonc: parseMenuJsonc,
+    mergeMenuSources: mergeMenuSources,
+    swapProviderRows: swapProviderRows
+  }
+/* @aranea-facade-end */
+
+/* @aranea-facade-start: plugins/araneadev.menu/MenuGuardScript.js */
+// The batch bash script that answers every `when:` and `checked:` guard.
+
 // Commands a `checked:` expression reads a value out of. Every sibling row
 // asks the same one -- Defaults > Browser has seven rows all comparing
 // against `omarchy-default-browser` -- so the batch runs it once and the rows
@@ -1116,6 +1126,18 @@ function guardScript(items) {
 
   return guards ? guardPrelude(guards) + guards : ""
 }
+
+if (typeof module !== "undefined")
+  module.exports = {
+    guardReaders: GUARD_READERS,
+    guardHelpers: guardHelpers,
+    guardPrelude: guardPrelude,
+    guardReaderSlot: guardReaderSlot,
+    substituteGuardReaders: substituteGuardReaders,
+    guardLine: guardLine,
+    guardScript: guardScript
+  }
+/* @aranea-facade-end */
 
 if (typeof module !== "undefined") {
   module.exports = {

@@ -10,9 +10,11 @@ test("facades contain every generator-owned source region", () => {
   const expected = {
     "plugins/araneadev.menu/MenuModel.js": [
       "MenuPresentation.js",
-      "MenuHistory.js",
       "MenuSearch.js",
-      "MenuTree.js"
+      "MenuTree.js",
+      "MenuAppRows.js",
+      "MenuItemParsing.js",
+      "MenuGuardScript.js"
     ],
     "plugins/araneadev.clipboard/ClipboardLogic.js": [
       "ClipboardPresentation.js",
