@@ -237,6 +237,25 @@ capture_menu_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
+# Prints the address of every window on the capture workspace (2), one per
+# line.
+capture_window_addresses() {
+  hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.workspace.id == 2) | .address' 2>/dev/null || true
+}
+
+# Closes the windows on the capture workspace that were not in BEFORE (the
+# output of capture_window_addresses taken before launching the capture app),
+# by address. Never "the active window": focus may be on the user's own
+# window by the time the capture finishes.
+close_new_windows() {
+  local before="$1" address
+  while IFS= read -r address; do
+    [[ -n "$address" ]] || continue
+    grep -Fxq -- "$address" <<<"$before" && continue
+    hyprctl dispatch "hl.dsp.window.close({ window = \"address:$address\" })" >/dev/null 2>&1 || true
+  done < <(capture_window_addresses)
+}
+
 # Opens kitty with the Aranea config running COMMAND in a window titled
 # TITLE, grabs the screen, then closes the window.
 capture_terminal_surface() {
@@ -251,6 +270,8 @@ capture_terminal_surface() {
     exit 3
   }
 
+  local windows_before
+  windows_before="$(capture_window_addresses)"
   kitty --config "$repo_root/integrations/terminal/kitty.conf" \
     --class "aranea-screenshot-$surface" --title "$title" \
     --override initial_window_width=104c --override initial_window_height=34c \
@@ -261,7 +282,7 @@ capture_terminal_surface() {
   sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
   grim "$output/$surface.png"
   # Close the capture window immediately so the next surface cannot inherit it.
-  hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
+  close_new_windows "$windows_before"
   kill "$child_pid" >/dev/null 2>&1 || true
   wait "$child_pid" >/dev/null 2>&1 || true
   # Terminal applications can exit non-zero after the compositor frame is
@@ -701,13 +722,14 @@ case "$surface" in
       echo 'nautilus is required to capture file-manager' >&2
       exit 3
     }
+    windows_before="$(capture_window_addresses)"
     nautilus --new-window "$repo_root" >/dev/null 2>&1 &
     child_pid=$!
     sleep 1
     hyprctl dismissnotify >/dev/null 2>&1 || true
     sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
     grim "$output/$surface.png"
-    hyprctl dispatch 'hl.dsp.window.close()' >/dev/null 2>&1 || true
+    close_new_windows "$windows_before"
     kill "$child_pid" >/dev/null 2>&1 || true
     wait "$child_pid" >/dev/null 2>&1 || true
     printf 'captured: %s\n' "$output/$surface.png"
