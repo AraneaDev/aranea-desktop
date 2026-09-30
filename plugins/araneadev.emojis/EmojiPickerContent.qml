@@ -44,6 +44,8 @@ Item {
   property int cellWidth: Style.space(44)
   // Cell height supplied by Emojis.qml.
   property int cellHeight: Style.space(44)
+  // Grid columns (Emojis.qml).
+  property int columns: 1
   // Shared corner radius for result cells.
   property real cornerRadius: Style.cornerRadius
 
@@ -83,7 +85,9 @@ Item {
 
       Flow {
         visible: content.showRecents
-        width: parent.width
+        width: content.columns * content.cellWidth
+        // Split the remainder of the content width on both sides.
+        x: Math.round((parent.width - width) / 2)
         Repeater {
           model: content.showRecents ? content.recentModel : []
           delegate: EmojiCell {
@@ -102,7 +106,9 @@ Item {
 
       EmojiGrid {
         id: resultGrid
-        width: parent.width
+        width: content.columns * content.cellWidth
+        // Split the remainder of the content width on both sides.
+        x: Math.round((parent.width - width) / 2)
         height: parent.height - y - nameLine.height - parent.spacing
         model: content.resultModel
         filterText: content.filterText
@@ -124,7 +130,6 @@ Item {
         id: nameLine
         width: parent.width
         selectedName: content.selectedEmoji ? content.selectedEmoji + "  " + content.selectedName : " "
-        hintText: content.hintText
         showFilter: false
         fontFamily: content.fontFamily
         foreground: content.foreground
@@ -132,7 +137,8 @@ Item {
     }
   }
 
-  component Caption: Text {
+  component Caption: Aranea.InkText {
+    horizontalAlignment: Text.AlignLeft
     textFormat: Text.PlainText
     color: Util.alpha(content.foreground, 0.58)
     font.family: content.fontFamily

@@ -34,8 +34,11 @@ modules own history, search, and tree traversal.
 - `MenuDmenu.qml` serves dmenu-style select/input requests: it holds the
   request, turns options into rows, and writes the answer.
 - `MenuLayout.js` is the pure layout math for the menu card: running
-  row-list heights, the space the card can give its rows, and the fold
-  that ends mid-row when the rows do not fit.
+  row-list heights, the space the card can give its rows, the fold that
+  ends mid-row when the rows do not fit, the scroll position that keeps the
+  cursor row visible with a peek of its neighbor (`revealContentY`), and
+  the screen dimension to lay the card out against before the layer
+  surface reports its own size (`screenExtent`).
 
 ## Logic boundaries
 

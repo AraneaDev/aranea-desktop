@@ -59,8 +59,6 @@ function validateTokens(tokens) {
   if (tokens.mode !== "dark") throw new Error(`unsupported token mode: ${tokens.mode}`)
   for (const name of ["accent", "background", "foreground", "red"])
     if (typeof tokens.colors[name] !== "string") throw new Error(`colors.${name} must be a string`)
-  if (!Number.isFinite(tokens.dimensions.corner_radius))
-    throw new Error("dimensions.corner_radius must be numeric")
   return tokens
 }
 
@@ -158,6 +156,8 @@ QtObject {
   readonly property color surfaceBorder: Color.tooltip.border
   // Shared panel corner radius.
   readonly property int cornerRadius: Style.cornerRadius
+  // Shared panel border width: the host's panel frame width (KeyboardPanel, PopupCard, OSD).
+  readonly property int borderWidth: Math.max(1, Style.space(2))
   // Shared panel padding.
   readonly property int panelPadding: Style.spacing.panelPadding
   // Shared row horizontal padding.

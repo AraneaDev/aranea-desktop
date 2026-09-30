@@ -33,7 +33,7 @@ QtObject {
   // Card border color.
   property color border: Color.menu.border
   // Border spec for the card, from the shell's menu border settings.
-  property var borderSpec: Border.surfaceSpec("menu", "border", style.border, Math.max(1, Style.space(1)))
+  property var borderSpec: Border.surfaceSpec("menu", "border", style.border, Aranea.DesignTokens.borderWidth)
   // Full-screen backdrop color behind the card.
   property color scrim: Color.menu.scrim
   // Keep the new ornamentation derived from the stable shell palette.  The
@@ -55,8 +55,10 @@ QtObject {
   readonly property real rowReservedBorderLeft: Border.left(style.selectedBorderSpec)
   // Space the row reserves on its right edge for the selection border.
   readonly property real rowReservedBorderRight: Border.right(style.selectedBorderSpec)
+  // How far row highlights reach into the card padding; also the row's inner inset.
+  readonly property int rowBleed: Style.spacing.rowPaddingX
   // Corner radius of the card and its header.
-  readonly property int cornerRadius: Math.max(8, Style.space(8))
+  readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Scale applied to shell font sizes by menuFontSize().
   readonly property real menuFontScale: 1.10
   // Letter spacing for menu labels.
@@ -69,16 +71,28 @@ QtObject {
   property int contentMargin: Style.spacing.panelPadding
   // Header height for submenus and dmenu requests.
   property int headerHeight: Math.max(Style.space(46), style.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
-  // Header height on the unfiltered root menu.
-  property int rootHeaderHeight: Math.max(Style.space(68), style.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  // Header height on the unfiltered root menu: the 48 px mark, so its top sits
+  // one panel padding below the border, like its left edge.
+  property int rootHeaderHeight: Math.max(Style.space(48), style.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   // Height of the root tile row.
   property int rootTileHeight: Style.space(96)
   // Height of the root context band (status, workspace, clock).
   property int rootContextHeight: Style.space(20)
   // Height of the root footer.
   property int footerHeight: Style.space(26)
-  // Extra card height for the root context band, tiles and footer (0 elsewhere).
-  property int rootExtrasHeight: style.fullRootHeader ? style.rootContextHeight + style.rootTileHeight + style.footerHeight + style.contentSpacing * 3 : 0
+  // Gap between the root chrome's header, context band, tiles and footer.
+  property int rootChromeSpacing: Style.spacing.md
+  // Extra card height for the root context band, tiles and footer and the
+  // three gaps between the chrome's four parts (0 elsewhere).
+  property int rootExtrasHeight: style.fullRootHeader ? style.rootContextHeight + style.rootTileHeight + style.footerHeight + style.rootChromeSpacing * 3 : 0
+  // Height of the whole chrome (header, and on the root the band, tiles and footer).
+  readonly property int chromeHeight: style.fullRootHeader ? style.rootHeaderHeight + style.rootExtrasHeight : style.headerHeight
+  // Gap between the chrome and the rows (and the input line); the card height uses the same value.
+  readonly property int sectionSpacing: style.fullRootHeader ? style.contentSpacing : style.compactContentSpacing
+  // Card border top plus bottom, which the card height must include.
+  readonly property real borderInsetY: Border.top(style.borderSpec) + Border.bottom(style.borderSpec)
+  // Height of the dmenu input line (input mode).
+  property int inputLineHeight: Math.max(Style.space(32), style.menuFontSize(Style.font.subtitle) + Style.space(18))
   // Keep the polished default, while allowing a session-wide reduced-motion
   // override for accessibility and deterministic testing.
   property bool motionEnabled: Aranea.MotionState.motionEnabled

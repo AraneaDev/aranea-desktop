@@ -83,23 +83,18 @@ Item {
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
     }
-    ColumnLayout {
+    Aranea.EmptyState {
       visible: root.count === 0
       Layout.fillWidth: true
-      Image {
-        Layout.alignment: Qt.AlignHCenter
-        Layout.preferredWidth: Style.space(28)
-        Layout.preferredHeight: Style.space(28)
-        source: Aranea.RuntimePaths.glyphUrl
-        opacity: 0.6
-      }
-      Text {
-        Layout.alignment: Qt.AlignHCenter
-        text: "All caught up"
-        color: Qt.darker(root.foreground, 1.4)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-      }
+      Layout.preferredHeight: implicitHeight
+      imageSource: Aranea.RuntimePaths.glyphUrl
+      imageSize: Style.space(28)
+      imageOpacity: 0.6
+      message: "All caught up"
+      messageSize: Style.font.body
+      spacing: Style.space(6)
+      fontFamily: root.fontFamily
+      foreground: root.foreground
     }
   }
 }

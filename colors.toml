@@ -37,7 +37,6 @@ cursor_shadow = "#15121f"
 surface_border = "#33424b"
 surface_border_alpha = 0.48
 surface_shadow_alpha = 0.42
-corner_radius = 10
 
 motion_enabled = true
 

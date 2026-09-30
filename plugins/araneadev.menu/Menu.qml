@@ -36,10 +36,11 @@ Item {
   property var run: function (command) {
     Util.execDetached(command)
   }
-  // Screen width from the window (1920 offscreen).
-  readonly property int screenWidth: root.view ? root.view.width : 1920
-  // Screen height from the window (1080 offscreen).
-  readonly property int screenHeight: root.view ? root.view.height : 1080
+  // Screen width from the window's screen: known before the layer surface is
+  // configured, while the window's own size is still 0 (1920 offscreen).
+  readonly property int screenWidth: MenuLayout.screenExtent(root.view && root.view.screen ? root.view.screen.width : 0, root.view ? root.view.width : 0, 1920)
+  // Screen height from the window's screen, like screenWidth (1080 offscreen).
+  readonly property int screenHeight: MenuLayout.screenExtent(root.view && root.view.screen ? root.view.screen.height : 0, root.view ? root.view.height : 0, 1080)
   // The window's frozen card top, or -1.
   readonly property int viewCardTop: root.view ? root.view.cardTop : -1
   // The window's row-height ceiling for this opening, or -1.
@@ -308,8 +309,9 @@ Item {
   property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), root.screenWidth - Style.gapsOut * 2)
   // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
-  // Total card height, capped to the screen.
-  property int cardHeight: root.dmenuActive ? Math.min(root.style.contentMargin * 2 + root.style.headerHeight + (mode === "input" ? 0 : root.style.contentSpacing + visibleRowsHeight), root.screenHeight - Style.gapsOut * 2) : Math.min(root.style.contentMargin * 2 + (root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight) + root.style.contentSpacing + root.style.rootExtrasHeight + visibleRowsHeight, root.screenHeight - Style.gapsOut * 2)
+  // Total card height: borders, padding, chrome, one section gap and the rows
+  // (or the input line), exactly what MenuWindow lays out; capped to the screen.
+  property int cardHeight: Math.min(Math.ceil(root.style.borderInsetY) + root.style.contentMargin * 2 + root.style.chromeHeight + root.style.sectionSpacing + (root.mode === "input" ? root.style.inputLineHeight : visibleRowsHeight), root.screenHeight - Style.gapsOut * 2)
 
   // The dmenu (select or input) request being served.
   MenuDmenu {
@@ -410,9 +412,10 @@ Item {
       cardTop: root.viewCardTop,
       gapsOut: Style.gapsOut,
       contentMargin: root.style.contentMargin,
-      headerHeight: root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight,
-      contentSpacing: root.style.contentSpacing,
-      rootExtrasHeight: root.style.rootExtrasHeight,
+      headerHeight: root.style.chromeHeight,
+      contentSpacing: root.style.sectionSpacing,
+      rootExtrasHeight: 0,
+      borderInsetY: Math.ceil(root.style.borderInsetY),
       maxRowsHeight: root.viewMaxRowsHeight,
       ceiling: root.fullRootHeader ? Style.space(250) : Math.round(root.screenHeight * 0.7)
     })

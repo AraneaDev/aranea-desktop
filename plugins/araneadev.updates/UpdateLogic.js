@@ -103,11 +103,34 @@ function displayState(status) {
   }
 }
 
+/**
+ * The update center's header hint: the check state, never an action.
+ * @param {any} status - update status (parseStatus / mergeRefresh)
+ * @returns {string} "CHECK FAILED", "CHECKED HH:MM", or "" before the first check
+ */
+function headerHint(status) {
+  var s = status || {}
+  if (s.error) return "CHECK FAILED"
+  var at = Number(s.checkedAt) || 0
+  if (at <= 0) return ""
+  var d = new Date(at)
+  /**
+   * Zero-pads a two-digit time component.
+   * @param {number} n - Hours or minutes.
+   * @returns {string} Two-digit, zero-padded value.
+   */
+  var pad = function (n) {
+    return (n < 10 ? "0" : "") + n
+  }
+  return "CHECKED " + pad(d.getHours()) + ":" + pad(d.getMinutes())
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     parseStatus,
     groupUpdates,
     mergeRefresh,
-    displayState
+    displayState,
+    headerHint
   }
 }

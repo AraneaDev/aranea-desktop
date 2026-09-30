@@ -19,7 +19,7 @@ const fixture = {
     cyan: "#123456"
   },
   dimensions: {
-    cornerRadius: 10
+    surfaceBorderAlpha: 0.48
   },
   motion: {
     enabled: true,
@@ -48,7 +48,7 @@ test("flattenTokens exposes canonical dotted token paths", async () => {
     "colors.red": "#ff5f56",
     "colors.bright_green": "#abcdef",
     "colors.cyan": "#123456",
-    "dimensions.cornerRadius": 10,
+    "dimensions.surfaceBorderAlpha": 0.48,
     "motion.enabled": true,
     "motion.reduced_motion_fallback": "static",
     "shell.bar.background": "#06090d",
@@ -61,12 +61,17 @@ test("token validation rejects missing required sections", async () => {
   assert.throws(() => validateTokens({ colors: {} }), /mode|shell|dimensions/)
 })
 
+test("dimensions need no corner radius: the radius follows Hyprland", async () => {
+  const { validateTokens } = await generatorPromise
+  assert.doesNotThrow(() => validateTokens({ ...fixture, dimensions: {} }))
+})
+
 test("renderColorsToml keeps host-compatible flat color keys", async () => {
   const { renderColorsToml } = await generatorPromise
   const output = renderColorsToml(fixture)
   assert.match(output, /^mode = "dark"$/m)
   assert.match(output, /^accent = "#3bff9e"$/m)
-  assert.match(output, /^corner_radius = 10$/m)
+  assert.match(output, /^surface_border_alpha = 0\.48$/m)
 })
 
 test("renderShellToml renders nested shell sections", async () => {
@@ -81,6 +86,7 @@ test("renderQmlTokens exposes stable shared token aliases", async () => {
   const output = renderQmlTokens(fixture)
   assert.match(output, /readonly property color accent: Color\.accent/)
   assert.match(output, /readonly property int cornerRadius: Style\.cornerRadius/)
+  assert.match(output, /readonly property int borderWidth: Math\.max\(1, Style\.space\(2\)\)/)
   assert.match(output, /readonly property bool motionEnabled: MotionState\.motionEnabled/)
 })
 

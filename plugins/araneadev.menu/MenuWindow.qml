@@ -8,6 +8,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "MenuLayout.js" as MenuLayout
 
 PanelWindow {
   id: panel
@@ -47,27 +48,27 @@ PanelWindow {
 
   // Contain alone parks the cursor row flush with the viewport edge, hiding
   // the neighbor entirely and losing the fold affordance. Keep the next
-  // hidden row peeking past the cursor in the direction of travel.
+  // hidden row peeking past the cursor in the direction of travel, but never
+  // at the cost of the cursor row itself (MenuLayout.revealContentY).
   function revealCursor(): void {
     if (panel.root.displayModel.count === 0)
       return
-    resultListComponent.list.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
-
-    var item = resultListComponent.list.itemAtIndex(panel.root.selectedIndex)
+    var list = resultListComponent.list
+    list.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
+    var item = list.itemAtIndex(panel.root.selectedIndex)
     if (!item)
       return
-    var reach = panel.root.style.rowPeek + panel.root.style.rowSpacing
-    if (panel.root.selectedIndex < panel.root.displayModel.count - 1) {
-      var maxY = Math.max(resultListComponent.list.originY, resultListComponent.list.originY + resultListComponent.list.contentHeight - resultListComponent.list.height)
-      var overhang = item.y + item.height + reach - (resultListComponent.list.contentY + resultListComponent.list.height)
-      if (overhang > 0)
-        resultListComponent.list.contentY = Math.min(resultListComponent.list.contentY + overhang, maxY)
-    }
-    if (panel.root.selectedIndex > 0) {
-      var underhang = resultListComponent.list.contentY - (item.y - reach)
-      if (underhang > 0)
-        resultListComponent.list.contentY = Math.max(resultListComponent.list.contentY - underhang, resultListComponent.list.originY)
-    }
+    list.contentY = MenuLayout.revealContentY({
+      index: panel.root.selectedIndex,
+      count: panel.root.displayModel.count,
+      contentY: list.contentY,
+      originY: list.originY,
+      contentHeight: list.contentHeight,
+      viewHeight: list.height,
+      itemY: item.y,
+      itemHeight: item.height,
+      reach: panel.root.style.rowPeek + panel.root.style.rowSpacing
+    })
   }
 
   PointerMoveGate {
@@ -97,8 +98,14 @@ PanelWindow {
   property int cardTop: -1
   // Rows height frozen with cardTop (the starting menu's height), or -1.
   property int maxRowsHeight: -1
-  // Top edge that centres the card vertically.
-  readonly property int centeredTop: Math.max(Style.gapsOut, Math.round((height - panel.root.cardHeight) / 2))
+  // Top edge that centres the card vertically. Reads panel.root.screenHeight
+  // (screen size, falling back to the window's own size, then a fixed
+  // default; see MenuLayout.screenExtent) rather than this window's own
+  // height, which layer-shell windows report as 0 until the compositor
+  // configures them, the same class of bug the frozen-top fix above solves
+  // for cardTop. The window is anchored to all edges with
+  // ExclusionMode.Ignore, so once configured the two are equal.
+  readonly property int centeredTop: Math.max(Style.gapsOut, Math.round((panel.root.screenHeight - panel.root.cardHeight) / 2))
   // Where the card's top edge is: frozen, or centred until the first move.
   readonly property int effectiveCardTop: cardTop >= 0 ? cardTop : centeredTop
   // Freezes the card top and rows height at their current values.
@@ -177,11 +184,12 @@ PanelWindow {
       anchors.rightMargin: card.contentRightInset
       anchors.bottomMargin: card.contentBottomInset
       anchors.leftMargin: card.contentLeftInset
-      spacing: panel.root.fullRootHeader ? panel.root.style.contentSpacing : panel.root.style.compactContentSpacing
+      spacing: panel.root.style.sectionSpacing
 
       MenuCardChrome {
         width: parent.width
-        height: panel.root.fullRootHeader ? panel.root.style.rootHeaderHeight + panel.root.style.rootContextHeight + panel.root.style.rootTileHeight + panel.root.style.footerHeight : panel.root.style.headerHeight
+        height: panel.root.style.chromeHeight
+        sectionSpacing: panel.root.style.rootChromeSpacing
         fullRootHeader: panel.root.fullRootHeader
         dmenuActive: panel.root.dmenuActive
         activeTitle: panel.root.item(panel.root.activeMenu) ? (panel.root.item(panel.root.activeMenu).title || panel.root.item(panel.root.activeMenu).label || "GO") : "GO"
@@ -211,12 +219,64 @@ PanelWindow {
         }
       }
 
+      // Input mode: the line that shows what is typed (the filter text).
+      Rectangle {
+        visible: panel.root.mode === "input"
+        width: parent.width
+        height: panel.root.style.inputLineHeight
+        radius: panel.root.style.cornerRadius
+        color: Util.alpha(panel.root.style.foreground, 0.04)
+        border.width: 1
+        border.color: Util.alpha(panel.root.style.foreground, panel.root.filterText ? 0.22 : 0.10)
+
+        Row {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(12)
+          anchors.rightMargin: Style.space(12)
+          spacing: Style.space(8)
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "›"
+            color: panel.root.filterText ? panel.root.style.selectedText : Util.alpha(panel.root.style.foreground, 0.58)
+            font.family: panel.root.style.fontFamily
+            font.pixelSize: panel.root.style.menuFontSize(Style.font.subtitle)
+          }
+          Text {
+            id: inputValue
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, parent.width - x - inputCaret.width - parent.spacing)
+            textFormat: Text.PlainText
+            text: panel.root.filterText || "Type a value…"
+            color: panel.root.style.foreground
+            opacity: panel.root.filterText ? 1 : 0.58
+            font.family: panel.root.style.fontFamily
+            font.pixelSize: panel.root.style.menuFontSize(Style.font.subtitle)
+            elide: Text.ElideLeft
+          }
+          Rectangle {
+            id: inputCaret
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(1, Style.space(2))
+            height: inputValue.font.pixelSize + Style.space(2)
+            color: panel.root.style.selectedText
+          }
+        }
+      }
+
       Item {
         width: parent.width
         height: panel.root.visibleRowsHeight
         MenuResultList {
           id: resultListComponent
           anchors.fill: parent
+          // Row highlights bleed into the card padding so row content meets the
+          // chrome's content edges.
+          anchors.leftMargin: -panel.root.style.rowBleed
+          anchors.rightMargin: -panel.root.style.rowBleed
+          rowInset: panel.root.style.rowBleed
+          foldPeek: panel.root.style.rowPeek
           model: panel.root.displayModel
           selectedIndex: panel.root.selectedIndex
           cursorActive: panel.root.cursorActive

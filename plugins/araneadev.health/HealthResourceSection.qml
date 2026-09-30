@@ -76,6 +76,15 @@ Item {
         onPaint: {
           var ctx = getContext("2d")
           ctx.reset()
+          // The chart floor spans the width even before 60 samples exist.
+          ctx.globalAlpha = 0.25
+          ctx.strokeStyle = root.foreground
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(0, height - 0.5)
+          ctx.lineTo(width, height - 0.5)
+          ctx.stroke()
+          ctx.globalAlpha = 1
           var v = values || []
           if (v.length < 2)
             return
@@ -92,6 +101,7 @@ Item {
           }
           ctx.stroke()
         }
+        onWidthChanged: requestPaint()
       }
     }
 

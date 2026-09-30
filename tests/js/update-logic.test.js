@@ -65,3 +65,11 @@ test("maps update status to compact indicator severity", () => {
   )
   assert.equal(logic.displayState({ count: 0, error: "offline", stale: true }).severity, "error")
 })
+
+test("the header hint states the check, it never repeats the REFRESH action", () => {
+  const at = new Date(2026, 8, 30, 12, 5).getTime()
+  assert.equal(logic.headerHint({ checkedAt: at }), "CHECKED 12:05")
+  assert.equal(logic.headerHint({ checkedAt: at, error: "status unavailable" }), "CHECK FAILED")
+  assert.equal(logic.headerHint({ checkedAt: 0 }), "")
+  assert.equal(logic.headerHint(null), "")
+})

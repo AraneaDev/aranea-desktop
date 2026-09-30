@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: root
@@ -21,7 +22,7 @@ Item {
   ColumnLayout {
     id: content
     anchors.fill: parent
-    spacing: Style.space(4)
+    spacing: Style.space(8)
     RowLayout {
       Layout.fillWidth: true
       Rectangle {
@@ -47,16 +48,30 @@ Item {
     }
     Repeater {
       model: root.problems
-      delegate: Rectangle {
+      delegate: Item {
         required property var modelData
         required property int index
         Layout.fillWidth: true
-        implicitHeight: Style.space(32)
-        radius: Style.space(6)
-        color: root.cursor === index ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
-        RowLayout {
+        // The row is its text line; the cursor fill bleeds around it instead
+        // of padding the row, so the text meets the panel's content edges and
+        // the next section keeps the panel's section gap.
+        implicitHeight: problemLine.implicitHeight
+
+        Rectangle {
           anchors.fill: parent
-          anchors.margins: Style.space(8)
+          anchors.leftMargin: -Style.space(8)
+          anchors.rightMargin: -Style.space(8)
+          anchors.topMargin: -Style.space(4)
+          anchors.bottomMargin: -Style.space(4)
+          radius: Aranea.DesignTokens.cornerRadius
+          color: root.cursor === index ? Qt.rgba(1, 1, 1, 0.06) : "transparent"
+        }
+
+        RowLayout {
+          id: problemLine
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
           Text {
             text: modelData.glyph
             color: Color.popups.text
@@ -78,8 +93,10 @@ Item {
             font.pixelSize: Style.font.caption
           }
         }
+
         MouseArea {
           anchors.fill: parent
+          anchors.margins: -Style.space(4)
           onClicked: root.problemActivated(modelData)
         }
       }

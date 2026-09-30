@@ -58,7 +58,9 @@ Item {
   RowLayout {
     anchors.fill: parent
     anchors.leftMargin: Style.space(16)
-    anchors.rightMargin: Style.space(14)
+    // The row is unboxed: its trailing values meet the panel's right content
+    // edge, like the header hint and footer actions above and below it.
+    anchors.rightMargin: 0
     spacing: Style.space(12)
 
     StatusTextPair {

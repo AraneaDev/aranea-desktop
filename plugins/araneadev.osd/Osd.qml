@@ -42,16 +42,62 @@ Item {
   readonly property int gap: Style.space(12)
   // Strand width: long with progress, short without.
   readonly property int strandWidth: root.hasProgress ? Style.space(180) : Style.space(80)
-  // Width of the icon column.
-  readonly property int iconWidth: Style.space(28)
-  // Keep the percentage/message slot wide enough for the largest normal
-  // value at the active font size; a fixed 42px slot clipped `71%` to `7...`
-  // on 4K captures.
-  readonly property int valueWidth: Math.max(Style.space(56), messageMetrics.advanceWidth + Style.space(8))
+  // Icon column: fixed to the widest ink of every glyph the OSD can show
+  // (OsdModel.allIconGlyphs), so the card never resizes when the icon
+  // changes. Recomputed at startup and whenever the icon font's family or
+  // size changes (see the Connections below): Style.font is not fixed for
+  // a running shell; `omarchy display text size` and the applyTheme IPC
+  // both rewrite ~/.config/omarchy/shell.toml, which Color.qml's
+  // userShellFile FileView watches and reloads live, without a restart.
+  // Left-aligned ink (Aranea.InkText) then starts `pad` from the inner
+  // border for every icon.
+  readonly property alias iconWidth: root._iconWidth
+  // Private backing store for iconWidth (kept writable so
+  // maxIconInkWidth's result can be assigned from Component.onCompleted
+  // and the Style.font Connections below); read iconWidth, not this.
+  property real _iconWidth: 0
+  // Value column: the wider of the "100%" floor and the current value's own
+  // ink (OsdModel.valueColumnWidth), so the card never resizes across
+  // 0-100% and only widens for an out-of-range value ("1000%" from
+  // `omarchy osd -p 1000`; /usr/bin/omarchy-osd builds progress_text from
+  // the raw, unclamped argument). Left-aligned ink (Aranea.InkText) then
+  // starts `gap` after the strand for every value.
+  readonly property real valueWidth: OsdModel.valueColumnWidth(valueFloorInk.tightBoundingRect.width, valueInk.tightBoundingRect.width)
   // Message column width: the message's width, capped.
   readonly property int messageWidth: Math.min(Style.space(220), messageMetrics.advanceWidth)
   // Width of the card content between the paddings.
-  readonly property int contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
+  readonly property real contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
+
+  // Widest ink among OsdModel.allIconGlyphs() at the icon font:
+  // OsdModel.maxInkWidth (pure, unit-tested against a fake measure
+  // callback) driven by iconProbeMetrics (one TextMetrics, its text set
+  // per glyph in turn, read back synchronously) rather than one
+  // TextMetrics per glyph.
+  function maxIconInkWidth() {
+    return OsdModel.maxInkWidth(OsdModel.allIconGlyphs(), function (glyph) {
+      iconProbeMetrics.text = glyph
+      return iconProbeMetrics.tightBoundingRect.width
+    })
+  }
+
+  // Style.font.title/family can change live (see iconWidth above);
+  // recompute iconWidth whenever either does. A direct binding on
+  // iconWidth cannot do this without mutating iconProbeMetrics inside
+  // its own dependency chain (a binding loop), so this recomputes
+  // imperatively instead.
+  Connections {
+    target: Style.font
+    function onTitleChanged() {
+      root._iconWidth = root.maxIconInkWidth()
+    }
+    function onFamilyChanged() {
+      root._iconWidth = root.maxIconInkWidth()
+    }
+  }
+
+  Component.onCompleted: {
+    root._iconWidth = root.maxIconInkWidth()
+  }
 
   // Applies a request (OsdModel.stateForShow), opens the card and
   // (re)starts the hide timer, or stops it for duration 0.
@@ -96,6 +142,33 @@ Item {
     font.family: Style.font.family
     font.pixelSize: Style.font.body
     text: root.message
+  }
+
+  // "100%" at the value font: the value column's floor width (valueWidth).
+  TextMetrics {
+    id: valueFloorInk
+    font.family: Style.font.family
+    font.pixelSize: Style.font.title
+    text: "100%"
+  }
+
+  // The current value text's ink at the value font: widens valueWidth past
+  // the "100%" floor for an out-of-range value instead of letting it spill.
+  // Reuses valueFloorInk's resolved font (rather than restating
+  // Style.font.family/title) so this does not add another qmllint
+  // missing-property warning for Style.font to the baseline.
+  TextMetrics {
+    id: valueInk
+    font: valueFloorInk.font
+    text: root.message
+  }
+
+  // Reused by maxIconInkWidth to measure each OsdModel.allIconGlyphs()
+  // glyph in turn, at the icon font.
+  TextMetrics {
+    id: iconProbeMetrics
+    font.family: Style.font.family
+    font.pixelSize: Style.font.title
   }
 
   IpcHandler {
@@ -143,8 +216,6 @@ Item {
       fillColor: Util.alpha(Color.background, 0.9)
       surface: "popups"
       borderColor: Color.popups.border
-      borderWidth: Math.max(1, Style.space(1))
-      radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
       transform: Translate {
         y: card.revealOffset
@@ -173,10 +244,10 @@ Item {
         anchors.leftMargin: card.borderLeft + root.pad
         spacing: root.gap
 
-        Text {
+        Aranea.InkText {
           width: root.iconWidth
           anchors.verticalCenter: parent.verticalCenter
-          horizontalAlignment: Text.AlignHCenter
+          horizontalAlignment: Text.AlignLeft
           text: root.icon
           color: Color.popups.text
           font.family: Style.font.family
@@ -227,11 +298,11 @@ Item {
           }
         }
 
-        Text {
+        Aranea.InkText {
           visible: root.hasProgress
           width: root.valueWidth
           anchors.verticalCenter: parent.verticalCenter
-          horizontalAlignment: Text.AlignRight
+          horizontalAlignment: Text.AlignLeft
           text: root.message
           elide: Text.ElideNone
           color: Color.popups.text

@@ -18,10 +18,13 @@ state rather than decoration.
 
 ## Proportion and rhythm
 
-Controls use a compact spacing rhythm, restrained borders, and rounded panels
-that stay subordinate to content. Typography separates proportional UI labels
-from monospace telemetry and technical values. The center of a wallpaper stays
-quiet so bars, menus, and lock surfaces remain readable.
+Controls use a compact spacing rhythm and panels that stay subordinate to
+content. Panel corner radius and border width follow the desktop's own
+window rounding and border width rather than a fixed Aranea value, so a
+square-cornered Hyprland config gets square Aranea panels. Typography
+separates proportional UI labels from monospace telemetry and technical
+values. The center of a wallpaper stays quiet so bars, menus, and lock
+surfaces remain readable.
 
 ## Motion
 

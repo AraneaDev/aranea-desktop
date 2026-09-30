@@ -47,7 +47,7 @@ function plainRowTotals(rows, rowSpacing) {
  * frozen top edge once a search has pinned the card; capped by the opening's
  * ceiling (drilling into a longer submenu scrolls instead of growing the card)
  * and by the menu's own ceiling.
- * @param {{screenHeight: number, cardTop: number, gapsOut: number, contentMargin: number, headerHeight: number, contentSpacing: number, rootExtrasHeight: number, maxRowsHeight: number, ceiling: number}} input - screen, card and style numbers; cardTop and maxRowsHeight are -1 when unset
+ * @param {{screenHeight: number, cardTop: number, gapsOut: number, contentMargin: number, headerHeight: number, contentSpacing: number, rootExtrasHeight: number, maxRowsHeight: number, ceiling: number, borderInsetY: (number|undefined)}} input - screen, card and style numbers; cardTop and maxRowsHeight are -1 when unset; borderInsetY (the card border's top plus bottom) defaults to 0 when omitted
  * @returns {number} available row-list height
  */
 function availableRowsHeight(input) {
@@ -57,6 +57,7 @@ function availableRowsHeight(input) {
     top -
     input.gapsOut -
     input.contentMargin * 2 -
+    (input.borderInsetY || 0) -
     input.headerHeight -
     input.contentSpacing -
     input.rootExtrasHeight
@@ -83,10 +84,56 @@ function foldedListHeight(totals, available, metrics) {
   return totals[full - 1] + metrics.rowSpacing + metrics.rowPeek
 }
 
+/**
+ * contentY that keeps the cursor row visible with a peek of the next row in
+ * the direction of travel. The peek never pushes the cursor row itself out of
+ * view: on a list shorter than row + peek (the window not yet sized) the row
+ * stays whole and the peek is dropped.
+ * @param {{index: number, count: number, contentY: number, originY: number, contentHeight: number, viewHeight: number, itemY: number, itemHeight: number, reach: number}} input - list geometry after positionViewAtIndex(Contain); reach = rowPeek + rowSpacing
+ * @returns {number} the new contentY
+ */
+function revealContentY(input) {
+  var y = input.contentY
+  var minY = input.originY
+  var maxY = Math.max(minY, input.originY + input.contentHeight - input.viewHeight)
+  if (input.index < input.count - 1) {
+    var overhang = input.itemY + input.itemHeight + input.reach - (y + input.viewHeight)
+    // Scroll down for the peek, but never past the cursor row's own top.
+    if (overhang > 0) y = Math.min(y + overhang, maxY, Math.max(input.itemY, y))
+  }
+  if (input.index > 0) {
+    var underhang = y - (input.itemY - input.reach)
+    // Scroll up for the peek, but never past the cursor row's own bottom.
+    if (underhang > 0)
+      y = Math.max(
+        y - underhang,
+        minY,
+        Math.min(input.itemY + input.itemHeight - input.viewHeight, y)
+      )
+  }
+  return y
+}
+
+/**
+ * One screen dimension for the layout. A layer surface reports 0 (then a
+ * provisional size) until the compositor configures it, which happens after
+ * the first rows are laid out; the screen's own size is known before that.
+ * @param {number} screenSize - the window's screen size, 0 when there is no screen
+ * @param {number} windowSize - the window's current size
+ * @param {number} fallback - size to use with neither (offscreen tests)
+ * @returns {number} the size to lay the card out against
+ */
+function screenExtent(screenSize, windowSize, fallback) {
+  if (screenSize > 0) return screenSize
+  return windowSize > 0 ? windowSize : fallback
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     menuRowTotals: menuRowTotals,
     plainRowTotals: plainRowTotals,
     availableRowsHeight: availableRowsHeight,
-    foldedListHeight: foldedListHeight
+    foldedListHeight: foldedListHeight,
+    revealContentY: revealContentY,
+    screenExtent: screenExtent
   }

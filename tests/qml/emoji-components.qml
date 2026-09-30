@@ -44,6 +44,7 @@ ShellRoot {
     showRecents: true
     recentModel: ["😀"]
     resultModel: emojiModel
+    columns: 9
   }
 
   Component.onCompleted: {

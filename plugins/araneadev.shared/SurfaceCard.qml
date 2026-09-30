@@ -15,7 +15,7 @@ BorderSurface {
   // Border opacity multiplier.
   property real borderAlpha: 1.0
   // Border width when no override is supplied.
-  property int borderWidth: Style.normalBorderWidth
+  property int borderWidth: DesignTokens.borderWidth
   // Card fill colour.
   property color fillColor: Color.popups.background
   // Optional complete border specification.

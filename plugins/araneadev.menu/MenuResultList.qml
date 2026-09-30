@@ -3,6 +3,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 Item {
   id: results
@@ -48,6 +49,12 @@ Item {
   property int dividerHeight: Style.spacing.md
   // Public contract member.
   property var rowHeightForDetail: null
+  // Inner horizontal inset of row content (the highlight's bleed).
+  property int rowInset: Style.spacing.rowPaddingX
+  // Width of the icon column.
+  property int iconSlot: Style.space(24)
+  // Height of the peeking row at the fold (MenuStyle.rowPeek).
+  property int foldPeek: Style.space(22)
   // Public contract member.
   signal rowHovered(int index, var row, var point)
   // Public contract member.
@@ -75,7 +82,9 @@ Item {
       visible: section === "drilldown"
       Rectangle {
         anchors.left: parent.left
+        anchors.leftMargin: results.rowInset
         anchors.right: parent.right
+        anchors.rightMargin: results.rowInset
         anchors.verticalCenter: parent.verticalCenter
         height: Style.spacing.hairline
         color: Util.alpha(results.foreground, 0.2)
@@ -103,17 +112,16 @@ Item {
       color: hasCursor ? results.selectedBackground : "transparent"
       borderSpec: hasCursor ? results.selectedBorderSpec : Border.none()
 
-      Text {
+      Aranea.InkText {
         id: iconText
         visible: row.hasIcon && !row.isApp
         text: row.icon
         color: row.hasCursor ? results.selectedText : results.foreground
         font.family: row.iconFont.length > 0 ? row.iconFont : results.fontFamily
         font.pixelSize: Style.font.iconLarge
-        width: Style.space(36)
-        horizontalAlignment: Text.AlignHCenter
+        horizontalAlignment: Text.AlignLeft
         anchors.left: parent.left
-        anchors.leftMargin: results.rowReservedBorderLeft + Style.space(8)
+        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
       }
 
@@ -129,15 +137,16 @@ Item {
         source: row.isApp && results.appLibrary && results.appLibrary.iconSource ? results.appLibrary.iconSource(row.appIcon) : ""
         asynchronous: true
         anchors.left: parent.left
-        anchors.leftMargin: results.rowReservedBorderLeft + Style.space(8) + (Style.space(36) - width) / 2
+        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
       }
 
       Column {
-        anchors.left: row.isApp ? appIconImage.right : (row.hasIcon ? iconText.right : parent.left)
-        anchors.leftMargin: row.hasIcon ? Style.space(6) : results.rowReservedBorderLeft + Style.space(18)
+        // One label column for every row with an icon, whatever the glyph's width.
+        anchors.left: parent.left
+        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset + (row.hasIcon ? results.iconSlot + Style.space(10) : 0)
         anchors.right: parent.right
-        anchors.rightMargin: results.rowReservedBorderRight + Style.space(22)
+        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset + Style.space(14)
         anchors.verticalCenter: parent.verticalCenter
         spacing: Style.space(4)
         Text {
@@ -161,10 +170,11 @@ Item {
         }
       }
 
-      Text {
+      Aranea.InkText {
         anchors.right: parent.right
-        anchors.rightMargin: results.rowReservedBorderRight + Style.space(8)
+        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
+        horizontalAlignment: Text.AlignRight
         text: row.kind === "menu" || row.kind === "link" ? "›" : ""
         color: row.hasCursor ? results.selectedText : results.foreground
         opacity: 0.36
@@ -216,7 +226,9 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    height: Math.min(Style.space(28), parent.height / 2)
+    // Fade only the lower half of the peeking row: the cut-off row itself is
+    // the fold affordance and must stay readable.
+    height: Math.min(Math.round(results.foldPeek / 2), parent.height / 2)
     visible: opacity > 0
     opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.originY + resultList.contentHeight - resultList.height - resultList.contentY) / height)) : 0
     gradient: Gradient {

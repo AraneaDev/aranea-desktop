@@ -49,3 +49,65 @@ test("only a real value shows a bar, and zero is a value", () => {
   eq(model.stateForShow("", "", "0", "", "", "").hasProgress, true, "zero is a value")
   eq(model.widestIcon, undefined, "unused export removed")
 })
+
+test("allIconGlyphs covers every glyph the OSD can show, no duplicates", () => {
+  const glyphs = model.allIconGlyphs()
+  eq(Array.isArray(glyphs), true, "allIconGlyphs returns an array")
+  eq(glyphs.length > 0, true, "allIconGlyphs is not empty")
+  eq(
+    glyphs.every((glyph) => typeof glyph === "string" && glyph.length > 0),
+    true,
+    "every glyph is a non-empty string"
+  )
+  eq(new Set(glyphs).size, glyphs.length, "allIconGlyphs has no duplicate glyphs")
+  // The percent-only fallback (no icon name) reuses the volume-* glyphs, so
+  // it needs no separate entries in allIconGlyphs to be covered.
+  ;[0, 20, 50, 80, 100].forEach((percent) => {
+    eq(
+      glyphs.includes(model.iconFor("", percent)),
+      true,
+      `percent fallback glyph for ${percent}% is covered`
+    )
+  })
+  // /usr/bin/omarchy-chromium-ytdlp-host passes this glyph straight through
+  // `omarchy-osd -i <glyph>` (iconFor returns an unrecognized name as-is),
+  // so the icon column's fixed width must cover it even though it has no
+  // entry in iconNames.
+  eq(
+    glyphs.includes(String.fromCodePoint(0xf01da)),
+    true,
+    "the chromium-ytdlp-host download glyph (U+F01DA) is covered"
+  )
+})
+
+test("valueColumnWidth keeps the '100%' floor for normal values and widens for out-of-range ones", () => {
+  eq(model.valueColumnWidth(28, 18), 28, "a value narrower than the floor keeps the fixed width")
+  eq(model.valueColumnWidth(28, 28), 28, "exactly '100%' keeps the fixed width")
+  eq(model.valueColumnWidth(28, 35), 35, "'1000%' (wider than the floor) widens the column")
+})
+
+test("maxInkWidth picks the widest glyph by the measure callback, 0 for an empty list", () => {
+  eq(
+    model.maxInkWidth([], () => 99),
+    0,
+    "an empty glyph list measures 0, never calling measure"
+  )
+  eq(
+    model.maxInkWidth(["a", "bb", "ccc", "d"], (glyph) => glyph.length),
+    3,
+    "picks the widest"
+  )
+  // Every real OSD icon glyph measures a positive width at a real font;
+  // order and which entry is widest should not matter.
+  const widths = { x: 5, yy: 12, zzz: 3 }
+  eq(
+    model.maxInkWidth(Object.keys(widths), (glyph) => widths[glyph]),
+    12,
+    "reads the measure callback per glyph"
+  )
+  eq(
+    model.maxInkWidth(Object.keys(widths).reverse(), (glyph) => widths[glyph]),
+    12,
+    "order does not matter"
+  )
+})

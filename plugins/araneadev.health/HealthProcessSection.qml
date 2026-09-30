@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "MetricsLogic.js" as MetricsLogic
 
 Item {
   id: root
@@ -22,39 +23,66 @@ Item {
       font.pixelSize: Style.font.body
       font.bold: true
     }
+    RowLayout {
+      Layout.fillWidth: true
+      spacing: Style.space(16)
+      ProcessCell {
+        name: "CPU"
+        value: "USE"
+        dim: true
+      }
+      ProcessCell {
+        name: "MEM"
+        value: "RSS"
+        dim: true
+      }
+    }
     Repeater {
       model: Math.max(root.cpuProcesses.length, root.memoryProcesses.length)
       delegate: RowLayout {
         required property int index
         Layout.fillWidth: true
-        Text {
-          text: root.cpuProcesses[index] ? root.cpuProcesses[index].comm : ""
-          color: Color.popups.text
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
-          Layout.preferredWidth: Style.space(110)
-          elide: Text.ElideRight
+        spacing: Style.space(16)
+        ProcessCell {
+          name: root.cpuProcesses[index] ? root.cpuProcesses[index].comm : ""
+          value: root.cpuProcesses[index] ? root.cpuProcesses[index].percent + "%" : ""
         }
-        Text {
-          text: root.cpuProcesses[index] ? root.cpuProcesses[index].percent + "%" : ""
-          color: Color.popups.text
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
-          Layout.preferredWidth: Style.space(50)
-          horizontalAlignment: Text.AlignRight
-        }
-        Item {
-          Layout.preferredWidth: Style.space(16)
-        }
-        Text {
-          text: root.memoryProcesses[index] ? root.memoryProcesses[index].comm : ""
-          color: Color.popups.text
-          font.family: Style.font.family
-          font.pixelSize: Style.font.caption
-          Layout.fillWidth: true
-          elide: Text.ElideRight
+        ProcessCell {
+          name: root.memoryProcesses[index] ? root.memoryProcesses[index].comm : ""
+          value: root.memoryProcesses[index] ? MetricsLogic.humanBytes(root.memoryProcesses[index].rss) : ""
         }
       }
+    }
+  }
+
+  // One half of a TOP row: process name and its right-aligned value.
+  component ProcessCell: RowLayout {
+    // Process name (or column heading).
+    property string name: ""
+    // Value (or unit heading), right-aligned.
+    property string value: ""
+    // Heading style.
+    property bool dim: false
+    // Equal halves: both cells prefer the same width and fill.
+    Layout.fillWidth: true
+    Layout.preferredWidth: 1
+    spacing: Style.space(8)
+    Text {
+      text: parent.name
+      color: Color.popups.text
+      opacity: parent.dim ? 0.55 : 1
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      Layout.fillWidth: true
+      elide: Text.ElideRight
+    }
+    Text {
+      text: parent.value
+      color: Color.popups.text
+      opacity: parent.dim ? 0.55 : 1
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      horizontalAlignment: Text.AlignRight
     }
   }
 }

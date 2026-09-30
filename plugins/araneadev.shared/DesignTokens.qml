@@ -25,6 +25,8 @@ QtObject {
   readonly property color surfaceBorder: Color.tooltip.border
   // Shared panel corner radius.
   readonly property int cornerRadius: Style.cornerRadius
+  // Shared panel border width: the host's panel frame width (KeyboardPanel, PopupCard, OSD).
+  readonly property int borderWidth: Math.max(1, Style.space(2))
   // Shared panel padding.
   readonly property int panelPadding: Style.spacing.panelPadding
   // Shared row horizontal padding.

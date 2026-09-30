@@ -28,7 +28,7 @@ Item {
   // Card border colour while the failure flash is on.
   property color borderError: Color.polkit.borderError
   // Border spec handed to BorderSurface; switches to the error border during errorFlash.
-  property var borderSpec: Border.surfaceSpec("polkit", errorFlash ? "border-error" : "border", errorFlash ? borderError : border, Math.max(1, Style.space(2)), "border-alpha")
+  property var borderSpec: Border.surfaceSpec("polkit", errorFlash ? "border-error" : "border", errorFlash ? borderError : border, Aranea.DesignTokens.borderWidth, "border-alpha")
   // Lock-grade dim: at least 0.72, whatever the theme's scrim alpha is.
   readonly property color scrim: Qt.rgba(Color.polkit.scrim.r, Color.polkit.scrim.g, Color.polkit.scrim.b, Math.max(Color.polkit.scrim.a, 0.72))
   // Secondary text colour: foreground at 58% alpha.
@@ -38,7 +38,7 @@ Item {
   // file:// URL of the Aranea glyph from the current theme's branding, shown in the header.
   readonly property string glyphSource: Aranea.RuntimePaths.glyphUrl
   // Corner radius of the card and the password field.
-  readonly property int cornerRadius: Style.cornerRadius
+  readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Padding inside the card.
   property int contentMargin: Style.spacing.panelPadding
   // Height of the password field (at least the shell's control height).

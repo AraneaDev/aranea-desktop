@@ -3,10 +3,22 @@ import QtQuick
 import Quickshell
 import "lib"
 import "plugins/araneadev.health" as HealthComponents
+import "plugins/araneadev.health/MetricsLogic.js" as MetricsLogic
 
 ShellRoot {
   QmlTest {
     id: t
+  }
+
+  // True when ITEM or one of its descendants is a Text with this exact text.
+  function hasText(item, text) {
+    if (item.text !== undefined && item.text === text)
+      return true
+    for (var i = 0; i < item.children.length; i++) {
+      if (hasText(item.children[i], text))
+        return true
+    }
+    return false
   }
 
   HealthComponents.HealthProblemsSection {
@@ -36,6 +48,22 @@ ShellRoot {
     ]
   }
 
+  HealthComponents.HealthProcessSection {
+    id: processesMemory
+    cpuProcesses: [
+      {
+        comm: "a",
+        percent: 5
+      }
+    ]
+    memoryProcesses: [
+      {
+        comm: "b",
+        rss: 1048576
+      }
+    ]
+  }
+
   HealthComponents.HealthResourceSection {
     id: resources
     metrics: ({})
@@ -60,6 +88,7 @@ ShellRoot {
     t.equal(resources.diskRows.length, 1, "health resource sections expose disk rows")
     t.equal(resources.active, true, "health resource sections expose active state")
     t.equal(resources.metrics.cpu, undefined, "health resource sections expose metrics state")
+    t.check(hasText(processesMemory, MetricsLogic.humanBytes(1048576)), "health process sections render the memory column's value")
     t.done()
   }
 }
