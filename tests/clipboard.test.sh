@@ -37,7 +37,7 @@ grep -Fq 'activeRow.secret && revealedIndex !== selectedIndex' "$plugin/componen
 # a reveal belongs to one item; any change to the list masks everything again
 block_grep "$entry" 'function rebuildDisplay()' 'root.revealedIndex = -1'
 # menu-like open motion that honours the Aranea motion setting
-grep -Fq 'aranea/motion' "$entry"
+grep -Fq 'Aranea.MotionState.motionEnabled' "$entry"
 grep -Fq 'NumberAnimation' "$window"
 # pin time recorded; no secret toggle offered for images; header wording
 grep -Fq 'ClipboardLogic.togglePinned(root.history, displayModel.get(index).historyIndex, Date.now())' "$entry"
