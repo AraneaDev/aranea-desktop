@@ -63,9 +63,12 @@ runtime checks require the Omarchy tooling available on the development host.
 
 Use `plugins/araneadev.shared` for visual and input contracts that are
 identical across plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`,
-`StatusTextPair`, `StatusRow`, `BrandHeader`, `KeyboardInputFrame`, and
-`KeyboardPanelFrame`. `KeyboardInputFrame` owns only key forwarding;
-`KeyboardPanelFrame` adds the layer-shell panel. Keep lifecycle, cursor, and
+`StatusTextPair`, `StatusRow`, `BrandHeader`, `KeyboardInputFrame`,
+`KeyboardPanelFrame`, `EmptyState`, and `InkText`. `KeyboardInputFrame` owns
+only key forwarding; `KeyboardPanelFrame` adds the layer-shell panel.
+`EmptyState` is the shared centered empty-state presentation for menu and
+picker surfaces. `InkText` is a `Text` whose glyph ink, rather than its
+advance width, sits on the alignment line. Keep lifecycle, cursor, and
 plugin-specific interaction logic in the owning plugin rather than adding it
 to shared components.
 
