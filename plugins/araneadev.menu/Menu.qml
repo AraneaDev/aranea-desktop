@@ -25,13 +25,9 @@ Item {
 
   // The rows shown in the menu (display order), read by the window.
   readonly property alias displayModel: rowsModel
-  // Omarchy's default menu file has loaded (or is missing).
-  property bool defaultMenuSeen: false
-  // The user's menu extension file has loaded (or is missing).
-  property bool userMenuSeen: false
   // Both menu files have reported: a pending route can only resolve then, or
   // it would resolve against a half-built menu and fall back to the root.
-  readonly property bool menuSourcesReady: root.defaultMenuSeen && root.userMenuSeen
+  readonly property bool menuSourcesReady: sources.ready
   // Whether to create the on-screen window (MenuWindow.qml); tests switch it off.
   property bool windowEnabled: true
   // The window, once created; null offscreen.
@@ -177,8 +173,7 @@ Item {
 
   // Reloads both JSONC menu files and returns "ok".
   function refresh(): string {
-    defaultMenuFile.reload()
-    userMenuFile.reload()
+    sources.reload()
     return "ok"
   }
 
@@ -187,16 +182,6 @@ Item {
     return "ok"
   }
 
-  // JSONC menu definitions. The shell parses both at startup and merges
-  // the user file on top of the defaults, so the keybind → IPC → visible
-  // path doesn't have to shell out to bash + jq on every open.
-  property string defaultMenuPath: omarchyPath + "/default/omarchy/omarchy-menu.jsonc"
-  // User extension file merged over the defaults.
-  property string userMenuPath: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
-  // Items parsed from the default JSONC file.
-  property var defaultMenuItems: []
-  // Items parsed from the user JSONC file ([] when it is missing).
-  property var userMenuItems: []
   // Whether the menu is showing; clearing it closes the panel.
   property bool opened: false
   // "menu" for the command menu, "select" or "input" for a dmenu request.
@@ -519,7 +504,7 @@ Item {
   // on a per-key basis (so the user can tweak label/icon/action without
   // re-declaring the whole row).
   function rebuildItemsFromSources(): void {
-    var mergedMenu = MenuModel.mergeMenuSources(root.defaultMenuItems, root.userMenuItems)
+    var mergedMenu = sources.merge()
     root.providerRevision += 1
     root.providersLoaded = ({})
     root.providerQueue = []
@@ -1295,43 +1280,14 @@ Item {
     }
   }
 
-  // The JSONC sources are watched so live edits to the default file (or the
-  // user extension at ~/.config/omarchy/extensions/omarchy-menu.jsonc) take
-  // effect without restarting the shell.
-  FileView {
-    id: defaultMenuFile
-    path: root.defaultMenuPath
-    watchChanges: true
-    printErrors: false
-    onLoaded: {
-      root.defaultMenuItems = MenuModel.parseMenuJsonc(text())
-      root.defaultMenuSeen = true
-      root.rebuildItemsFromSources()
-    }
-    onLoadFailed: {
-      root.defaultMenuSeen = true
-      root.rebuildItemsFromSources()
-    }
-    onFileChanged: reload()
+  // Omarchy's default menu file and the user extension; a change rebuilds the items.
+  MenuSources {
+    id: sources
+    omarchyPath: root.omarchyPath
+    onUpdated: root.rebuildItemsFromSources()
   }
-
-  FileView {
-    id: userMenuFile
-    path: root.userMenuPath
-    watchChanges: true
-    printErrors: false
-    onLoaded: {
-      root.userMenuItems = MenuModel.parseMenuJsonc(text())
-      root.userMenuSeen = true
-      root.rebuildItemsFromSources()
-    }
-    onLoadFailed: {
-      root.userMenuItems = []
-      root.userMenuSeen = true
-      root.rebuildItemsFromSources()
-    }
-    onFileChanged: reload()
-  }
+  // Omarchy's default menu file (tests point it at a fixture).
+  property alias defaultMenuPath: sources.defaultMenuPath
 
   // Batched `when:` and `checked:` guards; a finished batch rebuilds the rows.
   MenuGuards {
