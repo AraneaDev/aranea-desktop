@@ -80,6 +80,12 @@ test("allIconGlyphs covers every glyph the OSD can show, no duplicates", () => {
   )
 })
 
+test("valueColumnWidth keeps the '100%' floor for normal values and widens for out-of-range ones", () => {
+  eq(model.valueColumnWidth(28, 18), 28, "a value narrower than the floor keeps the fixed width")
+  eq(model.valueColumnWidth(28, 28), 28, "exactly '100%' keeps the fixed width")
+  eq(model.valueColumnWidth(28, 35), 35, "'1000%' (wider than the floor) widens the column")
+})
+
 test("maxInkWidth picks the widest glyph by the measure callback, 0 for an empty list", () => {
   eq(
     model.maxInkWidth([], () => 99),

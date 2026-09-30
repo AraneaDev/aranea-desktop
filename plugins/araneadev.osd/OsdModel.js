@@ -126,6 +126,20 @@ function maxInkWidth(glyphs, measure) {
 }
 
 /**
+ * OSD value column width: the wider of the fixed "100%" floor and the
+ * current value text's ink, so a normal 0-100% value keeps the card's fixed
+ * width and only an out-of-range value (e.g. "1000%" from
+ * `omarchy osd -p 1000`, which /usr/bin/omarchy-osd builds unclamped from
+ * the raw argument) widens the card instead of spilling past its padding.
+ * @param {number} floorWidth - ink width of "100%" at the value font
+ * @param {number} valueInkWidth - ink width of the current value text at the value font
+ * @returns {number} the value column's width
+ */
+function valueColumnWidth(floorWidth, valueInkWidth) {
+  return Math.max(floorWidth, valueInkWidth)
+}
+
+/**
  * Turns the raw strings of an OSD request into display state.
  * @param {string} iconName - icon name for iconFor
  * @param {string} rawMessage - message text; a non-empty message disables progress
@@ -169,5 +183,12 @@ function progressFraction(state) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { iconFor, stateForShow, progressFraction, allIconGlyphs, maxInkWidth }
+  module.exports = {
+    iconFor,
+    stateForShow,
+    progressFraction,
+    allIconGlyphs,
+    maxInkWidth,
+    valueColumnWidth
+  }
 }

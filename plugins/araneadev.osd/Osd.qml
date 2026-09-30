@@ -56,10 +56,13 @@ Item {
   // maxIconInkWidth's result can be assigned from Component.onCompleted
   // and the Style.font Connections below); read iconWidth, not this.
   property real _iconWidth: 0
-  // Value column: fixed to the ink width of "100%" at the value font, so
-  // the card never resizes across 0-100%. Left-aligned ink (Aranea.InkText)
-  // then starts `gap` after the strand for every value.
-  readonly property real valueWidth: valueFloorInk.tightBoundingRect.width
+  // Value column: the wider of the "100%" floor and the current value's own
+  // ink (OsdModel.valueColumnWidth), so the card never resizes across
+  // 0-100% and only widens for an out-of-range value ("1000%" from
+  // `omarchy osd -p 1000`; /usr/bin/omarchy-osd builds progress_text from
+  // the raw, unclamped argument). Left-aligned ink (Aranea.InkText) then
+  // starts `gap` after the strand for every value.
+  readonly property real valueWidth: OsdModel.valueColumnWidth(valueFloorInk.tightBoundingRect.width, valueInk.tightBoundingRect.width)
   // Message column width: the message's width, capped.
   readonly property int messageWidth: Math.min(Style.space(220), messageMetrics.advanceWidth)
   // Width of the card content between the paddings.
@@ -141,12 +144,23 @@ Item {
     text: root.message
   }
 
-  // "100%" at the value font: the value column's fixed width (valueWidth).
+  // "100%" at the value font: the value column's floor width (valueWidth).
   TextMetrics {
     id: valueFloorInk
     font.family: Style.font.family
     font.pixelSize: Style.font.title
     text: "100%"
+  }
+
+  // The current value text's ink at the value font: widens valueWidth past
+  // the "100%" floor for an out-of-range value instead of letting it spill.
+  // Reuses valueFloorInk's resolved font (rather than restating
+  // Style.font.family/title) so this does not add another qmllint
+  // missing-property warning for Style.font to the baseline.
+  TextMetrics {
+    id: valueInk
+    font: valueFloorInk.font
+    text: root.message
   }
 
   // Reused by maxIconInkWidth to measure each OsdModel.allIconGlyphs()
