@@ -8,6 +8,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "MenuLayout.js" as MenuLayout
 
 PanelWindow {
   id: panel
@@ -47,27 +48,27 @@ PanelWindow {
 
   // Contain alone parks the cursor row flush with the viewport edge, hiding
   // the neighbor entirely and losing the fold affordance. Keep the next
-  // hidden row peeking past the cursor in the direction of travel.
+  // hidden row peeking past the cursor in the direction of travel, but never
+  // at the cost of the cursor row itself (MenuLayout.revealContentY).
   function revealCursor(): void {
     if (panel.root.displayModel.count === 0)
       return
-    resultListComponent.list.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
-
-    var item = resultListComponent.list.itemAtIndex(panel.root.selectedIndex)
+    var list = resultListComponent.list
+    list.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
+    var item = list.itemAtIndex(panel.root.selectedIndex)
     if (!item)
       return
-    var reach = panel.root.style.rowPeek + panel.root.style.rowSpacing
-    if (panel.root.selectedIndex < panel.root.displayModel.count - 1) {
-      var maxY = Math.max(resultListComponent.list.originY, resultListComponent.list.originY + resultListComponent.list.contentHeight - resultListComponent.list.height)
-      var overhang = item.y + item.height + reach - (resultListComponent.list.contentY + resultListComponent.list.height)
-      if (overhang > 0)
-        resultListComponent.list.contentY = Math.min(resultListComponent.list.contentY + overhang, maxY)
-    }
-    if (panel.root.selectedIndex > 0) {
-      var underhang = resultListComponent.list.contentY - (item.y - reach)
-      if (underhang > 0)
-        resultListComponent.list.contentY = Math.max(resultListComponent.list.contentY - underhang, resultListComponent.list.originY)
-    }
+    list.contentY = MenuLayout.revealContentY({
+      index: panel.root.selectedIndex,
+      count: panel.root.displayModel.count,
+      contentY: list.contentY,
+      originY: list.originY,
+      contentHeight: list.contentHeight,
+      viewHeight: list.height,
+      itemY: item.y,
+      itemHeight: item.height,
+      reach: panel.root.style.rowPeek + panel.root.style.rowSpacing
+    })
   }
 
   PointerMoveGate {

@@ -36,10 +36,11 @@ Item {
   property var run: function (command) {
     Util.execDetached(command)
   }
-  // Screen width from the window (1920 offscreen).
-  readonly property int screenWidth: root.view ? root.view.width : 1920
-  // Screen height from the window (1080 offscreen).
-  readonly property int screenHeight: root.view ? root.view.height : 1080
+  // Screen width from the window's screen: known before the layer surface is
+  // configured, while the window's own size is still 0 (1920 offscreen).
+  readonly property int screenWidth: MenuLayout.screenExtent(root.view && root.view.screen ? root.view.screen.width : 0, root.view ? root.view.width : 0, 1920)
+  // Screen height from the window's screen, like screenWidth (1080 offscreen).
+  readonly property int screenHeight: MenuLayout.screenExtent(root.view && root.view.screen ? root.view.screen.height : 0, root.view ? root.view.height : 0, 1080)
   // The window's frozen card top, or -1.
   readonly property int viewCardTop: root.view ? root.view.cardTop : -1
   // The window's row-height ceiling for this opening, or -1.

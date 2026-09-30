@@ -59,3 +59,46 @@ test("the fold shows every row that fits, else ends mid-row with a peek", () => 
   assert.equal(layout.foldedListHeight([200], 50, metrics), 50)
   assert.equal(layout.foldedListHeight([200], 10, metrics), 40)
 })
+
+test("revealing the cursor never scrolls the cursor row itself out of view", () => {
+  const base = {
+    index: 0,
+    count: 5,
+    contentY: 0,
+    originY: 0,
+    contentHeight: 306,
+    itemY: 0,
+    itemHeight: 58,
+    reach: 26
+  }
+  // The regression: a one-row list (window not sized yet) used to scroll to 44.
+  assert.equal(layout.revealContentY({ ...base, viewHeight: 40 }), 0)
+  // A tall enough list is left alone at the top.
+  assert.equal(layout.revealContentY({ ...base, viewHeight: 208 }), 0)
+})
+
+test("revealing the cursor keeps the forward and backward peeks", () => {
+  const rows = {
+    count: 10,
+    originY: 0,
+    contentHeight: 436,
+    viewHeight: 150,
+    itemHeight: 40,
+    reach: 26
+  }
+  // Moving down to row 2 (y 88): 88 + 40 + 26 - 150 = 4 px of scroll.
+  assert.equal(layout.revealContentY({ ...rows, index: 2, contentY: 0, itemY: 88 }), 4)
+  // Moving up to row 3 (y 132) from contentY 150: keep 26 above it.
+  assert.equal(layout.revealContentY({ ...rows, index: 3, contentY: 150, itemY: 132 }), 106)
+  // The last row has no forward peek.
+  assert.equal(layout.revealContentY({ ...rows, index: 9, contentY: 286, itemY: 396 }), 286)
+})
+
+test("the layout's screen size comes from the screen, not the unconfigured window", () => {
+  // A freshly mapped layer surface reports 0 (then 500) before it is configured.
+  assert.equal(layout.screenExtent(810, 0, 1080), 810)
+  assert.equal(layout.screenExtent(810, 500, 1080), 810)
+  // Without a screen: the window's size once it has one, else the fallback.
+  assert.equal(layout.screenExtent(0, 810, 1080), 810)
+  assert.equal(layout.screenExtent(0, 0, 1080), 1080)
+})
