@@ -204,28 +204,12 @@ Item {
   property int dmenuMaxHeight: 0
   // Whether a dmenu request is still waiting for its answer.
   property bool requestActive: false
-  // Menu ids whose bash provider is running (id → true).
-  property var providerLoadingMenus: ({})
-  // Menu ids whose last bash provider run exited nonzero (id → true).
-  property var providerErrorMenus: ({})
   // What the empty list shows for the active menu (its own provider only).
   readonly property var emptyStateInfo: MenuModel.emptyState({
-    loading: !!root.providerLoadingMenus[root.activeMenu],
-    error: !!root.providerErrorMenus[root.activeMenu],
+    loading: !!providers.loadingMenus[root.activeMenu],
+    error: !!providers.errorMenus[root.activeMenu],
     filter: root.filterText
   })
-
-  // Returns a copy of map with key set (or removed); maps are replaced, not mutated, so bindings update.
-  function withFlag(map: var, key: string, value: bool): var {
-    var next = ({})
-    for (var k in map)
-      next[k] = map[k]
-    if (value)
-      next[key] = true
-    else
-      delete next[key]
-    return next
-  }
   // Set once the JSONC sources have been merged; the panel stays hidden until then.
   property bool rowsLoaded: false
   // Id of the submenu being shown.
@@ -246,12 +230,6 @@ Item {
   property var itemOrder: []
   // Previously visited submenu ids, popped by goBack().
   property var navStack: []
-  // Submenu ids whose provider has run (or started) since the last rebuild.
-  property var providersLoaded: ({})
-  // Submenu ids waiting for providerProc to become free.
-  property var providerQueue: []
-  // Bumped on each rebuild so output from an older provider run is discarded.
-  property int providerRevision: 0
   // Last generated Apps rows, including the Favorites and Recent submenus.
   property var appRows: []
   // One-off message that replaces the key hints until noticeTimer clears it.
@@ -475,11 +453,7 @@ Item {
   // re-declaring the whole row).
   function rebuildItemsFromSources(): void {
     var mergedMenu = sources.merge()
-    root.providerRevision += 1
-    root.providersLoaded = ({})
-    root.providerQueue = []
-    root.providerLoadingMenus = ({})
-    root.providerErrorMenus = ({})
+    providers.reset()
     root.items = mergedMenu.items
     root.itemOrder = mergedMenu.itemOrder
     root.rowsLoaded = true
@@ -488,176 +462,41 @@ Item {
     // sources: merge them back, so a rebuild (the user menu file loading after
     // the default one) keeps an open generated menu instead of resetting to root.
     if (root.appRows.length > 0)
-      root.startProviderForMenu("apps")
+      providers.start("apps")
     if (root.opened) {
       root.rebuildDisplay()
       if (!root.dmenuActive) {
         if (root.filterText.trim())
-          root.loadProvidersForSearch()
+          providers.loadForSearch(root.activeMenu)
         else
-          root.loadProviderForMenu(root.activeMenu)
+          providers.load(root.activeMenu)
       }
     }
     if (root.pendingInitialMenu) {
-      root.startProviderForMenu("apps")
+      providers.start("apps")
       root.resolvePendingAppsRoute()
     }
   }
 
-  // Each known provider is a tiny bash one-liner that enumerates a list and
-  // emits one tab-delimited row per item: `label\tvalue\tcurrent`. The shell
-  // turns those into menu items children of `menuId`. A `volatile` provider
-  // re-runs every time its submenu is entered, so a font installed since the
-  // shell started shows up without restarting it.
-  readonly property var providers: ({
-      "fonts": {
-        script: "current=$(omarchy-font-current 2>/dev/null); omarchy-font-list 2>/dev/null | while read -r f; do [[ -z $f ]] && continue; printf '%s\\t%s\\t%s\\n' \"$f\" \"$f\" \"$current\"; done",
-        icon: "",
-        volatile: true,
-        actionFor: function (value) {
-          return "omarchy-font-set " + Util.shellQuote(value)
-        }
-      },
-      "power-profiles": {
-        script: "current=$(powerprofilesctl get 2>/dev/null); omarchy-powerprofiles-list 2>/dev/null | while read -r p; do [[ -z $p ]] && continue; printf '%s\\t%s\\t%s\\n' \"$p\" \"$p\" \"$current\"; done",
-        icon: "\udb81\udc0b",
-        actionFor: function (value) {
-          return "omarchy-powerprofiles-set autodetect " + Util.shellQuote(value)
-        }
-      }
-    })
-
-  // Runs the provider of submenu `id` unless it already ran; apps merge inline, others start providerProc.
-  function startProviderForMenu(id) {
-    var entry = root.item(id)
-    if (!entry || !entry.provider || root.providersLoaded[id])
-      return
-    if (entry.provider === "apps") {
-      root.providersLoaded[id] = true
-      root.loadApps()
-      return
+  // Bash providers that fill submenus on demand; their rows swap into the items.
+  MenuProviders {
+    id: providers
+    items: root.items
+    itemOrder: root.itemOrder
+    onAppsRequested: root.loadApps()
+    onRowsReady: function (menuId, rows) {
+      root.applyProviderRows(menuId, rows)
     }
-    var spec = root.providers[entry.provider]
-    if (!spec)
-      return
-    root.providersLoaded[id] = true
-    root.providerLoadingMenus = root.withFlag(root.providerLoadingMenus, id, true)
-    root.providerErrorMenus = root.withFlag(root.providerErrorMenus, id, false)
-    providerProc.menuId = id
-    providerProc.providerKey = entry.provider
-    providerProc.revision = root.providerRevision
-    providerProc.collected = ""
-    providerProc.command = ["bash", "-lc", spec.script]
-    providerProc.running = true
   }
 
-  // Turns a provider's tab-separated output into action rows under `menuId` and swaps them in.
-  function mergeProviderRows(rows, menuId, providerKey) {
-    var spec = root.providers[providerKey]
-    if (!spec)
-      return
-    var lines = String(rows || "").split("\n")
-    var providerRows = []
-    var takenIds = ({})
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim()
-      if (!line)
-        continue
-      var parts = line.split("\t")
-      var label = parts[0] || ""
-      var value = parts[1] || parts[0] || ""
-      var current = parts[2] || ""
-      if (!label)
-        continue
-      // Distinct values can slugify alike — Fira Code and Fira-Code both give
-      // fira-code — and a repeated id is dropped, which would silently lose a
-      // row from the list. Nudge it until it is the row's own.
-      var rowId = menuId + "." + MenuModel.slugify(value)
-      while (takenIds[rowId])
-        rowId += "-"
-      takenIds[rowId] = true
-
-      providerRows.push({
-        id: rowId,
-        parent: menuId,
-        kind: "action",
-        icon: (value === current) ? "✓" : (spec.icon || ""),
-        label: label,
-        title: "",
-        target: "",
-        description: "",
-        action: spec.actionFor(value),
-        provider: "",
-        aliases: [],
-        when: "",
-        checked: "",
-        order: 0
-      })
-    }
-    var merged = MenuModel.swapProviderRows(root.items, root.itemOrder, menuId, providerRows)
+  // Swaps a provider's rows in under MENUID, rebuilds, and lets a running search load more.
+  function applyProviderRows(menuId: string, rows: var): void {
+    var merged = MenuModel.swapProviderRows(root.items, root.itemOrder, menuId, rows)
     root.items = merged.items
     root.itemOrder = merged.itemOrder
-    if (root.opened)
-      root.rebuildDisplay()
-  }
-
-  // Starts the next queued provider once providerProc is free.
-  function startNextProvider(): void {
-    if (providerProc.running)
-      return
-    while (root.providerQueue.length > 0) {
-      var id = root.providerQueue.shift()
-      var entry = root.item(id)
-      if (!entry || !entry.provider || root.providersLoaded[id])
-        continue
-      root.startProviderForMenu(id)
-      return
-    }
-  }
-
-  // Entering a submenu is the one moment a volatile list is worth paying for
-  // again: it may have been reshaped by the last pick from it. Search doesn't
-  // invalidate, or every keystroke would restart the same enumeration.
-  function invalidateVolatileProvider(id) {
-    var entry = root.item(id)
-    var spec = entry && entry.provider ? root.providers[entry.provider] : null
-    if (spec && spec.volatile)
-      root.providersLoaded[id] = false
-  }
-
-  // Loads submenu `id`'s provider, queueing it when providerProc is busy.
-  function loadProviderForMenu(id) {
-    var entry = root.item(id)
-    if (!entry || !entry.provider || root.providersLoaded[id])
-      return
-
-    // Native providers don't touch providerProc, so they never need to queue.
-    if (entry.provider === "apps") {
-      root.startProviderForMenu(id)
-      return
-    }
-
-    if (providerProc.running) {
-      if (root.providerQueue.indexOf(id) < 0)
-        root.providerQueue = root.providerQueue.concat([id])
-      return
-    }
-
-    root.startProviderForMenu(id)
-  }
-
-  // Loads every not-yet-run provider under the active menu so search can see its rows.
-  function loadProvidersForSearch() {
-    var active = root.item(root.activeMenu) ? root.activeMenu : "root"
-
-    for (var i = 0; i < root.itemOrder.length; i++) {
-      var entry = root.item(root.itemOrder[i])
-      if (!entry || !entry.provider || root.providersLoaded[entry.id])
-        continue
-      if (active !== "root" && entry.id !== active && !MenuModel.isDescendantOf(root.items, entry.id, active))
-        continue
-      root.loadProviderForMenu(entry.id)
-    }
+    root.rebuildIfOpen()
+    if (root.filterText.trim())
+      providers.loadForSearch(root.activeMenu)
   }
 
   // Refills displayModel with the dmenu options that match the filter.
@@ -834,7 +673,7 @@ Item {
     root.cursorActive = root.mode !== "input"
     root.disarmPointer()
     if (!root.dmenuActive && root.filterText.trim())
-      root.loadProvidersForSearch()
+      providers.loadForSearch(root.activeMenu)
     root.rebuildDisplay()
   }
 
@@ -854,8 +693,8 @@ Item {
     else if (!fromPointer)
       root.disarmPointer()
     root.rebuildDisplay()
-    root.invalidateVolatileProvider(id)
-    root.loadProviderForMenu(id)
+    providers.invalidateVolatile(id)
+    providers.load(id)
   }
 
   // Returns to the previous submenu (or the parent); returns false on root.
@@ -989,8 +828,8 @@ Item {
     guards.evaluate(root.items)
     opened = true
     rebuildDisplay()
-    invalidateVolatileProvider(activeMenu)
-    loadProviderForMenu(activeMenu)
+    providers.invalidateVolatile(activeMenu)
+    providers.load(activeMenu)
     // The shell may start before first-install packages have finished placing
     // their icons. Refresh here even when the desktop entry list did not change.
     if (root.appLibrary)
@@ -1047,7 +886,7 @@ Item {
     // them after that provider has merged its generated submenu entries.
     if (initialMenu === "apps.favorites" || initialMenu === "apps.recent") {
       root.pendingInitialMenu = initialMenu
-      root.startProviderForMenu("apps")
+      providers.start("apps")
       root.resolvePendingAppsRoute()
       return
     }
@@ -1095,29 +934,6 @@ Item {
   }
 
   Process {
-    id: providerProc
-    property string menuId: ""
-    property string providerKey: ""
-    property string collected: ""
-    property int revision: 0
-    stdout: SplitParser {
-      onRead: function (data) {
-        providerProc.collected += data + "\n"
-      }
-    }
-    onExited: function (exitCode, exitStatus) {
-      root.providerLoadingMenus = root.withFlag(root.providerLoadingMenus, providerProc.menuId, false)
-      if (providerProc.revision === root.providerRevision) {
-        root.providerErrorMenus = root.withFlag(root.providerErrorMenus, providerProc.menuId, exitCode !== 0)
-        root.mergeProviderRows(providerProc.collected, providerProc.menuId, providerProc.providerKey)
-        if (root.filterText.trim())
-          root.loadProvidersForSearch()
-      }
-      root.startNextProvider()
-    }
-  }
-
-  Process {
     id: resultProc
     onExited: {
       if (root.applySerial === root.requestSerial)
@@ -1135,7 +951,7 @@ Item {
   Connections {
     target: root.appLibrary
     function onAppsChanged() {
-      if (root.providersLoaded["apps"])
+      if (providers.loaded["apps"])
         root.loadApps()
     }
   }

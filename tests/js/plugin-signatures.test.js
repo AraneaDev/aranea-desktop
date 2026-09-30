@@ -117,7 +117,15 @@ test("menu QML exposes its typed function signatures", () => {
     "function rebuildItemsFromSources(): void",
     "menu rebuildItemsFromSources"
   )
-  requiresSignature(menuQml, "function startNextProvider(): void", "menu startNextProvider")
+  const menuProvidersQml = fs.readFileSync(
+    `${root}/plugins/araneadev.menu/MenuProviders.qml`,
+    "utf8"
+  )
+  requiresSignature(
+    menuProvidersQml,
+    "function startNextProvider(): void",
+    "menu providers startNextProvider"
+  )
   requiresSignature(menuQml, "function rebuildDmenuDisplay(): void", "menu rebuildDmenuDisplay")
   requiresSignature(menuQml, "function cancel(): void", "menu cancel")
 

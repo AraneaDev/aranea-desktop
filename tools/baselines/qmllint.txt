@@ -61,8 +61,9 @@
 12	plugins/araneadev.lock/Service.qml:unqualified:Unqualified access
 1	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "barSize" not found on type "QObject"
 2	plugins/araneadev.menu/BarWidget.qml:missing-property:Member "run" not found on type "QObject"
-2	plugins/araneadev.menu/Menu.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+1	plugins/araneadev.menu/Menu.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.menu/MenuGuards.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
+1	plugins/araneadev.menu/MenuProviders.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "background" not found on type "QObject"
 2	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "bodySmall" not found on type "QObject"
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "border" not found on type "QObject"

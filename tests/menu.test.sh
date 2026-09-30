@@ -9,6 +9,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 source "$repo_root/tests/lib/assert.sh"
 menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
+menu_providers="$repo_root/plugins/araneadev.menu/MenuProviders.qml"
 menu_style="$repo_root/plugins/araneadev.menu/MenuStyle.qml"
 menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
 menu_results="$repo_root/plugins/araneadev.menu/MenuResultList.qml"
@@ -51,10 +52,10 @@ fi
 grep -Fq 'precision: SystemClock.Minutes' "$menu_style"
 grep -Fq 'Qt.formatDateTime(menuClock.date, "HH:mm")' "$menu_style"
 # --- 4b: provider state per menu; routes resolve when the rows exist
-grep -Fq 'property var providerLoadingMenus: ({})' "$menu_qml"
-grep -Fq 'property var providerErrorMenus: ({})' "$menu_qml"
+grep -Fq 'property var loadingMenus: ({})' "$menu_providers"
+grep -Fq 'property var errorMenus: ({})' "$menu_providers"
 grep -Fq 'MenuModel.emptyState(' "$menu_qml"
-if grep -Eq 'property bool provider(Loading|Error)|openGeneratedAppsMenu|attempt < 12' "$menu_qml"; then
+if grep -Eq 'provider(Loading|Error)|openGeneratedAppsMenu|attempt < 12' "$menu_qml" "$menu_providers"; then
   echo "global provider flags and the route retry loop must be gone" >&2
   exit 1
 fi
