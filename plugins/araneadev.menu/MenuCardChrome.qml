@@ -54,6 +54,8 @@ Item {
   property int rootTileHeight: Style.space(72)
   // Public contract member.
   property int footerHeight: Style.space(30)
+  // Gap between header, context band, tiles and footer on the root.
+  property int sectionSpacing: Style.spacing.md
   // Public contract member.
   signal tileActivated(var tile)
 
@@ -64,7 +66,7 @@ Item {
 
   Column {
     anchors.fill: parent
-    spacing: fullRootHeader ? Style.spacing.md : Style.spacing.sm
+    spacing: fullRootHeader ? chrome.sectionSpacing : Style.spacing.sm
 
     Item {
       width: parent.width
@@ -87,7 +89,7 @@ Item {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(220)
-        height: Style.space(68)
+        height: parent.height
         source: "file://" + brandingMotifsPath + "menu-network.svg"
         fillMode: Image.PreserveAspectFit
         opacity: 0.24

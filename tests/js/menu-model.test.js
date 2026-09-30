@@ -152,7 +152,11 @@ test("menu model (4b)", () => {
   eq(h({ filter: true }), "ESC CLEAR  ·  ENTER OPEN", "filter")
   eq(h({}), "⌫ BACK  ·  ENTER OPEN  ·  ESC CLOSE", "submenu")
   eq(h({ appRow: true }), "⌫ BACK  ·  ENTER OPEN  ·  ^P PIN  ·  ESC CLOSE", "app row")
-  eq(h({ dmenu: true, input: true }), "TYPE TO FILTER  ·  ESC CANCEL", "dmenu input")
+  eq(
+    h({ dmenu: true, input: true }),
+    "TYPE TO ENTER  ·  ENTER CONFIRM  ·  ESC CANCEL",
+    "dmenu input"
+  )
   eq(h({ dmenu: true, count: 4 }), "4 RESULTS  ·  ENTER SELECT  ·  ESC CANCEL", "dmenu select")
   // empty state
   eq(menu.emptyState({ loading: true, error: false, filter: "" }).text, "Loading…", "loading")

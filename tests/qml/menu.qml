@@ -1,8 +1,9 @@
 // Behaviour of the Aranea menu's non-visual entry (Menu.qml) with its window
 // switched off, a fake app library and a recorder for commands: a 13th pin
 // is refused with a notice, search shows an app once, hints follow the
-// state, Ctrl+P pins and Ctrl+1..3 open the tiles, and a Favorites route
-// opens once the rows exist.
+// state, Ctrl+P pins and Ctrl+1..3 open the tiles, a Favorites route opens
+// once the rows exist, and cardHeight is exactly the laid-out chrome, one
+// section gap and the rows (or the input line).
 import QtQuick
 import Quickshell
 import "lib"
@@ -150,6 +151,16 @@ ShellRoot {
       menu.openRoute("root")
       menu.handleKey(key(Qt.Key_3, Qt.ControlModifier))
       t.equal(menu.activeMenu, "setup", "Ctrl+3 opens Setup")
+
+      // cardHeight budgets exactly what MenuWindow lays out: the border, the
+      // padding, the chrome, one section gap and the rows (or the input line).
+      menu.openRoute("root")
+      t.equal(menu.cardHeight, Math.ceil(menu.style.borderInsetY) + menu.style.contentMargin * 2 + menu.style.chromeHeight + menu.style.sectionSpacing + menu.visibleRowsHeight, "the card budget is exactly the laid-out content")
+      menu.open(JSON.stringify({
+        mode: "input",
+        prompt: "Name"
+      }))
+      t.equal(menu.cardHeight, Math.ceil(menu.style.borderInsetY) + menu.style.contentMargin * 2 + menu.style.headerHeight + menu.style.sectionSpacing + menu.style.inputLineHeight, "the input prompt reserves its input line")
       t.done()
     })
   }

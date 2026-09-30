@@ -63,7 +63,7 @@ function hintText(state) {
   var s = state || {}
   if (s.dmenu)
     return s.input
-      ? "TYPE TO FILTER  ·  ESC CANCEL"
+      ? "TYPE TO ENTER  ·  ENTER CONFIRM  ·  ESC CANCEL"
       : (Number(s.count) || 0) + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL"
   if (s.root) return "SYSTEM // READY"
   if (s.filter) return "ESC CLEAR  ·  ENTER OPEN"

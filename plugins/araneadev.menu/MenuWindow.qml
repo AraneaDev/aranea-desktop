@@ -177,11 +177,12 @@ PanelWindow {
       anchors.rightMargin: card.contentRightInset
       anchors.bottomMargin: card.contentBottomInset
       anchors.leftMargin: card.contentLeftInset
-      spacing: panel.root.fullRootHeader ? panel.root.style.contentSpacing : panel.root.style.compactContentSpacing
+      spacing: panel.root.style.sectionSpacing
 
       MenuCardChrome {
         width: parent.width
-        height: panel.root.fullRootHeader ? panel.root.style.rootHeaderHeight + panel.root.style.rootContextHeight + panel.root.style.rootTileHeight + panel.root.style.footerHeight : panel.root.style.headerHeight
+        height: panel.root.style.chromeHeight
+        sectionSpacing: panel.root.style.rootChromeSpacing
         fullRootHeader: panel.root.fullRootHeader
         dmenuActive: panel.root.dmenuActive
         activeTitle: panel.root.item(panel.root.activeMenu) ? (panel.root.item(panel.root.activeMenu).title || panel.root.item(panel.root.activeMenu).label || "GO") : "GO"
@@ -211,12 +212,64 @@ PanelWindow {
         }
       }
 
+      // Input mode: the line that shows what is typed (the filter text).
+      Rectangle {
+        visible: panel.root.mode === "input"
+        width: parent.width
+        height: panel.root.style.inputLineHeight
+        radius: panel.root.style.cornerRadius
+        color: Util.alpha(panel.root.style.foreground, 0.04)
+        border.width: 1
+        border.color: Util.alpha(panel.root.style.foreground, panel.root.filterText ? 0.22 : 0.10)
+
+        Row {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(12)
+          anchors.rightMargin: Style.space(12)
+          spacing: Style.space(8)
+
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: "›"
+            color: panel.root.filterText ? panel.root.style.selectedText : Util.alpha(panel.root.style.foreground, 0.58)
+            font.family: panel.root.style.fontFamily
+            font.pixelSize: panel.root.style.menuFontSize(Style.font.subtitle)
+          }
+          Text {
+            id: inputValue
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, parent.width - x - inputCaret.width - parent.spacing)
+            textFormat: Text.PlainText
+            text: panel.root.filterText || "Type a value…"
+            color: panel.root.style.foreground
+            opacity: panel.root.filterText ? 1 : 0.58
+            font.family: panel.root.style.fontFamily
+            font.pixelSize: panel.root.style.menuFontSize(Style.font.subtitle)
+            elide: Text.ElideLeft
+          }
+          Rectangle {
+            id: inputCaret
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(1, Style.space(2))
+            height: inputValue.font.pixelSize + Style.space(2)
+            color: panel.root.style.selectedText
+          }
+        }
+      }
+
       Item {
         width: parent.width
         height: panel.root.visibleRowsHeight
         MenuResultList {
           id: resultListComponent
           anchors.fill: parent
+          // Row highlights bleed into the card padding so row content meets the
+          // chrome's content edges.
+          anchors.leftMargin: -panel.root.style.rowBleed
+          anchors.rightMargin: -panel.root.style.rowBleed
+          rowInset: panel.root.style.rowBleed
+          foldPeek: panel.root.style.rowPeek
           model: panel.root.displayModel
           selectedIndex: panel.root.selectedIndex
           cursorActive: panel.root.cursorActive

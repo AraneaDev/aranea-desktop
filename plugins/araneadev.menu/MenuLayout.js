@@ -47,7 +47,7 @@ function plainRowTotals(rows, rowSpacing) {
  * frozen top edge once a search has pinned the card; capped by the opening's
  * ceiling (drilling into a longer submenu scrolls instead of growing the card)
  * and by the menu's own ceiling.
- * @param {{screenHeight: number, cardTop: number, gapsOut: number, contentMargin: number, headerHeight: number, contentSpacing: number, rootExtrasHeight: number, maxRowsHeight: number, ceiling: number}} input - screen, card and style numbers; cardTop and maxRowsHeight are -1 when unset
+ * @param {{screenHeight: number, cardTop: number, gapsOut: number, contentMargin: number, headerHeight: number, contentSpacing: number, rootExtrasHeight: number, maxRowsHeight: number, ceiling: number, borderInsetY: (number|undefined)}} input - screen, card and style numbers; cardTop and maxRowsHeight are -1 when unset; borderInsetY (the card border's top plus bottom) defaults to 0 when omitted
  * @returns {number} available row-list height
  */
 function availableRowsHeight(input) {
@@ -57,6 +57,7 @@ function availableRowsHeight(input) {
     top -
     input.gapsOut -
     input.contentMargin * 2 -
+    (input.borderInsetY || 0) -
     input.headerHeight -
     input.contentSpacing -
     input.rootExtrasHeight

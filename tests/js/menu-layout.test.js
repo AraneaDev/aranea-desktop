@@ -47,6 +47,7 @@ test("the space for rows respects the frozen top, the opening ceiling and the me
   }
   assert.equal(layout.availableRowsHeight(base), 756)
   assert.equal(layout.availableRowsHeight({ ...base, ceiling: 5000 }), 982)
+  assert.equal(layout.availableRowsHeight({ ...base, borderInsetY: 4, ceiling: 5000 }), 978)
   assert.equal(layout.availableRowsHeight({ ...base, cardTop: 100, ceiling: 5000 }), 892)
   assert.equal(layout.availableRowsHeight({ ...base, maxRowsHeight: 300 }), 300)
 })

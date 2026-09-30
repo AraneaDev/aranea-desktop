@@ -66,7 +66,7 @@ BorderSurface {
     anchors.centerIn: parent
     spacing: Style.space(11)
 
-    Text {
+    Aranea.InkText {
       width: parent.width
       text: tile.icon
       color: tile.selectedText
