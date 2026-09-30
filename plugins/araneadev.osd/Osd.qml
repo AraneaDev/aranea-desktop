@@ -44,11 +44,18 @@ Item {
   readonly property int strandWidth: root.hasProgress ? Style.space(180) : Style.space(80)
   // Icon column: fixed to the widest ink of every glyph the OSD can show
   // (OsdModel.allIconGlyphs), so the card never resizes when the icon
-  // changes. Measured once at startup (Component.onCompleted): the icon set
-  // is fixed and Style tokens only change across a shell restart, which
-  // recreates this component anyway. Left-aligned ink (Aranea.InkText) then
-  // starts `pad` from the inner border for every icon.
-  property real iconWidth: 0
+  // changes. Recomputed at startup and whenever the icon font's family or
+  // size changes (see the Connections below): Style.font is not fixed for
+  // a running shell; `omarchy display text size` and the applyTheme IPC
+  // both rewrite ~/.config/omarchy/shell.toml, which Color.qml's
+  // userShellFile FileView watches and reloads live, without a restart.
+  // Left-aligned ink (Aranea.InkText) then starts `pad` from the inner
+  // border for every icon.
+  readonly property alias iconWidth: root._iconWidth
+  // Private backing store for iconWidth (kept writable so
+  // maxIconInkWidth's result can be assigned from Component.onCompleted
+  // and the Style.font Connections below); read iconWidth, not this.
+  property real _iconWidth: 0
   // Value column: fixed to the ink width of "100%" at the value font, so
   // the card never resizes across 0-100%. Left-aligned ink (Aranea.InkText)
   // then starts `gap` after the strand for every value.
@@ -58,21 +65,35 @@ Item {
   // Width of the card content between the paddings.
   readonly property real contentWidth: root.iconWidth + root.gap + root.strandWidth + (root.hasProgress ? root.gap + root.valueWidth : (root.message.length > 0 ? root.gap + root.messageWidth : 0))
 
-  // Widest ink among OsdModel.allIconGlyphs() at the icon font: reuses
-  // iconProbeMetrics (one TextMetrics, its text set per glyph in turn, read
-  // back synchronously) rather than one TextMetrics per glyph.
+  // Widest ink among OsdModel.allIconGlyphs() at the icon font:
+  // OsdModel.maxInkWidth (pure, unit-tested against a fake measure
+  // callback) driven by iconProbeMetrics (one TextMetrics, its text set
+  // per glyph in turn, read back synchronously) rather than one
+  // TextMetrics per glyph.
   function maxIconInkWidth() {
-    var max = 0
-    var glyphs = OsdModel.allIconGlyphs()
-    for (var i = 0; i < glyphs.length; i++) {
-      iconProbeMetrics.text = glyphs[i]
-      max = Math.max(max, iconProbeMetrics.tightBoundingRect.width)
+    return OsdModel.maxInkWidth(OsdModel.allIconGlyphs(), function (glyph) {
+      iconProbeMetrics.text = glyph
+      return iconProbeMetrics.tightBoundingRect.width
+    })
+  }
+
+  // Style.font.title/family can change live (see iconWidth above);
+  // recompute iconWidth whenever either does. A direct binding on
+  // iconWidth cannot do this without mutating iconProbeMetrics inside
+  // its own dependency chain (a binding loop), so this recomputes
+  // imperatively instead.
+  Connections {
+    target: Style.font
+    function onTitleChanged() {
+      root._iconWidth = root.maxIconInkWidth()
     }
-    return max
+    function onFamilyChanged() {
+      root._iconWidth = root.maxIconInkWidth()
+    }
   }
 
   Component.onCompleted: {
-    root.iconWidth = root.maxIconInkWidth()
+    root._iconWidth = root.maxIconInkWidth()
   }
 
   // Applies a request (OsdModel.stateForShow), opens the card and

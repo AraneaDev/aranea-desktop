@@ -69,4 +69,39 @@ test("allIconGlyphs covers every glyph the OSD can show, no duplicates", () => {
       `percent fallback glyph for ${percent}% is covered`
     )
   })
+  // /usr/bin/omarchy-chromium-ytdlp-host passes this glyph straight through
+  // `omarchy-osd -i <glyph>` (iconFor returns an unrecognized name as-is),
+  // so the icon column's fixed width must cover it even though it has no
+  // entry in iconNames.
+  eq(
+    glyphs.includes(String.fromCodePoint(0xf01da)),
+    true,
+    "the chromium-ytdlp-host download glyph (U+F01DA) is covered"
+  )
+})
+
+test("maxInkWidth picks the widest glyph by the measure callback, 0 for an empty list", () => {
+  eq(
+    model.maxInkWidth([], () => 99),
+    0,
+    "an empty glyph list measures 0, never calling measure"
+  )
+  eq(
+    model.maxInkWidth(["a", "bb", "ccc", "d"], (glyph) => glyph.length),
+    3,
+    "picks the widest"
+  )
+  // Every real OSD icon glyph measures a positive width at a real font;
+  // order and which entry is widest should not matter.
+  const widths = { x: 5, yy: 12, zzz: 3 }
+  eq(
+    model.maxInkWidth(Object.keys(widths), (glyph) => widths[glyph]),
+    12,
+    "reads the measure callback per glyph"
+  )
+  eq(
+    model.maxInkWidth(Object.keys(widths).reverse(), (glyph) => widths[glyph]),
+    12,
+    "order does not matter"
+  )
 })

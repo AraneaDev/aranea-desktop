@@ -86,16 +86,43 @@ var iconNames = [
   "media-previous"
 ]
 
+// Glyphs shown by the OSD that do not come through iconFor's name mapping:
+// a caller can pass a glyph straight through `-i` (iconFor returns `name`
+// unchanged for any name it does not recognize). /usr/bin/omarchy-chromium-ytdlp-host
+// does this (`omarchy-osd -i <glyph> -p ...`) with the download glyph
+// U+F01DA, so the icon column's fixed width must cover it too.
+var extraIconGlyphs = [String.fromCodePoint(0xf01da)]
+
 /**
- * Every glyph the OSD can show: one call to iconFor per name in iconNames.
- * The percent-only fallback glyphs (no icon name given) reuse the
- * volume-* glyphs, so they need no separate entries here.
- * @returns {string[]} the glyphs, one per known icon
+ * Every glyph the OSD can show: one call to iconFor per name in iconNames,
+ * plus extraIconGlyphs (glyphs passed straight through by name, not mapped
+ * by iconFor). The percent-only fallback glyphs (no icon name given) reuse
+ * the volume-* glyphs, so they need no separate entries here.
+ * @returns {string[]} the glyphs
  */
 function allIconGlyphs() {
-  return iconNames.map(function (name) {
-    return iconFor(name, -1)
-  })
+  return iconNames
+    .map(function (name) {
+      return iconFor(name, -1)
+    })
+    .concat(extraIconGlyphs)
+}
+
+/**
+ * Widest ink width among a list of glyphs, at whatever font `measure`
+ * applies. Pure: QML supplies `measure` (typically a TextMetrics probe),
+ * this function only loops and compares, so it is unit-testable without a
+ * QML engine.
+ * @param {string[]} glyphs - glyphs to measure
+ * @param {(glyph: string) => number} measure - a glyph's ink width
+ * @returns {number} the widest ink width, 0 for an empty glyph list
+ */
+function maxInkWidth(glyphs, measure) {
+  var max = 0
+  for (var i = 0; i < glyphs.length; i++) {
+    max = Math.max(max, measure(glyphs[i]))
+  }
+  return max
 }
 
 /**
@@ -142,5 +169,5 @@ function progressFraction(state) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { iconFor, stateForShow, progressFraction, allIconGlyphs }
+  module.exports = { iconFor, stateForShow, progressFraction, allIconGlyphs, maxInkWidth }
 }
