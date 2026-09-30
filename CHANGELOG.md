@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.0...v2.7.1) (2026-09-30)
+
+
+### Refactoring
+
+* share script paths and drop motion leftovers ([#75](https://github.com/AraneaDev/aranea-desktop/issues/75)) ([e5625d3](https://github.com/AraneaDev/aranea-desktop/commit/e5625d31ec560bd256ec6faeab656fa5e5ea1734))
+
 ## [2.7.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.6.1...v2.7.0) (2026-09-30)
 
 
