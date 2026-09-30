@@ -69,6 +69,15 @@ grep -Fq 'wl-copy --clear' "$capture_script"
 grep -Fq '.samples' "$capture_script"
 grep -Fq 'omarchy-shell health status' "$capture_script"
 
+# Capture windows are closed by address, never as "the active window": focus
+# may have moved to the user's own window (closing it once killed a session).
+if grep -Fq 'hl.dsp.window.close()' "$capture_script"; then
+  echo "capture must never close the active window" >&2
+  exit 1
+fi
+# shellcheck disable=SC2016 # a literal, not an expansion
+grep -Fq 'close_new_windows "$windows_before"' "$capture_script"
+
 # The polkit shot is a harmless pkexec request that is always cancelled with
 # Escape: nothing is ever typed into the password field.
 grep -Fq 'pkexec /usr/bin/true' "$capture_script"
