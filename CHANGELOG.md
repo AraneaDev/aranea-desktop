@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.4](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.3...v2.7.4) (2026-09-30)
+
+
+### Fixes
+
+* resolve the surface review's spacing, alignment and menu-jump findings ([#81](https://github.com/AraneaDev/aranea-desktop/issues/81)) ([dd650e2](https://github.com/AraneaDev/aranea-desktop/commit/dd650e2022129292a9baa491c8879e1310b4dcb2))
+
 ## [2.7.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.2...v2.7.3) (2026-09-30)
 
 
