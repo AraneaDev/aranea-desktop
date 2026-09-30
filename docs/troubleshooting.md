@@ -36,6 +36,18 @@ omarchy restart shell
 The repair path reinstalls the theme-set and post-boot hooks and reconciles
 deployed plugins.
 
+## The spider mark is missing
+
+A blank bar icon, menu header or lock mark means the deployed plugins are
+newer than the installed theme: they reference a branding file (for example
+`branding/brand.svg`) the active theme does not have yet. The doctor's
+`branding` check names the missing files, and `deploy-plugins-safely` warns
+about them. Update the theme so both match:
+
+```bash
+scripts/install.sh --yes --profile "$(cat ~/.local/state/aranea/profile)"
+```
+
 ## Installation failed
 
 The installer reports the exact command for restoring the previously active

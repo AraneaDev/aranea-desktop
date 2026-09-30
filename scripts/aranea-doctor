@@ -22,6 +22,8 @@ source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/json-events.sh"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/brand-assets.sh"
 
 json=0
 fix=0
@@ -122,6 +124,22 @@ if [[ -f "$manifest_file" ]]; then
   emit manifest ok 'integration manifest is present'
 else
   emit manifest repair 'theme-manifest.toml is missing'
+fi
+
+# Branding files the deployed plugins use must exist in the active theme; a
+# plugin deploy newer than the installed theme leaves the mark blank. Omarchy
+# fixes both locations; ARANEA_DOCTOR_PLUGIN_ROOT/_THEME_ROOT override them.
+brand_plugin_root="${ARANEA_DOCTOR_PLUGIN_ROOT:-$HOME/.config/omarchy/plugins}"
+brand_theme_root="${ARANEA_DOCTOR_THEME_ROOT:-$HOME/.local/state/omarchy/current/theme}"
+if [[ ! -f "$brand_plugin_root/araneadev.shared/BrandConfig.qml" ]]; then
+  emit branding skipped 'no deployed Aranea plugins'
+else
+  mapfile -t brand_missing < <(missing_brand_assets "$brand_plugin_root" "$brand_theme_root")
+  if ((${#brand_missing[@]} == 0)); then
+    emit branding ok 'the active theme has every branding file the plugins use'
+  else
+    emit branding repair "the active theme lacks ${brand_missing[*]}, used by the deployed plugins; update the theme with scripts/install.sh"
+  fi
 fi
 
 icon_root="${ARANEA_DOCTOR_ICON_ROOT:-$(xdg_data_home)/icons/Aranea-icons}"

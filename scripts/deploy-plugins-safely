@@ -10,6 +10,8 @@ set -euo pipefail
 
 # shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/lib/paths.sh"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/brand-assets.sh"
 
 [[ $# -ge 1 && -n "$1" ]] || {
   echo "Usage: scripts/deploy-plugins-safely <theme-root> [target-root]" >&2
@@ -37,6 +39,14 @@ for plugin_id in "${plugin_ids[@]}"; do
     needs_deploy=1
   fi
 done
+
+# Plugins newer than the installed theme reference branding files the active
+# theme lacks (a blank mark). Deploy anyway, but say what is missing and how
+# to fix it. Omarchy keeps the active theme copy at this fixed location.
+mapfile -t brand_missing < <(missing_brand_assets "$theme_root/plugins" "$HOME/.local/state/omarchy/current/theme")
+if ((${#brand_missing[@]})); then
+  echo "warning: the active theme lacks ${brand_missing[*]}, used by these plugins; update the theme with scripts/install.sh" >&2
+fi
 
 # Reconcile shell.json against whatever plugins actually exist on disk on
 # every run, deploy or not. A plugin can land here without ever being
