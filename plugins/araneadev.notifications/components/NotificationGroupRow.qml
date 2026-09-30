@@ -51,6 +51,9 @@ RowLayout {
     color: closeArea.containsMouse ? row.accent : row.dim
     font.family: row.fontFamily
     font.pixelSize: Style.font.body
+    // Same right inset as the card's close button: the card border plus its
+    // content margin (NotificationCard: border Math.max(1, Style.space(1)), Layout.rightMargin Style.space(12)).
+    Layout.rightMargin: Math.max(1, Style.space(1)) + Style.space(12)
 
     MouseArea {
       id: closeArea
