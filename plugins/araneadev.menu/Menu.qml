@@ -528,7 +528,7 @@ Item {
     root.items = mergedMenu.items
     root.itemOrder = mergedMenu.itemOrder
     root.rowsLoaded = true
-    root.evaluateGuards()
+    guards.evaluate(root.items)
     // The generated Apps rows (apps, Favorites, Recent) are not in the JSONC
     // sources: merge them back, so a rebuild (the user menu file loading after
     // the default one) keeps an open generated menu instead of resetting to root.
@@ -891,10 +891,10 @@ Item {
           continue
         if (!MenuModel.isDescendantOf(root.items, entry.id, active))
           continue
-        if (!MenuModel.matchesQuery(entry, query, MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, entry)))
+        if (!MenuModel.matchesQuery(entry, query, MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, entry)))
           continue
         var detail = MenuModel.parentPathFor(root.items, entry.id)
-        var row = MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
+        var row = MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, entry, detail, MenuModel.searchScore(root.items, entry, query))
         if (entry.parent === active)
           currentRows.push(row)
         else
@@ -931,9 +931,9 @@ Item {
         var child = root.item(root.itemOrder[j])
         if (!child || child.parent !== active)
           continue
-        if (!MenuModel.isVisible(root.items, root.itemOrder, root.whenResults, child))
+        if (!MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, child))
           continue
-        rows.push(MenuModel.displayRow(root.items, root.itemOrder, root.checkedResults, child, child.description, child.order))
+        rows.push(MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, child, child.description, child.order))
       }
 
       // DesktopEntries can reorder its values when an application starts.
@@ -1141,7 +1141,7 @@ Item {
     selectedIndex = 0
     cursorActive = true
     root.disarmPointer()
-    root.evaluateGuards()
+    guards.evaluate(root.items)
     opened = true
     rebuildDisplay()
     invalidateVolatileProvider(activeMenu)
@@ -1333,98 +1333,15 @@ Item {
     onFileChanged: reload()
   }
 
-  // ---------------------------------------------------------------- guards
-  //
-  // `when:` (visibility) and `checked:` (✓ marker) are bash expressions the
-  // shell wasn't allowed to evaluate before the perf rewrite. Now the shell
-  // batches them into one bash subprocess per (re)load so the open path
-  // never has to wait on them.
-
-  // Latest `when:` results by id (false hides the item).
-  property var whenResults: ({})       // id → true|false (allow visibility)
-  // Latest `checked:` results by id (true adds the check mark).
-  property var checkedResults: ({})    // id → true|false (show ✓)
-  // Set when an evaluation was requested while one was running; it reruns afterwards.
-  property bool guardsPending: false
-
-  // Runs every `when:` and `checked:` guard in one bash batch (deferred if one is in flight).
-  function evaluateGuards() {
-    // Process ignores a command change while it is running, and `collected`
-    // belongs to the run in flight, so a second evaluation cannot overwrite
-    // the first: it would throw away the lines already read and never start.
-    // The surviving tail then lands as the whole answer, and every id lost
-    // with it goes back to showing, since a `when:` only hides on an explicit
-    // false. Wait for the run in flight and evaluate once it lands instead.
-    if (guardProc.running) {
-      root.guardsPending = true
-      return
-    }
-    root.guardsPending = false
-
-    var script = MenuModel.guardScript(root.items)
-    if (!script) {
-      root.whenResults = ({})
-      root.checkedResults = ({})
-      return
-    }
-    guardProc.collected = ""
-    guardProc.command = ["bash", "-lc", script]
-    guardProc.running = true
+  // Batched `when:` and `checked:` guards; a finished batch rebuilds the rows.
+  MenuGuards {
+    id: guards
+    onUpdated: root.rebuildIfOpen()
   }
 
-  Process {
-    id: guardProc
-    property string collected: ""
-    stdout: SplitParser {
-      onRead: function (data) {
-        guardProc.collected += data + "\n"
-      }
-    }
-    onExited: function (exitCode, exitStatus) {
-      // A batch that was killed rather than finished has only told us about
-      // the rows it reached, and a row whose `when:` went unanswered shows.
-      // Keep the last complete set rather than let a half-read one through.
-      // A signal leaves the exit code at 0, so the status is what tells us.
-      if (exitCode !== 0 || exitStatus !== 0) {
-        if (root.guardsPending)
-          Qt.callLater(function () {
-            root.evaluateGuards()
-          })
-        return
-      }
-
-      var nextWhen = ({})
-      var nextChecked = ({})
-      var lines = guardProc.collected.split("\n")
-      for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim()
-        if (!line)
-          continue
-        var colon = line.lastIndexOf(":")
-        if (colon < 0)
-          continue
-        var value = line.substring(colon + 1) === "1"
-        var rest = line.substring(0, colon)
-        var tagAt = rest.lastIndexOf(":")
-        if (tagAt < 0)
-          continue
-        var id = rest.substring(0, tagAt)
-        var tag = rest.substring(tagAt + 1)
-        if (tag === "w")
-          nextWhen[id] = value
-        else if (tag === "c")
-          nextChecked[id] = value
-      }
-      root.whenResults = nextWhen
-      root.checkedResults = nextChecked
-      if (root.opened)
-        root.rebuildDisplay()
-      // Run the evaluation that had to stand aside. Deferred by a turn so the
-      // process is settled before its command is set again.
-      if (root.guardsPending)
-        Qt.callLater(function () {
-          root.evaluateGuards()
-        })
-    }
+  // Rebuilds the rows when the menu is showing; children report changes here.
+  function rebuildIfOpen(): void {
+    if (root.opened)
+      root.rebuildDisplay()
   }
 }
