@@ -13,11 +13,13 @@ set -euo pipefail
 #        scripts/aranea-wallpaper motion on|off
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
 manifest="${ARANEA_WALLPAPER_MANIFEST:-$repo_root/backgrounds/manifest.toml}"
-state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
-config_root="${ARANEA_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}}/aranea"
+state_root="$(aranea_state_root)"
+config_root="${ARANEA_CONFIG_HOME:-$(xdg_config_home)}/aranea"
 schedule_config="$config_root/wallpaper-schedule.conf"
-systemd_user_dir="${ARANEA_SYSTEMD_USER_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
+systemd_user_dir="${ARANEA_SYSTEMD_USER_DIR:-$(xdg_config_home)/systemd/user}"
 timer_unit="aranea-wallpaper-day-night.timer"
 service_unit="aranea-wallpaper-day-night.service"
 

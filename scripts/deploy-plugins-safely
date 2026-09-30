@@ -8,6 +8,9 @@ set -euo pipefail
 #
 # Usage: scripts/deploy-plugins-safely <theme-root> [target-root]
 
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/paths.sh"
+
 [[ $# -ge 1 && -n "$1" ]] || {
   echo "Usage: scripts/deploy-plugins-safely <theme-root> [target-root]" >&2
   exit 2
@@ -76,7 +79,7 @@ finish() {
     restart_needed=0
     omarchy restart shell >/dev/null 2>&1 || true
     # This restart also completes any polkit agent handover.
-    rm -f "${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}/polkit-handover"
+    rm -f "$(aranea_state_root)/polkit-handover"
   fi
 }
 trap finish EXIT

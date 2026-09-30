@@ -7,9 +7,12 @@ set -euo pipefail
 # from user customisations, and restores the backups on deactivate or
 # uninstall. ARANEA_OWNERSHIP_ROOT overrides the state dir.
 
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/paths.sh"
+
 # Prints the state dir that holds the ledger and the backups.
 aranea_ownership_root() {
-  printf '%s\n' "${ARANEA_OWNERSHIP_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+  printf '%s\n' "${ARANEA_OWNERSHIP_ROOT:-$(aranea_state_root)}"
 }
 
 # Prints the path of the managed-files ledger.
@@ -57,7 +60,8 @@ is_aranea_target() {
     fi
     return 1
   fi
-  local data_root="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local data_root
+  data_root="$(xdg_data_home)"
   [[ "$target" == "$data_root/icons/Aranea/"* || "$target" == "$data_root/icons/Aranea-icons/"* ]]
 }
 

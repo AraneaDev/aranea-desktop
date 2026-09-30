@@ -9,7 +9,9 @@ set -euo pipefail
 #
 # Usage: scripts/repair-shell-config [shell.json]
 
-config_file="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json}"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/paths.sh"
+config_file="${1:-$(xdg_config_home)/omarchy/shell.json}"
 
 if [[ ! -f "$config_file" ]]; then
   printf 'Shell config not found: %s\n' "$config_file" >&2
@@ -29,7 +31,7 @@ resolved_config="$(readlink -f -- "$config_file" 2>/dev/null || true)"
 config_dir="$(dirname "$config_file")"
 tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 backup_file="$config_file.aranea.bak"
-state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+state_root="$(aranea_state_root)"
 bell_marker="$state_root/notifications-widget-placed"
 # Written by release-shell-config when another theme took the bell out of the
 # bar; it overrides the once-only marker so returning to Aranea restores it.

@@ -6,7 +6,9 @@ set -euo pipefail
 #
 # Usage: scripts/aranea-motion [status|set on|off|toggle|apply]
 
-state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/lib/paths.sh"
+state_root="$(aranea_state_root)"
 state_file="$state_root/motion"
 
 # Prints "off" when the state file says off, else "on".

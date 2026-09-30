@@ -10,6 +10,8 @@ set -euo pipefail
 # Usage: scripts/install-integration [--dry-run] [--yes] <integration-id>
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/ownership.sh"
 
@@ -64,7 +66,7 @@ if [[ -n "$optional_command" ]]; then
   fi
 fi
 
-config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+config_root="$(xdg_config_home)"
 # Temp dirs made below; removed however the script exits.
 cleanup_dirs=()
 trap 'rm -rf -- "${cleanup_dirs[@]}"' EXIT
@@ -161,7 +163,7 @@ case "$integration" in
     install_one "$repo_root/integrations/session/omarchy.css" "$config_root/omarchy/session/aranea.css"
     ;;
   cursor)
-    cursor_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Aranea"
+    cursor_root="$(xdg_data_home)/icons/Aranea"
     install_one "$repo_root/integrations/cursor/index.theme" "$cursor_root/index.theme"
     install_one "$repo_root/integrations/cursor/uwsm-env" "$config_root/uwsm/env.d/aranea-cursor"
     if [[ -d "$repo_root/integrations/cursor/hyprcursor" ]]; then
@@ -239,7 +241,7 @@ case "$integration" in
     # muted, accent-toned host variant for every unsupported name. Keep the
     # install recursive so new contexts do not require another installer branch.
     icon_theme=Aranea-icons
-    icon_root="${XDG_DATA_HOME:-$HOME/.local/share}/icons/$icon_theme"
+    icon_root="$(xdg_data_home)/icons/$icon_theme"
     ownership_file="$(ownership_record)"
     if [[ -f "$ownership_file" ]]; then
       while IFS= read -r managed_icon; do

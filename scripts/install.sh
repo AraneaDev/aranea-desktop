@@ -10,6 +10,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
+source "$repo_root/scripts/lib/paths.sh"
+# shellcheck disable=SC1091
 source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/json-events.sh"
@@ -240,7 +242,7 @@ else
   }
   trap install_failure_handler EXIT
   ((json_mode)) && json_step install running persist-profile 'persist installation profile'
-  profile_state="${XDG_STATE_HOME:-$HOME/.local/state}/aranea/profile"
+  profile_state="$(aranea_state_root)/profile"
   install -Dm644 /dev/null "$profile_state"
   printf '%s\n' "$profile" >"$profile_state"
   ((json_mode)) && json_step install ok persist-profile 'installation profile persisted'
