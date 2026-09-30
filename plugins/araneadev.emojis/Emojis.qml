@@ -85,9 +85,9 @@ Item {
   property int cellWidth: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
   // Height of one emoji cell, sized like cellWidth.
   property int cellHeight: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
-  // From the real grid width (inside the chrome insets), so Up/Down move
-  // straight rather than drifting diagonally.
-  property int columns: Math.max(1, Math.floor((root.cardWidth - root.contentMargin * 2) / root.cellWidth))
+  // From the real grid width (inside the chrome insets and the card border),
+  // so Up/Down move straight rather than drifting diagonally.
+  property int columns: Math.max(1, Math.floor((root.cardWidth - root.contentMargin * 2 - Border.left(root.borderSpec) - Border.right(root.borderSpec)) / root.cellWidth))
 
   // The emoji under the cursor, from the RECENT row or the grid; "" when none.
   readonly property string selectedEmoji: {
@@ -451,6 +451,7 @@ Item {
         foreground: root.foreground
         cellWidth: root.cellWidth
         cellHeight: root.cellHeight
+        columns: root.columns
         cornerRadius: root.cornerRadius
         selectedBackground: root.selectedBackground
         selectedText: root.selectedText

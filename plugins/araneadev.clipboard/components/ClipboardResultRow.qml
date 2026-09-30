@@ -2,6 +2,7 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import "../../araneadev.shared" as Aranea
 
 Rectangle {
   id: row
@@ -68,8 +69,8 @@ Rectangle {
 
   Row {
     anchors.fill: parent
-    anchors.leftMargin: Style.space(14)
-    anchors.rightMargin: Style.space(10)
+    anchors.leftMargin: Style.spacing.rowPaddingX
+    anchors.rightMargin: Style.spacing.rowPaddingX
     spacing: Style.space(10)
 
     Item {
@@ -78,7 +79,8 @@ Rectangle {
 
       Image {
         visible: row.previewImage.length > 0
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
         width: parent.width
         height: parent.width
         source: row.previewImage
@@ -88,7 +90,8 @@ Rectangle {
       }
       Rectangle {
         visible: row.swatch.length > 0
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
         width: Style.space(14)
         height: Style.space(14)
         radius: Style.space(3)
@@ -96,9 +99,11 @@ Rectangle {
         border.width: 1
         border.color: Util.alpha(row.foreground, 0.25)
       }
-      Text {
+      Aranea.InkText {
         visible: row.previewImage.length === 0 && row.colour.length === 0
-        anchors.centerIn: parent
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        horizontalAlignment: Text.AlignLeft
         textFormat: Text.PlainText
         text: row.secret ? "󰌾" : row.glyph
         color: row.hasCursor ? row.selectedText : Util.alpha(row.foreground, 0.7)
@@ -120,9 +125,10 @@ Rectangle {
       verticalAlignment: Text.AlignVCenter
     }
 
-    Text {
+    Aranea.InkText {
       id: detailText
       height: parent.height
+      horizontalAlignment: Text.AlignRight
       textFormat: Text.PlainText
       text: (row.pinned ? "📌 " : "") + row.detail
       color: Util.alpha(row.foreground, 0.5)

@@ -62,6 +62,26 @@ Item {
   // Whether the selected secret remains hidden in the preview.
   readonly property bool masked: !!activeRow && activeRow.secret && revealedIndex !== selectedIndex
 
+  // Probes the section caption's line box (same font as sectionCaption).
+  Text {
+    id: captionProbe
+    visible: false
+    text: "PINNED"
+    font.family: pane.fontFamily
+    font.pixelSize: Style.font.caption
+    font.weight: Font.Medium
+    font.letterSpacing: 0.20
+  }
+  // Cap-height ink of the caption font.
+  TextMetrics {
+    id: captionInk
+    font: captionProbe.font
+    text: "H"
+  }
+  // Cap top of the first section label from the top of the list (the section
+  // header is 26 high with the caption 4 above its bottom).
+  readonly property real firstLabelCapTop: Style.space(26) - Style.space(4) - captionProbe.height + captionProbe.baselineOffset + captionInk.tightBoundingRect.y
+
   Row {
     anchors.fill: parent
     spacing: 0
@@ -90,7 +110,7 @@ Item {
             anchors.left: sectionCaption.right
             anchors.leftMargin: Style.space(8)
             anchors.right: parent.right
-            anchors.rightMargin: Style.space(6)
+            anchors.rightMargin: 0
             anchors.verticalCenter: sectionCaption.verticalCenter
             height: 1
             color: Util.alpha(pane.foreground, 0.10)
@@ -99,7 +119,7 @@ Item {
           Text {
             id: sectionCaption
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(6)
+            anchors.leftMargin: 0
             anchors.bottom: parent.bottom
             anchors.bottomMargin: Style.space(4)
             textFormat: Text.PlainText
@@ -140,6 +160,7 @@ Item {
 
       ClipboardPreview {
         anchors.fill: parent
+        firstLineTop: pane.firstLabelCapTop
         masked: pane.masked
         secretHint: "SPACE TO REVEAL"
         secretExpiry: {

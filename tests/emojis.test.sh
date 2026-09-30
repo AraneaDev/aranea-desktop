@@ -24,7 +24,7 @@ fi
 grep -Fq 'Aranea.MotionState.motionEnabled' "$plugin/Emojis.qml"
 grep -Fq 'EmojiLogic.keywordsFor' "$plugin/Emojis.qml"
 # m7: columns follow the real grid width; Up from the grid lands in the last recent row
-grep -Fq 'Math.floor((root.cardWidth - root.contentMargin * 2) / root.cellWidth)' "$plugin/Emojis.qml"
+grep -Fq 'Math.floor((root.cardWidth - root.contentMargin * 2 - Border.left(root.borderSpec) - Border.right(root.borderSpec)) / root.cellWidth)' "$plugin/Emojis.qml"
 grep -Fq 'lastRowStart' "$plugin/Emojis.qml"
 
 # --- 4d: without a manifest the picker hides itself, not the stock one

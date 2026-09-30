@@ -32,6 +32,15 @@ Item {
   property color borderColor: Color.menu.border
   // Corner radius for the swatch.
   property real cornerRadius: Style.cornerRadius
+  // Cap top the preview's first line aligns to.
+  property real firstLineTop: 0
+
+  // Ink metrics of the preview text's own font.
+  TextMetrics {
+    id: previewInk
+    font: previewText.font
+    text: "H"
+  }
 
   Rectangle {
     anchors.left: parent.left
@@ -70,6 +79,7 @@ Item {
     anchors.left: parent.left
     anchors.leftMargin: preview.contentMargin
     anchors.top: parent.top
+    anchors.topMargin: preview.firstLineTop
     spacing: Style.space(10)
 
     Rectangle {
@@ -91,9 +101,11 @@ Item {
   }
 
   Text {
+    id: previewText
     visible: !preview.masked && !preview.imageSource && preview.colourText.length === 0
     anchors.fill: parent
     anchors.leftMargin: preview.contentMargin
+    anchors.topMargin: Math.max(0, preview.firstLineTop - (previewText.baselineOffset + previewInk.tightBoundingRect.y))
     textFormat: Text.PlainText
     text: preview.textValue
     color: preview.foreground
@@ -108,6 +120,7 @@ Item {
     visible: !preview.masked && preview.imageSource.length > 0
     anchors.fill: parent
     anchors.leftMargin: preview.contentMargin
+    anchors.topMargin: preview.firstLineTop
     source: preview.imageSource
     fillMode: Image.PreserveAspectFit
     verticalAlignment: Image.AlignTop

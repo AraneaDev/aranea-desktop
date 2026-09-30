@@ -48,6 +48,7 @@ Item {
       elide: Text.ElideRight
     }
     Text {
+      visible: root.hintText.length > 0
       width: parent.width
       text: root.hintText
       color: root.foreground
