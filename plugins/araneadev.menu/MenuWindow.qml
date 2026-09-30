@@ -142,7 +142,7 @@ PanelWindow {
     Item {
       id: keyCatcher
       anchors.fill: parent
-      z: panel.root.deleteConfirmOpen ? 20 : 0
+      z: panel.root.appHistory.deleteConfirmOpen ? 20 : 0
       focus: true
 
       Keys.priority: Keys.BeforeItem
@@ -154,9 +154,9 @@ PanelWindow {
         id: deleteConfirm
 
         anchors.fill: parent
-        opened: panel.root.deleteConfirmOpen
+        opened: panel.root.appHistory.deleteConfirmOpen
         z: 10
-        message: "Do you want to uninstall " + ((panel.root.deleteTarget && panel.root.deleteTarget.label) || "") + "?"
+        message: "Do you want to uninstall " + ((panel.root.appHistory.deleteTarget && panel.root.appHistory.deleteTarget.label) || "") + "?"
         confirmText: "Uninstall"
         background: panel.root.style.background
         foreground: panel.root.style.foreground

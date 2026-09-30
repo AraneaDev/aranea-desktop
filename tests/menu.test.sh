@@ -12,6 +12,7 @@ menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
 menu_style="$repo_root/plugins/araneadev.menu/MenuStyle.qml"
 menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
 menu_results="$repo_root/plugins/araneadev.menu/MenuResultList.qml"
+menu_history="$repo_root/plugins/araneadev.menu/MenuAppHistory.qml"
 # Behaviour (pin limit and notice, search dedupe, hints, Ctrl+P, Ctrl+1..3,
 # Favorites route after the menu files load): tests/qml/menu.qml, run
 # offscreen by tests/qml-behaviour.test.sh.
@@ -29,11 +30,11 @@ grep -Fq 'id: appIconImage' "$menu_results"
 grep -Fq 'results.appLibrary.iconSource(row.appIcon)' "$menu_results"
 
 # --- 4b: favourites and recents persist to $XDG_STATE_HOME/aranea/menu.json
-grep -Fq '"/menu.json"' "$menu_qml"
-grep -Fq 'MenuModel.parseAppHistory(' "$menu_qml"
-grep -Fq 'MenuModel.serializeAppHistory(' "$menu_qml"
-grep -Fq 'MenuModel.pruneAppIds(' "$menu_qml"
-if grep -Fq 'PersistentProperties' "$menu_qml"; then
+grep -Fq '"/menu.json"' "$menu_history"
+grep -Fq 'MenuModel.parseAppHistory(' "$menu_history"
+grep -Fq 'MenuModel.serializeAppHistory(' "$menu_history"
+grep -Fq 'MenuModel.pruneAppIds(' "$menu_history"
+if grep -Fq 'PersistentProperties' "$menu_history"; then
   echo "menu state must live in the state file" >&2
   exit 1
 fi
@@ -71,7 +72,7 @@ if grep -Eq 'root\.setActiveMenu\([^,()]+, (true|false)\)|root\.activateIndex\([
   exit 1
 fi
 # --- 4b final review: state loads before use; stale routes never reopen; clock only when open
-block_grep "$menu_qml" 'id: appHistoryFile' 'blockLoading: true'
+block_grep "$menu_history" 'id: appHistoryFile' 'blockLoading: true'
 block_grep "$menu_style" 'id: menuClock' 'enabled: style.opened'
 [[ "$(grep -c 'root.pendingInitialMenu = ""' "$menu_qml")" -ge 4 ]] || {
   echo "every other open/cancel path must drop a pending Favorites/Recent route" >&2

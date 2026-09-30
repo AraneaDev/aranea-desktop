@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "MenuModel.js" as MenuModel
 import "MenuLayout.js" as MenuLayout
 
@@ -74,7 +75,7 @@ Item {
 
   // One key map for the menu (the window forwards its key presses here).
   function handleKey(event): void {
-    if (root.deleteConfirmOpen) {
+    if (history.deleteConfirmOpen) {
       if (root.view && root.view.deleteConfirmHandleKey(event))
         event.accepted = true
       return
@@ -135,6 +136,7 @@ Item {
   }
 
   Component.onCompleted: {
+    root.loadApps()
     if (!root.windowEnabled)
       return
     var windowComponent = Qt.createComponent(Qt.resolvedUrl("MenuWindow.qml"))
@@ -250,40 +252,10 @@ Item {
   property var providerQueue: []
   // Bumped on each rebuild so output from an older provider run is discarded.
   property int providerRevision: 0
-  // Maximum number of pinned apps kept.
-  readonly property int favoriteAppLimit: 12
-  // Maximum number of recent apps kept.
-  readonly property int recentAppLimit: 12
-  // Pinned app ids, saved to the state file.
-  property var favoriteAppIds: []
-  // Recently launched app ids, newest first, saved to the state file.
-  property var recentAppIds: []
   // Last generated Apps rows, including the Favorites and Recent submenus.
   property var appRows: []
-  // Aranea state directory ($XDG_STATE_HOME/aranea).
-  readonly property string stateRoot: (Quickshell.env("XDG_STATE_HOME") || (Quickshell.env("HOME") + "/.local/state")) + "/aranea"
-  // Favourites and recents on disk, so they survive shell restarts.
-  readonly property string appHistoryPath: root.stateRoot + "/menu.json"
   // One-off message that replaces the key hints until noticeTimer clears it.
   property string notice: ""
-
-  // Loads the favourites and recents; a missing or broken file means none.
-  FileView {
-    id: appHistoryFile
-    path: root.appHistoryPath
-    // Load before anything can pin or launch, so the file never overwrites newer changes.
-    blockLoading: true
-    atomicWrites: true
-    printErrors: false
-    onLoaded: root.applyAppHistory(text())
-    onLoadFailed: root.applyAppHistory("")
-  }
-
-  // Makes sure the state directory exists before the first write.
-  Process {
-    running: true
-    command: ["mkdir", "-p", root.stateRoot]
-  }
 
   // Clears the hint-line notice three seconds after showNotice.
   Timer {
@@ -303,28 +275,35 @@ Item {
     id: localAppLibrary
     owner: root
   }
-  // Whether the uninstall confirmation dialog is showing.
-  property bool deleteConfirmOpen: false
-  // App awaiting uninstall confirmation ({appId, label}), or null.
-  property var deleteTarget: null
-  onOpenedChanged: {
-    if (!opened) {
-      deleteConfirmOpen = false
-      deleteTarget = null
+
+  // Favourites, recents and the uninstall prompt; builds the Apps rows.
+  MenuAppHistory {
+    id: history
+    stateRoot: Aranea.RuntimePaths.araneaStateRoot
+    opened: root.opened
+    onUpdated: root.loadApps()
+    onNoticeRequested: function (text) {
+      root.showNotice(text)
     }
   }
+  // Favourites, recents and the uninstall prompt (the window reads it).
+  readonly property alias appHistory: history
+  // Pinned app ids.
+  readonly property alias favoriteAppIds: history.favoriteAppIds
 
-  // Applies the state file's favourites and recents and regenerates the Apps rows.
-  function applyAppHistory(raw: string): void {
-    var history = MenuModel.parseAppHistory(raw, root.favoriteAppLimit, root.recentAppLimit)
-    root.favoriteAppIds = history.favorites
-    root.recentAppIds = history.recent
-    root.mergeAppRows()
-  }
-
-  // Writes pinned and recent app ids to the state file.
-  function saveAppHistory(): void {
-    appHistoryFile.setText(MenuModel.serializeAppHistory(root.favoriteAppIds, root.recentAppIds, root.favoriteAppLimit, root.recentAppLimit))
+  // Regenerates the Apps rows (apps, Favorites, Recent) from the app library,
+  // merges them into the items and resolves a waiting Favorites/Recent route.
+  // The Apps provider is QML-native: rows come from the shared AppLibrary
+  // (DesktopEntries), so they carry image icons, launch feedback and uninstall.
+  function loadApps(): void {
+    if (!root.appLibrary)
+      return
+    root.appRows = history.rowsFor(root.appLibrary)
+    var merged = MenuModel.mergeAppRows(root.items, root.itemOrder, root.appRows)
+    root.items = merged.items
+    root.itemOrder = merged.itemOrder
+    root.rebuildIfOpen()
+    root.resolvePendingAppsRoute()
   }
 
   // Whether the cursor row is an app (the hint line then offers ^P PIN).
@@ -338,23 +317,14 @@ Item {
     noticeTimer.restart()
   }
 
-  // Pins or unpins an app, saves, and regenerates the Apps rows; a 13th pin is refused with a notice.
+  // Pins or unpins an app (a 13th pin is refused with a notice).
   function toggleFavoriteApp(appId: string): void {
-    var result = MenuModel.toggleFavoriteApp(root.favoriteAppIds, appId, root.favoriteAppLimit)
-    if (result.refused) {
-      root.showNotice("12 FAVOURITES · UNPIN ONE FIRST")
-      return
-    }
-    root.favoriteAppIds = result.ids
-    root.saveAppHistory()
-    root.mergeAppRows()
+    history.toggleFavorite(appId)
   }
 
-  // Moves an app to the front of Recent, saves, and regenerates the Apps rows.
+  // Moves an app to the front of Recent.
   function recordRecentApp(appId: string): void {
-    root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)
-    root.saveAppHistory()
-    root.mergeAppRows()
+    history.recordRecent(appId)
   }
   // True on the unfiltered root menu, which shows the large header, tiles and footer.
   readonly property bool fullRootHeader: !root.dmenuActive && root.activeMenu === "root" && !root.filterText.trim()
@@ -557,109 +527,6 @@ Item {
       }
     })
 
-  // The apps provider is QML-native: rows come from the shared AppLibrary
-  // (DesktopEntries) instead of a bash enumeration, so they carry image
-  // icons, launch feedback, and uninstall support like the launcher.
-  function mergeAppRows() {
-    if (!root.appLibrary)
-      return
-    var rows = root.appLibrary.sortedEntries("")
-    // Uninstalled apps must not use up favourite or recent slots; an app
-    // library that has not loaded yet (no rows) must not wipe the lists.
-    var installed = rows.map(function (r) {
-      return String(r.entry.id || "")
-    })
-    var favorites = MenuModel.pruneAppIds(root.favoriteAppIds, installed)
-    var recent = MenuModel.pruneAppIds(root.recentAppIds, installed)
-    if (rows.length > 0 && (favorites.length !== root.favoriteAppIds.length || recent.length !== root.recentAppIds.length)) {
-      root.favoriteAppIds = favorites
-      root.recentAppIds = recent
-      root.saveAppHistory()
-    }
-    var appRows = []
-    for (var j = 0; j < rows.length; j++) {
-      var entry = rows[j].entry
-      var appId = String(entry.id || "")
-      if (!appId)
-        continue
-      var subtext = root.appLibrary.entrySubtext(entry)
-      var aliases = subtext ? [subtext] : []
-      try {
-        if (entry.keywords && typeof entry.keywords.join === "function")
-          aliases = aliases.concat(entry.keywords)
-      } catch (e) {}
-      appRows.push({
-        id: "apps." + appId,
-        parent: "apps",
-        kind: "app",
-        icon: "",
-        appIcon: String(entry.icon || ""),
-        appId: appId,
-        label: root.appLibrary.entryName(entry),
-        title: "",
-        target: "",
-        description: subtext,
-        action: "",
-        provider: "",
-        aliases: aliases,
-        when: "",
-        checked: "",
-        order: 0
-      })
-    }
-    var favoriteRows = MenuModel.appRowsForIds(appRows, root.favoriteAppIds, "apps.favorites", "apps.favorites")
-    var recentRows = MenuModel.appRowsForIds(appRows, root.recentAppIds, "apps.recent", "apps.recent")
-    // Keep both generated destinations present even when they are empty. This
-    // gives direct routes and screenshots a deliberate empty state, and lets
-    // the sections become useful immediately after the first pin or launch.
-    appRows.unshift({
-      id: "apps.favorites",
-      parent: "apps",
-      kind: "menu",
-      icon: "",
-      appIcon: "",
-      appId: "",
-      label: "Favorites",
-      title: "",
-      target: "",
-      description: "Pinned applications",
-      action: "",
-      provider: "",
-      aliases: ["favorite", "favorites", "pinned"],
-      when: "",
-      checked: "",
-      order: 0
-    })
-    appRows = appRows.slice(0, 1).concat(favoriteRows, appRows.slice(1))
-    appRows.unshift({
-      id: "apps.recent",
-      parent: "apps",
-      kind: "menu",
-      icon: "󰋚",
-      appIcon: "",
-      appId: "",
-      label: "Recent",
-      title: "",
-      target: "",
-      description: "Recently launched applications",
-      action: "",
-      provider: "",
-      aliases: ["recent", "history"],
-      when: "",
-      checked: "",
-      order: 0
-    })
-    appRows = appRows.slice(0, 1).concat(recentRows, appRows.slice(1))
-
-    root.appRows = appRows
-    var merged = MenuModel.mergeAppRows(root.items, root.itemOrder, appRows)
-    root.items = merged.items
-    root.itemOrder = merged.itemOrder
-    if (root.opened)
-      root.rebuildDisplay()
-    root.resolvePendingAppsRoute()
-  }
-
   // Runs the provider of submenu `id` unless it already ran; apps merge inline, others start providerProc.
   function startProviderForMenu(id) {
     var entry = root.item(id)
@@ -667,7 +534,7 @@ Item {
       return
     if (entry.provider === "apps") {
       root.providersLoaded[id] = true
-      root.mergeAppRows()
+      root.loadApps()
       return
     }
     var spec = root.providers[entry.provider]
@@ -1010,7 +877,7 @@ Item {
 
   // Activates row `index`: open a submenu, launch an app, run an action, or answer a dmenu request.
   function activateIndex(index: int, fromPointer: bool): void {
-    if (root.deleteConfirmOpen)
+    if (history.deleteConfirmOpen)
       return
     if (root.dmenuActive) {
       if (root.mode === "input") {
@@ -1044,25 +911,20 @@ Item {
   }
 
   // Asks to uninstall the app under the cursor (app rows only).
-  function requestDeleteSelected() {
+  function requestDeleteSelected(): void {
     if (!root.cursorActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
       return
     var row = displayModel.get(root.selectedIndex)
     if (!row || row.kind !== "app")
       return
-    root.deleteTarget = {
-      appId: row.appId,
-      label: row.label
-    }
     if (root.view)
       root.view.resetDeleteConfirm()
-    root.deleteConfirmOpen = true
+    history.requestDelete(row.appId, row.label)
   }
 
   // Dismisses the uninstall dialog and gives focus back to the menu.
-  function cancelDelete() {
-    root.deleteConfirmOpen = false
-    root.deleteTarget = null
+  function cancelDelete(): void {
+    history.cancelDelete()
     if (root.view)
       root.view.resetDeleteConfirm()
     root.disarmPointer()
@@ -1072,10 +934,8 @@ Item {
   }
 
   // Closes the menu and uninstalls the app picked in the dialog.
-  function confirmDelete() {
-    var target = root.deleteTarget
-    root.deleteConfirmOpen = false
-    root.deleteTarget = null
+  function confirmDelete(): void {
+    var target = history.takeDeleteTarget()
     if (!target)
       return
     root.cancel()
@@ -1276,7 +1136,7 @@ Item {
     target: root.appLibrary
     function onAppsChanged() {
       if (root.providersLoaded["apps"])
-        root.mergeAppRows()
+        root.loadApps()
     }
   }
 

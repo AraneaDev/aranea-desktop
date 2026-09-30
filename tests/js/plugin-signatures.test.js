@@ -85,18 +85,18 @@ test("menu QML exposes its typed function signatures", () => {
     "menu favorite toggle"
   )
   requiresSignature(menuQml, "function recordRecentApp(appId: string): void", "menu recent history")
+  const menuHistoryQml = fs.readFileSync(
+    `${root}/plugins/araneadev.menu/MenuAppHistory.qml`,
+    "utf8"
+  )
   requiresSignature(
     menuQml,
-    "function recordRecentApp(appId: string): void {\n    root.recentAppIds",
-    "menu recent history implementation"
+    "function recordRecentApp(appId: string): void {\n    history.recordRecent(appId)",
+    "menu recent history forwards to MenuAppHistory"
   )
-  if (
-    !menuQml.includes(
-      "root.recentAppIds = MenuModel.recordRecentApp(root.recentAppIds, appId, root.recentAppLimit)\n    root.saveAppHistory()\n    root.mergeAppRows()"
-    )
-  ) {
+  if (!menuHistoryQml.includes("history.saveAppHistory()\n    history.updated()"))
     throw new Error("recent app history must refresh visible rows immediately")
-  }
+  requiresSignature(menuHistoryQml, "function rowsFor(library: var): var", "menu app rows")
   requiresSignature(menuQml, "id: localAppLibrary", "menu local app-library fallback")
   const menuAppLibraryQml = fs.readFileSync(
     `${root}/plugins/araneadev.menu/MenuAppLibrary.qml`,

@@ -95,7 +95,7 @@ ShellRoot {
 
   // Whether the uninstall prompt is showing.
   function deleteOpen() {
-    return menu.deleteConfirmOpen
+    return menu.appHistory.deleteConfirmOpen
   }
 
   Component.onCompleted: {
