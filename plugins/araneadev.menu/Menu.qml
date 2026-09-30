@@ -6,6 +6,7 @@ import Quickshell.Io
 import QtQuick
 import qs.Commons
 import "MenuModel.js" as MenuModel
+import "MenuLayout.js" as MenuLayout
 
 Item {
   id: root
@@ -446,68 +447,54 @@ Item {
     return (root.fullRootHeader || root.filterText || root.dmenuActive) && detail ? root.style.detailRowHeight : root.style.baseRowHeight
   }
 
-  // Height the card can devote to rows before running off the screen — or
-  // past the frozen top edge once a search has pinned the card in place.
-  // Uses root.viewCardTop rather than effectiveCardTop: the centered top is
-  // derived from the card height, which this value feeds.
-  function availableRowsHeight(): int {
-    var top = root.viewCardTop >= 0 ? root.viewCardTop : Style.gapsOut
-    var headerHeight = root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight
-    var available = root.screenHeight - top - Style.gapsOut - root.style.contentMargin * 2 - headerHeight - root.style.contentSpacing - root.style.rootExtrasHeight
-    // The starting menu sets the ceiling along with the offset: drilling into
-    // a longer submenu scrolls behind the fold instead of growing the card.
-    if (root.viewMaxRowsHeight >= 0)
-      available = Math.min(available, root.viewMaxRowsHeight)
-    // The root surface is intentionally a shorter command viewport: the
-    // header, context band, tiles, and footer need to read as one composition
-    // instead of allowing the command list to turn the card into a page.
-    var menuCeiling = root.fullRootHeader ? Style.space(250) : Math.round(root.screenHeight * 0.7)
-    return Math.min(available, menuCeiling)
+  // Each display row's section and height, for MenuLayout.
+  function displayRowMetrics(): var {
+    var rows = []
+    for (var i = 0; i < displayModel.count; i++) {
+      var row = displayModel.get(i)
+      rows.push({
+        section: row.section,
+        height: root.rowHeightForDetail(row.detail)
+      })
+    }
+    return rows
   }
 
-  // When every row fits, the list gets its full height. When they don't,
-  // the card must end mid-row: a clipped row is what tells the eye there is
-  // more below the fold, so never come out even on a row boundary.
-  function foldedListHeight(totals: var, available: int): int {
-    var count = totals.length
-    if (count === 0)
-      return root.style.baseRowHeight
-    if (totals[count - 1] <= available)
-      return totals[count - 1]
+  // The style numbers MenuLayout needs.
+  function layoutMetrics(): var {
+    return {
+      baseRowHeight: root.style.baseRowHeight,
+      rowSpacing: root.style.rowSpacing,
+      rowPeek: root.style.rowPeek,
+      dividerHeight: root.style.dividerHeight
+    }
+  }
 
-    var peek = root.style.rowPeek
-    var full = 0
-    while (full < count && totals[full] <= available)
-      full++
-    while (full > 1 && totals[full - 1] + root.style.rowSpacing + peek > available)
-      full--
-    if (full < 1)
-      return Math.max(available, root.style.baseRowHeight)
-
-    return totals[full - 1] + root.style.rowSpacing + peek
+  // Height the card can devote to rows (MenuLayout.availableRowsHeight). Uses
+  // root.viewCardTop rather than effectiveCardTop: the centered top is derived
+  // from the card height, which this value feeds. The root surface is a
+  // shorter command viewport, so its header, band, tiles and footer read as
+  // one composition.
+  function availableRowsHeight(): int {
+    return MenuLayout.availableRowsHeight({
+      screenHeight: root.screenHeight,
+      cardTop: root.viewCardTop,
+      gapsOut: Style.gapsOut,
+      contentMargin: root.style.contentMargin,
+      headerHeight: root.fullRootHeader ? root.style.rootHeaderHeight : root.style.headerHeight,
+      contentSpacing: root.style.contentSpacing,
+      rootExtrasHeight: root.style.rootExtrasHeight,
+      maxRowsHeight: root.viewMaxRowsHeight,
+      ceiling: root.fullRootHeader ? Style.space(250) : Math.round(root.screenHeight * 0.7)
+    })
   }
 
   // Row-list height for the menu (arguments are unused; they only make the binding re-evaluate).
   function rowListHeight(_serial: int, _count: int, _filter: string, _divider: bool): int {
     if (displayModel.count === 0)
       return root.style.emptyStateHeight
-
-    var totals = []
-    var total = 0
-    var previousSection = ""
-
-    for (var i = 0; i < displayModel.count; i++) {
-      var row = displayModel.get(i)
-      if (i > 0)
-        total += root.style.rowSpacing
-      if (row.section === "drilldown" && previousSection !== "drilldown")
-        total += root.style.dividerHeight
-      total += root.rowHeightForDetail(row.detail)
-      previousSection = row.section
-      totals.push(total)
-    }
-
-    return foldedListHeight(totals, availableRowsHeight())
+    var metrics = root.layoutMetrics()
+    return MenuLayout.foldedListHeight(MenuLayout.menuRowTotals(root.displayRowMetrics(), metrics), root.availableRowsHeight(), metrics)
   }
 
   // Row-list height for a dmenu request (arguments only trigger re-evaluation).
@@ -516,21 +503,11 @@ Item {
       return 0
     if (displayModel.count === 0)
       return root.style.baseRowHeight
-
-    var available = availableRowsHeight()
+    var available = root.availableRowsHeight()
     if (root.dmenuMaxHeight > 0)
       available = Math.min(available, Style.space(root.dmenuMaxHeight))
-
-    var totals = []
-    var total = 0
-    for (var i = 0; i < displayModel.count; i++) {
-      if (i > 0)
-        total += root.style.rowSpacing
-      total += root.rowHeightForDetail(displayModel.get(i).detail)
-      totals.push(total)
-    }
-
-    return foldedListHeight(totals, available)
+    var metrics = root.layoutMetrics()
+    return MenuLayout.foldedListHeight(MenuLayout.plainRowTotals(root.displayRowMetrics(), metrics.rowSpacing), available, metrics)
   }
 
   // Returns the item with this id, or null.
