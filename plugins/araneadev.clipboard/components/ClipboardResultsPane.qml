@@ -116,12 +116,13 @@ Item {
             color: Util.alpha(pane.foreground, 0.10)
           }
 
-          Text {
+          Aranea.InkText {
             id: sectionCaption
             anchors.left: parent.left
             anchors.leftMargin: 0
             anchors.bottom: parent.bottom
             anchors.bottomMargin: Style.space(4)
+            horizontalAlignment: Text.AlignLeft
             textFormat: Text.PlainText
             text: parent.section === "pinned" ? "PINNED" : "RECENT"
             color: Util.alpha(pane.foreground, 0.58)

@@ -137,7 +137,8 @@ Item {
     }
   }
 
-  component Caption: Text {
+  component Caption: Aranea.InkText {
+    horizontalAlignment: Text.AlignLeft
     textFormat: Text.PlainText
     color: Util.alpha(content.foreground, 0.58)
     font.family: content.fontFamily
