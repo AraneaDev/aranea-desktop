@@ -36,7 +36,7 @@ Install step IDs include `validate`, `persist-profile`, `install-theme`,
 `install-terminal`. Uninstall IDs include `remove-hooks`, `remove-plugins`,
 `remove-timer`, `restore-managed-files`, `restore-settings`, `remove-state`,
 and `remove-theme`. Doctor step IDs are its check IDs, such as `theme`,
-`hooks`, `icons`, `plugins`, `runtime`, and `health`.
+`hooks`, `branding`, `icons`, `plugins`, `runtime`, and `health`.
 
 ## Exit codes
 
