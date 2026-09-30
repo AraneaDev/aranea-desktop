@@ -112,4 +112,28 @@ Item {
     }
     return null
   }
+
+  // Depth-first search over ROOT's children (and contentItem, where
+  // present) for every descendant whose objectName is NAME, in depth-first
+  // order.
+  function findChildren(root, name) {
+    var matches = []
+    if (!root)
+      return matches
+    var kids = []
+    if (root.contentItem)
+      kids.push(root.contentItem)
+    if (root.children)
+      for (var i = 0; i < root.children.length; i++)
+        kids.push(root.children[i])
+    for (var j = 0; j < kids.length; j++) {
+      var kid = kids[j]
+      if (!kid)
+        continue
+      if (kid.objectName === name)
+        matches.push(kid)
+      matches = matches.concat(findChildren(kid, name))
+    }
+    return matches
+  }
 }
