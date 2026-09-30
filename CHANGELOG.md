@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.2...v2.7.3) (2026-09-30)
+
+
+### Refactoring
+
+* decompose the menu into focused components ([#79](https://github.com/AraneaDev/aranea-desktop/issues/79)) ([385b561](https://github.com/AraneaDev/aranea-desktop/commit/385b5616b65872644a3b789299c0aac4b7c3d0e5))
+
 ## [2.7.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.1...v2.7.2) (2026-09-30)
 
 
