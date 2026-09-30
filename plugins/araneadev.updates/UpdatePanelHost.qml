@@ -20,7 +20,7 @@ Aranea.KeyboardPanelFrame {
   centerOnBar: true
   gap: Style.gapsOut
   contentWidth: fittedContentWidth(Style.space(380))
-  contentHeight: fittedContentHeight(content.implicitHeight)
+  contentHeight: fittedContentHeight(content.implicitHeight, Style.space(520))
   onCloseRequested: host.owner.close()
   onTabRequested: function (direction) {
     host.owner.switchPanel(direction)

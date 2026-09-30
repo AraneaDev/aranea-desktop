@@ -16,7 +16,7 @@ Aranea.KeyboardPanelFrame {
   open: owner ? owner.opened : false
   gap: Style.gapsOut
   contentWidth: fittedContentWidth(Style.space(380))
-  contentHeight: fittedContentHeight(content.implicitHeight)
+  contentHeight: fittedContentHeight(content.implicitHeight, Style.space(520))
   // Move the keyboard cursor through the workspace rows.
   function moveCursor(delta) {
     if (!workspaceStates.length)
