@@ -22,6 +22,10 @@ command -v jq >/dev/null 2>&1 || {
   exit 1
 }
 
+# The directory of the config path as given: the shell (and the plugin
+# deploy) work from there, even when shell.json is a symlink elsewhere.
+given_config_dir="$(dirname "$config_file")"
+
 # Write through a symlinked shell.json (dotfile managers) instead of
 # replacing the link with a plain file (the .aranea.bak backup then sits
 # next to the real file too).
@@ -45,9 +49,13 @@ place_health=true
 # araneadev.audio only takes over the bar entry once it is actually deployed
 # beside this config (deploy-plugins-safely writes its manifest there); a
 # repair that runs before that (a bare hook, a partial install) must not
-# retarget the id to a plugin that does not exist on disk yet.
+# retarget the id to a plugin that does not exist on disk yet. The deploy
+# writes beside the config path as given; beside a symlink's target counts
+# too.
 audio_installed=false
-[[ -f "$config_dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
+for dir in "$given_config_dir" "$config_dir"; do
+  [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
+done
 # Removes the temp file on exit.
 cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
