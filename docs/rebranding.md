@@ -12,12 +12,15 @@ do not edit generated assets by hand.
 | `design/tokens.toml`                | Colors, shell surfaces, dimensions, motion, and integration values                 |
 | `branding/marks/aranea-primary.svg` | The canonical brand mark used across the desktop                                   |
 
-The primary SVG should keep its existing SVG structure and two semantic mark
-colors: `#7DFFC0` for the bright gradient stop and `#10F0D0` for the cyan
-gradient stop. Those colors are projected to `bright_green` and `cyan` from
+The primary SVG should keep its existing SVG structure (one gradient-filled
+path in a padded square viewBox) and its three semantic mark colors:
+`#8af79c`, `#2cf2b8` and `#00e5ff` for the gradient stops. Those colors are
+projected to `mark_start`, `mark_mid` and `mark_end` from
 `design/tokens.toml`. If the replacement SVG introduces different source
 colors, update the projection map in `tools/token-generator.mjs` as part of
-the same change.
+the same change. Keep some padding inside the viewBox: the generator also
+insets the mark when it renders the 640x640 `unlock.png`, so the spider never
+touches the edge of the boot and lock artwork.
 
 ## Make a rebrand
 

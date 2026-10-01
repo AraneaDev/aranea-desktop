@@ -43,14 +43,18 @@ Item {
   readonly property string stateHome: Quickshell.env("HOME") + "/.local/state"
   // Directory of the active Omarchy theme.
   readonly property string themeAssetRoot: stateHome + "/omarchy/current/theme"
-  // Password field width in pixels.
-  readonly property int fieldWidth: 381
+  // Password field width in pixels: the wide, slim field of the 24-Sep design.
+  // Capped to the view width minus a margin so narrow or portrait outputs never clip it.
+  readonly property int fieldWidth: Math.min(528, width - Style.space(32))
   // Password field height in pixels.
-  readonly property int fieldHeight: 67
-  // Password field border thickness in pixels.
-  readonly property int outlineThickness: 3
+  readonly property int fieldHeight: 44
+  // Password field border thickness in pixels: a thin outline (six device
+  // pixels at the 2.67 scale the 24-Sep design was captured at).
+  readonly property real outlineThickness: 2.25
   // Font size of the placeholder and messages in the field.
-  readonly property int fieldFontSize: Math.round(Style.font.heading * 1.125)
+  readonly property int fieldFontSize: Math.round(Style.font.heading * 0.875)
+  // Letter spacing of the placeholder and messages in the field.
+  readonly property real fieldLetterSpacing: 1
   // Full-size font size of the password dots, before passwordDotScale shrinks them.
   readonly property int passwordDotFontSize: Math.round(Style.font.heading * 1.33)
   // Full-size letter spacing between password dots.
@@ -65,7 +69,9 @@ Item {
   readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
   // True while a failure message is shown.
   readonly property bool errorState: failureMessage.length > 0
-  // Border spec for the field: the lock surface's error border in errorState, its active border otherwise.
+  // Border spec for the field: the lock surface's error border in errorState,
+  // its active border otherwise (Aranea's theme sets a left-to-right mint to
+  // violet gradient there, [lock] border-active in shell.toml).
   readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha") : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
 
   // Emitted on Enter with the typed password (only when it is non-empty).
@@ -113,7 +119,7 @@ Item {
   function updateClock(): void {
     var now = new Date()
     clockText = Qt.formatDateTime(now, "HH:mm")
-    dateText = Qt.formatDate(now, "dddd  •  dd MMMM")
+    dateText = Qt.formatDate(now, "dddd • dd MMMM")
   }
 
   Timer {
@@ -187,7 +193,7 @@ Item {
       width: root.fieldWidth
       height: root.fieldHeight
       anchors.centerIn: parent
-      anchors.verticalCenterOffset: Math.min(130, parent.height * 0.12)
+      anchors.verticalCenterOffset: 2
       passwordText: root.passwordText
       syncingPasswordText: root.syncingPasswordText
       inputEnabled: root.inputEnabled
@@ -198,10 +204,11 @@ Item {
       fieldWidth: root.fieldWidth
       fieldHeight: root.fieldHeight
       fieldFontSize: root.fieldFontSize
+      fieldLetterSpacing: root.fieldLetterSpacing
       passwordDotFontSize: root.passwordDotFontSize
       passwordDotLetterSpacing: root.passwordDotLetterSpacing
       inputBorderSpec: root.inputBorderSpec
-      cornerRadius: Math.max(10, Style.space(10))
+      cornerRadius: Style.space(6)
       fontFamily: Style.font.family
       foreground: Color.lock.text
       placeholderColor: Color.lock.placeholder
@@ -220,7 +227,7 @@ Item {
     LockBranding {
       width: parent.width
       anchors.horizontalCenter: parent.horizontalCenter
-      y: Math.max(32, inputField.y - height - 42)
+      y: Math.max(32, inputField.y - height - 49)
       z: 1
       logoSource: Aranea.RuntimePaths.brandUrl
       fontFamily: Style.font.family
@@ -230,7 +237,7 @@ Item {
 
     LockClock {
       anchors.horizontalCenter: parent.horizontalCenter
-      y: inputField.y + inputField.height + 28
+      y: inputField.y + inputField.height + 19
       z: 1
       clockText: root.clockText
       dateText: root.dateText
@@ -241,11 +248,13 @@ Item {
 
     Text {
       anchors.horizontalCenter: parent.horizontalCenter
-      y: parent.height - height - 34
+      // Qt adds letter spacing after the last glyph too; shift by half of it.
+      anchors.horizontalCenterOffset: font.letterSpacing / 2
+      y: parent.height - height - 54
       text: root.fingerprintConfigured ? "TOUCH SENSOR OR ENTER PASSWORD" : "ENTER PASSWORD TO CONTINUE"
       color: Color.lock.placeholder
       font.family: Style.font.family
-      font.pixelSize: Style.font.bodySmall
+      font.pixelSize: Math.round(Style.font.bodySmall * 0.82)
       font.letterSpacing: 1.5
       z: 1
     }

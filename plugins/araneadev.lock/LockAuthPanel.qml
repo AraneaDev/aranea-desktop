@@ -26,6 +26,8 @@ Item {
   property int fieldHeight: 67
   // Public contract member.
   property int fieldFontSize: Math.round(Style.font.heading * 1.125)
+  // Letter spacing of the placeholder and status text (not the password dots).
+  property real fieldLetterSpacing: 0
   // Public contract member.
   property int passwordDotFontSize: Math.round(Style.font.heading * 1.33)
   // Public contract member.
@@ -157,6 +159,7 @@ Item {
       color: root.authenticatingPassword ? root.foreground : (root.failureMessage.length > 0 ? root.errorColor : root.placeholderColor)
       font.family: root.fontFamily
       font.pixelSize: root.fieldFontSize
+      font.letterSpacing: root.fieldLetterSpacing
       font.italic: !root.authenticatingPassword && root.failureMessage.length > 0
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
