@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.8.0...v2.8.1) (2026-10-01)
+
+
+### Fixes
+
+* restore the 24-Sep lock screen and draw the spider as a clean vector ([#87](https://github.com/AraneaDev/aranea-desktop/issues/87)) ([7f27552](https://github.com/AraneaDev/aranea-desktop/commit/7f275528798caf374c98adcd76a002b381726052))
+
 ## [2.8.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.4...v2.8.0) (2026-10-01)
 
 
