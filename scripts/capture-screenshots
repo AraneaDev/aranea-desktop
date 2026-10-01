@@ -28,6 +28,38 @@ bar_capture_target=""
 bar_capture_previous_workspace=""
 bar_capture_update_marker_created=0
 bar_capture_update_marker="$HOME/.local/state/omarchy/reboot-required"
+# Puts the real notification inbox, parked in backup dir $1, back into inbox
+# dir $2. The shell clears its inbox with a queued job that can run seconds
+# later and deletes every *.json there by then, so: ask for the clear, wait
+# until it has emptied the inbox, stop the shell (no queued job survives
+# that), drop any capture leftovers, copy the parked files back and delete
+# the backup only once every file is verified back. On a mismatch the backup
+# is kept and its path printed. The caller restarts the shell.
+restore_parked_inbox() {
+  local backup="$1" inbox="$2" file waited=0
+  omarchy-shell notifications clear >/dev/null 2>&1 || true
+  while compgen -G "$inbox/*.json" >/dev/null && ((waited < 100)); do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null 2>&1 || true
+  sleep 1
+  mkdir -p "$inbox"
+  find "$inbox" -maxdepth 1 -name '*.json' -delete 2>/dev/null || true
+  for file in "$backup"/*.json; do
+    [[ -e "$file" ]] || continue
+    cp -p -- "$file" "$inbox/" 2>/dev/null || true
+  done
+  for file in "$backup"/*.json; do
+    [[ -e "$file" ]] || continue
+    cmp -s -- "$file" "$inbox/${file##*/}" || {
+      printf 'notification inbox not fully restored; your notifications are kept in %s\n' "$backup" >&2
+      return 1
+    }
+  done
+  rm -rf -- "$backup"
+}
+
 # The surfaces --all captures.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
@@ -124,15 +156,14 @@ if ((capture_all)); then
   # before the inbox is parked; the capture inbox is only cleared once the
   # real one has actually been moved aside.
   batch_swapped=0
-  # Moves the real inbox back (when it was parked), restarts the shell, waits,
-  # then focuses workspace 1.
+  # Puts the real inbox back (when it was parked; see restore_parked_inbox),
+  # restarts the shell, waits, then focuses workspace 1.
   finish_batch() {
     if ((batch_swapped)); then
-      omarchy-shell notifications clear >/dev/null 2>&1 || true
-      sleep 1
-      find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+      restore_parked_inbox "$batch_inbox_backup" "$batch_inbox_dir" || true
+    else
+      rmdir "$batch_inbox_backup" 2>/dev/null || true
     fi
-    rmdir "$batch_inbox_backup" 2>/dev/null || true
     omarchy restart shell >/dev/null 2>&1 || true
     sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
     hyprctl dispatch 'hl.dsp.focus({ workspace = "1" })' >/dev/null 2>&1 || true
@@ -424,16 +455,18 @@ case "$surface" in
     # Only undo what was done: before the move, the inbox is the real one and
     # must not be cleared.
     inbox_swapped=0
-    # Hides the notification center; when the inbox was parked, clears the
-    # capture notifications, moves the real inbox back and restarts the shell.
+    # Hides the notification center; when the inbox was parked, dismisses the
+    # capture notifications, puts the real inbox back (restore_parked_inbox)
+    # and restarts the shell.
     restore_inbox() {
       omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
-      if ((! inbox_swapped)); then return 0; fi
+      if ((! inbox_swapped)); then
+        rmdir "$inbox_backup" 2>/dev/null || true
+        return 0
+      fi
+      inbox_swapped=0
       omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
-      omarchy-shell notifications clear >/dev/null 2>&1 || true
-      sleep 1
-      find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
-      rmdir "$inbox_backup" 2>/dev/null || true
+      restore_parked_inbox "$inbox_backup" "$inbox_dir" || true
       omarchy restart shell >/dev/null 2>&1 || true
     }
     trap restore_inbox EXIT

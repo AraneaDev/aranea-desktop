@@ -109,7 +109,20 @@ fi
 grep -Fq 'if ((picker_swapped)); then' "$capture_script"
 grep -Fq '&& ((clipboard_swapped)); then' "$capture_script"
 (($(line_of 'inbox_swapped=1') > $(line_of "mv -t \"\$inbox_backup\"")))
-grep -Fq 'if ((! inbox_swapped)); then return 0; fi' "$capture_script"
+grep -Fq 'if ((! inbox_swapped)); then' "$capture_script"
+# Parked notifications come back only after the queued clear has run and the
+# shell is stopped, are copied (not moved) and the backup is kept unless every
+# file is verified back (a late clear once deleted a restored inbox).
+# shellcheck disable=SC2016 # literals, not expansions
+grep -Fq 'restore_parked_inbox "$batch_inbox_backup" "$batch_inbox_dir"' "$capture_script"
+# shellcheck disable=SC2016 # literals, not expansions
+grep -Fq 'restore_parked_inbox "$inbox_backup" "$inbox_dir"' "$capture_script"
+grep -Fq 'your notifications are kept in' "$capture_script"
+# shellcheck disable=SC2016 # a literal pattern, not an expansion
+if grep -Eq 'mv -t "\$(batch_)?inbox_dir"' "$capture_script"; then
+  echo "parked notifications must be copied back and verified, never moved" >&2
+  exit 1
+fi
 # The --all batch also sets its restore trap before parking the inbox, and a
 # clipboard that cannot be saved is never replaced.
 (($(line_of 'trap finish_batch EXIT') < $(line_of "-exec mv -t \"\$batch_inbox_backup\"")))

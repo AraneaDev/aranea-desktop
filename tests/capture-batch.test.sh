@@ -35,7 +35,25 @@ cat >"$bin/fake-surface" <<'SH'
 [[ " ${CAPTURE_FAILS:-} " == *" $1 "* ]] && exit 1
 printf 'new %s\n' "$1" >"$2/$1.png"
 SH
-chmod +x "$bin/hyprctl" "$bin/magick" "$bin/fake-surface"
+# omarchy-shell clears the notification inbox the way the real shell does:
+# with a queued job that may run seconds later and deletes whatever *.json is
+# in the inbox by then. Stopping the shell (quickshell kill) cancels it.
+cat >"$bin/omarchy-shell" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1 $2" == "notifications clear" ]]; then
+  inbox="$HOME/.local/state/omarchy/notifications/inbox"
+  (sleep 2 && rm -f "$inbox"/*.json) </dev/null >/dev/null 2>&1 &
+  printf '%s\n' "$!" >>"$ARANEA_TEST_SANDBOX/shell-jobs"
+fi
+SH
+cat >"$bin/quickshell" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == kill && -f "$ARANEA_TEST_SANDBOX/shell-jobs" ]]; then
+  while read -r job; do kill "$job" 2>/dev/null || true; done <"$ARANEA_TEST_SANDBOX/shell-jobs"
+  rm -f "$ARANEA_TEST_SANDBOX/shell-jobs"
+fi
+SH
+chmod +x "$bin/hyprctl" "$bin/magick" "$bin/fake-surface" "$bin/omarchy-shell" "$bin/quickshell"
 
 # Runs the batch with the stubs; prints its stderr (stdout is dropped),
 # returns its status.
@@ -91,5 +109,18 @@ errors="$(run_batch)" || status=$?
 [[ "$(cat "$out/osd.png")" == "new osd" ]]
 [[ "$(cat "$out/hero-showcase.gif")" == "built" ]]
 [[ "$(cat "$inbox/1-1.json")" == "real" ]]
+
+# --- a late inbox clear never deletes the restored notifications
+# (a queued clear outlived the old one-second wait and deleted them)
+printf 'real a\n' >"$inbox/2-1.json"
+printf 'real b\n' >"$inbox/2-2.json"
+run_batch >/dev/null || true
+sleep 3
+for file in 1-1 2-1 2-2; do
+  [[ -f "$inbox/$file.json" ]] || {
+    echo "real notification $file was deleted by the capture's inbox clear" >&2
+    exit 1
+  }
+done
 
 echo "capture batch behaviour passed"
