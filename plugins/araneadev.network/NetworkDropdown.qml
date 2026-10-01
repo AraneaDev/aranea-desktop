@@ -257,7 +257,9 @@ Column {
     objectName: "wifiScroll"
     width: parent.width
     height: Math.min(scrollColumn.implicitHeight, dropdown.maxScrollHeight)
-    visible: wifiSection.visible || savedSection.visible
+    // From the inputs, not the sections' own visible: a child reads
+    // invisible while its parent is, so that would latch hidden for good.
+    visible: !!dropdown.wifi.available || (dropdown.view.saved || []).length > 0
     contentWidth: width
     contentHeight: scrollColumn.implicitHeight
     clip: true

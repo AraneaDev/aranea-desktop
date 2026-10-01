@@ -748,6 +748,13 @@ ShellRoot {
         t.check(actions.some(function (a) {
           return a[0] === "hover"
         }), "a real move after the slide reports hover again")
+        // Wi-Fi arriving after the view was built (the live panel's first
+        // frames) must still show the scroll area and its sections.
+        bare.view = fullView(cur(false, "wifi", 0), wifiRows)
+      }], [80, function () {
+        t.check(t.findChild(bare, "wifiScroll").visible, "the scroll area shows once Wi-Fi arrives")
+        t.check(t.findChild(bare, "wifiSection").visible, "the Wi-Fi list shows once Wi-Fi arrives")
+        t.check(t.findChild(bare, "savedSection").visible, "Saved shows once its rows arrive")
       }]])
 
   // The Wi-Fi delegates (wrappers, then rows) before the refresh check.
