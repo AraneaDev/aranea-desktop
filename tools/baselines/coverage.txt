@@ -18,3 +18,4 @@ plugins/araneadev.notifications/ServiceBridge.js 100
 plugins/araneadev.osd/OsdModel.js 100
 plugins/araneadev.polkit/PolkitLogic.js 100
 plugins/araneadev.shared/ServiceRegistry.js 100
+plugins/araneadev.shared/ShowcaseLogic.js 100

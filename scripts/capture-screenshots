@@ -12,6 +12,16 @@ set -euo pipefail
 # Wi-Fi password in a screenshot). Workspace and update bar popovers expose
 # explicit IPC capture targets below.
 #
+# Network and Bluetooth never show real nearby names: once summoned, the
+# dropdown is handed stand-in names through its `showcase` IPC method
+# (display only, cleared when it closes), and a dropdown that doesn't answer
+# "ok" (the stock panel, say) fails the surface with no screenshot written.
+# Network waits for its link graph to draw a trace first.
+#   ARANEA_CAPTURE_WIFI_NAMES    JSON array of Wi-Fi names (default below)
+#   ARANEA_CAPTURE_BT_NAMES      JSON array of Bluetooth names (default below)
+#   ARANEA_NETWORK_GRAPH_DELAY   seconds the Network graph records (default 20)
+#   ARANEA_BLUETOOTH_SCAN_DELAY  extra seconds for the Bluetooth scan (default 3)
+#
 # ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
 # --all: it is run as `<command> <surface> <output dir>` (tests use it).
 #
@@ -156,6 +166,10 @@ remove_empty_backup() {
   printf 'notification files from an aborted park are kept in %s; move them back into %s\n' "$1" "$notification_state_dir" >&2
   return 1
 }
+
+# Stand-in names the Network and Bluetooth captures draw instead of real ones.
+default_wifi_names='["Aranea-Home","Neighbour-5G","Cafe-Guest","Library-Free","Studio-2G","Atelier","Harbour-Net","Old-Router"]'
+default_bt_names='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","Xbox Controller","Galaxy Buds2","Kindle"]'
 
 # The surfaces --all captures.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
@@ -464,6 +478,47 @@ capture_popup_surface() {
     exit 3
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  grim "$output/$surface.png"
+  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  printf 'captured: %s\n' "$output/$surface.png"
+}
+
+# Summons dropdown TARGET, hands it the stand-in NAMES (a JSON array) through
+# its showcase IPC method, waits SECONDS... (each one slept in turn), grabs
+# the screen, then hides it, which clears the names. A showcase answer other
+# than "ok" hides the dropdown and exits 3 before anything is grabbed.
+capture_showcase_surface() {
+  local target="$1" names="$2"
+  shift 2
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo "omarchy-shell is required to capture $surface" >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo "grim is required to capture $surface" >&2
+    exit 3
+  }
+
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  local summon_result showcase_result seconds
+  summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+  if [[ "$summon_result" != "ok" ]]; then
+    echo "Unable to summon popup $target: $summon_result" >&2
+    exit 3
+  fi
+  # The leading space keeps qs from reading a bracketed argument as a list
+  # (it would split '["a","b"]' into two arguments); JSON.parse skips it.
+  showcase_result="$(omarchy-shell "$target" showcase " $names" 2>&1 || true)"
+  if [[ "$showcase_result" != "ok" ]]; then
+    omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+    printf 'capture failed: %s did not take the stand-in names (showcase answered "%s"); is the Aranea dropdown active? No screenshot written.\n' "$target" "$showcase_result" >&2
+    exit 3
+  fi
+  for seconds in "$@"; do
+    sleep "$seconds"
+  done
   hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
@@ -821,7 +876,9 @@ case "$surface" in
     exit 0
     ;;
   network)
-    capture_popup_surface omarchy.network
+    # Stand-in SSIDs, and 20 s for the 60 s link graph to draw a trace.
+    capture_showcase_surface omarchy.network "${ARANEA_CAPTURE_WIFI_NAMES:-$default_wifi_names}" \
+      "${ARANEA_NETWORK_GRAPH_DELAY:-20}"
     exit 0
     ;;
   audio)
@@ -829,7 +886,9 @@ case "$surface" in
     exit 0
     ;;
   bluetooth)
-    capture_popup_surface omarchy.bluetooth
+    # Stand-in device names, and a few seconds more for the scan to find some.
+    capture_showcase_surface omarchy.bluetooth "${ARANEA_CAPTURE_BT_NAMES:-$default_bt_names}" \
+      "${ARANEA_SCREENSHOT_DELAY:-1}" "${ARANEA_BLUETOOTH_SCAN_DELAY:-3}"
     exit 0
     ;;
   agents)

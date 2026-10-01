@@ -13,6 +13,7 @@ import qs.Ui
 import qs.Commons
 import "Model.js" as Model
 import "NetworkLogic.js" as NetworkLogic
+import "../araneadev.shared/ShowcaseLogic.js" as Showcase
 import "../araneadev.shared" as Aranea
 
 Panel {
@@ -301,7 +302,21 @@ Panel {
     function speedTest() {
       root.summonSpeedTest()
     }
+    // Screenshot stand-ins (scripts/capture-screenshots): NAMESJSON, a JSON
+    // array of strings, relabels the Wi-Fi, Saved, VPN and interface rows
+    // and the header until the dropdown closes. Display only.
+    function showcase(namesJson: string): string {
+      var names = Showcase.parseNames(namesJson)
+      if (names === null)
+        return "invalid"
+      root.showcaseNames = names
+      return "ok"
+    }
   }
+
+  // Stand-in names for README screenshots (the showcase IPC method); empty
+  // outside a capture, and cleared whenever the dropdown closes.
+  property var showcaseNames: []
 
   // Runs whichever header action is under the keyboard cursor.
   function activateHeader() {
@@ -1564,17 +1579,21 @@ Panel {
   }
 
   // The view's interface rows (shown with two or more links).
-  readonly property var interfaceRows: NetworkLogic.keepRows(rowCache, "interfaces", NetworkLogic.interfaceRows(extraDevices, extraAddrs))
-  // The view's VPN rows.
-  readonly property var vpnRows: NetworkLogic.keepRows(rowCache, "vpn", NetworkLogic.vpnRows(extraConnections, extraAddrs))
-  // The view's Saved rows: saved Wi-Fi profiles not in the current scan.
-  readonly property var savedRows: NetworkLogic.keepRows(rowCache, "saved", NetworkLogic.savedRows(extraConnections, ssidByUuid, wifiNetworks.map(function (n) {
+  // With showcase names they take the names after the Wi-Fi, Saved and VPN
+  // rows' (the offsets are read only then, so they never rebuild it).
+  readonly property var interfaceRows: NetworkLogic.keepRows(rowCache, "interfaces", Showcase.showcaseLabels(NetworkLogic.interfaceRows(extraDevices, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length + vpnRows.length : 0))
+  // The view's VPN rows; showcase names after the Wi-Fi and Saved rows'.
+  readonly property var vpnRows: NetworkLogic.keepRows(rowCache, "vpn", Showcase.showcaseLabels(NetworkLogic.vpnRows(extraConnections, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length : 0))
+  // The view's Saved rows: saved Wi-Fi profiles not in the current scan;
+  // showcase names after the Wi-Fi rows'.
+  readonly property var savedRows: NetworkLogic.keepRows(rowCache, "saved", Showcase.showcaseLabels(NetworkLogic.savedRows(extraConnections, ssidByUuid, wifiNetworks.map(function (n) {
     return n.ssid
-  }), Date.now() / 1000))
+  }), Date.now() / 1000), showcaseNames, "Network", wifiNetworks.length))
   // The view's Wi-Fi rows, from stock's wifiNetworks. Their own binding,
   // apart from networkView, so status, rates and the phrase never rebuild
-  // them; a scan that changed nothing hands back the same array.
-  readonly property var wifiViewRows: NetworkLogic.keepRows(rowCache, "wifi", wifiNetworks.map(function (net, i) {
+  // them; a scan that changed nothing hands back the same array. Showcase
+  // names relabel them in display order.
+  readonly property var wifiViewRows: NetworkLogic.keepRows(rowCache, "wifi", Showcase.showcaseLabels(wifiNetworks.map(function (net, i) {
     return {
       key: net.ssid,
       label: net.ssid,
@@ -1586,13 +1605,16 @@ Panel {
       forgettable: canForgetNetwork(net),
       enterprise: isEnterpriseSecurity(net.security)
     }
-  }))
+  }), showcaseNames, "Network"))
 
   // The header title, as stock's heroSsid: "SSID (detail)", "Ethernet
-  // (detail)", the interface, or "Disconnected" / "No connection".
+  // (detail)", the interface, or "Disconnected" / "No connection". With
+  // showcase names, the connected row's stand-in replaces the SSID.
   readonly property string heroTitle: {
     var title
-    if (info.type === "wifi")
+    if (info.type === "wifi" && showcaseNames.length > 0)
+      title = Showcase.connectedLabel(wifiViewRows) || "Wi-Fi"
+    else if (info.type === "wifi")
       title = info.ssid || "Wi-Fi"
     else if (info.type === "ethernet")
       title = "Ethernet"
@@ -2015,6 +2037,7 @@ Panel {
         root.headerCursorKey = ""
       } else {
         root.linkHistory = []
+        root.showcaseNames = []
       }
     }
     function onWifiNetworksChanged() {
