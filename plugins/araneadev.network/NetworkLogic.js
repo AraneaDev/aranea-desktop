@@ -586,18 +586,17 @@ function keyTargetConfirmed(target) {
 }
 
 /**
- * The key a cursor holds once the keyboard reveals its outline. A cursor
- * with no choice yet takes the row the outline now shows; an existing key
- * (even a lost one) is never replaced.
- * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
- * @param {string|null|undefined} key - the cursor's key, or ""
- * @param {number} index - the cursor's index
- * @returns {string} the key to keep
+ * The choice a fresh open makes: stock's open handler puts the Wi-Fi cursor
+ * on row 0, a deliberate placement, so that row (and its section) count as
+ * chosen. With no Wi-Fi rows nothing is chosen. (A keyboard reveal, by
+ * contrast, never chooses: see pressOutcome.)
+ * @param {Array<{key: string}|null|undefined>|undefined} wifiRows - the Wi-Fi rows at open
+ * @returns {{chosen: string, key: string}} the chosen section ("wifi" or "") and row 0's key
  */
-function revealKey(rows, key, index) {
-  if (typeof key === "string" && key !== "") return key
-  var row = Array.isArray(rows) ? rows[index] : null
-  return row && typeof row.key === "string" ? row.key : ""
+function openChoice(wifiRows) {
+  if (!Array.isArray(wifiRows) || wifiRows.length === 0) return { chosen: "", key: "" }
+  var row = wifiRows[0]
+  return { chosen: "wifi", key: row && typeof row.key === "string" ? row.key : "" }
 }
 
 /**
@@ -623,6 +622,37 @@ function savedEmptyFallback(wifiCount) {
 function pressIntent(cursorActive, keyboardCursor) {
   if (!cursorActive) return "ignore"
   return keyboardCursor ? "act" : "reveal"
+}
+
+/**
+ * What Enter or `x` does to the cursor's target. Before any cursor exists
+ * it's ignored; on a cursor the keyboard isn't showing it only reveals the
+ * outline, which never changes the chosen section or key (a reveal is not
+ * a choice: the row that slid into a lost key's place stays unchosen);
+ * otherwise it acts only when `keyTargetConfirmed`, else it's refused.
+ * @param {{section: string, chosen: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key?: string, index?: number}|null|undefined} target - the cursor's target, as for keyTargetConfirmed
+ * @param {boolean} cursorActive - whether a cursor has been placed
+ * @param {boolean} keyboardCursor - whether its outline is showing
+ * @returns {string} `ignore`, `reveal`, `refuse` or `act`
+ */
+function pressOutcome(target, cursorActive, keyboardCursor) {
+  var intent = pressIntent(cursorActive, keyboardCursor)
+  if (intent !== "act") return intent
+  return keyTargetConfirmed(target) ? "act" : "refuse"
+}
+
+/**
+ * Whether a left/right press in `section` is a deliberate choice of the
+ * control it lands on: the header actions, the band pills and the DNS
+ * pills. On Automatic (`bandAuto`) it does nothing; on a Wi-Fi or Saved
+ * row it only moves onto the row's forget action, which chooses no row.
+ * @param {string} section - the cursor's section
+ * @param {boolean} bandAuto - whether the band cursor is on the Automatic switch
+ * @returns {boolean} true when the press chooses
+ */
+function sidewaysChooses(section, bandAuto) {
+  if (section === "band") return !bandAuto
+  return section === "header" || section === "dns"
 }
 
 /**
@@ -670,6 +700,33 @@ function keepRows(cache, name, next) {
  */
 function extrasFollowUp(dirty, forgetRunning) {
   return { rerun: !!dirty, settle: !dirty && !forgetRunning }
+}
+
+/**
+ * Whether the extras process exiting should read again: a request that
+ * arrived after its output was applied (a forget finishing between the
+ * output and the exit) only marked it dirty, and nothing else re-reads.
+ * @param {boolean} dirty - whether another read was asked for and not yet followed up
+ * @returns {boolean} true to read again
+ */
+function extrasExitFollowUp(dirty) {
+  return !!dirty
+}
+
+/**
+ * The Saved rows' action state by uuid: the profile being forgotten
+ * breathes with "Forgetting…"; one whose forget failed reads "Couldn't
+ * forget" (shown in the urgent colour). A running forget wins.
+ * @param {string|null|undefined} forgettingUuid - the profile a forget is running for, or ""
+ * @param {string|null|undefined} failedUuid - the profile whose last forget failed, or ""
+ * @returns {Record<string, {busy: boolean, failed: boolean, text: string}>} uuid -> state
+ */
+function savedStatusMap(forgettingUuid, failedUuid) {
+  /** @type {Record<string, {busy: boolean, failed: boolean, text: string}>} */
+  var out = {}
+  if (failedUuid) out[failedUuid] = { busy: false, failed: true, text: "Couldn't forget" }
+  if (forgettingUuid) out[forgettingUuid] = { busy: true, failed: false, text: "Forgetting…" }
+  return out
 }
 
 /**
@@ -738,7 +795,11 @@ if (typeof module !== "undefined")
     followCursor: followCursor,
     cursorConfirmed: cursorConfirmed,
     keyTargetConfirmed: keyTargetConfirmed,
-    revealKey: revealKey,
+    openChoice: openChoice,
+    pressOutcome: pressOutcome,
+    sidewaysChooses: sidewaysChooses,
+    extrasExitFollowUp: extrasExitFollowUp,
+    savedStatusMap: savedStatusMap,
     savedEmptyFallback: savedEmptyFallback,
     pressIntent: pressIntent,
     enterDecision: enterDecision,

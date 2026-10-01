@@ -1,7 +1,9 @@
 // The "Saved, out of range" section of the Aranea Network dropdown: saved
 // Wi-Fi profiles the scan doesn't see, as dimmed NodeDeviceRows with a
 // forget button on hover or under the cursor. A row click does nothing
-// (there's nothing in range to connect to). Hidden when empty. Pure view:
+// (there's nothing in range to connect to). A profile being forgotten
+// breathes; a failed forget reads its text ("Couldn't forget") in the
+// urgent colour. Hidden when empty. Pure view:
 // plain inputs in, signals out.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -14,8 +16,9 @@ Column {
   // Saved rows from NetworkLogic.savedRows: [{key, label, detail}], key
   // being the profile's uuid.
   property var rows: []
-  // Per-profile action state, keyed by uuid: {uuid: {busy, text}}. A
-  // profile being forgotten breathes and reads its text ("Forgetting…").
+  // Per-profile action state, keyed by uuid: {uuid: {busy, failed, text}}.
+  // A profile being forgotten breathes and reads its text ("Forgetting…");
+  // a failed one reads it in the urgent colour ("Couldn't forget").
   property var status: ({})
   // The keyboard cursor's row, or -1 when the cursor isn't here.
   property int cursorIndex: -1
@@ -83,6 +86,7 @@ Column {
       // This row's action state.
       readonly property var actionState: section.status ? section.status[savedRow.modelData.key] : undefined
       detail: savedRow.actionState && savedRow.actionState.text ? String(savedRow.actionState.text) : (savedRow.modelData.detail || "")
+      detailColor: savedRow.actionState && savedRow.actionState.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       busy: !!(savedRow.actionState && savedRow.actionState.busy)
       available: true
       hasCursor: section.cursorIndex === savedRow.index

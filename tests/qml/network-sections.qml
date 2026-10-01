@@ -14,8 +14,8 @@
 // stock does; DNS marks the selected pill, emits pick and explains Custom;
 // pills draw no outline without the cursor (pointer hover included) and
 // exactly one with it, and pointer hover reaches the sections through the
-// PointerMoveGate. A forget button that appears under a still pointer
-// ignores a click until it settles.
+// PointerMoveGate. A forget button or VPN switch that appears under a
+// still pointer ignores a click until it settles.
 import QtQuick
 import QtTest
 import Quickshell
@@ -373,6 +373,50 @@ ShellRoot {
     }
   }
 
+  // A VPN section whose rows are rebuilt under a still pointer (bringing
+  // one profile up re-sorts them active-first): a click on the switch that
+  // now sits there was aimed at another profile's.
+  FloatingWindow {
+    id: freshVpnWindow
+    implicitWidth: 300
+    implicitHeight: 120
+    visible: true
+
+    Item {
+      id: freshVpnHost
+      anchors.fill: parent
+
+      // How many times a fresh VPN row's switch was toggled.
+      property int toggledCount: 0
+
+      Loader {
+        id: freshVpnLoader
+        width: parent.width
+        active: false
+        sourceComponent: Network.NetworkVpnSection {
+          width: freshVpnHost.width
+          pointerGate: freshVpnGate
+          rows: [
+            {
+              key: "u-9",
+              glyph: String.fromCodePoint(0xf0582),
+              label: "fresh-wg",
+              detail: "WireGuard",
+              active: false
+            }
+          ]
+          onToggle: function (index) {
+            freshVpnHost.toggledCount += 1
+          }
+        }
+      }
+      PointerMoveGate {
+        id: freshVpnGate
+        referenceItem: freshVpnHost
+      }
+    }
+  }
+
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
     return t.findChildren(item, "cursorOutline").filter(function (o) {
@@ -406,6 +450,31 @@ ShellRoot {
           t.step(350, function () {
             pointer.mouseClick(freshHost, 32, 28)
             t.equal(freshHost.clickedCount, 1, "once it has settled, a click forgets")
+            freshVpnSwitch()
+          })
+        })
+      })
+    })
+  }
+
+  // A VPN switch that appears under a still pointer ignores clicks for
+  // about 300 ms, unless the gate accepted a real move over its row.
+  function freshVpnSwitch() {
+    freshVpnLoader.active = true
+    var sw = t.findChild(freshVpnLoader.item, "vpnSwitch")
+    var p = sw.mapToItem(freshVpnHost, sw.width / 2, sw.height / 2)
+    freshVpnLoader.active = false
+    pointer.mouseMove(freshVpnHost, p.x - 2, p.y)
+    t.step(60, function () {
+      pointer.mouseMove(freshVpnHost, p.x, p.y)
+      t.step(60, function () {
+        freshVpnLoader.active = true
+        t.step(30, function () {
+          pointer.mouseClick(freshVpnHost, p.x, p.y)
+          t.equal(freshVpnHost.toggledCount, 0, "a click right after a VPN switch appears under a still pointer is ignored")
+          t.step(350, function () {
+            pointer.mouseClick(freshVpnHost, p.x, p.y)
+            t.equal(freshVpnHost.toggledCount, 1, "once it has settled, a click on the VPN switch toggles")
             t.done()
           })
         })

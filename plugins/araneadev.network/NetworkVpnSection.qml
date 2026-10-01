@@ -96,6 +96,9 @@ Column {
       // The only item in the trailing slot, so the slot sizes to it.
       Aranea.FilamentSwitch {
         objectName: "vpnSwitch"
+        // A re-sort (active first) can rebuild this row under a still
+        // pointer: the row's settle guard covers its switch too.
+        clickGate: vpnRow
         checked: !!vpnRow.modelData.active
         onToggled: section.toggle(vpnRow.index)
       }

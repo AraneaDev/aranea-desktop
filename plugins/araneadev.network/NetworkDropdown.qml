@@ -31,7 +31,7 @@ Column {
   property var wifiStatus: ({})
   // Per-uuid VPN action state: {uuid: {busy, failed, text}}.
   property var vpnStatus: ({})
-  // Per-uuid Saved action state: {uuid: {busy, text}}.
+  // Per-uuid Saved action state: {uuid: {busy, failed, text}}.
   property var savedStatus: ({})
   // The passphrase prompt: {ssid, enterprise, busy, failed, passphrase,
   // identity}; ssid "" while closed.

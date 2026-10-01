@@ -1219,7 +1219,7 @@ Panel {
   // Whether the cursor sits on the Saved row's forget button.
   property bool savedActionFocused: false
   // The SSID of the Wi-Fi row the cursor was deliberately put on (a move,
-  // hover, click, open or a keyboard reveal), so the cursor follows that
+  // hover, click or open; never a keyboard reveal), so the cursor follows that
   // network when a scan re-sorts the list. Never adopted from a clamp: when
   // the network is gone it's "" and keyboard actions refuse until the user
   // picks a row (NetworkLogic.followCursor).
@@ -1235,9 +1235,10 @@ Panel {
   // the Automatic switch (see headerCursorKey).
   property string bandCursorKey: ""
   // The section the user last deliberately put the cursor in (a move,
-  // hover, click or keyboard reveal); "" after open. An automatic move (a
-  // section emptying or hiding under the cursor) changes focusSection but
-  // not this, so keyboard actions there refuse until the user picks a row.
+  // hover, click, or "wifi" from open's row-0 placement; never a keyboard
+  // reveal). An automatic move (a section emptying or hiding under the
+  // cursor) changes focusSection but not this, so keyboard actions there
+  // refuse until the user picks a row.
   property string cursorChosenSection: ""
 
   // The SSID of Wi-Fi row INDEX, or "" when there is none.
@@ -1339,28 +1340,21 @@ Panel {
     setSectionKey(section, row && typeof row.key === "string" ? row.key : "")
   }
 
-  // The keyboard just revealed the cursor's outline, so its section counts
-  // as chosen, and a cursor with no choice yet takes the row now outlined
-  // (NetworkLogic.revealKey). A key it already holds is never replaced.
-  function revealCursor() {
-    cursorChosenSection = focusSection
-    var auto = focusSection === "band" && bandAutoFocused
-    var rows = auto ? [
-      {
-        key: "auto"
-      }
-    ] : sectionKeyRows(focusSection)
-    setSectionKey(focusSection, NetworkLogic.revealKey(rows, sectionKey(focusSection), auto ? 0 : cursorIndexIn(focusSection)))
-  }
-
   // Whether the keyboard may act on the cursor in SECTION: it's the section
   // the user chose, and the cursor still sits on the row (or band control)
   // they chose and can see (NetworkLogic.keyTargetConfirmed). DNS's pills
   // never move. Keyboard actions refuse otherwise, so a re-sort, a vanished
   // row or an automatic move never retargets a key press.
   function cursorRowConfirmed(section) {
+    return NetworkLogic.keyTargetConfirmed(cursorTarget(section))
+  }
+
+  // The cursor's target in SECTION for NetworkLogic.keyTargetConfirmed and
+  // pressOutcome: the section, the one last chosen, whether its controls
+  // never move (DNS), and its rows, key and index.
+  function cursorTarget(section) {
     var auto = section === "band" && bandAutoFocused
-    return NetworkLogic.keyTargetConfirmed({
+    return {
       section: section,
       chosen: cursorChosenSection,
       fixed: section === "dns",
@@ -1371,7 +1365,7 @@ Panel {
       ] : sectionKeyRows(section),
       key: sectionKey(section),
       index: auto ? 0 : cursorIndexIn(section)
-    })
+    }
   }
   // The header caption's opacity, which connectionPhraseSwap fades between
   // phrases. Passed to the view on its own, outside networkView, so the fade
@@ -1402,6 +1396,9 @@ Panel {
   // The Saved profile a forget is running for, until the next extras read
   // that started after it finished; "" otherwise.
   property string savedForgettingUuid: ""
+  // The Saved profile whose last forget failed, for savedForgetFailedTimer's
+  // 4 s ("Couldn't forget"), or "".
+  property string savedForgetFailedUuid: ""
   // Whether another extras read was asked for while one ran.
   property bool extrasDirty: false
   // Row arrays kept by NetworkLogic.keepRows, so an unchanged refresh hands
@@ -1423,10 +1420,13 @@ Panel {
   // Starts the extras poll (devices, profiles, addresses), or marks it
   // dirty when one is running so it reads again afterwards.
   function runExtras() {
-    if (extrasProc.running)
+    if (extrasProc.running) {
       extrasDirty = true
-    else
+    } else {
+      // A read starting now covers every request so far.
+      extrasDirty = false
       extrasProc.running = true
+    }
   }
 
   // Applies the extras poll's output. Anything unparsable leaves empty
@@ -1506,6 +1506,8 @@ Panel {
     var row = savedRows[index]
     if (!row || !row.key || savedForgetProc.running || savedForgettingUuid === row.key)
       return
+    savedForgetFailedTimer.stop()
+    savedForgetFailedUuid = ""
     savedForgettingUuid = row.key
     savedForgetProc.command = ["nmcli", "connection", "delete", "uuid", row.key]
     savedForgetProc.running = true
@@ -1770,16 +1772,9 @@ Panel {
     return out
   }
 
-  // uuid -> {busy, text} for the Saved rows (NetworkDropdown.savedStatus).
-  readonly property var savedStatusView: {
-    var out = {}
-    if (savedForgettingUuid !== "")
-      out[savedForgettingUuid] = {
-        busy: true,
-        text: "Forgetting…"
-      }
-    return out
-  }
+  // uuid -> {busy, failed, text} for the Saved rows
+  // (NetworkDropdown.savedStatus, NetworkLogic.savedStatusMap).
+  readonly property var savedStatusView: NetworkLogic.savedStatusMap(savedForgettingUuid, savedForgetFailedUuid)
 
   // The passphrase prompt (NetworkDropdown.prompt); ssid "" while closed.
   readonly property var promptView: {
@@ -1833,22 +1828,25 @@ Panel {
     chooseCursorRow(next.section)
   }
 
-  // Moves the cursor sideways within its section, with stock's helpers.
+  // Moves the cursor sideways within its section, with stock's helpers. A
+  // pick in the header, band pills or DNS is a deliberate choice of what it
+  // lands on (NetworkLogic.sidewaysChooses).
   function moveHorizontalBy(dx) {
-    if (focusSection === "header") {
+    var section = focusSection
+    var bandAuto = bandAutoFocused
+    if (section === "header")
       selectHeaderByDelta(dx)
-      chooseCursorRow("header")
-    } else if (focusSection === "band") {
-      if (!bandAutoFocused) {
+    else if (section === "band") {
+      if (!bandAuto)
         selectBandByDelta(dx)
-        chooseCursorRow("band")
-      }
-    } else if (focusSection === "dns")
+    } else if (section === "dns")
       selectDnsByDelta(dx)
-    else if (focusSection === "wifi")
+    else if (section === "wifi")
       selectWifiActionByDelta(dx)
-    else if (focusSection === "saved" && savedIndex < savedRows.length)
+    else if (section === "saved" && savedIndex < savedRows.length)
       savedActionFocused = dx > 0
+    if (NetworkLogic.sidewaysChooses(section, bandAuto))
+      chooseCursorRow(section)
   }
 
   // Enter: activates whatever the cursor sits on, refusing a row that isn't
@@ -2000,13 +1998,15 @@ Panel {
       root.savedActionFocused = false
       if (root.opened) {
         root.ssidLookupPending = true
-        // Nothing is chosen until the user moves, hovers, clicks or the
-        // keyboard reveals the cursor.
-        root.cursorChosenSection = ""
-        // Stock's open handler puts the Wi-Fi cursor on row 0; VPN and Saved
-        // start on their first rows too, so each follows its row until the
-        // keyboard reveals it. The header and band take theirs on reveal.
-        root.wifiCursorSsid = root.wifiSsidAt(0)
+        // Stock's open handler puts the Wi-Fi cursor on row 0, a deliberate
+        // placement, so that row is chosen (NetworkLogic.openChoice); with
+        // no Wi-Fi rows nothing is until the user moves, hovers or clicks.
+        // A keyboard reveal never chooses. VPN and Saved start on their
+        // first rows too, followed until the user picks; the header and band
+        // take theirs on a move, hover or click.
+        var open = NetworkLogic.openChoice(root.wifiKeyRows())
+        root.cursorChosenSection = open.chosen
+        root.wifiCursorSsid = open.key
         root.vpnIndex = 0
         root.vpnCursorKey = root.vpnRows.length > 0 ? root.vpnRows[0].key : ""
         root.savedIndex = 0
@@ -2124,7 +2124,10 @@ Panel {
   }
 
   // Devices, connection profiles and IPv4 addresses in one shot, for the
-  // Interfaces, VPN and Saved sections. Prints nothing without nmcli.
+  // Interfaces, VPN and Saved sections. Prints nothing without nmcli. A
+  // request that arrived after the output was applied (a forget finishing
+  // before the exit) only marked it dirty: the exit reads again.
+  // qmllint disable signal-handler-parameters
   Process {
     id: extrasProc
     command: ["bash", "-c", "command -v nmcli >/dev/null 2>&1 || exit 0; nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device; echo ---; nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show; echo ---; ip -j -4 -br addr"]
@@ -2132,7 +2135,12 @@ Panel {
       waitForEnd: true
       onStreamFinished: root.updateExtras(text)
     }
+    onExited: {
+      if (NetworkLogic.extrasExitFollowUp(root.extrasDirty))
+        extrasRerun.restart()
+    }
   }
+  // qmllint enable signal-handler-parameters
 
   // Re-reads the extras once the read that was running when another was
   // asked for has finished (see updateExtras).
@@ -2190,16 +2198,29 @@ Panel {
   }
 
   // Deletes a saved Wi-Fi profile, then re-reads profiles and SSIDs; a read
-  // already running is followed by a fresh one (runExtras, extrasDirty).
+  // already running is followed by a fresh one (runExtras, extrasDirty). A
+  // failed delete reads "Couldn't forget" on its row for 4 s.
   // qmllint disable signal-handler-parameters
   Process {
     id: savedForgetProc
-    onExited: {
+    onExited: function (exitCode) {
+      if (exitCode !== 0) {
+        root.savedForgetFailedUuid = root.savedForgettingUuid
+        root.savedForgettingUuid = ""
+        savedForgetFailedTimer.restart()
+      }
       root.ssidLookupPending = true
       root.runExtras()
     }
   }
   // qmllint enable signal-handler-parameters
+
+  // Clears a Saved forget failure after 4 s.
+  Timer {
+    id: savedForgetFailedTimer
+    interval: 4000
+    onTriggered: root.savedForgetFailedUuid = ""
+  }
 
   // The Aranea view in the shared keyboard frame. The view pins the header
   // through DNS and scrolls Wi-Fi and Saved itself, so the frame only sizes
@@ -2228,39 +2249,36 @@ Panel {
       var revealing = !root.cursorActive || !root.keyboardCursor
       root.cursorActive = true
       root.keyboardCursor = true
+      // A reveal only shows the outline: it never chooses a row.
       if (!revealing || dy < 0) {
         if (dy !== 0)
           root.moveVerticalBy(dy)
         if (dx !== 0)
           root.moveHorizontalBy(dx)
-      } else {
-        root.revealCursor()
       }
       Qt.callLater(root.ensureCursorVisible)
     }
     // Enter and x act only on a cursor the keyboard is showing; on one the
-    // pointer placed (no outline) they only reveal it, as arrows do.
+    // pointer placed (no outline) they only reveal it, as arrows do, and
+    // the reveal chooses nothing. A row the user didn't choose is refused
+    // (NetworkLogic.pressOutcome).
     onActivateRequested: {
       dropdown.disarmPointer()
-      var intent = NetworkLogic.pressIntent(root.cursorActive, root.keyboardCursor)
-      if (intent === "ignore")
+      var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
+      if (outcome === "ignore")
         return
       root.keyboardCursor = true
-      if (intent === "reveal")
-        root.revealCursor()
-      else
+      if (outcome === "act")
         root.activateCursor()
       Qt.callLater(root.ensureCursorVisible)
     }
     onDeleteRequested: {
       dropdown.disarmPointer()
-      var intent = NetworkLogic.pressIntent(root.cursorActive, root.keyboardCursor)
-      if (intent === "ignore")
+      var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
+      if (outcome === "ignore")
         return
       root.keyboardCursor = true
-      if (intent === "reveal")
-        root.revealCursor()
-      else
+      if (outcome === "act")
         root.deleteCursor()
       Qt.callLater(root.ensureCursorVisible)
     }

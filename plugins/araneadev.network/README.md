@@ -27,13 +27,15 @@ The extras, all hidden when they have nothing to show:
   `nmcli -g 802-11-wireless.ssid connection show uuid <uuid>` (one
   `uuid<TAB>ssid` line per profile, an empty SSID when the lookup fails),
   run on open and after a forget only. A read asked for while one runs
-  (a forget landing mid-poll) runs again once it finishes.
+  (a forget landing mid-poll, even after the output was read) runs again
+  once it finishes.
 - **VPN toggle:** `nmcli --wait 20 connection up|down uuid <uuid>`; the row
   breathes while it runs and reads "Couldn't connect" (or "Couldn't
   disconnect") for 4 s if it fails.
 - **Saved forget:** `nmcli connection delete uuid <uuid>`; the row breathes
   and reads "Forgetting…" until the next extras read that started after
-  the delete finished.
+  the delete finished. A failed delete reads "Couldn't forget" in the
+  urgent colour for 4 s.
 
 The keyboard walks header, VPN, band, DNS, Wi-Fi and Saved
 (`NetworkLogic.moveVertical`); `r` refreshes and `w` toggles Wi-Fi. Enter
@@ -53,8 +55,9 @@ the keyboard drives it.
 
 - Each section's cursor holds the key of the row (header action, band pill
   or Automatic switch, VPN, network or profile) it was deliberately put on
-  (an arrow, a hover, a click, open, or the keyboard revealing it) and
-  follows that row when the list re-sorts.
+  (an arrow, a left/right pick in the header, band or DNS, a hover, a
+  click, or open's Wi-Fi row 0) and follows that row when the list
+  re-sorts. Revealing the outline never chooses a row.
 - When the row disappears, the cursor is clamped but its key is dropped.
   Enter and `x` then do nothing until the user picks a row
   (`NetworkLogic.followCursor` / `cursorConfirmed`). A hidden SSID never
@@ -62,11 +65,13 @@ the keyboard drives it.
 - The same goes for a cursor moved automatically into another section, for
   example when Saved or the band section empties or hides under it
   (`NetworkLogic.keyTargetConfirmed`).
-- Enter or `x` on a cursor the pointer placed (no outline) only reveals it.
+- Enter or `x` on a cursor the pointer placed (no outline) only reveals it
+  (`NetworkLogic.pressOutcome`), so the row that slid into a lost key's
+  place is never adopted by a reveal.
 - Pointer actions carry their row's key and are refused when the row
   changed.
-- A row or forget button created under a still pointer ignores clicks for
-  300 ms unless the pointer really moves over it.
+- A row, forget button or VPN switch created under a still pointer ignores
+  clicks for 300 ms unless the pointer really moves over its row or button.
 - Unchanged refreshes keep the same row arrays, so delegates aren't
   rebuilt.
 - While a Wi-Fi action runs, the Wi-Fi rows are dimmed, as stock disabled

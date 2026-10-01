@@ -795,6 +795,16 @@ ShellRoot {
         var savedRows = t.findChildren(t.findChild(full, "savedSection"), "savedRow")
         t.check(savedRows[0].busy && savedRows[0].detail === "Forgetting…", "a profile being forgotten breathes and reads Forgetting…")
         t.check(!savedRows[1].busy && savedRows[1].detail === "never used", "the others keep their detail")
+        t.check(Qt.colorEqual(savedRows[1].detailColor, Util.alpha(Aranea.DesignTokens.foreground, 0.55)), "a plain Saved detail is muted")
+        full.savedStatus = {
+          "uuid-guest": {
+            busy: false,
+            failed: true,
+            text: "Couldn't forget"
+          }
+        }
+        t.check(!savedRows[0].busy && savedRows[0].detail === "Couldn't forget", "a failed forget reads Couldn't forget")
+        t.check(Qt.colorEqual(savedRows[0].detailColor, Aranea.DesignTokens.urgent), "in the urgent colour")
         full.savedStatus = {}
 
         // ---------- The VPN switch names its row ----------

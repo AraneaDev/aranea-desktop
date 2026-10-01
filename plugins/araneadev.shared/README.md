@@ -13,7 +13,10 @@ service contracts to the feature plugins.
   presentational contracts.
 - `FilamentSlider` is the Filament-style hairline slider/handle used by
   volume and level controls.
-- `FilamentSwitch` is the Filament-style compact on/off switch.
+- `FilamentSwitch` is the Filament-style compact on/off switch. An optional
+  `clickGate` (the `NodeDeviceRow` hosting it, or anything with
+  `clickSettled()`) makes its pointer clicks settle like that row's, as
+  Network's VPN rows do.
 - `FilamentPulse` is the Filament-style hairline strand that lights up (a
   travelling light, or a static lit strand with motion disabled) while a
   scan is running: Bluetooth's device discovery now, Wi-Fi scans later.

@@ -778,14 +778,91 @@ test("an empty key (a hidden SSID, or no choice) is never confirmed", () => {
   assert.equal(logic.cursorConfirmed([null], "a", 0), false)
 })
 
-test("revealKey adopts the row the keyboard reveals only when there is no choice yet", () => {
-  const rows = [{ key: "a" }, { key: "b" }]
-  assert.equal(logic.revealKey(rows, "", 1), "b", "a revealed outline is a visible choice")
-  assert.equal(logic.revealKey(rows, "a", 0), "a")
-  assert.equal(logic.revealKey(rows, "z", 1), "z", "an existing key is never replaced")
-  assert.equal(logic.revealKey(rows, "", 7), "")
-  assert.equal(logic.revealKey(undefined, "", 0), "")
-  assert.equal(logic.revealKey([null], "", 0), "")
+// --- a reveal never chooses (fix wave 2, R1) ------------------------------
+
+test("pressOutcome: Enter, Enter after Saved empties under the pointer never connects", () => {
+  // Mouse-forget the last Saved row: Saved empties and the cursor drops to
+  // the last Wi-Fi row with no key, still marked as chosen in Saved.
+  const wifi = [{ key: "Home" }, { key: "Cafe" }, { key: "OpenStranger" }]
+  const drop = logic.savedEmptyFallback(wifi.length)
+  const target = {
+    section: drop.section,
+    chosen: "saved",
+    rows: wifi,
+    key: drop.key,
+    index: drop.index
+  }
+  // The first Enter only reveals the outline (the pointer had the cursor)...
+  assert.equal(logic.pressOutcome(target, true, false), "reveal")
+  // ...and choosing nothing, so the second Enter is refused.
+  assert.equal(logic.pressOutcome(target, true, true), "refuse")
+  // Even had the section been chosen, the lost key still refuses.
+  assert.equal(logic.pressOutcome({ ...target, chosen: "wifi" }, true, true), "refuse")
+})
+
+test("pressOutcome: Enter, Enter after a hovered network vanished never hits the one that slid in", () => {
+  // The pointer hovered A (a deliberate choice); A drops out of the scan
+  // and B slides into its index.
+  const before = [{ key: "Home" }, { key: "A" }, { key: "B" }]
+  assert.equal(logic.cursorConfirmed(before, "A", 1), true)
+  const after = [{ key: "Home" }, { key: "B" }]
+  const next = logic.followCursor(after, "A", 1)
+  const target = { section: "wifi", chosen: "wifi", rows: after, key: next.key, index: next.index }
+  assert.equal(logic.pressOutcome(target, true, false), "reveal")
+  assert.equal(logic.pressOutcome(target, true, true), "refuse", "B was never chosen")
+  // A deliberate pick of B (an arrow move, hover or click) makes it act.
+  assert.equal(logic.pressOutcome({ ...target, key: "B" }, true, true), "act")
+})
+
+test("pressOutcome ignores a press before any cursor exists and acts on a confirmed row", () => {
+  const rows = [{ key: "a" }]
+  const target = { section: "wifi", chosen: "wifi", rows: rows, key: "a", index: 0 }
+  assert.equal(logic.pressOutcome(target, false, false), "ignore")
+  assert.equal(logic.pressOutcome(target, false, true), "ignore")
+  assert.equal(logic.pressOutcome(target, true, true), "act")
+  assert.equal(
+    logic.pressOutcome({ section: "dns", chosen: "dns", fixed: true }, true, true),
+    "act"
+  )
+  assert.equal(logic.pressOutcome(null, true, true), "refuse")
+})
+
+test("openChoice preselects Wi-Fi row 0 as the open's deliberate placement", () => {
+  assert.deepEqual(logic.openChoice([{ key: "Home" }, { key: "Cafe" }]), {
+    chosen: "wifi",
+    key: "Home"
+  })
+  // Then Down reveals and Enter acts on row 0, following it across a re-sort.
+  const rows = [{ key: "Cafe" }, { key: "Home" }]
+  const next = logic.followCursor(rows, "Home", 0)
+  assert.equal(
+    logic.pressOutcome(
+      { section: "wifi", chosen: "wifi", rows: rows, key: next.key, index: next.index },
+      true,
+      true
+    ),
+    "act"
+  )
+  // No rows (or a hidden first SSID): nothing is chosen.
+  assert.deepEqual(logic.openChoice([]), { chosen: "", key: "" })
+  assert.deepEqual(logic.openChoice(undefined), { chosen: "", key: "" })
+  assert.deepEqual(logic.openChoice([null]), { chosen: "wifi", key: "" })
+})
+
+// --- sidewaysChooses (R3) ---------------------------------------------------
+
+test("sidewaysChooses: a left/right pick in header, band pills and DNS is a deliberate choice", () => {
+  assert.equal(logic.sidewaysChooses("header", false), true)
+  assert.equal(logic.sidewaysChooses("dns", false), true, "DNS after an automatic evacuation")
+  assert.equal(logic.sidewaysChooses("band", false), true)
+  assert.equal(logic.sidewaysChooses("band", true), false, "left/right does nothing on Automatic")
+  assert.equal(
+    logic.sidewaysChooses("wifi", false),
+    false,
+    "Wi-Fi left/right only moves onto forget"
+  )
+  assert.equal(logic.sidewaysChooses("saved", false), false)
+  assert.equal(logic.sidewaysChooses("vpn", false), false)
 })
 
 test("savedEmptyFallback lands on the last Wi-Fi row without choosing it", () => {
@@ -829,6 +906,28 @@ test("keepRows hands back the previous array when nothing changed", () => {
 })
 
 // --- extrasFollowUp ---------------------------------------------------------------
+
+test("extrasExitFollowUp re-reads when a forget landed after the output but before the exit", () => {
+  // updateExtras already ran (not dirty then); the forget's runExtras saw
+  // the process still running and only marked it dirty.
+  assert.equal(logic.extrasExitFollowUp(true), true)
+  assert.equal(logic.extrasExitFollowUp(false), false)
+})
+
+test("savedStatusMap: a forget breathes, a failed one reads Couldn't forget", () => {
+  assert.deepEqual(logic.savedStatusMap("", ""), {})
+  assert.deepEqual(logic.savedStatusMap("u-1", ""), {
+    "u-1": { busy: true, failed: false, text: "Forgetting…" }
+  })
+  assert.deepEqual(logic.savedStatusMap("", "u-2"), {
+    "u-2": { busy: false, failed: true, text: "Couldn't forget" }
+  })
+  // A new forget of the failed row shows as running, not failed.
+  assert.deepEqual(logic.savedStatusMap("u-2", "u-2"), {
+    "u-2": { busy: true, failed: false, text: "Forgetting…" }
+  })
+  assert.deepEqual(logic.savedStatusMap(undefined, null), {})
+})
 
 test("extrasFollowUp re-reads after a forget that landed mid-poll, and settles only on a fresh read", () => {
   assert.deepEqual(logic.extrasFollowUp(true, false), { rerun: true, settle: false })
