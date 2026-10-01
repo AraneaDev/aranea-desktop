@@ -1,10 +1,39 @@
 # Aranea Network
 
 `araneadev.network` replaces Omarchy's `omarchy.network` bar dropdown. It
-keeps stock's logic and view in `Panel.qml` and `Model.js` unchanged for
-now (connection details, throughput/ping polling, Wi-Fi scanning and
-actions, DNS and band selection, the keyboard cursor and IPC) and adds only
-documentation comments.
+keeps stock's root logic in `Panel.qml` and `Model.js` (connection details,
+throughput and ping polling, Wi-Fi scanning and actions, the passphrase
+prompt and enterprise connect, DNS and band selection, the cursor model,
+the bar icon and IPC) and draws an Aranea view, `NetworkDropdown.qml`, in
+place of stock's.
+
+Stock's root code is kept except for three edits: the caption fade animates
+`captionOpacity` instead of stock's caption Text, `updateDetails` ends by
+recording a Link graph sample, and `keyCatcher` names the frame's key
+catcher so stock's prompt-close focus hand-back still resolves. Stock's
+per-row NetworkManager hooks (connect failures, completion checks) and the
+2 s "Wrong password" timer moved from the stock row to the root, and the
+prompt's submit moved there too.
+
+The extras, all hidden when they have nothing to show:
+
+- **Link graph:** the receive and send rates stock already computes, the
+  last 40 samples (60 s), cleared on close.
+- **Interfaces, VPN, Saved:** one poll every 4 s while open (and on open):
+  `nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device`,
+  `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show` and
+  `ip -j -4 -br addr`, in one `bash -c` that prints nothing without
+  `nmcli`. Saved profiles' SSIDs come from
+  `nmcli -g 802-11-wireless.ssid connection show uuid <uuid>`, run on open
+  and after a forget only.
+- **VPN toggle:** `nmcli connection up|down uuid <uuid>`; the row breathes
+  while it runs and reads "Couldn't connect" for 4 s if it fails.
+- **Saved forget:** `nmcli connection delete uuid <uuid>`, then a re-read.
+
+The keyboard walks header, VPN, band, DNS, Wi-Fi and Saved
+(`NetworkLogic.moveVertical`); Enter activates, `x` forgets a known Wi-Fi
+or Saved row, `r` refreshes and `w` toggles Wi-Fi. The cursor outline
+shows only while the keyboard drives it.
 
 `Panel.qml` keeps stock's `manageIpc: false` and owns the `omarchy.network`
 IpcHandler itself, so `omarchy-shell shell summon omarchy.network` still
