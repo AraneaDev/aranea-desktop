@@ -95,7 +95,7 @@ Column {
       font.pixelSize: Style.font.body
     }
   }
-  NetworkGraph {
+  Aranea.LinkGraph {
     width: parent.width
     samples: section.samples
   }

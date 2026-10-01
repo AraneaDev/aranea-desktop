@@ -49,6 +49,9 @@ service contracts to the feature plugins.
   or only on a real pointer move when a `pointerGate` is set.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph,
   title/caption pair, and a trailing slot.
+- `LinkGraph` is the 60 s receive/send `Canvas` trace for a link's
+  throughput, shared by the Network and VPN dropdowns. It draws
+  `GraphLogic.graphPoints` and a bare baseline before there are samples.
 - `InkText` aligns glyph ink rather than advance width.
 - `KeyboardInputFrame` owns key forwarding and focus targeting, including a
   `deleteRequested` signal forwarded from the key catcher's "x" key, and a
@@ -58,6 +61,25 @@ service contracts to the feature plugins.
   input and forwards the same `deleteRequested` signal and `blocked` alias.
 - `OverlayChrome` provides common overlay placement and dismiss behavior.
 - `ServiceRegistry.js` publishes isolated service slots for dependent plugins.
+- `CursorLogic.js` is the shared keyboard-cursor safety contract (moved from
+  the Network plugin): a cursor follows the row key it was put on, never
+  its position (`reselectIndex`, `followCursor`), a lost or evacuated key
+  is refused rather than retargeted (`cursorConfirmed`), Enter/`x` only
+  reveal a cursor the keyboard isn't showing before they act
+  (`pressIntent`), a view's Repeater keeps its delegates across an
+  unchanged refresh (`keepRows`), and a pointer action only lands on the
+  row it names (`rowKeyMatches`). Network and VPN both import it directly.
+- `GraphLogic.js` is the shared rolling-sample and plot-point math behind
+  `LinkGraph` (`pushSample`, `graphPoints`), also moved from the Network
+  plugin.
+- `VpnApps.js` parses `~/.config/aranea/vpn-apps.json` (own-app VPNs,
+  both the bare-array and `{apps, profiles}` object forms), matches an
+  interface name against a glob (`globMatch`), derives an own-app VPN's
+  `connected`/`present`/`absent` state and matched interface
+  (`appState`, `appInterface`), and formats the Network dropdown's VPN
+  status line (`statusLine`). Used by `araneadev.vpn`; kept here (not in
+  `araneadev.network`) so Network can show the status line without
+  importing from another plugin.
 
 ## Ownership rules
 

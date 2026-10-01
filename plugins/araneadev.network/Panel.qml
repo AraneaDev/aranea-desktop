@@ -14,6 +14,8 @@ import qs.Commons
 import "Model.js" as Model
 import "NetworkLogic.js" as NetworkLogic
 import "../araneadev.shared/ShowcaseLogic.js" as Showcase
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
+import "../araneadev.shared/GraphLogic.js" as GraphLogic
 import "../araneadev.shared" as Aranea
 
 Panel {
@@ -1237,7 +1239,7 @@ Panel {
   // hover, click or open; never a keyboard reveal), so the cursor follows that
   // network when a scan re-sorts the list. Never adopted from a clamp: when
   // the network is gone it's "" and keyboard actions refuse until the user
-  // picks a row (NetworkLogic.followCursor).
+  // picks a row (CursorLogic.followCursor).
   property string wifiCursorSsid: ""
   // The uuid of the VPN row the cursor was put on (see wifiCursorSsid).
   property string vpnCursorKey: ""
@@ -1416,7 +1418,7 @@ Panel {
   property string savedForgetFailedUuid: ""
   // Whether another extras read was asked for while one ran.
   property bool extrasDirty: false
-  // Row arrays kept by NetworkLogic.keepRows, so an unchanged refresh hands
+  // Row arrays kept by CursorLogic.keepRows, so an unchanged refresh hands
   // the view the same array and its Repeaters keep their delegates.
   property var rowCache: ({})
 
@@ -1425,7 +1427,7 @@ Panel {
   function recordLinkSample() {
     if (!opened || !info.iface || !hasTransferStats)
       return
-    linkHistory = NetworkLogic.pushSample(linkHistory, {
+    linkHistory = GraphLogic.pushSample(linkHistory, {
       iface: info.iface,
       rx: downloadRate,
       tx: uploadRate
@@ -1581,19 +1583,19 @@ Panel {
   // The view's interface rows (shown with two or more links).
   // With showcase names they take the names after the Wi-Fi, Saved and VPN
   // rows' (the offsets are read only then, so they never rebuild it).
-  readonly property var interfaceRows: NetworkLogic.keepRows(rowCache, "interfaces", Showcase.showcaseLabels(NetworkLogic.interfaceRows(extraDevices, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length + vpnRows.length : 0))
+  readonly property var interfaceRows: CursorLogic.keepRows(rowCache, "interfaces", Showcase.showcaseLabels(NetworkLogic.interfaceRows(extraDevices, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length + vpnRows.length : 0))
   // The view's VPN rows; showcase names after the Wi-Fi and Saved rows'.
-  readonly property var vpnRows: NetworkLogic.keepRows(rowCache, "vpn", Showcase.showcaseLabels(NetworkLogic.vpnRows(extraConnections, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length : 0))
+  readonly property var vpnRows: CursorLogic.keepRows(rowCache, "vpn", Showcase.showcaseLabels(NetworkLogic.vpnRows(extraConnections, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length : 0))
   // The view's Saved rows: saved Wi-Fi profiles not in the current scan;
   // showcase names after the Wi-Fi rows'.
-  readonly property var savedRows: NetworkLogic.keepRows(rowCache, "saved", Showcase.showcaseLabels(NetworkLogic.savedRows(extraConnections, ssidByUuid, wifiNetworks.map(function (n) {
+  readonly property var savedRows: CursorLogic.keepRows(rowCache, "saved", Showcase.showcaseLabels(NetworkLogic.savedRows(extraConnections, ssidByUuid, wifiNetworks.map(function (n) {
     return n.ssid
   }), Date.now() / 1000), showcaseNames, "Network", wifiNetworks.length))
   // The view's Wi-Fi rows, from stock's wifiNetworks. Their own binding,
   // apart from networkView, so status, rates and the phrase never rebuild
   // them; a scan that changed nothing hands back the same array. Showcase
   // names relabel them in display order.
-  readonly property var wifiViewRows: NetworkLogic.keepRows(rowCache, "wifi", Showcase.showcaseLabels(wifiNetworks.map(function (net, i) {
+  readonly property var wifiViewRows: CursorLogic.keepRows(rowCache, "wifi", Showcase.showcaseLabels(wifiNetworks.map(function (net, i) {
     return {
       key: net.ssid,
       label: net.ssid,
@@ -1913,9 +1915,9 @@ Panel {
   }
 
   // Whether a pointer action ARG ({index, key}) still names the row it was
-  // reported for in ROWS (NetworkLogic.rowKeyMatches).
+  // reported for in ROWS (CursorLogic.rowKeyMatches).
   function pointerRowMatches(rows, arg) {
-    return !!arg && NetworkLogic.rowKeyMatches(rows, arg.index, arg.key)
+    return !!arg && CursorLogic.rowKeyMatches(rows, arg.index, arg.key)
   }
 
   // Carries out one NetworkDropdown action. Pointer actions hand the cursor
@@ -2010,7 +2012,7 @@ Panel {
   // (outline-free) cursor and asks for the saved SSIDs; a close drops the
   // Link history. When rows change, every keyed cursor follows the
   // network, profile, action or band it was put on
-  // (NetworkLogic.followCursor); when that's gone, the index is clamped
+  // (CursorLogic.followCursor); when that's gone, the index is clamped
   // but the key dropped, so keyboard actions refuse rather than hit the
   // row that slid into its place.
   Connections {
@@ -2048,7 +2050,7 @@ Panel {
       }
       // An open prompt pins its own row, as stock's handler does.
       var key = root.passwordSsid !== "" ? root.passwordSsid : root.wifiCursorSsid
-      var next = NetworkLogic.followCursor(root.wifiKeyRows(), key, root.selectedIndex)
+      var next = CursorLogic.followCursor(root.wifiKeyRows(), key, root.selectedIndex)
       root.selectedIndex = next.index
       root.wifiCursorSsid = next.key
       // A lost row, or one that can no longer be forgotten, drops the
@@ -2057,14 +2059,14 @@ Panel {
         root.wifiActionFocused = false
     }
     function onVpnRowsChanged() {
-      var next = NetworkLogic.followCursor(root.vpnRows, root.vpnCursorKey, root.vpnIndex)
+      var next = CursorLogic.followCursor(root.vpnRows, root.vpnCursorKey, root.vpnIndex)
       root.vpnIndex = Math.max(0, next.index)
       root.vpnCursorKey = next.key
       if (root.focusSection === "vpn" && root.vpnRows.length === 0)
         root.focusSection = root.headerActionCount > 0 ? "header" : "dns"
     }
     function onSavedRowsChanged() {
-      var next = NetworkLogic.followCursor(root.savedRows, root.savedCursorKey, root.savedIndex)
+      var next = CursorLogic.followCursor(root.savedRows, root.savedCursorKey, root.savedIndex)
       root.savedIndex = Math.max(0, next.index)
       root.savedCursorKey = next.key
       if (!next.confirmed)
@@ -2082,7 +2084,7 @@ Panel {
     function onBandAvailableChanged() {
       if (root.bandCursorKey === "auto")
         return
-      var next = NetworkLogic.followCursor(root.bandKeyRows(), root.bandCursorKey, root.bandIndex)
+      var next = CursorLogic.followCursor(root.bandKeyRows(), root.bandCursorKey, root.bandIndex)
       if (next.index >= 0)
         root.bandIndex = next.index
       root.bandCursorKey = next.key
@@ -2101,7 +2103,7 @@ Panel {
   // Keeps the header cursor on the action it was put on as actions appear
   // and vanish (stock only clamps the index).
   function followHeaderCursor() {
-    var next = NetworkLogic.followCursor(headerKeyRows(), headerCursorKey, headerIndex)
+    var next = CursorLogic.followCursor(headerKeyRows(), headerCursorKey, headerIndex)
     if (next.index >= 0)
       headerIndex = next.index
     headerCursorKey = next.key

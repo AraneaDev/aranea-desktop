@@ -1,9 +1,12 @@
 // Pure rules for the Aranea network dropdown (Panel.qml): parsing nmcli and
-// `ip -j` output, building the interface/VPN/saved-network rows, the
-// throughput graph's points, vertical keyboard navigation and the cursor
-// safety rules (a keyboard action only ever hits the row the user chose and
-// can see). No QML, no I/O; tests/js/network-logic.test.js runs this under
-// Node.
+// `ip -j` output, building the interface/VPN/saved-network rows, and
+// vertical keyboard navigation. The cursor safety primitives
+// (reselectIndex, followCursor, cursorConfirmed, keepRows, rowKeyMatches,
+// pressIntent) and the throughput graph's points (pushSample, graphPoints)
+// moved to `araneadev.shared` (CursorLogic.js, GraphLogic.js) so
+// araneadev.vpn can reuse them; keyTargetConfirmed and pressOutcome stay
+// here (Network-only section logic) and inline the same cursor checks.
+// No QML, no I/O; tests/js/network-logic.test.js runs this under Node.
 
 /** @type {Record<string, string>} */
 var interfaceTypeLabels = {
@@ -362,69 +365,6 @@ function lastUsedText(ts, now) {
 }
 
 /**
- * Appends a throughput sample to the rolling history kept for the graph,
- * resetting it when the sampled interface changes.
- * @param {Array<{iface: string, rx: number, tx: number}>|undefined} history - the samples kept so far
- * @param {{iface: string, rx: number, tx: number}} sample - the new sample
- * @param {number} max - the most samples to keep
- * @returns {Array<{iface: string, rx: number, tx: number}>} a new array; `history` is never mutated
- */
-function pushSample(history, sample, max) {
-  var hist = Array.isArray(history) ? history : []
-  var s = sample
-  var last = hist[hist.length - 1]
-  if (!last || last.iface !== s.iface) return [s]
-  var next = hist.concat([s])
-  var limit = Math.max(1, Number(max) || 1)
-  if (next.length > limit) next = next.slice(next.length - limit)
-  return next
-}
-
-/**
- * Turns throughput samples into plot points for the rx/tx graph. A null or
- * non-object entry in `samples` is read as rx/tx 0 rather than thrown on.
- * @param {Array<{iface: string, rx: number, tx: number}>|undefined} samples - the rolling history, oldest first
- * @param {number} slots - the graph's time slots (at least 2)
- * @param {number} width - the plot width, in pixels
- * @param {number} height - the plot height, in pixels
- * @param {number} floor - the minimum scale, so a near-idle graph doesn't look noisy
- * @returns {{rx: Array<{x: number, y: number}>, tx: Array<{x: number, y: number}>, scale: number}} the points and the scale used
- */
-function graphPoints(samples, slots, width, height, floor) {
-  var list = Array.isArray(samples) ? samples : []
-  var f = Number(floor) || 0
-  if (list.length === 0) return { rx: [], tx: [], scale: f }
-
-  var scale = f
-  for (var i = 0; i < list.length; i++) {
-    var item = list[i]
-    var rxValue = item ? Math.max(0, Number(item.rx) || 0) : 0
-    var txValue = item ? Math.max(0, Number(item.tx) || 0) : 0
-    if (rxValue > scale) scale = rxValue
-    if (txValue > scale) scale = txValue
-  }
-
-  var n = list.length
-  var w = Number(width) || 0
-  var h = Number(height) || 0
-  var effectiveSlots = Number(slots) < 2 ? 2 : Number(slots)
-  var step = w / (effectiveSlots - 1)
-
-  var rx = []
-  var tx = []
-  for (var j = 0; j < n; j++) {
-    var x = w - (n - 1 - j) * step
-    var entry = list[j]
-    var rxV = entry ? Math.max(0, Number(entry.rx) || 0) : 0
-    var txV = entry ? Math.max(0, Number(entry.tx) || 0) : 0
-    rx.push({ x: x, y: h - (rxV / scale) * h })
-    tx.push({ x: x, y: h - (txV / scale) * h })
-  }
-
-  return { rx: rx, tx: tx, scale: scale }
-}
-
-/**
  * The next keyboard-navigation state after moving vertically, following the
  * dropdown's header/VPN/band/DNS/wifi/saved section order and skipping any
  * section with nothing in it. QML can hand this a null `state` before its
@@ -524,65 +464,24 @@ function moveVertical(state, dy, avail) {
  * @param {number} fallback - the index to clamp when the key is gone
  * @returns {number} the index, or -1 when there are no rows
  */
-function reselectIndex(rows, key, fallback) {
-  var list = Array.isArray(rows) ? rows : []
-  if (list.length === 0) return -1
-  if (typeof key === "string") {
-    for (var i = 0; i < list.length; i++) {
-      var row = list[i]
-      if (row && row.key === key) return i
-    }
-  }
-  var f = Math.floor(Number(fallback)) || 0
-  return Math.max(0, Math.min(list.length - 1, f))
-}
-
-/**
- * Where a list cursor goes after its rows changed: onto the row whose `key`
- * equals `key`, wherever it moved. When that row is gone (or there was no
- * key), the index is clamped into the list but the key is dropped, so the
- * row that slid into its place is never adopted as the user's choice.
- * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
- * @param {string|null|undefined} key - the key the cursor was deliberately put on, or ""
- * @param {number} index - the cursor's index before the change
- * @returns {{index: number, key: string, confirmed: boolean}} the new index (-1 with no rows), the key it keeps ("" when lost) and whether the cursor's row is the chosen one
- */
-function followCursor(rows, key, index) {
-  var list = Array.isArray(rows) ? rows : []
-  var chosen = typeof key === "string" && key !== "" ? key : null
-  var next = reselectIndex(list, chosen, index)
-  var row = next >= 0 ? list[next] : null
-  var confirmed = chosen !== null && !!row && row.key === chosen
-  return { index: next, key: confirmed ? chosen : "", confirmed: confirmed }
-}
-
-/**
- * Whether the cursor's row is still the one the user chose: `key` isn't
- * empty (a hidden SSID or no choice never is) and the row at `index` has it.
- * Keyboard actions refuse otherwise.
- * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
- * @param {string|null|undefined} key - the key the cursor was put on
- * @param {number} index - the cursor's index
- * @returns {boolean} true when the keyboard may act on that row
- */
-function cursorConfirmed(rows, key, index) {
-  if (!Array.isArray(rows) || typeof key !== "string" || key === "") return false
-  var row = rows[index]
-  return !!row && row.key === key
-}
-
 /**
  * Whether a key press may act on the cursor's target: the cursor must be in
  * the section the user last deliberately put it in (an automatic move, such
  * as a section emptying or hiding under it, never counts), and on a fixed
- * control or on the row whose key it holds (`cursorConfirmed`).
+ * control or on the row whose key it holds (the same check as shared
+ * `CursorLogic.cursorConfirmed`, inlined so this file stays self-contained:
+ * `key` isn't empty, and the row at `index` has it).
  * @param {{section: string, chosen: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key?: string, index?: number}|null|undefined} target - the cursor's section, the section last chosen, whether the section's controls never move, and its rows, key and index
  * @returns {boolean} true when the keyboard may act
  */
 function keyTargetConfirmed(target) {
   if (!target || !target.section || target.section !== target.chosen) return false
   if (target.fixed) return true
-  return cursorConfirmed(target.rows, target.key, Number(target.index))
+  var rows = target.rows
+  var key = target.key
+  if (!Array.isArray(rows) || typeof key !== "string" || key === "") return false
+  var row = rows[Number(target.index)]
+  return !!row && row.key === key
 }
 
 /**
@@ -613,31 +512,21 @@ function savedEmptyFallback(wifiCount) {
 }
 
 /**
- * What Enter or `x` does: nothing before any cursor exists, only reveal a
- * cursor the keyboard isn't showing (one the pointer placed), else act.
- * @param {boolean} cursorActive - whether a cursor has been placed
- * @param {boolean} keyboardCursor - whether its outline is showing
- * @returns {string} `ignore`, `reveal` or `act`
- */
-function pressIntent(cursorActive, keyboardCursor) {
-  if (!cursorActive) return "ignore"
-  return keyboardCursor ? "act" : "reveal"
-}
-
-/**
  * What Enter or `x` does to the cursor's target. Before any cursor exists
  * it's ignored; on a cursor the keyboard isn't showing it only reveals the
  * outline, which never changes the chosen section or key (a reveal is not
  * a choice: the row that slid into a lost key's place stays unchosen);
- * otherwise it acts only when `keyTargetConfirmed`, else it's refused.
+ * otherwise it acts only when `keyTargetConfirmed`, else it's refused. The
+ * ignore/reveal/act split is the same as shared `CursorLogic.pressIntent`,
+ * inlined so this file stays self-contained.
  * @param {{section: string, chosen: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key?: string, index?: number}|null|undefined} target - the cursor's target, as for keyTargetConfirmed
  * @param {boolean} cursorActive - whether a cursor has been placed
  * @param {boolean} keyboardCursor - whether its outline is showing
  * @returns {string} `ignore`, `reveal`, `refuse` or `act`
  */
 function pressOutcome(target, cursorActive, keyboardCursor) {
-  var intent = pressIntent(cursorActive, keyboardCursor)
-  if (intent !== "act") return intent
+  if (!cursorActive) return "ignore"
+  if (!keyboardCursor) return "reveal"
   return keyTargetConfirmed(target) ? "act" : "refuse"
 }
 
@@ -669,24 +558,6 @@ function enterDecision(section, actionFocused, forgettable) {
   if (section === "saved") return actionFocused ? "forget" : "focusForget"
   if (section === "wifi" && actionFocused) return forgettable ? "forget" : "none"
   return "activate"
-}
-
-/**
- * Hands back the array last stored under `name` when `next` has the same
- * content, so a view's Repeater keeps its delegates (and nothing slides
- * under a still pointer) on a refresh that changed nothing. Stores `next`
- * otherwise. `cache` is mutated in place.
- * @param {Record<string, any>|null|undefined} cache - the arrays kept so far, by name
- * @param {string} name - which row array this is
- * @param {Array<any>} next - the freshly built rows
- * @returns {Array<any>} the kept array or `next`
- */
-function keepRows(cache, name, next) {
-  if (!cache || typeof cache !== "object") return next
-  var prev = cache[name]
-  if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(next)) return prev
-  cache[name] = next
-  return next
 }
 
 /**
@@ -750,20 +621,6 @@ function vpnFailureText(wasActive) {
 }
 
 /**
- * Whether row `index` still carries `key`, so a pointer action reported for
- * one row never lands on another.
- * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
- * @param {number} index - the row the action names
- * @param {string|undefined} key - the key the view saw at that row
- * @returns {boolean} true when the row is the one the user clicked
- */
-function rowKeyMatches(rows, index, key) {
-  if (!Array.isArray(rows) || typeof key !== "string") return false
-  var row = rows[index]
-  return !!row && row.key === key
-}
-
-/**
  * The key-hint line for the cursor's section, saying what Enter does there.
  * @param {string|undefined} section - the cursor's section
  * @returns {string} the hint
@@ -788,12 +645,7 @@ if (typeof module !== "undefined")
     vpnRows: vpnRows,
     savedRows: savedRows,
     lastUsedText: lastUsedText,
-    pushSample: pushSample,
-    graphPoints: graphPoints,
     moveVertical: moveVertical,
-    reselectIndex: reselectIndex,
-    followCursor: followCursor,
-    cursorConfirmed: cursorConfirmed,
     keyTargetConfirmed: keyTargetConfirmed,
     openChoice: openChoice,
     pressOutcome: pressOutcome,
@@ -801,12 +653,9 @@ if (typeof module !== "undefined")
     extrasExitFollowUp: extrasExitFollowUp,
     savedStatusMap: savedStatusMap,
     savedEmptyFallback: savedEmptyFallback,
-    pressIntent: pressIntent,
     enterDecision: enterDecision,
-    keepRows: keepRows,
     extrasFollowUp: extrasFollowUp,
     vpnCommand: vpnCommand,
     vpnFailureText: vpnFailureText,
-    rowKeyMatches: rowKeyMatches,
     keyHint: keyHint
   }

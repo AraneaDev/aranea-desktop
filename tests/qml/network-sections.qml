@@ -91,7 +91,7 @@ ShellRoot {
         canToggle: true
       }
 
-      Network.NetworkGraph {
+      Aranea.LinkGraph {
         id: graphIdle
         width: 340
         samples: [
@@ -109,7 +109,7 @@ ShellRoot {
           }
         ]
       }
-      Network.NetworkGraph {
+      Aranea.LinkGraph {
         id: graphPeak
         width: 340
         samples: [
@@ -123,7 +123,7 @@ ShellRoot {
           }
         ]
       }
-      Network.NetworkGraph {
+      Aranea.LinkGraph {
         id: graphEmpty
         width: 340
         samples: []

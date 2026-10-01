@@ -60,7 +60,7 @@ the keyboard drives it.
   re-sorts. Revealing the outline never chooses a row.
 - When the row disappears, the cursor is clamped but its key is dropped.
   Enter and `x` then do nothing until the user picks a row
-  (`NetworkLogic.followCursor` / `cursorConfirmed`). A hidden SSID never
+  (`CursorLogic.followCursor` / `cursorConfirmed`, `araneadev.shared`). A hidden SSID never
   confirms (it still works by mouse).
 - The same goes for a cursor moved automatically into another section, for
   example when Saved or the band section empties or hides under it
@@ -90,9 +90,9 @@ through the `pointerGate` each section receives.
 
 - `NetworkHeader`: `DropdownHeader` with QR, speed test and the Wi-Fi
   switch (each only when it applies) and a scan `FilamentPulse` under it.
-- `NetworkLinkSection`: "LINK", the `NetworkGraph` trace and stock's stats
-  grid; the IP address and gateway copy on click.
-- `NetworkGraph`: a `Canvas` drawing `NetworkLogic.graphPoints`.
+- `NetworkLinkSection`: "LINK", the shared `Aranea.LinkGraph` trace
+  (`GraphLogic.graphPoints`, `araneadev.shared`) and stock's stats grid;
+  the IP address and gateway copy on click.
 - `NetworkInterfacesSection`: read-only interface rows, shown with two or
   more links.
 - `NetworkVpnSection`: VPN and WireGuard rows with a switch each.
