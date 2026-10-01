@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.9.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.8.1...v2.9.0) (2026-10-01)
+
+
+### Features
+
+* Aranea-native Bluetooth dropdown ([#89](https://github.com/AraneaDev/aranea-desktop/issues/89)) ([9ce16c6](https://github.com/AraneaDev/aranea-desktop/commit/9ce16c6bb129e9711fc3d616c5238291bebea964))
+
 ## [2.8.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.8.0...v2.8.1) (2026-10-01)
 
 
