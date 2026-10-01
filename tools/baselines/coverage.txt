@@ -11,6 +11,7 @@ plugins/araneadev.health/HealthPresentation.js 100
 plugins/araneadev.health/MetricsLogic.js 100
 plugins/araneadev.menu/MenuLayout.js 100
 plugins/araneadev.menu/MenuModel.js 100
+plugins/araneadev.network/NetworkLogic.js 100
 plugins/araneadev.notifications/InboxLogic.js 100
 plugins/araneadev.notifications/NotificationLogic.js 97
 plugins/araneadev.notifications/ServiceBridge.js 100
