@@ -36,8 +36,9 @@ exit_code() {
 
 # --- fake upstream: v1.0.0, then bar/Commons/unwatched changes, v1.1.0, then a
 # pre-release that must never be picked as the newest target.
-mkdir -p "$upstream"/shell/{plugins/bar,plugins/lock,Commons,Ui,services} "$upstream/docs"
+mkdir -p "$upstream"/shell/{plugins/bar,plugins/lock,plugins/panels/audio,Commons,Ui,services} "$upstream/docs"
 printf 'bar\n' >"$upstream/shell/plugins/bar/Bar.qml"
+printf 'audio\n' >"$upstream/shell/plugins/panels/audio/Panel.qml"
 printf 'lock\n' >"$upstream/shell/plugins/lock/Lock.qml"
 printf 'util\n' >"$upstream/shell/Commons/Util.js"
 printf 'ui\n' >"$upstream/shell/Ui/Panel.qml"
@@ -185,6 +186,17 @@ md="$(ARANEA_UPSTREAM_REPO=https://github.com/basecamp/omarchy "$drift")"
 grep -Eq '^- `[0-9a-f]{7,}` [0-9-]{10} Keep overlays sharp \(basecamp/omarchy#13419\)$' <<<"$md"
 json="$(ARANEA_UPSTREAM_REPO=https://github.com/basecamp/omarchy "$drift" --json)"
 jq -e 'any(.paths[].commits[]; .subject == "Keep overlays sharp (#13419)")' <<<"$json" >/dev/null
+
+# --- a panel plugin (omarchy.audio) lives under shell/plugins/panels upstream
+mkdir -p "$aranea/plugins/araneadev.audio"
+printf '{"id":"araneadev.audio","omarchy":{"clonedFrom":"omarchy.audio"}}\n' \
+  >"$aranea/plugins/araneadev.audio/manifest.json"
+json="$("$drift" --json)"
+jq -e '.paths[] | select(.plugin == "araneadev.audio")
+  | .upstream == "shell/plugins/panels/audio" and .status == "unchanged"' <<<"$json" >/dev/null
+jq -e '.paths[] | select(.plugin == "araneadev.bar") | .upstream == "shell/plugins/bar"' <<<"$json" >/dev/null
+jq -e '.paths[] | select(.plugin == "araneadev.ghost") | .upstream == "shell/plugins/ghost" and .status == "missing-upstream"' <<<"$json" >/dev/null
+rm -rf "$aranea/plugins/araneadev.audio"
 
 # --- the weekly workflow: least privilege, pinned checkout, one issue
 workflow="$repo_root/.github/workflows/upstream-drift.yml"

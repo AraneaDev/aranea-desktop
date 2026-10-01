@@ -63,6 +63,57 @@ ShellRoot {
     property int count: 0
     onChosen: count += 1
   }
+  Aranea.NodeDeviceRow {
+    id: busyRow
+    width: 300
+    label: "Earbuds"
+    busy: true
+  }
+  Aranea.NodeDeviceRow {
+    id: strongSignal
+    width: 300
+    label: "Keyboard"
+    signal: 3
+  }
+  Aranea.NodeDeviceRow {
+    id: noSignal
+    width: 300
+    label: "Mouse"
+    signal: 0
+  }
+  Aranea.NodeDeviceRow {
+    id: unusedSignal
+    width: 300
+    label: "Headset"
+  }
+  Aranea.NodeDeviceRow {
+    id: trailingRow
+    width: 300
+    label: "Trailing device"
+    detail: "connected"
+    Rectangle {
+      id: trailingAction
+      width: 20
+      height: 20
+    }
+  }
+  Aranea.FilamentPulse {
+    id: pulseOff
+    width: 200
+    running: false
+  }
+  Aranea.FilamentPulse {
+    id: pulseOn
+    width: 200
+    running: true
+  }
+  Aranea.KeyboardInputFrame {
+    id: keyboardInput
+    width: 120
+    height: 80
+    property int deletes: 0
+    onDeleteRequested: deletes += 1
+  }
 
   Component.onCompleted: t.step(200, function () {
     t.equal(Math.round(stream.progress * 100), 80, "1.2 of 1.5 lights 80% of the strand")
@@ -99,6 +150,33 @@ ShellRoot {
     t.equal(unplugged.count, 0, "an unavailable device can't be chosen")
     speakers.activate()
     t.equal(speakers.count, 1, "an available device is chosen")
+
+    var pulse = t.findChild(busyRow, "busyPulse")
+    t.check(pulse !== null && pulse.running, "a busy row's marker pulse is running")
+    var noPulse = t.findChild(speakers, "busyPulse")
+    t.check(noPulse !== null && !noPulse.running, "a non-busy row's marker pulse is idle")
+
+    var strongGlow = t.findChild(strongSignal, "signalGlow")
+    t.check(strongGlow !== null && strongGlow.visible, "signal: 3 shows a marker glow")
+    var noGlow = t.findChild(noSignal, "signalGlow")
+    t.check(noGlow !== null && !noGlow.visible, "signal: 0 shows no marker glow")
+    var unusedGlow = t.findChild(unusedSignal, "signalGlow")
+    t.check(unusedGlow !== null && !unusedGlow.visible, "signal: -1 (default/unused) shows no marker glow")
+
+    var edge = trailingRow.width
+    var actionEdge = trailingAction.mapToItem(trailingRow, trailingAction.width, 0).x
+    t.check(Math.abs(actionEdge - edge) < 0.5, "a trailing child ends on the row's right edge")
+    var actionLeft = trailingAction.mapToItem(trailingRow, 0, 0).x
+    var detail = t.findChild(trailingRow, "detailText")
+    var detailRight = detail.mapToItem(trailingRow, detail.width, 0).x
+    t.check(detail !== null && detailRight <= actionLeft + 0.5, "the detail text ends left of the trailing child")
+
+    t.check(!pulseOff.visible, "FilamentPulse hides when not running")
+    t.check(pulseOn.visible, "FilamentPulse shows when running")
+
+    keyboardInput.focusTarget.deleteRequested()
+    t.equal(keyboardInput.deletes, 1, "KeyboardInputFrame forwards the key catcher's deleteRequested")
+
     t.done()
   })
 }

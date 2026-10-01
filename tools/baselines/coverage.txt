@@ -1,5 +1,6 @@
 plugins/araneadev.audio/AudioLogic.js 100
 plugins/araneadev.bar/BarModel.js 80
+plugins/araneadev.bluetooth/BluetoothLogic.js 100
 plugins/araneadev.clipboard/ClipboardLogic.js 89
 plugins/araneadev.clipboard/ClipboardPresentation.js 50
 plugins/araneadev.emojis/EmojiLogic.js 100

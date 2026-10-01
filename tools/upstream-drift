@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Reports what Omarchy changed upstream since the version Aranea is pinned to
 # in .omarchy-version: for every forked plugin (a manifest whose
-# omarchy.clonedFrom is omarchy.NAME, watched at shell/plugins/NAME) and for
+# omarchy.clonedFrom is omarchy.NAME, watched at shell/plugins/NAME, or at
+# shell/plugins/panels/NAME where the bar's panel plugins live) and for
 # the shell platform modules every plugin depends on, the upstream commits
 # and a diffstat. Markdown by default, one JSON document with --json, the
 # full diff per changed path with --diff. Exits 0 whether or not there is
@@ -70,15 +71,34 @@ latest_tag() {
   upstream_git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1
 }
 
-# Prints "PLUGIN-ID<TAB>shell/plugins/NAME" for every manifest whose
+# Prints the upstream path of plugin NAME ($1): shell/plugins/NAME, or
+# shell/plugins/panels/NAME when only that exists at the pin or the target
+# (panel plugins such as audio and bluetooth live there). Falls back to
+# shell/plugins/NAME, which then reports as missing upstream.
+upstream_plugin_path() {
+  local candidate ref
+  for candidate in "shell/plugins/$1" "shell/plugins/panels/$1"; do
+    for ref in "$base" "$target"; do
+      if [[ -n "$(upstream_git ls-tree "$ref" -- "$candidate")" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  done
+  printf 'shell/plugins/%s\n' "$1"
+}
+
+# Prints "PLUGIN-ID<TAB>UPSTREAM-PATH" for every manifest whose
 # omarchy.clonedFrom is "omarchy.NAME", in plugin directory order.
 fork_paths() {
-  local manifest
+  local manifest id name
   for manifest in "$repo_root"/plugins/*/manifest.json; do
     [[ -f "$manifest" ]] || continue
-    jq -r '(.omarchy.clonedFrom // "") as $source
+    while IFS=$'\t' read -r id name; do
+      printf '%s\t%s\n' "$id" "$(upstream_plugin_path "$name")"
+    done < <(jq -r '(.omarchy.clonedFrom // "") as $source
       | select($source | startswith("omarchy."))
-      | [.id, "shell/plugins/" + ($source | ltrimstr("omarchy."))] | @tsv' "$manifest"
+      | [.id, ($source | ltrimstr("omarchy."))] | @tsv' "$manifest")
   done
 }
 

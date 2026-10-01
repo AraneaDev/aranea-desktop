@@ -18,7 +18,14 @@ Column {
       index: -1
     })
 
-  // Emitted for every user action; see the plan's action list.
+  // Emitted for every user action, NAME with its ARG:
+  //   toggleAll (none): mute or unmute every channel;
+  //   outputVolume / inputVolume (volume 0..1.5): set a channel's volume;
+  //   outputMute / inputMute (none): toggle a channel's mute;
+  //   outputDevice / inputDevice (row index): make that device the default;
+  //   streamVolume ({index, value}) / streamMute (index): one app stream;
+  //   previous / playPause / next (none): the Now playing controls;
+  //   hover ({section, index}): the pointer entered a row or control.
   signal action(string name, var arg)
 
   // Cursor index for SECTION: the view's index there, else -2 (none).

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.bluetooth",
+  "name": "Aranea Bluetooth",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Bluetooth device list with connect/disconnect",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Aranea Bluetooth",
+    "description": "Bluetooth device list with connect/disconnect",
+    "category": "Network",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.bluetooth"
+  }
+}

@@ -13,6 +13,9 @@ Item {
   property string title: ""
   // Caption under the title, shown uppercase.
   property string caption: ""
+  // Opacity of the caption alone, for a host that fades it between values
+  // (Bluetooth's rotating phrases). 1 leaves it as before.
+  property real captionOpacity: 1
   // Trailing content, anchored to the right edge.
   default property alias trailing: trailingSlot.data
 
@@ -48,7 +51,9 @@ Item {
     }
     Text {
       width: parent.width
+      objectName: "headerCaption"
       text: header.caption.toUpperCase()
+      opacity: header.captionOpacity
       elide: Text.ElideRight
       color: Util.alpha(DesignTokens.foreground, 0.55)
       font.family: Style.font.family
