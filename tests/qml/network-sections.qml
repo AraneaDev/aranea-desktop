@@ -6,16 +6,13 @@
 // the bottom, a peak at the top and draws no points without samples; the
 // Link section hides without stats, lists its stats in stock order and
 // copies the IP but never a "--"; Interfaces shows only with two or more
-// links and never outlines; VPN hides when empty, emits toggle from its
-// switch, shows "Couldn't connect" (or the failure's own text, e.g.
-// "Couldn't disconnect") in the urgent colour on failure and
-// breathes while busy; Band hides with visible false, shows pills only
+// links and never outlines; Band hides with visible false, shows pills only
 // when pillsVisible, emits pick and toggleAuto and explains its switch as
 // stock does; DNS marks the selected pill, emits pick and explains Custom;
 // pills draw no outline without the cursor (pointer hover included) and
 // exactly one with it, and pointer hover reaches the sections through the
-// PointerMoveGate. A forget button or VPN switch that appears under a
-// still pointer ignores a click until it settles.
+// PointerMoveGate. A forget button that appears under a still pointer
+// ignores a click until it settles.
 import QtQuick
 import QtTest
 import Quickshell
@@ -196,49 +193,6 @@ ShellRoot {
         ]
       }
 
-      Network.NetworkVpnSection {
-        id: vpnEmpty
-        width: parent.width
-        rows: []
-      }
-      Network.NetworkVpnSection {
-        id: vpn
-        width: parent.width
-        pointerGate: gate
-        rows: [
-          {
-            key: "u-1",
-            glyph: String.fromCodePoint(0xf0582),
-            label: "office-wg",
-            detail: "WireGuard · 10.8.0.3",
-            active: true
-          },
-          {
-            key: "u-2",
-            glyph: String.fromCodePoint(0xf0582),
-            label: "home-openvpn",
-            detail: "VPN",
-            active: false
-          }
-        ]
-        status: ({
-            "u-1": {
-              busy: true,
-              failed: false
-            },
-            "u-2": {
-              busy: false,
-              failed: true
-            }
-          })
-        onToggle: function (index) {
-          log.push(["toggle", index])
-        }
-        onRowHovered: function (index) {
-          log.push(["vpnHover", index])
-        }
-      }
-
       Network.NetworkBandSection {
         id: bandHidden
         width: parent.width
@@ -373,50 +327,6 @@ ShellRoot {
     }
   }
 
-  // A VPN section whose rows are rebuilt under a still pointer (bringing
-  // one profile up re-sorts them active-first): a click on the switch that
-  // now sits there was aimed at another profile's.
-  FloatingWindow {
-    id: freshVpnWindow
-    implicitWidth: 300
-    implicitHeight: 120
-    visible: true
-
-    Item {
-      id: freshVpnHost
-      anchors.fill: parent
-
-      // How many times a fresh VPN row's switch was toggled.
-      property int toggledCount: 0
-
-      Loader {
-        id: freshVpnLoader
-        width: parent.width
-        active: false
-        sourceComponent: Network.NetworkVpnSection {
-          width: freshVpnHost.width
-          pointerGate: freshVpnGate
-          rows: [
-            {
-              key: "u-9",
-              glyph: String.fromCodePoint(0xf0582),
-              label: "fresh-wg",
-              detail: "WireGuard",
-              active: false
-            }
-          ]
-          onToggle: function (index) {
-            freshVpnHost.toggledCount += 1
-          }
-        }
-      }
-      PointerMoveGate {
-        id: freshVpnGate
-        referenceItem: freshVpnHost
-      }
-    }
-  }
-
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
     return t.findChildren(item, "cursorOutline").filter(function (o) {
@@ -450,31 +360,6 @@ ShellRoot {
           t.step(350, function () {
             pointer.mouseClick(freshHost, 32, 28)
             t.equal(freshHost.clickedCount, 1, "once it has settled, a click forgets")
-            freshVpnSwitch()
-          })
-        })
-      })
-    })
-  }
-
-  // A VPN switch that appears under a still pointer ignores clicks for
-  // about 300 ms, unless the gate accepted a real move over its row.
-  function freshVpnSwitch() {
-    freshVpnLoader.active = true
-    var sw = t.findChild(freshVpnLoader.item, "vpnSwitch")
-    var p = sw.mapToItem(freshVpnHost, sw.width / 2, sw.height / 2)
-    freshVpnLoader.active = false
-    pointer.mouseMove(freshVpnHost, p.x - 2, p.y)
-    t.step(60, function () {
-      pointer.mouseMove(freshVpnHost, p.x, p.y)
-      t.step(60, function () {
-        freshVpnLoader.active = true
-        t.step(30, function () {
-          pointer.mouseClick(freshVpnHost, p.x, p.y)
-          t.equal(freshVpnHost.toggledCount, 0, "a click right after a VPN switch appears under a still pointer is ignored")
-          t.step(350, function () {
-            pointer.mouseClick(freshVpnHost, p.x, p.y)
-            t.equal(freshVpnHost.toggledCount, 1, "once it has settled, a click on the VPN switch toggles")
             t.done()
           })
         })
@@ -556,38 +441,6 @@ ShellRoot {
     t.equal(t.findChild(ifaceTwo, "interfacesCount").text, "2", "the count shows")
     t.equal(litOutlines(ifaceTwo), 0, "interface rows never outline")
 
-    // ---------- VPN ----------
-    t.check(!vpnEmpty.visible, "no VPN profiles hide the section")
-    t.check(vpn.visible, "VPN profiles show it")
-    t.equal(t.findChild(vpn, "vpnCount").text, "1 up", "the count reads N up")
-    var vpnRows = t.findChildren(vpn, "vpnRow")
-    var vpnSwitches = t.findChildren(vpn, "vpnSwitch")
-    t.equal(vpnRows.length, 2, "two VPN rows")
-    t.check(vpnSwitches[0].checked && !vpnSwitches[1].checked, "the switch follows active")
-    pointer.mouseClick(vpnSwitches[0])
-    t.equal(last(), JSON.stringify(["toggle", 0]), "the switch emits toggle(0)")
-    pointer.mouseClick(vpnRows[1], 40, vpnRows[1].height / 2)
-    t.equal(last(), JSON.stringify(["toggle", 1]), "a row click emits toggle(1)")
-    t.equal(vpnRows[1].detail, "Couldn't connect", "a failed profile reads Couldn't connect")
-    t.equal(t.findChild(vpnRows[1], "detailText").color, Aranea.DesignTokens.urgent, "the failure is urgent")
-    t.equal(vpnRows[0].detail, "WireGuard · 10.8.0.3", "a healthy profile keeps its detail")
-    t.check(t.findChild(vpnRows[0], "busyPulse").running, "a busy profile breathes")
-    t.check(!t.findChild(vpnRows[1], "busyPulse").running, "an idle profile doesn't")
-    var vpnStatusBefore = vpn.status
-    vpn.status = {
-      "u-1": {
-        busy: false,
-        failed: true,
-        text: "Couldn't disconnect"
-      }
-    }
-    t.equal(vpnRows[0].detail, "Couldn't disconnect", "a failed down reads Couldn't disconnect")
-    vpn.status = vpnStatusBefore
-    t.equal(litOutlines(vpn), 0, "no VPN outline without the cursor")
-    vpn.cursorIndex = 1
-    t.equal(litOutlines(vpn), 1, "the cursor outlines one VPN row")
-    vpn.cursorIndex = -1
-
     // ---------- Band ----------
     t.check(!bandHidden.visible, "the band hides with visible false")
     t.check(bandAuto.visible && band.visible, "the band shows otherwise")
@@ -657,17 +510,7 @@ ShellRoot {
                 t.check(log.some(function (e) {
                   return e[0] === "bandHover" && e[1] === true && e[2] === -1
                 }), "a real move over Automatic reports pillHovered(true, -1)")
-                log = []
-                pointer.mouseMove(vpnRows[1], 40, 6)
-                t.step(60, function () {
-                  pointer.mouseMove(vpnRows[1], 46, 8)
-                  t.step(60, function () {
-                    t.check(log.some(function (e) {
-                      return e[0] === "vpnHover" && e[1] === 1
-                    }), "a real move over a VPN row reports rowHovered(1)")
-                    freshForget()
-                  })
-                })
+                freshForget()
               })
             })
           })

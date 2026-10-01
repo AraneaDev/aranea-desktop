@@ -19,7 +19,7 @@ The extras, all hidden when they have nothing to show:
 
 - **Link graph:** the receive and send rates stock already computes, the
   last 40 samples (60 s), cleared on close.
-- **Interfaces, VPN, Saved:** one poll every 4 s while open (and on open):
+- **Interfaces, Saved:** one poll every 4 s while open (and on open):
   `nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device`,
   `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show` and
   `ip -j -4 -br addr`, in one `bash -c` that prints nothing without
@@ -29,24 +29,33 @@ The extras, all hidden when they have nothing to show:
   run on open and after a forget only. A read asked for while one runs
   (a forget landing mid-poll, even after the output was read) runs again
   once it finishes.
-- **VPN toggle:** `nmcli --wait 20 connection up|down uuid <uuid>`; the row
-  breathes while it runs and reads "Couldn't connect" (or "Couldn't
-  disconnect") for 4 s if it fails.
+- **VPN status line:** one muted line under the header, "VPN · <name> up"
+  (or "VPN · N up"), hidden when nothing is up. It's `VpnApps.statusLine`
+  (`araneadev.shared`) over NetworkManager VPN/WireGuard connections from
+  the same extras poll (active ones) plus own-app VPNs from the optional
+  `~/.config/aranea/vpn-apps.json` (`VpnApps.parseAppsConfig`, read through
+  a `FileView`) detected by interface against the same poll's `ip -j -4
+-br addr` output (`VpnApps.appState`). Pointer-only: clicking it closes
+  this dropdown and opens `araneadev.vpn`'s
+  (`bar.shell.summon("araneadev.vpn")`), which owns every other VPN
+  behaviour (connect/disconnect, sessions, uptimes, traffic).
 - **Saved forget:** `nmcli connection delete uuid <uuid>`; the row breathes
   and reads "Forgetting…" until the next extras read that started after
   the delete finished. A failed delete reads "Couldn't forget" in the
   urgent colour for 4 s.
 
-The keyboard walks header, VPN, band, DNS, Wi-Fi and Saved
+The keyboard walks header, band, DNS, Wi-Fi and Saved
 (`NetworkLogic.moveVertical`); `r` refreshes and `w` toggles Wi-Fi. Enter
 does what the key hint under the list says for the cursor's section:
 
 - **Header, band, DNS:** runs the action or applies the pill.
-- **VPN:** brings the profile up or down.
 - **Wi-Fi:** connects (or opens the passphrase prompt), or disconnects the
   connected network; on the forget action (→) it forgets.
 - **Saved:** moves onto the row's forget action, as → does; Enter there
   forgets.
+
+The VPN status line isn't in this chain: it's pointer-only, drawing no
+cursor outline.
 
 `x` forgets a known Wi-Fi or Saved row. The cursor outline shows only while
 the keyboard drives it.
@@ -54,7 +63,7 @@ the keyboard drives it.
 **No key press ever acts on a row the user didn't choose and can see.**
 
 - Each section's cursor holds the key of the row (header action, band pill
-  or Automatic switch, VPN, network or profile) it was deliberately put on
+  or Automatic switch, network or profile) it was deliberately put on
   (an arrow, a left/right pick in the header, band or DNS, a hover, a
   click, or open's Wi-Fi row 0) and follows that row when the list
   re-sorts. Revealing the outline never chooses a row.
@@ -71,8 +80,8 @@ the keyboard drives it.
   place is never adopted by a reveal.
 - Pointer actions carry their row's key and are refused when the row
   changed.
-- A row, forget button or VPN switch created under a still pointer ignores
-  clicks for 300 ms unless the pointer really moves over its row or button.
+- A row or forget button created under a still pointer ignores clicks for
+  300 ms unless the pointer really moves over its row or button.
 - Unchanged refreshes keep the same row arrays, so delegates aren't
   rebuilt.
 - While a Wi-Fi action runs, the Wi-Fi rows are dimmed, as stock disabled
@@ -96,16 +105,15 @@ through the `pointerGate` each section receives.
   the IP address and gateway copy on click.
 - `NetworkInterfacesSection`: read-only interface rows, shown with two or
   more links.
-- `NetworkVpnSection`: VPN and WireGuard rows with a switch each.
 - `NetworkBandSection`, `NetworkDnsSection`: `FilamentPill` rows.
 - `NetworkWifiSection`: the Wi-Fi list with stock's section titles, a lock
   on secured rows, forget, status text and the inline passphrase prompt
   (the shared `Aranea.CredentialPrompt`, identity first for enterprise).
 - `NetworkSavedSection`: saved profiles out of range, dimmed, with forget.
 - Both lists use the shared `Aranea.ForgetButton` (as Bluetooth does).
-- `NetworkDropdown`: every section, the Wi-Fi/Saved scroll area, the empty
-  text and the key hint, reporting user actions through one
-  `action(name, arg)` signal.
+- `NetworkDropdown`: every section, the VPN status line (drawn inline,
+  under the header), the Wi-Fi/Saved scroll area, the empty text and the
+  key hint, reporting user actions through one `action(name, arg)` signal.
 
 ## Validation
 

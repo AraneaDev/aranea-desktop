@@ -1,7 +1,9 @@
 // The assembled Aranea Network dropdown, driven by a plain view object in
 // a real window with real pointer clicks and key presses: every section
 // shows and hides on its fixture data (and the empty text takes over when
-// there's no Wi-Fi at all); the Wi-Fi list draws its section titles, a
+// there's no Wi-Fi at all); the VPN status line shows with text and hides
+// without, and a click on it emits openVpn without touching the keyboard
+// cursor; the Wi-Fi list draws its section titles, a
 // lock on secured rows, "Hidden" for a nameless network, status text (the
 // failure urgent, busy rows breathing) and a forget button only on
 // forgettable rows under the cursor, which emits wifiForget while a row
@@ -133,15 +135,7 @@ ShellRoot {
           active: false
         }
       ],
-      vpn: [
-        {
-          key: "uuid-wg",
-          glyph: String.fromCodePoint(0xf0582),
-          label: "office-wg",
-          detail: "WireGuard · 10.8.0.3",
-          active: true
-        }
-      ],
+      vpnLine: "VPN · office-wg up",
       band: {
         visible: true,
         title: "BAND · 2.4 GHz",
@@ -359,7 +353,6 @@ ShellRoot {
               busy: true
             }
           })
-        vpnStatus: ({})
         prompt: closedPrompt
         onAction: function (name, arg) {
           actions.push([name, arg])
@@ -405,7 +398,7 @@ ShellRoot {
                 active: false
               }
             ],
-            vpn: [],
+            vpnLine: "",
             band: {
               visible: false
             },
@@ -444,17 +437,27 @@ ShellRoot {
 
   Component.onCompleted: run([[300, function () {
         // ---------- Sections show and hide ----------
-        var names = ["networkHeader", "linkSection", "interfacesSection", "vpnSection", "bandSection", "dnsSection", "wifiSection", "savedSection"]
+        var names = ["networkHeader", "linkSection", "interfacesSection", "bandSection", "dnsSection", "wifiSection", "savedSection"]
         for (var i = 0; i < names.length; i++) {
           var s = t.findChild(full, names[i])
           t.check(s !== null && s.visible, names[i] + " shows with its data")
         }
-        var hidden = ["linkSection", "interfacesSection", "vpnSection", "bandSection", "wifiSection", "savedSection"]
+        var hidden = ["linkSection", "interfacesSection", "bandSection", "wifiSection", "savedSection"]
         for (var j = 0; j < hidden.length; j++)
           t.check(!t.findChild(bare, hidden[j]).visible, hidden[j] + " hides without its data")
         t.check(t.findChild(bare, "networkHeader").visible, "the header always shows")
-        t.equal(shown(full, "separator").length, 7, "a separator above every shown section")
+        t.equal(shown(full, "separator").length, 6, "a separator above every shown section")
         t.equal(shown(bare, "separator").length, 0, "no separator without sections")
+
+        // ---------- The VPN status line ----------
+        var vpnLine = t.findChild(full, "vpnLine")
+        t.check(vpnLine !== null && vpnLine.visible && vpnLine.text === "VPN · office-wg up", "the VPN status line shows its text")
+        t.check(!t.findChild(bare, "vpnLine").visible, "it hides with nothing up")
+        actions = []
+        pointer.mouseClick(vpnLine)
+        t.check(reported("openVpn", null), "clicking it emits openVpn")
+        t.equal(litOutlines(full), 0, "the click leaves no keyboard cursor outline")
+
         var empty = t.findChild(bare, "emptyText")
         t.check(empty.visible && empty.text === "Wi-Fi is off", "no Wi-Fi at all shows the empty text")
         t.check(!t.findChild(full, "emptyText").visible, "Wi-Fi rows hide the empty text")
@@ -548,7 +551,7 @@ ShellRoot {
         }), "saved forget emits savedForget with the row's key")
 
         // ---------- One outline per section ----------
-        var cases = [cur(true, "header", 1), cur(true, "vpn", 0), cur(true, "band", 0, false, true), cur(true, "band", 2, false, false), cur(true, "dns", 1), cur(true, "wifi", 3), cur(true, "saved", 1)]
+        var cases = [cur(true, "header", 1), cur(true, "band", 0, false, true), cur(true, "band", 2, false, false), cur(true, "dns", 1), cur(true, "wifi", 3), cur(true, "saved", 1)]
         for (var i = 0; i < cases.length; i++) {
           full.view = withCursor(cases[i])
           t.equal(litOutlines(full), 1, "an active cursor on " + cases[i].section + (cases[i].section === "band" ? (cases[i].bandAuto ? " auto" : " pill") : "") + " draws exactly one outline")
@@ -561,7 +564,7 @@ ShellRoot {
         var rows = t.findChildren(wifi, "wifiRow")
         var bandPills = t.findChildren(t.findChild(full, "bandSection"), "pill")
         var dnsPills = t.findChildren(t.findChild(full, "dnsSection"), "pill")
-        var trailing = [["header", t.findChild(full, "headerTrailing")], ["VPN switch", t.findChild(full, "vpnSwitch")], ["Automatic", t.findChild(full, "autoSwitch")], ["last band pill", bandPills[bandPills.length - 1]], ["last DNS pill", dnsPills[dnsPills.length - 1]], ["Wi-Fi forget", shown(wifi, "forgetButton")[0]], ["Wi-Fi lock", t.findChild(rows[2], "wifiLock")]]
+        var trailing = [["header", t.findChild(full, "headerTrailing")], ["Automatic", t.findChild(full, "autoSwitch")], ["last band pill", bandPills[bandPills.length - 1]], ["last DNS pill", dnsPills[dnsPills.length - 1]], ["Wi-Fi forget", shown(wifi, "forgetButton")[0]], ["Wi-Fi lock", t.findChild(rows[2], "wifiLock")]]
         for (var j = 0; j < trailing.length; j++)
           t.check(trailing[j][1] && Math.abs(rightEdge(trailing[j][1], full) - edge) < 0.5, trailing[j][0] + " ends on the content edge")
         full.view = withCursor(cur(true, "saved", 1))
@@ -633,12 +636,6 @@ ShellRoot {
           }
         }
         full.captionOpacity = 0.4
-        full.vpnStatus = {
-          "uuid-wg": {
-            busy: true,
-            failed: false
-          }
-        }
         full.prompt = promptFor("Ziggo-5G", {
           passphrase: "ab"
         })
@@ -765,8 +762,6 @@ ShellRoot {
         var hint = t.findChild(full, "keyHint")
         full.view = withCursor(cur(true, "saved", 0))
         t.equal(hint.text, "↑↓ move · enter/→ select forget · x forget · tab next", "on Saved, Enter selects forget")
-        full.view = withCursor(cur(true, "vpn", 0))
-        t.equal(hint.text, "↑↓ move · enter toggle VPN · tab next", "on VPN, Enter toggles")
         full.view = withCursor(cur(true, "dns", 0))
         t.equal(hint.text, "↑↓ move · ←→ pick · enter apply · tab next", "on DNS, Enter applies")
         full.view = withCursor(cur(false, "saved", 0))
@@ -806,14 +801,6 @@ ShellRoot {
         t.check(!savedRows[0].busy && savedRows[0].detail === "Couldn't forget", "a failed forget reads Couldn't forget")
         t.check(Qt.colorEqual(savedRows[0].detailColor, Aranea.DesignTokens.urgent), "in the urgent colour")
         full.savedStatus = {}
-
-        // ---------- The VPN switch names its row ----------
-        actions = []
-        pointer.mouseClick(t.findChild(full, "vpnSwitch"))
-        t.check(reported("vpnToggle", {
-          index: 0,
-          key: "uuid-wg"
-        }), "the VPN switch emits vpnToggle with the row's key")
       }]])
 
   // The Wi-Fi delegates (wrappers, then rows) before the refresh check.

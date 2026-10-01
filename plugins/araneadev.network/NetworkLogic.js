@@ -1,6 +1,7 @@
 // Pure rules for the Aranea network dropdown (Panel.qml): parsing nmcli and
-// `ip -j` output, building the interface/VPN/saved-network rows, and
-// vertical keyboard navigation. The cursor safety primitives
+// `ip -j` output, building the interface/saved-network rows, and vertical
+// keyboard navigation (header, band, DNS, Wi-Fi, saved -- VPN control moved
+// to araneadev.vpn, Task 6). The cursor safety primitives
 // (reselectIndex, followCursor, cursorConfirmed, keepRows, rowKeyMatches,
 // pressIntent) and the throughput graph's points (pushSample, graphPoints)
 // moved to `araneadev.shared` (CursorLogic.js, GraphLogic.js) so
@@ -402,34 +403,21 @@ function interfaceRows(devices, addrs) {
 }
 
 /**
- * Builds the VPN rows (VPN and WireGuard connections) shown below the
- * interface section. A null or non-object entry in `connections` is ignored
- * rather than thrown on.
- * @param {Array<{name: string, uuid: string, type: string, device: string, active: boolean, timestamp: number}>|undefined} connections - from `parseConnections`
- * @param {Record<string, string>|undefined} addrs - from `parseAddrs`
- * @returns {Array<{key: string, glyph: string, label: string, detail: string, active: boolean}>} the rows
+ * Parses `ip -j -4 -br addr` output into its link entries, for the own-app
+ * VPN detection the Network status line uses
+ * (`araneadev.shared/VpnApps.js`'s `appState` / `appInterface`). Anything
+ * that isn't a JSON array of entries reads as no links.
+ * @param {string|undefined} json - the command's stdout
+ * @returns {Array<{ifname?: string, operstate?: string, addr_info?: any[]}>} the parsed links, or `[]` on bad input
  */
-function vpnRows(connections, addrs) {
-  var list = Array.isArray(connections) ? connections : []
-  var addrMap = addrs || {}
-  var rows = []
-  for (var i = 0; i < list.length; i++) {
-    var c = list[i]
-    if (!c) continue
-    if (c.type !== "vpn" && c.type !== "wireguard") continue
-    var detail = c.type === "wireguard" ? "WireGuard" : "VPN"
-    var ip = c.active ? addrMap[c.device] : undefined
-    if (ip) detail += " · " + ip
-    rows.push({
-      key: c.uuid,
-      glyph: String.fromCodePoint(0xf0582),
-      label: c.name,
-      detail: detail,
-      active: !!c.active
-    })
+function parseLinks(json) {
+  var parsed
+  try {
+    parsed = JSON.parse(String(json || ""))
+  } catch (e) {
+    return []
   }
-  rows.sort(compareActiveThenLabel)
-  return rows
+  return Array.isArray(parsed) ? parsed : []
 }
 
 /**
@@ -502,13 +490,13 @@ function lastUsedText(ts, now) {
 
 /**
  * The next keyboard-navigation state after moving vertically, following the
- * dropdown's header/VPN/band/DNS/wifi/saved section order and skipping any
+ * dropdown's header/band/DNS/wifi/saved section order and skipping any
  * section with nothing in it. QML can hand this a null `state` before its
  * bindings settle, in which case it lands on dns/auto; a null `avail` reads
  * as nothing available anywhere.
  * @param {{section: string, index: number, bandAuto: boolean}|null|undefined} state - the current navigation state
  * @param {number} dy - the direction: negative for up, positive for down
- * @param {{header: number, vpn: number, band: boolean, bandPills: boolean, wifi: number, saved: number}|null|undefined} avail - what's available to land on
+ * @param {{header: number, band: boolean, bandPills: boolean, wifi: number, saved: number}|null|undefined} avail - what's available to land on
  * @returns {{section: string, index: number, bandAuto: boolean}} the next state
  */
 function moveVertical(state, dy, avail) {
@@ -517,7 +505,6 @@ function moveVertical(state, dy, avail) {
   var index = Number(state.index) || 0
   var bandAuto = !!state.bandAuto
   var header = avail ? Number(avail.header) || 0 : 0
-  var vpn = avail ? Number(avail.vpn) || 0 : 0
   var band = avail ? !!avail.band : false
   var bandPills = avail ? !!avail.bandPills : false
   var wifi = avail ? Number(avail.wifi) || 0 : 0
@@ -526,28 +513,13 @@ function moveVertical(state, dy, avail) {
 
   if (section === "header") {
     if (dy < 0) return here
-    if (vpn > 0) return { section: "vpn", index: 0, bandAuto: bandAuto }
     if (band) return { section: "band", index: 0, bandAuto: true }
     return { section: "dns", index: 0, bandAuto: bandAuto }
-  }
-
-  if (section === "vpn") {
-    var vpnNext = index + dy
-    if (vpnNext < 0) {
-      if (header > 0) return { section: "header", index: 0, bandAuto: bandAuto }
-      return here
-    }
-    if (vpnNext > vpn - 1) {
-      if (band) return { section: "band", index: 0, bandAuto: true }
-      return { section: "dns", index: 0, bandAuto: bandAuto }
-    }
-    return { section: "vpn", index: vpnNext, bandAuto: bandAuto }
   }
 
   if (section === "band") {
     if (dy < 0) {
       if (!bandAuto) return { section: "band", index: 0, bandAuto: true }
-      if (vpn > 0) return { section: "vpn", index: vpn - 1, bandAuto: bandAuto }
       if (header > 0) return { section: "header", index: 0, bandAuto: bandAuto }
       return here
     }
@@ -558,7 +530,6 @@ function moveVertical(state, dy, avail) {
   if (section === "dns") {
     if (dy < 0) {
       if (band) return { section: "band", index: 0, bandAuto: !bandPills }
-      if (vpn > 0) return { section: "vpn", index: vpn - 1, bandAuto: bandAuto }
       if (header > 0) return { section: "header", index: 0, bandAuto: bandAuto }
       return here
     }
@@ -723,33 +694,12 @@ function savedStatusMap(forgettingUuid, failedUuid) {
 }
 
 /**
- * The argv bringing VPN profile `uuid` up, or down when it's active, waiting
- * at most 20 s for NetworkManager.
- * @param {string} uuid - the profile's uuid
- * @param {boolean} active - whether the profile is up now
- * @returns {string[]} the nmcli argv
- */
-function vpnCommand(uuid, active) {
-  return ["nmcli", "--wait", "20", "connection", active ? "down" : "up", "uuid", uuid]
-}
-
-/**
- * The detail a VPN row shows after its toggle failed.
- * @param {boolean} wasActive - whether the toggle was taking the profile down
- * @returns {string} `Couldn't disconnect` or `Couldn't connect`
- */
-function vpnFailureText(wasActive) {
-  return wasActive ? "Couldn't disconnect" : "Couldn't connect"
-}
-
-/**
  * The key-hint line for the cursor's section, saying what Enter does there.
  * @param {string|undefined} section - the cursor's section
  * @returns {string} the hint
  */
 function keyHint(section) {
   if (section === "saved") return "↑↓ move · enter/→ select forget · x forget · tab next"
-  if (section === "vpn") return "↑↓ move · enter toggle VPN · tab next"
   if (section === "header" || section === "band" || section === "dns")
     return "↑↓ move · ←→ pick · enter apply · tab next"
   return "↑↓ move · ←→ pick · enter connect · x forget · tab next"
@@ -763,8 +713,8 @@ if (typeof module !== "undefined")
     parseConnections: parseConnections,
     parseAddrs: parseAddrs,
     parseSsids: parseSsids,
+    parseLinks: parseLinks,
     interfaceRows: interfaceRows,
-    vpnRows: vpnRows,
     savedRows: savedRows,
     lastUsedText: lastUsedText,
     moveVertical: moveVertical,
@@ -777,7 +727,5 @@ if (typeof module !== "undefined")
     savedEmptyFallback: savedEmptyFallback,
     enterDecision: enterDecision,
     extrasFollowUp: extrasFollowUp,
-    vpnCommand: vpnCommand,
-    vpnFailureText: vpnFailureText,
     keyHint: keyHint
   }

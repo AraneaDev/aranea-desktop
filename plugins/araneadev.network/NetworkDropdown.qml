@@ -1,11 +1,12 @@
-// The Aranea Network dropdown's view: the header, then the pinned Link,
-// Interfaces, VPN, Band and DNS sections, then the Wi-Fi list and the
-// Saved profiles scrolling together in a Flickable (objectName
-// "wifiScroll") capped at maxScrollHeight, the empty text and a key-hint
-// line. Drawn from one plain view object (Panel.networkView) plus a few
-// fast-changing properties kept out of it, and reporting every user
-// action through a single action signal. No NetworkManager objects here,
-// so tests drive it with fixtures.
+// The Aranea Network dropdown's view: the header, a VPN status line under
+// it (pointer-only; hidden with nothing up), then the pinned Link,
+// Interfaces, Band and DNS sections, then the Wi-Fi list and the Saved
+// profiles scrolling together in a Flickable (objectName "wifiScroll")
+// capped at maxScrollHeight, the empty text and a key-hint line. Drawn from
+// one plain view object (Panel.networkView) plus a few fast-changing
+// properties kept out of it, and reporting every user action through a
+// single action signal. No NetworkManager objects here, so tests drive it
+// with fixtures.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -15,8 +16,9 @@ import "NetworkLogic.js" as NetworkLogic
 Column {
   id: dropdown
 
-  // View state built by Panel.networkView: {header, interfaces, vpn, band,
-  // dns, wifi, saved, cursor, emptyText}. Rebuilt only when rows change.
+  // View state built by Panel.networkView: {header, interfaces, vpnLine,
+  // band, dns, wifi, saved, cursor, emptyText}. Rebuilt only when rows
+  // change; vpnLine is the VPN status line's text, "" when hidden.
   property var view: ({})
   // Cap on the Wi-Fi/Saved scroll area's height, so a busy neighbourhood
   // doesn't grow the popup past the screen.
@@ -29,8 +31,6 @@ Column {
   property var graph: []
   // Per-SSID Wi-Fi action status: {ssid: {text, failed, busy}}.
   property var wifiStatus: ({})
-  // Per-uuid VPN action state: {uuid: {busy, failed, text}}.
-  property var vpnStatus: ({})
   // Per-uuid Saved action state: {uuid: {busy, failed, text}}.
   property var savedStatus: ({})
   // The passphrase prompt: {ssid, enterprise, busy, failed, passphrase,
@@ -69,7 +69,8 @@ Column {
   // Emitted for every user action, NAME with its ARG:
   //   qr, speed, toggleWifi (null): the header's actions;
   //   copy ({value}): a copyable Link value was clicked;
-  //   vpnToggle ({index, key}): a VPN row or its switch;
+  //   openVpn (null): the VPN status line was clicked (pointer-only; no
+  //     cursor, no keyboard path);
   //   bandAuto (null): the band's Automatic switch;
   //   band ({key}), dns ({key}): a band or DNS pill;
   //   wifiPrimary ({index, key}), wifiForget ({index, key}): a Wi-Fi row,
@@ -81,8 +82,8 @@ Column {
   // Row actions carry the row's key as the view saw it, so the host can
   // refuse one whose row changed underneath the click.
   //   hover ({section, index, action}): the pointer moved onto something
-  //     (through the gate) in "header", "vpn", "band" (adds auto: true for
-  //     the Automatic switch, index 0), "dns", "wifi" or "saved"; action is
+  //     (through the gate) in "header", "band" (adds auto: true for the
+  //     Automatic switch, index 0), "dns", "wifi" or "saved"; action is
   //     true on a forget button. Leaving a forget button adds leave: true,
   //     so the host only drops the action focus there.
   signal action(string name, var arg)
@@ -182,6 +183,25 @@ Column {
       dropdown.hover("header", index, false)
     }
   }
+  Text {
+    id: vpnLine
+    objectName: "vpnLine"
+    width: parent.width
+    visible: (dropdown.view.vpnLine || "") !== ""
+    text: dropdown.view.vpnLine || ""
+    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    elide: Text.ElideRight
+
+    // Pointer only: opening the VPN dropdown isn't part of the keyboard
+    // chain, so this draws no cursor outline and takes no keyboard focus.
+    MouseArea {
+      anchors.fill: parent
+      cursorShape: Qt.PointingHandCursor
+      onClicked: dropdown.action("openVpn", null)
+    }
+  }
   Separator {
     visible: linkSection.visible
   }
@@ -204,23 +224,6 @@ Column {
     id: interfacesSection
     width: parent.width
     rows: dropdown.view.interfaces || []
-  }
-  Separator {
-    visible: vpnSection.visible
-  }
-  NetworkVpnSection {
-    id: vpnSection
-    width: parent.width
-    rows: dropdown.view.vpn || []
-    status: dropdown.vpnStatus
-    cursorIndex: dropdown.cursorIn("vpn")
-    pointerGate: dropdown.pointerGate
-    onToggle: function (index) {
-      dropdown.rowAction("vpnToggle", dropdown.view.vpn, index)
-    }
-    onRowHovered: function (index) {
-      dropdown.hover("vpn", index, false)
-    }
   }
   Separator {
     visible: bandSection.visible

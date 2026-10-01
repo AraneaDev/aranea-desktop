@@ -2,8 +2,9 @@
 // Wi-Fi/Ethernet icon and its dropdown. Stock logic (connection details,
 // throughput/ping polling, Wi-Fi scanning and actions, DNS and band
 // selection, the cursor model and IPC), plus the extras (link history,
-// interfaces, VPN, saved profiles); the Aranea view, NetworkDropdown,
-// replaces the stock one.
+// interfaces, saved profiles, a VPN status line); the Aranea view,
+// NetworkDropdown, replaces the stock one. VPN control itself lives in
+// araneadev.vpn, summoned from the status line's click.
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
@@ -16,6 +17,7 @@ import "NetworkLogic.js" as NetworkLogic
 import "../araneadev.shared/ShowcaseLogic.js" as Showcase
 import "../araneadev.shared/CursorLogic.js" as CursorLogic
 import "../araneadev.shared/GraphLogic.js" as GraphLogic
+import "../araneadev.shared/VpnApps.js" as VpnApps
 import "../araneadev.shared" as Aranea
 
 Panel {
@@ -847,6 +849,19 @@ Panel {
     // qmllint enable missing-property
   }
 
+  // The status line's click: VPN control is its own panel plugin
+  // (araneadev.vpn), summoned by id; this one closes first, as the other
+  // summon actions do.
+  function openVpnDropdown() {
+    if (!root.bar)
+      return
+    controller.hide()
+    cancelPasswordPrompt()
+    // qmllint disable missing-property
+    bar.shell.summon("araneadev.vpn")
+    // qmllint enable missing-property
+  }
+
   // Shell command to query or set the DNS provider.
   function dnsCommand(provider) {
     var command = "omarchy-dns"
@@ -1229,8 +1244,6 @@ Panel {
   // True while the keyboard drives the cursor; any pointer action clears it.
   // The view outlines the cursor only then, so the mouse never shows one.
   property bool keyboardCursor: false
-  // The cursor's row in the VPN section.
-  property int vpnIndex: 0
   // The cursor's row in the Saved section.
   property int savedIndex: 0
   // Whether the cursor sits on the Saved row's forget button.
@@ -1241,8 +1254,6 @@ Panel {
   // the network is gone it's "" and keyboard actions refuse until the user
   // picks a row (CursorLogic.followCursor).
   property string wifiCursorSsid: ""
-  // The uuid of the VPN row the cursor was put on (see wifiCursorSsid).
-  property string vpnCursorKey: ""
   // The uuid of the Saved row the cursor was put on (see wifiCursorSsid).
   property string savedCursorKey: ""
   // The header action ("qr", "speed" or "toggle") the cursor was put on, so
@@ -1304,8 +1315,6 @@ Panel {
   function sectionKeyRows(section) {
     if (section === "header")
       return headerKeyRows()
-    if (section === "vpn")
-      return vpnRows
     if (section === "band")
       return bandKeyRows()
     if (section === "wifi")
@@ -1319,8 +1328,6 @@ Panel {
   function sectionKey(section) {
     if (section === "header")
       return headerCursorKey
-    if (section === "vpn")
-      return vpnCursorKey
     if (section === "band")
       return bandCursorKey
     if (section === "wifi")
@@ -1334,8 +1341,6 @@ Panel {
   function setSectionKey(section, key) {
     if (section === "header")
       headerCursorKey = key
-    else if (section === "vpn")
-      vpnCursorKey = key
     else if (section === "band")
       bandCursorKey = key
     else if (section === "wifi")
@@ -1398,18 +1403,22 @@ Panel {
   property var extraConnections: []
   // Interface name -> IPv4 address from the extras poll (NetworkLogic.parseAddrs).
   property var extraAddrs: ({})
+  // The same extras poll's `ip -j -4 -br addr` links, parsed for own-app VPN
+  // detection (NetworkLogic.parseLinks, VpnApps.appState/appInterface).
+  property var extraLinks: []
+  // The parsed own-app VPN config: {apps, profiles} (VpnApps.parseAppsConfig).
+  // Network only reads apps' name/label/detect for the status line; VPN
+  // control (profiles, connect/disconnect) lives in araneadev.vpn.
+  property var vpnAppsConfig: ({
+      apps: [],
+      profiles: {}
+    })
+  // The last apps-file error warned about, so each distinct one warns once.
+  property string vpnAppsError: ""
   // Saved Wi-Fi profile uuid -> SSID, read on open and after a saved forget.
   property var ssidByUuid: ({})
   // Whether the next extras result should be followed by an SSID lookup.
   property bool ssidLookupPending: false
-  // The VPN profile a toggle is running for, or "".
-  property string vpnBusyUuid: ""
-  // The VPN profile whose last toggle failed, for vpnFailedTimer's 4 s, or "".
-  property string vpnFailedUuid: ""
-  // The failed VPN row's detail ("Couldn't connect" or "Couldn't disconnect").
-  property string vpnFailedText: ""
-  // Whether the running VPN toggle is taking its profile down.
-  property bool vpnBusyWasActive: false
   // The Saved profile a forget is running for, until the next extras read
   // that started after it finished; "" otherwise.
   property string savedForgettingUuid: ""
@@ -1434,6 +1443,24 @@ Panel {
     }, 40)
   }
 
+  // Applies the own-app VPN config file's text, or null when it's missing
+  // (no apps). An invalid file warns once per distinct error, as
+  // araneadev.vpn does.
+  function applyVpnAppsText(text) {
+    var parsed = text === null ? {
+      apps: [],
+      profiles: {},
+      error: ""
+    } : VpnApps.parseAppsConfig(text)
+    if (parsed.error !== "" && parsed.error !== vpnAppsError)
+      console.warn("aranea network: " + Aranea.RuntimePaths.vpnAppsPath + ": " + parsed.error)
+    vpnAppsError = parsed.error
+    vpnAppsConfig = {
+      apps: parsed.apps,
+      profiles: parsed.profiles
+    }
+  }
+
   // Starts the extras poll (devices, profiles, addresses), or marks it
   // dirty when one is running so it reads again afterwards.
   function runExtras() {
@@ -1453,15 +1480,18 @@ Panel {
     var devices = []
     var connections = []
     var addrs = {}
+    var links = []
     try {
       var parts = NetworkLogic.splitSections(raw)
       devices = NetworkLogic.parseDevices(parts[0])
       connections = NetworkLogic.parseConnections(parts[1])
       addrs = NetworkLogic.parseAddrs(parts[2])
+      links = NetworkLogic.parseLinks(parts[2])
     } catch (e) {
       devices = []
       connections = []
       addrs = {}
+      links = []
     }
     if (JSON.stringify(devices) !== JSON.stringify(extraDevices))
       extraDevices = devices
@@ -1469,6 +1499,8 @@ Panel {
       extraConnections = connections
     if (JSON.stringify(addrs) !== JSON.stringify(extraAddrs))
       extraAddrs = addrs
+    if (JSON.stringify(links) !== JSON.stringify(extraLinks))
+      extraLinks = links
     // A read that ran while a forget landed may predate it: read again,
     // and settle the forget and the SSID lookup only on a fresh read.
     var follow = NetworkLogic.extrasFollowUp(extrasDirty, savedForgetProc.running)
@@ -1502,19 +1534,6 @@ Panel {
     // parseSsids skips), so a failure never glues two profiles together.
     ssidProc.command = ["bash", "-c", "for u; do printf '%s\\t%s\\n' \"$u\" \"$(nmcli -g 802-11-wireless.ssid connection show uuid \"$u\" 2>/dev/null)\"; done", "_"].concat(uuids)
     ssidProc.running = true
-  }
-
-  // Brings VPN row INDEX up, or down when it's active.
-  function toggleVpn(index) {
-    var row = vpnRows[index]
-    if (!row || !row.key || vpnProc.running)
-      return
-    vpnFailedTimer.stop()
-    vpnFailedUuid = ""
-    vpnBusyUuid = row.key
-    vpnBusyWasActive = !!row.active
-    vpnProc.command = NetworkLogic.vpnCommand(row.key, !!row.active)
-    vpnProc.running = true
   }
 
   // Deletes the saved Wi-Fi profile on Saved row INDEX; the row breathes
@@ -1581,11 +1600,9 @@ Panel {
   }
 
   // The view's interface rows (shown with two or more links).
-  // With showcase names they take the names after the Wi-Fi, Saved and VPN
+  // With showcase names they take the names after the Wi-Fi and Saved
   // rows' (the offsets are read only then, so they never rebuild it).
-  readonly property var interfaceRows: CursorLogic.keepRows(rowCache, "interfaces", Showcase.showcaseLabels(NetworkLogic.interfaceRows(extraDevices, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length + vpnRows.length : 0))
-  // The view's VPN rows; showcase names after the Wi-Fi and Saved rows'.
-  readonly property var vpnRows: CursorLogic.keepRows(rowCache, "vpn", Showcase.showcaseLabels(NetworkLogic.vpnRows(extraConnections, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length : 0))
+  readonly property var interfaceRows: CursorLogic.keepRows(rowCache, "interfaces", Showcase.showcaseLabels(NetworkLogic.interfaceRows(extraDevices, extraAddrs), showcaseNames, "Network", showcaseNames.length > 0 ? wifiNetworks.length + savedRows.length : 0))
   // The view's Saved rows: saved Wi-Fi profiles not in the current scan;
   // showcase names after the Wi-Fi rows'.
   readonly property var savedRows: CursorLogic.keepRows(rowCache, "saved", Showcase.showcaseLabels(NetworkLogic.savedRows(extraConnections, ssidByUuid, wifiNetworks.map(function (n) {
@@ -1608,6 +1625,30 @@ Panel {
       enterprise: isEnterpriseSecurity(net.security)
     }
   }), showcaseNames, "Network"))
+
+  // Own-app VPN entries from the apps file (vpnAppsFile), for the status
+  // line only: VPN control itself lives in araneadev.vpn.
+  readonly property var vpnApps: vpnAppsConfig.apps || []
+  // The names of VPNs currently up: NetworkManager VPN/WireGuard
+  // connections from the extras poll, then own-app entries whose
+  // detect.interface matches an up, addressed link in extraLinks
+  // (VpnApps.appState; no process polling here, so a process-only or
+  // dual-detect app never shows as connected from Network).
+  readonly property var vpnUpNames: {
+    var names = []
+    for (var i = 0; i < extraConnections.length; i++) {
+      var c = extraConnections[i]
+      if (c && (c.type === "vpn" || c.type === "wireguard") && c.active)
+        names.push(c.name)
+    }
+    for (var j = 0; j < vpnApps.length; j++) {
+      if (VpnApps.appState(vpnApps[j], extraLinks, []) === "connected")
+        names.push(vpnApps[j].label)
+    }
+    return names
+  }
+  // The VPN status line shown under the header, hidden ("") with nothing up.
+  readonly property string vpnLine: VpnApps.statusLine(vpnUpNames)
 
   // The header title, as stock's heroSsid: "SSID (detail)", "Ethernet
   // (detail)", the interface, or "Disconnected" / "No connection". With
@@ -1653,8 +1694,6 @@ Panel {
   function cursorIndexIn(section) {
     if (section === "header")
       return headerIndex
-    if (section === "vpn")
-      return vpnIndex
     if (section === "band")
       return bandIndex
     if (section === "dns")
@@ -1681,7 +1720,7 @@ Panel {
         scanning: scanning && wifiStationAvailable
       },
       interfaces: interfaceRows,
-      vpn: vpnRows,
+      vpnLine: vpnLine,
       band: {
         visible: canSelectBand,
         title: bandSectionTitle,
@@ -1779,23 +1818,6 @@ Panel {
     return out
   }
 
-  // uuid -> {busy, failed} for the VPN rows (NetworkDropdown.vpnStatus).
-  readonly property var vpnStatusView: {
-    var out = {}
-    if (vpnBusyUuid !== "")
-      out[vpnBusyUuid] = {
-        busy: true,
-        failed: false
-      }
-    if (vpnFailedUuid !== "" && vpnFailedUuid !== vpnBusyUuid)
-      out[vpnFailedUuid] = {
-        busy: false,
-        failed: true,
-        text: vpnFailedText
-      }
-    return out
-  }
-
   // uuid -> {busy, failed, text} for the Saved rows
   // (NetworkDropdown.savedStatus, NetworkLogic.savedStatusMap).
   readonly property var savedStatusView: NetworkLogic.savedStatusMap(savedForgettingUuid, savedForgetFailedUuid)
@@ -1821,7 +1843,7 @@ Panel {
     dropdown.ensureVisible(focusSection, cursorIndexIn(focusSection))
   }
 
-  // Moves the cursor one row up (DY < 0) or down through header, VPN, band,
+  // Moves the cursor one row up (DY < 0) or down through header, band,
   // DNS, Wi-Fi and Saved, skipping whatever isn't on screen.
   function moveVerticalBy(dy) {
     var next = NetworkLogic.moveVertical({
@@ -1830,7 +1852,6 @@ Panel {
       bandAuto: bandAutoFocused
     }, dy, {
       header: headerActionCount,
-      vpn: vpnRows.length,
       band: canSelectBand,
       bandPills: bandPillsVisible,
       wifi: wifiNetworks.length,
@@ -1838,8 +1859,6 @@ Panel {
     })
     if (next.section === "header" && focusSection !== "header")
       headerIndex = 0
-    else if (next.section === "vpn")
-      vpnIndex = next.index
     else if (next.section === "wifi")
       selectedIndex = next.index
     else if (next.section === "saved")
@@ -1895,8 +1914,6 @@ Panel {
         savedActionFocused = true
     } else if (focusSection === "header")
       activateHeader()
-    else if (focusSection === "vpn")
-      toggleVpn(vpnIndex)
     else if (focusSection === "band")
       activateBand()
     else if (focusSection === "dns")
@@ -1939,10 +1956,9 @@ Panel {
       toggleNetwork()
     else if (name === "copy")
       copyToClipboard(arg.value)
-    else if (name === "vpnToggle") {
-      if (pointerRowMatches(vpnRows, arg))
-        toggleVpn(arg.index)
-    } else if (name === "bandAuto")
+    else if (name === "openVpn")
+      openVpnDropdown()
+    else if (name === "bandAuto")
       toggleBandAuto()
     else if (name === "band")
       setBand(arg.key)
@@ -1986,9 +2002,7 @@ Panel {
       return
     }
     cursorActive = true
-    if (arg.section === "vpn") {
-      vpnIndex = arg.index
-    } else if (arg.section === "band") {
+    if (arg.section === "band") {
       if (arg.auto)
         bandAutoFocused = true
       else {
@@ -2027,14 +2041,12 @@ Panel {
         // Stock's open handler puts the Wi-Fi cursor on row 0, a deliberate
         // placement, so that row is chosen (NetworkLogic.openChoice); with
         // no Wi-Fi rows nothing is until the user moves, hovers or clicks.
-        // A keyboard reveal never chooses. VPN and Saved start on their
-        // first rows too, followed until the user picks; the header and band
-        // take theirs on a move, hover or click.
+        // A keyboard reveal never chooses. Saved starts on its first row
+        // too, followed until the user picks; the header and band take
+        // theirs on a move, hover or click.
         var open = NetworkLogic.openChoice(root.wifiKeyRows())
         root.cursorChosenSection = open.chosen
         root.wifiCursorSsid = open.key
-        root.vpnIndex = 0
-        root.vpnCursorKey = root.vpnRows.length > 0 ? root.vpnRows[0].key : ""
         root.savedIndex = 0
         root.savedCursorKey = root.savedRows.length > 0 ? root.savedRows[0].key : ""
         root.bandCursorKey = ""
@@ -2057,13 +2069,6 @@ Panel {
       // forget focus, so Enter can't turn into a disconnect.
       if (!next.confirmed || !root.canForgetNetwork(root.wifiNetworks[next.index]))
         root.wifiActionFocused = false
-    }
-    function onVpnRowsChanged() {
-      var next = CursorLogic.followCursor(root.vpnRows, root.vpnCursorKey, root.vpnIndex)
-      root.vpnIndex = Math.max(0, next.index)
-      root.vpnCursorKey = next.key
-      if (root.focusSection === "vpn" && root.vpnRows.length === 0)
-        root.focusSection = root.headerActionCount > 0 ? "header" : "dns"
     }
     function onSavedRowsChanged() {
       var next = CursorLogic.followCursor(root.savedRows, root.savedCursorKey, root.savedIndex)
@@ -2199,28 +2204,24 @@ Panel {
     }
   }
 
-  // Brings a VPN profile up or down; a failure shows for 4 s.
-  // qmllint disable signal-handler-parameters
-  Process {
-    id: vpnProc
-    onExited: function (exitCode) {
-      var uuid = root.vpnBusyUuid
-      root.vpnBusyUuid = ""
-      if (exitCode !== 0) {
-        root.vpnFailedText = NetworkLogic.vpnFailureText(root.vpnBusyWasActive)
-        root.vpnFailedUuid = uuid
-        vpnFailedTimer.restart()
-      }
-      root.runExtras()
-    }
+  // The optional own-app VPN config file, read only for the status line
+  // (root.vpnLine); a missing file reads as no apps. The directory is
+  // watched too, since a FileView can't watch a file that doesn't exist yet
+  // (araneadev.vpn does the same).
+  FileView {
+    id: vpnAppsFile
+    path: Aranea.RuntimePaths.vpnAppsPath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.applyVpnAppsText(vpnAppsFile.text())
+    onLoadFailed: root.applyVpnAppsText(null)
+    onFileChanged: vpnAppsFile.reload()
   }
-  // qmllint enable signal-handler-parameters
-
-  // Clears a VPN failure after 4 s.
-  Timer {
-    id: vpnFailedTimer
-    interval: 4000
-    onTriggered: root.vpnFailedUuid = ""
+  FileView {
+    path: Aranea.RuntimePaths.araneaConfigRoot
+    watchChanges: true
+    printErrors: false
+    onFileChanged: vpnAppsFile.reload()
   }
 
   // Deletes a saved Wi-Fi profile, then re-reads profiles and SSIDs; a read
@@ -2331,7 +2332,6 @@ Panel {
         stats: root.statsView
         graph: root.linkHistory
         wifiStatus: root.wifiStatusView
-        vpnStatus: root.vpnStatusView
         savedStatus: root.savedStatusView
         prompt: root.promptView
         onAction: function (name, arg) {
