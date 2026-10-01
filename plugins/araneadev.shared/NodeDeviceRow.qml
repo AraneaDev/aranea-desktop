@@ -33,6 +33,9 @@ Item {
   default property alias trailing: trailingSlot.data
   // Opacity the busy marker's breathing animation drives, 0.45..1.
   property real pulseOpacity: 1
+  // Whether the pointer is over the row, for a trailing action a host
+  // dropdown shows only on hover (e.g. a forget button).
+  readonly property alias hovered: rowMouse.containsMouse
 
   // Emitted when an available row is clicked or activated.
   signal chosen
@@ -158,6 +161,7 @@ Item {
     height: childrenRect.height
   }
   MouseArea {
+    id: rowMouse
     anchors.fill: parent
     hoverEnabled: true
     cursorShape: row.available ? Qt.PointingHandCursor : Qt.ArrowCursor

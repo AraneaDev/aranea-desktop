@@ -30,6 +30,13 @@
 2	plugins/araneadev.bar/Bar.qml:unresolved-type:Type "PopupAnchor" of property "anchor" not found. This is likely due to a missing dependency entry or a type not being exposed declaratively.
 1	plugins/araneadev.bar/Bar.qml:unresolved-type:Type margins is used but it is not resolved
 1	plugins/araneadev.bar/Bar.qml:unused-imports:Unused import
+2	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "caption" not found on type "QObject"
+3	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "family" not found on type "QObject"
+3	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "border" not found on type "QObject"

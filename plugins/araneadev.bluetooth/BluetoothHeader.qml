@@ -1,0 +1,49 @@
+// Header of the Aranea Bluetooth dropdown: the shared DropdownHeader with
+// a power switch in its trailing slot. Pure view: plain inputs in,
+// signals out. (glyph and caption come from DropdownHeader.)
+import QtQuick
+import qs.Ui
+import "../araneadev.shared" as Aranea
+
+Aranea.DropdownHeader {
+  id: header
+
+  // Whether the adapter is powered on. Named "powered", not "enabled": the
+  // latter shadows QQuickItem.enabled and would make the whole header stop
+  // receiving events once the adapter is off.
+  property bool powered: false
+  // Whether a Bluetooth adapter is present at all; hides the switch without one.
+  property bool hasAdapter: false
+  // Whether the keyboard cursor is on the power switch.
+  property bool hasCursor: false
+  // The switch's tooltip, e.g. "Turn Bluetooth off".
+  property string hint: ""
+  // The switch's tooltip, exposed for tests.
+  readonly property alias hintTip: tip
+
+  // Emitted when the power switch is toggled.
+  signal toggleBluetooth
+  // Emitted when the pointer enters the switch.
+  signal entered
+
+  objectName: "bluetoothHeader"
+  title: "Bluetooth"
+
+  Aranea.FilamentSwitch {
+    visible: header.hasAdapter
+    anchors.verticalCenter: parent.verticalCenter
+    checked: header.powered
+    hasCursor: header.hasCursor
+    onToggled: header.toggleBluetooth()
+    HoverHandler {
+      id: switchHover
+      onHoveredChanged: if (hovered)
+        header.entered()
+    }
+    PanelToolTip {
+      id: tip
+      visible: switchHover.hovered && header.hint !== ""
+      text: header.hint
+    }
+  }
+}
