@@ -128,7 +128,7 @@ function renderShellToml(tokens) {
   return `${lines.join("\n").trimEnd()}\n`
 }
 
-function renderQmlTokens() {
+function renderQmlTokens(tokens) {
   return `// Canonical semantic design tokens exposed to shared QML components.
 // qmllint disable missing-property
 pragma Singleton
@@ -140,6 +140,9 @@ QtObject {
   readonly property color accent: Color.accent
   // Secondary accent used by selected menu text.
   readonly property color accentSecondary: Color.menu.selectedText
+  // Aranea's violet from design/tokens.toml (Omarchy's Color has none): the
+  // far end of the Filament's lit strand and the Now playing progress.
+  readonly property color strandEnd: ${JSON.stringify(tokens.colors.accent_secondary)}
   // Base background colour.
   readonly property color background: Color.background
   // Default foreground colour.
@@ -512,7 +515,7 @@ function outputs(tokens, brand) {
   return new Map([
     ["colors.toml", renderColorsToml(tokens)],
     ["shell.toml", renderShellToml(tokens)],
-    ["plugins/araneadev.shared/DesignTokens.qml", renderQmlTokens()],
+    ["plugins/araneadev.shared/DesignTokens.qml", renderQmlTokens(tokens)],
     ["plugins/araneadev.shared/BrandConfig.qml", renderBrandQml(brand)],
     ["integrations/aranea-colors.css", renderIntegrationCss(tokens)],
     ["integrations/browser/chromium/new-tab/index.html", renderBrowserIndex(brand)],

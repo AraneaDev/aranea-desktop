@@ -90,6 +90,16 @@ test("renderQmlTokens exposes stable shared token aliases", async () => {
   assert.match(output, /readonly property bool motionEnabled: MotionState\.motionEnabled/)
 })
 
+test("renderQmlTokens draws the filament's far end in Aranea's violet", async () => {
+  const { renderQmlTokens } = await generatorPromise
+  const output = renderQmlTokens({
+    ...fixture,
+    colors: { ...fixture.colors, accent_secondary: "#123456" }
+  })
+  assert.match(output, /readonly property color strandEnd: "#123456"/)
+  assert.match(output, /readonly property color accentSecondary: Color\.menu\.selectedText/)
+})
+
 test("renderIntegrationCss projects semantic palette variables", async () => {
   const { renderIntegrationCss } = await generatorPromise
   const output = renderIntegrationCss(fixture)

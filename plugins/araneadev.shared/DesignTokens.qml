@@ -9,6 +9,9 @@ QtObject {
   readonly property color accent: Color.accent
   // Secondary accent used by selected menu text.
   readonly property color accentSecondary: Color.menu.selectedText
+  // Aranea's violet from design/tokens.toml (Omarchy's Color has none): the
+  // far end of the Filament's lit strand and the Now playing progress.
+  readonly property color strandEnd: "#7a5cff"
   // Base background colour.
   readonly property color background: Color.background
   // Default foreground colour.

@@ -330,4 +330,45 @@ jq -e '.bar.id == "araneadev.bar" and .bar.layout.left[0] == "araneadev.menu"' "
   exit 1
 }
 
+# --- audio dropdown: only retargeted once araneadev.audio is installed
+# (guard: $(dirname "$config_file")/plugins/araneadev.audio/manifest.json)
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.audio", {"id": "omarchy.audio", "x": 1}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.audio", {"id": "omarchy.audio", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.audio")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.audio"
+: >"$(dirname "$config")/plugins/araneadev.audio/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["araneadev.audio", {"id": "araneadev.audio", "x": 1}]
+  and (.cloneSourceRestores | index("araneadev.audio")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.audio", {"id": "omarchy.audio", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.audio")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+audio_real="$test_root/audio-dotfiles/shell.json"
+audio_link="$test_root/audio-config/shell.json"
+mkdir -p "$(dirname "$audio_real")" "$(dirname "$audio_link")/plugins/araneadev.audio"
+: >"$(dirname "$audio_link")/plugins/araneadev.audio/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.audio"]}}}' >"$audio_real"
+ln -s "$audio_real" "$audio_link"
+"$repo_root/scripts/repair-shell-config" "$audio_link"
+test -L "$audio_link"
+jq -e '.bar.layout.right == ["araneadev.audio"]' "$audio_real" >/dev/null || {
+  cat "$audio_real"
+  exit 1
+}
+
 echo "shell config contract passed"
