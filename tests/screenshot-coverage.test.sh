@@ -111,7 +111,7 @@ fi
 grep -Fq 'if ((picker_swapped)); then' "$capture_script"
 grep -Fq '&& ((clipboard_swapped)); then' "$capture_script"
 # shellcheck disable=SC2016 # literals, not expansions
-(($(line_of 'inbox_swapped=1') > $(line_of 'park_notification_inbox "$inbox_backup"')))
+grep -Fq 'park_notification_inbox "$inbox_backup" inbox_swapped' "$capture_script"
 grep -Fq 'if ((! inbox_swapped)); then' "$capture_script"
 # Parking and restoring the inbox happen only while every shell instance is
 # stopped (a queued job of a running shell once deleted a restored inbox, and
@@ -123,8 +123,22 @@ restore_body="$(sed -n '/^restore_parked_inbox() {$/,/^}$/p' "$capture_script")"
 grep -Fq 'stop_omarchy_shell' <<<"$park_body"
 grep -Fq 'stop_omarchy_shell' <<<"$restore_body"
 grep -Fq 'images' <<<"$park_body"
+# The swapped flag is set by the park the moment the move is done (no window
+# in which a parked inbox is not restored), never by the caller afterwards.
+# shellcheck disable=SC2016 # a literal, not an expansion
+grep -Fq 'printf -v "$flag" 1' <<<"$park_body"
+if grep -Eq '^ *(batch|inbox)_swapped=1' "$capture_script"; then
+  echo "the inbox swapped flags are set inside park_notification_inbox" >&2
+  exit 1
+fi
+# A stop counts only when quickshell list confirms it (fails closed).
+stop_body="$(sed -n '/^stop_omarchy_shell() {$/,/^}$/p' "$capture_script")"
 # shellcheck disable=SC2016 # literals, not expansions
-grep -Fq 'park_notification_inbox "$batch_inbox_backup"' "$capture_script"
+grep -Fq 'listed="$(quickshell list -p "$config" --any-display 2>&1)" || return 1' <<<"$stop_body"
+# shellcheck disable=SC2016 # a literal, not an expansion
+grep -Fq '[[ -f "$config/shell.qml" ]] || return 1' <<<"$stop_body"
+# shellcheck disable=SC2016 # literals, not expansions
+grep -Fq 'park_notification_inbox "$batch_inbox_backup" batch_swapped' "$capture_script"
 # shellcheck disable=SC2016 # literals, not expansions
 grep -Fq 'restore_parked_inbox "$batch_inbox_backup"' "$capture_script"
 # shellcheck disable=SC2016 # literals, not expansions
@@ -133,7 +147,7 @@ grep -Fq 'your notifications are kept in' "$capture_script"
 # The verified backup is handed off by rename before it is deleted, so a
 # rerun after an interrupted delete finds no backup and touches nothing.
 # shellcheck disable=SC2016 # a literal, not an expansion
-grep -Fq 'mv -- "$backup" "$backup.restored" && rm -rf -- "$backup.restored"' <<<"$restore_body"
+grep -Fq 'if ! mv -- "$backup" "$backup.restored"; then' <<<"$restore_body"
 if grep -Fq 'notifications clear' "$capture_script"; then
   echo "park and restore must never ask the shell to clear the inbox" >&2
   exit 1
@@ -142,16 +156,25 @@ if grep -Eq 'quickshell kill .*\|\| true' "$capture_script"; then
   echo "a failed shell stop must never be ignored" >&2
   exit 1
 fi
-# shellcheck disable=SC2016 # a literal pattern, not an expansion
-if grep -Eq 'mv -t "\$(batch_)?inbox_dir"' "$capture_script"; then
+# shellcheck disable=SC2016 # a literal, not an expansion
+if grep -E '(^|[^a-z])mv ' <<<"$restore_body" | grep -vF 'mv -- "$backup" "$backup.restored"'; then
   echo "parked notifications must be copied back and verified, never moved" >&2
   exit 1
 fi
+# shellcheck disable=SC2016 # a literal, not an expansion
+grep -Fq 'cp -p -- "$file"' <<<"$restore_body"
+# shellcheck disable=SC2016 # a literal, not an expansion
+grep -Fq 'cmp -s -- "$file"' <<<"$restore_body"
 # The --all batch also sets its restore trap before parking the inbox, and
 # keeps it while the explicit finish runs (cleared only afterwards).
 # shellcheck disable=SC2016 # literals, not expansions
 (($(line_of "trap 'finish_batch || exit 1' EXIT") < $(line_of 'park_notification_inbox "$batch_inbox_backup"')))
-(($(line_of '  finish_batch || batch_restore_status=1') < $(line_of '  trap - EXIT')))
+# Each finisher's explicit call runs with its EXIT trap still set; the trap
+# is cleared on the very next line.
+next_line_of() { grep -A1 -Fx -- "$1" "$capture_script" | sed -n 2p; }
+[[ "$(next_line_of '  finish_batch || batch_restore_status=1')" == '  trap - EXIT' ]]
+[[ "$(next_line_of '    restore_inbox || exit 1')" == '    trap - EXIT' ]]
+[[ "$(next_line_of '    finish_picker || exit 1')" == '    trap - EXIT' ]]
 grep -Fq 'if ((batch_finished)); then' "$capture_script"
 # A clipboard that cannot be saved is never replaced.
 grep -Fq 'could not save the clipboard' "$capture_script"

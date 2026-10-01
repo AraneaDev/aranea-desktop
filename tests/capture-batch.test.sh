@@ -29,14 +29,17 @@ else
   printf 'hyprctl %s\n' "$*" >>"$ARANEA_TEST_SANDBOX/guard.log"
 fi
 SH
-# magick records that the hero GIF was built and writes it.
+# magick records that the hero GIF was built and writes it (fails with
+# MAGICK_FAILS=1, stopping the batch early).
 cat >"$bin/magick" <<'SH'
 #!/usr/bin/env bash
+[[ "${MAGICK_FAILS:-0}" == 1 ]] && exit 1
 printf 'built\n' >"${@: -1}"
 SH
 # Writes <surface>.png, except for the surfaces listed in CAPTURE_FAILS. Like
 # the real notifications surface it drops a capture entry and its image into
-# the inbox. STICK_SHELL=1 makes the fake shell unkillable from then on.
+# the inbox. STICK_SHELL=1 makes the fake shell unkillable from then on;
+# BREAK_LIST=1 makes `quickshell list` fail from then on.
 cat >"$bin/fake-surface" <<'SH'
 #!/usr/bin/env bash
 [[ " ${CAPTURE_FAILS:-} " == *" $1 "* ]] && exit 1
@@ -47,7 +50,17 @@ if [[ "$1" == notifications ]]; then
   printf 'fixture\n' >"$dir/inbox/9-9.json"
   printf 'fixture image\n' >"$dir/images/9-9-0.png"
   [[ "${STICK_SHELL:-0}" == 1 ]] && touch "$ARANEA_TEST_SANDBOX/shell-stuck"
+  [[ "${BREAK_LIST:-0}" == 1 ]] && touch "$ARANEA_TEST_SANDBOX/list-fails"
 fi
+exit 0
+SH
+# grim writes the frame; while the single notifications surface is shown a
+# notification arrives, and STICK_SHELL=1 makes the shell unkillable.
+cat >"$bin/grim" <<'SH'
+#!/usr/bin/env bash
+printf 'frame\n' >"${@: -1}"
+printf 'arrived\n' >"$HOME/.local/state/omarchy/notifications/inbox/8-8.json"
+[[ "${STICK_SHELL:-0}" == 1 ]] && touch "$ARANEA_TEST_SANDBOX/shell-stuck"
 exit 0
 SH
 # omarchy-shell clears the notification inbox the way the real shell does:
@@ -80,7 +93,8 @@ if [[ "$1 $2" == "restart shell" ]]; then
 fi
 SH
 # quickshell kill stops one running fake shell (and its queued jobs) and
-# fails once none is left; list reports a running (or stuck) one.
+# fails once none is left; list reports a running (or stuck) one, and fails
+# like a missing config with FAKE_LIST_FAILS=1 (or once list-fails exists).
 cat >"$bin/quickshell" <<'SH'
 #!/usr/bin/env bash
 printf 'quickshell %s\n' "$*" >>"$ARANEA_TEST_SANDBOX/guard.log"
@@ -96,6 +110,10 @@ case "$1" in
     rm -f "$ARANEA_TEST_SANDBOX/shell-running"
     ;;
   list)
+    if [[ "${FAKE_LIST_FAILS:-0}" == 1 || -e $ARANEA_TEST_SANDBOX/list-fails ]]; then
+      echo 'Could not open config file' >&2
+      exit 255
+    fi
     if [[ -e "$ARANEA_TEST_SANDBOX/shell-running" ]] || ((stuck)); then
       printf 'Instance fake:\n  Process ID: 1\n'
     fi
@@ -107,7 +125,7 @@ SH
 cat >"$bin/systemctl" <<'SH'
 #!/usr/bin/env bash
 printf 'systemctl %s\n' "$*" >>"$ARANEA_TEST_SANDBOX/guard.log"
-[[ "$*" == "--user show-environment" ]] && printf 'OMARCHY_PATH=/session/omarchy\n'
+[[ "$*" == "--user show-environment" ]] && printf 'OMARCHY_PATH=%s\n' "$ARANEA_TEST_SANDBOX/session-omarchy"
 exit 0
 SH
 # The session is unlocked unless FAKE_LOCKED=1.
@@ -117,6 +135,9 @@ cat >"$bin/omarchy-hyprland-session-locked" <<'SH'
 SH
 chmod +x "$bin"/*
 touch "$ARANEA_TEST_SANDBOX/shell-running"
+session="$ARANEA_TEST_SANDBOX/session-omarchy"
+mkdir -p "$session/shell"
+: >"$session/shell/shell.qml"
 export OMARCHY_PATH=/caller/omarchy
 
 # Runs the batch with the stubs; prints its stderr (stdout is dropped),
@@ -138,8 +159,13 @@ seed_real() {
   printf 'image of 1-1\n' >"$images/1-1-0.png"
   printf 'image of 2-1\n' >"$images/2-1-0.png"
   printf 'second image of 2-1\n' >"$images/2-1-1.jpg"
-  cp -p "$inbox"/* "$real/inbox/"
-  cp -p "$images"/* "$real/images/"
+  printf 'hidden\n' >"$inbox/.3-1.json"
+  printf 'hidden image\n' >"$images/.3-1-0.png"
+  : >"$ARANEA_TEST_SANDBOX/guard.log"
+  rm -f "$ARANEA_TEST_SANDBOX/shell-stuck" "$ARANEA_TEST_SANDBOX/list-fails"
+  touch "$ARANEA_TEST_SANDBOX/shell-running"
+  cp -pR "$inbox"/. "$real/inbox/"
+  cp -pR "$images"/. "$real/images/"
 }
 
 # Fails unless the inbox and images dirs hold exactly the reference files.
@@ -219,8 +245,8 @@ if grep -Fq 'omarchy-shell notifications clear' "$ARANEA_TEST_SANDBOX/guard.log"
 fi
 # The shell is stopped through the running session's config (not the
 # caller's OMARCHY_PATH), and checked to be gone.
-grep -Fq 'quickshell kill -p /session/omarchy/shell --any-display' "$ARANEA_TEST_SANDBOX/guard.log"
-grep -Fq 'quickshell list -p /session/omarchy/shell --any-display' "$ARANEA_TEST_SANDBOX/guard.log"
+grep -Fq "quickshell kill -p $session/shell --any-display" "$ARANEA_TEST_SANDBOX/guard.log"
+grep -Fq "quickshell list -p $session/shell --any-display" "$ARANEA_TEST_SANDBOX/guard.log"
 if grep -Fq 'quickshell kill -p /caller/omarchy/shell' "$ARANEA_TEST_SANDBOX/guard.log"; then
   echo "the shell must be stopped through the session's OMARCHY_PATH" >&2
   exit 1
@@ -252,7 +278,42 @@ diff -r "$real/images" "${kept[0]}/images" >/dev/null
   exit 1
 }
 grep -Fq 'omarchy restart shell' "$ARANEA_TEST_SANDBOX/guard.log"
+grep -Fq 'notifications that arrived during the capture are still in the inbox' <<<"$errors"
+if grep -Fq 'were not kept' <<<"$errors"; then
+  echo "an unrestored inbox still holds the arrivals; they were not dropped" >&2
+  exit 1
+fi
 rm -rf "${kept[0]}"
+
+# --- quickshell list fails at restore (it cannot confirm the shell is gone):
+# the restore fails closed and keeps the backup
+seed_real
+status=0
+errors="$(BREAK_LIST=1 run_batch)" || status=$?
+((status != 0)) || {
+  echo "a restore that cannot confirm the shell stopped must fail" >&2
+  exit 1
+}
+mapfile -t kept < <(compgen -G "$backups/capture-backup.*" || true)
+{ ((${#kept[@]} == 1)) && grep -Fq "your notifications are kept in ${kept[0]}" <<<"$errors"; } || {
+  printf 'an unconfirmed stop must keep the backup: %s\n' "$errors" >&2
+  exit 1
+}
+diff -r "$real/inbox" "${kept[0]}/inbox" >/dev/null
+diff -r "$real/images" "${kept[0]}/images" >/dev/null
+rm -rf "${kept[0]}"
+
+# --- a batch that stops early still restores and says arrivals were dropped
+seed_real
+status=0
+errors="$(MAGICK_FAILS=1 run_batch)" || status=$?
+((status != 0))
+assert_real_back 'early exit'
+assert_no_backup 'early exit'
+grep -Fq 'notifications that arrived during the capture were not kept' <<<"$errors" || {
+  printf 'the early-exit path must print the arrivals note: %s\n' "$errors" >&2
+  exit 1
+}
 
 # --- the session is locked before parking: nothing is parked or captured,
 # the batch stops with a message and the real inbox is untouched
@@ -281,10 +342,83 @@ fi
 assert_real_back 'locked session'
 assert_no_backup 'locked session'
 
+# --- quickshell list fails before parking: nothing is parked or captured
+seed_real
+status=0
+errors="$(
+  {
+    PATH="$bin:$PATH" FAKE_LIST_FAILS=1 ARANEA_CAPTURE_SURFACE_COMMAND="$bin/fake-surface" \
+      ARANEA_CAPTURE_RETURN_DELAY=0 "$capture" --all --output "$locked_out" >/dev/null
+  } 2>&1
+)" || status=$?
+{ ((status != 0)) && grep -Fq 'notification inbox not parked' <<<"$errors"; } || {
+  printf 'an unconfirmed stop must not park: %s\n' "$errors" >&2
+  exit 1
+}
+if compgen -G "$locked_out/*.png" >/dev/null; then
+  echo "nothing may be captured when the stop was not confirmed" >&2
+  exit 1
+fi
+assert_real_back 'list fails'
+assert_no_backup 'list fails'
+
+# Runs the single notifications-empty capture with the stubs; prints its
+# stderr, returns its status.
+run_single() {
+  {
+    PATH="$bin:$PATH" ARANEA_SCREENSHOT_DELAY=0 "$capture" --surface notifications-empty --output "$out" >/dev/null
+  } 2>&1
+}
+
+# --- the single notifications surface parks and restores the same way
+seed_real
+status=0
+errors="$(run_single)" || status=$?
+[[ "$status" -eq 0 ]] || {
+  printf 'a clean single capture must exit 0 (got %s): %s\n' "$status" "$errors" >&2
+  exit 1
+}
+assert_real_back 'single surface'
+assert_no_backup 'single surface'
+
+# --- ...keeps the backup when the shell cannot be stopped at restore
+seed_real
+status=0
+errors="$(STICK_SHELL=1 run_single)" || status=$?
+((status != 0)) || {
+  echo "an unrestored single capture must fail" >&2
+  exit 1
+}
+mapfile -t kept < <(compgen -G "$backups/capture-backup.*" || true)
+{ ((${#kept[@]} == 1)) && grep -Fq "your notifications are kept in ${kept[0]}" <<<"$errors"; } || {
+  printf 'the single capture must keep and name the backup: %s\n' "$errors" >&2
+  exit 1
+}
+diff -r "$real/inbox" "${kept[0]}/inbox" >/dev/null
+[[ "$(cat "$inbox/8-8.json")" == arrived ]]
+grep -Fq 'omarchy restart shell' "$ARANEA_TEST_SANDBOX/guard.log"
+rm -rf "${kept[0]}"
+
+# --- ...and restarts the shell when parking was refused after the stop had
+# already killed instances (not locked)
+seed_real
+status=0
+errors="$(FAKE_SHELL_STUCK=1 run_single)" || status=$?
+{ [[ "$status" -eq 3 ]] && grep -Fq 'notification inbox not parked' <<<"$errors"; } || {
+  printf 'a refused park must abort the capture (got %s): %s\n' "$status" "$errors" >&2
+  exit 1
+}
+assert_real_back 'single surface refused'
+assert_no_backup 'single surface refused'
+grep -Fq 'omarchy restart shell' "$ARANEA_TEST_SANDBOX/guard.log" || {
+  echo "a shell stopped by a refused park must be restarted" >&2
+  exit 1
+}
+
 # --- an interrupted restore can be run again without losing anything
 # restore_parked_inbox and its helpers are top-level functions; load them.
 eval "$(sed -n '/^notification_state_dir=/p; /^notification_inbox_dir=/p; /^notification_images_dir=/p' "$capture")"
-for helper in omarchy_shell_config stop_omarchy_shell restore_parked_inbox; do
+for helper in omarchy_shell_config stop_omarchy_shell dir_entries restore_parked_inbox remove_empty_backup; do
   eval "$(sed -n "/^$helper() {\$/,/^}\$/p" "$capture")"
   declare -F "$helper" >/dev/null || {
     echo "capture-screenshots must define $helper" >&2
@@ -297,8 +431,8 @@ PATH="$bin:$PATH"
 seed_real
 backup="$backups/capture-backup.test"
 mkdir -p "$backup/inbox" "$backup/images"
-mv "$inbox"/* "$backup/inbox/"
-mv "$images"/* "$backup/images/"
+mv "$inbox"/.[!.]* "$inbox"/* "$backup/inbox/"
+mv "$images"/.[!.]* "$images"/* "$backup/images/"
 # The first run was cut off halfway through copying: one entry is missing,
 # one is truncated, and a capture leftover is still there.
 cp -p "$backup/inbox/1-1.json" "$inbox/"
@@ -311,6 +445,38 @@ assert_real_back 'rerun restore'
   echo "a verified restore must hand off (remove) its backup" >&2
   exit 1
 }
+# A copy that fails is caught by the check: the backup is kept and named.
+seed_real
+backup="$backups/capture-backup.cpfail"
+mkdir -p "$backup/inbox" "$backup/images"
+mv "$inbox"/.[!.]* "$inbox"/* "$backup/inbox/"
+mv "$images"/.[!.]* "$images"/* "$backup/images/"
+cp_bin="$ARANEA_TEST_SANDBOX/cp-fails-bin"
+mkdir -p "$cp_bin"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$cp_bin/cp"
+chmod +x "$cp_bin/cp"
+status=0
+errors="$(PATH="$cp_bin:$PATH" restore_parked_inbox "$backup" 2>&1)" || status=$?
+{ ((status != 0)) && grep -Fq "your notifications are kept in $backup" <<<"$errors"; } || {
+  printf 'a failed copy must keep the backup: %s\n' "$errors" >&2
+  exit 1
+}
+diff -r "$real/inbox" "$backup/inbox" >/dev/null
+diff -r "$real/images" "$backup/images" >/dev/null
+restore_parked_inbox "$backup"
+assert_real_back 'restore after a failed copy'
+# A park backup that is not empty (a rolled-back park left files in it) is
+# kept and named, never silently left behind.
+leftover="$backups/capture-backup.leftover"
+mkdir -p "$leftover/inbox" "$leftover/images"
+printf 'stranded\n' >"$leftover/inbox/5-5.json"
+errors="$(remove_empty_backup "$leftover" 2>&1)" || true
+{ [[ -f "$leftover/inbox/5-5.json" ]] && grep -Fq "kept in $leftover" <<<"$errors"; } || {
+  printf 'a non-empty park backup must be kept and named: %s\n' "$errors" >&2
+  exit 1
+}
+rm -rf "$leftover"
+backup="$backups/capture-backup.test"
 # A second run after the hand-off (even one whose cleanup was cut off) never
 # touches the restored inbox.
 mkdir -p "$backup.restored/inbox"
