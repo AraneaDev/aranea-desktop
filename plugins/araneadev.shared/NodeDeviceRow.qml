@@ -17,6 +17,8 @@ Item {
   property string label: ""
   // Trailing detail, e.g. "unplugged".
   property string detail: ""
+  // The detail's colour; a host passes DesignTokens.urgent for a failure.
+  property color detailColor: Util.alpha(DesignTokens.foreground, 0.55)
   // Whether this is the active device.
   property bool active: false
   // Whether the device can be chosen.
@@ -149,7 +151,7 @@ Item {
     anchors.rightMargin: Style.space(8) + (trailingSlot.width > 0 ? trailingSlot.width + Style.space(8) : 0)
     anchors.verticalCenter: parent.verticalCenter
     text: row.detail
-    color: Util.alpha(DesignTokens.foreground, 0.55)
+    color: row.detailColor
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }

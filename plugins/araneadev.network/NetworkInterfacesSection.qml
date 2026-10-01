@@ -1,0 +1,59 @@
+// The Interfaces section of the Aranea Network dropdown: an "INTERFACES"
+// caption with the count, and one read-only NodeDeviceRow per real link
+// (its node lit while connected). Shown only with two or more links. Pure
+// view: rows in, nothing out (not in the keyboard chain, no actions).
+pragma ComponentBehavior: Bound
+import QtQuick
+import qs.Commons
+import "../araneadev.shared" as Aranea
+
+Column {
+  id: section
+
+  // Interface rows from NetworkLogic.interfaceRows:
+  // [{key, glyph, label, detail, active}].
+  property var rows: []
+
+  objectName: "interfacesSection"
+  visible: section.rows.length >= 2
+  spacing: Style.space(6)
+
+  Item {
+    width: parent.width
+    implicitHeight: captionText.implicitHeight
+    Text {
+      id: captionText
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      text: "INTERFACES"
+      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      font.bold: true
+      font.letterSpacing: 1.2
+    }
+    Text {
+      objectName: "interfacesCount"
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: String(section.rows.length)
+      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.body
+    }
+  }
+  Repeater {
+    model: section.rows
+    Aranea.NodeDeviceRow {
+      required property var modelData
+      objectName: "interfaceRow"
+      width: section.width
+      glyph: modelData.glyph
+      label: modelData.label
+      detail: modelData.detail
+      active: !!modelData.active
+      available: true
+      hasCursor: false
+    }
+  }
+}

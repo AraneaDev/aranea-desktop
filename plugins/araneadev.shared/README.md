@@ -24,7 +24,14 @@ service contracts to the feature plugins.
   `PointerMoveGate`, `qs.Ui`) filters synthetic hover churn from the row
   moving under a still pointer: with a gate set, `entered` fires only on a
   real pointer move, never on the row sliding underneath a stationary
-  cursor.
+  cursor. `detailColor` recolours the detail (the network VPN rows use
+  `DesignTokens.urgent` for "Couldn't connect").
+- `FilamentPill` is the Filament-style choice pill (the network dropdown's
+  band and DNS rows): a thin muted border, or an accent border with a 2 px
+  accent underline when `selected`; the keyboard cursor (`hasCursor`) draws
+  the same mint outline as `NodeDeviceRow`, pointer hover never does. A
+  `busy` pill breathes. It emits `clicked`, and `hoveredMoved` on entering,
+  or only on a real pointer move when a `pointerGate` is set.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph,
   title/caption pair, and a trailing slot.
 - `InkText` aligns glyph ink rather than advance width.
