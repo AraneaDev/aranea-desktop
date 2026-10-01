@@ -1,17 +1,18 @@
 // The Aranea Bluetooth view, driven by a plain view object: Connected,
-// Paired and Available sections show and hide with the fixture lists (and
-// stay hidden with the adapter off even if given non-empty lists), the
-// scanning pulse tracks view.scanning (only with the adapter on), device
-// glyphs and busy pulses come from the fixture, forget shows only for
-// forgettable rows and never steals width from the detail text while
+// Paired and Available sections show and hide with the fixture lists, an
+// adapter that is off keeps Paired (as stock does) but never shows
+// Available, the scanning pulse runs only while open, scanning and on,
+// device glyphs and busy pulses come from the fixture, forget shows only
+// for forgettable rows and never steals width from the detail text while
 // hidden, hovering forget swaps its row's tooltip for its own and reports
 // a dedicated hover action, available rows emit primary and right-click
 // emits secondary, the signal glow follows the separate signals map
 // without rebuilding rows, the keyboard cursor outlines exactly one row
 // when active, Paired/Available scroll together under a pinned Connected
-// and ensureVisible scrolls a row into view, every trailing element ends
-// on one right content edge, and a missing adapter hides the lists behind
-// the empty text. The header caption's opacity follows captionOpacity.
+// and ensureVisible scrolls a row (and a first row's caption) into view,
+// every trailing element ends on one right content edge, the key hint
+// fits one line, and a missing adapter hides the lists behind the empty
+// text. The header caption's opacity follows captionOpacity.
 import QtQuick
 import Quickshell
 import qs.Commons
@@ -37,6 +38,7 @@ ShellRoot {
         hasAdapter: true,
         toggleHint: "Turn Bluetooth off",
         headerCursor: false,
+        open: true,
         scanning: true,
         cursor: {
           active: false,
@@ -142,58 +144,42 @@ ShellRoot {
       })
   }
 
-  // A present adapter, turned off, whose lists are (wrongly, deliberately)
-  // still populated: the view must gate sections on enabled && hasAdapter
-  // itself rather than trust the caller to send empty arrays.
+  // A present adapter, turned off, as Panel.bluetoothView builds it: no
+  // connected devices, the paired ones still listed (stock shows them, and
+  // choosing one powers the adapter on and connects), no scan and no
+  // empty text.
   Bluetooth.BluetoothDropdown {
     id: off
     width: 360
     view: ({
-        glyph: String.fromCodePoint(0xf00af),
-        caption: "",
+        glyph: String.fromCodePoint(0xf00b2),
+        caption: "Turned Off",
         enabled: false,
         hasAdapter: true,
+        open: true,
         toggleHint: "Turn Bluetooth on",
         headerCursor: false,
-        scanning: true,
+        scanning: false,
         cursor: {
           active: false,
           section: "",
           index: -1,
           action: false
         },
-        connected: [
-          {
-            key: "ZZ:1",
-            label: "Stale",
-            glyph: "",
-            detail: "",
-            busy: false,
-            forgettable: true
-          }
-        ],
+        connected: [],
         known: [
           {
             key: "ZZ:2",
-            label: "Stale",
+            label: "MX Master 3S",
             glyph: "",
             detail: "",
             busy: false,
             forgettable: true
           }
         ],
-        discovered: [
-          {
-            key: "ZZ:3",
-            label: "Stale",
-            glyph: "",
-            detail: "",
-            busy: false,
-            forgettable: false
-          }
-        ],
+        discovered: [],
         signals: {},
-        emptyText: "Turn Bluetooth on to scan"
+        emptyText: ""
       })
   }
 
@@ -241,6 +227,16 @@ ShellRoot {
     for (var key in view)
       next[key] = view[key]
     next.signals = signals
+    return next
+  }
+
+  // VIEW with FIELDS (a plain object) laid over it; other values reused.
+  function withFields(view, fields) {
+    var next = {}
+    for (var key in view)
+      next[key] = view[key]
+    for (var f in fields)
+      next[f] = fields[f]
     return next
   }
 
@@ -298,7 +294,33 @@ ShellRoot {
     var pulse = t.findChild(full, "scanPulse")
     t.check(pulse !== null && pulse.visible, "the pulse runs while scanning")
     t.check(!t.findChild(bare, "scanPulse").visible, "the pulse is hidden without scanning")
+    var offView = off.view
+    off.view = withFields(offView, {
+      scanning: true,
+      discovered: [
+        {
+          key: "ZZ:3",
+          label: "Stale",
+          glyph: "",
+          detail: "",
+          busy: false,
+          forgettable: false
+        }
+      ]
+    })
     t.check(!t.findChild(off, "scanPulse").visible, "the pulse stays hidden with the adapter off, even if scanning is reported")
+    t.check(!t.findChild(off, "availableSection").visible, "adapter off hides Available, even if scanning is reported")
+    off.view = offView
+    var fullView = full.view
+    full.view = withFields(fullView, {
+      open: false
+    })
+    t.check(!t.findChild(full, "scanPulse").visible, "the pulse stops while the dropdown is closed")
+    full.view = fullView
+    t.check(t.findChild(full, "scanPulse").visible, "the pulse runs again once the dropdown is open")
+    var hint = t.findChild(full, "keyHint")
+    t.check(hint !== null && hint.text.indexOf("b power") !== -1, "the key hint names b power")
+    t.check(hint !== null && !hint.truncated && hint.lineCount === 1, "the key hint fits on one line")
 
     // Busy rows (Keychron K3, index 2 in Paired) run their breathing pulse.
     var busyPulse = t.findChildren(pairedRows[2], "busyPulse")[0]
@@ -445,11 +467,11 @@ ShellRoot {
               t.check(emptyText !== null && emptyText.visible && emptyText.text === "No Bluetooth adapter", "no adapter shows the empty text")
               t.check(!t.findChild(full, "emptyText").visible, "a working adapter with devices shows no empty text")
 
-              // A present-but-off adapter hides every section itself, even
-              // when (wrongly) handed non-empty lists.
-              t.check(!t.findChild(off, "connectedSection").visible, "adapter off hides Connected despite a non-empty list")
-              t.check(!t.findChild(off, "pairedSection").visible, "adapter off hides Paired despite a non-empty list")
-              t.check(!t.findChild(off, "availableSection").visible, "adapter off hides Available despite a non-empty list and scanning: true")
+              // A present-but-off adapter keeps Paired, as stock does.
+              t.check(t.findChild(off, "pairedSection").visible, "adapter off still shows Paired")
+              t.equal(t.findChildren(t.findChild(off, "pairedSection"), "deviceRow").length, 1, "adapter off lists the paired device")
+              t.check(!t.findChild(off, "availableSection").visible, "adapter off shows no Available")
+              t.check(!t.findChild(off, "emptyText").visible, "adapter off with paired devices shows no empty text")
 
               // ensureVisible scrolls a row below the fold into view.
               t.step(50, function () {
@@ -458,7 +480,13 @@ ShellRoot {
                 scroller.ensureVisible("known", 9)
                 t.step(50, function () {
                   t.check(scrollerFlick.contentY > 0, "ensureVisible scrolls a row below the fold into view")
-                  t.done()
+                  scroller.ensureVisible("known", 0)
+                  t.step(50, function () {
+                    var pairedCaption = t.findChild(scroller, "pairedSection")
+                    var captionTop = pairedCaption.mapToItem(scrollerFlick.contentItem, 0, 0).y
+                    t.check(scrollerFlick.contentY <= captionTop, "ensureVisible on a section's first row shows its caption too")
+                    t.done()
+                  })
                 })
               })
             })

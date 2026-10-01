@@ -66,4 +66,30 @@ function parseRssi(json) {
   return out
 }
 
-if (typeof module !== "undefined") module.exports = { deviceGlyph, signalLevel, parseRssi }
+/**
+ * The dropdown's empty text, stock's wording with the adapter checked
+ * first: without one the view hides every list, whatever the device rows.
+ * @param {boolean} hasAdapter - a Bluetooth adapter is present
+ * @param {boolean} enabled - the adapter is powered on
+ * @param {boolean} hasRows - any connected, paired or available row exists
+ * @returns {string} the text, or "" when the lists speak for themselves
+ */
+function emptyText(hasAdapter, enabled, hasRows) {
+  if (!hasAdapter) return "No Bluetooth adapter"
+  if (hasRows) return ""
+  return enabled ? "Scanning for devices…" : "Turn Bluetooth on to scan"
+}
+
+/**
+ * Whether a new RSSI poll differs from the readings already held, so an
+ * unchanged poll can skip reassigning them (and rebuilding the view).
+ * @param {Record<string, number>|undefined} prev - the readings held now
+ * @param {Record<string, number>|undefined} next - the new poll's readings
+ * @returns {boolean} true when an address or a value differs
+ */
+function rssiChanged(prev, next) {
+  return JSON.stringify(prev || {}) !== JSON.stringify(next || {})
+}
+
+if (typeof module !== "undefined")
+  module.exports = { deviceGlyph, signalLevel, parseRssi, emptyText, rssiChanged }

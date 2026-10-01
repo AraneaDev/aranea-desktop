@@ -68,3 +68,22 @@ test("bad or empty poll output gives no readings", () => {
   assert.deepEqual(logic.parseRssi('{"data":[]}'), {})
   assert.deepEqual(logic.parseRssi(undefined), {})
 })
+
+test("the empty text follows the adapter first, as stock's does", () => {
+  assert.equal(logic.emptyText(false, false, false), "No Bluetooth adapter")
+  assert.equal(logic.emptyText(false, false, true), "No Bluetooth adapter")
+  assert.equal(logic.emptyText(true, false, false), "Turn Bluetooth on to scan")
+  assert.equal(logic.emptyText(true, true, false), "Scanning for devices…")
+  assert.equal(logic.emptyText(true, false, true), "")
+  assert.equal(logic.emptyText(true, true, true), "")
+})
+
+test("RSSI readings count as changed only when a value or address differs", () => {
+  assert.equal(logic.rssiChanged({ A: -50 }, { A: -50 }), false)
+  assert.equal(logic.rssiChanged({}, {}), false)
+  assert.equal(logic.rssiChanged({ A: -50 }, { A: -51 }), true)
+  assert.equal(logic.rssiChanged({ A: -50 }, { A: -50, B: -70 }), true)
+  assert.equal(logic.rssiChanged({ A: -50, B: -70 }, { A: -50 }), true)
+  assert.equal(logic.rssiChanged(undefined, {}), false)
+  assert.equal(logic.rssiChanged({}, undefined), false)
+})

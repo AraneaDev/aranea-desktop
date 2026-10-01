@@ -140,6 +140,10 @@ Panel {
   // Tooltip text for the hero power switch.
   readonly property string toggleHint: root.adapter && root.adapter.enabled ? "Turn Bluetooth off" : "Turn Bluetooth on"
 
+  // hoverFill, selectedFill, scrollRowIndex and scrollSectionTitle fed
+  // stock's own rows and ListView. The Aranea view doesn't use them; they
+  // stay as stock wrote them so tools/upstream-drift can line this file up
+  // with stock's.
   // qmllint disable missing-property
   // Row fill color under mouse hover.
   readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Color.accent) : "transparent"
@@ -179,10 +183,10 @@ Panel {
     return Model.sectionDevices(deviceGroups, section)
   }
 
-  // The scrollable half of the panel — remembered devices, then whatever the
-  // scan turned up — flattened into one model so a ListView can own the
-  // viewport. Each entry carries the section it came from, which is what lets
-  // the delegate and the cursor keep working in section-relative terms.
+  // The scrollable half of the panel (remembered devices, then whatever the
+  // scan turned up) flattened into one list of primitive rows. Each entry
+  // carries the section it came from and its index there, which is how the
+  // view's Paired and Available rows and the cursor stay section-relative.
   readonly property var scrollRows: {
     var rows = []
     for (var k = 0; k < knownDevices.length; k++)
@@ -806,8 +810,15 @@ Panel {
     command: ["busctl", "--json=short", "call", "org.bluez", "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects"]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: if (root.opened)
-        root.rssiByAddress = BluetoothLogic.parseRssi(text)
+      // Only a changed reading is assigned, so a quiet poll doesn't rebuild
+      // the view every 2 s.
+      onStreamFinished: {
+        if (!root.opened)
+          return
+        var next = BluetoothLogic.parseRssi(text)
+        if (BluetoothLogic.rssiChanged(root.rssiByAddress, next))
+          root.rssiByAddress = next
+      }
     }
   }
 
@@ -918,6 +929,7 @@ Panel {
       toggleHint: toggleHint,
       headerCursor: headerHasCursor && keyboardCursor,
       scanning: !!adapter && adapter.enabled && adapter.discovering,
+      open: opened,
       cursor: {
         active: cursorActive && keyboardCursor,
         section: focusSection,
@@ -928,7 +940,7 @@ Panel {
       known: knownViewRows,
       discovered: discoveredViewRows,
       signals: deviceSignals,
-      emptyText: connectedRows.length === 0 && scrollRows.length === 0 ? (!adapter ? "No Bluetooth adapter" : !adapter.enabled ? "Turn Bluetooth on to scan" : "Scanning for devices…") : ""
+      emptyText: BluetoothLogic.emptyText(!!adapter, !!adapter && adapter.enabled, connectedRows.length > 0 || scrollRows.length > 0)
     })
 
   // The live device behind the view's row INDEX in SECTION, resolved the
