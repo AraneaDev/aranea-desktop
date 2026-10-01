@@ -1,16 +1,17 @@
 // The Aranea Bluetooth view, driven by a plain view object: Connected,
 // Paired and Available sections show and hide with the fixture lists (and
 // stay hidden with the adapter off even if given non-empty lists), the
-// scanning pulse tracks view.scanning, device glyphs and busy pulses come
-// from the fixture, forget shows only for forgettable rows and never
-// steals width from the detail text while hidden, hovering forget swaps
-// its row's tooltip for its own and reports a dedicated hover action,
-// available rows emit primary and right-click emits secondary, the signal
-// glow follows the separate signals map without rebuilding rows, the
-// keyboard cursor outlines exactly one row when active, Paired/Available
-// scroll together under a pinned Connected and ensureVisible scrolls a
-// row into view, every trailing element ends on one right content edge,
-// and a missing adapter hides the lists behind the empty text.
+// scanning pulse tracks view.scanning (only with the adapter on), device
+// glyphs and busy pulses come from the fixture, forget shows only for
+// forgettable rows and never steals width from the detail text while
+// hidden, hovering forget swaps its row's tooltip for its own and reports
+// a dedicated hover action, available rows emit primary and right-click
+// emits secondary, the signal glow follows the separate signals map
+// without rebuilding rows, the keyboard cursor outlines exactly one row
+// when active, Paired/Available scroll together under a pinned Connected
+// and ensureVisible scrolls a row into view, every trailing element ends
+// on one right content edge, and a missing adapter hides the lists behind
+// the empty text.
 import QtQuick
 import Quickshell
 import qs.Commons
@@ -257,23 +258,9 @@ ShellRoot {
     return next
   }
 
-  // Every match in LIST, once each: Flickable's contentItem is both an
-  // ordinary child (in .data) and pushed again explicitly by
-  // QmlTest.findChild[ren], so anything inside one (our Paired/Available
-  // scroll area) is found twice over.
-  function unique(list) {
-    var seen = []
-    return list.filter(function (o) {
-      if (seen.indexOf(o) !== -1)
-        return false
-      seen.push(o)
-      return true
-    })
-  }
-
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
-    return unique(t.findChildren(item, "cursorOutline")).filter(function (o) {
+    return t.findChildren(item, "cursorOutline").filter(function (o) {
       return o.visible && (o.border.width > 0 || o.color.a > 0)
     }).length
   }
@@ -291,9 +278,9 @@ ShellRoot {
     t.check(paired !== null && paired.visible, "Paired shows with devices")
     t.check(available !== null && available.visible, "Available shows while scanning with devices")
 
-    var connectedRows = unique(t.findChildren(connected, "deviceRow"))
-    var pairedRows = unique(t.findChildren(paired, "deviceRow"))
-    var availableRows = unique(t.findChildren(available, "deviceRow"))
+    var connectedRows = t.findChildren(connected, "deviceRow")
+    var pairedRows = t.findChildren(paired, "deviceRow")
+    var availableRows = t.findChildren(available, "deviceRow")
     t.equal(connectedRows.length, 1, "one connected device")
     t.equal(pairedRows.length, 3, "three paired devices")
     t.equal(availableRows.length, 3, "three available devices")
@@ -311,6 +298,7 @@ ShellRoot {
     var pulse = t.findChild(full, "scanPulse")
     t.check(pulse !== null && pulse.visible, "the pulse runs while scanning")
     t.check(!t.findChild(bare, "scanPulse").visible, "the pulse is hidden without scanning")
+    t.check(!t.findChild(off, "scanPulse").visible, "the pulse stays hidden with the adapter off, even if scanning is reported")
 
     // Busy rows (Keychron K3, index 2 in Paired) run their breathing pulse.
     var busyPulse = t.findChildren(pairedRows[2], "busyPulse")[0]
@@ -321,8 +309,8 @@ ShellRoot {
     // Forget is hidden off cursor for every row, forgettable or not, and a
     // hidden forget button must not push the detail text off the row's own
     // right edge (it reserves zero width while invisible).
-    var connectedForget = unique(t.findChildren(connected, "forgetButton"))
-    var availableForget = unique(t.findChildren(available, "forgetButton"))
+    var connectedForget = t.findChildren(connected, "forgetButton")
+    var availableForget = t.findChildren(available, "forgetButton")
     t.check(!connectedForget[0].visible, "forget hides off cursor even on a forgettable row")
     t.check(!availableForget[0].visible, "available rows are never forgettable")
     var pairedDetail0 = t.findChild(pairedRows[0], "detailText")
@@ -333,7 +321,7 @@ ShellRoot {
 
     full.view = cursorTick(full.view, true, "connected", 0, false)
     t.step(50, function () {
-      var connectedForgetOnCursor = unique(t.findChildren(connected, "forgetButton"))
+      var connectedForgetOnCursor = t.findChildren(connected, "forgetButton")
       t.check(connectedForgetOnCursor[0].visible, "forget shows once the cursor sits on a forgettable row")
       t.check(connectedForgetOnCursor[0].width > 0, "a shown forget button has real width")
       var connectedBorder = t.findChild(connectedForgetOnCursor[0], "forgetBorder")
@@ -362,7 +350,7 @@ ShellRoot {
         ]), "choosing an available row emits primary")
 
         // Right-click emits secondary.
-        var pairedSecondary = unique(t.findChildren(paired, "secondaryArea"))
+        var pairedSecondary = t.findChildren(paired, "secondaryArea")
         pairedSecondary[1].clicked(null)
         t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["secondary",
           {
@@ -406,7 +394,7 @@ ShellRoot {
           "CC:2": 3
         })
         t.step(50, function () {
-          var availableRowsAfter = unique(t.findChildren(available, "deviceRow"))
+          var availableRowsAfter = t.findChildren(available, "deviceRow")
           t.equal(availableRowsAfter.length, availableRows.length, "a signals tick keeps the row count")
           for (var i = 0; i < availableRows.length; i++)
             t.check(availableRowsAfter[i] === availableRows[i], "available row " + i + " is the same delegate after a signals tick")
@@ -428,7 +416,7 @@ ShellRoot {
               var header = t.findChild(full, "bluetoothHeader")
               t.check(header !== null && header.hintTip.text === "Turn Bluetooth off", "the power switch explains itself (stock's toggleHint)")
               var edge = rightEdge(full, full)
-              var cursorForget = unique(t.findChildren(paired, "forgetButton")).filter(function (b) {
+              var cursorForget = t.findChildren(paired, "forgetButton").filter(function (b) {
                 return b.visible
               })[0]
               var trailing = [t.findChild(full, "headerTrailing"), cursorForget]

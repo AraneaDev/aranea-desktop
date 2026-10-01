@@ -1,11 +1,15 @@
 # Aranea Bluetooth
 
-`araneadev.bluetooth` replaces Omarchy's `omarchy.bluetooth` bar dropdown.
-For now it is a straight clone: `Panel.qml` and `Model.js` are copied
-verbatim from stock (only documentation comments added), so behaviour and
-look are unchanged. A later task gives it the Aranea-native view (Filament
-components, the shared device-row glow and busy states) the same way
-`araneadev.audio` replaced `omarchy.audio`.
+`araneadev.bluetooth` replaces Omarchy's `omarchy.bluetooth` bar dropdown. It
+keeps stock's logic in `Panel.qml` and `Model.js` (discovery and its clean
+stop on close, pending actions, the audio hand-off after a connect, the
+keyboard cursor and the bar icon) and draws an Aranea view,
+`BluetoothDropdown.qml`: a Filament header and power switch, a scanning
+pulse, and web-node device rows for Connected, Paired and Available, with a
+busy pulse while a device connects and a signal glow on nearby devices.
+
+The signal glow reads RSSI from BlueZ with one `busctl` call every 2 s, and
+only while the open panel is scanning and has devices under Available.
 
 `Panel.qml` keeps stock's `manageIpc: false` and owns the `omarchy.bluetooth`
 IpcHandler itself, so `omarchy-shell shell summon omarchy.bluetooth` still
@@ -13,6 +17,5 @@ opens it.
 
 ## Validation
 
-Run `node --test tests/js/bluetooth-logic.test.js` for `BluetoothLogic.js`.
-A `tests/qml-behaviour.test.sh` suite for the dropdown's own view arrives
-with its Aranea-native redesign.
+Run `node --test tests/js/bluetooth-logic.test.js` and
+`tests/qml-behaviour.test.sh bluetooth-dropdown`.

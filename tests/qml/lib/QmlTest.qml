@@ -88,6 +88,20 @@ Item {
     console.log("QMLTEST DONE " + failures)
   }
 
+  // ROOT's data (every declared child, visual or not, e.g. Items,
+  // Animations, Timers) plus its contentItem where that isn't already among
+  // them: a Flickable's contentItem is one of its own data children, so
+  // pushing it unconditionally would visit its subtree twice.
+  function childrenOf(root) {
+    var kids = []
+    if (root.data)
+      for (var i = 0; i < root.data.length; i++)
+        kids.push(root.data[i])
+    if (root.contentItem && kids.indexOf(root.contentItem) < 0)
+      kids.unshift(root.contentItem)
+    return kids
+  }
+
   // Depth-first search over ROOT's data (every declared child, visual or
   // not, e.g. Items, Animations, Timers) and contentItem, where present,
   // for the first descendant whose objectName is NAME; null when none
@@ -95,12 +109,7 @@ Item {
   function findChild(root, name) {
     if (!root)
       return null
-    var kids = []
-    if (root.contentItem)
-      kids.push(root.contentItem)
-    if (root.data)
-      for (var i = 0; i < root.data.length; i++)
-        kids.push(root.data[i])
+    var kids = childrenOf(root)
     for (var j = 0; j < kids.length; j++) {
       var kid = kids[j]
       if (!kid)
@@ -121,12 +130,7 @@ Item {
     var matches = []
     if (!root)
       return matches
-    var kids = []
-    if (root.contentItem)
-      kids.push(root.contentItem)
-    if (root.data)
-      for (var i = 0; i < root.data.length; i++)
-        kids.push(root.data[i])
+    var kids = childrenOf(root)
     for (var j = 0; j < kids.length; j++) {
       var kid = kids[j]
       if (!kid)

@@ -1,8 +1,8 @@
 // Aranea Bluetooth (araneadev.bluetooth, cloned from omarchy.bluetooth): the
-// bar Bluetooth icon and its dropdown. Stock logic; the Aranea view replaces
-// the stock one in a later task.
+// bar Bluetooth icon and its dropdown. Stock logic (discovery, pending
+// actions, the audio hand-off, the cursor model and IPC); the Aranea view,
+// BluetoothDropdown, replaces the stock one.
 import QtQuick
-import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Bluetooth
@@ -10,6 +10,8 @@ import Quickshell.Services.Pipewire
 import qs.Ui
 import qs.Commons
 import "Model.js" as Model
+import "BluetoothLogic.js" as BluetoothLogic
+import "../araneadev.shared" as Aranea
 
 Panel {
   id: root
@@ -115,6 +117,12 @@ Panel {
   property bool actionFocused: false
   // Whether the keyboard cursor is visible (vs. idle, mouse-only).
   property bool cursorActive: false
+  // True while the keyboard drives the cursor; any pointer action clears it.
+  // The view outlines the cursor only then, so the mouse never shows one.
+  property bool keyboardCursor: false
+  // Upper-case address -> RSSI (dBm) for devices seen while scanning, read
+  // from BlueZ by rssiProc. Quickshell's BluetoothDevice has no RSSI.
+  property var rssiByAddress: ({})
 
   // Stable identity for the focused device. Devices move between sections as
   // they connect, disconnect, pair, or get forgotten, so follow the BlueZ
@@ -128,14 +136,7 @@ Panel {
   // Tooltip text for the hero power switch.
   readonly property string toggleHint: root.adapter && root.adapter.enabled ? "Turn Bluetooth off" : "Turn Bluetooth on"
 
-  // bar.foreground, with a safe fallback for when this entry point is
-  // instantiated without a bar (the smoke-test harness; never in production,
-  // where the host always sets bar before these bindings are read).
   // qmllint disable missing-property
-  readonly property color textForeground: bar ? bar.foreground : Color.foreground
-  // bar.fontFamily, with the same bar-less fallback as textForeground.
-  readonly property string textFontFamily: bar ? bar.fontFamily : Style.fontFamily
-
   // Row fill color under mouse hover.
   readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Color.accent) : "transparent"
   // Row fill color for the keyboard-selected row.
@@ -748,43 +749,204 @@ Panel {
     onTriggered: root.switchPendingAudioOutput()
   }
 
+  // Steps the hero caption through activePhrases while Bluetooth is on.
+  // Stock faded its own caption Text out and back in around each step; the
+  // Aranea header has no such item, so the caption simply changes.
   Timer {
     id: phraseTimer
     interval: 2800
     running: root.opened && root.rotatingPhrases
     repeat: true
-    onTriggered: phraseSwap.restart()
+    onTriggered: root.phraseIndex = (root.phraseIndex + 1) % root.activePhrases.length
   }
 
-  SequentialAnimation {
-    id: phraseSwap
-    PropertyAnimation {
-      target: heroStatus
-      property: "opacity"
-      to: 0.0
-      duration: 180
-      easing.type: Easing.OutQuad
-    }
-    ScriptAction {
-      script: root.phraseIndex = (root.phraseIndex + 1) % root.activePhrases.length
-    }
-    PropertyAnimation {
-      target: heroStatus
-      property: "opacity"
-      to: 1.0
-      duration: 260
-      easing.type: Easing.InQuad
+  // Reads every BlueZ device's RSSI in one D-Bus call, for the Available
+  // rows' signal glow.
+  Process {
+    id: rssiProc
+    command: ["busctl", "--json=short", "call", "org.bluez", "/", "org.freedesktop.DBus.ObjectManager", "GetManagedObjects"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: if (root.opened)
+        root.rssiByAddress = BluetoothLogic.parseRssi(text)
     }
   }
 
+  // Polls rssiProc only while the open panel is scanning with something to
+  // show under Available; closed, nothing runs.
+  Timer {
+    interval: 2000
+    repeat: true
+    triggeredOnStart: true
+    running: root.opened && root.adapter !== null && root.adapter.enabled && root.adapter.discovering && root.discoveredDevices.length > 0
+    onTriggered: if (!rssiProc.running)
+      rssiProc.running = true
+  }
+
+  // Additions to stock's open/cursor handlers: a fresh open starts with the
+  // mouse's (outline-free) cursor and a close drops the RSSI readings; a
+  // keyboard move scrolls its row into view.
   Connections {
     target: root
-    function onRotatingPhrasesChanged() {
-      if (!root.rotatingPhrases) {
-        phraseSwap.stop()
-        heroStatus.opacity = 1.0
-      }
+    function onOpenedChanged() {
+      root.keyboardCursor = false
+      if (!root.opened)
+        root.rssiByAddress = ({})
     }
+    function onFocusSectionChanged() {
+      Qt.callLater(root.ensureCursorVisible)
+    }
+    function onSelectedIndexChanged() {
+      Qt.callLater(root.ensureCursorVisible)
+    }
+    function onKeyboardCursorChanged() {
+      Qt.callLater(root.ensureCursorVisible)
+    }
+  }
+
+  // A row's status line, the same rules stock's DeviceRow used: pending
+  // action first, then the battery of a connected device, then BlueZ's
+  // connecting/disconnecting states.
+  function rowStatusText(dev, section) {
+    if (!dev)
+      return ""
+    var action = pendingAction(dev.address || "")
+    var devState = dev.state !== undefined ? dev.state : -1
+    if (action === "forgetting")
+      return "Forgetting…"
+    if (action === "disconnecting" || devState === 2)
+      return "Disconnecting…"
+    if (dev.connected) {
+      if (dev.batteryAvailable)
+        return Math.round(dev.battery * 100) + "%"
+      return section === "connected" ? "" : "Connected"
+    }
+    if (action === "connecting" || devState === 3 || dev.pairing === true)
+      return "Connecting…"
+    return ""
+  }
+
+  // One view row from a stock primitive row (Model.deviceRow) and the live
+  // device behind it, which supplies the type icon deviceRow doesn't carry.
+  function viewRow(dev, device, section) {
+    var state = dev && dev.state !== undefined ? dev.state : -1
+    return {
+      key: dev ? dev.address : "",
+      label: deviceLabel(dev) || "Device",
+      glyph: BluetoothLogic.deviceGlyph(device ? device.icon : "", !!(dev && dev.connected)),
+      detail: rowStatusText(dev, section),
+      busy: !!dev && (pendingAction(dev.address || "") !== "" || state === 2 || state === 3 || dev.pairing === true),
+      forgettable: section !== "discovered"
+    }
+  }
+
+  // View rows for SECTION ("known" or "discovered") out of scrollRows.
+  function scrollViewRows(section) {
+    var rows = []
+    for (var i = 0; i < scrollRows.length; i++) {
+      var r = scrollRows[i]
+      if (r.section === section)
+        rows.push(viewRow(r.dev, deviceAt(section, r.indexInSection), section))
+    }
+    return rows
+  }
+
+  // The view's Connected rows. These row arrays are their own bindings, apart
+  // from bluetoothView, so RSSI and the rotating phrase never rebuild them.
+  readonly property var connectedViewRows: connectedRows.map(function (dev, i) {
+    return viewRow(dev, connectedDevices[i], "connected")
+  })
+  // The view's Paired rows (see connectedViewRows).
+  readonly property var knownViewRows: scrollViewRows("known")
+  // The view's Available rows (see connectedViewRows).
+  readonly property var discoveredViewRows: scrollViewRows("discovered")
+  // Address -> signal level (0..3) behind each Available row's node glow.
+  readonly property var deviceSignals: {
+    var out = {}
+    for (var i = 0; i < discoveredViewRows.length; i++) {
+      var key = discoveredViewRows[i].key
+      out[key] = BluetoothLogic.signalLevel(rssiByAddress[String(key).toUpperCase()])
+    }
+    return out
+  }
+
+  // Everything the Aranea view draws (BluetoothDropdown.view).
+  readonly property var bluetoothView: ({
+      glyph: icon,
+      caption: heroStatusText,
+      enabled: !!adapter && adapter.enabled,
+      hasAdapter: !!adapter,
+      toggleHint: toggleHint,
+      headerCursor: headerHasCursor && keyboardCursor,
+      scanning: !!adapter && adapter.enabled && adapter.discovering,
+      cursor: {
+        active: cursorActive && keyboardCursor,
+        section: focusSection,
+        index: selectedIndex,
+        action: actionFocused
+      },
+      connected: connectedViewRows,
+      known: knownViewRows,
+      discovered: discoveredViewRows,
+      signals: deviceSignals,
+      emptyText: connectedRows.length === 0 && scrollRows.length === 0 ? (!adapter ? "No Bluetooth adapter" : !adapter.enabled ? "Turn Bluetooth on to scan" : "Scanning for devices…") : ""
+    })
+
+  // The live device behind the view's row INDEX in SECTION, resolved the
+  // way stock's rows did: through deviceFor on the section's primitive row.
+  function viewDevice(section, index) {
+    if (section === "connected")
+      return deviceFor({
+        dev: connectedRows[index]
+      })
+    for (var i = 0; i < scrollRows.length; i++)
+      if (scrollRows[i].section === section && scrollRows[i].indexInSection === index)
+        return deviceFor(scrollRows[i])
+    return null
+  }
+
+  // Carries out one BluetoothDropdown action. Every action comes from the
+  // pointer, so each one hands the cursor back from the keyboard.
+  function handleAction(name, arg) {
+    keyboardCursor = false
+    if (name === "toggleBluetooth") {
+      toggleBluetooth()
+      return
+    }
+    if (name === "hover") {
+      if (arg.section === "header") {
+        setHeaderCursor()
+        return
+      }
+      cursorActive = true
+      focusSection = arg.section
+      selectedIndex = arg.index
+      actionFocused = !!arg.action
+      return
+    }
+    var dev = viewDevice(arg.section, arg.index)
+    if (!dev)
+      return
+    if (name === "primary") {
+      if (dev.connected)
+        disconnectDevice(dev)
+      else
+        connectDevice(dev)
+    } else if (name === "secondary") {
+      if (dev.connected)
+        disconnectDevice(dev)
+      else if (arg.section !== "discovered")
+        forgetDevice(dev)
+    } else if (name === "forget")
+      forgetDevice(dev)
+  }
+
+  // Scrolls the keyboard cursor's row into the view's Paired/Available
+  // scroll area. Pointer moves leave the scroll position alone.
+  function ensureCursorVisible() {
+    if (!opened || !cursorActive || !keyboardCursor)
+      return
+    dropdown.ensureVisible(focusSection, selectedIndex)
   }
 
   // Not adapter.enabled: that writes BlueZ's Powered, which nothing persists, so
@@ -830,6 +992,7 @@ Panel {
     bar: root.bar
     text: root.icon
     onPressed: function (b) {
+      root.keyboardCursor = false
       if (b === Qt.RightButton)
         root.toggleBluetooth()
       else
@@ -837,427 +1000,66 @@ Panel {
     }
   }
 
-  // The stock visual tree below reads root.bar.* and Style.font.* through
-  // the generically-typed `bar`/Style singletons qmllint cannot resolve
-  // statically here; a real bar always provides them at runtime. Temporary
-  // while this view is the stock clone — deleted with the Aranea-native
-  // redesign (see README.md).
-  // qmllint disable missing-property unqualified
-  KeyboardPanel {
+  // The Aranea view in the shared keyboard frame. The view pins the header
+  // and Connected and scrolls Paired and Available itself, so the frame only
+  // sizes to it; stock's 400 px list cap becomes the view's scroll cap.
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight)
-
-    PanelKeyCatcher {
-      id: keyCatcher
-      anchors.fill: parent
-      onMoveRequested: function (dx, dy) {
-        if (!root.cursorActive) {
-          root.cursorActive = true
-          return
-        }
-        if (dy !== 0)
-          root.moveCursor(dy)
-        else if (dx !== 0)
-          root.moveCursorH(dx)
-      }
-      onActivateRequested: if (root.cursorActive)
-        root.activateCursor()
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
-      }
-      onDeleteRequested: if (root.cursorActive)
-        root.deleteSelected()
-      onTextKey: function (t) {
-        if (t === "b" || t === "B")
-          root.toggleBluetooth()
-      }
-
-      Column {
-        id: column
-        anchors.fill: parent
-        spacing: Style.space(14)
-
-        // ---------- Hero: Bluetooth icon · status ----------
-        Item {
-          width: parent.width
-          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
-
-          // Status only — the switch owns toggling, mouse and keyboard alike.
-          Text {
-            id: heroIcon
-            textFormat: Text.PlainText
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.icon
-            color: root.textForeground
-            font.family: root.textFontFamily
-            font.pixelSize: Style.font.display
-            opacity: root.adapter && root.adapter.enabled ? 1.0 : 0.5
-          }
-
-          // Compact on/off switch on the trailing edge of the hero, and the
-          // header's only cursor target.
-          ToggleSwitch {
-            id: powerSwitch
-            visible: !!root.adapter
-            checked: !!root.adapter && root.adapter.enabled
-            hasCursor: root.headerHasCursor
-            foreground: root.textForeground
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            onHovered: function (on) {
-              if (on)
-                root.setHeaderCursor()
-            }
-            onToggled: root.toggleBluetooth()
-
-            PanelToolTip {
-              visible: powerSwitch.containsMouse
-              text: root.toggleHint
-              fontFamily: root.textFontFamily
-            }
-          }
-
-          Column {
-            id: heroLabels
-            anchors.left: heroIcon.right
-            anchors.leftMargin: Style.space(14)
-            anchors.right: parent.right
-            anchors.rightMargin: powerSwitch.visible ? powerSwitch.width + Style.space(12) : 0
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(2)
-
-            Text {
-              text: "Bluetooth"
-              color: root.textForeground
-              font.family: root.textFontFamily
-              font.pixelSize: Style.font.title
-              font.bold: true
-              elide: Text.ElideRight
-              width: parent.width
-            }
-
-            Text {
-              id: heroStatus
-              textFormat: Text.PlainText
-              text: root.heroStatusText.toUpperCase()
-              color: Qt.darker(root.textForeground, 1.4)
-              font.family: root.textFontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              font.letterSpacing: 1.2
-              elide: Text.ElideRight
-              width: parent.width
-            }
-          }
-        }
-
-        // Scrollable device list — capped so a noisy neighborhood doesn't
-        // grow the popup past the screen.
-        PanelSeparator {
-          foreground: root.textForeground
-        }
-
-        Column {
-          id: connectedList
-          visible: root.connectedDevices.length > 0
-          width: parent.width
-          spacing: Style.space(10)
-
-          PanelSectionHeader {
-            text: "CONNECTED"
-            foreground: root.textForeground
-            fontFamily: root.textFontFamily
-          }
-
-          Repeater {
-            model: root.connectedRows
-            DeviceRow {
-              required property var modelData
-              required property int index
-              width: connectedList.width
-              dev: modelData
-              rowIndex: index
-              sectionName: "connected"
-              isDiscovered: false
-            }
-          }
-        }
-
-        PanelSeparator {
-          visible: root.connectedDevices.length > 0 && root.scrollRows.length > 0
-          foreground: root.textForeground
-        }
-
-        // ListView, not a Flickable: it owns the scroll position, so it keeps
-        // the current row visible on j/k, re-clamps itself when discovery
-        // shortens the list, and — because Contain only moves when a row is
-        // actually clipped — never lurches under a hovering mouse.
-        ListView {
-          id: deviceListView
-          width: parent.width
-          height: Math.min(contentHeight, Style.space(400))
-          spacing: Style.space(10)
-          clip: true
-          boundsBehavior: Flickable.StopAtBounds
-          interactive: contentHeight > height
-
-          ScrollBar.vertical: ScrollBar {
-            policy: ScrollBar.AsNeeded
-          }
-
-          model: root.scrollRows
-          currentIndex: root.scrollRowIndex
-          // Deferred by a turn. Called straight out of the signal the position
-          // does not take — verified with the cursor six rows down and
-          // contentY still 0 — because scrollRows is rebuilt every time
-          // discovery reports, and swapping the model resets the view out from
-          // under the call. Network's list is stable enough not to need this.
-          onCurrentIndexChanged: if (currentIndex >= 0)
-            Qt.callLater(keepCurrentVisible)
-          function keepCurrentVisible() {
-            if (currentIndex >= 0)
-              positionViewAtIndex(currentIndex, ListView.Contain)
-          }
-
-          delegate: Item {
-            required property var modelData
-            required property int index
-            readonly property string sectionTitle: root.scrollSectionTitle(index)
-
-            width: ListView.view.width
-            height: delegateColumn.implicitHeight
-
-            Column {
-              id: delegateColumn
-              width: parent.width
-              spacing: Style.space(10)
-
-              PanelSeparator {
-                visible: index > 0 && sectionTitle !== ""
-                height: visible ? implicitHeight : 0
-                foreground: root.textForeground
-              }
-
-              PanelSectionHeader {
-                visible: sectionTitle !== ""
-                height: visible ? implicitHeight : 0
-                text: sectionTitle
-                foreground: root.textForeground
-                fontFamily: root.textFontFamily
-              }
-
-              DeviceRow {
-                width: parent.width
-                dev: modelData.dev
-                rowIndex: modelData.indexInSection
-                sectionName: modelData.section
-                isDiscovered: modelData.section === "discovered"
-              }
-            }
-          }
-        }
-
-        Text {
-          textFormat: Text.PlainText
-          visible: root.connectedDevices.length === 0 && root.scrollRows.length === 0
-          text: !root.adapter ? "No Bluetooth adapter" : !root.adapter.enabled ? "Turn Bluetooth on to scan" : "Scanning for devices…"
-          color: Qt.darker(root.textForeground, 1.5)
-          font.family: root.textFontFamily
-          font.pixelSize: Style.font.bodySmall
-          wrapMode: Text.WordWrap
-          width: parent.width
-        }
-      }
+    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      root.switchPanel(direction)
     }
-  }
-
-  // Two-line device row showing name + live status. Pending state is owned
-  // by the panel so it survives rows moving between sections.
-  component DeviceRow: CursorSurface {
-    id: row
-    required property var dev
-    required property int rowIndex
-    required property string sectionName
-    required property bool isDiscovered
-
-    readonly property bool isConnected: dev && dev.connected
-    readonly property int devState: dev && dev.state !== undefined ? dev.state : -1
-    readonly property string action: root.pendingAction(dev ? dev.address : "")
-    readonly property string actionTooltip: {
-      if (!dev)
-        return ""
-      if (isConnected)
-        return "Disconnect"
-      if (isDiscovered)
-        return "Pair"
-      return "Connect"
-    }
-
-    readonly property bool rowSelected: root.cursorActive && root.focusSection === sectionName && root.selectedIndex === rowIndex
-    readonly property bool forgetAvailable: (sectionName === "known" || sectionName === "connected") && !isDiscovered
-    readonly property bool showForgetButton: forgetAvailable && (rowMouse.containsMouse || rowSelected)
-
-    hasCursor: rowSelected && !root.actionFocused
-    current: isConnected
-    foreground: root.textForeground
-    fill: root.hoverFill
-    currentFill: root.selectedFill
-
-    readonly property string statusText: {
-      if (!dev)
-        return ""
-      if (action === "forgetting")
-        return "Forgetting…"
-      if (action === "disconnecting" || devState === 2)
-        return "Disconnecting…"
-      if (isConnected) {
-        if (dev.batteryAvailable)
-          return Math.round(dev.battery * 100) + "%"
-        return sectionName === "connected" ? "" : "Connected"
-      }
-      if (action === "connecting" || devState === 3 || dev.pairing === true)
-        return "Connecting…"
-      if (isDiscovered)
-        return ""
-      return ""
-    }
-
-    readonly property color statusColor: {
-      if (isConnected)
-        return root.textForeground
-      if (action !== "" || devState === 3 || dev.pairing === true)
-        return root.textForeground
-      return Qt.darker(root.textForeground, 1.5)
-    }
-
-    implicitHeight: rowContent.implicitHeight + Style.spacing.rowPaddingX
-
-    MouseArea {
-      id: rowMouse
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.LeftButton | Qt.RightButton
-      cursorShape: row.dev ? Qt.PointingHandCursor : Qt.ArrowCursor
-
-      onContainsMouseChanged: if (containsMouse) {
+    onMoveRequested: function (dx, dy) {
+      // The first key after opening or after mouse use only reveals the
+      // cursor where it is.
+      if (!root.cursorActive || !root.keyboardCursor) {
         root.cursorActive = true
-        root.focusSection = row.sectionName
-        root.selectedIndex = row.rowIndex
-        root.actionFocused = false
+        root.keyboardCursor = true
+        return
       }
-
-      onClicked: function (mouse) {
-        var dev = root.deviceFor(row)
-        if (!dev)
-          return
-        if (mouse.button === Qt.RightButton) {
-          if (row.isConnected)
-            root.disconnectDevice(dev)
-          else if (!row.isDiscovered)
-            root.forgetDevice(dev)
-          return
-        }
-        if (row.isConnected)
-          root.disconnectDevice(dev)
-        else
-          root.connectDevice(dev)
-      }
+      if (dy !== 0)
+        root.moveCursor(dy)
+      else if (dx !== 0)
+        root.moveCursorH(dx)
     }
-
-    PanelToolTip {
-      visible: row.actionTooltip !== "" && rowMouse.containsMouse && !root.actionFocused
-      text: row.actionTooltip
-      fontFamily: root.textFontFamily
+    onActivateRequested: {
+      if (!root.cursorActive)
+        return
+      root.keyboardCursor = true
+      root.activateCursor()
+    }
+    onDeleteRequested: {
+      if (!root.cursorActive)
+        return
+      root.keyboardCursor = true
+      root.deleteSelected()
+    }
+    onTextKey: function (t) {
+      if (t === "b" || t === "B") {
+        root.keyboardCursor = true
+        root.toggleBluetooth()
+      }
     }
 
     Item {
-      id: rowContent
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
-      implicitHeight: Math.max(deviceIcon.implicitHeight, info.implicitHeight, forgetBtn.implicitHeight)
+      anchors.fill: parent
+      clip: true
 
-      Text {
-        id: deviceIcon
-        textFormat: Text.PlainText
-        text: row.isConnected ? "󰂱" : "󰂯"
-        color: row.statusColor
-        font.family: root.textFontFamily
-        font.pixelSize: Style.font.heading
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Column {
-        id: info
-        spacing: Style.space(1)
-        anchors.left: deviceIcon.right
-        anchors.leftMargin: Style.space(10)
-        anchors.right: forgetBtn.visible ? forgetBtn.left : parent.right
-        anchors.rightMargin: forgetBtn.visible ? Style.space(8) : 0
-        anchors.verticalCenter: parent.verticalCenter
-
-        Text {
-          textFormat: Text.PlainText
-          text: root.deviceLabel(row.dev) || "Device"
-          color: root.textForeground
-          font.family: root.textFontFamily
-          font.pixelSize: Style.font.body
-          elide: Text.ElideRight
-          width: parent.width
-        }
-        Text {
-          textFormat: Text.PlainText
-          visible: row.statusText !== ""
-          text: row.statusText
-          color: row.statusColor
-          font.family: root.textFontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-          width: parent.width
-        }
-      }
-
-      PanelActionButton {
-        id: forgetBtn
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        visible: row.showForgetButton
-        iconText: "󰅙"
-        tooltipText: "Forget"
-        foreground: root.textForeground
-        hoverColor: root.textForeground
-        fontFamily: root.textFontFamily
-        hasCursor: row.rowSelected && root.actionFocused
-        onHovered: function (isHovered) {
-          if (!isHovered) {
-            if (rowMouse.containsMouse)
-              root.actionFocused = false
-            return
-          }
-          root.cursorActive = true
-          root.focusSection = row.sectionName
-          root.selectedIndex = row.rowIndex
-          root.actionFocused = true
-        }
-        onClicked: {
-          var dev = root.deviceFor(row)
-          if (!dev)
-            return
-          root.forgetDevice(dev)
+      BluetoothDropdown {
+        id: dropdown
+        width: parent.width
+        maxScrollHeight: Style.space(400)
+        view: root.bluetoothView
+        onAction: function (name, arg) {
+          root.handleAction(name, arg)
         }
       }
     }
   }
-  // qmllint enable missing-property unqualified
 }

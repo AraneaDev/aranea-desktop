@@ -29,9 +29,11 @@ Aranea.DropdownHeader {
   objectName: "bluetoothHeader"
   title: "Bluetooth"
 
+  // Not anchored: the trailing slot sizes itself to this switch (its
+  // childrenRect) and is centred already, so centring the switch on the
+  // slot would make the slot's height depend on itself.
   Aranea.FilamentSwitch {
     visible: header.hasAdapter
-    anchors.verticalCenter: parent.verticalCenter
     checked: header.powered
     hasCursor: header.hasCursor
     onToggled: header.toggleBluetooth()

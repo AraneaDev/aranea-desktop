@@ -79,7 +79,7 @@ Column {
   Aranea.FilamentPulse {
     objectName: "scanPulse"
     width: parent.width
-    running: !!dropdown.view.scanning
+    running: dropdown.devicesAvailable && !!dropdown.view.scanning
   }
   Rectangle {
     width: parent.width
