@@ -371,4 +371,45 @@ jq -e '.bar.layout.right == ["araneadev.audio"]' "$audio_real" >/dev/null || {
   exit 1
 }
 
+# --- bluetooth dropdown: only retargeted once araneadev.bluetooth is
+# installed (guard: $(dirname "$config_file")/plugins/araneadev.bluetooth/manifest.json)
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.bluetooth", {"id": "omarchy.bluetooth", "x": 1}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.bluetooth", {"id": "omarchy.bluetooth", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.bluetooth")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.bluetooth"
+: >"$(dirname "$config")/plugins/araneadev.bluetooth/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["araneadev.bluetooth", {"id": "araneadev.bluetooth", "x": 1}]
+  and (.cloneSourceRestores | index("araneadev.bluetooth")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.bluetooth", {"id": "omarchy.bluetooth", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.bluetooth")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+bluetooth_real="$test_root/bluetooth-dotfiles/shell.json"
+bluetooth_link="$test_root/bluetooth-config/shell.json"
+mkdir -p "$(dirname "$bluetooth_real")" "$(dirname "$bluetooth_link")/plugins/araneadev.bluetooth"
+: >"$(dirname "$bluetooth_link")/plugins/araneadev.bluetooth/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.bluetooth"]}}}' >"$bluetooth_real"
+ln -s "$bluetooth_real" "$bluetooth_link"
+"$repo_root/scripts/repair-shell-config" "$bluetooth_link"
+test -L "$bluetooth_link"
+jq -e '.bar.layout.right == ["araneadev.bluetooth"]' "$bluetooth_real" >/dev/null || {
+  cat "$bluetooth_real"
+  exit 1
+}
+
 echo "shell config contract passed"
