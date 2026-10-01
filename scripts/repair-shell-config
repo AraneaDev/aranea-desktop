@@ -91,6 +91,21 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
   # Whether araneadev.vpn already sits anywhere in the bar layout.
   def vpn_present: ([.bar.layout[]? | arrays | .[] | entry_id] | index("araneadev.vpn")) != null;
+  # The single layout section to insert araneadev.vpn into: the first, in a
+  # fixed scan order (right, center, left, then any other section in the
+  # layout object own key order), whose array holds a network entry
+  # (araneadev.network or omarchy.network). Returns null when no section
+  # holds one, so the caller falls back to appending onto "right" instead.
+  # Only ever one section is chosen, so the insert never runs twice even
+  # when both the araneadev and omarchy ids appear in different sections.
+  def vpn_target_section:
+    (.bar.layout) as $layout
+    | (["right", "center", "left"] + (($layout | keys) - ["right", "center", "left"])) as $order
+    | ($order
+        | map(select(($layout[.] | type) == "array"
+            and (($layout[.] | map(entry_id)) as $ids
+                 | ($ids | index("araneadev.network")) != null or ($ids | index("omarchy.network")) != null)))
+        | .[0]);
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   # Aranea bar widgets take the place of their stock entries (release hands
   # them back), while preserving the user layout position and inline settings.
@@ -112,20 +127,23 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
        else . end))
      else . end)
   # araneadev.vpn is not a clone (there is no stock entry to swap): it gets
-  # its own bar entry inserted right after the network entry, in whichever
-  # layout section holds it (araneadev.network, or omarchy.network when that
-  # clone is not installed). With no network entry anywhere, it goes on the
-  # end of the right section instead. Skipped entirely once already present
-  # anywhere in the layout, so a second repair never duplicates it.
+  # its own bar entry inserted right after the network entry, in the single
+  # layout section vpn_target_section picks (the araneadev.network index
+  # wins over the omarchy.network index within that section, even when
+  # omarchy.network comes first in the array). With no network entry
+  # anywhere, it goes on the end of the right section instead. Skipped
+  # entirely once already present anywhere in the layout, so a second
+  # repair never duplicates it, and only ever one section is touched, so a
+  # network entry split across two sections never inserts twice.
   | (if $vpn and (.bar.layout | type) == "object" and (vpn_present | not) then
-       (.bar.layout |= with_entries(.value |= (if type == "array" then
-          (map(entry_id)) as $ids
-          | (($ids | index("araneadev.network")) // ($ids | index("omarchy.network"))) as $netIdx
-          | if $netIdx != null then .[0:($netIdx + 1)] + [{id: "araneadev.vpn"}] + .[($netIdx + 1):]
-            else . end
-        else . end)))
-       | if (vpn_present | not) and ((.bar.layout.right | type) == "array")
-         then .bar.layout.right += [{id: "araneadev.vpn"}]
+       (vpn_target_section) as $section
+       | if $section != null then
+           .bar.layout[$section] |= (
+             (map(entry_id)) as $ids
+             | (($ids | index("araneadev.network")) // ($ids | index("omarchy.network"))) as $netIdx
+             | .[0:($netIdx + 1)] + [{id: "araneadev.vpn"}] + .[($netIdx + 1):])
+         elif (.bar.layout.right | type) == "array" then
+           .bar.layout.right += [{id: "araneadev.vpn"}]
          else . end
      else . end)
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
