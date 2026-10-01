@@ -50,12 +50,22 @@ Column {
       font.bold: true
     }
   }
+  // The model is the row count, not the array: a stream's volume or mute
+  // arrives as a new streams array, and an array model would rebuild every
+  // row then, dropping a slider drag after its first step.
   Repeater {
-    model: section.streams
+    model: section.streams.length
     Column {
       id: row
-      required property var modelData
       required property int index
+      // This row's stream, read from the live array.
+      readonly property var modelData: section.streams[index] || ({
+          key: "",
+          label: "",
+          volume: 0,
+          muted: false,
+          current: false
+        })
       objectName: "streamRow"
       width: section.width
 

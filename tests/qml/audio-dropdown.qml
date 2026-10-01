@@ -153,6 +153,35 @@ ShellRoot {
       })
   }
 
+  // VIEW with only output.level changed to LEVEL; every row array is reused.
+  function levelTick(view, level) {
+    var next = {}
+    for (var key in view)
+      next[key] = view[key]
+    next.output = {
+      present: view.output.present,
+      volume: view.output.volume,
+      muted: view.output.muted,
+      level: level
+    }
+    return next
+  }
+
+  // VIEW with a new streams array where stream INDEX has volume VOLUME.
+  function streamVolumeTick(view, index, volume) {
+    var next = levelTick(view, view.output.level)
+    next.streams = view.streams.map(function (s, i) {
+      return {
+        key: s.key,
+        label: s.label,
+        volume: i === index ? volume : s.volume,
+        muted: s.muted,
+        current: s.current
+      }
+    })
+    return next
+  }
+
   // Right edge of ITEM in full's coordinates.
   function rightEdge(item) {
     return item.mapToItem(full, item.width, 0).x
@@ -180,6 +209,32 @@ ShellRoot {
     var trailing = [t.findChild(full, "headerTrailing"), t.findChild(output, "levelText"), t.findChild(output, "channelSlider"), rows[0], streamSlider]
     for (var i = 0; i < trailing.length; i++)
       t.check(Math.abs(rightEdge(trailing[i]) - edge) < 0.5, "trailing element " + i + " ends on the content edge")
-    t.done()
+    // A level tick rebuilds the view object but reuses the row arrays, as
+    // Panel.audioView does; the row delegates must survive it, or a slider
+    // drag or click in progress would be lost.
+    var deviceRowsBefore = t.findChildren(output, "deviceRow")
+    var streamRowsBefore = t.findChildren(sources, "streamRow")
+    full.view = levelTick(full.view, 0.9)
+    t.step(50, function () {
+      var deviceRowsAfter = t.findChildren(output, "deviceRow")
+      var streamRowsAfter = t.findChildren(sources, "streamRow")
+      t.equal(t.findChild(output, "channelSlider").level, 0.9, "the level tick reaches the output filament")
+      t.equal(deviceRowsAfter.length, deviceRowsBefore.length, "a level tick keeps the device rows")
+      t.equal(streamRowsAfter.length, streamRowsBefore.length, "a level tick keeps the stream rows")
+      for (var j = 0; j < deviceRowsBefore.length; j++)
+        t.check(deviceRowsAfter[j] === deviceRowsBefore[j], "device row " + j + " is the same delegate after a level tick")
+      for (var k = 0; k < streamRowsBefore.length; k++)
+        t.check(streamRowsAfter[k] === streamRowsBefore[k], "stream row " + k + " is the same delegate after a level tick")
+      // Dragging a stream slider writes the volume back, which arrives as
+      // a new streams array; the rows (and the slider's drag) must survive.
+      full.view = streamVolumeTick(full.view, 0, 0.9)
+      t.step(50, function () {
+        var streamRowsMoved = t.findChildren(sources, "streamRow")
+        t.equal(t.findChildren(sources, "streamSlider")[0].value, 0.9, "the new stream volume reaches its slider")
+        for (var m = 0; m < streamRowsBefore.length; m++)
+          t.check(streamRowsMoved[m] === streamRowsBefore[m], "stream row " + m + " is the same delegate after a volume change")
+        t.done()
+      })
+    })
   })
 }

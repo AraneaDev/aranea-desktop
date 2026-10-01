@@ -458,6 +458,8 @@ Panel {
       Qt.callLater(resetScroll)
     } else {
       clearDisplayAudioModels()
+      outputSignal = 0
+      inputSignal = 0
     }
   }
 
@@ -538,7 +540,7 @@ Panel {
     if (!cursorActive)
       return
     var maxY = Math.max(0, scrollArea.contentHeight - scrollArea.height)
-    if (maxY <= 0 || focusSection === "header" || (focusSection === "output" && selectedIndex === -1)) {
+    if (maxY <= Style.space(24) || focusSection === "header" || (focusSection === "output" && selectedIndex === -1)) {
       scrollArea.contentY = 0
       return
     }
@@ -826,6 +828,21 @@ Panel {
     }
     return rows
   }
+  // The view's output rows. Kept apart from audioView so the arrays keep
+  // their identity while the levels tick ~30 times a second.
+  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, sink, sinkGlyph, opened ? unpluggedSinks : [])
+  // The view's input rows (see outputDeviceRows).
+  readonly property var inputDeviceRows: deviceRows(displayAudioSources, source, sourceGlyph, [])
+  // The view's stream rows (see outputDeviceRows).
+  readonly property var streamRows: displayAudioStreams.map(function (s) {
+    return {
+      key: String(s.id),
+      label: streamLabel(s),
+      volume: s.audio ? s.audio.volume : 0,
+      muted: s.audio ? s.audio.muted : false,
+      current: streamRepresentsPlayer(s, activeMediaPlayer)
+    }
+  })
   // Everything the Aranea view draws (AudioDropdown.view).
   readonly property var audioView: ({
       glyph: outputIcon(),
@@ -843,7 +860,7 @@ Panel {
         muted: outputMuted,
         level: outputSignal
       },
-      outputDevices: deviceRows(displayAudioSinks, sink, sinkGlyph, opened ? unpluggedSinks : []),
+      outputDevices: outputDeviceRows,
       inputVisible: displayAudioSources.length > 0 || !!source,
       input: {
         present: hasInput,
@@ -851,16 +868,8 @@ Panel {
         muted: inputMuted,
         level: inputSignal
       },
-      inputDevices: deviceRows(displayAudioSources, source, sourceGlyph, []),
-      streams: displayAudioStreams.map(function (s) {
-        return {
-          key: String(s.id),
-          label: streamLabel(s),
-          volume: s.audio ? s.audio.volume : 0,
-          muted: s.audio ? s.audio.muted : false,
-          current: streamRepresentsPlayer(s, activeMediaPlayer)
-        }
-      }),
+      inputDevices: inputDeviceRows,
+      streams: streamRows,
       nowPlaying: nowPlaying
     })
   // Carries out one AudioDropdown action.
@@ -1051,6 +1060,8 @@ Panel {
             s.audio.muted = !s.audio.muted
         } else if (root.focusSection === "input") {
           root.toggleInputMute()
+        } else if (root.focusSection === "nowplaying") {
+          return
         } else {
           root.toggleOutputMute()
         }
