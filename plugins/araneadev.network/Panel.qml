@@ -1670,10 +1670,13 @@ Panel {
       forgetSaved(savedIndex)
   }
 
-  // Carries out one NetworkDropdown action. Every action comes from the
-  // pointer, so each one hands the cursor back from the keyboard.
+  // Carries out one NetworkDropdown action. Pointer actions hand the cursor
+  // back from the keyboard; the prompt's own actions (typing, Enter, Esc)
+  // are keyboard input and leave it alone.
   function handleAction(name, arg) {
-    keyboardCursor = false
+    var promptKey = name === "promptSubmit" || name === "promptCancel" || name === "passphraseEdited" || name === "identityEdited"
+    if (!promptKey)
+      keyboardCursor = false
     if (name === "hover") {
       handleHover(arg)
       return
