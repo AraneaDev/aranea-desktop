@@ -15,8 +15,8 @@
 /** @type {number} the glyph shared by NetworkManager VPN and WireGuard rows (same mark NetworkLogic uses for its VPN rows) */
 var VPN_GLYPH = 0xf0582
 
-/** @type {number} the glyph for an own-app VPN row ("open in new"); Task 3's QML may swap this for a different mark */
-var APP_GLYPH = 0xf05f4
+/** @type {number} the glyph for an own-app VPN row (MDI "open in new") */
+var APP_GLYPH = 0xf03cc
 
 /**
  * One parsed VPN or WireGuard connection, from

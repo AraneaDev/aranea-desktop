@@ -46,7 +46,7 @@ ShellRoot {
   // The NetworkManager VPN glyph.
   readonly property string vpnGlyph: String.fromCodePoint(0xf0582)
   // The own-app VPN glyph.
-  readonly property string appGlyph: String.fromCodePoint(0xf05f4)
+  readonly property string appGlyph: String.fromCodePoint(0xf03cc)
 
   // The connected rows, built once so a view rebuilt with them keeps the
   // same model (as Panel's vpnView does).

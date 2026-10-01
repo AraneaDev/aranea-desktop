@@ -886,3 +886,17 @@ test("whichCommand passes the binary as a positional arg", () => {
   assert.deepEqual(logic.whichCommand("a b").slice(3), ["_", "a b"])
   assert.equal(logic.whichCommand(undefined)[4], "")
 })
+
+test("app rows carry the open-in-new glyph, NetworkManager rows the VPN glyph", () => {
+  const built = logic.vpnRows(
+    [{ name: "A", uuid: "u", type: "vpn", device: "", active: false, state: "" }],
+    [{ name: "B", label: "B", detect: {}, open: ["x"] }],
+    {}
+  )
+  assert.equal(built.available[0].glyph, String.fromCodePoint(0xf0582))
+  assert.equal(built.available[1].glyph, String.fromCodePoint(0xf03cc))
+  assert.equal(
+    logic.parseFixture('[{"name":"B","kind":"app"}]').available[0].glyph,
+    String.fromCodePoint(0xf03cc)
+  )
+})
