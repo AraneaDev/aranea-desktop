@@ -558,3 +558,331 @@ test("keyHint: a NetworkManager row says connect from available, disconnect from
   assert.equal(logic.keyHint("available", "nm"), "↑↓ move · enter connect · tab next")
   assert.equal(logic.keyHint("connected", "nm"), "↑↓ move · enter disconnect · tab next")
 })
+
+// --- Panel wiring rules -------------------------------------------------------
+
+const REAL_VPN_DATA =
+  "vpn.data:auth = SHA256, ca = /home/user/ca.pem, connection-type = password-tls, remote = vpn.example.com:443, username = jdoe"
+
+test("parseUsername reads vpn.data's username, or empty", () => {
+  assert.equal(
+    logic.parseUsername(
+      REAL_VPN_DATA + "\nvpn.service-type:org.freedesktop.NetworkManager.openvpn"
+    ),
+    "jdoe"
+  )
+  assert.equal(logic.parseUsername("vpn.data:remote = a:1"), "")
+  assert.equal(logic.parseUsername(""), "")
+})
+
+test("viewRows labels NetworkManager rows with their type and keeps app labels", () => {
+  const conns = [
+    { name: "Office", uuid: "u1", type: "vpn", device: "", active: false, state: "" },
+    { name: "Home", uuid: "u2", type: "wireguard", device: "wg0", active: true, state: "activated" }
+  ]
+  const built = logic.vpnRows(
+    conns,
+    [{ name: "Azure", label: "Azure VPN Client", detect: {}, open: ["x"] }],
+    {}
+  )
+  const rows = logic.viewRows(built.available, conns, {
+    u1: { ip: "", server: "", vpnType: "OpenVPN" }
+  })
+  assert.deepEqual(
+    rows.map((r) => [r.key, r.label]),
+    [
+      ["u1", "OpenVPN"],
+      ["app:Azure", "Azure VPN Client"]
+    ]
+  )
+  assert.equal(logic.viewRows(built.connected, conns, undefined)[0].label, "WireGuard")
+  assert.deepEqual(Object.keys(rows[0]).sort(), ["glyph", "key", "kind", "label", "name"])
+  // An unknown session (or a row whose profile vanished) reads as the generic type.
+  assert.equal(logic.viewRows(built.available, [], {})[0].label, "VPN")
+  assert.deepEqual(logic.viewRows(undefined, undefined, undefined), [])
+})
+
+test("sessionsToFetch reads new profiles and connected-state changes only", () => {
+  const conns = [
+    { name: "A", uuid: "a", type: "vpn", device: "", active: false, state: "" },
+    { name: "B", uuid: "b", type: "vpn", device: "", active: true, state: "activated" }
+  ]
+  const first = logic.sessionsToFetch(undefined, conns)
+  assert.deepEqual(first.fetch, ["a", "b"])
+  assert.deepEqual(first.seen, { a: false, b: true })
+  assert.deepEqual(logic.sessionsToFetch(first.seen, conns).fetch, [])
+  const changed = conns.map((c) =>
+    c.uuid === "a" ? { ...c, active: true, state: "activated" } : c
+  )
+  assert.deepEqual(logic.sessionsToFetch(first.seen, changed).fetch, ["a"])
+  // Activating isn't connected yet.
+  const activating = conns.map((c) =>
+    c.uuid === "a" ? { ...c, active: true, state: "activating" } : c
+  )
+  assert.deepEqual(logic.sessionsToFetch(first.seen, activating).fetch, [])
+  assert.deepEqual(logic.sessionsToFetch(first.seen, undefined), { fetch: [], seen: {} })
+})
+
+test("linkCommand passes process names as positional args, never in the script", () => {
+  const argv = logic.linkCommand(["evil; rm -rf ~", "gpd"])
+  assert.equal(argv[0], "bash")
+  assert.equal(argv[1], "-c")
+  assert.equal(argv[2].includes("evil"), false)
+  assert.deepEqual(argv.slice(3), ["_", "evil; rm -rf ~", "gpd"])
+  assert.deepEqual(logic.linkCommand(undefined).slice(3), ["_"])
+})
+
+test("parseLinkOutput splits links and running processes, tolerating junk", () => {
+  const text =
+    '[{"ifname":"tun0","operstate":"UNKNOWN","addr_info":[{"family":"inet","local":"10.8.0.2"}]}]\n\n---\ngpd\n'
+  const out = logic.parseLinkOutput(text)
+  assert.equal(out.links[0].ifname, "tun0")
+  assert.deepEqual(out.procs, ["gpd"])
+  assert.deepEqual(logic.parseLinkOutput("not json\n---\n"), { links: [], procs: [] })
+  assert.deepEqual(logic.parseLinkOutput('{"a":1}'), { links: [], procs: [] })
+  assert.deepEqual(logic.parseLinkOutput(undefined), { links: [], procs: [] })
+})
+
+const LINKS = [
+  {
+    ifname: "wlp2s0",
+    operstate: "UP",
+    addr_info: [
+      { family: "inet6", local: "fe80::1" },
+      { family: "inet", local: "192.168.0.2" }
+    ]
+  },
+  { ifname: "tun0", operstate: "UNKNOWN", addr_info: [{ family: "inet", local: "10.8.0.2" }] },
+  { ifname: "bare" },
+  null
+]
+
+test("linkAddress and interfaceForAddress map between interfaces and IPv4", () => {
+  assert.equal(logic.linkAddress(LINKS, "wlp2s0"), "192.168.0.2")
+  assert.equal(logic.linkAddress(LINKS, "bare"), "")
+  assert.equal(logic.linkAddress(LINKS, ""), "")
+  assert.equal(logic.linkAddress(undefined, "tun0"), "")
+  assert.equal(logic.interfaceForAddress(LINKS, "10.8.0.2"), "tun0")
+  assert.equal(logic.interfaceForAddress(LINKS, "fe80::1"), "")
+  assert.equal(logic.interfaceForAddress(LINKS, ""), "")
+  assert.equal(logic.interfaceForAddress(undefined, "10.8.0.2"), "")
+})
+
+test("rowInterfaces finds each connected row's tunnel", () => {
+  const rows = [
+    { key: "u1", kind: "nm", name: "Office", glyph: "", label: "" },
+    { key: "u2", kind: "nm", name: "Home", glyph: "", label: "" },
+    { key: "u3", kind: "nm", name: "Lost", glyph: "", label: "" },
+    { key: "app:Azure", kind: "app", name: "Azure", glyph: "", label: "" },
+    { key: "app:GP", kind: "app", name: "GP", glyph: "", label: "" }
+  ]
+  const conns = [
+    { name: "Office", uuid: "u1", type: "vpn", device: "wlp2s0", active: true, state: "activated" },
+    {
+      name: "Home",
+      uuid: "u2",
+      type: "wireguard",
+      device: "wg0",
+      active: true,
+      state: "activated"
+    },
+    { name: "Lost", uuid: "u3", type: "vpn", device: "wlp2s0", active: true, state: "activated" }
+  ]
+  const out = logic.rowInterfaces(
+    rows,
+    conns,
+    { u1: { ip: "10.8.0.2", server: "", vpnType: "OpenVPN" } },
+    LINKS,
+    {
+      Azure: "tun9"
+    }
+  )
+  // Never the parent device nmcli names for a plugin VPN.
+  assert.deepEqual(out, { u1: "tun0", u2: "wg0", "app:Azure": "tun9" })
+  assert.deepEqual(logic.rowInterfaces(undefined, undefined, undefined, undefined, undefined), {})
+})
+
+test("countersCommand passes interface names as positional args", () => {
+  const argv = logic.countersCommand(["tun0", "$(x)"])
+  assert.equal(argv[2].includes("tun0"), false)
+  assert.deepEqual(argv.slice(3), ["_", "tun0", "$(x)"])
+  assert.deepEqual(logic.countersCommand(undefined).slice(3), ["_"])
+})
+
+test("parseCounters and counterRates turn byte counters into rates", () => {
+  const a = logic.parseCounters("tun0 100 200\nbad line\nwg0 x 1\n")
+  assert.deepEqual(a, { tun0: { rx: 100, tx: 200 } })
+  const b = logic.parseCounters("tun0 400 260\nwg0 5 5\n")
+  assert.deepEqual(logic.counterRates(a, b, 1.5), { tun0: { rx: 200, tx: 40 } })
+  // Counters going backwards (a recreated tunnel) give no rate.
+  assert.deepEqual(logic.counterRates(b, a, 1), {})
+  assert.deepEqual(logic.counterRates(null, b, 1), {})
+  assert.deepEqual(logic.counterRates(a, b, 0), {})
+  assert.deepEqual(logic.parseCounters(undefined), {})
+})
+
+test("trackUptime keeps, starts and forgets keys; the first read says before open", () => {
+  const first = logic.trackUptime(undefined, ["a"], 1000, true)
+  assert.deepEqual(first, { a: -1 })
+  const next = logic.trackUptime(first, ["a", "b"], 5000, false)
+  assert.deepEqual(next, { a: -1, b: 5000 })
+  const dropped = logic.trackUptime(next, ["b"], 9000, false)
+  assert.deepEqual(dropped, { b: 5000 })
+  // Back up after a transition: a fresh time, not "before open".
+  assert.deepEqual(logic.trackUptime(dropped, ["a", "b"], 9500, false), { a: 9500, b: 5000 })
+  assert.deepEqual(logic.trackUptime(undefined, undefined, 0, false), {})
+})
+
+test("upText and sessionDetails format the connected rows' details", () => {
+  assert.equal(logic.upText(-1, 0), "since before open")
+  assert.equal(logic.upText(0, 72 * 60000), "1 h 12 min")
+  assert.equal(logic.upText(undefined, 0), "")
+  const rows = [
+    { key: "u1", kind: "nm", name: "Office", glyph: "", label: "" },
+    { key: "u2", kind: "nm", name: "NoSession", glyph: "", label: "" },
+    { key: "app:Azure", kind: "app", name: "Azure", glyph: "", label: "" },
+    { key: "app:GP", kind: "app", name: "GP", glyph: "", label: "" }
+  ]
+  const out = logic.sessionDetails(
+    rows,
+    { u1: { ip: "10.8.0.2", server: "vpn.example.com:443", vpnType: "OpenVPN" } },
+    { Azure: "10.9.0.3" },
+    { u1: -1, "app:Azure": 0 },
+    120000
+  )
+  assert.deepEqual(out, {
+    u1: { ip: "10.8.0.2", server: "vpn.example.com:443", up: "since before open" },
+    u2: { ip: "", server: "", up: "" },
+    "app:Azure": { ip: "10.9.0.3", server: "", up: "2 min" },
+    "app:GP": { ip: "", server: "", up: "" }
+  })
+  assert.deepEqual(logic.sessionDetails(undefined, undefined, undefined, undefined, 0), {})
+})
+
+test("statusMap shows the running action and a recent failure", () => {
+  assert.deepEqual(logic.statusMap(null, null), {})
+  assert.deepEqual(
+    logic.statusMap(
+      { key: "a", phase: "connecting", waited: 6000 },
+      { key: "b", phase: "failedUp" }
+    ),
+    {
+      a: { text: "Connecting… approve on phone", busy: true, failed: false },
+      b: { text: "Couldn't connect", busy: false, failed: true }
+    }
+  )
+  // A new action on the failed row wins.
+  assert.deepEqual(
+    logic.statusMap(
+      { key: "a", phase: "disconnecting", waited: 0 },
+      { key: "a", phase: "failedOpen" }
+    ),
+    {
+      a: { text: "Disconnecting…", busy: true, failed: false }
+    }
+  )
+})
+
+test("connectOutcome sorts nmcli exits into ok, prompt, wrong and failed", () => {
+  assert.equal(logic.connectOutcome(0, "", false), "ok")
+  assert.equal(
+    logic.connectOutcome(4, "Error: Secrets were required, but not provided", false),
+    "prompt"
+  )
+  assert.equal(
+    logic.connectOutcome(4, "Error: Secrets were required, but not provided", true),
+    "wrong"
+  )
+  assert.equal(logic.connectOutcome(4, "VPN authentication failed", true), "wrong")
+  assert.equal(logic.connectOutcome(4, "Error: timeout", true), "failed")
+  assert.equal(logic.connectOutcome(4, "VPN authentication failed", false), "failed")
+})
+
+test("droppedKeys flags only rows that went from Connected to Available unbidden", () => {
+  const row = (key) => ({ key, kind: "nm", name: key, glyph: "", label: "" })
+  assert.deepEqual(
+    logic.droppedKeys(["a", "b", "c", "d"], [row("d")], [row("a"), row("b")], ["b"]),
+    ["a"]
+  )
+  assert.deepEqual(logic.droppedKeys(undefined, undefined, undefined, undefined), [])
+})
+
+test("pollInterval polls fast open, slowly closed, and not at all with nothing to watch", () => {
+  assert.equal(logic.pollInterval(true, false, false), 2000)
+  assert.equal(logic.pollInterval(false, true, false), 5000)
+  assert.equal(logic.pollInterval(false, false, true), 5000)
+  assert.equal(logic.pollInterval(false, false, false), 0)
+})
+
+test("otpMode reads the profile's mode, defaulting to append", () => {
+  assert.equal(logic.otpMode({ A: { otp: "challenge" } }, "A"), "challenge")
+  assert.equal(logic.otpMode({ A: { otp: "append" } }, "A"), "append")
+  assert.equal(logic.otpMode({}, "A"), "append")
+  assert.equal(logic.otpMode(undefined, "A"), "append")
+})
+
+test("emptyText and hintFor", () => {
+  assert.equal(logic.emptyText(true, 0), "No VPNs yet")
+  assert.equal(logic.emptyText(false, 0), "NetworkManager isn't running")
+  assert.equal(logic.emptyText(false, 2), "")
+  assert.equal(logic.hintFor(true, "available", "nm", true), "enter connect · esc cancel")
+  assert.equal(logic.hintFor(false, "", "", false), "tab next · esc close")
+  assert.equal(logic.hintFor(false, "connected", "nm", true), logic.keyHint("connected", "nm"))
+})
+
+test("moveFlat and cursorPlace walk Connected then Available", () => {
+  assert.equal(logic.moveFlat(0, 1, 3), 1)
+  assert.equal(logic.moveFlat(2, 1, 3), 2)
+  assert.equal(logic.moveFlat(0, -1, 3), 0)
+  assert.equal(logic.moveFlat(0, 1, 0), -1)
+  assert.equal(logic.moveFlat(undefined, 1, 2), 1)
+  assert.deepEqual(logic.cursorPlace(1, 2), { section: "connected", index: 1 })
+  assert.deepEqual(logic.cursorPlace(2, 2), { section: "available", index: 0 })
+})
+
+test("parseFixture builds display-only rows and sessions keyed fixture:N", () => {
+  const out = logic.parseFixture(
+    JSON.stringify([
+      {
+        name: "Office",
+        label: "OpenVPN",
+        kind: "nm",
+        connected: true,
+        ip: "10.8.0.2",
+        server: "vpn.example.com",
+        upMinutes: 72
+      },
+      { name: "Azure", label: "Azure VPN Client", kind: "app", connected: false },
+      { name: "Lab", kind: "nm", connected: true },
+      { name: "GP", kind: "app" }
+    ])
+  )
+  assert.deepEqual(
+    out.connected.map((r) => [r.key, r.kind, r.label]),
+    [
+      ["fixture:0", "nm", "OpenVPN"],
+      ["fixture:2", "nm", "VPN"]
+    ]
+  )
+  assert.deepEqual(
+    out.available.map((r) => [r.key, r.kind, r.label]),
+    [
+      ["fixture:1", "app", "Azure VPN Client"],
+      ["fixture:3", "app", "GP"]
+    ]
+  )
+  assert.deepEqual(out.sessions["fixture:0"], {
+    ip: "10.8.0.2",
+    server: "vpn.example.com",
+    up: "1 h 12 min"
+  })
+  assert.deepEqual(out.sessions["fixture:2"], { ip: "", server: "", up: "" })
+  assert.equal(logic.parseFixture("nope"), null)
+  assert.equal(logic.parseFixture("{}"), null)
+  assert.equal(logic.parseFixture('[{"label":"x"}]'), null)
+})
+
+test("whichCommand passes the binary as a positional arg", () => {
+  assert.deepEqual(logic.whichCommand("a b").slice(3), ["_", "a b"])
+  assert.equal(logic.whichCommand(undefined)[4], "")
+})
