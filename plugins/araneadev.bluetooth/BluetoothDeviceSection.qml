@@ -114,14 +114,19 @@ Column {
         Item {
           id: forgetBtn
           objectName: "forgetButton"
-          // Whether this row can be forgotten and either the pointer is
-          // over the row or the keyboard cursor sits on it.
-          readonly property bool shown: !!wrapper.modelData.forgettable && (devRow.hovered || section.cursor === wrapper.index)
+          // Whether this row can be forgotten and the pointer is over the
+          // row or this button, or the keyboard cursor sits on the row. The
+          // button's own hover counts: it sits above the row's MouseArea
+          // and takes the hover from it, so devRow.hovered alone hid the
+          // button under the pointer and showed it again on every move.
+          readonly property bool shown: !!wrapper.modelData.forgettable && (devRow.hovered || forgetHover.hovered || section.cursor === wrapper.index)
           // Whether the keyboard cursor's action (not just the row) is here.
           readonly property bool bright: section.cursor === wrapper.index && section.cursorAction
 
+          // Not anchored: NodeDeviceRow's trailing slot sizes itself to
+          // this button (its childrenRect) and is centred already, so
+          // centring on the slot made the slot's height depend on itself.
           visible: shown
-          anchors.verticalCenter: parent.verticalCenter
           width: shown ? forgetLabel.implicitWidth + Style.space(12) : 0
           height: shown ? forgetLabel.implicitHeight + Style.space(4) : 0
 
