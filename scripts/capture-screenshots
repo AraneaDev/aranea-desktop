@@ -16,11 +16,15 @@ set -euo pipefail
 # dropdown is handed stand-in names through its `showcase` IPC method
 # (display only, cleared when it closes), and a dropdown that doesn't answer
 # "ok" (the stock panel, say) fails the surface with no screenshot written.
-# Network waits for its link graph to draw a trace first.
+# Network waits for its link graph to draw a trace first. VPN never shows the
+# machine's real profiles either: it is handed stand-in fixture rows through
+# its `showcaseFixture` IPC method (display only, every action refused while
+# shown, cleared when it closes), failing the same way on a non-"ok" answer.
 #   ARANEA_CAPTURE_WIFI_NAMES    JSON array of Wi-Fi names (default below)
 #   ARANEA_CAPTURE_BT_NAMES      JSON array of Bluetooth names (default below)
 #   ARANEA_NETWORK_GRAPH_DELAY   seconds the Network graph records (default 20)
 #   ARANEA_BLUETOOTH_SCAN_DELAY  extra seconds for the Bluetooth scan (default 3)
+#   ARANEA_CAPTURE_VPN_FIXTURE   JSON array of VPN fixture rows (default below)
 #
 # ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
 # --all: it is run as `<command> <surface> <output dir>` (tests use it).
@@ -170,6 +174,9 @@ remove_empty_backup() {
 # Stand-in names the Network and Bluetooth captures draw instead of real ones.
 default_wifi_names='["Aranea-Home","Neighbour-5G","Cafe-Guest","Library-Free","Studio-2G","Atelier","Harbour-Net","Old-Router"]'
 default_bt_names='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","Xbox Controller","Galaxy Buds2","Kindle"]'
+# Stand-in fixture rows the VPN capture draws instead of the machine's real
+# NetworkManager profiles and own-app VPNs.
+default_vpn_fixture='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
 
 # The surfaces --all captures.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
@@ -523,6 +530,47 @@ capture_showcase_surface() {
   hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  printf 'captured: %s\n' "$output/$surface.png"
+}
+
+# Summons the VPN dropdown (bar widget araneadev.vpn) and hands it FIXTURE (a
+# JSON array of fixture rows) through its `showcaseFixture` IPC method on
+# target aranea.vpn, waits, grabs the screen, then hides it, which clears the
+# fixture. A failed summon, or a showcaseFixture answer other than "ok" (a
+# closed dropdown answers "closed"), exits 3 before anything is grabbed, so
+# the machine's real VPN profiles never reach a screenshot.
+capture_vpn_surface() {
+  local fixture="$1"
+  local summon_target=araneadev.vpn ipc_target=aranea.vpn
+  command -v omarchy-shell >/dev/null 2>&1 || {
+    echo "omarchy-shell is required to capture $surface" >&2
+    exit 3
+  }
+  command -v grim >/dev/null 2>&1 || {
+    echo "grim is required to capture $surface" >&2
+    exit 3
+  }
+
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  omarchy-shell shell hide "$summon_target" >/dev/null 2>&1 || true
+  local summon_result fixture_result
+  summon_result="$(omarchy-shell shell summon "$summon_target" 2>&1 || true)"
+  if [[ "$summon_result" != "ok" ]]; then
+    echo "Unable to summon popup $summon_target: $summon_result" >&2
+    exit 3
+  fi
+  # The leading space keeps qs from reading a bracketed argument as a list
+  # (it would split '[{...}]' into many arguments); JSON.parse skips it.
+  fixture_result="$(omarchy-shell "$ipc_target" showcaseFixture " $fixture" 2>&1 || true)"
+  if [[ "$fixture_result" != "ok" ]]; then
+    omarchy-shell shell hide "$summon_target" >/dev/null 2>&1 || true
+    printf 'capture failed: %s did not take the fixture rows (showcaseFixture answered "%s"); is the Aranea VPN dropdown active? No screenshot written.\n' "$ipc_target" "$fixture_result" >&2
+    exit 3
+  fi
+  sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  hyprctl dismissnotify >/dev/null 2>&1 || true
+  grim "$output/$surface.png"
+  omarchy-shell shell hide "$summon_target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
@@ -880,6 +928,11 @@ case "$surface" in
     # Stand-in SSIDs, and 20 s for the 60 s link graph to draw a trace.
     capture_showcase_surface omarchy.network "${ARANEA_CAPTURE_WIFI_NAMES:-$default_wifi_names}" \
       "${ARANEA_NETWORK_GRAPH_DELAY:-20}"
+    exit 0
+    ;;
+  vpn)
+    # Stand-in fixture rows: never the machine's real VPN profiles.
+    capture_vpn_surface "${ARANEA_CAPTURE_VPN_FIXTURE:-$default_vpn_fixture}"
     exit 0
     ;;
   audio)
