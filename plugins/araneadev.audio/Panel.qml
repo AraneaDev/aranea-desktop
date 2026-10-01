@@ -2,7 +2,6 @@
 // volume icon and its dropdown. Stock logic; the Aranea view replaces
 // the stock one.
 import QtQuick
-import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
@@ -10,6 +9,8 @@ import Quickshell.Services.Pipewire
 import qs.Ui
 import qs.Commons
 import "Model.js" as Model
+import "AudioLogic.js" as AudioLogic
+import "../araneadev.shared" as Aranea
 
 Panel {
   id: root
@@ -30,6 +31,21 @@ Panel {
   // qmllint enable missing-property
   // The media service's currently active player, if any.
   readonly property var activeMediaPlayer: mediaService ? mediaService.activePlayer : null
+
+  // Smoothed live levels behind the Output and Input filament glow.
+  property real outputSignal: 0
+  // (see above)
+  property real inputSignal: 0
+  // dbusName of the player Now playing showed last.
+  property string lastPlayerKey: ""
+  // The player Now playing follows: Omarchy's media service first.
+  readonly property var nowPlayingPlayer: activeMediaPlayer || AudioLogic.pickPlayer(mprisPlayers, lastPlayerKey)
+  // What the Now playing strip shows.
+  readonly property var nowPlaying: AudioLogic.nowPlayingState(nowPlayingPlayer)
+
+  // Remember the followed player, so Now playing stays on it once it pauses.
+  onNowPlayingPlayerChanged: if (nowPlayingPlayer)
+    lastPlayerKey = String(nowPlayingPlayer.dbusName || "")
 
   // Real (non-stream) sink nodes that could be the default output.
   readonly property var candidateSinks: {
@@ -107,6 +123,15 @@ Panel {
         list.push(candidateSinks[i])
     if (sink && list.indexOf(sink) < 0)
       list.unshift(sink)
+    return list
+  }
+
+  // Sinks stock hides as unplugged; shown dimmed and never chosen.
+  readonly property var unpluggedSinks: {
+    var list = []
+    for (var i = 0; i < candidateSinks.length; i++)
+      if (!sinkAvailable(candidateSinks[i]))
+        list.push(candidateSinks[i])
     return list
   }
 
@@ -200,6 +225,7 @@ Panel {
   //   "output"  — output slider + sink device list
   //   "input"   — input slider + source device list
   //   "streams" — per-app playback streams
+  //   "nowplaying" - the Now playing strip (a single row)
   // selectedIndex semantics within a section:
   //   -1            → on the slider row (h/l adjusts volume, m/Enter mute)
   //   0..N-1        → on the Nth device/stream row
@@ -241,6 +267,8 @@ Panel {
       return displayAudioSources.length
     if (section === "streams")
       return displayAudioStreams.length
+    if (section === "nowplaying")
+      return 1
     return 0
   }
 
@@ -252,6 +280,8 @@ Panel {
       return displayAudioSources.length > 0 || !!source
     if (section === "streams")
       return displayAudioStreams.length > 0
+    if (section === "nowplaying")
+      return nowPlaying.visible
     return false
   }
 
@@ -275,6 +305,8 @@ Panel {
       list.push("input")
     if (sectionVisible("streams"))
       list.push("streams")
+    if (sectionVisible("nowplaying"))
+      list.push("nowplaying")
     return list
   }
 
@@ -370,6 +402,13 @@ Panel {
       var s = displayAudioStreams[selectedIndex]
       if (s && s.audio)
         s.audio.volume = Math.max(0, Math.min(1.5, s.audio.volume + delta))
+      return
+    }
+    if (focusSection === "nowplaying" && nowPlayingPlayer) {
+      if (delta < 0 && nowPlayingPlayer.canGoPrevious)
+        nowPlayingPlayer.previous()
+      else if (delta > 0 && nowPlayingPlayer.canGoNext)
+        nowPlayingPlayer.next()
     }
   }
 
@@ -403,7 +442,10 @@ Panel {
       var st = displayAudioStreams[selectedIndex]
       if (st && st.audio)
         st.audio.muted = !st.audio.muted
+      return
     }
+    if (focusSection === "nowplaying" && nowPlayingPlayer && nowPlayingPlayer.canTogglePlaying)
+      nowPlayingPlayer.togglePlaying()
   }
 
   onOpenedChanged: {
@@ -454,44 +496,72 @@ Panel {
     displayAudioStreams = []
   }
 
-  // Keep the keyboard-focused row inside the visible viewport of the
-  // ScrollView. Each cursor target (slider rows, SinkRow, SourceRow,
-  // StreamRow) calls this when it gains hasCursor. Without it, j/k can
-  // walk the selection off-screen — wifi uses ListView.positionViewAtIndex
-  // for this; we don't have that affordance with a multi-section Column.
-  // qmllint disable missing-property
+  // Keep the keyboard-focused row inside the visible part of the dropdown's
+  // Flickable. The view's rows carry objectNames (channelSlider, deviceRow,
+  // streamRow, nowPlaying) and their Repeater index, so the cursor's
+  // section and index find the row without the view knowing about scrolling.
   function resetScroll() {
-    if (!scrollArea)
-      return
-    var flick = scrollArea.contentItem
-    if (flick && flick.contentY !== undefined)
-      flick.contentY = 0
+    scrollArea.contentY = 0
+  }
+
+  // The section item of the dropdown for a cursor section, or null.
+  function cursorSectionItem(section) {
+    var names = {
+      "output": "outputSection",
+      "input": "inputSection",
+      "streams": "sourcesSection",
+      "nowplaying": "nowPlaying"
+    }
+    var kids = dropdown.children
+    for (var i = 0; i < kids.length; i++)
+      if (kids[i].objectName === names[section])
+        return kids[i]
+    return null
+  }
+
+  // The first descendant of ITEM named NAME (with Repeater index INDEX, if given).
+  function findNamed(item, name, index) {
+    var kids = item ? item.children : []
+    for (var i = 0; i < kids.length; i++) {
+      var kid = kids[i]
+      if (kid.objectName === name && (index === undefined || kid.index === index))
+        return kid
+      var found = findNamed(kid, name, index)
+      if (found)
+        return found
+    }
+    return null
   }
 
   // Scrolls the keyboard-focused row into view.
-  function ensureCursorVisible(item) {
-    if (!item || !scrollArea)
+  function ensureCursorVisible() {
+    if (!cursorActive)
       return
-    var flick = scrollArea.contentItem
-    if (!flick || flick.contentY === undefined)
-      return
-    var margin = 6
-    var maxY = Math.max(0, (flick.contentHeight || 0) - flick.height)
-    if (maxY <= Style.space(24) || (root.focusSection === "output" && root.selectedIndex === -1)) {
-      flick.contentY = 0
+    var maxY = Math.max(0, scrollArea.contentHeight - scrollArea.height)
+    if (maxY <= 0 || focusSection === "header" || (focusSection === "output" && selectedIndex === -1)) {
+      scrollArea.contentY = 0
       return
     }
-    var pt = item.mapToItem(flick.contentItem || flick, 0, 0)
-    var top = pt.y
-    var bottom = top + (item.height || 0)
-    var viewTop = flick.contentY
-    var viewBottom = viewTop + flick.height
-    if (top < viewTop + margin)
-      flick.contentY = Math.max(0, Math.min(maxY, top - margin))
-    else if (bottom > viewBottom - margin)
-      flick.contentY = Math.max(0, Math.min(maxY, bottom + margin - flick.height))
+    var section = cursorSectionItem(focusSection)
+    if (!section)
+      return
+    var item = section
+    if (focusSection === "streams")
+      item = findNamed(section, "streamRow", selectedIndex) || section
+    else if (focusSection !== "nowplaying")
+      item = selectedIndex === -1 ? (findNamed(section, "channelSlider") || section) : (findNamed(section, "deviceRow", selectedIndex) || section)
+    var margin = 6
+    var top = item.mapToItem(dropdown, 0, 0).y
+    var bottom = top + item.height
+    if (top < scrollArea.contentY + margin)
+      scrollArea.contentY = Math.max(0, Math.min(maxY, top - margin))
+    else if (bottom > scrollArea.contentY + scrollArea.height - margin)
+      scrollArea.contentY = Math.max(0, Math.min(maxY, bottom + margin - scrollArea.height))
   }
-  // qmllint enable missing-property
+
+  onFocusSectionChanged: Qt.callLater(ensureCursorVisible)
+  onSelectedIndexChanged: Qt.callLater(ensureCursorVisible)
+  onCursorActiveChanged: Qt.callLater(ensureCursorVisible)
 
   // Keeps focusSection/selectedIndex valid after a list changes underneath them.
   function clampCursor() {
@@ -729,6 +799,108 @@ Panel {
     return Model.streamRepresentsPlayer(node, player, mprisPlayers, displayAudioStreams)
   }
 
+  // Plain device rows for the view, from Pipewire NODES.
+  function deviceRows(nodes, activeNode, glyphFor, unplugged) {
+    var rows = []
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i]
+      rows.push({
+        key: String(n.id),
+        label: nodeLabel(n),
+        glyph: glyphFor(n),
+        detail: "",
+        active: !!activeNode && activeNode.id === n.id,
+        available: true
+      })
+    }
+    for (var j = 0; j < (unplugged || []).length; j++) {
+      var u = unplugged[j]
+      rows.push({
+        key: String(u.id),
+        label: nodeLabel(u),
+        glyph: glyphFor(u),
+        detail: "unplugged",
+        active: false,
+        available: false
+      })
+    }
+    return rows
+  }
+  // Everything the Aranea view draws (AudioDropdown.view).
+  readonly property var audioView: ({
+      glyph: outputIcon(),
+      mood: outputVolumeName(outputVolume, outputMuted),
+      anyAudible: anyAudible,
+      headerCursor: headerHasCursor,
+      cursor: {
+        active: cursorActive,
+        section: focusSection,
+        index: selectedIndex
+      },
+      output: {
+        present: hasOutput,
+        volume: outputVolume,
+        muted: outputMuted,
+        level: outputSignal
+      },
+      outputDevices: deviceRows(displayAudioSinks, sink, sinkGlyph, opened ? unpluggedSinks : []),
+      inputVisible: displayAudioSources.length > 0 || !!source,
+      input: {
+        present: hasInput,
+        volume: inputVolume,
+        muted: inputMuted,
+        level: inputSignal
+      },
+      inputDevices: deviceRows(displayAudioSources, source, sourceGlyph, []),
+      streams: displayAudioStreams.map(function (s) {
+        return {
+          key: String(s.id),
+          label: streamLabel(s),
+          volume: s.audio ? s.audio.volume : 0,
+          muted: s.audio ? s.audio.muted : false,
+          current: streamRepresentsPlayer(s, activeMediaPlayer)
+        }
+      }),
+      nowPlaying: nowPlaying
+    })
+  // Carries out one AudioDropdown action.
+  function handleAction(name, arg) {
+    if (name === "toggleAll")
+      toggleAllMuted()
+    else if (name === "outputVolume")
+      setOutputVolume(arg)
+    else if (name === "outputMute")
+      toggleOutputMute()
+    else if (name === "outputDevice") {
+      if (displayAudioSinks[arg])
+        setDefaultSink(displayAudioSinks[arg])
+    } else if (name === "inputVolume")
+      setInputVolume(arg)
+    else if (name === "inputMute")
+      toggleInputMute()
+    else if (name === "inputDevice") {
+      if (displayAudioSources[arg])
+        setDefaultSource(displayAudioSources[arg])
+    } else if (name === "streamVolume") {
+      var s = displayAudioStreams[arg.index]
+      if (s && s.audio)
+        s.audio.volume = Math.max(0, Math.min(1.5, arg.value))
+    } else if (name === "streamMute") {
+      var m = displayAudioStreams[arg]
+      if (m && m.audio)
+        m.audio.muted = !m.audio.muted
+    } else if (name === "hover") {
+      cursorActive = true
+      focusSection = arg.section
+      selectedIndex = arg.index
+    } else if (name === "previous" && nowPlayingPlayer && nowPlayingPlayer.canGoPrevious)
+      nowPlayingPlayer.previous()
+    else if (name === "playPause" && nowPlayingPlayer && nowPlayingPlayer.canTogglePlaying)
+      nowPlayingPlayer.togglePlaying()
+    else if (name === "next" && nowPlayingPlayer && nowPlayingPlayer.canGoNext)
+      nowPlayingPlayer.next()
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -746,6 +918,32 @@ Panel {
     id: inputPeakMonitor
     node: root.source
     enabled: root.opened && !!root.source
+  }
+
+  PwNodePeakMonitor {
+    id: outputPeakMonitor
+    node: root.volumeSink
+    enabled: root.opened && !!root.volumeSink
+  }
+
+  // Samples both peak monitors into the smoothed filament glow. With motion
+  // off it samples at 250 ms, so the glow shows the level without pulsing.
+  Timer {
+    interval: Aranea.DesignTokens.motionEnabled ? 33 : 250
+    repeat: true
+    running: root.opened
+    onTriggered: {
+      root.outputSignal = AudioLogic.signalLevel(root.outputSignal, root.outputMuted ? 0 : outputPeakMonitor.peak, interval)
+      root.inputSignal = AudioLogic.signalLevel(root.inputSignal, root.inputMuted ? 0 : inputPeakMonitor.peak, interval)
+    }
+  }
+
+  // Quickshell doesn't update MPRIS position on its own; nudge it each second.
+  Timer {
+    interval: 1000
+    repeat: true
+    running: root.opened && !!root.nowPlayingPlayer && root.nowPlaying.playing
+    onTriggered: root.nowPlayingPlayer.positionChanged()
   }
 
   Process {
@@ -817,627 +1015,67 @@ Panel {
     }
   }
 
-  KeyboardPanel {
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(560))
-
-    PanelKeyCatcher {
-      id: keyCatcher
-      anchors.fill: parent
-      onMoveRequested: function (dx, dy) {
-        if (!root.cursorActive) {
-          root.cursorActive = true
+    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight, Style.space(560))
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      root.switchPanel(direction)
+    }
+    onMoveRequested: function (dx, dy) {
+      if (!root.cursorActive) {
+        root.cursorActive = true
+        return
+      }
+      if (dy !== 0)
+        root.moveCursor(dy)
+      else if (dx !== 0)
+        root.adjustVolume(dx * 0.05)
+    }
+    onActivateRequested: if (root.cursorActive)
+      root.activateCursor()
+    onTextKey: function (t) {
+      // 'm' mutes whatever the cursor is on: focused section's slider
+      // for output/input, the focused stream for streams.
+      if (t === "m" || t === "M") {
+        if (!root.cursorActive)
           return
-        }
-        if (dy !== 0)
-          root.moveCursor(dy)
-        else if (dx !== 0)
-          root.adjustVolume(dx * 0.05)
-      }
-      onActivateRequested: if (root.cursorActive)
-        root.activateCursor()
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
-      }
-      onTextKey: function (t) {
-        // 'm' mutes whatever the cursor is on: focused section's slider
-        // for output/input, the focused stream for streams.
-        if (t === "m" || t === "M") {
-          if (!root.cursorActive)
-            return
-          if (root.focusSection === "streams" && root.selectedIndex >= 0 && root.selectedIndex < root.displayAudioStreams.length) {
-            var s = root.displayAudioStreams[root.selectedIndex]
-            if (s && s.audio)
-              s.audio.muted = !s.audio.muted
-          } else if (root.focusSection === "input") {
-            root.toggleInputMute()
-          } else {
-            root.toggleOutputMute()
-          }
-        }
-      }
-
-      ScrollView {
-        id: scrollArea
-        anchors.fill: parent
-        clip: true
-        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-        ScrollBar.vertical.policy: panelColumn.implicitHeight > height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-        Binding {
-          target: scrollArea.contentItem
-          property: "interactive"
-          value: panelColumn.implicitHeight > scrollArea.height
-        }
-
-        Column {
-          id: panelColumn
-          width: scrollArea.availableWidth
-          spacing: Style.space(14)
-
-          // ---------- Hero: speaker icon · title/status ----------
-          // qmllint disable missing-property unqualified
-          Item {
-            id: heroItem
-            width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
-
-            // Status only — the switch owns muting, mouse and keyboard alike.
-            Text {
-              id: heroIcon
-              textFormat: Text.PlainText
-              text: root.outputIcon()
-              color: root.bar.foreground
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.display
-              opacity: root.outputMuted ? 0.5 : 1.0
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-            }
-
-            // Compact on/off switch on the trailing edge of the hero, and the
-            // header's only cursor target. Checked means something is still
-            // audible, so muting everything reads as switching audio off.
-            ToggleSwitch {
-              id: powerSwitch
-              checked: root.anyAudible
-              hasCursor: root.headerHasCursor
-              foreground: root.bar.foreground
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              onHovered: function (on) {
-                if (on)
-                  root.setHeaderCursor()
-              }
-              onToggled: root.toggleAllMuted()
-
-              PanelToolTip {
-                visible: powerSwitch.containsMouse
-                text: root.toggleHint
-                fontFamily: root.bar.fontFamily
-              }
-            }
-
-            Column {
-              id: heroLabels
-              anchors.left: heroIcon.right
-              anchors.leftMargin: Style.space(14)
-              anchors.right: parent.right
-              anchors.rightMargin: powerSwitch.width + Style.space(12)
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(2)
-
-              Text {
-                text: "Audio"
-                color: root.bar.foreground
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.title
-                font.bold: true
-                elide: Text.ElideRight
-                width: parent.width
-              }
-
-              Text {
-                id: heroLabel
-                textFormat: Text.PlainText
-                text: root.outputVolumeName(outputSlider.dragging ? outputSlider.liveValue : root.outputVolume, root.outputMuted).toUpperCase()
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                font.letterSpacing: 1.2
-                elide: Text.ElideRight
-                width: parent.width
-              }
-            }
-          }
-
-          // ---- Output devices ----
-          PanelSeparator {
-            foreground: root.bar.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(outputHeader.implicitHeight, outputPercent.implicitHeight)
-
-              PanelSectionHeader {
-                id: outputHeader
-                text: "OUTPUT"
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: outputPercent
-                textFormat: Text.PlainText
-                text: Math.round((outputSlider.dragging ? outputSlider.liveValue : root.outputVolume) * 100) + "%"
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                opacity: root.outputMuted ? 0.5 : 1.0
-              }
-            }
-
-            CursorSurface {
-              id: outputSliderRow
-              width: parent.width
-              height: outputSlider.implicitHeight + Style.spacing.controlGap
-              hasCursor: root.cursorActive && root.focusSection === "output" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor)
-                root.ensureCursorVisible(outputSliderRow)
-              foreground: root.bar.foreground
-              outline: true
-
-              PanelSlider {
-                id: outputSlider
-                bar: root.bar
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(6)
-                anchors.rightMargin: Style.space(6)
-                minimum: 0
-                maximum: 1
-                step: 0.05
-                value: root.outputVolume
-                opacity: root.outputMuted ? 0.5 : 1.0
-                enabled: !!root.sink
-
-                onMoved: function (v) {
-                  root.setOutputVolume(v)
-                }
-                onRightClicked: root.toggleOutputMute()
-              }
-
-              HoverHandler {
-                onHoveredChanged: if (hovered) {
-                  root.cursorActive = true
-                  root.focusSection = "output"
-                  root.selectedIndex = -1
-                }
-              }
-            }
-
-            Repeater {
-              model: root.displayAudioSinks
-
-              SinkRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                node: modelData
-                rowIndex: index
-              }
-            }
-          }
-
-          // ---- Input ----
-          PanelSeparator {
-            visible: root.displayAudioSources.length > 0 || !!root.source
-            foreground: root.bar.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-            visible: root.displayAudioSources.length > 0 || !!root.source
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(microphoneHeader.implicitHeight, microphonePercent.implicitHeight)
-
-              PanelSectionHeader {
-                id: microphoneHeader
-                text: "INPUT"
-                foreground: root.bar.foreground
-                fontFamily: root.bar.fontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: microphonePercent
-                textFormat: Text.PlainText
-                text: Math.round((inputSlider.dragging ? inputSlider.liveValue : root.inputVolume) * 100) + "%"
-                color: Qt.darker(root.bar.foreground, 1.4)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                opacity: root.inputMuted ? 0.5 : 1.0
-              }
-            }
-
-            CursorSurface {
-              id: inputSliderRow
-              visible: !!root.source
-              width: parent.width
-              height: inputControls.implicitHeight + Style.spacing.controlGap
-              hasCursor: root.cursorActive && root.focusSection === "input" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor)
-                root.ensureCursorVisible(inputSliderRow)
-              foreground: root.bar.foreground
-              outline: true
-
-              Column {
-                id: inputControls
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(6)
-                anchors.rightMargin: Style.space(6)
-                spacing: Style.space(5)
-
-                PanelSlider {
-                  id: inputSlider
-                  bar: root.bar
-                  width: parent.width
-                  minimum: 0
-                  maximum: 1
-                  step: 0.05
-                  value: root.inputVolume
-                  opacity: root.inputMuted ? 0.5 : 1.0
-                  enabled: !!root.source
-
-                  onMoved: function (v) {
-                    root.setInputVolume(v)
-                  }
-                  onRightClicked: root.toggleInputMute()
-                }
-
-                Rectangle {
-                  width: parent.width
-                  height: Math.max(Style.space(5), Style.spacing.xs)
-                  color: Util.alpha(root.bar.foreground, 0.18)
-                  opacity: root.inputMuted ? 0.35 : 1.0
-
-                  Rectangle {
-                    height: parent.height
-                    width: parent.width * Math.max(0, Math.min(1, inputPeakMonitor.peak))
-                    color: root.bar.foreground
-                    Behavior on width {
-                      NumberAnimation {
-                        duration: 70
-                      }
-                    }
-                  }
-                }
-              }
-
-              HoverHandler {
-                onHoveredChanged: if (hovered) {
-                  root.cursorActive = true
-                  root.focusSection = "input"
-                  root.selectedIndex = -1
-                }
-              }
-            }
-
-            Repeater {
-              model: root.displayAudioSources
-
-              SourceRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                node: modelData
-                rowIndex: index
-              }
-            }
-          }
-
-          // ---- Per-app streams ----
-          PanelSeparator {
-            visible: root.displayAudioStreams.length > 0
-            foreground: root.bar.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(10)
-            visible: root.displayAudioStreams.length > 0
-
-            PanelSectionHeader {
-              text: "SOURCES"
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-            }
-
-            Repeater {
-              model: root.displayAudioStreams
-
-              StreamRow {
-                required property var modelData
-                required property int index
-                width: panelColumn.width
-                node: modelData
-                rowIndex: index
-              }
-            }
-          }
+        if (root.focusSection === "streams" && root.selectedIndex >= 0 && root.selectedIndex < root.displayAudioStreams.length) {
+          var s = root.displayAudioStreams[root.selectedIndex]
+          if (s && s.audio)
+            s.audio.muted = !s.audio.muted
+        } else if (root.focusSection === "input") {
+          root.toggleInputMute()
+        } else {
+          root.toggleOutputMute()
         }
       }
     }
-  }
 
-  // ---- Reusable inline components ----
-
-  // Output device row — cursor target inside the "output" section. Mouse
-  // hover updates the panel cursor at the root; visuals come entirely
-  // from hasCursor/current via CursorSurface, never from containsMouse.
-  component SinkRow: CursorSurface {
-    id: sinkRow
-    required property var node
-    required property int rowIndex
-
-    readonly property bool isActive: root.sink && node && root.sink.id === node.id
-    hasCursor: root.cursorActive && root.focusSection === "output" && root.selectedIndex === rowIndex
-    onHasCursorChanged: if (hasCursor)
-      root.ensureCursorVisible(sinkRow)
-    current: isActive
-    foreground: root.bar.foreground
-    fill: root.hoverFill
-    currentFill: root.selectedFill
-    implicitHeight: sinkInner.implicitHeight + Style.spacing.xl
-
-    Row {
-      id: sinkInner
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(8)
-
-      Text {
-        textFormat: Text.PlainText
-        text: root.sinkGlyph(sinkRow.node)
-        color: root.bar.foreground
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.title
-        width: Style.space(22)
-        horizontalAlignment: Text.AlignHCenter
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: root.nodeLabel(sinkRow.node)
-        color: root.bar.foreground
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: sinkRow.isActive
-        elide: Text.ElideRight
-        width: parent.width - Style.space(22) - Style.space(8)
-        anchors.verticalCenter: parent.verticalCenter
-      }
-    }
-
-    MouseArea {
+    Flickable {
+      id: scrollArea
       anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onContainsMouseChanged: if (containsMouse) {
-        root.cursorActive = true
-        root.focusSection = "output"
-        root.selectedIndex = sinkRow.rowIndex
-      }
-      onClicked: root.setDefaultSink(sinkRow.node)
-    }
-  }
+      contentHeight: dropdown.implicitHeight
+      clip: true
+      boundsBehavior: Flickable.StopAtBounds
+      // Only scroll when the dropdown overflows, as stock's ScrollView did,
+      // so drags on the sliders are never taken for a flick.
+      interactive: contentHeight > height
+      onContentHeightChanged: returnToBounds()
 
-  // Input device row — sibling of SinkRow for the "input" section.
-  component SourceRow: CursorSurface {
-    id: sourceRow
-    required property var node
-    required property int rowIndex
-
-    readonly property bool isActive: root.source && node && root.source.id === node.id
-    hasCursor: root.cursorActive && root.focusSection === "input" && root.selectedIndex === rowIndex
-    onHasCursorChanged: if (hasCursor)
-      root.ensureCursorVisible(sourceRow)
-    current: isActive
-    foreground: root.bar.foreground
-    fill: root.hoverFill
-    currentFill: root.selectedFill
-    implicitHeight: sourceInner.implicitHeight + Style.spacing.xl
-
-    Row {
-      id: sourceInner
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(8)
-
-      Text {
-        textFormat: Text.PlainText
-        text: root.sourceGlyph(sourceRow.node)
-        color: root.bar.foreground
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.title
-        width: Style.space(22)
-        horizontalAlignment: Text.AlignHCenter
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: root.nodeLabel(sourceRow.node)
-        color: root.bar.foreground
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: sourceRow.isActive
-        elide: Text.ElideRight
-        width: parent.width - Style.space(22) - Style.space(8)
-        anchors.verticalCenter: parent.verticalCenter
-      }
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onContainsMouseChanged: if (containsMouse) {
-        root.cursorActive = true
-        root.focusSection = "input"
-        root.selectedIndex = sourceRow.rowIndex
-      }
-      onClicked: root.setDefaultSource(sourceRow.node)
-    }
-  }
-
-  // Per-app stream row — cursor target inside the "streams" section.
-  // The stream has its own slider inline, so h/l from the keyboard
-  // adjusts THIS stream's volume (not the global output) when the cursor
-  // sits on this row. Enter/Space mutes the stream.
-  component StreamRow: CursorSurface {
-    id: streamRow
-    required property var node
-    required property int rowIndex
-
-    readonly property real streamVolume: node && node.audio ? node.audio.volume : 0
-    readonly property bool streamMuted: node && node.audio ? node.audio.muted : false
-    readonly property bool isActive: root.streamRepresentsPlayer(node, root.activeMediaPlayer)
-
-    hasCursor: root.cursorActive && root.focusSection === "streams" && root.selectedIndex === rowIndex
-    onHasCursorChanged: if (hasCursor)
-      root.ensureCursorVisible(streamRow)
-    current: isActive
-    foreground: root.bar.foreground
-    fill: root.hoverFill
-    currentFill: root.selectedFill
-    implicitHeight: streamColumn.implicitHeight + Style.spacing.xl
-
-    Column {
-      id: streamColumn
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(2)
-
-      Row {
-        width: parent.width
-        spacing: Style.space(8)
-
-        Text {
-          id: streamMuteIcon
-          textFormat: Text.PlainText
-          text: streamRow.streamMuted ? "󰝟" : "󰕾"
-          color: root.bar.foreground
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.title
-          width: Style.space(22)
-          horizontalAlignment: Text.AlignHCenter
-          anchors.verticalCenter: parent.verticalCenter
-          opacity: streamRow.streamMuted ? 0.5 : 1.0
-
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              if (streamRow.node && streamRow.node.audio)
-                streamRow.node.audio.muted = !streamRow.node.audio.muted
-            }
-          }
-        }
-
-        Text {
-          textFormat: Text.PlainText
-          text: root.streamLabel(streamRow.node)
-          color: root.bar.foreground
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.body
-          font.bold: streamRow.isActive
-          elide: Text.ElideRight
-          width: parent.width - streamMuteIcon.width - streamPct.width - Style.space(16)
-          anchors.verticalCenter: parent.verticalCenter
-        }
-
-        Text {
-          id: streamPct
-          textFormat: Text.PlainText
-          text: Math.round(streamRow.streamVolume * 100) + "%"
-          color: Qt.darker(root.bar.foreground, 1.5)
-          font.family: root.bar.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: true
-          width: Style.space(36)
-          horizontalAlignment: Text.AlignRight
-          anchors.verticalCenter: parent.verticalCenter
-          opacity: streamRow.streamMuted ? 0.5 : 1.0
-        }
-      }
-
-      PanelSlider {
-        bar: root.bar
-        width: parent.width
-        minimum: 0
-        maximum: 1.5
-        step: 0.05
-        value: streamRow.streamVolume
-        opacity: streamRow.streamMuted ? 0.5 : 1.0
-
-        onMoved: function (v) {
-          if (streamRow.node && streamRow.node.audio)
-            streamRow.node.audio.volume = v
-        }
-        onRightClicked: {
-          if (streamRow.node && streamRow.node.audio)
-            streamRow.node.audio.muted = !streamRow.node.audio.muted
+      AudioDropdown {
+        id: dropdown
+        width: scrollArea.width
+        view: root.audioView
+        onAction: function (name, arg) {
+          root.handleAction(name, arg)
         }
       }
     }
-
-    MouseArea {
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.NoButton
-      propagateComposedEvents: true
-      onContainsMouseChanged: if (containsMouse) {
-        root.cursorActive = true
-        root.focusSection = "streams"
-        root.selectedIndex = streamRow.rowIndex
-      }
-    }
-    // qmllint enable missing-property unqualified
   }
 }
