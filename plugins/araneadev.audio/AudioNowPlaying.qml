@@ -168,7 +168,7 @@ Column {
           anchors.top: parent.top
           anchors.bottom: parent.bottom
           width: parent.width * Math.max(0, Math.min(1, strip.info.progress))
-          color: Aranea.DesignTokens.accentSecondary
+          color: Aranea.DesignTokens.strandEnd
         }
       }
     }

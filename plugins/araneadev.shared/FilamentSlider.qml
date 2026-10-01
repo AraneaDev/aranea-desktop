@@ -84,7 +84,7 @@ Item {
       }
       GradientStop {
         position: 1
-        color: slider.muted ? slider.quietColor : DesignTokens.accentSecondary
+        color: slider.muted ? slider.quietColor : DesignTokens.strandEnd
       }
     }
   }
