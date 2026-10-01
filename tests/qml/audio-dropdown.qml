@@ -182,6 +182,24 @@ ShellRoot {
     return next
   }
 
+  // VIEW with the cursor set to ACTIVE, SECTION and INDEX.
+  function cursorTick(view, active, section, index) {
+    var next = levelTick(view, view.output.level)
+    next.cursor = {
+      active: active,
+      section: section,
+      index: index
+    }
+    return next
+  }
+
+  // How many cursor outlines in ITEM are drawn (a border or a fill).
+  function litOutlines(item) {
+    return t.findChildren(item, "cursorOutline").filter(function (o) {
+      return o.visible && (o.border.width > 0 || o.color.a > 0)
+    }).length
+  }
+
   // Right edge of ITEM in full's coordinates.
   function rightEdge(item) {
     return item.mapToItem(full, item.width, 0).x
@@ -233,7 +251,18 @@ ShellRoot {
         t.equal(t.findChildren(sources, "streamSlider")[0].value, 0.9, "the new stream volume reaches its slider")
         for (var m = 0; m < streamRowsBefore.length; m++)
           t.check(streamRowsMoved[m] === streamRowsBefore[m], "stream row " + m + " is the same delegate after a volume change")
-        t.done()
+        // The cursor outline is the keyboard's: Panel passes an inactive
+        // cursor while the mouse is in use, and then nothing is outlined.
+        t.equal(litOutlines(full), 0, "no outline without an active cursor")
+        full.view = cursorTick(full.view, true, "output", 1)
+        t.step(50, function () {
+          t.equal(litOutlines(full), 1, "an active cursor outlines exactly one row")
+          full.view = cursorTick(full.view, false, "output", 1)
+          t.step(50, function () {
+            t.equal(litOutlines(full), 0, "the outline goes once the cursor is inactive")
+            t.done()
+          })
+        })
       })
     })
   })

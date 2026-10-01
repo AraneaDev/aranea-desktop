@@ -37,6 +37,8 @@ Item {
   opacity: available ? 1 : 0.45
 
   Rectangle {
+    // The keyboard cursor outline.
+    objectName: "cursorOutline"
     anchors.fill: parent
     color: row.hasCursor ? Util.alpha(DesignTokens.accent, 0.08) : "transparent"
     border.width: row.hasCursor ? 1 : 0

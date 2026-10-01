@@ -44,6 +44,8 @@ Column {
     implicitHeight: content.implicitHeight
 
     Rectangle {
+      // The keyboard cursor outline.
+      objectName: "cursorOutline"
       anchors.fill: parent
       color: "transparent"
       border.width: strip.hasCursor ? 1 : 0

@@ -24,6 +24,8 @@ Item {
   implicitHeight: Style.space(16)
 
   Rectangle {
+    // The keyboard cursor outline.
+    objectName: "cursorOutline"
     anchors.fill: parent
     anchors.margins: -Style.space(3)
     color: "transparent"

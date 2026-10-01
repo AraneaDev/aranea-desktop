@@ -75,6 +75,8 @@ Column {
     height: slider.implicitHeight + Style.space(6)
     visible: section.channel.present
     Rectangle {
+      // The keyboard cursor outline.
+      objectName: "cursorOutline"
       anchors.fill: parent
       color: "transparent"
       border.width: section.cursor === -1 ? 1 : 0

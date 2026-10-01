@@ -237,6 +237,9 @@ Panel {
   property int selectedIndex: -1
   // True once the keyboard or mouse has given a row focus.
   property bool cursorActive: false
+  // True while the keyboard drives the cursor; any pointer action clears it.
+  // The view outlines the cursor only then, so the mouse never shows one.
+  property bool keyboardCursor: false
 
   // "header" is a virtual section for the hero output mute toggle; it sits
   // above the output section so the speaker can be muted from the keyboard.
@@ -455,6 +458,7 @@ Panel {
       selectedIndex = -1
       // first keyboard cursor reveal starts on the output slider
       cursorActive = false
+      keyboardCursor = false
       Qt.callLater(resetScroll)
     } else {
       clearDisplayAudioModels()
@@ -537,7 +541,7 @@ Panel {
 
   // Scrolls the keyboard-focused row into view.
   function ensureCursorVisible() {
-    if (!cursorActive)
+    if (!cursorActive || !keyboardCursor)
       return
     var maxY = Math.max(0, scrollArea.contentHeight - scrollArea.height)
     if (maxY <= Style.space(24) || focusSection === "header" || (focusSection === "output" && selectedIndex === -1)) {
@@ -564,6 +568,7 @@ Panel {
   onFocusSectionChanged: Qt.callLater(ensureCursorVisible)
   onSelectedIndexChanged: Qt.callLater(ensureCursorVisible)
   onCursorActiveChanged: Qt.callLater(ensureCursorVisible)
+  onKeyboardCursorChanged: Qt.callLater(ensureCursorVisible)
 
   // Keeps focusSection/selectedIndex valid after a list changes underneath them.
   function clampCursor() {
@@ -848,9 +853,9 @@ Panel {
       glyph: outputIcon(),
       mood: outputVolumeName(outputVolume, outputMuted),
       anyAudible: anyAudible,
-      headerCursor: headerHasCursor,
+      headerCursor: headerHasCursor && keyboardCursor,
       cursor: {
-        active: cursorActive,
+        active: cursorActive && keyboardCursor,
         section: focusSection,
         index: selectedIndex
       },
@@ -872,8 +877,10 @@ Panel {
       streams: streamRows,
       nowPlaying: nowPlaying
     })
-  // Carries out one AudioDropdown action.
+  // Carries out one AudioDropdown action. Every action comes from the
+  // pointer, so each one hands the cursor back from the keyboard.
   function handleAction(name, arg) {
+    keyboardCursor = false
     if (name === "toggleAll")
       toggleAllMuted()
     else if (name === "outputVolume")
@@ -1037,8 +1044,11 @@ Panel {
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
-      if (!root.cursorActive) {
+      // The first key after opening or after mouse use only reveals the
+      // cursor where it is.
+      if (!root.cursorActive || !root.keyboardCursor) {
         root.cursorActive = true
+        root.keyboardCursor = true
         return
       }
       if (dy !== 0)
@@ -1046,14 +1056,19 @@ Panel {
       else if (dx !== 0)
         root.adjustVolume(dx * 0.05)
     }
-    onActivateRequested: if (root.cursorActive)
+    onActivateRequested: {
+      if (!root.cursorActive)
+        return
+      root.keyboardCursor = true
       root.activateCursor()
+    }
     onTextKey: function (t) {
       // 'm' mutes whatever the cursor is on: focused section's slider
       // for output/input, the focused stream for streams.
       if (t === "m" || t === "M") {
         if (!root.cursorActive)
           return
+        root.keyboardCursor = true
         if (root.focusSection === "streams" && root.selectedIndex >= 0 && root.selectedIndex < root.displayAudioStreams.length) {
           var s = root.displayAudioStreams[root.selectedIndex]
           if (s && s.audio)
