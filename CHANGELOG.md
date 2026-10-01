@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.8.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.4...v2.8.0) (2026-10-01)
+
+
+### Features
+
+* Aranea-native audio dropdown ([#85](https://github.com/AraneaDev/aranea-desktop/issues/85)) ([0b015c2](https://github.com/AraneaDev/aranea-desktop/commit/0b015c2a6092a34ac892cd2255ef50ff16106dfb))
+
+
+### Fixes
+
+* never lose notifications when a screenshot capture restores them ([#84](https://github.com/AraneaDev/aranea-desktop/issues/84)) ([093539d](https://github.com/AraneaDev/aranea-desktop/commit/093539dfb28a819e721b78d8a08c8e8a0beb1278))
+
 ## [2.7.4](https://github.com/AraneaDev/aranea-desktop/compare/v2.7.3...v2.7.4) (2026-09-30)
 
 
