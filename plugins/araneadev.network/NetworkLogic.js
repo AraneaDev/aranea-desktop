@@ -224,7 +224,8 @@ function compareActiveThenLabel(a, b) {
 
 /**
  * Builds the interface rows (Wi-Fi, Ethernet, mobile, WireGuard, tunnel)
- * shown above the VPN section.
+ * shown above the VPN section. A null or non-object entry in `devices` is
+ * ignored rather than thrown on.
  * @param {Array<{device: string, type: string, state: string, connection: string}>|undefined} devices - from `parseDevices`
  * @param {Record<string, string>|undefined} addrs - from `parseAddrs`
  * @returns {Array<{key: string, glyph: string, label: string, detail: string, active: boolean}>} the rows
@@ -235,6 +236,7 @@ function interfaceRows(devices, addrs) {
   var rows = []
   for (var i = 0; i < list.length; i++) {
     var d = list[i]
+    if (!d) continue
     var type = d.type
     if (!Object.prototype.hasOwnProperty.call(interfaceTypeLabels, type)) continue
     if (d.state === "unmanaged") continue
@@ -257,7 +259,8 @@ function interfaceRows(devices, addrs) {
 
 /**
  * Builds the VPN rows (VPN and WireGuard connections) shown below the
- * interface section.
+ * interface section. A null or non-object entry in `connections` is ignored
+ * rather than thrown on.
  * @param {Array<{name: string, uuid: string, type: string, device: string, active: boolean, timestamp: number}>|undefined} connections - from `parseConnections`
  * @param {Record<string, string>|undefined} addrs - from `parseAddrs`
  * @returns {Array<{key: string, glyph: string, label: string, detail: string, active: boolean}>} the rows
@@ -268,6 +271,7 @@ function vpnRows(connections, addrs) {
   var rows = []
   for (var i = 0; i < list.length; i++) {
     var c = list[i]
+    if (!c) continue
     if (c.type !== "vpn" && c.type !== "wireguard") continue
     var detail = c.type === "wireguard" ? "WireGuard" : "VPN"
     var ip = c.active ? addrMap[c.device] : undefined
@@ -298,7 +302,8 @@ function savedSsid(connection, ssidByUuid) {
 
 /**
  * Builds the saved-network rows: known Wi-Fi connections not already shown
- * as a scanned network.
+ * as a scanned network. A null or non-object entry in `connections` is
+ * ignored rather than thrown on.
  * @param {Array<{name: string, uuid: string, type: string, device: string, active: boolean, timestamp: number}>|undefined} connections - from `parseConnections`
  * @param {Record<string, string>|undefined} ssidByUuid - from `parseSsids`
  * @param {string[]|undefined} scannedSsids - SSIDs already shown in the live scan
@@ -313,6 +318,7 @@ function savedRows(connections, ssidByUuid, scannedSsids, nowSeconds) {
   var entries = []
   for (var i = 0; i < list.length; i++) {
     var c = list[i]
+    if (!c) continue
     if (c.type !== "802-11-wireless") continue
     var ssid = savedSsid(c, ssidMap)
     if (!ssid) continue
@@ -370,7 +376,8 @@ function pushSample(history, sample, max) {
 }
 
 /**
- * Turns throughput samples into plot points for the rx/tx graph.
+ * Turns throughput samples into plot points for the rx/tx graph. A null or
+ * non-object entry in `samples` is read as rx/tx 0 rather than thrown on.
  * @param {Array<{iface: string, rx: number, tx: number}>|undefined} samples - the rolling history, oldest first
  * @param {number} slots - the graph's time slots (at least 2)
  * @param {number} width - the plot width, in pixels
@@ -385,8 +392,9 @@ function graphPoints(samples, slots, width, height, floor) {
 
   var scale = f
   for (var i = 0; i < list.length; i++) {
-    var rxValue = Math.max(0, Number(list[i].rx) || 0)
-    var txValue = Math.max(0, Number(list[i].tx) || 0)
+    var item = list[i]
+    var rxValue = item ? Math.max(0, Number(item.rx) || 0) : 0
+    var txValue = item ? Math.max(0, Number(item.tx) || 0) : 0
     if (rxValue > scale) scale = rxValue
     if (txValue > scale) scale = txValue
   }
@@ -401,8 +409,9 @@ function graphPoints(samples, slots, width, height, floor) {
   var tx = []
   for (var j = 0; j < n; j++) {
     var x = w - (n - 1 - j) * step
-    var rxV = Math.max(0, Number(list[j].rx) || 0)
-    var txV = Math.max(0, Number(list[j].tx) || 0)
+    var entry = list[j]
+    var rxV = entry ? Math.max(0, Number(entry.rx) || 0) : 0
+    var txV = entry ? Math.max(0, Number(entry.tx) || 0) : 0
     rx.push({ x: x, y: h - (rxV / scale) * h })
     tx.push({ x: x, y: h - (txV / scale) * h })
   }
@@ -413,24 +422,25 @@ function graphPoints(samples, slots, width, height, floor) {
 /**
  * The next keyboard-navigation state after moving vertically, following the
  * dropdown's header/VPN/band/DNS/wifi/saved section order and skipping any
- * section with nothing in it.
- * @param {{section: string, index: number, bandAuto: boolean}} state - the current navigation state
+ * section with nothing in it. QML can hand this a null `state` before its
+ * bindings settle, in which case it lands on dns/auto; a null `avail` reads
+ * as nothing available anywhere.
+ * @param {{section: string, index: number, bandAuto: boolean}|null|undefined} state - the current navigation state
  * @param {number} dy - the direction: negative for up, positive for down
- * @param {{header: number, vpn: number, band: boolean, bandPills: boolean, wifi: number, saved: number}} avail - what's available to land on
+ * @param {{header: number, vpn: number, band: boolean, bandPills: boolean, wifi: number, saved: number}|null|undefined} avail - what's available to land on
  * @returns {{section: string, index: number, bandAuto: boolean}} the next state
  */
 function moveVertical(state, dy, avail) {
-  var s = state
-  var a = avail
-  var section = s.section
-  var index = Number(s.index) || 0
-  var bandAuto = !!s.bandAuto
-  var header = Number(a.header) || 0
-  var vpn = Number(a.vpn) || 0
-  var band = !!a.band
-  var bandPills = !!a.bandPills
-  var wifi = Number(a.wifi) || 0
-  var saved = Number(a.saved) || 0
+  if (!state) return { section: "dns", index: 0, bandAuto: true }
+  var section = state.section
+  var index = Number(state.index) || 0
+  var bandAuto = !!state.bandAuto
+  var header = avail ? Number(avail.header) || 0 : 0
+  var vpn = avail ? Number(avail.vpn) || 0 : 0
+  var band = avail ? !!avail.band : false
+  var bandPills = avail ? !!avail.bandPills : false
+  var wifi = avail ? Number(avail.wifi) || 0 : 0
+  var saved = avail ? Number(avail.saved) || 0 : 0
   var here = { section: section, index: index, bandAuto: bandAuto }
 
   if (section === "header") {

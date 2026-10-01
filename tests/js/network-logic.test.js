@@ -221,6 +221,17 @@ test("interfaceRows orders active rows first, then alphabetically", () => {
   )
 })
 
+test("interfaceRows never throws on a null or undefined array element", () => {
+  const devices = [
+    null,
+    { device: "wlp2s0", type: "wifi", state: "connected", connection: "Interwebz24Ghz" }
+  ]
+  assert.deepEqual(logic.interfaceRows(devices, {}), [
+    { key: "wlp2s0", glyph: g(0xf05a9), label: "wlp2s0", detail: "Wi-Fi · connected", active: true }
+  ])
+  assert.deepEqual(logic.interfaceRows([undefined], {}), [])
+})
+
 // --- vpnRows -------------------------------------------------------------
 
 test("vpnRows keeps only vpn and wireguard types, labels and glyphs them", () => {
@@ -257,6 +268,17 @@ test("vpnRows omits the address when inactive or unknown", () => {
   assert.deepEqual(logic.vpnRows(connections, {}), [
     { key: "u2", glyph: g(0xf0582), label: "No Addr", detail: "VPN", active: true },
     { key: "u1", glyph: g(0xf0582), label: "Idle WG", detail: "WireGuard", active: false }
+  ])
+})
+
+test("vpnRows never throws on a null or undefined array element", () => {
+  assert.deepEqual(logic.vpnRows([undefined], {}), [])
+  const connections = [
+    null,
+    { name: "Office VPN", uuid: "u1", type: "vpn", device: "", active: false, timestamp: 0 }
+  ]
+  assert.deepEqual(logic.vpnRows(connections, {}), [
+    { key: "u1", glyph: g(0xf0582), label: "Office VPN", detail: "VPN", active: false }
   ])
 })
 
@@ -304,6 +326,10 @@ test("savedRows skips an empty SSID", () => {
     { name: "", uuid: "u1", type: "802-11-wireless", device: "", active: false, timestamp: 1 }
   ]
   assert.deepEqual(logic.savedRows(connections, {}, [], 100), [])
+})
+
+test("savedRows never throws on a null array element", () => {
+  assert.deepEqual(logic.savedRows([null], {}, [], 100), [])
 })
 
 test("lastUsedText boundaries", () => {
@@ -398,6 +424,14 @@ test("graphPoints treats slots below 2 as 2", () => {
 test("graphPoints on empty samples returns {rx: [], tx: [], scale: floor}", () => {
   assert.deepEqual(logic.graphPoints([], 4, 100, 50, 7), { rx: [], tx: [], scale: 7 })
   assert.deepEqual(logic.graphPoints(undefined, 4, 100, 50, 7), { rx: [], tx: [], scale: 7 })
+})
+
+test("graphPoints never throws on a null array element, reading it as rx/tx 0", () => {
+  assert.deepEqual(logic.graphPoints([null], 2, 100, 50, 1), {
+    rx: [{ x: 100, y: 50 }],
+    tx: [{ x: 100, y: 50 }],
+    scale: 1
+  })
 })
 
 // --- moveVertical ------------------------------------------------------
@@ -594,6 +628,35 @@ test("moveVertical: an unrecognized section stays put", () => {
   const avail = { header: 1, vpn: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "bogus", index: 0, bandAuto: false }, 1, avail), {
     section: "bogus",
+    index: 0,
+    bandAuto: false
+  })
+})
+
+test("moveVertical: a null or undefined state never throws and lands on dns/auto", () => {
+  const avail = { header: 1, vpn: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
+  assert.deepEqual(logic.moveVertical(null, 1, avail), { section: "dns", index: 0, bandAuto: true })
+  assert.deepEqual(logic.moveVertical(undefined, -1, avail), {
+    section: "dns",
+    index: 0,
+    bandAuto: true
+  })
+})
+
+test("moveVertical: a null or undefined avail never throws and reads as nothing available", () => {
+  const state = { section: "wifi", index: 0, bandAuto: false }
+  assert.deepEqual(logic.moveVertical(state, 1, null), {
+    section: "wifi",
+    index: 0,
+    bandAuto: false
+  })
+  assert.deepEqual(logic.moveVertical(state, 1, undefined), {
+    section: "wifi",
+    index: 0,
+    bandAuto: false
+  })
+  assert.deepEqual(logic.moveVertical({ section: "header", index: 0, bandAuto: false }, 1, null), {
+    section: "dns",
     index: 0,
     bandAuto: false
   })
