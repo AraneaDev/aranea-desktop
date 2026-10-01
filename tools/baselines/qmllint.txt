@@ -127,10 +127,8 @@
 1	plugins/araneadev.network/NetworkVpnSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.network/NetworkVpnSection.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.network/NetworkVpnSection.qml:missing-property:Member "family" not found on type "QObject"
-4	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "controlGap" not found on type "QObject"
-2	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
-4	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "family" not found on type "QObject"
+3	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "caption" not found on type "QObject"
+3	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.notifications/Inbox.qml:unused-imports:Unused import
 1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "caption" not found on type "QObject"
@@ -171,6 +169,10 @@
 2	plugins/araneadev.polkit/PolkitAgent.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.polkit/PolkitAgent.qml:unqualified:Unqualified access
 1	plugins/araneadev.polkit/PolkitWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+3	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "controlGap" not found on type "QObject"
+1	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
+3	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "display" not found on type "QObject"
 3	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "family" not found on type "QObject"

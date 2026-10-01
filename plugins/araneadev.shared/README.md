@@ -49,6 +49,15 @@ service contracts to the feature plugins.
   or only on a real pointer move when a `pointerGate` is set.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph,
   title/caption pair, and a trailing slot.
+- `CredentialPrompt` is the inline credential prompt (Network's passphrase,
+  VPN's password and 2FA code): an accent-to-violet frame around `fields`
+  (`{key, label, placeholder, secret, readOnly, optional, hidden, value}`)
+  and a check-glyph connect button. Opening focuses the first editable
+  field; Enter moves on and `submit`s from the last; Esc `cancel`s; typing
+  emits `edited(key, text)`; the button emits `connectClicked`, settled
+  through an optional `pointerGate`. `busy`/`failed` show `busyText` /
+  `failedText` instead of the fields. Its Repeater counts fields, so a
+  host echoing typed values back never rebuilds a field.
 - `LinkGraph` is the 60 s receive/send `Canvas` trace for a link's
   throughput, shared by the Network and VPN dropdowns. It draws
   `GraphLogic.graphPoints` and a bare baseline before there are samples.

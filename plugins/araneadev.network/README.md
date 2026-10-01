@@ -100,7 +100,7 @@ through the `pointerGate` each section receives.
 - `NetworkBandSection`, `NetworkDnsSection`: `FilamentPill` rows.
 - `NetworkWifiSection`: the Wi-Fi list with stock's section titles, a lock
   on secured rows, forget, status text and the inline passphrase prompt
-  (identity first for enterprise).
+  (the shared `Aranea.CredentialPrompt`, identity first for enterprise).
 - `NetworkSavedSection`: saved profiles out of range, dimmed, with forget.
 - Both lists use the shared `Aranea.ForgetButton` (as Bluetooth does).
 - `NetworkDropdown`: every section, the Wi-Fi/Saved scroll area, the empty
