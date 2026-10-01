@@ -20,6 +20,8 @@ Item {
   property real level: 0
   // Whether the channel is muted: strand and node turn grey.
   property bool muted: false
+  // How far one mouse-wheel notch moves the value (stock PanelSlider's step).
+  property real step: 0.05
   // Whether the slider takes pointer input.
   property bool interactive: true
   // Value shown while dragging; follows value otherwise.
@@ -45,6 +47,16 @@ Item {
     var span = Math.max(1, width - node.width)
     var fraction = Math.max(0, Math.min(1, (x - node.width / 2) / span))
     var next = minimum + fraction * (maximum - minimum)
+    liveValue = next
+    moved(next)
+  }
+
+  // Steps the value one notch up or down by a wheel ANGLE (angleDelta.y),
+  // clamped, as stock's PanelSlider does; a zero angle does nothing.
+  function wheelBy(angle) {
+    if (angle === 0)
+      return
+    var next = Math.max(minimum, Math.min(maximum, liveValue + (angle > 0 ? step : -step)))
     liveValue = next
     moved(next)
   }
@@ -161,8 +173,12 @@ Item {
   }
 
   MouseArea {
+    objectName: "filamentMouse"
     anchors.fill: parent
     enabled: slider.interactive
+    // Keep a drag that drifts vertically from turning into a flick of the
+    // scrolling dropdown around the slider.
+    preventStealing: true
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -182,9 +198,17 @@ Item {
       slider.dragging = false
       slider.liveValue = slider.value
     }
+    onCanceled: {
+      slider.dragging = false
+      slider.liveValue = slider.value
+    }
     onClicked: function (mouse) {
       if (mouse.button === Qt.RightButton)
         slider.rightClicked()
+    }
+    onWheel: function (wheel) {
+      slider.wheelBy(wheel.angleDelta.y)
+      wheel.accepted = true
     }
   }
 }

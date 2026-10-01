@@ -28,6 +28,20 @@ ShellRoot {
     width: 300
     value: 0.8
   }
+  Aranea.FilamentSlider {
+    id: wheeled
+    width: 300
+    value: 0.5
+    property var emitted: []
+    onMoved: function (value) {
+      emitted.push(Math.round(value * 100))
+    }
+  }
+  Aranea.FilamentSlider {
+    id: canceled
+    width: 300
+    value: 0.3
+  }
   Aranea.FilamentSwitch {
     id: sw
     property int count: 0
@@ -65,6 +79,20 @@ ShellRoot {
     t.check(Math.abs(glow.width - lit.width / 2) < 0.5, "a half level glows over half the lit strand")
     signal.muted = true
     t.check(!glow.visible, "a muted slider has no signal glow")
+    wheeled.wheelBy(120)
+    wheeled.wheelBy(-120)
+    wheeled.wheelBy(-120)
+    wheeled.wheelBy(0)
+    t.equal(wheeled.emitted, [55, 50, 45], "each wheel notch steps by 5% (a zero delta does nothing)")
+    wheeled.value = 0.98
+    wheeled.wheelBy(120)
+    t.equal(wheeled.emitted[wheeled.emitted.length - 1], 100, "the wheel clamps at the maximum")
+    var area = t.findChild(canceled, "filamentMouse")
+    t.check(area !== null && area.preventStealing, "a drag can't be stolen by a surrounding Flickable")
+    canceled.dragging = true
+    canceled.liveValue = 0.9
+    area.canceled()
+    t.check(!canceled.dragging && Math.abs(canceled.liveValue - 0.3) < 0.001, "a canceled drag ends and shows the real value")
     sw.activate()
     t.equal(sw.count, 1, "the switch emits toggled")
     unplugged.activate()
