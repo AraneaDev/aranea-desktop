@@ -33,6 +33,7 @@ Column {
     glyph: dropdown.view.glyph || ""
     mood: dropdown.view.mood || ""
     anyAudible: !!dropdown.view.anyAudible
+    hint: dropdown.view.toggleHint || ""
     hasCursor: !!dropdown.view.headerCursor
     onToggleAll: dropdown.action("toggleAll", null)
     onEntered: dropdown.action("hover", {

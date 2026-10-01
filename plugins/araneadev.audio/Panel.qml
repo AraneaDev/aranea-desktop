@@ -858,6 +858,7 @@ Panel {
       glyph: outputIcon(),
       mood: outputVolumeName(outputVolume, outputMuted),
       anyAudible: anyAudible,
+      toggleHint: toggleHint,
       headerCursor: headerHasCursor && keyboardCursor,
       cursor: {
         active: cursorActive && keyboardCursor,

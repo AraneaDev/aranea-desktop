@@ -22,6 +22,7 @@ ShellRoot {
         glyph: "",
         mood: "Cranked up",
         anyAudible: true,
+        toggleHint: "Mute",
         headerCursor: false,
         cursor: {
           active: false,
@@ -228,6 +229,8 @@ ShellRoot {
     var sources = t.findChild(full, "sourcesSection")
     var streamSlider = t.findChildren(sources, "streamSlider")[0]
     t.equal(streamSlider.maximum, 1.5, "streams go to 150%")
+    var header = t.findChild(full, "audioHeader")
+    t.check(header !== null && header.hintTip.text === "Mute", "the mute-all switch explains itself (stock's toggleHint)")
     t.check(t.findChild(full, "nowPlaying").visible, "now playing shows with a player")
     t.check(!t.findChild(bare, "nowPlaying").visible, "now playing hides without one")
     t.check(!t.findChild(bare, "sourcesSection").visible, "sources hide without streams")
