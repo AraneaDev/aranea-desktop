@@ -34,6 +34,9 @@ bright_cyan = "#8ff5df"
 bright_blue = "#8fb4ff"
 bright_magenta = "#8f75ff"
 cursor_shadow = "#15121f"
+mark_start = "#8af79c"
+mark_mid = "#2cf2b8"
+mark_end = "#00e5ff"
 
 [dimensions]
 surface_border = "#33424b"

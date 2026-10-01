@@ -18,7 +18,7 @@ grep -Fq 'Aranea.BrandConfig.shortName' "$repo_root/plugins/araneadev.lock/LockB
 grep -Fq 'Aranea.RuntimePaths.brandUrl' "$repo_root/plugins/araneadev.lock/LockView.qml"
 grep -Fq '<h1>Aranea</h1>' "$repo_root/integrations/browser/chromium/new-tab/index.html"
 
-test "$(identify -format '%wx%h' "$repo_root/unlock.png")" = '320x320'
+test "$(identify -format '%wx%h' "$repo_root/unlock.png")" = '640x640'
 test "$(identify -format '%wx%h' "$repo_root/branding/screens/plymouth.png")" = '1920x1080'
 grep -Fq 'Theme: Aranea' "$repo_root/branding/about-card.txt"
 grep -Fq 'Quiet systems. Connected focus.' "$repo_root/branding/screensaver.txt"

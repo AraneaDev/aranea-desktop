@@ -295,23 +295,44 @@ function renderBrandRaster(brand, tokens, markSvg, width, height, filename) {
   }
 }
 
+// Edge length in pixels of the square unlock.png. Omarchy's Plymouth theme
+// draws it at native size, so it must be large enough to stay crisp on 4K.
+const unlockSize = 640
+// Transparent margin on each side of unlock.png as a fraction of its edge, so
+// the spider never touches or crosses the canvas edge. With the canonical
+// mark's own viewBox padding the spider fills about 72% of the canvas.
+const unlockInset = 0.09
+
+// Renders the brand mark centred on a transparent square canvas of `size`
+// pixels, inset by `unlockInset` on every side.
+function renderPaddedMark(markSvg, size) {
+  const inset = Math.round(size * unlockInset)
+  const box = size - inset * 2
+  const markData = Buffer.from(markSvg).toString("base64")
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <image href="data:image/svg+xml;base64,${markData}" x="${inset}" y="${inset}" width="${box}" height="${box}" preserveAspectRatio="xMidYMid meet"/>
+</svg>
+`
+}
+
 function renderBrandAssets(brand, tokens) {
   const markSvg = renderAssetSource(brand.assets.mark, tokens)
   const fingerprint = createHash("sha256")
-    .update(JSON.stringify({ brand, tokens, markSvg }))
+    .update(JSON.stringify({ brand, tokens, markSvg, unlockSize, unlockInset }))
     .digest("hex")
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-brand-"))
   const output = path.join(temporaryRoot, "unlock.png")
-  const markOutput = path.join(temporaryRoot, "brand.svg")
+  const markOutput = path.join(temporaryRoot, "unlock.svg")
+  const size = String(unlockSize)
   try {
-    fs.writeFileSync(markOutput, markSvg)
-    execFileSync(rasterizer, ["-w", "320", "-h", "320", "-o", output, markOutput], {
+    fs.writeFileSync(markOutput, renderPaddedMark(markSvg, unlockSize))
+    execFileSync(rasterizer, ["-w", size, "-h", size, "-o", output, markOutput], {
       stdio: "ignore"
     })
     return new Map([
       [
         "branding/raster-manifest.txt",
-        `# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.\ninput_sha256=${fingerprint}\nunlock=320x320\nlock=3840x2160\nplymouth=1920x1080\n`
+        `# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.\ninput_sha256=${fingerprint}\nunlock=${size}x${size}\nlock=3840x2160\nplymouth=1920x1080\n`
       ],
       ["branding/brand.svg", markSvg],
       ["unlock.png", canonicalPng(fs.readFileSync(output))],
@@ -441,7 +462,10 @@ function renderPaletteProjection(relative, tokens) {
     "#ff5f56": tokens.colors.red,
     "#ffbd2e": tokens.colors.yellow,
     "#7dffc0": tokens.colors.bright_green,
-    "#10f0d0": tokens.colors.cyan
+    "#10f0d0": tokens.colors.cyan,
+    "#8af79c": tokens.colors.mark_start,
+    "#2cf2b8": tokens.colors.mark_mid,
+    "#00e5ff": tokens.colors.mark_end
   }
   return current.replaceAll(/#[0-9a-fA-F]{6}/g, (value) => palette[value.toLowerCase()] || value)
 }

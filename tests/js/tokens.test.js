@@ -16,7 +16,10 @@ const fixture = {
     dark_foreground: "#8b96a6",
     red: "#ff5f56",
     bright_green: "#abcdef",
-    cyan: "#123456"
+    cyan: "#123456",
+    mark_start: "#a1b2c3",
+    mark_mid: "#d4e5f6",
+    mark_end: "#0a1b2c"
   },
   dimensions: {
     surfaceBorderAlpha: 0.48
@@ -48,6 +51,9 @@ test("flattenTokens exposes canonical dotted token paths", async () => {
     "colors.red": "#ff5f56",
     "colors.bright_green": "#abcdef",
     "colors.cyan": "#123456",
+    "colors.mark_start": "#a1b2c3",
+    "colors.mark_mid": "#d4e5f6",
+    "colors.mark_end": "#0a1b2c",
     "dimensions.surfaceBorderAlpha": 0.48,
     "motion.enabled": true,
     "motion.reduced_motion_fallback": "static",
@@ -169,8 +175,10 @@ test("brand projections use the configured identity and tokenized mark colors", 
     assets: { mark: "branding/marks/aranea-primary.svg" }
   }
   const mark = renderAssetSource(brand.assets.mark, fixture)
-  assert.match(mark, /#abcdef/)
-  assert.match(mark, /#123456/)
+  assert.match(mark, /#a1b2c3/)
+  assert.match(mark, /#d4e5f6/)
+  assert.match(mark, /#0a1b2c/)
+  assert.doesNotMatch(mark, /#8af79c|#2cf2b8|#00e5ff/i)
   assert.match(renderBrandQml(brand), /shortName: "EXAMPLE"/)
   assert.match(renderBrandQml(brand), /lockSubtitle: "PRIVATE SESSION"/)
 })
