@@ -412,11 +412,20 @@ ShellRoot {
                   }
                 ])
                 t.step(80, function () {
-                  t.equal(gatedActions.length, 0, "a device sliding under a still pointer emits no hover action")
-                  pointer.mouseMove(gated, pt.x, pt.y + 5)
+                  // A compositor redelivers the pointer's last position as a
+                  // new event when the scene changes underneath it, so
+                  // replay that same absolute point explicitly (the one the
+                  // pointer actually last moved to, pt.x + 4) rather than
+                  // relying on an implicit re-hover (the offscreen test
+                  // platform never redelivers hover without a new event).
+                  pointer.mouseMove(gated, pt.x + 4, pt.y)
                   t.step(80, function () {
-                    t.check(gatedActions.length > 0, "a real move after the slide reports hover again")
-                    t.done()
+                    t.equal(gatedActions.length, 0, "a device sliding under a still pointer emits no hover action")
+                    pointer.mouseMove(gated, pt.x, pt.y + 5)
+                    t.step(80, function () {
+                      t.check(gatedActions.length > 0, "a real move after the slide reports hover again")
+                      t.done()
+                    })
                   })
                 })
               })
