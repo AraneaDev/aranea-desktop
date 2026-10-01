@@ -11,7 +11,7 @@
 // when active, Paired/Available scroll together under a pinned Connected
 // and ensureVisible scrolls a row into view, every trailing element ends
 // on one right content edge, and a missing adapter hides the lists behind
-// the empty text.
+// the empty text. The header caption's opacity follows captionOpacity.
 import QtQuick
 import Quickshell
 import qs.Commons
@@ -360,8 +360,8 @@ ShellRoot {
         ]), "right-clicking a row emits secondary")
 
         // Hovering the forget button reports a dedicated hover action with
-        // action: true, and action: false once it leaves (still over the
-        // row), via the section's own signal (there's no real pointer in
+        // action: true, and action: false plus leave: true once it leaves
+        // (still over the row), via the section's own signal (there's no real pointer in
         // this offscreen harness to synthesize a true hover with).
         paired.actionHovered(2, true)
         t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["hover",
@@ -376,9 +376,10 @@ ShellRoot {
           {
             section: "known",
             index: 2,
-            action: false
+            action: false,
+            leave: true
           }
-        ]), "leaving forget (still on the row) reports action: false")
+        ]), "leaving forget (still on the row) reports action: false with leave: true")
 
         // Signal glow levels come from the separate signals map.
         t.equal(availableRows[0].signal, 3, "a strong signal reaches its row")
@@ -415,6 +416,13 @@ ShellRoot {
               // nothing on its own).
               var header = t.findChild(full, "bluetoothHeader")
               t.check(header !== null && header.hintTip.text === "Turn Bluetooth off", "the power switch explains itself (stock's toggleHint)")
+              // The caption fades with captionOpacity, apart from the view.
+              var caption = t.findChild(header, "headerCaption")
+              t.check(caption !== null && caption.opacity === 1, "the caption starts fully opaque")
+              full.captionOpacity = 0.25
+              t.check(caption !== null && Math.abs(caption.opacity - 0.25) < 0.001, "the caption opacity follows captionOpacity")
+              t.check(caption !== null && caption.text === "HERDING HEADSETS", "fading the caption keeps its text")
+              full.captionOpacity = 1
               var edge = rightEdge(full, full)
               var cursorForget = t.findChildren(paired, "forgetButton").filter(function (b) {
                 return b.visible

@@ -92,6 +92,10 @@ Panel {
   property int phraseIndex: 0
   // Playful phrases shown in the hero status while Bluetooth is on.
   readonly property var activePhrases: ["Untangling wires", "Streaming vikings", "Pairing mysteries", "Herding headsets", "Taming radios", "Summoning speakers", "Wrangling codecs", "Polishing packets"]
+  // The hero caption's opacity, which phraseSwap fades between phrases.
+  // Passed to the view on its own, outside bluetoothView, so the fade never
+  // rebuilds the view object.
+  property real captionOpacity: 1
   // Whether the hero status should rotate through activePhrases.
   readonly property bool rotatingPhrases: adapter && adapter.enabled
   // The hero status line: adapter state, or a rotating phrase.
@@ -749,15 +753,50 @@ Panel {
     onTriggered: root.switchPendingAudioOutput()
   }
 
-  // Steps the hero caption through activePhrases while Bluetooth is on.
-  // Stock faded its own caption Text out and back in around each step; the
-  // Aranea header has no such item, so the caption simply changes.
   Timer {
     id: phraseTimer
     interval: 2800
     running: root.opened && root.rotatingPhrases
     repeat: true
-    onTriggered: root.phraseIndex = (root.phraseIndex + 1) % root.activePhrases.length
+    // With motion off the phrase just steps, without the fade.
+    onTriggered: {
+      if (Aranea.DesignTokens.motionEnabled)
+        phraseSwap.restart()
+      else
+        root.phraseIndex = (root.phraseIndex + 1) % root.activePhrases.length
+    }
+  }
+
+  // Stock's caption fade, on captionOpacity rather than stock's own Text.
+  SequentialAnimation {
+    id: phraseSwap
+    PropertyAnimation {
+      target: root
+      property: "captionOpacity"
+      to: 0.0
+      duration: 180
+      easing.type: Easing.OutQuad
+    }
+    ScriptAction {
+      script: root.phraseIndex = (root.phraseIndex + 1) % root.activePhrases.length
+    }
+    PropertyAnimation {
+      target: root
+      property: "captionOpacity"
+      to: 1.0
+      duration: 260
+      easing.type: Easing.InQuad
+    }
+  }
+
+  Connections {
+    target: root
+    function onRotatingPhrasesChanged() {
+      if (!root.rotatingPhrases) {
+        phraseSwap.stop()
+        root.captionOpacity = 1.0
+      }
+    }
   }
 
   // Reads every BlueZ device's RSSI in one D-Bus call, for the Available
@@ -914,6 +953,13 @@ Panel {
       return
     }
     if (name === "hover") {
+      // Leaving a forget button only drops the action focus on that row,
+      // as stock's button did; the row's own hover places the cursor.
+      if (arg.leave) {
+        if (focusSection === arg.section && selectedIndex === arg.index)
+          actionFocused = false
+        return
+      }
       if (arg.section === "header") {
         setHeaderCursor()
         return
@@ -1055,6 +1101,7 @@ Panel {
         id: dropdown
         width: parent.width
         maxScrollHeight: Style.space(400)
+        captionOpacity: root.captionOpacity
         view: root.bluetoothView
         onAction: function (name, arg) {
           root.handleAction(name, arg)

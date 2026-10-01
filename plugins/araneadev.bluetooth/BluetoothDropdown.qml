@@ -20,6 +20,9 @@ Column {
   // Cap on the Paired/Available scroll area's height, so a noisy
   // neighbourhood doesn't grow the popup past the screen.
   property real maxScrollHeight: Style.space(400)
+  // The header caption's opacity, animated by Panel between rotating
+  // phrases. Kept out of view so the fade never rebuilds the view object.
+  property real captionOpacity: 1
   // Cursor object from the view, or a neutral one.
   readonly property var cursor: view && view.cursor ? view.cursor : ({
       active: false,
@@ -32,7 +35,9 @@ Column {
   readonly property bool devicesAvailable: !!dropdown.view.enabled && !!dropdown.view.hasAdapter
 
   // Emitted for every user action: toggleBluetooth, primary, secondary,
-  // forget and hover. See the plan's action list.
+  // forget and hover. See the plan's action list. A hover that leaves a
+  // forget button carries leave: true, so the host only drops the action
+  // focus there instead of moving the cursor.
   signal action(string name, var arg)
 
   // Cursor row index for SECTION: the view's index there, else -2 (none).
@@ -65,6 +70,7 @@ Column {
     width: parent.width
     glyph: dropdown.view.glyph || ""
     caption: dropdown.view.caption || ""
+    captionOpacity: dropdown.captionOpacity
     powered: !!dropdown.view.enabled
     hasAdapter: !!dropdown.view.hasAdapter
     hint: dropdown.view.toggleHint || ""
@@ -125,10 +131,15 @@ Column {
       })
     }
     onActionHovered: function (index, hovered) {
-      dropdown.action("hover", {
+      dropdown.action("hover", hovered ? {
         section: "connected",
         index: index,
-        action: hovered
+        action: true
+      } : {
+        section: "connected",
+        index: index,
+        action: false,
+        leave: true
       })
     }
   }
@@ -192,10 +203,15 @@ Column {
           })
         }
         onActionHovered: function (index, hovered) {
-          dropdown.action("hover", {
+          dropdown.action("hover", hovered ? {
             section: "known",
             index: index,
-            action: hovered
+            action: true
+          } : {
+            section: "known",
+            index: index,
+            action: false,
+            leave: true
           })
         }
       }
@@ -243,10 +259,15 @@ Column {
           })
         }
         onActionHovered: function (index, hovered) {
-          dropdown.action("hover", {
+          dropdown.action("hover", hovered ? {
             section: "discovered",
             index: index,
-            action: hovered
+            action: true
+          } : {
+            section: "discovered",
+            index: index,
+            action: false,
+            leave: true
           })
         }
       }
