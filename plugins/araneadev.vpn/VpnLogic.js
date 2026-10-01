@@ -25,8 +25,9 @@ var APP_GLYPH = 0xf05f4
  */
 
 /**
- * A connection's session fields, from `nmcli -t -g
- * IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers connection show uuid <u>`.
+ * A connection's session fields, from `nmcli -t -f
+ * IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers connection show uuid <u>`
+ * (see `sessionCommand`).
  * @typedef {{ip: string, server: string, vpnType: string}} VpnSession
  */
 
@@ -112,17 +113,66 @@ function parseVpnConnections(text) {
 }
 
 /**
- * The first address in a comma-separated `nmcli -g IP4.ADDRESS` value, with
- * its `/prefix` suffix dropped.
- * @param {string|undefined} line - the IP4.ADDRESS line
- * @returns {string} the first address, or "" when the line is empty
+ * An `IP4.ADDRESS[n]` value with its `/prefix` suffix dropped.
+ * @param {string|undefined} value - the address, as `parseNamedFields` returns it
+ * @returns {string} the address without its prefix, or "" when there is none
  */
-function firstAddress(line) {
-  var s = String(line || "").trim()
+function stripPrefix(value) {
+  var s = String(value || "").trim()
   if (!s) return ""
-  var first = s.split(",")[0].trim()
-  var slash = first.indexOf("/")
-  return slash === -1 ? first : first.substring(0, slash)
+  var slash = s.indexOf("/")
+  return slash === -1 ? s : s.substring(0, slash)
+}
+
+/**
+ * Splits one `nmcli -t -f <names> ... show` line into its field name and raw
+ * value, on the first unescaped `:` only (unlike `splitTerse`, which splits
+ * every unescaped `:` into separate fields). Past that first colon nmcli does
+ * not escape further colons in this named-field mode (confirmed against a
+ * real profile: `vpn.data`'s `remote = host:port` comes through with its
+ * colon intact), so the value is taken verbatim to the end of the line.
+ * @param {string} line - one line of the command's stdout
+ * @returns {{name: string, value: string}|null} the field, or null when the line has no unescaped colon
+ */
+function splitNamedField(line) {
+  var s = String(line || "")
+  for (var i = 0; i < s.length; i++) {
+    var c = s[i]
+    if (c === "\\" && i + 1 < s.length && (s[i + 1] === ":" || s[i + 1] === "\\")) {
+      i++
+      continue
+    }
+    if (c === ":") return { name: s.substring(0, i), value: s.substring(i + 1) }
+  }
+  return null
+}
+
+/**
+ * Parses `nmcli -t -f <names> ... connection show`-style output: one
+ * requested property per line as `name:value` (or `name[n]:value` for a
+ * multi-valued property such as `IP4.ADDRESS`), with a property that
+ * doesn't apply to this connection (an inactive one's `IP4.ADDRESS`, a
+ * non-WireGuard one's `wireguard.peers`) omitted entirely rather than
+ * printed empty (confirmed against a real, inactive OpenVPN profile, whose
+ * `-t -f IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers` output was
+ * only 2 lines, not 4). Keeps each base name's FIRST line only, so an
+ * indexed property's `[1]` always wins over its `[2]`.
+ * @param {string|undefined} text - the command's stdout
+ * @returns {Record<string, string>} base field name (index suffix stripped) to its first value
+ */
+function parseNamedFields(text) {
+  var lines = String(text || "").split("\n")
+  /** @type {Record<string, string>} */
+  var out = {}
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i]
+    if (!line) continue
+    var field = splitNamedField(line)
+    if (!field) continue
+    var baseName = field.name.replace(/\[\d+\]$/, "")
+    if (!Object.prototype.hasOwnProperty.call(out, baseName)) out[baseName] = field.value
+  }
+  return out
 }
 
 /**
@@ -178,17 +228,19 @@ function vpnTypeFromServiceType(serviceTypeLine, peersLine) {
 }
 
 /**
- * The first WireGuard peer's endpoint host (port stripped), from a
- * `wireguard.peers` line holding one or more peers separated by `" | "`,
- * each a `parseKeyValueList`-shaped segment with an `endpoint` key.
- * @param {string|undefined} peersLine - the wireguard.peers line
- * @returns {string} the first peer's endpoint host, or "" when there is none
+ * The first WireGuard peer's endpoint host (port stripped). `peersLine` is
+ * already the first peer's own `key = value, key = value` attributes
+ * (`parseNamedFields` keeps only `wireguard.peers[1]`, the first index), so
+ * this just reads its `endpoint` key. There's no real WireGuard profile on
+ * this machine to confirm a peer's inner shape against (unlike `vpn.data`,
+ * captured from a real OpenVPN profile below); it's constructed from the
+ * same `key = value` convention nmcli uses for `vpn.data` (see the task
+ * report).
+ * @param {string|undefined} peersLine - the first peer's attributes (`wireguard.peers[1]`'s value)
+ * @returns {string} the peer's endpoint host, or "" when there is none
  */
 function firstPeerHost(peersLine) {
-  var s = String(peersLine || "").trim()
-  if (!s) return ""
-  var firstPeer = s.split("|")[0]
-  var map = parseKeyValueList(firstPeer)
+  var map = parseKeyValueList(peersLine)
   var endpoint = map.endpoint || ""
   if (!endpoint) return ""
   var colon = endpoint.lastIndexOf(":")
@@ -196,21 +248,40 @@ function firstPeerHost(peersLine) {
 }
 
 /**
- * Parses a connection's session fields from `nmcli -t -g
+ * The nmcli argv that reads a connection's session fields (fed to
+ * `parseSession`).
+ * @param {string} uuid - the profile's uuid
+ * @returns {string[]} the argv
+ */
+function sessionCommand(uuid) {
+  return [
+    "nmcli",
+    "-t",
+    "-f",
+    "IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers",
+    "connection",
+    "show",
+    "uuid",
+    uuid
+  ]
+}
+
+/**
+ * Parses a connection's session fields from `sessionCommand`'s `nmcli -t -f
  * IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers connection show uuid
- * <u>`: one requested property per line, in that order. There are no real
- * VPN profiles to capture this from; the `vpn.data` and `wireguard.peers`
- * line shapes are constructed from nmcli's documented `key = value, ...`
- * rendering of a complex property (see the task report).
+ * <u>` (named fields, not `-g`: real nmcli output for a multi-property `-g`
+ * request on one `connection show` target is NOT one line per requested
+ * field in request order: an inapplicable property's line is omitted
+ * entirely, which silently shifts every later field. Named `-t -f` output
+ * carries each property's own name, immune to that shift).
  * @param {string|undefined} text - the command's stdout
  * @returns {VpnSession} the IP, server and VPN type
  */
 function parseSession(text) {
-  var lines = String(text || "").split("\n")
-  var ipLine = lines[0]
-  var vpnDataLine = lines[1]
-  var serviceTypeLine = lines[2]
-  var peersLine = lines[3]
+  var fields = parseNamedFields(text)
+  var vpnDataLine = fields["vpn.data"] || ""
+  var serviceTypeLine = fields["vpn.service-type"] || ""
+  var peersLine = fields["wireguard.peers"] || ""
 
   var vpnType = vpnTypeFromServiceType(serviceTypeLine, peersLine)
   var server = ""
@@ -218,7 +289,7 @@ function parseSession(text) {
   else if (vpnType === "OpenConnect") server = vpnDataValue(vpnDataLine, "gateway")
   else if (vpnType === "WireGuard") server = firstPeerHost(peersLine)
 
-  return { ip: firstAddress(ipLine), server: server, vpnType: vpnType }
+  return { ip: stripPrefix(fields["IP4.ADDRESS"]), server: server, vpnType: vpnType }
 }
 
 /**
@@ -387,7 +458,11 @@ function needsSecrets(stderr) {
 /**
  * Whether nmcli's stderr says the connect failed because of authentication
  * (missing secrets, or secrets it was given being rejected), the case that
- * reopens the prompt rather than just showing a generic failure.
+ * reopens the prompt rather than just showing a generic failure. Requires
+ * the full "authentication failed" phrase, not a bare "auth": that alone
+ * also matches unrelated nmcli/NetworkManager noise such as "Auth dialog
+ * failed to open", "HTTP proxy auth file" or a "PolicyKit Authentication
+ * Agent" log line, none of which mean the VPN's own secrets were rejected.
  * @param {string|undefined} stderr - the failed `nmcli connection up`'s stderr
  * @returns {boolean} true on any authentication failure
  */
@@ -396,7 +471,7 @@ function isAuthFailure(stderr) {
   return (
     String(stderr || "")
       .toLowerCase()
-      .indexOf("auth") !== -1
+      .indexOf("authentication failed") !== -1
   )
 }
 
@@ -483,6 +558,7 @@ if (typeof module !== "undefined")
   module.exports = {
     splitTerse: splitTerse,
     parseVpnConnections: parseVpnConnections,
+    sessionCommand: sessionCommand,
     parseSession: parseSession,
     typeLabel: typeLabel,
     vpnRows: vpnRows,

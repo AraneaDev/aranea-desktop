@@ -56,51 +56,91 @@ test("parseVpnConnections on missing/undefined text returns [] rather than throw
   assert.deepEqual(logic.parseVpnConnections(""), [])
 })
 
+// --- sessionCommand --------------------------------------------------------------
+
+test("sessionCommand: the named-field nmcli argv parseSession expects", () => {
+  assert.deepEqual(logic.sessionCommand("uuid-1"), [
+    "nmcli",
+    "-t",
+    "-f",
+    "IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers",
+    "connection",
+    "show",
+    "uuid",
+    "uuid-1"
+  ])
+})
+
 // --- parseSession --------------------------------------------------------------
 //
-// There are no real VPN profiles on this machine to capture `nmcli -t -g`
-// output from. These fixtures are constructed from nmcli's documented
-// behaviour: `-g` with several properties on a single `connection show`
-// target prints one requested property per line, in the order asked; a
-// complex property such as `vpn.data` renders as `key = value, key = value`
-// (the task brief's own example). `wireguard.peers`'s shape isn't specified
-// anywhere the brief points to, so its `key = value` / `" | "`-separated-peers
-// format here is this task's own construction (see task-2-report.md).
+// `nmcli -g` is NOT one line per requested field in request order: an
+// inapplicable property (an inactive connection's IP4.ADDRESS, a non-
+// WireGuard connection's wireguard.peers) is omitted entirely, silently
+// shifting every later field. Verified live, read-only, against this
+// machine's real (inactive) OpenVPN profile "client" with
+// `nmcli -t -f IP4.ADDRESS,vpn.data,vpn.service-type,wireguard.peers
+// connection show uuid <uuid>`: output was 2 lines (vpn.data,
+// vpn.service-type), not 4 - IP4.ADDRESS (inactive) and wireguard.peers (not
+// a WireGuard connection) were both missing, not blank. `-t -f` (named
+// fields) avoids the shift since each line carries its own property name;
+// `parseSession` is built on that instead. The `vpn.data` fixture below is
+// that real profile's actual line, with the host and local paths redacted
+// (`vpn.example.com`, `/home/user/...`) per the task's redaction rule -
+// including, notably, a `remote` value with an unescaped `:` in it
+// (`vpn.example.com:443`) and an internal `verify-x509-name` value with
+// escaped commas, both reproduced verbatim from the real capture.
+// `IP4.ADDRESS[1]` (an active connection's indexed field name) was
+// confirmed live too, against an active Wi-Fi connection's IP; the
+// WireGuard fixtures remain constructed (no real WireGuard profile exists
+// on this machine) from the same `key = value` convention `vpn.data` uses.
 
-test("parseSession reads an OpenVPN session: ip, remote as server, OpenVPN as type", () => {
+const REAL_OPENVPN_VPN_DATA =
+  "vpn.data:auth = SHA256, ca = /home/user/.config/openvpn/mobile-vpn/ca.crt, " +
+  "cert = /home/user/.config/openvpn/mobile-vpn/client.crt, challenge-response-flags = 2, " +
+  "cipher = AES-256-CBC, connection-type = password-tls, dev = tun, float = yes, " +
+  "key = /home/user/.config/openvpn/mobile-vpn/client.pem, password-flags = 1, ping = 10, " +
+  "ping-restart = 60, proto-tcp = yes, remote = vpn.example.com:443, reneg-seconds = 28800, " +
+  "tls-version-min = 1.2, verify-x509-name = subject:O=WatchGuard_Technologies\\, OU=Fireware\\, " +
+  "CN=Fireware SSLVPN Server"
+
+test("parseSession reads the real (redacted) inactive OpenVPN profile: no IP4.ADDRESS line at all, remote survives its own unescaped colon", () => {
   const text = [
-    "10.8.0.2/24",
-    "remote = vpn.example.com:1194, cipher = AES-256-GCM, username = tschipper",
-    "org.freedesktop.NetworkManager.openvpn",
-    ""
+    REAL_OPENVPN_VPN_DATA,
+    "vpn.service-type:org.freedesktop.NetworkManager.openvpn"
   ].join("\n")
   assert.deepEqual(logic.parseSession(text), {
-    ip: "10.8.0.2",
-    server: "vpn.example.com:1194",
+    ip: "",
+    server: "vpn.example.com:443",
     vpnType: "OpenVPN"
   })
 })
 
+test("parseSession reads IP4.ADDRESS[1] (the real indexed field name for an active connection) and strips its prefix", () => {
+  const text = [
+    "IP4.ADDRESS[1]:192.168.0.126/24",
+    REAL_OPENVPN_VPN_DATA,
+    "vpn.service-type:org.freedesktop.NetworkManager.openvpn"
+  ].join("\n")
+  assert.equal(logic.parseSession(text).ip, "192.168.0.126")
+})
+
 test("parseSession reads an OpenConnect session: gateway as server, OpenConnect as type", () => {
   const text = [
-    "10.9.0.4/24",
-    "gateway = gp.example.com, gateway-flags = 0",
-    "org.freedesktop.NetworkManager.openconnect",
-    ""
+    "vpn.data:gateway = gp.example.com, gateway-flags = 0",
+    "vpn.service-type:org.freedesktop.NetworkManager.openconnect"
   ].join("\n")
   assert.deepEqual(logic.parseSession(text), {
-    ip: "10.9.0.4",
+    ip: "",
     server: "gp.example.com",
     vpnType: "OpenConnect"
   })
 })
 
-test("parseSession reads a WireGuard session: first peer endpoint host as server, WireGuard as type", () => {
+test("parseSession reads a WireGuard session: no vpn.service-type line at all, wireguard.peers[1]'s endpoint host as server", () => {
   const text = [
-    "10.10.0.5/32",
-    "",
-    "",
-    "endpoint = 203.0.113.5:51820, allowed-ips = 0.0.0.0/0 | endpoint = 203.0.113.6:51820, allowed-ips = 0.0.0.0/0"
+    "IP4.ADDRESS[1]:10.10.0.5/32",
+    "wireguard.peers[1]:public-key = abc123, endpoint = 203.0.113.5:51820, allowed-ips = 0.0.0.0/0",
+    "wireguard.peers[2]:public-key = def456, endpoint = 203.0.113.6:51820, allowed-ips = 0.0.0.0/0"
   ].join("\n")
   assert.deepEqual(logic.parseSession(text), {
     ip: "10.10.0.5",
@@ -109,30 +149,37 @@ test("parseSession reads a WireGuard session: first peer endpoint host as server
   })
 })
 
-test("parseSession falls back to VPN with an unrecognized service type and no peers", () => {
-  const text = ["10.11.0.1/24", "", "org.freedesktop.NetworkManager.something-else", ""].join("\n")
-  const result = logic.parseSession(text)
+test("parseSession falls back to VPN when neither vpn.service-type nor wireguard.peers is present", () => {
+  const result = logic.parseSession("IP4.ADDRESS[1]:10.11.0.1/24")
   assert.equal(result.vpnType, "VPN")
   assert.equal(result.server, "")
+  assert.equal(result.ip, "10.11.0.1")
 })
 
-test("parseSession takes the first address and drops its prefix when several are listed", () => {
-  const text = [
-    "10.8.0.2/24,10.8.0.3/24",
-    "remote = vpn.example.com",
-    "org.freedesktop.NetworkManager.openvpn",
-    ""
-  ].join("\n")
-  assert.equal(logic.parseSession(text).ip, "10.8.0.2")
-})
-
-test("parseSession on missing/short text never throws", () => {
+test("parseSession on missing/empty text never throws", () => {
   assert.deepEqual(logic.parseSession(undefined), { ip: "", server: "", vpnType: "VPN" })
-  assert.deepEqual(logic.parseSession("10.0.0.1/24"), {
-    ip: "10.0.0.1",
-    server: "",
-    vpnType: "VPN"
-  })
+  assert.deepEqual(logic.parseSession(""), { ip: "", server: "", vpnType: "VPN" })
+})
+
+test("parseSession ignores a line with no unescaped colon at all, rather than throwing", () => {
+  const text = [
+    "garbage with no colon",
+    "vpn.service-type:org.freedesktop.NetworkManager.openvpn"
+  ].join("\n")
+  assert.equal(logic.parseSession(text).vpnType, "OpenVPN")
+})
+
+test("parseSession's field-name split treats an escaped colon in a field name as part of the name, not a separator", () => {
+  // Real nmcli field names never contain a colon, escaped or not; this only
+  // exercises splitNamedField's defensive escape handling (shared with
+  // splitTerse's), not a real nmcli shape.
+  const text = "weird\\:name:org.freedesktop.NetworkManager.openvpn"
+  const result = logic.parseSession(text)
+  assert.equal(
+    result.vpnType,
+    "VPN",
+    "the whole line is dropped: its base name is not vpn.service-type"
+  )
 })
 
 // --- typeLabel -------------------------------------------------------------
@@ -383,14 +430,20 @@ test("isAuthFailure is true for anything needsSecrets matches", () => {
   assert.equal(logic.isAuthFailure("secrets were required"), true)
 })
 
-test("isAuthFailure is true on auth/authentication-failed text", () => {
+test("isAuthFailure is true on the full authentication-failed phrase, case-insensitively", () => {
   assert.equal(logic.isAuthFailure("Authentication failed."), true)
-  assert.equal(logic.isAuthFailure("auth error"), true)
+  assert.equal(logic.isAuthFailure("AUTHENTICATION FAILED"), true)
 })
 
 test("isAuthFailure is false on an unrelated failure", () => {
   assert.equal(logic.isAuthFailure("connection activation failed: timeout"), false)
   assert.equal(logic.isAuthFailure(undefined), false)
+})
+
+test('isAuthFailure requires the full phrase, not a bare "auth": real nmcli/NM noise that only contains "auth" is not an auth failure', () => {
+  assert.equal(logic.isAuthFailure("Auth dialog failed to open"), false)
+  assert.equal(logic.isAuthFailure("HTTP proxy auth file"), false)
+  assert.equal(logic.isAuthFailure("PolicyKit Authentication Agent"), false)
 })
 
 // --- connectCommand / disconnectCommand -----------------------------------------
