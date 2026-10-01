@@ -1,15 +1,16 @@
-// The "forget" button the Aranea Network dropdown's Wi-Fi and Saved rows
-// show at their right edge: Bluetooth's forget button (BluetoothDevice-
-// Section.qml), soft red with a hairline border, brighter when the
-// keyboard cursor's action is on it. It sizes to zero while hidden so a
-// NodeDeviceRow's trailing slot, which sizes to its children, never
-// reserves room for it. Like NodeDeviceRow, a click within settleMs of
+// The "forget" button a dropdown row shows at its right edge (Bluetooth's
+// devices, Network's Wi-Fi and Saved rows): soft red with a hairline
+// border, brighter when the keyboard cursor's action is on it. It shows on
+// a forgettable row under the pointer or the keyboard cursor, and sizes to
+// zero while hidden so a NodeDeviceRow's trailing slot, which sizes to its
+// children, never reserves room for it. Entering it is gated (pointerGate)
+// so a button sliding under a still pointer never takes the cursor;
+// leaving it, and its own hover and visibility, are not. Like NodeDeviceRow, a click within settleMs of
 // the button being created is ignored unless the gate accepted a real
 // pointer move onto it since.
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "../araneadev.shared" as Aranea
 
 Item {
   id: forgetBtn
@@ -25,8 +26,8 @@ Item {
   // Optional PointerMoveGate (qs.Ui): only a real pointer move onto the
   // button reports pointerEntered.
   property var pointerGate: null
-  // The tooltip.
-  property string tooltipText: "Forget network"
+  // The button's tooltip.
+  property string tooltipText: "Forget"
   // Whether the pointer is over the button itself.
   readonly property alias hovered: forgetHover.hovered
   // Whether the button shows: a forgettable row under the pointer (the
@@ -72,14 +73,14 @@ Item {
     anchors.fill: parent
     color: "transparent"
     border.width: 1
-    border.color: forgetBtn.bright ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.22)
+    border.color: forgetBtn.bright ? DesignTokens.urgent : Util.alpha(DesignTokens.foreground, 0.22)
   }
   Text {
     id: forgetLabel
     objectName: "forgetLabel"
     anchors.centerIn: parent
     text: String.fromCodePoint(0xf0156) + " forget"
-    color: forgetBtn.bright ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.urgent, 0.7)
+    color: forgetBtn.bright ? DesignTokens.urgent : Util.alpha(DesignTokens.urgent, 0.7)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }

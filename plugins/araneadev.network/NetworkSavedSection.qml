@@ -90,7 +90,8 @@ Column {
       onEntered: section.hovered(savedRow.index, false)
 
       // The trailing slot's only child.
-      NetworkForgetButton {
+      Aranea.ForgetButton {
+        tooltipText: "Forget network"
         forgettable: true
         rowHovered: savedRow.hovered
         hasCursor: section.cursorIndex === savedRow.index

@@ -155,9 +155,10 @@ Column {
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
           }
-          NetworkForgetButton {
+          Aranea.ForgetButton {
             id: forgetBtn
             anchors.verticalCenter: parent.verticalCenter
+            tooltipText: "Forget network"
             forgettable: !!wrapper.modelData.forgettable && !section.disabled
             rowHovered: wifiRow.hovered
             hasCursor: wrapper.hasCursor

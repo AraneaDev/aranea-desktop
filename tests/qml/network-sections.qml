@@ -359,7 +359,7 @@ ShellRoot {
         x: 20
         y: 20
         active: false
-        sourceComponent: Network.NetworkForgetButton {
+        sourceComponent: Aranea.ForgetButton {
           forgettable: true
           hasCursor: true
           pointerGate: freshGate

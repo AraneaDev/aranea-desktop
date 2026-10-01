@@ -19,3 +19,4 @@ FilamentPulse 1.0 FilamentPulse.qml
 NodeDeviceRow 1.0 NodeDeviceRow.qml
 DropdownHeader 1.0 DropdownHeader.qml
 FilamentPill 1.0 FilamentPill.qml
+ForgetButton 1.0 ForgetButton.qml

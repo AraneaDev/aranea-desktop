@@ -31,8 +31,8 @@
 1	plugins/araneadev.bar/Bar.qml:unresolved-type:Type margins is used but it is not resolved
 1	plugins/araneadev.bar/Bar.qml:unused-imports:Unused import
 1	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "body" not found on type "QObject"
-2	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "caption" not found on type "QObject"
-3	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.bluetooth/BluetoothDeviceSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.bluetooth/BluetoothDropdown.qml:missing-property:Member "family" not found on type "QObject"
@@ -113,8 +113,6 @@
 1	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
-1	plugins/araneadev.network/NetworkForgetButton.qml:missing-property:Member "caption" not found on type "QObject"
-1	plugins/araneadev.network/NetworkForgetButton.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkHeader.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkHeader.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.network/NetworkInterfacesSection.qml:missing-property:Member "body" not found on type "QObject"
@@ -179,6 +177,8 @@
 1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.shared/FilamentPill.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.shared/FilamentPill.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.shared/ForgetButton.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.shared/ForgetButton.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "caption" not found on type "QObject"
 3	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "family" not found on type "QObject"

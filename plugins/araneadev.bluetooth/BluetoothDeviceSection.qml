@@ -1,6 +1,6 @@
 // One device list (Connected, Paired or Available) in the Aranea
 // Bluetooth dropdown: a caption row with the count, a Repeater of
-// Aranea.NodeDeviceRow, each with an optional forget button and a
+// Aranea.NodeDeviceRow, each with an optional Aranea.ForgetButton and a
 // right-click MouseArea for the secondary action. Pure view: plain
 // inputs in, signals out.
 pragma ComponentBehavior: Bound
@@ -109,91 +109,24 @@ Column {
 
         // The only item in NodeDeviceRow's default (trailing) slot, so the
         // slot's childrenRect sizing stays just the button's own size: the
-        // tooltips and the right-click area below sit outside it instead.
-        // width/height are forced to 0 while hidden: NodeDeviceRow's
-        // trailing slot sizes to childrenRect, which (unlike layout
-        // anchoring) counts invisible children's geometry too, so an
-        // implicitly-sized hidden button would still push the detail text
-        // left of it.
-        Item {
+        // row tooltip and the right-click area below sit outside it.
+        Aranea.ForgetButton {
           id: forgetBtn
-          objectName: "forgetButton"
-          // Whether this row can be forgotten and the pointer is over the
-          // row or this button, or the keyboard cursor sits on the row. The
-          // button's own hover counts: it sits above the row's MouseArea
-          // and takes the hover from it, so devRow.hovered alone hid the
-          // button under the pointer and showed it again on every move.
-          readonly property bool shown: !!wrapper.modelData.forgettable && (devRow.hovered || forgetHover.hovered || section.cursor === wrapper.index)
-          // Whether the keyboard cursor's action (not just the row) is here.
-          readonly property bool bright: section.cursor === wrapper.index && section.cursorAction
-
-          // Not anchored: NodeDeviceRow's trailing slot sizes itself to
-          // this button (its childrenRect) and is centred already, so
-          // centring on the slot made the slot's height depend on itself.
-          visible: shown
-          width: shown ? forgetLabel.implicitWidth + Style.space(12) : 0
-          height: shown ? forgetLabel.implicitHeight + Style.space(4) : 0
-
-          // Directly callable from tests, like NodeDeviceRow.activate().
-          function activate() {
-            section.forget(wrapper.index)
-          }
-
-          Rectangle {
-            id: forgetBorder
-            objectName: "forgetBorder"
-            anchors.fill: parent
-            color: "transparent"
-            border.width: 1
-            border.color: forgetBtn.bright ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.22)
-          }
-          Text {
-            id: forgetLabel
-            objectName: "forgetLabel"
-            anchors.centerIn: parent
-            text: String.fromCodePoint(0xf0156) + " forget"
-            color: forgetBtn.bright ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.urgent, 0.7)
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-          }
-          MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: forgetBtn.activate()
-          }
-          // Non-blocking: only observes hover, never intercepts the click
-          // above. Scoped to the button's own (small) bounds, so it fires
-          // true entering it and false leaving it, independent of the
-          // row's own, much larger, hover area. Only the entering action is
-          // gated: a still pointer never moves the keyboard cursor onto the
-          // forget action just because the button slid underneath it.
-          // Leaving (dropping the action focus) and the button's own
-          // `hovered` (which drives shown/bright above) stay ungated.
-          HoverHandler {
-            id: forgetHover
-            onHoveredChanged: {
-              if (!hovered)
-                section.actionHovered(wrapper.index, false)
-              else if (!section.pointerGate)
-                section.actionHovered(wrapper.index, true)
-              else if (section.pointerGate.moved(forgetHover.parent, {
-                x: forgetHover.point.position.x,
-                y: forgetHover.point.position.y
-              }))
-                section.actionHovered(wrapper.index, true)
-            }
-          }
+          forgettable: !!wrapper.modelData.forgettable
+          rowHovered: devRow.hovered
+          hasCursor: section.cursor === wrapper.index
+          cursorAction: section.cursorAction
+          pointerGate: section.pointerGate
+          onClicked: section.forget(wrapper.index)
+          onPointerEntered: section.actionHovered(wrapper.index, true)
+          onPointerLeft: section.actionHovered(wrapper.index, false)
         }
       }
       // The row's Connect/Disconnect/Pair tooltip, hidden while the forget
-      // button's own tooltip (below) is showing instead.
+      // button's own tooltip is showing instead.
       PanelToolTip {
-        visible: devRow.hovered && !forgetHover.hovered && section.rowTooltip !== ""
+        visible: devRow.hovered && !forgetBtn.hovered && section.rowTooltip !== ""
         text: section.rowTooltip
-      }
-      PanelToolTip {
-        visible: forgetHover.hovered
-        text: "Forget"
       }
       // A right-click signal NodeDeviceRow doesn't have: a dedicated
       // overlay rather than changing its left-click (shared with audio)

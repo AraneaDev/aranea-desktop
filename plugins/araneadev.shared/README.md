@@ -25,7 +25,19 @@ service contracts to the feature plugins.
   moving under a still pointer: with a gate set, `entered` fires only on a
   real pointer move, never on the row sliding underneath a stationary
   cursor. `detailColor` recolours the detail (the network VPN rows use
-  `DesignTokens.urgent` for "Couldn't connect").
+  `DesignTokens.urgent` for "Couldn't connect"). A pointer click within
+  `settleMs` (300 ms) of the row being created is ignored unless the gate
+  accepted a real move over it since, so a Repeater rebuild never turns a
+  click aimed at one row into a click on another.
+- `ForgetButton` is the soft red "forget" button a row puts in its trailing
+  slot (Bluetooth devices, Network's Wi-Fi and Saved rows). It shows on a
+  `forgettable` row while the row (`rowHovered`), the button or the
+  keyboard cursor (`hasCursor`) is on it, and draws bright when the
+  cursor's action is on it (`cursorAction`). It sizes to zero while
+  hidden. It emits `clicked` (also `activate()`), `pointerEntered` (gated
+  through `pointerGate`) and `pointerLeft` (ungated). Its `hovered` lets a
+  host hide its own row tooltip. `tooltipText` is the button's tooltip, and
+  clicks settle like `NodeDeviceRow`'s.
 - `FilamentPill` is the Filament-style choice pill (the network dropdown's
   band and DNS rows): a thin muted border, or an accent border with a 2 px
   accent underline when `selected`; the keyboard cursor (`hasCursor`) draws

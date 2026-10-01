@@ -96,7 +96,7 @@ through the `pointerGate` each section receives.
   on secured rows, forget, status text and the inline passphrase prompt
   (identity first for enterprise).
 - `NetworkSavedSection`: saved profiles out of range, dimmed, with forget.
-- `NetworkForgetButton`: Bluetooth's forget button, shared by both lists.
+- Both lists use the shared `Aranea.ForgetButton` (as Bluetooth does).
 - `NetworkDropdown`: every section, the Wi-Fi/Saved scroll area, the empty
   text and the key hint, reporting user actions through one
   `action(name, arg)` signal.
