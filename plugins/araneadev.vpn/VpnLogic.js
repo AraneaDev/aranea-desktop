@@ -628,8 +628,10 @@ function sessionsToFetch(seen, conns) {
 /**
  * The argv that reads links and running processes for the own-app VPNs:
  * `ip -j addr`, a `---` line, then each configured process name that
- * `pgrep -x` finds, one per line. The names travel as positional
- * arguments to `bash -c`, never interpolated into the script.
+ * `pgrep -x` finds, one per line (printed in full). `pgrep -x` matches the
+ * kernel's process name, which is cut to 15 characters, so a longer name
+ * is matched on its first 15. The names travel as positional arguments to
+ * `bash -c`, never interpolated into the script.
  * @param {string[]|undefined} processNames - the apps' `detect.process` names
  * @returns {string[]} the argv
  */
@@ -638,7 +640,7 @@ function linkCommand(processNames) {
   return [
     "bash",
     "-c",
-    'ip -j addr 2>/dev/null || echo "[]"; echo; echo ---; for p; do pgrep -x -- "$p" >/dev/null 2>&1 && printf \'%s\\n\' "$p"; done; exit 0',
+    'ip -j addr 2>/dev/null || echo "[]"; echo; echo ---; for p; do pgrep -x -- "${p:0:15}" >/dev/null 2>&1 && printf \'%s\\n\' "$p"; done; exit 0',
     "_"
   ].concat(names.map(String))
 }
@@ -1067,6 +1069,46 @@ function whichCommand(bin) {
   return ["bash", "-c", 'command -v -- "$1" >/dev/null 2>&1', "_", String(bin || "")]
 }
 
+/**
+ * The apps config the panel applies from a `VpnApps.parseAppsConfig`
+ * result: the whole file is ignored (no apps, no profiles) when it has any
+ * error, so a partly invalid file never shows a partial list.
+ * @param {{apps: VpnAppEntry[], profiles: Record<string, {otp: string}>, error: string}|null} parsed - the parsed file, or null when it's missing
+ * @returns {{apps: VpnAppEntry[], profiles: Record<string, {otp: string}>}} what to apply
+ */
+function appsToApply(parsed) {
+  if (!parsed || parsed.error !== "") return { apps: [], profiles: {} }
+  return { apps: parsed.apps, profiles: parsed.profiles }
+}
+
+/**
+ * Whether a finished action takes the prompt's typed secrets with it: only
+ * a secrets connect for the row the prompt is open on. Any other action
+ * finishing leaves a half-typed password alone.
+ * @param {boolean} withSecrets - whether the finished action passed secrets on stdin
+ * @param {string} actionKey - the row the finished action was for
+ * @param {string} promptKey - the row the prompt is open on, or ""
+ * @returns {boolean} true when the prompt's password and code are cleared
+ */
+function finishClearsSecrets(withSecrets, actionKey, promptKey) {
+  return !!withSecrets && actionKey !== "" && actionKey === promptKey
+}
+
+/**
+ * What a secrets connect does as its process starts: write the secrets
+ * only while the prompt is still open on its row with a password typed;
+ * otherwise (the prompt was closed, or a fixture cleared it, between submit
+ * and start) cancel, so an empty password is never sent to the VPN server.
+ * @param {string} actionKey - the row the connect is for
+ * @param {string} promptKey - the row the prompt is open on, or ""
+ * @param {string} password - the typed password
+ * @returns {"write"|"cancel"} the decision
+ */
+function secretsStart(actionKey, promptKey, password) {
+  if (actionKey === "" || actionKey !== promptKey || !password) return "cancel"
+  return "write"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     splitTerse: splitTerse,
@@ -1109,5 +1151,8 @@ if (typeof module !== "undefined")
     moveFlat: moveFlat,
     cursorPlace: cursorPlace,
     parseFixture: parseFixture,
-    whichCommand: whichCommand
+    whichCommand: whichCommand,
+    appsToApply: appsToApply,
+    finishClearsSecrets: finishClearsSecrets,
+    secretsStart: secretsStart
   }

@@ -37,7 +37,9 @@ function globMatch(pattern, name) {
  * entry needs a `name` and an array `open`; anything missing either (a
  * non-object entry, no name, a missing or non-array `open`, such as a bare
  * string) is dropped and named in `error`, without aborting the rest of the
- * file. A valid entry's `label` defaults to its `name` and `detect` to `{}`.
+ * file; so is a later entry repeating an earlier one's `name` (row keys are
+ * built from names, so they must be unique). A valid entry's `label`
+ * defaults to its `name` and `detect` to `{}`.
  * Profile entries map a NetworkManager connection name to `{otp}`,
  * defaulting `otp` to `"append"` for anything other than `"challenge"`.
  * @param {string|undefined} text - the file's contents
@@ -65,6 +67,8 @@ function parseAppsConfig(text) {
 
   var apps = []
   var dropped = []
+  /** @type {string[]} */
+  var seen = []
   for (var i = 0; i < rawApps.length; i++) {
     var entry = rawApps[i]
     var name =
@@ -74,6 +78,11 @@ function parseAppsConfig(text) {
       dropped.push(name || "entry " + (i + 1))
       continue
     }
+    if (seen.indexOf(name) !== -1) {
+      dropped.push(name + " (duplicate name)")
+      continue
+    }
+    seen.push(name)
     var detectRaw = entry.detect && typeof entry.detect === "object" ? entry.detect : {}
     /** @type {{interface?: string, process?: string}} */
     var detect = {}

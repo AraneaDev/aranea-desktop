@@ -297,3 +297,18 @@ test("statusLine counts several VPNs that are up", () => {
   assert.equal(logic.statusLine(["Office (Firebox)", "Azure (Contoso)"]), "VPN · 2 up")
   assert.equal(logic.statusLine(["A", "B", "C"]), "VPN · 3 up")
 })
+
+test("parseAppsConfig drops a later entry repeating a name and says so", () => {
+  const out = logic.parseAppsConfig(
+    JSON.stringify([
+      { name: "A", open: ["a"] },
+      { name: "A", open: ["b"] },
+      { name: "B", open: ["c"] }
+    ])
+  )
+  assert.deepEqual(
+    out.apps.map((a) => a.open[0]),
+    ["a", "c"]
+  )
+  assert.equal(out.error, "dropped: A (duplicate name)")
+})

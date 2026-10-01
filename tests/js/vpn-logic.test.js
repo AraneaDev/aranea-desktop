@@ -900,3 +900,36 @@ test("app rows carry the open-in-new glyph, NetworkManager rows the VPN glyph", 
     String.fromCodePoint(0xf03cc)
   )
 })
+
+test("linkCommand matches pgrep on the first 15 characters but prints the full name", () => {
+  const script = logic.linkCommand(["microsoft-azurevpnclient"])[2]
+  assert.ok(script.includes('pgrep -x -- "${p:0:15}"'))
+  assert.ok(script.includes("printf '%s\\n' \"$p\""))
+  assert.equal(script.includes("microsoft"), false)
+})
+
+test("appsToApply ignores the whole file on any error", () => {
+  const good = {
+    apps: [{ name: "A", label: "A", detect: {}, open: ["a"] }],
+    profiles: { P: { otp: "challenge" } },
+    error: ""
+  }
+  assert.deepEqual(logic.appsToApply(good), { apps: good.apps, profiles: good.profiles })
+  assert.deepEqual(logic.appsToApply({ ...good, error: "dropped: B" }), { apps: [], profiles: {} })
+  assert.deepEqual(logic.appsToApply(null), { apps: [], profiles: {} })
+})
+
+test("finishClearsSecrets only for a secrets connect on the prompt's row", () => {
+  assert.equal(logic.finishClearsSecrets(true, "a", "a"), true)
+  assert.equal(logic.finishClearsSecrets(false, "a", "a"), false)
+  assert.equal(logic.finishClearsSecrets(true, "a", "b"), false)
+  assert.equal(logic.finishClearsSecrets(true, "", ""), false)
+})
+
+test("secretsStart writes only to the open prompt's row with a password, else cancels", () => {
+  assert.equal(logic.secretsStart("a", "a", "pw"), "write")
+  assert.equal(logic.secretsStart("a", "a", ""), "cancel")
+  assert.equal(logic.secretsStart("a", "", "pw"), "cancel")
+  assert.equal(logic.secretsStart("a", "b", "pw"), "cancel")
+  assert.equal(logic.secretsStart("", "", "pw"), "cancel")
+})

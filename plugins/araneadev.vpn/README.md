@@ -57,8 +57,10 @@ open (or a reveal) chooses no row until you move or hover.
 
 `~/.config/aranea/vpn-apps.json` (`$XDG_CONFIG_HOME/aranea/` when set) is
 optional and yours: the theme never writes it. It's watched, so edits
-apply without a shell restart. An invalid file is ignored with one
-warning in the shell log per distinct error.
+apply without a shell restart. A file with any error (invalid JSON, an
+entry without a `name` or an array `open`, two entries with the same
+`name`) is ignored as a whole, apps and profiles alike, with one warning in
+the shell log per distinct error.
 
 A bare array lists the apps:
 
@@ -83,6 +85,9 @@ A bare array lists the apps:
 addr`; up with an address counts as connected.
 - `detect.process`: a process name matched with `pgrep -x`. With both
   given, both must match for connected.
+  The kernel cuts process names to 15 characters, so a longer name (such
+  as `microsoft-azurevpnclient`) is matched on its first 15
+  (`microsoft-azure`): any process whose name starts with them counts.
 - `open`: an argv array run detached, never through a shell. When its
   binary isn't on `PATH` the row reads "Couldn't open" for 4 s.
 

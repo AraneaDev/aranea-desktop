@@ -102,6 +102,9 @@ Panel {
   property string actionOtp: "append"
   // Whether the running action's process has started.
   property bool actionStartedOk: false
+  // Whether the running secrets connect was cancelled as it started (the
+  // prompt had closed), so its exit shows nothing.
+  property bool actionCancelled: false
   // The row whose last action failed, for failedTimer's 4 s, or "".
   property string failedKey: ""
   // The failure's VpnLogic.statusText phase ("failedUp", "failedDown",
@@ -294,21 +297,17 @@ Panel {
       runLinks()
   }
 
-  // Applies the apps file's text, or null when it's missing (no apps). An
-  // invalid file warns once per distinct error.
+  // Applies the apps file's text, or null when it's missing (no apps). A
+  // file with any error is ignored as a whole (no apps, no profiles) and
+  // warns once per distinct error.
   function applyAppsText(text) {
-    var parsed = text === null ? {
-      apps: [],
-      profiles: {},
-      error: ""
-    } : VpnApps.parseAppsConfig(text)
-    if (parsed.error !== "" && parsed.error !== appsError)
-      console.warn("aranea vpn: " + Aranea.RuntimePaths.vpnAppsPath + ": " + parsed.error)
-    appsError = parsed.error
-    var next = {
-      apps: parsed.apps,
-      profiles: parsed.profiles
-    }
+    var parsed = text === null ? null : VpnApps.parseAppsConfig(text)
+    var error = parsed ? parsed.error : ""
+    if (error !== "" && error !== appsError)
+      console.warn("aranea vpn: ignoring " + Aranea.RuntimePaths.vpnAppsPath + ": " + error)
+    appsError = error
+    // Any error ignores the whole file (VpnLogic.appsToApply).
+    var next = VpnLogic.appsToApply(parsed)
     if (JSON.stringify(next) !== JSON.stringify(appsConfig)) {
       appsConfig = next
       poll()
@@ -416,6 +415,7 @@ Panel {
     actionWaited = 0
     actionWithSecrets = withSecrets
     actionStartedOk = false
+    actionCancelled = false
     actionProc.stdinEnabled = withSecrets
     actionProc.command = argv
     actionProc.running = true
@@ -606,7 +606,7 @@ Panel {
     command: ["bash", "-c", "command -v nmcli >/dev/null 2>&1 || exit 127; exec nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,STATE connection show"]
     stdout: StdioCollector {
       id: listOut
-      waitForEnd: false
+      waitForEnd: true
     }
     onExited: function (exitCode) {
       var ok = exitCode === 0
@@ -624,7 +624,7 @@ Panel {
     id: linkProc
     stdout: StdioCollector {
       id: linkOut
-      waitForEnd: false
+      waitForEnd: true
     }
     onExited: {
       var out = VpnLogic.parseLinkOutput(linkOut.text)
@@ -644,7 +644,7 @@ Panel {
     property string uuid: ""
     stdout: StdioCollector {
       id: sessionOut
-      waitForEnd: false
+      waitForEnd: true
     }
     onExited: function (exitCode) {
       var next = {}
@@ -662,7 +662,7 @@ Panel {
     id: usernameProc
     stdout: StdioCollector {
       id: usernameOut
-      waitForEnd: false
+      waitForEnd: true
     }
     onExited: function (exitCode) {
       var key = root.usernameKey
@@ -675,21 +675,29 @@ Panel {
   // Connects or disconnects one profile. A secrets connect writes the
   // password and code to nmcli's stdin (passwd-file /dev/stdin) as it
   // starts, clears them at once and closes stdin; they are never in argv,
-  // logs or files.
+  // logs or files. When the prompt was closed (or a fixture cleared it)
+  // between submit and start, nothing is written: the process is
+  // terminated before stdin closes, so an empty password never reaches the
+  // VPN server (VpnLogic.secretsStart).
   Process {
     id: actionProc
     stderr: StdioCollector {
       id: actionErr
-      waitForEnd: false
+      waitForEnd: true
     }
     onStarted: {
       root.actionStartedOk = true
-      if (root.actionWithSecrets) {
+      if (!root.actionWithSecrets)
+        return
+      if (VpnLogic.secretsStart(root.actionKey, root.promptKey, root.promptPassword) === "write") {
         write(VpnLogic.secretsStdin(root.promptPassword, root.promptCode, root.actionOtp))
         root.promptPassword = ""
         root.promptCode = ""
-        stdinEnabled = false
+      } else {
+        root.actionCancelled = true
+        actionProc.signal(15)
       }
+      stdinEnabled = false
     }
     // A process that fails to start never emits exited.
     onRunningChanged: {
@@ -719,7 +727,7 @@ Panel {
     id: countersProc
     stdout: StdioCollector {
       id: countersOut
-      waitForEnd: false
+      waitForEnd: true
     }
     onExited: root.applyCounters(countersOut.text)
   }
@@ -731,12 +739,22 @@ Panel {
     var phase = actionPhase
     var withSecrets = actionWithSecrets
     var stderr = exitCode === -1 ? "" : actionErr.text
-    // The secrets never outlive the process, whatever happened.
-    promptPassword = ""
-    promptCode = ""
+    var cancelled = actionCancelled
+    // A secrets connect's secrets never outlive its process, whatever
+    // happened; any other action leaves a half-typed password alone.
+    if (VpnLogic.finishClearsSecrets(withSecrets, key, promptKey)) {
+      promptPassword = ""
+      promptCode = ""
+    }
     actionKey = ""
     actionPhase = ""
     actionWithSecrets = false
+    actionCancelled = false
+    // A connect cancelled at start shows nothing.
+    if (cancelled) {
+      runList()
+      return
+    }
     if (phase === "disconnecting") {
       if (exitCode !== 0) {
         intentionalDown = intentionalDown.filter(function (k) {
