@@ -167,6 +167,8 @@ Panel {
   property var displayAudioSources: []
   // Display snapshot of the per-app playback streams.
   property var displayAudioStreams: []
+  // Display snapshot of the unplugged outputs (see displayAudioSinks).
+  property var displayUnpluggedSinks: []
 
   // A DSP sink -- a speaker tuning, or EasyEffects -- can be the selected output
   // without being where loudness lives: changing its volume alters the level going
@@ -471,6 +473,7 @@ Panel {
   onAudioSinksChanged: scheduleDisplayAudioModelRefresh()
   onAudioSourcesChanged: scheduleDisplayAudioModelRefresh()
   onAudioStreamsChanged: scheduleDisplayAudioModelRefresh()
+  onUnpluggedSinksChanged: scheduleDisplayAudioModelRefresh()
 
   // Copies a live Pipewire list into a plain array snapshot.
   function listSnapshot(list) {
@@ -484,6 +487,7 @@ Panel {
     displayAudioSinks = listSnapshot(audioSinks)
     displayAudioSources = listSnapshot(audioSources)
     displayAudioStreams = listSnapshot(audioStreams)
+    displayUnpluggedSinks = listSnapshot(unpluggedSinks)
     clampCursor()
   }
 
@@ -500,6 +504,7 @@ Panel {
     displayAudioSinks = []
     displayAudioSources = []
     displayAudioStreams = []
+    displayUnpluggedSinks = []
   }
 
   // Keep the keyboard-focused row inside the visible part of the dropdown's
@@ -835,7 +840,7 @@ Panel {
   }
   // The view's output rows. Kept apart from audioView so the arrays keep
   // their identity while the levels tick ~30 times a second.
-  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, sink, true, opened ? unpluggedSinks : [])
+  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, sink, true, displayUnpluggedSinks)
   // The view's input rows (see outputDeviceRows).
   readonly property var inputDeviceRows: deviceRows(displayAudioSources, source, false, [])
   // The view's stream rows (see outputDeviceRows).
@@ -1013,6 +1018,7 @@ Panel {
     bar: root.bar
     text: root.outputIcon()
     onPressed: function (b) {
+      root.keyboardCursor = false
       if (b === Qt.RightButton)
         root.toggleAllMuted()
       else
@@ -1020,6 +1026,7 @@ Panel {
     }
 
     onWheelMoved: function (delta) {
+      root.keyboardCursor = false
       if (!root.hasOutput)
         return
       var wheel = Util.wheelSteps(root.wheelAccumulator, delta)
