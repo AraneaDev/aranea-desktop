@@ -59,8 +59,7 @@ Column {
       text: section.channel.muted ? "muted" : Math.round((slider.dragging ? slider.liveValue : section.channel.volume) * 100) + "%"
       color: Aranea.DesignTokens.foreground
       font.family: Style.font.family
-      font.pixelSize: Style.font.caption
-      font.bold: true
+      font.pixelSize: Style.font.body
     }
   }
   Text {

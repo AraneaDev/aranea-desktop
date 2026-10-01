@@ -1,6 +1,7 @@
 // Shared Filament components: the slider maps value to progress over any
 // range and keeps its node inside its own width (one right edge), the
-// switch and device row emit only when they should.
+// switch and device row emit only when they should, and the live-signal
+// glow follows the level along the lit strand.
 import QtQuick
 import Quickshell
 import "lib"
@@ -21,6 +22,11 @@ ShellRoot {
     id: full
     width: 300
     value: 1
+  }
+  Aranea.FilamentSlider {
+    id: signal
+    width: 300
+    value: 0.8
   }
   Aranea.FilamentSwitch {
     id: sw
@@ -51,6 +57,14 @@ ShellRoot {
     t.check(node !== null && node.x + node.width <= full.width + 0.01, "the node never passes the strand's right edge")
     full.setFromX(150)
     t.equal(Math.round(full.liveValue * 100), 50, "a click at half width sets half")
+    var glow = t.findChild(signal, "filamentGlow")
+    t.check(glow !== null && !glow.visible, "no level, no signal glow")
+    signal.level = 0.5
+    var lit = t.findChild(signal, "filamentLit")
+    t.check(glow.visible, "a level lights the signal glow")
+    t.check(Math.abs(glow.width - lit.width / 2) < 0.5, "a half level glows over half the lit strand")
+    signal.muted = true
+    t.check(!glow.visible, "a muted slider has no signal glow")
     sw.activate()
     t.equal(sw.count, 1, "the switch emits toggled")
     unplugged.activate()

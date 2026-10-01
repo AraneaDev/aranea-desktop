@@ -3,6 +3,7 @@
 // dropdowns, the label, and a trailing detail. Unavailable devices are
 // dimmed and never chosen. The row spans the item's full width.
 import QtQuick
+import QtQuick.Effects
 import qs.Commons
 
 Item {
@@ -41,6 +42,17 @@ Item {
     border.width: row.hasCursor ? 1 : 0
     border.color: DesignTokens.accent
   }
+  // The active device's node glows.
+  RectangularShadow {
+    x: marker.x
+    y: marker.y
+    width: marker.width
+    height: marker.height
+    rotation: marker.rotation
+    blur: Style.space(8)
+    color: Util.alpha(DesignTokens.accent, 0.8)
+    visible: row.active
+  }
   Rectangle {
     id: marker
     width: Style.space(8)
@@ -50,7 +62,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     color: row.active ? DesignTokens.accent : "transparent"
     border.width: 1
-    border.color: row.active ? DesignTokens.accent : Util.alpha(DesignTokens.foreground, 0.35)
+    border.color: row.active ? DesignTokens.accent : Util.alpha(DesignTokens.foreground, 0.22)
   }
   Text {
     id: glyphText
@@ -59,7 +71,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignHCenter
     text: row.glyph
-    color: DesignTokens.foreground
+    color: Util.alpha(DesignTokens.foreground, 0.82)
     font.family: Style.font.family
     font.pixelSize: Style.font.body
   }

@@ -46,8 +46,7 @@ Column {
       text: String(section.streams.length)
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       font.family: Style.font.family
-      font.pixelSize: Style.font.caption
-      font.bold: true
+      font.pixelSize: Style.font.body
     }
   }
   // The model is the row count, not the array: a stream's volume or mute
@@ -114,7 +113,7 @@ Column {
               anchors.verticalCenter: parent.verticalCenter
               elide: Text.ElideRight
               text: row.modelData.label
-              color: row.modelData.current ? Aranea.DesignTokens.accent : Aranea.DesignTokens.foreground
+              color: row.modelData.current ? Aranea.DesignTokens.accent : Util.alpha(Aranea.DesignTokens.foreground, row.modelData.muted ? 0.55 : 1)
               font.family: Style.font.family
               font.pixelSize: Style.font.body
             }
@@ -123,10 +122,9 @@ Column {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               text: row.modelData.muted ? "muted" : Math.round((streamSlider.dragging ? streamSlider.liveValue : row.modelData.volume) * 100) + "%"
-              color: Aranea.DesignTokens.foreground
+              color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
               font.family: Style.font.family
-              font.pixelSize: Style.font.caption
-              font.bold: true
+              font.pixelSize: Style.font.body
             }
           }
           Item {

@@ -4,6 +4,7 @@
 // rightClicked (audio mutes with it). The node stays inside the item, so
 // the strand's right edge is the item's right edge.
 import QtQuick
+import QtQuick.Effects
 import qs.Commons
 
 Item {
@@ -27,8 +28,12 @@ Item {
   property bool dragging: false
   // Lit fraction of the strand, 0..1.
   readonly property real progress: Math.max(0, Math.min(1, (liveValue - minimum) / Math.max(0.0001, maximum - minimum)))
-  // Colour of the unlit strand and of everything when muted.
-  readonly property color quietColor: Util.alpha(DesignTokens.foreground, 0.28)
+  // Colour of the lit strand and the node when muted.
+  readonly property color quietColor: Util.alpha(DesignTokens.foreground, 0.22)
+  // Colour of the unlit strand.
+  readonly property color strandColor: Util.alpha(DesignTokens.foreground, 0.15)
+  // Thickness of the strand, lit and unlit.
+  readonly property real strandHeight: Math.max(2, Style.space(2))
 
   // Emitted with the new value while dragging or on click.
   signal moved(real value)
@@ -54,28 +59,62 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    height: Math.max(1, Style.spacing.hairline)
-    color: slider.quietColor
+    height: slider.strandHeight
+    color: slider.strandColor
   }
 
-  Rectangle {
+  // The live signal: a soft mint glow fading in from the left, as long as
+  // the level along the lit strand. Two stacked bands stand in for a blur.
+  Item {
     id: glow
+    objectName: "filamentGlow"
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     width: lit.width * Math.max(0, Math.min(1, slider.level))
     height: Style.space(6)
-    radius: height / 2
-    color: Util.alpha(DesignTokens.accent, 0.35)
-    visible: !slider.muted && slider.level > 0
+    visible: !slider.muted && width > 0
+    Rectangle {
+      anchors.fill: parent
+      radius: height / 2
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop {
+          position: 0
+          color: "transparent"
+        }
+        GradientStop {
+          position: 1
+          color: Util.alpha(DesignTokens.accent, 0.25)
+        }
+      }
+    }
+    Rectangle {
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      height: parent.height / 2
+      radius: height / 2
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop {
+          position: 0
+          color: "transparent"
+        }
+        GradientStop {
+          position: 1
+          color: Util.alpha(DesignTokens.accent, 0.55)
+        }
+      }
+    }
   }
 
   Rectangle {
     id: lit
+    objectName: "filamentLit"
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     width: node.x + node.width / 2
-    height: Math.max(2, Style.space(2))
-    radius: height / 2
+    height: slider.strandHeight
     gradient: Gradient {
       orientation: Gradient.Horizontal
       GradientStop {
@@ -87,6 +126,18 @@ Item {
         color: slider.muted ? slider.quietColor : DesignTokens.strandEnd
       }
     }
+  }
+
+  // The node's soft mint glow; none when muted.
+  RectangularShadow {
+    x: node.x
+    y: node.y
+    width: node.width
+    height: node.height
+    radius: node.radius
+    blur: Style.space(10)
+    color: Util.alpha(DesignTokens.accent, 0.8)
+    visible: !slider.muted
   }
 
   Rectangle {

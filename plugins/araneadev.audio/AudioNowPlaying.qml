@@ -95,7 +95,6 @@ Column {
             color: Aranea.DesignTokens.foreground
             font.family: Style.font.family
             font.pixelSize: Style.font.body
-            font.bold: true
           }
           Text {
             width: parent.width
@@ -117,7 +116,7 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             text: String.fromCodePoint(0xF04AE)
             opacity: strip.info.canPrevious ? 1 : 0.35
-            color: Aranea.DesignTokens.foreground
+            color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             MouseArea {
@@ -130,7 +129,7 @@ Column {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: strip.info.playing ? String.fromCodePoint(0xF03E4) : String.fromCodePoint(0xF040A)
-            color: Aranea.DesignTokens.foreground
+            color: Aranea.DesignTokens.accent
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             MouseArea {
@@ -143,7 +142,7 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             text: String.fromCodePoint(0xF04AD)
             opacity: strip.info.canNext ? 1 : 0.35
-            color: Aranea.DesignTokens.foreground
+            color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             MouseArea {
@@ -157,7 +156,7 @@ Column {
       }
       Item {
         width: parent.width
-        height: Math.max(1, Style.spacing.hairline)
+        height: Math.max(2, Style.space(2))
         visible: strip.info.progress >= 0
         Rectangle {
           anchors.fill: parent
