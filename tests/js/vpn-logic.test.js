@@ -9,20 +9,10 @@ const { test } = require("node:test")
 
 const logic = require(path.join(__dirname, "..", "..", "plugins/araneadev.vpn/VpnLogic.js"))
 
-// --- splitTerse --------------------------------------------------------------
-
-test("splitTerse splits on unescaped colons and unescapes \\: and \\\\", () => {
-  assert.deepEqual(logic.splitTerse("a:b:c"), ["a", "b", "c"])
-  assert.deepEqual(logic.splitTerse("Office (Firebox)\\: HQ:uuid-1"), [
-    "Office (Firebox): HQ",
-    "uuid-1"
-  ])
-  assert.deepEqual(logic.splitTerse("back\\\\slash:next"), ["back\\slash", "next"])
-})
-
-test("splitTerse on missing input returns one empty field, never throws", () => {
-  assert.deepEqual(logic.splitTerse(undefined), [""])
-})
+// splitTerse's own contract lives in tests/js/nmcli-terse.test.js
+// (NmcliTerse.js); VpnLogic.js gets a generated copy of it
+// (tools/js-facade-generator.mjs) and exercises it through
+// parseVpnConnections below.
 
 // --- parseVpnConnections ------------------------------------------------------
 

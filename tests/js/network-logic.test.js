@@ -8,25 +8,10 @@ const logic = require(path.join(__dirname, "..", "..", "plugins/araneadev.networ
 const cursor = require(path.join(__dirname, "..", "..", "plugins/araneadev.shared/CursorLogic.js"))
 const g = (cp) => String.fromCodePoint(cp)
 
-// --- splitTerse ---------------------------------------------------------
-
-test("splitTerse splits on unescaped colons", () => {
-  assert.deepEqual(logic.splitTerse("a:b:c"), ["a", "b", "c"])
-  assert.deepEqual(logic.splitTerse(""), [""])
-  assert.deepEqual(logic.splitTerse(undefined), [""])
-})
-
-test("splitTerse unescapes \\: and \\\\ within a field", () => {
-  assert.deepEqual(logic.splitTerse("My\\:Net:uuid-1:802-11-wireless::no:0"), [
-    "My:Net",
-    "uuid-1",
-    "802-11-wireless",
-    "",
-    "no",
-    "0"
-  ])
-  assert.deepEqual(logic.splitTerse("a\\\\\\:b"), ["a\\:b"])
-})
+// splitTerse's own contract lives in tests/js/nmcli-terse.test.js
+// (NmcliTerse.js); NetworkLogic.js gets a generated copy of it
+// (tools/js-facade-generator.mjs) and exercises it through parseDevices /
+// parseConnections below.
 
 // --- splitSections -------------------------------------------------------
 

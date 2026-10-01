@@ -68,10 +68,22 @@ service contracts to the feature plugins.
   reveal a cursor the keyboard isn't showing before they act
   (`pressIntent`), a view's Repeater keeps its delegates across an
   unchanged refresh (`keepRows`), and a pointer action only lands on the
-  row it names (`rowKeyMatches`). Network and VPN both import it directly.
+  row it names (`rowKeyMatches`). `araneadev.network`'s `Panel.qml` imports
+  it directly (a real QML/JS import) for `keepRows`, `followCursor` and
+  `rowKeyMatches`; `NetworkLogic.js`'s own `keyTargetConfirmed`/
+  `pressOutcome` instead get a generated copy of `cursorConfirmed`/
+  `pressIntent` via `tools/js-facade-generator.mjs` (see
+  docs/development.md's "JavaScript facades"), since a plain `.js` logic
+  file can't import another `.js` file in a way both QML and Node can
+  load. Either way there is exactly one hand-written implementation, here.
 - `GraphLogic.js` is the shared rolling-sample and plot-point math behind
   `LinkGraph` (`pushSample`, `graphPoints`), also moved from the Network
-  plugin.
+  plugin. `Panel.qml` and `LinkGraph.qml` both import it directly.
+- `NmcliTerse.js` holds `splitTerse`, the `nmcli -t` terse-output field
+  splitter both `araneadev.network/NetworkLogic.js` and
+  `araneadev.vpn/VpnLogic.js` need. Neither imports it (the same QML/Node
+  constraint as `CursorLogic.js`'s inlined pair): both get a generated copy
+  via `tools/js-facade-generator.mjs`.
 - `VpnApps.js` parses `~/.config/aranea/vpn-apps.json` (own-app VPNs,
   both the bare-array and `{apps, profiles}` object forms), matches an
   interface name against a glob (`globMatch`), derives an own-app VPN's

@@ -60,7 +60,8 @@ the keyboard drives it.
   re-sorts. Revealing the outline never chooses a row.
 - When the row disappears, the cursor is clamped but its key is dropped.
   Enter and `x` then do nothing until the user picks a row
-  (`CursorLogic.followCursor` / `cursorConfirmed`, `araneadev.shared`). A hidden SSID never
+  (`CursorLogic.followCursor`, `araneadev.shared`, imported directly; `cursorConfirmed`
+  generated into `NetworkLogic.js` by `tools/js-facade-generator.mjs`). A hidden SSID never
   confirms (it still works by mouse).
 - The same goes for a cursor moved automatically into another section, for
   example when Saved or the band section empties or hides under it

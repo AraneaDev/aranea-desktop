@@ -6,10 +6,11 @@
 // caption, key hints). No QML, no I/O; tests/js/vpn-logic.test.js runs this
 // under Node.
 //
-// `splitTerse` is copied from `araneadev.network/NetworkLogic.js` rather
-// than imported: there is no cross-`.js`-file import mechanism usable from
-// both QML and Node in this codebase (see araneadev.shared's README and
-// task-1-report.md), so every plugin that needs it keeps its own copy.
+// `splitTerse` is a generated copy of `araneadev.shared/NmcliTerse.js`
+// (`tools/js-facade-generator.mjs`, see docs/development.md's "JavaScript
+// facades"), not imported or hand-copied: there is no cross-`.js`-file
+// import mechanism usable from both QML and Node in this codebase, so every
+// plugin that needs it gets the generator's copy instead.
 
 /** @type {number} the glyph shared by NetworkManager VPN and WireGuard rows (same mark NetworkLogic uses for its VPN rows) */
 var VPN_GLYPH = 0xf0582
@@ -43,9 +44,17 @@ var APP_GLYPH = 0xf05f4
  * @typedef {{key: string, kind: string, name: string, glyph: string, label: string}} AppRow
  */
 
+/* @aranea-facade-start: plugins/araneadev.shared/NmcliTerse.js */
+// Shared nmcli terse-output parsing, generated into
+// `araneadev.network/NetworkLogic.js` and `araneadev.vpn/VpnLogic.js` by
+// `tools/js-facade-generator.mjs` (see docs/development.md's "JavaScript
+// facades") rather than imported or hand-copied, since no cross-`.js`-file
+// import mechanism is usable from both QML and Node in this codebase. No
+// QML, no I/O; tests/js/nmcli-terse.test.js runs this under Node.
+
 /**
- * Unescapes a single nmcli terse field: `\:` becomes `:` and `\\` becomes `\`.
- * Copied verbatim from `araneadev.network/NetworkLogic.js`.
+ * Splits one `nmcli -t` line into its fields, on unescaped `:` only, and
+ * unescapes `\:` and `\\` within each field.
  * @param {string|undefined} line - one line of `nmcli -t` output
  * @returns {string[]} the line's fields, unescaped
  */
@@ -70,6 +79,9 @@ function splitTerse(line) {
   fields.push(cur)
   return fields
 }
+
+if (typeof module !== "undefined") module.exports = { splitTerse: splitTerse }
+/* @aranea-facade-end */
 
 /**
  * Parses `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,STATE connection show`

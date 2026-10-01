@@ -33,7 +33,10 @@ const specs = [
   [
     "plugins/araneadev.notifications/ServiceBridge.js",
     "plugins/araneadev.shared/ServiceRegistry.js"
-  ]
+  ],
+  ["plugins/araneadev.network/NetworkLogic.js", "plugins/araneadev.shared/CursorLogic.js"],
+  ["plugins/araneadev.network/NetworkLogic.js", "plugins/araneadev.shared/NmcliTerse.js"],
+  ["plugins/araneadev.vpn/VpnLogic.js", "plugins/araneadev.shared/NmcliTerse.js"]
 ]
 
 function marker(target, source) {
