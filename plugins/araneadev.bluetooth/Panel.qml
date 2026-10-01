@@ -1071,9 +1071,11 @@ Panel {
     contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
+      dropdown.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
       if (!root.cursorActive || !root.keyboardCursor) {
@@ -1087,18 +1089,21 @@ Panel {
         root.moveCursorH(dx)
     }
     onActivateRequested: {
+      dropdown.disarmPointer()
       if (!root.cursorActive)
         return
       root.keyboardCursor = true
       root.activateCursor()
     }
     onDeleteRequested: {
+      dropdown.disarmPointer()
       if (!root.cursorActive)
         return
       root.keyboardCursor = true
       root.deleteSelected()
     }
     onTextKey: function (t) {
+      dropdown.disarmPointer()
       if (t === "b" || t === "B") {
         root.keyboardCursor = true
         root.toggleBluetooth()

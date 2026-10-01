@@ -21,6 +21,9 @@ Item {
   property alias focusTarget: keyCatcher
   // Content rendered inside the frame.
   default property alias content: body.data
+  // Blocks all keys (forwarded to descendants) while true, e.g. an inline
+  // editor has focus and must receive keys normally.
+  property alias blocked: keyCatcher.blocked
 
   PanelKeyCatcher {
     id: keyCatcher

@@ -20,14 +20,20 @@ service contracts to the feature plugins.
 - `NodeDeviceRow` is the Filament-style selectable device row with glyph,
   label, and detail slots, an optional busy (breathing marker) and signal
   (marker glow strength) state, and an optional trailing action slot flush
-  with the row's right edge.
+  with the row's right edge. An optional `pointerGate` (a stock
+  `PointerMoveGate`, `qs.Ui`) filters synthetic hover churn from the row
+  moving under a still pointer: with a gate set, `entered` fires only on a
+  real pointer move, never on the row sliding underneath a stationary
+  cursor.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph,
   title/caption pair, and a trailing slot.
 - `InkText` aligns glyph ink rather than advance width.
 - `KeyboardInputFrame` owns key forwarding and focus targeting, including a
-  `deleteRequested` signal forwarded from the key catcher's "x" key.
+  `deleteRequested` signal forwarded from the key catcher's "x" key, and a
+  `blocked` alias to the key catcher's own `blocked` (an inline editor with
+  focus short-circuits all key handling).
 - `KeyboardPanelFrame` adds the layer-shell panel contract around keyboard
-  input and forwards the same `deleteRequested` signal.
+  input and forwards the same `deleteRequested` signal and `blocked` alias.
 - `OverlayChrome` provides common overlay placement and dismiss behavior.
 - `ServiceRegistry.js` publishes isolated service slots for dependent plugins.
 

@@ -29,6 +29,9 @@ Column {
   property bool cursorAction: false
   // Tooltip shown on a row's hover: "Connect", "Disconnect" or "Pair".
   property string rowTooltip: ""
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from a
+  // device row moving under a still pointer.
+  property var pointerGate: null
 
   // Emitted when row INDEX is chosen (connect, disconnect or pair).
   signal primary(int index)
@@ -100,6 +103,7 @@ Column {
         busy: !!wrapper.modelData.busy
         signal: section.sectionName === "discovered" ? (section.signals[wrapper.modelData.key] !== undefined ? section.signals[wrapper.modelData.key] : -1) : -1
         hasCursor: section.cursor === wrapper.index
+        pointerGate: section.pointerGate
         onChosen: section.primary(wrapper.index)
         onEntered: section.rowHovered(wrapper.index)
 
@@ -160,10 +164,24 @@ Column {
           // Non-blocking: only observes hover, never intercepts the click
           // above. Scoped to the button's own (small) bounds, so it fires
           // true entering it and false leaving it, independent of the
-          // row's own, much larger, hover area.
+          // row's own, much larger, hover area. Only the entering action is
+          // gated: a still pointer never moves the keyboard cursor onto the
+          // forget action just because the button slid underneath it.
+          // Leaving (dropping the action focus) and the button's own
+          // `hovered` (which drives shown/bright above) stay ungated.
           HoverHandler {
             id: forgetHover
-            onHoveredChanged: section.actionHovered(wrapper.index, hovered)
+            onHoveredChanged: {
+              if (!hovered)
+                section.actionHovered(wrapper.index, false)
+              else if (!section.pointerGate)
+                section.actionHovered(wrapper.index, true)
+              else if (section.pointerGate.moved(forgetHover.parent, {
+                x: forgetHover.point.position.x,
+                y: forgetHover.point.position.y
+              }))
+                section.actionHovered(wrapper.index, true)
+            }
           }
         }
       }

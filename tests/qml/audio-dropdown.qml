@@ -2,7 +2,11 @@
 // with the active one marked and unplugged ones never chosen, actions
 // emitted for mute and device picks, empty channels and sections hidden,
 // Now playing only with a player, and one right content edge (audio-1).
+// Every device row carries the dropdown's PointerMoveGate, and a device
+// that slides under a still pointer (a list change, not a real move) never
+// steals the keyboard cursor via a synthetic hover action.
 import QtQuick
+import QtTest
 import Quickshell
 import "lib"
 import "plugins/araneadev.audio" as Audio
@@ -154,6 +158,104 @@ ShellRoot {
       })
   }
 
+  // Actions reported by gated's action signal, in emission order.
+  property var gatedActions: []
+
+  // Three output devices, so removing the first slides the others up one
+  // row under a pointer that never moved.
+  function gatedView(devices) {
+    return {
+      glyph: "",
+      mood: "",
+      anyAudible: true,
+      toggleHint: "Mute",
+      headerCursor: false,
+      cursor: {
+        active: false,
+        section: "output",
+        index: -1
+      },
+      output: {
+        present: true,
+        volume: 0.5,
+        muted: false,
+        level: 0
+      },
+      outputDevices: devices,
+      inputVisible: false,
+      input: {
+        present: false,
+        volume: 0,
+        muted: false,
+        level: 0
+      },
+      inputDevices: [],
+      streams: [],
+      nowPlaying: {
+        visible: false,
+        player: "",
+        title: "",
+        artist: "",
+        album: "",
+        progress: -1,
+        playing: false,
+        canPrevious: false,
+        canNext: false
+      }
+    }
+  }
+
+  // Real window + real pointer moves, so Qt's hover delivery (including the
+  // synthetic re-hover a shifting delegate gets under a still pointer) is
+  // genuine rather than simulated through direct signal calls.
+  FloatingWindow {
+    id: gateWindow
+    implicitWidth: 380
+    implicitHeight: 300
+    visible: true
+
+    Audio.AudioDropdown {
+      id: gated
+      width: 360
+      view: gatedView([
+        {
+          key: "a",
+          label: "Device A",
+          glyph: "",
+          detail: "",
+          active: false,
+          available: true
+        },
+        {
+          key: "b",
+          label: "Device B",
+          glyph: "",
+          detail: "",
+          active: false,
+          available: true
+        },
+        {
+          key: "c",
+          label: "Device C",
+          glyph: "",
+          detail: "",
+          active: false,
+          available: true
+        }
+      ])
+      onAction: function (name, arg) {
+        gatedActions.push([name, arg])
+      }
+    }
+  }
+
+  // Synthesizes the pointer events (TestCase's mouseMove), never run as a test.
+  TestCase {
+    id: pointer
+    name: "pointer"
+    when: false
+  }
+
   // VIEW with only output.level changed to LEVEL; every row array is reused.
   function levelTick(view, level) {
     var next = {}
@@ -273,7 +375,52 @@ ShellRoot {
           full.view = cursorTick(full.view, false, "output", 1)
           t.step(50, function () {
             t.equal(litOutlines(full), 0, "the outline goes once the cursor is inactive")
-            t.done()
+
+            var gatedRows = t.findChildren(gated, "deviceRow")
+            t.equal(gatedRows.length, 3, "the gated fixture lists all three devices")
+            for (var gi = 0; gi < gatedRows.length; gi++)
+              t.check(gatedRows[gi].pointerGate !== null, "device row " + gi + " carries the dropdown's pointer gate")
+
+            var pt = gatedRows[1].mapToItem(gated, 10, gatedRows[1].height / 2)
+            pointer.mouseMove(gated, pt.x, pt.y)
+            t.step(80, function () {
+              pointer.mouseMove(gated, pt.x + 4, pt.y)
+              t.step(80, function () {
+                t.check(gatedActions.some(function (a) {
+                  return a[0] === "hover" && a[1].section === "output" && a[1].index === 1
+                }), "a real hover on row 1 reports a hover action")
+                gatedActions = []
+                // Remove the first device without moving the pointer: the
+                // device now under it (was row 2) slides up to take row 1's
+                // place, exactly a row moving under a still pointer.
+                gated.view = gatedView([
+                  {
+                    key: "b",
+                    label: "Device B",
+                    glyph: "",
+                    detail: "",
+                    active: false,
+                    available: true
+                  },
+                  {
+                    key: "c",
+                    label: "Device C",
+                    glyph: "",
+                    detail: "",
+                    active: false,
+                    available: true
+                  }
+                ])
+                t.step(80, function () {
+                  t.equal(gatedActions.length, 0, "a device sliding under a still pointer emits no hover action")
+                  pointer.mouseMove(gated, pt.x, pt.y + 5)
+                  t.step(80, function () {
+                    t.check(gatedActions.length > 0, "a real move after the slide reports hover again")
+                    t.done()
+                  })
+                })
+              })
+            })
           })
         })
       })

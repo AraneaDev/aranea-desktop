@@ -36,6 +36,10 @@ Item {
   // Whether the pointer is over the row, for a trailing action a host
   // dropdown shows only on hover (e.g. a forget button).
   readonly property alias hovered: rowMouse.containsMouse
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover churn from
+  // this row moving under a still pointer. null (default) keeps the old
+  // behaviour: entered on containsMouse becoming true.
+  property var pointerGate: null
 
   // Emitted when an available row is clicked or activated.
   signal chosen
@@ -165,8 +169,12 @@ Item {
     anchors.fill: parent
     hoverEnabled: true
     cursorShape: row.available ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onContainsMouseChanged: if (containsMouse)
+    onContainsMouseChanged: if (containsMouse && !row.pointerGate)
       row.entered()
+    onPositionChanged: function (mouse) {
+      if (row.pointerGate && row.pointerGate.moved(rowMouse, mouse))
+        row.entered()
+    }
     onClicked: row.activate()
   }
 }
