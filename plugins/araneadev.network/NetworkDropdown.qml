@@ -7,6 +7,13 @@
 // properties kept out of it, and reporting every user action through a
 // single action signal. No NetworkManager objects here, so tests drive it
 // with fixtures.
+//
+// Anything that moves rows or controls under a still pointer without
+// rebuilding them (the VPN status line showing or hiding, a section
+// growing, the prompt opening, a scroll) stamps layoutChangedAt, which the
+// Wi-Fi and Saved rows, their forget buttons, the band and DNS pills and
+// the band's Automatic switch read through pointerGate: a click within
+// 300 ms of it is ignored unless the pointer has really moved there since.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -63,8 +70,12 @@ Column {
       visible: false
     })
   // Filters synthetic hover from rows and controls moving under a still
-  // pointer (e.g. the Wi-Fi list changing underneath the cursor).
+  // pointer (e.g. the Wi-Fi list changing underneath the cursor), and
+  // carries layoutChangedAt to the controls that settle clicks.
   readonly property alias pointerGate: gate
+  // When the layout last shifted under the pointer (Date.now()), 0 for
+  // never; see noteLayoutChange.
+  property real layoutChangedAt: 0
 
   // Emitted for every user action, NAME with its ARG:
   //   qr, speed, toggleWifi (null): the header's actions;
@@ -87,6 +98,11 @@ Column {
   //     true on a forget button. Leaving a forget button adds leave: true,
   //     so the host only drops the action focus there.
   signal action(string name, var arg)
+
+  // Stamps layoutChangedAt: something moved rows without rebuilding them.
+  function noteLayoutChange() {
+    dropdown.layoutChangedAt = Date.now()
+  }
 
   // Resets the pointer gate; called after every keyboard-driven move so a
   // stale pointer sample never steals the cursor back.
@@ -208,6 +224,8 @@ Column {
   NetworkLinkSection {
     id: linkSection
     width: parent.width
+    onYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
     stats: dropdown.stats
     samples: dropdown.graph
     pointerGate: dropdown.pointerGate
@@ -223,6 +241,8 @@ Column {
   NetworkInterfacesSection {
     id: interfacesSection
     width: parent.width
+    onYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
     rows: dropdown.view.interfaces || []
   }
   Separator {
@@ -231,6 +251,8 @@ Column {
   NetworkBandSection {
     id: bandSection
     width: parent.width
+    onYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
     visible: !!dropdown.band.visible
     title: dropdown.band.title || ""
     auto: dropdown.band.auto !== false
@@ -262,6 +284,8 @@ Column {
   NetworkDnsSection {
     id: dnsSection
     width: parent.width
+    onYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
     visible: options.length > 0
     options: dropdown.view.dns && dropdown.view.dns.options ? dropdown.view.dns.options : []
     cursorIndex: dropdown.cursorIn("dns")
@@ -288,11 +312,15 @@ Column {
     clip: true
     interactive: contentHeight > height
     boundsBehavior: Flickable.StopAtBounds
+    onYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
+    onContentYChanged: dropdown.noteLayoutChange()
 
     Column {
       id: scrollColumn
       width: wifiScroll.width
       spacing: Style.space(14)
+      onHeightChanged: dropdown.noteLayoutChange()
 
       Separator {
         id: wifiSeparator
@@ -310,6 +338,7 @@ Column {
         cursorIndex: dropdown.cursorIn("wifi")
         cursorAction: !!dropdown.cursor.action
         pointerGate: dropdown.pointerGate
+        onLayoutShifted: dropdown.noteLayoutChange()
         onPrimary: function (index) {
           dropdown.rowAction("wifiPrimary", dropdown.wifi.rows, index)
         }
@@ -348,6 +377,7 @@ Column {
         cursorIndex: dropdown.cursorIn("saved")
         cursorAction: !!dropdown.cursor.action
         pointerGate: dropdown.pointerGate
+        onYChanged: dropdown.noteLayoutChange()
         onForget: function (index) {
           dropdown.rowAction("savedForget", dropdown.view.saved, index)
         }
@@ -383,6 +413,9 @@ Column {
 
   PointerMoveGate {
     id: gate
+    // The dropdown's last layout shift, for the controls' clickSettled().
+    property real layoutChangedAt: dropdown.layoutChangedAt
+
     referenceItem: dropdown
   }
 }

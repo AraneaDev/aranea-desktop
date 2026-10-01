@@ -16,7 +16,7 @@ service contracts to the feature plugins.
 - `FilamentSwitch` is the Filament-style compact on/off switch. An optional
   `clickGate` (the `NodeDeviceRow` hosting it, or anything with
   `clickSettled()`) makes its pointer clicks settle like that row's, as
-  Network's VPN rows do.
+  the VPN dropdown's rows do.
 - `FilamentPulse` is the Filament-style hairline strand that lights up (a
   travelling light, or a static lit strand with motion disabled) while a
   scan is running: Bluetooth's device discovery now, Wi-Fi scans later.
@@ -29,9 +29,12 @@ service contracts to the feature plugins.
   real pointer move, never on the row sliding underneath a stationary
   cursor. `detailColor` recolours the detail (the network VPN rows use
   `DesignTokens.urgent` for "Couldn't connect"). A pointer click within
-  `settleMs` (300 ms) of the row being created is ignored unless the gate
-  accepted a real move over it since, so a Repeater rebuild never turns a
-  click aimed at one row into a click on another.
+  `settleMs` (300 ms) of the row being created, or of its dropdown's layout
+  shifting, is ignored unless the gate accepted a real move over it since,
+  so neither a Repeater rebuild nor a section growing turns a click aimed at
+  one row into a click on another. A dropdown reports layout shifts by
+  declaring `layoutChangedAt` (a `Date.now()` stamp) on the gate it hands
+  down; `ClickSettle.clickSettled` holds the rule.
 - `ForgetButton` is the soft red "forget" button a row puts in its trailing
   slot (Bluetooth devices, Network's Wi-Fi and Saved rows). It shows on a
   `forgettable` row while the row (`rowHovered`), the button or the
@@ -48,7 +51,8 @@ service contracts to the feature plugins.
   `busy` pill breathes. It emits `clicked`, and `hoveredMoved` on entering,
   or only on a real pointer move when a `pointerGate` is set. A pill on a
   row a Repeater can rebuild takes the row as `clickGate` (VPN's "open app"
-  chip), as `FilamentSwitch` does.
+  chip), as `FilamentSwitch` does; without one, a pill with a gate settles
+  its clicks after the dropdown's layout shifts on its own.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph
   (tinted by `glyphColor`), title/caption pair, and a trailing slot.
 - `CredentialPrompt` is the inline credential prompt (Network's passphrase,
@@ -72,6 +76,11 @@ service contracts to the feature plugins.
   input and forwards the same `deleteRequested` signal and `blocked` alias.
 - `OverlayChrome` provides common overlay placement and dismiss behavior.
 - `ServiceRegistry.js` publishes isolated service slots for dependent plugins.
+- `ClickSettle.js` is the shared click-settling rule (`clickSettled`): a
+  click on a control that was just created, or that a layout shift just
+  moved under a still pointer, waits for the pointer to really move onto it
+  or for 300 ms to pass. `NodeDeviceRow`, `ForgetButton`, `FilamentPill`,
+  `CredentialPrompt` and Network's band switch use it.
 - `CursorLogic.js` is the shared keyboard-cursor safety contract (moved from
   the Network plugin): a cursor follows the row key it was put on, never
   its position (`reselectIndex`, `followCursor`), a lost or evacuated key

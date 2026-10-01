@@ -8,7 +8,10 @@
 //
 // The Repeater's model is `rows` alone; status and the prompt are separate
 // properties keyed by SSID, so a status change or a keystroke never
-// rebuilds a delegate (and never drops a half-typed passphrase).
+// rebuilds a delegate (and never drops a half-typed passphrase). A row
+// wrapper moving or resizing without a rebuild (the prompt opening, moving
+// or turning into its message, the scanning caption) reports
+// layoutShifted, so the dropdown can settle clicks.
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
@@ -49,6 +52,8 @@ Column {
   signal hovered(int index, bool action)
   // Emitted when the pointer leaves row INDEX's forget button.
   signal actionLeft(int index)
+  // Emitted when a row wrapper moves or resizes without a rebuild.
+  signal layoutShifted
   // Emitted on Enter in the passphrase.
   signal promptSubmit
   // Emitted when the prompt's connect button is clicked.
@@ -111,6 +116,8 @@ Column {
       objectName: "wifiRowWrapper"
       width: section.width
       spacing: Style.space(4)
+      onYChanged: section.layoutShifted()
+      onHeightChanged: section.layoutShifted()
 
       Text {
         objectName: "wifiTitle"
@@ -175,6 +182,9 @@ Column {
         objectName: "promptPanel"
         visible: wrapper.promptOpen
         width: wrapper.width
+        // Settles the connect button like the rows: not within 300 ms of
+        // opening or of a layout shift, unless the pointer moved there.
+        pointerGate: section.pointerGate
         fields: [
           {
             key: "identity",

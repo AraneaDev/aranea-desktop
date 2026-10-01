@@ -6,6 +6,12 @@
 // sessions, graphs, the prompt), and reporting every user action through a
 // single action signal. No NetworkManager objects and no nmcli logic here:
 // the view gets ready strings, so tests drive it with fixtures.
+//
+// Anything that moves rows under a still pointer without rebuilding them
+// (a session growing its IP, Server and graph lines, the prompt opening, a
+// scroll) stamps layoutChangedAt, which the rows, switches, chips and the
+// prompt's connect button read through pointerGate: a click within 300 ms
+// of it is ignored unless the pointer has really moved there since.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -51,8 +57,12 @@ Column {
   readonly property var connectedRows: view && view.connected ? view.connected : []
   // The view's available rows, or [].
   readonly property var availableRows: view && view.available ? view.available : []
-  // Filters synthetic hover from rows moving under a still pointer.
+  // Filters synthetic hover from rows moving under a still pointer, and
+  // carries layoutChangedAt to the controls that settle clicks.
   readonly property alias pointerGate: gate
+  // When the layout last shifted under the pointer (Date.now()), 0 for
+  // never; see noteLayoutChange.
+  property real layoutChangedAt: 0
 
   // Emitted for every user action, NAME with its ARG:
   //   toggle ({index, key}): a NetworkManager row or its switch;
@@ -65,6 +75,11 @@ Column {
   // Row actions carry the row's key as the view saw it, so the host can
   // refuse one whose row changed underneath the click.
   signal action(string name, var arg)
+
+  // Stamps layoutChangedAt: something moved rows without rebuilding them.
+  function noteLayoutChange() {
+    dropdown.layoutChangedAt = Date.now()
+  }
 
   // Resets the pointer gate; called after every keyboard-driven move so a
   // stale pointer sample never steals the cursor back.
@@ -152,6 +167,9 @@ Column {
     nameOffset: 0
     cursorIndex: dropdown.cursorIn("connected")
     pointerGate: dropdown.pointerGate
+    onHeightChanged: dropdown.noteLayoutChange()
+    onVisibleChanged: dropdown.noteLayoutChange()
+    onLayoutShifted: dropdown.noteLayoutChange()
     onToggle: function (index) {
       dropdown.rowAction("toggle", dropdown.connectedRows, index)
     }
@@ -188,11 +206,15 @@ Column {
     clip: true
     interactive: contentHeight > height
     boundsBehavior: Flickable.StopAtBounds
+    onYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
+    onContentYChanged: dropdown.noteLayoutChange()
 
     Column {
       id: scrollColumn
       width: vpnScroll.width
       spacing: Style.space(14)
+      onHeightChanged: dropdown.noteLayoutChange()
 
       Separator {
         id: availableSeparator
@@ -212,6 +234,7 @@ Column {
         nameOffset: dropdown.connectedRows.length
         cursorIndex: dropdown.cursorIn("available")
         pointerGate: dropdown.pointerGate
+        onLayoutShifted: dropdown.noteLayoutChange()
         onToggle: function (index) {
           dropdown.rowAction("toggle", dropdown.availableRows, index)
         }
@@ -259,6 +282,9 @@ Column {
 
   PointerMoveGate {
     id: gate
+    // The dropdown's last layout shift, for the controls' clickSettled().
+    property real layoutChangedAt: dropdown.layoutChangedAt
+
     referenceItem: dropdown
   }
 }

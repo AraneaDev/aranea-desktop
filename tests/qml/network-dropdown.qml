@@ -801,7 +801,44 @@ ShellRoot {
         t.check(!savedRows[0].busy && savedRows[0].detail === "Couldn't forget", "a failed forget reads Couldn't forget")
         t.check(Qt.colorEqual(savedRows[0].detailColor, Aranea.DesignTokens.urgent), "in the urgent colour")
         full.savedStatus = {}
+
+        // ---------- The VPN line shifts everything below it ----------
+        full.view = withCursor(cur(false, "wifi", 0))
+      }], [400, function () {
+        full.disarmPointer()
+        var rows = t.findChildren(t.findChild(full, "wifiSection"), "wifiRow")
+        // Where Wi-Fi row 2 will be once the VPN line (and the spacing
+        // after it) is gone, so the shifted click lands on a row.
+        var line = t.findChild(full, "vpnLine")
+        stillPoint = rows[2].mapToItem(full, 60, rows[2].height / 2 - line.height - full.spacing)
+        pointer.mouseMove(full, stillPoint.x, stillPoint.y)
+      }], [80, function () {
+        pointer.mouseMove(full, stillPoint.x + 4, stillPoint.y)
+      }], [400, function () {
+        shiftedFrom = t.findChildren(t.findChild(full, "wifiSection"), "wifiRow")[1].mapToItem(full, 0, 0).y
+        actions = []
+        var noVpn = withCursor(cur(false, "wifi", 0))
+        noVpn.vpnLine = ""
+        full.view = noVpn
+      }], [60, function () {
+        t.check(!t.findChild(full, "vpnLine").visible, "the VPN line hid")
+        t.check(t.findChildren(t.findChild(full, "wifiSection"), "wifiRow")[1].mapToItem(full, 0, 0).y < shiftedFrom, "the rows moved up under the still pointer")
+        var row2 = t.findChildren(t.findChild(full, "wifiSection"), "wifiRow")[2]
+        var top = row2.mapToItem(full, 0, 0).y
+        t.check(stillPoint.y > top && stillPoint.y < top + row2.height, "Wi-Fi row 2 slid under the still pointer")
+        pointer.mouseClick(full, stillPoint.x + 4, stillPoint.y)
+        t.equal(nonHover().length, 0, "a Wi-Fi click within 300 ms of the VPN line hiding is ignored")
+      }], [350, function () {
+        pointer.mouseClick(full, stillPoint.x + 4, stillPoint.y)
+        t.check(reported("wifiPrimary", {
+          index: 2,
+          key: wifiRows[2].key
+        }) && nonHover().length === 1, "a click 300 ms after the shift is accepted, on the row now under it")
+        full.view = withCursor(cur(false, "wifi", 0))
       }]])
+
+  // A Wi-Fi row's position before the VPN line hid.
+  property real shiftedFrom: 0
 
   // The Wi-Fi delegates (wrappers, then rows) before the refresh check.
   property var identityBefore: []

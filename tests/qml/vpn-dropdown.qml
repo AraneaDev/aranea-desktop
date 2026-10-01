@@ -325,6 +325,10 @@ ShellRoot {
         width: 380
         maxScrollHeight: 40
         view: withCursor(cur(false, "available", 0))
+        onAction: function (name, arg) {
+          if (name !== "hover")
+            scrollActions.push([name, arg])
+        }
       }
     }
   }
@@ -550,7 +554,9 @@ ShellRoot {
           password: "ab",
           code: "1"
         })
-      }], [100, function () {
+      }], [350, function () {
+        // (Past 300 ms: dropping the Azure session shrank Connected, which
+        // settles the connect button like any layout shift.)
         var now = wrappersOf("connected").concat(rowsOf("connected"), wrappersOf("available"), rowsOf("available"))
         t.check(now.length === 10 && identityBefore.length === 10 && identityBefore.every(function (w, k) {
           return w === now[k]
@@ -692,7 +698,86 @@ ShellRoot {
         t.check(actions.some(function (a) {
           return a[0] === "hover"
         }), "a real move after the slide reports hover again")
+
+        // ---------- Layout shifts under a still pointer ----------
+        full.view = withCursor(cur(false, "available", 0))
+        full.prompt = closedPrompt
+      }], [400, function () {
+        full.disarmPointer()
+        var arows = rowsOf("available")
+        stillPoint = arows[1].mapToItem(full, 60, arows[1].height / 2)
+        pointer.mouseMove(full, stillPoint.x, stillPoint.y)
+      }], [80, function () {
+        pointer.mouseMove(full, stillPoint.x + 4, stillPoint.y)
+      }], [400, function () {
+        t.check(reported("hover", {
+          section: "available",
+          index: 1,
+          key: "uuid-gp"
+        }), "the pointer rests on GlobalProtect")
+        shiftedFrom = rowsOf("available")[1].mapToItem(full, 0, 0).y
+        actions = []
+        // The Azure app session gains a Server line and its first samples:
+        // the Connected block grows without rebuilding a delegate.
+        full.sessions = {
+          "uuid-office": {
+            ip: "10.20.4.17",
+            server: "vpn.example.com",
+            up: "1 h 13 min"
+          },
+          "app:Azure (Contoso)": {
+            ip: "172.16.8.40",
+            server: "gw.contoso.example",
+            up: "23 min"
+          }
+        }
+        full.graphs = {
+          "app:Azure (Contoso)": [
+            {
+              rx: 1000,
+              tx: 10
+            }
+          ]
+        }
+      }], [60, function () {
+        t.check(rowsOf("available")[1].mapToItem(full, 0, 0).y > shiftedFrom, "the session grew the rows down under the still pointer")
+        pointer.mouseClick(full, stillPoint.x + 4, stillPoint.y)
+        t.equal(nonHover().length, 0, "a click within 300 ms of a session growing is ignored")
+      }], [350, function () {
+        pointer.mouseClick(full, stillPoint.x + 4, stillPoint.y)
+        t.equal(nonHover().length, 1, "a click 300 ms after the growth is accepted")
+        actions = []
+        // The prompt opens on the row above the pointer's.
+        full.prompt = promptFor("uuid-client-a", {})
+      }], [60, function () {
+        t.check(shown(wrappersOf("available")[0], "promptPanel").length === 1, "the prompt opened above the pointer's row")
+        pointer.mouseClick(full, stillPoint.x + 4, stillPoint.y)
+        t.equal(nonHover().length, 0, "a click within 300 ms of a prompt opening above the row is ignored")
+      }], [350, function () {
+        pointer.mouseClick(full, stillPoint.x + 4, stillPoint.y)
+        t.equal(nonHover().length, 1, "a click 300 ms after the prompt opened is accepted")
+        full.prompt = closedPrompt
+        actions = []
+        // A scroll moves Available's rows under the pointer too.
+        var flick = t.findChild(scroller, "vpnScroll")
+        scrollPoint = flick.mapToItem(scroller, 60, flick.height / 2)
+        scroller.ensureVisible("available", 2)
+      }], [60, function () {
+        t.check(t.findChild(scroller, "vpnScroll").contentY > 0, "the scroll area scrolled")
+        scrollActions = []
+        pointer.mouseClick(scroller, scrollPoint.x, scrollPoint.y)
+        t.equal(scrollActions.length, 0, "a click within 300 ms of a scroll is ignored")
+      }], [350, function () {
+        pointer.mouseClick(scroller, scrollPoint.x, scrollPoint.y)
+        t.equal(scrollActions.length, 1, "a click 300 ms after the scroll is accepted")
       }]])
+
+  // The available row's position before the session grew.
+  property real shiftedFrom: 0
+  // The middle of the scroller's scroll area, which a scroll moves rows under.
+  property var scrollPoint: null
+  // Actions reported by scroller, as [name, arg], other than hover.
+  property var scrollActions: []
 
   // The row delegates before the refresh check.
   property var identityBefore: []

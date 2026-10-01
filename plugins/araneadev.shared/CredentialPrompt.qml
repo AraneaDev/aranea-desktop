@@ -10,12 +10,15 @@
 // `fields` on every keystroke (to echo the typed values back) never
 // rebuilds a field and never drops a half-typed secret or its selection.
 // With a pointerGate, a connect click within settleMs of the prompt
-// opening is ignored unless the pointer has really moved over it since,
-// so a prompt opening under a still pointer can't be clicked by accident.
+// opening, or of its dropdown's layout shifting
+// (pointerGate.layoutChangedAt), is ignored unless the pointer has really
+// moved over it since, so a prompt opening or sliding under a still
+// pointer can't be clicked by accident.
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "ClickSettle.js" as ClickSettle
 
 Item {
   id: prompt
@@ -37,15 +40,17 @@ Item {
   // The failure message.
   property string failedText: "Wrong password"
   // Optional PointerMoveGate (qs.Ui): with one, the connect button ignores
-  // a click within settleMs of opening unless the pointer has moved here.
+  // a click within settleMs of opening or of a layout shift unless the
+  // pointer has moved here since.
   property var pointerGate: null
-  // How long after opening a connect click is ignored, in ms (with a gate).
+  // How long after opening or a layout shift a connect click is ignored,
+  // in ms (with a gate).
   property int settleMs: 300
   // When the prompt last opened (Date.now()), for settleMs.
   property real openedAt: 0
-  // Whether the gate has accepted a real pointer move over the prompt since
-  // it opened.
-  property bool pointerMovedHere: false
+  // When the gate last accepted a real pointer move over the prompt
+  // (Date.now()), 0 for never; reset when it opens.
+  property real pointerMovedAt: 0
   // What each field holds now, by key, so connect enables as you type.
   property var texts: ({})
   // Each field's text input, by index, registered by the field slots.
@@ -110,16 +115,25 @@ Item {
     prompt.texts = copy
   }
 
-  // Whether a connect click counts: no gate, or settled since opening.
+  // Whether a connect click counts: no gate, or settled since opening and
+  // since the last layout shift (ClickSettle.clickSettled).
   function clickSettled() {
-    return !prompt.pointerGate || prompt.pointerMovedHere || Date.now() - prompt.openedAt >= prompt.settleMs
+    if (!prompt.pointerGate)
+      return true
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      createdAt: prompt.openedAt,
+      movedAt: prompt.pointerMovedAt,
+      layoutChangedAt: Number(prompt.pointerGate.layoutChangedAt) || 0,
+      settleMs: prompt.settleMs
+    })
   }
 
   objectName: "promptPanel"
   height: visible ? content.implicitHeight + Style.space(16) : 0
   onVisibleChanged: if (visible) {
     prompt.openedAt = Date.now()
-    prompt.pointerMovedHere = false
+    prompt.pointerMovedAt = 0
     Qt.callLater(prompt.focusFirst)
   }
   onMessageChanged: if (!prompt.message)
@@ -294,6 +308,6 @@ Item {
       x: hover.point.position.x,
       y: hover.point.position.y
     }))
-      prompt.pointerMovedHere = true
+      prompt.pointerMovedAt = Date.now()
   }
 }

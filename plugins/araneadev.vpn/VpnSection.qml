@@ -8,6 +8,10 @@
 // shared credential prompt (read-only username, password, optional 2FA
 // code). Pure view: plain inputs in, signals out.
 //
+// A row wrapper moving or resizing (a session line or graph appearing,
+// the prompt opening or moving) reports layoutShifted, so the dropdown can
+// settle clicks even when the section's own height stays the same.
+//
 // The Repeater's model is `rows` alone; status, sessions, graphs and the
 // prompt are separate properties keyed by row key, so none of them ever
 // rebuilds a delegate (or drops a half-typed password).
@@ -53,6 +57,8 @@ Column {
   signal openApp(int index)
   // Emitted when the pointer moves onto row INDEX (through the gate).
   signal hovered(int index)
+  // Emitted when a row wrapper moves or resizes without a rebuild.
+  signal layoutShifted
   // Emitted on Enter in the prompt's last field.
   signal promptSubmit
   // Emitted when the prompt's connect button is clicked.
@@ -152,6 +158,8 @@ Column {
       objectName: "vpnRowWrapper"
       width: section.width
       spacing: Style.space(4)
+      onYChanged: section.layoutShifted()
+      onHeightChanged: section.layoutShifted()
 
       Aranea.NodeDeviceRow {
         id: vpnRow
