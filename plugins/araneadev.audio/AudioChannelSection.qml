@@ -115,7 +115,8 @@ Column {
       available: modelData.available
       hasCursor: section.cursor === index
       onChosen: section.deviceChosen(index)
-      onEntered: section.rowHovered(index)
+      onEntered: if (modelData.available)
+        section.rowHovered(index)
     }
   }
 }

@@ -213,6 +213,16 @@ ShellRoot {
     rows[2].activate()
     rows[1].activate()
     t.equal(JSON.stringify(actions), JSON.stringify([["outputDevice", 1]]), "only the available device is chosen")
+    var hoversBefore = actions.length
+    rows[2].entered()
+    t.equal(actions.length, hoversBefore, "hovering an unplugged device doesn't move the cursor")
+    rows[1].entered()
+    t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["hover",
+      {
+        section: "output",
+        index: 1
+      }
+    ]), "hovering an available device moves the cursor")
     t.findChild(output, "channelSlider").rightClicked()
     t.equal(actions[actions.length - 1][0], "outputMute", "right-click on the output slider mutes output")
     var sources = t.findChild(full, "sourcesSection")
