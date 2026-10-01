@@ -15,6 +15,8 @@ Item {
   signal textKey(string text)
   // Requests activation of the current value.
   signal activateRequested
+  // Requests deletion of the current selection (stock emits it for "x").
+  signal deleteRequested
   // Item receiving keyboard focus.
   property alias focusTarget: keyCatcher
   // Content rendered inside the frame.
@@ -34,6 +36,7 @@ Item {
       frame.textKey(text)
     }
     onActivateRequested: frame.activateRequested()
+    onDeleteRequested: frame.deleteRequested()
 
     Item {
       id: body

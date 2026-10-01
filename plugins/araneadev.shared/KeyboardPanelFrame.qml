@@ -15,6 +15,8 @@ KeyboardPanel {
   signal textKey(string text)
   // Emitted when the focused item is activated.
   signal activateRequested
+  // Emitted when the focused item's deletion is requested ("x").
+  signal deleteRequested
   // Content rendered inside the keyboard frame.
   default property alias panelContent: input.content
   focusTarget: input.focusTarget
@@ -33,5 +35,6 @@ KeyboardPanel {
       frame.textKey(text)
     }
     onActivateRequested: frame.activateRequested()
+    onDeleteRequested: frame.deleteRequested()
   }
 }

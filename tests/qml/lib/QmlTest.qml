@@ -88,18 +88,19 @@ Item {
     console.log("QMLTEST DONE " + failures)
   }
 
-  // Depth-first search over ROOT's children (and contentItem, where
-  // present) for the first descendant whose objectName is NAME; null when
-  // none matches.
+  // Depth-first search over ROOT's data (every declared child, visual or
+  // not, e.g. Items, Animations, Timers) and contentItem, where present,
+  // for the first descendant whose objectName is NAME; null when none
+  // matches.
   function findChild(root, name) {
     if (!root)
       return null
     var kids = []
     if (root.contentItem)
       kids.push(root.contentItem)
-    if (root.children)
-      for (var i = 0; i < root.children.length; i++)
-        kids.push(root.children[i])
+    if (root.data)
+      for (var i = 0; i < root.data.length; i++)
+        kids.push(root.data[i])
     for (var j = 0; j < kids.length; j++) {
       var kid = kids[j]
       if (!kid)
@@ -113,9 +114,9 @@ Item {
     return null
   }
 
-  // Depth-first search over ROOT's children (and contentItem, where
-  // present) for every descendant whose objectName is NAME, in depth-first
-  // order.
+  // Depth-first search over ROOT's data (every declared child, visual or
+  // not, e.g. Items, Animations, Timers) and contentItem, where present,
+  // for every descendant whose objectName is NAME, in depth-first order.
   function findChildren(root, name) {
     var matches = []
     if (!root)
@@ -123,9 +124,9 @@ Item {
     var kids = []
     if (root.contentItem)
       kids.push(root.contentItem)
-    if (root.children)
-      for (var i = 0; i < root.children.length; i++)
-        kids.push(root.children[i])
+    if (root.data)
+      for (var i = 0; i < root.data.length; i++)
+        kids.push(root.data[i])
     for (var j = 0; j < kids.length; j++) {
       var kid = kids[j]
       if (!kid)
