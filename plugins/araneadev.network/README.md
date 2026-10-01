@@ -26,9 +26,17 @@ through the `pointerGate` each section receives.
   more links.
 - `NetworkVpnSection`: VPN and WireGuard rows with a switch each.
 - `NetworkBandSection`, `NetworkDnsSection`: `FilamentPill` rows.
+- `NetworkWifiSection`: the Wi-Fi list with stock's section titles, a lock
+  on secured rows, forget, status text and the inline passphrase prompt
+  (identity first for enterprise).
+- `NetworkSavedSection`: saved profiles out of range, dimmed, with forget.
+- `NetworkForgetButton`: Bluetooth's forget button, shared by both lists.
+- `NetworkDropdown`: every section, the Wi-Fi/Saved scroll area, the empty
+  text and the key hint, reporting user actions through one
+  `action(name, arg)` signal.
 
 ## Validation
 
 Run `node --test tests/js/network-logic.test.js`,
-`tests/qml-behaviour.test.sh network-sections` and `tools/check-docs
+`tests/qml-behaviour.test.sh network-sections network-dropdown` and `tools/check-docs
 --root . plugins/araneadev.network/Panel.qml`.
