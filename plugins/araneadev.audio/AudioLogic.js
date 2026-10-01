@@ -1,7 +1,8 @@
 // Pure rules for the Aranea audio dropdown (Panel.qml): the live signal
 // level behind the filament glow, which media player Now playing follows
-// when Omarchy's media service is missing, and the Now playing state. No
-// QML, no I/O; tests/js/audio-logic.test.js runs this under Node.
+// when Omarchy's media service is missing, the Now playing state and the
+// device rows' trailing detail. No QML, no I/O;
+// tests/js/audio-logic.test.js runs this under Node.
 
 /**
  * Now playing state for one player (nowPlayingState).
@@ -93,4 +94,38 @@ function nowPlayingState(player) {
   }
 }
 
-if (typeof module !== "undefined") module.exports = { signalLevel, pickPlayer, nowPlayingState }
+/**
+ * A device row's short trailing detail: how the device is connected, else
+ * what it is. Reads the properties Model.nodeProps returns; headphone
+ * detection stays in Model.isHeadphones, whose answer comes in HEADPHONES.
+ * @param {{[key: string]: *}|null|undefined} props - the node's Pipewire properties
+ * @param {boolean} isSink - an output (else an input) device
+ * @param {boolean} headphones - Model.isHeadphones said so
+ * @returns {string} e.g. "HDMI", "bluetooth", "speakers" or "mic"
+ */
+function deviceDetail(props, isSink, headphones) {
+  if (headphones) return "headphones"
+  var p = props || {}
+  var keys = [
+    "node.name",
+    "node.description",
+    "device.api",
+    "device.bus",
+    "device.icon-name",
+    "device.product.name"
+  ]
+  var blob = keys
+    .map(function (key) {
+      return String(p[key] || "")
+    })
+    .join(" ")
+    .toLowerCase()
+  if (blob.indexOf("hdmi") !== -1) return "HDMI"
+  if (blob.indexOf("displayport") !== -1) return "DisplayPort"
+  if (blob.indexOf("bluez") !== -1 || blob.indexOf("bluetooth") !== -1) return "bluetooth"
+  if (blob.indexOf("usb") !== -1) return "USB"
+  return isSink ? "speakers" : "mic"
+}
+
+if (typeof module !== "undefined")
+  module.exports = { signalLevel, pickPlayer, nowPlayingState, deviceDetail }

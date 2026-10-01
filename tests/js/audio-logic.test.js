@@ -96,3 +96,25 @@ test("progress is clamped to 0..1", () => {
   })
   assert.equal(s.progress, 1)
 })
+
+test("a device's detail names how it is connected", () => {
+  const hdmi = { "node.name": "alsa_output.pci-0000_00_1f.3.hdmi-stereo", "device.api": "alsa" }
+  const dp = { "node.description": "LG ULTRAGEAR DisplayPort 2" }
+  const bt = { "device.api": "bluez5", "node.name": "bluez_output.AA_BB" }
+  const usb = { "device.bus": "usb", "node.name": "alsa_output.usb-Focusrite" }
+  assert.equal(logic.deviceDetail(hdmi, true, false), "HDMI")
+  assert.equal(logic.deviceDetail(dp, true, false), "DisplayPort")
+  assert.equal(logic.deviceDetail(bt, true, false), "bluetooth")
+  assert.equal(logic.deviceDetail(usb, false, false), "USB")
+  assert.equal(logic.deviceDetail(bt, true, true), "headphones")
+})
+
+test("a plain device is speakers or a mic, even without properties", () => {
+  assert.equal(
+    logic.deviceDetail({ "node.name": "alsa_output.pci-0000_00_1f.3.analog-stereo" }, true, false),
+    "speakers"
+  )
+  assert.equal(logic.deviceDetail({}, false, false), "mic")
+  assert.equal(logic.deviceDetail(null, true, false), "speakers")
+  assert.equal(logic.deviceDetail(undefined, false, false), "mic")
+})

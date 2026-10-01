@@ -801,16 +801,16 @@ Panel {
     return Model.streamRepresentsPlayer(node, player, mprisPlayers, displayAudioStreams)
   }
 
-  // Plain device rows for the view, from Pipewire NODES.
-  function deviceRows(nodes, activeNode, glyphFor, unplugged) {
+  // Plain device rows for the view, from Pipewire NODES (outputs when IS_SINK).
+  function deviceRows(nodes, activeNode, isSink, unplugged) {
     var rows = []
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i]
       rows.push({
         key: String(n.id),
         label: nodeLabel(n),
-        glyph: glyphFor(n),
-        detail: "",
+        glyph: isSink ? sinkGlyph(n) : sourceGlyph(n),
+        detail: AudioLogic.deviceDetail(nodeProps(n), isSink, isHeadphones(n)),
         active: !!activeNode && activeNode.id === n.id,
         available: true
       })
@@ -820,7 +820,7 @@ Panel {
       rows.push({
         key: String(u.id),
         label: nodeLabel(u),
-        glyph: glyphFor(u),
+        glyph: isSink ? sinkGlyph(u) : sourceGlyph(u),
         detail: "unplugged",
         active: false,
         available: false
@@ -830,9 +830,9 @@ Panel {
   }
   // The view's output rows. Kept apart from audioView so the arrays keep
   // their identity while the levels tick ~30 times a second.
-  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, sink, sinkGlyph, opened ? unpluggedSinks : [])
+  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, sink, true, opened ? unpluggedSinks : [])
   // The view's input rows (see outputDeviceRows).
-  readonly property var inputDeviceRows: deviceRows(displayAudioSources, source, sourceGlyph, [])
+  readonly property var inputDeviceRows: deviceRows(displayAudioSources, source, false, [])
   // The view's stream rows (see outputDeviceRows).
   readonly property var streamRows: displayAudioStreams.map(function (s) {
     return {
