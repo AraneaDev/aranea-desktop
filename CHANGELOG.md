@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.9.0...v2.10.0) (2026-10-01)
+
+
+### Features
+
+* Aranea-native Network dropdown ([#91](https://github.com/AraneaDev/aranea-desktop/issues/91)) ([e8c0f6d](https://github.com/AraneaDev/aranea-desktop/commit/e8c0f6d40fb3a6f02699f8903014d9809a049d1d))
+
 ## [2.9.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.8.1...v2.9.0) (2026-10-01)
 
 
