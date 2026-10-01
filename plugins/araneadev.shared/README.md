@@ -16,7 +16,7 @@ service contracts to the feature plugins.
 - `FilamentSwitch` is the Filament-style compact on/off switch.
 - `FilamentPulse` is the Filament-style hairline strand that lights up (a
   travelling light, or a static lit strand with motion disabled) while a
-  background operation such as pairing or connecting is running.
+  scan is running: Bluetooth's device discovery now, Wi-Fi scans later.
 - `NodeDeviceRow` is the Filament-style selectable device row with glyph,
   label, and detail slots, an optional busy (breathing marker) and signal
   (marker glow strength) state, and an optional trailing action slot flush

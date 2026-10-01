@@ -1,14 +1,14 @@
-// Aranea filament pulse: a hairline strand that lights while a background
-// operation (pairing, connecting) is running. A soft light travels along
-// it when motion is enabled; otherwise the strand simply lights up.
-// Hidden entirely when not running.
+// Aranea filament pulse: a hairline strand that lights while a scan is
+// running (Bluetooth device discovery; Wi-Fi scans to come). A soft light
+// travels along it when motion is enabled; otherwise the strand simply
+// lights up. Hidden entirely when not running.
 import QtQuick
 import qs.Commons
 
 Item {
   id: pulse
 
-  // Whether a background operation is in progress.
+  // Whether a scan is in progress.
   property bool running: false
 
   implicitHeight: Style.space(6)
