@@ -51,14 +51,18 @@ place_health=true
 # (deploy-plugins-safely writes their manifest there); a repair that runs
 # before that (a bare hook, a partial install) must not retarget the id to a
 # plugin that does not exist on disk yet. The deploy writes beside the config
-# path as given; beside a symlink's target counts too.
+# path as given; beside a symlink's target counts too. araneadev.vpn is not a
+# clone (there is no stock entry to retarget): the same guard just decides
+# whether its own bar entry gets inserted at all.
 audio_installed=false
 bluetooth_installed=false
 network_installed=false
+vpn_installed=false
 for dir in "$given_config_dir" "$config_dir"; do
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
   [[ -f "$dir/plugins/araneadev.bluetooth/manifest.json" ]] && bluetooth_installed=true
   [[ -f "$dir/plugins/araneadev.network/manifest.json" ]] && network_installed=true
+  [[ -f "$dir/plugins/araneadev.vpn/manifest.json" ]] && vpn_installed=true
 done
 # Removes the temp file on exit.
 cleanup() { rm -f "$tmp_file"; }
@@ -81,10 +85,12 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson network "$network_installed" '
+jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson network "$network_installed" --argjson vpn "$vpn_installed" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
+  # Whether araneadev.vpn already sits anywhere in the bar layout.
+  def vpn_present: ([.bar.layout[]? | arrays | .[] | entry_id] | index("araneadev.vpn")) != null;
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   # Aranea bar widgets take the place of their stock entries (release hands
   # them back), while preserving the user layout position and inline settings.
@@ -104,6 +110,23 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
              elif $network and type == "object" and .id == "omarchy.network" then .id = "araneadev.network"
              else . end)
        else . end))
+     else . end)
+  # araneadev.vpn is not a clone (there is no stock entry to swap): it gets
+  # its own bar entry inserted right after the network entry, in whichever
+  # layout section holds it (araneadev.network, or omarchy.network when that
+  # clone is not installed). With no network entry anywhere, it goes on the
+  # end of the right section instead. Skipped entirely once already present
+  # anywhere in the layout, so a second repair never duplicates it.
+  | (if $vpn and (.bar.layout | type) == "object" and (vpn_present | not) then
+       (.bar.layout |= with_entries(.value |= (if type == "array" then
+          (map(entry_id)) as $ids
+          | (($ids | index("araneadev.network")) // ($ids | index("omarchy.network"))) as $netIdx
+          | if $netIdx != null then .[0:($netIdx + 1)] + [{id: "araneadev.vpn"}] + .[($netIdx + 1):]
+            else . end
+        else . end)))
+       | if (vpn_present | not) and ((.bar.layout.right | type) == "array")
+         then .bar.layout.right += [{id: "araneadev.vpn"}]
+         else . end
      else . end)
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
       {id: "araneadev.lock"},

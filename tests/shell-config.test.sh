@@ -453,4 +453,93 @@ jq -e '.bar.layout.right == ["araneadev.network"]' "$network_real" >/dev/null ||
   exit 1
 }
 
+# --- VPN bar entry: not a clone (no stock id to retarget), inserted right
+# after the network entry only once its own manifest is installed (guard:
+# $(dirname "$config_file")/plugins/araneadev.vpn/manifest.json)
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "omarchy.tray"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.vpn"
+: >"$(dirname "$config")/plugins/araneadev.vpn/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "araneadev.vpn", "omarchy.tray"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+# Not duplicated on a second repair.
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end) | select(. == "araneadev.vpn")] | length == 1' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+# release removes it.
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '[.bar.layout.right[]? | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# Inserted after omarchy.network when the Aranea network clone is not
+# installed (a separate dir, so network_installed stays false there).
+vpn_only_dir="$test_root/vpn-only"
+mkdir -p "$vpn_only_dir/plugins/araneadev.vpn"
+: >"$vpn_only_dir/plugins/araneadev.vpn/manifest.json"
+vpn_only_cfg="$vpn_only_dir/shell.json"
+cat >"$vpn_only_cfg" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$vpn_only_cfg"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.vpn", "omarchy.tray"]' "$vpn_only_cfg" >/dev/null || {
+  cat "$vpn_only_cfg"
+  exit 1
+}
+
+# Inserted after an object-form network entry.
+vpn_obj_dir="$test_root/vpn-object"
+mkdir -p "$vpn_obj_dir/plugins/araneadev.vpn"
+: >"$vpn_obj_dir/plugins/araneadev.vpn/manifest.json"
+vpn_obj_cfg="$vpn_obj_dir/shell.json"
+cat >"$vpn_obj_cfg" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.network", "x": 1}, {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$vpn_obj_cfg"
+jq -e '.bar.layout.right == [{"id": "omarchy.network", "x": 1}, {"id": "araneadev.vpn"}, {"id": "omarchy.tray"}]' "$vpn_obj_cfg" >/dev/null || {
+  cat "$vpn_obj_cfg"
+  exit 1
+}
+
+# No network entry at all: appended to the right section's end.
+vpn_nonet_dir="$test_root/vpn-no-network"
+mkdir -p "$vpn_nonet_dir/plugins/araneadev.vpn"
+: >"$vpn_nonet_dir/plugins/araneadev.vpn/manifest.json"
+vpn_nonet_cfg="$vpn_nonet_dir/shell.json"
+cat >"$vpn_nonet_cfg" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$vpn_nonet_cfg"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.tray", "araneadev.vpn"]' "$vpn_nonet_cfg" >/dev/null || {
+  cat "$vpn_nonet_cfg"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+vpn_real="$test_root/vpn-dotfiles/shell.json"
+vpn_link="$test_root/vpn-config/shell.json"
+mkdir -p "$(dirname "$vpn_real")" "$(dirname "$vpn_link")/plugins/araneadev.vpn"
+: >"$(dirname "$vpn_link")/plugins/araneadev.vpn/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.network"]}}}' >"$vpn_real"
+ln -s "$vpn_real" "$vpn_link"
+"$repo_root/scripts/repair-shell-config" "$vpn_link"
+test -L "$vpn_link"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.vpn"]' "$vpn_real" >/dev/null || {
+  cat "$vpn_real"
+  exit 1
+}
+
 echo "shell config contract passed"
