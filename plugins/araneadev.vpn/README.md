@@ -34,10 +34,15 @@ bar and its dropdown. It runs two kinds of VPN side by side:
   prompt: the profile's username (read-only, from `vpn.data`), the
   password and an optional 2FA code.
 - Connect runs `nmcli --wait 60 connection up uuid <uuid> passwd-file
-/dev/stdin`. The password and code are written to nmcli's **stdin**
-  only, the moment the process starts, and cleared from memory right
-  after; they never appear in argv, logs or files. While nmcli waits (push
-  2FA), the row reads "Connecting… approve on phone" after 5 s.
+/dev/stdin`, and only with a non-empty password. On submit the password
+  and code are copied out of the prompt (whose fields clear at once); the
+  copy is written to nmcli's **stdin** the moment the process starts, then
+  cleared, and only then is stdin closed, so a started nmcli always gets
+  the submitted password. They never appear in argv, logs or files.
+  Closing the prompt or the dropdown meanwhile doesn't cancel the connect:
+  it goes ahead and its outcome shows on the row and the bar icon. While
+  nmcli waits (push 2FA), the row reads "Connecting… approve on phone"
+  after 5 s.
 - A rejected password reopens the prompt ("Wrong password or code"); any
   other failure reads "Couldn't connect" for 4 s.
 - The switch on a connected row runs `nmcli --wait 20 connection down uuid
@@ -85,8 +90,8 @@ A bare array lists the apps:
 addr`; up with an address counts as connected.
 - `detect.process`: a process name matched with `pgrep -x`. With both
   given, both must match for connected.
-  The kernel cuts process names to 15 characters, so a longer name (such
-  as `microsoft-azurevpnclient`) is matched on its first 15
+  The kernel cuts process names to 15 bytes, so a longer name (such as
+  `microsoft-azurevpnclient`) is matched on its first 15 bytes
   (`microsoft-azure`): any process whose name starts with them counts.
 - `open`: an argv array run detached, never through a shell. When its
   binary isn't on `PATH` the row reads "Couldn't open" for 4 s.

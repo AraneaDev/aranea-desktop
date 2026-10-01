@@ -901,7 +901,7 @@ test("app rows carry the open-in-new glyph, NetworkManager rows the VPN glyph", 
   )
 })
 
-test("linkCommand matches pgrep on the first 15 characters but prints the full name", () => {
+test("linkCommand matches pgrep on the first 15 bytes but prints the full name", () => {
   const script = logic.linkCommand(["microsoft-azurevpnclient"])[2]
   assert.ok(script.includes('pgrep -x -- "${p:0:15}"'))
   assert.ok(script.includes("printf '%s\\n' \"$p\""))
@@ -926,10 +926,35 @@ test("finishClearsSecrets only for a secrets connect on the prompt's row", () =>
   assert.equal(logic.finishClearsSecrets(true, "", ""), false)
 })
 
-test("secretsStart writes only to the open prompt's row with a password, else cancels", () => {
-  assert.equal(logic.secretsStart("a", "a", "pw"), "write")
-  assert.equal(logic.secretsStart("a", "a", ""), "cancel")
-  assert.equal(logic.secretsStart("a", "", "pw"), "cancel")
-  assert.equal(logic.secretsStart("a", "b", "pw"), "cancel")
-  assert.equal(logic.secretsStart("", "", "pw"), "cancel")
+test("canStartSecrets needs a password that survives newline stripping", () => {
+  assert.equal(logic.canStartSecrets("pw"), true)
+  assert.equal(logic.canStartSecrets(""), false)
+  assert.equal(logic.canStartSecrets("\r\n"), false)
+  assert.equal(logic.canStartSecrets(undefined), false)
+})
+
+test("linkCommand cuts a process name to 15 bytes, not characters, for pgrep", () => {
+  const fs = require("node:fs")
+  const os = require("node:os")
+  const { execFileSync } = require("node:child_process")
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vpn-pgrep-"))
+  try {
+    // Stubs: ip prints no links, pgrep records the name it was given.
+    fs.writeFileSync(path.join(dir, "ip"), "#!/bin/bash\necho []\n", { mode: 0o755 })
+    fs.writeFileSync(
+      path.join(dir, "pgrep"),
+      '#!/bin/bash\nprintf "%s" "$3" > "$(dirname "$0")/arg"\nexit 1\n',
+      {
+        mode: 0o755
+      }
+    )
+    const name = "é".repeat(10) // 10 characters, 20 bytes
+    const argv = logic.linkCommand([name])
+    execFileSync(argv[0], argv.slice(1), { env: { PATH: dir + ":/usr/bin:/bin", LANG: "C.UTF-8" } })
+    const got = fs.readFileSync(path.join(dir, "arg"))
+    assert.equal(got.length, 15)
+    assert.deepEqual(got, Buffer.from(name).subarray(0, 15))
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })

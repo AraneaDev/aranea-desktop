@@ -98,13 +98,12 @@ Panel {
   property real actionWaited: 0
   // Whether the running connect passes secrets on stdin.
   property bool actionWithSecrets: false
-  // The OTP mode for the running secrets connect ("append" or "challenge").
-  property string actionOtp: "append"
   // Whether the running action's process has started.
   property bool actionStartedOk: false
-  // Whether the running secrets connect was cancelled as it started (the
-  // prompt had closed), so its exit shows nothing.
-  property bool actionCancelled: false
+  // The secrets text (VpnLogic.secretsStdin) copied from the prompt at
+  // submit for the running secrets connect, written to nmcli's stdin as it
+  // starts and cleared right after; "" otherwise.
+  property string actionSecret: ""
   // The row whose last action failed, for failedTimer's 4 s, or "".
   property string failedKey: ""
   // The failure's VpnLogic.statusText phase ("failedUp", "failedDown",
@@ -415,7 +414,6 @@ Panel {
     actionWaited = 0
     actionWithSecrets = withSecrets
     actionStartedOk = false
-    actionCancelled = false
     actionProc.stdinEnabled = withSecrets
     actionProc.command = argv
     actionProc.running = true
@@ -479,12 +477,16 @@ Panel {
 
   // Connects the prompt's profile with the typed secrets (on stdin, see
   // actionProc.onStarted).
+  // nmcli starts only with a non-empty password copied into actionSecret;
+  // the prompt's fields are cleared at once, so the copy is the only one.
   function submitPrompt() {
     var conn = connFor(promptKey)
-    if (!conn || busy || promptBusy || promptFailed || promptPassword.length === 0 || fixture)
+    if (!conn || busy || promptBusy || promptFailed || fixture || !VpnLogic.canStartSecrets(promptPassword))
       return
     promptBusy = true
-    actionOtp = VpnLogic.otpMode(appsConfig.profiles, conn.name)
+    actionSecret = VpnLogic.secretsStdin(promptPassword, promptCode, VpnLogic.otpMode(appsConfig.profiles, conn.name))
+    promptPassword = ""
+    promptCode = ""
     startAction(promptKey, "connecting", VpnLogic.connectCommand(promptKey, true), true)
   }
 
@@ -672,13 +674,13 @@ Panel {
     }
   }
 
-  // Connects or disconnects one profile. A secrets connect writes the
-  // password and code to nmcli's stdin (passwd-file /dev/stdin) as it
-  // starts, clears them at once and closes stdin; they are never in argv,
-  // logs or files. When the prompt was closed (or a fixture cleared it)
-  // between submit and start, nothing is written: the process is
-  // terminated before stdin closes, so an empty password never reaches the
-  // VPN server (VpnLogic.secretsStart).
+  // Connects or disconnects one profile. A secrets connect always writes
+  // the copy taken at submit (actionSecret) to nmcli's stdin (passwd-file
+  // /dev/stdin) as it starts, clears it and only then closes stdin, so a
+  // started nmcli always gets the submitted password; the secrets are
+  // never in argv, logs or files. Closing the prompt or the dropdown in the
+  // meantime doesn't cancel it: the connect goes ahead and its outcome
+  // shows on the row (and the bar icon).
   Process {
     id: actionProc
     stderr: StdioCollector {
@@ -689,14 +691,8 @@ Panel {
       root.actionStartedOk = true
       if (!root.actionWithSecrets)
         return
-      if (VpnLogic.secretsStart(root.actionKey, root.promptKey, root.promptPassword) === "write") {
-        write(VpnLogic.secretsStdin(root.promptPassword, root.promptCode, root.actionOtp))
-        root.promptPassword = ""
-        root.promptCode = ""
-      } else {
-        root.actionCancelled = true
-        actionProc.signal(15)
-      }
+      write(root.actionSecret)
+      root.actionSecret = ""
       stdinEnabled = false
     }
     // A process that fails to start never emits exited.
@@ -739,7 +735,6 @@ Panel {
     var phase = actionPhase
     var withSecrets = actionWithSecrets
     var stderr = exitCode === -1 ? "" : actionErr.text
-    var cancelled = actionCancelled
     // A secrets connect's secrets never outlive its process, whatever
     // happened; any other action leaves a half-typed password alone.
     if (VpnLogic.finishClearsSecrets(withSecrets, key, promptKey)) {
@@ -749,12 +744,8 @@ Panel {
     actionKey = ""
     actionPhase = ""
     actionWithSecrets = false
-    actionCancelled = false
-    // A connect cancelled at start shows nothing.
-    if (cancelled) {
-      runList()
-      return
-    }
+    // The copy never outlives the process (one that never started included).
+    actionSecret = ""
     if (phase === "disconnecting") {
       if (exitCode !== 0) {
         intentionalDown = intentionalDown.filter(function (k) {

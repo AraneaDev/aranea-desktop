@@ -629,8 +629,9 @@ function sessionsToFetch(seen, conns) {
  * The argv that reads links and running processes for the own-app VPNs:
  * `ip -j addr`, a `---` line, then each configured process name that
  * `pgrep -x` finds, one per line (printed in full). `pgrep -x` matches the
- * kernel's process name, which is cut to 15 characters, so a longer name
- * is matched on its first 15. The names travel as positional arguments to
+ * kernel's process name, which is cut to 15 bytes, so a longer name is
+ * matched on its first 15 bytes (`LC_ALL=C` makes `${p:0:15}` count bytes,
+ * not characters). The names travel as positional arguments to
  * `bash -c`, never interpolated into the script.
  * @param {string[]|undefined} processNames - the apps' `detect.process` names
  * @returns {string[]} the argv
@@ -640,7 +641,7 @@ function linkCommand(processNames) {
   return [
     "bash",
     "-c",
-    'ip -j addr 2>/dev/null || echo "[]"; echo; echo ---; for p; do pgrep -x -- "${p:0:15}" >/dev/null 2>&1 && printf \'%s\\n\' "$p"; done; exit 0',
+    'export LC_ALL=C; ip -j addr 2>/dev/null || echo "[]"; echo; echo ---; for p; do pgrep -x -- "${p:0:15}" >/dev/null 2>&1 && printf \'%s\\n\' "$p"; done; exit 0',
     "_"
   ].concat(names.map(String))
 }
@@ -1095,18 +1096,15 @@ function finishClearsSecrets(withSecrets, actionKey, promptKey) {
 }
 
 /**
- * What a secrets connect does as its process starts: write the secrets
- * only while the prompt is still open on its row with a password typed;
- * otherwise (the prompt was closed, or a fixture cleared it, between submit
- * and start) cancel, so an empty password is never sent to the VPN server.
- * @param {string} actionKey - the row the connect is for
- * @param {string} promptKey - the row the prompt is open on, or ""
- * @param {string} password - the typed password
- * @returns {"write"|"cancel"} the decision
+ * Whether a secrets connect may start: only with a password that's still
+ * non-empty once newlines are stripped (as `secretsStdin` strips them). A
+ * started nmcli is always handed this password, so an empty one is never
+ * sent to the VPN server.
+ * @param {string|undefined} password - the password copied from the prompt at submit
+ * @returns {boolean} true when nmcli may start
  */
-function secretsStart(actionKey, promptKey, password) {
-  if (actionKey === "" || actionKey !== promptKey || !password) return "cancel"
-  return "write"
+function canStartSecrets(password) {
+  return sanitizeSecret(password) !== ""
 }
 
 if (typeof module !== "undefined")
@@ -1154,5 +1152,5 @@ if (typeof module !== "undefined")
     whichCommand: whichCommand,
     appsToApply: appsToApply,
     finishClearsSecrets: finishClearsSecrets,
-    secretsStart: secretsStart
+    canStartSecrets: canStartSecrets
   }
