@@ -15,6 +15,16 @@ set -euo pipefail
 # ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
 # --all: it is run as `<command> <surface> <output dir>` (tests use it).
 #
+# The real notification inbox (entries and their images) is parked only while
+# every shell instance is stopped, and put back the same way, so no queued
+# shell job and no restart-time image sweep can touch it. Parking refuses
+# (the capture is aborted, the inbox untouched) while the session is locked or
+# the shell cannot be stopped; a restore that cannot stop the shell or verify
+# every file keeps the notifications in their capture-backup.* dir and says
+# so. Notifications that arrive during a capture land in the capture inbox and
+# are dropped at restore (a failed restore leaves them there). A stop counts
+# only when `quickshell list` confirms no instance is left.
+#
 # Usage: scripts/capture-screenshots --surface <name> --output <dir> | --all --output <dir> | --hero --output <dir>
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,6 +38,125 @@ bar_capture_target=""
 bar_capture_previous_workspace=""
 bar_capture_update_marker_created=0
 bar_capture_update_marker="$HOME/.local/state/omarchy/reboot-required"
+notification_state_dir="$HOME/.local/state/omarchy/notifications"
+notification_inbox_dir="$notification_state_dir/inbox"
+notification_images_dir="$notification_state_dir/images"
+
+# Prints the running shell's config dir, resolved like omarchy-restart-shell:
+# the session's OMARCHY_PATH (a caller may disagree after dev link/unlink),
+# else $OMARCHY_PATH, else /usr/share/omarchy.
+omarchy_shell_config() {
+  local session_path
+  session_path="$(systemctl --user show-environment 2>/dev/null | sed -n 's/^OMARCHY_PATH=//p' | tail -n 1 || true)"
+  printf '%s/shell\n' "${session_path:-${OMARCHY_PATH:-/usr/share/omarchy}}"
+}
+
+# Stops every running Omarchy shell instance and succeeds only once
+# `quickshell list` confirms none is left. Fails closed: refuses (stopping
+# nothing) while the session is locked (that would kill the lock screen), and
+# fails when the config is missing or the list cannot be read.
+stop_omarchy_shell() {
+  local config listed tries=0
+  if omarchy-hyprland-session-locked >/dev/null 2>&1; then
+    return 1
+  fi
+  config="$(omarchy_shell_config)"
+  [[ -f "$config/shell.qml" ]] || return 1
+  # Each kill stops the oldest instance and fails once none is left.
+  while ((tries < 50)) && timeout 5 quickshell kill -p "$config" --any-display >/dev/null 2>&1; do
+    tries=$((tries + 1))
+  done
+  listed="$(quickshell list -p "$config" --any-display 2>&1)" || return 1
+  ! grep -Fq 'Process ID' <<<"$listed"
+}
+
+# Prints every entry (dotfiles included) directly inside dir $1, one per
+# line, NUL-terminated.
+dir_entries() {
+  find "$1" -mindepth 1 -maxdepth 1 -print0 2>/dev/null
+}
+
+# Moves the real notification inbox (entries and images) into backup dir $1
+# while the shell is stopped, sets the caller's swapped flag (variable named
+# $2) to 1 the moment the move is done, then restarts the shell on the empty
+# inbox. Fails with nothing parked when the shell cannot be stopped (the shell
+# is restarted unless the session is locked, as the stop may already have
+# killed instances); a failed move is rolled back, and anything the rollback
+# could not move stays in the backup (see remove_empty_backup).
+park_notification_inbox() {
+  local backup="$1" flag="$2" dir file
+  if ! stop_omarchy_shell; then
+    omarchy-hyprland-session-locked >/dev/null 2>&1 || omarchy restart shell >/dev/null 2>&1 || true
+    return 1
+  fi
+  mkdir -p "$backup/inbox" "$backup/images" "$notification_inbox_dir" "$notification_images_dir"
+  if ! { find "$notification_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$backup/inbox" {} + &&
+    find "$notification_images_dir" -mindepth 1 -maxdepth 1 -exec mv -t "$backup/images" {} +; }; then
+    for dir in inbox images; do
+      while IFS= read -r -d '' file; do
+        mv -n -- "$file" "$notification_state_dir/$dir/" || true
+      done < <(dir_entries "$backup/$dir")
+    done
+    omarchy restart shell >/dev/null 2>&1 || true
+    return 1
+  fi
+  printf -v "$flag" 1
+  omarchy restart shell >/dev/null 2>&1 || true
+}
+
+# Puts the notification inbox parked in backup dir $1 back. With every shell
+# instance stopped (so no queued job of the capture shell survives), it drops
+# the capture entries and images, copies every parked file (dotfiles too)
+# back and checks each one; only then is the backup handed off (renamed, then
+# deleted), so a rerun never deletes verified files. When the shell cannot be
+# stopped or a file does not match, nothing more is touched and the backup is
+# kept and named. Rerunning after an interruption is safe. The caller
+# restarts the shell.
+restore_parked_inbox() {
+  local backup="$1" dir file
+  [[ -d "$backup" ]] || return 0
+  if ! stop_omarchy_shell; then
+    printf 'notification inbox not restored (shell still running / session locked); your notifications are kept in %s\n' "$backup" >&2
+    return 1
+  fi
+  mkdir -p "$notification_inbox_dir" "$notification_images_dir"
+  find "$notification_inbox_dir" -maxdepth 1 -name '*.json' -delete 2>/dev/null || true
+  find "$notification_images_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null || true
+  for dir in inbox images; do
+    while IFS= read -r -d '' file; do
+      cp -p -- "$file" "$notification_state_dir/$dir/" 2>/dev/null || true
+    done < <(dir_entries "$backup/$dir")
+  done
+  for dir in inbox images; do
+    while IFS= read -r -d '' file; do
+      cmp -s -- "$file" "$notification_state_dir/$dir/${file##*/}" || {
+        printf 'notification inbox not fully restored; your notifications are kept in %s\n' "$backup" >&2
+        return 1
+      }
+    done < <(dir_entries "$backup/$dir")
+  done
+  # Every file is back: a leftover of the backup is no longer needed.
+  rm -rf -- "$backup.restored" 2>/dev/null || true
+  if ! mv -- "$backup" "$backup.restored"; then
+    printf 'notification inbox restored; its backup %s could not be removed, delete it yourself\n' "$backup" >&2
+    return 0
+  fi
+  rm -rf -- "$backup.restored" 2>/dev/null ||
+    printf 'notification inbox restored; delete the leftover %s yourself\n' "$backup.restored" >&2
+  return 0
+}
+
+# Removes an unused park backup dir $1 (rmdir only: never deletes files).
+# When files are left in it (a park whose rollback could not move them all
+# back), it is kept and named, and this fails.
+remove_empty_backup() {
+  rmdir -- "$1/inbox" "$1/images" 2>/dev/null || true
+  rmdir -- "$1" 2>/dev/null && return 0
+  [[ -d "$1" ]] || return 0
+  printf 'notification files from an aborted park are kept in %s; move them back into %s\n' "$1" "$notification_state_dir" >&2
+  return 1
+}
+
 # The surfaces --all captures.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
@@ -116,33 +245,47 @@ if ((capture_all)); then
   # no longer toast (they go to the center), so instead of hiding the plugin
   # the real inbox is parked for the whole batch and restored afterwards;
   # badges then show capture data only, never the user's own count.
-  batch_inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
   mkdir -p "$(aranea_state_root)"
   batch_inbox_backup="$(mktemp -d "$(aranea_state_root)/capture-backup.XXXXXX")"
   # Restore the real inbox, leave the finished capture set visible on the
   # intentionally empty workspace for a moment, then return focus. Set
-  # before the inbox is parked; the capture inbox is only cleared once the
-  # real one has actually been moved aside.
+  # before the inbox is parked; the swapped flag is only set once the real
+  # inbox has actually been moved aside, and cleared once it is back.
   batch_swapped=0
-  # Moves the real inbox back (when it was parked), restarts the shell, waits,
-  # then focuses workspace 1.
+  batch_finished=0
+  batch_finish_status=0
+  # Puts the real inbox back (when it was parked; see restore_parked_inbox),
+  # restarts the shell, waits, then focuses workspace 1. Runs once (the EXIT
+  # trap stays set while the explicit call runs); fails when the inbox could
+  # not be restored, after the shell is back. Says what became of
+  # notifications that arrived during the capture.
   finish_batch() {
-    if ((batch_swapped)); then
-      omarchy-shell notifications clear >/dev/null 2>&1 || true
-      sleep 1
-      find "$batch_inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_dir" {} + 2>/dev/null || true
+    if ((batch_finished)); then
+      return "$batch_finish_status"
     fi
-    rmdir "$batch_inbox_backup" 2>/dev/null || true
+    if ((batch_swapped)); then
+      if restore_parked_inbox "$batch_inbox_backup"; then
+        batch_swapped=0
+        printf '%s\n' 'note: notifications that arrived during the capture were not kept (the real inbox was parked)' >&2
+      else
+        batch_finish_status=1
+        printf '%s\n' 'note: notifications that arrived during the capture are still in the inbox, next to the capture ones' >&2
+      fi
+    else
+      remove_empty_backup "$batch_inbox_backup" || batch_finish_status=1
+    fi
     omarchy restart shell >/dev/null 2>&1 || true
     sleep "${ARANEA_CAPTURE_RETURN_DELAY:-10}"
     hyprctl dispatch 'hl.dsp.focus({ workspace = "1" })' >/dev/null 2>&1 || true
+    batch_finished=1
+    return "$batch_finish_status"
   }
   # A batch that stops early (set -e) still restores the inbox and focus.
-  trap finish_batch EXIT
-  mkdir -p "$batch_inbox_dir"
-  find "$batch_inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$batch_inbox_backup" {} + 2>/dev/null || true
-  batch_swapped=1
-  omarchy restart shell >/dev/null 2>&1 || true
+  trap 'finish_batch || exit 1' EXIT
+  if ! park_notification_inbox "$batch_inbox_backup" batch_swapped; then
+    echo 'notification inbox not parked (session locked, shell still running or a file could not be moved); nothing captured' >&2
+    exit 3
+  fi
   sleep 3
   # Captures one surface in a child run; fails when it wrote no new PNG. The
   # previous PNG is set aside first (so it never counts as a new capture) and
@@ -176,14 +319,15 @@ if ((capture_all)); then
     printf '%s\n' 'hero showcase not rebuilt: some surfaces failed' >&2
   fi
   # Normal completion restores explicitly; the trap only covers a batch that
-  # stops early.
+  # stops early, and stays set until the explicit restore is done.
+  batch_restore_status=0
+  finish_batch || batch_restore_status=1
   trap - EXIT
-  finish_batch
   if ((${#failed_surfaces[@]})); then
     printf 'capture failed: %s\n' "${failed_surfaces[*]}" >&2
     exit 1
   fi
-  exit 0
+  exit "$batch_restore_status"
 fi
 
 [[ -n "$surface" && -n "$output" ]] || {
@@ -416,32 +560,46 @@ case "$surface" in
     exit 0
     ;;
   notifications | notifications-empty)
-    state_home="$(xdg_state_home)"
-    mkdir -p "$state_home/aranea"
-    inbox_backup="$(mktemp -d "$state_home/aranea/capture-backup.XXXXXX")"
-    inbox_dir="$HOME/.local/state/omarchy/notifications/inbox"
-    # Put the real inbox back however this ends (set by the move below).
-    # Only undo what was done: before the move, the inbox is the real one and
-    # must not be cleared.
+    mkdir -p "$(aranea_state_root)"
+    inbox_backup="$(mktemp -d "$(aranea_state_root)/capture-backup.XXXXXX")"
+    # Put the real inbox back however this ends (set by the park below, the
+    # moment the real inbox has been moved aside).
+    # Only undo what was done: before the park, the inbox is the real one and
+    # must not be touched.
     inbox_swapped=0
-    # Hides the notification center; when the inbox was parked, clears the
-    # capture notifications, moves the real inbox back and restarts the shell.
+    inbox_restored=0
+    inbox_restore_status=0
+    # Hides the notification center; when the inbox was parked, dismisses the
+    # capture popups, puts the real inbox back (restore_parked_inbox) and
+    # restarts the shell, also when the restore failed. Runs once (the EXIT
+    # trap stays set while the explicit call runs); fails when the inbox could
+    # not be restored.
     restore_inbox() {
+      if ((inbox_restored)); then
+        return "$inbox_restore_status"
+      fi
       omarchy-shell shell hide araneadev.notifications >/dev/null 2>&1 || true
-      if ((! inbox_swapped)); then return 0; fi
+      if ((! inbox_swapped)); then
+        remove_empty_backup "$inbox_backup" || inbox_restore_status=1
+        inbox_restored=1
+        return "$inbox_restore_status"
+      fi
       omarchy-shell notifications dismissAll >/dev/null 2>&1 || true
-      omarchy-shell notifications clear >/dev/null 2>&1 || true
-      sleep 1
-      find "$inbox_backup" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_dir" {} + 2>/dev/null || true
-      rmdir "$inbox_backup" 2>/dev/null || true
+      if restore_parked_inbox "$inbox_backup"; then
+        inbox_swapped=0
+      else
+        inbox_restore_status=1
+      fi
       omarchy restart shell >/dev/null 2>&1 || true
+      inbox_restored=1
+      return "$inbox_restore_status"
     }
-    trap restore_inbox EXIT
+    trap 'restore_inbox || exit 1' EXIT
     # Sanitized fixtures: park the real inbox, show only capture notifications.
-    mkdir -p "$inbox_dir"
-    find "$inbox_dir" -maxdepth 1 -name '*.json' -exec mv -t "$inbox_backup" {} + 2>/dev/null || true
-    inbox_swapped=1
-    omarchy restart shell >/dev/null 2>&1 || true
+    if ! park_notification_inbox "$inbox_backup" inbox_swapped; then
+      echo "notification inbox not parked (session locked, shell still running or a file could not be moved); $surface not captured" >&2
+      exit 3
+    fi
     sleep 2
     case "$surface" in
       notifications)
@@ -460,7 +618,7 @@ case "$surface" in
     esac
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
     grim "$output/$surface.png"
-    restore_inbox
+    restore_inbox || exit 1
     trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
@@ -479,11 +637,6 @@ case "$surface" in
       picker_file="$state_home/aranea/emoji-recent.json"
       picker_id=omarchy.emojis
     fi
-    # Stops the running shell and waits a second.
-    stop_shell() {
-      quickshell kill -p "${OMARCHY_PATH:-/usr/share/omarchy}/shell" --any-display >/dev/null 2>&1 || true
-      sleep 1
-    }
     # The backup lives in the state dir, not /tmp: if this script is killed,
     # the real file is still next to where it belongs.
     mkdir -p "$state_home/aranea"
@@ -494,22 +647,44 @@ case "$surface" in
     # was moved aside must not delete it, nor clear an untouched clipboard.
     picker_swapped=0
     clipboard_swapped=0
-    # Stops the shell, restores the picker file and clipboard (only what was
-    # swapped), deletes the backup dir and restarts the shell.
+    picker_finished=0
+    picker_finish_status=0
+    # Stops the shell (stop_omarchy_shell), restores the picker file and
+    # clipboard (only what was swapped), deletes the backup dir and restarts
+    # the shell. When the shell cannot be stopped, a running picker could
+    # write its fixture history over the restored file, so the swapped file
+    # stays in the backup (named on stderr) and the capture fails. Runs once
+    # (the EXIT trap stays set while the explicit call runs).
     finish_picker() {
-      stop_shell
-      if ((picker_swapped)); then
+      local keep_backup=0
+      if ((picker_finished)); then
+        return "$picker_finish_status"
+      fi
+      if ((picker_swapped)) && ! stop_omarchy_shell; then
+        printf 'picker history not restored (shell still running / session locked); yours is kept in %s\n' "$picker_backup" >&2
+        keep_backup=1
+        picker_finish_status=1
+      elif ((picker_swapped)); then
         rm -f "$picker_file"
-        if [[ -e "$picker_backup/saved" ]]; then mv "$picker_backup/saved" "$picker_file"; fi
+        if [[ -e "$picker_backup/saved" ]] && ! mv "$picker_backup/saved" "$picker_file"; then
+          printf 'picker history not restored; yours is kept in %s\n' "$picker_backup" >&2
+          keep_backup=1
+          picker_finish_status=1
+        fi
       fi
       if [[ "$surface" == clipboard ]] && ((clipboard_swapped)); then
         if [[ -n "$clip_type" ]]; then wl-copy --type "$clip_type" <"$picker_backup/clipboard"; else wl-copy --clear; fi
       fi
-      rm -rf "$picker_backup"
+      ((keep_backup)) || rm -rf "$picker_backup"
       omarchy restart shell >/dev/null 2>&1 || true
+      picker_finished=1
+      return "$picker_finish_status"
     }
-    trap finish_picker EXIT
-    stop_shell
+    trap 'finish_picker || exit 1' EXIT
+    if ! stop_omarchy_shell; then
+      echo "shell not stopped (session locked or shell still running); $surface not captured, nothing was swapped" >&2
+      exit 3
+    fi
     [[ -e "$picker_file" ]] && mv "$picker_file" "$picker_backup/saved"
     picker_swapped=1
     if [[ "$surface" == clipboard ]]; then
@@ -543,8 +718,8 @@ case "$surface" in
     omarchy-shell shell toggle "$picker_id" >/dev/null
     sleep 1.5
     grim "$output/$surface.png"
+    finish_picker || exit 1
     trap - EXIT
-    finish_picker
     printf 'captured: %s\n' "$output/$surface.png"
     exit 0
     ;;
