@@ -44,7 +44,8 @@ Item {
   // Directory of the active Omarchy theme.
   readonly property string themeAssetRoot: stateHome + "/omarchy/current/theme"
   // Password field width in pixels: the wide, slim field of the 24-Sep design.
-  readonly property int fieldWidth: 528
+  // Capped to the view width minus a margin so narrow or portrait outputs never clip it.
+  readonly property int fieldWidth: Math.min(528, width - Style.space(32))
   // Password field height in pixels.
   readonly property int fieldHeight: 44
   // Password field border thickness in pixels: a thin outline (six device
@@ -68,17 +69,10 @@ Item {
   readonly property bool showPasswordCursor: inputEnabled && !authenticatingPassword && failureMessage.length === 0
   // True while a failure message is shown.
   readonly property bool errorState: failureMessage.length > 0
-  // Thin left-to-right mint to violet gradient outline of the idle field.
-  readonly property var activeBorderSpec: Border.withWidth({
-    "color": Aranea.DesignTokens.accent,
-    "gradient": {
-      "colors": [Aranea.DesignTokens.accent, Aranea.DesignTokens.strandEnd],
-      "angle": 0,
-      "enabled": true
-    }
-  }, root.outlineThickness)
-  // Border spec for the field: the lock surface's error border in errorState, the gradient outline otherwise.
-  readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha") : root.activeBorderSpec
+  // Border spec for the field: the lock surface's error border in errorState,
+  // its active border otherwise (Aranea's theme sets a left-to-right mint to
+  // violet gradient there, [lock] border-active in shell.toml).
+  readonly property var inputBorderSpec: errorState ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, root.outlineThickness, "border-alpha") : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, root.outlineThickness, "border-alpha")
 
   // Emitted on Enter with the typed password (only when it is non-empty).
   signal submitPassword(string password)
