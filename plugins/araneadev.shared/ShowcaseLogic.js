@@ -22,6 +22,21 @@ function parseNames(json) {
 }
 
 /**
+ * The answer to a `showcase` IPC call. Names are taken only while the
+ * dropdown is open, so they can never outlive a capture into a real open
+ * (the dropdown clears them on open and on close).
+ * @param {boolean} opened - the dropdown is open
+ * @param {string|undefined} json - the call's JSON array of strings
+ * @returns {{answer: string, names: string[]|null}} "ok" with the names,
+ *   or "closed" / "invalid" with null
+ */
+function showcaseCall(opened, json) {
+  if (!opened) return { answer: "closed", names: null }
+  var names = parseNames(json)
+  return names === null ? { answer: "invalid", names: null } : { answer: "ok", names: names }
+}
+
+/**
  * View rows with their labels replaced, by display position, with stand-in
  * names. Rows past the names (or on an empty name) get "<prefix> N", never
  * their real label. Without names the rows come back as they are.
@@ -59,4 +74,5 @@ function connectedLabel(rows) {
   return ""
 }
 
-if (typeof module !== "undefined") module.exports = { parseNames, showcaseLabels, connectedLabel }
+if (typeof module !== "undefined")
+  module.exports = { parseNames, showcaseCall, showcaseLabels, connectedLabel }

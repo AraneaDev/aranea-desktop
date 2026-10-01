@@ -304,13 +304,13 @@ Panel {
     }
     // Screenshot stand-ins (scripts/capture-screenshots): NAMESJSON, a JSON
     // array of strings, relabels the Wi-Fi, Saved, VPN and interface rows
-    // and the header until the dropdown closes. Display only.
+    // and the header until the dropdown closes; while it is closed the
+    // answer is "closed" and nothing is set. Display only.
     function showcase(namesJson: string): string {
-      var names = Showcase.parseNames(namesJson)
-      if (names === null)
-        return "invalid"
-      root.showcaseNames = names
-      return "ok"
+      var call = Showcase.showcaseCall(root.opened, namesJson)
+      if (call.names !== null)
+        root.showcaseNames = call.names
+      return call.answer
     }
   }
 
@@ -2018,6 +2018,8 @@ Panel {
     function onOpenedChanged() {
       root.keyboardCursor = false
       root.savedActionFocused = false
+      // Stand-in names never carry over into an open or past a close.
+      root.showcaseNames = []
       if (root.opened) {
         root.ssidLookupPending = true
         // Stock's open handler puts the Wi-Fi cursor on row 0, a deliberate
@@ -2037,7 +2039,6 @@ Panel {
         root.headerCursorKey = ""
       } else {
         root.linkHistory = []
-        root.showcaseNames = []
       }
     }
     function onWifiNetworksChanged() {

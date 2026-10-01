@@ -4,8 +4,8 @@
 # through its `showcase` IPC method (the defaults, or the ARANEA_CAPTURE_*
 # overrides), given time to draw (the graph delay for Network, the scan delay
 # for Bluetooth), grabbed and hidden. A showcase call that doesn't answer "ok"
-# fails the surface with exit 3 and writes no screenshot, so real names never
-# reach one.
+# (a closed dropdown answers "closed"), or a summon that fails, fails the
+# surface with exit 3 and writes no screenshot, so real names never reach one.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,7 +25,13 @@ cat >"$bin/omarchy-shell" <<'SH'
 #!/usr/bin/env bash
 printf 'omarchy-shell'"$(printf ' [%%s]%.0s' "$@")"'\n' "$@" >>"$ARANEA_TEST_SANDBOX/calls.log"
 case "$2" in
-  summon) echo ok ;;
+  summon)
+    if [[ "${SUMMON_FAILS:-0}" == 1 ]]; then
+      echo 'omarchy-shell is not running' >&2
+      exit 1
+    fi
+    echo ok
+    ;;
   showcase)
     if [[ "$3" == "["* ]]; then
       echo 'Too many arguments provided (1 required but 8 were provided.)'
@@ -110,7 +116,7 @@ grep -Fxq 'omarchy-shell [omarchy.bluetooth] [showcase] [ ["Pod"]]' "$log"
 # --- A showcase call that isn't "ok" (the stock panel, no answer, bad JSON)
 # fails the surface: exit 3, a clear message, no screenshot, dropdown hidden.
 for surface in network bluetooth; do
-  for answer in 'Function not found.' 'invalid' ''; do
+  for answer in 'Function not found.' 'invalid' 'closed' ''; do
     : >"$log"
     rm -f "$out/$surface.png"
     status=0
@@ -128,6 +134,20 @@ for surface in network bluetooth; do
       exit 1
     }
   done
+done
+
+# --- A summon that fails (omarchy-shell down) is the scripted exit 3 with
+# no screenshot and no showcase call, not a set -e abort.
+for surface in network bluetooth; do
+  : >"$log"
+  rm -f "$out/$surface.png"
+  status=0
+  errors="$(SUMMON_FAILS=1 "$capture" --surface "$surface" --output "$out" 2>&1 >/dev/null)" || status=$?
+  if ((status != 3)) || [[ -e "$out/$surface.png" ]] || grep -Fq '[showcase]' "$log"; then
+    printf '%s: a failed summon must exit 3 without a screenshot (status %s): %s\n' "$surface" "$status" "$errors" >&2
+    exit 1
+  fi
+  grep -Fq "Unable to summon popup omarchy.$surface" <<<"$errors"
 done
 
 echo "capture showcase behaviour passed"

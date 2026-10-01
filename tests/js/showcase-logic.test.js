@@ -67,3 +67,10 @@ test("connectedLabel names the connected row, or nothing", () => {
   assert.equal(logic.connectedLabel([{ label: "One" }]), "")
   assert.equal(logic.connectedLabel(undefined), "")
 })
+
+test("showcaseCall takes names only while the dropdown is open", () => {
+  assert.deepEqual(logic.showcaseCall(true, ' ["One"]'), { answer: "ok", names: ["One"] })
+  assert.deepEqual(logic.showcaseCall(true, "nope"), { answer: "invalid", names: null })
+  assert.deepEqual(logic.showcaseCall(false, ' ["One"]'), { answer: "closed", names: null })
+  assert.deepEqual(logic.showcaseCall(false, "nope"), { answer: "closed", names: null })
+})

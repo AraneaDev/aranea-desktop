@@ -841,10 +841,10 @@ Panel {
     target: root
     function onOpenedChanged() {
       root.keyboardCursor = false
-      if (!root.opened) {
+      // Stand-in names never carry over into an open or past a close.
+      root.showcaseNames = []
+      if (!root.opened)
         root.rssiByAddress = ({})
-        root.showcaseNames = []
-      }
     }
     function onFocusSectionChanged() {
       Qt.callLater(root.ensureCursorVisible)
@@ -1049,13 +1049,13 @@ Panel {
     }
     // Screenshot stand-ins (scripts/capture-screenshots): NAMESJSON, a JSON
     // array of strings, relabels every device row until the dropdown
-    // closes. Display only.
+    // closes; while it is closed the answer is "closed" and nothing is set.
+    // Display only.
     function showcase(namesJson: string): string {
-      var names = Showcase.parseNames(namesJson)
-      if (names === null)
-        return "invalid"
-      root.showcaseNames = names
-      return "ok"
+      var call = Showcase.showcaseCall(root.opened, namesJson)
+      if (call.names !== null)
+        root.showcaseNames = call.names
+      return call.answer
     }
   }
 
