@@ -1218,6 +1218,43 @@ Panel {
   property int savedIndex: 0
   // Whether the cursor sits on the Saved row's forget button.
   property bool savedActionFocused: false
+  // The SSID of the Wi-Fi row the cursor was put on, so the cursor follows
+  // that network when a scan re-sorts the list (stock's selectedIndex alone
+  // stays on a position that may now hold another network).
+  property string wifiCursorSsid: ""
+  // The uuid of the VPN row the cursor was put on (see wifiCursorSsid).
+  property string vpnCursorKey: ""
+  // The uuid of the Saved row the cursor was put on (see wifiCursorSsid).
+  // Never re-pointed at another row: forgetting is irreversible.
+  property string savedCursorKey: ""
+
+  // The SSID of Wi-Fi row INDEX, or "" when there is none.
+  function wifiSsidAt(index) {
+    var net = wifiNetworks[index]
+    return net ? net.ssid : ""
+  }
+
+  // Wi-Fi rows as {key} for NetworkLogic.reselectIndex.
+  function wifiKeyRows() {
+    return wifiNetworks.map(function (n) {
+      return {
+        key: n ? n.ssid : ""
+      }
+    })
+  }
+
+  // Whether the cursor's row in SECTION is still the one it was put on.
+  // Keyboard actions refuse otherwise, so a re-sort between a look and a key
+  // press never acts on a different network or profile.
+  function cursorRowConfirmed(section) {
+    if (section === "wifi")
+      return selectedIndex >= 0 && selectedIndex < wifiNetworks.length && wifiSsidAt(selectedIndex) === wifiCursorSsid
+    if (section === "vpn")
+      return !!vpnRows[vpnIndex] && vpnRows[vpnIndex].key === vpnCursorKey
+    if (section === "saved")
+      return !!savedRows[savedIndex] && savedCursorKey !== "" && savedRows[savedIndex].key === savedCursorKey
+    return true
+  }
   // The header caption's opacity, which connectionPhraseSwap fades between
   // phrases. Passed to the view on its own, outside networkView, so the fade
   // never rebuilds the view object.
@@ -1356,6 +1393,7 @@ Panel {
     cursorActive = true
     focusSection = "wifi"
     selectedIndex = index
+    wifiCursorSsid = net.ssid
     wifiActionFocused = false
     if (net.connected) {
       disconnectRow(net.ssid)
@@ -1619,12 +1657,16 @@ Panel {
     })
     if (next.section === "header" && focusSection !== "header")
       headerIndex = 0
-    else if (next.section === "vpn")
+    else if (next.section === "vpn") {
       vpnIndex = next.index
-    else if (next.section === "wifi")
+      vpnCursorKey = vpnRows[next.index] ? vpnRows[next.index].key : ""
+    } else if (next.section === "wifi") {
       selectedIndex = next.index
-    else if (next.section === "saved")
+      wifiCursorSsid = wifiSsidAt(next.index)
+    } else if (next.section === "saved") {
       savedIndex = next.index
+      savedCursorKey = savedRows[next.index] ? savedRows[next.index].key : ""
+    }
     bandAutoFocused = next.bandAuto
     wifiActionFocused = false
     savedActionFocused = false
@@ -1646,8 +1688,11 @@ Panel {
       savedActionFocused = dx > 0
   }
 
-  // Enter: activates whatever the cursor sits on.
+  // Enter: activates whatever the cursor sits on, refusing a row that isn't
+  // the one the cursor was put on.
   function activateCursor() {
+    if (!cursorRowConfirmed(focusSection))
+      return
     if (focusSection === "header")
       activateHeader()
     else if (focusSection === "vpn")
@@ -1664,6 +1709,8 @@ Panel {
 
   // 'x': forgets the cursor's Wi-Fi row (when forgettable) or Saved row.
   function deleteCursor() {
+    if (!cursorRowConfirmed(focusSection))
+      return
     if (focusSection === "wifi")
       wifiForget(selectedIndex)
     else if (focusSection === "saved")
@@ -1733,6 +1780,7 @@ Panel {
     cursorActive = true
     if (arg.section === "vpn") {
       vpnIndex = arg.index
+      vpnCursorKey = vpnRows[arg.index] ? vpnRows[arg.index].key : ""
     } else if (arg.section === "band") {
       if (arg.auto)
         bandAutoFocused = true
@@ -1744,9 +1792,11 @@ Panel {
       dnsIndex = arg.index
     } else if (arg.section === "wifi") {
       selectedIndex = arg.index
+      wifiCursorSsid = wifiSsidAt(arg.index)
       wifiActionFocused = !!arg.action
     } else if (arg.section === "saved") {
       savedIndex = arg.index
+      savedCursorKey = savedRows[arg.index] ? savedRows[arg.index].key : ""
       savedActionFocused = !!arg.action
     }
     focusSection = arg.section
@@ -1754,31 +1804,50 @@ Panel {
 
   // Additions to stock's open handler: a fresh open starts with the mouse's
   // (outline-free) cursor and asks for the saved SSIDs; a close drops the
-  // Link history. The VPN and Saved cursors stay on rows that exist.
+  // Link history. When rows change, the Wi-Fi, VPN and Saved cursors
+  // follow the network or profile they were put on (by key); when it's
+  // gone, Wi-Fi and VPN keep stock's clamp and take the clamped row's key,
+  // while Saved keeps its key so a forget is refused rather than retargeted.
   Connections {
     target: root
     function onOpenedChanged() {
       root.keyboardCursor = false
       root.savedActionFocused = false
-      if (root.opened)
+      if (root.opened) {
         root.ssidLookupPending = true
-      else
+        // Stock's open handler puts the Wi-Fi cursor on row 0.
+        root.wifiCursorSsid = root.wifiSsidAt(0)
+        root.vpnCursorKey = root.vpnRows[root.vpnIndex] ? root.vpnRows[root.vpnIndex].key : ""
+        root.savedCursorKey = root.savedRows[root.savedIndex] ? root.savedRows[root.savedIndex].key : ""
+      } else {
         root.linkHistory = []
+      }
+    }
+    function onWifiNetworksChanged() {
+      if (root.wifiNetworks.length === 0)
+        return
+      // An open prompt pins its own row, as stock's handler does.
+      var key = root.passwordSsid !== "" ? root.passwordSsid : root.wifiCursorSsid
+      var idx = NetworkLogic.reselectIndex(root.wifiKeyRows(), key, root.selectedIndex)
+      root.selectedIndex = idx
+      root.wifiCursorSsid = root.wifiSsidAt(idx)
     }
     function onVpnRowsChanged() {
-      if (root.vpnIndex > root.vpnRows.length - 1)
-        root.vpnIndex = Math.max(0, root.vpnRows.length - 1)
+      var idx = NetworkLogic.reselectIndex(root.vpnRows, root.vpnCursorKey, root.vpnIndex)
+      root.vpnIndex = Math.max(0, idx)
+      if (idx >= 0)
+        root.vpnCursorKey = root.vpnRows[idx].key
       if (root.focusSection === "vpn" && root.vpnRows.length === 0)
         root.focusSection = root.headerActionCount > 0 ? "header" : "dns"
     }
     function onSavedRowsChanged() {
-      if (root.savedIndex > root.savedRows.length - 1)
-        root.savedIndex = Math.max(0, root.savedRows.length - 1)
+      root.savedIndex = Math.max(0, NetworkLogic.reselectIndex(root.savedRows, root.savedCursorKey, root.savedIndex))
       if (root.focusSection === "saved" && root.savedRows.length === 0) {
         root.savedActionFocused = false
         if (root.wifiNetworks.length > 0) {
           root.focusSection = "wifi"
           root.selectedIndex = root.wifiNetworks.length - 1
+          root.wifiCursorSsid = root.wifiSsidAt(root.selectedIndex)
         } else {
           root.focusSection = "dns"
         }

@@ -684,3 +684,33 @@ test("moveVertical: saved moves within its rows, up goes to wifi or dns, down st
     { section: "dns", index: 0, bandAuto: false }
   )
 })
+
+// --- reselectIndex -------------------------------------------------------
+
+test("reselectIndex finds the keyed row wherever it moved", () => {
+  const rows = [{ key: "a" }, { key: "b" }, { key: "c" }]
+  assert.equal(logic.reselectIndex(rows, "c", 0), 2)
+  assert.equal(logic.reselectIndex(rows, "a", 2), 0)
+  assert.equal(
+    logic.reselectIndex(rows, "", 1),
+    1,
+    "an empty key is a real (hidden) key only when a row has it"
+  )
+  assert.equal(logic.reselectIndex([{ key: "" }, { key: "x" }], "", 1), 0)
+})
+
+test("reselectIndex falls back to the clamped fallback when the key is gone", () => {
+  const rows = [{ key: "a" }, { key: "b" }]
+  assert.equal(logic.reselectIndex(rows, "z", 1), 1)
+  assert.equal(logic.reselectIndex(rows, "z", 9), 1)
+  assert.equal(logic.reselectIndex(rows, "z", -3), 0)
+  assert.equal(logic.reselectIndex(rows, "z", Number.NaN), 0)
+  assert.equal(logic.reselectIndex(rows, null, 1), 1)
+})
+
+test("reselectIndex returns -1 for no rows and never throws on bad input", () => {
+  assert.equal(logic.reselectIndex([], "a", 0), -1)
+  assert.equal(logic.reselectIndex(undefined, "a", 0), -1)
+  assert.equal(logic.reselectIndex([null, { key: "a" }], "a", 0), 1)
+  assert.equal(logic.reselectIndex([null, undefined], "a", 1), 1)
+})

@@ -509,6 +509,29 @@ function moveVertical(state, dy, avail) {
   return here
 }
 
+/**
+ * The index a list cursor should sit on after its rows changed: the row
+ * whose `key` equals `key` wherever it moved, else `fallback` clamped into
+ * the list. Lets a cursor follow its network or profile across a re-sort
+ * instead of staying on a position that now holds another row.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
+ * @param {string|null|undefined} key - the key the cursor was on
+ * @param {number} fallback - the index to clamp when the key is gone
+ * @returns {number} the index, or -1 when there are no rows
+ */
+function reselectIndex(rows, key, fallback) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return -1
+  if (typeof key === "string") {
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i]
+      if (row && row.key === key) return i
+    }
+  }
+  var f = Math.floor(Number(fallback)) || 0
+  return Math.max(0, Math.min(list.length - 1, f))
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     splitTerse: splitTerse,
@@ -523,5 +546,6 @@ if (typeof module !== "undefined")
     lastUsedText: lastUsedText,
     pushSample: pushSample,
     graphPoints: graphPoints,
-    moveVertical: moveVertical
+    moveVertical: moveVertical,
+    reselectIndex: reselectIndex
   }
