@@ -1,5 +1,8 @@
 // Small on/off switch in the Filament style: a short strand with a node
-// that sits right and glows when on, left and grey when off.
+// that sits right and glows when on, left and grey when off. A host whose
+// switch sits on a row a Repeater can rebuild under a still pointer passes
+// that row (or anything with clickSettled()) as clickGate, so a click that
+// was aimed at another row's switch is ignored until the row settles.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -11,6 +14,10 @@ Item {
   property bool checked: false
   // Whether the keyboard cursor is on the switch.
   property bool hasCursor: false
+  // Optional item whose clickSettled() a pointer click must pass, e.g. the
+  // NodeDeviceRow hosting the switch; null (default) never ignores a click.
+  // activate() stays unguarded for the keyboard and tests.
+  property var clickGate: null
 
   // Emitted when the switch is clicked or activated.
   signal toggled
@@ -64,6 +71,7 @@ Item {
   MouseArea {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
-    onClicked: sw.activate()
+    onClicked: if (!sw.clickGate || sw.clickGate.clickSettled())
+      sw.activate()
   }
 }

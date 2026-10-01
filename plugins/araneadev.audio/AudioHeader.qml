@@ -19,6 +19,9 @@ Aranea.DropdownHeader {
   property string hint: ""
   // The switch's tooltip, exposed for tests.
   readonly property alias hintTip: tip
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
+  // switch moving under a still pointer.
+  property var pointerGate: null
 
   // Emitted when the mute-all switch is toggled.
   signal toggleAll
@@ -47,7 +50,12 @@ Aranea.DropdownHeader {
       onToggled: header.toggleAll()
       HoverHandler {
         id: switchHover
-        onHoveredChanged: if (hovered)
+        onHoveredChanged: if (hovered && !header.pointerGate)
+          header.entered()
+        onPointChanged: if (header.pointerGate && switchHover.hovered && header.pointerGate.moved(switchHover.parent, {
+          x: switchHover.point.position.x,
+          y: switchHover.point.position.y
+        }))
           header.entered()
       }
       PanelToolTip {

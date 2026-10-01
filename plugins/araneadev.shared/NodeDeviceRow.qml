@@ -3,7 +3,10 @@
 // glyph in a fixed-width slot so labels line up across dropdowns, the
 // label, a trailing detail, and an optional trailing action slot flush
 // with the row's right edge. Unavailable devices are dimmed and never
-// chosen. The row spans the item's full width.
+// chosen. The row spans the item's full width. A pointer click within
+// settleMs of the row being created is ignored unless the pointer has
+// really moved over it since (through pointerGate): a Repeater rebuild can
+// put this row under a pointer that was aimed at another.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -17,6 +20,8 @@ Item {
   property string label: ""
   // Trailing detail, e.g. "unplugged".
   property string detail: ""
+  // The detail's colour; a host passes DesignTokens.urgent for a failure.
+  property color detailColor: Util.alpha(DesignTokens.foreground, 0.55)
   // Whether this is the active device.
   property bool active: false
   // Whether the device can be chosen.
@@ -36,11 +41,28 @@ Item {
   // Whether the pointer is over the row, for a trailing action a host
   // dropdown shows only on hover (e.g. a forget button).
   readonly property alias hovered: rowMouse.containsMouse
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover churn from
+  // this row moving under a still pointer. null (default) keeps the old
+  // behaviour: entered on containsMouse becoming true.
+  property var pointerGate: null
+  // How long after creation a pointer click is ignored, in ms, unless the
+  // gate has accepted a real move over the row since.
+  property int settleMs: 300
+  // When the row was created (Date.now()), for settleMs.
+  property real createdAt: 0
+  // Whether the gate has accepted a real pointer move over this row.
+  property bool pointerMovedHere: false
 
   // Emitted when an available row is clicked or activated.
   signal chosen
   // Emitted when the pointer enters the row.
   signal entered
+
+  // Whether a pointer click may choose the row: it has been on screen for
+  // settleMs, or the pointer has really moved over it.
+  function clickSettled() {
+    return pointerMovedHere || Date.now() - createdAt >= settleMs
+  }
 
   // Chooses the device, unless it is unavailable.
   function activate() {
@@ -50,6 +72,7 @@ Item {
 
   implicitHeight: Style.space(30)
   opacity: available ? 1 : 0.45
+  Component.onCompleted: createdAt = Date.now()
 
   Rectangle {
     // The keyboard cursor outline.
@@ -145,7 +168,7 @@ Item {
     anchors.rightMargin: Style.space(8) + (trailingSlot.width > 0 ? trailingSlot.width + Style.space(8) : 0)
     anchors.verticalCenter: parent.verticalCenter
     text: row.detail
-    color: Util.alpha(DesignTokens.foreground, 0.55)
+    color: row.detailColor
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }
@@ -165,8 +188,15 @@ Item {
     anchors.fill: parent
     hoverEnabled: true
     cursorShape: row.available ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onContainsMouseChanged: if (containsMouse)
+    onContainsMouseChanged: if (containsMouse && !row.pointerGate)
       row.entered()
-    onClicked: row.activate()
+    onPositionChanged: function (mouse) {
+      if (row.pointerGate && row.pointerGate.moved(rowMouse, mouse)) {
+        row.pointerMovedHere = true
+        row.entered()
+      }
+    }
+    onClicked: if (row.clickSettled())
+      row.activate()
   }
 }

@@ -4,6 +4,7 @@
 // Pipewire here, so tests drive it with fixtures.
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
 
 Column {
@@ -17,6 +18,15 @@ Column {
       section: "",
       index: -1
     })
+  // Filters synthetic hover from rows and controls moving under a still
+  // pointer (e.g. a device list changing underneath the cursor).
+  readonly property alias pointerGate: gate
+
+  // Resets the pointer gate; called after every keyboard-driven move so a
+  // stale pointer sample never steals the cursor back.
+  function disarmPointer() {
+    gate.reset()
+  }
 
   // Emitted for every user action, NAME with its ARG:
   //   toggleAll (none): mute or unmute every channel;
@@ -42,6 +52,7 @@ Column {
     anyAudible: !!dropdown.view.anyAudible
     hint: dropdown.view.toggleHint || ""
     hasCursor: !!dropdown.view.headerCursor
+    pointerGate: dropdown.pointerGate
     onToggleAll: dropdown.action("toggleAll", null)
     onEntered: dropdown.action("hover", {
       section: "header",
@@ -68,6 +79,7 @@ Column {
       })
     devices: dropdown.view.outputDevices || []
     cursor: dropdown.cursorIn("output")
+    pointerGate: dropdown.pointerGate
     onVolumeMoved: function (value) {
       dropdown.action("outputVolume", value)
     }
@@ -103,6 +115,7 @@ Column {
       })
     devices: dropdown.view.inputDevices || []
     cursor: dropdown.cursorIn("input")
+    pointerGate: dropdown.pointerGate
     onVolumeMoved: function (value) {
       dropdown.action("inputVolume", value)
     }
@@ -128,6 +141,7 @@ Column {
     width: parent.width
     streams: dropdown.view.streams || []
     cursor: Math.max(-1, dropdown.cursorIn("streams"))
+    pointerGate: dropdown.pointerGate
     onVolumeMoved: function (index, value) {
       dropdown.action("streamVolume", {
         index: index,
@@ -165,6 +179,7 @@ Column {
         canNext: false
       })
     hasCursor: dropdown.cursorIn("nowplaying") >= 0
+    pointerGate: dropdown.pointerGate
     onPreviousRequested: dropdown.action("previous", null)
     onPlayPauseRequested: dropdown.action("playPause", null)
     onNextRequested: dropdown.action("next", null)
@@ -180,5 +195,10 @@ Column {
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
+  }
+
+  PointerMoveGate {
+    id: gate
+    referenceItem: dropdown
   }
 }

@@ -10,6 +10,7 @@ plugins/araneadev.clipboard/Clipboard.qml
 plugins/araneadev.health/Panel.qml
 plugins/araneadev.lock/LockView.qml
 plugins/araneadev.menu/MenuStyle.qml
+plugins/araneadev.network/Panel.qml
 plugins/araneadev.notifications/components/NotificationCard.qml
 plugins/araneadev.notifications/NotificationLogic.js
 plugins/araneadev.notifications/Service.qml

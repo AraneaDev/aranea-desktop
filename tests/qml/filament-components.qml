@@ -1,9 +1,13 @@
 // Shared Filament components: the slider maps value to progress over any
 // range and keeps its node inside its own width (one right edge), the
 // switch and device row emit only when they should, and the live-signal
-// glow follows the level along the lit strand.
+// glow follows the level along the lit strand. A NodeDeviceRow with a
+// PointerMoveGate never takes the cursor when it moves under a still
+// pointer, and KeyboardInputFrame/blocked forwards to its key catcher.
 import QtQuick
+import QtTest
 import Quickshell
+import qs.Ui
 import "lib"
 import "plugins/araneadev.shared" as Aranea
 
@@ -114,6 +118,125 @@ ShellRoot {
     property int deletes: 0
     onDeleteRequested: deletes += 1
   }
+  Aranea.KeyboardInputFrame {
+    id: blockedInput
+    width: 120
+    height: 80
+    blocked: true
+  }
+
+  // A tall row so it still covers the test point after shifting, and a
+  // plain row with no gate, in a real window so Qt delivers hover/move.
+  FloatingWindow {
+    id: gateWindow
+    implicitWidth: 320
+    implicitHeight: 220
+    visible: true
+
+    Item {
+      id: gateHost
+      anchors.fill: parent
+
+      Aranea.NodeDeviceRow {
+        id: gatedRow
+        objectName: "gatedRow"
+        width: 300
+        height: 100
+        y: 40
+        label: "Gated"
+        pointerGate: rowGate
+        property int enteredCount: 0
+        onEntered: enteredCount += 1
+      }
+      Aranea.NodeDeviceRow {
+        id: ungatedRow
+        objectName: "ungatedRow"
+        width: 300
+        y: 180
+        label: "Ungated"
+        property int enteredCount: 0
+        onEntered: enteredCount += 1
+      }
+
+      PointerMoveGate {
+        id: rowGate
+        referenceItem: gateHost
+      }
+    }
+  }
+
+  // A row created under a still pointer, as a Repeater rebuild does: a
+  // click that lands right after it appears, before any real move over it,
+  // was aimed at whatever was there before.
+  FloatingWindow {
+    id: freshWindow
+    implicitWidth: 320
+    implicitHeight: 120
+    visible: true
+
+    Item {
+      id: freshHost
+      anchors.fill: parent
+
+      Loader {
+        id: freshLoader
+        y: 20
+        active: false
+        sourceComponent: Aranea.NodeDeviceRow {
+          width: 300
+          height: 60
+          label: "Fresh"
+          pointerGate: freshGate
+          onChosen: freshHost.chosenCount += 1
+        }
+      }
+
+      // How many times a fresh row was chosen.
+      property int chosenCount: 0
+
+      PointerMoveGate {
+        id: freshGate
+        referenceItem: freshHost
+      }
+    }
+  }
+
+  // Synthesizes the pointer events (TestCase's mouseMove), never run as a test.
+  TestCase {
+    id: pointer
+    name: "pointer"
+    when: false
+  }
+
+  // Clicks on rows created under a still pointer: refused for about 300 ms
+  // unless the gate accepted a real move over the row since.
+  function freshClicks() {
+    pointer.mouseMove(freshHost, 40, 50)
+    t.step(80, function () {
+      pointer.mouseMove(freshHost, 44, 50)
+      t.step(80, function () {
+        freshLoader.active = true
+        t.step(30, function () {
+          pointer.mouseClick(freshHost, 44, 50)
+          t.equal(freshHost.chosenCount, 0, "a click right after a row appears under a still pointer is ignored")
+          t.step(350, function () {
+            pointer.mouseClick(freshHost, 44, 50)
+            t.equal(freshHost.chosenCount, 1, "once the row has settled, a click chooses it")
+            freshLoader.active = false
+            freshLoader.active = true
+            t.step(30, function () {
+              pointer.mouseMove(freshHost, 50, 52)
+              t.step(30, function () {
+                pointer.mouseClick(freshHost, 50, 52)
+                t.equal(freshHost.chosenCount, 2, "a real move over a fresh row lets a click through at once")
+                t.done()
+              })
+            })
+          })
+        })
+      })
+    })
+  }
 
   Component.onCompleted: t.step(200, function () {
     t.equal(Math.round(stream.progress * 100), 80, "1.2 of 1.5 lights 80% of the strand")
@@ -176,7 +299,38 @@ ShellRoot {
 
     keyboardInput.focusTarget.deleteRequested()
     t.equal(keyboardInput.deletes, 1, "KeyboardInputFrame forwards the key catcher's deleteRequested")
+    t.check(blockedInput.focusTarget.blocked, "KeyboardInputFrame.blocked forwards to the key catcher")
 
-    t.done()
+    // A gated row: the first sample only primes the gate, a real move past
+    // it fires entered, a still pointer under a row that moved underneath
+    // it does not, and a further real move does. Settle the pointer outside
+    // any row first, since the window may open with the pointer already
+    // somewhere over the content.
+    pointer.mouseMove(gateHost, 10, 10)
+    t.step(80, function () {
+      pointer.mouseMove(gateHost, 10, 90)
+      t.step(80, function () {
+        pointer.mouseMove(gateHost, 14, 90)
+        t.step(80, function () {
+          t.equal(gatedRow.enteredCount, 1, "the first sample primes the gate; the second (a real move) fires entered")
+          gatedRow.y += 20
+          t.step(80, function () {
+            pointer.mouseMove(gateHost, 14, 90)
+            t.step(80, function () {
+              t.equal(gatedRow.enteredCount, 1, "a still pointer under a row that moved doesn't take the cursor")
+              pointer.mouseMove(gateHost, 14, 95)
+              t.step(80, function () {
+                t.equal(gatedRow.enteredCount, 2, "a real move after the row shifts fires entered again")
+                pointer.mouseMove(ungatedRow, 10, 10)
+                t.step(80, function () {
+                  t.equal(ungatedRow.enteredCount, 1, "a row with no gate still emits entered on the first mouseMove")
+                  freshClicks()
+                })
+              })
+            })
+          })
+        })
+      })
+    })
   })
 }

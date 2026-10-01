@@ -11,6 +11,7 @@ import qs.Ui
 import qs.Commons
 import "Model.js" as Model
 import "BluetoothLogic.js" as BluetoothLogic
+import "../araneadev.shared/ShowcaseLogic.js" as Showcase
 import "../araneadev.shared" as Aranea
 
 Panel {
@@ -840,6 +841,8 @@ Panel {
     target: root
     function onOpenedChanged() {
       root.keyboardCursor = false
+      // Stand-in names never carry over into an open or past a close.
+      root.showcaseNames = []
       if (!root.opened)
         root.rssiByAddress = ({})
     }
@@ -903,13 +906,15 @@ Panel {
 
   // The view's Connected rows. These row arrays are their own bindings, apart
   // from bluetoothView, so RSSI and the rotating phrase never rebuild them.
-  readonly property var connectedViewRows: connectedRows.map(function (dev, i) {
+  // Showcase names relabel Connected, Paired, then Available in display
+  // order; the offsets are read only then, so they never rebuild a section.
+  readonly property var connectedViewRows: Showcase.showcaseLabels(connectedRows.map(function (dev, i) {
     return viewRow(dev, connectedDevices[i], "connected")
-  })
+  }), showcaseNames, "Device")
   // The view's Paired rows (see connectedViewRows).
-  readonly property var knownViewRows: scrollViewRows("known")
+  readonly property var knownViewRows: Showcase.showcaseLabels(scrollViewRows("known"), showcaseNames, "Device", showcaseNames.length > 0 ? connectedRows.length : 0)
   // The view's Available rows (see connectedViewRows).
-  readonly property var discoveredViewRows: scrollViewRows("discovered")
+  readonly property var discoveredViewRows: Showcase.showcaseLabels(scrollViewRows("discovered"), showcaseNames, "Device", showcaseNames.length > 0 ? connectedRows.length + knownDevices.length : 0)
   // Address -> signal level (0..3) behind each Available row's node glow.
   readonly property var deviceSignals: {
     var out = {}
@@ -1042,7 +1047,21 @@ Panel {
     function toggleBluetooth() {
       root.toggleBluetooth()
     }
+    // Screenshot stand-ins (scripts/capture-screenshots): NAMESJSON, a JSON
+    // array of strings, relabels every device row until the dropdown
+    // closes; while it is closed the answer is "closed" and nothing is set.
+    // Display only.
+    function showcase(namesJson: string): string {
+      var call = Showcase.showcaseCall(root.opened, namesJson)
+      if (call.names !== null)
+        root.showcaseNames = call.names
+      return call.answer
+    }
   }
+
+  // Stand-in names for README screenshots (the showcase IPC method); empty
+  // outside a capture, and cleared whenever the dropdown closes.
+  property var showcaseNames: []
 
   BarIconButton {
     id: button
@@ -1071,9 +1090,11 @@ Panel {
     contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
+      dropdown.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
       if (!root.cursorActive || !root.keyboardCursor) {
@@ -1087,18 +1108,21 @@ Panel {
         root.moveCursorH(dx)
     }
     onActivateRequested: {
+      dropdown.disarmPointer()
       if (!root.cursorActive)
         return
       root.keyboardCursor = true
       root.activateCursor()
     }
     onDeleteRequested: {
+      dropdown.disarmPointer()
       if (!root.cursorActive)
         return
       root.keyboardCursor = true
       root.deleteSelected()
     }
     onTextKey: function (t) {
+      dropdown.disarmPointer()
       if (t === "b" || t === "B") {
         root.keyboardCursor = true
         root.toggleBluetooth()

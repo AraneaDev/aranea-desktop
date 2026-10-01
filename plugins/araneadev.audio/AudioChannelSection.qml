@@ -24,6 +24,9 @@ Column {
   property var devices: []
   // Cursor here: -2 none, -1 the slider row, 0.. a device row.
   property int cursor: -2
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
+  // slider row or a device row moving under a still pointer.
+  property var pointerGate: null
 
   // Emitted with a new volume from the slider.
   signal volumeMoved(real value)
@@ -97,7 +100,13 @@ Column {
       onRightClicked: section.muteToggled()
     }
     HoverHandler {
-      onHoveredChanged: if (hovered)
+      id: sliderHover
+      onHoveredChanged: if (hovered && !section.pointerGate)
+        section.rowHovered(-1)
+      onPointChanged: if (section.pointerGate && sliderHover.hovered && section.pointerGate.moved(sliderHover.parent, {
+        x: sliderHover.point.position.x,
+        y: sliderHover.point.position.y
+      }))
         section.rowHovered(-1)
     }
   }
@@ -114,6 +123,7 @@ Column {
       active: modelData.active
       available: modelData.available
       hasCursor: section.cursor === index
+      pointerGate: section.pointerGate
       onChosen: section.deviceChosen(index)
       onEntered: if (modelData.available)
         section.rowHovered(index)

@@ -10,6 +10,7 @@
 // ListView.
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
 
 Column {
@@ -35,6 +36,15 @@ Column {
   // off. Connected and Paired need only an adapter: stock keeps Paired on
   // screen while the adapter is off, and choosing a device powers it on.
   readonly property bool devicesAvailable: !!dropdown.view.enabled && !!dropdown.view.hasAdapter
+  // Filters synthetic hover from rows and controls moving under a still
+  // pointer (e.g. a device list changing underneath the cursor).
+  readonly property alias pointerGate: gate
+
+  // Resets the pointer gate; called after every keyboard-driven move so a
+  // stale pointer sample never steals the cursor back.
+  function disarmPointer() {
+    gate.reset()
+  }
 
   // Emitted for every user action, NAME with its ARG:
   //   toggleBluetooth (null): the power switch was toggled;
@@ -85,6 +95,7 @@ Column {
     hasAdapter: !!dropdown.view.hasAdapter
     hint: dropdown.view.toggleHint || ""
     hasCursor: !!dropdown.view.headerCursor
+    pointerGate: dropdown.pointerGate
     onToggleBluetooth: dropdown.action("toggleBluetooth", null)
     onEntered: dropdown.action("hover", {
       section: "header",
@@ -113,6 +124,7 @@ Column {
     rows: dropdown.view.hasAdapter ? (dropdown.view.connected || []) : []
     signals: dropdown.view.signals || ({})
     cursor: dropdown.cursorIn("connected")
+    pointerGate: dropdown.pointerGate
     cursorAction: !!dropdown.cursor.action
     rowTooltip: "Disconnect"
     onPrimary: function (index) {
@@ -185,6 +197,7 @@ Column {
         rows: dropdown.view.hasAdapter ? (dropdown.view.known || []) : []
         signals: dropdown.view.signals || ({})
         cursor: dropdown.cursorIn("known")
+        pointerGate: dropdown.pointerGate
         cursorAction: !!dropdown.cursor.action
         rowTooltip: "Connect"
         onPrimary: function (index) {
@@ -241,6 +254,7 @@ Column {
         rows: dropdown.devicesAvailable && dropdown.view.scanning ? (dropdown.view.discovered || []) : []
         signals: dropdown.view.signals || ({})
         cursor: dropdown.cursorIn("discovered")
+        pointerGate: dropdown.pointerGate
         cursorAction: !!dropdown.cursor.action
         rowTooltip: "Pair"
         onPrimary: function (index) {
@@ -301,5 +315,10 @@ Column {
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
+  }
+
+  PointerMoveGate {
+    id: gate
+    referenceItem: dropdown
   }
 }

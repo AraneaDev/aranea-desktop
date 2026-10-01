@@ -15,6 +15,9 @@ Column {
   property var streams: []
   // Cursor here: -1 none, 0.. a stream row.
   property int cursor: -1
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from a
+  // stream row moving under a still pointer.
+  property var pointerGate: null
 
   // Emitted with a new volume for stream INDEX.
   signal volumeMoved(int index, real value)
@@ -149,7 +152,13 @@ Column {
           }
         }
         HoverHandler {
-          onHoveredChanged: if (hovered)
+          id: streamHover
+          onHoveredChanged: if (hovered && !section.pointerGate)
+            section.rowHovered(row.index)
+          onPointChanged: if (section.pointerGate && streamHover.hovered && section.pointerGate.moved(streamHover.parent, {
+            x: streamHover.point.position.x,
+            y: streamHover.point.position.y
+          }))
             section.rowHovered(row.index)
         }
       }

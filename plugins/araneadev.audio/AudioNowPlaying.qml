@@ -23,6 +23,9 @@ Column {
     })
   // Whether the keyboard cursor is on the strip.
   property bool hasCursor: false
+  // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
+  // strip moving under a still pointer.
+  property var pointerGate: null
 
   // Emitted when the previous button is activated.
   signal previousRequested
@@ -174,7 +177,13 @@ Column {
       }
     }
     HoverHandler {
-      onHoveredChanged: if (hovered)
+      id: stripHover
+      onHoveredChanged: if (hovered && !strip.pointerGate)
+        strip.entered()
+      onPointChanged: if (strip.pointerGate && stripHover.hovered && strip.pointerGate.moved(stripHover.parent, {
+        x: stripHover.point.position.x,
+        y: stripHover.point.position.y
+      }))
         strip.entered()
     }
   }

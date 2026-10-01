@@ -412,4 +412,45 @@ jq -e '.bar.layout.right == ["araneadev.bluetooth"]' "$bluetooth_real" >/dev/nul
   exit 1
 }
 
+# --- network dropdown: only retargeted once araneadev.network is
+# installed (guard: $(dirname "$config_file")/plugins/araneadev.network/manifest.json)
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", {"id": "omarchy.network", "x": 1}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.network", {"id": "omarchy.network", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.network")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.network"
+: >"$(dirname "$config")/plugins/araneadev.network/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["araneadev.network", {"id": "araneadev.network", "x": 1}]
+  and (.cloneSourceRestores | index("araneadev.network")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.network", {"id": "omarchy.network", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.network")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+network_real="$test_root/network-dotfiles/shell.json"
+network_link="$test_root/network-config/shell.json"
+mkdir -p "$(dirname "$network_real")" "$(dirname "$network_link")/plugins/araneadev.network"
+: >"$(dirname "$network_link")/plugins/araneadev.network/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.network"]}}}' >"$network_real"
+ln -s "$network_real" "$network_link"
+"$repo_root/scripts/repair-shell-config" "$network_link"
+test -L "$network_link"
+jq -e '.bar.layout.right == ["araneadev.network"]' "$network_real" >/dev/null || {
+  cat "$network_real"
+  exit 1
+}
+
 echo "shell config contract passed"

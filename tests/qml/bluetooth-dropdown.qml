@@ -12,8 +12,12 @@
 // and ensureVisible scrolls a row (and a first row's caption) into view,
 // every trailing element ends on one right content edge, the key hint
 // fits one line, and a missing adapter hides the lists behind the empty
-// text. The header caption's opacity follows captionOpacity.
+// text. The header caption's opacity follows captionOpacity. Every device
+// row carries the dropdown's PointerMoveGate, and a device that slides
+// under a still pointer (a list change, not a real move) never steals the
+// keyboard cursor via a synthetic hover action.
 import QtQuick
+import QtTest
 import Quickshell
 import qs.Commons
 import "lib"
@@ -219,6 +223,86 @@ ShellRoot {
         signals: {},
         emptyText: ""
       })
+  }
+
+  // Actions reported by gated's action signal, in emission order.
+  property var gatedActions: []
+
+  // Three known devices, so removing the first slides the others up one
+  // row under a pointer that never moved.
+  function gatedView(known) {
+    return {
+      glyph: "",
+      caption: "",
+      enabled: true,
+      hasAdapter: true,
+      toggleHint: "",
+      headerCursor: false,
+      open: true,
+      scanning: false,
+      cursor: {
+        active: false,
+        section: "known",
+        index: -1,
+        action: false
+      },
+      connected: [],
+      known: known,
+      discovered: [],
+      signals: {},
+      emptyText: ""
+    }
+  }
+
+  // Real window + real pointer moves, so Qt's hover delivery (including the
+  // synthetic re-hover a shifting delegate gets under a still pointer) is
+  // genuine rather than simulated through direct signal calls.
+  FloatingWindow {
+    id: gateWindow
+    implicitWidth: 380
+    implicitHeight: 300
+    visible: true
+
+    Bluetooth.BluetoothDropdown {
+      id: gated
+      width: 360
+      view: gatedView([
+        {
+          key: "AA:1",
+          label: "Device A",
+          glyph: "",
+          detail: "",
+          busy: false,
+          forgettable: true
+        },
+        {
+          key: "AA:2",
+          label: "Device B",
+          glyph: "",
+          detail: "",
+          busy: false,
+          forgettable: true
+        },
+        {
+          key: "AA:3",
+          label: "Device C",
+          glyph: "",
+          detail: "",
+          busy: false,
+          forgettable: true
+        }
+      ])
+      onAction: function (name, arg) {
+        gatedActions.push([name, arg])
+      }
+    }
+  }
+
+  // Synthesizes the pointer events (TestCase's mouseMove), never run as a test.
+  TestCase {
+    id: pointer
+    name: "pointer"
+    when: false
   }
 
   // VIEW with only signals replaced by SIGNALS; every row array is reused.
@@ -485,7 +569,64 @@ ShellRoot {
                     var pairedCaption = t.findChild(scroller, "pairedSection")
                     var captionTop = pairedCaption.mapToItem(scrollerFlick.contentItem, 0, 0).y
                     t.check(scrollerFlick.contentY <= captionTop, "ensureVisible on a section's first row shows its caption too")
-                    t.done()
+
+                    var gatedRows = t.findChildren(gated, "deviceRow")
+                    t.equal(gatedRows.length, 3, "the gated fixture lists all three devices")
+                    for (var gi = 0; gi < gatedRows.length; gi++)
+                      t.check(gatedRows[gi].pointerGate !== null, "device row " + gi + " carries the dropdown's pointer gate")
+
+                    var pt = gatedRows[1].mapToItem(gated, 10, gatedRows[1].height / 2)
+                    pointer.mouseMove(gated, pt.x, pt.y)
+                    t.step(80, function () {
+                      pointer.mouseMove(gated, pt.x + 4, pt.y)
+                      t.step(80, function () {
+                        t.check(gatedActions.some(function (a) {
+                          return a[0] === "hover" && a[1].section === "known" && a[1].index === 1
+                        }), "a real hover on row 1 reports a hover action")
+                        gatedActions = []
+                        // Remove the first device without moving the pointer:
+                        // the device now under it (was row 2) slides up to
+                        // take row 1's place, exactly a row moving under a
+                        // still pointer.
+                        gated.view = gatedView([
+                          {
+                            key: "AA:2",
+                            label: "Device B",
+                            glyph: "",
+                            detail: "",
+                            busy: false,
+                            forgettable: true
+                          },
+                          {
+                            key: "AA:3",
+                            label: "Device C",
+                            glyph: "",
+                            detail: "",
+                            busy: false,
+                            forgettable: true
+                          }
+                        ])
+                        t.step(80, function () {
+                          // A compositor redelivers the pointer's last
+                          // position as a new event when the scene changes
+                          // underneath it, so replay that same absolute
+                          // point explicitly (the one the pointer actually
+                          // last moved to, pt.x + 4) rather than relying on
+                          // an implicit re-hover (the offscreen test
+                          // platform never redelivers hover without a new
+                          // event).
+                          pointer.mouseMove(gated, pt.x + 4, pt.y)
+                          t.step(80, function () {
+                            t.equal(gatedActions.length, 0, "a device sliding under a still pointer emits no hover action")
+                            pointer.mouseMove(gated, pt.x, pt.y + 5)
+                            t.step(80, function () {
+                              t.check(gatedActions.length > 0, "a real move after the slide reports hover again")
+                              t.done()
+                            })
+                          })
+                        })
+                      })
+                    })
                   })
                 })
               })

@@ -1049,9 +1049,11 @@ Panel {
     contentHeight: panel.fittedContentHeight(dropdown.implicitHeight, Style.space(560))
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
+      dropdown.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
       if (!root.cursorActive || !root.keyboardCursor) {
@@ -1065,12 +1067,14 @@ Panel {
         root.adjustVolume(dx * 0.05)
     }
     onActivateRequested: {
+      dropdown.disarmPointer()
       if (!root.cursorActive)
         return
       root.keyboardCursor = true
       root.activateCursor()
     }
     onTextKey: function (t) {
+      dropdown.disarmPointer()
       // 'm' mutes whatever the cursor is on: focused section's slider
       // for output/input, the focused stream for streams.
       if (t === "m" || t === "M") {

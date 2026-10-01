@@ -20,6 +20,8 @@ KeyboardPanel {
   // Content rendered inside the keyboard frame.
   default property alias panelContent: input.content
   focusTarget: input.focusTarget
+  // Blocks all keys while true (forwarded from the input frame's key catcher).
+  property alias blocked: input.blocked
 
   KeyboardInputFrame {
     id: input
