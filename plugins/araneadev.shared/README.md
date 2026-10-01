@@ -46,9 +46,11 @@ service contracts to the feature plugins.
   accent underline when `selected`; the keyboard cursor (`hasCursor`) draws
   the same mint outline as `NodeDeviceRow`, pointer hover never does. A
   `busy` pill breathes. It emits `clicked`, and `hoveredMoved` on entering,
-  or only on a real pointer move when a `pointerGate` is set.
-- `DropdownHeader` is the Filament-style dropdown header with a glyph,
-  title/caption pair, and a trailing slot.
+  or only on a real pointer move when a `pointerGate` is set. A pill on a
+  row a Repeater can rebuild takes the row as `clickGate` (VPN's "open app"
+  chip), as `FilamentSwitch` does.
+- `DropdownHeader` is the Filament-style dropdown header with a glyph
+  (tinted by `glyphColor`), title/caption pair, and a trailing slot.
 - `CredentialPrompt` is the inline credential prompt (Network's passphrase,
   VPN's password and 2FA code): an accent-to-violet frame around `fields`
   (`{key, label, placeholder, secret, readOnly, optional, hidden, value}`)

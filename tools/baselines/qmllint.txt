@@ -193,6 +193,15 @@
 7	plugins/araneadev.updates/UpdatePanel.qml:missing-property:Member "text" not found on type "QObject"
 3	plugins/araneadev.updates/UpdatePanel.qml:unqualified:Unqualified access
 1	plugins/araneadev.updates/UpdatePanelHost.qml:unused-imports:Unused import
+1	plugins/araneadev.vpn/VpnDropdown.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.vpn/VpnDropdown.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.vpn/VpnDropdown.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.vpn/VpnDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
+1	plugins/araneadev.vpn/VpnSection.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.vpn/VpnSection.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.vpn/VpnSection.qml:missing-property:Member "family" not found on type "QObject"
+2	plugins/araneadev.vpn/VpnSession.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.vpn/VpnSession.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "cursorIndex" not found on type "QQuickItem"
 1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "focusWorkspace" not found on type "QQuickItem"

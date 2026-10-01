@@ -9,6 +9,9 @@ Item {
 
   // Leading glyph (a Nerd Font icon).
   property string glyph: ""
+  // The glyph's colour; a host tints it by state (VPN's lit or failed
+  // icon). The foreground leaves it as before.
+  property color glyphColor: DesignTokens.foreground
   // Title, e.g. "Audio".
   property string title: ""
   // Caption under the title, shown uppercase.
@@ -28,7 +31,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignHCenter
     text: header.glyph
-    color: DesignTokens.foreground
+    color: header.glyphColor
     font.family: Style.font.family
     font.pixelSize: Style.font.display
   }

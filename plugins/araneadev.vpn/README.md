@@ -25,13 +25,32 @@ Mullvad, ProtonVPN, ...), moved out of `araneadev.network`'s VPN section.
   Aranea steps aside. `scripts/deploy-plugins-safely` deploys it like any
   other plugin.
 
+## View
+
+Pure views (plain properties in, one `action(name, arg)` signal out, no
+nmcli logic; the panel hands them ready strings):
+
+- `VpnHeader`: `DropdownHeader` with the VPN glyph tinted by `iconState`,
+  "VPN" and the connection caption. No switch.
+- `VpnSection`: CONNECTED or AVAILABLE with a count; NetworkManager rows
+  carry a `FilamentSwitch`, own-app rows an "open app" `FilamentPill`, both
+  settled by their row. Connected rows show a `VpnSession`; the row the
+  prompt names shows the shared `CredentialPrompt` (read-only username,
+  password, optional 2FA code).
+- `VpnSession`: IP, Server (when known) and Up, then `Aranea.LinkGraph`
+  once there are samples.
+- `VpnDropdown`: the header, pinned Connected, Available in a capped
+  Flickable, the empty text and the key hint. Status, sessions, graphs and
+  the prompt are separate properties keyed by row key, so they never
+  rebuild a row.
+
 ## What's missing
 
-The icon stays invisible and the panel has no dropdown until a later task
-wires real state (VPN rows, the credential prompt, polling and the keyboard
-cursor) into this skeleton.
+The icon stays invisible and the panel shows no dropdown until a later task
+wires real state (polling, the prompt state and the keyboard cursor) into
+`Panel.qml` and hosts `VpnDropdown`.
 
 ## Validation
 
-Run `node --test tests/js/vpn-logic.test.js` and
-`tests/shell-config.test.sh`.
+Run `node --test tests/js/vpn-logic.test.js`,
+`tests/qml-behaviour.test.sh vpn-dropdown` and `tests/shell-config.test.sh`.

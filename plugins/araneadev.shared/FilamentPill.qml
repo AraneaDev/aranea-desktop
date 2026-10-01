@@ -2,7 +2,9 @@
 // rows): a thin muted border and muted text, or, when selected, an accent
 // border, full text and a 2 px accent underline. The keyboard cursor draws
 // the same mint outline as NodeDeviceRow; pointer hover never draws one.
-// A busy pill breathes like a busy NodeDeviceRow marker.
+// A busy pill breathes like a busy NodeDeviceRow marker. A pill sitting on
+// a row a Repeater can rebuild under a still pointer takes that row as
+// clickGate, as FilamentSwitch does.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -26,6 +28,10 @@ Item {
   property var pointerGate: null
   // Opacity the busy animation drives, 0.45..1.
   property real pulseOpacity: 1
+  // Optional item whose clickSettled() a pointer click must pass, e.g. the
+  // NodeDeviceRow hosting the pill; null (default) never ignores a click.
+  // activate() stays unguarded for the keyboard and tests.
+  property var clickGate: null
 
   // Emitted when the pill is clicked or activated.
   signal clicked
@@ -103,7 +109,8 @@ Item {
   MouseArea {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
-    onClicked: pill.activate()
+    onClicked: if (!pill.clickGate || pill.clickGate.clickSettled())
+      pill.activate()
   }
   HoverHandler {
     id: hover
