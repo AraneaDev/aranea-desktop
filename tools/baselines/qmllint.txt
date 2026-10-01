@@ -62,7 +62,6 @@
 1	plugins/araneadev.health/Panel.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.health/Panel.qml:unqualified:Unqualified access
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "bodySmall" not found on type "QObject"
-1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderActive" not found on type "QObject"
 1	plugins/araneadev.lock/LockView.qml:missing-property:Member "borderError" not found on type "QObject"
 4	plugins/araneadev.lock/LockView.qml:missing-property:Member "family" not found on type "QObject"
 3	plugins/araneadev.lock/LockView.qml:missing-property:Member "heading" not found on type "QObject"
