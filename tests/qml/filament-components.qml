@@ -165,11 +165,77 @@ ShellRoot {
     }
   }
 
+  // A row created under a still pointer, as a Repeater rebuild does: a
+  // click that lands right after it appears, before any real move over it,
+  // was aimed at whatever was there before.
+  FloatingWindow {
+    id: freshWindow
+    implicitWidth: 320
+    implicitHeight: 120
+    visible: true
+
+    Item {
+      id: freshHost
+      anchors.fill: parent
+
+      Loader {
+        id: freshLoader
+        y: 20
+        active: false
+        sourceComponent: Aranea.NodeDeviceRow {
+          width: 300
+          height: 60
+          label: "Fresh"
+          pointerGate: freshGate
+          onChosen: freshHost.chosenCount += 1
+        }
+      }
+
+      // How many times a fresh row was chosen.
+      property int chosenCount: 0
+
+      PointerMoveGate {
+        id: freshGate
+        referenceItem: freshHost
+      }
+    }
+  }
+
   // Synthesizes the pointer events (TestCase's mouseMove), never run as a test.
   TestCase {
     id: pointer
     name: "pointer"
     when: false
+  }
+
+  // Clicks on rows created under a still pointer: refused for about 300 ms
+  // unless the gate accepted a real move over the row since.
+  function freshClicks() {
+    pointer.mouseMove(freshHost, 40, 50)
+    t.step(80, function () {
+      pointer.mouseMove(freshHost, 44, 50)
+      t.step(80, function () {
+        freshLoader.active = true
+        t.step(30, function () {
+          pointer.mouseClick(freshHost, 44, 50)
+          t.equal(freshHost.chosenCount, 0, "a click right after a row appears under a still pointer is ignored")
+          t.step(350, function () {
+            pointer.mouseClick(freshHost, 44, 50)
+            t.equal(freshHost.chosenCount, 1, "once the row has settled, a click chooses it")
+            freshLoader.active = false
+            freshLoader.active = true
+            t.step(30, function () {
+              pointer.mouseMove(freshHost, 50, 52)
+              t.step(30, function () {
+                pointer.mouseClick(freshHost, 50, 52)
+                t.equal(freshHost.chosenCount, 2, "a real move over a fresh row lets a click through at once")
+                t.done()
+              })
+            })
+          })
+        })
+      })
+    })
   }
 
   Component.onCompleted: t.step(200, function () {
@@ -258,7 +324,7 @@ ShellRoot {
                 pointer.mouseMove(ungatedRow, 10, 10)
                 t.step(80, function () {
                   t.equal(ungatedRow.enteredCount, 1, "a row with no gate still emits entered on the first mouseMove")
-                  t.done()
+                  freshClicks()
                 })
               })
             })

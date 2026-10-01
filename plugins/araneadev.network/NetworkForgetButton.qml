@@ -3,7 +3,9 @@
 // Section.qml), soft red with a hairline border, brighter when the
 // keyboard cursor's action is on it. It sizes to zero while hidden so a
 // NodeDeviceRow's trailing slot, which sizes to its children, never
-// reserves room for it.
+// reserves room for it. Like NodeDeviceRow, a click within settleMs of
+// the button being created is ignored unless the gate accepted a real
+// pointer move onto it since.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -33,6 +35,13 @@ Item {
   readonly property bool shown: forgettable && (rowHovered || forgetHover.hovered || hasCursor)
   // Whether it's drawn bright: the keyboard cursor's action is on it.
   readonly property bool bright: hasCursor && cursorAction
+  // How long after creation a pointer click is ignored, in ms, unless the
+  // gate has accepted a real move onto the button since.
+  property int settleMs: 300
+  // When the button was created (Date.now()), for settleMs.
+  property real createdAt: 0
+  // Whether the gate has accepted a real pointer move onto the button.
+  property bool pointerMovedHere: false
 
   // Emitted when the button is clicked.
   signal clicked
@@ -46,10 +55,17 @@ Item {
     forgetBtn.clicked()
   }
 
+  // Whether a pointer click may land: the button has been on screen for
+  // settleMs, or the pointer has really moved onto it.
+  function clickSettled() {
+    return pointerMovedHere || Date.now() - createdAt >= settleMs
+  }
+
   objectName: "forgetButton"
   visible: shown
   width: shown ? forgetLabel.implicitWidth + Style.space(12) : 0
   height: shown ? forgetLabel.implicitHeight + Style.space(4) : 0
+  Component.onCompleted: createdAt = Date.now()
 
   Rectangle {
     objectName: "forgetBorder"
@@ -70,7 +86,8 @@ Item {
   MouseArea {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
-    onClicked: forgetBtn.activate()
+    onClicked: if (forgetBtn.clickSettled())
+      forgetBtn.activate()
   }
   // Observes hover only. Entering is gated so a button sliding under a
   // still pointer never takes the cursor; leaving is not.
@@ -84,8 +101,10 @@ Item {
       else if (forgetBtn.pointerGate.moved(forgetHover.parent, {
         x: forgetHover.point.position.x,
         y: forgetHover.point.position.y
-      }))
+      })) {
+        forgetBtn.pointerMovedHere = true
         forgetBtn.pointerEntered()
+      }
     }
   }
   PanelToolTip {

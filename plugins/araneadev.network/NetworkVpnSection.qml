@@ -1,7 +1,8 @@
 // The VPN section of the Aranea Network dropdown: a "VPN" caption with
 // "N up", and one NodeDeviceRow per VPN or WireGuard profile with a
 // trailing FilamentSwitch. A profile being brought up or down breathes; a
-// failed one reads "Couldn't connect" in the urgent colour. Pure view:
+// failed one reads its failure ("Couldn't connect" or "Couldn't
+// disconnect") in the urgent colour. Pure view:
 // plain inputs in, signals out.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -14,7 +15,7 @@ Column {
   // VPN rows from NetworkLogic.vpnRows: [{key, glyph, label, detail,
   // active}], key being the profile's uuid.
   property var rows: []
-  // Per-profile action state, keyed by uuid: {uuid: {busy, failed}}.
+  // Per-profile action state, keyed by uuid: {uuid: {busy, failed, text}}.
   // Separate from rows so an action never rebuilds them.
   property var status: ({})
   // The keyboard cursor's row, or -1 when the cursor isn't here.
@@ -32,12 +33,14 @@ Column {
   // Emitted when the pointer moves onto row INDEX (through the gate).
   signal rowHovered(int index)
 
-  // The action state for KEY: {busy, failed}, both false when unknown.
+  // The action state for KEY: {busy, failed, text}, false and "" when
+  // unknown; a failure without text reads "Couldn't connect".
   function statusOf(key) {
     var s = section.status ? section.status[key] : undefined
     return {
       busy: !!(s && s.busy),
-      failed: !!(s && s.failed)
+      failed: !!(s && s.failed),
+      text: s && s.text ? String(s.text) : "Couldn't connect"
     }
   }
 
@@ -81,7 +84,7 @@ Column {
       width: section.width
       glyph: vpnRow.modelData.glyph
       label: vpnRow.modelData.label
-      detail: vpnRow.actionState.failed ? "Couldn't connect" : vpnRow.modelData.detail
+      detail: vpnRow.actionState.failed ? vpnRow.actionState.text : vpnRow.modelData.detail
       detailColor: vpnRow.actionState.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       active: !!vpnRow.modelData.active
       busy: vpnRow.actionState.busy

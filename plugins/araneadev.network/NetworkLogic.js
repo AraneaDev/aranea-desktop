@@ -1,7 +1,9 @@
 // Pure rules for the Aranea network dropdown (Panel.qml): parsing nmcli and
 // `ip -j` output, building the interface/VPN/saved-network rows, the
-// throughput graph's points and vertical keyboard navigation. No QML, no
-// I/O; tests/js/network-logic.test.js runs this under Node.
+// throughput graph's points, vertical keyboard navigation and the cursor
+// safety rules (a keyboard action only ever hits the row the user chose and
+// can see). No QML, no I/O; tests/js/network-logic.test.js runs this under
+// Node.
 
 /** @type {Record<string, string>} */
 var interfaceTypeLabels = {
@@ -163,7 +165,7 @@ function parseAddrs(json) {
 
 /**
  * Parses `uuid<TAB>ssid` lines into a uuid-to-SSID map, unescaping the SSID
- * as `splitTerse` does.
+ * as `splitTerse` does. An empty SSID (a failed lookup) maps nothing.
  * @param {string|undefined} text - the command's stdout
  * @returns {Record<string, string>} connection uuid to SSID
  */
@@ -175,7 +177,10 @@ function parseSsids(text) {
     var line = lines[i]
     var tab = line.indexOf("\t")
     if (tab === -1) continue
-    out[line.substring(0, tab)] = unescapeTerse(line.substring(tab + 1))
+    var ssid = unescapeTerse(line.substring(tab + 1))
+    // A failed lookup prints an empty SSID: no mapping, not "".
+    if (ssid === "") continue
+    out[line.substring(0, tab)] = ssid
   }
   return out
 }
@@ -532,6 +537,188 @@ function reselectIndex(rows, key, fallback) {
   return Math.max(0, Math.min(list.length - 1, f))
 }
 
+/**
+ * Where a list cursor goes after its rows changed: onto the row whose `key`
+ * equals `key`, wherever it moved. When that row is gone (or there was no
+ * key), the index is clamped into the list but the key is dropped, so the
+ * row that slid into its place is never adopted as the user's choice.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
+ * @param {string|null|undefined} key - the key the cursor was deliberately put on, or ""
+ * @param {number} index - the cursor's index before the change
+ * @returns {{index: number, key: string, confirmed: boolean}} the new index (-1 with no rows), the key it keeps ("" when lost) and whether the cursor's row is the chosen one
+ */
+function followCursor(rows, key, index) {
+  var list = Array.isArray(rows) ? rows : []
+  var chosen = typeof key === "string" && key !== "" ? key : null
+  var next = reselectIndex(list, chosen, index)
+  var row = next >= 0 ? list[next] : null
+  var confirmed = chosen !== null && !!row && row.key === chosen
+  return { index: next, key: confirmed ? chosen : "", confirmed: confirmed }
+}
+
+/**
+ * Whether the cursor's row is still the one the user chose: `key` isn't
+ * empty (a hidden SSID or no choice never is) and the row at `index` has it.
+ * Keyboard actions refuse otherwise.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
+ * @param {string|null|undefined} key - the key the cursor was put on
+ * @param {number} index - the cursor's index
+ * @returns {boolean} true when the keyboard may act on that row
+ */
+function cursorConfirmed(rows, key, index) {
+  if (!Array.isArray(rows) || typeof key !== "string" || key === "") return false
+  var row = rows[index]
+  return !!row && row.key === key
+}
+
+/**
+ * Whether a key press may act on the cursor's target: the cursor must be in
+ * the section the user last deliberately put it in (an automatic move, such
+ * as a section emptying or hiding under it, never counts), and on a fixed
+ * control or on the row whose key it holds (`cursorConfirmed`).
+ * @param {{section: string, chosen: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key?: string, index?: number}|null|undefined} target - the cursor's section, the section last chosen, whether the section's controls never move, and its rows, key and index
+ * @returns {boolean} true when the keyboard may act
+ */
+function keyTargetConfirmed(target) {
+  if (!target || !target.section || target.section !== target.chosen) return false
+  if (target.fixed) return true
+  return cursorConfirmed(target.rows, target.key, Number(target.index))
+}
+
+/**
+ * The key a cursor holds once the keyboard reveals its outline. A cursor
+ * with no choice yet takes the row the outline now shows; an existing key
+ * (even a lost one) is never replaced.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
+ * @param {string|null|undefined} key - the cursor's key, or ""
+ * @param {number} index - the cursor's index
+ * @returns {string} the key to keep
+ */
+function revealKey(rows, key, index) {
+  if (typeof key === "string" && key !== "") return key
+  var row = Array.isArray(rows) ? rows[index] : null
+  return row && typeof row.key === "string" ? row.key : ""
+}
+
+/**
+ * Where the cursor goes when the Saved section empties under it: the last
+ * Wi-Fi row (or DNS without one), with no key, so Enter there is refused
+ * until the user picks a row.
+ * @param {number|undefined} wifiCount - how many Wi-Fi rows there are
+ * @returns {{section: string, index: number, key: string}} the new cursor
+ */
+function savedEmptyFallback(wifiCount) {
+  var n = Math.floor(Number(wifiCount)) || 0
+  if (n > 0) return { section: "wifi", index: n - 1, key: "" }
+  return { section: "dns", index: -1, key: "" }
+}
+
+/**
+ * What Enter or `x` does: nothing before any cursor exists, only reveal a
+ * cursor the keyboard isn't showing (one the pointer placed), else act.
+ * @param {boolean} cursorActive - whether a cursor has been placed
+ * @param {boolean} keyboardCursor - whether its outline is showing
+ * @returns {string} `ignore`, `reveal` or `act`
+ */
+function pressIntent(cursorActive, keyboardCursor) {
+  if (!cursorActive) return "ignore"
+  return keyboardCursor ? "act" : "reveal"
+}
+
+/**
+ * What Enter does on a confirmed row. On Saved, Enter only moves onto the
+ * forget action; Enter there (or `x`) forgets. On Wi-Fi, Enter on a focused
+ * forget action forgets, and does nothing once the row can't be forgotten
+ * (so it never becomes a disconnect).
+ * @param {string} section - the cursor's section
+ * @param {boolean} actionFocused - whether the cursor is on the row's forget action
+ * @param {boolean} forgettable - whether the row can be forgotten
+ * @returns {string} `focusForget`, `forget`, `none` or `activate`
+ */
+function enterDecision(section, actionFocused, forgettable) {
+  if (section === "saved") return actionFocused ? "forget" : "focusForget"
+  if (section === "wifi" && actionFocused) return forgettable ? "forget" : "none"
+  return "activate"
+}
+
+/**
+ * Hands back the array last stored under `name` when `next` has the same
+ * content, so a view's Repeater keeps its delegates (and nothing slides
+ * under a still pointer) on a refresh that changed nothing. Stores `next`
+ * otherwise. `cache` is mutated in place.
+ * @param {Record<string, any>|null|undefined} cache - the arrays kept so far, by name
+ * @param {string} name - which row array this is
+ * @param {Array<any>} next - the freshly built rows
+ * @returns {Array<any>} the kept array or `next`
+ */
+function keepRows(cache, name, next) {
+  if (!cache || typeof cache !== "object") return next
+  var prev = cache[name]
+  if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(next)) return prev
+  cache[name] = next
+  return next
+}
+
+/**
+ * What follows an extras read. A request that arrived while it ran (a forget
+ * landing mid-poll) re-reads, since this result may predate it; a pending
+ * forget's busy state and the SSID lookup settle only on a read that started
+ * after the forget finished.
+ * @param {boolean} dirty - whether another read was asked for while this one ran
+ * @param {boolean} forgetRunning - whether a saved forget is still running
+ * @returns {{rerun: boolean, settle: boolean}} whether to read again and whether this read settles pending work
+ */
+function extrasFollowUp(dirty, forgetRunning) {
+  return { rerun: !!dirty, settle: !dirty && !forgetRunning }
+}
+
+/**
+ * The argv bringing VPN profile `uuid` up, or down when it's active, waiting
+ * at most 20 s for NetworkManager.
+ * @param {string} uuid - the profile's uuid
+ * @param {boolean} active - whether the profile is up now
+ * @returns {string[]} the nmcli argv
+ */
+function vpnCommand(uuid, active) {
+  return ["nmcli", "--wait", "20", "connection", active ? "down" : "up", "uuid", uuid]
+}
+
+/**
+ * The detail a VPN row shows after its toggle failed.
+ * @param {boolean} wasActive - whether the toggle was taking the profile down
+ * @returns {string} `Couldn't disconnect` or `Couldn't connect`
+ */
+function vpnFailureText(wasActive) {
+  return wasActive ? "Couldn't disconnect" : "Couldn't connect"
+}
+
+/**
+ * Whether row `index` still carries `key`, so a pointer action reported for
+ * one row never lands on another.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
+ * @param {number} index - the row the action names
+ * @param {string|undefined} key - the key the view saw at that row
+ * @returns {boolean} true when the row is the one the user clicked
+ */
+function rowKeyMatches(rows, index, key) {
+  if (!Array.isArray(rows) || typeof key !== "string") return false
+  var row = rows[index]
+  return !!row && row.key === key
+}
+
+/**
+ * The key-hint line for the cursor's section, saying what Enter does there.
+ * @param {string|undefined} section - the cursor's section
+ * @returns {string} the hint
+ */
+function keyHint(section) {
+  if (section === "saved") return "↑↓ move · enter/→ select forget · x forget · tab next"
+  if (section === "vpn") return "↑↓ move · enter toggle VPN · tab next"
+  if (section === "header" || section === "band" || section === "dns")
+    return "↑↓ move · ←→ pick · enter apply · tab next"
+  return "↑↓ move · ←→ pick · enter connect · x forget · tab next"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     splitTerse: splitTerse,
@@ -547,5 +734,18 @@ if (typeof module !== "undefined")
     pushSample: pushSample,
     graphPoints: graphPoints,
     moveVertical: moveVertical,
-    reselectIndex: reselectIndex
+    reselectIndex: reselectIndex,
+    followCursor: followCursor,
+    cursorConfirmed: cursorConfirmed,
+    keyTargetConfirmed: keyTargetConfirmed,
+    revealKey: revealKey,
+    savedEmptyFallback: savedEmptyFallback,
+    pressIntent: pressIntent,
+    enterDecision: enterDecision,
+    keepRows: keepRows,
+    extrasFollowUp: extrasFollowUp,
+    vpnCommand: vpnCommand,
+    vpnFailureText: vpnFailureText,
+    rowKeyMatches: rowKeyMatches,
+    keyHint: keyHint
   }

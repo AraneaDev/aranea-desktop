@@ -14,6 +14,9 @@ Column {
   // Saved rows from NetworkLogic.savedRows: [{key, label, detail}], key
   // being the profile's uuid.
   property var rows: []
+  // Per-profile action state, keyed by uuid: {uuid: {busy, text}}. A
+  // profile being forgotten breathes and reads its text ("Forgetting…").
+  property var status: ({})
   // The keyboard cursor's row, or -1 when the cursor isn't here.
   property int cursorIndex: -1
   // Whether the keyboard cursor sits on the cursor row's forget action.
@@ -77,7 +80,10 @@ Column {
       opacity: 0.7
       glyph: String.fromCodePoint(0xf092e)
       label: savedRow.modelData.label || ""
-      detail: savedRow.modelData.detail || ""
+      // This row's action state.
+      readonly property var actionState: section.status ? section.status[savedRow.modelData.key] : undefined
+      detail: savedRow.actionState && savedRow.actionState.text ? String(savedRow.actionState.text) : (savedRow.modelData.detail || "")
+      busy: !!(savedRow.actionState && savedRow.actionState.busy)
       available: true
       hasCursor: section.cursorIndex === savedRow.index
       pointerGate: section.pointerGate

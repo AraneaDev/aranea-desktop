@@ -8,14 +8,16 @@
 // click emits wifiPrimary; the passphrase prompt opens under its row with
 // the passphrase focused (identity first for enterprise), typing emits
 // passphraseEdited/identityEdited, Enter submits, Esc cancels, the connect
-// button submits and busy or failed swap the fields for stock's messages;
+// button emits promptConnect and busy or failed swap the fields for stock's messages;
 // Saved rows are dimmed, never chosen, and their forget emits savedForget;
 // changing stats, graph, wifiStatus, captionOpacity or prompt keeps the
 // same Wi-Fi row delegates and a half-typed passphrase; an inactive cursor
 // draws no outline and an active one draws exactly one in every section;
 // every trailing element ends on one right content edge; ensureVisible
-// scrolls the Wi-Fi area; and a row sliding under a still pointer emits no
-// hover.
+// scrolls the Wi-Fi area; a row sliding under a still pointer emits no
+// hover; row actions carry their row's key; the key hint says what Enter
+// does in the cursor's section; a running Wi-Fi action dims the rows and
+// hides forget; and a Saved profile being forgotten breathes.
 import QtQuick
 import QtTest
 import Quickshell
@@ -502,8 +504,9 @@ ShellRoot {
         actions = []
         pointer.mouseClick(rows[2], 40, rows[2].height / 2)
         t.check(reported("wifiPrimary", {
-          index: 2
-        }), "a row click emits wifiPrimary")
+          index: 2,
+          key: "Ziggo-5G"
+        }), "a row click emits wifiPrimary with the row's key")
         actions = []
         // Move first, as a real pointer does, so hover tracking (and
         // leaving below) sees it.
@@ -525,8 +528,9 @@ ShellRoot {
         actions = []
         pointer.mouseClick(forgets[0])
         t.check(reported("wifiForget", {
-          index: 0
-        }), "forget emits wifiForget")
+          index: 0,
+          key: "Interwebz24Ghz"
+        }), "forget emits wifiForget with the row's key")
         full.view = withCursor(cur(true, "wifi", 2, false))
       }], [60, function () {
         t.equal(shown(t.findChild(full, "wifiSection"), "forgetButton").length, 0, "no forget on a row that can't be forgotten")
@@ -539,8 +543,9 @@ ShellRoot {
         actions = []
         pointer.mouseClick(forgets[0])
         t.check(reported("savedForget", {
-          index: 0
-        }), "saved forget emits savedForget")
+          index: 0,
+          key: "uuid-guest"
+        }), "saved forget emits savedForget with the row's key")
 
         // ---------- One outline per section ----------
         var cases = [cur(true, "header", 1), cur(true, "vpn", 0), cur(true, "band", 0, false, true), cur(true, "band", 2, false, false), cur(true, "dns", 1), cur(true, "wifi", 3), cur(true, "saved", 1)]
@@ -655,7 +660,7 @@ ShellRoot {
         t.check(reported("promptSubmit", null), "Enter in the passphrase emits promptSubmit")
         actions = []
         pointer.mouseClick(t.findChild(after[2], "connectButton"))
-        t.check(reported("promptSubmit", null), "the connect button emits promptSubmit")
+        t.check(reported("promptConnect", null) && !reported("promptSubmit", null), "the connect button emits promptConnect (a pointer action)")
         t.findChild(after[2], "passphraseField").forceActiveFocus()
         actions = []
         pointer.keyClick(Qt.Key_Escape)
@@ -755,6 +760,50 @@ ShellRoot {
         t.check(t.findChild(bare, "wifiScroll").visible, "the scroll area shows once Wi-Fi arrives")
         t.check(t.findChild(bare, "wifiSection").visible, "the Wi-Fi list shows once Wi-Fi arrives")
         t.check(t.findChild(bare, "savedSection").visible, "Saved shows once its rows arrive")
+
+        // ---------- The key hint says what Enter does ----------
+        var hint = t.findChild(full, "keyHint")
+        full.view = withCursor(cur(true, "saved", 0))
+        t.equal(hint.text, "↑↓ move · enter/→ select forget · x forget · tab next", "on Saved, Enter selects forget")
+        full.view = withCursor(cur(true, "vpn", 0))
+        t.equal(hint.text, "↑↓ move · enter toggle VPN · tab next", "on VPN, Enter toggles")
+        full.view = withCursor(cur(true, "dns", 0))
+        t.equal(hint.text, "↑↓ move · ←→ pick · enter apply · tab next", "on DNS, Enter applies")
+        full.view = withCursor(cur(false, "saved", 0))
+        t.equal(hint.text, "↑↓ move · ←→ pick · enter connect · x forget · tab next", "without a cursor, the Wi-Fi hint")
+
+        // ---------- A running Wi-Fi action dims the rows ----------
+        var busyView = withCursor(cur(true, "wifi", 0))
+        busyView.wifi.disabled = true
+        full.view = busyView
+      }], [60, function () {
+        var wifi = t.findChild(full, "wifiSection")
+        var rows = t.findChildren(wifi, "wifiRow")
+        t.check(rows.length === 5 && rows.every(function (r) {
+          return !r.available && r.opacity < 1
+        }), "while an action runs every Wi-Fi row is dimmed and can't be chosen")
+        t.equal(shown(wifi, "forgetButton").length, 0, "and forget hides")
+        full.view = withCursor(cur(true, "wifi", 0))
+
+        // ---------- A Saved forget breathes ----------
+        full.savedStatus = {
+          "uuid-guest": {
+            busy: true,
+            text: "Forgetting…"
+          }
+        }
+        var savedRows = t.findChildren(t.findChild(full, "savedSection"), "savedRow")
+        t.check(savedRows[0].busy && savedRows[0].detail === "Forgetting…", "a profile being forgotten breathes and reads Forgetting…")
+        t.check(!savedRows[1].busy && savedRows[1].detail === "never used", "the others keep their detail")
+        full.savedStatus = {}
+
+        // ---------- The VPN switch names its row ----------
+        actions = []
+        pointer.mouseClick(t.findChild(full, "vpnSwitch"))
+        t.check(reported("vpnToggle", {
+          index: 0,
+          key: "uuid-wg"
+        }), "the VPN switch emits vpnToggle with the row's key")
       }]])
 
   // The Wi-Fi delegates (wrappers, then rows) before the refresh check.

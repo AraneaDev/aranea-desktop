@@ -714,3 +714,223 @@ test("reselectIndex returns -1 for no rows and never throws on bad input", () =>
   assert.equal(logic.reselectIndex([null, { key: "a" }], "a", 0), 1)
   assert.equal(logic.reselectIndex([null, undefined], "a", 1), 1)
 })
+
+test("parseSsids treats an empty SSID as no mapping", () => {
+  // A uuid whose lookup failed prints "uuid<TAB>" and an empty field; it
+  // must not map to "" (nor swallow the next profile's line).
+  assert.deepEqual(logic.parseSsids("uuid-1\t\nuuid-2\tHome\n"), { "uuid-2": "Home" })
+})
+
+// --- followCursor / cursorConfirmed (the 19:04 incident) -----------------
+
+test("followCursor follows the chosen network across a re-sort", () => {
+  // The cursor sat on a secured AP at index 1; a scan re-sorts and an open
+  // network takes index 1. The cursor must move with the secured AP.
+  const before = [{ key: "Home" }, { key: "Daikin" }, { key: "SmartLife" }]
+  assert.equal(logic.cursorConfirmed(before, "Daikin", 1), true)
+  const after = [{ key: "Home" }, { key: "SmartLife" }, { key: "Daikin" }]
+  assert.deepEqual(logic.followCursor(after, "Daikin", 1), {
+    index: 2,
+    key: "Daikin",
+    confirmed: true
+  })
+  assert.equal(
+    logic.cursorConfirmed(after, "Daikin", 1),
+    false,
+    "the old index now holds the open network"
+  )
+})
+
+test("followCursor never adopts the row that slides into a vanished network's place", () => {
+  // The cursored AP drops out of the scan and an open network slides into
+  // its index: the cursor stays there, but nothing is confirmed.
+  const after = [{ key: "Home" }, { key: "SmartLife" }]
+  const r = logic.followCursor(after, "Daikin", 1)
+  assert.deepEqual(r, { index: 1, key: "", confirmed: false })
+  assert.equal(logic.cursorConfirmed(after, r.key, r.index), false)
+  // And stays refused across the next re-sort, never jumping to a row.
+  const later = logic.followCursor([{ key: "SmartLife" }, { key: "Home" }], r.key, r.index)
+  assert.deepEqual(later, { index: 1, key: "", confirmed: false })
+})
+
+test("followCursor clamps into the list and returns -1 with no rows", () => {
+  assert.deepEqual(logic.followCursor([{ key: "a" }], "z", 5), {
+    index: 0,
+    key: "",
+    confirmed: false
+  })
+  assert.deepEqual(logic.followCursor([], "a", 0), { index: -1, key: "", confirmed: false })
+  assert.deepEqual(logic.followCursor(undefined, "a", 0), { index: -1, key: "", confirmed: false })
+  assert.deepEqual(logic.followCursor([{ key: "a" }], null, Number.NaN), {
+    index: 0,
+    key: "",
+    confirmed: false
+  })
+})
+
+test("an empty key (a hidden SSID, or no choice) is never confirmed", () => {
+  const rows = [{ key: "" }, { key: "a" }]
+  assert.equal(logic.cursorConfirmed(rows, "", 0), false)
+  assert.deepEqual(logic.followCursor(rows, "", 1), { index: 1, key: "", confirmed: false })
+  assert.equal(logic.cursorConfirmed(rows, "a", 1), true)
+  assert.equal(logic.cursorConfirmed(rows, "a", 5), false)
+  assert.equal(logic.cursorConfirmed(undefined, "a", 0), false)
+  assert.equal(logic.cursorConfirmed([null], "a", 0), false)
+})
+
+test("revealKey adopts the row the keyboard reveals only when there is no choice yet", () => {
+  const rows = [{ key: "a" }, { key: "b" }]
+  assert.equal(logic.revealKey(rows, "", 1), "b", "a revealed outline is a visible choice")
+  assert.equal(logic.revealKey(rows, "a", 0), "a")
+  assert.equal(logic.revealKey(rows, "z", 1), "z", "an existing key is never replaced")
+  assert.equal(logic.revealKey(rows, "", 7), "")
+  assert.equal(logic.revealKey(undefined, "", 0), "")
+  assert.equal(logic.revealKey([null], "", 0), "")
+})
+
+test("savedEmptyFallback lands on the last Wi-Fi row without choosing it", () => {
+  // Forget the last Saved row: the cursor drops into the Wi-Fi list, often
+  // onto a weak open network. Enter must not connect to it.
+  assert.deepEqual(logic.savedEmptyFallback(4), { section: "wifi", index: 3, key: "" })
+  assert.deepEqual(logic.savedEmptyFallback(0), { section: "dns", index: -1, key: "" })
+  assert.deepEqual(logic.savedEmptyFallback(undefined), { section: "dns", index: -1, key: "" })
+})
+
+// --- pressIntent / enterDecision ---------------------------------------------
+
+test("pressIntent: Enter and x only reveal a cursor the keyboard isn't showing", () => {
+  assert.equal(logic.pressIntent(false, false), "ignore")
+  assert.equal(logic.pressIntent(false, true), "ignore")
+  assert.equal(logic.pressIntent(true, false), "reveal", "a pointer-placed cursor is invisible")
+  assert.equal(logic.pressIntent(true, true), "act")
+})
+
+test("enterDecision: Saved Enter focuses forget first; Wi-Fi forget never turns into disconnect", () => {
+  assert.equal(logic.enterDecision("saved", false, true), "focusForget")
+  assert.equal(logic.enterDecision("saved", true, true), "forget")
+  assert.equal(logic.enterDecision("wifi", true, true), "forget")
+  assert.equal(logic.enterDecision("wifi", true, false), "none")
+  assert.equal(logic.enterDecision("wifi", false, false), "activate")
+  assert.equal(logic.enterDecision("vpn", false, false), "activate")
+})
+
+// --- keepRows ------------------------------------------------------------------
+
+test("keepRows hands back the previous array when nothing changed", () => {
+  const cache = {}
+  const first = [{ key: "a" }]
+  assert.equal(logic.keepRows(cache, "wifi", first), first)
+  const same = [{ key: "a" }]
+  assert.equal(logic.keepRows(cache, "wifi", same), first, "equal content keeps the old array")
+  const changed = [{ key: "b" }]
+  assert.equal(logic.keepRows(cache, "wifi", changed), changed)
+  assert.equal(logic.keepRows(cache, "vpn", same), same, "each name has its own slot")
+  assert.equal(logic.keepRows(null, "wifi", same), same)
+})
+
+// --- extrasFollowUp ---------------------------------------------------------------
+
+test("extrasFollowUp re-reads after a forget that landed mid-poll, and settles only on a fresh read", () => {
+  assert.deepEqual(logic.extrasFollowUp(true, false), { rerun: true, settle: false })
+  assert.deepEqual(logic.extrasFollowUp(false, true), { rerun: false, settle: false })
+  assert.deepEqual(logic.extrasFollowUp(true, true), { rerun: true, settle: false })
+  assert.deepEqual(logic.extrasFollowUp(false, false), { rerun: false, settle: true })
+})
+
+// --- VPN ----------------------------------------------------------------------------
+
+test("vpnCommand waits up to 20 s and targets the uuid", () => {
+  assert.deepEqual(logic.vpnCommand("uuid-1", false), [
+    "nmcli",
+    "--wait",
+    "20",
+    "connection",
+    "up",
+    "uuid",
+    "uuid-1"
+  ])
+  assert.deepEqual(logic.vpnCommand("uuid-1", true), [
+    "nmcli",
+    "--wait",
+    "20",
+    "connection",
+    "down",
+    "uuid",
+    "uuid-1"
+  ])
+})
+
+test("vpnFailureText names what failed", () => {
+  assert.equal(logic.vpnFailureText(true), "Couldn't disconnect")
+  assert.equal(logic.vpnFailureText(false), "Couldn't connect")
+})
+
+// --- rowKeyMatches -----------------------------------------------------------------
+
+test("rowKeyMatches checks a pointer action's row is still the one it names", () => {
+  const rows = [{ key: "a" }, { key: "" }]
+  assert.equal(logic.rowKeyMatches(rows, 0, "a"), true)
+  assert.equal(logic.rowKeyMatches(rows, 1, ""), true, "a hidden network still works by mouse")
+  assert.equal(logic.rowKeyMatches(rows, 0, "b"), false)
+  assert.equal(logic.rowKeyMatches(rows, 4, "a"), false)
+  assert.equal(logic.rowKeyMatches(rows, 0, undefined), false)
+  assert.equal(logic.rowKeyMatches(undefined, 0, "a"), false)
+})
+
+// --- keyHint ----------------------------------------------------------------------------
+
+test("keyHint says what Enter does in each section", () => {
+  assert.equal(logic.keyHint("wifi"), "↑↓ move · ←→ pick · enter connect · x forget · tab next")
+  assert.equal(logic.keyHint("saved"), "↑↓ move · enter/→ select forget · x forget · tab next")
+  assert.equal(logic.keyHint("vpn"), "↑↓ move · enter toggle VPN · tab next")
+  assert.equal(logic.keyHint("dns"), "↑↓ move · ←→ pick · enter apply · tab next")
+  assert.equal(logic.keyHint("band"), "↑↓ move · ←→ pick · enter apply · tab next")
+  assert.equal(logic.keyHint("header"), "↑↓ move · ←→ pick · enter apply · tab next")
+  assert.equal(logic.keyHint(""), "↑↓ move · ←→ pick · enter connect · x forget · tab next")
+})
+
+// --- keyTargetConfirmed ------------------------------------------------------------
+
+test("keyTargetConfirmed refuses a section the cursor was moved into automatically", () => {
+  const rows = [{ key: "Home" }, { key: "OpenCafe" }]
+  // The user chose Saved; Saved emptied and the cursor fell into Wi-Fi.
+  assert.equal(
+    logic.keyTargetConfirmed({
+      section: "wifi",
+      chosen: "saved",
+      rows: rows,
+      key: "OpenCafe",
+      index: 1
+    }),
+    false
+  )
+  // The band hid under the cursor and stock sent it to DNS.
+  assert.equal(logic.keyTargetConfirmed({ section: "dns", chosen: "band", fixed: true }), false)
+  assert.equal(logic.keyTargetConfirmed({ section: "dns", chosen: "dns", fixed: true }), true)
+  assert.equal(
+    logic.keyTargetConfirmed({
+      section: "wifi",
+      chosen: "wifi",
+      rows: rows,
+      key: "OpenCafe",
+      index: 1
+    }),
+    true
+  )
+  assert.equal(
+    logic.keyTargetConfirmed({
+      section: "wifi",
+      chosen: "wifi",
+      rows: rows,
+      key: "Home",
+      index: 1
+    }),
+    false
+  )
+  assert.equal(
+    logic.keyTargetConfirmed({ section: "", chosen: "", fixed: true }),
+    false,
+    "no choice at all"
+  )
+  assert.equal(logic.keyTargetConfirmed(null), false)
+})

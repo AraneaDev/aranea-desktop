@@ -30,6 +30,9 @@ Column {
   property bool scanning: false
   // Whether there's a Wi-Fi station at all; the section hides without one.
   property bool available: true
+  // Whether a Wi-Fi action is running: rows dim and can't be chosen, and
+  // forget hides, as stock's rows were disabled.
+  property bool disabled: false
   // The keyboard cursor's row, or -1 when the cursor isn't here.
   property int cursorIndex: -1
   // Whether the keyboard cursor sits on the cursor row's forget action.
@@ -47,8 +50,10 @@ Column {
   signal hovered(int index, bool action)
   // Emitted when the pointer leaves row INDEX's forget button.
   signal actionLeft(int index)
-  // Emitted on Enter in the passphrase or the connect button.
+  // Emitted on Enter in the passphrase.
   signal promptSubmit
+  // Emitted when the prompt's connect button is clicked.
+  signal promptConnect
   // Emitted on Esc in either prompt field.
   signal promptCancel
   // Emitted when the passphrase field's text changes to TEXT.
@@ -128,6 +133,7 @@ Column {
         detail: wrapper.promptOpen ? "" : wrapper.rowStatus.text
         detailColor: wrapper.rowStatus.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
         active: !!wrapper.modelData.connected
+        available: !section.disabled
         busy: wrapper.rowStatus.busy
         signal: -1
         hasCursor: wrapper.hasCursor
@@ -152,7 +158,7 @@ Column {
           NetworkForgetButton {
             id: forgetBtn
             anchors.verticalCenter: parent.verticalCenter
-            forgettable: !!wrapper.modelData.forgettable
+            forgettable: !!wrapper.modelData.forgettable && !section.disabled
             rowHovered: wifiRow.hovered
             hasCursor: wrapper.hasCursor
             cursorAction: section.cursorAction
@@ -293,7 +299,7 @@ Column {
               tooltipText: "Connect"
               foreground: Aranea.DesignTokens.foreground
               hoverColor: Aranea.DesignTokens.accent
-              onClicked: section.promptSubmit()
+              onClicked: section.promptConnect()
             }
           }
         }

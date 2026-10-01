@@ -24,16 +24,53 @@ The extras, all hidden when they have nothing to show:
   `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show` and
   `ip -j -4 -br addr`, in one `bash -c` that prints nothing without
   `nmcli`. Saved profiles' SSIDs come from
-  `nmcli -g 802-11-wireless.ssid connection show uuid <uuid>`, run on open
-  and after a forget only.
-- **VPN toggle:** `nmcli connection up|down uuid <uuid>`; the row breathes
-  while it runs and reads "Couldn't connect" for 4 s if it fails.
-- **Saved forget:** `nmcli connection delete uuid <uuid>`, then a re-read.
+  `nmcli -g 802-11-wireless.ssid connection show uuid <uuid>` (one
+  `uuid<TAB>ssid` line per profile, an empty SSID when the lookup fails),
+  run on open and after a forget only. A read asked for while one runs
+  (a forget landing mid-poll) runs again once it finishes.
+- **VPN toggle:** `nmcli --wait 20 connection up|down uuid <uuid>`; the row
+  breathes while it runs and reads "Couldn't connect" (or "Couldn't
+  disconnect") for 4 s if it fails.
+- **Saved forget:** `nmcli connection delete uuid <uuid>`; the row breathes
+  and reads "Forgetting…" until the next extras read that started after
+  the delete finished.
 
 The keyboard walks header, VPN, band, DNS, Wi-Fi and Saved
-(`NetworkLogic.moveVertical`); Enter activates, `x` forgets a known Wi-Fi
-or Saved row, `r` refreshes and `w` toggles Wi-Fi. The cursor outline
-shows only while the keyboard drives it.
+(`NetworkLogic.moveVertical`); `r` refreshes and `w` toggles Wi-Fi. Enter
+does what the key hint under the list says for the cursor's section:
+
+- **Header, band, DNS:** runs the action or applies the pill.
+- **VPN:** brings the profile up or down.
+- **Wi-Fi:** connects (or opens the passphrase prompt), or disconnects the
+  connected network; on the forget action (→) it forgets.
+- **Saved:** moves onto the row's forget action, as → does; Enter there
+  forgets.
+
+`x` forgets a known Wi-Fi or Saved row. The cursor outline shows only while
+the keyboard drives it.
+
+**No key press ever acts on a row the user didn't choose and can see.**
+
+- Each section's cursor holds the key of the row (header action, band pill
+  or Automatic switch, VPN, network or profile) it was deliberately put on
+  (an arrow, a hover, a click, open, or the keyboard revealing it) and
+  follows that row when the list re-sorts.
+- When the row disappears, the cursor is clamped but its key is dropped.
+  Enter and `x` then do nothing until the user picks a row
+  (`NetworkLogic.followCursor` / `cursorConfirmed`). A hidden SSID never
+  confirms (it still works by mouse).
+- The same goes for a cursor moved automatically into another section, for
+  example when Saved or the band section empties or hides under it
+  (`NetworkLogic.keyTargetConfirmed`).
+- Enter or `x` on a cursor the pointer placed (no outline) only reveals it.
+- Pointer actions carry their row's key and are refused when the row
+  changed.
+- A row or forget button created under a still pointer ignores clicks for
+  300 ms unless the pointer really moves over it.
+- Unchanged refreshes keep the same row arrays, so delegates aren't
+  rebuilt.
+- While a Wi-Fi action runs, the Wi-Fi rows are dimmed, as stock disabled
+  them.
 
 `Panel.qml` keeps stock's `manageIpc: false` and owns the `omarchy.network`
 IpcHandler itself, so `omarchy-shell shell summon omarchy.network` still

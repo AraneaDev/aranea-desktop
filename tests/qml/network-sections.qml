@@ -7,13 +7,15 @@
 // Link section hides without stats, lists its stats in stock order and
 // copies the IP but never a "--"; Interfaces shows only with two or more
 // links and never outlines; VPN hides when empty, emits toggle from its
-// switch, shows "Couldn't connect" in the urgent colour on failure and
+// switch, shows "Couldn't connect" (or the failure's own text, e.g.
+// "Couldn't disconnect") in the urgent colour on failure and
 // breathes while busy; Band hides with visible false, shows pills only
 // when pillsVisible, emits pick and toggleAuto and explains its switch as
 // stock does; DNS marks the selected pill, emits pick and explains Custom;
 // pills draw no outline without the cursor (pointer hover included) and
 // exactly one with it, and pointer hover reaches the sections through the
-// PointerMoveGate.
+// PointerMoveGate. A forget button that appears under a still pointer
+// ignores a click until it settles.
 import QtQuick
 import QtTest
 import Quickshell
@@ -337,6 +339,40 @@ ShellRoot {
     }
   }
 
+  // A forget button created under a still pointer (a Repeater rebuild):
+  // a click right after it appears was aimed at another row's.
+  FloatingWindow {
+    id: freshWindow
+    implicitWidth: 200
+    implicitHeight: 80
+    visible: true
+
+    Item {
+      id: freshHost
+      anchors.fill: parent
+
+      // How many times a fresh forget button was clicked.
+      property int clickedCount: 0
+
+      Loader {
+        id: freshLoader
+        x: 20
+        y: 20
+        active: false
+        sourceComponent: Network.NetworkForgetButton {
+          forgettable: true
+          hasCursor: true
+          pointerGate: freshGate
+          onClicked: freshHost.clickedCount += 1
+        }
+      }
+      PointerMoveGate {
+        id: freshGate
+        referenceItem: freshHost
+      }
+    }
+  }
+
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
     return t.findChildren(item, "cursorOutline").filter(function (o) {
@@ -353,6 +389,27 @@ ShellRoot {
   function allAt(pts, y) {
     return pts.length > 0 && pts.every(function (p) {
       return Math.abs(p.y - y) < 0.5
+    })
+  }
+
+  // A forget button that appears under a still pointer ignores clicks for
+  // about 300 ms, unless the gate accepted a real move onto it.
+  function freshForget() {
+    pointer.mouseMove(freshHost, 30, 28)
+    t.step(60, function () {
+      pointer.mouseMove(freshHost, 32, 28)
+      t.step(60, function () {
+        freshLoader.active = true
+        t.step(30, function () {
+          pointer.mouseClick(freshHost, 32, 28)
+          t.equal(freshHost.clickedCount, 0, "a click right after forget appears under a still pointer is ignored")
+          t.step(350, function () {
+            pointer.mouseClick(freshHost, 32, 28)
+            t.equal(freshHost.clickedCount, 1, "once it has settled, a click forgets")
+            t.done()
+          })
+        })
+      })
     })
   }
 
@@ -447,6 +504,16 @@ ShellRoot {
     t.equal(vpnRows[0].detail, "WireGuard · 10.8.0.3", "a healthy profile keeps its detail")
     t.check(t.findChild(vpnRows[0], "busyPulse").running, "a busy profile breathes")
     t.check(!t.findChild(vpnRows[1], "busyPulse").running, "an idle profile doesn't")
+    var vpnStatusBefore = vpn.status
+    vpn.status = {
+      "u-1": {
+        busy: false,
+        failed: true,
+        text: "Couldn't disconnect"
+      }
+    }
+    t.equal(vpnRows[0].detail, "Couldn't disconnect", "a failed down reads Couldn't disconnect")
+    vpn.status = vpnStatusBefore
     t.equal(litOutlines(vpn), 0, "no VPN outline without the cursor")
     vpn.cursorIndex = 1
     t.equal(litOutlines(vpn), 1, "the cursor outlines one VPN row")
@@ -529,7 +596,7 @@ ShellRoot {
                     t.check(log.some(function (e) {
                       return e[0] === "vpnHover" && e[1] === 1
                     }), "a real move over a VPN row reports rowHovered(1)")
-                    t.done()
+                    freshForget()
                   })
                 })
               })

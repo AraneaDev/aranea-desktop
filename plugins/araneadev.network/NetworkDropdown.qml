@@ -10,6 +10,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "NetworkLogic.js" as NetworkLogic
 
 Column {
   id: dropdown
@@ -28,8 +29,10 @@ Column {
   property var graph: []
   // Per-SSID Wi-Fi action status: {ssid: {text, failed, busy}}.
   property var wifiStatus: ({})
-  // Per-uuid VPN action state: {uuid: {busy, failed}}.
+  // Per-uuid VPN action state: {uuid: {busy, failed, text}}.
   property var vpnStatus: ({})
+  // Per-uuid Saved action state: {uuid: {busy, text}}.
+  property var savedStatus: ({})
   // The passphrase prompt: {ssid, enterprise, busy, failed, passphrase,
   // identity}; ssid "" while closed.
   property var prompt: ({
@@ -52,6 +55,7 @@ Column {
   readonly property var wifi: view && view.wifi ? view.wifi : ({
       available: false,
       scanning: false,
+      disabled: false,
       rows: []
     })
   // The view's band part, or a hidden one.
@@ -65,13 +69,17 @@ Column {
   // Emitted for every user action, NAME with its ARG:
   //   qr, speed, toggleWifi (null): the header's actions;
   //   copy ({value}): a copyable Link value was clicked;
-  //   vpnToggle ({index}): a VPN row or its switch;
+  //   vpnToggle ({index, key}): a VPN row or its switch;
   //   bandAuto (null): the band's Automatic switch;
   //   band ({key}), dns ({key}): a band or DNS pill;
-  //   wifiPrimary ({index}), wifiForget ({index}): a Wi-Fi row, its forget;
-  //   promptSubmit, promptCancel (null): the passphrase prompt;
+  //   wifiPrimary ({index, key}), wifiForget ({index, key}): a Wi-Fi row,
+  //     its forget;
+  //   promptSubmit, promptCancel (null): Enter and Esc in the prompt;
+  //   promptConnect (null): the prompt's connect button (a pointer action);
   //   passphraseEdited ({text}), identityEdited ({text}): prompt typing;
-  //   savedForget ({index}): a Saved row's forget;
+  //   savedForget ({index, key}): a Saved row's forget;
+  // Row actions carry the row's key as the view saw it, so the host can
+  // refuse one whose row changed underneath the click.
   //   hover ({section, index, action}): the pointer moved onto something
   //     (through the gate) in "header", "vpn", "band" (adds auto: true for
   //     the Automatic switch, index 0), "dns", "wifi" or "saved"; action is
@@ -88,6 +96,20 @@ Column {
   // The cursor's index in SECTION, or -1 when the cursor isn't active there.
   function cursorIn(section) {
     return cursor.active && cursor.section === section ? cursor.index : -1
+  }
+
+  // ROWS[INDEX]'s key, or "" when there's no such row.
+  function keyAt(rows, index) {
+    var row = rows ? rows[index] : null
+    return row && typeof row.key === "string" ? row.key : ""
+  }
+
+  // Reports row action NAME for INDEX in ROWS, with the row's key.
+  function rowAction(name, rows, index) {
+    dropdown.action(name, {
+      index: index,
+      key: dropdown.keyAt(rows, index)
+    })
   }
 
   // Reports a hover on SECTION's INDEX (ACTION on its forget button).
@@ -194,9 +216,7 @@ Column {
     cursorIndex: dropdown.cursorIn("vpn")
     pointerGate: dropdown.pointerGate
     onToggle: function (index) {
-      dropdown.action("vpnToggle", {
-        index: index
-      })
+      dropdown.rowAction("vpnToggle", dropdown.view.vpn, index)
     }
     onRowHovered: function (index) {
       dropdown.hover("vpn", index, false)
@@ -283,18 +303,15 @@ Column {
         prompt: dropdown.prompt
         scanning: !!dropdown.wifi.scanning
         available: !!dropdown.wifi.available
+        disabled: !!dropdown.wifi.disabled
         cursorIndex: dropdown.cursorIn("wifi")
         cursorAction: !!dropdown.cursor.action
         pointerGate: dropdown.pointerGate
         onPrimary: function (index) {
-          dropdown.action("wifiPrimary", {
-            index: index
-          })
+          dropdown.rowAction("wifiPrimary", dropdown.wifi.rows, index)
         }
         onForget: function (index) {
-          dropdown.action("wifiForget", {
-            index: index
-          })
+          dropdown.rowAction("wifiForget", dropdown.wifi.rows, index)
         }
         onHovered: function (index, action) {
           dropdown.hover("wifi", index, action)
@@ -303,6 +320,7 @@ Column {
           dropdown.leaveAction("wifi", index)
         }
         onPromptSubmit: dropdown.action("promptSubmit", null)
+        onPromptConnect: dropdown.action("promptConnect", null)
         onPromptCancel: dropdown.action("promptCancel", null)
         onPassphraseEdited: function (text) {
           dropdown.action("passphraseEdited", {
@@ -323,13 +341,12 @@ Column {
         id: savedSection
         width: parent.width
         rows: dropdown.view.saved || []
+        status: dropdown.savedStatus
         cursorIndex: dropdown.cursorIn("saved")
         cursorAction: !!dropdown.cursor.action
         pointerGate: dropdown.pointerGate
         onForget: function (index) {
-          dropdown.action("savedForget", {
-            index: index
-          })
+          dropdown.rowAction("savedForget", dropdown.view.saved, index)
         }
         onHovered: function (index, action) {
           dropdown.hover("saved", index, action)
@@ -353,7 +370,8 @@ Column {
   Text {
     objectName: "keyHint"
     width: parent.width
-    text: "↑↓ move · ←→ pick · enter connect · x forget · tab next"
+    // What Enter does where the keyboard cursor is.
+    text: NetworkLogic.keyHint(dropdown.cursor.active ? dropdown.cursor.section : "")
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
