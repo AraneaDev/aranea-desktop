@@ -15,6 +15,8 @@ KeyboardPanel {
   signal textKey(string text)
   // Emitted when the focused item is activated.
   signal activateRequested
+  // Emitted for Return or Enter (not Space), just before activateRequested.
+  signal returnRequested
   // Emitted when the focused item's deletion is requested ("x").
   signal deleteRequested
   // Content rendered inside the keyboard frame.
@@ -36,6 +38,7 @@ KeyboardPanel {
     onTextKey: function (text) {
       frame.textKey(text)
     }
+    onReturnRequested: frame.returnRequested()
     onActivateRequested: frame.activateRequested()
     onDeleteRequested: frame.deleteRequested()
   }

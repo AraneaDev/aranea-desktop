@@ -801,4 +801,47 @@ jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["om
   exit 1
 }
 
+# --- weather bar entry: only retargeted once araneadev.weather is installed
+# (guard: $(dirname "$config_file")/plugins/araneadev.weather/manifest.json);
+# an object entry's settings (unit, refreshMinutes) survive the round trip.
+# Weather has no bar.centerAnchor handling (that anchor is the clock).
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.weather", "unit": "imperial", "refreshMinutes": 30}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "omarchy.weather", "unit": "imperial", "refreshMinutes": 30}]
+  and ((.cloneSourceRestores // []) | index("araneadev.weather")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.weather"
+: >"$(dirname "$config")/plugins/araneadev.weather/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "araneadev.weather", "unit": "imperial", "refreshMinutes": 30}]
+  and (.cloneSourceRestores | index("araneadev.weather")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "omarchy.weather", "unit": "imperial", "refreshMinutes": 30}]
+  and ((.cloneSourceRestores // []) | index("araneadev.weather")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+weather_real="$test_root/weather-dotfiles/shell.json"
+weather_link="$test_root/weather-config/shell.json"
+mkdir -p "$(dirname "$weather_real")" "$(dirname "$weather_link")/plugins/araneadev.weather"
+: >"$(dirname "$weather_link")/plugins/araneadev.weather/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.weather"]}}}' >"$weather_real"
+ln -s "$weather_real" "$weather_link"
+"$repo_root/scripts/repair-shell-config" "$weather_link"
+test -L "$weather_link"
+jq -e '.bar.layout.right == ["araneadev.weather"]' "$weather_real" >/dev/null || {
+  cat "$weather_real"
+  exit 1
+}
+
 echo "shell config contract passed"

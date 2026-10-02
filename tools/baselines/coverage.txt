@@ -28,3 +28,4 @@ plugins/araneadev.shared/ServiceRegistry.js 100
 plugins/araneadev.shared/ShowcaseLogic.js 100
 plugins/araneadev.shared/VpnApps.js 100
 plugins/araneadev.vpn/VpnLogic.js 100
+plugins/araneadev.weather/WeatherLogic.js 100
