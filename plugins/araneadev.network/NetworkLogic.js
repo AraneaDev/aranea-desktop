@@ -1,7 +1,7 @@
 // Pure rules for the Aranea network dropdown (Panel.qml): parsing nmcli and
 // `ip -j` output, building the interface/saved-network rows, and vertical
 // keyboard navigation (header, band, DNS, Wi-Fi, saved -- VPN control moved
-// to araneadev.vpn, Task 6). The cursor safety primitives
+// to araneadev.vpn). The cursor safety primitives
 // (reselectIndex, followCursor, cursorConfirmed, keepRows, rowKeyMatches,
 // pressIntent) and the throughput graph's points (pushSample, graphPoints)
 // moved to `araneadev.shared` (CursorLogic.js, GraphLogic.js) so
@@ -254,9 +254,11 @@ function parseDevices(text) {
 }
 
 /**
- * Parses `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show` output.
+ * Parses `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP,STATE connection show`
+ * output. STATE ("activating", "activated", ...) is "" when nmcli leaves it
+ * out or the profile isn't active.
  * @param {string|undefined} text - the command's stdout
- * @returns {Array<{name: string, uuid: string, type: string, device: string, active: boolean, timestamp: number}>} the connections
+ * @returns {Array<{name: string, uuid: string, type: string, device: string, active: boolean, timestamp: number, state: string}>} the connections
  */
 function parseConnections(text) {
   var lines = String(text || "").split("\n")
@@ -273,7 +275,8 @@ function parseConnections(text) {
       type: f[2],
       device: f[3],
       active: f[4] === "yes",
-      timestamp: isFinite(ts) ? ts : 0
+      timestamp: isFinite(ts) ? ts : 0,
+      state: f[6] || ""
     })
   }
   return out
@@ -368,8 +371,8 @@ function compareActiveThenLabel(a, b) {
 }
 
 /**
- * Builds the interface rows (Wi-Fi, Ethernet, mobile, WireGuard, tunnel)
- * shown above the VPN section. A null or non-object entry in `devices` is
+ * Builds the interface rows (Wi-Fi, Ethernet, mobile, WireGuard, tunnel).
+ * A null or non-object entry in `devices` is
  * ignored rather than thrown on.
  * @param {Array<{device: string, type: string, state: string, connection: string}>|undefined} devices - from `parseDevices`
  * @param {Record<string, string>|undefined} addrs - from `parseAddrs`

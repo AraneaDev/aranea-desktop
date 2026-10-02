@@ -770,6 +770,18 @@ ShellRoot {
       }], [350, function () {
         pointer.mouseClick(scroller, scrollPoint.x, scrollPoint.y)
         t.equal(scrollActions.length, 1, "a click 300 ms after the scroll is accepted")
+
+        // ---------- Enter with the next field not registered yet ----------
+        full.prompt = promptFor("uuid-client-a", {})
+      }], [150, function () {
+        var panel = shown(wrappersOf("available")[0], "promptPanel")[0]
+        var code = panel.inputs[2]
+        delete panel.inputs[2]
+        actions = []
+        panel.advance(1)
+        panel.inputs[2] = code
+        t.equal(nonHover().length, 0, "Enter with the next field missing neither throws nor submits")
+        full.prompt = closedPrompt
       }]])
 
   // The available row's position before the session grew.

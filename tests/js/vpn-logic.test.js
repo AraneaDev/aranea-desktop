@@ -508,6 +508,22 @@ test("statusText: the other phases", () => {
   assert.equal(logic.statusText("failedUp", 0), "Couldn't connect")
   assert.equal(logic.statusText("failedDown", 0), "Couldn't disconnect")
   assert.equal(logic.statusText("failedOpen", 0), "Couldn't open")
+  assert.equal(
+    logic.statusText("failedOpen", 0, "Azure (Contoso)"),
+    "Couldn't open Azure (Contoso)"
+  )
+  assert.equal(
+    logic.statusText("failedUp", 0, "Office"),
+    "Couldn't connect",
+    "only an open names it"
+  )
+})
+
+test("statusMap names the app that couldn't open", () => {
+  assert.deepEqual(
+    logic.statusMap(null, { key: "app:Azure", phase: "failedOpen", name: "Azure" }),
+    { "app:Azure": { text: "Couldn't open Azure", busy: false, failed: true } }
+  )
 })
 
 test("statusText on an unknown phase is empty, not a throw", () => {
@@ -827,7 +843,16 @@ test("emptyText and hintFor", () => {
   assert.equal(logic.emptyText(false, 2), "")
   assert.equal(logic.hintFor(true, "available", "nm", true), "enter connect · esc cancel")
   assert.equal(logic.hintFor(false, "", "", false), "tab next · esc close")
-  assert.equal(logic.hintFor(false, "connected", "nm", true), logic.keyHint("connected", "nm"))
+  assert.equal(
+    logic.hintFor(false, "connected", "nm", true, true),
+    logic.keyHint("connected", "nm")
+  )
+  assert.equal(
+    logic.hintFor(false, "available", "nm", true, false),
+    "↑↓ move · esc close · tab next",
+    "no Enter promise before a row is chosen"
+  )
+  assert.equal(logic.hintFor(false, "available", "app", true), "↑↓ move · esc close · tab next")
 })
 
 test("moveFlat and cursorPlace walk Connected then Available", () => {
@@ -887,6 +912,57 @@ test("whichCommand passes the binary as a positional arg", () => {
   assert.equal(logic.whichCommand(undefined)[4], "")
 })
 
+test("whichCommand finds binaries on PATH only, never builtins or keywords", () => {
+  const { spawnSync } = require("node:child_process")
+  // Runs whichCommand(BIN) and returns its exit status.
+  const run = (bin) => {
+    const argv = logic.whichCommand(bin)
+    return spawnSync(argv[0], argv.slice(1)).status
+  }
+  assert.equal(run("bash"), 0)
+  assert.notEqual(run("cd"), 0, "a builtin isn't an app to open")
+  assert.notEqual(run("if"), 0, "nor is a keyword")
+  assert.notEqual(run("no-such-binary-aranea"), 0)
+})
+
+test("promptOrFail prompts only in an open dropdown on a row that's still there", () => {
+  assert.equal(logic.promptOrFail(true, true), "prompt")
+  assert.equal(logic.promptOrFail(false, true), "fail", "closed: nowhere to prompt")
+  assert.equal(logic.promptOrFail(true, false), "fail")
+})
+
+test("linkCommand matches a process name literally, not as a pattern", () => {
+  const fs = require("node:fs")
+  const os = require("node:os")
+  const { execFileSync } = require("node:child_process")
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vpn-pgrep-"))
+  try {
+    // Stubs: ip prints no links; pgrep -x matches its pattern (an ERE, as
+    // the real one) against the names in $RUNNING.
+    fs.writeFileSync(path.join(dir, "ip"), "#!/bin/bash\necho []\n", { mode: 0o755 })
+    fs.writeFileSync(
+      path.join(dir, "pgrep"),
+      '#!/bin/bash\nprintf "%s\\n" $RUNNING | grep -Eqx -- "$3"\n',
+      { mode: 0o755 }
+    )
+    // Returns the names linkCommand reports running among RUNNING.
+    const found = (names, running) => {
+      const argv = logic.linkCommand(names)
+      const out = execFileSync(argv[0], argv.slice(1), {
+        env: { PATH: dir + ":/usr/bin:/bin", RUNNING: running }
+      }).toString()
+      return logic.parseLinkOutput(out).procs
+    }
+    assert.deepEqual(found(["a.b+c"], "axbbbc"), [], "a dot and a plus are literal")
+    assert.deepEqual(found(["a.b+c"], "a.b+c"), ["a.b+c"])
+    assert.deepEqual(found(["vpn(x)|y"], "y"), [], "so are brackets and bars")
+    assert.deepEqual(found(["vpn(x)|y"], "vpn(x)|y"), ["vpn(x)|y"])
+    assert.deepEqual(found(["[a]^$*?{1}\\"], "[a]^$*?{1}\\"), ["[a]^$*?{1}\\"])
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test("app rows carry the open-in-new glyph, NetworkManager rows the VPN glyph", () => {
   const built = logic.vpnRows(
     [{ name: "A", uuid: "u", type: "vpn", device: "", active: false, state: "" }],
@@ -903,20 +979,10 @@ test("app rows carry the open-in-new glyph, NetworkManager rows the VPN glyph", 
 
 test("linkCommand matches pgrep on the first 15 bytes but prints the full name", () => {
   const script = logic.linkCommand(["microsoft-azurevpnclient"])[2]
-  assert.ok(script.includes('pgrep -x -- "${p:0:15}"'))
+  assert.ok(script.includes('"${p:0:15}"'))
+  assert.ok(script.includes('pgrep -x -- "$q"'))
   assert.ok(script.includes("printf '%s\\n' \"$p\""))
   assert.equal(script.includes("microsoft"), false)
-})
-
-test("appsToApply ignores the whole file on any error", () => {
-  const good = {
-    apps: [{ name: "A", label: "A", detect: {}, open: ["a"] }],
-    profiles: { P: { otp: "challenge" } },
-    error: ""
-  }
-  assert.deepEqual(logic.appsToApply(good), { apps: good.apps, profiles: good.profiles })
-  assert.deepEqual(logic.appsToApply({ ...good, error: "dropped: B" }), { apps: [], profiles: {} })
-  assert.deepEqual(logic.appsToApply(null), { apps: [], profiles: {} })
 })
 
 test("finishClearsSecrets only for a secrets connect on the prompt's row", () => {

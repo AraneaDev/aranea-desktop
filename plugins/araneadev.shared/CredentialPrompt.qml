@@ -34,7 +34,7 @@ Item {
   // Whether the connect is running: busyText replaces the fields.
   property bool busy: false
   // The busy message.
-  property string busyText: "Connecting..."
+  property string busyText: "Connecting…"
   // Whether the connect failed: failedText, urgent, replaces the fields.
   property bool failed: false
   // The failure message.
@@ -97,13 +97,17 @@ Item {
       input.forceActiveFocus()
   }
 
-  // Enter in field INDEX: focus the next editable field, or submit.
+  // Enter in field INDEX: focus the next editable field, or submit. A next
+  // field whose slot hasn't registered its input yet is left alone.
   function advance(index) {
     var next = prompt.editableFrom(index + 1, 1)
-    if (next < 0)
+    if (next < 0) {
       prompt.submit()
-    else
-      prompt.inputAt(next).forceActiveFocus()
+      return
+    }
+    var input = prompt.inputAt(next)
+    if (input)
+      input.forceActiveFocus()
   }
 
   // Records TEXT as field KEY's current text.

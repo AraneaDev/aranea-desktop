@@ -501,15 +501,16 @@ function disconnectCommand(uuid) {
  * or after a failure.
  * @param {string} phase - "connecting", "disconnecting", "failedUp", "failedDown" or "failedOpen"
  * @param {number|undefined} waitedMs - how long "connecting" has been waiting, in milliseconds
+ * @param {string} [name] - the app that couldn't open, named by "failedOpen"
  * @returns {string} the status text, or "" for an unknown phase
  */
-function statusText(phase, waitedMs) {
+function statusText(phase, waitedMs, name) {
   var ms = Number(waitedMs) || 0
   if (phase === "connecting") return ms >= 5000 ? "Connecting… approve on phone" : "Connecting…"
   if (phase === "disconnecting") return "Disconnecting…"
   if (phase === "failedUp") return "Couldn't connect"
   if (phase === "failedDown") return "Couldn't disconnect"
-  if (phase === "failedOpen") return "Couldn't open"
+  if (phase === "failedOpen") return name ? "Couldn't open " + name : "Couldn't open"
   return ""
 }
 
@@ -631,7 +632,9 @@ function sessionsToFetch(seen, conns) {
  * `pgrep -x` finds, one per line (printed in full). `pgrep -x` matches the
  * kernel's process name, which is cut to 15 bytes, so a longer name is
  * matched on its first 15 bytes (`LC_ALL=C` makes `${p:0:15}` count bytes,
- * not characters). The names travel as positional arguments to
+ * not characters). `pgrep` reads its pattern as an extended regex, so the
+ * cut name's metacharacters are escaped first and a name such as `a.b+c`
+ * only ever matches itself. The names travel as positional arguments to
  * `bash -c`, never interpolated into the script.
  * @param {string[]|undefined} processNames - the apps' `detect.process` names
  * @returns {string[]} the argv
@@ -641,7 +644,7 @@ function linkCommand(processNames) {
   return [
     "bash",
     "-c",
-    'export LC_ALL=C; ip -j addr 2>/dev/null || echo "[]"; echo; echo ---; for p; do pgrep -x -- "${p:0:15}" >/dev/null 2>&1 && printf \'%s\\n\' "$p"; done; exit 0',
+    'export LC_ALL=C; ip -j addr 2>/dev/null || echo "[]"; echo; echo ---; for p; do q="$(printf \'%s\' "${p:0:15}" | sed \'s/[][\\.^$*+?(){}|]/\\\\&/g\')"; pgrep -x -- "$q" >/dev/null 2>&1 && printf \'%s\\n\' "$p"; done; exit 0',
     "_"
   ].concat(names.map(String))
 }
@@ -883,14 +886,18 @@ function sessionDetails(connected, sessions, appIps, since, now) {
  * ("Connecting…", "Connecting… approve on phone" after 5 s,
  * "Disconnecting…"); a failed one reads urgent for its 4 s.
  * @param {{key: string, phase: string, waited: number}|null|undefined} action - the running action
- * @param {{key: string, phase: string}|null|undefined} failure - the recent failure
+ * @param {{key: string, phase: string, name?: string}|null|undefined} failure - the recent failure, with the app's name for "failedOpen"
  * @returns {Record<string, {text: string, busy: boolean, failed: boolean}>} row key to its status
  */
 function statusMap(action, failure) {
   /** @type {Record<string, {text: string, busy: boolean, failed: boolean}>} */
   var out = {}
   if (failure && failure.key)
-    out[failure.key] = { text: statusText(failure.phase, 0), busy: false, failed: true }
+    out[failure.key] = {
+      text: statusText(failure.phase, 0, failure.name),
+      busy: false,
+      failed: true
+    }
   if (action && action.key)
     out[action.key] = { text: statusText(action.phase, action.waited), busy: true, failed: false }
   return out
@@ -977,16 +984,20 @@ function emptyText(nmOk, rowCount) {
 
 /**
  * The key hint: the prompt's own keys while it's open, the cursor row's
- * Enter action (`keyHint`) while there are rows, else Tab and Esc.
+ * Enter action (`keyHint`) once a row is chosen, the moves alone before
+ * that (Enter does nothing yet, so the hint never promises it), else Tab
+ * and Esc.
  * @param {boolean} promptOpen - whether the credential prompt is open
  * @param {string} section - the cursor's section
  * @param {string} rowKind - the cursor row's kind ("nm" or "app")
  * @param {boolean} hasRows - whether any row is shown
+ * @param {boolean} [chosen] - whether the cursor is on a row the user chose (Enter acts)
  * @returns {string} the hint
  */
-function hintFor(promptOpen, section, rowKind, hasRows) {
+function hintFor(promptOpen, section, rowKind, hasRows, chosen) {
   if (promptOpen) return "enter connect · esc cancel"
   if (!hasRows) return "tab next · esc close"
+  if (!chosen) return "↑↓ move · esc close · tab next"
   return keyHint(section, rowKind)
 }
 
@@ -1062,24 +1073,26 @@ function parseFixture(json) {
 
 /**
  * The argv that checks an app's `open` binary is on PATH before it's run
- * detached (`command -v`); the name travels as a positional argument.
+ * detached (`type -P`: a file on PATH only, never a builtin, keyword,
+ * alias or function); the name travels as a positional argument.
  * @param {string} bin - the binary (the app's `open[0]`)
  * @returns {string[]} the argv; exit 0 when it's found
  */
 function whichCommand(bin) {
-  return ["bash", "-c", 'command -v -- "$1" >/dev/null 2>&1', "_", String(bin || "")]
+  return ["bash", "-c", 'type -P -- "$1" >/dev/null 2>&1', "_", String(bin || "")]
 }
 
 /**
- * The apps config the panel applies from a `VpnApps.parseAppsConfig`
- * result: the whole file is ignored (no apps, no profiles) when it has any
- * error, so a partly invalid file never shows a partial list.
- * @param {{apps: VpnAppEntry[], profiles: Record<string, {otp: string}>, error: string}|null} parsed - the parsed file, or null when it's missing
- * @returns {{apps: VpnAppEntry[], profiles: Record<string, {otp: string}>}} what to apply
+ * What a connect that needs secrets leads to once the profile's username
+ * is read: the prompt, in an open dropdown on a row that's still there;
+ * otherwise (the dropdown closed meanwhile, nowhere to prompt) a failure,
+ * so the row reads "Couldn't connect" and the bar icon flags it.
+ * @param {boolean} opened - whether the dropdown is open
+ * @param {boolean} rowExists - whether the profile's row is still listed
+ * @returns {"prompt"|"fail"} what to do
  */
-function appsToApply(parsed) {
-  if (!parsed || parsed.error !== "") return { apps: [], profiles: {} }
-  return { apps: parsed.apps, profiles: parsed.profiles }
+function promptOrFail(opened, rowExists) {
+  return opened && rowExists ? "prompt" : "fail"
 }
 
 /**
@@ -1150,7 +1163,7 @@ if (typeof module !== "undefined")
     cursorPlace: cursorPlace,
     parseFixture: parseFixture,
     whichCommand: whichCommand,
-    appsToApply: appsToApply,
+    promptOrFail: promptOrFail,
     finishClearsSecrets: finishClearsSecrets,
     canStartSecrets: canStartSecrets
   }

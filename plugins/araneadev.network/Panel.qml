@@ -307,8 +307,8 @@ Panel {
       root.summonSpeedTest()
     }
     // Screenshot stand-ins (scripts/capture-screenshots): NAMESJSON, a JSON
-    // array of strings, relabels the Wi-Fi, Saved, VPN and interface rows
-    // and the header until the dropdown closes; while it is closed the
+    // array of strings, relabels the Wi-Fi, Saved and interface rows, the
+    // VPN status line and the header until the dropdown closes; while it is closed the
     // answer is "closed" and nothing is set. Display only.
     function showcase(namesJson: string): string {
       var call = Showcase.showcaseCall(root.opened, namesJson)
@@ -1444,21 +1444,16 @@ Panel {
   }
 
   // Applies the own-app VPN config file's text, or null when it's missing
-  // (no apps). An invalid file warns once per distinct error, as
-  // araneadev.vpn does.
+  // (no apps). A file with any error is ignored as a whole
+  // (VpnApps.appsToApply) and warns once per distinct error, as
+  // araneadev.vpn does, so both panels read the same file the same way.
   function applyVpnAppsText(text) {
-    var parsed = text === null ? {
-      apps: [],
-      profiles: {},
-      error: ""
-    } : VpnApps.parseAppsConfig(text)
-    if (parsed.error !== "" && parsed.error !== vpnAppsError)
-      console.warn("aranea network: " + Aranea.RuntimePaths.vpnAppsPath + ": " + parsed.error)
-    vpnAppsError = parsed.error
-    vpnAppsConfig = {
-      apps: parsed.apps,
-      profiles: parsed.profiles
-    }
+    var parsed = text === null ? null : VpnApps.parseAppsConfig(text)
+    var error = parsed ? parsed.error : ""
+    if (error !== "" && error !== vpnAppsError)
+      console.warn("aranea network: ignoring " + Aranea.RuntimePaths.vpnAppsPath + ": " + error)
+    vpnAppsError = error
+    vpnAppsConfig = VpnApps.appsToApply(parsed)
   }
 
   // Starts the extras poll (devices, profiles, addresses), or marks it
@@ -1629,26 +1624,22 @@ Panel {
   // Own-app VPN entries from the apps file (vpnAppsFile), for the status
   // line only: VPN control itself lives in araneadev.vpn.
   readonly property var vpnApps: vpnAppsConfig.apps || []
-  // The names of VPNs currently up: NetworkManager VPN/WireGuard
-  // connections from the extras poll, then own-app entries whose
-  // detect.interface matches an up, addressed link in extraLinks
-  // (VpnApps.appState; no process polling here, so a process-only or
-  // dual-detect app never shows as connected from Network).
-  readonly property var vpnUpNames: {
-    var names = []
-    for (var i = 0; i < extraConnections.length; i++) {
-      var c = extraConnections[i]
-      if (c && (c.type === "vpn" || c.type === "wireguard") && c.active)
-        names.push(c.name)
+  // The names of VPNs currently up (VpnApps.upNames): activated
+  // NetworkManager VPN/WireGuard connections from the extras poll, then
+  // own-app entries, by name, whose detect.interface matches an up,
+  // addressed link in extraLinks (no process polling here, so a
+  // process-only or dual-detect app never shows as connected from Network).
+  readonly property var vpnUpNames: VpnApps.upNames(extraConnections, vpnApps, extraLinks)
+  // The VPN status line shown under the header, hidden ("") with nothing
+  // up. With showcase names, the VPNs take stand-ins after the Wi-Fi,
+  // Saved and interface rows' ("VPN N" past the list), never a real name.
+  readonly property string vpnLine: VpnApps.statusLine(showcaseNames.length > 0 ? Showcase.showcaseLabels(vpnUpNames.map(function (name) {
+    return {
+      label: name
     }
-    for (var j = 0; j < vpnApps.length; j++) {
-      if (VpnApps.appState(vpnApps[j], extraLinks, []) === "connected")
-        names.push(vpnApps[j].label)
-    }
-    return names
-  }
-  // The VPN status line shown under the header, hidden ("") with nothing up.
-  readonly property string vpnLine: VpnApps.statusLine(vpnUpNames)
+  }), showcaseNames, "VPN", wifiNetworks.length + savedRows.length + interfaceRows.length).map(function (row) {
+    return row.label
+  }) : vpnUpNames)
 
   // The header title, as stock's heroSsid: "SSID (detail)", "Ethernet
   // (detail)", the interface, or "Disconnected" / "No connection". With
@@ -2161,7 +2152,7 @@ Panel {
   // qmllint disable signal-handler-parameters
   Process {
     id: extrasProc
-    command: ["bash", "-c", "command -v nmcli >/dev/null 2>&1 || exit 0; nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device; echo ---; nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show; echo ---; ip -j -4 -br addr"]
+    command: ["bash", "-c", "command -v nmcli >/dev/null 2>&1 || exit 0; nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device; echo ---; nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP,STATE connection show; echo ---; ip -j -4 -br addr"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.updateExtras(text)

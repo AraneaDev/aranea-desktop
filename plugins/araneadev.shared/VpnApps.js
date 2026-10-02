@@ -1,8 +1,9 @@
 // Shared rules for the own-app VPNs config file
 // (~/.config/aranea/vpn-apps.json), used by araneadev.vpn: parsing both the
 // bare-array and {apps, profiles} object forms, glob matching an interface
-// name, an own-app VPN's detected state and matched interface, and the
-// Network status line shown for every up VPN (NetworkManager and own-app).
+// name, an own-app VPN's detected state and matched interface, which
+// parsed config a panel applies, and the Network status line shown for
+// every up VPN (NetworkManager and own-app).
 // No QML, no I/O; tests/js/vpn-apps.test.js runs this under Node.
 
 /**
@@ -193,8 +194,9 @@ function appState(app, links, procs) {
 
 /**
  * The interface name an own-app VPN's `detect.interface` matches in
- * `links`, for its session IP and traffic graph. Picks the first match
- * regardless of its up state.
+ * `links`, for its session IP and traffic graph: the first match that is
+ * up with an address (`linkIsUp`), so a glob such as `tun*` skips another
+ * VPN's idle tunnel.
  * @param {{detect?: {interface?: string}}|null|undefined} app - the app entry
  * @param {Array<{ifname?: string, operstate?: string, addr_info?: any[]}>|null|undefined} links - parsed `ip -j addr`
  * @returns {string} the matched interface name, or "" with no interface detect or no match
@@ -203,8 +205,46 @@ function appInterface(app, links) {
   var detect = (app && app.detect) || {}
   var pattern = typeof detect.interface === "string" ? detect.interface : ""
   if (!pattern) return ""
-  var matches = matchingLinks(links, pattern)
-  return matches.length > 0 && typeof matches[0].ifname === "string" ? matches[0].ifname : ""
+  var up = matchingLinks(links, pattern).filter(linkIsUp)
+  return up.length > 0 && typeof up[0].ifname === "string" ? up[0].ifname : ""
+}
+
+/**
+ * The apps config a panel applies from a `parseAppsConfig` result: the
+ * whole file is ignored (no apps, no profiles) when it has any error, so a
+ * partly invalid file never shows a partial list. Shared by the VPN panel
+ * and Network's status line, so both read the file the same way.
+ * @param {{apps: VpnApp[], profiles: Record<string, {otp: string}>, error: string}|null|undefined} parsed - the parsed file, or null when it's missing
+ * @returns {{apps: VpnApp[], profiles: Record<string, {otp: string}>}} what to apply
+ */
+function appsToApply(parsed) {
+  if (!parsed || parsed.error !== "") return { apps: [], profiles: {} }
+  return { apps: parsed.apps, profiles: parsed.profiles }
+}
+
+/**
+ * The names of the VPNs up now, for Network's status line: NetworkManager
+ * VPN and WireGuard connections that are active and fully "activated" (not
+ * still activating), then own-app VPNs whose `detect.interface` matches an
+ * up, addressed link (`appState` without process polling, so a process-only
+ * or dual-detect app never shows as up here), by their `name`.
+ * @param {Array<{name: string, type: string, active: boolean, state?: string}|null>|null|undefined} connections - NetworkManager connections (`NetworkLogic.parseConnections`)
+ * @param {VpnApp[]|null|undefined} apps - the applied own-app VPNs
+ * @param {Array<{ifname?: string, operstate?: string, addr_info?: any[]}>|null|undefined} links - parsed `ip -j addr`
+ * @returns {string[]} the names, NetworkManager ones first
+ */
+function upNames(connections, apps, links) {
+  var names = []
+  var conns = Array.isArray(connections) ? connections : []
+  for (var i = 0; i < conns.length; i++) {
+    var c = conns[i]
+    if (c && (c.type === "vpn" || c.type === "wireguard") && c.active && c.state === "activated")
+      names.push(c.name)
+  }
+  var list = Array.isArray(apps) ? apps : []
+  for (var j = 0; j < list.length; j++)
+    if (appState(list[j], links, []) === "connected") names.push(list[j].name)
+  return names
 }
 
 /**
@@ -226,5 +266,7 @@ if (typeof module !== "undefined")
     globMatch: globMatch,
     appState: appState,
     appInterface: appInterface,
+    appsToApply: appsToApply,
+    upNames: upNames,
     statusLine: statusLine
   }

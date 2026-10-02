@@ -265,10 +265,18 @@ test("appState accepts procs as a Set, an array or a plain object", () => {
 
 // --- appInterface --------------------------------------------------------------
 
-test("appInterface returns the matched interface name regardless of up state", () => {
+test("appInterface returns the matched interface only when it's up with an address", () => {
   const app = { detect: { interface: "gpd0" } }
-  assert.equal(logic.appInterface(app, [DOWN]), "gpd0")
+  assert.equal(logic.appInterface(app, [DOWN]), "")
+  assert.equal(logic.appInterface(app, [UP_NO_ADDR]), "")
   assert.equal(logic.appInterface(app, [UP_WITH_ADDR]), "gpd0")
+})
+
+test("appInterface skips a matching interface that isn't up for a later one that is", () => {
+  const app = { detect: { interface: "tun*" } }
+  const nmTun = { ifname: "tun0", operstate: "DOWN", addr_info: [] }
+  const appTun = { ifname: "tun1", operstate: "UNKNOWN", addr_info: [{ local: "10.8.0.2" }] }
+  assert.equal(logic.appInterface(app, [nmTun, appTun]), "tun1")
 })
 
 test("appInterface matches a glob pattern against ifname", () => {
@@ -311,4 +319,40 @@ test("parseAppsConfig drops a later entry repeating a name and says so", () => {
     ["a", "c"]
   )
   assert.equal(out.error, "dropped: A (duplicate name)")
+})
+
+// --- appsToApply ------------------------------------------------------------------
+
+test("appsToApply ignores the whole file on any error", () => {
+  const good = {
+    apps: [{ name: "A", label: "A", detect: {}, open: ["a"] }],
+    profiles: { P: { otp: "challenge" } },
+    error: ""
+  }
+  assert.deepEqual(logic.appsToApply(good), { apps: good.apps, profiles: good.profiles })
+  assert.deepEqual(logic.appsToApply({ ...good, error: "dropped: B" }), { apps: [], profiles: {} })
+  assert.deepEqual(logic.appsToApply(null), { apps: [], profiles: {} })
+})
+
+// --- upNames ------------------------------------------------------------------------
+
+test("upNames lists activated NetworkManager VPNs, then connected apps by name", () => {
+  const conns = [
+    { name: "Office", type: "vpn", active: true, state: "activated" },
+    { name: "Home WG", type: "wireguard", active: true, state: "activated" },
+    { name: "Starting", type: "vpn", active: true, state: "activating" },
+    { name: "Off", type: "vpn", active: false, state: "" },
+    { name: "Wi-Fi", type: "802-11-wireless", active: true, state: "activated" },
+    null
+  ]
+  const apps = [
+    { name: "GlobalProtect (HQ)", label: "GlobalProtect", detect: { interface: "gpd0" }, open: [] },
+    { name: "Azure", label: "Azure VPN Client", detect: { interface: "tun9" }, open: [] }
+  ]
+  assert.deepEqual(logic.upNames(conns, apps, [UP_WITH_ADDR]), [
+    "Office",
+    "Home WG",
+    "GlobalProtect (HQ)"
+  ])
+  assert.deepEqual(logic.upNames(undefined, undefined, undefined), [])
 })

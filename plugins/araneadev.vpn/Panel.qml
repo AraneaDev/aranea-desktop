@@ -248,7 +248,7 @@ Panel {
         index: cursorAt.index
       },
       emptyText: VpnLogic.emptyText(nmOk, flatRows.length),
-      keyHint: VpnLogic.hintFor(promptKey !== "", cursorAt.section, cursorKind, flatRows.length > 0)
+      keyHint: VpnLogic.hintFor(promptKey !== "", cursorAt.section, cursorKind, flatRows.length > 0, cursorActive && CursorLogic.cursorConfirmed(flatRows, cursorKey, cursorFlat))
     })
   // Row key -> {text, busy, failed} (VpnLogic.statusMap).
   readonly property var statusView: fixture ? ({}) : VpnLogic.statusMap({
@@ -257,7 +257,8 @@ Panel {
     waited: actionWaited
   }, {
     key: failedKey,
-    phase: failedPhase
+    phase: failedPhase,
+    name: appFor(failedKey) ? appFor(failedKey).name : ""
   })
   // Row key -> {ip, server, up} (VpnLogic.sessionDetails).
   readonly property var sessionsView: fixture ? fixture.sessions : VpnLogic.sessionDetails(connectedRows, sessions, appIps, upSince, nowMs)
@@ -305,8 +306,9 @@ Panel {
     if (error !== "" && error !== appsError)
       console.warn("aranea vpn: ignoring " + Aranea.RuntimePaths.vpnAppsPath + ": " + error)
     appsError = error
-    // Any error ignores the whole file (VpnLogic.appsToApply).
-    var next = VpnLogic.appsToApply(parsed)
+    // Any error ignores the whole file (VpnApps.appsToApply, shared with
+    // Network's status line).
+    var next = VpnApps.appsToApply(parsed)
     if (JSON.stringify(next) !== JSON.stringify(appsConfig)) {
       appsConfig = next
       poll()
@@ -666,11 +668,19 @@ Panel {
       id: usernameOut
       waitForEnd: true
     }
+    // The dropdown closing meanwhile leaves nowhere to prompt: the connect
+    // reads as failed on its row and the bar icon (VpnLogic.promptOrFail).
     onExited: function (exitCode) {
       var key = root.usernameKey
       root.usernameKey = ""
-      if (root.opened && root.connFor(key))
+      if (key === "")
+        return
+      if (VpnLogic.promptOrFail(root.opened, !!root.connFor(key)) === "prompt") {
         root.openPrompt(key, exitCode === 0 ? VpnLogic.parseUsername(usernameOut.text) : "")
+      } else {
+        root.fail(key, "failedUp")
+        root.raiseAlert()
+      }
     }
   }
 

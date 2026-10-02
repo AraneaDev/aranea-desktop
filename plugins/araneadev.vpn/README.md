@@ -56,7 +56,8 @@ Shift+Tab switch dropdowns; Esc closes. While the prompt is open it owns
 the keys: Enter moves to the next field and connects from the last, Esc
 cancels. The cursor follows the profile it was put on, never a position:
 a row that vanished or moved under it is refused, not replaced, and an
-open (or a reveal) chooses no row until you move or hover.
+open (or a reveal) chooses no row until you move or hover. Until a row
+is chosen, the key hint offers only the moves, Tab and Esc.
 
 ## The config file
 
@@ -87,14 +88,23 @@ A bare array lists the apps:
 ```
 
 - `detect.interface`: a name or glob (`*`, `?`) matched against `ip -j
-addr`; up with an address counts as connected.
-- `detect.process`: a process name matched with `pgrep -x`. With both
+addr`; up with an address counts as connected, and the first matching
+  interface that is up with an address gives the session IP and graph.
+  Prefer the client's own interface name over a glob: `tun*` also matches
+  NetworkManager OpenVPN's `tun0`, so an OpenVPN profile coming up would
+  read as this app being connected too (and could lend it its IP and
+  graph). Where the client always uses the same device, give its exact
+  name, as `gpd0` above; keep a glob such as `tun*` only alongside a
+  `detect.process`, as the Azure entry does, so both have to match.
+- `detect.process`: a process name matched exactly with `pgrep -x` (its
+  characters are literal: a `.` or `+` in it matches only itself). With both
   given, both must match for connected.
   The kernel cuts process names to 15 bytes, so a longer name (such as
   `microsoft-azurevpnclient`) is matched on its first 15 bytes
   (`microsoft-azure`): any process whose name starts with them counts.
 - `open`: an argv array run detached, never through a shell. When its
-  binary isn't on `PATH` the row reads "Couldn't open" for 4 s.
+  binary isn't a program on `PATH` (a shell builtin or alias doesn't count)
+  the row reads "Couldn't open <name>" for 4 s.
 
 The object form adds per-profile settings for NetworkManager VPNs, keyed
 by profile name. `otp` says how the 2FA code is sent: `append` (the
@@ -130,11 +140,17 @@ Target `aranea.vpn`: `open`, `close`, `show`, `hide`, `toggle`, plus two
 display-only screenshot calls, accepted only while the dropdown is open
 and cleared on open and close:
 
-- `showcase '<names JSON>'` relabels the rows in display order;
-- `showcaseFixture '<rows JSON>'` replaces the rows with stand-ins
+- `showcase ' ["Alpha", "Beta"]'` relabels the rows in display order;
+- `showcaseFixture ' [{"name": "Office", "kind": "nm", "connected": true}]'`
+  replaces the rows with stand-ins
   (`[{name, label, kind: "nm"|"app", connected, ip, server, upMinutes}]`),
   so a capture works on a machine without VPNs. Every action is refused
   while a fixture is shown.
+
+Keep the leading space inside the quotes: `qs` reads an argument that
+starts with `[` as a list, not as the JSON string, so
+`omarchy-shell aranea.vpn showcaseFixture ' [...]'` works where `'[...]'`
+doesn't (`scripts/capture-screenshots` does the same).
 
 ## Files
 

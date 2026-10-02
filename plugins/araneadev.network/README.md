@@ -21,7 +21,7 @@ The extras, all hidden when they have nothing to show:
   last 40 samples (60 s), cleared on close.
 - **Interfaces, Saved:** one poll every 4 s while open (and on open):
   `nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device`,
-  `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP connection show` and
+  `nmcli -t -f NAME,UUID,TYPE,DEVICE,ACTIVE,TIMESTAMP,STATE connection show` and
   `ip -j -4 -br addr`, in one `bash -c` that prints nothing without
   `nmcli`. Saved profiles' SSIDs come from
   `nmcli -g 802-11-wireless.ssid connection show uuid <uuid>` (one
@@ -31,11 +31,16 @@ The extras, all hidden when they have nothing to show:
   once it finishes.
 - **VPN status line:** one muted line under the header, "VPN · <name> up"
   (or "VPN · N up"), hidden when nothing is up. It's `VpnApps.statusLine`
-  (`araneadev.shared`) over NetworkManager VPN/WireGuard connections from
-  the same extras poll (active ones) plus own-app VPNs from the optional
+  over `VpnApps.upNames` (`araneadev.shared`): NetworkManager VPN/WireGuard
+  connections from the same extras poll (only fully "activated" ones) plus
+  own-app VPNs, by name, from the optional
   `~/.config/aranea/vpn-apps.json` (`VpnApps.parseAppsConfig`, read through
-  a `FileView`) detected by interface against the same poll's `ip -j -4
--br addr` output (`VpnApps.appState`). Pointer-only: clicking it closes
+  a `FileView`; a file with any error is ignored as a whole,
+  `VpnApps.appsToApply`, as `araneadev.vpn` does) detected by interface
+  against the same poll's `ip -j -4 -br addr` output (`VpnApps.appState`).
+  The `showcase` stand-ins relabel it too. Showing or hiding it moves
+  every section below, so clicks there settle for 300 ms after it does
+  (see `araneadev.shared`'s `ClickSettle.js`). Pointer-only: clicking it closes
   this dropdown and opens `araneadev.vpn`'s
   (`bar.shell.summon("araneadev.vpn")`), which owns every other VPN
   behaviour (connect/disconnect, sessions, uptimes, traffic).

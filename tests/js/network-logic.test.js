@@ -66,7 +66,8 @@ test("parseConnections unescapes a colon in the name and keeps an empty device",
       type: "802-11-wireless",
       device: "",
       active: false,
-      timestamp: 0
+      timestamp: 0,
+      state: ""
     }
   ])
 })
@@ -79,9 +80,21 @@ test("parseConnections reads active and a numeric timestamp", () => {
       type: "802-11-wireless",
       device: "wlp2s0",
       active: true,
-      timestamp: 1700000000
+      timestamp: 1700000000,
+      state: ""
     }
   ])
+})
+
+test("parseConnections reads the activation state when nmcli lists it", () => {
+  assert.equal(
+    logic.parseConnections("Office:uuid-3:vpn:tun0:yes:1700000000:activating")[0].state,
+    "activating"
+  )
+  assert.equal(
+    logic.parseConnections("Office:uuid-3:vpn:tun0:yes:1700000000:activated")[0].state,
+    "activated"
+  )
 })
 
 test("parseConnections treats a non-numeric timestamp as 0 and skips blank/short lines", () => {
@@ -92,7 +105,8 @@ test("parseConnections treats a non-numeric timestamp as 0 and skips blank/short
       type: "802-11-wireless",
       device: "wlp2s0",
       active: false,
-      timestamp: 0
+      timestamp: 0,
+      state: ""
     }
   ])
   assert.deepEqual(logic.parseConnections("\nonly:two"), [])
