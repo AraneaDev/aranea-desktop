@@ -50,6 +50,7 @@
 1	plugins/araneadev.clipboard/Clipboard.qml:missing-property:Member "text" not found on type "QObject"
 3	plugins/araneadev.clipboard/Clipboard.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.clipboard/ClipboardWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+3	plugins/araneadev.clock/BarWidget.qml:missing-property:Member "iconSlot" not found on type "QObject"
 2	plugins/araneadev.clock/ClockDropdown.qml:missing-property:Member "body" not found on type "QObject"
 3	plugins/araneadev.clock/ClockDropdown.qml:missing-property:Member "caption" not found on type "QObject"
 3	plugins/araneadev.clock/ClockDropdown.qml:missing-property:Member "family" not found on type "QObject"

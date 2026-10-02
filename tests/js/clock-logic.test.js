@@ -396,3 +396,24 @@ test("shouldFetchArea: fetches on open, unconfigured, not yet fetched today", ()
 test("shouldFetchArea: no retry once already fetched today", () => {
   assert.equal(logic.shouldFetchArea(null, "2026-10-02", "2026-10-02", true), false)
 })
+
+// --- showcaseCall (the README capture's stand-in place) -----------------------------
+
+test("showcaseCall: refused while closed, whatever the input", () => {
+  const r = logic.showcaseCall(false, '{"name":"Amsterdam","latitude":52.37,"longitude":4.9}')
+  assert.deepEqual(r, { answer: "closed", place: null })
+})
+
+test("showcaseCall: takes a named place with coordinates while open", () => {
+  const r = logic.showcaseCall(true, '{"name":"Amsterdam","latitude":52.37,"longitude":4.9}')
+  assert.deepEqual(r, { answer: "ok", place: { name: "Amsterdam", lat: 52.37, lon: 4.9 } })
+})
+
+test("showcaseCall: refuses a place without a name or coordinates, or out of range", () => {
+  const invalid = { answer: "invalid", place: null }
+  assert.deepEqual(logic.showcaseCall(true, "not json"), invalid)
+  assert.deepEqual(logic.showcaseCall(true, '{"name":"Amsterdam"}'), invalid)
+  assert.deepEqual(logic.showcaseCall(true, '{"latitude":52.37,"longitude":4.9}'), invalid)
+  assert.deepEqual(logic.showcaseCall(true, '{"name":"X","latitude":91,"longitude":4.9}'), invalid)
+  assert.deepEqual(logic.showcaseCall(true, '{"name":"X","latitude":52,"longitude":181}'), invalid)
+})

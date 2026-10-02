@@ -374,6 +374,27 @@ function shouldFetchArea(configured, lastFetchDayKey, todayKey, opened) {
   return true
 }
 
+/**
+ * The answer to the `showcase` IPC call: a display-only stand-in place for
+ * README screenshots, in the weather location file's shape
+ * (`{"name", "latitude", "longitude"}`). It is taken only while the
+ * dropdown is open (the dropdown clears it on open and on close) and only
+ * with coordinates, so the sun row draws from it and never from the real
+ * location.
+ * @param {boolean} opened - the dropdown is open
+ * @param {string|undefined} json - the call's JSON object
+ * @returns {{answer: string, place: Place|null}} "ok" with the place, or
+ *   "closed" / "invalid" with null
+ */
+function showcaseCall(opened, json) {
+  if (!opened) return { answer: "closed", place: null }
+  var place = parseWeatherLocation(json)
+  if (!place || place.lat === null || !place.name) return { answer: "invalid", place: null }
+  if (Math.abs(place.lat) > 90 || Math.abs(/** @type {number} */ (place.lon)) > 180)
+    return { answer: "invalid", place: null }
+  return { answer: "ok", place: place }
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     sunTimes: sunTimes,
@@ -385,5 +406,6 @@ if (typeof module !== "undefined")
     parseWttrArea: parseWttrArea,
     parseWeatherLocation: parseWeatherLocation,
     placeCaption: placeCaption,
-    shouldFetchArea: shouldFetchArea
+    shouldFetchArea: shouldFetchArea,
+    showcaseCall: showcaseCall
   }

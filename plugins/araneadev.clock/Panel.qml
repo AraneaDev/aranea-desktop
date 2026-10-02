@@ -1,19 +1,22 @@
 // Aranea Clock (araneadev.clock, cloned from omarchy.clock): the calendar
-// popup. This is the Task 2 clone: the stock root logic and markup below
-// are unchanged from Omarchy's Clock, so the popup behaves identically
-// until the Aranea-native dropdown view lands in a later task.
-// Temporary for this clone (stock's dynamic root.bar.* access and its lack
-// of ComponentBehavior: Bound); Task 4 removes this once the view is rebuilt.
-// qmllint disable missing-property unqualified
+// dropdown. Stock's root logic stays (month and year stepping, Back to
+// today, the week start setting, the Memento Mori edit, persistSettings,
+// the SystemClock rollover, the hostWidget / barIdentity owner contract,
+// centerOnBar and open / close / toggle). Added here: the sun and moon
+// (the weather location file, else one wttr.in lookup a day on open), the
+// showcase stand-in place for README captures, and handleAction. The pure
+// view, ClockDropdown, draws it in the shared keyboard frame; the sun and
+// moon rules are ClockLogic.js functions, tested under Node.
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "ClockLogic.js" as ClockLogic
+import "../araneadev.shared" as Aranea
 
-// The clock's calendar popup: a month grid with ISO week numbers, built to
-// sit beside the weather panel - same hero-over-detail composition, same
-// spacing scale, same small-caps labels.
+// The clock's calendar popup: a month grid with ISO week numbers.
 //
 // The grid is a read-out rather than a picker: today is the only marked
 // day, and the only thing that moves is which month is on screen -
@@ -96,23 +99,117 @@ Panel {
   // The six-week grid for the viewed month.
   readonly property var weeks: Model.monthGrid(viewYear, viewMonth, weekStart, todayKey)
 
-  // Guarded so the widget renders before the bar is injected (the bar-widget
-  // contract instantiates it bare).
-  readonly property color contentForeground: bar ? bar.foreground : Color.foreground
-  // The content font family, likewise guarded against a bare instantiation.
-  readonly property string contentFontFamily: bar ? bar.fontFamily : Style.font.family
+  // The month grid's rows for the view: stock's weeks without their
+  // trailing all-next-month rows (5 or 6 weeks), each day trimmed to the
+  // key, the day number and whether it is in the viewed month. Today is
+  // the separate todayKey, so the cells never rebuild for it.
+  readonly property var gridWeeks: root.weeks.filter(function (w) {
+    return w.days.some(function (d) {
+      return d.inMonth
+    })
+  }).map(function (w) {
+    return {
+      week: w.week,
+      days: w.days.map(function (d) {
+        return {
+          key: d.key,
+          day: d.day,
+          inMonth: d.inMonth
+        }
+      })
+    }
+  })
 
-  // The day cell width.
-  readonly property int cellWidth: Style.space(52)
-  // The day cell height.
-  readonly property int cellHeight: Style.space(34)
-  // The gap between grid cells.
-  readonly property int cellSpacing: Style.space(2)
-  // The width of the ISO week number column.
-  readonly property int weekColumnWidth: Style.space(32)
-  // The gap between the week column and the day columns.
-  readonly property int gutterWidth: Style.space(14)
+  // The life fields' texts: seeded by startEditingLife, replaced by the
+  // texts a lifeCommit carries, and read by commitLife.
+  property string lifeBornText: ""
+  // The live-to field's text, as lifeBornText.
+  property string lifeLiveToText: ""
 
+  // ---- Sun and moon.
+  // The weather location (stock weather's state file), only when it has
+  // coordinates; null otherwise, which lets the wttr.in lookup run.
+  property var configuredPlace: null
+  // The place wttr.in resolved today ({name, lat, lon}), kept for the
+  // session; null until a lookup succeeds.
+  property var wttrPlace: null
+  // The day key ("yyyy-MM-dd") of the current or last successful wttr.in
+  // lookup; "" again after a failure, so the next open retries.
+  property string areaFetchDay: ""
+  // The README capture's stand-in place (the showcase IPC method); null
+  // outside a capture, and cleared whenever the dropdown opens or closes.
+  property var showcasePlace: null
+  // The time the sun arc and the moon are drawn for: set on open and by
+  // the minute timer while open.
+  property date skyNow: new Date()
+  // The place the sun is computed for: the stand-in, else the configured
+  // location, else wttr.in's.
+  readonly property var skyPlace: showcasePlace || configuredPlace || wttrPlace
+  // Today's sun times at skyPlace (ClockLogic.sunTimes), or null without a
+  // place.
+  readonly property var sunToday: skyPlace && skyPlace.lat !== null ? ClockLogic.sunTimes(skyPlace.lat, skyPlace.lon, today.getFullYear(), today.getMonth() + 1, today.getDate(), -today.getTimezoneOffset()) : null
+  // The view's sky part: the place caption, the sun (hidden without a
+  // place) and the moon (always).
+  readonly property var skyView: {
+    var sun = root.sunToday
+    var sunView = {
+      visible: false
+    }
+    if (sun) {
+      var polar = sun.polar
+      // sunArcPosition reads a polar day as night, so a polar sun takes
+      // its state from polar instead.
+      var arc = polar !== "" ? {
+        t: 0,
+        night: polar === "night"
+      } : ClockLogic.sunArcPosition(root.skyNow.getHours() * 60 + root.skyNow.getMinutes(), sun.sunrise, sun.sunset)
+      sunView = {
+        visible: true,
+        sunrise: polar !== "" ? "" : ClockLogic.formatClock(sun.sunrise),
+        sunset: polar !== "" ? "" : ClockLogic.formatClock(sun.sunset),
+        daylight: polar !== "" ? "" : ClockLogic.daylightText(sun.sunrise, sun.sunset),
+        arcT: arc.t,
+        night: arc.night,
+        polar: polar
+      }
+    }
+    var moon = ClockLogic.moonPhase(root.skyNow.getTime())
+    return {
+      visible: true,
+      place: root.showcasePlace ? root.showcasePlace.name : ClockLogic.placeCaption(root.configuredPlace, root.wttrPlace),
+      sun: sunView,
+      moon: {
+        glyph: ClockLogic.moonGlyph(moon.index),
+        name: moon.name,
+        illumination: moon.illumination
+      }
+    }
+  }
+
+  // The plain view object ClockDropdown draws (see its view property).
+  readonly property var clockView: ({
+      title: root.today.toLocaleDateString(root.labelLocale, "dddd d MMMM"),
+      subtitle: Qt.formatTime(clock.date, "HH:mm") + " · Week " + Model.isoWeek(root.today.getFullYear(), root.today.getMonth(), root.today.getDate()),
+      monthLabel: root.viewDate.toLocaleDateString(root.labelLocale, "MMMM yyyy"),
+      viewingCurrentMonth: root.viewingCurrentMonth,
+      weekdays: root.weekdays.map(function (d) {
+        return root.weekdayLabel(d).slice(0, 2)
+      }),
+      weeks: root.gridWeeks,
+      weekStartLabel: "Start weeks on " + root.nextWeekStartLabel,
+      year: {
+        percent: root.yearDonePercent
+      },
+      life: {
+        visible: root.birthYear > 0,
+        percent: root.lifeDonePercent,
+        born: root.birthYear,
+        liveTo: root.lifeExpectancy,
+        editing: root.editingLife
+      },
+      sky: root.skyView,
+      keyHint: "←→ month · ↑↓ year · t today · tab next"
+    })
   // Refreshes to today and reveals the popup.
   function open() {
     refresh()
@@ -148,17 +245,22 @@ Panel {
 
   // Hands focus to the bar's other open dropdown, if any, for Tab cycling.
   function switchPanel(direction) {
+    // qmllint disable missing-property
     if (root.bar && typeof root.bar.switchPanelFrom === "function")
       return root.bar.switchPanelFrom(root.barIdentity, direction)
+    // qmllint enable missing-property
     return false
   }
 
   // Summoning by hotkey moves no pointer, so a hover the bar was still
   // holding must not keep the center indicators revealed behind the panel.
   function setCenterHoverRevealSuppressed(value) {
+    // qmllint disable missing-property
     if (root.bar && typeof root.bar.setCenterHoverRevealSuppressed === "function")
       root.bar.setCenterHoverRevealSuppressed(value)
-    else if (root.bar && "centerHoverRevealSuppressed" in root.bar)
+    else
+    // qmllint enable missing-property
+    if (root.bar && "centerHoverRevealSuppressed" in root.bar)
       root.bar.centerHoverRevealSuppressed = value
   }
 
@@ -205,8 +307,10 @@ Panel {
     root.settings = entry
     if (root.hostWidget && "settings" in root.hostWidget)
       root.hostWidget.settings = entry
+    // qmllint disable missing-property
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
       root.bar.shell.updateEntryInline(root.moduleName, entry)
+    // qmllint enable missing-property
   }
 
   // Persists a new week start, no-op when it matches the current one.
@@ -219,40 +323,21 @@ Panel {
     })
   }
 
-  // Opens the birth year / life expectancy fields, pre-filled and focused.
+  // Opens the birth year / life expectancy fields, pre-filled and focused
+  // (the view focuses the born field and selects its text).
   function startEditingLife() {
+    root.lifeBornText = root.birthYear > 0 ? String(root.birthYear) : ""
+    root.lifeLiveToText = String(root.lifeExpectancy)
     root.editingLife = true
-    Qt.callLater(function () {
-      bornField.text = root.birthYear > 0 ? String(root.birthYear) : ""
-      expectancyField.text = String(root.lifeExpectancy)
-      bornField.selectAll()
-      bornField.forceActiveFocus()
-    })
   }
 
   // Closes the life fields without saving and returns focus to the grid.
   function cancelEditingLife() {
     root.editingLife = false
     Qt.callLater(function () {
-      if (keyCatcher)
-        keyCatcher.forceActiveFocus()
+      if (panel.focusTarget)
+        panel.focusTarget.forceActiveFocus()
     })
-  }
-
-  // Shared by both fields: Tab hops to the other one, Enter commits the pair,
-  // Escape drops the lot.
-  function handleLifeKey(event, other) {
-    if (event.key === Qt.Key_Escape) {
-      root.cancelEditingLife()
-      event.accepted = true
-    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-      root.commitLife()
-      event.accepted = true
-    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-      other.selectAll()
-      other.forceActiveFocus()
-      event.accepted = true
-    }
   }
 
   // Double-tapping the life bar puts it away again. The expectancy stays in
@@ -268,8 +353,8 @@ Panel {
 
   // Saves the edited birth year and life expectancy, then closes the fields.
   function commitLife() {
-    var born = Model.parseBirthYear(bornField.text, today.getFullYear())
-    var span = Model.parseLifeExpectancy(expectancyField.text)
+    var born = Model.parseBirthYear(root.lifeBornText, today.getFullYear())
+    var span = Model.parseLifeExpectancy(root.lifeLiveToText)
     if (born !== root.birthYear || span !== root.lifeExpectancy)
       persistSettings({
         birthYear: born,
@@ -288,6 +373,74 @@ Panel {
     return String(labelLocale.dayName(weekday, Locale.ShortFormat)).toUpperCase()
   }
 
+  // Runs a ClockDropdown action (see its action signal) through stock's
+  // functions.
+  function handleAction(name, arg) {
+    if (name === "prevMonth")
+      root.moveMonth(-1)
+    else if (name === "nextMonth")
+      root.moveMonth(1)
+    else if (name === "today")
+      root.goToToday()
+    else if (name === "toggleWeekStart")
+      root.toggleWeekStart()
+    else if (name === "wheel") {
+      // Horizontal wheels and touchpad side-scrolls report y === 0;
+      // without this they would every one read as "next month".
+      if (!arg || !arg.dy)
+        return
+      root.moveMonth(arg.dy > 0 ? -1 : 1)
+    } else if (name === "editLife") {
+      if (arg && arg.clear)
+        root.clearLife()
+      else if (!root.editingLife)
+        root.startEditingLife()
+    } else if (name === "lifeCommit") {
+      root.lifeBornText = String(arg && arg.born !== undefined ? arg.born : "")
+      root.lifeLiveToText = String(arg && arg.liveTo !== undefined ? arg.liveTo : "")
+      root.commitLife()
+    } else if (name === "lifeCancel")
+      root.cancelEditingLife()
+  }
+
+  // Reads the weather location file's text into configuredPlace (only a
+  // place with coordinates counts; anything else falls back to wttr.in).
+  function applyLocationText(text) {
+    var place = ClockLogic.parseWeatherLocation(text)
+    root.configuredPlace = place && place.lat !== null ? place : null
+  }
+
+  // Starts today's wttr.in lookup when ClockLogic.shouldFetchArea allows
+  // it: open, no configured location, not yet looked up today.
+  function maybeFetchArea() {
+    var day = Model.keyForDate(new Date())
+    if (areaProc.running || !ClockLogic.shouldFetchArea(root.configuredPlace, root.areaFetchDay, day, root.opened))
+      return
+    root.areaFetchDay = day
+    areaProc.running = true
+  }
+
+  // Takes a wttr.in response: the place on success, else clears the day
+  // key so the next open tries again (no retry loop).
+  function applyArea(text) {
+    var place = ClockLogic.parseWttrArea(text)
+    if (place)
+      root.wttrPlace = place
+    else
+      root.areaFetchDay = ""
+  }
+
+  // The showcase IPC method (forwarded by BarWidget): PLACEJSON, a
+  // {"name", "latitude", "longitude"} object, stands in for the real place
+  // until the dropdown closes. "closed" while closed, "invalid" for a bad
+  // place. Display only.
+  function showcase(placeJson) {
+    var call = ClockLogic.showcaseCall(root.opened, placeJson)
+    if (call.place !== null)
+      root.showcasePlace = call.place
+    return call.answer
+  }
+
   SystemClock {
     id: clock
     precision: SystemClock.Minutes
@@ -301,541 +454,109 @@ Panel {
     }
   }
 
-  KeyboardPanel {
+  // The stand-in place never carries over into an open or past a close; an
+  // open redraws the sky for now and may start today's lookup, and a close
+  // stops a lookup still running.
+  Connections {
+    target: root
+    function onOpenedChanged() {
+      root.showcasePlace = null
+      if (root.opened) {
+        root.skyNow = new Date()
+        locationFile.reload()
+        root.maybeFetchArea()
+      } else if (areaProc.running) {
+        areaProc.running = false
+      }
+    }
+  }
+
+  // Stock weather's location file, watched so an edit takes effect live.
+  FileView {
+    id: locationFile
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/settings/weather.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: locationFile.reload()
+    onLoaded: root.applyLocationText(locationFile.text())
+    onLoadFailed: root.applyLocationText("")
+  }
+
+  // The once-a-day place lookup, only on open and only without a
+  // configured location (maybeFetchArea).
+  Process {
+    id: areaProc
+    command: ["curl", "-fsS", "--max-time", "8", "https://wttr.in/?format=j1"]
+    stdout: StdioCollector {
+      id: areaOut
+      waitForEnd: true
+      onStreamFinished: root.applyArea(areaOut.text)
+    }
+  }
+
+  // Moves the sun arc's dot along once a minute while open.
+  Timer {
+    interval: 60000
+    repeat: true
+    running: root.opened
+    onTriggered: root.skyNow = new Date()
+  }
+
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: root.anchorItem
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
     centerOnBar: true
-    focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(560))
-    contentHeight: panel.fittedContentHeight(calendarColumn.implicitHeight)
+    blocked: root.editingLife
+    contentWidth: panel.fittedContentWidth(Style.space(380))
+    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      dropdown.disarmPointer()
+      root.switchPanel(direction)
+    }
+    onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
+      if (dx !== 0)
+        root.moveMonth(dx)
+      if (dy !== 0)
+        root.moveYear(dy)
+    }
+    onActivateRequested: {
+      dropdown.disarmPointer()
+      root.goToToday()
+    }
+    onTextKey: function (t) {
+      dropdown.disarmPointer()
+      if (t === "[")
+        root.moveMonth(-1)
+      else if (t === "]")
+        root.moveMonth(1)
+      else if (t === "{")
+        root.moveYear(-1)
+      else if (t === "}")
+        root.moveYear(1)
+      else if (t === "t" || t === "T")
+        root.goToToday()
+      else if (t === "w" || t === "W")
+        root.toggleWeekStart()
+    }
 
-    PanelKeyCatcher {
-      id: keyCatcher
+    Item {
       anchors.fill: parent
-      blocked: root.editingLife
-      onMoveRequested: function (dx, dy) {
-        if (dx !== 0)
-          root.moveMonth(dx)
-        if (dy !== 0)
-          root.moveYear(dy)
-      }
-      onActivateRequested: root.goToToday()
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
-      }
-      onTextKey: function (t) {
-        if (t === "[")
-          root.moveMonth(-1)
-        else if (t === "]")
-          root.moveMonth(1)
-        else if (t === "{")
-          root.moveYear(-1)
-        else if (t === "}")
-          root.moveYear(1)
-        else if (t === "t" || t === "T")
-          root.goToToday()
-        else if (t === "w" || t === "W")
-          root.toggleWeekStart()
-      }
+      clip: true
 
-      Flickable {
-        id: calendarScroll
-        anchors.fill: parent
-        contentWidth: calendarColumn.width
-        contentHeight: calendarColumn.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentHeight > height || contentWidth > width
-
-        Column {
-          id: calendarColumn
-          // Never narrower than the grid. The popup width is capped to what
-          // the screen allows, and a fixed seven-column grid would otherwise
-          // lose its last days off the edge instead of scrolling.
-          width: Math.max(calendarScroll.width, gridColumn.width)
-          spacing: Style.space(8)
-
-          // ---- Hero: today, centered. Once the view has stepped back
-          //      it is also the way home - clicking the date you are
-          //      looking for beats hunting for a reset button.
-          Item {
-            width: parent.width
-            height: heroRow.height
-
-            Row {
-              id: heroRow
-              anchors.horizontalCenter: parent.horizontalCenter
-              spacing: Style.space(22)
-
-              Text {
-                // Baseline-aligned, not center-aligned: "July 26" carries a
-                // descender, so centering the two boxes leaves the icon
-                // sitting visibly low against the digits.
-                anchors.baseline: heroDate.baseline
-                text: "󰃭"
-                color: heroMouse.containsMouse ? Style.hoverStateColor(root.contentForeground, Color.accent) : root.contentForeground
-                font.family: root.contentFontFamily
-                // Decorative, and deliberately outside the Style.font.*
-                // scale. Sized so the glyph reads at the cap height of the
-                // date beside it rather than towering over it.
-                font.pixelSize: 48
-              }
-
-              Text {
-                id: heroDate
-                textFormat: Text.PlainText
-                anchors.verticalCenter: parent.verticalCenter
-                text: Qt.formatDate(root.today, "MMMM d")
-                color: heroMouse.containsMouse ? Style.hoverStateColor(root.contentForeground, Color.accent) : root.contentForeground
-                font.family: root.contentFontFamily
-                font.pixelSize: 52
-                font.bold: true
-              }
-            }
-
-            MouseArea {
-              id: heroMouse
-              x: heroRow.x
-              y: heroRow.y
-              width: heroRow.width
-              height: heroRow.height
-              enabled: !root.viewingCurrentMonth
-              hoverEnabled: enabled
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.goToToday()
-
-              PanelToolTip {
-                visible: heroMouse.containsMouse
-                text: "Back to today"
-                fontFamily: root.contentFontFamily
-              }
-            }
-          }
-
-          // ---- Year progress, doubling as the rule under the hero:
-          //      a plain hairline said nothing, and whole days done
-          //      over days in the year says the same thing louder.
-          Item {
-            width: parent.width
-            height: yearBlock.y + yearBlock.height
-
-            Item {
-              id: yearBlock
-              y: Style.space(6)
-              anchors.horizontalCenter: parent.horizontalCenter
-              width: gridColumn.width
-              height: Math.max(yearLabel.implicitHeight, Style.space(10))
-
-              TapHandler {
-                enabled: !root.editingLife
-                onDoubleTapped: root.startEditingLife()
-              }
-
-              Row {
-                visible: root.editingLife
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Style.space(10)
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "BORN"
-                  color: Qt.darker(root.contentForeground, 1.5)
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  font.letterSpacing: 1
-                }
-
-                TextField {
-                  id: bornField
-                  width: Style.space(70)
-                  anchors.verticalCenter: parent.verticalCenter
-                  placeholderText: "year"
-                  foreground: root.contentForeground
-                  font.family: root.contentFontFamily
-                  inputMethodHints: Qt.ImhDigitsOnly
-
-                  Keys.onPressed: function (event) {
-                    root.handleLifeKey(event, expectancyField)
-                  }
-                }
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  anchors.verticalCenterOffset: 0
-                  leftPadding: Style.space(6)
-                  text: "LIVE TO"
-                  color: Qt.darker(root.contentForeground, 1.5)
-                  font.family: root.contentFontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  font.letterSpacing: 1
-                }
-
-                TextField {
-                  id: expectancyField
-                  width: Style.space(60)
-                  anchors.verticalCenter: parent.verticalCenter
-                  placeholderText: "90"
-                  foreground: root.contentForeground
-                  font.family: root.contentFontFamily
-                  inputMethodHints: Qt.ImhDigitsOnly
-
-                  Keys.onPressed: function (event) {
-                    root.handleLifeKey(event, bornField)
-                  }
-                }
-              }
-
-              Text {
-                id: yearLabel
-                textFormat: Text.PlainText
-                visible: !root.editingLife
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.today.getFullYear()
-                color: Qt.darker(root.contentForeground, 1.5)
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.bodySmall
-                font.letterSpacing: 1
-              }
-
-              Text {
-                id: yearPercent
-                textFormat: Text.PlainText
-                visible: !root.editingLife
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.yearDonePercent + "%"
-                color: root.contentForeground
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Rectangle {
-                id: yearTrack
-                visible: !root.editingLife
-                anchors.left: yearLabel.right
-                anchors.right: yearPercent.left
-                anchors.leftMargin: Style.space(12)
-                anchors.rightMargin: Style.space(12)
-                anchors.verticalCenter: parent.verticalCenter
-                height: Style.space(6)
-                radius: Style.cornerRadius > 0 ? height / 2 : 0
-                color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.12)
-
-                Rectangle {
-                  width: Math.round(parent.width * root.yearDone)
-                  height: parent.height
-                  radius: parent.radius
-                  color: Style.selectedStateColor(root.contentForeground, Color.accent)
-
-                  Behavior on width {
-                    NumberAnimation {
-                      duration: 160
-                      easing.type: Easing.OutCubic
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          // ---- Memento mori. Only here once someone has gone looking and
-          //      given an age; the same rail as the year above it, measured
-          //      against a nominal lifetime.
-          Item {
-            visible: root.birthYear > 0
-            width: parent.width
-            height: visible ? lifeBlock.height : 0
-
-            Item {
-              id: lifeBlock
-              anchors.horizontalCenter: parent.horizontalCenter
-              width: gridColumn.width
-              height: Math.max(lifeLabel.implicitHeight, Style.space(10))
-
-              Text {
-                id: lifeLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "LIFE"
-                color: Qt.darker(root.contentForeground, 1.5)
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.bodySmall
-                font.letterSpacing: 1
-              }
-
-              Text {
-                id: lifePercent
-                textFormat: Text.PlainText
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.lifeDonePercent + "%"
-                color: root.contentForeground
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Rectangle {
-                anchors.left: lifeLabel.right
-                anchors.right: lifePercent.left
-                anchors.leftMargin: Style.space(12)
-                anchors.rightMargin: Style.space(12)
-                anchors.verticalCenter: parent.verticalCenter
-                height: Style.space(6)
-                radius: Style.cornerRadius > 0 ? height / 2 : 0
-                color: Qt.rgba(root.contentForeground.r, root.contentForeground.g, root.contentForeground.b, 0.12)
-
-                Rectangle {
-                  width: Math.round(parent.width * root.lifeDone)
-                  height: parent.height
-                  radius: parent.radius
-                  color: Style.selectedStateColor(root.contentForeground, Color.accent)
-
-                  Behavior on width {
-                    NumberAnimation {
-                      duration: 160
-                      easing.type: Easing.OutCubic
-                    }
-                  }
-                }
-              }
-
-              TapHandler {
-                onDoubleTapped: root.clearLife()
-              }
-
-              MouseArea {
-                id: lifeMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.NoButton
-
-                PanelToolTip {
-                  visible: lifeMouse.containsMouse
-                  text: "Memento Mori"
-                  fontFamily: root.contentFontFamily
-                }
-              }
-            }
-          }
-
-          // ---- Month grid: week numbers down a gutter on the left, then
-          //      the seven day columns. Always six rows, so the popup is
-          //      exactly as tall in February as it is in August.
-          Item {
-            width: parent.width
-            height: gridColumn.y + gridColumn.height
-
-            WheelHandler {
-              onWheel: function (event) {
-                // Horizontal wheels and touchpad side-scrolls report y === 0;
-                // without this they would every one read as "next month".
-                if (event.angleDelta.y === 0)
-                  return
-                root.moveMonth(event.angleDelta.y > 0 ? -1 : 1)
-              }
-            }
-
-            Column {
-              id: gridColumn
-              // The meter above is a solid rule; the grid needs room to
-              // read as its own block rather than hanging off it.
-              y: Style.space(18)
-              anchors.horizontalCenter: parent.horizontalCenter
-              spacing: Style.space(3)
-
-              Row {
-                id: headerRow
-                spacing: root.cellSpacing
-
-                // The week-number heading doubles as the week-start toggle.
-                // It is the one control in the panel whose meaning is not
-                // self-evident, so it carries a tooltip naming the day the
-                // click will switch to.
-                Rectangle {
-                  width: root.weekColumnWidth
-                  height: Style.space(16)
-                  radius: Style.cornerRadius
-                  color: weekStartMouse.containsMouse ? Style.hoverFillFor(root.contentForeground, Color.accent) : "transparent"
-
-                  Text {
-                    anchors.centerIn: parent
-                    text: "W"
-                    color: weekStartMouse.containsMouse ? Style.hoverStateColor(root.contentForeground, Color.accent) : Qt.darker(root.contentForeground, 1.9)
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                    font.letterSpacing: 1
-                    font.bold: true
-                  }
-
-                  MouseArea {
-                    id: weekStartMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.toggleWeekStart()
-                  }
-
-                  PanelToolTip {
-                    visible: weekStartMouse.containsMouse
-                    text: "Start weeks on " + root.nextWeekStartLabel
-                    fontFamily: root.contentFontFamily
-                  }
-                }
-
-                Item {
-                  width: root.gutterWidth
-                  height: Style.space(16)
-                }
-
-                Repeater {
-                  model: root.weekdays
-
-                  Text {
-                    textFormat: Text.PlainText
-                    required property var modelData
-                    width: root.cellWidth
-                    height: Style.space(16)
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: root.weekdayLabel(modelData)
-                    color: Qt.darker(root.contentForeground, 1.5)
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                    font.letterSpacing: 1
-                    font.bold: true
-                  }
-                }
-              }
-
-              Repeater {
-                model: root.weeks
-
-                Row {
-                  required property var modelData
-                  spacing: root.cellSpacing
-
-                  Text {
-                    textFormat: Text.PlainText
-                    width: root.weekColumnWidth
-                    height: root.cellHeight
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: modelData.week
-                    color: Qt.darker(root.contentForeground, 1.9)
-                    font.family: root.contentFontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-
-                  Item {
-                    width: root.gutterWidth
-                    height: root.cellHeight
-                  }
-
-                  Repeater {
-                    model: modelData.days
-
-                    Rectangle {
-                      required property var modelData
-
-                      width: root.cellWidth
-                      height: root.cellHeight
-                      radius: Style.cornerRadius
-                      // Today is outlined, not filled: a lit-up block shouts
-                      // over a grid this quiet.
-                      color: "transparent"
-                      border.width: modelData.today ? Style.spacing.hairline : 0
-                      border.color: Style.normalBorderFor(root.contentForeground, Color.accent)
-
-                      Text {
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: modelData.day
-                        color: modelData.inMonth ? (modelData.weekend ? Qt.darker(root.contentForeground, 1.45) : root.contentForeground) : Qt.darker(root.contentForeground, 2.2)
-                        font.family: root.contentFontFamily
-                        font.pixelSize: Style.font.body
-                        font.bold: modelData.today
-                      }
-                    }
-                  }
-                }
-              }
-            }
-
-            // Hairline down the week-number gutter, drawn only beside the
-            // day rows so it does not cut through the header band.
-            Rectangle {
-              x: gridColumn.x + root.weekColumnWidth + root.cellSpacing + Math.round((root.gutterWidth - width) / 2)
-              y: gridColumn.y + headerRow.height + gridColumn.spacing
-              width: Style.spacing.hairline
-              height: gridColumn.height - headerRow.height - gridColumn.spacing
-              color: root.contentForeground
-              opacity: 0.1
-            }
-          }
-
-          // ---- Month stepping, spanning the grid it drives. The chevrons
-          //      sit on the grid's outer bounds, the same edges the year
-          //      rail above uses, so the row reads as the panel's other
-          //      full-width rail instead of a cluster floating in space.
-          //      The label is centered and fixed-width, so it holds still
-          //      from "MAY" to "SEPTEMBER".
-          Item {
-            width: parent.width
-            height: monthNav.height
-
-            Item {
-              id: monthNav
-              anchors.horizontalCenter: parent.horizontalCenter
-              width: gridColumn.width
-              height: monthLabel.implicitHeight + Style.space(10)
-
-              Text {
-                id: monthLabel
-                textFormat: Text.PlainText
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                // Fixed width so the chevrons hold still between a
-                // "MAY 2026" and a "SEPTEMBER 2026".
-                width: Style.space(130)
-                horizontalAlignment: Text.AlignHCenter
-                text: Qt.formatDate(root.viewDate, "MMMM yyyy").toUpperCase()
-                color: Qt.darker(root.contentForeground, 1.4)
-                font.family: root.contentFontFamily
-                font.pixelSize: Style.font.body
-                font.letterSpacing: 1
-              }
-
-              PanelActionButton {
-                // Pulled out by the button's own padding so the glyph, not
-                // its hit box, lines up with the "2026" on the year rail.
-                anchors.left: parent.left
-                anchors.leftMargin: -Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                iconText: "󰅁"
-                tooltipText: "Previous month"
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                onClicked: root.moveMonth(-1)
-              }
-
-              PanelActionButton {
-                anchors.right: parent.right
-                anchors.rightMargin: -Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                iconText: "󰅂"
-                tooltipText: "Next month"
-                foreground: root.contentForeground
-                fontFamily: root.contentFontFamily
-                onClicked: root.moveMonth(1)
-              }
-            }
-          }
+      ClockDropdown {
+        id: dropdown
+        width: parent.width
+        view: root.clockView
+        todayKey: root.todayKey
+        bornText: root.lifeBornText
+        liveToText: root.lifeLiveToText
+        onAction: function (name, arg) {
+          root.handleAction(name, arg)
         }
       }
     }

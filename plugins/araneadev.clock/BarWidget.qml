@@ -1,11 +1,8 @@
 // Aranea Clock (araneadev.clock, cloned from omarchy.clock): the bar's
-// date/time label and the host for the calendar popup. This is the Task 2
-// clone: the stock root logic, markup and IPC target below are unchanged
-// from Omarchy's Clock, so the bar entry keeps working identically while
-// the Aranea-native dropdown view lands in a later task.
-// Temporary for this clone (stock's dynamic root.bar.* access and its lack
-// of ComponentBehavior: Bound); Task 4 removes this once the view is rebuilt.
-// qmllint disable missing-property unqualified
+// date/time label and the host for the calendar dropdown. Stock's root
+// logic, label markup and IPC target stay; the one addition is the
+// showcase IPC method, forwarded to the dropdown for README captures.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -50,8 +47,10 @@ BarWidget {
   // refresh method and the periodic poll both call this).
   function refresh() {
     displayDate = new Date()
+    // qmllint disable missing-property
     if (panelLoader.item && panelLoader.item.refresh)
       panelLoader.item.refresh()
+    // qmllint enable missing-property
   }
 
   // Right click: advances to the next format in formatRing and persists it.
@@ -71,8 +70,10 @@ BarWidget {
     // Applied locally first so the label changes on the click itself; the
     // shell.json write comes back through the bar as the same value.
     root.settings = entry
+    // qmllint disable missing-property
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
       root.bar.shell.updateEntryInline(root.moduleName, entry)
+    // qmllint enable missing-property
   }
 
   // Renders date against activeFormat, substituting the ISO week token.
@@ -83,30 +84,50 @@ BarWidget {
   // ---- Calendar popup. Shape contract for shell.summon/hide/toggle
   //      routing: Bar.findPanelWidget requires open/close/opened on the
   //      bar-widget root.
+  // qmllint disable missing-property
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
+  // qmllint enable missing-property
 
   // Opens the calendar popup.
   function open() {
+    // qmllint disable missing-property
     if (panelLoader.item)
       panelLoader.item.open()
+    // qmllint enable missing-property
   }
 
   // Closes the calendar popup.
   function close() {
+    // qmllint disable missing-property
     if (panelLoader.item)
       panelLoader.item.close()
+    // qmllint enable missing-property
+  }
+
+  // Forwards the showcase IPC method's stand-in place to the popup; "closed"
+  // before it has loaded.
+  function showcase(placeJson) {
+    // qmllint disable missing-property
+    if (panelLoader.item && typeof panelLoader.item.showcase === "function")
+      return panelLoader.item.showcase(placeJson)
+    // qmllint enable missing-property
+    return "closed"
   }
 
   // Opens the popup if closed, closes it if open.
   function togglePanel() {
+    // qmllint disable missing-property
     if (panelLoader.item)
       panelLoader.item.toggle()
+    // qmllint enable missing-property
   }
 
   // Forwards the "W" week-start toggle to the popup (used by the IPC method).
   function toggleWeekStart() {
+    // qmllint disable missing-property
     if (panelLoader.item)
       panelLoader.item.toggleWeekStart()
+    // qmllint enable missing-property
   }
 
   // The clock fills more slot than it paints a mark for, at both
@@ -121,12 +142,16 @@ BarWidget {
   // Forwarded so this widget can stand in for the panel as the bar's popout
   // identity: Bar.requestPopout prefers closeForPopoutSwitch over close, and
   // KeyboardPanel reads popoutSwitchClosing back off its owner.
+  // qmllint disable missing-property
   readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
+  // qmllint enable missing-property
 
   // Closes the popup for a popout hand-off rather than a normal dismissal.
   function closeForPopoutSwitch() {
+    // qmllint disable missing-property
     if (panelLoader.item)
       panelLoader.item.closeForPopoutSwitch()
+    // qmllint enable missing-property
   }
 
   // Hands the loaded Panel.qml instance the bar, settings and anchor it
@@ -196,6 +221,13 @@ BarWidget {
     function toggle(): void {
       root.togglePanel()
     }
+    // Screenshot stand-in (scripts/capture-screenshots): PLACEJSON, a
+    // {"name", "latitude", "longitude"} object, replaces the sun and moon
+    // place until the dropdown closes; while it is closed the answer is
+    // "closed" and nothing is set. Display only.
+    function showcase(placeJson: string): string {
+      return root.showcase(placeJson)
+    }
   }
 
   WidgetButton {
@@ -213,8 +245,10 @@ BarWidget {
       if (b === Qt.RightButton)
         root.cycleFormat()
       else if (b === Qt.MiddleButton) {
+        // qmllint disable missing-property
         if (root.bar)
           root.bar.run("omarchy-menu-timezone")
+        // qmllint enable missing-property
       } else
         root.togglePanel()
     }
