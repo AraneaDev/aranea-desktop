@@ -442,7 +442,11 @@ function secretsStdin(password, code, mode) {
 
 /**
  * Whether nmcli's stderr says a non-interactive connect needs secrets it
- * wasn't given.
+ * wasn't given. Covers nmcli's own "secrets were required" / "no secrets"
+ * messages, the "passwords or encryption keys" phrasing, and
+ * "no valid secrets" (nmcli's text for the active-connection reason
+ * NO_SECRETS, logged by NetworkManager as "No agents were available for
+ * this request").
  * @param {string|undefined} stderr - the failed `nmcli connection up`'s stderr
  * @returns {boolean} true when secrets are needed
  */
@@ -451,6 +455,7 @@ function needsSecrets(stderr) {
   return (
     s.indexOf("secrets were required") !== -1 ||
     s.indexOf("no secrets") !== -1 ||
+    s.indexOf("no valid secrets") !== -1 ||
     s.indexOf("passwords or encryption keys are required") !== -1
   )
 }

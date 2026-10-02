@@ -424,6 +424,17 @@ test("needsSecrets is false on unrelated stderr, and never throws on missing inp
   assert.equal(logic.needsSecrets(""), false)
 })
 
+test("needsSecrets matches nmcli's NO_SECRETS reason text, case-insensitively", () => {
+  assert.equal(
+    logic.needsSecrets(
+      "Error: Connection activation failed: No valid secrets\n" +
+        "Hint: use 'journalctl -xe NM_CONNECTION=...' to get more details."
+    ),
+    true
+  )
+  assert.equal(logic.needsSecrets("NO VALID SECRETS"), true)
+})
+
 // --- isAuthFailure ---------------------------------------------------------------
 
 test("isAuthFailure is true for anything needsSecrets matches", () => {
@@ -812,6 +823,14 @@ test("connectOutcome sorts nmcli exits into ok, prompt, wrong and failed", () =>
   assert.equal(logic.connectOutcome(4, "VPN authentication failed", true), "wrong")
   assert.equal(logic.connectOutcome(4, "Error: timeout", true), "failed")
   assert.equal(logic.connectOutcome(4, "VPN authentication failed", false), "failed")
+})
+
+test("connectOutcome opens the prompt for nmcli's NO_SECRETS wording, and reopens it as wrong on a rejected password", () => {
+  const stderr =
+    "Error: Connection activation failed: No valid secrets\n" +
+    "Hint: use 'journalctl -xe NM_CONNECTION=...' to get more details."
+  assert.equal(logic.connectOutcome(4, stderr, false), "prompt")
+  assert.equal(logic.connectOutcome(4, stderr, true), "wrong")
 })
 
 test("droppedKeys flags only rows that went from Connected to Available unbidden", () => {
