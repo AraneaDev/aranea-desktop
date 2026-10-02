@@ -124,6 +124,9 @@ Panel {
   property bool nightOn: false
   // The night light row's caption (DisplaysLogic.nightlightCaption).
   property string nightCaption: "Off"
+  // The night light temperature as read (K), or null with none; the
+  // toggle's prediction depends on it (DisplaysLogic.nightToggleTarget).
+  property var nightTemperature: null
   // The night light state asked for but not yet confirmed by a re-read, or
   // null for none. Shown at once and pulsing busy.
   property var nightPending: null
@@ -267,13 +270,14 @@ Panel {
       },
       textStops: textSizeStops,
       scales: scaleRows,
+      scaleCaption: DisplaysLogic.scaleCaption(selectedScaleKey, pendingScale, focusedDisplay ? effectiveScale(monitorScale) : ""),
       displays: displayRows,
       cursor: {
         active: cursorActive && keyboardCursor,
         section: focusSection,
         index: selectedIndex
       },
-      keyHint: DisplaysLogic.keyHint(focusSection)
+      keyHint: DisplaysLogic.keyHint(focusSection, kbdMode)
     })
 
   // The rows of SECTION for the keyed cursor: the scale pills, the display
@@ -729,11 +733,20 @@ Panel {
   }
 
   // Asks for text stop IDX: previews it at once (pulsing busy) and runs
-  // the CLI.
+  // the CLI; textPreviewTimeout drops the preview if the base size never
+  // follows.
   function requestTextStop(idx) {
     markReflowing()
     textSizePreviewIndex = idx
+    textPreviewTimeout.restart()
     setTextSize(textSizeStops[idx])
+  }
+
+  // The base size never followed a text-size request within 5 s: drops
+  // the preview and any queued size, so the slider shows the real size.
+  function textPreviewTimedOut() {
+    root.textSizePreviewIndex = -1
+    root.queuedTextPx = 0
   }
 
   // textScaleProc exited with EXITCODE: runs the queued size, else drops a
@@ -762,6 +775,7 @@ Panel {
     var state = DisplaysLogic.parseNightlight(text)
     root.nightAvailable = state.available
     root.nightOn = state.enabled
+    root.nightTemperature = state.temperature
     root.nightCaption = DisplaysLogic.nightlightCaption(state)
     if (typeof root.nightPending !== "boolean" || nightToggleProc.running)
       return
@@ -769,15 +783,22 @@ Panel {
       root.nightPending = null
   }
 
-  // Flips the night light: shown at once (nightPending, pulsing busy). A
-  // flip while the toggle runs only changes what is asked for; the exit
-  // handler toggles again if it still differs (the last one wins).
+  // Flips the night light, only while its row shows: the state the toggle
+  // will leave is shown at once (nightPending, pulsing busy). From a read
+  // that is the script's own rule (DisplaysLogic.nightToggleTarget: an odd
+  // temperature ends off); from a pending request, its opposite. A flip
+  // while the toggle runs only changes what is asked for; the exit handler
+  // toggles again if it still differs (the last one wins).
   function toggleNightlight() {
-    var shown = typeof root.nightPending === "boolean" ? root.nightPending : root.nightOn
-    root.nightPending = !shown
+    if (visibleSections.indexOf("nightlight") < 0)
+      return
+    var target = typeof root.nightPending === "boolean" ? !root.nightPending : DisplaysLogic.nightToggleTarget({
+      temperature: root.nightTemperature
+    })
+    root.nightPending = target
     if (nightToggleProc.running)
       return
-    runNightToggle(!shown)
+    runNightToggle(target)
   }
 
   // Starts omarchy-toggle-nightlight, which will leave the light at TARGET.
@@ -839,10 +860,11 @@ Panel {
     return root.kbdPending >= 0 ? root.kbdPending : root.kbdValue
   }
 
-  // Sets the keyboard light to VALUE (clamped to 0..kbdMax): shown at once
-  // (kbdPending), queued behind a running set, the last one winning.
+  // Sets the keyboard light to VALUE (clamped to 0..kbdMax), only while its
+  // row shows: shown at once (kbdPending), queued behind a running set, the
+  // last one winning.
   function setKbd(value) {
-    if (root.kbdDevice === "" || root.kbdMax <= 0)
+    if (root.kbdDevice === "" || root.kbdMax <= 0 || visibleSections.indexOf("kbdlight") < 0)
       return
     var level = Math.max(0, Math.min(root.kbdMax, Math.round(Number(value) || 0)))
     if (level === kbdShownLevel())
@@ -1115,6 +1137,16 @@ Panel {
     }
   }
 
+  // Drops a text-size preview the base size never followed (see
+  // textPreviewTimedOut).
+  Timer {
+    id: textPreviewTimeout
+    interval: 5000
+    repeat: false
+    onTriggered: if (root.textSizePreviewIndex >= 0)
+      root.textPreviewTimedOut()
+  }
+
   // Clears the hover-suppression flag once the reflow triggered by a text-size
   // change has settled.
   Timer {
@@ -1229,6 +1261,8 @@ Panel {
         width: parent.width
         view: root.displaysView
         brightnessPercent: root.brightnessPercent
+        brightnessBusy: setBrightnessProc.running || root.brightnessSetQueued
+        reflowing: root.reflowingText
         nightlightOn: root.nightOn
         nightlightCaption: root.nightCaption
         nightlightPending: root.nightPending

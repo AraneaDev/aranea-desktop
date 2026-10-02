@@ -6,9 +6,10 @@
 // the header caption (`Model.cleanScale`'s companion), the pending/queue
 // helpers (araneadev.power's `PowerLogic` pattern), the last-display guard
 // (never switch off the last display confirmed on), the focus-checked
-// scale command, what runs when the scale/display command exits, and the
-// keyboard hint. No QML, no I/O; tests/js/displays-logic.test.js runs this
-// under Node.
+// scale command, what runs when the scale/display command exits, the
+// night light toggle's prediction, the SCALE caption and the keyboard
+// hint. No QML, no I/O; tests/js/displays-logic.test.js runs this under
+// Node.
 
 /**
  * The night light's parsed status, from `omarchy-toggle-nightlight
@@ -386,12 +387,45 @@ function nextAction(state) {
 }
 
 /**
- * The key-hint line for the cursor's section.
+ * The night light state `omarchy-toggle-nightlight` will leave, for the
+ * instant prediction: on (4000 K) only from no temperature or exactly
+ * 6500 K; from any other temperature it sets 6500 K, so an odd one such as
+ * 6200 K (which `--status` already reads as off) is treated as off.
+ * @param {{temperature?: number|null}|null|undefined} state - from `parseNightlight`
+ * @returns {boolean} true when the toggle will turn the light on
+ */
+function nightToggleTarget(state) {
+  var t = (state || {}).temperature
+  return typeof t !== "number" || t === 6500
+}
+
+/**
+ * The SCALE caption's trailing text: "<scale>× · custom" while the focused
+ * display's scale matches no preset (and none is pending), else "".
+ * @param {string|null|undefined} selectedKey - the preset the scale matches, "" for none
+ * @param {string|null|undefined} pendingKey - a scale asked for, "" for none
+ * @param {string|null|undefined} scale - the already-`Model.cleanScale`d scale string
+ * @returns {string} e.g. "2.67× · custom", or ""
+ */
+function scaleCaption(selectedKey, pendingKey, scale) {
+  if (selectedKey || pendingKey || !scale) return ""
+  return trimScale(scale) + "× · custom"
+}
+
+/**
+ * The key-hint line for the cursor's section; the keyboard light toggles
+ * with enter in switch mode and adjusts with the arrows as a slider.
  * @param {string|undefined} section - the cursor's section
+ * @param {string} [kbdMode] - the keyboard light's control (`kbdMode`)
  * @returns {string} the hint
  */
-function keyHint(section) {
-  if (section === "nightlight" || section === "monitors") return "↑↓ move · enter toggle · tab next"
+function keyHint(section, kbdMode) {
+  if (
+    section === "nightlight" ||
+    section === "monitors" ||
+    (section === "kbdlight" && kbdMode === "switch")
+  )
+    return "↑↓ move · enter toggle · tab next"
   if (section === "scale") return "↑↓ move · ←→ pick · tab next"
   if (section === "brightness" || section === "kbdlight" || section === "textsize")
     return "↑↓ move · ←→ adjust · tab next"
@@ -415,5 +449,7 @@ if (typeof module !== "undefined")
     lastEnabledName: lastEnabledName,
     scaleCommand: scaleCommand,
     nextAction: nextAction,
+    nightToggleTarget: nightToggleTarget,
+    scaleCaption: scaleCaption,
     keyHint: keyHint
   }

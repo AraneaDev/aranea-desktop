@@ -6,7 +6,8 @@
 // step (a drag previews with it); committed reports where a drag or click
 // was let go, or a wheel step landed. A busy slider (a change in flight)
 // breathes its node; a clickGate refuses a press aimed before a layout
-// shift, as FilamentSwitch's does.
+// shift, as FilamentSwitch's does. Opt-in (gateWheel), the wheel is refused
+// the same way, and while wheelHeld (e.g. during a text-size reflow).
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -38,8 +39,14 @@ Item {
   property real pulseOpacity: 1
   // Optional item whose clickSettled() a left press must pass; a refused
   // press neither moves nor commits. null (default) never refuses one.
-  // The wheel and wheelBy() stay unguarded.
+  // The wheel stays unguarded unless gateWheel; wheelBy() always does.
   property var clickGate: null
+  // Opt-in, off by default: when true, a wheel step must also pass
+  // clickGate's clickSettled() and is ignored while wheelHeld.
+  property bool gateWheel: false
+  // With gateWheel, ignore wheel steps while true (e.g. while the host's
+  // layout is reflowing under the pointer).
+  property bool wheelHeld: false
   // Lit fraction of the strand, 0..1.
   readonly property real progress: Math.max(0, Math.min(1, (liveValue - minimum) / Math.max(0.0001, maximum - minimum)))
   // Colour of the lit strand and the node when muted.
@@ -75,6 +82,16 @@ Item {
     liveValue = next
     moved(next)
     committed(next)
+  }
+
+  // Whether a real wheel step may move the slider: always without
+  // gateWheel; with it, never while wheelHeld or before clickGate settles.
+  function wheelAllowed() {
+    if (!gateWheel)
+      return true
+    if (wheelHeld)
+      return false
+    return !clickGate || clickGate.clickSettled()
   }
 
   onValueChanged: if (!dragging)
@@ -249,7 +266,8 @@ Item {
         slider.rightClicked()
     }
     onWheel: function (wheel) {
-      slider.wheelBy(wheel.angleDelta.y)
+      if (slider.wheelAllowed())
+        slider.wheelBy(wheel.angleDelta.y)
       wheel.accepted = true
     }
   }

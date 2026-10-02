@@ -37,6 +37,9 @@ Column {
   property bool kbdCursor: false
   // The dropdown's PointerMoveGate (with layoutChangedAt).
   property var pointerGate: null
+  // Whether the dropdown is reflowing (a text-size change): the keyboard
+  // light slider ignores the wheel meanwhile.
+  property bool reflowing: false
 
   // Emitted when the night light switch is clicked.
   signal nightToggled
@@ -139,6 +142,8 @@ Column {
         value: toggles.kbdLevel
         busy: toggles.kbdBusy
         clickGate: kbdSliderRow
+        gateWheel: true
+        wheelHeld: toggles.reflowing
         onCommitted: function (value) {
           var level = Math.max(0, Math.min(toggles.kbdMax, Math.round(value)))
           if (level !== toggles.kbdLevel)

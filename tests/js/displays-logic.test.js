@@ -711,3 +711,57 @@ test("nextAction: never mutates the maps it is given", () => {
   assert.deepEqual(state.queuedDisplays, { "eDP-1": false })
   assert.deepEqual(state.pendingDisplays, { "DP-2": true, "eDP-1": false })
 })
+
+// --- nightToggleTarget (the state omarchy-toggle-nightlight will leave) -------------
+//
+// The script sets 4000 K only from no temperature or exactly 6500 K; from any
+// other temperature (4000 K, or an odd one such as 6200 K that --status already
+// reads as off) it sets 6500 K, i.e. off.
+
+test("nightToggleTarget: off at 6500 K, or with no temperature, turns on", () => {
+  assert.equal(logic.nightToggleTarget({ enabled: false, temperature: 6500 }), true)
+  assert.equal(logic.nightToggleTarget({ enabled: false, temperature: null }), true)
+})
+
+test("nightToggleTarget: on turns off", () => {
+  assert.equal(logic.nightToggleTarget({ enabled: true, temperature: 4000 }), false)
+  assert.equal(logic.nightToggleTarget({ enabled: true, temperature: 5000 }), false)
+})
+
+test("nightToggleTarget: an odd temperature (6000-6499 K) is treated as off: the script sets 6500 K", () => {
+  assert.equal(logic.nightToggleTarget({ enabled: false, temperature: 6000 }), false)
+  assert.equal(logic.nightToggleTarget({ enabled: false, temperature: 6200 }), false)
+  assert.equal(logic.nightToggleTarget({ enabled: false, temperature: 6499 }), false)
+})
+
+test("nightToggleTarget: missing state predicts on (no temperature) without throwing", () => {
+  assert.equal(logic.nightToggleTarget(undefined), true)
+  assert.equal(logic.nightToggleTarget(null), true)
+})
+
+// --- keyHint with the keyboard light mode ------------------------------------------
+
+test("keyHint: the keyboard light switch toggles with enter", () => {
+  assert.equal(logic.keyHint("kbdlight", "switch"), "↑↓ move · enter toggle · tab next")
+})
+
+test("keyHint: the keyboard light slider adjusts with the arrow keys", () => {
+  assert.equal(logic.keyHint("kbdlight", "slider"), "↑↓ move · ←→ adjust · tab next")
+})
+
+// --- scaleCaption -----------------------------------------------------------------
+
+test("scaleCaption: a scale no preset matches reads custom", () => {
+  assert.equal(logic.scaleCaption("", "", "2.67"), "2.67× · custom")
+  assert.equal(logic.scaleCaption("", "", "1.500"), "1.5× · custom")
+})
+
+test("scaleCaption: nothing while a preset matches or one is pending", () => {
+  assert.equal(logic.scaleCaption("2", "", "2"), "")
+  assert.equal(logic.scaleCaption("", "3", "2.67"), "")
+})
+
+test("scaleCaption: nothing with no scale read", () => {
+  assert.equal(logic.scaleCaption("", "", ""), "")
+  assert.equal(logic.scaleCaption(undefined, undefined, undefined), "")
+})

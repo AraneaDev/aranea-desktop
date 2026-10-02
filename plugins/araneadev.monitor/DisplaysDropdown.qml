@@ -28,12 +28,18 @@ Column {
   // View state built by Panel.displaysView: {header: {title, caption,
   // glyph?}, brightness: {visible, label (the level name)}, nightlight:
   // {visible}, kbd: {visible, mode ("switch" or "slider"), max},
-  // textStops: [px], scales: [{key (the scale value), label}], displays:
-  // [{key (the monitor name), label, detail, glyph}], cursor: {active,
-  // section, index}, keyHint}. The rows carry no selected or enabled flag.
+  // textStops: [px], scales: [{key (the scale value), label}],
+  // scaleCaption (e.g. "2.67× · custom", or ""), displays: [{key (the
+  // monitor name), label, detail, glyph}], cursor: {active, section,
+  // index}, keyHint}. The rows carry no selected or enabled flag.
   property var view: ({})
   // The focused display's brightness, 0..100.
   property real brightnessPercent: 0
+  // Whether a brightness set is running or queued: the slider pulses.
+  property bool brightnessBusy: false
+  // Whether a text-size reflow is in progress: the sliders ignore the
+  // wheel meanwhile.
+  property bool reflowing: false
   // Whether the night light is on, as read.
   property bool nightlightOn: false
   // The night light caption, e.g. "4000 K" or "Off".
@@ -241,7 +247,10 @@ Column {
         maximum: 100
         step: 5
         value: dropdown.brightnessPercent
+        busy: dropdown.brightnessBusy
         clickGate: brightRow
+        gateWheel: true
+        wheelHeld: dropdown.reflowing
         onMoved: function (value) {
           if (brightSlider.dragging)
             dropdown.action("brightnessPreview", {
@@ -275,6 +284,7 @@ Column {
     kbdBusy: dropdown.kbdPending >= 0
     kbdCursor: dropdown.cursorIn("kbdlight") === 0
     pointerGate: dropdown.pointerGate
+    reflowing: dropdown.reflowing
     onHeightChanged: dropdown.noteLayoutChange()
     onVisibleChanged: dropdown.noteLayoutChange()
     onNightToggled: dropdown.action("nightlight", {
@@ -330,6 +340,8 @@ Column {
         value: dropdown.textIndex
         busy: dropdown.textPending
         clickGate: textRow
+        gateWheel: true
+        wheelHeld: dropdown.reflowing
         onCommitted: function (value) {
           dropdown.requestTextIndex(value)
         }
@@ -377,6 +389,8 @@ Column {
     DisplaysCaption {
       width: parent.width
       title: "SCALE"
+      trailing: dropdown.view && dropdown.view.scaleCaption ? dropdown.view.scaleCaption : ""
+      trailingName: "scaleCaption"
     }
     Row {
       id: pillRow

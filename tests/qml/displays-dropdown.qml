@@ -8,7 +8,9 @@
 // only the selected scale, enabledDisplays or pendingDisplays keeps the
 // pill and display-row delegates; the last enabled display's switch is
 // disabled and a click on it, or its row, emits nothing; a click within
-// 300 ms of a section appearing is ignored; no outline without
+// 300 ms of a section appearing is ignored, and so is a wheel step during
+// a text-size reflow or right after a layout change; a brightness set in
+// flight pulses; a custom scale reads on the SCALE caption; no outline without
 // cursor.active and exactly one with it; controls moved under a still
 // pointer emit no hover; and every trailing element ends on one right
 // content edge.
@@ -81,7 +83,7 @@ ShellRoot {
   readonly property var stops: [9, 10, 11, 12, 14, 16, 20]
 
   // A view with CURSOR and OPTS: {brightness, nightlight, kbdMode, kbdMax,
-  // scales, displays}; missing options give the full dropdown.
+  // scales, displays, scaleCaption}; missing options give the full dropdown.
   function viewOf(cursor, opts) {
     var o = opts || {}
     return {
@@ -104,6 +106,7 @@ ShellRoot {
       textStops: stops,
       scales: o.scales || scaleRows,
       displays: o.displays || displayRows,
+      scaleCaption: o.scaleCaption || "",
       cursor: cursor,
       keyHint: "↑↓ move · ←→ adjust · tab next"
     }
@@ -286,6 +289,15 @@ ShellRoot {
         }), ["9", "10", "11", "12", "14", "16", "20"], "a label per text stop")
         t.check(Math.abs(one(full, "textSlider").value - 3) < 0.01, "the text slider sits on the stop index")
         t.check(one(full, "scaleSection").visible, "scale shows")
+        t.equal(one(full, "scaleCaption").text, "", "a matched preset adds no scale caption")
+        full.view = viewOf(cur(false, "brightness", 0), {
+          scaleCaption: "2.67× · custom"
+        })
+        t.equal(one(full, "scaleCaption").text, "2.67× · custom", "a scale no preset matches reads custom on the caption line")
+        t.equal(pillsOf(full).filter(function (p) {
+          return p.selected
+        }).length, 1, "with no extra pill")
+        full.view = viewOf(cur(false, "brightness", 0))
         t.equal(pillsOf(full).map(function (p) {
           return p.text
         }), ["1×", "1.5×", "2×", "2.67×", "3×"], "a pill per scale")
@@ -372,6 +384,17 @@ ShellRoot {
         t.check(reported("brightnessCommit", {
           value: 77
         }) && named("brightnessPreview").length === 0, "a wheel step commits five more")
+        actions = []
+        full.reflowing = true
+        pointer.mouseWheel(bright, bright.width / 2, bright.height / 2, 0, 120)
+        var textWheel = one(full, "textSlider")
+        pointer.mouseWheel(textWheel, textWheel.width / 2, textWheel.height / 2, 0, 120)
+        stepped.reflowing = true
+        var kbdWheel = one(stepped, "kbdSlider")
+        pointer.mouseWheel(kbdWheel, kbdWheel.width / 2, kbdWheel.height / 2, 0, 120)
+        t.equal(nonHover().length, 0, "a wheel step during a text-size reflow is ignored on every slider")
+        full.reflowing = false
+        stepped.reflowing = false
 
         actions = []
         var text = one(full, "textSlider")
@@ -396,6 +419,11 @@ ShellRoot {
 
         // ---------- Pending shows at once ----------
         actions = []
+        t.check(!one(full, "brightnessSlider").busy, "brightness is still while no set runs")
+        full.brightnessBusy = true
+        t.check(one(full, "brightnessSlider").busy, "a brightness set in flight (or queued) pulses")
+        full.brightnessBusy = false
+        t.check(!one(full, "brightnessSlider").busy, "and stops when it exits")
         full.nightlightOn = false
         full.nightlightPending = true
         t.check(one(full, "nightlightSwitch").checked && one(full, "nightlightSwitch").busy, "a pending night light shows on, pulsing")
@@ -516,6 +544,11 @@ ShellRoot {
         actions = []
         pointer.mouseClick(pillsOf(full)[1])
         t.equal(nonHover().length, 0, "a click right after noteLayoutChange (a text reflow) is ignored")
+        var brightLate = one(full, "brightnessSlider")
+        pointer.mouseWheel(brightLate, brightLate.width / 2, brightLate.height / 2, 0, 120)
+        var textLate = one(full, "textSlider")
+        pointer.mouseWheel(textLate, textLate.width / 2, textLate.height / 2, 0, -120)
+        t.equal(nonHover().length, 0, "and so is a wheel step on a slider")
       }], [350, function () {
         // ---------- A still pointer ----------
         full.disarmPointer()
