@@ -38,6 +38,8 @@ Column {
   signal commit(string text)
   // Emitted on Esc in the place field.
   signal cancel
+  // Emitted on Up (-1) or Down (+1) in the place field.
+  signal step(int delta)
   // Emitted on a settled click on the clear button.
   signal clearPlace
   // Emitted when the pointer really moves onto the control in SECTION
@@ -131,6 +133,9 @@ Column {
           hero.commit(text)
         }
         onCancel: hero.cancel()
+        onStep: function (delta) {
+          hero.step(delta)
+        }
         onClear: hero.clearPlace()
         onClearHovered: hero.hovered("clear")
       }

@@ -227,6 +227,7 @@
 2	plugins/araneadev.vpn/VpnSection.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.vpn/VpnSession.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.vpn/VpnSession.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.weather/BarWidget.qml:missing-property:Member "statusSlot" not found on type "QObject"
 2	plugins/araneadev.weather/WeatherAir.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.weather/WeatherAir.qml:missing-property:Member "family" not found on type "QObject"
 3	plugins/araneadev.weather/WeatherDays.qml:missing-property:Member "bodySmall" not found on type "QObject"

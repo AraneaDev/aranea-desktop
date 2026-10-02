@@ -95,6 +95,8 @@ Column {
   //     highlighted suggestion's {index, key}, or null with none or with
   //     an empty text (an empty commit is back to automatic);
   //   cancel ({}): Esc in the place field;
+  //   step ({delta}): Up (-1) or Down (+1) in the place field, to move
+  //     the highlighted suggestion;
   //   clearPlace ({}): the clear button beside the field was clicked;
   //   refresh ({}): the updated label was clicked;
   //   hover ({section, index, key}): the pointer really moved onto a
@@ -197,6 +199,11 @@ Column {
       dropdown.commitText(text)
     }
     onCancel: dropdown.action("cancel", {})
+    onStep: function (delta) {
+      dropdown.action("step", {
+        delta: delta
+      })
+    }
     onClearPlace: dropdown.action("clearPlace", {})
     onHovered: function (section) {
       dropdown.hoverAt(section, 0)

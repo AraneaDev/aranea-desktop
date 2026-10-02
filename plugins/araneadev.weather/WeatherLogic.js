@@ -5,8 +5,12 @@
 // 3-hour pressure trend arrow, the European AQI and WHO UV bands, the
 // next-24h temperature/rain-chance points for the hourly trace (normalised
 // 0..1), unit conversions and their formatted strings, the shared-report
-// freshness check across per-monitor instances (the Clock lesson) and
-// parsing wttr.in's nearest_area down to coordinates only. No QML, no I/O,
+// freshness check across per-monitor instances (the Clock lesson), parsing
+// wttr.in's nearest_area down to coordinates only, and the pieces Panel's
+// view object is built from (hour labels and the trace caption, the
+// condition label, the days from today, keyed suggestion rows and picks,
+// the air chips, the detail cells, the shared bundle and the automatic
+// refresh plan). No QML, no I/O,
 // no `Date.now()` (every "now" is passed in explicitly, as an open-meteo
 // `timezone=auto` local ISO string, and compared by its wall-clock digits
 // rather than through the host's timezone); tests/js/weather-logic.test.js
@@ -597,6 +601,315 @@ function wttrCoords(j1json) {
   return { lat: lat, lon: lon }
 }
 
+/**
+ * The hour labels under the next-24h trace: COUNT labels spread evenly over
+ * the same window `hourlyPoints` draws (the hourly slot containing `nowIso`
+ * onward, up to `slots` hours), the first reading "now" and the rest the
+ * slot's two-digit hour ("03"). No window (missing data, an unparseable
+ * `nowIso` or no slot at or before it) gives [].
+ * @param {HourlySeries|null|undefined} hourly - from `parseOpenMeteo`
+ * @param {string} nowIso - the location's "now", from `nowIsoAt`
+ * @param {number} slots - the window's length in hours, as given to `hourlyPoints`
+ * @param {number} count - how many labels to spread over it (at least 2)
+ * @returns {string[]} the labels, left to right
+ */
+function hourLabels(hourly, nowIso, slots, count) {
+  if (!hourly || !Array.isArray(hourly.time) || hourly.time.length === 0) return []
+  var nowMs = parseLocalIso(nowIso)
+  if (!isFiniteNumber(nowMs)) return []
+  var nowIdx = latestIndexAtOrBefore(hourly.time, nowMs)
+  if (nowIdx < 0) return []
+  var n =
+    Math.min(hourly.time.length, nowIdx + Math.max(1, Math.floor(Number(slots)) || 1)) - nowIdx
+  var labels = Math.max(2, Math.floor(Number(count)) || 2)
+  var out = ["now"]
+  if (n < 2) return out
+  for (var i = 1; i < labels; i++) {
+    var idx = nowIdx + Math.round((i * (n - 1)) / (labels - 1))
+    var m = /T(\d{2})/.exec(String(hourly.time[idx]))
+    out.push(m ? m[1] : "")
+  }
+  return out
+}
+
+/**
+ * A Celsius value as a bare rounded degree in the active unit ("17°", or
+ * "63°" imperial), "" when it is not a finite number.
+ * @param {*} celsius - the temperature, deg C
+ * @param {boolean} imperial - whether to show Fahrenheit
+ * @returns {string} the degree text, or ""
+ */
+function bareDegrees(celsius, imperial) {
+  var c = typeof celsius === "string" && celsius !== "" ? Number(celsius) : celsius
+  if (!isFiniteNumber(c)) return ""
+  return Math.round(imperial ? (c * 9) / 5 + 32 : c) + "°"
+}
+
+/**
+ * The next-24h caption from `hourlyPoints`'s actual degrees: "now → min →
+ * max" ("17° → 11° → 19°"), "" without them.
+ * @param {HourlyPoints|null|undefined} points - from `hourlyPoints`
+ * @param {boolean} imperial - whether to show Fahrenheit
+ * @returns {string} the caption, or ""
+ */
+function hourlyCaption(points, imperial) {
+  if (!points) return ""
+  var parts = [points.now, points.min, points.max].map(function (v) {
+    return bareDegrees(v, imperial)
+  })
+  return parts.indexOf("") >= 0 ? "" : parts.join(" → ")
+}
+
+/** @type {Record<number, string>} */
+var WMO_LABELS = {
+  0: "Clear",
+  1: "Mainly clear",
+  2: "Partly cloudy",
+  3: "Overcast",
+  45: "Fog",
+  48: "Rime fog",
+  51: "Light drizzle",
+  53: "Drizzle",
+  55: "Heavy drizzle",
+  56: "Freezing drizzle",
+  57: "Freezing drizzle",
+  61: "Light rain",
+  63: "Rain",
+  65: "Heavy rain",
+  66: "Freezing rain",
+  67: "Freezing rain",
+  71: "Light snow",
+  73: "Snow",
+  75: "Heavy snow",
+  77: "Snow grains",
+  80: "Light showers",
+  81: "Showers",
+  82: "Heavy showers",
+  85: "Snow showers",
+  86: "Heavy snow showers",
+  95: "Thunderstorm",
+  96: "Thunderstorm, hail",
+  99: "Thunderstorm, hail"
+}
+
+/**
+ * The condition label under the hero temperature, from the current row the
+ * panel uses (Model.js's shape): open-meteo's WMO weather code when the row
+ * came from open-meteo, else wttr.in's own `weatherDesc`. "" when neither
+ * names a condition.
+ * @param {*} current - the panel's current-conditions row, or null
+ * @returns {string} e.g. "Partly cloudy", or ""
+ */
+function conditionLabel(current) {
+  if (!current || typeof current !== "object") return ""
+  var code = current.openMeteoWeatherCode
+  if (code !== undefined && code !== null) {
+    var label = WMO_LABELS[parseInt(String(code), 10)]
+    return typeof label === "string" ? label : ""
+  }
+  var desc =
+    Array.isArray(current.weatherDesc) && current.weatherDesc[0] ? current.weatherDesc[0].value : ""
+  return typeof desc === "string" ? desc.trim() : ""
+}
+
+/**
+ * The forecast days the dropdown shows: today and the days after it, up to
+ * COUNT, in Model.js's day shape (so its `bareTempForDay` and `dayIcon`
+ * read them). open-meteo's daily block when it has today or later, else
+ * wttr.in's `weather` days (stock's fallback order).
+ * @param {*} report - wttr.in's parsed j1 response, or null
+ * @param {*} daily - open-meteo's parsed forecast response (with `daily`), or null
+ * @param {string} todayString - today's "yyyy-MM-dd" at the forecast location
+ * @param {number} count - the most days to return
+ * @returns {Array<object>} the days, today first
+ */
+function forecastFromToday(report, daily, todayString, count) {
+  var max = Math.max(1, Math.floor(Number(count)) || 1)
+  var today = String(todayString || "")
+  var d = daily && daily.daily && Array.isArray(daily.daily.time) ? daily.daily : null
+  var out = []
+  if (d) {
+    for (var i = 0; i < d.time.length && out.length < max; i++) {
+      var date = String(d.time[i] || "")
+      if (date.slice(0, 10) < today) continue
+      var hi = Array.isArray(d.temperature_2m_max) ? d.temperature_2m_max[i] : null
+      var lo = Array.isArray(d.temperature_2m_min) ? d.temperature_2m_min[i] : null
+      out.push({
+        date: date,
+        maxtempC: bareDegrees(hi, false).replace("°", ""),
+        mintempC: bareDegrees(lo, false).replace("°", ""),
+        maxtempF: bareDegrees(hi, true).replace("°", ""),
+        mintempF: bareDegrees(lo, true).replace("°", ""),
+        openMeteoWeatherCode: Array.isArray(d.weather_code) ? d.weather_code[i] : null
+      })
+    }
+    if (out.length > 0) return out
+  }
+  var days = report && Array.isArray(report.weather) ? report.weather : []
+  for (var j = 0; j < days.length && out.length < max; j++)
+    if (days[j] && String(days[j].date || "").slice(0, 10) >= today) out.push(days[j])
+  return out
+}
+
+/**
+ * A geocoding suggestion's key: its name and coordinates, so a pick names
+ * the place the user saw even if the list was replaced underneath.
+ * @param {*} suggestion - a Model.parseGeocodingResults row
+ * @returns {string} "name|lat|lon", or "" for no row
+ */
+function suggestionKey(suggestion) {
+  if (!suggestion || typeof suggestion !== "object") return ""
+  return (
+    String(suggestion.name) + "|" + String(suggestion.latitude) + "|" + String(suggestion.longitude)
+  )
+}
+
+/**
+ * The suggestion rows the view draws: {key, name, description}.
+ * @param {*} suggestions - Model.parseGeocodingResults rows
+ * @returns {Array<{key: string, name: string, description: string}>} the rows
+ */
+function suggestionRows(suggestions) {
+  if (!Array.isArray(suggestions)) return []
+  return suggestions.map(function (s) {
+    return {
+      key: suggestionKey(s),
+      name: s && s.name ? String(s.name) : "",
+      description: s && s.description ? String(s.description) : ""
+    }
+  })
+}
+
+/**
+ * The suggestion a keyed pick names, only when row INDEX of the CURRENT
+ * suggestions still carries KEY; null otherwise (the pick is refused).
+ * @param {*} suggestions - the current Model.parseGeocodingResults rows
+ * @param {*} index - the row the pick names
+ * @param {*} key - the key the view saw at that row
+ * @returns {object|null} the suggestion, or null
+ */
+function suggestionAt(suggestions, index, key) {
+  if (!Array.isArray(suggestions) || typeof key !== "string" || key === "") return null
+  if (typeof index !== "number" || index < 0 || index >= suggestions.length) return null
+  var s = suggestions[index]
+  return suggestionKey(s) === key ? s : null
+}
+
+/**
+ * The view's air part from `parseAir`'s reading: an AQI chip ("AQI 53 ·
+ * Fair", toned) and a UV chip ("UV 5 · Moderate"), each hidden without its
+ * value; both hidden when the air request failed (null).
+ * @param {ParsedAir|null|undefined} air - from `parseAir`
+ * @returns {{aqi: {visible: boolean, text: string, tone: string}, uv: {visible: boolean, text: string}}} the chips
+ */
+function airView(air) {
+  var aqi = air ? aqiBand(air.aqi) : null
+  var uv = air ? uvBand(air.uv) : null
+  return {
+    aqi: {
+      visible: !!aqi,
+      text: aqi && air ? "AQI " + Math.round(Number(air.aqi)) + " · " + aqi.label : "",
+      tone: aqi ? aqi.tone : "plain"
+    },
+    uv: {
+      visible: !!uv,
+      text: uv && air ? "UV " + Math.round(Number(air.uv)) + " · " + uv.label : ""
+    }
+  }
+}
+
+/**
+ * One cell of the details grid: its key, label and value, with the wind's
+ * arrow rotation and compass label, or the pressure trend.
+ * @typedef {{key: string, label: string, value: string, arrow?: number, dir?: string, trend?: string}} DetailCell
+ */
+
+/**
+ * The details grid's cells, in the mockup's order (feels, humid, wind,
+ * gusts, pressure, visibility), each dropped when its value is "". Wind
+ * gets the compass arrow and label when a direction is known; pressure
+ * gets its trend when there is one.
+ * @param {{feels?: string, humid?: string, wind?: string, windDeg?: *, gustsKmh?: *, pressureHpa?: *, trend?: string, visibilityM?: *, imperial?: boolean}} d - the readings: feels, humid and wind already formatted (stock's), the rest raw open-meteo values
+ * @returns {Array<DetailCell>} the cells
+ */
+function detailCells(d) {
+  var r = d || {}
+  var imperial = !!r.imperial
+  /** @type {Array<DetailCell>} */
+  var cells = []
+  /**
+   * Adds a cell when its value is not empty.
+   * @param {DetailCell} cell - the cell
+   */
+  function add(cell) {
+    if (cell.value !== "") cells.push(cell)
+  }
+  add({ key: "feels", label: "Feels", value: String(r.feels || "") })
+  add({ key: "humid", label: "Humid", value: String(r.humid || "") })
+  /** @type {DetailCell} */
+  var wind = { key: "wind", label: "Wind", value: String(r.wind || "") }
+  var deg = Number(r.windDeg)
+  if (r.windDeg !== null && r.windDeg !== undefined && r.windDeg !== "" && isFiniteNumber(deg)) {
+    var c = compass(deg)
+    wind.arrow = c.rotation
+    wind.dir = c.label
+  }
+  add(wind)
+  add({ key: "gusts", label: "Gusts", value: formatWind(r.gustsKmh, imperial) })
+  /** @type {DetailCell} */
+  var pressure = {
+    key: "pressure",
+    label: "Pressure",
+    value: formatPressure(r.pressureHpa, imperial)
+  }
+  if (r.trend) pressure.trend = String(r.trend)
+  add(pressure)
+  add({ key: "visibility", label: "Visibility", value: formatVisibility(r.visibilityM, imperial) })
+  return cells
+}
+
+/**
+ * The bundle a refresh may adopt instead of fetching: the freshest
+ * instance bundle (`{locationQuery, fetchedAtMs, ...}`) for the same
+ * location query and younger than `freshMinutes` (`sharedReport`), or null.
+ * @param {Array<*>|undefined} bundles - the instances' published bundles
+ * @param {string} locationQuery - this instance's location query
+ * @param {number} nowMs - the current instant, milliseconds
+ * @param {number} freshMinutes - how young a bundle must be, minutes
+ * @returns {object|null} the bundle to adopt, or null
+ */
+function sharedBundle(bundles, locationQuery, nowMs, freshMinutes) {
+  if (!Array.isArray(bundles)) return null
+  var peers = []
+  for (var i = 0; i < bundles.length; i++) {
+    var b = bundles[i]
+    if (b && typeof b === "object" && b.locationQuery === locationQuery)
+      peers.push({ fetchedAt: b.fetchedAtMs, report: b })
+  }
+  return sharedReport(peers, nowMs, freshMinutes)
+}
+
+/**
+ * What an automatic refresh (the timer, an open, a location change) does,
+ * so the per-monitor instances make one fetch per interval between them:
+ * "defer" (try again shortly) until the bar is injected, so the other
+ * instances can be seen; "skip" while this instance is already fetching;
+ * "adopt" a fresh bundle (any instance's, this one's included); "wait"
+ * while another instance is fetching the same location (its publish
+ * reaches this one); else "fetch". An explicit refresh never asks: it
+ * fetches.
+ * @param {{ready: boolean, selfFetching: boolean, fresh: boolean, peerFetching: boolean}} s - the state
+ * @returns {string} "defer", "skip", "adopt", "wait" or "fetch"
+ */
+function refreshPlan(s) {
+  var st = s || { ready: true, selfFetching: false, fresh: false, peerFetching: false }
+  if (!st.ready) return "defer"
+  if (st.selfFetching) return "skip"
+  if (st.fresh) return "adopt"
+  if (st.peerFetching) return "wait"
+  return "fetch"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     buildForecastUrl: buildForecastUrl,
@@ -617,5 +930,17 @@ if (typeof module !== "undefined")
     formatPressure: formatPressure,
     formatVisibility: formatVisibility,
     sharedReport: sharedReport,
-    wttrCoords: wttrCoords
+    wttrCoords: wttrCoords,
+    hourLabels: hourLabels,
+    bareDegrees: bareDegrees,
+    hourlyCaption: hourlyCaption,
+    conditionLabel: conditionLabel,
+    forecastFromToday: forecastFromToday,
+    suggestionKey: suggestionKey,
+    suggestionRows: suggestionRows,
+    suggestionAt: suggestionAt,
+    airView: airView,
+    detailCells: detailCells,
+    sharedBundle: sharedBundle,
+    refreshPlan: refreshPlan
   }

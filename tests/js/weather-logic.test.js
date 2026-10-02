@@ -533,3 +533,221 @@ test("wttrCoords gives null on invalid JSON, a missing/empty nearest_area, or ba
     null
   )
 })
+
+// --- Panel's view pieces (Task 4) ----------------------------------------------------
+
+const HOURLY = {
+  time: [
+    "2026-10-02T17:00",
+    "2026-10-02T18:00",
+    "2026-10-02T19:00",
+    "2026-10-02T20:00",
+    "2026-10-02T21:00",
+    "2026-10-02T22:00",
+    "2026-10-02T23:00",
+    "2026-10-03T00:00",
+    "2026-10-03T01:00"
+  ],
+  temp: [15, 16, 17, 17, 16, 15, 14, 13, 12],
+  rain: [0, 0, 0, 10, 20, 0, 0, 0, 0],
+  pressure: [1010, 1010, 1011, 1012, 1012, 1012, 1013, 1013, 1013]
+}
+
+test("hourLabels: 'now' then spread two-digit hours over the hourlyPoints window", () => {
+  assert.deepEqual(logic.hourLabels(HOURLY, "2026-10-02T20:15", 24, 3), ["now", "23", "01"])
+  assert.deepEqual(logic.hourLabels(HOURLY, "2026-10-02T20:15", 5, 5), [
+    "now",
+    "21",
+    "22",
+    "23",
+    "00"
+  ])
+})
+
+test("hourLabels: no window gives [], a single slot only 'now', a bad time an empty label", () => {
+  assert.deepEqual(logic.hourLabels(null, "2026-10-02T20:15", 24, 5), [])
+  assert.deepEqual(logic.hourLabels({ time: [] }, "2026-10-02T20:15", 24, 5), [])
+  assert.deepEqual(logic.hourLabels(HOURLY, "nope", 24, 5), [])
+  assert.deepEqual(logic.hourLabels(HOURLY, "2026-10-01T00:00", 24, 5), [])
+  assert.deepEqual(logic.hourLabels(HOURLY, "2026-10-03T01:30", 24, 5), ["now"])
+  assert.deepEqual(logic.hourLabels(HOURLY, "2026-10-02T20:15", "x", 5), ["now"])
+  assert.deepEqual(
+    logic.hourLabels({ time: ["2026-10-02T20:00", "bad"] }, "2026-10-02T20:15", 2, "y"),
+    ["now", ""]
+  )
+})
+
+test("bareDegrees and hourlyCaption: rounded degrees, Fahrenheit when imperial", () => {
+  assert.equal(logic.bareDegrees(16.6, false), "17°")
+  assert.equal(logic.bareDegrees("20", true), "68°")
+  assert.equal(logic.bareDegrees("", false), "")
+  assert.equal(logic.bareDegrees(null, false), "")
+  assert.equal(logic.hourlyCaption({ now: 17, min: 11, max: 19 }, false), "17° → 11° → 19°")
+  assert.equal(logic.hourlyCaption({ now: 0, min: -5, max: 5 }, true), "32° → 23° → 41°")
+  assert.equal(logic.hourlyCaption({ now: null, min: 1, max: 2 }, false), "")
+  assert.equal(logic.hourlyCaption(null, false), "")
+})
+
+test("conditionLabel: WMO code from open-meteo, else wttr's weatherDesc", () => {
+  assert.equal(logic.conditionLabel({ openMeteoWeatherCode: 2 }), "Partly cloudy")
+  assert.equal(logic.conditionLabel({ openMeteoWeatherCode: "63" }), "Rain")
+  assert.equal(logic.conditionLabel({ openMeteoWeatherCode: 42 }), "")
+  assert.equal(logic.conditionLabel({ weatherDesc: [{ value: " Light rain " }] }), "Light rain")
+  assert.equal(logic.conditionLabel({ weatherDesc: [] }), "")
+  assert.equal(logic.conditionLabel({ weatherDesc: [{ value: 3 }] }), "")
+  assert.equal(logic.conditionLabel(null), "")
+})
+
+const DAILY = {
+  daily: {
+    time: ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"],
+    weather_code: [0, 2, 3, 61, 0],
+    temperature_2m_max: [18.2, 19.4, 16, 18, 15],
+    temperature_2m_min: [10, 11.2, 10, 9, 8]
+  }
+}
+
+test("forecastFromToday: open-meteo days from today on, in Model.js's shape", () => {
+  const days = logic.forecastFromToday(null, DAILY, "2026-10-02", 4)
+  assert.deepEqual(
+    days.map((d) => d.date),
+    ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"]
+  )
+  assert.deepEqual(days[0], {
+    date: "2026-10-02",
+    maxtempC: "19",
+    mintempC: "11",
+    maxtempF: "67",
+    mintempF: "52",
+    openMeteoWeatherCode: 2
+  })
+  assert.equal(logic.forecastFromToday(null, DAILY, "2026-10-02", 2).length, 2)
+  const bare = logic.forecastFromToday(null, { daily: { time: ["2026-10-02"] } }, "2026-10-02", "x")
+  assert.deepEqual(bare, [
+    {
+      date: "2026-10-02",
+      maxtempC: "",
+      mintempC: "",
+      maxtempF: "",
+      mintempF: "",
+      openMeteoWeatherCode: null
+    }
+  ])
+})
+
+test("forecastFromToday: falls back to wttr's days from today when open-meteo has none", () => {
+  const report = {
+    weather: [{ date: "2026-10-01" }, { date: "2026-10-02" }, null, { date: "2026-10-03" }]
+  }
+  assert.deepEqual(logic.forecastFromToday(report, null, "2026-10-02", 4), [
+    { date: "2026-10-02" },
+    { date: "2026-10-03" }
+  ])
+  assert.deepEqual(logic.forecastFromToday(report, DAILY, "2026-11-01", 4), [])
+  assert.deepEqual(logic.forecastFromToday(null, null, undefined, 4), [])
+})
+
+const PLACES = [
+  {
+    name: "Amsterdam",
+    description: "Noord-Holland, Netherlands",
+    latitude: 52.37,
+    longitude: 4.89
+  },
+  { name: "Amstelveen", latitude: 52.3, longitude: 4.86 }
+]
+
+test("suggestionKey and suggestionRows: keyed by name and coordinates", () => {
+  assert.equal(logic.suggestionKey(PLACES[0]), "Amsterdam|52.37|4.89")
+  assert.equal(logic.suggestionKey(null), "")
+  assert.deepEqual(logic.suggestionRows(PLACES), [
+    { key: "Amsterdam|52.37|4.89", name: "Amsterdam", description: "Noord-Holland, Netherlands" },
+    { key: "Amstelveen|52.3|4.86", name: "Amstelveen", description: "" }
+  ])
+  assert.deepEqual(logic.suggestionRows([null]), [{ key: "", name: "", description: "" }])
+  assert.deepEqual(logic.suggestionRows(undefined), [])
+})
+
+test("suggestionAt: only the current row carrying the key; refused otherwise", () => {
+  assert.equal(logic.suggestionAt(PLACES, 1, "Amstelveen|52.3|4.86"), PLACES[1])
+  assert.equal(logic.suggestionAt(PLACES, 0, "Amstelveen|52.3|4.86"), null)
+  assert.equal(logic.suggestionAt(PLACES, 2, "Amsterdam|52.37|4.89"), null)
+  assert.equal(logic.suggestionAt(PLACES, -1, "Amsterdam|52.37|4.89"), null)
+  assert.equal(logic.suggestionAt(PLACES, "0", "Amsterdam|52.37|4.89"), null)
+  assert.equal(logic.suggestionAt(PLACES, 0, ""), null)
+  assert.equal(logic.suggestionAt(null, 0, "Amsterdam|52.37|4.89"), null)
+})
+
+test("airView: toned AQI and UV chips, each hidden without its value", () => {
+  assert.deepEqual(logic.airView({ aqi: 53.4, uv: 0.2 }), {
+    aqi: { visible: true, text: "AQI 53 · Moderate", tone: "plain" },
+    uv: { visible: true, text: "UV 0 · Low" }
+  })
+  assert.deepEqual(logic.airView({ aqi: 25, uv: null }), {
+    aqi: { visible: true, text: "AQI 25 · Fair", tone: "good" },
+    uv: { visible: false, text: "" }
+  })
+  assert.deepEqual(logic.airView(null), {
+    aqi: { visible: false, text: "", tone: "plain" },
+    uv: { visible: false, text: "" }
+  })
+})
+
+test("detailCells: the six cells in order, wind arrow and pressure trend, empties dropped", () => {
+  const cells = logic.detailCells({
+    feels: "16°",
+    humid: "71%",
+    wind: "7 km/h",
+    windDeg: 225,
+    gustsKmh: 19,
+    pressureHpa: 1030,
+    trend: "↑",
+    visibilityM: 20000,
+    imperial: false
+  })
+  assert.deepEqual(cells, [
+    { key: "feels", label: "Feels", value: "16°" },
+    { key: "humid", label: "Humid", value: "71%" },
+    { key: "wind", label: "Wind", value: "7 km/h", arrow: 405, dir: "SW" },
+    { key: "gusts", label: "Gusts", value: "19 km/h" },
+    { key: "pressure", label: "Pressure", value: "1030 hPa", trend: "↑" },
+    { key: "visibility", label: "Visibility", value: "20 km" }
+  ])
+  const imperial = logic.detailCells({
+    wind: "4 mph",
+    windDeg: null,
+    gustsKmh: 16.1,
+    pressureHpa: 1013.25,
+    visibilityM: 16093,
+    imperial: true
+  })
+  assert.deepEqual(imperial, [
+    { key: "wind", label: "Wind", value: "4 mph" },
+    { key: "gusts", label: "Gusts", value: "10 mph" },
+    { key: "pressure", label: "Pressure", value: "29.92 inHg" },
+    { key: "visibility", label: "Visibility", value: "10 mi" }
+  ])
+  assert.deepEqual(logic.detailCells(undefined), [])
+  assert.deepEqual(logic.detailCells({ wind: "", windDeg: 90 }), [])
+})
+
+test("sharedBundle: the freshest peer bundle for the same location query", () => {
+  const a = { locationQuery: "52.37,4.89", fetchedAtMs: 1000 }
+  const b = { locationQuery: "52.37,4.89", fetchedAtMs: 2000 }
+  const other = { locationQuery: "", fetchedAtMs: 3000 }
+  assert.equal(logic.sharedBundle([a, b, other, null, 7], "52.37,4.89", 3000, 15), b)
+  assert.equal(logic.sharedBundle([other], "52.37,4.89", 3000, 15), null)
+  assert.equal(logic.sharedBundle([a], "52.37,4.89", 1000 + 15 * 60000, 15), null)
+  assert.equal(logic.sharedBundle(undefined, "", 0, 15), null)
+})
+
+test("refreshPlan: defer until ready, skip while fetching, adopt fresh, wait on a peer, else fetch", () => {
+  const plan = (ready, selfFetching, fresh, peerFetching) =>
+    logic.refreshPlan({ ready, selfFetching, fresh, peerFetching })
+  assert.equal(plan(false, true, true, true), "defer")
+  assert.equal(plan(true, true, true, true), "skip")
+  assert.equal(plan(true, false, true, true), "adopt")
+  assert.equal(plan(true, false, false, true), "wait")
+  assert.equal(plan(true, false, false, false), "fetch")
+  assert.equal(logic.refreshPlan(undefined), "fetch")
+})

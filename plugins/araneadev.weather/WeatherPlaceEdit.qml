@@ -2,9 +2,11 @@
 // TextField) with a clear button beside it. Shown in the place label's
 // stead while editing; opening it seeds the field from editText, selects
 // it and focuses it. Typing (never seeding) reports the text; Enter
-// commits and Esc cancels. Up and Down are left to propagate, so the host
-// panel moves the highlighted suggestion as stock does. While a place
-// saves, the field is disabled. Pure view: plain inputs in, signals out.
+// commits and Esc cancels. Up and Down are taken before the field's own
+// handling (which would move the text cursor) and reported as a step, so
+// the host panel moves the highlighted suggestion as stock does. While a
+// place saves, the field is disabled. Pure view: plain inputs in, signals
+// out.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -32,6 +34,8 @@ Row {
   signal commit(string text)
   // Emitted on Esc.
   signal cancel
+  // Emitted on Up (-1) or Down (+1): move the highlighted suggestion.
+  signal step(int delta)
   // Emitted on a settled click on the clear button.
   signal clear
   // Emitted when the pointer really moves onto the clear button.
@@ -46,11 +50,14 @@ Row {
     placeField.forceActiveFocus()
   }
 
-  // Stock's location keys: Esc cancels, Enter commits; anything else (Up,
-  // Down) is left to propagate to the host panel.
+  // Stock's location keys: Esc cancels, Enter commits, Up and Down step
+  // the highlighted suggestion (stock's handler lived on the field too).
   function handleKey(event) {
     if (event.key === Qt.Key_Escape) {
       edit.cancel()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+      edit.step(event.key === Qt.Key_Up ? -1 : 1)
       event.accepted = true
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       edit.commit(placeField.text)

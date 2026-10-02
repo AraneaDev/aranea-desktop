@@ -7,8 +7,8 @@
 // updated label to refresh; the place edit takes focus, emits query on
 // typing only, keys its suggestions, picks by click with its index and key,
 // commits on Enter with the highlighted suggestion or the raw text (empty
-// is automatic) and cancels on Esc; a stale editText echo never overwrites
-// the focused field; saving pulses the place label and refuses to edit;
+// is automatic), steps the highlight on Up and Down and cancels on Esc; a
+// stale editText echo never overwrites the focused field; saving pulses the place label and refuses to edit;
 // opening or closing the editor stamps the layout; the trace paints; a click
 // right after a layout stamp (a section showing or hiding, the suggestions
 // changing) or on a row whose key changed is refused; rows moving under a
@@ -581,6 +581,22 @@ ShellRoot {
         t.check(reported("query", {
           text: "Amsterdam"
         }), "a backspace emits query too")
+
+        // ---------- Edit: Up and Down step the highlight ----------
+        actions = []
+        var cursorAt = one(full, "placeField").cursorPosition
+        pointer.keyClick(Qt.Key_Up)
+        pointer.keyClick(Qt.Key_Down)
+        t.equal(nonHover(), [["step",
+            {
+              delta: -1
+            }
+          ], ["step",
+            {
+              delta: 1
+            }
+          ]], "Up and Down report a step each, Up first")
+        t.equal(one(full, "placeField").cursorPosition, cursorAt, "and never move the text cursor")
 
         // ---------- Edit: Enter and Esc ----------
         actions = []
