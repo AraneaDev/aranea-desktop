@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.15.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.14.0...v2.15.0) (2026-10-02)
+
+
+### Features
+
+* Aranea-native Weather dropdown ([#101](https://github.com/AraneaDev/aranea-desktop/issues/101)) ([0fcd5e5](https://github.com/AraneaDev/aranea-desktop/commit/0fcd5e59ecd75fe2e5b3d5118bc82c1315ee09d5))
+
 ## [2.14.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.13.0...v2.14.0) (2026-10-02)
 
 
