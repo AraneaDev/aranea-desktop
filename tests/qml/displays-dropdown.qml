@@ -7,7 +7,8 @@
 // wheel step); a pending request shows at once, pulsing busy; a change of
 // only the selected scale, enabledDisplays or pendingDisplays keeps the
 // pill and display-row delegates; the last enabled display's switch is
-// disabled and a click on it, or its row, emits nothing; a click within
+// disabled and a click on it, or its row, emits nothing; while the
+// displays are locked every switch is disabled and no click emits; a click within
 // 300 ms of a section appearing is ignored, and so is a wheel step during
 // a text-size reflow or right after a layout change; a brightness set in
 // flight pulses; a custom scale reads on the SCALE caption; no outline without
@@ -193,6 +194,7 @@ ShellRoot {
     }
     full.pendingDisplays = {}
     full.lastEnabled = "eDP-1"
+    full.displaysLocked = false
   }
 
   // Runs STEPS ([delay, fn] pairs) one after another, then ends the run.
@@ -492,6 +494,30 @@ ShellRoot {
         full.lastEnabled = ""
         t.check(switchesOf(full)[0].enabled, "it enables again once another display is on")
         full.lastEnabled = "eDP-1"
+
+        // ---------- Locked while a display command or its re-read is due ----------
+        full.lastEnabled = ""
+        full.enabledDisplays = {
+          "eDP-1": true,
+          "DP-2": true
+        }
+        full.pendingDisplays = {
+          "eDP-1": false
+        }
+        full.displaysLocked = true
+        t.check(!switchesOf(full)[0].enabled && !switchesOf(full)[1].enabled, "every display switch is disabled while locked")
+        t.check(switchesOf(full)[0].busy && rowsOf(full)[0].busy, "the target pulses busy")
+        t.check(!switchesOf(full)[1].busy, "the others do not")
+        actions = []
+        pointer.mouseClick(switchesOf(full)[1])
+        var lockedRow = rowsOf(full)[1]
+        pointer.mouseClick(lockedRow, 40, lockedRow.height / 2)
+        pointer.mouseClick(switchesOf(full)[0])
+        t.equal(nonHover().length, 0, "a click on any display switch or row while locked emits nothing")
+        full.displaysLocked = false
+        full.pendingDisplays = {}
+        t.check(switchesOf(full)[0].enabled && switchesOf(full)[1].enabled, "the switches enable again once the fresh read lands")
+        resetState()
 
         // ---------- One outline per cursor ----------
         var spots = [["brightness", 0], ["nightlight", 0], ["kbdlight", 0], ["textsize", 0], ["scale", 0], ["scale", 4], ["monitors", 0], ["monitors", 1]]

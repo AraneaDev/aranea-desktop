@@ -3,7 +3,8 @@
 // rows are keyed by monitor name and carry no on/off state: whether a
 // display reads on comes from `enabledDisplays` and `pendingDisplays`, so a toggle never
 // rebuilds a delegate. A pending display reads its requested state at once
-// and pulses busy; the last enabled display's switch is disabled. Pure
+// and pulses busy; the last enabled display's switch is disabled, and so is
+// every switch while the list is locked. Pure
 // view: plain inputs in, signals out.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -22,6 +23,9 @@ Column {
   property var pendingDisplays: ({})
   // The name of the only enabled display, or "" when more are on.
   property string lastEnabled: ""
+  // Whether every switch is disabled (a display command or its re-read is
+  // due).
+  property bool locked: false
   // The keyboard cursor's row, or -1 when the cursor isn't here.
   property int cursorIndex: -1
   // The dropdown's PointerMoveGate (with layoutChangedAt).
@@ -77,7 +81,7 @@ Column {
         clickGate: displayRow
         checked: list.onOf(displayRow.modelData.key)
         busy: list.busyOf(displayRow.modelData.key)
-        enabled: list.lastEnabled === "" || list.lastEnabled !== displayRow.modelData.key
+        enabled: !list.locked && (list.lastEnabled === "" || list.lastEnabled !== displayRow.modelData.key)
         onToggled: list.toggle(displayRow.index)
       }
     }

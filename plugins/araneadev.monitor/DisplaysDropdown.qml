@@ -66,6 +66,10 @@ Column {
   property var pendingDisplays: ({})
   // The name of the only enabled display (its switch is disabled), or "".
   property string lastEnabled: ""
+  // Whether every display switch and row is refused (a display command or
+  // its fresh re-read is due): the switches show disabled, the pending
+  // target keeps pulsing.
+  property bool displaysLocked: false
   // When the layout last shifted under the pointer (Date.now()), 0 for
   // never; see noteLayoutChange.
   property real layoutChangedAt: 0
@@ -117,7 +121,7 @@ Column {
   //     is the stop in px);
   //   scale ({index, key}): a scale pill was clicked;
   //   display ({index, key: name, enable}): a display switch or row was
-  //     clicked (never for the last enabled display);
+  //     clicked (never for the last enabled display, nor while locked);
   //   hover ({section, index, key}): the pointer really moved onto a
   //     control (through the gate); section is "brightness", "nightlight",
   //     "kbdlight", "textsize", "scale" or "monitors".
@@ -168,10 +172,11 @@ Column {
     return !!dropdown.enabledDisplays && dropdown.enabledDisplays[name] === true
   }
 
-  // Asks to flip display INDEX; refused for the last enabled display.
+  // Asks to flip display INDEX; refused while the displays are locked and
+  // for the last enabled display.
   function toggleDisplay(index) {
     var key = dropdown.keyAt("monitors", index)
-    if (key === "" || key === dropdown.lastEnabled)
+    if (dropdown.displaysLocked || key === "" || key === dropdown.lastEnabled)
       return
     dropdown.action("display", {
       index: index,
@@ -457,6 +462,7 @@ Column {
     enabledDisplays: dropdown.enabledDisplays
     pendingDisplays: dropdown.pendingDisplays
     lastEnabled: dropdown.lastEnabled
+    locked: dropdown.displaysLocked
     cursorIndex: dropdown.cursorIn("monitors")
     pointerGate: dropdown.pointerGate
     onHeightChanged: dropdown.noteLayoutChange()

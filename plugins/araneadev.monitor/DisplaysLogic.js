@@ -6,7 +6,8 @@
 // the header caption (`Model.cleanScale`'s companion), the pending/queue
 // helpers (araneadev.power's `PowerLogic` pattern), the last-display guard
 // (never switch off the last display confirmed on), the focus-checked
-// scale command, what runs when the scale/display command exits, the
+// scale command, the display lock (no switch behind a stale read), what
+// runs when the scale/display command exits, the
 // night light toggle's prediction, the SCALE caption and the keyboard
 // hint. No QML, no I/O; tests/js/displays-logic.test.js runs this under
 // Node.
@@ -252,14 +253,14 @@ function takeQueued(state) {
 
 /**
  * Whether display `name` is confirmed on: read enabled, with no pending
- * request to switch it off. A display only pending on never is.
+ * entry at all (any request in flight or unconfirmed makes it uncertain).
  * @param {string} name - the monitor name
  * @param {{[name: string]: boolean}} enabledMap - which displays read enabled
  * @param {{[name: string]: boolean}} pendingMap - requests not yet confirmed
  * @returns {boolean} true when it is confirmed on
  */
 function confirmedOn(name, enabledMap, pendingMap) {
-  return enabledMap[name] === true && pendingMap[name] !== false
+  return enabledMap[name] === true && !Object.prototype.hasOwnProperty.call(pendingMap, name)
 }
 
 /**
@@ -322,68 +323,70 @@ function scaleCommand(name, scale) {
 }
 
 /**
+ * Whether every display switch and row is refused: while a command runs
+ * (`actionProc`), and after a display command exits until a state read that
+ * STARTED after that exit has landed (`landedSerial` is the exit count the
+ * landed read started at; `exitSerial` the exit count of the last display
+ * command, 0 before any). Display switches are never queued, so no request
+ * can act on a stale read; an unknown landed read counts as stale.
+ * @param {{running?: boolean, exitSerial?: number, landedSerial?: number}|null|undefined} state
+ * @returns {boolean} true while the display switches are locked
+ */
+function displaysLocked(state) {
+  var s = state || {}
+  if (s.running) return true
+  var exit = Number(s.exitSerial) || 0
+  return exit > 0 && !(Number(s.landedSerial) >= exit)
+}
+
+/**
+ * Whether a display switch request may run now: never while
+ * `displaysLocked`; an enable otherwise, a disable only through `mayDisable`.
+ * @param {{name?: string, enable?: boolean, locked?: boolean, enabledMap?: {[name: string]: boolean}, pendingMap?: {[name: string]: boolean}}|null|undefined} state
+ * @returns {boolean} true when the request may run
+ */
+function mayToggleDisplay(state) {
+  var s = state || {}
+  if (!s.name || s.locked !== false) return false
+  return s.enable === true || mayDisable(s.name, s.enabledMap, s.pendingMap)
+}
+
+/**
  * What the scale/display command (`actionProc`) does next once it exits, and
- * the pending and queued state that leaves. In order: a failed request drops
- * its own pending state first; a scale queued behind a display command is
- * dropped (the displays, and so the focus, may have moved under it), as is
- * one with no display recorded; a queued scale runs next, on the display it
- * was chosen on; else the queued display requests are taken in order, and a
- * queued disable is re-checked with `mayDisable` and dropped (with its pending
- * state) when it would leave no display confirmed on.
- * @param {{done?: {kind: string, key: string}|null, exitCode?: number, queuedScale?: string, queuedScaleMonitor?: string, queuedDisplays?: {[name: string]: boolean}, pendingScale?: string, pendingDisplays?: {[name: string]: boolean}, enabledMap?: {[name: string]: boolean}}|null|undefined} state
- * @returns {{run: ({kind: "scale", key: string, monitor: string}|{kind: "display", key: string, enable: boolean}|null), queuedScale: string, queuedScaleMonitor: string, queuedDisplays: {[name: string]: boolean}, pendingScale: string, pendingDisplays: {[name: string]: boolean}}} what to run (null for nothing) and the state to keep
+ * the pending and queued state that leaves. A failed request drops its own
+ * pending state (a display entry only while it still holds that request's
+ * state); a scale queued behind a display command is dropped (the displays,
+ * and so the focus, may have moved under it), as is one with no display
+ * recorded; else a queued scale runs on the display it was chosen on.
+ * Display switches are never queued (`displaysLocked`).
+ * @param {{done?: {kind: string, key: string, enable?: boolean}|null, exitCode?: number, queuedScale?: string, queuedScaleMonitor?: string, pendingScale?: string, pendingDisplays?: {[name: string]: boolean}}|null|undefined} state
+ * @returns {{run: ({kind: string, key: string, monitor: string}|null), queuedScale: string, queuedScaleMonitor: string, pendingScale: string, pendingDisplays: {[name: string]: boolean}}} what to run (null for nothing) and the state to keep
  */
 function nextAction(state) {
   var s = state || {}
   var done = s.done || null
   var pendingScale = s.pendingScale || ""
   var pendingDisplays = Object.assign({}, s.pendingDisplays || {})
-  var queuedDisplays = Object.assign({}, s.queuedDisplays || {})
   var queuedScale = s.queuedScale || ""
   var queuedScaleMonitor = s.queuedScaleMonitor || ""
-  var enabledMap = s.enabledMap || {}
+  var run = null
   if (done && s.exitCode !== 0) {
     if (done.kind === "scale" && pendingScale === done.key) pendingScale = ""
-    else if (done.kind === "display") delete pendingDisplays[done.key]
+    else if (done.kind === "display" && pendingDisplays[done.key] === done.enable)
+      delete pendingDisplays[done.key]
   }
   if (queuedScale !== "" && ((done && done.kind === "display") || queuedScaleMonitor === "")) {
     if (pendingScale === queuedScale) pendingScale = ""
-    queuedScale = ""
-    queuedScaleMonitor = ""
+  } else if (queuedScale !== "") {
+    run = { kind: "scale", key: queuedScale, monitor: queuedScaleMonitor }
   }
-  /**
-   * The result with RUN and the state so far.
-   * @param {{kind: string, key: string, monitor?: string, enable?: boolean}|null} run - what to run
-   * @returns {*} nextAction's result
-   */
-  var result = function (run) {
-    return {
-      run: run,
-      queuedScale: queuedScale,
-      queuedScaleMonitor: queuedScaleMonitor,
-      queuedDisplays: queuedDisplays,
-      pendingScale: pendingScale,
-      pendingDisplays: pendingDisplays
-    }
+  return {
+    run: run,
+    queuedScale: "",
+    queuedScaleMonitor: "",
+    pendingScale: pendingScale,
+    pendingDisplays: pendingDisplays
   }
-  if (queuedScale !== "") {
-    var run = { kind: "scale", key: queuedScale, monitor: queuedScaleMonitor }
-    queuedScale = ""
-    queuedScaleMonitor = ""
-    return result(run)
-  }
-  var names = Object.keys(queuedDisplays)
-  for (var i = 0; i < names.length; i++) {
-    var name = names[i]
-    var enable = queuedDisplays[name] === true
-    delete queuedDisplays[name]
-    if (!enable && !mayDisable(name, enabledMap, pendingDisplays)) {
-      delete pendingDisplays[name]
-      continue
-    }
-    return result({ kind: "display", key: name, enable: enable })
-  }
-  return result(null)
 }
 
 /**
@@ -449,6 +452,8 @@ if (typeof module !== "undefined")
     lastEnabledName: lastEnabledName,
     scaleCommand: scaleCommand,
     nextAction: nextAction,
+    displaysLocked: displaysLocked,
+    mayToggleDisplay: mayToggleDisplay,
     nightToggleTarget: nightToggleTarget,
     scaleCaption: scaleCaption,
     keyHint: keyHint

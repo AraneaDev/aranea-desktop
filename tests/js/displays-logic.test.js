@@ -479,6 +479,7 @@ test("mayDisable: no name, or missing maps, is refused without throwing", () => 
   assert.equal(logic.mayDisable("", { "eDP-1": true, "DP-2": true }, {}), false)
   assert.equal(logic.mayDisable("eDP-1", undefined, undefined), false)
   assert.equal(logic.mayDisable("eDP-1", { "DP-2": true }, null), true)
+  assert.equal(logic.mayDisable("eDP-1", { "eDP-1": true, "DP-2": true }, { "DP-2": true }), false)
 })
 
 test("lastEnabledName: the only confirmed-on display", () => {
@@ -525,7 +526,9 @@ test("scaleCommand: no display or no scale gives no command", () => {
   assert.equal(logic.scaleCommand(undefined, undefined), null)
 })
 
-// --- nextAction (C1 + C2: what runs when the scale/display command exits) -----------
+// --- nextAction (C2: what runs when the scale/display command exits) ---------------
+//
+// Display switches are never queued (see displaysLocked); only a scale is.
 
 const idleState = (over) =>
   Object.assign(
@@ -534,10 +537,8 @@ const idleState = (over) =>
       exitCode: 0,
       queuedScale: "",
       queuedScaleMonitor: "",
-      queuedDisplays: {},
       pendingScale: "",
-      pendingDisplays: {},
-      enabledMap: { "eDP-1": true, "DP-2": false }
+      pendingDisplays: {}
     },
     over
   )
@@ -549,22 +550,43 @@ test("nextAction: nothing queued runs nothing and keeps the pending state", () =
       run: null,
       queuedScale: "",
       queuedScaleMonitor: "",
-      queuedDisplays: {},
       pendingScale: "2",
       pendingDisplays: {}
     }
   )
 })
 
-test("nextAction: a failed display request drops its pending state", () => {
+test("nextAction: a failed display request drops its own pending entry", () => {
   const next = logic.nextAction(
     idleState({
-      done: { kind: "display", key: "DP-2" },
+      done: { kind: "display", key: "DP-2", enable: true },
       exitCode: 1,
       pendingDisplays: { "DP-2": true }
     })
   )
   assert.deepEqual(next.pendingDisplays, {})
+  assert.equal(next.run, null)
+})
+
+test("nextAction: a failed display request leaves a pending entry that is no longer its own", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2", enable: true },
+      exitCode: 1,
+      pendingDisplays: { "DP-2": false }
+    })
+  )
+  assert.deepEqual(next.pendingDisplays, { "DP-2": false })
+})
+
+test("nextAction: a successful display request keeps its pending entry for the re-read", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2", enable: true },
+      pendingDisplays: { "DP-2": true }
+    })
+  )
+  assert.deepEqual(next.pendingDisplays, { "DP-2": true })
   assert.equal(next.run, null)
 })
 
@@ -581,73 +603,6 @@ test("nextAction: a failed scale drops its pending scale, a later one stays", ()
     ).pendingScale,
     "3"
   )
-})
-
-test("nextAction: the pending-on display failed, so the queued disable of the last one is dropped", () => {
-  const next = logic.nextAction(
-    idleState({
-      done: { kind: "display", key: "DP-2" },
-      exitCode: 1,
-      queuedDisplays: { "eDP-1": false },
-      pendingDisplays: { "DP-2": true, "eDP-1": false }
-    })
-  )
-  assert.equal(next.run, null)
-  assert.deepEqual(next.queuedDisplays, {})
-  assert.deepEqual(next.pendingDisplays, {})
-})
-
-test("nextAction: a queued disable is re-checked even after a success not yet re-read", () => {
-  const next = logic.nextAction(
-    idleState({
-      done: { kind: "display", key: "DP-2" },
-      queuedDisplays: { "eDP-1": false },
-      pendingDisplays: { "DP-2": true, "eDP-1": false }
-    })
-  )
-  assert.equal(next.run, null)
-  assert.deepEqual(next.queuedDisplays, {})
-  assert.deepEqual(next.pendingDisplays, { "DP-2": true })
-})
-
-test("nextAction: a queued disable runs while another display is confirmed on", () => {
-  const next = logic.nextAction(
-    idleState({
-      done: { kind: "display", key: "DP-3" },
-      enabledMap: { "eDP-1": true, "DP-2": true, "DP-3": false },
-      queuedDisplays: { "eDP-1": false },
-      pendingDisplays: { "DP-3": true, "eDP-1": false }
-    })
-  )
-  assert.deepEqual(next.run, { kind: "display", key: "eDP-1", enable: false })
-  assert.deepEqual(next.queuedDisplays, {})
-  assert.deepEqual(next.pendingDisplays, { "DP-3": true, "eDP-1": false })
-})
-
-test("nextAction: a refused queued disable gives way to the next queued request", () => {
-  const next = logic.nextAction(
-    idleState({
-      done: { kind: "display", key: "DP-2" },
-      exitCode: 1,
-      queuedDisplays: { "eDP-1": false, "DP-3": true },
-      pendingDisplays: { "DP-2": true, "eDP-1": false, "DP-3": true },
-      enabledMap: { "eDP-1": true, "DP-2": false, "DP-3": false }
-    })
-  )
-  assert.deepEqual(next.run, { kind: "display", key: "DP-3", enable: true })
-  assert.deepEqual(next.queuedDisplays, {})
-  assert.deepEqual(next.pendingDisplays, { "DP-3": true })
-})
-
-test("nextAction: a queued enable always runs", () => {
-  const next = logic.nextAction(
-    idleState({
-      done: { kind: "scale", key: "2" },
-      queuedDisplays: { "DP-2": true },
-      pendingDisplays: { "DP-2": true }
-    })
-  )
-  assert.deepEqual(next.run, { kind: "display", key: "DP-2", enable: true })
 })
 
 test("nextAction: a queued scale runs on the display it was chosen on", () => {
@@ -668,7 +623,7 @@ test("nextAction: a queued scale runs on the display it was chosen on", () => {
 test("nextAction: a scale queued behind a display command is dropped with its pending", () => {
   const next = logic.nextAction(
     idleState({
-      done: { kind: "display", key: "DP-2" },
+      done: { kind: "display", key: "DP-2", enable: true },
       queuedScale: "3",
       queuedScaleMonitor: "eDP-1",
       pendingScale: "3",
@@ -694,22 +649,146 @@ test("nextAction: missing state never throws", () => {
     run: null,
     queuedScale: "",
     queuedScaleMonitor: "",
-    queuedDisplays: {},
     pendingScale: "",
     pendingDisplays: {}
   })
 })
 
-test("nextAction: never mutates the maps it is given", () => {
+test("nextAction: never mutates the map it is given", () => {
   const state = idleState({
-    done: { kind: "display", key: "DP-2" },
+    done: { kind: "display", key: "DP-2", enable: true },
     exitCode: 1,
-    queuedDisplays: { "eDP-1": false },
-    pendingDisplays: { "DP-2": true, "eDP-1": false }
+    pendingDisplays: { "DP-2": true }
   })
   logic.nextAction(state)
-  assert.deepEqual(state.queuedDisplays, { "eDP-1": false })
-  assert.deepEqual(state.pendingDisplays, { "DP-2": true, "eDP-1": false })
+  assert.deepEqual(state.pendingDisplays, { "DP-2": true })
+})
+
+// --- displaysLocked / mayToggleDisplay (no display switch behind a stale read) --------
+
+test("displaysLocked: locked while a command runs", () => {
+  assert.equal(logic.displaysLocked({ running: true, exitSerial: 0, landedSerial: 0 }), true)
+})
+
+test("displaysLocked: locked after a display command exits until a read started after it lands", () => {
+  assert.equal(logic.displaysLocked({ running: false, exitSerial: 3, landedSerial: 2 }), true)
+  assert.equal(logic.displaysLocked({ running: false, exitSerial: 3, landedSerial: 3 }), false)
+  assert.equal(logic.displaysLocked({ running: false, exitSerial: 3, landedSerial: 4 }), false)
+})
+
+test("displaysLocked: unlocked from the start, and missing state never throws", () => {
+  assert.equal(logic.displaysLocked({ running: false, exitSerial: 0, landedSerial: -1 }), false)
+  assert.equal(logic.displaysLocked(undefined), false)
+})
+
+test("mayToggleDisplay: refused while locked, enable or disable", () => {
+  const base = { locked: true, enabledMap: { A: true, B: true }, pendingMap: {} }
+  assert.equal(logic.mayToggleDisplay(Object.assign({ name: "A", enable: true }, base)), false)
+  assert.equal(logic.mayToggleDisplay(Object.assign({ name: "A", enable: false }, base)), false)
+})
+
+test("mayToggleDisplay: unlocked, an enable is allowed and a disable needs mayDisable", () => {
+  assert.equal(
+    logic.mayToggleDisplay({
+      name: "B",
+      enable: true,
+      locked: false,
+      enabledMap: { A: true, B: false },
+      pendingMap: {}
+    }),
+    true
+  )
+  assert.equal(
+    logic.mayToggleDisplay({
+      name: "A",
+      enable: false,
+      locked: false,
+      enabledMap: { A: true, B: true },
+      pendingMap: {}
+    }),
+    true
+  )
+  assert.equal(
+    logic.mayToggleDisplay({
+      name: "A",
+      enable: false,
+      locked: false,
+      enabledMap: { A: true, B: false },
+      pendingMap: {}
+    }),
+    false
+  )
+})
+
+test("mayToggleDisplay: no name, or missing state, is refused", () => {
+  assert.equal(logic.mayToggleDisplay({ name: "", enable: true, locked: false }), false)
+  assert.equal(logic.mayToggleDisplay(undefined), false)
+})
+
+test("mayDisable: a display with any pending entry is not confirmed (the stale-read repro, step 4)", () => {
+  assert.equal(logic.mayDisable("B", { A: true, B: true }, { A: true }), false)
+})
+
+// The re-review's repro, played through the pure rules the panel follows: A and
+// B read on; disable A (in flight); re-enable A; disable B; A's disable exits 0;
+// the enable of A would fail. Every step after the first is refused, so a
+// display always stays on.
+test("the stale-read repro now leaves A or B on", () => {
+  let enabledMap = { A: true, B: true }
+  let pendingMap = {}
+  let running = false
+  let exitSerial = 0
+  let landedSerial = -1
+  let actionSerial = 0
+  const locked = () => logic.displaysLocked({ running, exitSerial, landedSerial })
+  const request = (name, enable) => {
+    if (!logic.mayToggleDisplay({ name, enable, locked: locked(), enabledMap, pendingMap }))
+      return false
+    pendingMap = Object.assign({}, pendingMap, { [name]: enable })
+    running = true
+    return { kind: "display", key: name, enable }
+  }
+  const exit = (done, code) => {
+    running = false
+    actionSerial++
+    exitSerial = actionSerial
+    pendingMap = logic.nextAction({
+      done,
+      exitCode: code,
+      pendingDisplays: pendingMap
+    }).pendingDisplays
+  }
+
+  // 1-2. Disable A: allowed, now in flight.
+  const disableA = request("A", false)
+  assert.ok(disableA, "disabling A is allowed while B is confirmed on")
+  // 3. Re-enable A while its disable is in flight: refused, nothing queued.
+  assert.equal(request("A", true), false, "re-enabling A is refused while a command runs")
+  // 4. Disable B: refused.
+  assert.equal(request("B", false), false, "disabling B is refused while a command runs")
+  // 5. A's disable exits 0; the read is now stale.
+  exit(disableA, 0)
+  assert.equal(locked(), true, "still locked until a fresh read lands")
+  assert.equal(request("A", true), false, "re-enabling A waits for the fresh read")
+  assert.equal(request("B", false), false, "and so does disabling B")
+  // 6. A fresh read lands: A off, B on; the confirmed request settles.
+  enabledMap = { A: false, B: true }
+  landedSerial = actionSerial
+  pendingMap = {}
+  assert.equal(locked(), false, "the fresh read unlocks the switches")
+  assert.equal(request("B", false), false, "B is now the last display and cannot be disabled")
+  assert.equal(logic.lastEnabledName(enabledMap, pendingMap), "B")
+  // The re-enable of A runs now and fails: B was never touched.
+  const enableA = request("A", true)
+  assert.ok(enableA, "re-enabling A is allowed again")
+  assert.equal(request("B", false), false, "B cannot be disabled while A is only pending on")
+  exit(enableA, 1)
+  assert.deepEqual(pendingMap, {}, "the failed enable drops its own pending entry")
+  assert.equal(request("B", false), false, "nor before the read after the failure lands")
+  landedSerial = actionSerial
+  assert.equal(request("B", false), false, "nor after it: A is off")
+  const on = Object.keys(enabledMap).filter((n) => enabledMap[n])
+  assert.deepEqual(on, ["B"], "a display stays on")
 })
 
 // --- nightToggleTarget (the state omarchy-toggle-nightlight will leave) -------------
@@ -764,4 +843,8 @@ test("scaleCaption: nothing while a preset matches or one is pending", () => {
 test("scaleCaption: nothing with no scale read", () => {
   assert.equal(logic.scaleCaption("", "", ""), "")
   assert.equal(logic.scaleCaption(undefined, undefined, undefined), "")
+})
+
+test("displaysLocked: after a display command, an unknown landed read counts as stale", () => {
+  assert.equal(logic.displaysLocked({ running: false, exitSerial: 2 }), true)
 })

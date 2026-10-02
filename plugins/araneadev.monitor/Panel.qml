@@ -168,9 +168,8 @@ Panel {
   property string queuedScaleMonitor: ""
   // Display requests not yet confirmed: {name: the enabled state asked for}.
   property var pendingDisplays: ({})
-  // Display requests waiting behind a running actionProc, same shape.
-  property var queuedDisplays: ({})
-  // What the running actionProc does: {kind: "scale" or "display", key},
+  // What the running actionProc does: {kind: "scale" or "display", key,
+  // enable (a display request's asked-for state)},
   // so a failure drops only that request's pending state, and a scale
   // queued behind a display command is dropped (DisplaysLogic.nextAction).
   property var actionRunning: null
@@ -178,6 +177,19 @@ Panel {
   property int actionSerial: 0
   // See actionSerial.
   property int stateReadSerial: -1
+  // The actionSerial the last landed state read started at, -1 for none.
+  property int stateLandedSerial: -1
+  // The actionSerial right after the last display command exited, 0 for
+  // none: the switches stay locked until a read started after it lands.
+  property int displayExitSerial: 0
+  // Whether every display switch and row is refused: a command runs, or
+  // the last display command's fresh read hasn't landed
+  // (DisplaysLogic.displaysLocked). Display switches are never queued.
+  readonly property bool displaysLocked: DisplaysLogic.displaysLocked({
+    running: actionProc.running,
+    exitSerial: displayExitSerial,
+    landedSerial: stateLandedSerial
+  })
 
   // Row arrays kept by CursorLogic.keepRows, so an unchanged refresh hands
   // the view the same array and its Repeaters keep their delegates.
@@ -549,24 +561,22 @@ Panel {
     return enabledDisplayMap[name] === true
   }
 
-  // Enables or disables a display via hyprctl. A disable is refused unless
-  // another display is confirmed on (DisplaysLogic.mayDisable: one only
-  // pending on never counts). Shown at once (pendingDisplays) and queued
-  // behind a running actionProc.
+  // Enables or disables a display via hyprctl, never queued: refused while
+  // the switches are locked (displaysLocked), and a disable unless another
+  // display is confirmed on with no pending entry (DisplaysLogic
+  // .mayToggleDisplay / mayDisable). Shown at once (pendingDisplays).
   function toggleDisplay(name, enabled) {
-    if (!name)
-      return
-    if (enabled && !DisplaysLogic.mayDisable(name, root.enabledDisplayMap, root.pendingDisplays))
+    if (!DisplaysLogic.mayToggleDisplay({
+      name: name,
+      enable: !enabled,
+      locked: root.displaysLocked,
+      enabledMap: root.enabledDisplayMap,
+      pendingMap: root.pendingDisplays
+    }))
       return
     root.pendingDisplays = Object.assign({}, root.pendingDisplays, {
       [name]: !enabled
     })
-    if (actionProc.running) {
-      root.queuedDisplays = Object.assign({}, root.queuedDisplays, {
-        [name]: !enabled
-      })
-      return
-    }
     runDisplayCommand(name, !enabled)
   }
 
@@ -574,7 +584,8 @@ Panel {
   function runDisplayCommand(name, enable) {
     root.actionRunning = {
       kind: "display",
-      key: name
+      key: name,
+      enable: enable
     }
     actionProc.command = ["hyprctl", "keyword", "monitor", name + (enable ? ",preferred,auto,auto" : ",disable")]
     actionProc.running = true
@@ -612,35 +623,30 @@ Panel {
   }
 
   // actionProc exited with EXITCODE (DisplaysLogic.nextAction): a failure
-  // drops its pending state first; then the queued scale runs (dropped when
-  // a display command ran before it), else the next queued display, with a
-  // queued disable re-checked against the last-display guard. With nothing
-  // to run, the state is re-read.
+  // drops its own pending state; a display command locks the switches
+  // until a fresh read lands, drops any queued scale and always re-reads;
+  // else the queued scale runs, or with nothing to run, the state is
+  // re-read.
   function actionExited(exitCode) {
     var done = root.actionRunning
     root.actionRunning = null
     root.actionSerial++
+    if (done && done.kind === "display")
+      root.displayExitSerial = root.actionSerial
     var next = DisplaysLogic.nextAction({
       done: done,
       exitCode: exitCode,
       queuedScale: root.queuedScale,
       queuedScaleMonitor: root.queuedScaleMonitor,
-      queuedDisplays: root.queuedDisplays,
       pendingScale: root.pendingScale,
-      pendingDisplays: root.pendingDisplays,
-      enabledMap: root.enabledDisplayMap
+      pendingDisplays: root.pendingDisplays
     })
     root.queuedScale = next.queuedScale
     root.queuedScaleMonitor = next.queuedScaleMonitor
-    root.queuedDisplays = next.queuedDisplays
     root.pendingScale = next.pendingScale
     root.pendingDisplays = next.pendingDisplays
-    if (next.run && next.run.kind === "scale") {
+    if (next.run) {
       runScaleCommand(next.run.monitor, next.run.key)
-      return
-    }
-    if (next.run && next.run.kind === "display") {
-      runDisplayCommand(next.run.key, next.run.enable)
       return
     }
     root.refresh()
@@ -666,19 +672,19 @@ Panel {
       if (root.enabledDisplayMap[names[i]] === root.pendingDisplays[names[i]])
         dropPendingDisplay(names[i])
     }
-    var idle = !actionProc.running && root.queuedScale === "" && Object.keys(root.queuedDisplays).length === 0
+    var idle = !actionProc.running && root.queuedScale === ""
     if (idle && root.stateReadSerial === root.actionSerial) {
       root.pendingScale = ""
       root.pendingDisplays = {}
     }
   }
 
-  // Whether a scale or display request still waits on a state read that
-  // started after its command exited.
+  // Whether a scale or display request, or the display lock, still waits
+  // on a state read that started after its command exited.
   function actionsAwaitRead() {
     if (actionProc.running || root.stateReadSerial === root.actionSerial)
       return false
-    return root.pendingScale !== "" || Object.keys(root.pendingDisplays).length > 0
+    return root.displaysLocked || root.pendingScale !== "" || Object.keys(root.pendingDisplays).length > 0
   }
 
   // ---- Text size (shell base font + GTK text-scaling, via one CLI) ----
@@ -1012,6 +1018,7 @@ Panel {
         root.focusedMonitor = String(lines[5] || "").trim()
         root.monitorScale = root.normalizeScale(String(lines[6] || "").trim())
         root.updateDisplays(String(lines[7] || "[]").trim())
+        root.stateLandedSerial = root.stateReadSerial
         root.settleActions()
       }
     }
@@ -1275,6 +1282,7 @@ Panel {
         enabledDisplays: root.enabledDisplayMap
         pendingDisplays: root.pendingDisplays
         lastEnabled: root.lastEnabled
+        displaysLocked: root.displaysLocked
         onAction: function (name, arg) {
           root.handleAction(name, arg)
         }
