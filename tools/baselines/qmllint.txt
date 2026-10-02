@@ -105,6 +105,11 @@
 2	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "subtitle" not found on type "QObject"
 1	plugins/araneadev.menu/MenuWindow.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.menu/MenuWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
+2	plugins/araneadev.monitor/DisplaysCaption.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.monitor/DisplaysCaption.qml:missing-property:Member "family" not found on type "QObject"
+3	plugins/araneadev.monitor/DisplaysDropdown.qml:missing-property:Member "caption" not found on type "QObject"
+2	plugins/araneadev.monitor/DisplaysDropdown.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.monitor/DisplaysDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
 2	plugins/araneadev.network/NetworkBandSection.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.network/NetworkBandSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkDnsSection.qml:missing-property:Member "caption" not found on type "QObject"

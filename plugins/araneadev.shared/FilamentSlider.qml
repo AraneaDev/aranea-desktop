@@ -2,7 +2,11 @@
 // violet, a glowing node as the handle, and an optional live-signal glow
 // along the lit part. Left-drag or click sets the value; right-click emits
 // rightClicked (audio mutes with it). The node stays inside the item, so
-// the strand's right edge is the item's right edge.
+// the strand's right edge is the item's right edge. moved reports every
+// step (a drag previews with it); committed reports where a drag or click
+// was let go, or a wheel step landed. A busy slider (a change in flight)
+// breathes its node; a clickGate refuses a press aimed before a layout
+// shift, as FilamentSwitch's does.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -28,6 +32,14 @@ Item {
   property real liveValue: value
   // Whether a drag is in progress.
   property bool dragging: false
+  // Whether a change is in flight: the node breathes until it settles.
+  property bool busy: false
+  // Opacity the busy animation drives, 0.45..1.
+  property real pulseOpacity: 1
+  // Optional item whose clickSettled() a left press must pass; a refused
+  // press neither moves nor commits. null (default) never refuses one.
+  // The wheel and wheelBy() stay unguarded.
+  property var clickGate: null
   // Lit fraction of the strand, 0..1.
   readonly property real progress: Math.max(0, Math.min(1, (liveValue - minimum) / Math.max(0.0001, maximum - minimum)))
   // Colour of the lit strand and the node when muted.
@@ -41,6 +53,9 @@ Item {
   signal moved(real value)
   // Emitted on right-click anywhere on the slider.
   signal rightClicked
+  // Emitted with the final value when a drag or click is let go, and after
+  // a wheel step.
+  signal committed(real value)
 
   // Sets the value from an x position in the item, as a click would.
   function setFromX(x) {
@@ -59,6 +74,7 @@ Item {
     var next = Math.max(minimum, Math.min(maximum, liveValue + (angle > 0 ? step : -step)))
     liveValue = next
     moved(next)
+    committed(next)
   }
 
   onValueChanged: if (!dragging)
@@ -163,12 +179,34 @@ Item {
     color: Color.background
     border.width: Math.max(1, Style.space(2))
     border.color: slider.muted ? slider.quietColor : DesignTokens.accent
+    opacity: slider.busy ? (DesignTokens.motionEnabled ? slider.pulseOpacity : 0.7) : 1
     Behavior on x {
       enabled: !slider.dragging && DesignTokens.motionEnabled
       NumberAnimation {
         duration: 140
         easing.type: Easing.OutCubic
       }
+    }
+  }
+
+  // Breathing while busy; static at 0.7 when motion is disabled.
+  SequentialAnimation {
+    objectName: "busyPulse"
+    loops: Animation.Infinite
+    running: slider.busy && DesignTokens.motionEnabled
+    NumberAnimation {
+      target: slider
+      property: "pulseOpacity"
+      to: 0.45
+      duration: 1200
+      easing.type: Easing.InOutSine
+    }
+    NumberAnimation {
+      target: slider
+      property: "pulseOpacity"
+      to: 1
+      duration: 1200
+      easing.type: Easing.InOutSine
     }
   }
 
@@ -185,6 +223,8 @@ Item {
     onPressed: function (mouse) {
       if (mouse.button !== Qt.LeftButton)
         return
+      if (slider.clickGate && !slider.clickGate.clickSettled())
+        return
       slider.dragging = true
       slider.setFromX(mouse.x)
     }
@@ -193,10 +233,12 @@ Item {
         slider.setFromX(mouse.x)
     }
     onReleased: function (mouse) {
-      if (mouse.button !== Qt.LeftButton)
+      if (mouse.button !== Qt.LeftButton || !slider.dragging)
         return
+      var landed = slider.liveValue
       slider.dragging = false
       slider.liveValue = slider.value
+      slider.committed(landed)
     }
     onCanceled: {
       slider.dragging = false
