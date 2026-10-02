@@ -3,7 +3,8 @@
 // `brightnessctl -d <device> -m` parsing, the keyboard-light command and
 // control kind, which sections the dropdown shows and the keyboard order
 // through them, the header caption, the pending/queue helpers (mirroring
-// `araneadev.power`'s `PowerLogic`) and the keyboard hint. No QML, no I/O;
+// `araneadev.power`'s `PowerLogic`), the last-display guard, the
+// focus-checked scale command, the exit queue and the keyboard hint. No QML, no I/O;
 // run with `node --test tests/js/` (tools/check runs it with coverage).
 
 const assert = require("node:assert/strict")
@@ -446,4 +447,267 @@ test("keyHint: any other section (or none) defaults to esc close / tab next", ()
   assert.equal(logic.keyHint("unknown"), "esc close · tab next")
   assert.equal(logic.keyHint(undefined), "esc close · tab next")
   assert.equal(logic.keyHint(""), "esc close · tab next")
+})
+
+// --- mayDisable / lastEnabledName (C1: never switch off the last display) ----------
+//
+// Only a display CONFIRMED on (read enabled, and no pending request to switch
+// it off) counts as another enabled display; a display that is only pending
+// on never does.
+
+test("mayDisable: allowed while another display is confirmed on", () => {
+  assert.equal(logic.mayDisable("eDP-1", { "eDP-1": true, "DP-2": true }, {}), true)
+})
+
+test("mayDisable: two displays, the other only pending on, is refused", () => {
+  assert.equal(logic.mayDisable("eDP-1", { "eDP-1": true, "DP-2": false }, { "DP-2": true }), false)
+})
+
+test("mayDisable: the pending-on display failed (its request dropped), still refused", () => {
+  assert.equal(logic.mayDisable("eDP-1", { "eDP-1": true, "DP-2": false }, {}), false)
+})
+
+test("mayDisable: another display already pending off does not count", () => {
+  assert.equal(logic.mayDisable("eDP-1", { "eDP-1": true, "DP-2": true }, { "DP-2": false }), false)
+})
+
+test("mayDisable: a single display is refused", () => {
+  assert.equal(logic.mayDisable("eDP-1", { "eDP-1": true }, {}), false)
+})
+
+test("mayDisable: no name, or missing maps, is refused without throwing", () => {
+  assert.equal(logic.mayDisable("", { "eDP-1": true, "DP-2": true }, {}), false)
+  assert.equal(logic.mayDisable("eDP-1", undefined, undefined), false)
+  assert.equal(logic.mayDisable("eDP-1", { "DP-2": true }, null), true)
+})
+
+test("lastEnabledName: the only confirmed-on display", () => {
+  assert.equal(logic.lastEnabledName({ "eDP-1": true, "DP-2": false }, {}), "eDP-1")
+})
+
+test("lastEnabledName: a display only pending on leaves the confirmed one last", () => {
+  assert.equal(logic.lastEnabledName({ "eDP-1": true, "DP-2": false }, { "DP-2": true }), "eDP-1")
+})
+
+test("lastEnabledName: a display pending off leaves the other last", () => {
+  assert.equal(logic.lastEnabledName({ "eDP-1": true, "DP-2": true }, { "eDP-1": false }), "DP-2")
+})
+
+test("lastEnabledName: two confirmed on, or none, gives no last display", () => {
+  assert.equal(logic.lastEnabledName({ "eDP-1": true, "DP-2": true }, {}), "")
+  assert.equal(logic.lastEnabledName({ "eDP-1": false }, {}), "")
+  assert.equal(logic.lastEnabledName(undefined, undefined), "")
+})
+
+// --- scaleCommand (C2: a scale only lands on the display it was chosen for) -----------
+
+test("scaleCommand: checks the focused display first, values passed as arguments", () => {
+  assert.deepEqual(logic.scaleCommand("eDP-1", "2"), [
+    "bash",
+    "-c",
+    '[ "$(hyprctl monitors -j | jq -r ".[]|select(.focused).name")" = "$1" ] && exec omarchy-hyprland-monitor-scaling "$2"',
+    "_",
+    "eDP-1",
+    "2"
+  ])
+})
+
+test("scaleCommand: hostile values stay single arguments, never spliced into the script", () => {
+  const argv = logic.scaleCommand('x"; rm -rf ~; "', "2; reboot")
+  assert.equal(argv[2].indexOf("rm"), -1)
+  assert.equal(argv[2].indexOf("reboot"), -1)
+  assert.deepEqual(argv.slice(3), ["_", 'x"; rm -rf ~; "', "2; reboot"])
+})
+
+test("scaleCommand: no display or no scale gives no command", () => {
+  assert.equal(logic.scaleCommand("", "2"), null)
+  assert.equal(logic.scaleCommand("eDP-1", ""), null)
+  assert.equal(logic.scaleCommand(undefined, undefined), null)
+})
+
+// --- nextAction (C1 + C2: what runs when the scale/display command exits) -----------
+
+const idleState = (over) =>
+  Object.assign(
+    {
+      done: null,
+      exitCode: 0,
+      queuedScale: "",
+      queuedScaleMonitor: "",
+      queuedDisplays: {},
+      pendingScale: "",
+      pendingDisplays: {},
+      enabledMap: { "eDP-1": true, "DP-2": false }
+    },
+    over
+  )
+
+test("nextAction: nothing queued runs nothing and keeps the pending state", () => {
+  assert.deepEqual(
+    logic.nextAction(idleState({ pendingScale: "2", done: { kind: "scale", key: "2" } })),
+    {
+      run: null,
+      queuedScale: "",
+      queuedScaleMonitor: "",
+      queuedDisplays: {},
+      pendingScale: "2",
+      pendingDisplays: {}
+    }
+  )
+})
+
+test("nextAction: a failed display request drops its pending state", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2" },
+      exitCode: 1,
+      pendingDisplays: { "DP-2": true }
+    })
+  )
+  assert.deepEqual(next.pendingDisplays, {})
+  assert.equal(next.run, null)
+})
+
+test("nextAction: a failed scale drops its pending scale, a later one stays", () => {
+  assert.equal(
+    logic.nextAction(
+      idleState({ done: { kind: "scale", key: "2" }, exitCode: 1, pendingScale: "2" })
+    ).pendingScale,
+    ""
+  )
+  assert.equal(
+    logic.nextAction(
+      idleState({ done: { kind: "scale", key: "2" }, exitCode: 1, pendingScale: "3" })
+    ).pendingScale,
+    "3"
+  )
+})
+
+test("nextAction: the pending-on display failed, so the queued disable of the last one is dropped", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2" },
+      exitCode: 1,
+      queuedDisplays: { "eDP-1": false },
+      pendingDisplays: { "DP-2": true, "eDP-1": false }
+    })
+  )
+  assert.equal(next.run, null)
+  assert.deepEqual(next.queuedDisplays, {})
+  assert.deepEqual(next.pendingDisplays, {})
+})
+
+test("nextAction: a queued disable is re-checked even after a success not yet re-read", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2" },
+      queuedDisplays: { "eDP-1": false },
+      pendingDisplays: { "DP-2": true, "eDP-1": false }
+    })
+  )
+  assert.equal(next.run, null)
+  assert.deepEqual(next.queuedDisplays, {})
+  assert.deepEqual(next.pendingDisplays, { "DP-2": true })
+})
+
+test("nextAction: a queued disable runs while another display is confirmed on", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-3" },
+      enabledMap: { "eDP-1": true, "DP-2": true, "DP-3": false },
+      queuedDisplays: { "eDP-1": false },
+      pendingDisplays: { "DP-3": true, "eDP-1": false }
+    })
+  )
+  assert.deepEqual(next.run, { kind: "display", key: "eDP-1", enable: false })
+  assert.deepEqual(next.queuedDisplays, {})
+  assert.deepEqual(next.pendingDisplays, { "DP-3": true, "eDP-1": false })
+})
+
+test("nextAction: a refused queued disable gives way to the next queued request", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2" },
+      exitCode: 1,
+      queuedDisplays: { "eDP-1": false, "DP-3": true },
+      pendingDisplays: { "DP-2": true, "eDP-1": false, "DP-3": true },
+      enabledMap: { "eDP-1": true, "DP-2": false, "DP-3": false }
+    })
+  )
+  assert.deepEqual(next.run, { kind: "display", key: "DP-3", enable: true })
+  assert.deepEqual(next.queuedDisplays, {})
+  assert.deepEqual(next.pendingDisplays, { "DP-3": true })
+})
+
+test("nextAction: a queued enable always runs", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "scale", key: "2" },
+      queuedDisplays: { "DP-2": true },
+      pendingDisplays: { "DP-2": true }
+    })
+  )
+  assert.deepEqual(next.run, { kind: "display", key: "DP-2", enable: true })
+})
+
+test("nextAction: a queued scale runs on the display it was chosen on", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "scale", key: "2" },
+      queuedScale: "3",
+      queuedScaleMonitor: "eDP-1",
+      pendingScale: "3"
+    })
+  )
+  assert.deepEqual(next.run, { kind: "scale", key: "3", monitor: "eDP-1" })
+  assert.equal(next.queuedScale, "")
+  assert.equal(next.queuedScaleMonitor, "")
+  assert.equal(next.pendingScale, "3")
+})
+
+test("nextAction: a scale queued behind a display command is dropped with its pending", () => {
+  const next = logic.nextAction(
+    idleState({
+      done: { kind: "display", key: "DP-2" },
+      queuedScale: "3",
+      queuedScaleMonitor: "eDP-1",
+      pendingScale: "3",
+      pendingDisplays: { "DP-2": true }
+    })
+  )
+  assert.equal(next.run, null)
+  assert.equal(next.queuedScale, "")
+  assert.equal(next.queuedScaleMonitor, "")
+  assert.equal(next.pendingScale, "")
+})
+
+test("nextAction: a queued scale with no display recorded is dropped", () => {
+  const next = logic.nextAction(
+    idleState({ done: { kind: "scale", key: "2" }, queuedScale: "3", pendingScale: "3" })
+  )
+  assert.equal(next.run, null)
+  assert.equal(next.pendingScale, "")
+})
+
+test("nextAction: missing state never throws", () => {
+  assert.deepEqual(logic.nextAction(undefined), {
+    run: null,
+    queuedScale: "",
+    queuedScaleMonitor: "",
+    queuedDisplays: {},
+    pendingScale: "",
+    pendingDisplays: {}
+  })
+})
+
+test("nextAction: never mutates the maps it is given", () => {
+  const state = idleState({
+    done: { kind: "display", key: "DP-2" },
+    exitCode: 1,
+    queuedDisplays: { "eDP-1": false },
+    pendingDisplays: { "DP-2": true, "eDP-1": false }
+  })
+  logic.nextAction(state)
+  assert.deepEqual(state.queuedDisplays, { "eDP-1": false })
+  assert.deepEqual(state.pendingDisplays, { "DP-2": true, "eDP-1": false })
 })

@@ -160,12 +160,16 @@ Panel {
   property string pendingScale: ""
   // A scale asked for while actionProc was already running; "" for none.
   property string queuedScale: ""
+  // The display focused when queuedScale was clicked; the scale only lands
+  // there (DisplaysLogic.scaleCommand).
+  property string queuedScaleMonitor: ""
   // Display requests not yet confirmed: {name: the enabled state asked for}.
   property var pendingDisplays: ({})
   // Display requests waiting behind a running actionProc, same shape.
   property var queuedDisplays: ({})
   // What the running actionProc does: {kind: "scale" or "display", key},
-  // so a failure drops only that request's pending state.
+  // so a failure drops only that request's pending state, and a scale
+  // queued behind a display command is dropped (DisplaysLogic.nextAction).
   property var actionRunning: null
   // Exit and read counters for actionProc and stateProc, as nightSerial.
   property int actionSerial: 0
@@ -229,19 +233,9 @@ Panel {
     return map
   }
 
-  // The names of the displays that read on, counting pending requests.
-  readonly property var shownEnabledNames: {
-    var names = []
-    for (var i = 0; i < displays.length; i++) {
-      var d = displays[i]
-      if (d && d.name && root.displayShownOn(String(d.name)))
-        names.push(String(d.name))
-    }
-    return names
-  }
-
-  // The only display that reads on (its switch is disabled), or "".
-  readonly property string lastEnabled: shownEnabledNames.length === 1 ? shownEnabledNames[0] : ""
+  // The only display confirmed on (its switch is disabled), or "": a
+  // display only pending on never counts (DisplaysLogic.lastEnabledName).
+  readonly property string lastEnabled: DisplaysLogic.lastEnabledName(enabledDisplayMap, pendingDisplays)
 
   // The scale key the pills mark chosen, as read: the active preset
   // (Model.matchingScaleIndex), or "" with no match.
@@ -551,13 +545,14 @@ Panel {
     return enabledDisplayMap[name] === true
   }
 
-  // Enables or disables a display via hyprctl, refusing to disable the last
-  // enabled one (counting requests still in flight). Shown at once
-  // (pendingDisplays) and queued behind a running actionProc.
+  // Enables or disables a display via hyprctl. A disable is refused unless
+  // another display is confirmed on (DisplaysLogic.mayDisable: one only
+  // pending on never counts). Shown at once (pendingDisplays) and queued
+  // behind a running actionProc.
   function toggleDisplay(name, enabled) {
     if (!name)
       return
-    if (enabled && root.shownEnabledNames.length <= 1)
+    if (enabled && !DisplaysLogic.mayDisable(name, root.enabledDisplayMap, root.pendingDisplays))
       return
     root.pendingDisplays = Object.assign({}, root.pendingDisplays, {
       [name]: !enabled
@@ -581,11 +576,13 @@ Panel {
     actionProc.running = true
   }
 
-  // Applies scale to the focused display via omarchy-hyprland-monitor-scaling.
+  // Applies scale to the display focused now (the one it was clicked on),
+  // via omarchy-hyprland-monitor-scaling; refused with no focused display.
   // Shown chosen at once (pendingScale); a request while actionProc runs is
-  // queued, the last one winning (DisplaysLogic.takeQueued).
+  // queued with its display, the last one winning (DisplaysLogic.takeQueued).
   function setScale(scale) {
-    if (!scale)
+    var monitor = root.focusedMonitor
+    if (!scale || !monitor)
       return
     root.pendingScale = String(scale)
     var next = DisplaysLogic.takeQueued({
@@ -593,51 +590,54 @@ Panel {
       queued: String(scale)
     })
     root.queuedScale = next.queue
+    root.queuedScaleMonitor = next.queue !== "" ? monitor : ""
     if (next.run !== "")
-      runScaleCommand(next.run)
+      runScaleCommand(monitor, next.run)
   }
 
-  // Starts omarchy-hyprland-monitor-scaling for SCALE.
-  function runScaleCommand(scale) {
+  // Starts the scaling for SCALE on display MONITOR, which only runs while
+  // MONITOR is still focused (DisplaysLogic.scaleCommand); a mismatch exits
+  // non-zero, dropping the pending scale.
+  function runScaleCommand(monitor, scale) {
     root.actionRunning = {
       kind: "scale",
       key: scale
     }
-    actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]
+    actionProc.command = DisplaysLogic.scaleCommand(monitor, scale)
     actionProc.running = true
   }
 
-  // actionProc exited with EXITCODE: runs the queued scale, else the next
-  // queued display; otherwise a failure drops its pending state, and the
-  // state is re-read either way.
+  // actionProc exited with EXITCODE (DisplaysLogic.nextAction): a failure
+  // drops its pending state first; then the queued scale runs (dropped when
+  // a display command ran before it), else the next queued display, with a
+  // queued disable re-checked against the last-display guard. With nothing
+  // to run, the state is re-read.
   function actionExited(exitCode) {
     var done = root.actionRunning
     root.actionRunning = null
     root.actionSerial++
-    var next = DisplaysLogic.takeQueued({
-      running: false,
-      queued: root.queuedScale
+    var next = DisplaysLogic.nextAction({
+      done: done,
+      exitCode: exitCode,
+      queuedScale: root.queuedScale,
+      queuedScaleMonitor: root.queuedScaleMonitor,
+      queuedDisplays: root.queuedDisplays,
+      pendingScale: root.pendingScale,
+      pendingDisplays: root.pendingDisplays,
+      enabledMap: root.enabledDisplayMap
     })
-    root.queuedScale = next.queue
-    if (next.run !== "") {
-      runScaleCommand(next.run)
+    root.queuedScale = next.queuedScale
+    root.queuedScaleMonitor = next.queuedScaleMonitor
+    root.queuedDisplays = next.queuedDisplays
+    root.pendingScale = next.pendingScale
+    root.pendingDisplays = next.pendingDisplays
+    if (next.run && next.run.kind === "scale") {
+      runScaleCommand(next.run.monitor, next.run.key)
       return
     }
-    var names = Object.keys(root.queuedDisplays)
-    if (names.length > 0) {
-      var name = names[0]
-      var enable = root.queuedDisplays[name]
-      var rest = Object.assign({}, root.queuedDisplays)
-      delete rest[name]
-      root.queuedDisplays = rest
-      runDisplayCommand(name, enable)
+    if (next.run && next.run.kind === "display") {
+      runDisplayCommand(next.run.key, next.run.enable)
       return
-    }
-    if (exitCode !== 0 && done) {
-      if (done.kind === "scale" && root.pendingScale === done.key)
-        root.pendingScale = ""
-      else if (done.kind === "display")
-        dropPendingDisplay(done.key)
     }
     root.refresh()
   }

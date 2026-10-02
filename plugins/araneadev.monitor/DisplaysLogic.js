@@ -4,8 +4,11 @@
 // `brightnessctl -d <device> -m`, the command a keyboard-light change runs,
 // which sections the dropdown shows and the keyboard order through them,
 // the header caption (`Model.cleanScale`'s companion), the pending/queue
-// helpers (araneadev.power's `PowerLogic` pattern) and the keyboard hint. No
-// QML, no I/O; tests/js/displays-logic.test.js runs this under Node.
+// helpers (araneadev.power's `PowerLogic` pattern), the last-display guard
+// (never switch off the last display confirmed on), the focus-checked
+// scale command, what runs when the scale/display command exits, and the
+// keyboard hint. No QML, no I/O; tests/js/displays-logic.test.js runs this
+// under Node.
 
 /**
  * The night light's parsed status, from `omarchy-toggle-nightlight
@@ -247,6 +250,142 @@ function takeQueued(state) {
 }
 
 /**
+ * Whether display `name` is confirmed on: read enabled, with no pending
+ * request to switch it off. A display only pending on never is.
+ * @param {string} name - the monitor name
+ * @param {{[name: string]: boolean}} enabledMap - which displays read enabled
+ * @param {{[name: string]: boolean}} pendingMap - requests not yet confirmed
+ * @returns {boolean} true when it is confirmed on
+ */
+function confirmedOn(name, enabledMap, pendingMap) {
+  return enabledMap[name] === true && pendingMap[name] !== false
+}
+
+/**
+ * Whether display `name` may be switched off: only while ANOTHER display is
+ * confirmed on (`confirmedOn`), so a failed or slow enable elsewhere can never
+ * leave zero enabled displays. When in doubt (no name, no maps) it refuses.
+ * @param {string|null|undefined} name - the display to switch off
+ * @param {{[name: string]: boolean}|null|undefined} enabledMap - which displays read enabled
+ * @param {{[name: string]: boolean}|null|undefined} pendingMap - requests not yet confirmed
+ * @returns {boolean} true when the disable may run
+ */
+function mayDisable(name, enabledMap, pendingMap) {
+  if (!name) return false
+  var enabled = enabledMap || {}
+  var pending = pendingMap || {}
+  var names = Object.keys(enabled)
+  for (var i = 0; i < names.length; i++) {
+    if (names[i] !== name && confirmedOn(names[i], enabled, pending)) return true
+  }
+  return false
+}
+
+/**
+ * The display whose switch is locked on: the only one confirmed on
+ * (`confirmedOn`), or "" when there are none or several. The same rule as
+ * `mayDisable`, so the view never offers a disable the panel would refuse.
+ * @param {{[name: string]: boolean}|null|undefined} enabledMap - which displays read enabled
+ * @param {{[name: string]: boolean}|null|undefined} pendingMap - requests not yet confirmed
+ * @returns {string} the monitor name, or ""
+ */
+function lastEnabledName(enabledMap, pendingMap) {
+  var enabled = enabledMap || {}
+  var pending = pendingMap || {}
+  var on = Object.keys(enabled).filter(function (n) {
+    return confirmedOn(n, enabled, pending)
+  })
+  return on.length === 1 ? on[0] : ""
+}
+
+/**
+ * The argv that sets `scale` on display `name`, and only if `name` is still
+ * the focused display when it runs (`omarchy-hyprland-monitor-scaling` acts
+ * on whichever display is focused). The name and the scale are passed as
+ * positional arguments, never spliced into the script; a focus mismatch
+ * exits non-zero.
+ * @param {string|null|undefined} name - the display the scale was chosen on
+ * @param {string|null|undefined} scale - the scale preset
+ * @returns {string[]|null} the argv, or null with no display or no scale
+ */
+function scaleCommand(name, scale) {
+  if (!name || !scale) return null
+  return [
+    "bash",
+    "-c",
+    '[ "$(hyprctl monitors -j | jq -r ".[]|select(.focused).name")" = "$1" ] && exec omarchy-hyprland-monitor-scaling "$2"',
+    "_",
+    String(name),
+    String(scale)
+  ]
+}
+
+/**
+ * What the scale/display command (`actionProc`) does next once it exits, and
+ * the pending and queued state that leaves. In order: a failed request drops
+ * its own pending state first; a scale queued behind a display command is
+ * dropped (the displays, and so the focus, may have moved under it), as is
+ * one with no display recorded; a queued scale runs next, on the display it
+ * was chosen on; else the queued display requests are taken in order, and a
+ * queued disable is re-checked with `mayDisable` and dropped (with its pending
+ * state) when it would leave no display confirmed on.
+ * @param {{done?: {kind: string, key: string}|null, exitCode?: number, queuedScale?: string, queuedScaleMonitor?: string, queuedDisplays?: {[name: string]: boolean}, pendingScale?: string, pendingDisplays?: {[name: string]: boolean}, enabledMap?: {[name: string]: boolean}}|null|undefined} state
+ * @returns {{run: ({kind: "scale", key: string, monitor: string}|{kind: "display", key: string, enable: boolean}|null), queuedScale: string, queuedScaleMonitor: string, queuedDisplays: {[name: string]: boolean}, pendingScale: string, pendingDisplays: {[name: string]: boolean}}} what to run (null for nothing) and the state to keep
+ */
+function nextAction(state) {
+  var s = state || {}
+  var done = s.done || null
+  var pendingScale = s.pendingScale || ""
+  var pendingDisplays = Object.assign({}, s.pendingDisplays || {})
+  var queuedDisplays = Object.assign({}, s.queuedDisplays || {})
+  var queuedScale = s.queuedScale || ""
+  var queuedScaleMonitor = s.queuedScaleMonitor || ""
+  var enabledMap = s.enabledMap || {}
+  if (done && s.exitCode !== 0) {
+    if (done.kind === "scale" && pendingScale === done.key) pendingScale = ""
+    else if (done.kind === "display") delete pendingDisplays[done.key]
+  }
+  if (queuedScale !== "" && ((done && done.kind === "display") || queuedScaleMonitor === "")) {
+    if (pendingScale === queuedScale) pendingScale = ""
+    queuedScale = ""
+    queuedScaleMonitor = ""
+  }
+  /**
+   * The result with RUN and the state so far.
+   * @param {{kind: string, key: string, monitor?: string, enable?: boolean}|null} run - what to run
+   * @returns {*} nextAction's result
+   */
+  var result = function (run) {
+    return {
+      run: run,
+      queuedScale: queuedScale,
+      queuedScaleMonitor: queuedScaleMonitor,
+      queuedDisplays: queuedDisplays,
+      pendingScale: pendingScale,
+      pendingDisplays: pendingDisplays
+    }
+  }
+  if (queuedScale !== "") {
+    var run = { kind: "scale", key: queuedScale, monitor: queuedScaleMonitor }
+    queuedScale = ""
+    queuedScaleMonitor = ""
+    return result(run)
+  }
+  var names = Object.keys(queuedDisplays)
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i]
+    var enable = queuedDisplays[name] === true
+    delete queuedDisplays[name]
+    if (!enable && !mayDisable(name, enabledMap, pendingDisplays)) {
+      delete pendingDisplays[name]
+      continue
+    }
+    return result({ kind: "display", key: name, enable: enable })
+  }
+  return result(null)
+}
+
+/**
  * The key-hint line for the cursor's section.
  * @param {string|undefined} section - the cursor's section
  * @returns {string} the hint
@@ -272,5 +411,9 @@ if (typeof module !== "undefined")
     headerCaption: headerCaption,
     settlePending: settlePending,
     takeQueued: takeQueued,
+    mayDisable: mayDisable,
+    lastEnabledName: lastEnabledName,
+    scaleCommand: scaleCommand,
+    nextAction: nextAction,
     keyHint: keyHint
   }
