@@ -348,7 +348,9 @@ Panel {
       hero: {
         glyph: root.label,
         temp: temp,
-        label: root.current ? WeatherLogic.conditionLabel(root.current) : "Fetching forecast…",
+        // From the same source as the glyph (open-meteo's code when it has
+        // answered, as Model.currentIcon), so the two never disagree.
+        label: root.current ? WeatherLogic.conditionLabel(root.openMeteoCurrent || root.current) : "Fetching forecast…",
         place: root.reportLocation,
         updated: root.fetchedAtMs > 0 ? "updated " + Qt.formatTime(new Date(root.fetchedAtMs), "HH:mm") : "",
         loading: root.fetchInFlight || root.awaitingPeer
