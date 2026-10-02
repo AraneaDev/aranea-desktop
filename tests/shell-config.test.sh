@@ -844,4 +844,64 @@ jq -e '.bar.layout.right == ["araneadev.weather"]' "$weather_real" >/dev/null ||
   exit 1
 }
 
+# --- tray bar entry: only retargeted once araneadev.tray is installed
+# (guard: $(dirname "$config_file")/plugins/araneadev.tray/manifest.json);
+# an object entry's pinned/hidden lists survive the round trip. Tray has no
+# bar.centerAnchor handling (that anchor is the clock).
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.tray", "pinned": ["a"], "hidden": ["b"]}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "omarchy.tray", "pinned": ["a"], "hidden": ["b"]}]
+  and ((.cloneSourceRestores // []) | index("araneadev.tray")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.tray"
+: >"$(dirname "$config")/plugins/araneadev.tray/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "araneadev.tray", "pinned": ["a"], "hidden": ["b"]}]
+  and (.cloneSourceRestores | index("araneadev.tray")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "omarchy.tray", "pinned": ["a"], "hidden": ["b"]}]
+  and ((.cloneSourceRestores // []) | index("araneadev.tray")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+tray_real="$test_root/tray-dotfiles/shell.json"
+tray_link="$test_root/tray-config/shell.json"
+mkdir -p "$(dirname "$tray_real")" "$(dirname "$tray_link")/plugins/araneadev.tray"
+: >"$(dirname "$tray_link")/plugins/araneadev.tray/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.tray"]}}}' >"$tray_real"
+ln -s "$tray_real" "$tray_link"
+"$repo_root/scripts/repair-shell-config" "$tray_link"
+test -L "$tray_link"
+jq -e '.bar.layout.right == ["araneadev.tray"]' "$tray_real" >/dev/null || {
+  cat "$tray_real"
+  exit 1
+}
+
+# The bell and health icons place themselves just before the tray entry,
+# looking it up as araneadev.tray once installed and retargeted (not the
+# now-stale literal "omarchy.tray"), all in the same repair pass.
+tray_bell_config="$test_root/tray-bell-config/shell.json"
+mkdir -p "$(dirname "$tray_bell_config")/plugins/araneadev.tray"
+: >"$(dirname "$tray_bell_config")/plugins/araneadev.tray/manifest.json"
+export ARANEA_STATE_ROOT="$test_root/tray-bell-state"
+cat >"$tray_bell_config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.network"}, {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$tray_bell_config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.health", "araneadev.notifications", "araneadev.tray"]' "$tray_bell_config" >/dev/null || {
+  cat "$tray_bell_config"
+  exit 1
+}
+export ARANEA_STATE_ROOT="$state_root"
+
 echo "shell config contract passed"
