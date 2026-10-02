@@ -443,6 +443,8 @@ Panel {
       fetchRate()
     } else {
       drawSamples = []
+      historySamples = []
+      historyNowSec = 0
     }
   }
 
@@ -528,10 +530,12 @@ Panel {
     onTriggered: root.fetchHistory()
   }
 
-  // The live draw, sampled every 1.5 s while open.
+  // The live draw, sampled every 1.5 s while open and while the draw
+  // section is shown (current flowing either way, the same condition the
+  // view uses to show it): never while on AC and full.
   Timer {
     interval: 1500
-    running: root.opened
+    running: root.opened && root.drawFlowing
     repeat: true
     onTriggered: root.fetchRate()
   }

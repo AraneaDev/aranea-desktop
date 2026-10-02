@@ -123,7 +123,7 @@ test("parseHistory on invalid input never throws, and gives []", () => {
 const NOW = 200000
 const WINDOW_START = NOW - 86400
 
-test("historyPoints: consecutive samples within 1800s stay in one segment", () => {
+test("historyPoints: consecutive samples within 1800s stay in one segment, tail held to now", () => {
   const samples = [
     { t: WINDOW_START + 100, pct: 50, state: 1 },
     { t: WINDOW_START + 200, pct: 60, state: 1 }
@@ -131,12 +131,13 @@ test("historyPoints: consecutive samples within 1800s stay in one segment", () =
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
     [
       { x: 100, y: 50 },
-      { x: 200, y: 40 }
+      { x: 200, y: 40 },
+      { x: 86400, y: 40 }
     ]
   ])
 })
 
-test("historyPoints: a gap of more than 1800s starts a new segment", () => {
+test("historyPoints: a gap of more than 1800s starts a new segment, tail held to now", () => {
   const samples = [
     { t: WINDOW_START + 100, pct: 50, state: 1 },
     { t: WINDOW_START + 200, pct: 60, state: 1 },
@@ -150,12 +151,13 @@ test("historyPoints: a gap of more than 1800s starts a new segment", () => {
     ],
     [
       { x: 2500, y: 30 },
-      { x: 2600, y: 20 }
+      { x: 2600, y: 20 },
+      { x: 86400, y: 20 }
     ]
   ])
 })
 
-test("historyPoints: a gap of exactly 1800s stays in the same segment", () => {
+test("historyPoints: a gap of exactly 1800s stays in the same segment, tail held to now", () => {
   const samples = [
     { t: WINDOW_START + 100, pct: 50, state: 1 },
     { t: WINDOW_START + 1900, pct: 60, state: 1 }
@@ -163,12 +165,13 @@ test("historyPoints: a gap of exactly 1800s stays in the same segment", () => {
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
     [
       { x: 100, y: 50 },
-      { x: 1900, y: 40 }
+      { x: 1900, y: 40 },
+      { x: 86400, y: 40 }
     ]
   ])
 })
 
-test("historyPoints: a sample before the window becomes a clipped start point at x=0", () => {
+test("historyPoints: a sample before the window becomes a clipped start point at x=0, tail held to now", () => {
   const samples = [
     { t: WINDOW_START - 500, pct: 40, state: 1 },
     { t: WINDOW_START + 300, pct: 55, state: 1 }
@@ -176,12 +179,13 @@ test("historyPoints: a sample before the window becomes a clipped start point at
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
     [
       { x: 0, y: 60 },
-      { x: 300, y: 45 }
+      { x: 300, y: 45 },
+      { x: 86400, y: 45 }
     ]
   ])
 })
 
-test("historyPoints: only the LAST sample before the window is kept as the clip point", () => {
+test("historyPoints: only the LAST sample before the window is kept as the clip point, tail held to now", () => {
   const samples = [
     { t: WINDOW_START - 9000, pct: 10, state: 1 },
     { t: WINDOW_START - 500, pct: 40, state: 1 },
@@ -190,38 +194,76 @@ test("historyPoints: only the LAST sample before the window is kept as the clip 
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
     [
       { x: 0, y: 60 },
-      { x: 300, y: 45 }
+      { x: 300, y: 45 },
+      { x: 86400, y: 45 }
     ]
   ])
 })
 
-test("historyPoints: a clip point more than 1800s from the next real sample starts its own segment", () => {
+test("historyPoints: a clip point more than 1800s from the next real sample starts its own segment, tail held to now", () => {
   const samples = [
     { t: WINDOW_START - 100000, pct: 40, state: 1 },
     { t: WINDOW_START + 5000, pct: 90, state: 1 }
   ]
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
     [{ x: 0, y: 60 }],
-    [{ x: 5000, y: 10 }]
+    [
+      { x: 5000, y: 10 },
+      { x: 86400, y: 10 }
+    ]
   ])
 })
 
-test("historyPoints: one sample in the window with nothing before it gives one single-point segment", () => {
+test("historyPoints: one sample in the window with nothing before it, tail held to now", () => {
   const samples = [{ t: WINDOW_START + 500, pct: 77, state: 1 }]
-  assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [[{ x: 500, y: 23 }]])
+  assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
+    [
+      { x: 500, y: 23 },
+      { x: 86400, y: 23 }
+    ]
+  ])
 })
 
-test("historyPoints: samples after now are dropped", () => {
+test("historyPoints: samples after now are dropped, tail held to now", () => {
   const samples = [
     { t: NOW + 500, pct: 99, state: 1 },
     { t: WINDOW_START + 300, pct: 50, state: 1 }
   ]
-  assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [[{ x: 300, y: 50 }]])
+  assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
+    [
+      { x: 300, y: 50 },
+      { x: 86400, y: 50 }
+    ]
+  ])
 })
 
-test("historyPoints: a sample exactly at now is kept, at the right edge", () => {
+test("historyPoints: a sample exactly at now is kept, at the right edge, with no duplicate tail", () => {
   const samples = [{ t: NOW, pct: 88, state: 1 }]
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [[{ x: 86400, y: 12 }]])
+})
+
+test("historyPoints: a steady 4h tail is held flat to now, past the 30-min gap rule", () => {
+  const samples = [{ t: NOW - 4 * 3600, pct: 100, state: 1 }]
+  assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
+    [
+      { x: 72000, y: 0 },
+      { x: 86400, y: 0 }
+    ]
+  ])
+})
+
+test("historyPoints: a mid-history gap still breaks while the final tail stretch holds flat", () => {
+  const samples = [
+    { t: NOW - 20000, pct: 30, state: 1 },
+    { t: NOW - 5000, pct: 70, state: 1 }
+  ]
+  assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
+    [{ x: 66400, y: 70 }],
+    [
+      { x: 81400, y: 30 },
+      { x: 86400, y: 30 }
+    ]
+  ])
 })
 
 test("historyPoints on an empty history gives []", () => {
@@ -233,7 +275,7 @@ test("historyPoints on missing/malformed samples never throws, and gives []", ()
   assert.deepEqual(logic.historyPoints(null, NOW, 86400, 100), [])
 })
 
-test("historyPoints tolerates samples given out of order", () => {
+test("historyPoints tolerates samples given out of order, tail held to now", () => {
   const samples = [
     { t: WINDOW_START + 200, pct: 60, state: 1 },
     { t: WINDOW_START + 100, pct: 50, state: 1 }
@@ -241,7 +283,8 @@ test("historyPoints tolerates samples given out of order", () => {
   assert.deepEqual(logic.historyPoints(samples, NOW, 86400, 100), [
     [
       { x: 100, y: 50 },
-      { x: 200, y: 40 }
+      { x: 200, y: 40 },
+      { x: 86400, y: 40 }
     ]
   ])
 })

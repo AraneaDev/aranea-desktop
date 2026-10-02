@@ -88,6 +88,15 @@ function parseHistory(json) {
  * sample doesn't wrongly split the line). A new segment starts whenever two
  * consecutive points (after clipping) are more than 1800s apart, so one
  * sample alone gives a single, single-point segment.
+ *
+ * UPower only writes a history sample when the value changes, so after a
+ * long steady stretch (for example, hours at 100%) the last sample can sit
+ * well before `nowSec`. The last in-window (or clipped) sample is therefore
+ * held flat with an extra point at `x=width` (`nowSec`), appended to the
+ * same, final segment; this tail stretch never breaks on the 30-min gap
+ * rule, even when it is longer than that. No tail point is added when the
+ * last sample already sits at `nowSec`. Mid-history gaps still break as
+ * usual.
  * @param {HistorySample[]|undefined} samples - from `parseHistory`
  * @param {number} nowSec - the current time, in epoch seconds
  * @param {number} width - the chart's pixel width
@@ -143,6 +152,15 @@ function historyPoints(samples, nowSec, width, height) {
     })
     prevT = point.t
   }
+
+  var lastPoint = points[points.length - 1]
+  if (lastPoint.t < nowSec) {
+    current.push({
+      x: width,
+      y: height - (lastPoint.pct * height) / 100
+    })
+  }
+
   segments.push(current)
   return segments
 }
