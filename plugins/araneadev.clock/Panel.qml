@@ -510,7 +510,10 @@ Panel {
     open: root.opened
     centerOnBar: true
     blocked: root.editingLife
-    contentWidth: panel.fittedContentWidth(Style.space(380))
+    // Wider than the other dropdowns (380): the sun and moon pairs share a
+    // row, and the longest moon line ("Waxing crescent · 100%") must leave
+    // room for its "Moon" label.
+    contentWidth: panel.fittedContentWidth(Style.space(440))
     contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
