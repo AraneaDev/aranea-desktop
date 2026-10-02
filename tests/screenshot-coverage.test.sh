@@ -19,14 +19,14 @@ mapfile -t surfaces < <(
 expected_surfaces=(
   menu menu-submenu menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
-  network audio bluetooth agents
+  network vpn audio bluetooth agents
   power monitor clock weather image-picker apps favorites recent
   dawn osd workspaces updates
 )
 expected_hero_frames=(
   desktop menu menu-submenu menu-search menu-input apps favorites recent
   notifications notifications-empty health updates workspaces clipboard emojis
-  image-picker network audio bluetooth agents power monitor clock weather lock osd
+  image-picker network vpn audio bluetooth agents power monitor clock weather lock osd
 )
 [[ "${surfaces[*]}" == "${expected_surfaces[*]}" ]]
 

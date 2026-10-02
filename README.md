@@ -92,15 +92,16 @@ the Aranea state directory before changes are made.
 
 ## What you get
 
-| Surface             | Experience                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------ |
-| Command center      | A compact Omarchy menu with Aranea identity, Files, Terminal, Setup, Favorites, and Recent |
-| Notifications       | A quiet center with critical-state emphasis instead of interruptive popups                 |
-| System health       | Live CPU, memory, disk, network, process, service, reboot, and container status            |
-| Clipboard and emoji | Fast pickers with secret masking, recent history, pinning, and keyboard actions            |
-| Secure prompts      | A consistent polkit card for privileged actions                                            |
-| Wallpapers          | Day, night, dawn, sparse, dense, dusk, monochrome, and ultrawide compositions              |
-| Integrations        | Cursor, icons, terminal, browser, media, Qt, session, developer, and application styling   |
+| Surface             | Experience                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Command center      | A compact Omarchy menu with Aranea identity, Files, Terminal, Setup, Favorites, and Recent                                                                                                                                      |
+| Notifications       | A quiet center with critical-state emphasis instead of interruptive popups                                                                                                                                                      |
+| System health       | Live CPU, memory, disk, network, process, service, reboot, and container status                                                                                                                                                 |
+| VPN                 | Connect NetworkManager and app-based VPNs (OpenVPN, WireGuard, Azure VPN Client, GlobalProtect) from one dropdown; see [plugins/araneadev.vpn/README.md](plugins/araneadev.vpn/README.md) for the apps file and client installs |
+| Clipboard and emoji | Fast pickers with secret masking, recent history, pinning, and keyboard actions                                                                                                                                                 |
+| Secure prompts      | A consistent polkit card for privileged actions                                                                                                                                                                                 |
+| Wallpapers          | Day, night, dawn, sparse, dense, dusk, monochrome, and ultrawide compositions                                                                                                                                                   |
+| Integrations        | Cursor, icons, terminal, browser, media, Qt, session, developer, and application styling                                                                                                                                        |
 
 ## Showcase
 
@@ -149,9 +150,9 @@ The visual system is described in [Visual language](docs/visual-language.md).
 The showcase GIF is the quick impression; these are the individual interaction
 states and application surfaces behind it.
 
-| Network                                   | Audio                                 | Bluetooth                                     |
-| ----------------------------------------- | ------------------------------------- | --------------------------------------------- |
-| ![Network popup](screenshots/network.png) | ![Audio popup](screenshots/audio.png) | ![Bluetooth popup](screenshots/bluetooth.png) |
+| Network                                   | VPN                               | Audio                                 | Bluetooth                                     |
+| ----------------------------------------- | --------------------------------- | ------------------------------------- | --------------------------------------------- |
+| ![Network popup](screenshots/network.png) | ![VPN popup](screenshots/vpn.png) | ![Audio popup](screenshots/audio.png) | ![Bluetooth popup](screenshots/bluetooth.png) |
 
 | Agents                                  | Power                                 | Displays                                  |
 | --------------------------------------- | ------------------------------------- | ----------------------------------------- |

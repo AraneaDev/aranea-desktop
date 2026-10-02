@@ -179,7 +179,7 @@ default_bt_names='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip
 default_vpn_fixture='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
 
 # The surfaces --all captures.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
+all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
 # magick or a frame is missing.
@@ -192,7 +192,7 @@ build_hero_showcase() {
   # application launchers, notifications and panels, then system controls and
   # the workspace/update finish. Terminal-heavy captures stay in the gallery
   # but are omitted from the short showcase loop.
-  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network audio bluetooth agents power monitor clock weather lock osd)
+  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents power monitor clock weather lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
