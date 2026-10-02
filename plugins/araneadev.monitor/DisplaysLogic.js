@@ -117,7 +117,7 @@ function kbdCommand(device, value, max) {
   if (!isFinite(v)) v = 0
   v = Math.round(v)
   if (v < 0) v = 0
-  if (m > 0 && v > m) v = m
+  if (v > m) v = m
   if (m === 1 && v === 0) return ["omarchy-brightness-keyboard", "off"]
   return ["brightnessctl", "-sd", dev, "set", String(v)]
 }

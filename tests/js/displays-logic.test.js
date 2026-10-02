@@ -225,6 +225,16 @@ test("kbdCommand clamps the value into [0, max]", () => {
   ])
 })
 
+test("kbdCommand clamps to 0 when there is no range (max <= 0)", () => {
+  assert.deepEqual(logic.kbdCommand("kbd_backlight", 50, 0), [
+    "brightnessctl",
+    "-sd",
+    "kbd_backlight",
+    "set",
+    "0"
+  ])
+})
+
 test("kbdCommand rounds a fractional value", () => {
   assert.deepEqual(logic.kbdCommand("kbd_backlight", 6.6, 10), [
     "brightnessctl",
