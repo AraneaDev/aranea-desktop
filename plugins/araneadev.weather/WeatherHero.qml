@@ -45,7 +45,8 @@ Column {
   // Emitted when the pointer really moves onto the control in SECTION
   // ("place", "refresh", "clear").
   signal hovered(string section)
-  // Emitted when a part shows or hides (rain soon, the loading strand),
+  // Emitted when a part shows or hides (rain soon, the loading strand, the
+  // updated label),
   // before the column has been laid out again.
   signal partShifted
 
@@ -147,6 +148,9 @@ Column {
         pixelSize: Style.font.bodySmall
         tooltipText: "Refresh"
         hasCursor: hero.cursorSection === "refresh"
+        // Showing or hiding moves the place label above it (the column is
+        // centred in the row): stamp the layout.
+        onVisibleChanged: hero.partShifted()
         pointerGate: hero.pointerGate
         onClicked: hero.refresh()
         onHoveredMoved: hero.hovered("refresh")

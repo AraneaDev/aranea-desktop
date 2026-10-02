@@ -157,6 +157,12 @@ Panel {
     awaitingPeer = false
     // The stopped fetch no longer counts as one in flight.
     fetchClaimMs = 0
+    // Neither the old place's automatic coordinates nor its extras carry
+    // over: a name-only or automatic place waits for wttr's coordinates,
+    // and the extras hide until the new place's answer lands.
+    autoCoords = null
+    forecast = null
+    air = null
     Qt.callLater(root.autoRefresh)
   }
 
@@ -226,8 +232,6 @@ Panel {
   // wttr's resolved area for the current location (used for auto-detect's
   // place name and country).
   readonly property var areaInfo: report && report.nearest_area && report.nearest_area[0] ? report.nearest_area[0] : null
-  // The forecast days to show, built from whichever source answered.
-  readonly property var forecastDays: buildForecastDays()
   // The resolved location's country, used to pick metric vs. imperial when
   // the unit setting does not say.
   readonly property string reportCountry: areaInfo && areaInfo.country && areaInfo.country[0] ? areaInfo.country[0].value : ""
@@ -244,10 +248,6 @@ Panel {
   readonly property string reportLocation: configuredLocation || wttrLocation || (areaInfo && areaInfo.areaName && areaInfo.areaName[0] ? areaInfo.areaName[0].value : "")
   // The hero temperature's bare number, in the active unit.
   readonly property string reportTempNum: current ? String(useImperial ? current.temp_F : current.temp_C) : ""
-  // The hero temperature's unit glyph.
-  readonly property string tempUnit: "°" + (useImperial ? "F" : "C")
-  // The FEELS stat, formatted with its unit.
-  readonly property string reportFeels: current ? formatTemp(useImperial ? current.FeelsLikeF : current.FeelsLikeC) : ""
   // The WIND stat, formatted with its unit.
   readonly property string reportWind: current ? (useImperial ? (current.windspeedMiles + " mph") : (current.windspeedKmph + " km/h")) : ""
   // The HUMID stat, formatted as a percent.
@@ -385,7 +385,6 @@ Panel {
       days: root.dayRows,
       edit: {
         active: editing,
-        query: root.editQuery,
         suggestions: WeatherLogic.suggestionRows(root.locationSuggestions),
         saving: root.savingLocation,
         cursor: root.suggestionIndex
@@ -843,68 +842,6 @@ Panel {
     })
   }
 
-  // The forecast days to show: open-meteo's when available, else wttr's.
-  function buildForecastDays() {
-    return Model.buildForecastDays(report, dailyForecastReport, Qt.formatDate(new Date(), "yyyy-MM-dd"))
-  }
-
-  // open-meteo's upcoming forecast days alone.
-  function openMeteoForecastDays() {
-    return Model.openMeteoForecastDays(dailyForecastReport, Qt.formatDate(new Date(), "yyyy-MM-dd"))
-  }
-
-  // wttr's upcoming forecast days alone.
-  function wttrNextForecastDays() {
-    return Model.wttrNextForecastDays(report, Qt.formatDate(new Date(), "yyyy-MM-dd"))
-  }
-
-  // Whether dateString is strictly after today.
-  function isFutureForecastDate(dateString) {
-    return Model.isFutureForecastDate(dateString, Qt.formatDate(new Date(), "yyyy-MM-dd"))
-  }
-
-  // A temperature value rounded to the nearest whole degree, "" when unset.
-  function roundedTemp(value) {
-    return Model.roundedTemp(value)
-  }
-
-  // Converts a Celsius value to Fahrenheit, "" when unset.
-  function celsiusToFahrenheit(value) {
-    return Model.celsiusToFahrenheit(value)
-  }
-
-  // Formats a temperature value with its unit glyph for the active unit.
-  function formatTemp(value) {
-    return Model.formatTemp(value, useImperial)
-  }
-
-  // The English weekday name for an ISO date string.
-  function dayName(dateString) {
-    return Model.dayName(dateString, function (date) {
-      return Qt.formatDate(date, "dddd")
-    })
-  }
-
-  // Bare degree value (no unit letter), used in the forecast row.
-  function bareTempForDay(day, kind) {
-    return Model.bareTempForDay(day, kind, useImperial)
-  }
-
-  // Representative icon for a forecast day: the hourly entry nearest noon.
-  function dayIcon(day) {
-    return Model.dayIcon(day)
-  }
-
-  // Maps an open-meteo WMO weather code to its nerd-font glyph.
-  function iconForOpenMeteoCode(code) {
-    return Model.iconForOpenMeteoCode(code)
-  }
-
-  // Mirrors omarchy-weather-icon's wttr.in code to nerd-font glyph mapping.
-  function iconForCode(code, night) {
-    return Model.iconForCode(code, night)
-  }
-
   // A fresh open shows no cursor until the first navigation key, and
   // reads the location-time readings for now.
   onOpenedChanged: {
@@ -1023,8 +960,9 @@ Panel {
       waitForEnd: true
       onStreamFinished: {
         root.air = WeatherLogic.parseAir(String(airOut.text || ""))
-        if (root.air)
-          root.publishShared(false)
+        // Published either way, so the other instances drop a stale
+        // reading when this request failed.
+        root.publishShared(false)
       }
     }
   }

@@ -109,7 +109,8 @@ ShellRoot {
     })
 
   // A view with OPTS: {rainSoon, details, hourly, aqi, uv, days, edit,
-  // cursor, place, loading}; missing options give the full fixture.
+  // cursor, place, updated, loading}; missing options give the full
+  // fixture.
   function viewOf(opts) {
     var o = opts || {}
     return {
@@ -118,7 +119,7 @@ ShellRoot {
         temp: "17°",
         label: "Partly cloudy",
         place: o.place !== undefined ? o.place : "Amsterdam",
-        updated: "updated 20:15",
+        updated: o.updated !== undefined ? o.updated : "updated 20:15",
         loading: !!o.loading
       },
       rainSoon: o.rainSoon !== undefined ? o.rainSoon : "Dry for the next 3 h",
@@ -205,7 +206,6 @@ ShellRoot {
       ],
       edit: o.edit || {
         active: false,
-        query: "",
         suggestions: [],
         saving: false,
         cursor: -1
@@ -224,7 +224,6 @@ ShellRoot {
   function editing(suggestions, cursor, saving) {
     return {
       active: true,
-      query: "Amster",
       suggestions: suggestions,
       saving: !!saving,
       cursor: cursor
@@ -733,7 +732,6 @@ ShellRoot {
           place: "Utrecht",
           edit: {
             active: false,
-            query: "",
             suggestions: [],
             saving: true,
             cursor: -1
@@ -779,6 +777,17 @@ ShellRoot {
         t.check(full.layoutChangedAt > stampBefore, "rain soon hiding stamps the layout")
         full.hourlyPoints = points
         full.view = viewOf({})
+      }], [20, function () {
+        full.view = viewOf({
+          updated: ""
+        })
+      }], [350, function () {
+        stampBefore = full.layoutChangedAt
+        full.view = viewOf({})
+        t.check(full.layoutChangedAt > stampBefore, "the updated label appearing stamps the layout")
+        actions = []
+        pointer.mouseClick(one(full, "placeLabel"))
+        t.equal(nonHover().length, 0, "a place click right after it moved is refused")
       }], [350, function () {
         actions = []
         pointer.mouseClick(one(full, "placeLabel"))
@@ -812,7 +821,6 @@ ShellRoot {
           place: "Utrecht",
           edit: {
             active: false,
-            query: "",
             suggestions: [],
             saving: true,
             cursor: -1

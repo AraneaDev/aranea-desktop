@@ -31,7 +31,7 @@ Column {
   // value, arrow? (degrees, the wind's), dir?, trend?}], hourly: {visible,
   // caption, labels: [text]}, air: {aqi: {visible, text, tone ("good",
   // "plain" or "bad")}, uv: {visible, text}}, days: [{key (the date),
-  // label, glyph, hi, lo}], edit: {active, query, suggestions: [{key (name
+  // label, glyph, hi, lo}], edit: {active, suggestions: [{key (name
   // and coordinates), name, description}], saving, cursor (the highlighted
   // suggestion, -1 for none)}, cursor: {active, section ("place",
   // "refresh", "clear"), index}, keyHint}.
