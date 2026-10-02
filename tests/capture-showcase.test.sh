@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn`:
+# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn|clock`:
 # the dropdown is summoned, handed stand-in display data (names for
-# Network/Bluetooth via `showcase`, rows for VPN via `showcaseFixture`; the
-# defaults, or ARANEA_CAPTURE_* overrides), given time to draw, grabbed and
-# hidden. A showcase/showcaseFixture answer other than "ok", or a failed
-# summon, fails the surface with exit 3 and no screenshot, so real names and
-# real VPN profiles never reach one.
+# Network/Bluetooth, a place for Clock, both via `showcase`; rows for VPN via
+# `showcaseFixture`; defaults, or ARANEA_CAPTURE_* overrides), given time to
+# draw, grabbed and hidden. A non-"ok" answer, or a failed summon, fails the
+# surface with exit 3 and no screenshot, so no real data ever reaches one.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -58,6 +57,7 @@ export PATH="$bin:$PATH"
 wifi_default='["Aranea-Home","Neighbour-5G","Cafe-Guest","Library-Free","Studio-2G","Atelier","Harbour-Net","Old-Router"]'
 bt_default='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","Xbox Controller","Galaxy Buds2","Kindle"]'
 vpn_default='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
+clock_default='{"name":"Amsterdam","latitude":52.37,"longitude":4.90}'
 
 # Fails with MESSAGE unless the call log holds LINES in this order (other
 # calls may come between them).
@@ -133,6 +133,25 @@ ARANEA_CAPTURE_VPN_FIXTURE='[{"name":"Solo","kind":"nm","connected":false}]' \
   "$capture" --surface vpn --output "$out" >/dev/null
 grep -Fxq 'omarchy-shell [aranea.vpn] [showcaseFixture] [ [{"name":"Solo","kind":"nm","connected":false}]]' "$log"
 
+# --- Clock: default stand-in place (Amsterdam), then grim, then hide. The
+# README must never show the user's real area.
+: >"$log"
+"$capture" --surface clock --output "$out" >/dev/null
+test -f "$out/clock.png"
+assert_calls_in_order 'clock: summon, showcase default place, grim, hide' \
+  'omarchy-shell [shell] [summon] [omarchy.clock]' \
+  "omarchy-shell [omarchy.clock] [showcase] [$clock_default]" \
+  'sleep 1' \
+  'grim' \
+  'omarchy-shell [shell] [hide] [omarchy.clock]'
+
+# --- Clock: the stand-in place is overridable.
+: >"$log"
+rm -f "$out/clock.png"
+ARANEA_CAPTURE_CLOCK_PLACE='{"name":"Testville","latitude":1,"longitude":2}' \
+  "$capture" --surface clock --output "$out" >/dev/null
+grep -Fxq 'omarchy-shell [omarchy.clock] [showcase] [{"name":"Testville","latitude":1,"longitude":2}]' "$log"
+
 # --- A showcase call that isn't "ok" (the stock panel, no answer, bad JSON)
 # fails the surface: exit 3, a clear message, no screenshot, dropdown hidden.
 for surface in network bluetooth; do
@@ -178,9 +197,31 @@ for answer in 'Function not found.' 'invalid' 'closed' ''; do
   }
 done
 
+# --- A showcase answer that isn't "ok" fails the clock surface the same way:
+# exit 3, a clear message, no screenshot, dropdown hidden. The user's real
+# area must never reach a screenshot because the showcase call failed.
+for answer in 'Function not found.' 'invalid' 'closed' ''; do
+  : >"$log"
+  rm -f "$out/clock.png"
+  status=0
+  errors="$(SHOWCASE_ANSWER="$answer" "$capture" --surface clock --output "$out" 2>&1 >/dev/null)" || status=$?
+  if ((status != 3)) || [[ -e "$out/clock.png" ]] || grep -Fxq grim "$log"; then
+    printf 'clock: a showcase answer of "%s" must fail without a screenshot (status %s)\n' "$answer" "$status" >&2
+    exit 1
+  fi
+  grep -Fq 'stand-in place' <<<"$errors" || {
+    printf 'clock: the failure must say why: %s\n' "$errors" >&2
+    exit 1
+  }
+  grep -Fxq 'omarchy-shell [shell] [hide] [omarchy.clock]' "$log" || {
+    echo 'clock: a failed showcase must hide the dropdown' >&2
+    exit 1
+  }
+done
+
 # --- A summon that fails (omarchy-shell down) is the scripted exit 3 with
 # no screenshot and no showcase call, not a set -e abort.
-for surface in network bluetooth; do
+for surface in network bluetooth clock; do
   : >"$log"
   rm -f "$out/$surface.png"
   status=0
