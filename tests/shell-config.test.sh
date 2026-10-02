@@ -412,6 +412,47 @@ jq -e '.bar.layout.right == ["araneadev.bluetooth"]' "$bluetooth_real" >/dev/nul
   exit 1
 }
 
+# --- monitor dropdown: only retargeted once araneadev.monitor is
+# installed (guard: $(dirname "$config_file")/plugins/araneadev.monitor/manifest.json)
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.monitor", {"id": "omarchy.monitor", "x": 1}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.monitor", {"id": "omarchy.monitor", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.monitor")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.monitor"
+: >"$(dirname "$config")/plugins/araneadev.monitor/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["araneadev.monitor", {"id": "araneadev.monitor", "x": 1}]
+  and (.cloneSourceRestores | index("araneadev.monitor")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.monitor", {"id": "omarchy.monitor", "x": 1}]
+  and ((.cloneSourceRestores // []) | index("araneadev.monitor")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+monitor_real="$test_root/monitor-dotfiles/shell.json"
+monitor_link="$test_root/monitor-config/shell.json"
+mkdir -p "$(dirname "$monitor_real")" "$(dirname "$monitor_link")/plugins/araneadev.monitor"
+: >"$(dirname "$monitor_link")/plugins/araneadev.monitor/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.monitor"]}}}' >"$monitor_real"
+ln -s "$monitor_real" "$monitor_link"
+"$repo_root/scripts/repair-shell-config" "$monitor_link"
+test -L "$monitor_link"
+jq -e '.bar.layout.right == ["araneadev.monitor"]' "$monitor_real" >/dev/null || {
+  cat "$monitor_real"
+  exit 1
+}
+
 # --- network dropdown: only retargeted once araneadev.network is
 # installed (guard: $(dirname "$config_file")/plugins/araneadev.network/manifest.json)
 cat >"$config" <<'EOF'
