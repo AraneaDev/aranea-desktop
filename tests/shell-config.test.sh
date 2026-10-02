@@ -453,6 +453,48 @@ jq -e '.bar.layout.right == ["araneadev.network"]' "$network_real" >/dev/null ||
   exit 1
 }
 
+# --- power dropdown: only retargeted once araneadev.power is
+# installed (guard: $(dirname "$config_file")/plugins/araneadev.power/manifest.json);
+# a user setting (showPercentage) on the entry survives the round trip.
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.power", {"id": "omarchy.power", "showPercentage": true}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.power", {"id": "omarchy.power", "showPercentage": true}]
+  and ((.cloneSourceRestores // []) | index("araneadev.power")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.power"
+: >"$(dirname "$config")/plugins/araneadev.power/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == ["araneadev.power", {"id": "araneadev.power", "showPercentage": true}]
+  and (.cloneSourceRestores | index("araneadev.power")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == ["omarchy.power", {"id": "omarchy.power", "showPercentage": true}]
+  and ((.cloneSourceRestores // []) | index("araneadev.power")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+power_real="$test_root/power-dotfiles/shell.json"
+power_link="$test_root/power-config/shell.json"
+mkdir -p "$(dirname "$power_real")" "$(dirname "$power_link")/plugins/araneadev.power"
+: >"$(dirname "$power_link")/plugins/araneadev.power/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.power"]}}}' >"$power_real"
+ln -s "$power_real" "$power_link"
+"$repo_root/scripts/repair-shell-config" "$power_link"
+test -L "$power_link"
+jq -e '.bar.layout.right == ["araneadev.power"]' "$power_real" >/dev/null || {
+  cat "$power_real"
+  exit 1
+}
+
 # --- VPN bar entry: not a clone (no stock id to retarget), inserted right
 # after the network entry only once its own manifest is installed (guard:
 # $(dirname "$config_file")/plugins/araneadev.vpn/manifest.json), and only

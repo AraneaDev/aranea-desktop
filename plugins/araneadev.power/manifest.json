@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.power",
+  "name": "Aranea Power",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Battery, power profile, and system stats",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Aranea Power",
+    "description": "Battery, power profile, and system stats",
+    "category": "System",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.power"
+  }
+}
