@@ -453,4 +453,192 @@ jq -e '.bar.layout.right == ["araneadev.network"]' "$network_real" >/dev/null ||
   exit 1
 }
 
+# --- VPN bar entry: not a clone (no stock id to retarget), inserted right
+# after the network entry only once its own manifest is installed (guard:
+# $(dirname "$config_file")/plugins/araneadev.vpn/manifest.json), and only
+# once (a placed marker, parked by release like the health icon's)
+vmarker="$state_root/vpn-widget-placed"
+vparked="$state_root/vpn-widget-parked"
+rm -f "$vmarker" "$vparked"
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", {"id": "omarchy.tray"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "omarchy.tray"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.vpn"
+: >"$(dirname "$config")/plugins/araneadev.vpn/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "araneadev.vpn", "omarchy.tray"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+# Not duplicated on a second repair.
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end) | select(. == "araneadev.vpn")] | length == 1' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+# release removes it.
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '[.bar.layout.right[]? | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+test -f "$vmarker"
+# It was in the bar: release parks it, and the return (the plugin deployed
+# again) puts it back once.
+test -f "$vparked"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "araneadev.vpn", "omarchy.tray"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+test ! -e "$vparked"
+test -f "$vmarker"
+# Removed by the user while on Aranea: a repair leaves it out.
+jq '.bar.layout.right |= map(select((if type == "string" then . else .id end) != "araneadev.vpn"))' "$config" >"$config.tmp" && mv "$config.tmp" "$config"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+# Leaving parks nothing, and returning adds nothing.
+"$repo_root/scripts/release-shell-config" "$config"
+test ! -e "$vparked"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# Inserted after omarchy.network when the Aranea network clone is not
+# installed (a separate dir, so network_installed stays false there).
+vpn_only_dir="$test_root/vpn-only"
+mkdir -p "$vpn_only_dir/plugins/araneadev.vpn"
+: >"$vpn_only_dir/plugins/araneadev.vpn/manifest.json"
+vpn_only_cfg="$vpn_only_dir/shell.json"
+cat >"$vpn_only_cfg" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", {"id": "omarchy.tray"}]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_only_cfg"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.vpn", "omarchy.tray"]' "$vpn_only_cfg" >/dev/null || {
+  cat "$vpn_only_cfg"
+  exit 1
+}
+
+# Inserted after an object-form network entry.
+vpn_obj_dir="$test_root/vpn-object"
+mkdir -p "$vpn_obj_dir/plugins/araneadev.vpn"
+: >"$vpn_obj_dir/plugins/araneadev.vpn/manifest.json"
+vpn_obj_cfg="$vpn_obj_dir/shell.json"
+cat >"$vpn_obj_cfg" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.network", "x": 1}, {"id": "omarchy.tray"}]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_obj_cfg"
+jq -e '.bar.layout.right == [{"id": "omarchy.network", "x": 1}, {"id": "araneadev.vpn"}, {"id": "omarchy.tray"}]' "$vpn_obj_cfg" >/dev/null || {
+  cat "$vpn_obj_cfg"
+  exit 1
+}
+
+# No network entry at all: appended to the right section's end.
+vpn_nonet_dir="$test_root/vpn-no-network"
+mkdir -p "$vpn_nonet_dir/plugins/araneadev.vpn"
+: >"$vpn_nonet_dir/plugins/araneadev.vpn/manifest.json"
+vpn_nonet_cfg="$vpn_nonet_dir/shell.json"
+cat >"$vpn_nonet_cfg" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.tray"}]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_nonet_cfg"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.tray", "araneadev.vpn"]' "$vpn_nonet_cfg" >/dev/null || {
+  cat "$vpn_nonet_cfg"
+  exit 1
+}
+
+# A network entry split across two sections (left carries the araneadev
+# clone, right carries the stock id) must only insert araneadev.vpn once,
+# into the section vpn_target_section picks first (right, by the fixed
+# scan order), never into both.
+vpn_split_dir="$test_root/vpn-split"
+mkdir -p "$vpn_split_dir/plugins/araneadev.vpn"
+: >"$vpn_split_dir/plugins/araneadev.vpn/manifest.json"
+vpn_split_cfg="$vpn_split_dir/shell.json"
+cat >"$vpn_split_cfg" <<'EOF'
+{"bar": {"layout": {"left": ["araneadev.network"], "right": ["omarchy.network", {"id": "omarchy.tray"}]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_split_cfg"
+jq -e '.bar.layout.left == ["araneadev.network"]
+  and [.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.vpn", "omarchy.tray"]
+  and ([.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id end) | select(. == "araneadev.vpn")] | length) == 1' "$vpn_split_cfg" >/dev/null || {
+  cat "$vpn_split_cfg"
+  exit 1
+}
+
+# Both network ids in the same array: inserted once, after the araneadev
+# entry, regardless of which id comes first in the array.
+vpn_both_a_dir="$test_root/vpn-both-a"
+mkdir -p "$vpn_both_a_dir/plugins/araneadev.vpn"
+: >"$vpn_both_a_dir/plugins/araneadev.vpn/manifest.json"
+vpn_both_a_cfg="$vpn_both_a_dir/shell.json"
+cat >"$vpn_both_a_cfg" <<'EOF'
+{"bar": {"layout": {"right": ["araneadev.network", "omarchy.network"]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_both_a_cfg"
+jq -e '.bar.layout.right == ["araneadev.network", {"id": "araneadev.vpn"}, "omarchy.network"]' "$vpn_both_a_cfg" >/dev/null || {
+  cat "$vpn_both_a_cfg"
+  exit 1
+}
+
+vpn_both_b_dir="$test_root/vpn-both-b"
+mkdir -p "$vpn_both_b_dir/plugins/araneadev.vpn"
+: >"$vpn_both_b_dir/plugins/araneadev.vpn/manifest.json"
+vpn_both_b_cfg="$vpn_both_b_dir/shell.json"
+cat >"$vpn_both_b_cfg" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", "araneadev.network"]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_both_b_cfg"
+jq -e '.bar.layout.right == ["omarchy.network", "araneadev.network", {"id": "araneadev.vpn"}]' "$vpn_both_b_cfg" >/dev/null || {
+  cat "$vpn_both_b_cfg"
+  exit 1
+}
+
+# An existing araneadev.vpn in bare-string form is not duplicated.
+vpn_bare_dir="$test_root/vpn-bare"
+mkdir -p "$vpn_bare_dir/plugins/araneadev.vpn"
+: >"$vpn_bare_dir/plugins/araneadev.vpn/manifest.json"
+vpn_bare_cfg="$vpn_bare_dir/shell.json"
+cat >"$vpn_bare_cfg" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.network", "araneadev.vpn"]}}}
+EOF
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_bare_cfg"
+jq -e '.bar.layout.right == ["omarchy.network", "araneadev.vpn"]' "$vpn_bare_cfg" >/dev/null || {
+  cat "$vpn_bare_cfg"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+vpn_real="$test_root/vpn-dotfiles/shell.json"
+vpn_link="$test_root/vpn-config/shell.json"
+mkdir -p "$(dirname "$vpn_real")" "$(dirname "$vpn_link")/plugins/araneadev.vpn"
+: >"$(dirname "$vpn_link")/plugins/araneadev.vpn/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.network"]}}}' >"$vpn_real"
+ln -s "$vpn_real" "$vpn_link"
+rm -f "$vmarker"
+"$repo_root/scripts/repair-shell-config" "$vpn_link"
+test -L "$vpn_link"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.vpn"]' "$vpn_real" >/dev/null || {
+  cat "$vpn_real"
+  exit 1
+}
+
 echo "shell config contract passed"

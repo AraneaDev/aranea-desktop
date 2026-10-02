@@ -8,11 +8,13 @@
 //
 // The Repeater's model is `rows` alone; status and the prompt are separate
 // properties keyed by SSID, so a status change or a keystroke never
-// rebuilds a delegate (and never drops a half-typed passphrase).
+// rebuilds a delegate (and never drops a half-typed passphrase). A row
+// wrapper moving or resizing without a rebuild (the prompt opening, moving
+// or turning into its message, the scanning caption) reports
+// layoutShifted, so the dropdown can settle clicks.
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
-import qs.Ui
 import "../araneadev.shared" as Aranea
 
 Column {
@@ -50,6 +52,8 @@ Column {
   signal hovered(int index, bool action)
   // Emitted when the pointer leaves row INDEX's forget button.
   signal actionLeft(int index)
+  // Emitted when a row wrapper moves or resizes without a rebuild.
+  signal layoutShifted
   // Emitted on Enter in the passphrase.
   signal promptSubmit
   // Emitted when the prompt's connect button is clicked.
@@ -112,6 +116,8 @@ Column {
       objectName: "wifiRowWrapper"
       width: section.width
       spacing: Style.space(4)
+      onYChanged: section.layoutShifted()
+      onHeightChanged: section.layoutShifted()
 
       Text {
         objectName: "wifiTitle"
@@ -170,139 +176,43 @@ Column {
           }
         }
       }
-      // Stock's inline prompt, framed by a thin accent-to-violet strand.
-      Item {
-        id: promptPanel
+      // Stock's inline prompt (identity first for enterprise), framed by a
+      // thin accent-to-violet strand.
+      Aranea.CredentialPrompt {
         objectName: "promptPanel"
         visible: wrapper.promptOpen
         width: wrapper.width
-        height: visible ? promptContent.implicitHeight + Style.space(16) : 0
-
-        Rectangle {
-          anchors.top: parent.top
-          width: parent.width
-          height: 1
-          gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop {
-              position: 0
-              color: Aranea.DesignTokens.accent
-            }
-            GradientStop {
-              position: 1
-              color: Aranea.DesignTokens.strandEnd
-            }
+        // Settles the connect button like the rows: not within 300 ms of
+        // opening or of a layout shift, unless the pointer moved there.
+        pointerGate: section.pointerGate
+        fields: [
+          {
+            key: "identity",
+            label: "Identity",
+            placeholder: "Identity (user@domain)",
+            hidden: !wrapper.enterprise,
+            value: wrapper.promptOpen ? (section.prompt.identity || "") : ""
+          },
+          {
+            key: "passphrase",
+            label: "Passphrase",
+            placeholder: "Passphrase",
+            secret: true,
+            value: wrapper.promptOpen ? (section.prompt.passphrase || "") : ""
           }
-        }
-        Rectangle {
-          anchors.bottom: parent.bottom
-          width: parent.width
-          height: 1
-          gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop {
-              position: 0
-              color: Aranea.DesignTokens.accent
-            }
-            GradientStop {
-              position: 1
-              color: Aranea.DesignTokens.strandEnd
-            }
-          }
-        }
-        Rectangle {
-          anchors.left: parent.left
-          width: 1
-          height: parent.height
-          color: Aranea.DesignTokens.accent
-        }
-        Rectangle {
-          anchors.right: parent.right
-          width: 1
-          height: parent.height
-          color: Aranea.DesignTokens.strandEnd
-        }
-        Column {
-          id: promptContent
-          x: Style.space(8)
-          y: Style.space(8)
-          width: parent.width - Style.space(16)
-          spacing: Style.space(4)
-
-          TextField {
-            id: identityField
-            objectName: "identityField"
-            width: promptContent.width - connectButton.width - Style.space(6)
-            visible: wrapper.enterprise && !wrapper.promptMessage
-            placeholderText: "Identity (user@domain)"
-            foreground: Aranea.DesignTokens.foreground
-            accent: Aranea.DesignTokens.accent
-            horizontalPadding: Style.spacing.controlGap
-            verticalPadding: Style.spacing.controlPaddingY
-            text: wrapper.promptOpen ? (section.prompt.identity || "") : ""
-            onAccepted: passphraseField.forceActiveFocus()
-            onTextChanged: if (wrapper.promptOpen && text !== (section.prompt.identity || ""))
-              section.identityEdited(text)
-            Keys.onEscapePressed: section.promptCancel()
-            onVisibleChanged: if (visible)
-              Qt.callLater(identityField.forceActiveFocus)
-            Component.onCompleted: if (visible)
-              Qt.callLater(identityField.forceActiveFocus)
-          }
-          Item {
-            width: promptContent.width
-            height: Math.max(passphraseField.visible ? passphraseField.implicitHeight : 0, connectButton.visible ? connectButton.implicitHeight : 0, promptStatus.visible ? promptStatus.implicitHeight : 0)
-
-            TextField {
-              id: passphraseField
-              objectName: "passphraseField"
-              anchors.left: parent.left
-              anchors.right: connectButton.left
-              anchors.rightMargin: Style.space(6)
-              anchors.verticalCenter: parent.verticalCenter
-              visible: !wrapper.promptMessage
-              password: true
-              placeholderText: "Passphrase"
-              foreground: Aranea.DesignTokens.foreground
-              accent: Aranea.DesignTokens.accent
-              horizontalPadding: Style.spacing.controlGap
-              verticalPadding: Style.spacing.controlPaddingY
-              text: wrapper.promptOpen ? (section.prompt.passphrase || "") : ""
-              onAccepted: section.promptSubmit()
-              onTextChanged: if (wrapper.promptOpen && text !== (section.prompt.passphrase || ""))
-                section.passphraseEdited(text)
-              Keys.onEscapePressed: section.promptCancel()
-              onVisibleChanged: if (visible && !wrapper.enterprise)
-                Qt.callLater(passphraseField.forceActiveFocus)
-              Component.onCompleted: if (visible && !wrapper.enterprise)
-                Qt.callLater(passphraseField.forceActiveFocus)
-            }
-            Text {
-              id: promptStatus
-              objectName: "promptStatus"
-              anchors.fill: parent
-              visible: wrapper.promptMessage
-              horizontalAlignment: Text.AlignHCenter
-              verticalAlignment: Text.AlignVCenter
-              text: wrapper.promptOpen && section.prompt.failed ? "Wrong password" : "Connecting..."
-              color: wrapper.promptOpen && section.prompt.failed ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.foreground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.caption
-            }
-            PanelActionButton {
-              id: connectButton
-              objectName: "connectButton"
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              visible: !wrapper.promptMessage
-              enabled: passphraseField.text.length > 0 && (!wrapper.enterprise || identityField.text.length > 0)
-              iconText: String.fromCodePoint(0xf012c)
-              tooltipText: "Connect"
-              foreground: Aranea.DesignTokens.foreground
-              hoverColor: Aranea.DesignTokens.accent
-              onClicked: section.promptConnect()
-            }
-          }
+        ]
+        busy: wrapper.promptOpen && !!section.prompt.busy
+        busyText: "Connecting..."
+        failed: wrapper.promptOpen && !!section.prompt.failed
+        failedText: "Wrong password"
+        onSubmit: section.promptSubmit()
+        onCancel: section.promptCancel()
+        onConnectClicked: section.promptConnect()
+        onEdited: function (key, text) {
+          if (key === "identity")
+            section.identityEdited(text)
+          else
+            section.passphraseEdited(text)
         }
       }
     }

@@ -16,7 +16,7 @@ service contracts to the feature plugins.
 - `FilamentSwitch` is the Filament-style compact on/off switch. An optional
   `clickGate` (the `NodeDeviceRow` hosting it, or anything with
   `clickSettled()`) makes its pointer clicks settle like that row's, as
-  Network's VPN rows do.
+  the VPN dropdown's rows do.
 - `FilamentPulse` is the Filament-style hairline strand that lights up (a
   travelling light, or a static lit strand with motion disabled) while a
   scan is running: Bluetooth's device discovery now, Wi-Fi scans later.
@@ -29,9 +29,12 @@ service contracts to the feature plugins.
   real pointer move, never on the row sliding underneath a stationary
   cursor. `detailColor` recolours the detail (the network VPN rows use
   `DesignTokens.urgent` for "Couldn't connect"). A pointer click within
-  `settleMs` (300 ms) of the row being created is ignored unless the gate
-  accepted a real move over it since, so a Repeater rebuild never turns a
-  click aimed at one row into a click on another.
+  `settleMs` (300 ms) of the row being created, or of its dropdown's layout
+  shifting, is ignored unless the gate accepted a real move over it since,
+  so neither a Repeater rebuild nor a section growing turns a click aimed at
+  one row into a click on another. A dropdown reports layout shifts by
+  declaring `layoutChangedAt` (a `Date.now()` stamp) on the gate it hands
+  down; `ClickSettle.clickSettled` holds the rule.
 - `ForgetButton` is the soft red "forget" button a row puts in its trailing
   slot (Bluetooth devices, Network's Wi-Fi and Saved rows). It shows on a
   `forgettable` row while the row (`rowHovered`), the button or the
@@ -46,9 +49,24 @@ service contracts to the feature plugins.
   accent underline when `selected`; the keyboard cursor (`hasCursor`) draws
   the same mint outline as `NodeDeviceRow`, pointer hover never does. A
   `busy` pill breathes. It emits `clicked`, and `hoveredMoved` on entering,
-  or only on a real pointer move when a `pointerGate` is set.
-- `DropdownHeader` is the Filament-style dropdown header with a glyph,
-  title/caption pair, and a trailing slot.
+  or only on a real pointer move when a `pointerGate` is set. A pill on a
+  row a Repeater can rebuild takes the row as `clickGate` (VPN's "open app"
+  chip), as `FilamentSwitch` does; without one, a pill with a gate settles
+  its clicks after the dropdown's layout shifts on its own.
+- `DropdownHeader` is the Filament-style dropdown header with a glyph
+  (tinted by `glyphColor`), title/caption pair, and a trailing slot.
+- `CredentialPrompt` is the inline credential prompt (Network's passphrase,
+  VPN's password and 2FA code): an accent-to-violet frame around `fields`
+  (`{key, label, placeholder, secret, readOnly, optional, hidden, value}`)
+  and a check-glyph connect button. Opening focuses the first editable
+  field; Enter moves on and `submit`s from the last; Esc `cancel`s; typing
+  emits `edited(key, text)`; the button emits `connectClicked`, settled
+  through an optional `pointerGate`. `busy`/`failed` show `busyText` /
+  `failedText` instead of the fields. Its Repeater counts fields, so a
+  host echoing typed values back never rebuilds a field.
+- `LinkGraph` is the 60 s receive/send `Canvas` trace for a link's
+  throughput, shared by the Network and VPN dropdowns. It draws
+  `GraphLogic.graphPoints` and a bare baseline before there are samples.
 - `InkText` aligns glyph ink rather than advance width.
 - `KeyboardInputFrame` owns key forwarding and focus targeting, including a
   `deleteRequested` signal forwarded from the key catcher's "x" key, and a
@@ -58,6 +76,42 @@ service contracts to the feature plugins.
   input and forwards the same `deleteRequested` signal and `blocked` alias.
 - `OverlayChrome` provides common overlay placement and dismiss behavior.
 - `ServiceRegistry.js` publishes isolated service slots for dependent plugins.
+- `ClickSettle.js` is the shared click-settling rule (`clickSettled`): a
+  click on a control that was just created, or that a layout shift just
+  moved under a still pointer, waits for the pointer to really move onto it
+  or for 300 ms to pass. `NodeDeviceRow`, `ForgetButton`, `FilamentPill`,
+  `CredentialPrompt` and Network's band switch use it.
+- `CursorLogic.js` is the shared keyboard-cursor safety contract (moved from
+  the Network plugin): a cursor follows the row key it was put on, never
+  its position (`reselectIndex`, `followCursor`), a lost or evacuated key
+  is refused rather than retargeted (`cursorConfirmed`), Enter/`x` only
+  reveal a cursor the keyboard isn't showing before they act
+  (`pressIntent`), a view's Repeater keeps its delegates across an
+  unchanged refresh (`keepRows`), and a pointer action only lands on the
+  row it names (`rowKeyMatches`). `araneadev.network`'s `Panel.qml` imports
+  it directly (a real QML/JS import) for `keepRows`, `followCursor` and
+  `rowKeyMatches`; `NetworkLogic.js`'s own `keyTargetConfirmed`/
+  `pressOutcome` instead get a generated copy of `cursorConfirmed`/
+  `pressIntent` via `tools/js-facade-generator.mjs` (see
+  docs/development.md's "JavaScript facades"), since a plain `.js` logic
+  file can't import another `.js` file in a way both QML and Node can
+  load. Either way there is exactly one hand-written implementation, here.
+- `GraphLogic.js` is the shared rolling-sample and plot-point math behind
+  `LinkGraph` (`pushSample`, `graphPoints`), also moved from the Network
+  plugin. `Panel.qml` and `LinkGraph.qml` both import it directly.
+- `NmcliTerse.js` holds `splitTerse`, the `nmcli -t` terse-output field
+  splitter both `araneadev.network/NetworkLogic.js` and
+  `araneadev.vpn/VpnLogic.js` need. Neither imports it (the same QML/Node
+  constraint as `CursorLogic.js`'s inlined pair): both get a generated copy
+  via `tools/js-facade-generator.mjs`.
+- `VpnApps.js` parses `~/.config/aranea/vpn-apps.json` (own-app VPNs,
+  both the bare-array and `{apps, profiles}` object forms), matches an
+  interface name against a glob (`globMatch`), derives an own-app VPN's
+  `connected`/`present`/`absent` state and matched interface
+  (`appState`, `appInterface`), and formats the Network dropdown's VPN
+  status line (`statusLine`). Used by `araneadev.vpn`; kept here (not in
+  `araneadev.network`) so Network can show the status line without
+  importing from another plugin.
 
 ## Ownership rules
 

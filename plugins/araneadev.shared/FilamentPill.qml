@@ -2,10 +2,16 @@
 // rows): a thin muted border and muted text, or, when selected, an accent
 // border, full text and a 2 px accent underline. The keyboard cursor draws
 // the same mint outline as NodeDeviceRow; pointer hover never draws one.
-// A busy pill breathes like a busy NodeDeviceRow marker.
+// A busy pill breathes like a busy NodeDeviceRow marker. A pill sitting on
+// a row a Repeater can rebuild under a still pointer takes that row as
+// clickGate, as FilamentSwitch does. Without one, a pill with a
+// pointerGate ignores a click within settleMs of its dropdown's layout
+// shifting (pointerGate.layoutChangedAt) unless the gate accepted a real
+// move onto it since.
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "ClickSettle.js" as ClickSettle
 
 Item {
   id: pill
@@ -26,6 +32,16 @@ Item {
   property var pointerGate: null
   // Opacity the busy animation drives, 0.45..1.
   property real pulseOpacity: 1
+  // Optional item whose clickSettled() a pointer click must pass, e.g. the
+  // NodeDeviceRow hosting the pill; null (default) never ignores a click.
+  // activate() stays unguarded for the keyboard and tests.
+  property var clickGate: null
+  // How long after a layout shift a click is ignored, in ms, without a
+  // clickGate (see pointerGate).
+  property int settleMs: 300
+  // When the gate last accepted a real pointer move onto the pill
+  // (Date.now()), 0 for never.
+  property real pointerMovedAt: 0
 
   // Emitted when the pill is clicked or activated.
   signal clicked
@@ -35,6 +51,20 @@ Item {
   // Chooses the pill, as a click does.
   function activate() {
     clicked()
+  }
+
+  // Whether a pointer click may choose the pill: clickGate's verdict, else
+  // settled since the dropdown's last layout shift or moved onto since
+  // (ClickSettle.clickSettled; no gate never ignores a click).
+  function clickSettled() {
+    if (pill.clickGate)
+      return pill.clickGate.clickSettled()
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      movedAt: pill.pointerMovedAt,
+      layoutChangedAt: pill.pointerGate ? Number(pill.pointerGate.layoutChangedAt) || 0 : 0,
+      settleMs: pill.settleMs
+    })
   }
 
   objectName: "pill"
@@ -103,7 +133,8 @@ Item {
   MouseArea {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
-    onClicked: pill.activate()
+    onClicked: if (pill.clickSettled())
+      pill.activate()
   }
   HoverHandler {
     id: hover
@@ -112,8 +143,10 @@ Item {
     onPointChanged: if (pill.pointerGate && hover.hovered && pill.pointerGate.moved(hover.parent, {
       x: hover.point.position.x,
       y: hover.point.position.y
-    }))
+    })) {
+      pill.pointerMovedAt = Date.now()
       pill.hoveredMoved()
+    }
   }
   PanelToolTip {
     objectName: "pillTip"

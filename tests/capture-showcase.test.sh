@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Behaviour of `scripts/capture-screenshots --surface network|bluetooth` with
-# the desktop stubbed: the dropdown is summoned, handed the stand-in names
-# through its `showcase` IPC method (the defaults, or the ARANEA_CAPTURE_*
-# overrides), given time to draw (the graph delay for Network, the scan delay
-# for Bluetooth), grabbed and hidden. A showcase call that doesn't answer "ok"
-# (a closed dropdown answers "closed"), or a summon that fails, fails the
-# surface with exit 3 and writes no screenshot, so real names never reach one.
+# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn`:
+# the dropdown is summoned, handed stand-in display data (names for
+# Network/Bluetooth via `showcase`, rows for VPN via `showcaseFixture`; the
+# defaults, or ARANEA_CAPTURE_* overrides), given time to draw, grabbed and
+# hidden. A showcase/showcaseFixture answer other than "ok", or a failed
+# summon, fails the surface with exit 3 and no screenshot, so real names and
+# real VPN profiles never reach one.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,10 +17,11 @@ out="$ARANEA_TEST_SANDBOX/shots"
 log="$ARANEA_TEST_SANDBOX/calls.log"
 mkdir -p "$bin" "$out"
 
-# omarchy-shell answers "ok" to summon and showcase (showcase answers
-# SHOWCASE_ANSWER when set) and logs every call, one argument per field.
-# Like qs, it reads an argument that starts with "[" as a list, so a bare
-# JSON array never reaches the method as one string.
+# omarchy-shell answers "ok" to summon, showcase and showcaseFixture
+# (showcase/showcaseFixture answer SHOWCASE_ANSWER when set) and logs every
+# call, one argument per field. Like qs, it reads an argument that starts
+# with "[" as a list, so a bare JSON array never reaches the method as one
+# string.
 cat >"$bin/omarchy-shell" <<'SH'
 #!/usr/bin/env bash
 printf 'omarchy-shell'"$(printf ' [%%s]%.0s' "$@")"'\n' "$@" >>"$ARANEA_TEST_SANDBOX/calls.log"
@@ -32,7 +33,7 @@ case "$2" in
     fi
     echo ok
     ;;
-  showcase)
+  showcase | showcaseFixture)
     if [[ "$3" == "["* ]]; then
       echo 'Too many arguments provided (1 required but 8 were provided.)'
     else
@@ -56,6 +57,7 @@ export PATH="$bin:$PATH"
 
 wifi_default='["Aranea-Home","Neighbour-5G","Cafe-Guest","Library-Free","Studio-2G","Atelier","Harbour-Net","Old-Router"]'
 bt_default='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","Xbox Controller","Galaxy Buds2","Kindle"]'
+vpn_default='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
 
 # Fails with MESSAGE unless the call log holds LINES in this order (other
 # calls may come between them).
@@ -113,6 +115,24 @@ assert_calls_in_order 'bluetooth: summon, showcase defaults, waits, grim, hide' 
 ARANEA_CAPTURE_BT_NAMES='["Pod"]' "$capture" --surface bluetooth --output "$out" >/dev/null
 grep -Fxq 'omarchy-shell [omarchy.bluetooth] [showcase] [ ["Pod"]]' "$log"
 
+# --- VPN: default fixture rows (summon araneadev.vpn, showcaseFixture on
+# aranea.vpn), then grim, then hide. No real VPN profile is ever named.
+: >"$log"
+"$capture" --surface vpn --output "$out" >/dev/null
+test -f "$out/vpn.png"
+assert_calls_in_order 'vpn: summon, showcaseFixture defaults, grim, hide' \
+  'omarchy-shell [shell] [summon] [araneadev.vpn]' \
+  "omarchy-shell [aranea.vpn] [showcaseFixture] [ $vpn_default]" \
+  'grim' \
+  'omarchy-shell [shell] [hide] [araneadev.vpn]'
+
+# --- VPN: the fixture rows are overridable.
+: >"$log"
+rm -f "$out/vpn.png"
+ARANEA_CAPTURE_VPN_FIXTURE='[{"name":"Solo","kind":"nm","connected":false}]' \
+  "$capture" --surface vpn --output "$out" >/dev/null
+grep -Fxq 'omarchy-shell [aranea.vpn] [showcaseFixture] [ [{"name":"Solo","kind":"nm","connected":false}]]' "$log"
+
 # --- A showcase call that isn't "ok" (the stock panel, no answer, bad JSON)
 # fails the surface: exit 3, a clear message, no screenshot, dropdown hidden.
 for surface in network bluetooth; do
@@ -136,6 +156,28 @@ for surface in network bluetooth; do
   done
 done
 
+# --- A showcaseFixture answer that isn't "ok" fails the vpn surface the same
+# way: exit 3, a clear message, no screenshot, dropdown hidden. A real VPN
+# profile must never reach a screenshot because the fixture call failed.
+for answer in 'Function not found.' 'invalid' 'closed' ''; do
+  : >"$log"
+  rm -f "$out/vpn.png"
+  status=0
+  errors="$(SHOWCASE_ANSWER="$answer" "$capture" --surface vpn --output "$out" 2>&1 >/dev/null)" || status=$?
+  if ((status != 3)) || [[ -e "$out/vpn.png" ]] || grep -Fxq grim "$log"; then
+    printf 'vpn: a showcaseFixture answer of "%s" must fail without a screenshot (status %s)\n' "$answer" "$status" >&2
+    exit 1
+  fi
+  grep -Fq 'fixture rows' <<<"$errors" || {
+    printf 'vpn: the failure must say why: %s\n' "$errors" >&2
+    exit 1
+  }
+  grep -Fxq 'omarchy-shell [shell] [hide] [araneadev.vpn]' "$log" || {
+    echo 'vpn: a failed showcaseFixture must hide the dropdown' >&2
+    exit 1
+  }
+done
+
 # --- A summon that fails (omarchy-shell down) is the scripted exit 3 with
 # no screenshot and no showcase call, not a set -e abort.
 for surface in network bluetooth; do
@@ -149,5 +191,17 @@ for surface in network bluetooth; do
   fi
   grep -Fq "Unable to summon popup omarchy.$surface" <<<"$errors"
 done
+
+# --- A failed vpn summon is the same scripted exit 3, with no screenshot and
+# no showcaseFixture call (the real profiles are never at risk).
+: >"$log"
+rm -f "$out/vpn.png"
+status=0
+errors="$(SUMMON_FAILS=1 "$capture" --surface vpn --output "$out" 2>&1 >/dev/null)" || status=$?
+if ((status != 3)) || [[ -e "$out/vpn.png" ]] || grep -Fq '[showcaseFixture]' "$log"; then
+  printf 'vpn: a failed summon must exit 3 without a screenshot (status %s): %s\n' "$status" "$errors" >&2
+  exit 1
+fi
+grep -Fq 'Unable to summon popup araneadev.vpn' <<<"$errors"
 
 echo "capture showcase behaviour passed"

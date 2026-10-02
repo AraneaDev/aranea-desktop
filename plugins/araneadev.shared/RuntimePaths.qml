@@ -12,6 +12,16 @@ QtObject {
   // XDG state storage, with the conventional fallback when unset.
   readonly property string xdgStateHome: Quickshell.env("XDG_STATE_HOME") || (home + "/.local/state")
 
+  // XDG config storage, with the conventional fallback when unset.
+  readonly property string xdgConfigHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
+
+  // Aranea's user-owned config directory.
+  readonly property string araneaConfigRoot: xdgConfigHome + "/aranea"
+
+  // The optional own-app VPNs file read by araneadev.vpn (user-owned; the
+  // theme never writes it).
+  readonly property string vpnAppsPath: araneaConfigRoot + "/vpn-apps.json"
+
   // Aranea's persistent state directory.
   readonly property string araneaStateRoot: xdgStateHome + "/aranea"
 

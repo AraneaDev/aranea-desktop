@@ -4,12 +4,15 @@
 // label, a trailing detail, and an optional trailing action slot flush
 // with the row's right edge. Unavailable devices are dimmed and never
 // chosen. The row spans the item's full width. A pointer click within
-// settleMs of the row being created is ignored unless the pointer has
-// really moved over it since (through pointerGate): a Repeater rebuild can
-// put this row under a pointer that was aimed at another.
+// settleMs of the row being created, or of its dropdown's layout shifting
+// (the dropdown stamps pointerGate.layoutChangedAt), is ignored unless the
+// pointer has really moved over it since (through pointerGate): a Repeater
+// rebuild or a section growing can put this row under a pointer that was
+// aimed at another.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
+import "ClickSettle.js" as ClickSettle
 
 Item {
   id: row
@@ -45,23 +48,31 @@ Item {
   // this row moving under a still pointer. null (default) keeps the old
   // behaviour: entered on containsMouse becoming true.
   property var pointerGate: null
-  // How long after creation a pointer click is ignored, in ms, unless the
-  // gate has accepted a real move over the row since.
+  // How long after creation or a layout shift a pointer click is ignored,
+  // in ms, unless the gate has accepted a real move over the row since.
   property int settleMs: 300
   // When the row was created (Date.now()), for settleMs.
   property real createdAt: 0
-  // Whether the gate has accepted a real pointer move over this row.
-  property bool pointerMovedHere: false
+  // When the gate last accepted a real pointer move over this row
+  // (Date.now()), 0 for never.
+  property real pointerMovedAt: 0
 
   // Emitted when an available row is clicked or activated.
   signal chosen
   // Emitted when the pointer enters the row.
   signal entered
 
-  // Whether a pointer click may choose the row: it has been on screen for
-  // settleMs, or the pointer has really moved over it.
+  // Whether a pointer click may choose the row: it has been on screen, and
+  // the dropdown's layout has held still, for settleMs, or the pointer has
+  // really moved over it since (ClickSettle.clickSettled).
   function clickSettled() {
-    return pointerMovedHere || Date.now() - createdAt >= settleMs
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      createdAt: row.createdAt,
+      movedAt: row.pointerMovedAt,
+      layoutChangedAt: row.pointerGate ? Number(row.pointerGate.layoutChangedAt) || 0 : 0,
+      settleMs: row.settleMs
+    })
   }
 
   // Chooses the device, unless it is unavailable.
@@ -192,7 +203,7 @@ Item {
       row.entered()
     onPositionChanged: function (mouse) {
       if (row.pointerGate && row.pointerGate.moved(rowMouse, mouse)) {
-        row.pointerMovedHere = true
+        row.pointerMovedAt = Date.now()
         row.entered()
       }
     }

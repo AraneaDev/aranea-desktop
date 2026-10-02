@@ -5,12 +5,14 @@
 // zero while hidden so a NodeDeviceRow's trailing slot, which sizes to its
 // children, never reserves room for it. Entering it is gated (pointerGate)
 // so a button sliding under a still pointer never takes the cursor;
-// leaving it, and its own hover and visibility, are not. Like NodeDeviceRow, a click within settleMs of
-// the button being created is ignored unless the gate accepted a real
-// pointer move onto it since.
+// leaving it, and its own hover and visibility, are not. Like
+// NodeDeviceRow, a click within settleMs of the button being created, or
+// of its dropdown's layout shifting (pointerGate.layoutChangedAt), is
+// ignored unless the gate accepted a real pointer move onto it since.
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "ClickSettle.js" as ClickSettle
 
 Item {
   id: forgetBtn
@@ -36,13 +38,14 @@ Item {
   readonly property bool shown: forgettable && (rowHovered || forgetHover.hovered || hasCursor)
   // Whether it's drawn bright: the keyboard cursor's action is on it.
   readonly property bool bright: hasCursor && cursorAction
-  // How long after creation a pointer click is ignored, in ms, unless the
-  // gate has accepted a real move onto the button since.
+  // How long after creation or a layout shift a pointer click is ignored,
+  // in ms, unless the gate has accepted a real move onto the button since.
   property int settleMs: 300
   // When the button was created (Date.now()), for settleMs.
   property real createdAt: 0
-  // Whether the gate has accepted a real pointer move onto the button.
-  property bool pointerMovedHere: false
+  // When the gate last accepted a real pointer move onto the button
+  // (Date.now()), 0 for never.
+  property real pointerMovedAt: 0
 
   // Emitted when the button is clicked.
   signal clicked
@@ -56,10 +59,17 @@ Item {
     forgetBtn.clicked()
   }
 
-  // Whether a pointer click may land: the button has been on screen for
-  // settleMs, or the pointer has really moved onto it.
+  // Whether a pointer click may land: the button has been on screen, and
+  // the dropdown's layout has held still, for settleMs, or the pointer has
+  // really moved onto it since (ClickSettle.clickSettled).
   function clickSettled() {
-    return pointerMovedHere || Date.now() - createdAt >= settleMs
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      createdAt: forgetBtn.createdAt,
+      movedAt: forgetBtn.pointerMovedAt,
+      layoutChangedAt: forgetBtn.pointerGate ? Number(forgetBtn.pointerGate.layoutChangedAt) || 0 : 0,
+      settleMs: forgetBtn.settleMs
+    })
   }
 
   objectName: "forgetButton"
@@ -103,7 +113,7 @@ Item {
         x: forgetHover.point.position.x,
         y: forgetHover.point.position.y
       })) {
-        forgetBtn.pointerMovedHere = true
+        forgetBtn.pointerMovedAt = Date.now()
         forgetBtn.pointerEntered()
       }
     }

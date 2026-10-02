@@ -2,12 +2,15 @@
 // title on the left and "AUTOMATIC" with a FilamentSwitch on the right,
 // and, while a band is pinned, one FilamentPill per band below. Whether the
 // section shows at all is the host's `visible`. Pure view: plain inputs
-// in, signals out.
+// in, signals out. A click on the switch within 300 ms of the dropdown's
+// layout shifting (pointerGate.layoutChangedAt) is ignored unless the
+// pointer has really moved onto it since, as the pills' are.
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Column {
   id: section
@@ -32,6 +35,9 @@ Column {
   // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
   // switch or a pill moving under a still pointer.
   property var pointerGate: null
+  // When the gate last accepted a real pointer move onto the switch
+  // (Date.now()), 0 for never.
+  property real autoMovedAt: 0
 
   // Emitted when the Automatic switch is toggled.
   signal toggleAuto
@@ -40,6 +46,16 @@ Column {
   // Emitted when the pointer moves onto the switch (AUTO true, INDEX -1)
   // or onto pill INDEX (AUTO false), through the gate.
   signal pillHovered(bool auto, int index)
+
+  // Whether a pointer click may toggle the switch (its clickGate): settled
+  // since the dropdown's last layout shift, or moved onto since.
+  function clickSettled() {
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      movedAt: section.autoMovedAt,
+      layoutChangedAt: section.pointerGate ? Number(section.pointerGate.layoutChangedAt) || 0 : 0
+    })
+  }
 
   objectName: "bandSection"
   spacing: Style.space(10)
@@ -82,6 +98,7 @@ Column {
         checked: section.auto
         hasCursor: section.cursorAuto
         opacity: section.busy ? 0.6 : 1
+        clickGate: section
         onToggled: section.toggleAuto()
         HoverHandler {
           id: autoHover
@@ -90,8 +107,10 @@ Column {
           onPointChanged: if (section.pointerGate && autoHover.hovered && section.pointerGate.moved(autoHover.parent, {
             x: autoHover.point.position.x,
             y: autoHover.point.position.y
-          }))
+          })) {
+            section.autoMovedAt = Date.now()
             section.pillHovered(true, -1)
+          }
         }
         PanelToolTip {
           objectName: "autoTip"

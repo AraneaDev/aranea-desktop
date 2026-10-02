@@ -3,8 +3,9 @@ set -euo pipefail
 
 # Registers Aranea in the Omarchy shell.json: sets the Aranea bar, swaps the
 # stock menu entry for Aranea's, enables the Aranea plugins and disables the
-# stock ones they replace, and places the notification bell and health icon
-# once (again after release-shell-config parked them). Keeps a one-time
+# stock ones they replace, and places the notification bell, the health icon
+# and the VPN icon once each (again after release-shell-config parked them):
+# an icon the user took out of the bar stays out. Keeps a one-time
 # .aranea.bak backup and writes through a symlink.
 #
 # Usage: scripts/repair-shell-config [shell.json]
@@ -46,19 +47,27 @@ health_marker="$state_root/health-widget-placed"
 health_parked="$state_root/health-widget-parked"
 place_health=true
 [[ -e "$health_marker" && ! -e "$health_parked" ]] && place_health=false
+vpn_marker="$state_root/vpn-widget-placed"
+vpn_parked="$state_root/vpn-widget-parked"
+place_vpn=true
+[[ -e "$vpn_marker" && ! -e "$vpn_parked" ]] && place_vpn=false
 # araneadev.audio, araneadev.bluetooth and araneadev.network only take over
 # their bar entry once they are actually deployed beside this config
 # (deploy-plugins-safely writes their manifest there); a repair that runs
 # before that (a bare hook, a partial install) must not retarget the id to a
 # plugin that does not exist on disk yet. The deploy writes beside the config
-# path as given; beside a symlink's target counts too.
+# path as given; beside a symlink's target counts too. araneadev.vpn is not a
+# clone (there is no stock entry to retarget): the same guard just decides
+# whether its own bar entry gets inserted at all.
 audio_installed=false
 bluetooth_installed=false
 network_installed=false
+vpn_installed=false
 for dir in "$given_config_dir" "$config_dir"; do
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
   [[ -f "$dir/plugins/araneadev.bluetooth/manifest.json" ]] && bluetooth_installed=true
   [[ -f "$dir/plugins/araneadev.network/manifest.json" ]] && network_installed=true
+  [[ -f "$dir/plugins/araneadev.vpn/manifest.json" ]] && vpn_installed=true
 done
 # Removes the temp file on exit.
 cleanup() { rm -f "$tmp_file"; }
@@ -81,10 +90,27 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson network "$network_installed" '
+jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson network "$network_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
+  # Whether araneadev.vpn already sits anywhere in the bar layout.
+  def vpn_present: ([.bar.layout[]? | arrays | .[] | entry_id] | index("araneadev.vpn")) != null;
+  # The single layout section to insert araneadev.vpn into: the first, in a
+  # fixed scan order (right, center, left, then any other section in the
+  # layout object own key order), whose array holds a network entry
+  # (araneadev.network or omarchy.network). Returns null when no section
+  # holds one, so the caller falls back to appending onto "right" instead.
+  # Only ever one section is chosen, so the insert never runs twice even
+  # when both the araneadev and omarchy ids appear in different sections.
+  def vpn_target_section:
+    (.bar.layout) as $layout
+    | (["right", "center", "left"] + (($layout | keys) - ["right", "center", "left"])) as $order
+    | ($order
+        | map(select(($layout[.] | type) == "array"
+            and (($layout[.] | map(entry_id)) as $ids
+                 | ($ids | index("araneadev.network")) != null or ($ids | index("omarchy.network")) != null)))
+        | .[0]);
   .bar = ((.bar // {}) + {id: "araneadev.bar"})
   # Aranea bar widgets take the place of their stock entries (release hands
   # them back), while preserving the user layout position and inline settings.
@@ -104,6 +130,28 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
              elif $network and type == "object" and .id == "omarchy.network" then .id = "araneadev.network"
              else . end)
        else . end))
+     else . end)
+  # araneadev.vpn is not a clone (there is no stock entry to swap): it gets
+  # its own bar entry inserted right after the network entry, in the single
+  # layout section vpn_target_section picks (the araneadev.network index
+  # wins over the omarchy.network index within that section, even when
+  # omarchy.network comes first in the array). With no network entry
+  # anywhere, it goes on the end of the right section instead. Skipped
+  # entirely once already present anywhere in the layout, so a second
+  # repair never duplicates it, and only ever one section is touched, so a
+  # network entry split across two sections never inserts twice. Placed
+  # once ($placeVpn): an icon the user removed stays removed until a
+  # release parks it.
+  | (if $vpn and $placeVpn and (.bar.layout | type) == "object" and (vpn_present | not) then
+       (vpn_target_section) as $section
+       | if $section != null then
+           .bar.layout[$section] |= (
+             (map(entry_id)) as $ids
+             | (($ids | index("araneadev.network")) // ($ids | index("omarchy.network"))) as $netIdx
+             | .[0:($netIdx + 1)] + [{id: "araneadev.vpn"}] + .[($netIdx + 1):])
+         elif (.bar.layout.right | type) == "array" then
+           .bar.layout.right += [{id: "araneadev.vpn"}]
+         else . end
      else . end)
   | .plugins = ((if (.plugins | type) == "array" then .plugins else [] end) + [
       {id: "araneadev.lock"},
@@ -169,6 +217,11 @@ if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id?
   mkdir -p "$state_root"
   : >"$health_marker"
   rm -f "$health_parked"
+fi
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.vpn") != null' "$tmp_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : >"$vpn_marker"
+  rm -f "$vpn_parked"
 fi
 
 note_polkit_handover

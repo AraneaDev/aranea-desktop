@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.vpn",
+  "name": "Aranea VPN",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "VPN connections and own-app VPN state",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Aranea VPN",
+    "description": "VPN connections and own-app VPN state",
+    "category": "Network",
+    "allowMultiple": false
+  }
+}

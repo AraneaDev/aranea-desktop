@@ -15,6 +15,7 @@ grep -Fq 'quickshell kill' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'omarchy restart shell' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'repair-shell-config' "$repo_root/scripts/deploy-plugins-safely"
 grep -Fq 'araneadev.shared' "$repo_root/scripts/deploy-plugins-safely"
+grep -Fq 'araneadev.vpn' "$repo_root/scripts/deploy-plugins-safely"
 bash -n "$repo_root/scripts/deploy-plugins-safely"
 
 # A plugin can end up deployed on disk without ever being registered in
@@ -31,7 +32,7 @@ mkdir -p "$plugins_dir"
 cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
-for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates araneadev.audio araneadev.bluetooth araneadev.network; do
+for plugin_id in araneadev.lock araneadev.menu araneadev.bar araneadev.notifications araneadev.health araneadev.clipboard araneadev.emojis araneadev.polkit araneadev.osd araneadev.workspaces araneadev.updates araneadev.audio araneadev.bluetooth araneadev.network araneadev.vpn; do
   cp -a "$repo_root/plugins/$plugin_id" "$plugins_dir/$plugin_id"
 done
 

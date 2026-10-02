@@ -5,27 +5,13 @@ const path = require("node:path")
 const { test } = require("node:test")
 
 const logic = require(path.join(__dirname, "..", "..", "plugins/araneadev.network/NetworkLogic.js"))
+const cursor = require(path.join(__dirname, "..", "..", "plugins/araneadev.shared/CursorLogic.js"))
 const g = (cp) => String.fromCodePoint(cp)
 
-// --- splitTerse ---------------------------------------------------------
-
-test("splitTerse splits on unescaped colons", () => {
-  assert.deepEqual(logic.splitTerse("a:b:c"), ["a", "b", "c"])
-  assert.deepEqual(logic.splitTerse(""), [""])
-  assert.deepEqual(logic.splitTerse(undefined), [""])
-})
-
-test("splitTerse unescapes \\: and \\\\ within a field", () => {
-  assert.deepEqual(logic.splitTerse("My\\:Net:uuid-1:802-11-wireless::no:0"), [
-    "My:Net",
-    "uuid-1",
-    "802-11-wireless",
-    "",
-    "no",
-    "0"
-  ])
-  assert.deepEqual(logic.splitTerse("a\\\\\\:b"), ["a\\:b"])
-})
+// splitTerse's own contract lives in tests/js/nmcli-terse.test.js
+// (NmcliTerse.js); NetworkLogic.js gets a generated copy of it
+// (tools/js-facade-generator.mjs) and exercises it through parseDevices /
+// parseConnections below.
 
 // --- splitSections -------------------------------------------------------
 
@@ -80,7 +66,8 @@ test("parseConnections unescapes a colon in the name and keeps an empty device",
       type: "802-11-wireless",
       device: "",
       active: false,
-      timestamp: 0
+      timestamp: 0,
+      state: ""
     }
   ])
 })
@@ -93,9 +80,21 @@ test("parseConnections reads active and a numeric timestamp", () => {
       type: "802-11-wireless",
       device: "wlp2s0",
       active: true,
-      timestamp: 1700000000
+      timestamp: 1700000000,
+      state: ""
     }
   ])
+})
+
+test("parseConnections reads the activation state when nmcli lists it", () => {
+  assert.equal(
+    logic.parseConnections("Office:uuid-3:vpn:tun0:yes:1700000000:activating")[0].state,
+    "activating"
+  )
+  assert.equal(
+    logic.parseConnections("Office:uuid-3:vpn:tun0:yes:1700000000:activated")[0].state,
+    "activated"
+  )
 })
 
 test("parseConnections treats a non-numeric timestamp as 0 and skips blank/short lines", () => {
@@ -106,7 +105,8 @@ test("parseConnections treats a non-numeric timestamp as 0 and skips blank/short
       type: "802-11-wireless",
       device: "wlp2s0",
       active: false,
-      timestamp: 0
+      timestamp: 0,
+      state: ""
     }
   ])
   assert.deepEqual(logic.parseConnections("\nonly:two"), [])
@@ -232,54 +232,24 @@ test("interfaceRows never throws on a null or undefined array element", () => {
   assert.deepEqual(logic.interfaceRows([undefined], {}), [])
 })
 
-// --- vpnRows -------------------------------------------------------------
+// --- parseLinks ------------------------------------------------------------
 
-test("vpnRows keeps only vpn and wireguard types, labels and glyphs them", () => {
-  const connections = [
-    { name: "Office VPN", uuid: "u1", type: "vpn", device: "", active: false, timestamp: 0 },
-    { name: "Home WG", uuid: "u2", type: "wireguard", device: "wg0", active: true, timestamp: 0 },
-    {
-      name: "Home Net",
-      uuid: "u3",
-      type: "802-11-wireless",
-      device: "wlp2s0",
-      active: true,
-      timestamp: 0
-    }
-  ]
-  const addrs = { wg0: "10.0.0.2" }
-  assert.deepEqual(logic.vpnRows(connections, addrs), [
-    {
-      key: "u2",
-      glyph: g(0xf0582),
-      label: "Home WG",
-      detail: "WireGuard · 10.0.0.2",
-      active: true
-    },
-    { key: "u1", glyph: g(0xf0582), label: "Office VPN", detail: "VPN", active: false }
+test("parseLinks parses an `ip -j -4 -br addr` array", () => {
+  const json = JSON.stringify([
+    { ifname: "lo", operstate: "UNKNOWN", addr_info: [{ local: "127.0.0.1" }] },
+    { ifname: "tun0", operstate: "UP", addr_info: [{ local: "10.8.0.3" }] }
+  ])
+  assert.deepEqual(logic.parseLinks(json), [
+    { ifname: "lo", operstate: "UNKNOWN", addr_info: [{ local: "127.0.0.1" }] },
+    { ifname: "tun0", operstate: "UP", addr_info: [{ local: "10.8.0.3" }] }
   ])
 })
 
-test("vpnRows omits the address when inactive or unknown", () => {
-  const connections = [
-    { name: "Idle WG", uuid: "u1", type: "wireguard", device: "wg0", active: false, timestamp: 0 },
-    { name: "No Addr", uuid: "u2", type: "vpn", device: "tun0", active: true, timestamp: 0 }
-  ]
-  assert.deepEqual(logic.vpnRows(connections, {}), [
-    { key: "u2", glyph: g(0xf0582), label: "No Addr", detail: "VPN", active: true },
-    { key: "u1", glyph: g(0xf0582), label: "Idle WG", detail: "WireGuard", active: false }
-  ])
-})
-
-test("vpnRows never throws on a null or undefined array element", () => {
-  assert.deepEqual(logic.vpnRows([undefined], {}), [])
-  const connections = [
-    null,
-    { name: "Office VPN", uuid: "u1", type: "vpn", device: "", active: false, timestamp: 0 }
-  ]
-  assert.deepEqual(logic.vpnRows(connections, {}), [
-    { key: "u1", glyph: g(0xf0582), label: "Office VPN", detail: "VPN", active: false }
-  ])
+test("parseLinks reads invalid JSON or a non-array as no links", () => {
+  assert.deepEqual(logic.parseLinks("not json"), [])
+  assert.deepEqual(logic.parseLinks(JSON.stringify({ not: "an array" })), [])
+  assert.deepEqual(logic.parseLinks(undefined), [])
+  assert.deepEqual(logic.parseLinks(""), [])
 })
 
 // --- savedRows / lastUsedText ---------------------------------------------
@@ -343,176 +313,43 @@ test("lastUsedText boundaries", () => {
   assert.equal(logic.lastUsedText(now - 259200, now), "last used 3 days ago")
 })
 
-// --- pushSample ------------------------------------------------------------
-
-test("pushSample starts fresh, appends, trims at max, and never mutates its input", () => {
-  const empty = []
-  const first = logic.pushSample(empty, { iface: "wlp2s0", rx: 1, tx: 2 }, 3)
-  assert.deepEqual(first, [{ iface: "wlp2s0", rx: 1, tx: 2 }])
-  assert.deepEqual(empty, [])
-
-  const second = logic.pushSample(first, { iface: "wlp2s0", rx: 2, tx: 3 }, 3)
-  assert.deepEqual(second, [
-    { iface: "wlp2s0", rx: 1, tx: 2 },
-    { iface: "wlp2s0", rx: 2, tx: 3 }
-  ])
-  assert.deepEqual(first, [{ iface: "wlp2s0", rx: 1, tx: 2 }])
-
-  const third = logic.pushSample(second, { iface: "wlp2s0", rx: 3, tx: 4 }, 2)
-  assert.deepEqual(third, [
-    { iface: "wlp2s0", rx: 2, tx: 3 },
-    { iface: "wlp2s0", rx: 3, tx: 4 }
-  ])
-  assert.deepEqual(second.length, 2)
-
-  const switched = logic.pushSample(third, { iface: "enp3s0", rx: 9, tx: 9 }, 2)
-  assert.deepEqual(switched, [{ iface: "enp3s0", rx: 9, tx: 9 }])
-})
-
-// --- graphPoints -----------------------------------------------------------
-
-test("graphPoints at idle sits on the baseline", () => {
-  const samples = [
-    { iface: "wlp2s0", rx: 0, tx: 0 },
-    { iface: "wlp2s0", rx: 0, tx: 0 }
-  ]
-  const points = logic.graphPoints(samples, 2, 100, 50, 10)
-  assert.equal(points.scale, 10)
-  assert.ok(points.rx.every((p) => p.y === 50))
-  assert.ok(points.tx.every((p) => p.y === 50))
-})
-
-test("graphPoints at a peak touches the top", () => {
-  const samples = [
-    { iface: "wlp2s0", rx: 0, tx: 0 },
-    { iface: "wlp2s0", rx: 100, tx: 0 }
-  ]
-  const points = logic.graphPoints(samples, 2, 100, 50, 10)
-  assert.equal(points.scale, 100)
-  assert.equal(points.rx[1].y, 0)
-  assert.equal(points.rx[0].y, 50)
-})
-
-test("graphPoints uses the floor when every sample is below it", () => {
-  const samples = [{ iface: "wlp2s0", rx: 1, tx: 1 }]
-  const points = logic.graphPoints(samples, 4, 100, 50, 1000)
-  assert.equal(points.scale, 1000)
-})
-
-test("graphPoints treats negative values as 0 and places the newest sample at x === width", () => {
-  const samples = [
-    { iface: "wlp2s0", rx: -5, tx: -5 },
-    { iface: "wlp2s0", rx: 5, tx: 5 },
-    { iface: "wlp2s0", rx: 10, tx: 0 }
-  ]
-  const points = logic.graphPoints(samples, 3, 90, 50, 1)
-  assert.equal(points.rx[0].y, 50)
-  assert.equal(points.rx[2].x, 90)
-  assert.equal(points.rx[0].x, 90 - 2 * (90 / 2))
-})
-
-test("graphPoints treats slots below 2 as 2", () => {
-  const samples = [
-    { iface: "wlp2s0", rx: 1, tx: 1 },
-    { iface: "wlp2s0", rx: 2, tx: 2 }
-  ]
-  const points = logic.graphPoints(samples, 1, 10, 10, 1)
-  assert.equal(points.rx[1].x, 10)
-  assert.equal(points.rx[0].x, 0)
-})
-
-test("graphPoints on empty samples returns {rx: [], tx: [], scale: floor}", () => {
-  assert.deepEqual(logic.graphPoints([], 4, 100, 50, 7), { rx: [], tx: [], scale: 7 })
-  assert.deepEqual(logic.graphPoints(undefined, 4, 100, 50, 7), { rx: [], tx: [], scale: 7 })
-})
-
-test("graphPoints never throws on a null array element, reading it as rx/tx 0", () => {
-  assert.deepEqual(logic.graphPoints([null], 2, 100, 50, 1), {
-    rx: [{ x: 100, y: 50 }],
-    tx: [{ x: 100, y: 50 }],
-    scale: 1
-  })
-})
-
 // --- moveVertical ------------------------------------------------------
 
-test("moveVertical: header stays on up, and goes to vpn/band/dns on down", () => {
-  const avail = { header: 1, vpn: 2, band: true, bandPills: true, wifi: 1, saved: 1 }
+test("moveVertical: header stays on up, and goes to band/dns on down", () => {
+  const avail = { header: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(
     logic.moveVertical({ section: "header", index: 0, bandAuto: false }, -1, avail),
     { section: "header", index: 0, bandAuto: false }
   )
   assert.deepEqual(logic.moveVertical({ section: "header", index: 0, bandAuto: false }, 1, avail), {
-    section: "vpn",
+    section: "band",
     index: 0,
-    bandAuto: false
+    bandAuto: true
   })
-  assert.deepEqual(
-    logic.moveVertical({ section: "header", index: 0, bandAuto: false }, 1, { ...avail, vpn: 0 }),
-    { section: "band", index: 0, bandAuto: true }
-  )
   assert.deepEqual(
     logic.moveVertical({ section: "header", index: 0, bandAuto: false }, 1, {
       ...avail,
-      vpn: 0,
       band: false
     }),
     { section: "dns", index: 0, bandAuto: false }
   )
 })
 
-test("moveVertical: vpn moves within its rows and at both edges", () => {
-  const avail = { header: 1, vpn: 3, band: true, bandPills: true, wifi: 1, saved: 1 }
-  assert.deepEqual(logic.moveVertical({ section: "vpn", index: 1, bandAuto: false }, 1, avail), {
-    section: "vpn",
-    index: 2,
-    bandAuto: false
-  })
-  assert.deepEqual(logic.moveVertical({ section: "vpn", index: 1, bandAuto: false }, -1, avail), {
-    section: "vpn",
-    index: 0,
-    bandAuto: false
-  })
-  assert.deepEqual(logic.moveVertical({ section: "vpn", index: 0, bandAuto: false }, -1, avail), {
-    section: "header",
-    index: 0,
-    bandAuto: false
-  })
-  assert.deepEqual(
-    logic.moveVertical({ section: "vpn", index: 0, bandAuto: false }, -1, { ...avail, header: 0 }),
-    { section: "vpn", index: 0, bandAuto: false }
-  )
-  assert.deepEqual(logic.moveVertical({ section: "vpn", index: 2, bandAuto: false }, 1, avail), {
-    section: "band",
-    index: 0,
-    bandAuto: true
-  })
-  assert.deepEqual(
-    logic.moveVertical({ section: "vpn", index: 2, bandAuto: false }, 1, { ...avail, band: false }),
-    { section: "dns", index: 0, bandAuto: false }
-  )
-})
-
-test("moveVertical: band toggles bandAuto on up, chains to vpn/header/stay", () => {
-  const avail = { header: 1, vpn: 2, band: true, bandPills: true, wifi: 1, saved: 1 }
+test("moveVertical: band toggles bandAuto on up, chains to header/stay", () => {
+  const avail = { header: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "band", index: 0, bandAuto: false }, -1, avail), {
     section: "band",
     index: 0,
     bandAuto: true
   })
   assert.deepEqual(logic.moveVertical({ section: "band", index: 0, bandAuto: true }, -1, avail), {
-    section: "vpn",
-    index: 1,
+    section: "header",
+    index: 0,
     bandAuto: true
   })
   assert.deepEqual(
-    logic.moveVertical({ section: "band", index: 0, bandAuto: true }, -1, { ...avail, vpn: 0 }),
-    { section: "header", index: 0, bandAuto: true }
-  )
-  assert.deepEqual(
     logic.moveVertical({ section: "band", index: 0, bandAuto: true }, -1, {
       ...avail,
-      vpn: 0,
       header: 0
     }),
     { section: "band", index: 0, bandAuto: true }
@@ -520,7 +357,7 @@ test("moveVertical: band toggles bandAuto on up, chains to vpn/header/stay", () 
 })
 
 test("moveVertical: band on down toggles the pills or falls to dns", () => {
-  const avail = { header: 1, vpn: 2, band: true, bandPills: true, wifi: 1, saved: 1 }
+  const avail = { header: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "band", index: 0, bandAuto: true }, 1, avail), {
     section: "band",
     index: 0,
@@ -540,8 +377,8 @@ test("moveVertical: band on down toggles the pills or falls to dns", () => {
   )
 })
 
-test("moveVertical: dns on up lands on the band, vpn, header or stays", () => {
-  const avail = { header: 1, vpn: 2, band: true, bandPills: true, wifi: 1, saved: 1 }
+test("moveVertical: dns on up lands on the band, header or stays", () => {
+  const avail = { header: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "dns", index: 0, bandAuto: false }, -1, avail), {
     section: "band",
     index: 0,
@@ -559,21 +396,12 @@ test("moveVertical: dns on up lands on the band, vpn, header or stays", () => {
       ...avail,
       band: false
     }),
-    { section: "vpn", index: 1, bandAuto: false }
-  )
-  assert.deepEqual(
-    logic.moveVertical({ section: "dns", index: 0, bandAuto: false }, -1, {
-      ...avail,
-      band: false,
-      vpn: 0
-    }),
     { section: "header", index: 0, bandAuto: false }
   )
   assert.deepEqual(
     logic.moveVertical({ section: "dns", index: 0, bandAuto: false }, -1, {
       ...avail,
       band: false,
-      vpn: 0,
       header: 0
     }),
     { section: "dns", index: 0, bandAuto: false }
@@ -581,7 +409,7 @@ test("moveVertical: dns on up lands on the band, vpn, header or stays", () => {
 })
 
 test("moveVertical: dns on down lands on wifi, saved or stays", () => {
-  const avail = { header: 1, vpn: 2, band: true, bandPills: true, wifi: 2, saved: 1 }
+  const avail = { header: 1, band: true, bandPills: true, wifi: 2, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "dns", index: 0, bandAuto: false }, 1, avail), {
     section: "wifi",
     index: 0,
@@ -602,7 +430,7 @@ test("moveVertical: dns on down lands on wifi, saved or stays", () => {
 })
 
 test("moveVertical: wifi moves within its rows, up goes to dns, down to saved or stays", () => {
-  const avail = { header: 1, vpn: 1, band: true, bandPills: true, wifi: 2, saved: 1 }
+  const avail = { header: 1, band: true, bandPills: true, wifi: 2, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "wifi", index: 0, bandAuto: false }, 1, avail), {
     section: "wifi",
     index: 1,
@@ -625,7 +453,7 @@ test("moveVertical: wifi moves within its rows, up goes to dns, down to saved or
 })
 
 test("moveVertical: an unrecognized section stays put", () => {
-  const avail = { header: 1, vpn: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
+  const avail = { header: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(logic.moveVertical({ section: "bogus", index: 0, bandAuto: false }, 1, avail), {
     section: "bogus",
     index: 0,
@@ -634,7 +462,7 @@ test("moveVertical: an unrecognized section stays put", () => {
 })
 
 test("moveVertical: a null or undefined state never throws and lands on dns/auto", () => {
-  const avail = { header: 1, vpn: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
+  const avail = { header: 1, band: true, bandPills: true, wifi: 1, saved: 1 }
   assert.deepEqual(logic.moveVertical(null, 1, avail), { section: "dns", index: 0, bandAuto: true })
   assert.deepEqual(logic.moveVertical(undefined, -1, avail), {
     section: "dns",
@@ -663,7 +491,7 @@ test("moveVertical: a null or undefined avail never throws and reads as nothing 
 })
 
 test("moveVertical: saved moves within its rows, up goes to wifi or dns, down stays", () => {
-  const avail = { header: 1, vpn: 1, band: true, bandPills: true, wifi: 2, saved: 2 }
+  const avail = { header: 1, band: true, bandPills: true, wifi: 2, saved: 2 }
   assert.deepEqual(logic.moveVertical({ section: "saved", index: 0, bandAuto: false }, 1, avail), {
     section: "saved",
     index: 1,
@@ -685,100 +513,17 @@ test("moveVertical: saved moves within its rows, up goes to wifi or dns, down st
   )
 })
 
-// --- reselectIndex -------------------------------------------------------
-
-test("reselectIndex finds the keyed row wherever it moved", () => {
-  const rows = [{ key: "a" }, { key: "b" }, { key: "c" }]
-  assert.equal(logic.reselectIndex(rows, "c", 0), 2)
-  assert.equal(logic.reselectIndex(rows, "a", 2), 0)
-  assert.equal(
-    logic.reselectIndex(rows, "", 1),
-    1,
-    "an empty key is a real (hidden) key only when a row has it"
-  )
-  assert.equal(logic.reselectIndex([{ key: "" }, { key: "x" }], "", 1), 0)
-})
-
-test("reselectIndex falls back to the clamped fallback when the key is gone", () => {
-  const rows = [{ key: "a" }, { key: "b" }]
-  assert.equal(logic.reselectIndex(rows, "z", 1), 1)
-  assert.equal(logic.reselectIndex(rows, "z", 9), 1)
-  assert.equal(logic.reselectIndex(rows, "z", -3), 0)
-  assert.equal(logic.reselectIndex(rows, "z", Number.NaN), 0)
-  assert.equal(logic.reselectIndex(rows, null, 1), 1)
-})
-
-test("reselectIndex returns -1 for no rows and never throws on bad input", () => {
-  assert.equal(logic.reselectIndex([], "a", 0), -1)
-  assert.equal(logic.reselectIndex(undefined, "a", 0), -1)
-  assert.equal(logic.reselectIndex([null, { key: "a" }], "a", 0), 1)
-  assert.equal(logic.reselectIndex([null, undefined], "a", 1), 1)
-})
-
 test("parseSsids treats an empty SSID as no mapping", () => {
   // A uuid whose lookup failed prints "uuid<TAB>" and an empty field; it
   // must not map to "" (nor swallow the next profile's line).
   assert.deepEqual(logic.parseSsids("uuid-1\t\nuuid-2\tHome\n"), { "uuid-2": "Home" })
 })
 
-// --- followCursor / cursorConfirmed (the 19:04 incident) -----------------
-
-test("followCursor follows the chosen network across a re-sort", () => {
-  // The cursor sat on a secured AP at index 1; a scan re-sorts and an open
-  // network takes index 1. The cursor must move with the secured AP.
-  const before = [{ key: "Home" }, { key: "Daikin" }, { key: "SmartLife" }]
-  assert.equal(logic.cursorConfirmed(before, "Daikin", 1), true)
-  const after = [{ key: "Home" }, { key: "SmartLife" }, { key: "Daikin" }]
-  assert.deepEqual(logic.followCursor(after, "Daikin", 1), {
-    index: 2,
-    key: "Daikin",
-    confirmed: true
-  })
-  assert.equal(
-    logic.cursorConfirmed(after, "Daikin", 1),
-    false,
-    "the old index now holds the open network"
-  )
-})
-
-test("followCursor never adopts the row that slides into a vanished network's place", () => {
-  // The cursored AP drops out of the scan and an open network slides into
-  // its index: the cursor stays there, but nothing is confirmed.
-  const after = [{ key: "Home" }, { key: "SmartLife" }]
-  const r = logic.followCursor(after, "Daikin", 1)
-  assert.deepEqual(r, { index: 1, key: "", confirmed: false })
-  assert.equal(logic.cursorConfirmed(after, r.key, r.index), false)
-  // And stays refused across the next re-sort, never jumping to a row.
-  const later = logic.followCursor([{ key: "SmartLife" }, { key: "Home" }], r.key, r.index)
-  assert.deepEqual(later, { index: 1, key: "", confirmed: false })
-})
-
-test("followCursor clamps into the list and returns -1 with no rows", () => {
-  assert.deepEqual(logic.followCursor([{ key: "a" }], "z", 5), {
-    index: 0,
-    key: "",
-    confirmed: false
-  })
-  assert.deepEqual(logic.followCursor([], "a", 0), { index: -1, key: "", confirmed: false })
-  assert.deepEqual(logic.followCursor(undefined, "a", 0), { index: -1, key: "", confirmed: false })
-  assert.deepEqual(logic.followCursor([{ key: "a" }], null, Number.NaN), {
-    index: 0,
-    key: "",
-    confirmed: false
-  })
-})
-
-test("an empty key (a hidden SSID, or no choice) is never confirmed", () => {
-  const rows = [{ key: "" }, { key: "a" }]
-  assert.equal(logic.cursorConfirmed(rows, "", 0), false)
-  assert.deepEqual(logic.followCursor(rows, "", 1), { index: 1, key: "", confirmed: false })
-  assert.equal(logic.cursorConfirmed(rows, "a", 1), true)
-  assert.equal(logic.cursorConfirmed(rows, "a", 5), false)
-  assert.equal(logic.cursorConfirmed(undefined, "a", 0), false)
-  assert.equal(logic.cursorConfirmed([null], "a", 0), false)
-})
-
 // --- a reveal never chooses (fix wave 2, R1) ------------------------------
+// followCursor/cursorConfirmed moved to shared CursorLogic.js (their own
+// contract lives in tests/js/cursor-logic.test.js); these pressOutcome
+// scenarios still drive them as setup, since pressOutcome's job is to
+// respect exactly this cursor-follow safety invariant.
 
 test("pressOutcome: Enter, Enter after Saved empties under the pointer never connects", () => {
   // Mouse-forget the last Saved row: Saved empties and the cursor drops to
@@ -804,9 +549,9 @@ test("pressOutcome: Enter, Enter after a hovered network vanished never hits the
   // The pointer hovered A (a deliberate choice); A drops out of the scan
   // and B slides into its index.
   const before = [{ key: "Home" }, { key: "A" }, { key: "B" }]
-  assert.equal(logic.cursorConfirmed(before, "A", 1), true)
+  assert.equal(cursor.cursorConfirmed(before, "A", 1), true)
   const after = [{ key: "Home" }, { key: "B" }]
-  const next = logic.followCursor(after, "A", 1)
+  const next = cursor.followCursor(after, "A", 1)
   const target = { section: "wifi", chosen: "wifi", rows: after, key: next.key, index: next.index }
   assert.equal(logic.pressOutcome(target, true, false), "reveal")
   assert.equal(logic.pressOutcome(target, true, true), "refuse", "B was never chosen")
@@ -834,7 +579,7 @@ test("openChoice preselects Wi-Fi row 0 as the open's deliberate placement", () 
   })
   // Then Down reveals and Enter acts on row 0, following it across a re-sort.
   const rows = [{ key: "Cafe" }, { key: "Home" }]
-  const next = logic.followCursor(rows, "Home", 0)
+  const next = cursor.followCursor(rows, "Home", 0)
   assert.equal(
     logic.pressOutcome(
       { section: "wifi", chosen: "wifi", rows: rows, key: next.key, index: next.index },
@@ -873,14 +618,7 @@ test("savedEmptyFallback lands on the last Wi-Fi row without choosing it", () =>
   assert.deepEqual(logic.savedEmptyFallback(undefined), { section: "dns", index: -1, key: "" })
 })
 
-// --- pressIntent / enterDecision ---------------------------------------------
-
-test("pressIntent: Enter and x only reveal a cursor the keyboard isn't showing", () => {
-  assert.equal(logic.pressIntent(false, false), "ignore")
-  assert.equal(logic.pressIntent(false, true), "ignore")
-  assert.equal(logic.pressIntent(true, false), "reveal", "a pointer-placed cursor is invisible")
-  assert.equal(logic.pressIntent(true, true), "act")
-})
+// --- enterDecision ---------------------------------------------
 
 test("enterDecision: Saved Enter focuses forget first; Wi-Fi forget never turns into disconnect", () => {
   assert.equal(logic.enterDecision("saved", false, true), "focusForget")
@@ -889,20 +627,6 @@ test("enterDecision: Saved Enter focuses forget first; Wi-Fi forget never turns 
   assert.equal(logic.enterDecision("wifi", true, false), "none")
   assert.equal(logic.enterDecision("wifi", false, false), "activate")
   assert.equal(logic.enterDecision("vpn", false, false), "activate")
-})
-
-// --- keepRows ------------------------------------------------------------------
-
-test("keepRows hands back the previous array when nothing changed", () => {
-  const cache = {}
-  const first = [{ key: "a" }]
-  assert.equal(logic.keepRows(cache, "wifi", first), first)
-  const same = [{ key: "a" }]
-  assert.equal(logic.keepRows(cache, "wifi", same), first, "equal content keeps the old array")
-  const changed = [{ key: "b" }]
-  assert.equal(logic.keepRows(cache, "wifi", changed), changed)
-  assert.equal(logic.keepRows(cache, "vpn", same), same, "each name has its own slot")
-  assert.equal(logic.keepRows(null, "wifi", same), same)
 })
 
 // --- extrasFollowUp ---------------------------------------------------------------
@@ -936,52 +660,11 @@ test("extrasFollowUp re-reads after a forget that landed mid-poll, and settles o
   assert.deepEqual(logic.extrasFollowUp(false, false), { rerun: false, settle: true })
 })
 
-// --- VPN ----------------------------------------------------------------------------
-
-test("vpnCommand waits up to 20 s and targets the uuid", () => {
-  assert.deepEqual(logic.vpnCommand("uuid-1", false), [
-    "nmcli",
-    "--wait",
-    "20",
-    "connection",
-    "up",
-    "uuid",
-    "uuid-1"
-  ])
-  assert.deepEqual(logic.vpnCommand("uuid-1", true), [
-    "nmcli",
-    "--wait",
-    "20",
-    "connection",
-    "down",
-    "uuid",
-    "uuid-1"
-  ])
-})
-
-test("vpnFailureText names what failed", () => {
-  assert.equal(logic.vpnFailureText(true), "Couldn't disconnect")
-  assert.equal(logic.vpnFailureText(false), "Couldn't connect")
-})
-
-// --- rowKeyMatches -----------------------------------------------------------------
-
-test("rowKeyMatches checks a pointer action's row is still the one it names", () => {
-  const rows = [{ key: "a" }, { key: "" }]
-  assert.equal(logic.rowKeyMatches(rows, 0, "a"), true)
-  assert.equal(logic.rowKeyMatches(rows, 1, ""), true, "a hidden network still works by mouse")
-  assert.equal(logic.rowKeyMatches(rows, 0, "b"), false)
-  assert.equal(logic.rowKeyMatches(rows, 4, "a"), false)
-  assert.equal(logic.rowKeyMatches(rows, 0, undefined), false)
-  assert.equal(logic.rowKeyMatches(undefined, 0, "a"), false)
-})
-
 // --- keyHint ----------------------------------------------------------------------------
 
 test("keyHint says what Enter does in each section", () => {
   assert.equal(logic.keyHint("wifi"), "↑↓ move · ←→ pick · enter connect · x forget · tab next")
   assert.equal(logic.keyHint("saved"), "↑↓ move · enter/→ select forget · x forget · tab next")
-  assert.equal(logic.keyHint("vpn"), "↑↓ move · enter toggle VPN · tab next")
   assert.equal(logic.keyHint("dns"), "↑↓ move · ←→ pick · enter apply · tab next")
   assert.equal(logic.keyHint("band"), "↑↓ move · ←→ pick · enter apply · tab next")
   assert.equal(logic.keyHint("header"), "↑↓ move · ←→ pick · enter apply · tab next")
