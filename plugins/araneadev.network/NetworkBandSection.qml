@@ -23,8 +23,12 @@ Column {
   property string currentLabel: ""
   // Whether the band pills show (stock's bandPillsVisible: pinned).
   property bool pillsVisible: false
-  // The bands: [{key, label, tooltip, selected}].
+  // The bands: [{key, label, tooltip}]. No selected flag -- which one is
+  // chosen comes from selectedBand instead, so a selection change alone
+  // never rebuilds the pills (their Repeater keeps its delegates).
   property var options: []
+  // The band the pills show chosen (stock's bandEffective).
+  property string selectedBand: ""
   // Whether a band change is pending: the selected pill breathes and the
   // switch dims.
   property bool busy: false
@@ -136,8 +140,8 @@ Column {
         width: pillRow.cellWidth
         text: modelData.label
         tooltipText: modelData.tooltip || ""
-        selected: !!modelData.selected
-        busy: section.busy && !!modelData.selected
+        selected: modelData.key !== undefined && modelData.key === section.selectedBand
+        busy: section.busy && modelData.key === section.selectedBand
         hasCursor: !section.cursorAuto && section.cursorIndex === index
         pointerGate: section.pointerGate
         onClicked: section.pick(modelData.key)

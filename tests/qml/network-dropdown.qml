@@ -13,7 +13,10 @@
 // button emits promptConnect and busy or failed swap the fields for stock's messages;
 // Saved rows are dimmed, never chosen, and their forget emits savedForget;
 // changing stats, graph, wifiStatus, captionOpacity or prompt keeps the
-// same Wi-Fi row delegates and a half-typed passphrase; an inactive cursor
+// same Wi-Fi row delegates and a half-typed passphrase; a selectedBand/
+// selectedProvider change alone (no row change) keeps the band and DNS
+// pill delegates too, moving only which one reads selected, and a pending
+// DNS pick shows chosen and pulsing busy; an inactive cursor
 // draws no outline and an active one draws exactly one in every section;
 // every trailing element ends on one right content edge; ensureVisible
 // scrolls the Wi-Fi area; a row sliding under a still pointer emits no
@@ -104,9 +107,57 @@ ShellRoot {
     }
   ]
 
+  // The band pill rows, built once so a view rebuilt with the same rows
+  // keeps the same model (as Panel's bandRows does: no selected flag --
+  // which one is chosen comes from band.selectedBand instead).
+  readonly property var bandRows: [
+    {
+      key: "2.4",
+      label: "2.4 GHz",
+      tooltip: "Pin 2.4 GHz"
+    },
+    {
+      key: "5",
+      label: "5 GHz",
+      tooltip: "Pin 5 GHz"
+    },
+    {
+      key: "6",
+      label: "6 GHz",
+      tooltip: "Pin 6 GHz"
+    }
+  ]
+
+  // The DNS pill rows, built once for the same reason as bandRows; which
+  // one is chosen comes from dns.selectedProvider instead.
+  readonly property var dnsRows: [
+    {
+      key: "DHCP",
+      label: "DHCP",
+      tooltip: ""
+    },
+    {
+      key: "Cloudflare",
+      label: "Cloudflare",
+      tooltip: "Set DNS to Cloudflare"
+    },
+    {
+      key: "Google",
+      label: "Google",
+      tooltip: "Set DNS to Google"
+    },
+    {
+      key: "Custom",
+      label: "Custom",
+      tooltip: "Set custom DNS servers"
+    }
+  ]
+
   // A full view with every section populated, CURSOR its cursor and ROWS
-  // its Wi-Fi rows.
-  function fullView(cursor, rows) {
+  // its Wi-Fi rows, the band selected as BANDSELECTED ("2.4" when omitted)
+  // and DNS as DNSSELECTED ("DHCP" when omitted) with DNSPENDING pulsing
+  // busy ("" when omitted).
+  function fullView(cursor, rows, bandSelected, dnsSelected, dnsPending) {
     return {
       header: {
         glyph: String.fromCodePoint(0xf05a9),
@@ -143,54 +194,13 @@ ShellRoot {
         currentLabel: "2.4 GHz",
         pillsVisible: true,
         busy: false,
-        options: [
-          {
-            key: "2.4",
-            label: "2.4 GHz",
-            tooltip: "Pin 2.4 GHz",
-            selected: true
-          },
-          {
-            key: "5",
-            label: "5 GHz",
-            tooltip: "Pin 5 GHz",
-            selected: false
-          },
-          {
-            key: "6",
-            label: "6 GHz",
-            tooltip: "Pin 6 GHz",
-            selected: false
-          }
-        ]
+        options: bandRows,
+        selectedBand: bandSelected !== undefined ? bandSelected : "2.4"
       },
       dns: {
-        options: [
-          {
-            key: "DHCP",
-            label: "DHCP",
-            selected: true,
-            tooltip: ""
-          },
-          {
-            key: "Cloudflare",
-            label: "Cloudflare",
-            selected: false,
-            tooltip: "Set DNS to Cloudflare"
-          },
-          {
-            key: "Google",
-            label: "Google",
-            selected: false,
-            tooltip: "Set DNS to Google"
-          },
-          {
-            key: "Custom",
-            label: "Custom",
-            selected: false,
-            tooltip: "Set custom DNS servers"
-          }
-        ]
+        options: dnsRows,
+        selectedProvider: dnsSelected !== undefined ? dnsSelected : "DHCP",
+        pendingProvider: dnsPending !== undefined ? dnsPending : ""
       },
       wifi: {
         available: true,
@@ -229,6 +239,13 @@ ShellRoot {
   // The view, keeping its rows, with the cursor moved.
   function withCursor(c) {
     return fullView(c, wifiRows)
+  }
+
+  // The view, keeping its rows (and band/DNS row arrays), with the cursor
+  // moved and the band/DNS selection changed -- to check the pill
+  // delegates survive a selection-only change, as Power's profile pills do.
+  function withSelection(c, bandSelected, dnsSelected, dnsPending) {
+    return fullView(c, wifiRows, bandSelected, dnsSelected, dnsPending)
   }
 
   // A closed prompt.
@@ -567,6 +584,20 @@ ShellRoot {
         var trailing = [["header", t.findChild(full, "headerTrailing")], ["Automatic", t.findChild(full, "autoSwitch")], ["last band pill", bandPills[bandPills.length - 1]], ["last DNS pill", dnsPills[dnsPills.length - 1]], ["Wi-Fi forget", shown(wifi, "forgetButton")[0]], ["Wi-Fi lock", t.findChild(rows[2], "wifiLock")]]
         for (var j = 0; j < trailing.length; j++)
           t.check(trailing[j][1] && Math.abs(rightEdge(trailing[j][1], full) - edge) < 0.5, trailing[j][0] + " ends on the content edge")
+
+        // ---------- Pill identity across a selection change ----------
+        pillsBefore = bandPills.concat(dnsPills)
+        full.view = withSelection(cur(true, "saved", 1), "5", "Cloudflare", "Cloudflare")
+      }], [60, function () {
+        var bandPillsAfter = t.findChildren(t.findChild(full, "bandSection"), "pill")
+        var dnsPillsAfter = t.findChildren(t.findChild(full, "dnsSection"), "pill")
+        var pillsAfter = bandPillsAfter.concat(dnsPillsAfter)
+        t.check(pillsAfter.length === pillsBefore.length && pillsBefore.every(function (p, k) {
+          return p === pillsAfter[k]
+        }), "a selectedBand/selectedProvider change alone keeps the band and DNS pill delegates")
+        t.check(bandPillsAfter[1].selected && !bandPillsAfter[0].selected, "and moves which band pill reads selected")
+        t.check(dnsPillsAfter[1].selected && dnsPillsAfter[1].busy, "a pendingProvider shows chosen and pulsing busy")
+        t.check(!dnsPillsAfter[0].busy && !dnsPillsAfter[2].busy && !dnsPillsAfter[3].busy, "only the pending DNS pill pulses busy")
         full.view = withCursor(cur(true, "saved", 1))
       }], [60, function () {
         var forget = shown(t.findChild(full, "savedSection"), "forgetButton")[0]
@@ -844,4 +875,6 @@ ShellRoot {
   property var identityBefore: []
   // The pointer position the still-pointer check replays.
   property var stillPoint: null
+  // The DNS/band pill delegates before a selectedProvider/selectedBand-only change.
+  property var pillsBefore: []
 }

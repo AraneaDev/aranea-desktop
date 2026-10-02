@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.power",
+  "name": "Aranea Power",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Battery, charge history, power draw and power profiles",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Aranea Power",
+    "description": "Battery, charge history, power draw and power profiles",
+    "category": "System",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.power"
+  }
+}
