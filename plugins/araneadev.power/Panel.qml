@@ -188,6 +188,12 @@ Panel {
   // The current charge in percent, for the history summary and its dot.
   readonly property real nowPercent: Math.round(batteryFraction * 100)
 
+  // Clears the draw trace on a drawFlowing rising edge (idle to flowing),
+  // so an old trace from before a stretch of being idle never joins a new
+  // one.
+  onDrawFlowingChanged: if (root.drawFlowing)
+    root.drawSamples = []
+
   // The profiles as keyed rows ({key: name}) for CursorLogic.
   function profileKeyRows() {
     return profiles.map(function (name) {
@@ -235,7 +241,6 @@ Panel {
   // changers (the status fade, history segments, draw samples) are separate.
   readonly property var powerView: ({
       hero: batteryPresent ? {
-        glyph: batteryIcon(),
         fraction: batteryFraction,
         status: heroStatusText,
         percent: heroPercent
@@ -445,7 +450,8 @@ Panel {
       profileIndex = idx >= 0 ? idx : 0
       cursorActive = false
       fetchHistory()
-      fetchRate()
+      if (drawFlowing)
+        fetchRate()
     } else {
       drawSamples = []
       historySamples = []

@@ -16,7 +16,7 @@ Canvas {
   // How many samples span the full width (60 s at 1.5 s apart).
   property int slots: 40
   // The smallest scale in watts, so a near-idle draw stays low.
-  property real floor: 5
+  property real floor: 10
   // The last GraphLogic.graphPoints result ({rx, tx, scale}), for tests.
   readonly property var points: GraphLogic.graphPoints(trace.samples, trace.slots, trace.width, trace.height, trace.floor)
 

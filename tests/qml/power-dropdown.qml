@@ -79,7 +79,6 @@ ShellRoot {
   function viewOf(cursor, history, draw, profiles) {
     return {
       hero: {
-        glyph: "",
         fraction: 0.62,
         status: "Sipping juice",
         percent: "62"
@@ -286,11 +285,15 @@ ShellRoot {
         var hist = t.findChild(full, "powerHistory")
         t.equal(hist.segments.length, 2, "the history graph gets the segments")
         t.check(Math.abs(hist.height - Style.space(44)) < 0.5, "a 44 px history graph")
+        t.equal(hist.plotY(0), hist.inset, "the 0% line sits inset from the top")
+        t.equal(hist.plotY(1), hist.height - hist.inset, "the 100% line sits inset from the bottom")
+        t.check(hist.inset >= 2 && hist.inset <= 3, "the inset is 2-3 px")
         t.check(t.findChild(full, "drawSection").visible, "the draw section shows")
         t.equal(t.findChild(full, "drawCaption").text, "7.8 W", "with its caption")
         var draw = t.findChild(full, "powerDraw")
         t.equal(draw.samples.length, 2, "the draw trace gets the samples")
         t.check(Math.abs(draw.height - Style.space(26)) < 0.5, "a 26 px draw trace")
+        t.equal(draw.floor, 10, "the draw trace's floor is 10 W")
         t.check(t.findChild(full, "profilesSection").visible, "the profiles show")
         t.equal(pillsOf(full).map(function (p) {
           return p.text

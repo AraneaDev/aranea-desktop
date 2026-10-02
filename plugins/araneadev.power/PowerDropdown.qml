@@ -22,7 +22,7 @@ import "../araneadev.shared/ClickSettle.js" as ClickSettle
 Column {
   id: dropdown
 
-  // View state built by Panel.powerView: {hero: {glyph, fraction, status,
+  // View state built by Panel.powerView: {hero: {fraction, status,
   // percent} or null, details: [{label, value}], history: {visible,
   // summary, startLabel}, draw: {visible, caption}, profiles: [{key,
   // label, glyph, selected}], cursor: {active, section, index}, keyHint}.

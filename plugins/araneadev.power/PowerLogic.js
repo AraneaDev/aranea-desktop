@@ -50,8 +50,8 @@ function batteryPath(text) {
  * state], ...]]}`, one `[time, percent, state]` struct per history point,
  * newest first. Entries with `t <= 0` are dropped (UPower pads with zero
  * timestamps when there isn't enough history yet); a malformed entry (not an
- * array of at least 3 items) is skipped rather than thrown on. The result is
- * sorted oldest first.
+ * array of at least 3 items, so `state` is always present) is skipped rather
+ * than thrown on. The result is sorted oldest first.
  * @param {string|undefined} json - busctl's stdout
  * @returns {HistorySample[]} the samples, oldest first
  */
@@ -68,7 +68,7 @@ function parseHistory(json) {
   var out = []
   for (var i = 0; i < arr.length; i++) {
     var entry = arr[i]
-    if (!Array.isArray(entry) || entry.length < 2) continue
+    if (!Array.isArray(entry) || entry.length < 3) continue
     var t = Number(entry[0])
     if (!isFinite(t) || t <= 0) continue
     out.push({ t: t, pct: Number(entry[1]), state: entry[2] })
@@ -102,32 +102,30 @@ function historyWindowStart(samples, nowSec) {
 }
 
 /**
- * Builds the history chart's polyline segments over the window
+ * Builds the history chart's step-line points over the window
  * `[windowStart, nowSec]` (`nowSec-86400` by default, the usual 24h
  * window; pass `historyWindowStart`'s result to fit a shorter history).
  * Samples after `nowSec` are dropped. A sample before the window is clipped
  * to a single start point at `x=0`, carrying the last (most recent) such
- * sample's percentage, as if it were sampled exactly at the window's start
- * (so a short gap to the first in-window sample doesn't wrongly split the
- * line). A new segment starts whenever two consecutive points (after
- * clipping) are more than 1800s apart, so one sample alone gives a single,
- * single-point segment.
+ * sample's percentage, as if it were sampled exactly at the window's start.
  *
- * UPower only writes a history sample when the value changes, so after a
- * long steady stretch (for example, hours at 100%) the last sample can sit
- * well before `nowSec`. The last in-window (or clipped) sample is therefore
- * held flat with an extra point at `x=width` (`nowSec`), appended to the
- * same, final segment; this tail stretch never breaks on the 30-min gap
- * rule, even when it is longer than that. No tail point is added when the
- * last sample already sits at `nowSec`. Mid-history gaps still break as
- * usual.
+ * UPower only writes a history sample when the value changes, so the trace
+ * is a step: between two consecutive samples `(t_i, pct_i)` and
+ * `(t_{i+1}, pct_{i+1})`, `pct_i` is held flat until `t_{i+1}` (an extra
+ * point at `(t_{i+1}, pct_i)` right before the real `(t_{i+1}, pct_{i+1})`
+ * point), with no gap breaks at all, so the whole trace is always a single
+ * line. The last in-window (or clipped) sample is held flat with a final
+ * extra point at `x=width` (`nowSec`), for the same reason, no matter how
+ * long that stretch is; no tail point is added when the last sample already
+ * sits at `nowSec`.
  * @param {HistorySample[]|undefined} samples - from `parseHistory`
  * @param {number} nowSec - the current time, in epoch seconds
  * @param {number} width - the chart's pixel width
  * @param {number} height - the chart's pixel height
  * @param {number} [windowStart] - the window's start, in epoch seconds
  *   (default `nowSec-86400`)
- * @returns {ChartPoint[][]} the polyline segments, oldest first within each
+ * @returns {ChartPoint[][]} one polyline segment (oldest first), or `[]`
+ *   with no samples in range
  */
 function historyPoints(samples, nowSec, width, height, windowStart) {
   var list = Array.isArray(samples) ? samples.slice() : []
@@ -164,34 +162,30 @@ function historyPoints(samples, nowSec, width, height, windowStart) {
 
   if (points.length === 0) return []
 
-  /** @type {ChartPoint[][]} */
-  var segments = []
+  /**
+   * The pixel-space point for a sample at time T with percentage PCT,
+   * closing over this call's start/width/span/height.
+   * @param {number} t - the sample's time, in epoch seconds
+   * @param {number} pct - the sample's percentage
+   * @returns {ChartPoint} the pixel-space point
+   */
+  function pixel(t, pct) {
+    return { x: ((t - start) * width) / span, y: height - (pct * height) / 100 }
+  }
+
   /** @type {ChartPoint[]} */
-  var current = []
-  var prevT = null
-  for (var p = 0; p < points.length; p++) {
-    var point = points[p]
-    if (prevT !== null && point.t - prevT > 1800) {
-      segments.push(current)
-      current = []
-    }
-    current.push({
-      x: ((point.t - start) * width) / span,
-      y: height - (point.pct * height) / 100
-    })
-    prevT = point.t
+  var line = [pixel(points[0].t, points[0].pct)]
+  for (var p = 1; p < points.length; p++) {
+    // Held flat at the previous value until this sample's time, then the
+    // step up (or down) to its own value: the staircase.
+    line.push(pixel(points[p].t, points[p - 1].pct))
+    line.push(pixel(points[p].t, points[p].pct))
   }
 
   var lastPoint = points[points.length - 1]
-  if (lastPoint.t < nowSec) {
-    current.push({
-      x: width,
-      y: height - (lastPoint.pct * height) / 100
-    })
-  }
+  if (lastPoint.t < nowSec) line.push(pixel(nowSec, lastPoint.pct))
 
-  segments.push(current)
-  return segments
+  return [line]
 }
 
 /**
