@@ -1,30 +1,32 @@
 // Aranea Display (araneadev.monitor, cloned from omarchy.monitor): the bar
-// display icon and its dropdown. Stock logic and view (brightness, text
-// size, scale and display controls, the keyboard cursor and IPC) are
-// unchanged for now. DisplaysLogic.js holds the pure rules for the
-// Aranea-native view coming next (night light, keyboard backlight, section
-// and header rules, the pending/queue helpers); nothing here calls it yet.
+// display icon and its dropdown. Stock's root logic stays (the
+// omarchy-monitor-state poll, the debounced and queued brightness setter,
+// the brightness and state IPC, the display toggle with its last-display
+// guard, scale, text size with its reflow guard, the bar wheel accumulator
+// and the 5 s refresh while open). Added here: the night light and keyboard
+// light, instant pending state with a last-wins queue for every command,
+// and the keyed keyboard cursor. The pure view, DisplaysDropdown, draws it
+// in the shared keyboard frame. The rules are DisplaysLogic.js / Model.js /
+// CursorLogic.js functions, tested under Node.
+pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 import qs.Ui
 import qs.Commons
 import "Model.js" as Model
+import "DisplaysLogic.js" as DisplaysLogic
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
+import "../araneadev.shared" as Aranea
 
 Panel {
   id: root
   moduleName: "omarchy.monitor"
   ipcTarget: "omarchy.monitor"
+  // manageIpc: false so this panel can own the single IpcHandler the target
+  // permits, needed for the brightness + state methods below.
   manageIpc: false
 
-  // manageIpc: false so this panel can own the single IpcHandler the target
-  // permits — needed for the brightness + state methods below.
-  // Stock code, unqualified by design (qmllint cannot type `bar`, the
-  // generic Process exit handler, or the delegate-scoped Repeater members
-  // further down): a temporary region, deleted once Task 4 replaces the
-  // view below with the Aranea one.
-  // qmllint disable missing-property unqualified signal-handler-parameters
   // The displayed device's brightness, 0-100 (DDC/sysfs, via
   // `omarchy-monitor-state`), or 0 when no backlight is controllable.
   property int brightnessPercent: 0
@@ -56,17 +58,10 @@ Panel {
   // Carry sub-notch touchpad deltas between wheel events.
   property real wheelAccumulator: 0
 
-  // Cursor model shared by keyboard and mouse. Sections:
-  //   "brightness" - single slider row, selectedIndex = -1 sentinel
-  //                  (mirrors Audio's slider rows). Only present if a
-  //                  controllable backlight was detected.
-  //   "scale"      - 6 Button scale presets; treated as a single
-  //                  horizontal row from j/k's perspective. h/l moves
-  //                  between presets, identical to bluetooth's header.
-  //   "monitors"   - vertical display row list for enabling/disabling displays;
-  //                  j/k walks each row.
-  // Mouse hover on a target updates root state via the components' `hovered`
-  // signal so keyboard cursor and pointer share one highlight.
+  // Cursor model shared by keyboard and mouse. Sections, in keyboard order
+  // (DisplaysLogic.sectionsFor): "brightness", "nightlight", "kbdlight",
+  // "textsize" (one control each, index 0), "scale" (the pills, walked
+  // with left/right) and "monitors" (the display rows, walked with up/down).
   readonly property var scalePresets: ["1", "1.25", "1.6", "2", "3", "4"]
   // The scale presets available for the focused display (scalePresets
   // filtered to the ones its mode actually honors), or scalePresets itself
@@ -79,117 +74,269 @@ Panel {
     }
     return scalePresets
   }
-  // Which cursor section ("brightness", "textsize", "scale" or "monitors")
-  // currently has keyboard/mouse focus.
+  // Which cursor section currently has keyboard/mouse focus.
   property string focusSection: "scale"
-  // The focused row/preset within focusSection; -1 for the slider sections'
-  // sentinel.
+  // The focused row/pill within focusSection; 0 for the one-control
+  // sections.
   property int selectedIndex: 0
   // Whether keyboard/mouse navigation has placed a cursor yet.
   property bool cursorActive: false
+  // True while the keyboard drives the cursor; any pointer action clears it.
+  // The view outlines the cursor only then, so the mouse never shows one.
+  property bool keyboardCursor: false
+  // The key of the row the cursor was deliberately put on (a move, an
+  // adjustment or a hover; never an open or a keyboard reveal): a scale
+  // value, a monitor name, or the section name of a one-control section.
+  // The cursor follows it when the rows change, and Enter refuses while it
+  // is "" or no longer under the cursor (CursorLogic.cursorConfirmed).
+  property string cursorKey: ""
 
-  // Text size slider — curated macOS-style notches (px). The panel snaps to
+  // Text size slider: curated macOS-style notches (px). The panel snaps to
   // these stops; the CLI (omarchy-display-text-size) accepts any integer in range.
   readonly property var textSizeStops: [9, 10, 11, 12, 14, 16, 20]
   // While a change is in flight, the chosen stop index overrides the live
   // base-size so the knob doesn't snap back during the file round-trip. -1 =
   // no pending change; follow Style.font.baseSize.
   property int textSizePreviewIndex: -1
+  // A text size (px) asked for while textScaleProc was already running, run
+  // when it exits (the last one wins); 0 for none.
+  property int queuedTextPx: 0
 
   // A text-size change reflows the whole panel (both font and spacing scale),
   // which slides rows under a stationary pointer and fires synthetic hover.
-  // While true, hover is not allowed to hijack the keyboard focus section —
-  // otherwise h/l on the text-size slider can jump focus to another row.
+  // While true, hover is not allowed to hijack the keyboard focus section,
+  // otherwise left/right on the text-size slider can jump focus to another row.
   property bool reflowingText: false
-  // Marks a text-size reflow in progress and arms reflowSettle to clear it.
+  // Marks a text-size reflow in progress and arms reflowSettle to clear it;
+  // also stamps the view's layout, so a click landing mid-reflow is settled.
   function markReflowing() {
     root.reflowingText = true
     reflowSettle.restart()
+    dropdown.noteLayoutChange()
   }
+
+  // ---------- Aranea additions: night light, keyboard light, pending ----------
+
+  // Whether `omarchy-toggle-nightlight --status` answered (the row hides
+  // otherwise).
+  property bool nightAvailable: false
+  // Whether the night light is on, as read.
+  property bool nightOn: false
+  // The night light row's caption (DisplaysLogic.nightlightCaption).
+  property string nightCaption: "Off"
+  // The night light state asked for but not yet confirmed by a re-read, or
+  // null for none. Shown at once and pulsing busy.
+  property var nightPending: null
+  // The state the running omarchy-toggle-nightlight will leave, so its exit
+  // handler can toggle again when the latest request differs (last wins).
+  property bool nightTarget: false
+  // How many night light toggles have exited, and the count when the
+  // running status read started: a read only settles a request when it
+  // started after the last toggle exited.
+  property int nightSerial: 0
+  // See nightSerial.
+  property int nightReadSerial: -1
+
+  // The keyboard backlight device (DisplaysLogic.kbdDevice), "" for none.
+  property string kbdDevice: ""
+  // Whether `ls /sys/class/leds` has been read (the device is found once).
+  property bool kbdDeviceChecked: false
+  // The keyboard light's level and maximum, as read (max 0 hides the row).
+  property int kbdValue: 0
+  // See kbdValue.
+  property int kbdMax: 0
+  // A keyboard light level asked for but not yet confirmed, or -1.
+  property int kbdPending: -1
+  // A level asked for while kbdSetProc was already running, or -1.
+  property int kbdQueued: -1
+  // Exit and read counters for the keyboard light, as nightSerial.
+  property int kbdSerial: 0
+  // See kbdSerial.
+  property int kbdReadSerial: -1
+  // The keyboard light row's control (DisplaysLogic.kbdMode).
+  readonly property string kbdMode: DisplaysLogic.kbdMode(kbdMax)
+
+  // A scale asked for but not yet confirmed by a re-read; "" for none.
+  property string pendingScale: ""
+  // A scale asked for while actionProc was already running; "" for none.
+  property string queuedScale: ""
+  // Display requests not yet confirmed: {name: the enabled state asked for}.
+  property var pendingDisplays: ({})
+  // Display requests waiting behind a running actionProc, same shape.
+  property var queuedDisplays: ({})
+  // What the running actionProc does: {kind: "scale" or "display", key},
+  // so a failure drops only that request's pending state.
+  property var actionRunning: null
+  // Exit and read counters for actionProc and stateProc, as nightSerial.
+  property int actionSerial: 0
+  // See actionSerial.
+  property int stateReadSerial: -1
+
+  // Row arrays kept by CursorLogic.keepRows, so an unchanged refresh hands
+  // the view the same array and its Repeaters keep their delegates.
+  property var rowCache: ({})
 
   // The sections shown given the current state, in keyboard order.
-  readonly property var visibleSections: {
-    var list = []
-    if (brightnessAvailable)
-      list.push("brightness")
-    list.push("textsize")
-    list.push("scale")
-    if (displays.length > 1)
-      list.push("monitors")
-    return list
+  readonly property var visibleSections: DisplaysLogic.sectionsFor({
+    brightness: brightnessAvailable,
+    nightlight: nightAvailable,
+    kbd: kbdMode !== "none",
+    displayCount: displays.length
+  })
+
+  // The focused display, or null before any display has loaded.
+  readonly property var focusedDisplay: {
+    for (var i = 0; i < displays.length; i++) {
+      if (displays[i] && displays[i].focused)
+        return displays[i]
+    }
+    return null
   }
 
-  // How many navigable rows section has (0 for the slider sections, which
-  // use the -1 sentinel instead).
-  function sectionCount(section) {
-    if (section === "brightness")
-      return 0
-    // only the slider sentinel at -1
-    if (section === "textsize")
-      return 0
-    // slider sentinel at -1, like brightness
+  // The scale pills, keyed by scale value. No selected flag: which one is
+  // chosen is selectedScaleKey / pendingScale, passed separately.
+  readonly property var scaleRows: CursorLogic.keepRows(rowCache, "scales", scaleValues.map(function (value) {
+    return {
+      key: String(value),
+      label: root.effectiveScale(value) + "×"
+    }
+  }))
+
+  // The display rows, keyed by monitor name. No enabled flag: that is
+  // enabledDisplayMap / pendingDisplays, passed separately.
+  readonly property var displayRows: CursorLogic.keepRows(rowCache, "displays", displays.map(function (d) {
+    var name = String(d && d.name || "")
+    var size = d && d.width && d.height ? d.width + "×" + d.height : ""
+    var parts = size !== "" ? [size] : []
+    if (d && d.focused)
+      parts.push("focused")
+    return {
+      key: name,
+      label: name,
+      detail: parts.join(" · "),
+      glyph: String.fromCodePoint(name !== "" && name === root.internalMonitor ? 0xf0322 : 0xf0379)
+    }
+  }))
+
+  // Which displays are enabled, as read: {name: bool}.
+  readonly property var enabledDisplayMap: {
+    var map = {}
+    for (var i = 0; i < displays.length; i++) {
+      var d = displays[i]
+      if (d && d.name)
+        map[String(d.name)] = !!d.enabled
+    }
+    return map
+  }
+
+  // The names of the displays that read on, counting pending requests.
+  readonly property var shownEnabledNames: {
+    var names = []
+    for (var i = 0; i < displays.length; i++) {
+      var d = displays[i]
+      if (d && d.name && root.displayShownOn(String(d.name)))
+        names.push(String(d.name))
+    }
+    return names
+  }
+
+  // The only display that reads on (its switch is disabled), or "".
+  readonly property string lastEnabled: shownEnabledNames.length === 1 ? shownEnabledNames[0] : ""
+
+  // The scale key the pills mark chosen, as read: the active preset
+  // (Model.matchingScaleIndex), or "" with no match.
+  readonly property string selectedScaleKey: {
+    var idx = activeScaleIndex()
+    return idx >= 0 && idx < scaleValues.length ? String(scaleValues[idx]) : ""
+  }
+
+  // The view object DisplaysDropdown draws (its documented shape). The
+  // states (brightness, night light, keyboard light, text stop, chosen
+  // scale, enabled displays and every pending request) are separate.
+  readonly property var displaysView: ({
+      header: {
+        title: "Display",
+        caption: DisplaysLogic.headerCaption(focusedDisplay, focusedDisplay ? effectiveScale(monitorScale) : ""),
+        glyph: String.fromCodePoint(displays.length > 1 ? 0xf037a : 0xf0379)
+      },
+      brightness: {
+        visible: brightnessAvailable,
+        label: brightnessName(brightnessPercent)
+      },
+      nightlight: {
+        visible: nightAvailable
+      },
+      kbd: {
+        visible: kbdMode !== "none",
+        mode: kbdMode,
+        max: kbdMax
+      },
+      textStops: textSizeStops,
+      scales: scaleRows,
+      displays: displayRows,
+      cursor: {
+        active: cursorActive && keyboardCursor,
+        section: focusSection,
+        index: selectedIndex
+      },
+      keyHint: DisplaysLogic.keyHint(focusSection)
+    })
+
+  // The rows of SECTION for the keyed cursor: the scale pills, the display
+  // rows, or one row keyed by the section's own name. [] for the lists
+  // while their bindings are still being built (a change handler can run
+  // during construction).
+  function sectionRows(section) {
     if (section === "scale")
-      return scaleValues.length
+      return Array.isArray(scaleRows) ? scaleRows : []
     if (section === "monitors")
-      return displays.length
+      return Array.isArray(displayRows) ? displayRows : []
+    return [
+      {
+        key: section
+      }
+    ]
+  }
+
+  // The key of SECTION's row INDEX, "" when there is none.
+  function keyAt(section, index) {
+    var row = sectionRows(section)[index]
+    return row && typeof row.key === "string" ? row.key : ""
+  }
+
+  // Where the cursor lands on entering SECTION: the active scale pill, the
+  // first display, or the one control.
+  function sectionLanding(section) {
+    if (section === "scale")
+      return Math.max(0, activeScaleIndex())
     return 0
   }
 
-  // Whether section behaves as one horizontal row for j/k purposes.
-  function sectionIsSingleRow(section) {
-    // brightness and text size are lone sliders; scale presets sit horizontally.
-    return section === "brightness" || section === "textsize" || section === "scale"
-  }
-
-  // The selectedIndex a section starts at when entered from above.
-  function sectionFirstIndex(section) {
-    if (section === "brightness" || section === "textsize")
-      return -1
-    return 0
-  }
-
-  // Moves the keyboard cursor by delta rows, crossing section boundaries at
-  // the ends of a section's rows.
+  // Moves the keyboard cursor by delta rows: through the display rows, else
+  // to the next or previous section (DisplaysLogic.moveSection). The row it
+  // lands on is a deliberate choice.
   function moveCursor(delta) {
     var sections = visibleSections
     if (!sections || sections.length === 0)
       return
-    var sIdx = sections.indexOf(focusSection)
-    if (sIdx < 0) {
-      focusSection = sections[0]
-      selectedIndex = sectionFirstIndex(focusSection)
-      return
-    }
-    var inSingleRow = sectionIsSingleRow(focusSection)
-    var max = inSingleRow ? 0 : sectionCount(focusSection) - 1
-
-    if (delta > 0) {
-      if (!inSingleRow && selectedIndex < max) {
-        selectedIndex = selectedIndex + 1
+    if (focusSection === "monitors") {
+      var row = selectedIndex + delta
+      if (row >= 0 && row < displayRows.length) {
+        selectedIndex = row
+        cursorKey = keyAt(focusSection, selectedIndex)
         return
       }
-      if (sIdx < sections.length - 1) {
-        focusSection = sections[sIdx + 1]
-        selectedIndex = sectionFirstIndex(focusSection)
-      }
-    } else {
-      if (!inSingleRow && selectedIndex > 0) {
-        selectedIndex = selectedIndex - 1
-        return
-      }
-      if (sIdx > 0) {
-        var prev = sections[sIdx - 1]
-        focusSection = prev
-        // Coming up from below — land on the last navigable row of the prev
-        // section, or its sentinel for single-row sections.
-        selectedIndex = sectionIsSingleRow(prev) ? sectionFirstIndex(prev) : sectionCount(prev) - 1
-      }
     }
+    var next = DisplaysLogic.moveSection(sections, focusSection, delta)
+    if (next !== focusSection) {
+      focusSection = next
+      selectedIndex = sectionLanding(next)
+    }
+    cursorKey = keyAt(focusSection, selectedIndex)
   }
 
-  // h/l: in scale section, walks the preset row; everywhere else, no-op
-  // because adjustBrightness handles horizontal motion on the brightness
-  // slider.
+  // Left/right in the scale section: walks the pill row (choosing nothing
+  // until Enter); everywhere else, a no-op.
   function moveCursorH(delta) {
     if (focusSection !== "scale")
       return
@@ -199,6 +346,7 @@ Panel {
     if (next > scaleValues.length - 1)
       next = scaleValues.length - 1
     selectedIndex = next
+    cursorKey = keyAt(focusSection, selectedIndex)
   }
 
   // Nudges brightness by delta when the brightness slider has focus; a
@@ -211,73 +359,56 @@ Panel {
     setBrightness(root.brightnessPercent + delta)
   }
 
-  // Applies the action for whatever the keyboard cursor is on (a scale
-  // preset or a display toggle); the brightness slider has no separate
-  // activation.
+  // Left/right on the keyboard light: a step on the slider, or off/on on
+  // the switch.
+  function adjustKbd(delta) {
+    if (kbdMode === "slider")
+      setKbd(kbdShownLevel() + delta)
+    else if (kbdMode === "switch")
+      setKbd(delta > 0 ? kbdMax : 0)
+  }
+
+  // Applies the action for whatever the keyboard cursor is on, only when
+  // it is still the row the user chose (CursorLogic.cursorConfirmed): the
+  // night light or keyboard switch toggles, a scale pill is set, a display
+  // is switched. The sliders have no separate activation.
   function activateCursor() {
-    if (focusSection === "scale" && selectedIndex >= 0 && selectedIndex < scaleValues.length) {
-      setScale(scaleValues[selectedIndex])
+    if (!CursorLogic.cursorConfirmed(sectionRows(focusSection), cursorKey, selectedIndex))
       return
-    }
-    if (focusSection === "monitors" && selectedIndex >= 0 && selectedIndex < displays.length) {
-      var d = displays[selectedIndex]
-      if (d)
-        toggleDisplay(d.name, d.enabled)
-    }
-    // brightness: no separate action; the slider value is the action.
+    if (focusSection === "nightlight")
+      toggleNightlight()
+    else if (focusSection === "kbdlight" && kbdMode === "switch")
+      setKbd(kbdShownLevel() > 0 ? 0 : kbdMax)
+    else if (focusSection === "scale")
+      setScale(cursorKey)
+    else if (focusSection === "monitors")
+      toggleDisplay(cursorKey, displayShownOn(cursorKey))
   }
 
   // Keeps focusSection/selectedIndex inside the currently visible sections
-  // and rows after the data they point at changes.
+  // and rows after the data they point at changes, following cursorKey
+  // (CursorLogic.followCursor).
   function clampCursor() {
     var sections = visibleSections
     if (!sections || !sections.length)
       return
     if (sections.indexOf(focusSection) < 0) {
       focusSection = sections[0]
-      selectedIndex = sectionFirstIndex(focusSection)
+      selectedIndex = sectionLanding(focusSection)
+      cursorKey = ""
       return
     }
-    var count = sectionCount(focusSection)
-    if (sectionIsSingleRow(focusSection)) {
-      // brightness/text size use the -1 sentinel; scale clamps into the presets.
-      if (focusSection === "brightness" || focusSection === "textsize")
-        selectedIndex = -1
-      else if (selectedIndex < 0 || selectedIndex >= count)
-        selectedIndex = 0
+    var rows = sectionRows(focusSection)
+    if (cursorKey !== "") {
+      var next = CursorLogic.followCursor(rows, cursorKey, selectedIndex)
+      selectedIndex = Math.max(0, next.index)
+      cursorKey = next.key
       return
     }
-    if (count === 0) {
-      var sIdx = sections.indexOf(focusSection)
-      focusSection = sIdx > 0 ? sections[sIdx - 1] : sections[0]
-      selectedIndex = sectionFirstIndex(focusSection)
-      return
-    }
-    if (selectedIndex > count - 1)
-      selectedIndex = count - 1
+    if (selectedIndex > rows.length - 1)
+      selectedIndex = rows.length - 1
     if (selectedIndex < 0)
       selectedIndex = 0
-  }
-
-  // Keep the keyboard-focused row inside the viewport when the panel grows
-  // taller than its allotted height (lots of displays). Mirrors audio's
-  // ensureCursorVisible helper.
-  function ensureCursorVisible(item) {
-    if (!item || !scrollArea)
-      return
-    var flick = scrollArea.contentItem
-    if (!flick || flick.contentY === undefined)
-      return
-    var pt = item.mapToItem(flick.contentItem || flick, 0, 0)
-    var top = pt.y
-    var bottom = top + (item.height || 0)
-    var viewTop = flick.contentY
-    var viewBottom = viewTop + flick.height
-    var margin = 6
-    if (top < viewTop + margin)
-      flick.contentY = Math.max(0, top - margin)
-    else if (bottom > viewBottom - margin)
-      flick.contentY = bottom + margin - flick.height
   }
 
   // The `brightness` IPC method: sets brightness and reports the value sent.
@@ -324,10 +455,15 @@ Panel {
     }
   }
 
-  // Starts omarchy-monitor-state when it isn't already running.
+  // Starts omarchy-monitor-state when it isn't already running; while
+  // open, re-reads the night light and keyboard light too.
   function refresh() {
     if (!stateProc.running)
       stateProc.running = true
+    if (opened) {
+      readNight()
+      readKbd()
+    }
   }
 
   // Sets brightness: clamps value, updates the local state at once, and
@@ -356,12 +492,14 @@ Panel {
 
   // Summons the OSD with the brightness glyph and value.
   function showBrightnessOsd(percent) {
-    if (!bar || !bar.shell)
+    // qmllint disable missing-property
+    if (!root.bar || !root.bar.shell)
       return
-    bar.shell.summon("omarchy.osd", JSON.stringify({
+    root.bar.shell.summon("omarchy.osd", JSON.stringify({
       icon: "brightness",
       value: percent
     }))
+    // qmllint enable missing-property
   }
 
   // Normalizes a scale string, delegating to Model.js.
@@ -392,7 +530,7 @@ Panel {
   }
 
   // Playful mood-name for a given brightness percent. Bands intentionally
-  // span ~10–20 points so casual tweaks change the label, while small
+  // span ~10-20 points so casual tweaks change the label, while small
   // nudges within one band don't.
   function brightnessName(percent) {
     return Model.brightnessName(percent)
@@ -406,23 +544,137 @@ Panel {
     root.enabledDisplayCount = parsed.enabledDisplayCount
   }
 
+  // Whether display NAME reads on: its pending request, else as read.
+  function displayShownOn(name) {
+    if (typeof pendingDisplays[name] === "boolean")
+      return pendingDisplays[name]
+    return enabledDisplayMap[name] === true
+  }
+
   // Enables or disables a display via hyprctl, refusing to disable the last
-  // enabled one.
+  // enabled one (counting requests still in flight). Shown at once
+  // (pendingDisplays) and queued behind a running actionProc.
   function toggleDisplay(name, enabled) {
     if (!name)
       return
-    if (enabled && root.enabledDisplayCount <= 1)
+    if (enabled && root.shownEnabledNames.length <= 1)
       return
-    actionProc.command = ["hyprctl", "keyword", "monitor", name + (enabled ? ",disable" : ",preferred,auto,auto")]
-    if (!actionProc.running)
-      actionProc.running = true
+    root.pendingDisplays = Object.assign({}, root.pendingDisplays, {
+      [name]: !enabled
+    })
+    if (actionProc.running) {
+      root.queuedDisplays = Object.assign({}, root.queuedDisplays, {
+        [name]: !enabled
+      })
+      return
+    }
+    runDisplayCommand(name, !enabled)
+  }
+
+  // Starts hyprctl to enable or disable display NAME.
+  function runDisplayCommand(name, enable) {
+    root.actionRunning = {
+      kind: "display",
+      key: name
+    }
+    actionProc.command = ["hyprctl", "keyword", "monitor", name + (enable ? ",preferred,auto,auto" : ",disable")]
+    actionProc.running = true
   }
 
   // Applies scale to the focused display via omarchy-hyprland-monitor-scaling.
+  // Shown chosen at once (pendingScale); a request while actionProc runs is
+  // queued, the last one winning (DisplaysLogic.takeQueued).
   function setScale(scale) {
+    if (!scale)
+      return
+    root.pendingScale = String(scale)
+    var next = DisplaysLogic.takeQueued({
+      running: actionProc.running,
+      queued: String(scale)
+    })
+    root.queuedScale = next.queue
+    if (next.run !== "")
+      runScaleCommand(next.run)
+  }
+
+  // Starts omarchy-hyprland-monitor-scaling for SCALE.
+  function runScaleCommand(scale) {
+    root.actionRunning = {
+      kind: "scale",
+      key: scale
+    }
     actionProc.command = ["bash", "-c", "omarchy-hyprland-monitor-scaling " + scale]
-    if (!actionProc.running)
-      actionProc.running = true
+    actionProc.running = true
+  }
+
+  // actionProc exited with EXITCODE: runs the queued scale, else the next
+  // queued display; otherwise a failure drops its pending state, and the
+  // state is re-read either way.
+  function actionExited(exitCode) {
+    var done = root.actionRunning
+    root.actionRunning = null
+    root.actionSerial++
+    var next = DisplaysLogic.takeQueued({
+      running: false,
+      queued: root.queuedScale
+    })
+    root.queuedScale = next.queue
+    if (next.run !== "") {
+      runScaleCommand(next.run)
+      return
+    }
+    var names = Object.keys(root.queuedDisplays)
+    if (names.length > 0) {
+      var name = names[0]
+      var enable = root.queuedDisplays[name]
+      var rest = Object.assign({}, root.queuedDisplays)
+      delete rest[name]
+      root.queuedDisplays = rest
+      runDisplayCommand(name, enable)
+      return
+    }
+    if (exitCode !== 0 && done) {
+      if (done.kind === "scale" && root.pendingScale === done.key)
+        root.pendingScale = ""
+      else if (done.kind === "display")
+        dropPendingDisplay(done.key)
+    }
+    root.refresh()
+  }
+
+  // Drops display NAME's pending request.
+  function dropPendingDisplay(name) {
+    if (typeof root.pendingDisplays[name] !== "boolean")
+      return
+    var rest = Object.assign({}, root.pendingDisplays)
+    delete rest[name]
+    root.pendingDisplays = rest
+  }
+
+  // Settles the scale and display requests against a fresh state read: a
+  // request the state now shows is dropped, and once the read started
+  // after the last command exited with nothing left to run, every request
+  // is (the real state shows).
+  function settleActions() {
+    root.pendingScale = DisplaysLogic.settlePending(root.pendingScale, root.selectedScaleKey)
+    var names = Object.keys(root.pendingDisplays)
+    for (var i = 0; i < names.length; i++) {
+      if (root.enabledDisplayMap[names[i]] === root.pendingDisplays[names[i]])
+        dropPendingDisplay(names[i])
+    }
+    var idle = !actionProc.running && root.queuedScale === "" && Object.keys(root.queuedDisplays).length === 0
+    if (idle && root.stateReadSerial === root.actionSerial) {
+      root.pendingScale = ""
+      root.pendingDisplays = {}
+    }
+  }
+
+  // Whether a scale or display request still waits on a state read that
+  // started after its command exited.
+  function actionsAwaitRead() {
+    if (actionProc.running || root.stateReadSerial === root.actionSerial)
+      return false
+    return root.pendingScale !== "" || Object.keys(root.pendingDisplays).length > 0
   }
 
   // ---- Text size (shell base font + GTK text-scaling, via one CLI) ----
@@ -452,33 +704,224 @@ Panel {
     return textSizePreviewIndex >= 0 ? textSizeStops[textSizePreviewIndex] : Style.font.baseSize
   }
 
-  // Applies px via omarchy-display-text-size.
+  // Applies px via omarchy-display-text-size; a request while it runs is
+  // queued, the last one winning.
   function setTextSize(px) {
+    if (textScaleProc.running) {
+      root.queuedTextPx = px
+      return
+    }
     textScaleProc.command = ["omarchy-display-text-size", String(px)]
-    if (!textScaleProc.running)
-      textScaleProc.running = true
+    textScaleProc.running = true
   }
 
   // Moves the text-size stop by deltaSteps, previewing it at once while the
-  // CLI round-trips.
+  // CLI round-trips. Nothing at either end.
   function adjustTextSize(deltaSteps) {
     var idx = currentTextIndex() + deltaSteps
     if (idx < 0)
       idx = 0
     if (idx > textSizeStops.length - 1)
       idx = textSizeStops.length - 1
+    if (idx === currentTextIndex())
+      return
+    requestTextStop(idx)
+  }
+
+  // Asks for text stop IDX: previews it at once (pulsing busy) and runs
+  // the CLI.
+  function requestTextStop(idx) {
     markReflowing()
     textSizePreviewIndex = idx
     setTextSize(textSizeStops[idx])
   }
 
-  // Smoke-safe accessors: the popup content below is created eagerly at
-  // component completion (not deferred until the panel opens), and some
-  // runtime contexts (this project's smoke test) instantiate the panel
-  // with no bar at all.
-  readonly property color safeForeground: bar ? bar.foreground : Color.foreground
-  // See safeForeground.
-  readonly property string safeFontFamily: bar ? bar.fontFamily : Style.font.family
+  // textScaleProc exited with EXITCODE: runs the queued size, else drops a
+  // preview the CLI failed on or that Style already shows.
+  function textScaleExited(exitCode) {
+    if (root.queuedTextPx > 0) {
+      var px = root.queuedTextPx
+      root.queuedTextPx = 0
+      setTextSize(px)
+      return
+    }
+    if (exitCode !== 0 || (root.textSizePreviewIndex >= 0 && nearestTextStop(Style.font.baseSize) === root.textSizePreviewIndex))
+      root.textSizePreviewIndex = -1
+  }
+
+  // ---- Night light ----
+  // Reads `omarchy-toggle-nightlight --status` when it isn't already running.
+  function readNight() {
+    if (!nightProc.running)
+      nightProc.running = true
+  }
+
+  // Applies a status read: shows it, settles a request it confirms, and
+  // drops any request once the read started after the last toggle exited.
+  function applyNight(text) {
+    var state = DisplaysLogic.parseNightlight(text)
+    root.nightAvailable = state.available
+    root.nightOn = state.enabled
+    root.nightCaption = DisplaysLogic.nightlightCaption(state)
+    if (typeof root.nightPending !== "boolean" || nightToggleProc.running)
+      return
+    if (root.nightPending === root.nightOn || root.nightReadSerial === root.nightSerial)
+      root.nightPending = null
+  }
+
+  // Flips the night light: shown at once (nightPending, pulsing busy). A
+  // flip while the toggle runs only changes what is asked for; the exit
+  // handler toggles again if it still differs (the last one wins).
+  function toggleNightlight() {
+    var shown = typeof root.nightPending === "boolean" ? root.nightPending : root.nightOn
+    root.nightPending = !shown
+    if (nightToggleProc.running)
+      return
+    runNightToggle(!shown)
+  }
+
+  // Starts omarchy-toggle-nightlight, which will leave the light at TARGET.
+  function runNightToggle(target) {
+    root.nightTarget = target
+    nightToggleProc.running = true
+  }
+
+  // nightToggleProc exited with EXITCODE: toggles again when the latest
+  // request differs from what this toggle left; else a failure drops the
+  // request, and the status is re-read either way.
+  function nightExited(exitCode) {
+    root.nightSerial++
+    if (exitCode === 0 && typeof root.nightPending === "boolean" && root.nightPending !== root.nightTarget) {
+      runNightToggle(root.nightPending)
+      return
+    }
+    if (exitCode !== 0)
+      root.nightPending = null
+    readNight()
+  }
+
+  // ---- Keyboard light ----
+  // Reads the keyboard light: finds the device once, then runs
+  // `brightnessctl -d <device> -m` when it isn't already running.
+  function readKbd() {
+    if (!root.kbdDeviceChecked) {
+      if (!kbdFindProc.running)
+        kbdFindProc.running = true
+      return
+    }
+    if (root.kbdDevice === "" || kbdProc.running)
+      return
+    kbdProc.command = ["brightnessctl", "-d", root.kbdDevice, "-m"]
+    kbdProc.running = true
+  }
+
+  // Applies `ls /sys/class/leds`: caches the device and reads it.
+  function applyKbdDevice(text) {
+    root.kbdDevice = DisplaysLogic.kbdDevice(text)
+    root.kbdDeviceChecked = true
+    if (root.kbdDevice !== "")
+      readKbd()
+  }
+
+  // Applies a brightnessctl read, settling requests as applyNight does.
+  function applyKbd(text) {
+    var state = DisplaysLogic.parseKbdLight(text)
+    root.kbdValue = state.current
+    root.kbdMax = state.max
+    if (root.kbdPending < 0 || kbdSetProc.running || root.kbdQueued >= 0)
+      return
+    if (root.kbdPending === root.kbdValue || root.kbdReadSerial === root.kbdSerial)
+      root.kbdPending = -1
+  }
+
+  // The keyboard light level shown: the pending request, else as read.
+  function kbdShownLevel() {
+    return root.kbdPending >= 0 ? root.kbdPending : root.kbdValue
+  }
+
+  // Sets the keyboard light to VALUE (clamped to 0..kbdMax): shown at once
+  // (kbdPending), queued behind a running set, the last one winning.
+  function setKbd(value) {
+    if (root.kbdDevice === "" || root.kbdMax <= 0)
+      return
+    var level = Math.max(0, Math.min(root.kbdMax, Math.round(Number(value) || 0)))
+    if (level === kbdShownLevel())
+      return
+    root.kbdPending = level
+    if (kbdSetProc.running) {
+      root.kbdQueued = level
+      return
+    }
+    runKbdCommand(level)
+  }
+
+  // Starts the keyboard light command for LEVEL (DisplaysLogic.kbdCommand).
+  function runKbdCommand(level) {
+    kbdSetProc.command = DisplaysLogic.kbdCommand(root.kbdDevice, level, root.kbdMax)
+    kbdSetProc.running = true
+  }
+
+  // kbdSetProc exited with EXITCODE: runs the queued level, else a failure
+  // drops the request, and the level is re-read either way.
+  function kbdExited(exitCode) {
+    root.kbdSerial++
+    if (root.kbdQueued >= 0) {
+      var level = root.kbdQueued
+      root.kbdQueued = -1
+      runKbdCommand(level)
+      return
+    }
+    if (exitCode !== 0)
+      root.kbdPending = -1
+    readKbd()
+  }
+
+  // ---- The view's actions ----
+  // Whether a keyed pointer action ARG ({index, key}) still names the row
+  // of SECTION it was reported for (CursorLogic.rowKeyMatches).
+  function pointerRowMatches(section, arg) {
+    return !!arg && CursorLogic.rowKeyMatches(sectionRows(section), arg.index, arg.key)
+  }
+
+  // Carries out one DisplaysDropdown action. Pointer actions hand the
+  // cursor back from the keyboard; a keyed action whose row changed under
+  // it is refused; a hover moves the cursor (never during a text-size
+  // reflow); the rest map onto the setters above.
+  function handleAction(name, arg) {
+    keyboardCursor = false
+    if (name === "brightnessPreview") {
+      if (brightnessAvailable && arg)
+        previewBrightness(arg.value)
+    } else if (name === "brightnessCommit") {
+      if (brightnessAvailable && arg) {
+        brightnessDebounce.stop()
+        setBrightness(arg.value)
+      }
+    } else if (name === "nightlight") {
+      if (pointerRowMatches("nightlight", arg))
+        toggleNightlight()
+    } else if (name === "kbd") {
+      if (pointerRowMatches("kbdlight", arg))
+        setKbd(arg.value)
+    } else if (name === "textSize") {
+      // The key is the stop in px, a number: checked against the stops.
+      if (arg && arg.index >= 0 && arg.index < textSizeStops.length && textSizeStops[arg.index] === arg.key)
+        requestTextStop(arg.index)
+    } else if (name === "scale") {
+      if (pointerRowMatches("scale", arg))
+        setScale(arg.key)
+    } else if (name === "display") {
+      if (pointerRowMatches("monitors", arg) && typeof arg.enable === "boolean" && arg.enable !== displayShownOn(arg.key))
+        toggleDisplay(arg.key, !arg.enable)
+    } else if (name === "hover") {
+      if (reflowingText || !arg || visibleSections.indexOf(arg.section) < 0 || !pointerRowMatches(arg.section, arg))
+        return
+      cursorActive = true
+      focusSection = arg.section
+      selectedIndex = arg.index
+      cursorKey = arg.key
+    }
+  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -486,17 +929,20 @@ Panel {
   Component.onCompleted: refresh()
 
   // KeyboardPanel primes focus at open-time, so SUPER-bound IPC summons land
-  // with j/k ready to navigate. Keep a default landing point, but don't paint
-  // the cursor until hover or the first navigation key.
+  // with the arrows ready to navigate. Keep a default landing point, but
+  // don't paint the cursor until the first navigation key; a fresh open
+  // chooses nothing, so Enter is refused until a move, adjustment or hover.
   onOpenedChanged: {
+    keyboardCursor = false
+    cursorKey = ""
     if (opened) {
       refresh()
       if (brightnessAvailable) {
         focusSection = "brightness"
-        selectedIndex = -1
+        selectedIndex = 0
       } else {
         focusSection = "scale"
-        selectedIndex = 0
+        selectedIndex = sectionLanding("scale")
       }
       cursorActive = false
     }
@@ -517,13 +963,23 @@ Panel {
     onTriggered: root.refresh()
   }
 
+  // omarchy-monitor-state. Each read records which action exit it started
+  // after, and a read that started too early for a waiting request is
+  // followed by another.
   Process {
     id: stateProc
     command: ["omarchy-monitor-state"]
+    onRunningChanged: {
+      if (stateProc.running)
+        root.stateReadSerial = root.actionSerial
+      else if (root.actionsAwaitRead())
+        Qt.callLater(root.refresh)
+    }
     stdout: StdioCollector {
+      id: stateOut
       waitForEnd: true
       onStreamFinished: {
-        var lines = String(text || "").split("\n")
+        var lines = String(stateOut.text || "").split("\n")
         var brightness = String(lines[0] || "").trim()
         root.brightnessAvailable = brightness !== "unavailable" && brightness !== ""
         root.brightnessPercent = root.brightnessAvailable ? Math.max(0, Math.min(100, parseInt(brightness, 10))) : 0
@@ -534,6 +990,7 @@ Panel {
         root.focusedMonitor = String(lines[5] || "").trim()
         root.monitorScale = root.normalizeScale(String(lines[6] || "").trim())
         root.updateDisplays(String(lines[7] || "[]").trim())
+        root.settleActions()
       }
     }
   }
@@ -553,12 +1010,12 @@ Panel {
     // Do NOT call refresh() after a brightness set completes. The local
     // brightnessPercent we just wrote is authoritative; re-reading via
     // `omarchy-brightness-display` races the hardware/driver and can
-    // return an empty string, which the parser then coerces to 0 —
-    // visible as a "bounce to zero" after h/l keypresses. External
+    // return an empty string, which the parser then coerces to 0,
+    // visible as a "bounce to zero" after left/right keypresses. External
     // brightness changes are still picked up by the 5s periodic refresh,
     // the open-time refresh, and Component.onCompleted.
     onRunningChanged: {
-      if (running)
+      if (setBrightnessProc.running)
         return
       if (root.brightnessSetQueued) {
         root.setBrightness(root.pendingBrightnessPercent)
@@ -566,13 +1023,19 @@ Panel {
     }
   }
 
+  // The exited handlers below only name exitCode, which qmllint still
+  // can't type (QProcess::ExitStatus).
+  // qmllint disable signal-handler-parameters
+  // Stock's scale and display setter; actionExited runs the queue and
+  // re-reads.
   Process {
     id: actionProc
     stdout: StdioCollector {
       waitForEnd: true
     }
-    onRunningChanged: if (!running)
-      root.refresh()
+    onExited: function (exitCode) {
+      root.actionExited(exitCode)
+    }
   }
 
   // Applies text size via the CLI, which rewrites the shell override file;
@@ -582,6 +1045,73 @@ Panel {
     id: textScaleProc
     stdout: StdioCollector {
       waitForEnd: true
+    }
+    onExited: function (exitCode) {
+      root.textScaleExited(exitCode)
+    }
+  }
+
+  // omarchy-toggle-nightlight (no arguments: it flips the light).
+  Process {
+    id: nightToggleProc
+    command: ["omarchy-toggle-nightlight"]
+    onExited: function (exitCode) {
+      root.nightExited(exitCode)
+    }
+  }
+
+  // The keyboard light setter (runKbdCommand sets the command).
+  Process {
+    id: kbdSetProc
+    onExited: function (exitCode) {
+      root.kbdExited(exitCode)
+    }
+  }
+  // qmllint enable signal-handler-parameters
+
+  // The night light status read; records which toggle exit it started
+  // after, as stateProc does.
+  Process {
+    id: nightProc
+    command: ["omarchy-toggle-nightlight", "--status"]
+    onRunningChanged: {
+      if (nightProc.running)
+        root.nightReadSerial = root.nightSerial
+      else if (typeof root.nightPending === "boolean" && !nightToggleProc.running && root.nightReadSerial !== root.nightSerial)
+        Qt.callLater(root.readNight)
+    }
+    stdout: StdioCollector {
+      id: nightOut
+      waitForEnd: true
+      onStreamFinished: root.applyNight(nightOut.text)
+    }
+  }
+
+  // `ls /sys/class/leds`, once, for the keyboard backlight device.
+  Process {
+    id: kbdFindProc
+    command: ["ls", "/sys/class/leds"]
+    stdout: StdioCollector {
+      id: kbdFindOut
+      waitForEnd: true
+      onStreamFinished: root.applyKbdDevice(kbdFindOut.text)
+    }
+  }
+
+  // The keyboard light read (readKbd sets the command); records which set
+  // exit it started after, as stateProc does.
+  Process {
+    id: kbdProc
+    onRunningChanged: {
+      if (kbdProc.running)
+        root.kbdReadSerial = root.kbdSerial
+      else if (root.kbdPending >= 0 && !kbdSetProc.running && root.kbdReadSerial !== root.kbdSerial)
+        Qt.callLater(root.readKbd)
+    }
+    stdout: StdioCollector {
+      id: kbdOut
+      waitForEnd: true
+      onStreamFinished: root.applyKbd(kbdOut.text)
     }
   }
 
@@ -610,7 +1140,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: Quickshell.screens.length > 1 ? "󰍺" : "󰍹"
+    text: String.fromCodePoint(Quickshell.screens.length > 1 ? 0xf037a : 0xf0379)
     onPressed: function (b) {
       root.toggle()
     }
@@ -626,464 +1156,95 @@ Panel {
     }
   }
 
-  KeyboardPanel {
+  // The Aranea view in the shared keyboard frame, sized to the view.
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(560))
-
-    PanelKeyCatcher {
-      id: keyCatcher
-      anchors.fill: parent
-      onMoveRequested: function (dx, dy) {
-        if (!root.cursorActive) {
-          root.cursorActive = true
-          return
-        }
-        if (dy !== 0)
-          root.moveCursor(dy)
-        else if (dx !== 0) {
-          if (root.focusSection === "brightness")
-            root.adjustBrightness(dx * 5)
-          else if (root.focusSection === "textsize")
-            root.adjustTextSize(dx)
-          else if (root.focusSection === "scale")
-            root.moveCursorH(dx)
-        }
-      }
-      onActivateRequested: if (root.cursorActive)
-        root.activateCursor()
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
-      }
-
-      ScrollView {
-        id: scrollArea
-        anchors.fill: parent
-        clip: true
-        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-        ScrollBar.vertical.policy: panelColumn.implicitHeight > height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-        Binding {
-          target: scrollArea.contentItem
-          property: "interactive"
-          value: panelColumn.implicitHeight > scrollArea.height
-        }
-
-        Column {
-          id: panelColumn
-          width: scrollArea.availableWidth
-          spacing: Style.space(14)
-
-          // ---------- Hero: display icon · title/status ----------
-          Item {
-            width: parent.width
-            implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight)
-
-            Text {
-              id: heroIcon
-              textFormat: Text.PlainText
-              text: root.displays.length > 1 ? "󰍺" : "󰍹"
-              color: root.safeForeground
-              font.family: root.safeFontFamily
-              font.pixelSize: Style.font.display
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Column {
-              id: heroLabels
-              anchors.left: heroIcon.right
-              anchors.leftMargin: Style.space(14)
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(2)
-
-              Text {
-                text: "Display"
-                color: root.safeForeground
-                font.family: root.safeFontFamily
-                font.pixelSize: Style.font.title
-                font.bold: true
-                elide: Text.ElideRight
-                width: parent.width
-              }
-
-              Text {
-                id: heroLabel
-                textFormat: Text.PlainText
-                text: {
-                  if (root.brightnessAvailable) {
-                    return root.brightnessName(brightnessSlider.dragging ? brightnessSlider.liveValue : root.brightnessPercent).toUpperCase()
-                  }
-                  return "FIXED BRIGHTNESS"
-                }
-                color: Qt.darker(root.safeForeground, 1.4)
-                font.family: root.safeFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                font.letterSpacing: 1.2
-                elide: Text.ElideRight
-                width: parent.width
-              }
-            }
-          }
-
-          // ---------- Brightness ----------
-          PanelSeparator {
-            visible: root.brightnessAvailable
-            foreground: root.safeForeground
-          }
-
-          Column {
-            visible: root.brightnessAvailable
-            width: parent.width
-            spacing: Style.space(6)
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(brightnessHeader.implicitHeight, brightnessPercent.implicitHeight)
-
-              PanelSectionHeader {
-                id: brightnessHeader
-                text: "BRIGHTNESS"
-                foreground: root.safeForeground
-                fontFamily: root.safeFontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: brightnessPercent
-                textFormat: Text.PlainText
-                text: Math.round(brightnessSlider.dragging ? brightnessSlider.liveValue : root.brightnessPercent) + "%"
-                color: Qt.darker(root.safeForeground, 1.4)
-                font.family: root.safeFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-              }
-            }
-
-            CursorSurface {
-              id: brightnessRow
-              width: parent.width
-              height: brightnessSlider.implicitHeight + Style.spacing.controlGap
-              hasCursor: root.cursorActive && root.focusSection === "brightness" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor)
-                root.ensureCursorVisible(brightnessRow)
-              foreground: root.safeForeground
-              outline: true
-
-              PanelSlider {
-                id: brightnessSlider
-                bar: root.bar
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(6)
-                anchors.rightMargin: Style.space(6)
-                minimum: 1
-                maximum: 100
-                step: 1
-                value: root.brightnessPercent
-                integer: true
-                onMoved: function (v) {
-                  root.previewBrightness(v)
-                }
-                onReleased: function (v) {
-                  brightnessDebounce.stop()
-                  root.setBrightness(v)
-                }
-              }
-
-              HoverHandler {
-                onHoveredChanged: if (hovered && !root.reflowingText) {
-                  root.cursorActive = true
-                  root.focusSection = "brightness"
-                  root.selectedIndex = -1
-                }
-              }
-            }
-          }
-
-          // ---------- Text size ----------
-          PanelSeparator {
-            foreground: root.safeForeground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(textSizeHeader.implicitHeight, textSizePx.implicitHeight)
-
-              PanelSectionHeader {
-                id: textSizeHeader
-                text: "TEXT SIZE"
-                foreground: root.safeForeground
-                fontFamily: root.safeFontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: textSizePx
-                textFormat: Text.PlainText
-                text: (textSizeSlider.dragging ? root.textSizeStops[Math.round(textSizeSlider.liveValue)] : root.displayedTextPx()) + "px"
-                color: Qt.darker(root.safeForeground, 1.4)
-                font.family: root.safeFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-              }
-            }
-
-            CursorSurface {
-              id: textSizeRow
-              width: parent.width
-              height: textSizeSlider.implicitHeight + Style.spacing.controlGap
-              hasCursor: root.cursorActive && root.focusSection === "textsize" && root.selectedIndex === -1
-              onHasCursorChanged: if (hasCursor)
-                root.ensureCursorVisible(textSizeRow)
-              foreground: root.safeForeground
-              outline: true
-
-              PanelSlider {
-                id: textSizeSlider
-                bar: root.bar
-                anchors.fill: parent
-                anchors.leftMargin: Style.space(6)
-                anchors.rightMargin: Style.space(6)
-                minimum: 0
-                maximum: root.textSizeStops.length - 1
-                step: 1
-                integer: true
-                tickCount: root.textSizeStops.length
-                value: root.currentTextIndex()
-                onReleased: function (v) {
-                  root.setTextSize(root.textSizeStops[Math.round(v)])
-                }
-              }
-
-              HoverHandler {
-                onHoveredChanged: if (hovered && !root.reflowingText) {
-                  root.cursorActive = true
-                  root.focusSection = "textsize"
-                  root.selectedIndex = -1
-                }
-              }
-            }
-          }
-
-          // ---------- Scale ----------
-          PanelSeparator {
-            foreground: root.safeForeground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(10)
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(scaleHeader.implicitHeight, scaleMonitor.implicitHeight)
-
-              PanelSectionHeader {
-                id: scaleHeader
-                text: "SCALE"
-                foreground: root.safeForeground
-                fontFamily: root.safeFontFamily
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              // Name the monitor SCALE targets, since it only applies to the
-              // focused one.
-              Text {
-                id: scaleMonitor
-                textFormat: Text.PlainText
-                text: root.focusedMonitor
-                // Only worth naming when more than one display is in play.
-                visible: root.focusedMonitor !== "" && root.enabledDisplayCount > 1
-                color: Qt.darker(root.safeForeground, 1.4)
-                font.family: root.safeFontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-              }
-            }
-
-            Grid {
-              id: scaleRow
-              width: parent.width
-              columns: root.scaleValues.length
-              spacing: Style.spacing.xs
-
-              readonly property real cellWidth: root.scaleValues.length > 0 ? (width - spacing * (columns - 1)) / columns : 0
-
-              Repeater {
-                model: root.scaleValues
-
-                ScalePill {
-                  required property string modelData
-                  required property int index
-
-                  scaleValue: modelData
-                  scaleIndex: index
-                  width: scaleRow.cellWidth
-                }
-              }
-            }
-          }
-
-          // ---------- Monitors ----------
-          PanelSeparator {
-            visible: root.displays.length > 1
-            foreground: root.safeForeground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(10)
-            visible: root.displays.length > 1
-
-            PanelSectionHeader {
-              text: "DISPLAYS"
-              foreground: root.safeForeground
-              fontFamily: root.safeFontFamily
-            }
-
-            Repeater {
-              model: root.displays
-
-              MonitorRow {
-                required property var modelData
-                required property int index
-
-                width: panelColumn.width
-                display: modelData
-                rowIndex: index
-              }
-            }
-          }
-
-          Item {
-            width: parent.width
-            height: Style.space(4)
-          }
-        }
-      }
+    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      dropdown.disarmPointer()
+      root.keyboardCursor = true
+      root.switchPanel(direction)
     }
-  }
-
-  component ScalePill: Button {
-    id: pill
-    required property string scaleValue
-    required property int scaleIndex
-
-    text: root.effectiveScale(scaleValue) + "x"
-    fontSize: Style.font.caption
-    foreground: root.safeForeground
-    fontFamily: root.safeFontFamily
-    horizontalPadding: Style.spacing.sm
-    verticalPadding: Style.spacing.controlPaddingY
-    bordered: true
-
-    active: root.activeScaleIndex() === scaleIndex
-    hasCursor: root.cursorActive && root.focusSection === "scale" && root.selectedIndex === scaleIndex
-
-    onClicked: root.setScale(scaleValue)
-    onHovered: function (isHovered) {
-      if (!isHovered || root.reflowingText)
-        return
+    onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
+      // The first key after opening or after mouse use only reveals the
+      // cursor where it is; a reveal never chooses or adjusts.
+      var revealing = !root.cursorActive || !root.keyboardCursor
       root.cursorActive = true
-      root.focusSection = "scale"
-      root.selectedIndex = pill.scaleIndex
+      root.keyboardCursor = true
+      if (revealing)
+        return
+      if (dy !== 0) {
+        root.moveCursor(dy)
+        return
+      }
+      if (dx === 0)
+        return
+      if (root.focusSection === "brightness")
+        root.adjustBrightness(dx * 5)
+      else if (root.focusSection === "kbdlight")
+        root.adjustKbd(dx)
+      else if (root.focusSection === "textsize")
+        root.adjustTextSize(dx)
+      else if (root.focusSection === "scale") {
+        root.moveCursorH(dx)
+        return
+      }
+      // An adjustment is a deliberate choice of the control it lands on.
+      root.cursorKey = root.keyAt(root.focusSection, root.selectedIndex)
     }
-  }
-
-  component MonitorRow: CursorSurface {
-    id: monitorRow
-    required property var display
-    required property int rowIndex
-
-    readonly property bool isFocused: display && display.focused
-    readonly property bool canToggle: display && (!display.enabled || root.enabledDisplayCount > 1)
-
-    hasCursor: root.cursorActive && root.focusSection === "monitors" && root.selectedIndex === rowIndex
-    onHasCursorChanged: if (hasCursor)
-      root.ensureCursorVisible(monitorRow)
-    current: isFocused
-    foreground: root.safeForeground
-    fill: Style.hoverFillFor(root.safeForeground, Color.accent)
-    currentFill: Style.selectedFillFor(root.safeForeground, Color.accent)
-    implicitHeight: monitorInner.implicitHeight + Style.spacing.xl
-    opacity: canToggle ? 1.0 : 0.45
-
-    Row {
-      id: monitorInner
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(6)
-      anchors.rightMargin: Style.space(6)
-      spacing: Style.space(8)
-
-      Text {
-        text: "󰍹"
-        color: root.safeForeground
-        font.family: root.safeFontFamily
-        font.pixelSize: Style.font.title
-        width: Style.space(22)
-        horizontalAlignment: Text.AlignHCenter
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: monitorRow.display.name + (monitorRow.display.focused ? " · focused" : "")
-        color: root.safeForeground
-        font.family: root.safeFontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-        width: parent.width - Style.space(22) - Style.space(14) - Style.space(16)
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        text: monitorRow.display.enabled ? "󰄬" : ""
-        color: root.safeForeground
-        font.family: root.safeFontFamily
-        font.pixelSize: Style.font.subtitle
-        width: Style.space(14)
-        horizontalAlignment: Text.AlignRight
-        anchors.verticalCenter: parent.verticalCenter
-      }
+    // Enter acts only on a cursor the keyboard is showing, on the row the
+    // user chose and still sees (CursorLogic.pressIntent, cursorConfirmed);
+    // a pointer-placed cursor is only revealed.
+    onActivateRequested: {
+      dropdown.disarmPointer()
+      var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
+      if (intent === "ignore")
+        return
+      root.keyboardCursor = true
+      if (intent === "act")
+        root.activateCursor()
+    }
+    onDeleteRequested: {
+      dropdown.disarmPointer()
+      root.keyboardCursor = true
+    }
+    onTextKey: function (t) {
+      dropdown.disarmPointer()
+      root.keyboardCursor = true
     }
 
-    MouseArea {
+    Item {
       anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: monitorRow.canToggle ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onContainsMouseChanged: if (containsMouse && !root.reflowingText) {
-        root.cursorActive = true
-        root.focusSection = "monitors"
-        root.selectedIndex = monitorRow.rowIndex
+      clip: true
+
+      DisplaysDropdown {
+        id: dropdown
+        width: parent.width
+        view: root.displaysView
+        brightnessPercent: root.brightnessPercent
+        nightlightOn: root.nightOn
+        nightlightCaption: root.nightCaption
+        nightlightPending: root.nightPending
+        kbdValue: root.kbdValue
+        kbdPending: root.kbdPending
+        textIndex: root.currentTextIndex()
+        textPending: root.textSizePreviewIndex >= 0
+        selectedScale: root.selectedScaleKey
+        pendingScale: root.pendingScale
+        enabledDisplays: root.enabledDisplayMap
+        pendingDisplays: root.pendingDisplays
+        lastEnabled: root.lastEnabled
+        onAction: function (name, arg) {
+          root.handleAction(name, arg)
+        }
       }
-      onClicked: if (monitorRow.canToggle)
-        root.toggleDisplay(monitorRow.display.name, monitorRow.display.enabled)
     }
   }
 }
