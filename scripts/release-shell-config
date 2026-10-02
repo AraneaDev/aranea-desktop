@@ -61,7 +61,7 @@ note_polkit_handover() {
 jq '
   def entry_id: if type == "string" then . else .id? end;
   # Aranea clones that step aside, and the stock plugins that take over again.
-  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu", "araneadev.workspaces", "araneadev.updates", "araneadev.audio", "araneadev.bluetooth", "araneadev.monitor", "araneadev.network", "araneadev.vpn", "araneadev.power"];
+  def ours: ["araneadev.notifications", "araneadev.health", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu", "araneadev.workspaces", "araneadev.updates", "araneadev.audio", "araneadev.bluetooth", "araneadev.clock", "araneadev.monitor", "araneadev.network", "araneadev.vpn", "araneadev.power"];
   def stock: ["omarchy.notifications", "omarchy.clipboard", "omarchy.emojis", "omarchy.polkit", "omarchy.lock", "omarchy.osd", "omarchy.bar", "omarchy.menu"];
   def retarget($from; $to):
     if type == "string" then (if . == $from then $to else . end)
@@ -77,11 +77,14 @@ jq '
          | retarget("araneadev.updates"; "omarchy.system-update")
          | retarget("araneadev.audio"; "omarchy.audio")
          | retarget("araneadev.bluetooth"; "omarchy.bluetooth")
+         | retarget("araneadev.clock"; "omarchy.clock")
          | retarget("araneadev.monitor"; "omarchy.monitor")
          | retarget("araneadev.network"; "omarchy.network")
          | retarget("araneadev.power"; "omarchy.power")
        ) else . end))
      else . end)
+  # The bar center anchor reverses the same way the layout entries do.
+  | (if (.bar.centerAnchor? == "araneadev.clock") then .bar.centerAnchor = "omarchy.clock" else . end)
   |
   if (.bar.layout | type) == "object" then
     .bar.layout |= with_entries(

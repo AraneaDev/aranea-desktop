@@ -7,6 +7,8 @@ plugins/araneadev.bar/Bar.qml
 plugins/araneadev.bar/README.md
 plugins/araneadev.bluetooth/Panel.qml
 plugins/araneadev.clipboard/Clipboard.qml
+plugins/araneadev.clock/BarWidget.qml
+plugins/araneadev.clock/Model.js
 plugins/araneadev.health/Panel.qml
 plugins/araneadev.lock/LockView.qml
 plugins/araneadev.menu/MenuStyle.qml
