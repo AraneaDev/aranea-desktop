@@ -5,7 +5,9 @@
 // hover), a busy pulse (the place label while a new place saves) and a
 // settled click: a click within 300 ms of the control being built, or of
 // the dropdown's layout shifting (pointerGate.layoutChangedAt), is refused
-// unless the pointer has really moved onto it since.
+// unless the pointer has really moved onto it since. The outline, busy
+// pulse, settled click and gated hover block follow FilamentPill's
+// (araneadev.shared), adapted to plain text.
 import QtQuick
 import qs.Commons
 import qs.Ui

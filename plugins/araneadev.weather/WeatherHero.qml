@@ -28,7 +28,7 @@ Column {
   // The dropdown's PointerMoveGate, carrying layoutChangedAt.
   property var pointerGate: null
 
-  // Emitted on a settled click on the place label.
+  // Emitted on a settled click on the place label (never while saving).
   signal editPlace
   // Emitted on a settled click on the updated label.
   signal refresh
@@ -111,7 +111,8 @@ Column {
         busy: hero.saving
         hasCursor: hero.cursorSection === "place"
         pointerGate: hero.pointerGate
-        onClicked: hero.editPlace()
+        onClicked: if (!hero.saving)
+          hero.editPlace()
         onHoveredMoved: hero.hovered("place")
       }
       WeatherPlaceEdit {

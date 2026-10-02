@@ -7,7 +7,9 @@
 // updated label to refresh; the place edit takes focus, emits query on
 // typing only, keys its suggestions, picks by click with its index and key,
 // commits on Enter with the highlighted suggestion or the raw text (empty
-// is automatic) and cancels on Esc; saving pulses the place label; a click
+// is automatic) and cancels on Esc; a stale editText echo never overwrites
+// the focused field; saving pulses the place label and refuses to edit;
+// opening or closing the editor stamps the layout; the trace paints; a click
 // right after a layout stamp (a section showing or hiding, the suggestions
 // changing) or on a row whose key changed is refused; rows moving under a
 // still pointer emit no hover; no outline shows without cursor.active and
@@ -298,6 +300,33 @@ ShellRoot {
     implicitHeight: 1400
     visible: true
 
+    // Reads a grabbed image's pixels back: lit counts the non-transparent
+    // ones once src has loaded, -1 before.
+    Canvas {
+      id: probe
+      // The grabbed image's url.
+      property string src: ""
+      // How many pixels of the image are not transparent, -1 before.
+      property int lit: -1
+      width: 400
+      height: 60
+      z: -1
+      onImageLoaded: requestPaint()
+      onPaint: {
+        if (probe.src === "" || !probe.isImageLoaded(probe.src))
+          return
+        var ctx = getContext("2d")
+        ctx.reset()
+        ctx.drawImage(probe.src, 0, 0)
+        var data = ctx.getImageData(0, 0, probe.width, probe.height).data
+        var n = 0
+        for (var i = 3; i < data.length; i += 4)
+          if (data[i] > 0)
+            n++
+        probe.lit = n
+      }
+    }
+
     Column {
       x: 20
       width: 400
@@ -546,6 +575,8 @@ ShellRoot {
         }), "typing emits query with the text")
         full.editText = "Amsterdamx"
         t.equal(named("query").length, 1, "an echoed editText emits no second query")
+        full.editText = "Amst"
+        t.equal(one(full, "placeField").text, "Amsterdamx", "a stale echo never overwrites the focused field")
         pointer.keyClick(Qt.Key_Backspace)
         t.check(reported("query", {
           text: "Amsterdam"
@@ -736,5 +767,55 @@ ShellRoot {
         actions = []
         pointer.mouseClick(one(full, "placeLabel"))
         t.check(reported("editPlace", {}), "a click 300 ms later is accepted")
+
+        // ---------- Opening and closing the editor ----------
+        stampBefore = full.layoutChangedAt
+        actions = []
+        full.view = viewOf({
+          edit: editing([], -1)
+        })
+        t.check(!one(full, "suggestionsSection").visible, "opened with no suggestions yet")
+        t.check(full.layoutChangedAt > stampBefore, "opening the editor stamps the layout")
+      }], [40, function () {
+        // Once laid out, still well inside the settle window.
+        pointer.mouseClick(one(full, "clearPlace"))
+        t.equal(nonHover().length, 0, "a click on the clear button right after opening is refused")
+      }], [350, function () {
+        pointer.mouseClick(one(full, "clearPlace"))
+        t.check(reported("clearPlace", {}), "and accepted 300 ms later")
+        stampBefore = full.layoutChangedAt
+        actions = []
+        full.view = viewOf({})
+        t.check(full.layoutChangedAt > stampBefore, "closing the editor stamps the layout")
+      }], [40, function () {
+        pointer.mouseClick(one(full, "placeLabel"))
+        t.equal(nonHover().length, 0, "a click on the place right after closing is refused")
+        full.editText = "Utrecht"
+        t.equal(one(full, "placeField").text, "Utrecht", "a closed field takes a new editText")
+        full.view = viewOf({
+          place: "Utrecht",
+          edit: {
+            active: false,
+            query: "",
+            suggestions: [],
+            saving: true,
+            cursor: -1
+          }
+        })
+      }], [350, function () {
+        actions = []
+        pointer.mouseClick(one(full, "placeLabel"))
+        t.equal(nonHover().length, 0, "the place label does not ask to edit while saving")
+        full.view = viewOf({})
+
+        // ---------- The trace paints ----------
+        var file = Qt.resolvedUrl("trace-grab.png")
+        one(full, "hourlyTrace").grabToImage(function (result) {
+          result.saveToFile(decodeURIComponent(String(file).replace(/^file:\/\//, "")))
+          probe.src = String(file)
+          probe.loadImage(probe.src)
+        })
+      }], [600, function () {
+        t.check(probe.lit > 50, "the trace grab has drawn pixels (" + probe.lit + ")")
       }]])
 }

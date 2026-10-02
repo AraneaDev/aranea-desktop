@@ -14,7 +14,8 @@ Row {
 
   // Whether the editor is open.
   property bool active: false
-  // The field's text when editing starts (or the host resets it).
+  // The field's text when editing starts (or the host resets it while the
+  // field is closed or not focused).
   property string editText: ""
   // Whether a committed place is being saved: the field is disabled.
   property bool saving: false
@@ -60,7 +61,9 @@ Row {
   spacing: Style.space(6)
   onActiveChanged: if (edit.active)
     Qt.callLater(edit.startEditing)
-  onEditTextChanged: if (placeField.text !== edit.editText)
+  // A host echo reaches the field only while the user is not typing in it
+  // (closed, or not focused), so a stale echo never drops keystrokes.
+  onEditTextChanged: if (placeField.text !== edit.editText && (!edit.active || !placeField.activeFocus))
     placeField.text = edit.editText
   Component.onCompleted: if (edit.active)
     Qt.callLater(edit.startEditing)

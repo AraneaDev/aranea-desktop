@@ -13,7 +13,8 @@
 // hover; hover goes through a PointerMoveGate only. Suggestions are keyed
 // by name and coordinates and never rebuilt for a new highlight. Every
 // section showing, hiding or changing height, and the suggestion keys
-// changing, stamps layoutChangedAt; a click within 300 ms of that, or of
+// changing, and the place editor opening or closing, stamps
+// layoutChangedAt; a click within 300 ms of that, or of
 // its control being built, is ignored unless the pointer has really moved
 // onto it since, and a pick whose key no longer matches its row is refused.
 pragma ComponentBehavior: Bound
@@ -86,7 +87,7 @@ Column {
   readonly property bool hourlyShown: !!hourly.visible && !!hourlyPoints && Array.isArray(hourlyPoints.temp) && hourlyPoints.temp.length > 0
 
   // Emitted for every user action, NAME with its ARG:
-  //   editPlace ({}): the place label was clicked;
+  //   editPlace ({}): the place label was clicked (never while saving);
   //   query ({text}): typing changed the place field (never seeding it);
   //   pick ({index, key}): suggestion INDEX was clicked, KEY as the row
   //     held it (never when the row's key changed underneath);
@@ -161,6 +162,10 @@ Column {
 
   spacing: Style.space(10)
   onSuggestionKeysChanged: dropdown.noteLayoutChange()
+  // The place edit and its clear button take the place label's spot (and
+  // back) without the hero changing height: stamp, so a double-click on the
+  // place can't land on the clear button.
+  onEditingChanged: dropdown.noteLayoutChange()
 
   // A hairline above a section, shown with it.
   component Separator: Rectangle {
