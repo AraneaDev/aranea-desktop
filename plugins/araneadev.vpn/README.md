@@ -43,8 +43,8 @@ bar and its dropdown. It runs two kinds of VPN side by side:
   it goes ahead and its outcome shows on the row and the bar icon. While
   nmcli waits (push 2FA), the row reads "Connecting… approve on phone"
   after 5 s.
-- A rejected password reopens the prompt ("Wrong password or code"); any
-  other failure reads "Couldn't connect" for 4 s.
+- A rejected password reopens the prompt ("Couldn't connect, check password
+  or code"); any other failure reads "Couldn't connect" for 4 s.
 - The switch on a connected row runs `nmcli --wait 20 connection down uuid
 <uuid>`.
 

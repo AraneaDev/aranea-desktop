@@ -128,7 +128,7 @@ Panel {
   property string promptCode: ""
   // Whether the prompt's connect is running.
   property bool promptBusy: false
-  // Whether the prompt shows its failure ("Wrong password or code", 2 s).
+  // Whether the prompt shows its failure ("Couldn't connect, check password or code", 2 s).
   property bool promptFailed: false
   // The uuid the username read is for, or "".
   property string usernameKey: ""
@@ -270,7 +270,7 @@ Panel {
       code: promptCode,
       busy: promptBusy,
       failed: promptFailed,
-      failedText: "Wrong password or code"
+      failedText: "Couldn't connect, check password or code"
     })
 
   // ---------- Reading ----------
@@ -880,7 +880,7 @@ Panel {
     onTriggered: root.alertActive = false
   }
 
-  // "Wrong password or code" shows for 2 s, then the fields come back.
+  // "Couldn't connect, check password or code" shows for 2 s, then the fields come back.
   Timer {
     id: promptFailedTimer
     interval: 2000

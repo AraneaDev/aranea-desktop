@@ -911,8 +911,8 @@ function statusMap(action, failure) {
 /**
  * What a finished `nmcli connection up` means: `ok`; `prompt` when a
  * connect without secrets needs them (open the prompt); `wrong` when
- * secrets given on stdin were rejected (reopen it, "Wrong password or
- * code"); `failed` otherwise ("Couldn't connect").
+ * secrets given on stdin were rejected (reopen it, "Couldn't connect,
+ * check password or code"); `failed` otherwise ("Couldn't connect").
  * @param {number} exitCode - nmcli's exit code
  * @param {string|undefined} stderr - its stderr
  * @param {boolean} withSecrets - whether secrets were passed on stdin
