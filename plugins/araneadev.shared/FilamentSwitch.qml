@@ -3,6 +3,8 @@
 // switch sits on a row a Repeater can rebuild under a still pointer passes
 // that row (or anything with clickSettled()) as clickGate, so a click that
 // was aimed at another row's switch is ignored until the row settles.
+// A busy switch (a change in flight) breathes like a busy FilamentPill; a
+// disabled one (enabled: false) is dimmed and never toggles.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -18,17 +20,23 @@ Item {
   // NodeDeviceRow hosting the switch; null (default) never ignores a click.
   // activate() stays unguarded for the keyboard and tests.
   property var clickGate: null
+  // Whether a change is in flight: the node breathes until it settles.
+  property bool busy: false
+  // Opacity the busy animation drives, 0.45..1.
+  property real pulseOpacity: 1
 
   // Emitted when the switch is clicked or activated.
   signal toggled
 
-  // Toggles from the keyboard or a click.
+  // Toggles from the keyboard or a click; a disabled switch never does.
   function activate() {
-    toggled()
+    if (sw.enabled)
+      toggled()
   }
 
   implicitWidth: Style.space(34)
   implicitHeight: Style.space(16)
+  opacity: sw.enabled ? 1 : 0.5
 
   Rectangle {
     // The keyboard cursor outline.
@@ -67,6 +75,27 @@ Item {
     color: Color.background
     border.width: Math.max(1, Style.space(2))
     border.color: sw.checked ? DesignTokens.accent : Util.alpha(DesignTokens.foreground, 0.22)
+    opacity: sw.busy ? (DesignTokens.motionEnabled ? sw.pulseOpacity : 0.7) : 1
+  }
+  // Breathing while busy; static at 0.7 when motion is disabled.
+  SequentialAnimation {
+    objectName: "busyPulse"
+    loops: Animation.Infinite
+    running: sw.busy && DesignTokens.motionEnabled
+    NumberAnimation {
+      target: sw
+      property: "pulseOpacity"
+      to: 0.45
+      duration: 1200
+      easing.type: Easing.InOutSine
+    }
+    NumberAnimation {
+      target: sw
+      property: "pulseOpacity"
+      to: 1
+      duration: 1200
+      easing.type: Easing.InOutSine
+    }
   }
   MouseArea {
     anchors.fill: parent
