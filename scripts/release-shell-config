@@ -6,7 +6,8 @@ set -euo pipefail
 # notifications step aside and Omarchy's own notification daemon (with its
 # toasts) takes over again. When the bell was in the bar, a "parked" marker
 # asks repair-shell-config to put it back on the next return to Aranea; a
-# bell the user removed parks nothing and stays removed.
+# bell the user removed parks nothing and stays removed. The health and VPN
+# icons park the same way.
 #
 # `omarchy plugin disable` is not used here: for a cloned plugin it rewrites
 # the bell's bar entry into an entry for the clone's source.
@@ -33,6 +34,7 @@ resolved_config="$(readlink -f -- "$config_file" 2>/dev/null || true)"
 state_root="$(aranea_state_root)"
 parked_marker="$state_root/notifications-widget-parked"
 health_parked="$state_root/health-widget-parked"
+vpn_parked="$state_root/vpn-widget-parked"
 config_dir="$(dirname "$config_file")"
 tmp_file="$(mktemp "$config_dir/.shell.json.aranea.XXXXXX")"
 # Removes the temp file on exit.
@@ -91,7 +93,7 @@ jq '
     else . end
 ' "$config_file" >"$tmp_file"
 
-# Park the bell and health icon for the return to Aranea, only now that the
+# Park the bell, health and VPN icons for the return to Aranea, only now that the
 # release itself succeeded (a failing jq exits above under set -e).
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' \
   "$config_file" >/dev/null 2>&1; then
@@ -102,6 +104,11 @@ if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id?
   "$config_file" >/dev/null 2>&1; then
   mkdir -p "$state_root"
   : >"$health_parked"
+fi
+if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.vpn") != null' \
+  "$config_file" >/dev/null 2>&1; then
+  mkdir -p "$state_root"
+  : >"$vpn_parked"
 fi
 
 note_polkit_handover

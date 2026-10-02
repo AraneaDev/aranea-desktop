@@ -148,8 +148,11 @@ and cleared on open and close:
   sessions, graphs and the prompt are separate properties keyed by row key,
   so they never rebuild a row.
 - `scripts/repair-shell-config` inserts `araneadev.vpn` into the bar
-  layout right after the network entry; `scripts/release-shell-config`
-  removes it.
+  layout right after the network entry, once: it leaves
+  `$XDG_STATE_HOME/aranea/vpn-widget-placed`, so an icon you take out of
+  the bar stays out. `scripts/release-shell-config` removes it and, when
+  it was in the bar, parks it (`vpn-widget-parked`) so the next return to
+  Aranea puts it back, as the bell and health icons do.
 
 ## Polling
 
