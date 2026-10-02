@@ -124,17 +124,17 @@ BarWidget {
     // Tooltip suppressed because the panel is the detail view.
     tooltipText: ""
 
+    // qmllint disable missing-property
     onPressed: function (b) {
       if (!root.bar)
         return
-      // qmllint disable missing-property
       if (b === Qt.RightButton)
         root.bar.run("omarchy-notification-send \"$(omarchy-weather-status)\"")
       else if (b === Qt.MiddleButton)
         root.refresh()
       else
         root.togglePanel()
-    // qmllint enable missing-property
     }
+    // qmllint enable missing-property
   }
 }

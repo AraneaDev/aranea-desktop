@@ -15,6 +15,8 @@ Item {
   signal textKey(string text)
   // Requests activation of the current value.
   signal activateRequested
+  // Return or Enter (not Space), emitted just before its activateRequested.
+  signal returnRequested
   // Requests deletion of the current selection (stock emits it for "x").
   signal deleteRequested
   // Item receiving keyboard focus.
@@ -38,6 +40,7 @@ Item {
     onTextKey: function (text) {
       frame.textKey(text)
     }
+    onReturnRequested: frame.returnRequested()
     onActivateRequested: frame.activateRequested()
     onDeleteRequested: frame.deleteRequested()
 

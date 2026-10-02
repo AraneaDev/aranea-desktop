@@ -751,3 +751,10 @@ test("refreshPlan: defer until ready, skip while fetching, adopt fresh, wait on 
   assert.equal(plan(true, false, false, false), "fetch")
   assert.equal(logic.refreshPlan(undefined), "fetch")
 })
+
+test("saveEnds: a response ends the pending place only after omarchy-weather-location exited", () => {
+  assert.equal(logic.saveEnds(true, true, true), false)
+  assert.equal(logic.saveEnds(true, true, false), true)
+  assert.equal(logic.saveEnds(true, false, false), false)
+  assert.equal(logic.saveEnds(false, true, false), false)
+})

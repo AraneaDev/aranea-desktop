@@ -910,6 +910,19 @@ function refreshPlan(s) {
   return "fetch"
 }
 
+/**
+ * Whether a weather response (or an adopted report) may end the pending
+ * place: only while a save is pending, once its refetch has started, and
+ * never while omarchy-weather-location still runs (its exit ends it).
+ * @param {boolean} saving - whether a place is pending
+ * @param {boolean} queryStarted - whether the refetch for it has started
+ * @param {boolean} saveRunning - whether omarchy-weather-location is running
+ * @returns {boolean} true to end the pending place now
+ */
+function saveEnds(saving, queryStarted, saveRunning) {
+  return !!saving && !!queryStarted && !saveRunning
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     buildForecastUrl: buildForecastUrl,
@@ -942,5 +955,6 @@ if (typeof module !== "undefined")
     airView: airView,
     detailCells: detailCells,
     sharedBundle: sharedBundle,
-    refreshPlan: refreshPlan
+    refreshPlan: refreshPlan,
+    saveEnds: saveEnds
   }

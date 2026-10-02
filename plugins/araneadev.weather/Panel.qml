@@ -265,10 +265,16 @@ Panel {
   // coordinates are configured; null until wttr answers.
   property var autoCoords: null
   // When the report on screen was fetched (Date.now(), by this instance or
-  // the one it was adopted from); 0 before any.
+  // the one it was adopted from): stamped only by the primary response
+  // (open-meteo with configured coordinates, wttr j1 in automatic mode, as
+  // Model.weatherResponseCompletesSave), so the air reading or the %l place
+  // arriving alone never makes a failed refresh look fresh; 0 before any.
   property real fetchedAtMs: 0
+  // When the bundle on screen was last published (any of its responses),
+  // so the other instances take the later pieces too.
+  property real publishedAtMs: 0
   // This instance's own last fetch, published for the other monitors'
-  // instances: {locationQuery, fetchedAtMs, report, daily, forecast, air,
+  // instances: {locationQuery, fetchedAtMs, publishedAtMs, report, daily, forecast, air,
   // autoCoords, wttrLocation, label}; null before any.
   property var sharedWeather: null
   // True while an automatic refresh waits for another instance's fetch.
@@ -308,6 +314,9 @@ Panel {
   // True while the keyboard drives the cursor; any pointer action clears
   // it. The view outlines the cursor only then.
   property bool keyboardCursor: false
+  // True between the frame's returnRequested and the activateRequested
+  // that follows it (Return or Enter, not Space).
+  property bool returnPressed: false
   // The control the cursor is on: "place", "refresh" or "clear".
   property string cursorSection: "place"
   // The control the cursor was deliberately put on (a move or a hover;
@@ -477,13 +486,18 @@ Panel {
   }
 
   // Publishes this instance's report after one of its own responses landed,
-  // and hands it to the other instances (offerShared).
-  function publishShared() {
-    root.fetchedAtMs = Date.now()
-    root.nowMs = root.fetchedAtMs
+  // and hands it to the other instances (offerShared). PRIMARY (the
+  // response that makes a refresh, see fetchedAtMs) also stamps the
+  // fetch time.
+  function publishShared(primary) {
+    root.publishedAtMs = Date.now()
+    if (primary === true)
+      root.fetchedAtMs = root.publishedAtMs
+    root.nowMs = root.publishedAtMs
     root.sharedWeather = {
       locationQuery: root.locationQuery,
       fetchedAtMs: root.fetchedAtMs,
+      publishedAtMs: root.publishedAtMs,
       report: root.report,
       daily: root.dailyForecastReport,
       forecast: root.forecast,
@@ -501,7 +515,7 @@ Panel {
   // Takes another instance's freshly published BUNDLE when it is for this
   // instance's location and newer than what this one shows.
   function offerShared(bundle) {
-    if (bundle && bundle.locationQuery === root.locationQuery && bundle.fetchedAtMs > root.fetchedAtMs)
+    if (bundle && bundle.locationQuery === root.locationQuery && bundle.publishedAtMs > root.publishedAtMs)
       root.adoptShared(bundle)
   }
 
@@ -511,7 +525,7 @@ Panel {
   function adoptShared(bundle) {
     root.awaitingPeer = false
     peerWaitTimer.stop()
-    if (!bundle || !(bundle.fetchedAtMs > root.fetchedAtMs))
+    if (!bundle || !(bundle.publishedAtMs > root.publishedAtMs))
       return
     root.report = bundle.report || root.report
     root.dailyForecastReport = bundle.daily || root.dailyForecastReport
@@ -522,6 +536,7 @@ Panel {
       root.wttrLocation = bundle.wttrLocation
     root.label = bundle.label || root.label
     root.fetchedAtMs = bundle.fetchedAtMs
+    root.publishedAtMs = bundle.publishedAtMs
     root.nowMs = Date.now()
     root.finishSavingLocation()
   }
@@ -649,9 +664,11 @@ Panel {
     persistLocation(suggestion.name, suggestion.latitude, suggestion.longitude)
   }
 
-  // Closes the editor once the post-save refetch has actually started.
+  // Closes the editor once the post-save refetch has actually started, but
+  // never while omarchy-weather-location still runs: then locationSaved,
+  // on its exit, is what ends the pending place (WeatherLogic.saveEnds).
   function finishSavingLocation() {
-    if (savingLocation && savingLocationQueryStarted)
+    if (WeatherLogic.saveEnds(savingLocation, savingLocationQueryStarted, locationSaveProc.running))
       cancelEditingLocation()
   }
 
@@ -790,14 +807,18 @@ Panel {
     root.cursorKey = root.cursorSection
   }
 
-  // Enter in the frame (never in the place field, which takes its own
-  // keys): with no cursor yet, stock's Enter opens the place editor; a
+  // Enter or Space in the frame (never in the place field, which takes its
+  // own keys): with no cursor yet, Return / Enter opens the place editor as
+  // in stock (Space does nothing); a
   // pointer-placed cursor is only revealed; else the chosen control acts
   // (CursorLogic.pressIntent, cursorConfirmed).
   function activateCursor() {
+    var byReturn = root.returnPressed
+    root.returnPressed = false
     var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
     if (intent === "ignore") {
-      root.startEditingLocation()
+      if (byReturn)
+        root.startEditingLocation()
       return
     }
     root.keyboardCursor = true
@@ -916,7 +937,7 @@ Panel {
           var coords = WeatherLogic.wttrCoords(raw)
           if (coords)
             root.autoCoords = coords
-          root.publishShared()
+          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
           if (Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "wttr"))
             root.finishSavingLocation()
           // Stored coordinates already drove the fast open-meteo fetch from
@@ -982,7 +1003,7 @@ Panel {
           root.label = Model.currentIcon(parsedCurrent, root.label)
           root.dailyForecastRetries = 0
           root.forecastDoneKey = root.dailyForecastKey
-          root.publishShared()
+          root.publishShared(Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"))
           if (Model.weatherResponseCompletesSave(root.hasConfiguredCoordinates, "open-meteo"))
             root.finishSavingLocation()
         } catch (e) {
@@ -1003,7 +1024,7 @@ Panel {
       onStreamFinished: {
         root.air = WeatherLogic.parseAir(String(airOut.text || ""))
         if (root.air)
-          root.publishShared()
+          root.publishShared(false)
       }
     }
   }
@@ -1046,7 +1067,7 @@ Panel {
         if (!raw)
           return
         root.wttrLocation = raw.split(",")[0]
-        root.publishShared()
+        root.publishShared(false)
       }
     }
   }
@@ -1143,6 +1164,9 @@ Panel {
         return
       root.moveCursor(dy !== 0 ? dy : dx)
     }
+    // Return or Enter (never Space) marks the activation that follows, so
+    // only they open the editor with no cursor, as stock's catcher did.
+    onReturnRequested: root.returnPressed = true
     onActivateRequested: {
       dropdown.disarmPointer()
       root.activateCursor()

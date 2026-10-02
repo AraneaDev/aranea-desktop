@@ -3,18 +3,18 @@
 // clicks and keys: the hero, rain soon, the details grid (the wind arrow's
 // rotation, the pressure trend), the next-24h trace and rain bars, the air
 // and UV chips with their tones and the forecast days render from the view;
-// each section hides on its own; the place label asks to edit and the
-// updated label to refresh; the place edit takes focus, emits query on
-// typing only, keys its suggestions, picks by click with its index and key,
-// commits on Enter with the highlighted suggestion or the raw text (empty
-// is automatic), steps the highlight on Up and Down and cancels on Esc; a
-// stale editText echo never overwrites the focused field; saving pulses the place label and refuses to edit;
-// opening or closing the editor stamps the layout; the trace paints; a click
-// right after a layout stamp (a section showing or hiding, the suggestions
-// changing) or on a row whose key changed is refused; rows moving under a
-// still pointer emit no hover; no outline shows without cursor.active and
-// hover never draws one; and every trailing element ends on one right
-// content edge.
+// each section hides on its own; the place label asks to edit and the updated
+// label to refresh; the place edit takes focus, emits query on typing only,
+// keys its suggestions, picks by click with its index and key, commits on
+// Enter with the highlighted suggestion or the raw text (empty is automatic),
+// steps the highlight on Up and Down and cancels on Esc; a stale editText
+// echo never overwrites the focused field; saving pulses the place label and
+// refuses to edit; opening or closing the editor stamps the layout; the trace
+// paints; a click right after a layout stamp (a section showing or hiding,
+// the suggestions changing) or on a row whose key changed is refused; rows
+// moving under a still pointer emit no hover; no outline shows without
+// cursor.active and hover never draws one; and every trailing element ends on
+// one right content edge.
 import QtQuick
 import QtTest
 import Quickshell
