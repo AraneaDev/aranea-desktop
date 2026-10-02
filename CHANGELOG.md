@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.11.0...v2.12.0) (2026-10-02)
+
+
+### Features
+
+* Aranea-native Power dropdown ([#95](https://github.com/AraneaDev/aranea-desktop/issues/95)) ([4debdd6](https://github.com/AraneaDev/aranea-desktop/commit/4debdd6af9940d3b2894f8de99910df8950bcf3e))
+
 ## [2.11.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.10.0...v2.11.0) (2026-10-02)
 
 
