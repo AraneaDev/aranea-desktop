@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.10.0...v2.11.0) (2026-10-02)
+
+
+### Features
+
+* Aranea-native VPN dropdown ([#93](https://github.com/AraneaDev/aranea-desktop/issues/93)) ([fb5811b](https://github.com/AraneaDev/aranea-desktop/commit/fb5811b283e291ccb28cff77533f0d1d912dfc70))
+
 ## [2.10.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.9.0...v2.10.0) (2026-10-01)
 
 
