@@ -606,6 +606,14 @@ Panel {
   // Starts COMMAND (DisplaysLogic.displayCommand) to enable or disable
   // display NAME.
   function runDisplayCommand(name, enable, command) {
+    // A new request gets its own settle window (DisplaysLogic
+    // .startDisplayRequest).
+    var fresh = DisplaysLogic.startDisplayRequest({
+      exits: root.displayExits,
+      reads: root.displayReads
+    }, name)
+    root.displayExits = fresh.exits
+    root.displayReads = fresh.reads
     root.actionRunning = {
       kind: "display",
       key: name,

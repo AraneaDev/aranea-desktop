@@ -410,6 +410,24 @@ function settleDisplayPending(state) {
 }
 
 /**
+ * The settle bookkeeping once a new command starts for display `name`: its
+ * read count and its previous exit are cleared, so the new request gets its
+ * own full window (`settleDisplayPending` counts only reads after its own
+ * exit, up to 3). Other displays are kept.
+ * @param {{exits?: {[name: string]: number}, reads?: {[name: string]: number}}|null|undefined} state
+ * @param {string} name - the display the new command is for
+ * @returns {{exits: {[name: string]: number}, reads: {[name: string]: number}}} the bookkeeping to keep
+ */
+function startDisplayRequest(state, name) {
+  var s = state || {}
+  var exits = Object.assign({}, s.exits || {})
+  var reads = Object.assign({}, s.reads || {})
+  delete exits[name]
+  delete reads[name]
+  return { exits: exits, reads: reads }
+}
+
+/**
  * What the scale/display command (`actionProc`) does next once it exits, and
  * the pending and queued state that leaves. A failed request drops its own
  * pending state (a display entry only while it still holds that request's
@@ -514,6 +532,7 @@ if (typeof module !== "undefined")
     mayToggleDisplay: mayToggleDisplay,
     displayCommand: displayCommand,
     settleDisplayPending: settleDisplayPending,
+    startDisplayRequest: startDisplayRequest,
     nightToggleTarget: nightToggleTarget,
     scaleCaption: scaleCaption,
     keyHint: keyHint

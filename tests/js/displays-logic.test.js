@@ -999,3 +999,44 @@ test("displaysLocked: after an open, locked until a read started since the open 
 test("displaysLocked: an unknown landed read after an open counts as stale", () => {
   assert.equal(logic.displaysLocked({ running: false, exitSerial: 0, openMark: 0 }), true)
 })
+
+// --- startDisplayRequest (a re-toggle gets its full settle window) ---------------
+
+test("startDisplayRequest: clears the display's read count and stale exit, keeps the others", () => {
+  assert.deepEqual(
+    logic.startDisplayRequest(
+      { exits: { "DP-2": 4, "DP-3": 2 }, reads: { "DP-2": 2, "DP-3": 1 } },
+      "DP-2"
+    ),
+    { exits: { "DP-3": 2 }, reads: { "DP-3": 1 } }
+  )
+})
+
+test("startDisplayRequest: missing state never throws, and never mutates its input", () => {
+  assert.deepEqual(logic.startDisplayRequest(undefined, "DP-2"), { exits: {}, reads: {} })
+  const state = { exits: { "DP-2": 4 }, reads: { "DP-2": 2 } }
+  logic.startDisplayRequest(state, "DP-2")
+  assert.deepEqual(state, { exits: { "DP-2": 4 }, reads: { "DP-2": 2 } })
+})
+
+test("a re-toggle while the previous request is still settling gets its own 3 fresh reads", () => {
+  const read = (state, enabledMap, readSerial) =>
+    logic.settleDisplayPending(Object.assign({ enabledMap, readSerial }, state))
+  // First request: switch DP-2 on, exits at 4; two fresh reads don't show it yet.
+  let state = { pending: { "DP-2": true }, exits: { "DP-2": 4 }, reads: {} }
+  state = read(state, { "DP-2": false }, 4)
+  state = read(state, { "DP-2": false }, 4)
+  assert.deepEqual(state.reads, { "DP-2": 2 })
+  // Re-toggle DP-2 off: a new command starts, then exits at 6.
+  const fresh = logic.startDisplayRequest(state, "DP-2")
+  state = { pending: { "DP-2": false }, exits: fresh.exits, reads: fresh.reads }
+  state = read(state, { "DP-2": true }, 5)
+  assert.deepEqual(state.pending, { "DP-2": false }, "a read while it runs does not count")
+  state.exits = Object.assign({}, state.exits, { "DP-2": 6 })
+  for (let i = 1; i <= 2; i++) {
+    state = read(state, { "DP-2": true }, 6)
+    assert.deepEqual(state.pending, { "DP-2": false }, "kept after its own fresh read " + i)
+  }
+  state = read(state, { "DP-2": true }, 6)
+  assert.deepEqual(state.pending, {}, "dropped on its own third fresh read")
+})
