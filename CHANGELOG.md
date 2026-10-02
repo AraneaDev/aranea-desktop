@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.12.0...v2.13.0) (2026-10-02)
+
+
+### Features
+
+* Aranea-native Display dropdown ([#97](https://github.com/AraneaDev/aranea-desktop/issues/97)) ([759ee45](https://github.com/AraneaDev/aranea-desktop/commit/759ee45f70c85c873b8d7afb1e2ab150f1cad6d4))
+
 ## [2.12.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.11.0...v2.12.0) (2026-10-02)
 
 
