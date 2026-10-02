@@ -412,6 +412,83 @@ jq -e '.bar.layout.right == ["araneadev.bluetooth"]' "$bluetooth_real" >/dev/nul
   exit 1
 }
 
+# --- clock bar entry: only retargeted once araneadev.clock is installed
+# (guard: $(dirname "$config_file")/plugins/araneadev.clock/manifest.json);
+# format/formatAlt/weekStartDay/birthYear/lifeExpectancy survive the round
+# trip, and the bar's centerAnchor retargets and restores alongside the
+# layout entry.
+cat >"$config" <<'EOF'
+{"bar": {"centerAnchor": "omarchy.clock", "layout": {"center": [{"id": "omarchy.clock", "format": "dddd HH:mm", "formatAlt": "d MMMM 'W'ww yyyy", "weekStartDay": "monday", "birthYear": 1990, "lifeExpectancy": 90}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.centerAnchor == "omarchy.clock"
+  and .bar.layout.center == [{"id": "omarchy.clock", "format": "dddd HH:mm", "formatAlt": "d MMMM '"'"'W'"'"'ww yyyy", "weekStartDay": "monday", "birthYear": 1990, "lifeExpectancy": 90}]
+  and ((.cloneSourceRestores // []) | index("araneadev.clock")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.clock"
+: >"$(dirname "$config")/plugins/araneadev.clock/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.centerAnchor == "araneadev.clock"
+  and .bar.layout.center == [{"id": "araneadev.clock", "format": "dddd HH:mm", "formatAlt": "d MMMM '"'"'W'"'"'ww yyyy", "weekStartDay": "monday", "birthYear": 1990, "lifeExpectancy": 90}]
+  and (.cloneSourceRestores | index("araneadev.clock")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.centerAnchor == "omarchy.clock"
+  and .bar.layout.center == [{"id": "omarchy.clock", "format": "dddd HH:mm", "formatAlt": "d MMMM '"'"'W'"'"'ww yyyy", "weekStartDay": "monday", "birthYear": 1990, "lifeExpectancy": 90}]
+  and ((.cloneSourceRestores // []) | index("araneadev.clock")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A config without a centerAnchor gains none, and an anchor on another
+# widget stays put, through both the repair and the release (the clock
+# plugin is still installed beside $config from above).
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"center": ["omarchy.clock"]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '(.bar | has("centerAnchor") | not) and .bar.layout.center == ["araneadev.clock"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '(.bar | has("centerAnchor") | not) and .bar.layout.center == ["omarchy.clock"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+cat >"$config" <<'EOF'
+{"bar": {"centerAnchor": "omarchy.workspaces", "layout": {"center": ["omarchy.workspaces", "omarchy.clock"]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.centerAnchor == "omarchy.workspaces"' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.centerAnchor == "omarchy.workspaces" and (.bar.layout.center | index("omarchy.clock")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+clock_real="$test_root/clock-dotfiles/shell.json"
+clock_link="$test_root/clock-config/shell.json"
+mkdir -p "$(dirname "$clock_real")" "$(dirname "$clock_link")/plugins/araneadev.clock"
+: >"$(dirname "$clock_link")/plugins/araneadev.clock/manifest.json"
+printf '%s\n' '{"bar": {"centerAnchor": "omarchy.clock", "layout": {"center": ["omarchy.clock"]}}}' >"$clock_real"
+ln -s "$clock_real" "$clock_link"
+"$repo_root/scripts/repair-shell-config" "$clock_link"
+test -L "$clock_link"
+jq -e '.bar.centerAnchor == "araneadev.clock" and .bar.layout.center == ["araneadev.clock"]' "$clock_real" >/dev/null || {
+  cat "$clock_real"
+  exit 1
+}
+
 # --- monitor dropdown: only retargeted once araneadev.monitor is
 # installed (guard: $(dirname "$config_file")/plugins/araneadev.monitor/manifest.json)
 cat >"$config" <<'EOF'

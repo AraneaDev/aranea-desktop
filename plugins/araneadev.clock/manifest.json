@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.clock",
+  "name": "Aranea Clock",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Date/time label with a calendar popup",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Aranea Clock",
+    "description": "Date/time label with a calendar popup",
+    "category": "Time",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.clock"
+  }
+}

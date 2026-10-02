@@ -51,17 +51,18 @@ vpn_marker="$state_root/vpn-widget-placed"
 vpn_parked="$state_root/vpn-widget-parked"
 place_vpn=true
 [[ -e "$vpn_marker" && ! -e "$vpn_parked" ]] && place_vpn=false
-# araneadev.audio, araneadev.bluetooth, araneadev.monitor, araneadev.network
-# and araneadev.power only take over their bar entry once they are actually
-# deployed beside this config (deploy-plugins-safely writes their manifest
-# there); a repair that runs before that (a bare hook, a partial install)
-# must not retarget the id to a plugin that does not exist on disk yet. The
-# deploy writes beside the config path as given; beside a symlink's target
-# counts too. araneadev.vpn is not a clone (there is no stock entry to
-# retarget): the same guard just decides whether its own bar entry gets
-# inserted at all.
+# araneadev.audio, araneadev.bluetooth, araneadev.clock, araneadev.monitor,
+# araneadev.network and araneadev.power only take over their bar entry once
+# they are actually deployed beside this config (deploy-plugins-safely writes
+# their manifest there); a repair that runs before that (a bare hook, a
+# partial install) must not retarget the id to a plugin that does not exist
+# on disk yet. The deploy writes beside the config path as given; beside a
+# symlink's target counts too. araneadev.vpn is not a clone (there is no
+# stock entry to retarget): the same guard just decides whether its own bar
+# entry gets inserted at all.
 audio_installed=false
 bluetooth_installed=false
+clock_installed=false
 monitor_installed=false
 network_installed=false
 power_installed=false
@@ -69,6 +70,7 @@ vpn_installed=false
 for dir in "$given_config_dir" "$config_dir"; do
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
   [[ -f "$dir/plugins/araneadev.bluetooth/manifest.json" ]] && bluetooth_installed=true
+  [[ -f "$dir/plugins/araneadev.clock/manifest.json" ]] && clock_installed=true
   [[ -f "$dir/plugins/araneadev.monitor/manifest.json" ]] && monitor_installed=true
   [[ -f "$dir/plugins/araneadev.network/manifest.json" ]] && network_installed=true
   [[ -f "$dir/plugins/araneadev.power/manifest.json" ]] && power_installed=true
@@ -95,7 +97,7 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -126,6 +128,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
              | if . == "omarchy.system-update" then "araneadev.updates" else . end
              | if $audio and . == "omarchy.audio" then "araneadev.audio" else . end
              | if $bluetooth and . == "omarchy.bluetooth" then "araneadev.bluetooth" else . end
+             | if $clock and . == "omarchy.clock" then "araneadev.clock" else . end
              | if $monitor and . == "omarchy.monitor" then "araneadev.monitor" else . end
              | if $network and . == "omarchy.network" then "araneadev.network" else . end
              | if $power and . == "omarchy.power" then "araneadev.power" else . end
@@ -134,12 +137,18 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
              elif type == "object" and .id == "omarchy.system-update" then .id = "araneadev.updates"
              elif $audio and type == "object" and .id == "omarchy.audio" then .id = "araneadev.audio"
              elif $bluetooth and type == "object" and .id == "omarchy.bluetooth" then .id = "araneadev.bluetooth"
+             elif $clock and type == "object" and .id == "omarchy.clock" then .id = "araneadev.clock"
              elif $monitor and type == "object" and .id == "omarchy.monitor" then .id = "araneadev.monitor"
              elif $network and type == "object" and .id == "omarchy.network" then .id = "araneadev.network"
              elif $power and type == "object" and .id == "omarchy.power" then .id = "araneadev.power"
              else . end)
        else . end))
      else . end)
+  # The bar center anchor (the widget the center cluster expands/collapses
+  # around) retargets the same way, and only under the same guard: an anchor
+  # pointed at a plugin that is not deployed yet would make the bar center on
+  # nothing.
+  | (if $clock and (.bar.centerAnchor? == "omarchy.clock") then .bar.centerAnchor = "araneadev.clock" else . end)
   # araneadev.vpn is not a clone (there is no stock entry to swap): it gets
   # its own bar entry inserted right after the network entry, in the single
   # layout section vpn_target_section picks (the araneadev.network index
@@ -190,6 +199,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
       + ["araneadev.notifications", "araneadev.clipboard", "araneadev.emojis", "araneadev.polkit", "araneadev.lock", "araneadev.osd", "araneadev.menu"]
       + (if $audio then ["araneadev.audio"] else [] end)
       + (if $bluetooth then ["araneadev.bluetooth"] else [] end)
+      + (if $clock then ["araneadev.clock"] else [] end)
       + (if $monitor then ["araneadev.monitor"] else [] end)
       + (if $network then ["araneadev.network"] else [] end)
       + (if $power then ["araneadev.power"] else [] end) | unique)
