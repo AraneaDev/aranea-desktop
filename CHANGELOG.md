@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.14.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.13.0...v2.14.0) (2026-10-02)
+
+
+### Features
+
+* Aranea-native Clock dropdown ([#99](https://github.com/AraneaDev/aranea-desktop/issues/99)) ([ebe64d3](https://github.com/AraneaDev/aranea-desktop/commit/ebe64d322b4abe305f7aac25e47c12ad997e2e4f))
+
 ## [2.13.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.12.0...v2.13.0) (2026-10-02)
 
 
