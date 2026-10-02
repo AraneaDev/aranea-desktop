@@ -11,6 +11,15 @@
 // `timezone=auto` local ISO string, and compared by its wall-clock digits
 // rather than through the host's timezone); tests/js/weather-logic.test.js
 // runs this under Node.
+//
+// open-meteo's `timezone=auto` reports times in the requested LOCATION's
+// local time, not the host's. A host-local `new Date()` string would
+// misalign rainSoon/pressureTrend/hourlyPoints whenever the machine's
+// timezone differs from the forecast location's (and `current.time` is no
+// substitute: it is quantized to 15 minutes and goes stale while a report
+// is shared across monitors). Callers must build "now" with `nowIsoAt`
+// instead, from `Date.now()` and the parsed report's own
+// `utcOffsetSeconds`.
 
 /**
  * An hourly series, as `parseOpenMeteo` extracts it from open-meteo's
@@ -28,7 +37,7 @@
 
 /**
  * A parsed open-meteo forecast response.
- * @typedef {{current: object|null, hourly: HourlySeries, minutely: MinutelySeries}} ParsedForecast
+ * @typedef {{current: object|null, hourly: HourlySeries, minutely: MinutelySeries, utcOffsetSeconds: number}} ParsedForecast
  */
 
 /**
@@ -119,11 +128,12 @@ function buildAirUrl(lat, lon) {
 }
 
 /**
- * Parses open-meteo's forecast response body into the current reading and
- * the index-aligned hourly/minutely series this dropdown reads. Invalid
- * JSON or a non-object body gives null; a valid body missing `hourly` or
- * `minutely_15` gives empty series rather than throwing, so a response that
- * only has `current` still parses.
+ * Parses open-meteo's forecast response body into the current reading, the
+ * index-aligned hourly/minutely series this dropdown reads, and the
+ * location's UTC offset (for `nowIsoAt`). Invalid JSON or a non-object body
+ * gives null; a valid body missing `hourly` or `minutely_15` gives empty
+ * series rather than throwing, so a response that only has `current` still
+ * parses; a missing or non-finite `utc_offset_seconds` reads as 0.
  * @param {string|undefined} json - the response body
  * @returns {ParsedForecast|null} the parsed report, or null
  */
@@ -152,7 +162,14 @@ function parseOpenMeteo(json) {
     precip: Array.isArray(m.precipitation) ? m.precipitation : []
   }
 
-  return { current: current, hourly: hourly, minutely: minutely }
+  var utcOffsetSeconds = isFiniteNumber(data.utc_offset_seconds) ? data.utc_offset_seconds : 0
+
+  return {
+    current: current,
+    hourly: hourly,
+    minutely: minutely,
+    utcOffsetSeconds: utcOffsetSeconds
+  }
 }
 
 /**
@@ -203,6 +220,48 @@ function parseLocalIso(s) {
 }
 
 /**
+ * Zero-pads a non-negative integer to at least 2 digits.
+ * @param {number} n - the value
+ * @returns {string} "07", "43"
+ */
+function pad2(n) {
+  var s = String(n)
+  return s.length < 2 ? "0" + s : s
+}
+
+/**
+ * Builds the local-ISO "now" string the location's local time needs:
+ * `nowMs` (from `Date.now()`) shifted by the forecast's own
+ * `utcOffsetSeconds` (from `parseOpenMeteo`), then read back through UTC
+ * fields rather than the host's timezone, so the result reflects the
+ * LOCATION's wall clock regardless of where this runs. This is the only
+ * correct way to build the `nowIso` that `rainSoon`, `pressureTrend` and
+ * `hourlyPoints` take; a host-local `new Date()` string would misalign
+ * whenever the machine's timezone differs from the forecast location's.
+ * A non-finite `nowMs` gives "" (every reader treats that as "no data");
+ * a non-finite `utcOffsetSeconds` is treated as 0.
+ * @param {number} nowMs - the current instant, milliseconds since the Unix epoch
+ * @param {number} utcOffsetSeconds - the forecast location's UTC offset, seconds
+ * @returns {string} "2026-10-02T20:15", or ""
+ */
+function nowIsoAt(nowMs, utcOffsetSeconds) {
+  if (!isFiniteNumber(nowMs)) return ""
+  var offset = isFiniteNumber(utcOffsetSeconds) ? utcOffsetSeconds : 0
+  var d = new Date(nowMs + offset * 1000)
+  return (
+    d.getUTCFullYear() +
+    "-" +
+    pad2(d.getUTCMonth() + 1) +
+    "-" +
+    pad2(d.getUTCDate()) +
+    "T" +
+    pad2(d.getUTCHours()) +
+    ":" +
+    pad2(d.getUTCMinutes())
+  )
+}
+
+/**
  * The index of the latest entry in a local-ISO time series at or before a
  * given instant, assuming ascending order (as open-meteo returns them).
  * @param {string[]} times - local ISO time strings, ascending
@@ -228,7 +287,10 @@ function latestIndexAtOrBefore(times, ms) {
  * 3 h". Missing or empty minutely data, or an unparseable `nowIso`, reads
  * "" (hides the row) rather than throwing.
  * @param {MinutelySeries|null|undefined} minutely - from `parseOpenMeteo`
- * @param {string} nowIso - the current instant, as a local ISO string
+ * @param {string} nowIso - the current instant in the forecast LOCATION's
+ *   local time, from `nowIsoAt(Date.now(), report.utcOffsetSeconds)`; never
+ *   a host-local `new Date()` string, which would misalign this whenever
+ *   the machine's timezone differs from the location's
  * @returns {string} the line to show, or ""
  */
 function rainSoon(minutely, nowIso) {
@@ -284,7 +346,10 @@ function compass(deg) {
  * an unparseable `nowIso`, or no slot 3 hours before `nowIso` within the
  * series reads "" (hides the row) rather than throwing.
  * @param {HourlySeries|null|undefined} hourly - from `parseOpenMeteo`
- * @param {string} nowIso - the current instant, as a local ISO string
+ * @param {string} nowIso - the current instant in the forecast LOCATION's
+ *   local time, from `nowIsoAt(Date.now(), report.utcOffsetSeconds)`; never
+ *   a host-local `new Date()` string, which would misalign this whenever
+ *   the machine's timezone differs from the location's
  * @returns {"↑"|"↓"|"→"|""} the trend arrow, or ""
  */
 function pressureTrend(hourly, nowIso) {
@@ -355,7 +420,10 @@ function uvBand(n) {
  * unparseable `nowIso`, or no slot at or before it gives the empty shape
  * (hides the section) rather than throwing.
  * @param {HourlySeries|null|undefined} hourly - from `parseOpenMeteo`
- * @param {string} nowIso - the current instant, as a local ISO string
+ * @param {string} nowIso - the current instant in the forecast LOCATION's
+ *   local time, from `nowIsoAt(Date.now(), report.utcOffsetSeconds)`; never
+ *   a host-local `new Date()` string, which would misalign this whenever
+ *   the machine's timezone differs from the location's
  * @param {number} slots - how many hourly points to take, from now onward (at least 1)
  * @returns {HourlyPoints} the trace, or the empty shape
  */
@@ -535,6 +603,7 @@ if (typeof module !== "undefined")
     buildAirUrl: buildAirUrl,
     parseOpenMeteo: parseOpenMeteo,
     parseAir: parseAir,
+    nowIsoAt: nowIsoAt,
     rainSoon: rainSoon,
     compass: compass,
     pressureTrend: pressureTrend,

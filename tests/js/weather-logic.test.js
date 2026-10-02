@@ -60,6 +60,7 @@ const FORECAST_FIXTURE = JSON.stringify({
   latitude: 52.37,
   longitude: 4.9,
   timezone: "Europe/Amsterdam",
+  utc_offset_seconds: 7200,
   current_units: { time: "iso8601", temperature_2m: "°C" },
   current: {
     time: "2026-10-02T20:00",
@@ -110,6 +111,9 @@ test("parseOpenMeteo parses a real-shaped redacted fixture into current/hourly/m
     time: ["2026-10-02T19:30", "2026-10-02T19:45", "2026-10-02T20:00", "2026-10-02T20:15"],
     precip: [0.0, 0.0, 0.0, 0.0]
   })
+  // The location's UTC offset, for nowIsoAt: the fixture's Amsterdam
+  // utc_offset_seconds (UTC+2, CEST).
+  assert.equal(r.utcOffsetSeconds, 7200)
 })
 
 test("parseOpenMeteo gives null on invalid JSON or a non-object body, never throwing", () => {
@@ -130,6 +134,63 @@ test("parseOpenMeteo gives empty series (not null) for a valid body missing hour
 test("parseOpenMeteo reads a missing current as null", () => {
   const r = logic.parseOpenMeteo(JSON.stringify({ hourly: { time: [] } }))
   assert.equal(r.current, null)
+})
+
+test("parseOpenMeteo reads a missing or non-finite utc_offset_seconds as 0", () => {
+  assert.equal(logic.parseOpenMeteo(JSON.stringify({ current: {} })).utcOffsetSeconds, 0)
+  assert.equal(
+    logic.parseOpenMeteo(JSON.stringify({ current: {}, utc_offset_seconds: "x" })).utcOffsetSeconds,
+    0
+  )
+})
+
+// --- nowIsoAt (the forecast LOCATION's local "now", never the host's) --------------
+//
+// This file pins TZ=Europe/Amsterdam at the top, as the Clock tests do. The
+// whole point of nowIsoAt is that it must NOT depend on that: it reads the
+// UTC fields of nowMs+offset, never the host's zone. The offsets below are
+// all different from Amsterdam's (+7200s), which is exactly what would
+// expose a host-local `new Date()` bug if one crept back in.
+
+test("nowIsoAt: UTC+2 (e.g. Amsterdam CEST)", () => {
+  const nowMs = Date.UTC(2026, 9, 2, 18, 0, 0)
+  assert.equal(logic.nowIsoAt(nowMs, 7200), "2026-10-02T20:00")
+})
+
+test("nowIsoAt: UTC-5 (e.g. US Eastern standard time)", () => {
+  const nowMs = Date.UTC(2026, 9, 2, 18, 0, 0)
+  assert.equal(logic.nowIsoAt(nowMs, -18000), "2026-10-02T13:00")
+})
+
+test("nowIsoAt: UTC+5:30 (e.g. India)", () => {
+  const nowMs = Date.UTC(2026, 9, 2, 18, 0, 0)
+  assert.equal(logic.nowIsoAt(nowMs, 19800), "2026-10-02T23:30")
+})
+
+test("nowIsoAt: the offset can roll the date forward into the next day", () => {
+  const nowMs = Date.UTC(2026, 9, 2, 23, 0, 0)
+  assert.equal(logic.nowIsoAt(nowMs, 7200), "2026-10-03T01:00")
+})
+
+test("nowIsoAt: a non-finite nowMs reads '', never throwing", () => {
+  assert.equal(logic.nowIsoAt(NaN, 7200), "")
+  assert.equal(logic.nowIsoAt(undefined, 7200), "")
+})
+
+test("nowIsoAt: a non-finite offset is treated as 0 (UTC)", () => {
+  const nowMs = Date.UTC(2026, 9, 2, 20, 0, 0)
+  assert.equal(logic.nowIsoAt(nowMs, NaN), "2026-10-02T20:00")
+  assert.equal(logic.nowIsoAt(nowMs, undefined), "2026-10-02T20:00")
+})
+
+test("nowIsoAt: the result is the LOCATION's wall clock even though the process TZ is Amsterdam", () => {
+  // process.env.TZ is pinned to Europe/Amsterdam (UTC+2) at the top of this
+  // file. A host-local `new Date(nowMs).toString()`-style read would shift
+  // this to the Amsterdam hour; nowIsoAt must give the US Eastern hour
+  // (offset -18000) instead, proving it never consults the host's zone.
+  assert.equal(process.env.TZ, "Europe/Amsterdam")
+  const nowMs = Date.UTC(2026, 9, 2, 18, 0, 0)
+  assert.equal(logic.nowIsoAt(nowMs, -18000), "2026-10-02T13:00")
 })
 
 // --- parseAir --------------------------------------------------------------------
@@ -365,6 +426,19 @@ test("hourlyPoints: asking for more slots than available clips to what's there",
   const r = logic.hourlyPoints(hourly, "2026-10-02T20:00", 24)
   assert.equal(r.temp.length, 2)
   assert.equal(r.now, 16.0)
+})
+
+test("hourlyPoints: a zero, negative or non-numeric slots count falls back to 1 slot", () => {
+  const hourly = {
+    time: ["2026-10-02T20:00", "2026-10-02T21:00"],
+    temp: [16.0, 17.0],
+    rain: [0, 0]
+  }
+  for (const bogus of [0, -5, NaN, "nope"]) {
+    const r = logic.hourlyPoints(hourly, "2026-10-02T20:00", bogus)
+    assert.equal(r.temp.length, 1, `slots=${bogus}`)
+    assert.equal(r.now, 16.0, `slots=${bogus}`)
+  }
 })
 
 test("hourlyPoints: missing hourly data, no slot at or before now, or an unparseable now gives the empty shape", () => {
