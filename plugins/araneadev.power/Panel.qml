@@ -1,31 +1,34 @@
 // Aranea Power (araneadev.power, cloned from omarchy.power): the bar
-// battery icon and its dropdown. Stock logic (battery/system stats polling,
-// the power profile picker, the rotating hero status phrases and IPC) and
-// the stock view are unchanged for now.
+// battery icon and its dropdown. Stock's root logic stays (battery and
+// profile polling, the power profile picker, the rotating hero status
+// phrases, the percentage setting and IPC), minus the system stats poll.
+// Added here: the charge history (UPower GetHistory over busctl, on open
+// and every 60 s while open), the live power draw (EnergyRate every 1.5 s
+// while open) and the keyed keyboard cursor. The pure view, PowerDropdown,
+// draws it in the shared keyboard frame. The rules are PowerLogic.js /
+// Model.js / CursorLogic.js functions, tested under Node.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "PowerLogic.js" as PowerLogic
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
+import "../araneadev.shared/GraphLogic.js" as GraphLogic
+import "../araneadev.shared" as Aranea
 
 Panel {
   id: root
   moduleName: "omarchy.power"
   ipcTarget: "omarchy.power"
   // manageIpc: false so this panel can own the single IpcHandler the target
-  // permits — needed for the togglePercentage method below.
+  // permits, needed for the togglePercentage method below.
   manageIpc: false
-  // Stock code, unqualified by design (qmllint cannot type `bar`, the
-  // generic Process exit handler, or the delegate-scoped Repeater member
-  // further down): a temporary region, deleted once Task 4 replaces the
-  // view below with the Aranea one.
-  // qmllint disable missing-property unqualified signal-handler-parameters
   // The parsed `omarchy-battery-status --shell` fields (percentage, time,
   // rate, size, cycles, threshold), or {} before the first poll.
   property var batteryInfo: ({})
-  // The parsed `omarchy-system-stats` fields, or {} before the first poll.
-  property var systemInfo: ({})
   // The power profile names from `omarchy-powerprofiles-list`, in order.
   property var profiles: []
   // The currently active power profile's name.
@@ -34,6 +37,14 @@ Panel {
   property int profileIndex: 0
   // Whether keyboard/mouse navigation has placed a cursor on a profile yet.
   property bool cursorActive: false
+  // True while the keyboard drives the cursor; any pointer action clears it.
+  // The view outlines the cursor only then, so the mouse never shows one.
+  property bool keyboardCursor: false
+  // The profile the cursor was deliberately put on (a move, hover or
+  // click; never an open or a keyboard reveal), so the cursor follows that
+  // profile when the list changes. "" until the user picks one, and
+  // dropped when it's gone, so Enter refuses (CursorLogic.followCursor).
+  property string profileKey: ""
   // Whether the bar icon shows the battery percentage beside its glyph.
   readonly property bool showPercentage: setting("showPercentage", false) === true
   // With the percentage shown the button paints a text block wider than an
@@ -57,16 +68,19 @@ Panel {
     }
   }
 
-  // Moves the profile picker cursor by delta, clamped to profiles.
+  // Moves the profile picker cursor by delta, clamped to profiles, and
+  // chooses the profile it lands on.
   function selectProfileByDelta(delta) {
     profileIndex = Model.selectProfileIndex(profileIndex, delta, profiles)
+    profileKey = profileIndex < profiles.length ? String(profiles[profileIndex]) : ""
   }
 
-  // Applies the profile under the keyboard cursor.
+  // Applies the profile under the keyboard cursor, only when it is still
+  // the one the user chose (CursorLogic.cursorConfirmed).
   function activateSelectedProfile() {
-    if (profileIndex < 0 || profileIndex >= profiles.length)
+    if (!CursorLogic.cursorConfirmed(profileKeyRows(), profileKey, profileIndex))
       return
-    setProfile(profiles[profileIndex])
+    setProfile(profileKey)
   }
 
   // The bar icon's battery glyph, delegating to Model.js.
@@ -109,7 +123,7 @@ Panel {
   // a threshold), so "time left"/"time to full" has nothing to report.
   readonly property bool batteryFlowIdle: batteryFull || chargeThresholdActive
 
-  // 0..1 charge level, used by the visual progress bar.
+  // 0..1 charge level, for the hero's battery cell.
   readonly property real batteryFraction: {
     var d = UPower.displayDevice
     return Model.batteryFraction(d)
@@ -119,13 +133,6 @@ Panel {
   readonly property bool charging: {
     var d = UPower.displayDevice
     return d && d.isPresent && !UPower.onBattery && !root.batteryFlowIdle
-  }
-
-  // Fill color for the battery progress bar, falling back to Color.foreground
-  // when there is no bar yet (the smoke test instantiates the panel without
-  // one).
-  readonly property color batteryFillColor: {
-    return root.bar ? root.bar.foreground : Color.foreground
   }
 
   // Cute agent-flavored phrases shown in the hero status line, rotated on a
@@ -149,17 +156,110 @@ Panel {
   // Whether there is an active phrase list to rotate through.
   readonly property bool rotatingPhrases: activePhrases.length > 0
 
-  // The hero status line's text, before case transform.
-  readonly property string heroStatusText: {
-    if (fullyCharged)
-      return "Fully charged"
-    if (rotatingPhrases)
-      return activePhrases[phraseIndex % activePhrases.length]
-    return modeLabel()
+  // The hero status line's text, before case transform
+  // (PowerLogic.heroStatus, stock's rule).
+  readonly property string heroStatusText: PowerLogic.heroStatus({
+    fullyCharged: fullyCharged
+  }, activePhrases, phraseIndex, modeLabel())
+
+  // ---------- Aranea additions: history, draw, view ----------
+
+  // The hero status line's opacity, which phraseSwap fades between phrases.
+  // Passed to the view on its own, outside powerView, so the fade never
+  // rebuilds the view object.
+  property real statusOpacity: 1
+  // The UPower battery object path from `upower -e`
+  // (PowerLogic.batteryPath), read once; "" until then or with none.
+  property string batteryPath: ""
+  // Charge history samples, oldest first (PowerLogic.parseHistory); [] when
+  // the history is empty or busctl failed, which hides the section.
+  property var historySamples: []
+  // When the history was last read (epoch seconds): the right edge of its
+  // 24 h window.
+  property real historyNowSec: 0
+  // Power draw samples for the trace, oldest first: [{iface, rx: watts,
+  // tx: 0}] (GraphLogic.pushSample, 40 kept). Cleared on close.
+  property var drawSamples: []
+  // Row arrays kept by CursorLogic.keepRows, so an unchanged refresh hands
+  // the view the same array and its Repeaters keep their delegates.
+  property var rowCache: ({})
+  // Whether the live draw section applies: current is flowing either way.
+  readonly property bool drawFlowing: (discharging || charging) && !batteryFlowIdle
+  // The current charge in percent, for the history summary and its dot.
+  readonly property real nowPercent: Math.round(batteryFraction * 100)
+
+  // The profiles as keyed rows ({key: name}) for CursorLogic.
+  function profileKeyRows() {
+    return profiles.map(function (name) {
+      return {
+        key: String(name)
+      }
+    })
   }
 
-  // Starts the battery, profiles and system-stats processes when a battery
-  // is present and they aren't already running.
+  // The profile pills: one per profile, keyed by its name, the active one
+  // selected. Kept by CursorLogic.keepRows so phrase, rate and history
+  // updates never rebuild the pills.
+  readonly property var profileRows: CursorLogic.keepRows(rowCache, "profiles", profiles.map(function (name) {
+    var key = String(name)
+    return {
+      key: key,
+      label: key.charAt(0).toUpperCase() + key.slice(1),
+      glyph: root.profileIcon(key),
+      selected: root.activeProfile === key
+    }
+  }))
+
+  // The details grid's pairs (PowerLogic.detailRows, stock's rules), shown
+  // once battery data has ever loaded, as stock's stats row.
+  readonly property var detailRows: CursorLogic.keepRows(rowCache, "details", batteryInfo.percentage !== undefined ? PowerLogic.detailRows(batteryInfo, {
+    thresholdActive: chargeThresholdActive,
+    discharging: discharging,
+    flowIdle: batteryFlowIdle,
+    full: batteryFull
+  }) : [])
+
+  // The big percentage: stock's battery-status percentage without its "%",
+  // else UPower's.
+  readonly property string heroPercent: {
+    var text = String(batteryInfo.percentage || "").replace(/%\s*$/, "")
+    return text !== "" ? text : String(nowPercent)
+  }
+
+  // The view object PowerDropdown draws (its documented shape). Fast
+  // changers (the status fade, history segments, draw samples) are separate.
+  readonly property var powerView: ({
+      hero: batteryPresent ? {
+        glyph: batteryIcon(),
+        fraction: batteryFraction,
+        status: heroStatusText,
+        percent: heroPercent
+      } : null,
+      details: detailRows,
+      history: {
+        visible: historySamples.length > 0,
+        summary: PowerLogic.historySummary(historySamples, nowPercent),
+        startLabel: historyNowSec > 0 ? PowerLogic.timeLabel(historyNowSec - 86400, historyNowSec) : ""
+      },
+      draw: {
+        visible: drawFlowing,
+        caption: drawSamples.length > 0 ? Number(drawSamples[drawSamples.length - 1].rx).toFixed(1) + " W" : ""
+      },
+      profiles: profileRows,
+      cursor: {
+        active: cursorActive && keyboardCursor,
+        section: "profiles",
+        index: profileIndex
+      },
+      keyHint: PowerLogic.keyHint(profileRows.length > 0 ? "profiles" : "")
+    })
+
+  // The history's polyline segments in unit coordinates
+  // (PowerLogic.historyPoints); the view scales them.
+  readonly property var historySegments: PowerLogic.historyPoints(historySamples, historyNowSec, 1, 1)
+
+  // Starts the battery and profiles processes when a battery is present
+  // and they aren't already running.
   function refresh() {
     if (!batteryPresent)
       return
@@ -167,27 +267,24 @@ Panel {
       batteryProc.running = true
     if (!profilesProc.running)
       profilesProc.running = true
-    if (!systemProc.running)
-      systemProc.running = true
   }
 
-  // Parses a tab-separated key/value process reply into batteryInfo or
-  // systemInfo, keeping the last known good data on an empty reply.
+  // Parses a tab-separated key/value process reply into batteryInfo,
+  // keeping the last known good data on an empty reply.
   function updateKeyValue(raw, targetName) {
     var next = Model.parseKeyValue(raw)
-    // Keep last known good data if a refresh briefly returns nothing — happens
+    // Keep last known good data if a refresh briefly returns nothing; happens
     // around AC plug/unplug events. Avoids the section collapsing mid-transition.
     if (Object.keys(next).length === 0)
       return
     if (targetName === "battery")
       batteryInfo = next
-    else
-      systemInfo = next
   }
 
   // Parses the power-profiles-list reply into profiles/activeProfile/
   // profileIndex, keeping the cursor on the active profile while the panel
-  // is open and the user hasn't moved it.
+  // is open and the user hasn't moved it, and on the profile the user
+  // chose when the list changes (CursorLogic.followCursor).
   function updateProfiles(raw) {
     var parsed = Model.parseProfiles(raw, profileIndex)
     // Same guard as battery: preserve the last known profile list across
@@ -201,6 +298,11 @@ Panel {
       var idx = profiles.indexOf(activeProfile)
       if (idx >= 0)
         profileIndex = idx
+    }
+    if (profileKey !== "") {
+      var next = CursorLogic.followCursor(profileKeyRows(), profileKey, profileIndex)
+      profileIndex = Math.max(0, next.index)
+      profileKey = next.key
     }
   }
 
@@ -217,8 +319,86 @@ Panel {
     root.settings = Object.assign({}, root.settings, {
       showPercentage: !root.showPercentage
     })
+    // qmllint disable missing-property
     if (root.bar && root.bar.shell)
       root.bar.shell.updateEntryInline(root.moduleName, root.settings)
+    // qmllint enable missing-property
+  }
+
+  // Reads the charge history: finds the battery's object path once, then
+  // asks UPower for the last 24 h. Only while open.
+  function fetchHistory() {
+    if (!opened)
+      return
+    if (batteryPath === "") {
+      if (!pathProc.running)
+        pathProc.running = true
+      return
+    }
+    if (historyProc.running)
+      return
+    historyProc.command = ["busctl", "--json=short", "call", "org.freedesktop.UPower", batteryPath, "org.freedesktop.UPower.Device", "GetHistory", "suu", "charge", "86400", "200"]
+    historyProc.running = true
+  }
+
+  // Applies `upower -e`'s reply: caches the battery path and, when there is
+  // one, reads the history.
+  function applyBatteryPath(text) {
+    batteryPath = PowerLogic.batteryPath(text)
+    if (batteryPath !== "")
+      fetchHistory()
+  }
+
+  // Applies a GetHistory reply; a failure or an empty history hides the
+  // section. Ignored once closed.
+  function applyHistory(text) {
+    if (!opened)
+      return
+    historyNowSec = Date.now() / 1000
+    historySamples = PowerLogic.parseHistory(text)
+  }
+
+  // Asks UPower for the current EnergyRate. Only while open.
+  function fetchRate() {
+    if (!opened || batteryPath === "" || rateProc.running)
+      return
+    rateProc.command = ["busctl", "--json=short", "get-property", "org.freedesktop.UPower", batteryPath, "org.freedesktop.UPower.Device", "EnergyRate"]
+    rateProc.running = true
+  }
+
+  // Records one draw sample (watts) from an EnergyRate reply, keeping 40.
+  // Ignored once closed, so a late reply never refills a cleared trace.
+  function applyRate(text) {
+    if (!opened)
+      return
+    drawSamples = GraphLogic.pushSample(drawSamples, {
+      iface: "battery",
+      rx: PowerLogic.parseEnergyRate(text),
+      tx: 0
+    }, 40)
+  }
+
+  // Whether a pointer action ARG ({index, key}) still names the profile it
+  // was reported for (CursorLogic.rowKeyMatches).
+  function pointerRowMatches(arg) {
+    return !!arg && CursorLogic.rowKeyMatches(profileRows, arg.index, arg.key)
+  }
+
+  // Carries out one PowerDropdown action. Pointer actions hand the cursor
+  // back from the keyboard; a hover moves it (as stock's pills did) and
+  // chooses that profile; a click sets the profile it was reported for, or
+  // nothing when the pill changed underneath it.
+  function handleAction(name, arg) {
+    keyboardCursor = false
+    if (!pointerRowMatches(arg))
+      return
+    if (name === "hover") {
+      cursorActive = true
+      profileIndex = arg.index
+      profileKey = arg.key
+    } else if (name === "setProfile") {
+      setProfile(arg.key)
+    }
   }
 
   IpcHandler {
@@ -245,6 +425,10 @@ Panel {
   }
 
   onOpenedChanged: {
+    // A fresh open starts with the mouse's (outline-free) cursor and
+    // chooses nothing: Enter is refused until a move, hover or click.
+    keyboardCursor = false
+    profileKey = ""
     if (opened) {
       if (!batteryPresent) {
         close()
@@ -255,19 +439,15 @@ Panel {
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
       cursorActive = false
+      fetchHistory()
+      fetchRate()
+    } else {
+      drawSamples = []
     }
   }
 
   onBatteryPresentChanged: if (!batteryPresent)
     close()
-
-  // Smoke-safe accessors: the popup content below is created eagerly at
-  // component completion (not deferred until the panel opens), and some
-  // runtime contexts (this project's smoke test) instantiate the panel
-  // with no bar at all.
-  readonly property color safeForeground: bar ? bar.foreground : Color.foreground
-  // See safeForeground.
-  readonly property string safeFontFamily: bar ? bar.fontFamily : Style.font.family
 
   visible: batteryPresent
   implicitWidth: batteryPresent ? button.implicitWidth : 0
@@ -277,8 +457,9 @@ Panel {
     id: batteryProc
     command: ["omarchy-battery-status", "--shell"]
     stdout: StdioCollector {
+      id: batteryOut
       waitForEnd: true
-      onStreamFinished: root.updateKeyValue(text, "battery")
+      onStreamFinished: root.updateKeyValue(batteryOut.text, "battery")
     }
   }
 
@@ -286,23 +467,50 @@ Panel {
     id: profilesProc
     command: ["omarchy-powerprofiles-list", "--active-state"]
     stdout: StdioCollector {
+      id: profilesOut
       waitForEnd: true
-      onStreamFinished: root.updateProfiles(text)
+      onStreamFinished: root.updateProfiles(profilesOut.text)
     }
   }
 
-  Process {
-    id: systemProc
-    command: ["omarchy-system-stats"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.updateKeyValue(text, "system")
-    }
-  }
-
+  // Stock's profile setter; a finished set refreshes. Its exited handler
+  // takes no parameters, which qmllint can't type (QProcess::ExitStatus).
+  // qmllint disable signal-handler-parameters
   Process {
     id: actionProc
     onExited: root.refresh()
+  }
+  // qmllint enable signal-handler-parameters
+
+  // `upower -e`, once, for the battery's object path.
+  Process {
+    id: pathProc
+    command: ["upower", "-e"]
+    stdout: StdioCollector {
+      id: pathOut
+      waitForEnd: true
+      onStreamFinished: root.applyBatteryPath(pathOut.text)
+    }
+  }
+
+  // The charge history read (fetchHistory sets the command).
+  Process {
+    id: historyProc
+    stdout: StdioCollector {
+      id: historyOut
+      waitForEnd: true
+      onStreamFinished: root.applyHistory(historyOut.text)
+    }
+  }
+
+  // The EnergyRate read (fetchRate sets the command).
+  Process {
+    id: rateProc
+    stdout: StdioCollector {
+      id: rateOut
+      waitForEnd: true
+      onStreamFinished: root.applyRate(rateOut.text)
+    }
   }
 
   Timer {
@@ -310,6 +518,22 @@ Panel {
     running: root.opened
     repeat: true
     onTriggered: root.refresh()
+  }
+
+  // The charge history, re-read every 60 s while open.
+  Timer {
+    interval: 60000
+    running: root.opened
+    repeat: true
+    onTriggered: root.fetchHistory()
+  }
+
+  // The live draw, sampled every 1.5 s while open.
+  Timer {
+    interval: 1500
+    running: root.opened
+    repeat: true
+    onTriggered: root.fetchRate()
   }
 
   // Rotate the status phrase while the panel is open and we're in a
@@ -327,8 +551,8 @@ Panel {
   SequentialAnimation {
     id: phraseSwap
     PropertyAnimation {
-      target: heroStatus
-      property: "opacity"
+      target: root
+      property: "statusOpacity"
       to: 0.0
       duration: 180
       easing.type: Easing.OutQuad
@@ -341,8 +565,8 @@ Panel {
       }
     }
     PropertyAnimation {
-      target: heroStatus
-      property: "opacity"
+      target: root
+      property: "statusOpacity"
       to: 1.0
       duration: 260
       easing.type: Easing.InQuad
@@ -357,7 +581,7 @@ Panel {
     function onRotatingPhrasesChanged() {
       if (!root.rotatingPhrases) {
         phraseSwap.stop()
-        heroStatus.opacity = 1.0
+        root.statusOpacity = 1.0
       }
     }
   }
@@ -379,294 +603,72 @@ Panel {
     }
   }
 
-  KeyboardPanel {
+  // The Aranea view in the shared keyboard frame, sized to the view.
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened && root.batteryPresent
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight)
-
-    PanelKeyCatcher {
-      id: keyCatcher
-      anchors.fill: parent
-      onMoveRequested: function (dx, dy) {
-        if (!root.cursorActive) {
-          root.cursorActive = true
-          return
-        }
-        if (dx !== 0)
-          root.selectProfileByDelta(dx)
-        else if (dy !== 0)
-          root.selectProfileByDelta(dy)
-      }
-      onActivateRequested: if (root.cursorActive)
+    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      dropdown.disarmPointer()
+      root.keyboardCursor = true
+      root.switchPanel(direction)
+    }
+    onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
+      // The first key after opening or after mouse use only reveals the
+      // cursor where it is; a reveal never chooses a profile.
+      var revealing = !root.cursorActive || !root.keyboardCursor
+      root.cursorActive = true
+      root.keyboardCursor = true
+      if (revealing)
+        return
+      if (dx !== 0)
+        root.selectProfileByDelta(dx)
+      else if (dy !== 0)
+        root.selectProfileByDelta(dy)
+    }
+    // Enter acts only on a cursor the keyboard is showing, on the profile
+    // the user chose and still sees (CursorLogic.pressIntent,
+    // cursorConfirmed); a pointer-placed cursor is only revealed.
+    onActivateRequested: {
+      dropdown.disarmPointer()
+      var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
+      if (intent === "ignore")
+        return
+      root.keyboardCursor = true
+      if (intent === "act")
         root.activateSelectedProfile()
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
-      }
-
-      Column {
-        id: column
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        spacing: Style.space(14)
-
-        // ---------- Hero: battery icon · title/status · percentage ----------
-        Item {
-          width: parent.width
-          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroPercent.implicitHeight)
-
-          Text {
-            id: heroIcon
-            textFormat: Text.PlainText
-            text: root.batteryIcon()
-            color: root.safeForeground
-            font.family: root.safeFontFamily
-            font.pixelSize: Style.font.display
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-
-            Behavior on color {
-              ColorAnimation {
-                duration: 200
-              }
-            }
-          }
-
-          Column {
-            id: heroLabels
-            anchors.left: heroIcon.right
-            anchors.leftMargin: Style.space(14)
-            anchors.right: heroPercent.left
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(2)
-
-            Text {
-              text: "Battery"
-              color: root.safeForeground
-              font.family: root.safeFontFamily
-              font.pixelSize: Style.font.title
-              font.bold: true
-              elide: Text.ElideRight
-              width: parent.width
-            }
-
-            Text {
-              id: heroStatus
-              textFormat: Text.PlainText
-              text: root.heroStatusText.toUpperCase()
-              color: Qt.darker(root.safeForeground, 1.4)
-              font.family: root.safeFontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              font.letterSpacing: 1.2
-              elide: Text.ElideRight
-              width: parent.width
-            }
-          }
-
-          Text {
-            id: heroPercent
-            textFormat: Text.PlainText
-            text: root.batteryInfo.percentage || "—"
-            color: root.safeForeground
-            font.family: root.safeFontFamily
-            font.pixelSize: Style.font.displayLarge
-            font.bold: true
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-
-            Behavior on color {
-              ColorAnimation {
-                duration: 200
-              }
-            }
-          }
-        }
-
-        // ---------- Battery progress bar ----------
-        Item {
-          width: parent.width
-          implicitHeight: Style.space(8)
-
-          Rectangle {
-            id: barTrack
-            anchors.fill: parent
-            radius: height / 2
-            color: Qt.rgba(root.safeForeground.r, root.safeForeground.g, root.safeForeground.b, 0.12)
-          }
-
-          Rectangle {
-            id: barFill
-            anchors.left: barTrack.left
-            anchors.verticalCenter: barTrack.verticalCenter
-            height: barTrack.height
-            radius: barTrack.radius
-            color: root.batteryFillColor
-            width: Math.max(barTrack.height, barTrack.width * root.batteryFraction)
-
-            Behavior on width {
-              NumberAnimation {
-                duration: 320
-                easing.type: Easing.OutCubic
-              }
-            }
-            Behavior on color {
-              ColorAnimation {
-                duration: 220
-              }
-            }
-
-            // Subtle pulse while charging — visible signal that energy is flowing in.
-            SequentialAnimation on opacity {
-              running: root.charging && !root.fullyCharged && root.opened
-              loops: Animation.Infinite
-              alwaysRunToEnd: true
-              NumberAnimation {
-                from: 1.0
-                to: 0.55
-                duration: 950
-                easing.type: Easing.InOutSine
-              }
-              NumberAnimation {
-                from: 0.55
-                to: 1.0
-                duration: 950
-                easing.type: Easing.InOutSine
-              }
-            }
-          }
-        }
-
-        // ---------- Stats ----------
-        // Visibility is intentionally only gated by "we've ever loaded data" so
-        // the section never collapses mid-transition. fullyCharged is *not* part
-        // of the condition: UPower briefly reports FullyCharged on plug-in when
-        // the battery sits above the charge-control start threshold, and we
-        // refuse to flicker the whole panel for that ~1s window.
-        Row {
-          visible: root.batteryInfo.percentage !== undefined
-          width: parent.width
-          spacing: Style.space(20)
-
-          Column {
-            width: (parent.width - parent.spacing) / 2
-            spacing: Style.spacing.labelGap
-            InfoPair {
-              label: "Battery size"
-              value: root.batteryInfo.size || ""
-            }
-            InfoPair {
-              label: "Charge cycles"
-              value: root.batteryInfo.cycles || "—"
-            }
-          }
-
-          Column {
-            width: (parent.width - parent.spacing) / 2
-            spacing: Style.spacing.labelGap
-            InfoPair {
-              label: root.chargeThresholdActive ? "Charge limit" : (root.discharging ? "Time left" : "Time to full")
-              value: root.chargeThresholdActive ? (root.batteryInfo.threshold || "-") : (root.batteryFlowIdle ? "-" : (root.batteryInfo.time || "—"))
-            }
-            InfoPair {
-              label: root.chargeThresholdActive ? "Battery state" : (root.discharging ? "Discharging" : "Charging")
-              value: root.chargeThresholdActive ? "Holding" : (root.batteryFull ? "-" : (root.batteryInfo.rate || ""))
-            }
-          }
-        }
-
-        // ---------- Power profile picker ----------
-        PanelSeparator {
-          foreground: root.safeForeground
-        }
-
-        Column {
-          width: parent.width
-          spacing: Style.space(10)
-
-          PanelSectionHeader {
-            text: "POWER PROFILE"
-            foreground: root.safeForeground
-            fontFamily: root.safeFontFamily
-          }
-
-          Row {
-            id: profileRow
-            width: parent.width
-            spacing: Style.space(6)
-
-            readonly property real cellWidth: root.profiles.length > 0 ? (width - spacing * (root.profiles.length - 1)) / root.profiles.length : 0
-
-            Repeater {
-              model: root.profiles
-              Button {
-                required property var modelData
-                required property int index
-                width: profileRow.cellWidth
-                iconText: root.profileIcon(String(modelData))
-                iconSize: Style.font.title
-                text: String(modelData).charAt(0).toUpperCase() + String(modelData).slice(1)
-                fontSize: Style.font.bodySmall
-                foreground: root.safeForeground
-                fontFamily: root.safeFontFamily
-                horizontalPadding: Style.spacing.controlPaddingX
-                verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
-                bordered: true
-                active: root.activeProfile === modelData
-                hasCursor: root.cursorActive && root.profileIndex === index
-                onClicked: root.setProfile(modelData)
-                onHovered: function (h) {
-                  if (h) {
-                    root.cursorActive = true
-                    root.profileIndex = index
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
     }
-  }
-
-  component InfoPair: Row {
-    property string label: ""
-    property string value: ""
-
-    width: parent.width
-    spacing: Style.space(8)
-
-    InfoLabel {
-      text: label
+    onDeleteRequested: {
+      dropdown.disarmPointer()
+      root.keyboardCursor = true
     }
+    onTextKey: function (t) {
+      dropdown.disarmPointer()
+      root.keyboardCursor = true
+    }
+
     Item {
-      width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2)
-      height: 1
-    }
-    InfoValue {
-      text: value
-    }
-  }
+      anchors.fill: parent
+      clip: true
 
-  component InfoLabel: Text {
-    textFormat: Text.PlainText
-    color: root.safeForeground
-    opacity: 0.6
-    font.family: root.safeFontFamily
-    font.pixelSize: Style.font.bodySmall
-  }
-
-  component InfoValue: Text {
-    textFormat: Text.PlainText
-    color: root.safeForeground
-    font.family: root.safeFontFamily
-    font.pixelSize: Style.font.bodySmall
+      PowerDropdown {
+        id: dropdown
+        width: parent.width
+        view: root.powerView
+        statusOpacity: root.statusOpacity
+        historySegments: root.historySegments
+        drawSamples: root.drawSamples
+        nowPercent: root.nowPercent
+        onAction: function (name, arg) {
+          root.handleAction(name, arg)
+        }
+      }
+    }
   }
 }

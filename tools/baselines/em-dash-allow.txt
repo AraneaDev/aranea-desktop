@@ -16,7 +16,6 @@ plugins/araneadev.notifications/NotificationLogic.js
 plugins/araneadev.notifications/Service.qml
 plugins/araneadev.polkit/PolkitAgent.qml
 plugins/araneadev.polkit/PolkitLogic.js
-plugins/araneadev.power/Panel.qml
 README.md
 scripts/aranea-integrations
 scripts/release-shell-config
