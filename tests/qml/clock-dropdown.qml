@@ -9,7 +9,8 @@
 // today shows only off the current month; double-clicks ask to edit or
 // clear the life bar; the life fields take focus, Tab between them, commit
 // on Enter and cancel on Esc; the sun and moon section hides without data,
-// keeps the moon without the sun and names a polar day or night; a click
+// keeps the moon without the sun, reads "Night" after sunset and names a
+// polar day or night; Back to today appearing or going stamps; a click
 // within 300 ms of a layout stamp is ignored; nothing draws an outline; and
 // every trailing element ends on one right content edge.
 import QtQuick
@@ -361,6 +362,7 @@ ShellRoot {
         var dot = arc.dotPoint()
         t.check(dot && !dot.dim && dot.x > arc.width / 2 && dot.y < arc.height - 4, "the dot sits past noon, up on the arc")
         t.check(!one(full, "polarCaption").visible, "no polar caption")
+        t.check(!one(full, "nightCaption").visible, "no Night caption by day")
         full.view = viewOf({
           sun: {
             visible: true,
@@ -373,6 +375,7 @@ ShellRoot {
           }
         })
         t.check(!one(full, "sunArc").lit && one(full, "sunArc").dotPoint().dim, "at night the arc and the dot are dim")
+        t.check(one(full, "nightCaption").visible && one(full, "nightCaption").text === "Night", "and the caption reads Night")
         full.view = viewOf({})
 
         t.check(one(moonOnly, "skySection").visible, "the moon shows without sun data")
@@ -402,6 +405,7 @@ ShellRoot {
         })
         t.check(!one(polar, "sunArc").lit && one(polar, "sunArc").dotPoint() === null, "a polar night dims the arc, no dot")
         t.equal(one(polar, "polarCaption").text, "Sun down all day", "and says so")
+        t.check(!one(polar, "nightCaption").visible, "a polar night has no separate Night caption")
 
         // ---------- Year and life ----------
         t.equal(one(full, "yearPercent").text, "75%", "the year percent")
@@ -559,5 +563,26 @@ ShellRoot {
         actions = []
         pointer.mouseClick(one(full, "backToToday"))
         t.equal(actions.length, 0, "and a click right after it is ignored")
+        stampBefore = full.layoutChangedAt
+      }], [20, function () {
+        full.view = viewOf({
+          year: 2026,
+          month: 7,
+          current: true,
+          monthLabel: "August 2026",
+          life: false
+        })
+        t.check(!one(full, "backToToday").visible, "Back to today goes on the current month")
+        t.check(full.layoutChangedAt > stampBefore, "and Back to today going stamps the layout")
+        stampBefore = full.layoutChangedAt
+      }], [20, function () {
+        full.view = viewOf({
+          year: 2026,
+          month: 7,
+          current: false,
+          monthLabel: "August 2026",
+          life: false
+        })
+        t.check(full.layoutChangedAt > stampBefore, "and Back to today coming back stamps it too")
       }]])
 }

@@ -10,12 +10,15 @@ logic (month and year stepping, Back to today, the week start setting, the Memen
 `KeyboardPanelFrame`. The settings (`format`, `formatAlt`, `verticalFormat`,
 `verticalFormatAlt`, `weekStartDay`, `birthYear`, `lifeExpectancy`) are stock's.
 
-`moduleName`, `ipcTarget` and the IPC target stay `"omarchy.clock"`, so
-`omarchy-shell shell summon omarchy.clock` (and `hide`, `toggle`, `refresh`, `cycleFormat`,
-`toggleWeekStart`) keep working unchanged.
+`BarWidget.qml` runs as `araneadev.clock`: the bar sets its `moduleName` to the entry's id, and
+every settings write (the format cycle, the week start and the life bar) goes under that id,
+since the plugin shell refuses any other. Only `Panel.qml`'s `moduleName` and `ipcTarget`, and
+the IPC target, stay `"omarchy.clock"`, so `omarchy-shell shell summon omarchy.clock` (and
+`hide`, `toggle`, `refresh`, `cycleFormat`, `toggleWeekStart`) keep working unchanged.
 
-Keys: left / right step the month, up / down the year, Enter or `t` go back to today, Esc
-closes, and Tab moves to the bar's next dropdown. The calendar is a read-out with no cursor.
+Keys: left / right or `[` / `]` step the month, up / down or `{` / `}` the year, Enter or `t`
+go back to today, `w` switches the week start, Esc closes, and Tab moves to the bar's next
+dropdown. The calendar is a read-out with no cursor.
 
 Added to stock:
 
@@ -23,11 +26,15 @@ Added to stock:
   once a minute while open), and the moon's phase and illumination. The sun is computed
   locally (`ClockLogic.sunTimes`) for the weather location in
   `~/.local/state/omarchy/settings/weather.json` when it has coordinates. Otherwise it uses
-  the place `https://wttr.in/?format=j1` resolves: one lookup a day, only on open, never
-  while closed and stopped on close; a failed lookup tries again on the next open. Without a
-  place only the moon shows.
+  the place `https://wttr.in/?format=j1` resolves. The lookup runs at most once per day, on
+  the first open, and never while closed. Each monitor's bar hosts its own clock, and they
+  share that one lookup: an instance takes today's place from another before fetching. A
+  failed lookup, or one cancelled by closing the dropdown, retries on the next open; there is
+  no retry loop. Without a place only the moon shows, and after sunset the section reads
+  "Night".
 - **`showcase` IPC:** replaces the place and its coordinates for README captures. It is
   display only, taken only while the dropdown is open, and cleared on open and on close. The
+  instance the IPC target lands on hands it to whichever monitor's dropdown is open. The
   leading space keeps qs from splitting the argument:
 
   ```sh

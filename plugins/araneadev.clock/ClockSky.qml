@@ -2,8 +2,9 @@
 // place on the right, the sun arc, and a two-column grid of today's
 // sunrise, sunset, daylight and the moon (glyph, phase and illumination).
 // Without sun data (no location yet) the arc and the sun times hide and
-// the moon stays; a polar day or night shows its caption in place of the
-// sunrise and sunset. Pure view: the host hides the whole section when
+// the moon stays; after sunset a "Night" caption sits under the arc (its
+// dot dim at the horizon); a polar day or night shows its caption in place
+// of the sunrise and sunset. Pure view: the host hides the whole section when
 // there is nothing to show.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -111,6 +112,15 @@ Column {
     visible: sky.polar !== ""
     text: sky.polar === "day" ? "Sun up all day" : sky.polar === "night" ? "Sun down all day" : ""
     color: Aranea.DesignTokens.foreground
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+  }
+  Text {
+    objectName: "nightCaption"
+    width: sky.width
+    visible: sky.timesShown && !!sky.sun.night
+    text: "Night"
+    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
   }

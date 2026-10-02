@@ -11,9 +11,10 @@
 // the controls are pointer-only (the life fields keep their own focus).
 // The day cells are keyed by date and today is todayKey, so neither the
 // minute nor midnight rebuilds a cell. Any section changing height or
-// visibility, and a month changing the week count, stamps
-// layoutChangedAt; a click within 300 ms of that, or of its control being
-// built, is ignored unless the pointer has really moved onto it since.
+// visibility, a month changing the week count, and Back to today appearing
+// or going stamp layoutChangedAt; a click within 300 ms of that, or of its
+// control being built, is ignored unless the pointer has really moved onto
+// it since.
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
@@ -53,6 +54,9 @@ Column {
   readonly property var sky: view && view.sky ? view.sky : ({
       visible: false
     })
+  // Whether the view is on today's month: Back to today shows only when it
+  // is not, and its appearing or going stamps the layout.
+  readonly property bool viewingCurrentMonth: !view || view.viewingCurrentMonth !== false
   // Whether the sun and moon section has anything to show.
   readonly property bool skyShown: !!sky.visible && (!!(sky.sun && sky.sun.visible) || !!(sky.moon && sky.moon.name))
 
@@ -83,6 +87,8 @@ Column {
   }
 
   spacing: Style.space(10)
+
+  onViewingCurrentMonthChanged: dropdown.noteLayoutChange()
 
   // A hairline above a section, shown with it.
   component Separator: Rectangle {
@@ -206,7 +212,7 @@ Column {
       objectName: "backToToday"
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      visible: !!dropdown.view && dropdown.view.viewingCurrentMonth === false
+      visible: !dropdown.viewingCurrentMonth
       text: "Back to today"
       pointerGate: dropdown.pointerGate
       onClicked: dropdown.action("today", {})

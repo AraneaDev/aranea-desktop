@@ -444,6 +444,36 @@ jq -e '.bar.centerAnchor == "omarchy.clock"
   exit 1
 }
 
+# A config without a centerAnchor gains none, and an anchor on another
+# widget stays put, through both the repair and the release (the clock
+# plugin is still installed beside $config from above).
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"center": ["omarchy.clock"]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '(.bar | has("centerAnchor") | not) and .bar.layout.center == ["araneadev.clock"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '(.bar | has("centerAnchor") | not) and .bar.layout.center == ["omarchy.clock"]' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+cat >"$config" <<'EOF'
+{"bar": {"centerAnchor": "omarchy.workspaces", "layout": {"center": ["omarchy.workspaces", "omarchy.clock"]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.centerAnchor == "omarchy.workspaces"' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.centerAnchor == "omarchy.workspaces" and (.bar.layout.center | index("omarchy.clock")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
 # A symlinked shell.json (dotfile managers): the deploy writes the plugin
 # beside the config path the shell uses, not beside the link's target.
 clock_real="$test_root/clock-dotfiles/shell.json"

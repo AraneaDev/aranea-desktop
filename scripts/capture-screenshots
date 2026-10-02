@@ -587,7 +587,12 @@ capture_vpn_surface() {
 # method, waits, grabs the screen, then hides it, which clears the stand-in
 # place. A failed summon, or a showcase answer other than "ok" (a closed
 # dropdown answers "closed"), exits 3 before anything is grabbed, so the
-# README never shows the user's real area.
+# README never shows the user's real area. Each monitor's bar hosts its own
+# clock, and the IPC target lands on just one of them, so that instance
+# relays the showcase to whichever one's dropdown the summon opened; the
+# delay then lets the stand-in's caption and sun redraw before grim. The
+# stand-in's sunrise and sunset are computed in this machine's timezone
+# (the dropdown's local time), not the place's own.
 capture_clock_surface() {
   local place="$1" target=omarchy.clock
   command -v omarchy-shell >/dev/null 2>&1 || {
