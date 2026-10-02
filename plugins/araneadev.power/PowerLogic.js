@@ -326,6 +326,35 @@ function keyHint(section) {
   return "esc close · tab next"
 }
 
+/**
+ * Which profile the pills should show chosen: the one just requested but
+ * not yet confirmed (`pendingProfile`), so a click (or Enter) moves the
+ * selected pill at once, instead of waiting for `omarchy-powerprofiles-set`
+ * to finish and the profile list to be re-read; else the profile UPower
+ * actually reports active.
+ * @param {string|null|undefined} pendingProfile - requested but unconfirmed, "" for none
+ * @param {string|null|undefined} activeProfile - the profile UPower reports active
+ * @returns {string} the key the pills should mark selected
+ */
+function selectedProfile(pendingProfile, activeProfile) {
+  return pendingProfile || activeProfile || ""
+}
+
+/**
+ * Whether a freshly read active profile confirms a pending request: once
+ * the real profile matches it, the request is settled and the pending
+ * profile (and its busy pulse) is dropped; a request a refresh hasn't
+ * caught up to yet, or none at all, is unchanged.
+ * @param {string|null|undefined} pendingProfile - requested but unconfirmed, "" for none
+ * @param {string|null|undefined} activeProfile - the freshly read active profile
+ * @returns {string} the pending profile to keep, "" once it is confirmed
+ */
+function settlePending(pendingProfile, activeProfile) {
+  var pending = pendingProfile || ""
+  if (pending !== "" && pending === activeProfile) return ""
+  return pending
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     batteryPath: batteryPath,
@@ -337,5 +366,7 @@ if (typeof module !== "undefined")
     parseEnergyRate: parseEnergyRate,
     detailRows: detailRows,
     heroStatus: heroStatus,
-    keyHint: keyHint
+    keyHint: keyHint,
+    selectedProfile: selectedProfile,
+    settlePending: settlePending
   }

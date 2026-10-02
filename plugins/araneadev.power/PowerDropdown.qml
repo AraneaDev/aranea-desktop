@@ -25,7 +25,11 @@ Column {
   // View state built by Panel.powerView: {hero: {fraction, status,
   // percent} or null, details: [{label, value}], history: {visible,
   // summary, startLabel}, draw: {visible, caption}, profiles: [{key,
-  // label, glyph, selected}], cursor: {active, section, index}, keyHint}.
+  // label, glyph}] (stable regardless of which is selected, so a
+  // selection change never rebuilds the pills), selectedProfile (string,
+  // the key the pills mark chosen), pendingProfile (string, a request not
+  // yet confirmed by a refresh; "" for none, pulses that pill busy),
+  // cursor: {active, section, index}, keyHint}.
   property var view: ({})
   // Opacity of the hero's status line, for the phrase fade.
   property real statusOpacity: 1
@@ -56,6 +60,11 @@ Column {
     })
   // The view's profile pills, or [].
   readonly property var profiles: view && Array.isArray(view.profiles) ? view.profiles : []
+  // The key the pills mark selected (view.selectedProfile), or "".
+  readonly property string selectedProfile: view && typeof view.selectedProfile === "string" ? view.selectedProfile : ""
+  // A request not yet confirmed by a refresh (view.pendingProfile); "" for
+  // none. The pill with this key pulses busy.
+  readonly property string pendingProfile: view && typeof view.pendingProfile === "string" ? view.pendingProfile : ""
   // Filters synthetic hover from pills moving under a still pointer, and
   // carries layoutChangedAt to the pills that settle clicks.
   readonly property alias pointerGate: gate
@@ -317,7 +326,8 @@ Column {
             objectName: "profilePill"
             anchors.fill: parent
             text: (cell.modelData.glyph ? cell.modelData.glyph + " " : "") + (cell.modelData.label || "")
-            selected: !!cell.modelData.selected
+            selected: cell.modelData.key !== undefined && cell.modelData.key === dropdown.selectedProfile
+            busy: dropdown.pendingProfile !== "" && cell.modelData.key === dropdown.pendingProfile
             hasCursor: dropdown.cursorIn("profiles") === cell.index
             pointerGate: dropdown.pointerGate
             clickGate: cell

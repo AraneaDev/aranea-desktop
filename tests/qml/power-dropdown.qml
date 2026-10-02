@@ -7,8 +7,10 @@
 // within 300 ms of being built or of the history section appearing above them;
 // no outline without cursor.active and exactly one with it; changing only
 // drawSamples, historySegments or statusOpacity keeps the pill delegates;
-// pills rebuilt under a still pointer emit no hover; and every trailing
-// element ends on one right content edge.
+// a selectedProfile change alone (no profiles change) also keeps the pill
+// delegates, moving only which one reads selected; pills rebuilt under a
+// still pointer emit no hover; and every trailing element ends on one
+// right content edge.
 import QtQuick
 import QtTest
 import Quickshell
@@ -33,24 +35,23 @@ ShellRoot {
   }
 
   // The profile rows, built once so a rebuilt view keeps the same model.
+  // No selected flag: which one is chosen comes from the view's
+  // selectedProfile instead, so a selection change never needs a new row.
   readonly property var profileRows: [
     {
       key: "power-saver",
       label: "Power saver",
-      glyph: String.fromCodePoint(0xf032a),
-      selected: false
+      glyph: String.fromCodePoint(0xf032a)
     },
     {
       key: "balanced",
       label: "Balanced",
-      glyph: String.fromCodePoint(0xf029a),
-      selected: true
+      glyph: String.fromCodePoint(0xf029a)
     },
     {
       key: "performance",
       label: "Performance",
-      glyph: String.fromCodePoint(0xf04c5),
-      selected: false
+      glyph: String.fromCodePoint(0xf04c5)
     }
   ]
 
@@ -75,8 +76,10 @@ ShellRoot {
   ]
 
   // A view with CURSOR, the history section shown when HISTORY, the draw
-  // section when DRAW, and PROFILES.
-  function viewOf(cursor, history, draw, profiles) {
+  // section when DRAW, and PROFILES, selected as SELECTEDPROFILE
+  // ("balanced" when omitted) with PENDINGPROFILE pulsing busy ("" when
+  // omitted).
+  function viewOf(cursor, history, draw, profiles, selectedProfile, pendingProfile) {
     return {
       hero: {
         fraction: 0.62,
@@ -94,6 +97,8 @@ ShellRoot {
         caption: "7.8 W"
       },
       profiles: profiles,
+      selectedProfile: selectedProfile !== undefined ? selectedProfile : "balanced",
+      pendingProfile: pendingProfile !== undefined ? pendingProfile : "",
       cursor: cursor,
       keyHint: "←→ pick · enter set · tab next"
     }
@@ -369,6 +374,21 @@ ShellRoot {
         t.equal(t.findChild(full, "powerHistory").segments.length, 1, "new segments reach the history graph")
         full.statusOpacity = 1
 
+        // ---------- A selection change alone ----------
+        selectionBefore = pillsOf(full)
+        full.view = viewOf(cur(false, "profiles", 1), true, true, profileRows, "power-saver")
+        var afterSelection = pillsOf(full)
+        t.check(afterSelection.length === 3 && afterSelection.every(function (p, k) {
+          return p === selectionBefore[k]
+        }), "a selectedProfile change alone keeps the pill delegates")
+        t.check(afterSelection[0].selected && !afterSelection[1].selected, "and moves which pill reads selected")
+
+        // ---------- A pending (busy) profile ----------
+        full.view = viewOf(cur(false, "profiles", 1), true, true, profileRows, "performance", "performance")
+        var pending = pillsOf(full)
+        t.check(pending[2].selected && pending[2].busy, "a pendingProfile shows chosen and pulsing busy")
+        t.check(!pending[0].busy && !pending[1].busy, "only the pending pill pulses busy")
+
         // ---------- A fresh click ----------
         full.view = viewOf(cur(false, "profiles", 0), false, true, profileRows)
       }], [350, function () {
@@ -441,6 +461,8 @@ ShellRoot {
 
   // The pill delegates before the refresh check.
   property var identityBefore: []
+  // The pill delegates before the selectedProfile-only change.
+  property var selectionBefore: []
   // A pill's position before the history appeared.
   property real freshFrom: 0
   // The pointer position the still-pointer check replays.

@@ -552,3 +552,32 @@ test("keyHint: any other section (or none) defaults to esc close / tab next", ()
   assert.equal(logic.keyHint(undefined), "esc close · tab next")
   assert.equal(logic.keyHint(""), "esc close · tab next")
 })
+
+// --- selectedProfile -----------------------------------------------------------------
+
+test("selectedProfile: a pending request wins, for instant feedback", () => {
+  assert.equal(logic.selectedProfile("performance", "balanced"), "performance")
+})
+
+test("selectedProfile: falls back to the active profile once nothing is pending", () => {
+  assert.equal(logic.selectedProfile("", "balanced"), "balanced")
+})
+
+test("selectedProfile on missing input never throws", () => {
+  assert.equal(logic.selectedProfile(undefined, undefined), "")
+  assert.equal(logic.selectedProfile(null, "balanced"), "balanced")
+})
+
+// --- settlePending ---------------------------------------------------------------------
+
+test("settlePending: clears once the active profile catches up to it", () => {
+  assert.equal(logic.settlePending("performance", "performance"), "")
+})
+
+test("settlePending: stays while the active profile hasn't caught up yet", () => {
+  assert.equal(logic.settlePending("performance", "balanced"), "performance")
+})
+
+test("settlePending: nothing pending stays nothing", () => {
+  assert.equal(logic.settlePending("", "balanced"), "")
+})

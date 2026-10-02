@@ -45,6 +45,19 @@ Panel {
   // profile when the list changes. "" until the user picks one, and
   // dropped when it's gone, so Enter refuses (CursorLogic.followCursor).
   property string profileKey: ""
+  // A profile requested (by click or Enter) but not yet confirmed by a
+  // profiles refresh; "" for none. Shown chosen and pulsing busy at once,
+  // so a click never looks like it did nothing while
+  // omarchy-powerprofiles-set runs (PowerLogic.selectedProfile /
+  // settlePending).
+  property string pendingProfile: ""
+  // The latest profile requested while actionProc was already running, run
+  // when it exits (the last click wins instead of being dropped); "" when
+  // nothing is queued.
+  property string queuedProfile: ""
+  // The key the profile pills show chosen: pendingProfile once set, else
+  // activeProfile (PowerLogic.selectedProfile).
+  readonly property string selectedProfile: PowerLogic.selectedProfile(pendingProfile, activeProfile)
   // Whether the bar icon shows the battery percentage beside its glyph.
   readonly property bool showPercentage: setting("showPercentage", false) === true
   // With the percentage shown the button paints a text block wider than an
@@ -203,16 +216,18 @@ Panel {
     })
   }
 
-  // The profile pills: one per profile, keyed by its name, the active one
-  // selected. Kept by CursorLogic.keepRows so phrase, rate and history
-  // updates never rebuild the pills.
+  // The profile pills: one per profile, keyed by its name. Carries no
+  // selected flag, so which one is chosen never changes this array and
+  // CursorLogic.keepRows keeps handing back the same one: the Repeater's
+  // delegates survive a selection change exactly as they survive phrase,
+  // rate and history updates. Which pill shows chosen comes from
+  // selectedProfile instead (PowerDropdown reads it separately).
   readonly property var profileRows: CursorLogic.keepRows(rowCache, "profiles", profiles.map(function (name) {
     var key = String(name)
     return {
       key: key,
       label: key.charAt(0).toUpperCase() + key.slice(1),
-      glyph: root.profileIcon(key),
-      selected: root.activeProfile === key
+      glyph: root.profileIcon(key)
     }
   }))
 
@@ -256,6 +271,8 @@ Panel {
         caption: drawSamples.length > 0 ? Number(drawSamples[drawSamples.length - 1].rx).toFixed(1) + " W" : ""
       },
       profiles: profileRows,
+      selectedProfile: selectedProfile,
+      pendingProfile: pendingProfile,
       cursor: {
         active: cursorActive && keyboardCursor,
         section: "profiles",
@@ -304,6 +321,7 @@ Panel {
     profiles = parsed.profiles
     activeProfile = parsed.activeProfile
     profileIndex = parsed.profileIndex
+    pendingProfile = PowerLogic.settlePending(pendingProfile, activeProfile)
     if (opened && !cursorActive) {
       var idx = profiles.indexOf(activeProfile)
       if (idx >= 0)
@@ -316,10 +334,25 @@ Panel {
     }
   }
 
-  // Sets the active power profile via omarchy-powerprofiles-set.
+  // Sets the active power profile via omarchy-powerprofiles-set. Shown
+  // chosen (pendingProfile) at once rather than waiting for the command to
+  // finish and the profile list to be re-read. A request while one is
+  // already running is queued instead of dropped, the latest replacing any
+  // earlier one, and runs the moment the current one exits (the last click
+  // wins); see actionProc.onExited.
   function setProfile(profile) {
-    if (!profile || actionProc.running)
+    if (!profile)
       return
+    pendingProfile = profile
+    if (actionProc.running) {
+      queuedProfile = profile
+      return
+    }
+    runProfileCommand(profile)
+  }
+
+  // Starts omarchy-powerprofiles-set for PROFILE.
+  function runProfileCommand(profile) {
     actionProc.command = ["omarchy-powerprofiles-set", root.discharging ? "battery" : "ac", profile]
     actionProc.running = true
   }
@@ -486,12 +519,26 @@ Panel {
     }
   }
 
-  // Stock's profile setter; a finished set refreshes. Its exited handler
-  // takes no parameters, which qmllint can't type (QProcess::ExitStatus).
+  // Stock's profile setter. A queued request (setProfile, while this was
+  // already running) runs immediately, before refreshing; otherwise a
+  // failed set drops pendingProfile right away, so the real (unchanged)
+  // profile shows rather than a pill stuck pulsing busy, and either way a
+  // refresh re-reads the list. Its exited handler only names exitCode,
+  // which qmllint still can't type (QProcess::ExitStatus).
   // qmllint disable signal-handler-parameters
   Process {
     id: actionProc
-    onExited: root.refresh()
+    onExited: function (exitCode) {
+      if (root.queuedProfile !== "") {
+        var next = root.queuedProfile
+        root.queuedProfile = ""
+        root.runProfileCommand(next)
+        return
+      }
+      if (exitCode !== 0)
+        root.pendingProfile = ""
+      root.refresh()
+    }
   }
   // qmllint enable signal-handler-parameters
 
