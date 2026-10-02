@@ -848,3 +848,154 @@ test("scaleCaption: nothing with no scale read", () => {
 test("displaysLocked: after a display command, an unknown landed read counts as stale", () => {
   assert.equal(logic.displaysLocked({ running: false, exitSerial: 2 }), true)
 })
+
+// --- displayCommand (hyprctl keyword is rejected under the Lua config) ---------------
+
+test("displayCommand: a disable is an hl.monitor eval with disabled = true", () => {
+  assert.deepEqual(logic.displayCommand("DP-2", false), [
+    "hyprctl",
+    "eval",
+    'hl.monitor({ output = "DP-2", disabled = true })'
+  ])
+})
+
+test("displayCommand: an enable keeps stock's preferred/auto/auto", () => {
+  assert.deepEqual(logic.displayCommand("HDMI-A-1", true), [
+    "hyprctl",
+    "eval",
+    'hl.monitor({ output = "HDMI-A-1", mode = "preferred", position = "auto", scale = "auto" })'
+  ])
+})
+
+test("displayCommand: plain monitor names with dots, underscores and dashes are accepted", () => {
+  assert.ok(logic.displayCommand("eDP-1", true))
+  assert.ok(logic.displayCommand("Virtual.1_x", false))
+})
+
+test("displayCommand: a hostile name is refused, never spliced into the Lua", () => {
+  assert.equal(logic.displayCommand('DP-2"', false), null)
+  assert.equal(logic.displayCommand("DP-2)", false), null)
+  assert.equal(logic.displayCommand('DP-2", disabled = true }) os.execute("x', true), null)
+  assert.equal(logic.displayCommand("DP\n2", false), null)
+  assert.equal(logic.displayCommand("DP 2", true), null)
+})
+
+test("displayCommand: an empty or missing name is refused", () => {
+  assert.equal(logic.displayCommand("", true), null)
+  assert.equal(logic.displayCommand(undefined, false), null)
+})
+
+// --- settleDisplayPending (keep a request until a read shows it, up to 3 reads) ------
+
+test("settleDisplayPending: a read that shows the requested state drops the request", () => {
+  assert.deepEqual(
+    logic.settleDisplayPending({
+      pending: { "DP-2": true },
+      exits: { "DP-2": 4 },
+      reads: { "DP-2": 1 },
+      enabledMap: { "DP-2": true },
+      readSerial: 4
+    }),
+    { pending: {}, exits: {}, reads: {} }
+  )
+})
+
+test("settleDisplayPending: a fresh read that doesn't show it yet keeps the request and counts", () => {
+  assert.deepEqual(
+    logic.settleDisplayPending({
+      pending: { "DP-2": true },
+      exits: { "DP-2": 4 },
+      reads: {},
+      enabledMap: { "DP-2": false },
+      readSerial: 4
+    }),
+    { pending: { "DP-2": true }, exits: { "DP-2": 4 }, reads: { "DP-2": 1 } }
+  )
+})
+
+test("settleDisplayPending: the third fresh read without it drops the request", () => {
+  let state = { pending: { "DP-2": true }, exits: { "DP-2": 4 }, reads: {} }
+  for (let i = 0; i < 2; i++) {
+    state = logic.settleDisplayPending(
+      Object.assign({ enabledMap: { "DP-2": false }, readSerial: 4 }, state)
+    )
+    assert.deepEqual(state.pending, { "DP-2": true }, "kept after fresh read " + (i + 1))
+  }
+  state = logic.settleDisplayPending(
+    Object.assign({ enabledMap: { "DP-2": false }, readSerial: 5 }, state)
+  )
+  assert.deepEqual(state, { pending: {}, exits: {}, reads: {} })
+})
+
+test("settleDisplayPending: a read that started before the exit, or while it runs, is not counted", () => {
+  const stale = {
+    pending: { "DP-2": true },
+    exits: { "DP-2": 4 },
+    reads: {},
+    enabledMap: {},
+    readSerial: 3
+  }
+  assert.deepEqual(logic.settleDisplayPending(stale), {
+    pending: { "DP-2": true },
+    exits: { "DP-2": 4 },
+    reads: {}
+  })
+  const running = {
+    pending: { "DP-2": false },
+    exits: {},
+    reads: {},
+    enabledMap: { "DP-2": true },
+    readSerial: 9
+  }
+  assert.deepEqual(logic.settleDisplayPending(running), {
+    pending: { "DP-2": false },
+    exits: {},
+    reads: {}
+  })
+})
+
+test("settleDisplayPending: bookkeeping for a request no longer pending is dropped", () => {
+  assert.deepEqual(
+    logic.settleDisplayPending({
+      pending: {},
+      exits: { "DP-2": 4 },
+      reads: { "DP-2": 2 },
+      enabledMap: {},
+      readSerial: 5
+    }),
+    { pending: {}, exits: {}, reads: {} }
+  )
+})
+
+test("settleDisplayPending: missing state never throws", () => {
+  assert.deepEqual(logic.settleDisplayPending(undefined), { pending: {}, exits: {}, reads: {} })
+})
+
+// --- displaysLocked on open --------------------------------------------------------
+
+test("displaysLocked: after an open, locked until a read started since the open lands", () => {
+  assert.equal(
+    logic.displaysLocked({
+      running: false,
+      exitSerial: 0,
+      landedSerial: 0,
+      openMark: 5,
+      landedRead: 5
+    }),
+    true
+  )
+  assert.equal(
+    logic.displaysLocked({
+      running: false,
+      exitSerial: 0,
+      landedSerial: 0,
+      openMark: 5,
+      landedRead: 6
+    }),
+    false
+  )
+})
+
+test("displaysLocked: an unknown landed read after an open counts as stale", () => {
+  assert.equal(logic.displaysLocked({ running: false, exitSerial: 0, openMark: 0 }), true)
+})

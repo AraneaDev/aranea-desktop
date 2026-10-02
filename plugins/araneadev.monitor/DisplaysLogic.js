@@ -6,7 +6,8 @@
 // the header caption (`Model.cleanScale`'s companion), the pending/queue
 // helpers (araneadev.power's `PowerLogic` pattern), the last-display guard
 // (never switch off the last display confirmed on), the focus-checked
-// scale command, the display lock (no switch behind a stale read), what
+// scale command, the display lock (no switch behind a stale read), the
+// display switch command and its settling, what
 // runs when the scale/display command exits, the
 // night light toggle's prediction, the SCALE caption and the keyboard
 // hint. No QML, no I/O; tests/js/displays-logic.test.js runs this under
@@ -327,16 +328,21 @@ function scaleCommand(name, scale) {
  * (`actionProc`), and after a display command exits until a state read that
  * STARTED after that exit has landed (`landedSerial` is the exit count the
  * landed read started at; `exitSerial` the exit count of the last display
- * command, 0 before any). Display switches are never queued, so no request
- * can act on a stale read; an unknown landed read counts as stale.
- * @param {{running?: boolean, exitSerial?: number, landedSerial?: number}|null|undefined} state
+ * command, 0 before any). With `openMark` (the read count when the dropdown
+ * opened) it also stays locked until a read started since the open lands
+ * (`landedRead`, the count the last landed read started as). Display
+ * switches are never queued, so no request can act on a stale read; an
+ * unknown landed read counts as stale.
+ * @param {{running?: boolean, exitSerial?: number, landedSerial?: number, openMark?: number, landedRead?: number}|null|undefined} state
  * @returns {boolean} true while the display switches are locked
  */
 function displaysLocked(state) {
   var s = state || {}
   if (s.running) return true
   var exit = Number(s.exitSerial) || 0
-  return exit > 0 && !(Number(s.landedSerial) >= exit)
+  if (exit > 0 && !(Number(s.landedSerial) >= exit)) return true
+  if (s.openMark !== undefined && !(Number(s.landedRead) > Number(s.openMark))) return true
+  return false
 }
 
 /**
@@ -349,6 +355,58 @@ function mayToggleDisplay(state) {
   var s = state || {}
   if (!s.name || s.locked !== false) return false
   return s.enable === true || mayDisable(s.name, s.enabledMap, s.pendingMap)
+}
+
+/**
+ * The argv that switches display `name` on or off through `hyprctl eval`
+ * (`hyprctl keyword` is rejected under Hyprland's Lua config), Omarchy's own
+ * `hl.monitor` pattern; an enable keeps stock's preferred mode, auto
+ * position and auto scale. The name lands inside a Lua string, so anything
+ * but `[A-Za-z0-9._-]` is refused.
+ * @param {string|null|undefined} name - the monitor name
+ * @param {boolean} enable - true to switch it on, false to switch it off
+ * @returns {string[]|null} the argv, or null for a refused name
+ */
+function displayCommand(name, enable) {
+  var n = typeof name === "string" ? name : ""
+  if (!/^[A-Za-z0-9._-]+$/.test(n)) return null
+  var lua = enable
+    ? 'hl.monitor({ output = "' + n + '", mode = "preferred", position = "auto", scale = "auto" })'
+    : 'hl.monitor({ output = "' + n + '", disabled = true })'
+  return ["hyprctl", "eval", lua]
+}
+
+/**
+ * Settles the display requests against a state read. A request the read
+ * shows is dropped. One whose command has exited (`exits[name]`, the exit
+ * count then) and that a fresh read (started at or after that exit) doesn't
+ * show yet is kept, counting fresh reads, and dropped on the third (Hyprland
+ * can apply the rule a frame later). Bookkeeping for names no longer
+ * pending goes with them.
+ * @param {{pending?: {[name: string]: boolean}, exits?: {[name: string]: number}, reads?: {[name: string]: number}, enabledMap?: {[name: string]: boolean}, readSerial?: number}|null|undefined} state
+ * @returns {{pending: {[name: string]: boolean}, exits: {[name: string]: number}, reads: {[name: string]: number}}} the state to keep
+ */
+function settleDisplayPending(state) {
+  var s = state || {}
+  var pending = s.pending || {}
+  var exits = s.exits || {}
+  var reads = s.reads || {}
+  var enabledMap = s.enabledMap || {}
+  /** @type {{pending: {[name: string]: boolean}, exits: {[name: string]: number}, reads: {[name: string]: number}}} */
+  var out = { pending: {}, exits: {}, reads: {} }
+  var names = Object.keys(pending)
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i]
+    if (enabledMap[name] === pending[name]) continue
+    var exit = exits[name]
+    var count = reads[name] || 0
+    if (typeof exit === "number" && Number(s.readSerial) >= exit) count++
+    if (count >= 3) continue
+    out.pending[name] = pending[name]
+    if (typeof exit === "number") out.exits[name] = exit
+    if (count > 0) out.reads[name] = count
+  }
+  return out
 }
 
 /**
@@ -454,6 +512,8 @@ if (typeof module !== "undefined")
     nextAction: nextAction,
     displaysLocked: displaysLocked,
     mayToggleDisplay: mayToggleDisplay,
+    displayCommand: displayCommand,
+    settleDisplayPending: settleDisplayPending,
     nightToggleTarget: nightToggleTarget,
     scaleCaption: scaleCaption,
     keyHint: keyHint
