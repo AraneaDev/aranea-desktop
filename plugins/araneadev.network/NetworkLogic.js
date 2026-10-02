@@ -708,6 +708,20 @@ function keyHint(section) {
   return "↑↓ move · ←→ pick · enter connect · x forget · tab next"
 }
 
+/**
+ * Which DNS provider the pills should show chosen: the one just requested
+ * but not yet confirmed by `actionProc` exiting (`pendingDnsProvider`), so a
+ * click (or Enter) moves the selected pill at once instead of waiting for
+ * `omarchy-dns` to finish; else the provider last read from it. Mirrors
+ * araneadev.power's `selectedProfile`.
+ * @param {string|null|undefined} pendingDnsProvider - requested but unconfirmed, "" for none
+ * @param {string|null|undefined} dnsProvider - the provider last read from omarchy-dns
+ * @returns {string} the key the DNS pills should mark selected
+ */
+function selectedDnsProvider(pendingDnsProvider, dnsProvider) {
+  return pendingDnsProvider || dnsProvider || ""
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     splitTerse: splitTerse,
@@ -730,5 +744,6 @@ if (typeof module !== "undefined")
     savedEmptyFallback: savedEmptyFallback,
     enterDecision: enterDecision,
     extrasFollowUp: extrasFollowUp,
-    keyHint: keyHint
+    keyHint: keyHint,
+    selectedDnsProvider: selectedDnsProvider
   }

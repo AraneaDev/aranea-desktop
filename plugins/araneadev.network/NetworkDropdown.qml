@@ -26,6 +26,10 @@ Column {
   // View state built by Panel.networkView: {header, interfaces, vpnLine,
   // band, dns, wifi, saved, cursor, emptyText}. Rebuilt only when rows
   // change; vpnLine is the VPN status line's text, "" when hidden.
+  // band.options/dns.options carry no selected flag (stable regardless of
+  // which is picked); band.selectedBand and dns.selectedProvider say which
+  // pill is chosen, and dns.pendingProvider (a pick not yet confirmed by
+  // actionProc exiting, "" for none) pulses that pill busy.
   property var view: ({})
   // Cap on the Wi-Fi/Saved scroll area's height, so a busy neighbourhood
   // doesn't grow the popup past the screen.
@@ -259,6 +263,7 @@ Column {
     currentLabel: dropdown.band.currentLabel || ""
     pillsVisible: !!dropdown.band.pillsVisible
     options: dropdown.band.options || []
+    selectedBand: typeof dropdown.band.selectedBand === "string" ? dropdown.band.selectedBand : ""
     busy: !!dropdown.band.busy
     cursorAuto: dropdown.cursor.active && dropdown.cursor.section === "band" && !!dropdown.cursor.bandAuto
     cursorIndex: dropdown.cursor.active && dropdown.cursor.section === "band" && !dropdown.cursor.bandAuto ? dropdown.cursor.index : -1
@@ -288,6 +293,8 @@ Column {
     onHeightChanged: dropdown.noteLayoutChange()
     visible: options.length > 0
     options: dropdown.view.dns && dropdown.view.dns.options ? dropdown.view.dns.options : []
+    selectedProvider: dropdown.view.dns && typeof dropdown.view.dns.selectedProvider === "string" ? dropdown.view.dns.selectedProvider : ""
+    pendingProvider: dropdown.view.dns && typeof dropdown.view.dns.pendingProvider === "string" ? dropdown.view.dns.pendingProvider : ""
     cursorIndex: dropdown.cursorIn("dns")
     pointerGate: dropdown.pointerGate
     onPick: function (key) {

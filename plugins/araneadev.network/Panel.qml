@@ -106,7 +106,22 @@ Panel {
   // The DNS provider currently in effect, as reported by omarchy-dns.
   property string dnsProvider: ""
   // The DNS provider a change is in flight for, until actionProc exits.
+  // Shown chosen at once (selectedDnsProvider) rather than waiting for
+  // omarchy-dns to finish, as araneadev.power's pendingProfile does.
   property string pendingDnsProvider: ""
+  // The latest DNS provider requested while actionProc was already running
+  // (a DNS change or a band pin), run the moment it exits instead of being
+  // dropped (the last click wins); "" when nothing is queued. See
+  // setDns/runDnsCommand and actionProc.onExited.
+  property string queuedDnsProvider: ""
+  // Which action actionProc is currently running, "dns" or "band", so its
+  // onExited knows which pending state to settle -- needed once a queued
+  // DNS pick can land while pendingDnsProvider already holds a value that
+  // isn't what just ran. "" when actionProc isn't running.
+  property string actionProcKind: ""
+  // The key the DNS pills show chosen: pendingDnsProvider once set, else
+  // dnsProvider (NetworkLogic.selectedDnsProvider).
+  readonly property string selectedDnsProvider: NetworkLogic.selectedDnsProvider(pendingDnsProvider, dnsProvider)
   // Wi-Fi band state from `omarchy-network-band`. `bandCurrent` is the band
   // the radio is actually on; `bandSelected` is the pinned choice ("auto" when
   // nothing is pinned), and the two differ whenever Auto is in effect.
@@ -826,6 +841,7 @@ Panel {
     if (!band || actionProc.running)
       return
     root.pendingBand = band
+    root.actionProcKind = "band"
     actionProc.command = ["omarchy-network-band", band]
     actionProc.running = true
   }
@@ -870,9 +886,18 @@ Panel {
     return command
   }
 
-  // Sets the DNS provider, or opens a terminal for a custom one.
+  // Sets the DNS provider, or opens a terminal for a custom one. Unlike
+  // stock, a provider pick leaves the dropdown open: the pill shows chosen
+  // and pulses busy at once (selectedDnsProvider / pendingDnsProvider, as
+  // araneadev.power's profile pills do) so the change can be watched land
+  // instead of the dropdown closing before omarchy-dns even runs. A pick
+  // that lands while actionProc is already busy (running this or a band
+  // pin) is queued, the latest replacing any earlier one, and runs the
+  // moment the current one exits -- the last click wins (actionProc.onExited).
+  // Custom still closes immediately, as stock did: it hands off to a
+  // terminal rather than running a command here, so there's nothing to watch.
   function setDns(provider) {
-    if (!root.bar || !provider || actionProc.running)
+    if (!root.bar || !provider)
       return
     if (provider === "Custom") {
       var launcher = "omarchy-launch-floating-terminal-with-presentation"
@@ -884,9 +909,18 @@ Panel {
     }
 
     root.pendingDnsProvider = provider
+    if (actionProc.running) {
+      root.queuedDnsProvider = provider
+      return
+    }
+    runDnsCommand(provider)
+  }
+
+  // Starts the omarchy-dns command that sets PROVIDER.
+  function runDnsCommand(provider) {
+    root.actionProcKind = "dns"
     actionProc.command = ["bash", "-c", root.dnsCommand(provider)]
     actionProc.running = true
-    root.close()
   }
 
   // Whether security needs a passphrase, delegating to Model.js.
@@ -1122,12 +1156,14 @@ Panel {
       waitForEnd: true
     }
     onExited: function (exitCode) {
-      if (root.pendingDnsProvider !== "") {
-        if (exitCode === 0)
-          root.dnsProvider = root.pendingDnsProvider
-        root.pendingDnsProvider = ""
-      }
-      if (root.pendingBand !== "") {
+      // actionProcKind says which of pendingDnsProvider/pendingBand this run
+      // was actually for: once a DNS pick can queue, pendingDnsProvider may
+      // already hold a newer, not-yet-run pick while a band pin is what just
+      // exited, and the reverse (a queued pick isn't settled by the run it
+      // queued behind -- see below).
+      var kind = root.actionProcKind
+      root.actionProcKind = ""
+      if (kind === "band") {
         // A refused or reverted pin leaves bandSelected alone, so the pills
         // keep showing what is actually in force rather than what was asked.
         if (exitCode === 0)
@@ -1136,6 +1172,20 @@ Panel {
         // The panel stayed open through the reconnect, so pull fresh state now
         // instead of leaving stale readings until the next poll tick.
         root.refresh()
+      } else if (kind === "dns" && root.queuedDnsProvider === "") {
+        if (exitCode === 0)
+          root.dnsProvider = root.pendingDnsProvider
+        root.pendingDnsProvider = ""
+      }
+      // A DNS pick queued while this ran (dns or band) runs now, last click
+      // wins. When the run that just exited was itself a superseded DNS
+      // pick (kind === "dns" with something queued), its result is skipped
+      // above rather than wrongly applied to the newer pick's
+      // pendingDnsProvider.
+      if (root.queuedDnsProvider !== "") {
+        var next = root.queuedDnsProvider
+        root.queuedDnsProvider = ""
+        root.runDnsCommand(next)
       }
     }
   }
@@ -1681,6 +1731,31 @@ Panel {
       Custom: "Set custom DNS servers"
     })
 
+  // The DNS pill rows: one per provider, keyed by its name. Carries no
+  // selected flag, so which one is chosen never changes this array and
+  // CursorLogic.keepRows keeps handing back the same one: the Repeater's
+  // delegates survive a selection change exactly as the Wi-Fi/Saved/
+  // interface rows survive an unrelated refresh. Which pill shows chosen
+  // comes from selectedDnsProvider instead (networkView reads it
+  // separately), as araneadev.power's profileRows/selectedProfile does.
+  readonly property var dnsRows: CursorLogic.keepRows(rowCache, "dns", dnsProviders.map(function (p) {
+    return {
+      key: p,
+      label: p,
+      tooltip: dnsTooltips[p] || ""
+    }
+  }))
+  // The band pill rows: one per available band, keyed by its name. No
+  // selected flag either, for the same reason as dnsRows; bandEffective is
+  // the view's separate selected key.
+  readonly property var bandRows: CursorLogic.keepRows(rowCache, "band", bandAvailable.map(function (b) {
+    return {
+      key: b,
+      label: bandLabel(b),
+      tooltip: bandTooltip(b)
+    }
+  }))
+
   // The cursor's index within its section.
   function cursorIndexIn(section) {
     if (section === "header")
@@ -1698,6 +1773,12 @@ Panel {
 
   // Everything the Aranea view draws (NetworkDropdown.view). Rates, the
   // graph, status, VPN state and the prompt are separate properties.
+  // band.options and dns.options carry no selected flag (bandRows/dnsRows):
+  // which one is chosen is band.selectedBand / dns.selectedProvider instead,
+  // so a selection change alone never rebuilds the pills (as
+  // araneadev.power's profiles/selectedProfile do). dns.pendingProvider is a
+  // pick not yet confirmed by actionProc exiting; "" for none; the pill
+  // with that key pulses busy.
   readonly property var networkView: ({
       header: {
         glyph: icon,
@@ -1719,24 +1800,13 @@ Panel {
         currentLabel: bandLabel(bandCurrent),
         pillsVisible: bandPillsVisible,
         busy: bandBusy,
-        options: bandAvailable.map(function (b) {
-          return {
-            key: b,
-            label: bandLabel(b),
-            tooltip: bandTooltip(b),
-            selected: bandEffective === b
-          }
-        })
+        options: bandRows,
+        selectedBand: bandEffective
       },
       dns: {
-        options: dnsProviders.map(function (p) {
-          return {
-            key: p,
-            label: p,
-            selected: dnsProvider === p,
-            tooltip: dnsTooltips[p] || ""
-          }
-        })
+        options: dnsRows,
+        selectedProvider: selectedDnsProvider,
+        pendingProvider: pendingDnsProvider
       },
       wifi: {
         available: wifiStationAvailable,

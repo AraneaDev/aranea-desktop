@@ -671,6 +671,21 @@ test("keyHint says what Enter does in each section", () => {
   assert.equal(logic.keyHint(""), "↑↓ move · ←→ pick · enter connect · x forget · tab next")
 })
 
+// --- selectedDnsProvider ------------------------------------------------------------
+
+test("selectedDnsProvider: a pending request wins, for instant feedback", () => {
+  assert.equal(logic.selectedDnsProvider("Cloudflare", "DHCP"), "Cloudflare")
+})
+
+test("selectedDnsProvider: falls back to the last-read provider once nothing is pending", () => {
+  assert.equal(logic.selectedDnsProvider("", "DHCP"), "DHCP")
+})
+
+test("selectedDnsProvider on missing input never throws", () => {
+  assert.equal(logic.selectedDnsProvider(undefined, undefined), "")
+  assert.equal(logic.selectedDnsProvider(null, "DHCP"), "DHCP")
+})
+
 // --- keyTargetConfirmed ------------------------------------------------------------
 
 test("keyTargetConfirmed refuses a section the cursor was moved into automatically", () => {

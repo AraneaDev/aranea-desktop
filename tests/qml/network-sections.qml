@@ -8,8 +8,9 @@
 // copies the IP but never a "--"; Interfaces shows only with two or more
 // links and never outlines; Band hides with visible false, shows pills only
 // when pillsVisible, emits pick and toggleAuto and explains its switch as
-// stock does; DNS marks the selected pill, emits pick and explains Custom;
-// pills draw no outline without the cursor (pointer hover included) and
+// stock does; DNS marks the selected pill, a pending pick pulses it busy,
+// emits pick and explains Custom; pills draw no outline without the cursor
+// (pointer hover included) and
 // exactly one with it, and pointer hover reaches the sections through the
 // PointerMoveGate. A forget button that appears under a still pointer
 // ignores a click until it settles.
@@ -206,18 +207,17 @@ ShellRoot {
         auto: true
         currentLabel: "2.4ghz"
         pillsVisible: false
+        selectedBand: "2.4"
         options: [
           {
             key: "2.4",
             label: "2.4ghz",
-            tooltip: "Stay on 2.4ghz",
-            selected: true
+            tooltip: "Stay on 2.4ghz"
           },
           {
             key: "5",
             label: "5ghz",
-            tooltip: "Stay on 5ghz",
-            selected: false
+            tooltip: "Stay on 5ghz"
           }
         ]
       }
@@ -229,19 +229,18 @@ ShellRoot {
         currentLabel: "2.4ghz"
         pillsVisible: true
         busy: true
+        selectedBand: "2.4"
         pointerGate: gate
         options: [
           {
             key: "2.4",
             label: "2.4ghz",
-            tooltip: "Stay on 2.4ghz",
-            selected: true
+            tooltip: "Stay on 2.4ghz"
           },
           {
             key: "5",
             label: "5ghz",
-            tooltip: "Stay on 5ghz",
-            selected: false
+            tooltip: "Stay on 5ghz"
           }
         ]
         onToggleAuto: log.push(["toggleAuto"])
@@ -257,29 +256,26 @@ ShellRoot {
         id: dns
         width: parent.width
         pointerGate: gate
+        selectedProvider: "DHCP"
         options: [
           {
             key: "DHCP",
             label: "DHCP",
-            selected: true,
             tooltip: "Use DNS from DHCP"
           },
           {
             key: "Cloudflare",
             label: "Cloudflare",
-            selected: false,
             tooltip: "Set DNS to Cloudflare"
           },
           {
             key: "Google",
             label: "Google",
-            selected: false,
             tooltip: "Set DNS to Google"
           },
           {
             key: "Custom",
             label: "Custom",
-            selected: false,
             tooltip: "Set custom DNS servers"
           }
         ]
@@ -474,6 +470,14 @@ ShellRoot {
     t.equal(t.findChild(dns, "dnsTitle").text, "DNS PROVIDER", "the caption reads DNS PROVIDER")
     pointer.mouseClick(dnsPills[1])
     t.equal(last(), JSON.stringify(["dnsPick", "Cloudflare"]), "clicking Cloudflare emits pick")
+
+    // ---------- A pending (busy) pick ----------
+    dns.selectedProvider = "Cloudflare"
+    dns.pendingProvider = "Cloudflare"
+    t.check(dnsPills[1].selected && dnsPills[1].busy, "a pendingProvider shows chosen and pulsing busy")
+    t.check(!dnsPills[0].busy && !dnsPills[2].busy && !dnsPills[3].busy, "only the pending pill pulses busy")
+    dns.selectedProvider = "DHCP"
+    dns.pendingProvider = ""
 
     // ---------- Pills and the cursor ----------
     t.equal(litOutlines(dns), 0, "no pill outline without the cursor")

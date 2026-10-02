@@ -7,13 +7,30 @@ prompt and enterprise connect, DNS and band selection, the cursor model,
 the bar icon and IPC) and draws an Aranea view, `NetworkDropdown.qml`, in
 place of stock's.
 
-Stock's root code is kept except for three edits: the caption fade animates
+Stock's root code is kept except for four edits: the caption fade animates
 `captionOpacity` instead of stock's caption Text, `updateDetails` ends by
-recording a Link graph sample, and `keyCatcher` names the frame's key
-catcher so stock's prompt-close focus hand-back still resolves. Stock's
-per-row NetworkManager hooks (connect failures, completion checks) and the
-2 s "Wrong password" timer moved from the stock row to the root, and the
-prompt's submit moved there too.
+recording a Link graph sample, `keyCatcher` names the frame's key catcher
+so stock's prompt-close focus hand-back still resolves, and `setDns`
+leaves the dropdown open on a DNS provider pick instead of closing it
+immediately (stock's own behaviour). Stock's per-row NetworkManager hooks
+(connect failures, completion checks) and the 2 s "Wrong password" timer
+moved from the stock row to the root, and the prompt's submit moved there
+too.
+
+Picking a DNS provider (DHCP, Cloudflare, Google) shows it chosen and
+pulsing busy at once (`pendingDnsProvider` / `selectedDnsProvider`, as the
+Power dropdown's profile pills do) instead of closing the dropdown the way
+stock did; the pill settles once `actionProc` exits, to the real provider
+on success. A pick that lands while `actionProc` is already busy (running
+a DNS change or a band pin) queues, the latest replacing any earlier one,
+and runs the moment the current one exits -- the last click wins
+(`actionProcKind` says which of a DNS or band change just finished, since
+the two share one `Process`). Custom still opens the floating terminal and
+closes immediately, since it hands off rather than running a command here.
+The DNS and band pill rows (`dnsRows`, `bandRows`) carry no `selected`
+flag, so `CursorLogic.keepRows` keeps handing back the same array across a
+selection change and their `Repeater`s never rebuild; which pill is chosen
+comes from the view's `selectedDnsProvider`/`bandEffective` instead.
 
 The extras, all hidden when they have nothing to show:
 

@@ -10,8 +10,15 @@ import "../araneadev.shared" as Aranea
 Column {
   id: section
 
-  // The providers: [{key, label, selected, tooltip}].
+  // The providers: [{key, label, tooltip}]. No selected flag -- which one
+  // is chosen comes from selectedProvider instead, so a selection change
+  // alone never rebuilds the pills (their Repeater keeps its delegates).
   property var options: []
+  // The provider the pills show chosen.
+  property string selectedProvider: ""
+  // A provider requested but not yet confirmed (actionProc hasn't exited);
+  // "" for none. The pill with this key pulses busy.
+  property string pendingProvider: ""
   // The keyboard cursor's pill, or -1 when the cursor isn't here.
   property int cursorIndex: -1
   // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from a pill
@@ -49,7 +56,8 @@ Column {
         width: pillRow.cellWidth
         text: modelData.label
         tooltipText: modelData.tooltip || ""
-        selected: !!modelData.selected
+        selected: modelData.key !== undefined && modelData.key === section.selectedProvider
+        busy: section.pendingProvider !== "" && modelData.key === section.pendingProvider
         hasCursor: section.cursorIndex === index
         pointerGate: section.pointerGate
         onClicked: section.pick(modelData.key)
