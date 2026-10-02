@@ -3,9 +3,10 @@
 // the sun's position along its day/night arc, the moon's phase from a known
 // synodic reference (and its Nerd Font glyph), parsing wttr.in's
 // nearest_area and the stock weather.loc file, the place caption shown in
-// the header, and the once-a-day fetch gate for the wttr.in lookup. No QML,
-// no I/O, no `Date.now()` (every date is passed in explicitly); tests
-// /js/clock-logic.test.js runs this under Node.
+// the header, the once-a-day fetch gate for the wttr.in lookup (shared
+// across monitors), the settings write's entry, the action mapping and the
+// showcase relay. No QML, no I/O, no `Date.now()` (every date is passed in
+// explicitly); tests/js/clock-logic.test.js runs this under Node.
 
 /**
  * A day's sunrise and sunset, in minutes after local midnight, or the
@@ -395,6 +396,120 @@ function showcaseCall(opened, json) {
   return { answer: "ok", place: place }
 }
 
+/**
+ * The shell.json write for a dropdown setting (week start, life): the
+ * existing settings with VALUES merged over them, under the bar entry's
+ * id. That id is the host bar widget's moduleName (the bar injects the
+ * entry's own id, "araneadev.clock"); the panel's own moduleName
+ * ("omarchy.clock", kept for IPC) is only the fallback when there is no
+ * host, since the plugin shell refuses a write under any other id.
+ * @param {string|null|undefined} hostId - the host BarWidget's moduleName
+ * @param {string} ownId - the panel's own moduleName
+ * @param {Record<string, *>|null|undefined} settings - the current settings entry
+ * @param {Record<string, *>} values - the keys to write
+ * @returns {{id: string, entry: Record<string, *>}} the id to write under and the entry
+ */
+function persistEntry(hostId, ownId, settings, values) {
+  var id = typeof hostId === "string" && hostId !== "" ? hostId : ownId
+  /** @type {Record<string, *>} */
+  var entry = { id: id }
+  var key
+  if (settings && typeof settings === "object")
+    for (key in settings) if (key !== "id") entry[key] = settings[key]
+  for (key in values) entry[key] = values[key]
+  return { id: id, entry: entry }
+}
+
+/**
+ * Maps a ClockDropdown action (its action signal's name and argument) to
+ * the panel step it runs. A wheel step with no vertical delta (a
+ * horizontal wheel or touchpad side-scroll) does nothing; a positive dy
+ * steps back a month, as in stock. editLife clears with `clear`, else
+ * starts editing unless already editing. lifeCommit carries both field
+ * texts as strings, unparsed (the panel parses them with Model.js).
+ * @param {string} name - the action name
+ * @param {{dy?: number, clear?: boolean, born?: *, liveTo?: *}|null|undefined} arg - the action's argument
+ * @param {boolean} editingLife - whether the life fields are open
+ * @returns {{op: string, delta?: number, born?: string, liveTo?: string}}
+ *   the step: "moveMonth" (with delta), "today", "toggleWeekStart",
+ *   "clearLife", "startEditingLife", "commitLife" (with born and liveTo),
+ *   "cancelEditingLife" or "none"
+ */
+function actionStep(name, arg, editingLife) {
+  if (name === "prevMonth") return { op: "moveMonth", delta: -1 }
+  if (name === "nextMonth") return { op: "moveMonth", delta: 1 }
+  if (name === "today") return { op: "today" }
+  if (name === "toggleWeekStart") return { op: "toggleWeekStart" }
+  if (name === "wheel") {
+    if (!arg || !arg.dy) return { op: "none" }
+    return { op: "moveMonth", delta: arg.dy > 0 ? -1 : 1 }
+  }
+  if (name === "editLife") {
+    if (arg && arg.clear) return { op: "clearLife" }
+    return editingLife ? { op: "none" } : { op: "startEditingLife" }
+  }
+  if (name === "lifeCommit")
+    return {
+      op: "commitLife",
+      born: String(arg && arg.born !== undefined ? arg.born : ""),
+      liveTo: String(arg && arg.liveTo !== undefined ? arg.liveTo : "")
+    }
+  if (name === "lifeCancel") return { op: "cancelEditingLife" }
+  return { op: "none" }
+}
+
+/**
+ * Today's wttr.in place as another instance already holds it (each
+ * monitor's bar hosts its own dropdown): the first peer whose place, with
+ * coordinates, was resolved on TODAYKEY; null when none has one.
+ * @param {Array<{placeDay: string, place: Place|null}|null>|undefined} peers - the other instances
+ * @param {string} todayKey - today's day key, e.g. "2026-10-02"
+ * @returns {Place|null} the shared place, or null
+ */
+function sharedArea(peers, todayKey) {
+  if (!Array.isArray(peers)) return null
+  for (var i = 0; i < peers.length; i++) {
+    var p = peers[i]
+    if (!p || p.placeDay !== todayKey || !p.place) continue
+    if (!isFiniteNumber(p.place.lat) || !isFiniteNumber(p.place.lon)) continue
+    return p.place
+  }
+  return null
+}
+
+/**
+ * What an open does about the wttr.in place, across every instance: none
+ * of it while closed, with a configured location, or once this instance
+ * has looked up (or adopted) today's place; else adopt a peer's place from
+ * today; else fetch. A failed or cancelled lookup resets the instance's
+ * day key, so the next open fetches again (no retry loop).
+ * @param {Place|null|undefined} configured - from `parseWeatherLocation`
+ * @param {string|null|undefined} lastFetchDayKey - this instance's last lookup day, "" for none
+ * @param {Array<{placeDay: string, place: Place|null}|null>|undefined} peers - the other instances
+ * @param {string} todayKey - today's day key
+ * @param {boolean} opened - whether this dropdown is open
+ * @returns {{adopt: Place|null, fetch: boolean}} the place to adopt, or whether to fetch
+ */
+function areaPlan(configured, lastFetchDayKey, peers, todayKey, opened) {
+  if (!shouldFetchArea(configured, lastFetchDayKey, todayKey, opened))
+    return { adopt: null, fetch: false }
+  var shared = sharedArea(peers, todayKey)
+  if (shared) return { adopt: shared, fetch: false }
+  return { adopt: null, fetch: true }
+}
+
+/**
+ * The first item whose dropdown is open: the instance a showcase call
+ * must reach, since the IPC target lands on one instance per screen.
+ * @param {Array<{opened: boolean}|null>|undefined} items - the clock bar widgets
+ * @returns {{opened: boolean}|null} the open one, or null
+ */
+function firstOpen(items) {
+  if (!Array.isArray(items)) return null
+  for (var i = 0; i < items.length; i++) if (items[i] && items[i].opened === true) return items[i]
+  return null
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     sunTimes: sunTimes,
@@ -407,5 +522,10 @@ if (typeof module !== "undefined")
     parseWeatherLocation: parseWeatherLocation,
     placeCaption: placeCaption,
     shouldFetchArea: shouldFetchArea,
-    showcaseCall: showcaseCall
+    showcaseCall: showcaseCall,
+    persistEntry: persistEntry,
+    actionStep: actionStep,
+    sharedArea: sharedArea,
+    areaPlan: areaPlan,
+    firstOpen: firstOpen
   }

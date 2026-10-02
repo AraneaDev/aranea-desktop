@@ -42,6 +42,11 @@ Panel {
   // The identity the bar's popout coordinator tracks: hostWidget when set,
   // else this panel itself.
   readonly property var barIdentity: hostWidget || root
+  // The id the bar entry, the plugin shell and moduleWidgets know this
+  // widget by: the host's moduleName, which the bar sets to the entry's id
+  // ("araneadev.clock"), else this panel's own. moduleName itself stays
+  // "omarchy.clock" for IPC.
+  readonly property string entryId: hostWidget && hostWidget.moduleName ? String(hostWidget.moduleName) : root.moduleName
 
   // ---- Today. SystemClock keeps this honest across midnight so the
   //      highlight rolls over without the panel being reopened.
@@ -134,8 +139,12 @@ Panel {
   // session; null until a lookup succeeds.
   property var wttrPlace: null
   // The day key ("yyyy-MM-dd") of the current or last successful wttr.in
-  // lookup; "" again after a failure, so the next open retries.
+  // lookup (or of a place adopted from another monitor's instance); ""
+  // again after a failed or cancelled lookup, so the next open retries.
   property string areaFetchDay: ""
+  // The day key wttrPlace was resolved on, which the other monitors'
+  // instances read before looking it up themselves (ClockLogic.areaPlan).
+  property string wttrPlaceDay: ""
   // The README capture's stand-in place (the showcase IPC method); null
   // outside a capture, and cleared whenever the dropdown opens or closes.
   property var showcasePlace: null
@@ -294,22 +303,16 @@ Panel {
   // preference rather than doing nothing. The host widget builds its own
   // entry when the label format is cycled, so it has to be kept in step or
   // it would write this key straight back out from a stale copy.
+  // The write goes under entryId (the bar entry's id): the plugin shell
+  // drops a write under any other id.
   function persistSettings(values) {
-    var entry = {
-      id: root.moduleName
-    }
-    for (var existing in root.settings)
-      if (existing !== "id")
-        entry[existing] = root.settings[existing]
-    for (var key in values)
-      entry[key] = values[key]
-
-    root.settings = entry
+    var write = ClockLogic.persistEntry(root.entryId, root.moduleName, root.settings, values)
+    root.settings = write.entry
     if (root.hostWidget && "settings" in root.hostWidget)
-      root.hostWidget.settings = entry
+      root.hostWidget.settings = write.entry
     // qmllint disable missing-property
     if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function")
-      root.bar.shell.updateEntryInline(root.moduleName, entry)
+      root.bar.shell.updateEntryInline(write.id, write.entry)
     // qmllint enable missing-property
   }
 
@@ -374,32 +377,24 @@ Panel {
   }
 
   // Runs a ClockDropdown action (see its action signal) through stock's
-  // functions.
+  // functions, as ClockLogic.actionStep maps it.
   function handleAction(name, arg) {
-    if (name === "prevMonth")
-      root.moveMonth(-1)
-    else if (name === "nextMonth")
-      root.moveMonth(1)
-    else if (name === "today")
+    var step = ClockLogic.actionStep(name, arg, root.editingLife)
+    if (step.op === "moveMonth")
+      root.moveMonth(step.delta)
+    else if (step.op === "today")
       root.goToToday()
-    else if (name === "toggleWeekStart")
+    else if (step.op === "toggleWeekStart")
       root.toggleWeekStart()
-    else if (name === "wheel") {
-      // Horizontal wheels and touchpad side-scrolls report y === 0;
-      // without this they would every one read as "next month".
-      if (!arg || !arg.dy)
-        return
-      root.moveMonth(arg.dy > 0 ? -1 : 1)
-    } else if (name === "editLife") {
-      if (arg && arg.clear)
-        root.clearLife()
-      else if (!root.editingLife)
-        root.startEditingLife()
-    } else if (name === "lifeCommit") {
-      root.lifeBornText = String(arg && arg.born !== undefined ? arg.born : "")
-      root.lifeLiveToText = String(arg && arg.liveTo !== undefined ? arg.liveTo : "")
+    else if (step.op === "clearLife")
+      root.clearLife()
+    else if (step.op === "startEditingLife")
+      root.startEditingLife()
+    else if (step.op === "commitLife") {
+      root.lifeBornText = step.born
+      root.lifeLiveToText = step.liveTo
       root.commitLife()
-    } else if (name === "lifeCancel")
+    } else if (step.op === "cancelEditingLife")
       root.cancelEditingLife()
   }
 
@@ -410,23 +405,50 @@ Panel {
     root.configuredPlace = place && place.lat !== null ? place : null
   }
 
-  // Starts today's wttr.in lookup when ClockLogic.shouldFetchArea allows
-  // it: open, no configured location, not yet looked up today.
+  // The other monitors' instances' wttr.in places ({placeDay, place}):
+  // each bar surface hosts its own clock, and so its own panel.
+  function peerAreas() {
+    // qmllint disable missing-property
+    var hosts = root.bar && typeof root.bar.moduleWidgets === "function" ? root.bar.moduleWidgets(root.entryId) : []
+    var areas = []
+    for (var i = 0; i < hosts.length; i++) {
+      var peer = hosts[i] ? hosts[i].clockPanel : null
+      if (peer && peer !== root)
+        areas.push({
+          placeDay: String(peer.wttrPlaceDay || ""),
+          place: peer.wttrPlace || null
+        })
+    }
+    // qmllint enable missing-property
+    return areas
+  }
+
+  // On open, as ClockLogic.areaPlan decides across every monitor: adopts
+  // the place another instance looked up today, else starts today's
+  // lookup (open, no configured location, not yet looked up today).
   function maybeFetchArea() {
     var day = Model.keyForDate(new Date())
-    if (areaProc.running || !ClockLogic.shouldFetchArea(root.configuredPlace, root.areaFetchDay, day, root.opened))
+    if (areaProc.running)
       return
-    root.areaFetchDay = day
-    areaProc.running = true
+    var plan = ClockLogic.areaPlan(root.configuredPlace, root.areaFetchDay, root.peerAreas(), day, root.opened)
+    if (plan.adopt) {
+      root.wttrPlace = plan.adopt
+      root.wttrPlaceDay = day
+      root.areaFetchDay = day
+    } else if (plan.fetch) {
+      root.areaFetchDay = day
+      areaProc.running = true
+    }
   }
 
   // Takes a wttr.in response: the place on success, else clears the day
   // key so the next open tries again (no retry loop).
   function applyArea(text) {
     var place = ClockLogic.parseWttrArea(text)
-    if (place)
+    if (place) {
       root.wttrPlace = place
-    else
+      root.wttrPlaceDay = root.areaFetchDay
+    } else
       root.areaFetchDay = ""
   }
 
@@ -456,7 +478,8 @@ Panel {
 
   // The stand-in place never carries over into an open or past a close; an
   // open redraws the sky for now and may start today's lookup, and a close
-  // stops a lookup still running.
+  // stops a lookup still running and clears its day key, so the next open
+  // tries again.
   Connections {
     target: root
     function onOpenedChanged() {
@@ -467,6 +490,7 @@ Panel {
         root.maybeFetchArea()
       } else if (areaProc.running) {
         areaProc.running = false
+        root.areaFetchDay = ""
       }
     }
   }

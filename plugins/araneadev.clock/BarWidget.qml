@@ -1,7 +1,8 @@
 // Aranea Clock (araneadev.clock, cloned from omarchy.clock): the bar's
 // date/time label and the host for the calendar dropdown. Stock's root
-// logic, label markup and IPC target stay; the one addition is the
-// showcase IPC method, forwarded to the dropdown for README captures.
+// logic, label markup and IPC target stay. Added: the showcase IPC method,
+// relayed to whichever instance's dropdown is open for README captures,
+// and clockPanel, through which the instances share one wttr.in lookup.
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
@@ -9,6 +10,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "ClockLogic.js" as ClockLogic
 
 // Date/time label for the bar, and the host for the calendar popup.
 //
@@ -104,9 +106,25 @@ BarWidget {
     // qmllint enable missing-property
   }
 
-  // Forwards the showcase IPC method's stand-in place to the popup; "closed"
-  // before it has loaded.
+  // This instance's loaded Panel.qml, or null; the other monitors'
+  // panels read its wttr.in place through it (Panel.peerAreas).
+  readonly property var clockPanel: panelLoader.item
+
+  // The showcase IPC method: the IPC target lands on one instance, while
+  // the dropdown may be open on another monitor's, so the stand-in place
+  // goes to whichever instance is open (ClockLogic.firstOpen); "closed"
+  // when none is.
   function showcase(placeJson) {
+    // qmllint disable missing-property
+    var items = root.bar && typeof root.bar.moduleWidgets === "function" ? root.bar.moduleWidgets(root.moduleName) : []
+    // qmllint enable missing-property
+    var open = ClockLogic.firstOpen(items.length > 0 ? items : [root])
+    return open && typeof open.showcaseHere === "function" ? open.showcaseHere(placeJson) : "closed"
+  }
+
+  // Hands the stand-in place to this instance's popup; "closed" before it
+  // has loaded.
+  function showcaseHere(placeJson) {
     // qmllint disable missing-property
     if (panelLoader.item && typeof panelLoader.item.showcase === "function")
       return panelLoader.item.showcase(placeJson)

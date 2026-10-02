@@ -417,3 +417,157 @@ test("showcaseCall: refuses a place without a name or coordinates, or out of ran
   assert.deepEqual(logic.showcaseCall(true, '{"name":"X","latitude":91,"longitude":4.9}'), invalid)
   assert.deepEqual(logic.showcaseCall(true, '{"name":"X","latitude":52,"longitude":181}'), invalid)
 })
+
+// --- persistEntry (C1: the write goes to the bar entry's id) ------------------------
+
+test("persistEntry: writes under the host widget's id (the bar entry), not the panel's", () => {
+  const r = logic.persistEntry(
+    "araneadev.clock",
+    "omarchy.clock",
+    { id: "omarchy.clock", format: "HH:mm" },
+    { weekStartDay: "sunday" }
+  )
+  assert.equal(r.id, "araneadev.clock")
+  assert.deepEqual(r.entry, { id: "araneadev.clock", format: "HH:mm", weekStartDay: "sunday" })
+})
+
+test("persistEntry: falls back to the panel's own id without a host id", () => {
+  assert.equal(logic.persistEntry("", "omarchy.clock", {}, {}).id, "omarchy.clock")
+  assert.equal(
+    logic.persistEntry(undefined, "omarchy.clock", null, { birthYear: 0 }).id,
+    "omarchy.clock"
+  )
+  assert.deepEqual(logic.persistEntry(null, "omarchy.clock", undefined, { birthYear: 0 }).entry, {
+    id: "omarchy.clock",
+    birthYear: 0
+  })
+})
+
+test("persistEntry: new values win over the existing settings, which stay otherwise", () => {
+  const r = logic.persistEntry(
+    "araneadev.clock",
+    "omarchy.clock",
+    { birthYear: 1990, lifeExpectancy: 80 },
+    { birthYear: 1991, lifeExpectancy: 85 }
+  )
+  assert.deepEqual(r.entry, { id: "araneadev.clock", birthYear: 1991, lifeExpectancy: 85 })
+})
+
+// --- actionStep (the dropdown's action names mapped to the panel's steps) ----------
+
+test("actionStep: chevrons and Back to today", () => {
+  assert.deepEqual(logic.actionStep("prevMonth", {}, false), { op: "moveMonth", delta: -1 })
+  assert.deepEqual(logic.actionStep("nextMonth", {}, false), { op: "moveMonth", delta: 1 })
+  assert.deepEqual(logic.actionStep("today", {}, false), { op: "today" })
+  assert.deepEqual(logic.actionStep("toggleWeekStart", {}, false), { op: "toggleWeekStart" })
+})
+
+test("actionStep: the wheel steps back on a positive dy, forward on a negative, not at all on 0", () => {
+  assert.deepEqual(logic.actionStep("wheel", { dy: 120 }, false), { op: "moveMonth", delta: -1 })
+  assert.deepEqual(logic.actionStep("wheel", { dy: -120 }, false), { op: "moveMonth", delta: 1 })
+  assert.deepEqual(logic.actionStep("wheel", { dy: 0 }, false), { op: "none" })
+  assert.deepEqual(logic.actionStep("wheel", null, false), { op: "none" })
+})
+
+test("actionStep: editLife clears with clear, starts editing otherwise, and not twice", () => {
+  assert.deepEqual(logic.actionStep("editLife", { clear: true }, false), { op: "clearLife" })
+  assert.deepEqual(logic.actionStep("editLife", { clear: true }, true), { op: "clearLife" })
+  assert.deepEqual(logic.actionStep("editLife", { clear: false }, false), {
+    op: "startEditingLife"
+  })
+  assert.deepEqual(logic.actionStep("editLife", undefined, false), { op: "startEditingLife" })
+  assert.deepEqual(logic.actionStep("editLife", { clear: false }, true), { op: "none" })
+})
+
+test("actionStep: lifeCommit carries both texts as strings, missing ones empty", () => {
+  assert.deepEqual(logic.actionStep("lifeCommit", { born: 1990, liveTo: "85" }, true), {
+    op: "commitLife",
+    born: "1990",
+    liveTo: "85"
+  })
+  assert.deepEqual(logic.actionStep("lifeCommit", { born: "1990" }, true), {
+    op: "commitLife",
+    born: "1990",
+    liveTo: ""
+  })
+  assert.deepEqual(logic.actionStep("lifeCommit", null, true), {
+    op: "commitLife",
+    born: "",
+    liveTo: ""
+  })
+})
+
+test("actionStep: lifeCancel cancels; an unknown name does nothing", () => {
+  assert.deepEqual(logic.actionStep("lifeCancel", {}, true), { op: "cancelEditingLife" })
+  assert.deepEqual(logic.actionStep("bogus", {}, false), { op: "none" })
+})
+
+// --- sharedArea / areaPlan (C2: one wttr.in lookup a day across every monitor) ------
+
+const ams = { name: "Amsterdam", lat: 52.37, lon: 4.9 }
+
+test("sharedArea: a peer's place from today counts; yesterday's, a missing one or a bad list do not", () => {
+  assert.deepEqual(logic.sharedArea([{ placeDay: "2026-10-02", place: ams }], "2026-10-02"), ams)
+  assert.equal(logic.sharedArea([{ placeDay: "2026-10-01", place: ams }], "2026-10-02"), null)
+  assert.equal(logic.sharedArea([{ placeDay: "2026-10-02", place: null }], "2026-10-02"), null)
+  assert.equal(
+    logic.sharedArea(
+      [null, { placeDay: "2026-10-02", place: { name: "X", lat: null, lon: null } }],
+      "2026-10-02"
+    ),
+    null
+  )
+  assert.equal(logic.sharedArea(undefined, "2026-10-02"), null)
+  assert.deepEqual(
+    logic.sharedArea(
+      [
+        { placeDay: "2026-10-01", place: ams },
+        { placeDay: "2026-10-02", place: ams }
+      ],
+      "2026-10-02"
+    ),
+    ams
+  )
+})
+
+test("areaPlan: never while closed, never when configured, never twice a day", () => {
+  const none = { adopt: null, fetch: false }
+  assert.deepEqual(logic.areaPlan(null, "", [], "2026-10-02", false), none)
+  assert.deepEqual(
+    logic.areaPlan({ name: "Home", lat: 1, lon: 2 }, "", [], "2026-10-02", true),
+    none
+  )
+  assert.deepEqual(logic.areaPlan(null, "2026-10-02", [], "2026-10-02", true), none)
+})
+
+test("areaPlan: the first open of the day fetches; a failed or cancelled one (day reset) fetches again", () => {
+  assert.deepEqual(logic.areaPlan(null, "", [], "2026-10-02", true), { adopt: null, fetch: true })
+  assert.deepEqual(logic.areaPlan(null, "2026-10-01", [], "2026-10-02", true), {
+    adopt: null,
+    fetch: true
+  })
+})
+
+test("areaPlan: two instances share one lookup - the second adopts the first's place", () => {
+  const first = logic.areaPlan(null, "", [{ placeDay: "", place: null }], "2026-10-02", true)
+  assert.deepEqual(first, { adopt: null, fetch: true })
+  // The first instance's lookup succeeded: it now holds today's place.
+  const second = logic.areaPlan(
+    null,
+    "",
+    [{ placeDay: "2026-10-02", place: ams }],
+    "2026-10-02",
+    true
+  )
+  assert.deepEqual(second, { adopt: ams, fetch: false })
+})
+
+// --- firstOpen (the showcase reaches the instance whose dropdown is open) -----------
+
+test("firstOpen: the first item whose dropdown is open, else null", () => {
+  const a = { opened: false }
+  const b = { opened: true }
+  assert.equal(logic.firstOpen([a, b]), b)
+  assert.equal(logic.firstOpen([a, null]), null)
+  assert.equal(logic.firstOpen(undefined), null)
+})
