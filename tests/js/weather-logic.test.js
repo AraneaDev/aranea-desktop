@@ -224,28 +224,53 @@ test("parseAir reads a non-numeric field as null for that field only", () => {
 
 // --- rainSoon --------------------------------------------------------------------
 
-test("rainSoon: the slot containing now already above threshold reads 'Raining now'", () => {
+// open-meteo's minutely_15 precipitation is the sum over the PRECEDING 15
+// minutes: the slot stamped T covers (T-15, T].
+
+test("rainSoon: the slot containing now (the first stamped after now) above threshold reads 'Raining now'", () => {
+  const minutely = {
+    time: ["2026-10-02T20:00", "2026-10-02T20:15", "2026-10-02T20:30"],
+    precip: [0.0, 0.2, 0.0]
+  }
+  // 20:05 is inside (20:00, 20:15].
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:05"), "Raining now")
+})
+
+test("rainSoon: the slot that just ended (latest stamped at or before now) above threshold reads 'Raining now'", () => {
   const minutely = {
     time: ["2026-10-02T20:00", "2026-10-02T20:15", "2026-10-02T20:30"],
     precip: [0.2, 0.0, 0.0]
   }
   assert.equal(logic.rainSoon(minutely, "2026-10-02T20:05"), "Raining now")
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:00"), "Raining now")
 })
 
 test("rainSoon: exactly the 0.1mm threshold does not count as rain", () => {
-  const minutely = { time: ["2026-10-02T20:00"], precip: [0.1] }
-  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:00"), "Dry for the next 3 h")
+  const minutely = { time: ["2026-10-02T20:00", "2026-10-02T20:15"], precip: [0.1, 0.1] }
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:05"), "Dry for the next 3 h")
 })
 
-test("rainSoon: the first later slot above threshold gives the rounded minutes, floored at 5", () => {
+test("rainSoon: a later wet slot counts the minutes to its start (T-15), rounded to 5, at least 5", () => {
   const minutely = {
-    time: ["2026-10-02T20:00", "2026-10-02T20:15", "2026-10-02T20:30"],
-    precip: [0.0, 0.2, 0.2]
+    time: ["2026-10-02T20:00", "2026-10-02T20:15", "2026-10-02T20:30", "2026-10-02T20:45"],
+    precip: [0.0, 0.0, 0.0, 0.2]
   }
-  // 20:03 -> 20:15 is 12 minutes away; round(12/5)*5 = 10.
-  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:03"), "Rain in ~10 min")
-  // 20:13 -> 20:15 is 2 minutes away; round(2/5)*5 = 0, floored to 5.
-  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:13"), "Rain in ~5 min")
+  // The 20:45 slot starts at 20:30: from 20:03 that is 27 minutes, ~25.
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:03"), "Rain in ~25 min")
+  // From 20:13 it is 17 minutes, ~15.
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:13"), "Rain in ~15 min")
+  // The 20:30 slot wet from 20:13: starts 20:15, 2 minutes away, floored to 5.
+  const soon = { time: minutely.time, precip: [0.0, 0.0, 0.2, 0.0] }
+  assert.equal(logic.rainSoon(soon, "2026-10-02T20:13"), "Rain in ~5 min")
+})
+
+test("rainSoon: a wet slot whose start is already reached reads 'Raining now'", () => {
+  // Now before the first slot's own window: the 20:00 slot starts at
+  // 19:45, which now (19:50) is already past.
+  const minutely = { time: ["2026-10-02T20:00", "2026-10-02T20:15"], precip: [0.2, 0.0] }
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T19:50"), "Raining now")
+  // From 19:30 it starts 15 minutes away.
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T19:30"), "Rain in ~15 min")
 })
 
 test("rainSoon: nothing above threshold in the window reads 'Dry for the next 3 h'", () => {
@@ -256,9 +281,18 @@ test("rainSoon: nothing above threshold in the window reads 'Dry for the next 3 
   assert.equal(logic.rainSoon(minutely, "2026-10-02T20:00"), "Dry for the next 3 h")
 })
 
-test("rainSoon: now before every slot still finds a later slot above threshold", () => {
-  const minutely = { time: ["2026-10-02T20:00", "2026-10-02T20:15"], precip: [0.2, 0.0] }
-  assert.equal(logic.rainSoon(minutely, "2026-10-02T19:45"), "Rain in ~15 min")
+test("rainSoon: stale data (now at or past the last slot's end) reads '', neither dry nor raining", () => {
+  const minutely = { time: ["2026-10-02T20:00", "2026-10-02T20:15"], precip: [0.0, 0.5] }
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:15"), "")
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T21:00"), "")
+})
+
+test("rainSoon: unparseable slot times are skipped", () => {
+  const minutely = {
+    time: ["2026-10-02T20:00", "bad", "2026-10-02T20:30"],
+    precip: [0.0, 0.5, 0.5]
+  }
+  assert.equal(logic.rainSoon(minutely, "2026-10-02T20:05"), "Rain in ~10 min")
 })
 
 test("rainSoon: missing, empty or malformed minutely data reads '', never throwing", () => {
@@ -397,10 +431,12 @@ test("hourlyPoints: normalises temperature 0..1 against the window's own min/max
     { x: 0.5, y: (16.0 - 16.0) / (19.0 - 16.0) },
     { x: 1, y: (19.0 - 16.0) / (19.0 - 16.0) }
   ])
+  // Preceding-hour values: the bar under 20:00 is 21:00's 100 %, under
+  // 21:00 is 22:00's 10 %, and past the series' end it is 0.
   assert.deepEqual(r.rain, [
-    { x: 0, h: 0.5 },
-    { x: 0.5, h: 1 },
-    { x: 1, h: 0.1 }
+    { x: 0, h: 1 },
+    { x: 0.5, h: 0.1 },
+    { x: 1, h: 0 }
   ])
 })
 
@@ -757,4 +793,20 @@ test("saveEnds: a response ends the pending place only after omarchy-weather-loc
   assert.equal(logic.saveEnds(true, true, false), true)
   assert.equal(logic.saveEnds(true, false, false), false)
   assert.equal(logic.saveEnds(false, true, false), false)
+})
+
+test("airView: bands the rounded value the chip shows (UV 2.6, 5.6, 10.5; AQI 19.6, 39.5)", () => {
+  assert.equal(logic.airView({ aqi: null, uv: 2.6 }).uv.text, "UV 3 · Moderate")
+  assert.equal(logic.airView({ aqi: null, uv: 5.6 }).uv.text, "UV 6 · High")
+  assert.equal(logic.airView({ aqi: null, uv: 10.5 }).uv.text, "UV 11 · Extreme")
+  assert.deepEqual(logic.airView({ aqi: 19.6, uv: null }).aqi, {
+    visible: true,
+    text: "AQI 20 · Fair",
+    tone: "good"
+  })
+  assert.deepEqual(logic.airView({ aqi: 39.5, uv: null }).aqi, {
+    visible: true,
+    text: "AQI 40 · Moderate",
+    tone: "plain"
+  })
 })

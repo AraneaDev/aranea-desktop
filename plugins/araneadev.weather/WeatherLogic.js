@@ -283,13 +283,20 @@ function latestIndexAtOrBefore(times, ms) {
   return idx
 }
 
+var SLOT_MS = 15 * 60000
+
 /**
- * The "rain soon" line from the minutely-15 precipitation trace: "Raining
- * now" when the slot containing `nowIso` already exceeds the 0.1mm
- * threshold, else the first later slot that does ("Rain in ~N min", N
- * rounded to the nearest 5 minutes, floored at 5), else "Dry for the next
- * 3 h". Missing or empty minutely data, or an unparseable `nowIso`, reads
- * "" (hides the row) rather than throwing.
+ * The "rain soon" line from the minutely-15 precipitation trace.
+ * open-meteo's `minutely_15` precipitation is the sum over the PRECEDING 15
+ * minutes: the slot stamped T covers (T-15, T]. So the slot containing now
+ * is the first one stamped after now, and the slot just ended is the latest
+ * one stamped at or before now. "Raining now" when either exceeds the 0.1mm
+ * threshold; else the first later wet slot, N minutes from now to its start
+ * (T-15), rounded to the nearest 5 and at least 5 ("Rain in ~N min"; a
+ * start already reached reads "Raining now"); else "Dry for the next 3 h".
+ * Missing or empty minutely data, an unparseable `nowIso`, or a now at or
+ * past the last slot's end (stale data) reads "" (hides the row) rather
+ * than claiming dry or raining.
  * @param {MinutelySeries|null|undefined} minutely - from `parseOpenMeteo`
  * @param {string} nowIso - the current instant in the forecast LOCATION's
  *   local time, from `nowIsoAt(Date.now(), report.utcOffsetSeconds)`; never
@@ -305,18 +312,34 @@ function rainSoon(minutely, nowIso) {
   var nowMs = parseLocalIso(nowIso)
   if (!isFiniteNumber(nowMs)) return ""
 
-  var currentIdx = latestIndexAtOrBefore(times, nowMs)
-  if (currentIdx >= 0) {
-    var currentPrecip = Number(precip[currentIdx])
-    if (isFiniteNumber(currentPrecip) && currentPrecip > 0.1) return "Raining now"
+  var endedIdx = latestIndexAtOrBefore(times, nowMs)
+  var nextIdx = -1
+  for (var i = endedIdx + 1; i < times.length; i++) {
+    if (isFiniteNumber(parseLocalIso(times[i]))) {
+      nextIdx = i
+      break
+    }
   }
+  // Stale: every slot has ended, so nothing is known about now or later.
+  if (nextIdx < 0) return ""
 
-  for (var j = currentIdx + 1; j < times.length; j++) {
-    var p = Number(precip[j])
-    if (!isFiniteNumber(p) || p <= 0.1) continue
+  /**
+   * Whether slot IDX's precipitation is above the 0.1mm threshold.
+   * @param {number} idx - the slot's index
+   * @returns {boolean} true when it rains in that slot
+   */
+  var wet = function (idx) {
+    var p = Number(precip[idx])
+    return isFiniteNumber(p) && p > 0.1
+  }
+  if (endedIdx >= 0 && wet(endedIdx)) return "Raining now"
+
+  for (var j = nextIdx; j < times.length; j++) {
+    if (!wet(j)) continue
     var slotMs = parseLocalIso(times[j])
     if (!isFiniteNumber(slotMs)) continue
-    var minutes = Math.round((slotMs - nowMs) / 60000)
+    var minutes = (slotMs - SLOT_MS - nowMs) / 60000
+    if (minutes <= 0) return "Raining now"
     var rounded = Math.round(minutes / 5) * 5
     if (rounded < 5) rounded = 5
     return "Rain in ~" + rounded + " min"
@@ -419,7 +442,9 @@ function uvBand(n) {
  * hourly slot containing `nowIso` and running for up to `slots` hours:
  * temperature points normalised 0..1 against the selected window's own
  * min/max (a flat window reads 0.5 throughout), and rain-chance bars
- * normalised from the 0-100 percent probability. `min`/`max`/`now` carry
+ * normalised from the 0-100 percent probability. open-meteo's hourly
+ * `precipitation_probability` describes the PRECEDING hour, so the bar
+ * under each hour takes the next slot's value (0 past the series' end). `min`/`max`/`now` carry
  * the actual degree values for the caption. Missing hourly data, an
  * unparseable `nowIso`, or no slot at or before it gives the empty shape
  * (hides the section) rather than throwing.
@@ -467,7 +492,9 @@ function hourlyPoints(hourly, nowIso, slots) {
     var x = n > 1 ? j / (n - 1) : 0
     var t = Number(temps[idx])
     if (isFiniteNumber(t)) temp.push({ x: x, y: span > 0 ? (t - min) / span : 0.5 })
-    var r = Number(rainProb[idx])
+    // precipitation_probability is a preceding-hour value: the hour from
+    // this slot onward is reported at the next slot.
+    var r = Number(rainProb[idx + 1])
     var h = isFiniteNumber(r) ? Math.max(0, Math.min(1, r / 100)) : 0
     rain.push({ x: x, h: h })
   }
@@ -797,23 +824,27 @@ function suggestionAt(suggestions, index, key) {
 
 /**
  * The view's air part from `parseAir`'s reading: an AQI chip ("AQI 53 ·
- * Fair", toned) and a UV chip ("UV 5 · Moderate"), each hidden without its
- * value; both hidden when the air request failed (null).
+ * Fair", toned) and a UV chip ("UV 5 · Moderate"), each banded on the
+ * rounded value it shows and hidden without its value; both hidden when
+ * the air request failed (null).
  * @param {ParsedAir|null|undefined} air - from `parseAir`
  * @returns {{aqi: {visible: boolean, text: string, tone: string}, uv: {visible: boolean, text: string}}} the chips
  */
 function airView(air) {
-  var aqi = air ? aqiBand(air.aqi) : null
-  var uv = air ? uvBand(air.uv) : null
+  // Banded on the rounded value the chip shows, so "UV 3" never reads Low.
+  var aqiValue = air && isFiniteNumber(air.aqi) ? Math.round(air.aqi) : null
+  var uvValue = air && isFiniteNumber(air.uv) ? Math.round(air.uv) : null
+  var aqi = aqiValue === null ? null : aqiBand(aqiValue)
+  var uv = uvValue === null ? null : uvBand(uvValue)
   return {
     aqi: {
       visible: !!aqi,
-      text: aqi && air ? "AQI " + Math.round(Number(air.aqi)) + " · " + aqi.label : "",
+      text: aqi ? "AQI " + aqiValue + " · " + aqi.label : "",
       tone: aqi ? aqi.tone : "plain"
     },
     uv: {
       visible: !!uv,
-      text: uv && air ? "UV " + Math.round(Number(air.uv)) + " · " + uv.label : ""
+      text: uv ? "UV " + uvValue + " · " + uv.label : ""
     }
   }
 }
