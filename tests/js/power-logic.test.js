@@ -123,6 +123,51 @@ test("parseHistory on invalid input never throws, and gives []", () => {
 const NOW = 200000
 const WINDOW_START = NOW - 86400
 
+// --- historyWindowStart --------------------------------------------------------------
+
+test("historyWindowStart: empty samples give the usual 24h window", () => {
+  assert.equal(logic.historyWindowStart([], NOW), WINDOW_START)
+  assert.equal(logic.historyWindowStart(undefined, NOW), WINDOW_START)
+})
+
+test("historyWindowStart: history shorter than 24h (but more than 1h) starts at the first sample", () => {
+  const samples = [
+    { t: NOW - 10000, pct: 80, state: 1 },
+    { t: NOW - 5000, pct: 90, state: 1 }
+  ]
+  assert.equal(logic.historyWindowStart(samples, NOW), NOW - 10000)
+})
+
+test("historyWindowStart: history shorter than 1h clamps the window to 1h", () => {
+  const samples = [{ t: NOW - 200, pct: 95, state: 1 }]
+  assert.equal(logic.historyWindowStart(samples, NOW), NOW - 3600)
+})
+
+test("historyWindowStart: a full 24h of history (or more) keeps the usual window", () => {
+  assert.equal(
+    logic.historyWindowStart([{ t: WINDOW_START, pct: 10, state: 1 }], NOW),
+    WINDOW_START
+  )
+})
+
+test("historyWindowStart: a clip sample older than 24h still keeps the usual 24h window", () => {
+  const samples = [
+    { t: WINDOW_START - 100000, pct: 10, state: 1 },
+    { t: NOW - 1000, pct: 90, state: 1 }
+  ]
+  assert.equal(logic.historyWindowStart(samples, NOW), WINDOW_START)
+})
+
+test("historyWindowStart: picks the earliest sample regardless of order, and skips malformed entries", () => {
+  const samples = [
+    { t: NOW - 5000, pct: 90, state: 1 },
+    null,
+    { t: "nope", pct: 0, state: 1 },
+    { t: NOW - 10000, pct: 80, state: 1 }
+  ]
+  assert.equal(logic.historyWindowStart(samples, NOW), NOW - 10000)
+})
+
 test("historyPoints: consecutive samples within 1800s stay in one segment, tail held to now", () => {
   const samples = [
     { t: WINDOW_START + 100, pct: 50, state: 1 },
@@ -287,6 +332,44 @@ test("historyPoints tolerates samples given out of order, tail held to now", () 
       { x: 86400, y: 40 }
     ]
   ])
+})
+
+test("historyPoints: a given windowStart narrower than 24h fills the width, first point at x=0", () => {
+  const start = NOW - 10000
+  const samples = [
+    { t: start + 100, pct: 80, state: 1 },
+    { t: start + 200, pct: 90, state: 1 }
+  ]
+  assert.deepEqual(logic.historyPoints(samples, NOW, 10000, 100, start), [
+    [
+      { x: 100, y: 20 },
+      { x: 200, y: 10 },
+      { x: 10000, y: 10 }
+    ]
+  ])
+})
+
+test("historyPoints: a given windowStart still clips an earlier sample to x=0", () => {
+  const start = NOW - 10000
+  const samples = [
+    { t: start - 5000, pct: 60, state: 1 },
+    { t: start + 300, pct: 70, state: 1 }
+  ]
+  assert.deepEqual(logic.historyPoints(samples, NOW, 10000, 100, start), [
+    [
+      { x: 0, y: 40 },
+      { x: 300, y: 30 },
+      { x: 10000, y: 30 }
+    ]
+  ])
+})
+
+test("historyPoints: omitting windowStart defaults to the usual 24h window", () => {
+  const samples = [{ t: WINDOW_START + 500, pct: 77, state: 1 }]
+  assert.deepEqual(
+    logic.historyPoints(samples, NOW, 86400, 100),
+    logic.historyPoints(samples, NOW, 86400, 100, WINDOW_START)
+  )
 })
 
 // --- historySummary ----------------------------------------------------------------

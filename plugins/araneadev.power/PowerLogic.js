@@ -80,14 +80,38 @@ function parseHistory(json) {
 }
 
 /**
- * Builds the 24h history chart's polyline segments over the window
- * `[nowSec-86400, nowSec]`. Samples after `nowSec` are dropped. A sample
- * before the window is clipped to a single start point at `x=0`, carrying
- * the last (most recent) such sample's percentage, as if it were sampled
- * exactly at the window's start (so a short gap to the first in-window
- * sample doesn't wrongly split the line). A new segment starts whenever two
- * consecutive points (after clipping) are more than 1800s apart, so one
- * sample alone gives a single, single-point segment.
+ * The history chart's window start, for a history shorter than 24h: the
+ * first sample's time, clamped to at least 1h before `nowSec` (so the
+ * window is never narrower than that) and to at most 24h before `nowSec`
+ * (so a sample older than the 24h window, or a full 24h of history, keeps
+ * the usual 24h window). With no samples, the window is the usual 24h.
+ * @param {HistorySample[]|undefined} samples - from `parseHistory`
+ * @param {number} nowSec - the current time, in epoch seconds
+ * @returns {number} the window's start, in epoch seconds
+ */
+function historyWindowStart(samples, nowSec) {
+  var list = Array.isArray(samples) ? samples : []
+  var firstT = null
+  for (var i = 0; i < list.length; i++) {
+    var s = list[i]
+    if (!s || typeof s.t !== "number" || !isFinite(s.t)) continue
+    if (firstT === null || s.t < firstT) firstT = s.t
+  }
+  if (firstT === null) return nowSec - 86400
+  return Math.max(nowSec - 86400, Math.min(firstT, nowSec - 3600))
+}
+
+/**
+ * Builds the history chart's polyline segments over the window
+ * `[windowStart, nowSec]` (`nowSec-86400` by default, the usual 24h
+ * window; pass `historyWindowStart`'s result to fit a shorter history).
+ * Samples after `nowSec` are dropped. A sample before the window is clipped
+ * to a single start point at `x=0`, carrying the last (most recent) such
+ * sample's percentage, as if it were sampled exactly at the window's start
+ * (so a short gap to the first in-window sample doesn't wrongly split the
+ * line). A new segment starts whenever two consecutive points (after
+ * clipping) are more than 1800s apart, so one sample alone gives a single,
+ * single-point segment.
  *
  * UPower only writes a history sample when the value changes, so after a
  * long steady stretch (for example, hours at 100%) the last sample can sit
@@ -101,11 +125,16 @@ function parseHistory(json) {
  * @param {number} nowSec - the current time, in epoch seconds
  * @param {number} width - the chart's pixel width
  * @param {number} height - the chart's pixel height
+ * @param {number} [windowStart] - the window's start, in epoch seconds
+ *   (default `nowSec-86400`)
  * @returns {ChartPoint[][]} the polyline segments, oldest first within each
  */
-function historyPoints(samples, nowSec, width, height) {
+function historyPoints(samples, nowSec, width, height, windowStart) {
   var list = Array.isArray(samples) ? samples.slice() : []
-  var windowStart = nowSec - 86400
+  var start =
+    typeof windowStart === "number" && isFinite(windowStart) ? windowStart : nowSec - 86400
+  var span = nowSec - start
+  if (!(span > 0)) span = 86400
 
   var valid = []
   for (var i = 0; i < list.length; i++) {
@@ -121,7 +150,7 @@ function historyPoints(samples, nowSec, width, height) {
   var inWindow = []
   for (var j = 0; j < valid.length; j++) {
     var sample = valid[j]
-    if (sample.t <= windowStart) {
+    if (sample.t <= start) {
       if (!before || sample.t > before.t) before = sample
     } else {
       inWindow.push(sample)
@@ -130,7 +159,7 @@ function historyPoints(samples, nowSec, width, height) {
 
   /** @type {{t: number, pct: number}[]} */
   var points = []
-  if (before) points.push({ t: windowStart, pct: before.pct })
+  if (before) points.push({ t: start, pct: before.pct })
   for (var k = 0; k < inWindow.length; k++) points.push({ t: inWindow[k].t, pct: inWindow[k].pct })
 
   if (points.length === 0) return []
@@ -147,7 +176,7 @@ function historyPoints(samples, nowSec, width, height) {
       current = []
     }
     current.push({
-      x: ((point.t - windowStart) * width) / 86400,
+      x: ((point.t - start) * width) / span,
       y: height - (point.pct * height) / 100
     })
     prevT = point.t
@@ -307,6 +336,7 @@ if (typeof module !== "undefined")
   module.exports = {
     batteryPath: batteryPath,
     parseHistory: parseHistory,
+    historyWindowStart: historyWindowStart,
     historyPoints: historyPoints,
     historySummary: historySummary,
     timeLabel: timeLabel,

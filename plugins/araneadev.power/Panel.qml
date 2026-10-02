@@ -226,6 +226,11 @@ Panel {
     return text !== "" ? text : String(nowPercent)
   }
 
+  // The history chart's window start (PowerLogic.historyWindowStart): the
+  // first sample's time when the history is shorter than 24h (at least 1h),
+  // else the usual 24h-ago mark; `nowSec-86400` before the first read.
+  readonly property real historyWindowStart: historyNowSec > 0 ? PowerLogic.historyWindowStart(historySamples, historyNowSec) : 0
+
   // The view object PowerDropdown draws (its documented shape). Fast
   // changers (the status fade, history segments, draw samples) are separate.
   readonly property var powerView: ({
@@ -239,7 +244,7 @@ Panel {
       history: {
         visible: historySamples.length > 0,
         summary: PowerLogic.historySummary(historySamples, nowPercent),
-        startLabel: historyNowSec > 0 ? PowerLogic.timeLabel(historyNowSec - 86400, historyNowSec) : ""
+        startLabel: historyNowSec > 0 ? PowerLogic.timeLabel(historyWindowStart, historyNowSec) : ""
       },
       draw: {
         visible: drawFlowing,
@@ -256,7 +261,7 @@ Panel {
 
   // The history's polyline segments in unit coordinates
   // (PowerLogic.historyPoints); the view scales them.
-  readonly property var historySegments: PowerLogic.historyPoints(historySamples, historyNowSec, 1, 1)
+  readonly property var historySegments: PowerLogic.historyPoints(historySamples, historyNowSec, 1, 1, historyWindowStart)
 
   // Starts the battery and profiles processes when a battery is present
   // and they aren't already running.
