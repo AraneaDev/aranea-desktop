@@ -7,10 +7,10 @@ var DISK_CLEAR = 88
 var LOOP_EXITS = 3
 var LOOP_WINDOW_MS = 5 * 60 * 1000
 
-var GLYPH_UNIT = "󰒓"
-var GLYPH_DISK = "󰋊"
-var GLYPH_REBOOT = "󰜉"
-var GLYPH_CONTAINER = "󰡨"
+var GLYPH_UNIT = String.fromCodePoint(0xf0493)
+var GLYPH_DISK = String.fromCodePoint(0xf02ca)
+var GLYPH_REBOOT = String.fromCodePoint(0xf0709)
+var GLYPH_CONTAINER = String.fromCodePoint(0xf0868)
 
 /* @aranea-facade-start: plugins/araneadev.health/HealthPresentation.js */
 // Presentation helpers for health problem rows.
@@ -32,7 +32,75 @@ function humanBytes(n) {
   return text + " " + units[i]
 }
 
-if (typeof module !== "undefined") module.exports = { humanBytes: humanBytes }
+/**
+ * The key a dropdown row is followed and acted on by: the problem's id,
+ * falling back to its text when it has none.
+ * @param {?{key?: *, summary?: *}} row - a dropdown row
+ * @returns {string} the id, else the summary, else ""
+ */
+function problemKey(row) {
+  if (!row) return ""
+  if (typeof row.key === "string" && row.key !== "") return row.key
+  return typeof row.summary === "string" ? row.summary : ""
+}
+
+/**
+ * Every row's problemKey joined by newlines, so a host can tell when the
+ * rows really moved (an equal list rebuilt gives the same string).
+ * @param {?Array<?{key?: *, summary?: *}>} rows - dropdown rows
+ * @returns {string} the joined keys, "" for no rows
+ */
+function problemKeys(rows) {
+  return (rows || []).map(problemKey).join("\n")
+}
+
+/**
+ * The row a keyed action names: row `index`, but only while it still has
+ * `key`, so a click or Enter aimed before a re-sort never opens another
+ * problem.
+ * @param {?Array<?{key?: *, summary?: *}>} rows - dropdown rows
+ * @param {number} index - the row the action names
+ * @param {*} key - the key the view saw at that row
+ * @returns {?object} the row, or null when it no longer carries the key
+ */
+function keyedProblem(rows, index, key) {
+  if (typeof key !== "string" || key === "") return null
+  var row = (rows || [])[index]
+  return row && problemKey(row) === key ? row : null
+}
+
+/**
+ * The lit fraction of a strand bar for a usage percentage.
+ * @param {number} percent - usage, 0..100
+ * @returns {number} the fraction, clamped to 0..1; 0 for a non-number
+ */
+function barFraction(percent) {
+  var p = Number(percent)
+  if (!isFinite(p)) return 0
+  return Math.max(0, Math.min(1, p / 100))
+}
+
+/**
+ * Turns the CPU history (percentages, oldest first) into the shared
+ * LinkGraph's samples: the load as the receive line, no send line.
+ * @param {?Array<number>} history - CPU percentages
+ * @returns {Array<{rx: number, tx: number}>} one sample per entry, clamped to 0..100
+ */
+function cpuSamples(history) {
+  return (history || []).map(function (v) {
+    return { rx: Math.max(0, Math.min(100, Number(v) || 0)), tx: 0 }
+  })
+}
+
+if (typeof module !== "undefined")
+  module.exports = {
+    humanBytes: humanBytes,
+    problemKey: problemKey,
+    problemKeys: problemKeys,
+    keyedProblem: keyedProblem,
+    barFraction: barFraction,
+    cpuSamples: cpuSamples
+  }
 /* @aranea-facade-end */
 
 /**
@@ -578,21 +646,22 @@ function annotateProblems(open, tools) {
 }
 
 /**
- * Position of the row with this key.
- * @param {?Array<{key: string}>} rows - dropdown rows
+ * Position of the row with this key (its problemKey: the id, else its text).
+ * @param {?Array<{key?: string, summary?: string}>} rows - dropdown rows
  * @param {string} key - the row key, e.g. "disk:/"
- * @returns {number} its index, or -1
+ * @returns {number} its index, or -1 (always for an empty key)
  */
 function indexOfKey(rows, key) {
+  if (!key) return -1
   var list = rows || []
-  for (var i = 0; i < list.length; i++) if (list[i] && list[i].key === key) return i
+  for (var i = 0; i < list.length; i++) if (list[i] && problemKey(list[i]) === key) return i
   return -1
 }
 
 /**
  * Key of the row delta steps from the row with this key, wrapping; the first
  * (delta > 0) or last row when the key is empty or gone.
- * @param {?Array<{key: string}>} rows - dropdown rows
+ * @param {?Array<{key?: string, summary?: string}>} rows - dropdown rows
  * @param {string} key - the current cursor key, or ""
  * @param {number} delta - rows to move (sign matters)
  * @returns {string} the new cursor key, or "" when there are no rows
@@ -601,8 +670,56 @@ function moveCursorKey(rows, key, delta) {
   var list = rows || []
   if (list.length === 0) return ""
   var i = key ? indexOfKey(list, key) : -1
-  if (i < 0) return list[delta < 0 ? list.length - 1 : 0].key
-  return list[(i + delta + list.length) % list.length].key
+  if (i < 0) return problemKey(list[delta < 0 ? list.length - 1 : 0])
+  return problemKey(list[(i + delta + list.length) % list.length])
+}
+
+/**
+ * The cursor after an up or down key. The first key after opening or
+ * after pointer use (keyboard false) only reveals the cursor: on the row
+ * the pointer left it on, else the first (dy > 0) or last row. Later keys
+ * move it, wrapping.
+ * @param {?Array<{key?: string, summary?: string}>} rows - dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {number} dy - rows to move (sign matters); 0 does nothing
+ * @returns {{key: string, keyboard: boolean}} the new cursor key and mode
+ */
+function cursorMove(rows, key, keyboard, dy) {
+  var list = rows || []
+  if (list.length === 0 || !dy) return { key: key, keyboard: keyboard }
+  if (!keyboard)
+    return {
+      key: indexOfKey(list, key) >= 0 ? key : moveCursorKey(list, "", dy),
+      keyboard: true
+    }
+  return { key: moveCursorKey(list, key, dy), keyboard: true }
+}
+
+/**
+ * What Enter or Space does: nothing without a cursor, only reveal one the
+ * keyboard is not showing, else open the cursor's problem.
+ * @param {?Array<{key?: string, summary?: string}>} rows - dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @returns {{keyboard: boolean, row: ?object}} the new mode and the row to open, or null
+ */
+function cursorPress(rows, key, keyboard) {
+  var i = indexOfKey(rows, key)
+  if (i < 0) return { keyboard: keyboard, row: null }
+  return { keyboard: true, row: keyboard ? rows[i] : null }
+}
+
+/**
+ * The row the mint outline is drawn on: the cursor's, only while the
+ * keyboard drives it.
+ * @param {?Array<{key?: string, summary?: string}>} rows - dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @returns {number} the row index, or -1 for no outline
+ */
+function outlineIndex(rows, key, keyboard) {
+  return keyboard ? indexOfKey(rows, key) : -1
 }
 
 if (typeof module !== "undefined") {
@@ -610,6 +727,9 @@ if (typeof module !== "undefined") {
     isFailedExit: isFailedExit,
     indexOfKey: indexOfKey,
     moveCursorKey: moveCursorKey,
+    cursorMove: cursorMove,
+    cursorPress: cursorPress,
+    outlineIndex: outlineIndex,
     checkOf: checkOf,
     parseFailedUnits: parseFailedUnits,
     parseDf: parseDf,
@@ -623,6 +743,11 @@ if (typeof module !== "undefined") {
     parseDockerPs: parseDockerPs,
     seedDockerHistory: seedDockerHistory,
     humanBytes: humanBytes,
+    problemKey: problemKey,
+    problemKeys: problemKeys,
+    keyedProblem: keyedProblem,
+    barFraction: barFraction,
+    cpuSamples: cpuSamples,
     itemFor: itemFor,
     statusFor: statusFor,
     annotateProblems: annotateProblems

@@ -13,6 +13,10 @@ service contracts to the feature plugins.
   presentational contracts.
 - `FilamentSlider` is the Filament-style hairline slider/handle used by
   volume and level controls.
+- `FilamentBar` is the read-only strand bar for a level (`value`, 0..1,
+  clamped into `fraction`): a hairline track whose lit part runs mint to
+  violet like the slider's, with no node and no pointer input. Health's
+  memory and disk bars use it; the OSD's level bar will too.
 - `FilamentSwitch` is the Filament-style compact on/off switch. An optional
   `clickGate` (the `NodeDeviceRow` hosting it, or anything with
   `clickSettled()`) makes its pointer clicks settle like that row's, as
@@ -28,13 +32,15 @@ service contracts to the feature plugins.
   moving under a still pointer: with a gate set, `entered` fires only on a
   real pointer move, never on the row sliding underneath a stationary
   cursor. `detailColor` recolours the detail (the network VPN rows use
-  `DesignTokens.urgent` for "Couldn't connect"). A pointer click within
-  `settleMs` (300 ms) of the row being created, or of its dropdown's layout
-  shifting, is ignored unless the gate accepted a real move over it since,
-  so neither a Repeater rebuild nor a section growing turns a click aimed at
-  one row into a click on another. A dropdown reports layout shifts by
-  declaring `layoutChangedAt` (a `Date.now()` stamp) on the gate it hands
-  down; `ClickSettle.clickSettled` holds the rule.
+  `DesignTokens.urgent` for "Couldn't connect"), and `nodeColor` recolours
+  the lit node and its glow (Health tints a problem's node urgent or amber).
+  A pointer click within `settleMs` (300 ms) of the row being created, or
+  of its dropdown's layout shifting, is ignored unless the gate accepted a
+  real move over it since, so neither a Repeater rebuild nor a section
+  growing turns a click aimed at one row into a click on another. A
+  dropdown reports layout shifts by declaring `layoutChangedAt` (a
+  `Date.now()` stamp) on the gate it hands down; `ClickSettle.clickSettled`
+  holds the rule.
 - `ForgetButton` is the soft red "forget" button a row puts in its trailing
   slot (Bluetooth devices, Network's Wi-Fi and Saved rows). It shows on a
   `forgettable` row while the row (`rowHovered`), the button or the
@@ -67,6 +73,9 @@ service contracts to the feature plugins.
 - `LinkGraph` is the 60 s receive/send `Canvas` trace for a link's
   throughput, shared by the Network and VPN dropdowns. It draws
   `GraphLogic.graphPoints` and a bare baseline before there are samples.
+  Health's CPU trace reuses it with `slots: 60` and `floor: 100`, no send
+  line (`secondary: false`) and a soft mint fill under the line
+  (`softFill: true`); both default to the network look.
 - `InkText` aligns glyph ink rather than advance width.
 - `KeyboardInputFrame` owns key forwarding and focus targeting, including a
   `deleteRequested` signal forwarded from the key catcher's "x" key, and a

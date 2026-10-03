@@ -1,38 +1,62 @@
-// CPU, memory, disk and network presentation for the health panel.
-// qmllint disable missing-property unqualified
+// CPU, memory, disk and network presentation for the health panel. The CPU
+// trace is the shared Aranea.LinkGraph (the network graph's mint to violet
+// strand, here with a soft fill and no send line) over the last 60 one-
+// second samples; memory and disk use are Aranea.FilamentBar strand bars,
+// their values tinted by usage level. NET keeps its content, with the
+// same caption label as the other sections.
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "HealthLogic.js" as HealthLogic
 import "MetricsLogic.js" as MetricsLogic
 
 Item {
   id: root
-  // Public contract member.
+  // The health service's Metrics.qml, or null.
   property var metrics: null
-  // Public contract member.
+  // Whether the dropdown is open; the trace only follows the samples then.
   property bool active: false
-  // Public contract member.
+  // CPU use in percent, 0 without a reading.
   property real cpu: metrics && metrics.cpu !== null && metrics.cpu !== undefined ? metrics.cpu : 0
-  // Public contract member.
+  // Memory use in percent.
   property real memoryPercent: metrics && metrics.mem ? metrics.mem.memUsed * 100 / metrics.mem.memTotal : 0
-  // Public contract member.
+  // Disk rows ({target, percent, avail}) from the metrics.
   property var diskRows: metrics && metrics.diskRows ? metrics.diskRows : []
-  // Public contract member.
+  // The default route's interface, "offline" without one.
   property string networkLabel: metrics && metrics.iface ? metrics.iface : "offline"
-  // Public contract member.
+  // Upload and download rates, "-" without a reading.
   property string networkRateText: metrics && metrics.rates ? "↑ " + MetricsLogic.formatRate(metrics.rates.up) + "   ↓ " + MetricsLogic.formatRate(metrics.rates.down) : "-"
-  // Public contract member.
+  // Font family of every text here.
   property string fontFamily: Style.font.family
-  // Public contract member.
-  property color foreground: Color.popups.text
+  // Colour of the values and labels.
+  property color foreground: Aranea.DesignTokens.foreground
+  // Colour of captions and secondary text.
+  readonly property color muted: Util.alpha(root.foreground, 0.55)
 
   // Maps metric severity to the panel's semantic foreground colour.
   function levelColor(level: string): color {
-    return level === "critical" ? Color.urgent : (level === "attention" ? Aranea.DesignTokens.attention : root.foreground)
+    return level === "critical" ? Aranea.DesignTokens.urgent : (level === "attention" ? Aranea.DesignTokens.attention : root.foreground)
   }
 
   implicitHeight: content.implicitHeight
+
+  // A section label in the Filament caption style.
+  component Caption: Text {
+    color: root.muted
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+    font.bold: true
+    font.letterSpacing: 1.2
+  }
+
+  // The hairline between sections.
+  component Hairline: Rectangle {
+    Layout.fillWidth: true
+    Layout.preferredHeight: Math.max(1, Style.spacing.hairline)
+    color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
+  }
 
   ColumnLayout {
     id: content
@@ -44,14 +68,11 @@ Item {
       spacing: Style.space(4)
       RowLayout {
         Layout.fillWidth: true
-        Text {
+        Caption {
           text: "CPU"
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          font.bold: true
         }
         Text {
+          objectName: "cpuValue"
           text: Math.round(root.cpu) + "%"
           color: root.foreground
           font.family: root.fontFamily
@@ -62,110 +83,77 @@ Item {
           text: root.metrics && root.metrics.load ? "load " + root.metrics.load.map(function (v) {
             return v.toFixed(2)
           }).join(" ") : ""
-          color: Qt.darker(root.foreground, 1.3)
+          color: root.muted
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
         }
       }
-      Canvas {
+      Aranea.LinkGraph {
+        objectName: "cpuTrace"
         Layout.fillWidth: true
-        Layout.preferredHeight: Style.space(28)
-        property var values: root.metrics ? root.metrics.cpuHistory : []
-        onValuesChanged: if (root.active)
-          requestPaint()
-        onPaint: {
-          var ctx = getContext("2d")
-          ctx.reset()
-          // The chart floor spans the width even before 60 samples exist.
-          ctx.globalAlpha = 0.25
-          ctx.strokeStyle = root.foreground
-          ctx.lineWidth = 1
-          ctx.beginPath()
-          ctx.moveTo(0, height - 0.5)
-          ctx.lineTo(width, height - 0.5)
-          ctx.stroke()
-          ctx.globalAlpha = 1
-          var v = values || []
-          if (v.length < 2)
-            return
-          ctx.strokeStyle = Color.notifications.countdown
-          ctx.lineWidth = 1.5
-          ctx.beginPath()
-          for (var i = 0; i < v.length; i++) {
-            var x = (width - 1) * (i + 60 - v.length) / 59
-            var y = height - 1 - (height - 2) * Math.min(100, v[i]) / 100
-            if (i === 0)
-              ctx.moveTo(x, y)
-            else
-              ctx.lineTo(x, y)
-          }
-          ctx.stroke()
-        }
-        onWidthChanged: requestPaint()
+        Layout.preferredHeight: Style.space(34)
+        // Today's source and window: one sample a second, the last 60,
+        // on a fixed 0..100 % scale.
+        samples: root.active && root.metrics ? HealthLogic.cpuSamples(root.metrics.cpuHistory) : []
+        slots: 60
+        floor: 100
+        secondary: false
+        softFill: true
       }
     }
+
+    Hairline {}
 
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.space(4)
       RowLayout {
         Layout.fillWidth: true
-        Text {
+        Caption {
           text: "MEM"
-          color: root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          font.bold: true
           Layout.fillWidth: true
         }
         Text {
+          objectName: "memValue"
           text: root.metrics && root.metrics.mem ? MetricsLogic.humanBytes(root.metrics.mem.memUsed) + " / " + MetricsLogic.humanBytes(root.metrics.mem.memTotal) : Math.round(root.memoryPercent) + "%"
-          color: root.foreground
+          color: root.levelColor(MetricsLogic.usageLevel(root.memoryPercent))
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
         }
       }
-      Rectangle {
+      Aranea.FilamentBar {
+        objectName: "memBar"
         Layout.fillWidth: true
-        Layout.preferredHeight: Style.space(4)
-        radius: height / 2
-        color: Qt.rgba(1, 1, 1, 0.08)
-        Rectangle {
-          width: parent.width * Math.max(0, Math.min(1, root.memoryPercent / 100))
-          height: parent.height
-          radius: height / 2
-          color: root.levelColor(MetricsLogic.usageLevel(root.memoryPercent))
-        }
+        value: HealthLogic.barFraction(root.memoryPercent)
       }
       Text {
         visible: !!(root.metrics && root.metrics.mem && root.metrics.mem.swapUsed > 0)
         text: root.metrics && root.metrics.mem ? "swap " + MetricsLogic.humanBytes(root.metrics.mem.swapUsed) + " / " + MetricsLogic.humanBytes(root.metrics.mem.swapTotal) : ""
-        color: Qt.darker(root.foreground, 1.3)
+        color: root.muted
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
       }
     }
 
+    Hairline {}
+
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.space(4)
-      Text {
+      Caption {
         text: "DISK"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: true
       }
       Repeater {
         model: root.diskRows
         delegate: ColumnLayout {
+          id: diskRow
           required property var modelData
           Layout.fillWidth: true
           spacing: Style.space(2)
           RowLayout {
             Layout.fillWidth: true
             Text {
-              text: modelData.target
+              text: diskRow.modelData.target
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
@@ -173,46 +161,37 @@ Item {
               elide: Text.ElideMiddle
             }
             Text {
-              text: modelData.percent + "%"
-              color: root.foreground
+              text: diskRow.modelData.percent + "%"
+              color: root.levelColor(MetricsLogic.usageLevel(diskRow.modelData.percent))
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
             }
             Text {
-              text: MetricsLogic.humanBytes(modelData.avail) + " free"
-              color: Qt.darker(root.foreground, 1.3)
+              text: MetricsLogic.humanBytes(diskRow.modelData.avail) + " free"
+              color: root.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
           }
-          Rectangle {
+          Aranea.FilamentBar {
+            objectName: "diskBar"
             Layout.fillWidth: true
-            Layout.preferredHeight: Style.space(4)
-            radius: height / 2
-            color: Qt.rgba(1, 1, 1, 0.08)
-            Rectangle {
-              width: parent.width * Math.max(0, Math.min(1, modelData.percent / 100))
-              height: parent.height
-              radius: height / 2
-              color: root.levelColor(MetricsLogic.usageLevel(modelData.percent))
-            }
+            value: HealthLogic.barFraction(diskRow.modelData.percent)
           }
         }
       }
     }
 
+    Hairline {}
+
     RowLayout {
       Layout.fillWidth: true
-      Text {
+      Caption {
         text: "NET"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: true
       }
       Text {
         text: root.networkLabel
-        color: Qt.darker(root.foreground, 1.3)
+        color: root.muted
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
         Layout.fillWidth: true

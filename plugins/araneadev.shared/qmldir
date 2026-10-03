@@ -14,6 +14,7 @@ KeyboardInputFrame 1.0 KeyboardInputFrame.qml
 BrandHeader 1.0 BrandHeader.qml
 StatusRow 1.0 StatusRow.qml
 FilamentSlider 1.0 FilamentSlider.qml
+FilamentBar 1.0 FilamentBar.qml
 FilamentSwitch 1.0 FilamentSwitch.qml
 FilamentPulse 1.0 FilamentPulse.qml
 NodeDeviceRow 1.0 NodeDeviceRow.qml

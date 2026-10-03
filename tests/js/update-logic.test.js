@@ -66,10 +66,58 @@ test("maps update status to compact indicator severity", () => {
   assert.equal(logic.displayState({ count: 0, error: "offline", stale: true }).severity, "error")
 })
 
-test("the header hint states the check, it never repeats the REFRESH action", () => {
+test("the status caption states the check, it never repeats the REFRESH action", () => {
   const at = new Date(2026, 8, 30, 12, 5).getTime()
-  assert.equal(logic.headerHint({ checkedAt: at }), "CHECKED 12:05")
-  assert.equal(logic.headerHint({ checkedAt: at, error: "status unavailable" }), "CHECK FAILED")
-  assert.equal(logic.headerHint({ checkedAt: 0 }), "")
-  assert.equal(logic.headerHint(null), "")
+  assert.equal(logic.statusCaption({ checkedAt: at }), "checked 12:05")
+  assert.equal(logic.statusCaption({ checkedAt: at, error: "status unavailable" }), "check failed")
+  assert.equal(logic.statusCaption({ checkedAt: 0 }), "")
+  assert.equal(logic.statusCaption(null), "")
+})
+
+test("the status caption shows checking even over a stale error or an unchecked status", () => {
+  const at = new Date(2026, 8, 30, 12, 5).getTime()
+  assert.equal(
+    logic.statusCaption({ checkedAt: at, error: "status unavailable" }, true),
+    "checking…"
+  )
+  assert.equal(logic.statusCaption(null, true), "checking…")
+  assert.equal(logic.statusCaption({ checkedAt: at }, false), "checked 12:05")
+})
+
+test("the status row reads a failed check or a pending reboot as a warning", () => {
+  assert.deepEqual(logic.statusRow({ count: 0 }), {
+    tone: "ok",
+    title: "Up to date",
+    subtitle: "0 updates available"
+  })
+  assert.deepEqual(logic.statusRow({ count: 1 }), {
+    tone: "ok",
+    title: "Up to date",
+    subtitle: "1 update available"
+  })
+  assert.deepEqual(logic.statusRow({ count: 3, rebootRequired: true }), {
+    tone: "warn",
+    title: "Reboot required",
+    subtitle: "3 updates available"
+  })
+  assert.deepEqual(logic.statusRow({ count: 0, error: "offline" }), {
+    tone: "warn",
+    title: "Check failed",
+    subtitle: "0 updates available"
+  })
+  assert.deepEqual(logic.statusRow(null), {
+    tone: "ok",
+    title: "Up to date",
+    subtitle: "0 updates available"
+  })
+})
+
+test("the pill cursor only reveals on its first key, then moves and wraps", () => {
+  assert.deepEqual(logic.moveCursor(0, false, 1), { index: 0, keyboardCursor: true })
+  assert.deepEqual(logic.moveCursor(0, false, -1), { index: 0, keyboardCursor: true })
+  assert.deepEqual(logic.moveCursor(0, false, 0), { index: 0, keyboardCursor: false })
+  assert.deepEqual(logic.moveCursor(0, true, 1), { index: 1, keyboardCursor: true })
+  assert.deepEqual(logic.moveCursor(1, true, 1), { index: 0, keyboardCursor: true })
+  assert.deepEqual(logic.moveCursor(0, true, -1), { index: 1, keyboardCursor: true })
+  assert.deepEqual(logic.moveCursor(1, true, 0), { index: 1, keyboardCursor: true })
 })

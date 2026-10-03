@@ -7,7 +7,6 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
-import "../araneadev.shared"
 import "../araneadev.shared" as Aranea
 import "HealthBridge.js" as HealthBridge
 import "HealthLogic.js" as HealthLogic
@@ -42,19 +41,60 @@ Panel {
   // Colour of the "attention" status and levels.
   readonly property color amber: Aranea.DesignTokens.attention
   // Icon colour for the current status.
-  readonly property color statusColor: status === "critical" ? Color.urgent : (status === "attention" ? amber : Color.notifications.countdown)
-  // Key of the keyboard-selected problem ("" for none); rows re-sort as
-  // checks run, so the cursor follows the problem, not a position.
+  readonly property color statusColor: status === "critical" ? Aranea.DesignTokens.urgent : (status === "attention" ? amber : Aranea.DesignTokens.ceremony)
+  // Key of the cursor's problem (HealthLogic.problemKey, "" for none);
+  // rows re-sort as checks run, so the cursor follows the problem, not a
+  // position. The pointer places it too, without showing it.
   property string cursorKey: ""
+  // True while the keyboard drives the cursor; any pointer use clears it.
+  // The mint outline shows only then, and the first key after opening or
+  // after pointer use only reveals it.
+  property bool keyboardCursor: false
   // Index of cursorKey's row in problems, -1 when none.
   readonly property int cursor: HealthLogic.indexOfKey(root.problems, root.cursorKey)
-  // A problem that went away takes the cursor with it.
+  // A problem that went away takes the cursor with it (after the change
+  // settles, so cursor never re-evaluates inside its own change signal).
   onCursorChanged: if (root.cursor < 0 && root.cursorKey)
-    root.cursorKey = ""
+    Qt.callLater(root.dropLostCursor)
 
-  // Colour for a usage level: urgent, amber, or the normal text colour.
-  function levelColor(level: string): color {
-    return level === "critical" ? Color.urgent : (level === "attention" ? root.amber : Color.popups.text)
+  // Clears cursorKey when it no longer names an open problem.
+  function dropLostCursor(): void {
+    if (root.cursor < 0)
+      root.cursorKey = ""
+  }
+
+  // Moves the keyboard cursor DY rows, wrapping; the first key after
+  // opening or after pointer use only reveals it (HealthLogic.cursorMove).
+  function moveCursor(dy: int): void {
+    var next = HealthLogic.cursorMove(root.problems, root.cursorKey, root.keyboardCursor, dy)
+    root.cursorKey = next.key
+    root.keyboardCursor = next.keyboard
+  }
+
+  // Enter or Space: reveals a cursor the keyboard is not showing, else
+  // opens the cursor's problem (HealthLogic.cursorPress).
+  function activateCursor(): void {
+    var press = HealthLogic.cursorPress(root.problems, root.cursorKey, root.keyboardCursor)
+    root.keyboardCursor = press.keyboard
+    root.runRow(press.row)
+  }
+
+  // A settled click on row INDEX, which held KEY: opens that problem,
+  // refused when the row no longer carries KEY.
+  function activateRow(index: int, key: string): void {
+    root.keyboardCursor = false
+    var row = HealthLogic.keyedProblem(root.problems, index, key)
+    if (!row)
+      return
+    root.cursorKey = key
+    root.runRow(row)
+  }
+
+  // The pointer really moved onto row INDEX: the cursor goes there,
+  // hidden, so a following key reveals it in place.
+  function hoverRow(index: int): void {
+    root.keyboardCursor = false
+    root.cursorKey = HealthLogic.problemKey(root.problems[index])
   }
 
   // Runs a problem row's click command, if it has one.
@@ -106,8 +146,9 @@ Panel {
     if (opened && service) {
       service.metrics.refreshSlow()
       service.monitor.checkDisk()
-      root.cursorKey = ""
     }
+    root.cursorKey = ""
+    root.keyboardCursor = false
   }
 
   implicitWidth: button.implicitWidth
@@ -117,7 +158,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󰗶"
+    text: String.fromCodePoint(0xf05f6)
     foreground: root.available ? root.statusColor : root.barForeground
     dimmed: !root.available
     tooltipText: !root.available ? "Health unavailable" : (root.problems.length === 0 ? "Healthy" : root.problems.length + (root.problems.length === 1 ? " problem" : " problems") + (root.problems.filter(function (p) {
@@ -135,123 +176,101 @@ Panel {
     }
   }
 
-  component Rail: Rectangle {
-    width: Style.space(3)
-    height: Style.font.body + Style.space(2)
-    radius: width / 2
-  }
-
-  component Label: Text {
-    color: Color.popups.text
-    font.family: Style.font.family
-    font.pixelSize: Style.font.body
-  }
-
-  component UsageBar: Item {
-    property real fraction: 0
-    property string level: "normal"
-    property color base: Color.popups.text
-    implicitHeight: Style.space(4)
-    Rectangle {
-      anchors.fill: parent
-      radius: height / 2
-      color: Qt.rgba(1, 1, 1, 0.08)
-    }
-    Rectangle {
-      width: parent.width * Math.max(0, Math.min(1, parent.fraction))
-      height: parent.height
-      radius: height / 2
-      color: parent.level === "normal" ? parent.base : root.levelColor(parent.level)
-    }
-  }
-
-  KeyboardPanel {
+  // The dropdown in the shared keyboard frame: the header (glyph,
+  // hostname, uptime), the problems, the resources, the top processes and a
+  // key hint. Up and down walk the problems; Enter or Space opens one.
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened && root.available
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      problemsSection.disarmPointer()
+      root.switchPanel(direction)
+    }
+    onMoveRequested: function (dx, dy) {
+      problemsSection.disarmPointer()
+      root.moveCursor(dy)
+    }
+    onActivateRequested: {
+      problemsSection.disarmPointer()
+      root.activateCursor()
+    }
 
-    PanelKeyCatcher {
-      id: keyCatcher
-      anchors.fill: parent
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
+    ColumnLayout {
+      id: content
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      spacing: Style.space(10)
+
+      Aranea.DropdownHeader {
+        Layout.fillWidth: true
+        glyph: String.fromCodePoint(0xf05f6)
+        glyphColor: root.statusColor
+        title: root.m ? root.m.hostname : ""
+        caption: root.m ? root.m.uptime : ""
       }
-      onMoveRequested: function (dx, dy) {
-        if (root.problems.length === 0 || dy === 0)
-          return
-        root.cursorKey = HealthLogic.moveCursorKey(root.problems, root.cursorKey, dy)
+
+      Hairline {}
+
+      HealthProblemsSection {
+        id: problemsSection
+        Layout.fillWidth: true
+        problems: root.problems
+        // Growth anywhere in the card can move the rows (a side or bottom
+        // bar centres it or grows it upwards): it settles their clicks.
+        hostContentHeight: content.implicitHeight
+        cursor: HealthLogic.outlineIndex(root.problems, root.cursorKey, root.keyboardCursor)
+        amber: root.amber
+        onProblemActivated: function (index, key) {
+          root.activateRow(index, key)
+        }
+        onRowHovered: function (index) {
+          root.hoverRow(index)
+        }
       }
-      onActivateRequested: if (root.cursor >= 0)
-        root.runRow(root.problems[HealthLogic.indexOfKey(root.problems, root.cursorKey)])
 
-      ColumnLayout {
-        id: content
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        spacing: Style.space(10)
+      Hairline {}
 
-        // Header
-        RowLayout {
-          Layout.fillWidth: true
-          Label {
-            text: root.m ? root.m.hostname : ""
-            font.bold: true
-            font.pixelSize: Style.font.title
-            Layout.fillWidth: true
-          }
-          Label {
-            text: root.m ? root.m.uptime : ""
-            color: Qt.darker(Color.popups.text, 1.4)
-          }
-        }
+      HealthResourceSection {
+        Layout.fillWidth: true
+        metrics: root.m
+        active: root.opened
+      }
 
-        // Problems
-        RowLayout {
-          visible: root.problems.length === 0
-          spacing: Style.space(8)
-          Image {
-            Layout.preferredWidth: Style.space(16)
-            Layout.preferredHeight: Style.space(16)
-            source: RuntimePaths.glyphUrl
-            sourceSize: Qt.size(32, 32)
-          }
-          Label {
-            text: "All systems healthy"
-            color: Color.notifications.countdown
-          }
-        }
-        HealthProblemsSection {
-          Layout.fillWidth: true
-          problems: root.problems
-          cursor: root.cursor
-          statusColor: root.statusColor
-          amber: root.amber
-          onProblemActivated: function (problem) {
-            root.runRow(problem)
-          }
-        }
+      Hairline {
+        visible: processSection.visible
+      }
 
-        HealthResourceSection {
-          Layout.fillWidth: true
-          metrics: root.m
-          active: root.opened
-          foreground: Color.popups.text
-        }
+      HealthProcessSection {
+        id: processSection
+        visible: !!(root.m && (root.m.topProcs.cpu.length > 0 || root.m.topProcs.mem.length > 0))
+        Layout.fillWidth: true
+        cpuProcesses: root.m && root.m.topProcs ? root.m.topProcs.cpu : []
+        memoryProcesses: root.m && root.m.topProcs ? root.m.topProcs.mem : []
+      }
 
-        HealthProcessSection {
-          visible: !!(root.m && (root.m.topProcs.cpu.length > 0 || root.m.topProcs.mem.length > 0))
-          Layout.fillWidth: true
-          cpuProcesses: root.m && root.m.topProcs ? root.m.topProcs.cpu : []
-          memoryProcesses: root.m && root.m.topProcs ? root.m.topProcs.mem : []
-        }
+      Text {
+        objectName: "keyHint"
+        Layout.fillWidth: true
+        text: "↑↓ move · enter open · tab next"
+        color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+        font.family: Style.font.family
+        font.pixelSize: Style.font.caption
+        elide: Text.ElideRight
       }
     }
+  }
+
+  // The hairline between sections.
+  component Hairline: Rectangle {
+    Layout.fillWidth: true
+    Layout.preferredHeight: Math.max(1, Style.spacing.hairline)
+    color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
   }
 }

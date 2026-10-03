@@ -398,3 +398,107 @@ test("disk level from a known previous level (4c)", () => {
   if (h.diskLevel("ok", 89) !== "ok") throw new Error("89% from ok stays ok")
   if (h.diskLevel("normal", 89) !== "normal") throw new Error("hysteresis")
 })
+
+test("problem rows are keyed by id, falling back to their text", () => {
+  // The source module and the facade copy HealthLogic.js carries.
+  for (const m of [presentation, h]) {
+    eq(m.problemKey({ key: "disk:/", summary: "/ is 92% full" }), "disk:/", "id first")
+    eq(m.problemKey({ key: "", summary: "Reboot" }), "Reboot", "empty id falls back")
+    eq(m.problemKey({ summary: "Reboot" }), "Reboot", "missing id falls back")
+    eq(m.problemKey({ key: 7, summary: 3 }), "", "non-string fields give no key")
+    eq(m.problemKey(null), "", "no row, no key")
+    eq(m.problemKeys([{ key: "a" }, { summary: "b" }, null]), "a\nb\n", "keys joined")
+    eq(m.problemKeys(undefined), "", "no rows")
+    const rows = [{ key: "disk:/" }, { summary: "Reboot" }]
+    eq(h.indexOfKey(rows, "Reboot"), 1, "the cursor finds a text-keyed row")
+    eq(h.indexOfKey(rows, ""), -1, "an empty key finds nothing")
+    eq(h.moveCursorKey(rows, "disk:/", 1), "Reboot", "and moves onto it")
+  }
+})
+
+test("a keyed problem action only lands on the row it names", () => {
+  // The source module and the facade copy HealthLogic.js carries.
+  for (const m of [presentation, h]) {
+    const rows = [{ key: "disk:/" }, { key: "reboot" }]
+    eq(m.keyedProblem(rows, 1, "reboot"), rows[1], "a matching row")
+    eq(m.keyedProblem(rows, 0, "reboot"), null, "a re-sorted row is refused")
+    eq(m.keyedProblem(rows, 5, "reboot"), null, "out of range")
+    eq(m.keyedProblem(rows, 0, ""), null, "an empty key")
+    eq(m.keyedProblem(rows, 0, 3), null, "a non-string key")
+    eq(m.keyedProblem(undefined, 0, "disk:/"), null, "no rows")
+  }
+})
+
+test("strand bar fractions", () => {
+  // The source module and the facade copy HealthLogic.js carries.
+  for (const m of [presentation, h]) {
+    eq(m.barFraction(58), 0.58, "a percentage")
+    eq(m.barFraction(-4), 0, "clamped low")
+    eq(m.barFraction(140), 1, "clamped high")
+    eq(m.barFraction(NaN), 0, "NaN is empty")
+    eq(m.barFraction("x"), 0, "text is empty")
+  }
+})
+
+test("the CPU trace's samples", () => {
+  // The source module and the facade copy HealthLogic.js carries.
+  for (const m of [presentation, h]) {
+    deepEq(
+      m.cpuSamples([12, 140, -3, "x"]),
+      [
+        { rx: 12, tx: 0 },
+        { rx: 100, tx: 0 },
+        { rx: 0, tx: 0 },
+        { rx: 0, tx: 0 }
+      ],
+      "percentages clamped into LinkGraph samples"
+    )
+    deepEq(m.cpuSamples(null), [], "no history")
+  }
+})
+
+test("problem glyphs are the Nerd Font code points", () => {
+  const glyphs = ["unit", "disk", "reboot", "container"].map(
+    (check) =>
+      h.itemFor({ check, unit: "a", scope: "system", target: "/", name: "c", release: "" }).glyph
+  )
+  deepEq(
+    glyphs.map((g) => g.codePointAt(0)),
+    [0xf0493, 0xf02ca, 0xf0709, 0xf0868],
+    "unit, disk, reboot, container"
+  )
+})
+
+test("the keyboard cursor: the first key only reveals", () => {
+  const rows = [{ key: "disk:/" }, { key: "reboot" }, { summary: "Container web exited" }]
+  deepEq(h.cursorMove(rows, "", false, 1), { key: "disk:/", keyboard: true }, "reveal on first")
+  deepEq(
+    h.cursorMove(rows, "", false, -1),
+    { key: "Container web exited", keyboard: true },
+    "reveal on last going up"
+  )
+  deepEq(
+    h.cursorMove(rows, "reboot", false, 1),
+    { key: "reboot", keyboard: true },
+    "reveal where the pointer left it"
+  )
+  deepEq(h.cursorMove(rows, "gone", false, 1), { key: "disk:/", keyboard: true }, "a lost key")
+  deepEq(
+    h.cursorMove(rows, "reboot", true, 1),
+    { key: "Container web exited", keyboard: true },
+    "then moves"
+  )
+  deepEq(h.cursorMove(rows, "reboot", true, 0), { key: "reboot", keyboard: true }, "no dy")
+  deepEq(h.cursorMove([], "", false, 1), { key: "", keyboard: false }, "no rows")
+  deepEq(h.cursorMove(null, "", false, 1), { key: "", keyboard: false }, "null rows")
+})
+
+test("Enter reveals before it opens, and only a keyed row", () => {
+  const rows = [{ key: "disk:/" }, { key: "reboot" }]
+  deepEq(h.cursorPress(rows, "", false), { keyboard: false, row: null }, "no cursor: nothing")
+  deepEq(h.cursorPress(rows, "gone", true), { keyboard: true, row: null }, "a lost key: nothing")
+  deepEq(h.cursorPress(rows, "reboot", false), { keyboard: true, row: null }, "hover: reveal")
+  eq(h.cursorPress(rows, "reboot", true).row, rows[1], "keyboard: open")
+  eq(h.outlineIndex(rows, "reboot", true), 1, "the outline follows the keyboard")
+  eq(h.outlineIndex(rows, "reboot", false), -1, "never the pointer")
+})

@@ -5,7 +5,8 @@
 // PointerMoveGate never takes the cursor when it moves under a still
 // pointer, and KeyboardInputFrame/blocked forwards to its key catcher.
 // A key the catcher leaves unaccepted (Delete) reaches unhandledKey unless
-// the frame is blocked.
+// the frame is blocked. The strand bar lights its clamped value mint to
+// violet, and a row's nodeColor tints its lit node.
 import QtQuick
 import QtTest
 import Quickshell
@@ -47,6 +48,18 @@ ShellRoot {
     id: canceled
     width: 300
     value: 0.3
+  }
+  Aranea.FilamentBar {
+    id: strandBar
+    width: 300
+    value: 0.58
+  }
+  Aranea.NodeDeviceRow {
+    id: tinted
+    width: 300
+    label: "unit failed"
+    active: true
+    nodeColor: Aranea.DesignTokens.urgent
   }
   Aranea.FilamentSwitch {
     id: sw
@@ -288,6 +301,21 @@ ShellRoot {
   }
 
   Component.onCompleted: t.step(200, function () {
+    var barFill = t.findChild(strandBar, "filamentBarFill")
+    var barTrack = t.findChild(strandBar, "filamentBarTrack")
+    t.check(barFill !== null && barTrack !== null, "a strand bar has a track and a lit part")
+    t.check(Math.abs(barFill.width - 300 * 0.58) < 0.5, "the lit part spans the value")
+    var stops = barFill.gradient.stops
+    t.check(stops.length === 2 && Qt.colorEqual(stops[0].color, Aranea.DesignTokens.accent) && Qt.colorEqual(stops[1].color, Aranea.DesignTokens.strandEnd), "the lit part runs mint to violet")
+    strandBar.value = 1.7
+    t.equal(strandBar.fraction, 1, "a value past 1 lights the whole track")
+    strandBar.value = -0.2
+    t.check(strandBar.fraction === 0 && !barFill.visible, "a value under 0 lights nothing")
+    strandBar.value = NaN
+    t.equal(strandBar.fraction, 0, "NaN lights nothing")
+    var tintedNode = t.findChild(tinted, "nodeMarker")
+    t.check(Qt.colorEqual(tintedNode.color, Aranea.DesignTokens.urgent) && Qt.colorEqual(tintedNode.border.color, Aranea.DesignTokens.urgent), "nodeColor tints the lit node")
+    t.check(Qt.colorEqual(t.findChild(speakers, "nodeMarker").color, Aranea.DesignTokens.accent), "the node stays mint by default")
     t.equal(Math.round(stream.progress * 100), 80, "1.2 of 1.5 lights 80% of the strand")
     t.check(full.progress === 1, "a full slider lights the whole strand")
     var node = t.findChild(full, "filamentNode")

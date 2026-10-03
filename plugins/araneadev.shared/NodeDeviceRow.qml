@@ -27,6 +27,9 @@ Item {
   property color detailColor: Util.alpha(DesignTokens.foreground, 0.55)
   // Whether this is the active device.
   property bool active: false
+  // The lit node's colour and glow; a host tints it by state (Health's
+  // urgent or amber problem nodes). The accent leaves it as before.
+  property color nodeColor: DesignTokens.accent
   // Whether the device can be chosen.
   property bool available: true
   // Whether the keyboard cursor is on this row.
@@ -101,7 +104,7 @@ Item {
     height: marker.height
     rotation: marker.rotation
     blur: Style.space(8)
-    color: Util.alpha(DesignTokens.accent, 0.8)
+    color: Util.alpha(row.nodeColor, 0.8)
     visible: row.active
   }
   // The marker's live-signal glow; unused (-1) or 0 shows none.
@@ -118,14 +121,15 @@ Item {
   }
   Rectangle {
     id: marker
+    objectName: "nodeMarker"
     width: Style.space(8)
     height: width
     rotation: 45
     x: Style.space(8)
     anchors.verticalCenter: parent.verticalCenter
-    color: row.active ? DesignTokens.accent : "transparent"
+    color: row.active ? row.nodeColor : "transparent"
     border.width: 1
-    border.color: row.active ? DesignTokens.accent : Util.alpha(DesignTokens.foreground, 0.22)
+    border.color: row.active ? row.nodeColor : Util.alpha(DesignTokens.foreground, 0.22)
     opacity: row.busy ? (DesignTokens.motionEnabled ? row.pulseOpacity : 0.7) : 1
   }
   // Breathing animation for a busy marker; the marker sits static at 0.7

@@ -13,8 +13,9 @@ default.
   the overview.
 
 `BarWidget.qml` is the bar entry point. `WorkspacePanelHost.qml` owns panel
-hosting and `WorkspacePanel.qml` owns the overview composition. The shared
-`StatusRow` provides the status-row contract for the panel.
+hosting and `WorkspacePanel.qml` owns the overview composition, in the
+Filament look: an `Aranea.DropdownHeader` and one `Aranea.NodeDeviceRow` per
+workspace, keyed by workspace id.
 
 ## Logic boundaries
 
@@ -25,4 +26,5 @@ hosting and `WorkspacePanel.qml` owns the overview composition. The shared
 
 ## Validation
 
-Run `tests/qml-behaviour.test.sh workspaces-widget` and the workspace JS suite.
+Run `tests/qml-behaviour.test.sh workspaces-widget workspaces-keyed panel-heights`
+and the workspace JS suite.

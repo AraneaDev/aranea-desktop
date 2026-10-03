@@ -2,11 +2,11 @@
 import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
-import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
 
 Item {
   id: root
@@ -214,64 +214,123 @@ Item {
   }
 
   component PanelContent: Item {
+    // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
+    // Row index of the keyboard cursor, -1 for none.
     property int cursorIndex: -1
+    // Emitted to focus a workspace.
     signal focusWorkspace(int id)
+    // Emitted when a real pointer move lands on row INDEX.
+    signal rowHovered(int index)
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight
-    ColumnLayout {
+    // Resets the inner panel's pointer gate; forwarded so a host's key
+    // handling can disarm it without reaching into the panel directly.
+    function disarmPointer() {
+      content.disarmPointer()
+    }
+    WorkspacePanel {
       id: content
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      WorkspacePanel {
-        Layout.fillWidth: true
-        workspaceStates: parent.parent.workspaceStates
-        cursorIndex: parent.parent.cursorIndex
-        onFocusWorkspace: parent.parent.focusWorkspace(id)
+      anchors.fill: parent
+      workspaceStates: parent.workspaceStates
+      cursorIndex: parent.cursorIndex
+      onFocusWorkspace: function (id) {
+        parent.focusWorkspace(id)
+      }
+      onRowHovered: function (index) {
+        parent.rowHovered(index)
       }
     }
   }
 
   component TestPanelHost: Item {
     id: testHost
+    // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
-    property int cursorIndex: -1
+    // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
+    // none); the pointer places it too, without showing it.
+    property string cursorKey: ""
+    // True while the keyboard drives the cursor; any pointer use clears
+    // it. The mint outline shows only then, and the first key only
+    // reveals it.
+    property bool keyboardCursor: false
+    // Row index of cursorKey, drawn with the mint outline only while the
+    // keyboard shows it (WorkspaceModel.outlineIndex).
+    readonly property int cursorIndex: WorkspaceModel.outlineIndex(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
+    // Row index of cursorKey whether or not it is shown, -1 when none.
+    readonly property int cursorRow: WorkspaceModel.indexOfKey(testHost.workspaceStates, testHost.cursorKey)
+    // A workspace that went away takes the cursor with it (after the
+    // change settles, so cursorRow never re-evaluates inside its own
+    // change signal).
+    onCursorRowChanged: if (testHost.cursorRow < 0 && testHost.cursorKey)
+      Qt.callLater(testHost.dropLostCursor)
+
+    // Clears cursorKey when it no longer names a shown workspace.
+    function dropLostCursor() {
+      if (testHost.cursorRow < 0)
+        testHost.cursorKey = ""
+    }
+    // Whether the test host counts as open.
     property bool open: false
+    // Emitted to focus a workspace.
     signal focusWorkspace(int id)
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight
-    function moveCursor(delta) {
-      if (!workspaceStates.length)
-        return
-      cursorIndex = cursorIndex < 0 ? (delta > 0 ? 0 : workspaceStates.length - 1) : (cursorIndex + delta + workspaceStates.length) % workspaceStates.length
+    // A fresh open starts with the cursor hidden; the first key reveals it.
+    onOpenChanged: {
+      content.disarmPointer()
+      testHost.cursorKey = ""
+      testHost.keyboardCursor = false
     }
     Aranea.KeyboardInputFrame {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()
       onTabRequested: function (direction) {
+        content.disarmPointer()
         root.switchPanel(direction)
       }
       onMoveRequested: function (dx, dy) {
-        if (dy !== 0)
-          testHost.moveCursor(dy)
+        content.disarmPointer()
+        if (dy !== 0) {
+          var next = WorkspaceModel.cursorMove(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor, dy)
+          testHost.cursorKey = next.key
+          testHost.keyboardCursor = next.keyboard
+        }
       }
-      onActivateRequested: if (testHost.cursorIndex >= 0)
-        testHost.focusWorkspace(testHost.workspaceStates[testHost.cursorIndex].id)
+      onActivateRequested: {
+        content.disarmPointer()
+        var intent = CursorLogic.pressIntent(testHost.cursorKey !== "", testHost.keyboardCursor)
+        if (intent === "reveal") {
+          testHost.keyboardCursor = true
+          return
+        }
+        var press = WorkspaceModel.cursorPress(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
+        testHost.keyboardCursor = press.keyboard
+        if (press.row)
+          testHost.focusWorkspace(press.row.id)
+      }
       PanelContent {
         id: content
         anchors.fill: parent
         workspaceStates: testHost.workspaceStates
         cursorIndex: testHost.cursorIndex
-        onFocusWorkspace: testHost.focusWorkspace(id)
+        onFocusWorkspace: function (id) {
+          testHost.focusWorkspace(id)
+        }
+        onRowHovered: function (index) {
+          testHost.keyboardCursor = false
+          testHost.cursorKey = WorkspaceModel.workspaceKey(testHost.workspaceStates[index])
+        }
       }
     }
   }
 
   Component {
     id: testPanelHost
-    TestPanelHost {}
+    TestPanelHost {
+      objectName: "testPanelHost"
+    }
   }
   Loader {
     id: panelLoader

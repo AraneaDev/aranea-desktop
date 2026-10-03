@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Ui
 import "UpdateLogic.js" as UpdateLogic
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
 
 Item {
   id: root
@@ -23,6 +24,8 @@ Item {
   readonly property bool opened: panelOpen
   // Current service status.
   readonly property var status: service.status
+  // Whether Service is running a check right now.
+  readonly property bool checking: service.checking
   // Compact visibility and severity state.
   readonly property var display: UpdateLogic.displayState(status)
   // Reveal the inactive icon while the center section is being hovered.
@@ -107,54 +110,112 @@ Item {
   }
 
   component PanelContent: Item {
+    // The update status shown (see UpdatePanel.status).
     property var status: ({})
+    // Whether a check is running: the Refresh pill pulses and ignores clicks.
+    property bool checking: false
+    // The pill the keyboard cursor is on.
     property int cursorIndex: 0
+    // Whether the keyboard cursor shows (keyboard use only).
+    property bool keyboardCursor: false
+    // Emitted to open the updater.
     signal openUpdater
+    // Emitted to start a check.
     signal refresh
+    // Emitted when a real pointer move lands on pill INDEX.
+    signal pillHovered(int index)
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight
+    // Resets the inner panel's pointer gate; forwarded so a host's key
+    // handling can disarm it without reaching into the panel directly.
+    function disarmPointer() {
+      content.disarmPointer()
+    }
     UpdatePanel {
       id: content
       anchors.fill: parent
       status: parent.status
+      checking: parent.checking
       cursorIndex: parent.cursorIndex
+      keyboardCursor: parent.keyboardCursor
       onOpenUpdater: parent.openUpdater()
       onRefresh: parent.refresh()
+      onPillHovered: function (index) {
+        parent.pillHovered(index)
+      }
     }
   }
 
   component TestPanelHost: Item {
     id: testHost
+    // The update status shown.
     property var status: ({})
+    // Whether a check is running.
+    property bool checking: false
+    // The pill the keyboard cursor is on.
     property int cursorIndex: 0
+    // Whether the keyboard cursor shows.
+    property bool keyboardCursor: false
+    // Whether the test host counts as open.
     property bool open: false
+    // Emitted to open the updater.
     signal openUpdater
+    // Emitted to start a check.
     signal refresh
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight
+    // A fresh open starts with the cursor hidden; the first key reveals it.
+    onOpenChanged: {
+      content.disarmPointer()
+      testHost.cursorIndex = 0
+      testHost.keyboardCursor = false
+    }
     Aranea.KeyboardInputFrame {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()
       onTabRequested: function (direction) {
+        content.disarmPointer()
         root.switchPanel(direction)
       }
       onMoveRequested: function (dx, dy) {
-        if (dy !== 0)
-          testHost.cursorIndex = (testHost.cursorIndex + dy + 2) % 2
+        content.disarmPointer()
+        if (dy !== 0) {
+          var next = UpdateLogic.moveCursor(testHost.cursorIndex, testHost.keyboardCursor, dy)
+          testHost.cursorIndex = next.index
+          testHost.keyboardCursor = next.keyboardCursor
+        }
       }
       onTextKey: function (text) {
-        if (text === "r" || text === "R")
+        content.disarmPointer()
+        if ((text === "r" || text === "R") && !testHost.checking)
           testHost.refresh()
       }
-      onActivateRequested: testHost.cursorIndex === 0 ? testHost.openUpdater() : testHost.refresh()
+      onActivateRequested: {
+        content.disarmPointer()
+        var intent = CursorLogic.pressIntent(true, testHost.keyboardCursor)
+        if (intent === "reveal") {
+          testHost.keyboardCursor = true
+          return
+        }
+        if (testHost.cursorIndex === 0)
+          testHost.openUpdater()
+        else if (!testHost.checking)
+          testHost.refresh()
+      }
       PanelContent {
         id: content
         anchors.fill: parent
         status: testHost.status
+        checking: testHost.checking
         cursorIndex: testHost.cursorIndex
+        keyboardCursor: testHost.keyboardCursor
         onOpenUpdater: testHost.openUpdater()
         onRefresh: testHost.refresh()
+        onPillHovered: function (index) {
+          testHost.keyboardCursor = false
+          testHost.cursorIndex = index
+        }
       }
     }
   }
@@ -172,6 +233,9 @@ Item {
       })
       item.open = Qt.binding(function () {
         return root.panelOpen
+      })
+      item.checking = Qt.binding(function () {
+        return root.checking
       })
     }
   }
