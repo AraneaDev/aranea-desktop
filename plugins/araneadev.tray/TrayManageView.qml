@@ -7,8 +7,8 @@
 // and reporting every user action through a single action signal. No
 // settings, tray items or windows here: tests drive it with fixtures.
 //
-// The keyboard cursor outline shows on the {row, pill} cursor's pill only
-// while view.cursor.active, never on hover; hover goes through a
+// The keyboard cursor outline shows on the cursor's row and pill only, and
+// only while view.cursor.active, never on hover; hover goes through a
 // PointerMoveGate only. Rows are keyed by the tray item id and never
 // rebuilt for a cursor or state change (the Repeater's model is the row
 // count). The rows' keys changing (an equal list does not) and the panel
@@ -182,7 +182,9 @@ Column {
         }
 
         // Reports NAME for this row if the press held the key it still
-        // holds, then forgets the press.
+        // holds, then forgets the press. Pointer only: keyboard toggles go
+        // through the host's own {index, key} path, never pill.activate()
+        // (which has no press, so it is refused here).
         function release(name) {
           var key = row.pressedKey
           row.pressedKey = ""
