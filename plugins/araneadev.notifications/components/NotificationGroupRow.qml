@@ -89,7 +89,11 @@ RowLayout {
         if (row.pointerGate && row.pointerGate.moved(titleArea, mouse))
           row.pointerMovedAt = Date.now()
       }
-      onClicked: row.groupClicked()
+      onClicked: {
+        row.groupClicked()
+        // A press is used once.
+        row.pressedKey = ""
+      }
     }
   }
 
@@ -118,7 +122,10 @@ RowLayout {
         }
       }
       onExited: row.closeHot = false
-      onClicked: row.closeRequested()
+      onClicked: {
+        row.closeRequested()
+        row.pressedKey = ""
+      }
     }
   }
 }

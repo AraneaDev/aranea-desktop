@@ -236,6 +236,8 @@ ShellRoot {
         t.equal(JSON.stringify(toast.cardBorderSpec), todaysBorderSpec(1), "a toast's border spec is today's")
         t.equal(toast.radius, 6, "a toast keeps its corner radius")
         t.equal(toast.implicitWidth, Style.space(380), "a toast keeps its width")
+        t.equal(toast.implicitHeight, 64, "a normal toast keeps today's height (this harness: 380x64)")
+        t.equal(lowToast.implicitHeight, 56, "a low toast keeps today's height (no body: 380x56)")
         var rail = one(toast, "urgencyRail")
         t.equal(rail.width, Style.space(3), "the urgency rail keeps its width")
         t.check(sameColor(rail.color, Color.notifications.countdown), "a normal toast's rail is the countdown colour")
@@ -316,6 +318,7 @@ ShellRoot {
           index: 3,
           key: "e:b1"
         }), "a card click opens with its index and key")
+        t.equal(list.itemAtIndex(3).pressedKey, "", "a click uses its press's key once")
         pointer.mouseClick(one(list.itemAtIndex(3), "closeButton"))
         t.check(reported("dismiss", {
           index: 3,
@@ -375,7 +378,7 @@ ShellRoot {
         t.equal(collapsed.map(InboxLogic.rowKey), rowsOf(baseEntries()).map(InboxLogic.rowKey), "collapsing a one-entry group keeps the keys")
         list.rows = collapsed
         t.check(list.layoutChangedAt > stampBefore, "a group collapsing stamps the layout")
-        t.equal(one(list.itemAtIndex(2), "groupTitle").text.indexOf("▸"), 0, "and shows it collapsed")
+        t.equal(one(list.itemAtIndex(2), "groupTitle").text.indexOf(String.fromCodePoint(0x25b8)), 0, "and shows it collapsed")
         stampBefore = list.layoutChangedAt
       }], [20, function () {
         var more = baseEntries()

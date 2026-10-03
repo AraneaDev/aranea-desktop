@@ -225,6 +225,9 @@ BorderSurface {
         root.closeRequested()
       else
         root.cardClicked()
+      // A press is used once: a later click without a press of its own
+      // never reuses its key.
+      root.pressedKey = ""
     }
   }
 
@@ -434,7 +437,10 @@ BorderSurface {
               }
             }
             onExited: root.closeHot = false
-            onClicked: root.closeRequested()
+            onClicked: {
+              root.closeRequested()
+              root.pressedKey = ""
+            }
           }
         }
       }
