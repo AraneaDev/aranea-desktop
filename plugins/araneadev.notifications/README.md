@@ -36,8 +36,9 @@ Keys:
 - Esc closes; Tab and Shift+Tab switch to the next panel.
 
 The key hint line follows the state (`InboxLogic.centerKeyHint`): "↑↓ move
-· enter open · x dismiss · ⇧del group · tab next" with entries, shortened
-to fit the card, and "↑↓ move · tab next" when the center is empty.
+· x dismiss · ⇧del group · tab next" with entries and "↑↓ move · tab next"
+when the center is empty. The full set of keys did not fit the card, so the
+hint leaves out Enter (open), the most guessable key.
 
 The cursor is keyboard-only. A fresh open shows none; the first navigation
 key only reveals it, and any pointer use hides it. It follows its entry by

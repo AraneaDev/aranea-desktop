@@ -4,7 +4,7 @@
 // the key hint, stays at or above the content bottom and the list scrolls
 // inside the rest; a short list keeps its full height. The header shows
 // the bell glyph like the other dropdowns. Both key hints fit the card's
-// content width unelided.
+// content width unelided, the full one with a 10% margin.
 import QtQuick
 import Quickshell
 import qs.Commons
@@ -157,7 +157,9 @@ ShellRoot {
     t.check(bottomIn(longList, longFrame) <= pill.mapToItem(longFrame, 0, 0).y + 0.5, "the list ends above the Clear pill")
     t.check(Math.abs(shortList.height - shortList.contentHeight) < 0.5 && shortList.height > 0, "a short list keeps its full height")
     t.check(bottomIn(t.findChild(shortCenter, "keyHint"), shortFrame) <= shortFrame.height, "and its footer fits too")
-    t.check(hint.implicitWidth <= hint.width + 0.5, "the full key hint fits the card unelided (" + hint.implicitWidth + " <= " + hint.width + ")")
+    // A 10% margin: the live shell's font and spacing scale differ from
+    // this harness, and a hint that only just fit here was elided live.
+    t.check(hint.implicitWidth <= hint.width * 0.9, "the full key hint fits the card unelided, with a margin (" + hint.implicitWidth + " <= 0.9 * " + hint.width + ")")
     t.equal(hint.text, InboxLogic.centerKeyHint(12), "with entries the hint names every key")
     var emptyHint = t.findChild(emptyCenter, "keyHint")
     t.equal(emptyHint.text, "↑↓ move · tab next", "the empty center shows the short hint")

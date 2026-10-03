@@ -359,7 +359,7 @@ function centerCaption(count, quiet, quietUntilText) {
  * @returns {string} the hint
  */
 function centerKeyHint(count) {
-  if ((Number(count) || 0) > 0) return "↑↓ move · enter open · x dismiss · ⇧del group · tab next"
+  if ((Number(count) || 0) > 0) return "↑↓ move · x dismiss · ⇧del group · tab next"
   return "↑↓ move · tab next"
 }
 

@@ -129,7 +129,7 @@ test("notifications logic", () => {
   )
   assert(inbox.centerCaption(undefined, false, "") === "Nothing new", "a missing count reads as 0")
   assert(
-    inbox.centerKeyHint(4) === "↑↓ move · enter open · x dismiss · ⇧del group · tab next",
+    inbox.centerKeyHint(4) === "↑↓ move · x dismiss · ⇧del group · tab next",
     "the full hint with entries"
   )
   assert(inbox.centerKeyHint(0) === "↑↓ move · tab next", "the short hint when empty")
