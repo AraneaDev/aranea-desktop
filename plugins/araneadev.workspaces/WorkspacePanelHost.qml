@@ -4,41 +4,69 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
+import "WorkspaceModel.js" as WorkspaceModel
 
 Aranea.KeyboardPanelFrame {
   id: host
   // Normalized workspace rows supplied by the bar widget.
   property var workspaceStates: []
-  // Keyboard-selected row index.
-  property int cursorIndex: -1
-  // Request focus for a workspace row.
+  // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
+  // none); rows re-sort as workspaces come and go, so the cursor follows
+  // the workspace, not a position. The pointer places it too, without
+  // showing it.
+  property string cursorKey: ""
+  // True while the keyboard drives the cursor; any pointer use clears it.
+  // The mint outline shows only then, and the first key after opening or
+  // after pointer use only reveals it.
+  property bool keyboardCursor: false
+  // Row index of cursorKey in workspaceStates, drawn with the mint outline
+  // only while the keyboard shows it (WorkspaceModel.outlineIndex).
+  readonly property int cursorIndex: WorkspaceModel.outlineIndex(host.workspaceStates, host.cursorKey, host.keyboardCursor)
+  // Emitted to focus a workspace.
   signal focusWorkspace(int id)
   open: owner ? owner.opened : false
   gap: Style.gapsOut
   contentWidth: fittedContentWidth(Style.space(380))
   contentHeight: fittedContentHeight(content.implicitHeight, Style.space(520))
-  // Move the keyboard cursor through the workspace rows.
-  function moveCursor(delta) {
-    if (!workspaceStates.length)
-      return
-    cursorIndex = cursorIndex < 0 ? (delta > 0 ? 0 : workspaceStates.length - 1) : (cursorIndex + delta + workspaceStates.length) % workspaceStates.length
+  // A fresh open starts with the cursor hidden; the first key reveals it.
+  onOpenChanged: {
+    panel.disarmPointer()
+    host.cursorKey = ""
+    host.keyboardCursor = false
   }
   onCloseRequested: host.owner.close()
   onTabRequested: function (direction) {
+    panel.disarmPointer()
     host.owner.switchPanel(direction)
   }
   onMoveRequested: function (dx, dy) {
-    if (dy !== 0)
-      host.moveCursor(dy)
+    panel.disarmPointer()
+    if (dy !== 0) {
+      var next = WorkspaceModel.cursorMove(host.workspaceStates, host.cursorKey, host.keyboardCursor, dy)
+      host.cursorKey = next.key
+      host.keyboardCursor = next.keyboard
+    }
   }
-  onActivateRequested: if (host.cursorIndex >= 0)
-    host.focusWorkspace(host.workspaceStates[host.cursorIndex].id)
+  onActivateRequested: {
+    panel.disarmPointer()
+    var intent = CursorLogic.pressIntent(host.cursorKey !== "", host.keyboardCursor)
+    if (intent === "reveal") {
+      host.keyboardCursor = true
+      return
+    }
+    var press = WorkspaceModel.cursorPress(host.workspaceStates, host.cursorKey, host.keyboardCursor)
+    host.keyboardCursor = press.keyboard
+    if (press.row)
+      host.focusWorkspace(press.row.id)
+  }
   ColumnLayout {
     id: content
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
     WorkspacePanel {
+      id: panel
       Layout.fillWidth: true
       workspaceStates: host.workspaceStates
       cursorIndex: host.cursorIndex
@@ -47,7 +75,13 @@ Aranea.KeyboardPanelFrame {
       // card always reserves around the content, so a capped panel can
       // never exceed the space contentHolder actually gives it.
       maxContentHeight: Math.max(0, Math.min(Style.space(520), host.availableCardHeight) - host.verticalContentInset)
-      onFocusWorkspace: host.focusWorkspace(id)
+      onFocusWorkspace: function (id) {
+        host.focusWorkspace(id)
+      }
+      onRowHovered: function (index) {
+        host.keyboardCursor = false
+        host.cursorKey = WorkspaceModel.workspaceKey(host.workspaceStates[index])
+      }
     }
   }
 }

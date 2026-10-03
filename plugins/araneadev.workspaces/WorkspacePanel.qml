@@ -1,8 +1,26 @@
-// Workspace overview content shared by the live and test panel hosts.
+// Workspace overview content shared by the live and test panel hosts: a
+// DropdownHeader (glyph, "Workspaces", "N open"), then one
+// Aranea.NodeDeviceRow per workspace (its node lit on the current
+// workspace, the window count as detail), and a key hint at the bottom.
+// Pure view: rows and the keyboard cursor in, keyed signals out.
+//
+// Every row is keyed by WorkspaceModel.workspaceKey (the workspace id) and
+// a click or Enter is refused when the row no longer carries the key it
+// was aimed at. The Repeater runs over the row count, so a workspace list
+// that changes while the dropdown is open never recreates a row under a
+// resting pointer. When the rows really move (the joined keys change) the
+// panel stamps layoutChangedAt, which the rows read through pointerGate: a
+// click within 300 ms of it is ignored unless the pointer has really moved
+// onto the row since. The mint outline is drawn only on cursorIndex, which
+// the host sets only while the keyboard drives it; pointer hover never
+// highlights a row.
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
+import "WorkspaceModel.js" as WorkspaceModel
 
 Item {
   id: panel
@@ -13,12 +31,18 @@ Item {
   property var bar: null
   // Normalized workspace rows rendered by the panel.
   property var workspaceStates: []
-  // Keyboard-selected row index.
+  // Row index of the keyboard cursor, -1 for none (the host passes -1
+  // while the pointer drives, so the outline is keyboard only).
   property int cursorIndex: -1
   // Compatibility signal for panel hosts.
   signal closed
-  // Request focus for a workspace row.
+  // Emitted with a workspace's id once a settled click or Enter on its row
+  // is accepted, keyed by activateRow so a stale index never focuses
+  // another workspace.
   signal focusWorkspace(int id)
+  // Emitted when the pointer really moves onto row INDEX; the host places
+  // the cursor there, hidden, so a following key reveals it in place.
+  signal rowHovered(int index)
 
   // Maximum height this panel's content (this Item, not the host's card) may
   // grow to; the caller owns this number. The host passes down its real cap
@@ -29,8 +53,45 @@ Item {
   // default so a standalone panel (previews, tests without a host) isn't
   // artificially capped.
   property real maxContentHeight: Infinity
-  // Height left for the row list once the fixed chrome is accounted for.
-  readonly property real maxListHeight: Math.max(0, maxContentHeight - (header.implicitHeight + layout.spacing))
+  // The hairline's height, shared with the maxListHeight sum below so
+  // Style.spacing.hairline is only read in one place.
+  readonly property real hairlineHeight: Math.max(1, Style.spacing.hairline)
+  // Height left for the row list once the fixed chrome (the header, the
+  // hairline and the key hint) is accounted for.
+  readonly property real maxListHeight: Math.max(0, maxContentHeight - (header.implicitHeight + panel.hairlineHeight + keyHint.implicitHeight + layout.spacing * 3))
+
+  // The rows' keys joined, so a host can tell when the rows really moved
+  // (an equal list rebuilt gives the same string).
+  readonly property string rowKeys: WorkspaceModel.workspaceKeys(panel.workspaceStates)
+  // When the rows last moved under the pointer (Date.now()), 0 for never.
+  property real layoutChangedAt: 0
+  // Filters synthetic hover from rows moving under a still pointer, and
+  // carries layoutChangedAt to the rows' clickSettled().
+  readonly property alias pointerGate: gate
+
+  // Stamps layoutChangedAt: the rows moved without the pointer moving.
+  function noteLayoutChange() {
+    panel.layoutChangedAt = Date.now()
+  }
+  onRowKeysChanged: panel.noteLayoutChange()
+
+  // Resets the pointer gate; called after every key so a stale pointer
+  // sample never steals the cursor back.
+  function disarmPointer() {
+    gate.reset()
+  }
+
+  // Reports row INDEX as activated, refused when it no longer holds KEY.
+  function activateRow(index, key) {
+    var row = WorkspaceModel.keyedWorkspace(panel.workspaceStates, index, key)
+    if (row)
+      panel.focusWorkspace(row.id)
+  }
+
+  // The row at INDEX (objectName "workspaceRow"), or null.
+  function rowAt(index) {
+    return rowRepeater.itemAt(index)
+  }
 
   implicitWidth: Style.space(500)
   // Sized by its content: the gaps stay the layout spacing.
@@ -77,13 +138,19 @@ Item {
     anchors.top: parent.top
     spacing: Style.space(8)
 
-    Aranea.PanelHeader {
+    Aranea.DropdownHeader {
       id: header
       Layout.fillWidth: true
-      title: "Workspace overview"
-      hint: "CYCLE  ·  FOCUS"
-      hintText: "ENTER FOCUS  ·  WHEEL CYCLE  ·  ESC CLOSE"
-      section: "WORKSPACES  ·  " + panel.workspaceStates.length
+      glyph: String.fromCodePoint(0x283f)
+      title: "Workspaces"
+      caption: WorkspaceModel.openCaption(panel.workspaceStates.length)
+    }
+
+    Rectangle {
+      // The hairline between the header and the row list.
+      Layout.fillWidth: true
+      Layout.preferredHeight: panel.hairlineHeight
+      color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
     }
 
     // Scrolls when the row list would otherwise grow the panel past
@@ -98,50 +165,59 @@ Item {
       clip: true
       interactive: contentHeight > height
       boundsBehavior: Flickable.StopAtBounds
+      onVisibleChanged: panel.noteLayoutChange()
+      onHeightChanged: panel.noteLayoutChange()
 
       ColumnLayout {
         id: rowLayout
         width: rowList.width
-        spacing: Style.space(8)
+        spacing: Style.space(4)
 
+        // The model is the row count, not the array: a refresh that hands
+        // over a fresh (but equal) workspaceStates array never recreates a
+        // row under a resting pointer.
         Repeater {
           id: rowRepeater
-          model: panel.workspaceStates
-          delegate: Aranea.StatusRow {
-            required property var modelData
+          model: panel.workspaceStates.length
+          Aranea.NodeDeviceRow {
+            id: row
             required property int index
+            // This row's workspace, read from the live array.
+            readonly property var workspace: panel.workspaceStates[row.index] || ({})
+            // The row's key, sent with its action.
+            readonly property string key: WorkspaceModel.workspaceKey(row.workspace)
+
+            objectName: "workspaceRow"
             Layout.fillWidth: true
-            rowHeight: Style.space(50)
-            highlighted: panel.cursorIndex === index
-            clickable: true
-            railColor: modelData.urgent ? Color.accent : (modelData.active ? Color.accent : Util.alpha(Color.popups.text, 0.25))
-            title: "WORKSPACE " + modelData.name
-            titleColor: modelData.active ? Color.accent : Color.popups.text
-            titleBold: modelData.active
-            subtitle: modelData.windowLabels && modelData.windowLabels.length > 0 ? modelData.windowLabels.join("  ·  ") : (modelData.windows > 0 ? "OPEN WINDOWS" : "EMPTY")
-            subtitleSize: Style.font.caption
-            subtitleElide: Text.ElideRight
-            onClicked: panel.focusWorkspace(modelData.id)
-
-            Text {
-              text: modelData.windows + (modelData.windows === 1 ? " WINDOW" : " WINDOWS")
-              color: Color.popups.text
-              opacity: 0.7
-              font.pixelSize: Style.font.caption
-              font.family: Style.font.family
-            }
-
-            Text {
-              visible: modelData.urgent
-              text: "ATTENTION"
-              color: Color.accent
-              font.bold: true
-              font.pixelSize: Style.font.caption
-              font.family: Style.font.family
-            }
+            label: WorkspaceModel.workspaceLabel(row.workspace)
+            detail: WorkspaceModel.workspaceDetail(row.workspace)
+            active: !!row.workspace.active
+            hasCursor: panel.cursorIndex === row.index
+            pointerGate: panel.pointerGate
+            onChosen: panel.activateRow(row.index, row.key)
+            onEntered: panel.rowHovered(row.index)
           }
         }
       }
     }
+
+    Text {
+      id: keyHint
+      objectName: "keyHint"
+      Layout.fillWidth: true
+      text: "↑↓ move · enter focus · wheel cycle · tab next"
+      color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+      elide: Text.ElideRight
+    }
+  }
+
+  PointerMoveGate {
+    id: gate
+    // This panel's last layout shift, for the rows' clickSettled().
+    property real layoutChangedAt: panel.layoutChangedAt
+
+    referenceItem: panel
   }
 }

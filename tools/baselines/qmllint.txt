@@ -269,15 +269,10 @@
 1	plugins/araneadev.weather/WeatherSuggestions.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.weather/WeatherSuggestions.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.weather/WeatherSuggestions.qml:missing-property:Member "family" not found on type "QObject"
-1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "cursorIndex" not found on type "QQuickItem"
 1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "family" not found on type "QObject"
-1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "focusWorkspace" not found on type "QQuickItem"
 1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "title" not found on type "QObject"
-1	plugins/araneadev.workspaces/BarWidget.qml:missing-property:Member "workspaceStates" not found on type "QQuickItem"
-8	plugins/araneadev.workspaces/BarWidget.qml:unqualified:Unqualified access
-3	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "family" not found on type "QObject"
-3	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "text" not found on type "QObject"
-5	plugins/araneadev.workspaces/WorkspacePanel.qml:unqualified:Unqualified access
-1	plugins/araneadev.workspaces/WorkspacePanelHost.qml:unqualified:Unqualified access
+6	plugins/araneadev.workspaces/BarWidget.qml:unqualified:Unqualified access
+1	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.workspaces/WorkspacePanel.qml:missing-property:Member "hairline" not found on type "QObject"
 1	plugins/araneadev.workspaces/WorkspacePanelHost.qml:unused-imports:Unused import

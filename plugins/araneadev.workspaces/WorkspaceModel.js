@@ -251,6 +251,151 @@ function cycleTarget(states, currentId, direction) {
   return rows[target].id
 }
 
+/**
+ * The key a workspace row is followed and acted on by: its id.
+ * @param {*} row - Workspace row.
+ * @returns {string} The id as a string, "" when absent.
+ */
+function workspaceKey(row) {
+  if (!row || typeof row !== "object" || row.id === undefined || row.id === null) return ""
+  return String(row.id)
+}
+
+/**
+ * Every row's workspaceKey joined by newlines, so a host can tell when the
+ * rows really moved (an equal list rebuilt gives the same string).
+ * @param {*} rows - Workspace rows.
+ * @returns {string} The joined keys, "" for no rows.
+ */
+function workspaceKeys(rows) {
+  return (Array.isArray(rows) ? rows : []).map(workspaceKey).join("\n")
+}
+
+/**
+ * Position of the row with this key (its workspaceKey: the workspace id).
+ * @param {*} rows - Workspace rows.
+ * @param {string} key - The row key, e.g. "2".
+ * @returns {number} Its index, or -1 (always for an empty key).
+ */
+function indexOfKey(rows, key) {
+  if (!key) return -1
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) if (workspaceKey(list[i]) === key) return i
+  return -1
+}
+
+/**
+ * The row a keyed action names: row `index`, but only while it still has
+ * `key`, so a click or Enter aimed before the workspaces change never
+ * focuses another one.
+ * @param {*} rows - Workspace rows.
+ * @param {number} index - The row the action names.
+ * @param {*} key - The key the view saw at that row.
+ * @returns {?object} The row, or null when it no longer carries the key.
+ */
+function keyedWorkspace(rows, index, key) {
+  if (typeof key !== "string" || key === "") return null
+  var list = Array.isArray(rows) ? rows : []
+  var row = list[index]
+  return row && workspaceKey(row) === key ? row : null
+}
+
+/**
+ * Key of the row delta steps from the row with this key, wrapping; the
+ * first (delta > 0) or last row when the key is empty or gone.
+ * @param {*} rows - Workspace rows.
+ * @param {string} key - The current cursor key, or "".
+ * @param {number} delta - Rows to move (sign matters).
+ * @returns {string} The new cursor key, or "" when there are no rows.
+ */
+function moveCursorKey(rows, key, delta) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return ""
+  var i = key ? indexOfKey(list, key) : -1
+  if (i < 0) return workspaceKey(list[delta < 0 ? list.length - 1 : 0])
+  return workspaceKey(list[(i + delta + list.length) % list.length])
+}
+
+/**
+ * The cursor after an up or down key. The first key after opening or after
+ * pointer use (keyboard false) only reveals the cursor: on the row the
+ * pointer left it on, else the first (dy > 0) or last row. Later keys move
+ * it, wrapping.
+ * @param {*} rows - Workspace rows.
+ * @param {string} key - The cursor's key, or "".
+ * @param {boolean} keyboard - Whether the keyboard is showing the cursor.
+ * @param {number} dy - Rows to move (sign matters); 0 does nothing.
+ * @returns {{key: string, keyboard: boolean}} The new cursor key and mode.
+ */
+function cursorMove(rows, key, keyboard, dy) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0 || !dy) return { key: key, keyboard: keyboard }
+  if (!keyboard)
+    return {
+      key: indexOfKey(list, key) >= 0 ? key : moveCursorKey(list, "", dy),
+      keyboard: true
+    }
+  return { key: moveCursorKey(list, key, dy), keyboard: true }
+}
+
+/**
+ * What Enter or Space does: nothing without a cursor, only reveal one the
+ * keyboard is not showing, else focus the cursor's workspace.
+ * @param {*} rows - Workspace rows.
+ * @param {string} key - The cursor's key, or "".
+ * @param {boolean} keyboard - Whether the keyboard is showing the cursor.
+ * @returns {{keyboard: boolean, row: ?object}} The new mode and the row to
+ *   focus, or null.
+ */
+function cursorPress(rows, key, keyboard) {
+  var i = indexOfKey(rows, key)
+  if (i < 0) return { keyboard: keyboard, row: null }
+  return { keyboard: true, row: keyboard ? rows[i] : null }
+}
+
+/**
+ * The row the mint outline is drawn on: the cursor's, only while the
+ * keyboard drives it.
+ * @param {*} rows - Workspace rows.
+ * @param {string} key - The cursor's key, or "".
+ * @param {boolean} keyboard - Whether the keyboard is showing the cursor.
+ * @returns {number} The row index, or -1 for no outline.
+ */
+function outlineIndex(rows, key, keyboard) {
+  return keyboard ? indexOfKey(rows, key) : -1
+}
+
+/**
+ * The dropdown header's caption: how many workspaces are shown.
+ * @param {number} count - Number of visible workspace rows.
+ * @returns {string} "N open".
+ */
+function openCaption(count) {
+  return Math.max(0, Number(count) || 0) + " open"
+}
+
+/**
+ * A row's label: "Workspace" plus its display name.
+ * @param {*} row - Workspace row.
+ * @returns {string} The row's label.
+ */
+function workspaceLabel(row) {
+  var name = row && row.name !== undefined && row.name !== null ? row.name : ""
+  return "Workspace " + name
+}
+
+/**
+ * A row's trailing detail: the window count ("empty" for none), with
+ * "current" appended for the active workspace.
+ * @param {*} row - Workspace row.
+ * @returns {string} The detail text.
+ */
+function workspaceDetail(row) {
+  var windows = Math.max(0, Number(row && row.windows) || 0)
+  var label = windows === 0 ? "empty" : windows + (windows === 1 ? " window" : " windows")
+  return row && row.active ? label + " · current" : label
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     normalizeWorkspaces,
@@ -258,6 +403,17 @@ if (typeof module !== "undefined") {
     visibleWorkspaces,
     overviewWorkspaces,
     indicatorDots,
-    cycleTarget
+    cycleTarget,
+    workspaceKey,
+    workspaceKeys,
+    indexOfKey,
+    keyedWorkspace,
+    moveCursorKey,
+    cursorMove,
+    cursorPress,
+    outlineIndex,
+    openCaption,
+    workspaceLabel,
+    workspaceDetail
   }
 }
