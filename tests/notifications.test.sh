@@ -176,12 +176,11 @@ grep -Fq 'function expandAt(index: int): void' "$panel_qml"
 grep -Fq 'fixed.timestamp = now - f' "$inbox_qml"
 
 # --- consistency pass part 2, task 1: a keyboard Delete arms
-# pendingRemovalKey so the cursor stays shown on the shared
-# CursorLogic.afterRemoval's neighbour; a pointer dismiss clears it instead
-# (today's hide). The pure rule itself is tests/js/cursor-logic.test.js.
-grep -Fq 'import "../araneadev.shared/CursorLogic.js" as CursorLogic' "$panel_qml"
+# pendingRemovalKey; the keyboard-vs-pointer removal decision itself (land
+# on CursorLogic.afterRemoval's neighbour, or hide as a plain followStop)
+# is InboxLogic.followRemoval, a pure function tested by
+# tests/js/notifications.test.js, not by grep.
 grep -Fq 'root.pendingRemovalKey = root.cursorKey' "$panel_qml"
-grep -Fq 'CursorLogic.afterRemoval(root.stops, removed, lastStop)' "$panel_qml"
-grep -Fq 'root.pendingRemovalKey = ""' "$panel_qml"
+grep -Fq 'InboxLogic.followRemoval(' "$panel_qml"
 
 echo "notifications contract passed"
