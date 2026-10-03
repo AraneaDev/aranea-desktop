@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.15.0...v2.16.0) (2026-10-03)
+
+
+### Features
+
+* Aranea-native Tray dropdowns ([#103](https://github.com/AraneaDev/aranea-desktop/issues/103)) ([5d4bed5](https://github.com/AraneaDev/aranea-desktop/commit/5d4bed581ced9efc312fa734ae38fef01cbd3e03))
+
 ## [2.15.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.14.0...v2.15.0) (2026-10-02)
 
 
