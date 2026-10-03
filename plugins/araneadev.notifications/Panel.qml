@@ -41,18 +41,7 @@ Panel {
   // True while the service's quiet hours are active.
   readonly property bool quiet: service ? !!service.quietHours : false
   // Number of critical (urgency 2) inbox entries.
-  readonly property int criticalCount: {
-    if (!available)
-      return 0
-    var revision = service.inbox.revision
-    // re-evaluate on every inbox change
-    var n = 0
-    var model = service.inbox.model
-    for (var i = 0; i < model.count; i++)
-      if (model.get(i).urgency === 2)
-        n++
-    return n
-  }
+  readonly property int criticalCount: available ? InboxLogic.criticalCount(service.inbox.snapshot) : 0
   // Red with the critical count when anything critical waits; otherwise mint
   // with the total; DND hides the non-critical badge.
   readonly property var badge: InboxLogic.badgeState(count, criticalCount, dnd || quiet)
@@ -71,19 +60,10 @@ Panel {
   // Clock for the relative time labels: set on open, then every 30 s while open.
   property real now: Date.now()
 
-  // Center rows: inbox entries sorted critical first, grouped by app and
-  // flattened into group, entry and "more" rows (InboxLogic).
-  readonly property var rows: {
-    if (!available)
-      return []
-    var revision = service.inbox.revision
-    // re-evaluate on every inbox change
-    var entries = []
-    var model = service.inbox.model
-    for (var i = 0; i < model.count; i++)
-      entries.push(model.get(i))
-    return InboxLogic.flattenGroups(InboxLogic.groupView(InboxLogic.sortForCenter(entries), root.expanded))
-  }
+  // Center rows: the inbox snapshot (plain copies, never live model objects)
+  // sorted critical first, grouped by app and flattened into group, entry and
+  // "more" rows (InboxLogic.centerRows).
+  readonly property var rows: available ? InboxLogic.centerRows(service.inbox.snapshot, root.expanded) : []
 
   // Whether the row at index can hold the keyboard cursor (entry and "more" rows).
   function selectable(index: int): bool {

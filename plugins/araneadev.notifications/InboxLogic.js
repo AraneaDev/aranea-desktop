@@ -226,6 +226,68 @@ function sortForCenter(entries) {
   return rows
 }
 
+/** The fields of an inbox row, as Inbox.qml stores them in its ListModel. */
+var ROW_FIELDS = [
+  "fileName",
+  "id",
+  "originalId",
+  "app",
+  "appIcon",
+  "summary",
+  "body",
+  "image",
+  "glyph",
+  "execArgv",
+  "urgency",
+  "expireTimeout",
+  "timestamp",
+  "sourceKey"
+]
+
+/**
+ * Plain copies of inbox rows (ROW_FIELDS only). Inbox.qml publishes these as
+ * its snapshot, so bindings never hold live ListModel objects: a binding that
+ * hands those to a view re-enters itself through their change notifications
+ * (the `rows` binding loop).
+ * @param {Array<Dict>} rows - inbox rows, live or plain
+ * @returns {Array<Dict>} one new plain object per row, in order
+ */
+function snapshotOf(rows) {
+  var list = Array.isArray(rows) ? rows : []
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i] || {}
+    /** @type {Dict} */
+    var copy = {}
+    for (var k = 0; k < ROW_FIELDS.length; k++) copy[ROW_FIELDS[k]] = row[ROW_FIELDS[k]]
+    out.push(copy)
+  }
+  return out
+}
+
+/**
+ * The center's rows for an inbox snapshot: sorted critical first, grouped by
+ * app and flattened into group, entry and "more" rows.
+ * @param {Array<Dict>} entries - the inbox snapshot (snapshotOf)
+ * @param {?{[key: string]: boolean}} expanded - per-app expand overrides
+ * @returns {Array<Dict>} flattenGroups rows
+ */
+function centerRows(entries, expanded) {
+  return flattenGroups(groupView(sortForCenter(entries), expanded))
+}
+
+/**
+ * How many entries are critical (urgency 2).
+ * @param {Array<Dict>} entries - the inbox snapshot (snapshotOf)
+ * @returns {number} the critical count
+ */
+function criticalCount(entries) {
+  var list = Array.isArray(entries) ? entries : []
+  var n = 0
+  for (var i = 0; i < list.length; i++) if (list[i] && Number(list[i].urgency) === CRITICAL) n++
+  return n
+}
+
 /**
  * Stable identity for a center row, so the keyboard cursor follows its item
  * when arrivals shift the list.
@@ -359,6 +421,10 @@ if (typeof module !== "undefined") {
     tooltipText: tooltipText,
     badgeState: badgeState,
     sortForCenter: sortForCenter,
+    ROW_FIELDS: ROW_FIELDS,
+    snapshotOf: snapshotOf,
+    centerRows: centerRows,
+    criticalCount: criticalCount,
     rowKey: rowKey,
     indexOfKey: indexOfKey,
     bellGlyph: bellGlyph,

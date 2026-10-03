@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Runs the offscreen QML behaviour tests (tests/qml/*.qml) under quickshell
 # with QT_QPA_PLATFORM=offscreen; passes when a test prints "QMLTEST DONE 0",
-# no "QMLTEST FAIL" and loads cleanly. Skips (exit 0; 1 with
-# ARANEA_CHECK_REQUIRE_ALL=1) without quickshell or the Omarchy shell.
+# no "QMLTEST FAIL", no runtime error or binding loop, and loads cleanly.
+# Skips (exit 0; 1 with ARANEA_CHECK_REQUIRE_ALL=1) without quickshell or the
+# Omarchy shell.
 #
 # Usage: tests/qml-behaviour.test.sh [name...]
 set -euo pipefail
@@ -96,11 +97,12 @@ run_test() {
     return 1
   fi
   # A runtime error fails the test even when every check passed: it means
-  # some code path the test drove threw.
+  # some code path the test drove threw. So does a binding loop: Qt only
+  # warns, and keeps the stale value.
   local errors
-  errors="$(grep -E 'TypeError|ReferenceError|is not a function|Cannot read property|Unable to assign' <<<"$log" | grep -v 'quickshell.ipc' || true)"
+  errors="$(grep -E 'TypeError|ReferenceError|is not a function|Cannot read property|Unable to assign|Binding loop detected' <<<"$log" | grep -v 'quickshell.ipc' || true)"
   if [[ -n "$errors" ]]; then
-    echo "qmltest: $name FAILED (runtime error)"
+    echo "qmltest: $name FAILED (runtime error or binding loop)"
     head -20 <<<"$errors" | sed 's/^/  /'
     return 1
   fi

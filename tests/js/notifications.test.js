@@ -179,6 +179,29 @@ test("notifications logic", () => {
     { fileName: "c", timestamp: 2, urgency: 1 }
   ])
   assert(sorted.map((x) => x.fileName).join() === "b,a,c", "critical first, then newest")
+  // --- snapshot: plain copies of exactly the row fields
+  const liveRow = { fileName: "x.json", app: "mail", urgency: 2, timestamp: 5, extra: "no" }
+  const snap = inbox.snapshotOf([liveRow, null])
+  assert(snap.length === 2 && snap[0] !== liveRow, "snapshotOf copies every row")
+  assert(
+    Object.keys(snap[0]).join() === inbox.ROW_FIELDS.join(),
+    "a copy holds the row fields only"
+  )
+  assert(snap[0].app === "mail" && snap[1].fileName === undefined, "copied values, null rows empty")
+  liveRow.app = "changed"
+  assert(snap[0].app === "mail", "a copy does not follow its source")
+  assert(inbox.snapshotOf(undefined).length === 0, "no rows, empty snapshot")
+  assert(
+    inbox.criticalCount([{ urgency: 2 }, { urgency: "2" }, { urgency: 1 }, null]) === 2,
+    "critical count"
+  )
+  assert(inbox.criticalCount(null) === 0, "no entries, no critical")
+  const center = inbox.centerRows(sorted.slice().reverse(), {})
+  assert(
+    center.map((r) => r.kind + ":" + (r.entry ? r.entry.fileName : r.app)).join() ===
+      "group:unknown,entry:b,more:unknown",
+    "centerRows sorts, groups and flattens"
+  )
   // --- cursor follows the item (Important #5)
   const before = inbox.flattenGroups(inbox.groupView([g("Build", 8)], {}))
   const key = inbox.rowKey(before[1])

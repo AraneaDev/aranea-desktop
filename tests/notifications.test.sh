@@ -36,7 +36,7 @@ jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" 
 jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml"' "$plugin/manifest.json" >/dev/null
 test -f "$plugin/Panel.qml"
 grep -Fq 'KeyboardPanel' "$plugin/Panel.qml"
-grep -Fq 'InboxLogic.flattenGroups' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.centerRows(service.inbox.snapshot' "$plugin/Panel.qml"
 grep -Fq 'NotificationCenterContent {' "$plugin/Panel.qml"
 grep -Fq 'All caught up' "$plugin/NotificationCenterContent.qml"
 grep -Fq 'NotificationList {' "$plugin/Panel.qml"
@@ -59,7 +59,12 @@ fi
 grep -Fq 'merge' "$plugin/Inbox.qml"
 
 grep -Fq 'InboxLogic.badgeState' "$plugin/Panel.qml"
-grep -Fq 'InboxLogic.sortForCenter' "$plugin/Panel.qml"
+# The center reads the inbox's plain snapshot, never its live model
+# (live model objects in a binding feeding a view loop that binding).
+if grep -Fq 'inbox.model' "$plugin/Panel.qml"; then
+  echo "Panel.qml must read inbox.snapshot, not inbox.model" >&2
+  exit 1
+fi
 grep -Fq 'cursorKey' "$plugin/Panel.qml"
 if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then
   echo "centerOpen must be gone from Panel.qml" >&2
