@@ -43,12 +43,17 @@ qml_shrunk_baseline() {
     ($2 in base) { n = ($1 + 0 < base[$2] + 0) ? $1 : base[$2]; print n "\t" $2 }' "$2" "$1" | LC_ALL=C sort -t$'\t' -k2
 }
 
-# Prints "file:line: text" for every plugin QML line with a brace before the
-# file's first import: Quickshell's import scan reads the header up to the
-# imports and a brace there breaks loading at runtime. Returns 1 when any.
+# Prints "file:line: text" for every plugin QML line with a brace in the
+# file's header: the comments, blank lines and pragmas before the first
+# import (or before the first other line, for a file without imports).
+# Quickshell's import scan reads the header up to the imports and a brace
+# there breaks loading at runtime. Returns 1 when any.
 qml_header_braces() {
   local out
-  out="$(cd "$check_root" && awk 'FNR == 1 { p = 1 } /^import/ { p = 0 } p && /[{]/ { print "brace before imports: " FILENAME ":" FNR ": " $0 }' "$@")"
+  out="$(cd "$check_root" && awk '
+    FNR == 1 { p = 1 }
+    p && !/^[[:space:]]*$/ && !/^[[:space:]]*\/\// && !/^[[:space:]]*pragma[[:space:]]/ { p = 0 }
+    p && /[{]/ { print "brace before imports: " FILENAME ":" FNR ": " $0 }' "$@")"
   [[ -z "$out" ]] && return 0
   printf '%s\n' "$out"
   return 1
