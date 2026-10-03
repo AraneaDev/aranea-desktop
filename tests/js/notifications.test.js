@@ -517,6 +517,17 @@ test("notification center cursor stops", () => {
   assert.equal(inbox.stopIndex(stops, ""), -1)
   assert.equal(inbox.stopIndex(null, "dnd"), -1)
 
+  assert.deepEqual(inbox.followStop(stops, "e:b1", true), { key: "e:b1", shown: true })
+  assert.deepEqual(inbox.followStop(stops, "e:b1", false), { key: "e:b1", shown: false })
+  assert.deepEqual(
+    inbox.followStop(stops, "e:gone", true),
+    { key: "", shown: false },
+    "a vanished key is dropped and the cursor hides"
+  )
+  assert.deepEqual(inbox.followStop(stops, "", true), { key: "", shown: false })
+  // The same key returning later finds no cursor: it was dropped.
+  const gone = inbox.followStop(inbox.centerStops([], true), "e:a1", true)
+  assert.deepEqual(inbox.followStop(stops, gone.key, gone.shown), { key: "", shown: false })
   assert.equal(inbox.revealStop(stops, -1), 1, "first reveal lands on the first row")
   assert.equal(inbox.revealStop(stops, 2), 2, "a vanished cursor reveals where it was")
   assert.equal(inbox.revealStop(stops, 9), 4, "clamped into the stops")

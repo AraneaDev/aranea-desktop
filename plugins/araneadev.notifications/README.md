@@ -43,7 +43,9 @@ so the next key reveals it under the pointer.
 
 The DND switch shows the new state at once and pulses until the service
 echoes it. Clicks made while it waits are queued and the last one wins
-(`InboxLogic.dndClick`, `dndEcho` and `dndView`). The "+N more" row keeps its
+(`InboxLogic.dndClick`, `dndEcho` and `dndView`). If the service never echoes a
+change within 3 s, the switch gives up and shows the service's state again;
+a click queued behind that change is dropped. The "+N more" row keeps its
 12 px left padding, so its text lines up with the cards' content.
 
 ## Logic boundaries

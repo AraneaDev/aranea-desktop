@@ -426,6 +426,21 @@ function revealStop(stops, fallback) {
 }
 
 /**
+ * Where the cursor stands after its stops changed: it keeps its key and
+ * visibility while that key is still a stop; otherwise the key is dropped
+ * and the cursor hides, so the same key coming back later never shows the
+ * outline again without a key press.
+ * @param {Array<{key: string}>} stops - centerStops output
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} shown - whether the keyboard cursor shows
+ * @returns {{key: string, shown: boolean}} the cursor's key and visibility
+ */
+function followStop(stops, key, shown) {
+  if (stopIndex(stops, key) >= 0) return { key: key, shown: !!shown }
+  return { key: "", shown: false }
+}
+
+/**
  * The stop one step (`delta`) from `at`, held at both ends (no wrap, as in
  * the other Aranea dropdowns).
  * @param {Array<*>} stops - centerStops output
@@ -539,6 +554,7 @@ if (typeof module !== "undefined") {
     dismissAction: dismissAction,
     centerStops: centerStops,
     stopIndex: stopIndex,
+    followStop: followStop,
     revealStop: revealStop,
     moveStop: moveStop,
     dndIdle: dndIdle,

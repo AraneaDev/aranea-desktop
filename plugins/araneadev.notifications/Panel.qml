@@ -181,15 +181,20 @@ Panel {
   }
 
   // Expands the "+N more" row at index and puts the cursor on the first
-  // entry it revealed (the more row itself is gone after the expand).
+  // entry it revealed (the more row itself is gone after the expand). The
+  // more row's key vanishing hides the cursor; a keyboard-shown cursor is
+  // shown again on the revealed entry, a pointer-placed one stays hidden.
   function expandAt(index: int): void {
     var row = rows[index]
     if (!row)
       return
+    var shown = root.keyboardCursor
     toggleGroup(row.app)
     var revealed = rows[index]
-    if (revealed && revealed.kind === "entry")
+    if (revealed && revealed.kind === "entry") {
       root.cursorKey = InboxLogic.rowKey(revealed)
+      root.keyboardCursor = shown
+    }
   }
 
   // Enter on a row: runs an entry's action, or toggles a group or "more" row.
@@ -282,13 +287,20 @@ Panel {
   }
 
   // Remembers where the cursor is, for a reveal after its key vanished.
-  onCursorStopChanged: if (root.cursorStop >= 0)
-    root.lastStop = root.cursorStop
+  onCursorStopChanged: {
+    if (root.cursorStop >= 0)
+      root.lastStop = root.cursorStop
+    else if (root.cursorKey)
+      root.followStops()
+  }
 
-  // The cursor's stop vanished (dismissed, or the Clear pill hid): hide it.
-  onStopsChanged: if (root.cursorKey && root.cursorStop < 0) {
-    root.cursorKey = ""
-    root.keyboardCursor = false
+  // The cursor's stop vanished (dismissed, or the Clear pill hid): hide it
+  // and drop its key, so the outline never comes back without a key press
+  // when the same key reappears (InboxLogic.followStop).
+  function followStops(): void {
+    var next = InboxLogic.followStop(root.stops, root.cursorKey, root.keyboardCursor)
+    root.cursorKey = next.key
+    root.keyboardCursor = next.shown
   }
 
   // The service echoed a DND change (or something else changed it).
