@@ -1,6 +1,7 @@
 // Aranea audio (araneadev.audio, cloned from omarchy.audio): the bar
 // volume icon and its dropdown. Stock logic; the Aranea view replaces
-// the stock one.
+// the stock one. Added: the showcase IPC method's display-only stand-ins
+// for README captures.
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -10,12 +11,52 @@ import qs.Ui
 import qs.Commons
 import "Model.js" as Model
 import "AudioLogic.js" as AudioLogic
+import "../araneadev.shared/ShowcaseLogic.js" as Showcase
 import "../araneadev.shared" as Aranea
 
 Panel {
   id: root
   moduleName: "omarchy.audio"
   ipcTarget: "omarchy.audio"
+  // manageIpc: false so this panel can own the single IpcHandler the target
+  // permits — needed for the showcase method below.
+  manageIpc: false
+
+  IpcHandler {
+    target: "omarchy.audio"
+
+    function open() {
+      root.open()
+    }
+    function close() {
+      root.close()
+    }
+    function show() {
+      root.open()
+    }
+    function hide() {
+      root.close()
+    }
+    function toggle() {
+      root.toggle()
+    }
+    // Screenshot stand-ins (scripts/capture-screenshots): SHOWCASEJSON, a
+    // JSON object (AudioLogic.parseShowcase), relabels the output, input
+    // and stream rows and puts a made-up track in Now playing until the
+    // dropdown closes; while it is closed the answer is "closed" and
+    // nothing is set. Display only: PipeWire and the players are never
+    // touched, and the transport controls are refused meanwhile.
+    function showcase(showcaseJson: string): string {
+      var call = AudioLogic.showcaseCall(root.opened, showcaseJson)
+      if (call.showcase !== null)
+        root.audioShowcase = call.showcase
+      return call.answer
+    }
+  }
+
+  // Stand-ins for README screenshots (the showcase IPC method); null
+  // outside a capture, and cleared whenever the dropdown opens or closes.
+  property var audioShowcase: null
 
   // The system default output device.
   readonly property var sink: Pipewire.defaultAudioSink
@@ -58,8 +99,11 @@ Panel {
   property string lastPlayerKey: ""
   // The player Now playing follows: Omarchy's media service first.
   readonly property var nowPlayingPlayer: activeMediaPlayer || AudioLogic.pickPlayer(mprisPlayers, lastPlayerKey)
-  // What the Now playing strip shows.
-  readonly property var nowPlaying: AudioLogic.nowPlayingState(nowPlayingPlayer)
+  // What the Now playing strip shows: the stand-in track while showcasing.
+  readonly property var nowPlaying: AudioLogic.showcaseNowPlaying(audioShowcase, AudioLogic.nowPlayingState(nowPlayingPlayer))
+  // The player the transport controls act on: none while showcasing, so
+  // they never act on the real player behind a stand-in track.
+  readonly property var transportPlayer: audioShowcase ? null : nowPlayingPlayer
 
   // Remember the followed player, so Now playing stays on it once it pauses.
   onNowPlayingPlayerChanged: if (nowPlayingPlayer)
@@ -433,11 +477,11 @@ Panel {
         s.audio.volume = Math.max(0, Math.min(1.5, s.audio.volume + delta))
       return
     }
-    if (focusSection === "nowplaying" && nowPlayingPlayer) {
-      if (delta < 0 && nowPlayingPlayer.canGoPrevious)
-        nowPlayingPlayer.previous()
-      else if (delta > 0 && nowPlayingPlayer.canGoNext)
-        nowPlayingPlayer.next()
+    if (focusSection === "nowplaying" && transportPlayer) {
+      if (delta < 0 && transportPlayer.canGoPrevious)
+        transportPlayer.previous()
+      else if (delta > 0 && transportPlayer.canGoNext)
+        transportPlayer.next()
     }
   }
 
@@ -473,11 +517,13 @@ Panel {
         st.audio.muted = !st.audio.muted
       return
     }
-    if (focusSection === "nowplaying" && nowPlayingPlayer && nowPlayingPlayer.canTogglePlaying)
-      nowPlayingPlayer.togglePlaying()
+    if (focusSection === "nowplaying" && transportPlayer && transportPlayer.canTogglePlaying)
+      transportPlayer.togglePlaying()
   }
 
   onOpenedChanged: {
+    // Stand-ins never carry over into an open or past a close.
+    audioShowcase = null
     if (opened) {
       refreshDisplayAudioModels()
       focusSection = "output"
@@ -908,12 +954,13 @@ Panel {
     return rows
   }
   // The view's output rows. Kept apart from audioView so the arrays keep
-  // their identity while the levels tick ~30 times a second.
-  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, true, displayUnpluggedSinks)
+  // their identity while the levels tick ~30 times a second. While
+  // showcasing, the stand-in labels replace the real ones by position.
+  readonly property var outputDeviceRows: Showcase.showcaseLabels(deviceRows(displayAudioSinks, true, displayUnpluggedSinks), audioShowcase ? audioShowcase.outputs : [], "Output")
   // The view's input rows (see outputDeviceRows).
-  readonly property var inputDeviceRows: deviceRows(displayAudioSources, false, [])
+  readonly property var inputDeviceRows: Showcase.showcaseLabels(deviceRows(displayAudioSources, false, []), audioShowcase ? audioShowcase.inputs : [], "Input")
   // The view's stream rows (see outputDeviceRows).
-  readonly property var streamRows: displayAudioStreams.map(function (s) {
+  readonly property var streamRows: Showcase.showcaseLabels(displayAudioStreams.map(function (s) {
     return {
       key: String(s.id),
       label: streamLabel(s),
@@ -921,7 +968,7 @@ Panel {
       muted: s.audio ? s.audio.muted : false,
       current: streamRepresentsPlayer(s, activeMediaPlayer)
     }
-  })
+  }), audioShowcase ? audioShowcase.apps : [], "App")
   // Everything the Aranea view draws (AudioDropdown.view).
   readonly property var audioView: ({
       glyph: outputIcon(),
@@ -986,12 +1033,12 @@ Panel {
       cursorActive = true
       focusSection = arg.section
       selectedIndex = arg.index
-    } else if (name === "previous" && nowPlayingPlayer && nowPlayingPlayer.canGoPrevious)
-      nowPlayingPlayer.previous()
-    else if (name === "playPause" && nowPlayingPlayer && nowPlayingPlayer.canTogglePlaying)
-      nowPlayingPlayer.togglePlaying()
-    else if (name === "next" && nowPlayingPlayer && nowPlayingPlayer.canGoNext)
-      nowPlayingPlayer.next()
+    } else if (name === "previous" && transportPlayer && transportPlayer.canGoPrevious)
+      transportPlayer.previous()
+    else if (name === "playPause" && transportPlayer && transportPlayer.canTogglePlaying)
+      transportPlayer.togglePlaying()
+    else if (name === "next" && transportPlayer && transportPlayer.canGoNext)
+      transportPlayer.next()
   }
 
   implicitWidth: button.implicitWidth

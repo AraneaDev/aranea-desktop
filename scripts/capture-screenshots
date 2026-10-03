@@ -23,7 +23,12 @@ set -euo pipefail
 # Clock never shows the user's real area either: once summoned, the dropdown
 # is handed a stand-in place (Amsterdam) through its `showcase` IPC method
 # (display only, cleared when it closes), failing the same way on a
-# non-"ok" answer. Tray and tray-manage never show a real tray app: two
+# non-"ok" answer. Audio never shows the user's real devices, apps or track
+# either: once summoned, the dropdown is handed stand-in device and app
+# labels and a made-up track (with a position, so the progress strand
+# shows) through its `showcase` IPC method (display only, the transport
+# controls refused while shown, cleared when it closes), failing the same
+# way on a non-"ok" answer. Tray and tray-manage never show a real tray app: two
 # dev-only fixtures (tools/fixture-tray-item, "Courier" and "Syncbox") are
 # started for the capture and killed by their own PIDs afterwards; if the
 # StatusNotifierWatcher also lists any item that is not one of those two
@@ -36,6 +41,7 @@ set -euo pipefail
 #   ARANEA_BLUETOOTH_SCAN_DELAY  extra seconds for the Bluetooth scan (default 3)
 #   ARANEA_CAPTURE_VPN_FIXTURE   JSON array of VPN fixture rows (default below)
 #   ARANEA_CAPTURE_CLOCK_PLACE   JSON {name, latitude, longitude} stand-in place (default below)
+#   ARANEA_CAPTURE_AUDIO_SHOWCASE JSON {outputs, inputs, apps, track} audio stand-ins (default below)
 #
 # ARANEA_CAPTURE_SURFACE_COMMAND, when set, replaces each child capture of
 # --all: it is run as `<command> <surface> <output dir>` (tests use it).
@@ -191,6 +197,9 @@ default_vpn_fixture='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","
 # The stand-in place (Amsterdam) the Clock capture draws instead of the
 # user's own configured or wttr.in-resolved area.
 default_clock_place='{"name":"Amsterdam","latitude":52.37,"longitude":4.90}'
+# Stand-in device and app labels and the track the Audio capture draws
+# instead of the user's own (AudioLogic.parseShowcase reads it).
+default_audio_showcase='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["Desk Mic","WH-1000XM5"],"apps":["Spotify","Firefox"],"track":{"title":"Midnight City","artist":"M83","player":"Spotify","progress":0.4}}'
 
 # The surfaces --all captures.
 all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
@@ -505,7 +514,8 @@ capture_popup_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
-# Summons dropdown TARGET, hands it the stand-in NAMES (a JSON array) through
+# Summons dropdown TARGET, hands it the stand-in NAMES (JSON: an array, or
+# Audio's object) through
 # its showcase IPC method, waits SECONDS... (each one slept in turn), grabs
 # the screen, then hides it, which clears the names. A failed summon, or a
 # showcase answer other than "ok" (a closed dropdown answers "closed"), exits
@@ -1140,7 +1150,9 @@ case "$surface" in
     exit 0
     ;;
   audio)
-    capture_popup_surface omarchy.audio
+    # Stand-in device, app and track names: never the user's own.
+    capture_showcase_surface omarchy.audio "${ARANEA_CAPTURE_AUDIO_SHOWCASE:-$default_audio_showcase}" \
+      "${ARANEA_SCREENSHOT_DELAY:-1}"
     exit 0
     ;;
   bluetooth)

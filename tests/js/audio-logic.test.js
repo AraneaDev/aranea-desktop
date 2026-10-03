@@ -243,3 +243,89 @@ test("a device is keyed by its id and name, so a reused id never matches", () =>
     "a reused id's echo keeps waiting"
   )
 })
+
+// --- showcase: the README capture's display-only stand-ins.
+const showcaseJson = JSON.stringify({
+  outputs: ["Studio Monitors", "WH-1000XM5"],
+  inputs: ["Desk Mic", "WH-1000XM5"],
+  apps: ["Spotify", "Firefox"],
+  track: {
+    title: "Midnight City",
+    artist: "M83",
+    album: "Hurry Up",
+    player: "Spotify",
+    progress: 0.4
+  }
+})
+
+test("parseShowcase reads the stand-in labels and track", () => {
+  assert.deepEqual(logic.parseShowcase(" " + showcaseJson), {
+    outputs: ["Studio Monitors", "WH-1000XM5"],
+    inputs: ["Desk Mic", "WH-1000XM5"],
+    apps: ["Spotify", "Firefox"],
+    track: {
+      title: "Midnight City",
+      artist: "M83",
+      album: "Hurry Up",
+      player: "Spotify",
+      progress: 0.4
+    }
+  })
+  const noAlbum = JSON.parse(showcaseJson)
+  delete noAlbum.track.album
+  assert.equal(logic.parseShowcase(JSON.stringify(noAlbum)).track.album, "")
+})
+
+test("parseShowcase refuses anything that could leave a real name showing", () => {
+  const variant = (change) => {
+    const value = JSON.parse(showcaseJson)
+    change(value)
+    return JSON.stringify(value)
+  }
+  for (const json of [
+    "not json",
+    undefined,
+    "null",
+    "[]",
+    '"x"',
+    variant((v) => (v.outputs = [])),
+    variant((v) => (v.inputs = ["ok", 3])),
+    variant((v) => delete v.apps),
+    variant((v) => delete v.track),
+    variant((v) => (v.track = "x")),
+    variant((v) => (v.track.title = "")),
+    variant((v) => (v.track.title = 1)),
+    variant((v) => delete v.track.artist),
+    variant((v) => (v.track.player = null)),
+    variant((v) => (v.track.album = 2)),
+    variant((v) => (v.track.progress = "0.4")),
+    variant((v) => (v.track.progress = 1.5)),
+    variant((v) => (v.track.progress = -0.1))
+  ])
+    assert.equal(logic.parseShowcase(json), null, String(json))
+})
+
+test("showcaseCall takes stand-ins only while open", () => {
+  assert.deepEqual(logic.showcaseCall(false, showcaseJson), { answer: "closed", showcase: null })
+  assert.deepEqual(logic.showcaseCall(true, "{}"), { answer: "invalid", showcase: null })
+  const call = logic.showcaseCall(true, showcaseJson)
+  assert.equal(call.answer, "ok")
+  assert.deepEqual(call.showcase.apps, ["Spotify", "Firefox"])
+})
+
+test("showcaseNowPlaying shows the stand-in track, even without a real player", () => {
+  const real = logic.nowPlayingState(null)
+  assert.equal(logic.showcaseNowPlaying(null, real), real)
+  assert.equal(logic.showcaseNowPlaying(undefined, real), real)
+  assert.deepEqual(logic.showcaseNowPlaying(logic.parseShowcase(showcaseJson), real), {
+    visible: true,
+    player: "Spotify",
+    title: "Midnight City",
+    artist: "M83",
+    album: "Hurry Up",
+    progress: 0.4,
+    playing: true,
+    canPrevious: true,
+    canNext: true
+  })
+})

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn|clock`:
+# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn|clock|audio`:
 # the dropdown is summoned, handed stand-in display data (names for
-# Network/Bluetooth, a place for Clock, both via `showcase`; rows for VPN via
+# Network/Bluetooth, a place for Clock, labels and a track for Audio, all
+# via `showcase`; rows for VPN via
 # `showcaseFixture`; defaults, or ARANEA_CAPTURE_* overrides), given time to
 # draw, grabbed and hidden. A non-"ok" answer, or a failed summon, fails the
 # surface with exit 3 and no screenshot, so no real data ever reaches one.
@@ -58,6 +59,7 @@ wifi_default='["Aranea-Home","Neighbour-5G","Cafe-Guest","Library-Free","Studio-
 bt_default='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","Xbox Controller","Galaxy Buds2","Kindle"]'
 vpn_default='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
 clock_default='{"name":"Amsterdam","latitude":52.37,"longitude":4.90}'
+audio_default='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["Desk Mic","WH-1000XM5"],"apps":["Spotify","Firefox"],"track":{"title":"Midnight City","artist":"M83","player":"Spotify","progress":0.4}}'
 
 # Fails with MESSAGE unless the call log holds LINES in this order (other
 # calls may come between them).
@@ -152,9 +154,37 @@ ARANEA_CAPTURE_CLOCK_PLACE='{"name":"Testville","latitude":1,"longitude":2}' \
   "$capture" --surface clock --output "$out" >/dev/null
 grep -Fxq 'omarchy-shell [omarchy.clock] [showcase] [{"name":"Testville","latitude":1,"longitude":2}]' "$log"
 
+# --- Audio: default stand-in labels and track, then grim, then hide. The
+# README must never show the user's real devices, apps or track.
+: >"$log"
+"$capture" --surface audio --output "$out" >/dev/null
+test -f "$out/audio.png"
+assert_calls_in_order 'audio: summon, showcase defaults, wait, grim, hide' \
+  'omarchy-shell [shell] [summon] [omarchy.audio]' \
+  "omarchy-shell [omarchy.audio] [showcase] [ $audio_default]" \
+  'sleep 1' \
+  'grim' \
+  'omarchy-shell [shell] [hide] [omarchy.audio]'
+# The default is what AudioLogic.parseShowcase accepts, with a progress so
+# the strand bar shows.
+node -e '
+  const logic = require(process.argv[1])
+  const s = logic.parseShowcase(process.argv[2])
+  if (!s || !(s.track.progress > 0)) process.exit(1)
+' "$repo_root/plugins/araneadev.audio/AudioLogic.js" "$audio_default" || {
+  echo 'audio: the default stand-ins must parse, with a track position' >&2
+  exit 1
+}
+
+# --- Audio: the stand-ins are overridable.
+: >"$log"
+rm -f "$out/audio.png"
+ARANEA_CAPTURE_AUDIO_SHOWCASE='{"outputs":["A"]}' "$capture" --surface audio --output "$out" >/dev/null
+grep -Fxq 'omarchy-shell [omarchy.audio] [showcase] [ {"outputs":["A"]}]' "$log"
+
 # --- A showcase call that isn't "ok" (the stock panel, no answer, bad JSON)
 # fails the surface: exit 3, a clear message, no screenshot, dropdown hidden.
-for surface in network bluetooth; do
+for surface in network bluetooth audio; do
   for answer in 'Function not found.' 'invalid' 'closed' ''; do
     : >"$log"
     rm -f "$out/$surface.png"
@@ -221,7 +251,7 @@ done
 
 # --- A summon that fails (omarchy-shell down) is the scripted exit 3 with
 # no screenshot and no showcase call, not a set -e abort.
-for surface in network bluetooth clock; do
+for surface in network bluetooth clock audio; do
   : >"$log"
   rm -f "$out/$surface.png"
   status=0

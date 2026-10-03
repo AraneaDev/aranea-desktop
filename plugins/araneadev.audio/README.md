@@ -19,6 +19,17 @@ playing strip whose progress bar is lit as the filament strand.
   row, a slider, the mute switch, a stream's mute glyph or a transport
   button within 300 ms of a stamp is ignored unless the pointer has really
   moved there since.
+- **`showcase` IPC:** for README captures, stand-in labels replace the
+  output, input and stream rows' names by position (the rows, their kinds
+  and the default stay real), and a made-up track with a position fills
+  Now playing, even with no player running. Display only: PipeWire and the
+  players are never touched, the transport controls are refused while it
+  is shown, and it clears when the dropdown opens or closes. Closed, the
+  call answers `closed`; a bad payload, `invalid`.
+
+  ```bash
+  omarchy-shell omarchy.audio showcase ' {"outputs":["Studio Monitors"],"inputs":["Desk Mic"],"apps":["Spotify"],"track":{"title":"Midnight City","artist":"M83","player":"Spotify","progress":0.4}}'
+  ```
 
 ## Validation
 

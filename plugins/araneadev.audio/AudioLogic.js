@@ -2,7 +2,8 @@
 // level behind the filament glow, which media player Now playing follows
 // when Omarchy's media service is missing, the Now playing state, the
 // device rows' trailing detail, the pending default-device switch and the
-// keyed node lookups behind every row action. No QML, no I/O;
+// keyed node lookups behind every row action, and the README capture's
+// display-only stand-ins (the `showcase` IPC method). No QML, no I/O;
 // tests/js/audio-logic.test.js runs this under Node.
 
 /**
@@ -278,6 +279,104 @@ function nodeByKey(list, key, byName) {
   return null
 }
 
+/**
+ * The README capture's stand-ins (showcaseCall): labels for the output,
+ * input and stream rows, and a made-up track for Now playing.
+ * @typedef {object} AudioShowcase
+ * @property {string[]} outputs - output row labels, in display order
+ * @property {string[]} inputs - input row labels, in display order
+ * @property {string[]} apps - stream (Sources) row labels, in display order
+ * @property {{title: string, artist: string, album: string, player: string, progress: number}} track - the stand-in track
+ */
+
+/**
+ * Whether VALUE is a non-empty array of strings.
+ * @param {*} value - anything
+ * @returns {boolean} true for a non-empty string array
+ */
+function nameList(value) {
+  if (!Array.isArray(value) || value.length === 0) return false
+  for (var i = 0; i < value.length; i++) if (typeof value[i] !== "string") return false
+  return true
+}
+
+/**
+ * Reads the stand-ins handed to the `showcase` IPC method: a JSON object
+ * with non-empty string arrays "outputs", "inputs" and "apps", and a
+ * "track" with a non-empty "title", string "artist" and "player", an
+ * optional string "album" and a "progress" number in 0..1. Anything else
+ * is refused, so a capture never falls back to the real names.
+ * @param {string|undefined} json - the call's JSON
+ * @returns {AudioShowcase|null} the stand-ins, or null when invalid
+ */
+function parseShowcase(json) {
+  var parsed
+  try {
+    parsed = JSON.parse(String(json))
+  } catch (e) {
+    return null
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null
+  if (!nameList(parsed.outputs) || !nameList(parsed.inputs) || !nameList(parsed.apps)) return null
+  var t = parsed.track
+  if (!t || typeof t !== "object") return null
+  if (typeof t.title !== "string" || t.title === "") return null
+  if (typeof t.artist !== "string" || typeof t.player !== "string") return null
+  if (t.album !== undefined && typeof t.album !== "string") return null
+  if (typeof t.progress !== "number" || !(t.progress >= 0 && t.progress <= 1)) return null
+  return {
+    outputs: parsed.outputs.slice(),
+    inputs: parsed.inputs.slice(),
+    apps: parsed.apps.slice(),
+    track: {
+      title: t.title,
+      artist: t.artist,
+      album: t.album || "",
+      player: t.player,
+      progress: t.progress
+    }
+  }
+}
+
+/**
+ * The answer to a `showcase` IPC call. Stand-ins are taken only while the
+ * dropdown is open (it clears them on open and on close).
+ * @param {boolean} opened - the dropdown is open
+ * @param {string|undefined} json - the call's JSON
+ * @returns {{answer: string, showcase: AudioShowcase|null}} "ok" with the
+ *   stand-ins, or "closed" / "invalid" with null
+ */
+function showcaseCall(opened, json) {
+  if (!opened) return { answer: "closed", showcase: null }
+  var showcase = parseShowcase(json)
+  return showcase === null
+    ? { answer: "invalid", showcase: null }
+    : { answer: "ok", showcase: showcase }
+}
+
+/**
+ * What Now playing shows: the stand-in track while showcasing (shown even
+ * without a real player, playing, with its progress), else REAL.
+ * @param {AudioShowcase|null|undefined} showcase - the stand-ins, or null
+ * @param {NowPlaying} real - nowPlayingState of the followed player
+ * @returns {NowPlaying} the strip's content
+ */
+function showcaseNowPlaying(showcase, real) {
+  if (!showcase) return real
+  var t = showcase.track
+  return {
+    visible: true,
+    player: t.player,
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    progress: t.progress,
+    playing: true,
+    canPrevious: true,
+    canNext: true
+  }
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     signalLevel,
@@ -292,5 +391,8 @@ if (typeof module !== "undefined")
     defaultView,
     deviceKey,
     nodeAt,
-    nodeByKey
+    nodeByKey,
+    parseShowcase,
+    showcaseCall,
+    showcaseNowPlaying
   }
