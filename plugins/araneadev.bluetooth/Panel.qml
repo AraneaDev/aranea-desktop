@@ -619,14 +619,17 @@ Panel {
   }
 
   // The keyboard cursor's stops for following a Forget
-  // (BluetoothLogic.forgetStops), from the lists as shown.
+  // (BluetoothLogic.forgetStops), read from deviceGroups itself: the three
+  // per-section lists update one after another, so a sibling read from
+  // them could still be stale.
   function forgetStops() {
     var addr = function (list) {
-      return list.map(function (d) {
+      return (list || []).map(function (d) {
         return d ? (d.address || "") : ""
       })
     }
-    return BluetoothLogic.forgetStops(addr(connectedDevices), addr(knownDevices), sectionVisible("discovered") ? addr(discoveredDevices) : [])
+    var groups = deviceGroups || {}
+    return BluetoothLogic.forgetStops(addr(groups.connected), addr(groups.known), sectionVisible("discovered") ? addr(groups.discovered) : [])
   }
 
   // After the device lists changed: lands the cursor on the neighbour once a
@@ -725,16 +728,19 @@ Panel {
 
   onSelectedIndexChanged: updateFocusedAddress()
   onFocusSectionChanged: updateFocusedAddress()
+  // One device change updates the three lists one after another; the
+  // follow runs once, after all of them, so a forgotten device counts as
+  // gone only when it has left every remembered list.
   onConnectedDevicesChanged: {
-    followDevices()
+    Qt.callLater(root.followDevices)
     syncPendingActions()
   }
   onKnownDevicesChanged: {
-    followDevices()
+    Qt.callLater(root.followDevices)
     syncPendingActions()
   }
   onDiscoveredDevicesChanged: {
-    followDevices()
+    Qt.callLater(root.followDevices)
     syncPendingActions()
   }
   onVisibleSectionsChanged: clampCursor()
@@ -1004,8 +1010,10 @@ Panel {
       root.showcaseNames = []
       if (!root.opened) {
         root.rssiByAddress = ({})
-        // A queued action never runs with the panel closed.
+        // A queued action or power click never runs with the panel closed;
+        // a power change in flight finishes.
         root.deviceQueue = BluetoothLogic.queueAfter("close", root.deviceQueue)
+        root.powerPending = BluetoothLogic.powerAfter("close", root.powerPending)
       }
     }
     function onFocusSectionChanged() {

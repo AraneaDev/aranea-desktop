@@ -302,3 +302,25 @@ test("the device queue is short-lived: closing or the pending timeout empties it
   assert.deepEqual(logic.queueAfter("open", { A: "forget" }), { A: "forget" })
   assert.deepEqual(logic.queueAfter("open", null), {})
 })
+
+test("powerAfter drops a queued click on close and goes idle on timeout", () => {
+  const s = { target: true, queued: false }
+  assert.deepEqual(logic.powerAfter("close", s), { target: true, queued: null })
+  assert.deepEqual(logic.powerAfter("timeout", s), { target: null, queued: null })
+  assert.deepEqual(logic.powerAfter("open", s), s)
+  assert.notEqual(logic.powerAfter("open", s), s, "never the same object")
+  assert.deepEqual(logic.powerAfter("close", null), { target: null, queued: null })
+  assert.deepEqual(logic.powerAfter("open", {}), { target: null, queued: null })
+  const closed = logic.powerAfter("close", s)
+  assert.deepEqual(
+    logic.powerEcho(closed, true),
+    { state: { target: null, queued: null }, send: null },
+    "the echo then settles without sending the dropped click"
+  )
+})
+
+test("a device moving from Connected to Paired is still remembered, so the follow waits", () => {
+  const moved = logic.followForget(logic.forgetStops([], ["A", "B"], []), "A", 1)
+  assert.equal(moved.follow, false)
+  assert.equal(moved.pendingKey, "A")
+})

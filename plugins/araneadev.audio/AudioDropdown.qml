@@ -59,6 +59,8 @@ Column {
   // added, refused when that row no longer carries KEY (the list changed
   // underneath).
   function keyedAction(name, rows, index, key, extra) {
+    // Defence in depth: pointer clicks across a re-sort are really stopped
+    // by the layout stamp, the controls' settle and Panel's own key check.
     var row = (rows || [])[index]
     if (!row || String(row.key) !== key)
       return

@@ -86,6 +86,8 @@ Column {
   // Reports row action NAME for SECTION's row INDEX holding KEY, refused
   // when that row no longer carries KEY (the list changed underneath).
   function rowAction(name, section, index, key) {
+    // Defence in depth: pointer clicks across a re-sort are really stopped
+    // by the layout stamp, the rows' settle and Panel's own key check.
     var row = dropdown.sectionRows(section)[index]
     if (!row || row.key !== key)
       return

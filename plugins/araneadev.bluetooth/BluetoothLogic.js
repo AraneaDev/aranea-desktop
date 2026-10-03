@@ -150,6 +150,23 @@ function powerEcho(state, actual) {
 }
 
 /**
+ * The power state after a lifetime EVENT: the timeout falls back to the
+ * adapter's state; closing the panel drops the queued click, so it never
+ * runs with nobody watching, but lets the change in flight finish;
+ * anything else keeps it. Mirrors AudioLogic.defaultAfter.
+ * @param {string} event - "timeout", "close" or anything else
+ * @param {?PowerPending} state - the pending state
+ * @returns {PowerPending} the state to keep
+ */
+function powerAfter(event, state) {
+  var s = state || powerIdle()
+  if (event === "timeout") return powerIdle()
+  var target = s.target === undefined ? null : s.target
+  if (event === "close") return { target: target, queued: null }
+  return { target: target, queued: s.queued === undefined ? null : s.queued }
+}
+
+/**
  * What the power switch shows: the queued state, else the in-flight one,
  * else the adapter's; busy (pulsing) while a change is in flight.
  * @param {?PowerPending} state - the pending state
@@ -504,6 +521,7 @@ if (typeof module !== "undefined")
     powerIdle,
     powerClick,
     powerEcho,
+    powerAfter,
     powerView,
     rowIntent,
     inFlightIntent,

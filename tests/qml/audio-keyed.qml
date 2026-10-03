@@ -166,6 +166,15 @@ ShellRoot {
     pointer.mouseClick(t.findChild(full, "playPauseButton"))
   }
 
+  // Turns the wheel one notch up over the output slider and stream 0's
+  // slider.
+  function wheelSliders() {
+    var slider = t.findChild(t.findChild(full, "outputSection"), "channelSlider")
+    pointer.mouseWheel(slider, slider.width / 2, slider.height / 2, 0, 120)
+    var ss = streamSliders()[0]
+    pointer.mouseWheel(ss, ss.width / 2, ss.height / 2, 0, 120)
+  }
+
   // Runs STEPS ([delay, fn] pairs) one after another, then finishes.
   function run(steps) {
     if (steps.length === 0) {
@@ -315,10 +324,16 @@ ShellRoot {
         full.noteLayoutChange()
         clickControls()
         t.equal(nonHover().length, 0, "clicks right after a stamp are refused (switch, sliders, stream mute, play/pause)")
+        wheelSliders()
+        t.equal(nonHover().length, 0, "wheel steps right after a stamp are refused (output and stream sliders)")
       }], [60, function () {
         clickControls()
         t.equal(nonHover().length, 0, "and still refused inside the settle window")
       }], [350, function () {
+        actions = []
+        wheelSliders()
+        t.check(named("outputVolume").length === 1, "a settled wheel step moves the output slider")
+        t.check(named("streamVolume").length === 1 && named("streamVolume")[0][1].key === "7", "a settled wheel step moves the stream, keyed")
         actions = []
         clickControls()
         t.check(reported("toggleAll", null), "a settled mute switch click toggles")

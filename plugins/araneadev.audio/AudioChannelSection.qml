@@ -3,7 +3,7 @@
 // the device list. Pure view: plain inputs in, signals out. A press on
 // the slider within 300 ms of the dropdown's layout shifting
 // (pointerGate.layoutChangedAt) is ignored unless the pointer has really
-// moved onto it since; device rows settle their clicks the same way, and
+// moved onto it since, and so is a wheel step; device rows settle their clicks the same way, and
 // the pending default's row pulses (busy).
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -122,6 +122,8 @@ Column {
       muted: section.channel.muted
       level: section.channel.level
       clickGate: sliderRow
+      // A wheel step right after a layout shift is settled too.
+      gateWheel: true
       onMoved: function (value) {
         section.volumeMoved(value)
       }

@@ -4,8 +4,8 @@
 // signals out. Every action carries the stream's key (its node id): a
 // drag carries the key its press landed on, so a stream that comes or
 // goes mid-drag never hands the drag to its neighbour (the dropdown
-// refuses a key that no longer matches). A press or click on a row within
-// 300 ms of its creation or of the dropdown's layout shifting
+// refuses a key that no longer matches). A press, click or wheel step on
+// a row within 300 ms of its creation or of the dropdown's layout shifting
 // (pointerGate.layoutChangedAt) is ignored unless the pointer has really
 // moved onto the row since.
 pragma ComponentBehavior: Bound
@@ -176,6 +176,8 @@ Column {
               value: row.modelData.volume
               muted: row.modelData.muted
               clickGate: card
+              // A wheel step right after a layout shift is settled too.
+              gateWheel: true
               // A drag keeps the key it started on.
               onDraggingChanged: row.dragKey = dragging ? String(row.modelData.key) : ""
               onMoved: function (value) {
