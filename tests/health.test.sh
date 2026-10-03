@@ -49,8 +49,8 @@ grep -Fq 'Metrics {' "$plugin/Service.qml"
 
 jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" and .barWidget.defaultSection == "right"' "$plugin/manifest.json" >/dev/null
 grep -Fq 'HealthBridge.current()' "$plugin/Panel.qml"
-grep -Fq 'All systems healthy' "$plugin/Panel.qml"
-grep -Fq '󰗶' "$plugin/Panel.qml"
+grep -Fq 'All systems healthy' "$plugin/HealthProblemsSection.qml"
+grep -Fq 'String.fromCodePoint(0xf05f6)' "$plugin/Panel.qml"
 
 # One dropdown per monitor: top-process sampling follows an open-panel count,
 # never a shared boolean one bar can switch off for another (review Important #1).
@@ -77,9 +77,9 @@ if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then
   echo "TOP rows must guard root.m" >&2
   exit 1
 fi
-# 4: the sparkline repaints only while the dropdown is open
+# 4: the CPU trace follows the samples only while the dropdown is open
 grep -Fq 'HealthResourceSection {' "$plugin/Panel.qml"
-grep -A1 -F 'onValuesChanged: if (root.active)' "$plugin/HealthResourceSection.qml" | grep -Fq 'requestPaint()'
+grep -Fq 'samples: root.active && root.metrics ? HealthLogic.cpuSamples(' "$plugin/HealthResourceSection.qml"
 # 5: opening without a service closes again instead of sticking open
 grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
 # 9: branding paths honour XDG_STATE_HOME everywhere
@@ -97,7 +97,7 @@ grep -Fq 'samples: service.metrics.cpuHistory.length' "$plugin/Service.qml"
 # --- 4c: the cursor follows its problem; a reloaded service is counted again
 hpanel="$repo_root/plugins/araneadev.health/Panel.qml"
 grep -Fq 'property string cursorKey: ""' "$hpanel"
-grep -Fq 'HealthLogic.moveCursorKey(' "$hpanel"
+grep -Fq 'HealthLogic.cursorMove(' "$hpanel"
 if grep -Fq 'root.problems[root.cursor]' "$hpanel"; then
   echo "Enter must run the row under cursorKey" >&2
   exit 1
