@@ -30,6 +30,17 @@ The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-p
 tested under Node). `Main.qml`'s discovery and sync logic, and `Panel.qml`'s limit/balance/day/
 model formatting, stay stock's own functions for this clone.
 
+## View
+
+`AgentsDropdown.qml` is the pure Aranea view (not yet hosted by `Panel.qml`): one plain view
+object in (`hero`, `refresh`, `agents`, `limits`, `balance`, `days`, `models`, `footer`, `empty`,
+`cursor`, `keyHint`), one `action(name, arg)` signal out (`refresh`, `selectAgent` with
+`{index, key}`, `hover` with `{section, index}`). Its sections are `AgentsHeader.qml` (mark,
+tool, plan and the Refresh pill), `AgentsSwitch.qml` (agent pills), `AgentsBalanceSection.qml`,
+`AgentsLimitsSection.qml` and `AgentsUsageSection.qml` (days and models). `AgentsRing.qml` is
+the bar ring: a canvas arc taking `fraction` and `tone` from `AgentsLogic.js`, hidden at tone
+`none`. `tests/qml/agents-dropdown.qml` covers both.
+
 ## Integration
 
 - `scripts/repair-shell-config` retargets `omarchy.agents` to `araneadev.agents` in
