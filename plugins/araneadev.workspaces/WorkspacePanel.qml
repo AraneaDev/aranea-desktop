@@ -1,18 +1,21 @@
 // Workspace overview content shared by the live and test panel hosts: a
-// DropdownHeader (glyph, "Workspaces", "N open"), then one
-// Aranea.NodeDeviceRow per workspace (its node lit on the current
-// workspace, the window count as detail), and a key hint at the bottom.
-// Pure view: rows and the keyboard cursor in, keyed signals out.
+// DropdownHeader (glyph, "Workspaces", "N open"), then one row per
+// workspace (an Aranea.NodeDeviceRow lit on the current workspace, red for
+// an urgent one, with the window count plus "current"/"attention" as
+// detail, and a titles line underneath when any window has one), and a key
+// hint at the bottom. Pure view: rows and the keyboard cursor in, keyed
+// signals out.
 //
 // Every row is keyed by WorkspaceModel.workspaceKey (the workspace id) and
 // a click or Enter is refused when the row no longer carries the key it
 // was aimed at. The Repeater runs over the row count, so a workspace list
 // that changes while the dropdown is open never recreates a row under a
-// resting pointer. When the rows really move (the joined keys change) the
-// panel stamps layoutChangedAt, which the rows read through pointerGate: a
-// click within 300 ms of it is ignored unless the pointer has really moved
-// onto the row since. The mint outline is drawn only on cursorIndex, which
-// the host sets only while the keyboard drives it; pointer hover never
+// resting pointer. When the rows really move, or a row's titles line
+// appears or disappears (workspaceLayoutSignature changes), the panel
+// stamps layoutChangedAt, which the rows read through pointerGate: a click
+// within 300 ms of it is ignored unless the pointer has really moved onto
+// the row since. The mint outline is drawn only on cursorIndex, which the
+// host sets only while the keyboard drives it; pointer hover never
 // highlights a row.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -60,9 +63,12 @@ Item {
   // hairline and the key hint) is accounted for.
   readonly property real maxListHeight: Math.max(0, maxContentHeight - (header.implicitHeight + panel.hairlineHeight + keyHint.implicitHeight + layout.spacing * 3))
 
-  // The rows' keys joined, so a host can tell when the rows really moved
-  // (an equal list rebuilt gives the same string).
-  readonly property string rowKeys: WorkspaceModel.workspaceKeys(panel.workspaceStates)
+  // Every row's id paired with whether it shows a titles line, joined: a
+  // host can tell when the rows really moved, or when a row's titles line
+  // appeared/disappeared and so resized it, since either can shift the
+  // rows below under a resting pointer. An equal list rebuilt gives the
+  // same string.
+  readonly property string layoutSignature: WorkspaceModel.workspaceLayoutSignature(panel.workspaceStates)
   // When the rows last moved under the pointer (Date.now()), 0 for never.
   property real layoutChangedAt: 0
   // Filters synthetic hover from rows moving under a still pointer, and
@@ -73,7 +79,7 @@ Item {
   function noteLayoutChange() {
     panel.layoutChangedAt = Date.now()
   }
-  onRowKeysChanged: panel.noteLayoutChange()
+  onLayoutSignatureChanged: panel.noteLayoutChange()
 
   // Resets the pointer gate; called after every key so a stale pointer
   // sample never steals the cursor back.
@@ -88,9 +94,19 @@ Item {
       panel.focusWorkspace(row.id)
   }
 
-  // The row at INDEX (objectName "workspaceRow"), or null.
+  // The row at INDEX: its Aranea.NodeDeviceRow (objectName "workspaceNode"),
+  // or null. Found by objectName, not a typed property, so qmllint can
+  // still check this against the Repeater's generically-typed item. The
+  // titles line underneath it, when shown, has objectName "workspaceTitles"
+  // and is reached through t.findChild/t.findChildren in tests.
   function rowAt(index) {
-    return rowRepeater.itemAt(index)
+    var wrap = rowRepeater.itemAt(index)
+    if (!wrap)
+      return null
+    for (var i = 0; i < wrap.children.length; i++)
+      if (wrap.children[i].objectName === "workspaceNode")
+        return wrap.children[i]
+    return null
   }
 
   implicitWidth: Style.space(500)
@@ -175,27 +191,69 @@ Item {
 
         // The model is the row count, not the array: a refresh that hands
         // over a fresh (but equal) workspaceStates array never recreates a
-        // row under a resting pointer.
+        // row under a resting pointer. Each delegate is the workspace's
+        // Aranea.NodeDeviceRow plus, underneath it, a titles line that
+        // takes no space while empty. A plain Item with an explicit
+        // implicitHeight, not a Column, since a Column-of-Columns through
+        // this Repeater does not reflow its height in the offscreen test
+        // harness (confirmed against panel-heights.qml's 20-row cases);
+        // this is the same implicitHeight-on-an-Item pattern NodeDeviceRow
+        // itself uses as a ColumnLayout child.
         Repeater {
           id: rowRepeater
           model: panel.workspaceStates.length
-          Aranea.NodeDeviceRow {
-            id: row
+          Item {
+            id: rowWrap
             required property int index
             // This row's workspace, read from the live array.
-            readonly property var workspace: panel.workspaceStates[row.index] || ({})
+            readonly property var workspace: panel.workspaceStates[rowWrap.index] || ({})
             // The row's key, sent with its action.
-            readonly property string key: WorkspaceModel.workspaceKey(row.workspace)
+            readonly property string key: WorkspaceModel.workspaceKey(rowWrap.workspace)
+            // The row's secondary text: its open windows' titles, joined,
+            // "" when there are none to show.
+            readonly property string titles: WorkspaceModel.workspaceTitles(rowWrap.workspace)
 
             objectName: "workspaceRow"
             Layout.fillWidth: true
-            label: WorkspaceModel.workspaceLabel(row.workspace)
-            detail: WorkspaceModel.workspaceDetail(row.workspace)
-            active: !!row.workspace.active
-            hasCursor: panel.cursorIndex === row.index
-            pointerGate: panel.pointerGate
-            onChosen: panel.activateRow(row.index, row.key)
-            onEntered: panel.rowHovered(row.index)
+            implicitHeight: node.height + (titlesText.visible ? Style.space(2) + titlesText.height : 0)
+
+            Aranea.NodeDeviceRow {
+              id: node
+              objectName: "workspaceNode"
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              label: WorkspaceModel.workspaceLabel(rowWrap.workspace)
+              detail: WorkspaceModel.workspaceDetail(rowWrap.workspace)
+              detailColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+              nodeColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.accent
+              // Lit (filled, glowing) for the current workspace, and for an
+              // urgent one even when it is not current, so attention is
+              // visible wherever the workspace is.
+              active: !!(rowWrap.workspace.active || rowWrap.workspace.urgent)
+              hasCursor: panel.cursorIndex === rowWrap.index
+              pointerGate: panel.pointerGate
+              onChosen: panel.activateRow(rowWrap.index, rowWrap.key)
+              onEntered: panel.rowHovered(rowWrap.index)
+            }
+
+            Text {
+              id: titlesText
+              objectName: "workspaceTitles"
+              visible: rowWrap.titles !== ""
+              anchors.top: node.bottom
+              anchors.topMargin: Style.space(2)
+              // Indents roughly under node's label text (past its marker
+              // and glyph slot); a secondary line, so pixel-exact alignment
+              // with the label isn't required.
+              x: Style.space(54)
+              width: Math.max(0, rowWrap.width - x)
+              text: rowWrap.titles
+              elide: Text.ElideRight
+              color: Util.alpha(Aranea.DesignTokens.foreground, 0.5)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
           }
         }
       }

@@ -386,14 +386,48 @@ function workspaceLabel(row) {
 
 /**
  * A row's trailing detail: the window count ("empty" for none), with
- * "current" appended for the active workspace.
+ * "current" appended for the active workspace and "attention" appended for
+ * an urgent one (either, both, or neither).
  * @param {*} row - Workspace row.
  * @returns {string} The detail text.
  */
 function workspaceDetail(row) {
   var windows = Math.max(0, Number(row && row.windows) || 0)
-  var label = windows === 0 ? "empty" : windows + (windows === 1 ? " window" : " windows")
-  return row && row.active ? label + " · current" : label
+  var parts = [windows === 0 ? "empty" : windows + (windows === 1 ? " window" : " windows")]
+  if (row && row.active) parts.push("current")
+  if (row && row.urgent) parts.push("attention")
+  return parts.join(" · ")
+}
+
+/**
+ * A row's secondary text: its open windows' titles, joined, "" when there
+ * are none to show (so the row stays a single line).
+ * @param {*} row - Workspace row.
+ * @returns {string} The joined window titles.
+ */
+function workspaceTitles(row) {
+  var labels = row && Array.isArray(row.windowLabels) ? row.windowLabels : []
+  return labels
+    .filter(function (/** @type {*} */ label) {
+      return typeof label === "string" && label !== ""
+    })
+    .join(" · ")
+}
+
+/**
+ * A host's layout-shift signature: every row's id paired with whether it
+ * shows a titles line, joined. Unlike workspaceKeys (id order alone), this
+ * also changes when a row's titles line appears or disappears, since that
+ * resizes the row and can shift the ones below it under a resting pointer.
+ * @param {*} rows - Workspace rows.
+ * @returns {string} The joined signature, "" for no rows.
+ */
+function workspaceLayoutSignature(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(function (row) {
+      return workspaceKey(row) + ":" + (workspaceTitles(row) !== "" ? "1" : "0")
+    })
+    .join("\n")
 }
 
 if (typeof module !== "undefined") {
@@ -414,6 +448,8 @@ if (typeof module !== "undefined") {
     outlineIndex,
     openCaption,
     workspaceLabel,
-    workspaceDetail
+    workspaceDetail,
+    workspaceTitles,
+    workspaceLayoutSignature
   }
 }

@@ -235,3 +235,43 @@ test("workspaceDetail reads the window count, empty, and the active row", () => 
   assert.equal(model.workspaceDetail({ windows: 0, active: true }), "empty · current")
   assert.equal(model.workspaceDetail({ windows: 2, active: true }), "2 windows · current")
 })
+
+test("workspaceDetail appends attention for an urgent row, alongside current", () => {
+  assert.equal(model.workspaceDetail({ windows: 1, urgent: true }), "1 window · attention")
+  assert.equal(
+    model.workspaceDetail({ windows: 0, active: false, urgent: true }),
+    "empty · attention"
+  )
+  assert.equal(
+    model.workspaceDetail({ windows: 2, active: true, urgent: true }),
+    "2 windows · current · attention"
+  )
+  assert.equal(model.workspaceDetail({ windows: 1, urgent: false }), "1 window")
+})
+
+test("workspaceTitles joins the open windows' titles, blank with none", () => {
+  assert.equal(model.workspaceTitles({ windowLabels: ["kitty", "firefox"] }), "kitty · firefox")
+  assert.equal(model.workspaceTitles({ windowLabels: [] }), "")
+  assert.equal(model.workspaceTitles({}), "")
+  assert.equal(model.workspaceTitles({ windowLabels: ["a", "", 3, "b"] }), "a · b")
+})
+
+test("workspaceLayoutSignature pairs each row's id with whether it shows titles", () => {
+  const withTitles = [
+    { id: 1, windowLabels: ["kitty"] },
+    { id: 2, windowLabels: [] }
+  ]
+  assert.equal(model.workspaceLayoutSignature(withTitles), "1:1\n2:0")
+  assert.equal(
+    model.workspaceLayoutSignature(withTitles),
+    model.workspaceLayoutSignature(withTitles)
+  )
+  const titlesGone = [
+    { id: 1, windowLabels: [] },
+    { id: 2, windowLabels: [] }
+  ]
+  assert.notEqual(
+    model.workspaceLayoutSignature(withTitles),
+    model.workspaceLayoutSignature(titlesGone)
+  )
+})

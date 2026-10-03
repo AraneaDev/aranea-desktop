@@ -5,13 +5,17 @@
 // cursor there, hidden); rows are keyed by workspace id and a keyed action
 // whose row no longer carries that id is refused; the rows stay the same
 // delegates across a refresh that hands over a new (but equal) array, and
-// a click right after the rows change is refused until it settles.
+// a click right after the rows change is refused until it settles. A
+// second, static panel (panel2) covers the two state-only cases: an urgent
+// workspace's row is tinted (not only its "attention" detail text), and a
+// workspace with open windows shows their titles underneath.
 import QtQuick
 import QtTest
 import Quickshell
 import "lib"
 import "plugins/araneadev.workspaces" as Workspaces
 import "plugins/araneadev.workspaces/WorkspaceModel.js" as WorkspaceModel
+import "plugins/araneadev.shared" as Aranea
 
 ShellRoot {
   id: host
@@ -99,6 +103,33 @@ ShellRoot {
         host.hovered = host.hovered.concat([index])
       }
     }
+
+    // State-only panel: an urgent row (index 0, no titles) and a row with
+    // open windows (index 1, no urgency). No pointer/keyboard driving.
+    Workspaces.WorkspacePanel {
+      id: panel2
+      x: 20
+      y: 260
+      width: 380
+      workspaceStates: [
+        {
+          id: 9,
+          name: "9",
+          windows: 1,
+          active: false,
+          urgent: true,
+          windowLabels: []
+        },
+        {
+          id: 10,
+          name: "10",
+          windows: 2,
+          active: false,
+          urgent: false,
+          windowLabels: ["kitty", "firefox"]
+        }
+      ]
+    }
   }
 
   Component.onCompleted: run([[400, function () {
@@ -119,6 +150,15 @@ ShellRoot {
         t.equal(panel.rowAt(0).detail, "1 window · current", "the current workspace's detail names it")
         t.equal(panel.rowAt(1).detail, "empty", "an empty workspace reads empty")
         t.equal(panel.rowAt(2).detail, "2 windows", "the count pluralizes")
+
+        // ---------- Urgent tint and window titles (panel2) ----------
+        t.equal(panel2.rowAt(0).detail, "1 window · attention", "an urgent row's detail names it")
+        t.check(Qt.colorEqual(panel2.rowAt(0).nodeColor, Aranea.DesignTokens.urgent), "an urgent row's node colour is the urgent token")
+        t.check(Qt.colorEqual(t.findChild(panel2.rowAt(0), "nodeMarker").color, Aranea.DesignTokens.urgent), "an urgent row's marker is lit urgent even though it is not current")
+        var titlesLines = t.findChildren(panel2, "workspaceTitles")
+        t.check(!titlesLines[0].visible, "a row with no open windows shows no titles line")
+        t.check(titlesLines[1].visible && titlesLines[1].text === "kitty · firefox", "a row with open windows shows their titles")
+        t.check(!Qt.colorEqual(panel2.rowAt(1).nodeColor, Aranea.DesignTokens.urgent), "a non-urgent row's node colour is unaffected")
 
         // ---------- Stable rows across a refresh ----------
         rowsBefore = [panel.rowAt(0), panel.rowAt(1), panel.rowAt(2)]
