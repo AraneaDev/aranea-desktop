@@ -149,7 +149,7 @@ BarWidget {
         active: root.menuCursorActive && root.menuKeyboard,
         index: root.menuCursorIndex
       },
-      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2192) + " open " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190) + " back " + String.fromCodePoint(0xB7) + " enter select " + String.fromCodePoint(0xB7) + " esc close"
+      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2192) + " open " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190) + " back " + String.fromCodePoint(0xB7) + " enter select"
     })
 
   // ---- The manage panel's view.
@@ -195,7 +195,7 @@ BarWidget {
         row: root.manageCursor.row,
         pill: root.manageCursor.pill
       },
-      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190, 0x2192) + " pin / hide " + String.fromCodePoint(0xB7) + " enter toggle " + String.fromCodePoint(0xB7) + " esc close"
+      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190, 0x2192) + " pin / hide " + String.fromCodePoint(0xB7) + " enter toggle"
     })
 
   Component {
@@ -908,7 +908,7 @@ BarWidget {
               root.toggleManage()
           }
           Component.onCompleted: root.drawerArrow = expandIcon
-          Component.onDestruction: if (root.drawerArrow === expandIcon)
+          Component.onDestruction: if (root && root.drawerArrow === expandIcon)
             root.drawerArrow = null
         }
 
@@ -997,7 +997,7 @@ BarWidget {
               root.toggleManage()
           }
           Component.onCompleted: root.drawerArrow = expandIcon
-          Component.onDestruction: if (root.drawerArrow === expandIcon)
+          Component.onDestruction: if (root && root.drawerArrow === expandIcon)
             root.drawerArrow = null
         }
 
