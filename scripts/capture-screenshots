@@ -28,7 +28,8 @@ set -euo pipefail
 # started for the capture and killed by their own PIDs afterwards; if the
 # StatusNotifierWatcher also lists any item that is not one of those two
 # fixtures, both tray captures are refused with no screenshot written, so a
-# real tray app can never reach one.
+# real tray app can never reach one. Tray captures refuse while any real
+# tray app (for example LocalSend) is registered.
 #   ARANEA_CAPTURE_WIFI_NAMES    JSON array of Wi-Fi names (default below)
 #   ARANEA_CAPTURE_BT_NAMES      JSON array of Bluetooth names (default below)
 #   ARANEA_NETWORK_GRAPH_DELAY   seconds the Network graph records (default 20)
@@ -676,11 +677,30 @@ capture_tray_surface() {
   local courier_pid="" syncbox_pid="" courier_name="" syncbox_name=""
   # Kills exactly the two fixture PIDs started below (by PID, never a
   # `pkill -f` pattern, which could also match this capture shell itself).
+  # Each step tolerates a fixture that is already gone.
   tray_cleanup_fixtures() {
-    [[ -n "$courier_pid" ]] && kill "$courier_pid" >/dev/null 2>&1
-    [[ -n "$syncbox_pid" ]] && kill "$syncbox_pid" >/dev/null 2>&1
-    [[ -n "$courier_pid" ]] && wait "$courier_pid" >/dev/null 2>&1
-    [[ -n "$syncbox_pid" ]] && wait "$syncbox_pid" >/dev/null 2>&1
+    [[ -n "$courier_pid" ]] && kill "$courier_pid" >/dev/null 2>&1 || true
+    [[ -n "$syncbox_pid" ]] && kill "$syncbox_pid" >/dev/null 2>&1 || true
+    [[ -n "$courier_pid" ]] && wait "$courier_pid" >/dev/null 2>&1 || true
+    [[ -n "$syncbox_pid" ]] && wait "$syncbox_pid" >/dev/null 2>&1 || true
+    return 0
+  }
+  # Succeeds only when the watcher's list could be read, is not empty and
+  # holds nothing but the two fixtures; prints why otherwise. Fails closed:
+  # a busctl or jq failure counts as a mismatch.
+  tray_only_fixtures() {
+    local registered_json
+    if ! registered_json="$(busctl --user --json=short get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+      org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null)"; then
+      echo "could not read the StatusNotifierWatcher's registered items"
+      return 1
+    fi
+    if ! jq -e --arg c "$courier_name" --arg s "$syncbox_name" \
+      '(.data | type) == "array" and (.data | length) > 0 and all(.data[]; startswith($c) or startswith($s))' \
+      <<<"$registered_json" >/dev/null 2>&1; then
+      printf 'the tray holds something other than the two fixtures (%s)\n' "$registered_json"
+      return 1
+    fi
     return 0
   }
   trap tray_cleanup_fixtures EXIT
@@ -701,32 +721,40 @@ capture_tray_surface() {
     exit 3
   fi
 
-  # Fail closed: refuse both tray captures if the watcher knows about any
-  # item that is not one of the two fixtures just started.
-  local registered_json extra
-  registered_json="$(busctl --user --json=short get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
-    org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems 2>/dev/null)"
-  extra="$(jq -r --arg c "$courier_name" --arg s "$syncbox_name" \
-    '.data[] | select((startswith($c) or startswith($s)) | not)' <<<"$registered_json" 2>/dev/null)"
-  if [[ -n "$extra" ]]; then
-    printf 'capture failed: a non-fixture tray item is registered (%s); refusing both tray captures so a real app never reaches a screenshot\n' "$extra" >&2
+  # Fail closed: refuse both tray captures if the watcher's list can't be
+  # read, is empty, or holds any item that is not one of the two fixtures
+  # just started.
+  local mismatch
+  if ! mismatch="$(tray_only_fixtures)"; then
+    printf 'capture failed: %s; refusing both tray captures so a real app never reaches a screenshot\n' "$mismatch" >&2
+    exit 3
+  fi
+  # The fixture's Id is its name: a saved pin or hide of "Courier" or
+  # "Syncbox" would move or hide a fixture and change what `menu 0` opens.
+  local config_file
+  config_file="$(xdg_config_home)/omarchy/shell.json"
+  if [[ -f "$config_file" ]] && ! jq -e '
+      [.bar.layout[]? | arrays | .[] | objects
+        | select(.id == "araneadev.tray" or .id == "omarchy.tray")
+        | ((.pinned // []) + (.hidden // []))[]]
+      | any(. == "Courier" or . == "Syncbox") | not' "$config_file" >/dev/null 2>&1; then
+    echo "capture failed: Courier or Syncbox is in the tray entry's saved pinned or hidden list (or $config_file is unreadable); no screenshot written" >&2
     exit 3
   fi
 
   hyprctl dismissnotify >/dev/null 2>&1 || true
   omarchy-shell -q araneadev.tray close >/dev/null 2>&1 || true
-  # Courier is the first (index 0) drawer item: neither fixture's fresh pid
-  # is in any saved pinned list, so TrayLogic.menuTarget's drawer bucket
-  # (SystemTray insertion order) puts Courier, registered first, at index 0.
-  local ipc_result ipc_status
+  # Courier is the first (index 0) drawer item: a fixture's Id is its name,
+  # neither name is in the saved pinned or hidden lists (checked above), so
+  # TrayLogic.menuTarget's drawer bucket (SystemTray insertion order) puts
+  # Courier, registered first, at index 0.
+  local ipc_result="" ipc_status=0
   case "$surface" in
     tray)
-      ipc_result="$(omarchy-shell araneadev.tray menu 0 2>&1)"
-      ipc_status=$?
+      ipc_result="$(omarchy-shell araneadev.tray menu 0 2>&1)" || ipc_status=$?
       ;;
     tray-manage)
-      ipc_result="$(omarchy-shell araneadev.tray manage 2>&1)"
-      ipc_status=$?
+      ipc_result="$(omarchy-shell araneadev.tray manage 2>&1)" || ipc_status=$?
       ;;
   esac
   if ((ipc_status != 0)) || [[ -n "$ipc_result" ]]; then
@@ -736,6 +764,14 @@ capture_tray_surface() {
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
   grim "$output/$surface.png"
+  # The same check again: an app that registered while the popup was up
+  # could be in the screenshot, which is then deleted.
+  if ! mismatch="$(tray_only_fixtures)"; then
+    rm -f "$output/$surface.png"
+    omarchy-shell -q araneadev.tray close >/dev/null 2>&1 || true
+    printf 'capture failed: %s after the capture; screenshot deleted\n' "$mismatch" >&2
+    exit 3
+  fi
   omarchy-shell -q araneadev.tray close >/dev/null 2>&1 || true
   tray_cleanup_fixtures
   trap - EXIT
