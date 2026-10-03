@@ -139,7 +139,7 @@ grep -Fq 'onReloaded: service.reloadedSettings = true' "$svc"
 # --- 4c: Delete on "+N more" expands; Shift+Delete clears the group; the panel says so
 panel_qml="$repo_root/plugins/araneadev.notifications/Panel.qml"
 grep -Fq 'InboxLogic.dismissAction(' "$panel_qml"
-grep -Fq 'ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP' "$plugin/NotificationCenterContent.qml"
+grep -Fq '↑↓ move · enter open · del dismiss · ⇧del clear group' "$panel_qml"
 
 # --- 4c: dead restore code and unused card properties stay gone
 if grep -Eq 'restoredPopups|isRestoredRow|keepFileName' "$svc"; then

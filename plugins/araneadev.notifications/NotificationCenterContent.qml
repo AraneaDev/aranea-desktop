@@ -1,100 +1,174 @@
-// Header, status and empty-state presentation for the notification center.
-// qmllint disable missing-property unqualified
+// The notification center's Filament header and footer: the shared
+// DropdownHeader (title "Notifications" plus the view's caption, "N
+// unread", "Nothing new" or the quiet-hours text), a "Do not disturb" row
+// with a FilamentSwitch, the empty state ("All caught up") when the inbox
+// is empty, a default slot where Task 4's host places the row list
+// between the header and the footer, a "Clear all" FilamentPill (two-step
+// confirm) and the key hint line. One plain view object in (see `view`),
+// every user action reported through a single action signal. No service
+// or inbox here: tests drive it with fixtures.
+//
+// The keyboard cursor outline (dndCursor, clearCursor) shows only while a
+// host says so, never on hover. Hover is not wired here: neither control
+// changes with it. A click on the DND switch or the Clear pill is
+// refused within 300 ms of this view's own layout shifting (its caption
+// changing height, the Clear row showing or hiding) or of the slot's
+// content doing so, when the host calls noteLayoutChange() for it, the
+// same pattern WeatherDropdown uses for its sections.
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
-Item {
+ColumnLayout {
   id: root
-  // Public contract member.
-  property int count: 0
-  // Public contract member.
-  property bool dnd: false
-  // Public contract member.
-  property bool confirmingClear: false
-  // Public contract member.
-  property bool quiet: false
-  // Public contract member.
-  property string quietUntil: ""
-  // Public contract member.
-  property string fontFamily: Style.font.family
-  // Public contract member.
-  property color foreground: Color.popups.text
-  // Public contract member.
-  property color focusAccent: Color.notifications.countdown
-  // Public contract member.
-  signal toggleDnd
-  // Public contract member.
-  signal clearAll
 
-  implicitHeight: content.implicitHeight
-  ColumnLayout {
-    id: content
-    anchors.fill: parent
-    spacing: Style.space(10)
-    RowLayout {
-      Layout.fillWidth: true
-      Text {
-        Layout.fillWidth: true
-        text: "Notifications"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.title
-        font.bold: true
-      }
-      Text {
-        text: root.dnd ? "DND ◉" : "DND ○"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        MouseArea {
-          anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
-          onClicked: root.toggleDnd()
-        }
-      }
-      Text {
-        visible: root.count > 0
-        text: root.confirmingClear ? "Confirm clear (" + root.count + ")" : "Clear all"
-        color: root.focusAccent
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        MouseArea {
-          anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
-          onClicked: root.clearAll()
-        }
-      }
-    }
+  // View state built by the host: {count, caption ("N unread", "Nothing
+  // new" or the quiet-hours text), dnd: {on, busy}, clear: {visible,
+  // confirming, label ("Clear all" or "Confirm clear (N)")}, keyHint}.
+  property var view: ({})
+  // Whether the keyboard cursor is on the "Do not disturb" row; kept out
+  // of view, as WeatherDropdown keeps editText out of its view.
+  property bool dndCursor: false
+  // Whether the keyboard cursor is on the "Clear all" pill.
+  property bool clearCursor: false
+  // When this view's layout last shifted (Date.now()), 0 for never; see
+  // noteLayoutChange.
+  property real layoutChangedAt: 0
+  // Filters synthetic hover from controls moving under a still pointer,
+  // and carries layoutChangedAt to the Clear pill, the same gate
+  // WeatherDropdown exposes for its sections. Unused by the DND switch,
+  // which settles through clickSettled() instead (FilamentSwitch has no
+  // pointerGate fallback of its own).
+  readonly property alias pointerGate: gate
+  // Default slot: the host's row list sits here, between the header and
+  // the footer.
+  default property alias content: slot.data
+
+  // The view's dnd part, or an off, idle one.
+  readonly property var dnd: root.view && root.view.dnd ? root.view.dnd : ({
+      on: false,
+      busy: false
+    })
+  // The view's clear part, or a hidden one.
+  readonly property var clear: root.view && root.view.clear ? root.view.clear : ({
+      visible: false,
+      confirming: false,
+      label: "Clear all"
+    })
+  // The view's count, or 0.
+  readonly property int count: root.view && typeof root.view.count === "number" ? root.view.count : 0
+
+  // Emitted for every user action, NAME with its ARG: toggleDnd ({}), the
+  // DND switch was clicked or activated; clearAll ({}), the Clear-all
+  // pill was clicked or activated.
+  signal action(string name, var arg)
+
+  // Stamps layoutChangedAt: something moved the DND switch or the Clear
+  // pill without rebuilding them (the host's slot content changing
+  // height counts too; the host calls this directly for it).
+  function noteLayoutChange() {
+    root.layoutChangedAt = Date.now()
+  }
+
+  // Whether a pointer click on the DND switch may act: settled since this
+  // view's last layout shift. Passed as the switch's clickGate, the same
+  // "anything with clickSettled()" contract NodeDeviceRow and
+  // DisplaysControlRow satisfy.
+  function clickSettled() {
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      layoutChangedAt: root.layoutChangedAt
+    })
+  }
+
+  spacing: Style.space(10)
+
+  Aranea.DropdownHeader {
+    id: header
+    objectName: "centerHeader"
+    Layout.fillWidth: true
+    title: "Notifications"
+    caption: root.view && root.view.caption ? String(root.view.caption) : ""
+    onHeightChanged: root.noteLayoutChange()
+  }
+  RowLayout {
+    id: dndRow
+    objectName: "dndRow"
+    Layout.fillWidth: true
     Text {
+      objectName: "dndLabel"
       Layout.fillWidth: true
-      text: "ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP"
-      color: root.foreground
-      opacity: 0.5
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      elide: Text.ElideRight
+      text: "Do not disturb"
+      color: Aranea.DesignTokens.foreground
+      font.family: Style.font.family
+      font.pixelSize: Style.font.body
     }
-    Text {
-      visible: root.quiet && root.quietUntil !== ""
-      text: "Quiet until " + root.quietUntil
-      color: root.focusAccent
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
+    Aranea.FilamentSwitch {
+      id: dndSwitch
+      objectName: "dndSwitch"
+      checked: !!root.dnd.on
+      busy: !!root.dnd.busy
+      hasCursor: root.dndCursor
+      clickGate: root
+      onToggled: root.action("toggleDnd", ({}))
     }
-    Aranea.EmptyState {
-      visible: root.count === 0
+  }
+  Aranea.EmptyState {
+    objectName: "emptyState"
+    visible: root.count === 0
+    Layout.fillWidth: true
+    Layout.preferredHeight: implicitHeight
+    imageSource: Aranea.RuntimePaths.glyphUrl
+    imageSize: Style.space(28)
+    imageOpacity: 0.6
+    message: "All caught up"
+    messageSize: Style.font.body
+    spacing: Style.space(6)
+    fontFamily: Style.font.family
+    foreground: Aranea.DesignTokens.foreground
+  }
+  Item {
+    id: slot
+    objectName: "centerSlot"
+    Layout.fillWidth: true
+    Layout.preferredHeight: slot.childrenRect.height
+  }
+  RowLayout {
+    id: clearRow
+    objectName: "clearRow"
+    Layout.fillWidth: true
+    visible: !!root.clear.visible
+    onVisibleChanged: root.noteLayoutChange()
+    Item {
       Layout.fillWidth: true
-      Layout.preferredHeight: implicitHeight
-      imageSource: Aranea.RuntimePaths.glyphUrl
-      imageSize: Style.space(28)
-      imageOpacity: 0.6
-      message: "All caught up"
-      messageSize: Style.font.body
-      spacing: Style.space(6)
-      fontFamily: root.fontFamily
-      foreground: root.foreground
     }
+    Aranea.FilamentPill {
+      id: clearPill
+      objectName: "clearPill"
+      text: String(root.clear.label)
+      hasCursor: root.clearCursor
+      pointerGate: root.pointerGate
+      onClicked: root.action("clearAll", ({}))
+    }
+  }
+  Text {
+    objectName: "keyHint"
+    Layout.fillWidth: true
+    text: root.view && root.view.keyHint ? String(root.view.keyHint) : ""
+    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    elide: Text.ElideRight
+  }
+
+  PointerMoveGate {
+    id: gate
+    // This view's last layout shift, for the Clear pill's clickSettled().
+    property real layoutChangedAt: root.layoutChangedAt
+
+    referenceItem: root
   }
 }

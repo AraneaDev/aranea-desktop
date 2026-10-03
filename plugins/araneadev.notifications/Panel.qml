@@ -65,6 +65,31 @@ Panel {
   // "more" rows (InboxLogic.centerRows).
   readonly property var rows: available ? InboxLogic.centerRows(service.inbox.snapshot, root.expanded) : []
 
+  // The quiet-hours end time ("HH:MM"), or "" when there is no window or it
+  // is malformed.
+  readonly property string quietUntilText: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
+  // The header caption: the quiet-hours text while quiet.hours is active and
+  // the window parses, else "N unread" or "Nothing new" (today's quietUntil
+  // text keeps its meaning; see NotificationCenterContent.qml).
+  readonly property string centerCaption: root.quiet && root.quietUntilText !== "" ? ("Quiet until " + root.quietUntilText) : (root.count > 0 ? root.count + " unread" : "Nothing new")
+  // NotificationCenterContent's view object (its Filament header and
+  // footer): the list itself still renders as NotificationList below it,
+  // pending Task 4's rework to place it in the content slot.
+  readonly property var centerView: ({
+      count: root.count,
+      caption: root.centerCaption,
+      dnd: {
+        on: root.dnd,
+        busy: false
+      },
+      clear: {
+        visible: root.count > 0,
+        confirming: root.confirmingClear,
+        label: root.confirmingClear ? ("Confirm clear (" + root.count + ")") : "Clear all"
+      },
+      keyHint: "↑↓ move · enter open · del dismiss · ⇧del clear group"
+    })
+
   // Whether the row at index can hold the keyboard cursor (entry and "more" rows).
   function selectable(index: int): bool {
     var row = rows[index]
@@ -262,15 +287,13 @@ Panel {
 
           NotificationCenterContent {
             Layout.fillWidth: true
-            count: root.count
-            dnd: root.dnd
-            confirmingClear: root.confirmingClear
-            quiet: root.quiet
-            quietUntil: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
-            foreground: Color.popups.text
-            focusAccent: root.focusAccent
-            onToggleDnd: root.service.setDoNotDisturb(!root.dnd)
-            onClearAll: root.clearAll()
+            view: root.centerView
+            onAction: function (name, arg) {
+              if (name === "toggleDnd")
+                root.service.setDoNotDisturb(!root.dnd)
+              else if (name === "clearAll")
+                root.clearAll()
+            }
           }
 
           NotificationList {
