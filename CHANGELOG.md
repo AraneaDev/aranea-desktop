@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.0...v2.16.1) (2026-10-03)
+
+
+### Fixes
+
+* bring the notification center up to the Filament standard ([#105](https://github.com/AraneaDev/aranea-desktop/issues/105)) ([1fbf647](https://github.com/AraneaDev/aranea-desktop/commit/1fbf647e3af9651678d6ad95a0a7f675dd8c1447))
+
 ## [2.16.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.15.0...v2.16.0) (2026-10-03)
 
 
