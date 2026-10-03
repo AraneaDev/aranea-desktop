@@ -25,9 +25,12 @@
  */
 
 /**
- * One row `TrayMenuView.qml` draws: `index` is the source entry's index in
- * the array `menuRows` was given, needed to activate the real `QsMenuEntry`
- * (and to refuse a stale `{index, key}` action after a live menu rebuild).
+ * One row `TrayMenuView.qml` draws. The row's own `index` is the DBus source
+ * entry's index in the array `menuRows` was given, needed to activate the
+ * real `QsMenuEntry`. It is not the `index` the view's actions and cursor
+ * carry: an action's `index` is a position in the rows array, checked
+ * against its `key` (refusing a stale action after a live menu rebuild)
+ * before the entry at `rows[index].index` is activated.
  * @typedef {{key: string, label: string, separator: boolean, enabled: boolean, selectable: boolean, mark: ("" | "check" | "radio"), markOn: boolean, hasChildren: boolean, icon: *, index: number}} MenuRow
  */
 

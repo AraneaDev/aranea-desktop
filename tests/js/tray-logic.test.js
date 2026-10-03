@@ -24,6 +24,11 @@ test("labelOf: a doubled marker becomes a literal character", () => {
   assert.equal(logic.labelOf("a__b"), "a_b")
 })
 
+test("labelOf: a trailing marker is dropped, and a doubled marker before a single one stays literal", () => {
+  assert.equal(logic.labelOf("a_"), "a")
+  assert.equal(logic.labelOf("&&&x"), "&x")
+})
+
 test("labelOf: trims the result", () => {
   assert.equal(logic.labelOf("  _Open  "), "Open")
   assert.equal(logic.labelOf("_ Open"), "Open")

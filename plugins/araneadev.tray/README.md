@@ -12,10 +12,10 @@ hidden, check/radio marks, disabled dimming), and the manage popup (pin/hide per
 through `updateEntryInline`). `TrayModel.js` is stock's tray bucket helpers, unchanged apart from
 docs.
 
-`Tray.qml` runs as `omarchy.tray` for now: this is the Task 3 clone, so the stock root logic,
-markup and popups (`PopupCard`, xdg-popup) are unchanged from Omarchy's Tray and the bar entry
-keeps working identically until the Aranea-native, keyboard-reachable menu and manage views land
-in a later task. Pin and hide are saved under `root.moduleName`, which the bar overwrites with
+The plugin id is `araneadev.tray`. `Tray.qml` is still the Task 3 clone: it carries stock's root
+logic, markup and popups (`PopupCard`, xdg-popup) unchanged from Omarchy's Tray, so the bar entry
+keeps working identically until Task 5 wires in the Aranea-native, keyboard-reachable menu and
+manage views. Pin and hide are saved under `root.moduleName`, which the bar overwrites with
 the entry's own id (`araneadev.tray` once retargeted), never a literal `"omarchy.tray"`.
 
 `omarchy.clonePaths` (stock's `Tray.manifest.json` lists `TrayModel.js`) is read only by the
@@ -28,7 +28,8 @@ dropped from this manifest, the same way `araneadev.weather`'s was.
 `TrayMenuView.qml` and `TrayManageView.qml` are the pure Aranea-native views for the app menu
 and the manage panel (one view object in, one `action(name, arg)` signal out; keyed, settled
 clicks and gated hover). They are tested on their own (`tests/qml/tray-menu.qml`,
-`tests/qml/tray-manage.qml`) and not yet wired into `Tray.qml`.
+`tests/qml/tray-manage.qml`) and not yet wired into `Tray.qml`. Action index = position in
+`view.rows`; activate the entry at `rows[index].index` after `rows[index].key === key`.
 
 ## Integration
 

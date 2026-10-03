@@ -106,6 +106,11 @@ Column {
     })
   }
 
+  // Scrolls the row list so the keyboard cursor's row is in view.
+  function revealCursor() {
+    menu.revealRow(menu.cursorIndex)
+  }
+
   // Scrolls the row list so row INDEX is fully in view.
   function revealRow(index) {
     var item = index >= 0 ? rowRepeater.itemAt(index) : null
@@ -127,7 +132,9 @@ Column {
     list.contentY = 0
     menu.noteLayoutChange()
   }
-  onCursorIndexChanged: menu.revealRow(menu.cursorIndex)
+  // Later, so a depth change in the same view assignment resets the scroll
+  // first.
+  onCursorIndexChanged: Qt.callLater(menu.revealCursor)
 
   Item {
     id: header
@@ -332,8 +339,8 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             fillMode: Image.PreserveAspectFit
             // Decode at physical pixels, as stock's menu icons do.
-            sourceSize.width: width * Screen.devicePixelRatio
-            sourceSize.height: height * Screen.devicePixelRatio
+            sourceSize.width: Math.round(width * Screen.devicePixelRatio)
+            sourceSize.height: Math.round(height * Screen.devicePixelRatio)
             source: icon.visible ? String(row.entry.icon) : ""
           }
           Text {
@@ -378,8 +385,12 @@ Column {
                 })
               }
             }
-            onClicked: if (row.clickSettled() && row.pressedKey !== "" && row.pressedKey === row.key)
-              menu.activateAt(row.index, row.pressedKey)
+            onClicked: {
+              var key = row.pressedKey
+              row.pressedKey = ""
+              if (row.clickSettled() && key !== "" && key === row.key)
+                menu.activateAt(row.index, key)
+            }
           }
         }
       }
