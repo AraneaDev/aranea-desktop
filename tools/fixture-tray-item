@@ -175,7 +175,9 @@ class StatusNotifierItemObject(dbus.service.Object):
                 "Title": (app_name, "s"),
                 "Status": ("Active", "s"),
                 "IconName": (icon_name, "s"),
-                "ItemIsMenu": (False, "b"),
+                # A menu-only item: a left click opens its menu (the tray's
+                # onlyMenu path) instead of calling Activate.
+                "ItemIsMenu": (True, "b"),
                 "Menu": (dbus.ObjectPath("/MenuBar"), "o"),
             }
         }

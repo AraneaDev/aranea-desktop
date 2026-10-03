@@ -110,7 +110,10 @@ def main():
     its captured stdout from OUTFILE (argv[2]).
     """
     dest, outfile = sys.argv[1], sys.argv[2]
-    _bus, menu = connect(dest, timeout=5)
+    bus, menu = connect(dest, timeout=5)
+
+    item = dbus.Interface(bus.get_object(dest, "/StatusNotifierItem"), "org.freedesktop.DBus.Properties")
+    expect(bool(item.Get("org.kde.StatusNotifierItem", "ItemIsMenu")), "ItemIsMenu must be true (left click opens the menu)")
 
     revision, (root_id, _root_props, children) = menu.GetLayout(0, -1, NO_PROPS)
     expect(root_id == 0, "the root id must be 0")
