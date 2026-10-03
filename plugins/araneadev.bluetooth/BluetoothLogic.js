@@ -246,6 +246,55 @@ function takeReady(queue, inFlight) {
 }
 
 /**
+ * Ends a connect that failed fast: a "connecting" pending entry whose
+ * device reached BlueZ's connecting state (3) and then fell back to
+ * disconnected (0) is cleared, so its pulse stops and a retry or a queued
+ * action can run at once. `seen` marks the devices that reached 3; a
+ * device that never did keeps waiting on a 0 (its helper may still be
+ * starting). A device missing from `states` is left alone. Inputs are
+ * never mutated.
+ * @param {Record<string, string>|null|undefined} pending - address to pending action
+ * @param {Record<string, boolean>|null|undefined} seen - addresses whose connect reached state 3
+ * @param {Record<string, number>|null|undefined} states - address to BlueZ's device state, for every device present
+ * @returns {{pending: Record<string, string>, seen: Record<string, boolean>, changed: boolean}} the next maps, and whether pending changed
+ */
+function settleConnecting(pending, seen, states) {
+  /** @type {Record<string, string>} */
+  var nextPending = Object.assign({}, pending || {})
+  /** @type {Record<string, boolean>} */
+  var nextSeen = {}
+  var was = seen || {}
+  var now = states || {}
+  var changed = false
+  for (var key in nextPending) {
+    if (nextPending[key] !== "connecting") continue
+    if (!(key in now)) {
+      if (was[key]) nextSeen[key] = true
+      continue
+    }
+    if (now[key] === 3) nextSeen[key] = true
+    else if (now[key] === 0 && was[key]) {
+      delete nextPending[key]
+      changed = true
+    } else if (was[key]) nextSeen[key] = true
+  }
+  return { pending: nextPending, seen: nextSeen, changed: changed }
+}
+
+/**
+ * The device queue after a lifetime EVENT: closing the panel or the
+ * pending timeout empties it, so a queued action never runs long after,
+ * with nobody watching; anything else keeps it.
+ * @param {string} event - "close", "timeout" or anything else
+ * @param {Record<string, string>|null|undefined} queue - address to queued intent
+ * @returns {Record<string, string>} the queue to keep
+ */
+function queueAfter(event, queue) {
+  if (event === "close" || event === "timeout") return {}
+  return Object.assign({}, queue || {})
+}
+
+/**
  * The keyboard cursor's stops for following a keyboard Forget, top to
  * bottom: the power switch ("header"), the Connected and Paired rows keyed
  * by address, then the Available rows keyed "scan:" plus the address, so a
@@ -460,6 +509,8 @@ if (typeof module !== "undefined")
     inFlightIntent,
     deviceClick,
     takeReady,
+    settleConnecting,
+    queueAfter,
     forgetStops,
     followForget,
     rowKeyMatches

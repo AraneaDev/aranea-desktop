@@ -53,7 +53,7 @@ Column {
   property real layoutChangedAt: 0
   // The power switch's state from the view ({on, busy}), or the adapter's
   // own with nothing pending.
-  readonly property var power: view && view.power ? view.power : ({
+  readonly property var power: dropdown.view && dropdown.view.power ? dropdown.view.power : ({
       on: !!dropdown.view.enabled,
       busy: false
     })

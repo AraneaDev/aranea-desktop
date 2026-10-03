@@ -30,6 +30,9 @@ Panel {
   // while that device was busy, run once it goes idle; the last one wins
   // (BluetoothLogic.deviceClick / takeReady).
   property var deviceQueue: ({})
+  // Addresses whose "connecting" entry has seen BlueZ's connecting state,
+  // so a fall back to disconnected ends it (BluetoothLogic.settleConnecting).
+  property var connectingSeen: ({})
   // The pending power change (BluetoothLogic.powerClick / powerEcho): the
   // switch shows the new state at once and pulses until BlueZ's Powered
   // echoes it; clicks while it waits are queued, the last one wins.
@@ -445,8 +448,23 @@ Panel {
     runDeviceAction(device, "forget", "forgetting")
   }
 
+  // Ends a connect that failed fast: a "connecting" entry whose device went
+  // from BlueZ's connecting state back to disconnected is cleared, so its
+  // pulse stops and the queue can drain (BluetoothLogic.settleConnecting).
+  function settleConnectingActions() {
+    var states = {}
+    for (var i = 0; i < devices.length; i++)
+      if (devices[i] && devices[i].address)
+        states[devices[i].address] = devices[i].state !== undefined ? devices[i].state : -1
+    var r = BluetoothLogic.settleConnecting(root.pendingActions, root.connectingSeen, states)
+    root.connectingSeen = r.seen
+    if (r.changed)
+      root.pendingActions = r.pending
+  }
+
   // Clears pending actions whose BlueZ state has caught up.
   function syncPendingActions() {
+    settleConnectingActions()
     var next = cloneMap(pendingActions)
     var changed = false
 
@@ -723,11 +741,21 @@ Panel {
   // A device's pending action cleared: run what was queued for it.
   onPendingActionsChanged: Qt.callLater(root.drainDeviceQueue)
   // A row's busy state may have cleared with BlueZ's own state.
-  onConnectedViewRowsChanged: Qt.callLater(root.drainDeviceQueue)
+  // A fast-failing connect is caught here too (settleConnectingActions).
+  onConnectedViewRowsChanged: {
+    Qt.callLater(root.settleConnectingActions)
+    Qt.callLater(root.drainDeviceQueue)
+  }
   // (see onConnectedViewRowsChanged)
-  onKnownViewRowsChanged: Qt.callLater(root.drainDeviceQueue)
+  onKnownViewRowsChanged: {
+    Qt.callLater(root.settleConnectingActions)
+    Qt.callLater(root.drainDeviceQueue)
+  }
   // (see onConnectedViewRowsChanged)
-  onDiscoveredViewRowsChanged: Qt.callLater(root.drainDeviceQueue)
+  onDiscoveredViewRowsChanged: {
+    Qt.callLater(root.settleConnectingActions)
+    Qt.callLater(root.drainDeviceQueue)
+  }
 
   // Keeps the cursor within the current sections/rows after they change.
   function clampCursor() {
@@ -859,7 +887,10 @@ Panel {
     repeat: false
     onTriggered: {
       root.pendingActions = ({})
+      root.connectingSeen = ({})
       root.pendingRemovalKey = ""
+      // A queued action never outlives the pending it waited on.
+      root.deviceQueue = BluetoothLogic.queueAfter("timeout", root.deviceQueue)
     }
   }
 
@@ -971,8 +1002,11 @@ Panel {
       root.keyboardCursor = false
       // Stand-in names never carry over into an open or past a close.
       root.showcaseNames = []
-      if (!root.opened)
+      if (!root.opened) {
         root.rssiByAddress = ({})
+        // A queued action never runs with the panel closed.
+        root.deviceQueue = BluetoothLogic.queueAfter("close", root.deviceQueue)
+      }
     }
     function onFocusSectionChanged() {
       Qt.callLater(root.ensureCursorVisible)
@@ -1095,7 +1129,6 @@ Panel {
   function handleAction(name, arg) {
     keyboardCursor = false
     if (name === "toggleBluetooth") {
-      pendingRemovalKey = ""
       toggleBluetooth()
       return
     }
@@ -1164,6 +1197,8 @@ Panel {
   function toggleBluetooth() {
     if (!adapter)
       return
+    // Every power path spends a keyboard Forget's follow.
+    root.pendingRemovalKey = ""
     applyPower(BluetoothLogic.powerClick(root.powerPending, adapter.enabled))
   }
 

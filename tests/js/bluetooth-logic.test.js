@@ -258,3 +258,47 @@ test("BluetoothLogic.js's generated copy of CursorLogic answers like the source"
   assert.equal(logic.rowKeyMatches(rows, 0, "a"), true)
   assert.equal(logic.rowKeyMatches(rows, 0, "b"), false)
 })
+
+// --- A connect that fails fast ------------------------------------------------
+
+test("a connect that reached BlueZ's connecting state and fell back to disconnected clears", () => {
+  const pending = { A: "connecting", B: "connecting", C: "forgetting" }
+  // First read: A is connecting (3), B not yet; nothing clears.
+  let r = logic.settleConnecting(pending, {}, { A: 3, B: 0, C: 0 })
+  assert.deepEqual(r.pending, pending)
+  assert.deepEqual(r.seen, { A: true })
+  assert.equal(r.changed, false)
+  // A falls back to disconnected (0): its pending entry clears.
+  r = logic.settleConnecting(r.pending, r.seen, { A: 0, B: 0, C: 0 })
+  assert.deepEqual(r.pending, { B: "connecting", C: "forgetting" })
+  assert.deepEqual(r.seen, {})
+  assert.equal(r.changed, true)
+  // The input is never mutated.
+  assert.deepEqual(pending, { A: "connecting", B: "connecting", C: "forgetting" })
+})
+
+test("settleConnecting keeps a connect that never reached connecting, and forgets stale marks", () => {
+  // B never reached 3: a 0 keeps it waiting (the helper may still be starting).
+  let r = logic.settleConnecting({ B: "connecting" }, {}, { B: 0 })
+  assert.deepEqual(r.pending, { B: "connecting" })
+  // A mark for a device no longer connecting is dropped.
+  r = logic.settleConnecting({}, { Z: true }, {})
+  assert.deepEqual(r.seen, {})
+  assert.equal(r.changed, false)
+  // A device that went missing keeps its entry (syncPendingActions owns that).
+  r = logic.settleConnecting({ A: "connecting" }, { A: true }, {})
+  assert.deepEqual(r.pending, { A: "connecting" })
+  assert.deepEqual(r.seen, { A: true })
+  assert.deepEqual(logic.settleConnecting(null, null, null), {
+    pending: {},
+    seen: {},
+    changed: false
+  })
+})
+
+test("the device queue is short-lived: closing or the pending timeout empties it", () => {
+  assert.deepEqual(logic.queueAfter("close", { A: "forget" }), {})
+  assert.deepEqual(logic.queueAfter("timeout", { A: "forget" }), {})
+  assert.deepEqual(logic.queueAfter("open", { A: "forget" }), { A: "forget" })
+  assert.deepEqual(logic.queueAfter("open", null), {})
+})
