@@ -6,8 +6,8 @@ menu and its manage popup) with an Aranea-native one.
 `Tray.qml` keeps stock's buckets (`SystemTray.items`, filtered through `TrayModel.ownedByOmarchy`
 and the entry's `pinned` / `hidden` id lists), click handling (left activates or opens the menu
 for an `onlyMenu` item, middle secondary-activates, right opens the app menu, wheel scrolls,
-right-click on the drawer arrow toggles manage), both bar orientations with stock's containment
-masks, the app menu's submenu drill-down and quirks (the leading separator and root-title entry
+right-click on the drawer arrow toggles manage), both bar orientations (the containment masks
+are gone, see the drawer below), the app menu's submenu drill-down and quirks (the leading separator and root-title entry
 hidden, check/radio marks, disabled dimming), and the manage popup (pin/hide per item, saved
 through `updateEntryInline`). `TrayModel.js` is stock's tray bucket helpers, unchanged apart from
 docs.
@@ -20,7 +20,8 @@ overwrites with the entry's own id (`araneadev.tray` once retargeted), never a l
 and it grows as the drawer slides open (600 ms, clipped). Hovering the drawer opens it, as in
 stock. A left-click on the arrow holds it open until the arrow is clicked again (or IPC `close`);
 the bar takes no keyboard focus and never sees outside clicks, so Esc and a click elsewhere
-cannot close it. A right-click on the arrow toggles the manage panel. There is no containment
+cannot close it. A right-click on the arrow toggles the manage panel; a drawer that was open
+when manage opened stays open under it, so the card (anchored to the whole tray) never slides. There is no containment
 mask any more, since nothing in the widget's box is empty.
 
 Both popups are `Aranea.KeyboardPanelFrame` windows (layer-shell, focused when they map), anchored

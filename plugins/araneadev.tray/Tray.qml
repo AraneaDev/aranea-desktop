@@ -1,14 +1,16 @@
 // Aranea Tray (araneadev.tray, cloned from omarchy.tray): the bar's system
 // tray widget, with its app-menu and manage popups. Stock's root logic stays
-// (the buckets, the drawer animation, both bar orientations with their
-// containment masks, icon clicks and the wheel, QsMenuOpener with the
-// submenu stack, resetTrayMenu and the pin/hide persistence). Changed here:
-// both popups are Aranea.KeyboardPanelFrame windows (layer-shell, focused
-// when they map) drawing the pure TrayMenuView and TrayManageView; the app
-// menu and the manage panel take the keyboard; every action is keyed and
-// refused on a mismatch; pin and hide show their new state at once; a menu
-// whose item leaves the tray closes; and the IPC target araneadev.tray
-// opens either popup. The rules live in TrayLogic.js, tested under Node.
+// (the buckets, the drawer animation, both bar orientations, icon clicks
+// and the wheel, QsMenuOpener with the submenu stack, resetTrayMenu and the
+// pin/hide persistence). Changed here: the collapsed drawer reserves no
+// space, so the widget needs no containment mask, and a left-click on its
+// arrow holds it open; both popups are Aranea.KeyboardPanelFrame windows
+// (layer-shell, focused when they map) drawing the pure TrayMenuView and
+// TrayManageView; the app menu and the manage panel take the keyboard;
+// every action is keyed and refused on a mismatch; pin and hide show their
+// new state at once; a menu whose item leaves the tray closes; and the IPC
+// target araneadev.tray opens either popup. The rules live in TrayLogic.js,
+// tested under Node.
 pragma ComponentBehavior: Bound
 import Quickshell
 import Quickshell.Io
@@ -38,9 +40,15 @@ BarWidget {
   // focus and never sees clicks outside itself, so Esc and an outside click
   // cannot close it.
   property bool drawerClickedOpen: false
+  // Whether the drawer was open when the manage popup opened, so it stays
+  // open under the popup: the popup's layer takes the pointer off the bar,
+  // and a collapsing drawer would shrink root, the popup's anchor, and slide
+  // the card sideways.
+  property bool manageHeld: false
   // Whether the collapsed drawer is slid open: hovered, held open by a click
-  // on the arrow, or held under an open app menu of one of its icons.
-  readonly property bool expanded: drawerHovered || drawerClickedOpen || (trayMenuOpen && drawerHeld)
+  // on the arrow, held under an open app menu of one of its icons, or held
+  // under the manage popup it was open for.
+  readonly property bool expanded: drawerHovered || drawerClickedOpen || (trayMenuOpen && drawerHeld) || (managePopupOpen && manageHeld)
   // Whether the manage (pin/hide) popup is open.
   property bool managePopupOpen: false
   // Whether an item's app menu popup is open.
@@ -307,6 +315,7 @@ BarWidget {
       return
     }
     root.trayMenuOpen = false
+    root.manageHeld = root.expanded
     root.managePopupOpen = true
   }
 
@@ -367,6 +376,7 @@ BarWidget {
   // IPC `manage`: opens the manage popup.
   function openManage() {
     root.trayMenuOpen = false
+    root.manageHeld = root.expanded
     root.managePopupOpen = true
   }
 
