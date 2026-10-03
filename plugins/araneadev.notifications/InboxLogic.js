@@ -323,6 +323,21 @@ function bellGlyph(silenced) {
 }
 
 /**
+ * The center list's height: its content, capped so the header above the
+ * list and the footer below it (the Clear row and the key hint) still fit
+ * inside the card's content area.
+ * @param {number} contentHeight - the list's full content height
+ * @param {number} innerMax - the card's largest content height (inside padding and border)
+ * @param {number} slotTop - the height above the list
+ * @param {number} footerHeight - the height below the list
+ * @returns {number} the list height, never below 0
+ */
+function listHeight(contentHeight, innerMax, slotTop, footerHeight) {
+  var room = (Number(innerMax) || 0) - (Number(slotTop) || 0) - (Number(footerHeight) || 0)
+  return Math.max(0, Math.min(Number(contentHeight) || 0, room))
+}
+
+/**
  * Whether clearing this many entries asks for confirmation first (more than
  * CONFIRM_CLEAR_ABOVE).
  * @param {number} count - inbox entries
@@ -586,6 +601,7 @@ if (typeof module !== "undefined") {
     rowKey: rowKey,
     indexOfKey: indexOfKey,
     bellGlyph: bellGlyph,
+    listHeight: listHeight,
     needsClearConfirm: needsClearConfirm,
     quietUntil: quietUntil,
     relativeTime: relativeTime

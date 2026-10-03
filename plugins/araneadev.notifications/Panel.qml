@@ -100,6 +100,7 @@ Panel {
   readonly property var centerView: ({
       count: root.count,
       caption: root.centerCaption,
+      glyph: InboxLogic.bellGlyph(root.dnd || root.quiet),
       dnd: InboxLogic.dndView(root.dndPending, root.dnd),
       clear: {
         visible: root.count > 0,
@@ -416,7 +417,10 @@ Panel {
       NotificationList {
         id: list
         width: parent.width
-        height: root.count > 0 ? Math.max(0, Math.min(list.contentHeight, panel.screenH * 0.6 - centerContent.slotTop - centerContent.footerHeight)) : 0
+        // Capped so the header and the footer stay inside the card: the
+        // card's largest content height (the 60% cap, less its padding
+        // and border) less the space above and below the list.
+        height: root.count > 0 ? InboxLogic.listHeight(list.contentHeight, panel.fittedContentHeight(panel.screenH, panel.screenH * 0.6) - panel.verticalContentInset, centerContent.slotTop, centerContent.footerHeight) : 0
         visible: root.count > 0
         rows: root.rows
         // The mint outline: only while the keyboard drives the cursor and

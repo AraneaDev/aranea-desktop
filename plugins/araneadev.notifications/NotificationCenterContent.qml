@@ -26,7 +26,8 @@ ColumnLayout {
   id: root
 
   // View state built by the host: {count, caption ("N unread", "Nothing
-  // new" or the quiet-hours text), dnd: {on, busy}, clear: {visible,
+  // new" or the quiet-hours text), glyph (the header's bell; the plain
+  // bell when missing), dnd: {on, busy}, clear: {visible,
   // confirming, label ("Clear all" or "Confirm clear (N)")}, keyHint}.
   property var view: ({})
   // Whether the keyboard cursor is on the "Do not disturb" row; kept out
@@ -97,6 +98,7 @@ ColumnLayout {
     id: header
     objectName: "centerHeader"
     Layout.fillWidth: true
+    glyph: root.view && root.view.glyph ? String(root.view.glyph) : String.fromCodePoint(0xf009a)
     title: "Notifications"
     caption: root.view && root.view.caption ? String(root.view.caption) : ""
     onHeightChanged: root.noteLayoutChange()

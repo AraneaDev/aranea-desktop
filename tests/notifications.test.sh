@@ -39,6 +39,8 @@ grep -Fq 'Aranea.KeyboardPanelFrame {' "$plugin/Panel.qml"
 grep -Fq 'onUnhandledKey:' "$plugin/Panel.qml"
 grep -Fq 'InboxLogic.dndClick(' "$plugin/Panel.qml"
 grep -Fq 'InboxLogic.dndEcho(' "$plugin/Panel.qml"
+# The list cap counts the card's padding and border (the footer stays inside).
+grep -Fq 'InboxLogic.listHeight(list.contentHeight, panel.fittedContentHeight(panel.screenH, panel.screenH * 0.6) - panel.verticalContentInset' "$plugin/Panel.qml"
 if grep -Eq 'PanelKeyCatcher|^  KeyboardPanel \{' "$plugin/Panel.qml"; then
   echo "Panel.qml must use the shared Aranea keyboard frame" >&2
   exit 1

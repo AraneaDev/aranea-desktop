@@ -119,6 +119,10 @@ test("notifications logic", () => {
       inbox.bellGlyph(true) === String.fromCodePoint(0xf009b),
     "bell glyphs"
   )
+  assert(inbox.listHeight(200, 400, 100, 60) === 200, "a short list keeps its content height")
+  assert(inbox.listHeight(900, 400, 100, 60) === 240, "a long list is capped above the footer")
+  assert(inbox.listHeight(900, 100, 80, 60) === 0, "never below 0")
+  assert(inbox.listHeight(undefined, "x", null, NaN) === 0, "bad input reads as 0")
   assert(
     inbox.needsClearConfirm(20) === false && inbox.needsClearConfirm(21) === true,
     "confirm above 20"
