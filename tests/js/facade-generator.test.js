@@ -28,7 +28,9 @@ test("facades contain every generator-owned source region", () => {
     "plugins/araneadev.health/HealthBridge.js": ["ServiceRegistry.js"],
     "plugins/araneadev.notifications/ServiceBridge.js": ["ServiceRegistry.js"],
     "plugins/araneadev.network/NetworkLogic.js": ["CursorLogic.js", "NmcliTerse.js"],
-    "plugins/araneadev.vpn/VpnLogic.js": ["NmcliTerse.js"]
+    "plugins/araneadev.vpn/VpnLogic.js": ["NmcliTerse.js"],
+    "plugins/araneadev.bluetooth/BluetoothLogic.js": ["CursorLogic.js"],
+    "plugins/araneadev.notifications/InboxLogic.js": ["CursorLogic.js"]
   }
   for (const [file, sources] of Object.entries(expected)) {
     const source = fs.readFileSync(path.join(root, file), "utf8")

@@ -435,25 +435,29 @@ ShellRoot {
       t.check(connectedLabel.text.indexOf("forget") !== -1, "the forget button reads \"forget\"")
       t.check(connectedBorder.border.color !== Aranea.DesignTokens.urgent, "forget is muted, not bright, with the cursor on the row but not its action")
       full.view = cursorTick(full.view, true, "connected", 0, true)
-      t.step(50, function () {
+      // Past the settle window of the pulse's stamp above, so the
+      // right-click below lands.
+      t.step(350, function () {
         t.equal(connectedBorder.border.color, Aranea.DesignTokens.urgent, "forget brightens to full urgent once the cursor's action is on it")
         t.equal(connectedLabel.color, Aranea.DesignTokens.urgent, "the label brightens with it")
         connectedForgetOnCursor[0].activate()
         t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["forget",
           {
             section: "connected",
-            index: 0
+            index: 0,
+            key: "AA:1"
           }
-        ]), "the forget button emits forget for its row")
+        ]), "the forget button emits forget for its row, with its key")
 
         // Available rows emit primary when chosen.
         availableRows[1].activate()
         t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["primary",
           {
             section: "discovered",
-            index: 1
+            index: 1,
+            key: "CC:2"
           }
-        ]), "choosing an available row emits primary")
+        ]), "choosing an available row emits primary, with its key")
 
         // Right-click emits secondary.
         var pairedSecondary = t.findChildren(paired, "secondaryArea")
@@ -461,9 +465,10 @@ ShellRoot {
         t.equal(JSON.stringify(actions[actions.length - 1]), JSON.stringify(["secondary",
           {
             section: "known",
-            index: 1
+            index: 1,
+            key: "BB:2"
           }
-        ]), "right-clicking a row emits secondary")
+        ]), "right-clicking a row emits secondary, with its key")
 
         // Hovering the forget button reports a dedicated hover action with
         // action: true, and action: false plus leave: true once it leaves

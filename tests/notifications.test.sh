@@ -175,4 +175,12 @@ grep -Fq 'cache: false' "$card_qml"
 grep -Fq 'function expandAt(index: int): void' "$panel_qml"
 grep -Fq 'fixed.timestamp = now - f' "$inbox_qml"
 
+# --- consistency pass part 2, task 1: a keyboard Delete arms
+# pendingRemovalKey; the keyboard-vs-pointer removal decision itself (land
+# on CursorLogic.afterRemoval's neighbour, or hide as a plain followStop)
+# is InboxLogic.followRemoval, a pure function tested by
+# tests/js/notifications.test.js, not by grep.
+grep -Fq 'root.pendingRemovalKey = root.cursorKey' "$panel_qml"
+grep -Fq 'InboxLogic.followRemoval(' "$panel_qml"
+
 echo "notifications contract passed"

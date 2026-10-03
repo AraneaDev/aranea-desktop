@@ -57,15 +57,24 @@ Panel {
   // and Down step through them, held at both ends; Left and Right only
   // reveal. The cursor follows its stop's key (InboxLogic.rowKey, "dnd" or
   // "clear"), so an arrival that re-sorts the list never redirects Enter or
-  // Delete to another entry; when its key vanishes the cursor hides.
+  // Delete to another entry. When its key vanishes it hides, except right
+  // after a keyboard Delete, where it stays shown on the neighbour
+  // (the decision is InboxLogic.followRemoval's; see onCursorStopChanged).
   // The key of the stop the cursor is on, or "" for none.
   property string cursorKey: ""
   // True while the keyboard drives the cursor; any pointer use clears it.
   // The outline shows only then; the first navigation key only reveals.
   property bool keyboardCursor: false
   // The stop the cursor was last on, so a cursor whose key vanished is
-  // revealed near where it was; -1 for none.
+  // revealed near where it was, or (InboxLogic.followRemoval) is the
+  // neighbour a keyboard Delete lands on; -1 for none.
   property int lastStop: -1
+  // The key a keyboard Delete is removing (deleteCursor arms it with the
+  // cursor's own key before the row leaves), read by
+  // InboxLogic.followRemoval so the next stops change lands the cursor on
+  // its neighbour instead of hiding it; "" when the next loss should hide
+  // it as usual (a pointer dismiss or a background update).
+  property string pendingRemovalKey: ""
   // True while "Clear all" waits for its confirming click (reset after 4 s).
   property bool confirmingClear: false
   // Clock for the relative time labels: set on open, then every 30 s while open.
@@ -165,10 +174,15 @@ Panel {
   }
 
   // Delete (Shift sets wholeGroup) or x: on a row, see dismissAt; nothing on
-  // the DND switch or the Clear pill.
+  // the DND switch or the Clear pill. An actual removal (not a "+N more"
+  // expand) arms pendingRemovalKey, so the cursor stays shown on its
+  // neighbour once the row is gone (InboxLogic.followRemoval).
   function deleteCursor(wholeGroup: bool): void {
     if (!root.keyMayAct() || root.cursor < 0)
       return
+    var action = InboxLogic.dismissAction(root.rows[root.cursor], wholeGroup)
+    if (action === "dismiss" || action === "group")
+      root.pendingRemovalKey = root.cursorKey
     root.dismissAt(root.cursor, wholeGroup)
   }
 
@@ -283,27 +297,28 @@ Panel {
     root.keyboardCursor = false
     root.cursorKey = ""
     root.lastStop = -1
+    root.pendingRemovalKey = ""
     if (opened) {
       root.now = Date.now()
       root.confirmingClear = false
     }
   }
 
-  // Remembers where the cursor is, for a reveal after its key vanished.
+  // The cursor's stop recomputed (a removal, a re-sort, or the cursor's own
+  // key moving). InboxLogic.followRemoval is the single source of truth for
+  // what happens next: it lands the cursor on CursorLogic.afterRemoval's
+  // neighbour after a keyboard removal (pendingRemovalKey), hides it on any
+  // other vanish (a pointer dismiss or a background update), and otherwise
+  // keeps it exactly as shown, dropping a stale pendingRemovalKey once the
+  // cursor's own key survives.
   onCursorStopChanged: {
-    if (root.cursorStop >= 0)
-      root.lastStop = root.cursorStop
-    else if (root.cursorKey)
-      root.followStops()
-  }
-
-  // The cursor's stop vanished (dismissed, or the Clear pill hid): hide it
-  // and drop its key, so the outline never comes back without a key press
-  // when the same key reappears (InboxLogic.followStop).
-  function followStops(): void {
-    var next = InboxLogic.followStop(root.stops, root.cursorKey, root.keyboardCursor)
+    var next = InboxLogic.followRemoval(root.stops, root.pendingRemovalKey, root.cursorKey, root.lastStop, root.keyboardCursor)
+    root.pendingRemovalKey = next.pendingKey
     root.cursorKey = next.key
     root.keyboardCursor = next.shown
+    var stop = InboxLogic.stopIndex(root.stops, next.key)
+    if (stop >= 0)
+      root.lastStop = stop
   }
 
   // The service echoed a DND change (or something else changed it).

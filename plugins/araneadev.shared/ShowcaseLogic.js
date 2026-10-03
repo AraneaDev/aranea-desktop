@@ -1,7 +1,7 @@
 // Pure rules for the screenshot stand-in names: scripts/capture-screenshots
 // hands the Network and Bluetooth dropdowns (their `showcase` IPC method) a
 // list of made-up names, and the views draw those instead of real nearby
-// network and device names. Display only; nothing is stored. No QML, no
+// network and device names (Audio relabels its rows with showcaseLabels too). Display only; nothing is stored. No QML, no
 // I/O; tests/js/showcase-logic.test.js runs this under Node.
 
 /**

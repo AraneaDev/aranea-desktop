@@ -1,9 +1,13 @@
 // Now playing strip in the Aranea audio dropdown: player name, track
-// title and artist/album, transport buttons and a progress hairline.
-// Pure view: plain inputs in, signals out.
+// title and artist/album, transport buttons and a progress hairline lit
+// as the filament strand (mint to violet). Pure view: plain inputs in,
+// signals out. A transport click within 300 ms of the dropdown's layout
+// shifting (pointerGate.layoutChangedAt) is ignored unless the pointer has
+// really moved onto the strip since.
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Column {
   id: strip
@@ -26,6 +30,9 @@ Column {
   // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
   // strip moving under a still pointer.
   property var pointerGate: null
+  // When the gate last accepted a real pointer move over the strip
+  // (Date.now()), 0 for never.
+  property real pointerMovedAt: 0
 
   // Emitted when the previous button is activated.
   signal previousRequested
@@ -35,6 +42,16 @@ Column {
   signal nextRequested
   // Emitted when the pointer enters the strip.
   signal entered
+
+  // Whether a pointer click may reach a transport button: settled since
+  // the dropdown's last layout shift, or moved onto since.
+  function clickSettled() {
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      movedAt: strip.pointerMovedAt,
+      layoutChangedAt: strip.pointerGate ? Number(strip.pointerGate.layoutChangedAt) || 0 : 0
+    })
+  }
 
   visible: info.visible
 
@@ -125,10 +142,12 @@ Column {
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             MouseArea {
+              objectName: "previousButton"
               anchors.fill: parent
               enabled: strip.info.canPrevious
               cursorShape: Qt.PointingHandCursor
-              onClicked: strip.previousRequested()
+              onClicked: if (strip.clickSettled())
+                strip.previousRequested()
             }
           }
           Text {
@@ -138,9 +157,11 @@ Column {
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             MouseArea {
+              objectName: "playPauseButton"
               anchors.fill: parent
               cursorShape: Qt.PointingHandCursor
-              onClicked: strip.playPauseRequested()
+              onClicked: if (strip.clickSettled())
+                strip.playPauseRequested()
             }
           }
           Text {
@@ -151,15 +172,18 @@ Column {
             font.family: Style.font.family
             font.pixelSize: Style.font.body
             MouseArea {
+              objectName: "nextButton"
               anchors.fill: parent
               enabled: strip.info.canNext
               cursorShape: Qt.PointingHandCursor
-              onClicked: strip.nextRequested()
+              onClicked: if (strip.clickSettled())
+                strip.nextRequested()
             }
           }
         }
       }
       Item {
+        objectName: "progressBar"
         width: parent.width
         height: Math.max(2, Style.space(2))
         visible: strip.info.progress >= 0
@@ -167,12 +191,25 @@ Column {
           anchors.fill: parent
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.15)
         }
+        // The played part, lit as the filament strand: mint to violet
+        // across its own length, as FilamentSlider's lit strand.
         Rectangle {
+          objectName: "progressFill"
           anchors.left: parent.left
           anchors.top: parent.top
           anchors.bottom: parent.bottom
           width: parent.width * Math.max(0, Math.min(1, strip.info.progress))
-          color: Aranea.DesignTokens.strandEnd
+          gradient: Gradient {
+            orientation: Gradient.Horizontal
+            GradientStop {
+              position: 0
+              color: Aranea.DesignTokens.accent
+            }
+            GradientStop {
+              position: 1
+              color: Aranea.DesignTokens.strandEnd
+            }
+          }
         }
       }
     }
@@ -183,8 +220,10 @@ Column {
       onPointChanged: if (strip.pointerGate && stripHover.hovered && strip.pointerGate.moved(stripHover.parent, {
         x: stripHover.point.position.x,
         y: stripHover.point.position.y
-      }))
+      })) {
+        strip.pointerMovedAt = Date.now()
         strip.entered()
+      }
     }
   }
 }

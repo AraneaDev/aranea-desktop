@@ -568,6 +568,143 @@ test("notification center cursor stops", () => {
   assert.equal(inbox.moveStop(null, 0, 1), -1)
 })
 
+// Panel.qml's single call from onCursorStopChanged: the keyboard-vs-pointer
+// removal decision, extracted into a pure function (fix round 1).
+test("followRemoval: a keyboard delete lands on the neighbour, shown", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+
+  // The middle row: the row that slides into its place is the neighbour.
+  const afterMiddle = [{ key: "a" }, { key: "c" }, { key: "d" }]
+  assert.deepEqual(inbox.followRemoval(afterMiddle, "b", "b", 1, true), {
+    key: "c",
+    shown: true,
+    pendingKey: ""
+  })
+
+  // The last row: clamped to the previous one.
+  const afterLast = [{ key: "a" }, { key: "b" }]
+  assert.deepEqual(inbox.followRemoval(afterLast, "c", "c", 2, true), {
+    key: "b",
+    shown: true,
+    pendingKey: ""
+  })
+
+  // The only row: nothing left to show the cursor on.
+  assert.deepEqual(inbox.followRemoval([], "a", "a", 0, true), {
+    key: "",
+    shown: false,
+    pendingKey: ""
+  })
+})
+
+test("followRemoval: a pointer or background removal hides the cursor", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const after = [{ key: "a" }]
+
+  // Nothing armed (a pointer dismiss, or a background prune/expiry).
+  assert.deepEqual(inbox.followRemoval(after, "", "b", 1, true), {
+    key: "",
+    shown: false,
+    pendingKey: ""
+  })
+
+  // Armed, but for a different key than the one that vanished: still
+  // hides. (The arm is left as given here -- harmless, since the cursor
+  // can only ever retarget that key through a placeCursor-style write that
+  // finds it among a CURRENT stop, which the next followRemoval call would
+  // then see as survived and clear; see the "intervening" test below.)
+  assert.deepEqual(inbox.followRemoval(after, "z", "b", 1, true), {
+    key: "",
+    shown: false,
+    pendingKey: "z"
+  })
+})
+
+test("followRemoval: a surviving key is kept exactly as shown, clearing a stale arm", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const stops = [{ key: "a" }, { key: "b" }]
+
+  // A hover-placed cursor (shown false) on a row that still exists stays
+  // hidden; a keyboard-shown one (shown true) stays shown. Either way, a
+  // stale armed key (here "z", from an unrelated earlier delete) is
+  // dropped once the cursor's own key survives.
+  assert.deepEqual(inbox.followRemoval(stops, "z", "b", 5, false), {
+    key: "b",
+    shown: false,
+    pendingKey: ""
+  })
+  assert.deepEqual(inbox.followRemoval(stops, "z", "b", 5, true), {
+    key: "b",
+    shown: true,
+    pendingKey: ""
+  })
+})
+
+test("followRemoval: an intervening survive clears the arm, so a later vanish only hides (adversarial interleaving)", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+
+  // deleteCursor arms "b" for cursorKey "b" (cursor sat at stop 1)...
+  const armed = "b"
+  const cursorKey = "b"
+  const lastStop = 1
+
+  // ...but before that removal lands, a new notification arrives and
+  // re-sorts the stops: "b" is still there (survived), just moved. The
+  // intervening call must clear the stale arm rather than leave it primed.
+  const arrived = [{ key: "x" }, { key: "b" }, { key: "c" }]
+  const afterArrival = inbox.followRemoval(arrived, armed, cursorKey, lastStop, true)
+  assert.deepEqual(afterArrival, { key: "b", shown: true, pendingKey: "" })
+
+  // Now "b" actually leaves. Because the arm was already cleared, this is
+  // an ordinary vanish (hide), never afterRemoval's neighbour -- the stale
+  // arm from the delete that preceded the arrival can't fire late.
+  const afterRemoval = [{ key: "x" }, { key: "c" }]
+  assert.deepEqual(
+    inbox.followRemoval(afterRemoval, afterArrival.pendingKey, afterArrival.key, lastStop, true),
+    { key: "", shown: false, pendingKey: "" }
+  )
+})
+
+test("InboxLogic.js's generated copy of CursorLogic answers like the source", () => {
+  // Panel.qml imports InboxLogic.js only; this generated copy (fix round 1,
+  // tools/js-facade-generator.mjs) exists only because InboxLogic.js's own
+  // followRemoval calls afterRemoval internally, with no cross-.js-file
+  // import usable from both QML and Node (the same reason
+  // araneadev.network/NetworkLogic.js carries its own copy). The rest of
+  // CursorLogic rides along unused by InboxLogic's own code; loadPragma
+  // runs the copy for real so InboxLogic.js's own function-coverage floor
+  // stays honest.
+  const assert = require("node:assert/strict")
+  const source = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.shared/CursorLogic.js")
+  )
+  const plain = (value) => JSON.parse(JSON.stringify(value))
+  const copy = loadPragma("plugins/araneadev.notifications/InboxLogic.js")
+  const rows = [{ key: "a" }, { key: "b" }, { key: "c" }]
+  assert.deepEqual(
+    plain(copy.reselectIndex(rows, "c", 0)),
+    plain(source.reselectIndex(rows, "c", 0))
+  )
+  assert.deepEqual(plain(copy.followCursor(rows, "b", 0)), plain(source.followCursor(rows, "b", 0)))
+  assert.equal(copy.cursorConfirmed(rows, "b", 1), source.cursorConfirmed(rows, "b", 1))
+  assert.equal(copy.pressIntent(true, false), source.pressIntent(true, false))
+  assert.deepEqual(plain(copy.keepRows({}, "x", rows)), plain(source.keepRows({}, "x", rows)))
+  assert.equal(copy.rowKeyMatches(rows, 1, "b"), source.rowKeyMatches(rows, 1, "b"))
+  assert.deepEqual(plain(copy.afterRemoval(rows, "b", 1)), plain(source.afterRemoval(rows, "b", 1)))
+})
+
 test("DND switch: pending, echo and queued clicks", () => {
   const assert = require("node:assert/strict")
   const inbox = require(

@@ -1,6 +1,10 @@
 // Pure rules for the notification inbox, toast stack and center. No QML, no
 // I/O: Service.qml, Inbox.qml and Panel.qml call these, and
-// tests/notifications.test.sh runs them under Node.
+// tests/notifications.test.sh runs them under Node. followRemoval's
+// afterRemoval call runs a generated copy of araneadev.shared/CursorLogic.js
+// (tools/js-facade-generator.mjs), since there is no cross-.js-file import
+// mechanism usable from both QML and Node in this codebase (as
+// araneadev.network/NetworkLogic.js's own copy, for the same reason).
 
 var MAX_ITEMS = 100
 var MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -481,6 +485,185 @@ function followStop(stops, key, shown) {
   return { key: "", shown: false }
 }
 
+/* @aranea-facade-start: plugins/araneadev.shared/CursorLogic.js */
+// Shared keyboard-cursor safety rules, moved out of the Network plugin so
+// araneadev.vpn can reuse them: a cursor follows the row key it was put on
+// (never its position), a lost or evacuated key is refused rather than
+// retargeted, and a pointer action only ever lands on the row it names. No
+// QML, no I/O; tests/js/cursor-logic.test.js runs this under Node.
+
+/**
+ * The index a list cursor should sit on after its rows changed: the row
+ * whose `key` equals `key` wherever it moved, else `fallback` clamped into
+ * the list. Lets a cursor follow its network or profile across a re-sort
+ * instead of staying on a position that now holds another row.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
+ * @param {string|null|undefined} key - the key the cursor was on
+ * @param {number} fallback - the index to clamp when the key is gone
+ * @returns {number} the index, or -1 when there are no rows
+ */
+function reselectIndex(rows, key, fallback) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return -1
+  if (typeof key === "string") {
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i]
+      if (row && row.key === key) return i
+    }
+  }
+  var f = Math.floor(Number(fallback)) || 0
+  return Math.max(0, Math.min(list.length - 1, f))
+}
+
+/**
+ * Where a list cursor goes after its rows changed: onto the row whose `key`
+ * equals `key`, wherever it moved. When that row is gone (or there was no
+ * key), the index is clamped into the list but the key is dropped, so the
+ * row that slid into its place is never adopted as the user's choice.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
+ * @param {string|null|undefined} key - the key the cursor was deliberately put on, or ""
+ * @param {number} index - the cursor's index before the change
+ * @returns {{index: number, key: string, confirmed: boolean}} the new index (-1 with no rows), the key it keeps ("" when lost) and whether the cursor's row is the chosen one
+ */
+function followCursor(rows, key, index) {
+  var list = Array.isArray(rows) ? rows : []
+  var chosen = typeof key === "string" && key !== "" ? key : null
+  var next = reselectIndex(list, chosen, index)
+  var row = next >= 0 ? list[next] : null
+  var confirmed = chosen !== null && !!row && row.key === chosen
+  return { index: next, key: confirmed ? chosen : "", confirmed: confirmed }
+}
+
+/**
+ * Whether the cursor's row is still the one the user chose: `key` isn't
+ * empty (a hidden SSID or no choice never is) and the row at `index` has it.
+ * Keyboard actions refuse otherwise.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
+ * @param {string|null|undefined} key - the key the cursor was put on
+ * @param {number} index - the cursor's index
+ * @returns {boolean} true when the keyboard may act on that row
+ */
+function cursorConfirmed(rows, key, index) {
+  if (!Array.isArray(rows) || typeof key !== "string" || key === "") return false
+  var row = rows[index]
+  return !!row && row.key === key
+}
+
+/**
+ * What Enter or `x` does: nothing before any cursor exists, only reveal a
+ * cursor the keyboard isn't showing (one the pointer placed), else act.
+ * @param {boolean} cursorActive - whether a cursor has been placed
+ * @param {boolean} keyboardCursor - whether its outline is showing
+ * @returns {string} `ignore`, `reveal` or `act`
+ */
+function pressIntent(cursorActive, keyboardCursor) {
+  if (!cursorActive) return "ignore"
+  return keyboardCursor ? "act" : "reveal"
+}
+
+/**
+ * Hands back the array last stored under `name` when `next` has the same
+ * content, so a view's Repeater keeps its delegates (and nothing slides
+ * under a still pointer) on a refresh that changed nothing. Stores `next`
+ * otherwise. `cache` is mutated in place.
+ * @param {Record<string, any>|null|undefined} cache - the arrays kept so far, by name
+ * @param {string} name - which row array this is
+ * @param {Array<any>} next - the freshly built rows
+ * @returns {Array<any>} the kept array or `next`
+ */
+function keepRows(cache, name, next) {
+  if (!cache || typeof cache !== "object") return next
+  var prev = cache[name]
+  if (prev !== undefined && JSON.stringify(prev) === JSON.stringify(next)) return prev
+  cache[name] = next
+  return next
+}
+
+/**
+ * Whether row `index` still carries `key`, so a pointer action reported for
+ * one row never lands on another.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the section's rows
+ * @param {number} index - the row the action names
+ * @param {string|undefined} key - the key the view saw at that row
+ * @returns {boolean} true when the row is the one the user clicked
+ */
+function rowKeyMatches(rows, index, key) {
+  if (!Array.isArray(rows) || typeof key !== "string") return false
+  var row = rows[index]
+  return !!row && row.key === key
+}
+
+/**
+ * Where the keyboard cursor goes after a row left the list (Bluetooth
+ * Forget, Notifications Delete): the stop now at `lastIndex` (the row that
+ * slid into the removed one's place), clamped to the last stop when it was
+ * the bottom one. If `removedKey` still names a stop in `stops` (this read
+ * hasn't caught up with the removal yet), that stop is returned as is
+ * instead, since nothing has actually moved.
+ * @param {Array<{key: string}|null|undefined>|undefined} stops - the stops, read after the removal
+ * @param {string|null|undefined} removedKey - the key of the row that was removed
+ * @param {number} lastIndex - the removed row's index before it left
+ * @returns {{index: number, key: string}} the stop to keep the cursor on, or {index: -1, key: ""} with none left
+ */
+function afterRemoval(stops, removedKey, lastIndex) {
+  var list = Array.isArray(stops) ? stops : []
+  if (list.length === 0) return { index: -1, key: "" }
+  if (typeof removedKey === "string" && removedKey !== "") {
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i]
+      if (row && row.key === removedKey) return { index: i, key: removedKey }
+    }
+  }
+  var idx = Math.max(0, Math.min(list.length - 1, Math.floor(Number(lastIndex)) || 0))
+  var stop = list[idx]
+  return { index: idx, key: stop && typeof stop.key === "string" ? stop.key : "" }
+}
+
+if (typeof module !== "undefined")
+  module.exports = {
+    reselectIndex: reselectIndex,
+    followCursor: followCursor,
+    cursorConfirmed: cursorConfirmed,
+    pressIntent: pressIntent,
+    keepRows: keepRows,
+    rowKeyMatches: rowKeyMatches,
+    afterRemoval: afterRemoval
+  }
+/* @aranea-facade-end */
+
+/**
+ * Where the keyboard cursor goes after a stop change (centerStops
+ * recomputed, or the cursor's key itself changed): Panel.qml's single call
+ * from onCursorStopChanged. When `pendingKey` is armed for a keyboard
+ * removal (Panel.qml's deleteCursor, set to the cursor's own key before the
+ * row leaves) and that key just vanished from `stops`, the shared
+ * afterRemoval (CursorLogic, generated above) lands the cursor on the
+ * neighbour and keeps it shown; `pendingKey` is cleared.
+ *
+ * Otherwise this mirrors followStop: a vanished key hides the cursor, a
+ * surviving one keeps `shown` exactly as given, so a hover-placed cursor,
+ * or one merely carried to a new index by a re-sort, is never flipped by
+ * this alone. Either way, an armed `pendingKey` is dropped the moment the
+ * cursor's own key survives a stop change, so a Delete that never actually
+ * removed anything (an arrival landing first, say) can't fire afterRemoval
+ * on a later, unrelated vanish.
+ * @param {Array<{key: string}>} stops - centerStops output, read after the change
+ * @param {string} pendingKey - the key a keyboard Delete armed, or "" when none
+ * @param {string} cursorKey - the cursor's key before this change
+ * @param {number} lastStop - the stop the cursor was last on (Panel.qml's lastStop)
+ * @param {boolean} shown - whether the keyboard cursor currently shows
+ * @returns {{key: string, shown: boolean, pendingKey: string}} the cursor's next key, visibility and pending-removal key
+ */
+function followRemoval(stops, pendingKey, cursorKey, lastStop, shown) {
+  var survived = stopIndex(stops, cursorKey) >= 0
+  if (!survived && pendingKey && pendingKey === cursorKey) {
+    var next = afterRemoval(stops, pendingKey, lastStop)
+    return { key: next.key, shown: next.key !== "", pendingKey: "" }
+  }
+  var result = followStop(stops, cursorKey, shown)
+  return { key: result.key, shown: result.shown, pendingKey: survived ? "" : pendingKey }
+}
+
 /**
  * The stop one step (`delta`) from `at`, held at both ends (no wrap, as in
  * the other Aranea dropdowns).
@@ -596,6 +779,7 @@ if (typeof module !== "undefined") {
     centerStops: centerStops,
     stopIndex: stopIndex,
     followStop: followStop,
+    followRemoval: followRemoval,
     revealStop: revealStop,
     moveStop: moveStop,
     dndIdle: dndIdle,
