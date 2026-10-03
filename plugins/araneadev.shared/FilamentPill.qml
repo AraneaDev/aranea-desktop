@@ -1,6 +1,7 @@
 // Choice pill in the Filament style (the network dropdown's band and DNS
 // rows): a thin muted border and muted text, or, when selected, an accent
-// border, full text and a 2 px accent underline. The keyboard cursor draws
+// border, full text and a 2 px accent underline (selectedColor swaps the
+// accent for another token, e.g. the tray's violet Hidden pill). The keyboard cursor draws
 // the same mint outline as NodeDeviceRow; pointer hover never draws one.
 // A busy pill breathes like a busy NodeDeviceRow marker. A pill sitting on
 // a row a Repeater can rebuild under a still pointer takes that row as
@@ -20,6 +21,8 @@ Item {
   property string text: ""
   // Whether this is the chosen option.
   property bool selected: false
+  // The border and underline colour when selected (DesignTokens only).
+  property color selectedColor: DesignTokens.accent
   // Whether the keyboard cursor is on this pill.
   property bool hasCursor: false
   // Whether a change to this option is in progress (a pending band).
@@ -47,6 +50,9 @@ Item {
   signal clicked
   // Emitted when the pointer moves onto the pill (see pointerGate).
   signal hoveredMoved
+  // Emitted when a pointer press lands on the pill, so a host can remember
+  // what the pill stood for when pressed and refuse a changed release.
+  signal pressed
 
   // Chooses the pill, as a click does.
   function activate() {
@@ -85,7 +91,7 @@ Item {
     anchors.fill: parent
     color: "transparent"
     border.width: 1
-    border.color: pill.selected ? DesignTokens.accent : Util.alpha(DesignTokens.foreground, 0.2)
+    border.color: pill.selected ? pill.selectedColor : Util.alpha(DesignTokens.foreground, 0.2)
     opacity: pill.busy ? (DesignTokens.motionEnabled ? pill.pulseOpacity : 0.7) : 1
   }
   Rectangle {
@@ -94,7 +100,7 @@ Item {
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: 2
-    color: DesignTokens.accent
+    color: pill.selectedColor
     visible: pill.selected
     opacity: pill.busy ? (DesignTokens.motionEnabled ? pill.pulseOpacity : 0.7) : 1
   }
@@ -133,6 +139,7 @@ Item {
   MouseArea {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
+    onPressed: pill.pressed()
     onClicked: if (pill.clickSettled())
       pill.activate()
   }

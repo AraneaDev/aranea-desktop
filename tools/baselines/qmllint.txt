@@ -209,6 +209,15 @@
 2	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "caption" not found on type "QObject"
 3	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "family" not found on type "QObject"
+2	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "body" not found on type "QObject"
+2	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "caption" not found on type "QObject"
+5	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "hairline" not found on type "QObject"
+1	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "title" not found on type "QObject"
+5	plugins/araneadev.tray/TrayMenuView.qml:missing-property:Member "body" not found on type "QObject"
+4	plugins/araneadev.tray/TrayMenuView.qml:missing-property:Member "caption" not found on type "QObject"
+9	plugins/araneadev.tray/TrayMenuView.qml:missing-property:Member "family" not found on type "QObject"
+2	plugins/araneadev.tray/TrayMenuView.qml:missing-property:Member "hairline" not found on type "QObject"
 2	plugins/araneadev.updates/BarWidget.qml:unqualified:Unqualified access
 2	plugins/araneadev.updates/BarWidget.qml:unused-imports:Unused import
 2	plugins/araneadev.updates/Service.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?

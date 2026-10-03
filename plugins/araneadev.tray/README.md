@@ -25,6 +25,11 @@ itself: the plugin loader, `PluginRegistry.qml`, never looks at `clonePaths`). `
 is its own self-contained plugin directory with its own `manifest.json`, so `clonePaths` is
 dropped from this manifest, the same way `araneadev.weather`'s was.
 
+`TrayMenuView.qml` and `TrayManageView.qml` are the pure Aranea-native views for the app menu
+and the manage panel (one view object in, one `action(name, arg)` signal out; keyed, settled
+clicks and gated hover). They are tested on their own (`tests/qml/tray-menu.qml`,
+`tests/qml/tray-manage.qml`) and not yet wired into `Tray.qml`.
+
 ## Integration
 
 - `scripts/repair-shell-config` retargets `omarchy.tray` to `araneadev.tray` in `bar.layout`
