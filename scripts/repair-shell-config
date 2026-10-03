@@ -52,14 +52,15 @@ vpn_parked="$state_root/vpn-widget-parked"
 place_vpn=true
 [[ -e "$vpn_marker" && ! -e "$vpn_parked" ]] && place_vpn=false
 # araneadev.audio, araneadev.bluetooth, araneadev.clock, araneadev.monitor,
-# araneadev.network, araneadev.power, araneadev.weather and araneadev.tray
-# only take over their bar entry once they are actually deployed beside this
-# config (deploy-plugins-safely writes their manifest there); a repair that
-# runs before that (a bare hook, a partial install) must not retarget the id
-# to a plugin that does not exist on disk yet. The deploy writes beside the
-# config path as given; beside a symlink's target counts too. araneadev.vpn
-# is not a clone (there is no stock entry to retarget): the same guard just
-# decides whether its own bar entry gets inserted at all.
+# araneadev.network, araneadev.power, araneadev.weather, araneadev.tray and
+# araneadev.agents only take over their bar entry once they are actually
+# deployed beside this config (deploy-plugins-safely writes their manifest
+# there); a repair that runs before that (a bare hook, a partial install)
+# must not retarget the id to a plugin that does not exist on disk yet. The
+# deploy writes beside the config path as given; beside a symlink's target
+# counts too. araneadev.vpn is not a clone (there is no stock entry to
+# retarget): the same guard just decides whether its own bar entry gets
+# inserted at all.
 audio_installed=false
 bluetooth_installed=false
 clock_installed=false
@@ -68,6 +69,7 @@ network_installed=false
 power_installed=false
 weather_installed=false
 tray_installed=false
+agents_installed=false
 vpn_installed=false
 for dir in "$given_config_dir" "$config_dir"; do
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
@@ -78,6 +80,7 @@ for dir in "$given_config_dir" "$config_dir"; do
   [[ -f "$dir/plugins/araneadev.power/manifest.json" ]] && power_installed=true
   [[ -f "$dir/plugins/araneadev.weather/manifest.json" ]] && weather_installed=true
   [[ -f "$dir/plugins/araneadev.tray/manifest.json" ]] && tray_installed=true
+  [[ -f "$dir/plugins/araneadev.agents/manifest.json" ]] && agents_installed=true
   [[ -f "$dir/plugins/araneadev.vpn/manifest.json" ]] && vpn_installed=true
 done
 # Removes the temp file on exit.
@@ -101,7 +104,7 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -138,6 +141,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
              | if $power and . == "omarchy.power" then "araneadev.power" else . end
              | if $weather and . == "omarchy.weather" then "araneadev.weather" else . end
              | if $tray and . == "omarchy.tray" then "araneadev.tray" else . end
+             | if $agents and . == "omarchy.agents" then "araneadev.agents" else . end
              elif type == "object" and .id == "omarchy.menu" then .id = "araneadev.menu"
              elif type == "object" and .id == "omarchy.workspaces" then .id = "araneadev.workspaces"
              elif type == "object" and .id == "omarchy.system-update" then .id = "araneadev.updates"
@@ -149,6 +153,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
              elif $power and type == "object" and .id == "omarchy.power" then .id = "araneadev.power"
              elif $weather and type == "object" and .id == "omarchy.weather" then .id = "araneadev.weather"
              elif $tray and type == "object" and .id == "omarchy.tray" then .id = "araneadev.tray"
+             elif $agents and type == "object" and .id == "omarchy.agents" then .id = "araneadev.agents"
              else . end)
        else . end))
      else . end)
@@ -212,7 +217,8 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
       + (if $network then ["araneadev.network"] else [] end)
       + (if $power then ["araneadev.power"] else [] end)
       + (if $weather then ["araneadev.weather"] else [] end)
-      + (if $tray then ["araneadev.tray"] else [] end) | unique)
+      + (if $tray then ["araneadev.tray"] else [] end)
+      + (if $agents then ["araneadev.agents"] else [] end) | unique)
   # Place the notification bell once, right after the tray (the tray leads
   # the right section, then health, then the bell). Layout entries may be
   # plain id strings or {id: ...} objects; both count. Only a layout the

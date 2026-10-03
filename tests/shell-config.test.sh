@@ -932,4 +932,48 @@ jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["ar
 }
 export ARANEA_STATE_ROOT="$state_root"
 
+# --- agents bar entry: only retargeted once araneadev.agents is installed
+# (guard: $(dirname "$config_file")/plugins/araneadev.agents/manifest.json);
+# an object entry's settings (refreshIntervalSec, providers) survive the
+# round trip. Agents has no bar.centerAnchor handling (that anchor is the
+# clock), and no bell/health placement of its own (that is Tray's).
+cat >"$config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.agents", "refreshIntervalSec": 300, "providers": {"codex": {"enabled": false}}}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "omarchy.agents", "refreshIntervalSec": 300, "providers": {"codex": {"enabled": false}}}]
+  and ((.cloneSourceRestores // []) | index("araneadev.agents")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+mkdir -p "$(dirname "$config")/plugins/araneadev.agents"
+: >"$(dirname "$config")/plugins/araneadev.agents/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "araneadev.agents", "refreshIntervalSec": 300, "providers": {"codex": {"enabled": false}}}]
+  and (.cloneSourceRestores | index("araneadev.agents")) != null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+"$repo_root/scripts/release-shell-config" "$config"
+jq -e '.bar.layout.right == [{"id": "omarchy.agents", "refreshIntervalSec": 300, "providers": {"codex": {"enabled": false}}}]
+  and ((.cloneSourceRestores // []) | index("araneadev.agents")) == null' "$config" >/dev/null || {
+  cat "$config"
+  exit 1
+}
+
+# A symlinked shell.json (dotfile managers): the deploy writes the plugin
+# beside the config path the shell uses, not beside the link's target.
+agents_real="$test_root/agents-dotfiles/shell.json"
+agents_link="$test_root/agents-config/shell.json"
+mkdir -p "$(dirname "$agents_real")" "$(dirname "$agents_link")/plugins/araneadev.agents"
+: >"$(dirname "$agents_link")/plugins/araneadev.agents/manifest.json"
+printf '%s\n' '{"bar": {"layout": {"right": ["omarchy.agents"]}}}' >"$agents_real"
+ln -s "$agents_real" "$agents_link"
+"$repo_root/scripts/repair-shell-config" "$agents_link"
+test -L "$agents_link"
+jq -e '.bar.layout.right == ["araneadev.agents"]' "$agents_real" >/dev/null || {
+  cat "$agents_real"
+  exit 1
+}
+
 echo "shell config contract passed"
