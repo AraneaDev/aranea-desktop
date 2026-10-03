@@ -162,7 +162,7 @@
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "body" not found on type "QObject"
 2	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "border" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "caption" not found on type "QObject"
-4	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "countdown" not found on type "QObject"
+3	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "countdown" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "displayLarge" not found on type "QObject"
 4	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "icon" not found on type "QObject"

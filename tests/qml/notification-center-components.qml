@@ -20,12 +20,15 @@ ShellRoot {
         hidden: 2
       }
     ]
-    cursor: 0
+    cursor: ({
+        active: true,
+        index: 0
+      })
   }
 
   Component.onCompleted: {
     t.equal(list.rows.length, 1, "notification lists expose row models")
-    t.equal(list.cursor, 0, "notification lists expose cursor state")
+    t.equal(list.cursorIndex, 0, "notification lists expose cursor state")
     t.done()
   }
 }

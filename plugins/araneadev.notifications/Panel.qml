@@ -286,6 +286,7 @@ Panel {
           spacing: Style.space(10)
 
           NotificationCenterContent {
+            id: centerContent
             Layout.fillWidth: true
             view: root.centerView
             onAction: function (name, arg) {
@@ -302,23 +303,31 @@ Panel {
             Layout.preferredHeight: Math.min(list.contentHeight, panel.screenH * 0.6 - Style.space(80))
             visible: root.count > 0
             rows: root.rows
-            cursor: root.cursor
+            // The outline shows wherever the cursor is; Task 4's keyboard
+            // frame adds the reveal-only first key.
+            cursor: ({
+                active: root.cursor >= 0,
+                index: root.cursor
+              })
+            headerHeight: centerContent.height
             now: root.now
             service: root.service
             bar: root.bar
             motionEnabled: root.service ? root.service.motionEnabled : true
             cornerRadius: root.service ? root.service.cornerRadius : 0
-            onActivated: function (index, row) {
-              root.activate(index)
-            }
-            onDismissed: function (index, row) {
-              root.dismissAt(index, false)
-            }
-            onGroupToggled: function (app) {
-              root.toggleGroup(app)
-            }
-            onGroupDismissed: function (app) {
-              root.service.dismissGroup(app)
+            // Keyed actions, checked again against the current rows.
+            onAction: function (name, arg) {
+              var row = root.rows[arg.index]
+              if (!row || InboxLogic.rowKey(row) !== arg.key)
+                return
+              if (name === "open")
+                root.activate(arg.index)
+              else if (name === "dismiss")
+                root.dismissAt(arg.index, false)
+              else if (name === "toggle")
+                root.toggleGroup(row.app)
+              else if (name === "clearGroup")
+                root.service.dismissGroup(row.app)
             }
           }
         }

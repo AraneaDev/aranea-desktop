@@ -202,6 +202,43 @@ test("notifications logic", () => {
       "group:unknown,entry:b,more:unknown",
     "centerRows sorts, groups and flattens"
   )
+  // --- centerRows parity with the pipeline it replaced, for collapsed
+  // groups and "+N more" rows (more than COLLAPSE_AT entries per app)
+  const crowded = []
+  for (let i = 0; i < inbox.COLLAPSE_AT + 2; i++)
+    crowded.push({ fileName: "chat" + i, app: "Chat", timestamp: 100 - i, urgency: 1 })
+  for (let i = 0; i < inbox.COLLAPSE_AT; i++)
+    crowded.push({ fileName: "mail" + i, app: "Mail", timestamp: 50 - i, urgency: i === 0 ? 2 : 1 })
+  crowded.push({ fileName: "solo", app: "Build", timestamp: 75, urgency: 1 })
+  for (const expanded of [{}, { Chat: true }, { Mail: true, Build: false }]) {
+    const piped = inbox.flattenGroups(inbox.groupView(inbox.sortForCenter(crowded), expanded))
+    assert(
+      JSON.stringify(inbox.centerRows(crowded, expanded)) === JSON.stringify(piped),
+      "centerRows matches sortForCenter, groupView and flattenGroups for " +
+        JSON.stringify(expanded)
+    )
+  }
+  const collapsedRows = inbox.centerRows(crowded, {})
+  assert(
+    collapsedRows.map(inbox.rowKey).join() ===
+      "g:Mail,e:mail0,m:Mail,g:Chat,e:chat0,m:Chat,g:Build,e:solo",
+    "collapsed groups show their newest entry and a +N more row"
+  )
+  assert(
+    collapsedRows[2].hidden === inbox.COLLAPSE_AT - 1 &&
+      collapsedRows[5].hidden === inbox.COLLAPSE_AT + 1 &&
+      collapsedRows[0].collapsed &&
+      !collapsedRows[6].collapsed,
+    "the +N more counts and collapsed flags"
+  )
+  assert(
+    inbox
+      .centerRows(crowded, { Chat: true })
+      .filter((r) => r.app === "Chat")
+      .map((r) => r.kind)
+      .join() === "group,entry,entry,entry,entry,entry",
+    "an expanded group drops its +N more row"
+  )
   // --- cursor follows the item (Important #5)
   const before = inbox.flattenGroups(inbox.groupView([g("Build", 8)], {}))
   const key = inbox.rowKey(before[1])
