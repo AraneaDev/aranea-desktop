@@ -1,23 +1,41 @@
 // Aranea Tray (araneadev.tray, cloned from omarchy.tray): the bar's system
-// tray widget, with its app-menu and manage popups. Stock's buckets, click
-// handling, popup hosts and quirks stay unchanged from Omarchy's Tray; the
-// Aranea-native dropdown views land in a later task.
-// qmllint disable missing-property unqualified
+// tray widget, with its app-menu and manage popups. Stock's root logic stays
+// (the buckets, the drawer animation, both bar orientations with their
+// containment masks, icon clicks and the wheel, QsMenuOpener with the
+// submenu stack, resetTrayMenu and the pin/hide persistence). Changed here:
+// both popups are Aranea.KeyboardPanelFrame windows (layer-shell, focused
+// when they map) drawing the pure TrayMenuView and TrayManageView; the app
+// menu and the manage panel take the keyboard; every action is keyed and
+// refused on a mismatch; pin and hide show their new state at once; a menu
+// whose item leaves the tray closes; and the IPC target araneadev.tray
+// opens either popup. The rules live in TrayLogic.js, tested under Node.
+pragma ComponentBehavior: Bound
 import Quickshell
+import Quickshell.Io
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Effects
 import Quickshell.Services.SystemTray
 import qs.Commons
 import qs.Ui
 import "TrayModel.js" as TrayModel
+import "TrayLogic.js" as TrayLogic
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
+import "../araneadev.shared" as Aranea
 
 BarWidget {
   id: root
   moduleName: "omarchy.tray"
 
-  // Whether the collapsed drawer is slid open (hover-driven).
-  property bool expanded: false
+  // Whether the pointer is over the drawer block (its HoverHandler).
+  property bool drawerHovered: false
+  // Whether the open app menu belongs to a drawer icon it is anchored to, so
+  // the drawer stays slid open under the menu (the popup's full-screen
+  // layer takes the pointer off the bar, which would otherwise collapse the
+  // drawer and slide the anchor away).
+  property bool drawerHeld: false
+  // Whether the collapsed drawer is slid open: hovered, or held under an
+  // open app menu of one of its icons.
+  readonly property bool expanded: drawerHovered || (trayMenuOpen && drawerHeld)
   // Whether the manage (pin/hide) popup is open.
   property bool managePopupOpen: false
   // Whether an item's app menu popup is open.
@@ -27,9 +45,9 @@ BarWidget {
   // The TrayItem anchor the open app menu is positioned against.
   property var activeTrayAnchor: null
   // The bar's foreground colour, or the default when not hosted by a bar.
+  // qmllint disable missing-property
   readonly property color foreground: bar ? bar.foreground : Color.foreground
-  // The bar's font family, or the default when not hosted by a bar.
-  readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  // qmllint enable missing-property
   // Item ids pinned to the bar (always visible), from the entry's settings.
   readonly property var pinnedIds: settings.pinned instanceof Array ? settings.pinned : []
   // Item ids hidden from the tray entirely, from the entry's settings.
@@ -40,10 +58,14 @@ BarWidget {
   readonly property var drawerItems: bucket("drawer")
   // Every tray item Omarchy does not own, pinned, drawer or hidden.
   readonly property var allItems: bucket("all")
+  // Every item the tray reports, so a vanished app menu item is noticed.
+  readonly property var trayItemValues: root.listOf(SystemTray.items.values)
   // How many items sit in the drawer.
   readonly property int drawerCount: drawerItems.length
   // The square size one tray icon occupies.
+  // qmllint disable missing-property
   readonly property int trayItemExtent: Style.bar.iconSlot
+  // qmllint enable missing-property
   // The gap between adjacent tray icons.
   readonly property int trayItemGap: 0
   // The gap between the drawer block and the pinned row.
@@ -56,6 +78,10 @@ BarWidget {
   property real revealProgress: expanded ? 1 : 0
   // The drawer's currently revealed extent (drawerExtent times revealProgress).
   readonly property real revealExtent: drawerExtent * revealProgress
+  // The drawer arrow (the bar's chevron) of the loaded orientation, or null.
+  property Item drawerArrow: null
+  // The live TrayItem delegates, so IPC can anchor a menu to an item's icon.
+  property var trayItemViews: []
 
   // Submenu drill-down state. QsMenuEntry.display() renders a *platform* menu,
   // which Quickshell refuses unless the shell root sets `//@ pragma
@@ -83,6 +109,95 @@ BarWidget {
   // a beat after each level change; a deliberate follow-up click is slower.
   property bool menuLevelSettling: false
 
+  // ---- The app menu's view.
+  // The current level's QsMenuEntry objects, in order.
+  readonly property var currentEntries: root.listOf(currentChildren ? currentChildren.values : null)
+  // A stable serial per QsMenuEntry object (Quickshell does not expose the
+  // DBus id), so a row's key survives a live property update and changes
+  // when the app replaces the entry. Cleared with the menu.
+  property var entrySerials: ({
+      map: new Map(),
+      next: 1
+    })
+  // The app title stock compares the root-title entry with.
+  readonly property string activeTitle: root.activeTrayItem ? String(root.activeTrayItem.title || root.activeTrayItem.id || "") : ""
+  // The rows the menu view draws (TrayLogic.menuRows over the current
+  // level's entries, converted from QsMenuEntry).
+  readonly property var menuRowList: TrayLogic.menuRows(root.currentEntries.map(function (entry) {
+    return root.entryShape(entry)
+  }), root.submenuDepth === 0, root.activeTitle)
+  // Whether a navigation key has shown the menu cursor (or the pointer put
+  // it on a row).
+  property bool menuCursorActive: false
+  // True while the keyboard drives the menu cursor; any pointer action
+  // clears it. The view outlines the cursor only then.
+  property bool menuKeyboard: false
+  // The menu cursor's position in menuRowList, or -1.
+  property int menuCursorIndex: -1
+  // The key of the row the menu cursor was put on, or "".
+  property string menuCursorKey: ""
+  // The plain view object TrayMenuView draws (see its view property).
+  readonly property var menuView: ({
+      title: TrayLogic.displayName(root.activeTrayItem),
+      crumb: TrayLogic.crumb(root.submenuStack.map(function (level) {
+        return level.title
+      }), TrayLogic.displayName(root.activeTrayItem)),
+      depth: root.submenuDepth,
+      rows: root.menuRowList,
+      empty: root.menuRowList.length === 0,
+      cursor: {
+        active: root.menuCursorActive && root.menuKeyboard,
+        index: root.menuCursorIndex
+      },
+      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2192) + " open " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190) + " back " + String.fromCodePoint(0xB7) + " enter select " + String.fromCodePoint(0xB7) + " esc close"
+    })
+
+  // ---- The manage panel's view.
+  // How long a pin or hide shows its new state before the settings echo
+  // must have caught up; after that the actual state shows again.
+  readonly property int pendingTimeoutMs: 3000
+  // Pin/hide changes waiting for the settings echo, by item id:
+  // {pinned, hidden, at (Date.now())}.
+  property var pendingState: ({})
+  // The rows the manage view draws: one per item, keyed by its id, the
+  // pending state shown in place of the saved one.
+  readonly property var manageRowList: root.allItems.map(function (item) {
+    var id = String(item.id || "")
+    var pending = root.pendingState[id]
+    return {
+      key: id,
+      name: TrayLogic.displayName(item),
+      icon: root.trayIconSource(item.icon),
+      pinned: pending ? pending.pinned : root.pinnedIds.indexOf(id) !== -1,
+      hidden: pending ? pending.hidden : root.hiddenIds.indexOf(id) !== -1,
+      pending: !!pending
+    }
+  })
+  // Whether a navigation key has shown the manage cursor (or the pointer
+  // put it on a row).
+  property bool manageCursorActive: false
+  // True while the keyboard drives the manage cursor.
+  property bool manageKeyboard: false
+  // The manage cursor: {row (a position in manageRowList, or -1), pill (0
+  // Pin, 1 Hide)}.
+  property var manageCursor: ({
+      row: -1,
+      pill: 0
+    })
+  // The key (item id) of the row the manage cursor was put on, or "".
+  property string manageCursorKey: ""
+  // The plain view object TrayManageView draws (see its view property).
+  readonly property var manageView: ({
+      rows: root.manageRowList,
+      empty: root.manageRowList.length === 0,
+      cursor: {
+        active: root.manageCursorActive && root.manageKeyboard,
+        row: root.manageCursor.row,
+        pill: root.manageCursor.pill
+      },
+      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190, 0x2192) + " pin / hide " + String.fromCodePoint(0xB7) + " enter toggle " + String.fromCodePoint(0xB7) + " esc close"
+    })
+
   Component {
     id: submenuOpenerComponent
     QsMenuOpener {}
@@ -92,6 +207,14 @@ BarWidget {
     id: menuLevelSettleTimer
     interval: 250
     onTriggered: root.menuLevelSettling = false
+  }
+
+  // Ends pending pin/hide states that timed out.
+  Timer {
+    interval: 250
+    repeat: true
+    running: Object.keys(root.pendingState).length > 0
+    onTriggered: root.settlePending()
   }
 
   // Marks the menu as mid-transition for a beat after a level change, so a
@@ -109,7 +232,7 @@ BarWidget {
     // Flickable keeps its offset across a model swap whenever the new content
     // is still tall enough to hold it, so a menu dismissed while scrolled
     // would otherwise reopen part-way down with its first entries off screen.
-    trayMenuFlick.contentY = 0
+    menuViewItem.resetScroll()
     // Clear the reactive stack before tearing anything down, so no binding can
     // read a partially-destroyed opener while this runs. Then destroy deepest
     // first: an inner opener's menu entry is owned by its parent's children
@@ -119,6 +242,11 @@ BarWidget {
     submenuStack = []
     for (var i = openers.length - 1; i >= 0; i--)
       openers[i].opener.destroy()
+    entrySerials = {
+      map: new Map(),
+      next: 1
+    }
+    clearMenuCursor()
   }
 
   // Drills one level into a menu entry's children, opening a nested
@@ -135,6 +263,7 @@ BarWidget {
       title: title
     })
     submenuStack = stack
+    clearMenuCursor()
     settleMenuLevel()
   }
 
@@ -146,6 +275,7 @@ BarWidget {
     var top = stack.pop()
     submenuStack = stack
     top.opener.destroy()
+    clearMenuCursor()
     settleMenuLevel()
   }
 
@@ -155,10 +285,23 @@ BarWidget {
     trayMenuOpen = false
   }
 
+  // Opens or closes the manage popup (right-click on the drawer arrow),
+  // closing the app menu first so one popup holds the keyboard.
+  function toggleManage() {
+    if (root.managePopupOpen) {
+      root.managePopupOpen = false
+      return
+    }
+    root.trayMenuOpen = false
+    root.managePopupOpen = true
+  }
+
   // Opens an item's app menu anchored to it, or falls back to the platform
   // menu display() for an item that reports no DBus menu at all.
   function openTrayMenu(item, anchorItem, mouse) {
     if (!item || !item.menu) {
+      if (!item || !mouse)
+        return
       var point = anchorItem.QsWindow.contentItem.mapFromItem(anchorItem, mouse.x, mouse.y)
       item.display(anchorItem.QsWindow.window, point.x, point.y)
       return
@@ -169,9 +312,45 @@ BarWidget {
     // children immediately, before any nested opener referencing them would
     // otherwise get torn down.
     resetTrayMenu()
+    // One popup holds the keyboard at a time. Closed before the menu opens,
+    // so the shared popout owner is released before it is requested again.
+    managePopupOpen = false
     activeTrayItem = item
     activeTrayAnchor = anchorItem
+    drawerHeld = anchorItem !== root.drawerArrow && anchorItem !== root && classifyItem(item) === "drawer"
     trayMenuOpen = true
+  }
+
+  // The live TrayItem delegate showing ITEM, or null.
+  function trayItemViewFor(item) {
+    for (var i = 0; i < root.trayItemViews.length; i++) {
+      var view = root.trayItemViews[i]
+      if (view && view.modelData === item)
+        return view
+    }
+    return null
+  }
+
+  // IPC `menu <index>`: opens the app menu of the pinned item at INDEX, or
+  // of the drawer item past the pinned ones (TrayLogic.menuTarget),
+  // anchored to its icon, or to the drawer arrow while the drawer is
+  // collapsed. Out of range, or an item without a DBus menu: a no-op.
+  function openMenuAt(index) {
+    var target = TrayLogic.menuTarget(root.pinnedItems.length, root.drawerItems.length, index)
+    if (!target)
+      return
+    var item = target.bucket === "pinned" ? root.pinnedItems[target.index] : root.drawerItems[target.index]
+    if (!item || !item.menu)
+      return
+    var icon = root.trayItemViewFor(item)
+    var anchor = target.bucket === "pinned" || root.expanded ? icon : root.drawerArrow
+    root.openTrayMenu(item, anchor || root, null)
+  }
+
+  // IPC `manage`: opens the manage popup.
+  function openManage() {
+    root.trayMenuOpen = false
+    root.managePopupOpen = true
   }
 
   // The ready-to-use image:// URL for a tray icon.
@@ -210,7 +389,9 @@ BarWidget {
 
   // Whether a tray item is owned by Omarchy itself (TrayModel.ownedByOmarchy).
   function ownedByOmarchy(item) {
+    // qmllint disable missing-property
     var layout = root.bar && root.bar.layoutConfig ? root.bar.layoutConfig : null
+    // qmllint enable missing-property
     return TrayModel.ownedByOmarchy(item, layout)
   }
 
@@ -238,6 +419,7 @@ BarWidget {
   // Saves the pinned/hidden id lists under the bar entry id (root.moduleName,
   // which Bar.qml overwrites with the entry's own id), never a literal id.
   function persistTrayState(pinned, hidden) {
+    // qmllint disable missing-property
     if (!root.bar || !root.bar.shell || typeof root.bar.shell.updateEntryInline !== "function")
       return
     var id = root.moduleName || "omarchy.tray"
@@ -246,42 +428,388 @@ BarWidget {
       pinned: pinned,
       hidden: hidden
     })
+    // qmllint enable missing-property
   }
 
-  // Pins an item (un-hiding it), or unpins it when already pinned.
+  // The pinned and hidden lists as shown: the saved ones with every pending
+  // change applied, so a second toggle before the echo builds on the first.
+  function shownLists() {
+    var pinned = root.pinnedIds.slice()
+    var hidden = root.hiddenIds.slice()
+    for (var id in root.pendingState) {
+      var p = root.pendingState[id]
+      pinned = pinned.filter(function (x) {
+        return x !== id
+      })
+      hidden = hidden.filter(function (x) {
+        return x !== id
+      })
+      if (p.pinned)
+        pinned.push(id)
+      if (p.hidden)
+        hidden.push(id)
+    }
+    return {
+      pinned: pinned,
+      hidden: hidden
+    }
+  }
+
+  // Shows IID's new state from LISTS at once, until the settings echo
+  // matches it or pendingTimeoutMs passes.
+  function markPending(iid, lists) {
+    var next = Object.assign({}, root.pendingState)
+    next[iid] = {
+      pinned: lists.pinned.indexOf(iid) !== -1,
+      hidden: lists.hidden.indexOf(iid) !== -1,
+      at: Date.now()
+    }
+    root.pendingState = next
+  }
+
+  // Drops pending states the settings echo now matches, that timed out, or
+  // whose item left the tray.
+  function settlePending() {
+    var ids = Object.keys(root.pendingState)
+    if (ids.length === 0)
+      return
+    var present = root.allItems.map(function (item) {
+      return String(item.id || "")
+    })
+    var now = Date.now()
+    var next = {}
+    var changed = false
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i]
+      var p = root.pendingState[id]
+      var echoed = (root.pinnedIds.indexOf(id) !== -1) === p.pinned && (root.hiddenIds.indexOf(id) !== -1) === p.hidden
+      if (echoed || now - p.at >= root.pendingTimeoutMs || present.indexOf(id) === -1)
+        changed = true
+      else
+        next[id] = p
+    }
+    if (changed)
+      root.pendingState = next
+  }
+
+  // Pins an item (un-hiding it), or unpins it when already pinned
+  // (TrayLogic.togglePin over the lists as shown).
   function togglePin(iid) {
-    var p = pinnedIds.slice(), h = hiddenIds.slice()
-    var idx = p.indexOf(iid)
-    if (idx !== -1)
-      p.splice(idx, 1)
-    else {
-      p.push(iid)
-      var hi = h.indexOf(iid)
-      if (hi !== -1)
-        h.splice(hi, 1)
-    }
-    persistTrayState(p, h)
+    var shown = root.shownLists()
+    var next = TrayLogic.togglePin(shown.pinned, shown.hidden, iid)
+    root.markPending(iid, next)
+    persistTrayState(next.pinned, next.hidden)
   }
 
-  // Hides an item (un-pinning it), or unhides it when already hidden.
+  // Hides an item (un-pinning it), or unhides it when already hidden
+  // (TrayLogic.toggleHide over the lists as shown).
   function toggleHide(iid) {
-    var p = pinnedIds.slice(), h = hiddenIds.slice()
-    var idx = h.indexOf(iid)
-    if (idx !== -1)
-      h.splice(idx, 1)
-    else {
-      h.push(iid)
-      var pi = p.indexOf(iid)
-      if (pi !== -1)
-        p.splice(pi, 1)
+    var shown = root.shownLists()
+    var next = TrayLogic.toggleHide(shown.pinned, shown.hidden, iid)
+    root.markPending(iid, next)
+    persistTrayState(next.pinned, next.hidden)
+  }
+
+  // Closes the app menu once its item has left the tray, and drops pending
+  // states of items that vanished.
+  function pruneVanished() {
+    if (root.trayMenuOpen && (!root.activeTrayItem || root.trayItemValues.indexOf(root.activeTrayItem) === -1))
+      root.close()
+    root.settlePending()
+  }
+
+  // ---- The app menu's rows and keys.
+  // LIST (a Quickshell object model's values) as a plain JS array.
+  function listOf(list) {
+    var out = []
+    var count = list ? list.length : 0
+    for (var i = 0; i < count; i++)
+      out.push(list[i])
+    return out
+  }
+
+  // A stable serial for ENTRY (see entrySerials).
+  function entrySerial(entry) {
+    var serials = root.entrySerials
+    if (!serials.map.has(entry))
+      serials.map.set(entry, serials.next++)
+    return serials.map.get(entry)
+  }
+
+  // ENTRY (a QsMenuEntry) as TrayLogic's plain MenuEntry: Quickshell's
+  // button type and Qt's check state become strings.
+  function entryShape(entry) {
+    if (!entry)
+      return null
+    var type = entry.buttonType === QsMenuButtonType.CheckBox ? "check" : entry.buttonType === QsMenuButtonType.RadioButton ? "radio" : "none"
+    var state = entry.checkState === Qt.Checked ? "checked" : entry.checkState === Qt.PartiallyChecked ? "partial" : "unchecked"
+    return {
+      id: root.entrySerial(entry),
+      text: entry.text,
+      enabled: entry.enabled,
+      isSeparator: entry.isSeparator,
+      hasChildren: entry.hasChildren,
+      buttonType: type,
+      checkState: state,
+      icon: entry.icon
     }
-    persistTrayState(p, h)
+  }
+
+  // Hides the menu cursor (a new level or a new menu starts without one;
+  // the keyboard state is kept, so the next arrow picks a row at once).
+  function clearMenuCursor() {
+    root.menuCursorIndex = -1
+    root.menuCursorKey = ""
+  }
+
+  // Puts the menu cursor on row INDEX (-1 hides it), keyed by that row.
+  function placeMenuCursor(index) {
+    var row = index >= 0 ? root.menuRowList[index] : null
+    root.menuCursorIndex = row ? index : -1
+    root.menuCursorKey = row ? row.key : ""
+  }
+
+  // The first key after opening or after pointer use only reveals the
+  // cursor: on the row the pointer put it on, else on the first selectable
+  // row. Returns true when this key was that reveal.
+  function revealMenuCursor() {
+    if (root.menuCursorActive && root.menuKeyboard)
+      return false
+    root.menuCursorActive = true
+    root.menuKeyboard = true
+    if (!CursorLogic.cursorConfirmed(root.menuRowList, root.menuCursorKey, root.menuCursorIndex))
+      root.placeMenuCursor(TrayLogic.nextCursor(root.menuRowList, -1, 1))
+    return true
+  }
+
+  // Keeps the menu cursor on its row's key across a live menu rebuild, and
+  // hides it when that row is gone (never adopting the row that slid in).
+  function followMenuCursor() {
+    if (root.menuCursorIndex < 0)
+      return
+    var follow = CursorLogic.followCursor(root.menuRowList, root.menuCursorKey, root.menuCursorIndex)
+    if (follow.confirmed)
+      root.menuCursorIndex = follow.index
+    else
+      root.clearMenuCursor()
+  }
+
+  // Activates row INDEX of menuRowList if it still holds KEY: drills into
+  // an entry with children, else triggers the entry and closes (stock).
+  // Refused when the row changed or can't be activated.
+  function activateMenuRow(index, key) {
+    var rows = root.menuRowList
+    if (!CursorLogic.rowKeyMatches(rows, index, key))
+      return
+    var row = rows[index]
+    if (!row.selectable)
+      return
+    var entry = root.currentEntries[row.index]
+    if (!entry)
+      return
+    if (row.hasChildren) {
+      root.enterSubmenu(entry, row.label)
+    } else {
+      entry.triggered()
+      root.close()
+    }
+  }
+
+  // Goes back one menu level; nothing at the root.
+  function menuBack() {
+    if (root.submenuDepth > 0)
+      root.leaveSubmenu()
+  }
+
+  // Arrow keys in the menu: up/down move (wrapping, skipping separators and
+  // disabled rows), right drills into the cursor's submenu, left goes back.
+  function menuMove(dx, dy) {
+    menuViewItem.disarmPointer()
+    if (root.revealMenuCursor())
+      return
+    if (dy !== 0) {
+      root.placeMenuCursor(TrayLogic.nextCursor(root.menuRowList, root.menuCursorIndex, dy))
+    } else if (dx > 0) {
+      var row = root.menuRowList[root.menuCursorIndex]
+      if (row && row.hasChildren && CursorLogic.cursorConfirmed(root.menuRowList, root.menuCursorKey, root.menuCursorIndex))
+        root.activateMenuRow(root.menuCursorIndex, root.menuCursorKey)
+    } else if (dx < 0) {
+      root.menuBack()
+    }
+  }
+
+  // Enter or Space in the menu: acts on the cursor's row once the cursor
+  // shows and still holds its key.
+  function menuActivate() {
+    menuViewItem.disarmPointer()
+    if (root.revealMenuCursor())
+      return
+    if (CursorLogic.cursorConfirmed(root.menuRowList, root.menuCursorKey, root.menuCursorIndex))
+      root.activateMenuRow(root.menuCursorIndex, root.menuCursorKey)
+  }
+
+  // Typed text in the menu: Backspace goes back; a letter jumps to the next
+  // selectable row whose label starts with it (TrayLogic.jumpTo).
+  function menuText(text) {
+    menuViewItem.disarmPointer()
+    if (text.length !== 1 || (text !== "\b" && text.trim() === ""))
+      return
+    if (root.revealMenuCursor())
+      return
+    if (text === "\b")
+      root.menuBack()
+    else
+      root.placeMenuCursor(TrayLogic.jumpTo(root.menuRowList, root.menuCursorIndex, text))
+  }
+
+  // Carries out one TrayMenuView action: a keyed activate, back, or a
+  // real pointer move onto a row (which takes the cursor without showing
+  // it). Pointer clicks also wait out stock's level settle.
+  function handleMenuAction(name, arg) {
+    var a = arg || ({})
+    root.menuKeyboard = false
+    if (name === "activate") {
+      if (!root.menuLevelSettling)
+        root.activateMenuRow(a.index, a.key)
+    } else if (name === "back") {
+      if (!root.menuLevelSettling)
+        root.menuBack()
+    } else if (name === "hover") {
+      var row = root.menuRowList[a.index]
+      if (!row || !row.selectable)
+        return
+      root.menuCursorActive = true
+      root.placeMenuCursor(a.index)
+    }
+  }
+
+  // ---- The manage panel's rows and keys.
+  // Puts the manage cursor on CURSOR ({row, pill}), keyed by that row.
+  function placeManageCursor(cursor) {
+    var row = cursor && cursor.row >= 0 ? root.manageRowList[cursor.row] : null
+    root.manageCursor = {
+      row: row ? cursor.row : -1,
+      pill: cursor && cursor.pill === 1 ? 1 : 0
+    }
+    root.manageCursorKey = row ? row.key : ""
+  }
+
+  // The first key after opening or after pointer use only reveals the
+  // manage cursor (where the pointer put it, else the first row's Pin).
+  function revealManageCursor() {
+    if (root.manageCursorActive && root.manageKeyboard)
+      return false
+    root.manageCursorActive = true
+    root.manageKeyboard = true
+    if (!CursorLogic.cursorConfirmed(root.manageRowList, root.manageCursorKey, root.manageCursor.row))
+      root.placeManageCursor({
+        row: root.manageRowList.length > 0 ? 0 : -1,
+        pill: root.manageCursor.pill
+      })
+    return true
+  }
+
+  // Keeps the manage cursor on its item across a bucket change, and hides
+  // it when the item left.
+  function followManageCursor() {
+    if (root.manageCursor.row < 0)
+      return
+    var index = TrayLogic.indexOfKey(root.manageRowList, root.manageCursorKey)
+    if (index === root.manageCursor.row)
+      return
+    root.placeManageCursor({
+      row: index,
+      pill: root.manageCursor.pill
+    })
+  }
+
+  // Toggles NAME ("pin" or "hide") on manage row INDEX if it still holds
+  // KEY; refused otherwise.
+  function toggleManageRow(name, index, key) {
+    if (!CursorLogic.rowKeyMatches(root.manageRowList, index, key))
+      return
+    if (name === "pin")
+      root.togglePin(key)
+    else if (name === "hide")
+      root.toggleHide(key)
+  }
+
+  // Arrow keys in manage: up/down move between rows (clamped), left/right
+  // pick the Pin or Hide pill (TrayLogic.manageMove).
+  function manageMove(dx, dy) {
+    manageViewItem.disarmPointer()
+    if (root.revealManageCursor())
+      return
+    var key = dy < 0 ? "up" : dy > 0 ? "down" : dx < 0 ? "left" : "right"
+    var from = root.manageCursor.row < 0 ? {
+      row: 0,
+      pill: root.manageCursor.pill
+    } : root.manageCursor
+    root.placeManageCursor(TrayLogic.manageMove(from, root.manageRowList.length, key))
+  }
+
+  // Enter or Space in manage: toggles the chosen pill through the keyed
+  // path (never the pill's own activate).
+  function manageActivate() {
+    manageViewItem.disarmPointer()
+    if (root.revealManageCursor())
+      return
+    if (CursorLogic.cursorConfirmed(root.manageRowList, root.manageCursorKey, root.manageCursor.row))
+      root.toggleManageRow(root.manageCursor.pill === 1 ? "hide" : "pin", root.manageCursor.row, root.manageCursorKey)
+  }
+
+  // Carries out one TrayManageView action: a keyed pin or hide, or a real
+  // pointer move onto a row (which takes the cursor without showing it).
+  function handleManageAction(name, arg) {
+    var a = arg || ({})
+    root.manageKeyboard = false
+    if (name === "pin" || name === "hide") {
+      root.toggleManageRow(name, a.index, a.key)
+    } else if (name === "hover") {
+      if (!root.manageRowList[a.row])
+        return
+      root.manageCursorActive = true
+      root.placeManageCursor({
+        row: a.row,
+        pill: root.manageCursor.pill
+      })
+    }
   }
 
   visible: pinnedItems.length > 0 || drawerCount > 0
   clip: false
   implicitWidth: root.vertical ? root.barSize : trayContent.implicitWidth
   implicitHeight: root.vertical ? trayContent.implicitHeight : root.barSize
+
+  onMenuRowListChanged: root.followMenuCursor()
+  onManageRowListChanged: root.followManageCursor()
+  onTrayItemValuesChanged: root.pruneVanished()
+  onAllItemsChanged: root.pruneVanished()
+  onActiveTrayItemChanged: if (!root.activeTrayItem && root.trayMenuOpen)
+    root.close()
+  onPinnedIdsChanged: root.settlePending()
+  onHiddenIdsChanged: root.settlePending()
+  // The bucket lists changing moves the manage rows' state under a still
+  // pointer: stamp the manage view's layout.
+  onPinnedItemsChanged: manageViewItem.noteLayoutChange()
+  onDrawerItemsChanged: manageViewItem.noteLayoutChange()
+  // A fresh menu shows no cursor until the first navigation key, and a
+  // click right after it opens is settled.
+  onTrayMenuOpenChanged: {
+    root.menuCursorActive = false
+    root.menuKeyboard = false
+    root.clearMenuCursor()
+    if (root.trayMenuOpen)
+      menuViewItem.noteLayoutChange()
+  }
+  // The same for the manage panel.
+  onManagePopupOpenChanged: {
+    root.manageCursorActive = false
+    root.manageKeyboard = false
+    root.placeManageCursor(null)
+    if (root.managePopupOpen)
+      manageViewItem.noteLayoutChange()
+  }
 
   Behavior on revealProgress {
     NumberAnimation {
@@ -333,7 +861,7 @@ BarWidget {
         visible: root.allItems.length > 0
 
         HoverHandler {
-          onHoveredChanged: root.expanded = hovered
+          onHoveredChanged: root.drawerHovered = hovered
         }
 
         BarIconButton {
@@ -342,11 +870,14 @@ BarWidget {
           width: implicitWidth
           height: implicitHeight
           x: root.drawerExtent - root.revealExtent
-          text: "\uf053"
-          onPressed: function (button) {
+          text: ""
+          onPressed: function (button: int) {
             if (button === Qt.RightButton)
-              root.managePopupOpen = !root.managePopupOpen
+              root.toggleManage()
           }
+          Component.onCompleted: root.drawerArrow = expandIcon
+          Component.onDestruction: if (root.drawerArrow === expandIcon)
+            root.drawerArrow = null
         }
 
         Item {
@@ -418,7 +949,7 @@ BarWidget {
         visible: root.allItems.length > 0
 
         HoverHandler {
-          onHoveredChanged: root.expanded = hovered
+          onHoveredChanged: root.drawerHovered = hovered
         }
 
         BarIconButton {
@@ -427,12 +958,15 @@ BarWidget {
           width: implicitWidth
           height: implicitHeight
           y: root.drawerExtent - root.revealExtent
-          text: "\uf053"
+          text: ""
           textRotation: 90
-          onPressed: function (button) {
+          onPressed: function (button: int) {
             if (button === Qt.RightButton)
-              root.managePopupOpen = !root.managePopupOpen
+              root.toggleManage()
           }
+          Component.onCompleted: root.drawerArrow = expandIcon
+          Component.onDestruction: if (root.drawerArrow === expandIcon)
+            root.drawerArrow = null
         }
 
         Item {
@@ -472,122 +1006,26 @@ BarWidget {
     }
   }
 
-  PopupCard {
+  Aranea.KeyboardPanelFrame {
     id: managePopup
     anchorItem: root
     owner: root
     bar: root.bar
     open: root.managePopupOpen
-    contentWidth: managePopup.fittedContentWidth(Style.space(300))
-    contentHeight: managePopup.fittedContentHeight(manageColumn.implicitHeight)
+    contentWidth: managePopup.fittedContentWidth(Style.space(340))
+    contentHeight: managePopup.fittedContentHeight(manageViewItem.implicitHeight)
+    onCloseRequested: root.close()
+    onMoveRequested: function (dx: int, dy: int) {
+      root.manageMove(dx, dy)
+    }
+    onActivateRequested: root.manageActivate()
 
-    Column {
-      id: manageColumn
-      anchors.fill: parent
-      spacing: Style.space(8)
-
-      Text {
-        text: "Tray icons"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: true
-      }
-
-      Text {
-        text: "Pinned icons stay visible. Hidden icons never show."
-        color: Qt.darker(root.foreground, 1.4)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        wrapMode: Text.WordWrap
-        width: parent.width
-      }
-
-      Text {
-        visible: root.allItems.length === 0
-        text: "No tray items reporting."
-        color: Qt.darker(root.foreground, 1.5)
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        font.italic: true
-      }
-
-      Repeater {
-        model: root.allItems
-        delegate: Item {
-          id: rowRoot
-          required property var modelData
-          required property int index
-          width: manageColumn.width
-          implicitHeight: 28
-
-          readonly property string itemId: String(modelData.id || "")
-          readonly property string displayName: {
-            var t = String(modelData.title || "").trim()
-            if (t)
-              return t
-            var tt = String(modelData.tooltipTitle || "").trim()
-            if (tt)
-              return tt
-            var id = String(modelData.id || "")
-            var slash = id.lastIndexOf("/")
-            return slash !== -1 ? id.substring(slash + 1) : (id || "Unknown")
-          }
-          readonly property bool isPinned: root.pinnedIds.indexOf(itemId) !== -1
-          readonly property bool isHidden: root.hiddenIds.indexOf(itemId) !== -1
-
-          TrayIcon {
-            id: rowIcon
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            width: 16
-            height: 16
-            icon: rowRoot.modelData.icon
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: rowIcon.right
-            anchors.leftMargin: Style.space(10)
-            anchors.right: rowHideBtn.left
-            anchors.rightMargin: Style.space(8)
-            text: rowRoot.displayName
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            elide: Text.ElideRight
-          }
-
-          Button {
-            id: rowPinBtn
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: parent.right
-            iconText: "\uf08d"
-            text: rowRoot.isPinned ? "Unpin" : "Pin"
-            foreground: root.foreground
-            horizontalPadding: 8
-            verticalPadding: 3
-            iconSize: Style.font.bodySmall
-            fontSize: Style.font.bodySmall
-            onClicked: root.togglePin(rowRoot.itemId)
-          }
-
-          Button {
-            id: rowHideBtn
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: rowPinBtn.left
-            anchors.rightMargin: Style.space(6)
-            iconText: "\uf06e"
-            text: rowRoot.isHidden ? "Show" : "Hide"
-            foreground: root.foreground
-            horizontalPadding: 8
-            verticalPadding: 3
-            iconSize: Style.font.bodySmall
-            fontSize: Style.font.bodySmall
-            onClicked: root.toggleHide(rowRoot.itemId)
-          }
-        }
+    TrayManageView {
+      id: manageViewItem
+      width: parent.width
+      view: root.manageView
+      onAction: function (name: string, arg: var) {
+        root.handleManageAction(name, arg)
       }
     }
   }
@@ -597,254 +1035,59 @@ BarWidget {
     menu: root.activeTrayItem ? root.activeTrayItem.menu : null
   }
 
-  PopupCard {
+  Aranea.KeyboardPanelFrame {
     id: trayMenuPopup
     anchorItem: root.activeTrayAnchor || root
     owner: root
     bar: root.bar
     open: root.trayMenuOpen
-    // The card fades out over 140ms (visible stays true for that whole time --
-    // see PopupCard's own visible: open || card.opacity > 0), so resetting on
-    // "open" would swap a live submenu for the root menu mid-fade: a visible
-    // flash, and a resize/reposition if the two have different geometry. Wait
-    // for the fade to actually finish. Switching to a different tray item
-    // still resets immediately, from openTrayMenu() itself.
+    // The card fades out over 140ms (the frame stays visible for that whole
+    // time, see KeyboardPanel's own visible: open || card.opacity > 0), so
+    // resetting on "open" would swap a live submenu for the root menu
+    // mid-fade: a visible flash, and a resize/reposition if the two have
+    // different geometry. Wait for the fade to actually finish. Switching to
+    // a different tray item still resets immediately, from openTrayMenu()
+    // itself.
     onVisibleChanged: if (!visible)
       root.resetTrayMenu()
-    padding: Style.space(8)
-    borderColor: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.45)
-    contentWidth: trayMenuPopup.fittedContentWidth(Style.space(232))
-    contentHeight: trayMenuPopup.fittedContentHeight(menuHeaderHeight + trayMenuColumn.implicitHeight, Style.space(420))
+    contentWidth: trayMenuPopup.fittedContentWidth(Style.space(320))
+    contentHeight: trayMenuPopup.fittedContentHeight(menuViewItem.implicitHeight)
+    onCloseRequested: root.close()
+    onMoveRequested: function (dx: int, dy: int) {
+      root.menuMove(dx, dy)
+    }
+    onActivateRequested: root.menuActivate()
+    onTextKey: function (text: string) {
+      root.menuText(text)
+    }
+    // The key catcher takes "x" for delete; in the menu it is a letter.
+    onDeleteRequested: root.menuText("x")
 
-    // Column skips invisible children but keeps reporting their height, so
-    // read the header's extent through its own visibility.
-    readonly property int menuHeaderHeight: menuHeader.visible ? menuHeader.implicitHeight : 0
-
-    Column {
-      id: trayMenuLayout
-      anchors.fill: parent
-      spacing: 0
-
-      // Header for a drilled-into submenu: names where we are and walks back
-      // out. Pinned above the Flickable rather than scrolling with the rows,
-      // so the way back stays reachable in a submenu taller than the card.
-      // Only present below the root level, so the root menu is unchanged.
-      Column {
-        id: menuHeader
-        visible: root.submenuDepth > 0
-        width: trayMenuLayout.width
-        spacing: 0
-
-        Item {
-          id: menuBackRow
-          width: menuHeader.width
-          implicitHeight: Style.space(30)
-
-          Rectangle {
-            anchors.fill: parent
-            radius: Math.max(2, Style.cornerRadius)
-            color: backMouse.containsMouse ? Style.hoverFillFor(root.foreground, root.foreground) : "transparent"
-          }
-
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            width: Style.space(22)
-            horizontalAlignment: Text.AlignHCenter
-            text: "\u2039"
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(28)
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(10)
-            text: root.currentTitle
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            elide: Text.ElideRight
-          }
-
-          MouseArea {
-            id: backMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              if (root.menuLevelSettling)
-                return
-              // Reset before the model swap so the parent level shows from
-              // the top (same ordering as the row delegate below).
-              trayMenuFlick.contentY = 0
-              root.leaveSubmenu()
-            }
-          }
-        }
-
-        Item {
-          width: menuHeader.width
-          implicitHeight: Style.space(11)
-
-          Rectangle {
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(10)
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            height: 1
-            color: Color.popups.border
-            opacity: 0.45
-          }
-        }
+    TrayMenuView {
+      id: menuViewItem
+      width: parent.width
+      view: root.menuView
+      onAction: function (name: string, arg: var) {
+        root.handleMenuAction(name, arg)
       }
+    }
+  }
 
-      Flickable {
-        id: trayMenuFlick
-        width: trayMenuLayout.width
-        height: trayMenuLayout.height - trayMenuPopup.menuHeaderHeight
-        contentWidth: width
-        contentHeight: trayMenuColumn.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        flickableDirection: Flickable.VerticalFlick
-        interactive: contentHeight > height
+  IpcHandler {
+    target: "araneadev.tray"
 
-        ScrollBar.vertical: ScrollBar {
-          policy: ScrollBar.AsNeeded
-        }
-
-        Column {
-          id: trayMenuColumn
-          width: trayMenuFlick.width
-          spacing: 0
-
-          Repeater {
-            model: root.currentChildren
-
-            delegate: Item {
-              id: menuRow
-              required property var modelData
-              required property int index
-
-              readonly property string rowText: String(modelData.text || "")
-              readonly property string activeTitle: root.activeTrayItem ? String(root.activeTrayItem.title || root.activeTrayItem.id || "") : ""
-              // Both only ever describe the root menu; inside a submenu the first
-              // rows are real entries and must not be swallowed.
-              readonly property bool atRoot: root.submenuDepth === 0
-              readonly property bool rootTitleEntry: atRoot && index === 0 && modelData.hasChildren && rowText.toLowerCase() === activeTitle.toLowerCase()
-              readonly property bool leadingSeparator: atRoot && modelData.isSeparator && index <= 1
-              readonly property bool hiddenRow: rootTitleEntry || leadingSeparator
-
-              visible: !hiddenRow
-              width: trayMenuColumn.width
-              implicitHeight: hiddenRow ? 0 : (modelData.isSeparator ? Style.space(11) : Style.space(30))
-              opacity: modelData.enabled ? 1.0 : 0.45
-
-              Rectangle {
-                visible: menuRow.modelData.isSeparator
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(10)
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(10)
-                anchors.verticalCenter: parent.verticalCenter
-                height: 1
-                color: Color.popups.border
-                opacity: 0.45
-              }
-
-              Rectangle {
-                visible: !menuRow.modelData.isSeparator
-                anchors.fill: parent
-                radius: Math.max(2, Style.cornerRadius)
-                color: rowMouse.containsMouse && menuRow.modelData.enabled ? Style.hoverFillFor(root.foreground, root.foreground) : "transparent"
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                visible: !menuRow.modelData.isSeparator && menuRow.modelData.buttonType !== QsMenuButtonType.None
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                width: Style.space(22)
-                horizontalAlignment: Text.AlignHCenter
-                text: menuRow.modelData.checkState === Qt.Checked ? "\uf00c" : ""
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Image {
-                id: menuIcon
-                visible: !menuRow.modelData.isSeparator && String(menuRow.modelData.icon || "") !== ""
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(24)
-                width: Style.space(16)
-                height: Style.space(16)
-                fillMode: Image.PreserveAspectFit
-                // Decode at physical pixels: IconImage uses the logical size,
-                // which leaves PNG icons upscaled and blurry on HiDPI displays.
-                sourceSize.width: width * Screen.devicePixelRatio
-                sourceSize.height: height * Screen.devicePixelRatio
-                source: menuRow.modelData.icon
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                visible: !menuRow.modelData.isSeparator
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: menuIcon.visible ? Style.space(46) : Style.space(28)
-                anchors.right: submenuGlyph.left
-                anchors.rightMargin: Style.space(8)
-                text: menuRow.rowText
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                elide: Text.ElideRight
-              }
-
-              Text {
-                id: submenuGlyph
-                visible: !menuRow.modelData.isSeparator && menuRow.modelData.hasChildren
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(10)
-                text: "\u203a"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              MouseArea {
-                id: rowMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                enabled: !menuRow.modelData.isSeparator && menuRow.modelData.enabled
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: {
-                  if (root.menuLevelSettling)
-                    return
-                  if (menuRow.modelData.hasChildren) {
-                    // Reset scroll BEFORE swapping the model: the swap destroys
-                    // this delegate synchronously and ids stop resolving after.
-                    trayMenuFlick.contentY = 0
-                    root.enterSubmenu(menuRow.modelData, menuRow.rowText)
-                  } else {
-                    menuRow.modelData.triggered()
-                    root.close()
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+    // Opens the manage popup at the tray.
+    function manage(): void {
+      root.openManage()
+    }
+    // Opens the app menu of the pinned item at INDEX, or of the drawer item
+    // past the pinned ones; out of range is a no-op.
+    function menu(index: int): void {
+      root.openMenuAt(index)
+    }
+    // Closes either popup.
+    function close(): void {
+      root.close()
     }
   }
 
@@ -892,6 +1135,13 @@ BarWidget {
       root.openTrayMenu(trayItemRoot.modelData, trayItemRoot, mouse)
     }
 
+    Component.onCompleted: root.trayItemViews.push(trayItemRoot)
+    Component.onDestruction: {
+      var at = root.trayItemViews.indexOf(trayItemRoot)
+      if (at !== -1)
+        root.trayItemViews.splice(at, 1)
+    }
+
     TrayIcon {
       anchors.centerIn: parent
       width: Style.space(12)
@@ -905,17 +1155,19 @@ BarWidget {
       acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
+      // qmllint disable missing-property
       onEntered: if (root.bar)
-        root.bar.showTooltip(trayItemRoot, root.trayTooltip(modelData))
+        root.bar.showTooltip(trayItemRoot, root.trayTooltip(trayItemRoot.modelData))
       onExited: if (root.bar)
         root.bar.hideTooltip(trayItemRoot)
-      onPressed: function (mouse) {
+      // qmllint enable missing-property
+      onPressed: function (mouse: MouseEvent) {
         if (mouse.button === Qt.RightButton) {
           trayItemRoot.displayMenu(mouse)
           mouse.accepted = true
         }
       }
-      onClicked: function (mouse) {
+      onClicked: function (mouse: MouseEvent) {
         if (mouse.button === Qt.RightButton) {
           mouse.accepted = true
         } else if (mouse.button === Qt.MiddleButton) {
@@ -926,7 +1178,7 @@ BarWidget {
           trayItemRoot.modelData.activate()
         }
       }
-      onWheel: function (wheel) {
+      onWheel: function (wheel: WheelEvent) {
         trayItemRoot.modelData.scroll(wheel.angleDelta.y, false)
       }
     }

@@ -106,6 +106,12 @@ Column {
     })
   }
 
+  // Scrolls the row list back to the top (the host's resetTrayMenu, as
+  // stock reset its Flickable before a menu reopens).
+  function resetScroll() {
+    list.contentY = 0
+  }
+
   // Scrolls the row list so the keyboard cursor's row is in view.
   function revealCursor() {
     menu.revealRow(menu.cursorIndex)

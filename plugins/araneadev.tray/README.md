@@ -12,11 +12,30 @@ hidden, check/radio marks, disabled dimming), and the manage popup (pin/hide per
 through `updateEntryInline`). `TrayModel.js` is stock's tray bucket helpers, unchanged apart from
 docs.
 
-The plugin id is `araneadev.tray`. `Tray.qml` is still the Task 3 clone: it carries stock's root
-logic, markup and popups (`PopupCard`, xdg-popup) unchanged from Omarchy's Tray, so the bar entry
-keeps working identically until Task 5 wires in the Aranea-native, keyboard-reachable menu and
-manage views. Pin and hide are saved under `root.moduleName`, which the bar overwrites with
-the entry's own id (`araneadev.tray` once retargeted), never a literal `"omarchy.tray"`.
+The plugin id is `araneadev.tray`. Pin and hide are saved under `root.moduleName`, which the bar
+overwrites with the entry's own id (`araneadev.tray` once retargeted), never a literal
+`"omarchy.tray"`.
+
+Both popups are `Aranea.KeyboardPanelFrame` windows (layer-shell, focused when they map), anchored
+as stock's were: the app menu to the clicked icon (the drawer stays slid open under a drawer
+icon's menu), the manage panel to the whole tray. They draw `TrayMenuView` and `TrayManageView`.
+
+- **App menu keys:** up/down move (wrapping, skipping separators and disabled entries), a letter
+  jumps to the next entry starting with it, Enter or Space activates (drills into a submenu, or
+  triggers a leaf and closes), right drills in, left or Backspace goes back, Esc closes. The
+  first key only reveals the cursor. The key catcher keeps `h`/`j`/`k`/`l` as vim moves.
+- **Manage keys:** up/down move between rows, left/right pick the Pin or Hide pill, Enter or
+  Space toggles it, Esc closes.
+- **Keyed actions:** menu rows are keyed by a per-entry serial (Quickshell does not expose the
+  DBus id) plus the label, manage rows by the item id. Action index = position in `view.rows`;
+  the entry at `rows[index].index` is activated only while `rows[index].key === key`.
+- **Pending:** a pin or hide shows its new state at once and pulses until the settings echo
+  matches it (or 3 s pass).
+- **Vanishing items:** the app menu closes when its item leaves the tray; pending state of a
+  vanished manage row is dropped.
+- **IPC:** `omarchy-shell araneadev.tray manage`, `omarchy-shell araneadev.tray menu <index>`
+  (the pinned item at `index`, else the drawer item past the pinned ones; out of range is a
+  no-op) and `omarchy-shell araneadev.tray close`.
 
 `omarchy.clonePaths` (stock's `Tray.manifest.json` lists `TrayModel.js`) is read only by the
 `omarchy-plugin-clone` dev command, to find a stock bar widget's extra files when its manifest
@@ -28,8 +47,7 @@ dropped from this manifest, the same way `araneadev.weather`'s was.
 `TrayMenuView.qml` and `TrayManageView.qml` are the pure Aranea-native views for the app menu
 and the manage panel (one view object in, one `action(name, arg)` signal out; keyed, settled
 clicks and gated hover). They are tested on their own (`tests/qml/tray-menu.qml`,
-`tests/qml/tray-manage.qml`) and not yet wired into `Tray.qml`. Action index = position in
-`view.rows`; activate the entry at `rows[index].index` after `rows[index].key === key`.
+`tests/qml/tray-manage.qml`).
 
 ## Integration
 
