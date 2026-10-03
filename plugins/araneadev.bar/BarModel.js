@@ -140,7 +140,8 @@ function entryId(entry) {
 }
 
 /**
- * Move the tray entry to the inner edge of a region: first on the right, last elsewhere.
+ * Move the tray entry (stock's omarchy.tray or its Aranea clone araneadev.tray)
+ * to the inner edge of a region: first on the right, last elsewhere.
  * @param {Array<(string|EntryObject)>} entries - region entries; non-arrays count as empty
  * @param {string} section - region name ("left", "center" or "right")
  * @returns {Array<(string|EntryObject)>} a new array with the tray repositioned
@@ -150,7 +151,8 @@ function pinTrayToInner(entries, section) {
   var result = []
   var values = Array.isArray(entries) ? entries : []
   for (var i = 0; i < values.length; i++) {
-    if (entryId(values[i]) === "omarchy.tray") trayEntry = values[i]
+    var id = entryId(values[i])
+    if (id === "omarchy.tray" || id === "araneadev.tray") trayEntry = values[i]
     else result.push(values[i])
   }
   if (trayEntry) {

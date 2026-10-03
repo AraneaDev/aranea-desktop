@@ -76,6 +76,11 @@ test("bar model layout helpers (4b)", () => {
     "tray inner on the left"
   )
   eq(bar.pinTrayToInner(["a", "omarchy.tray"], "right"), ["omarchy.tray", "a"], "tray inner right")
+  eq(
+    bar.pinTrayToInner(["a", { id: "araneadev.tray" }], "right"),
+    [{ id: "araneadev.tray" }, "a"],
+    "the Aranea tray clone leads the right section too"
+  )
   eq(bar.expandPath("~/x", "/home/u"), "/home/u/x", "tilde")
   eq(bar.expandPath("$HOME/x", "/home/u"), "/home/u/x", "$HOME")
   eq(bar.customModuleSafeName("../evil"), false, "unsafe name")

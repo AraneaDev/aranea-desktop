@@ -2,8 +2,9 @@
 // numbers (its heading toggles the week start, with a tooltip naming the
 // next start), the weekday headings and the day cells. Today is a mint
 // diamond with a glow; days outside the viewed month are dim. The rows
-// come from stock Model.js (weeks: [{week, days: [{key, day, inMonth}]}])
-// as the host built them; the grid only draws them.
+// come from stock Model.js (weeks: a list of weeks, each with its week
+// number and its days, each day with its key, day and inMonth) as the host
+// built them; the grid only draws them.
 //
 // The day cells live in a ListModel keyed by date: a rebuilt but equal
 // weeks array (every minute's view) updates the cells in place, and today

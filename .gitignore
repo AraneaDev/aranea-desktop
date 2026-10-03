@@ -2,3 +2,4 @@ docs/superpowers/
 .worktrees/
 node_modules/
 coverage/
+__pycache__/

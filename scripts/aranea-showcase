@@ -7,7 +7,7 @@ set -euo pipefail
 # Usage: scripts/aranea-showcase [list|surface <name>]
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-surfaces=(desktop menu menu-submenu menu-search menu-input ceremony notifications clipboard emojis polkit health lock boot about idle file-manager editor network vpn audio bluetooth agents power monitor clock weather image-picker apps favorites recent dawn osd workspaces updates)
+surfaces=(desktop menu menu-submenu menu-search menu-input ceremony notifications clipboard emojis polkit health lock boot about idle file-manager editor network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
 case "${1:-list}" in
   list)

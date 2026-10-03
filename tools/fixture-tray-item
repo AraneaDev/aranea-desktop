@@ -1,0 +1,345 @@
+#!/usr/bin/env python3
+"""Dev-only fixture StatusNotifierItem, so tray work never has to touch a
+real tray app. It registers org.kde.StatusNotifierItem-<pid>-1 on the
+session bus, exporting a StatusNotifierItem at /StatusNotifierItem and a
+com.canonical.dbusmenu menu at /MenuBar, then (if present) registers itself
+with org.kde.StatusNotifierWatcher. Activating an entry only prints a line;
+"Quit fixture" and SIGTERM/SIGINT exit it cleanly. It runs until killed.
+
+Usage: tools/fixture-tray-item [--name Courier] [--icon mail-send]
+"""
+
+import argparse
+import os
+import signal
+import sys
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+SNI_IFACE = "org.kde.StatusNotifierItem"
+MENU_IFACE = "com.canonical.dbusmenu"
+PROPS_IFACE = "org.freedesktop.DBus.Properties"
+WATCHER_BUS = "org.kde.StatusNotifierWatcher"
+WATCHER_PATH = "/StatusNotifierWatcher"
+
+# This build of dbus-python has no dbus.Variant: a variant is instead a
+# plain typed value with variant_level=1, keyed here by its signature char.
+VARIANT_TYPES = {
+    "s": dbus.String,
+    "b": dbus.Boolean,
+    "i": dbus.Int32,
+    "u": dbus.UInt32,
+    "o": dbus.ObjectPath,
+}
+
+
+def variant(value, signature):
+    """Wraps VALUE as a "v" of SIGNATURE (one of VARIANT_TYPES's keys)."""
+    return VARIANT_TYPES[signature](value, variant_level=1)
+
+
+def parse_args(argv):
+    """Parses --name and --icon, defaulting to the stand-in app "Courier"."""
+    parser = argparse.ArgumentParser(
+        prog="tools/fixture-tray-item",
+        description="Dev-only fixture StatusNotifierItem for tray work.",
+    )
+    parser.add_argument("--name", default="Courier", help="the app title (default: Courier)")
+    parser.add_argument("--icon", default="mail-send", help="the theme icon name (default: mail-send)")
+    return parser.parse_args(argv)
+
+
+def base_node(entry_id, **kwargs):
+    """Builds one dbusmenu entry dict for ENTRY_ID with every field
+    node_properties expects, overridden by KWARGS.
+    """
+    node = {
+        "id": entry_id,
+        "type": "standard",
+        "label": None,
+        "enabled": True,
+        "visible": True,
+        "children": [],
+        "toggle_type": None,
+        "toggle_state": None,
+        "children_display": None,
+    }
+    node.update(kwargs)
+    return node
+
+
+def make_node(id_counter, **kwargs):
+    """Builds one dbusmenu entry dict with the next id from ID_COUNTER."""
+    return base_node(next(id_counter), **kwargs)
+
+
+def build_menu(app_name):
+    """Builds the fixture's menu tree for APP_NAME and returns
+    (root, by_id, parent_of, quit_id): the root node (id 0), a lookup from
+    id to node, a lookup from id to parent id, and the id of "Quit fixture".
+    """
+    id_counter = iter(range(1, 1000))
+    nearby = make_node(id_counter, label="To nearby device…")
+    share = make_node(id_counter, label="Share a link…")
+    fast_mode = make_node(id_counter, label="Fast mode", toggle_type="radio", toggle_state=1)
+    send_file = make_node(
+        id_counter,
+        label="Send a file",
+        children_display="submenu",
+        children=[nearby, share, fast_mode],
+    )
+    separator_1 = make_node(id_counter, type="separator")
+    open_item = make_node(id_counter, label=f"Open {app_name}")
+    start_minimised = make_node(id_counter, label="_Start minimised", toggle_type="checkmark", toggle_state=0)
+    receive = make_node(id_counter, label="Receive", enabled=False)
+    separator_2 = make_node(id_counter, type="separator")
+    quit_item = make_node(id_counter, label="Quit fixture")
+
+    root = base_node(0, children=[separator_1, open_item, send_file, start_minimised, receive, separator_2, quit_item])
+
+    by_id = {}
+    parent_of = {}
+
+    def index(node, parent_id):
+        by_id[node["id"]] = node
+        parent_of[node["id"]] = parent_id
+        for child in node.get("children", []):
+            index(child, node["id"])
+
+    index(root, None)
+    return root, by_id, parent_of, quit_item["id"]
+
+
+def node_properties(node, names):
+    """Returns NODE's dbusmenu properties as an a{sv} dict, limited to NAMES
+    (an empty list means "all properties").
+    """
+    wanted = set(names) if names else None
+    props = {}
+
+    def add(key, value, signature):
+        if value is None:
+            return
+        if wanted is not None and key not in wanted:
+            return
+        props[key] = variant(value, signature)
+
+    if node["type"] == "separator":
+        add("type", "separator", "s")
+        add("visible", node["visible"], "b")
+        return dbus.Dictionary(props, signature="sv")
+
+    add("label", node["label"], "s")
+    add("enabled", node["enabled"], "b")
+    add("visible", node["visible"], "b")
+    add("children-display", node["children_display"], "s")
+    add("toggle-type", node["toggle_type"], "s")
+    if node["toggle_type"]:
+        add("toggle-state", node["toggle_state"], "i")
+    return dbus.Dictionary(props, signature="sv")
+
+
+def properties_get(table, interface, prop):
+    """Implements Properties.Get against TABLE ({interface: {prop: (value, signature)}})."""
+    try:
+        value, signature = table[interface][prop]
+    except KeyError as error:
+        raise dbus.exceptions.DBusException(
+            f"no such property {prop} on {interface}",
+            name="org.freedesktop.DBus.Error.UnknownProperty",
+        ) from error
+    return variant(value, signature)
+
+
+def properties_get_all(table, interface):
+    """Implements Properties.GetAll against TABLE."""
+    entries = table.get(interface, {})
+    return dbus.Dictionary({name: variant(value, sig) for name, (value, sig) in entries.items()}, signature="sv")
+
+
+class StatusNotifierItemObject(dbus.service.Object):
+    """The /StatusNotifierItem object: properties plus Activate,
+    SecondaryActivate and Scroll, each of which only prints a line.
+    """
+
+    def __init__(self, bus_name, path, app_name, icon_name):
+        """Exports the object at PATH on BUS_NAME, titled APP_NAME with ICON_NAME."""
+        super().__init__(bus_name, path)
+        self.props = {
+            SNI_IFACE: {
+                "Category": ("ApplicationStatus", "s"),
+                "Id": (app_name, "s"),
+                "Title": (app_name, "s"),
+                "Status": ("Active", "s"),
+                "IconName": (icon_name, "s"),
+                # A menu-only item: a left click opens its menu (the tray's
+                # onlyMenu path) instead of calling Activate.
+                "ItemIsMenu": (True, "b"),
+                "Menu": (dbus.ObjectPath("/MenuBar"), "o"),
+            }
+        }
+
+    @dbus.service.method(PROPS_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface, prop):
+        """Returns one property (org.freedesktop.DBus.Properties.Get)."""
+        return properties_get(self.props, interface, prop)
+
+    @dbus.service.method(PROPS_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        """Returns every property of INTERFACE (Properties.GetAll)."""
+        return properties_get_all(self.props, interface)
+
+    @dbus.service.method(SNI_IFACE, in_signature="ii", out_signature="")
+    def Activate(self, x, y):
+        """Left-click: prints a line."""
+        print("fixture: activate", flush=True)
+
+    @dbus.service.method(SNI_IFACE, in_signature="ii", out_signature="")
+    def SecondaryActivate(self, x, y):
+        """Middle-click: prints a line."""
+        print("fixture: secondary-activate", flush=True)
+
+    @dbus.service.method(SNI_IFACE, in_signature="is", out_signature="")
+    def Scroll(self, delta, orientation):
+        """Wheel: prints a line."""
+        print(f"fixture: scroll {delta} {orientation}", flush=True)
+
+
+class DBusMenuObject(dbus.service.Object):
+    """The /MenuBar object: a minimal com.canonical.dbusmenu server over the
+    fixture's static menu tree.
+    """
+
+    def __init__(self, bus_name, path, root, by_id, parent_of, quit_id, loop):
+        """Exports the object at PATH, serving ROOT/BY_ID/PARENT_OF; Event
+        on QUIT_ID stops LOOP.
+        """
+        super().__init__(bus_name, path)
+        self.root = root
+        self.by_id = by_id
+        self.parent_of = parent_of
+        self.quit_id = quit_id
+        self.loop = loop
+        self.revision = 1
+        self.props = {
+            MENU_IFACE: {
+                "Version": (3, "u"),
+                "Status": ("normal", "s"),
+                "TextDirection": ("ltr", "s"),
+            }
+        }
+
+    @dbus.service.method(PROPS_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface, prop):
+        """Returns one property (org.freedesktop.DBus.Properties.Get)."""
+        return properties_get(self.props, interface, prop)
+
+    @dbus.service.method(PROPS_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        """Returns every property of INTERFACE (Properties.GetAll)."""
+        return properties_get_all(self.props, interface)
+
+    def _struct(self, node, depth, names, level=0):
+        """Builds the (i id, a{sv} properties, av children) struct for NODE,
+        recursing DEPTH levels (-1 is unlimited, 0 is none); LEVEL=1 marks
+        the struct as the "v" a child entry needs.
+        """
+        props = node_properties(node, names)
+        if depth == 0:
+            children = dbus.Array([], signature="v")
+        else:
+            next_depth = depth if depth < 0 else depth - 1
+            children = dbus.Array([self._struct(child, next_depth, names, level=1) for child in node["children"]], signature="v")
+        return dbus.Struct((dbus.Int32(node["id"]), props, children), signature="ia{sv}av", variant_level=level)
+
+    @dbus.service.method(MENU_IFACE, in_signature="iias", out_signature="u(ia{sv}av)")
+    def GetLayout(self, parent_id, recursion_depth, property_names):
+        """Returns (revision, layout) for the subtree rooted at PARENT_ID."""
+        node = self.by_id.get(parent_id, self.root)
+        return (dbus.UInt32(self.revision), self._struct(node, recursion_depth, property_names))
+
+    @dbus.service.method(MENU_IFACE, in_signature="aias", out_signature="a(ia{sv})")
+    def GetGroupProperties(self, ids, property_names):
+        """Returns the requested properties for each id in IDS that exists."""
+        result = []
+        for entry_id in ids:
+            node = self.by_id.get(entry_id)
+            if node is None:
+                continue
+            result.append(dbus.Struct((dbus.Int32(entry_id), node_properties(node, property_names)), signature="ia{sv}"))
+        return result
+
+    @dbus.service.method(MENU_IFACE, in_signature="i", out_signature="b")
+    def AboutToShow(self, entry_id):
+        """Always reports no update is needed: the fixture's layout is static."""
+        return False
+
+    @dbus.service.method(MENU_IFACE, in_signature="isvu", out_signature="")
+    def Event(self, entry_id, event_id, data, timestamp):
+        """Handles a dbusmenu event; only "clicked" does anything: it prints
+        the entry's label, toggles a checkbox/radio's state, and quits the
+        fixture for "Quit fixture".
+        """
+        node = self.by_id.get(entry_id)
+        if node is None or event_id != "clicked":
+            return
+        print(f"fixture: clicked {node['label']}", flush=True)
+        if node["toggle_type"]:
+            node["toggle_state"] = 0 if node["toggle_state"] else 1
+            self.revision += 1
+            self.LayoutUpdated(dbus.UInt32(self.revision), dbus.Int32(self.parent_of.get(entry_id) or 0))
+        if entry_id == self.quit_id:
+            GLib.idle_add(self.loop.quit)
+
+    @dbus.service.signal(MENU_IFACE, signature="ui")
+    def LayoutUpdated(self, revision, parent_id):
+        """Announces that the layout under PARENT_ID changed to REVISION."""
+
+
+def register_with_watcher(bus, service_name):
+    """Calls RegisterStatusNotifierItem on org.kde.StatusNotifierWatcher if
+    one is running; a missing watcher is not an error.
+    """
+    try:
+        watcher = bus.get_object(WATCHER_BUS, WATCHER_PATH)
+        dbus.Interface(watcher, WATCHER_BUS).RegisterStatusNotifierItem(service_name)
+    except dbus.exceptions.DBusException as error:
+        print(f"fixture: no StatusNotifierWatcher to register with ({error})", file=sys.stderr, flush=True)
+
+
+def request_quit(loop):
+    """GLib unix-signal callback: stops LOOP and removes the signal source."""
+    loop.quit()
+    return GLib.SOURCE_REMOVE
+
+
+def main(argv=None):
+    """Parses args, registers the fixture item and its menu, and runs until
+    killed or "Quit fixture" is clicked.
+    """
+    args = parse_args(argv)
+    DBusGMainLoop(set_as_default=True)
+    bus = dbus.SessionBus()
+    service_name = f"org.kde.StatusNotifierItem-{os.getpid()}-1"
+    bus_name = dbus.service.BusName(service_name, bus=bus)
+
+    root, by_id, parent_of, quit_id = build_menu(args.name)
+    loop = GLib.MainLoop()
+    DBusMenuObject(bus_name, "/MenuBar", root, by_id, parent_of, quit_id, loop)
+    StatusNotifierItemObject(bus_name, "/StatusNotifierItem", args.name, args.icon)
+
+    register_with_watcher(bus, service_name)
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, request_quit, loop)
+
+    print(f'fixture: {service_name} ready as "{args.name}"', flush=True)
+    loop.run()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -43,6 +43,22 @@ qml_shrunk_baseline() {
     ($2 in base) { n = ($1 + 0 < base[$2] + 0) ? $1 : base[$2]; print n "\t" $2 }' "$2" "$1" | LC_ALL=C sort -t$'\t' -k2
 }
 
+# Prints "file:line: text" for every plugin QML line with a brace in the
+# file's header: the comments, blank lines and pragmas before the first
+# import (or before the first other line, for a file without imports).
+# Quickshell's import scan reads the header up to the imports and a brace
+# there breaks loading at runtime. Returns 1 when any.
+qml_header_braces() {
+  local out
+  out="$(cd "$check_root" && awk '
+    FNR == 1 { p = 1 }
+    p && !/^[[:space:]]*$/ && !/^[[:space:]]*\/\// && !/^[[:space:]]*pragma[[:space:]]/ { p = 0 }
+    p && /[{]/ { print "brace before imports: " FILENAME ":" FNR ": " $0 }' "$@")"
+  [[ -z "$out" ]] && return 0
+  printf '%s\n' "$out"
+  return 1
+}
+
 # qml stage entry point.
 stage_qml() {
   local qmllint files
@@ -55,6 +71,12 @@ stage_qml() {
   # are checked by running them (qmltest stage).
   mapfile -t files < <(check_files '\.qml$' | grep -v '^tests/qml/')
   ((${#files[@]})) || return 0
+
+  local header_status=0 plugin_files
+  mapfile -t plugin_files < <(printf '%s\n' "${files[@]}" | grep '^plugins/' || true)
+  if ((${#plugin_files[@]})); then
+    qml_header_braces "${plugin_files[@]}" || header_status=1
+  fi
 
   local shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}" mode=bare import_root=""
   qml_import_root=""
@@ -80,6 +102,7 @@ stage_qml() {
   fi
 
   local status=0 syntax
+  ((header_status)) && status=1
   syntax="$(jq -r '.files[] | .filename as $file | .warnings[] | select(.id == "syntax") | "\($file):\(.line): \(.message)"' <<<"$json")"
   if [[ -n "$syntax" ]]; then
     printf 'syntax error: %s\n' "$syntax"
