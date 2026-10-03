@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.4](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.3...v2.16.4) (2026-10-03)
+
+
+### Fixes
+
+* render the real boot and lock screens for screenshots ([#111](https://github.com/AraneaDev/aranea-desktop/issues/111)) ([dd80e81](https://github.com/AraneaDev/aranea-desktop/commit/dd80e81a8add97b4f19724f33754016b44d1b386))
+
 ## [2.16.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.2...v2.16.3) (2026-10-03)
 
 
