@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.1...v2.16.2) (2026-10-03)
+
+
+### Fixes
+
+* bring bluetooth and audio up to the Filament standard ([#107](https://github.com/AraneaDev/aranea-desktop/issues/107)) ([eb73bf8](https://github.com/AraneaDev/aranea-desktop/commit/eb73bf893d7b2a8cb45519ff5ff39fbbf4510bcd))
+
 ## [2.16.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.0...v2.16.1) (2026-10-03)
 
 
