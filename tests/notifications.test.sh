@@ -35,8 +35,17 @@ jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" 
   "$plugin/manifest.json" >/dev/null
 jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml"' "$plugin/manifest.json" >/dev/null
 test -f "$plugin/Panel.qml"
-grep -Fq 'KeyboardPanel' "$plugin/Panel.qml"
-grep -Fq 'InboxLogic.flattenGroups' "$plugin/Panel.qml"
+grep -Fq 'Aranea.KeyboardPanelFrame {' "$plugin/Panel.qml"
+grep -Fq 'onUnhandledKey:' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.dndClick(' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.dndEcho(' "$plugin/Panel.qml"
+# The list cap counts the card's padding and border (the footer stays inside).
+grep -Fq 'InboxLogic.listHeight(list.contentHeight, panel.fittedContentHeight(panel.screenH, panel.screenH * 0.6) - panel.verticalContentInset' "$plugin/Panel.qml"
+if grep -Eq 'PanelKeyCatcher|^  KeyboardPanel \{' "$plugin/Panel.qml"; then
+  echo "Panel.qml must use the shared Aranea keyboard frame" >&2
+  exit 1
+fi
+grep -Fq 'InboxLogic.centerRows(service.inbox.snapshot' "$plugin/Panel.qml"
 grep -Fq 'NotificationCenterContent {' "$plugin/Panel.qml"
 grep -Fq 'All caught up' "$plugin/NotificationCenterContent.qml"
 grep -Fq 'NotificationList {' "$plugin/Panel.qml"
@@ -59,7 +68,12 @@ fi
 grep -Fq 'merge' "$plugin/Inbox.qml"
 
 grep -Fq 'InboxLogic.badgeState' "$plugin/Panel.qml"
-grep -Fq 'InboxLogic.sortForCenter' "$plugin/Panel.qml"
+# The center reads the inbox's plain snapshot, never its live model
+# (live model objects in a binding feeding a view loop that binding).
+if grep -Fq 'inbox.model' "$plugin/Panel.qml"; then
+  echo "Panel.qml must read inbox.snapshot, not inbox.model" >&2
+  exit 1
+fi
 grep -Fq 'cursorKey' "$plugin/Panel.qml"
 if grep -Fq 'centerOpen' "$plugin/Panel.qml"; then
   echo "centerOpen must be gone from Panel.qml" >&2
@@ -134,7 +148,9 @@ grep -Fq 'onReloaded: service.reloadedSettings = true' "$svc"
 # --- 4c: Delete on "+N more" expands; Shift+Delete clears the group; the panel says so
 panel_qml="$repo_root/plugins/araneadev.notifications/Panel.qml"
 grep -Fq 'InboxLogic.dismissAction(' "$panel_qml"
-grep -Fq 'ENTER OPEN · DEL DISMISS · ⇧DEL CLEAR GROUP' "$plugin/NotificationCenterContent.qml"
+grep -Fq 'InboxLogic.centerKeyHint(root.count)' "$panel_qml"
+grep -Fq 'InboxLogic.centerCaption(root.count, root.quiet, root.quietUntilText)' "$panel_qml"
+grep -Fq 'centerContent.disarmPointer()' "$panel_qml"
 
 # --- 4c: dead restore code and unused card properties stay gone
 if grep -Eq 'restoredPopups|isRestoredRow|keepFileName' "$svc"; then

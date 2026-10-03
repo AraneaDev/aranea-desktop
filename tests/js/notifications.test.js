@@ -114,7 +114,30 @@ test("notifications logic", () => {
     inbox.tooltipText(0, 0, false, true) === "0 notifications · Quiet hours",
     "quiet-hours tooltip"
   )
-  assert(inbox.bellGlyph(false) === "󰂚" && inbox.bellGlyph(true) === "󰂛", "bell glyphs")
+  assert(
+    inbox.bellGlyph(false) === String.fromCodePoint(0xf009a) &&
+      inbox.bellGlyph(true) === String.fromCodePoint(0xf009b),
+    "bell glyphs"
+  )
+  assert(inbox.centerCaption(3, false, "07:00") === "3 unread", "unread count when not quiet")
+  assert(inbox.centerCaption(0, false, "") === "Nothing new", "nothing new at 0")
+  assert(inbox.centerCaption(3, true, "07:00") === "Quiet until 07:00", "quiet hours win")
+  assert(inbox.centerCaption(0, true, "07:00") === "Quiet until 07:00", "quiet hours win at 0 too")
+  assert(
+    inbox.centerCaption(2, true, "") === "2 unread",
+    "a malformed window falls back to the count"
+  )
+  assert(inbox.centerCaption(undefined, false, "") === "Nothing new", "a missing count reads as 0")
+  assert(
+    inbox.centerKeyHint(4) === "↑↓ move · x dismiss · ⇧del group · tab next",
+    "the full hint with entries"
+  )
+  assert(inbox.centerKeyHint(0) === "↑↓ move · tab next", "the short hint when empty")
+  assert(inbox.centerKeyHint(undefined) === "↑↓ move · tab next", "a missing count reads as empty")
+  assert(inbox.listHeight(200, 400, 100, 60) === 200, "a short list keeps its content height")
+  assert(inbox.listHeight(900, 400, 100, 60) === 240, "a long list is capped above the footer")
+  assert(inbox.listHeight(900, 100, 80, 60) === 0, "never below 0")
+  assert(inbox.listHeight(undefined, "x", null, NaN) === 0, "bad input reads as 0")
   assert(
     inbox.needsClearConfirm(20) === false && inbox.needsClearConfirm(21) === true,
     "confirm above 20"
@@ -179,6 +202,66 @@ test("notifications logic", () => {
     { fileName: "c", timestamp: 2, urgency: 1 }
   ])
   assert(sorted.map((x) => x.fileName).join() === "b,a,c", "critical first, then newest")
+  // --- snapshot: plain copies of exactly the row fields
+  const liveRow = { fileName: "x.json", app: "mail", urgency: 2, timestamp: 5, extra: "no" }
+  const snap = inbox.snapshotOf([liveRow, null])
+  assert(snap.length === 2 && snap[0] !== liveRow, "snapshotOf copies every row")
+  assert(
+    Object.keys(snap[0]).join() === inbox.ROW_FIELDS.join(),
+    "a copy holds the row fields only"
+  )
+  assert(snap[0].app === "mail" && snap[1].fileName === undefined, "copied values, null rows empty")
+  liveRow.app = "changed"
+  assert(snap[0].app === "mail", "a copy does not follow its source")
+  assert(inbox.snapshotOf(undefined).length === 0, "no rows, empty snapshot")
+  assert(
+    inbox.criticalCount([{ urgency: 2 }, { urgency: "2" }, { urgency: 1 }, null]) === 2,
+    "critical count"
+  )
+  assert(inbox.criticalCount(null) === 0, "no entries, no critical")
+  const center = inbox.centerRows(sorted.slice().reverse(), {})
+  assert(
+    center.map((r) => r.kind + ":" + (r.entry ? r.entry.fileName : r.app)).join() ===
+      "group:unknown,entry:b,more:unknown",
+    "centerRows sorts, groups and flattens"
+  )
+  // --- centerRows parity with the pipeline it replaced, for collapsed
+  // groups and "+N more" rows (more than COLLAPSE_AT entries per app)
+  const crowded = []
+  for (let i = 0; i < inbox.COLLAPSE_AT + 2; i++)
+    crowded.push({ fileName: "chat" + i, app: "Chat", timestamp: 100 - i, urgency: 1 })
+  for (let i = 0; i < inbox.COLLAPSE_AT; i++)
+    crowded.push({ fileName: "mail" + i, app: "Mail", timestamp: 50 - i, urgency: i === 0 ? 2 : 1 })
+  crowded.push({ fileName: "solo", app: "Build", timestamp: 75, urgency: 1 })
+  for (const expanded of [{}, { Chat: true }, { Mail: true, Build: false }]) {
+    const piped = inbox.flattenGroups(inbox.groupView(inbox.sortForCenter(crowded), expanded))
+    assert(
+      JSON.stringify(inbox.centerRows(crowded, expanded)) === JSON.stringify(piped),
+      "centerRows matches sortForCenter, groupView and flattenGroups for " +
+        JSON.stringify(expanded)
+    )
+  }
+  const collapsedRows = inbox.centerRows(crowded, {})
+  assert(
+    collapsedRows.map(inbox.rowKey).join() ===
+      "g:Mail,e:mail0,m:Mail,g:Chat,e:chat0,m:Chat,g:Build,e:solo",
+    "collapsed groups show their newest entry and a +N more row"
+  )
+  assert(
+    collapsedRows[2].hidden === inbox.COLLAPSE_AT - 1 &&
+      collapsedRows[5].hidden === inbox.COLLAPSE_AT + 1 &&
+      collapsedRows[0].collapsed &&
+      !collapsedRows[6].collapsed,
+    "the +N more counts and collapsed flags"
+  )
+  assert(
+    inbox
+      .centerRows(crowded, { Chat: true })
+      .filter((r) => r.app === "Chat")
+      .map((r) => r.kind)
+      .join() === "group,entry,entry,entry,entry,entry",
+    "an expanded group drops its +N more row"
+  )
   // --- cursor follows the item (Important #5)
   const before = inbox.flattenGroups(inbox.groupView([g("Build", 8)], {}))
   const key = inbox.rowKey(before[1])
@@ -417,4 +500,149 @@ test("NotificationLogic isWithinQuietHours handles the overnight window", () => 
     throw new Error("quiet hours missed overnight window")
   if (notifications.isWithinQuietHours("22:00-07:00", day))
     throw new Error("quiet hours captured daytime")
+})
+
+test("notification center cursor stops", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const entry = (name) => ({ kind: "entry", app: "A", entry: { fileName: name } })
+  const rows = [{ kind: "group", app: "A" }, entry("a1"), { kind: "more", app: "A" }, entry("b1")]
+  const stops = inbox.centerStops(rows, true)
+  assert.deepEqual(
+    stops.map((s) => s.key),
+    ["dnd", "e:a1", "m:A", "e:b1", "clear"],
+    "DND, entries and more rows (no group headers), then Clear"
+  )
+  assert.deepEqual(stops[1], { key: "e:a1", section: "rows", index: 1 })
+  assert.deepEqual(stops[0], { key: "dnd", section: "dnd", index: -1 })
+  assert.deepEqual(
+    inbox.centerStops(rows, false).map((s) => s.key),
+    ["dnd", "e:a1", "m:A", "e:b1"],
+    "no Clear stop while the pill is hidden"
+  )
+  assert.deepEqual(
+    inbox.centerStops(undefined, false).map((s) => s.key),
+    ["dnd"]
+  )
+  assert.deepEqual(
+    inbox.centerStops([null, entry("x")], false).map((s) => s.key),
+    ["dnd", "e:x"]
+  )
+
+  assert.equal(inbox.stopIndex(stops, "e:b1"), 3)
+  assert.equal(inbox.stopIndex(stops, "e:gone"), -1)
+  assert.equal(inbox.stopIndex(stops, ""), -1)
+  assert.equal(inbox.stopIndex(null, "dnd"), -1)
+
+  assert.deepEqual(inbox.followStop(stops, "e:b1", true), { key: "e:b1", shown: true })
+  assert.deepEqual(inbox.followStop(stops, "e:b1", false), { key: "e:b1", shown: false })
+  assert.deepEqual(
+    inbox.followStop(stops, "e:gone", true),
+    { key: "", shown: false },
+    "a vanished key is dropped and the cursor hides"
+  )
+  assert.deepEqual(inbox.followStop(stops, "", true), { key: "", shown: false })
+  // The same key returning later finds no cursor: it was dropped.
+  const gone = inbox.followStop(inbox.centerStops([], true), "e:a1", true)
+  assert.deepEqual(inbox.followStop(stops, gone.key, gone.shown), { key: "", shown: false })
+  assert.equal(inbox.revealStop(stops, -1), 1, "first reveal lands on the first row")
+  assert.equal(inbox.revealStop(stops, 2), 2, "a vanished cursor reveals where it was")
+  assert.equal(inbox.revealStop(stops, 9), 4, "clamped into the stops")
+  assert.equal(
+    inbox.revealStop(inbox.centerStops([], false), -1),
+    0,
+    "empty center: the DND switch"
+  )
+  assert.equal(inbox.revealStop([], -1), -1)
+  assert.equal(inbox.revealStop(undefined, 0), -1)
+
+  assert.equal(inbox.moveStop(stops, 1, -1), 0, "up from the first row reaches DND")
+  assert.equal(inbox.moveStop(stops, 0, -1), 0, "held at the top")
+  assert.equal(inbox.moveStop(stops, 3, 1), 4, "down from the last row reaches Clear")
+  assert.equal(inbox.moveStop(stops, 4, 1), 4, "held at the bottom")
+  assert.equal(inbox.moveStop(stops, 2, 0), 2)
+  assert.equal(inbox.moveStop(stops, "x", 1), 1)
+  assert.equal(inbox.moveStop([], 0, 1), -1)
+  assert.equal(inbox.moveStop(null, 0, 1), -1)
+})
+
+test("DND switch: pending, echo and queued clicks", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const idle = inbox.dndIdle()
+  assert.deepEqual(idle, { target: null, queued: null })
+  assert.deepEqual(inbox.dndView(idle, false), { on: false, busy: false })
+  assert.deepEqual(inbox.dndView(null, true), { on: true, busy: false })
+
+  // A click shows the new state at once and pulses until the echo.
+  let r = inbox.dndClick(idle, false)
+  assert.equal(r.send, true)
+  assert.deepEqual(inbox.dndView(r.state, false), { on: true, busy: true })
+  assert.deepEqual(inbox.dndClick(null, true).send, false, "null counts as idle")
+
+  // The echo settles it.
+  let e = inbox.dndEcho(r.state, true)
+  assert.equal(e.send, null)
+  assert.deepEqual(e.state, idle)
+  assert.deepEqual(inbox.dndView(e.state, true), { on: true, busy: false })
+
+  // A value other than the target keeps waiting; idle ignores echoes.
+  assert.deepEqual(inbox.dndEcho(r.state, false), { state: r.state, send: null })
+  assert.deepEqual(inbox.dndEcho(idle, true), { state: idle, send: null })
+  assert.deepEqual(inbox.dndEcho(null, true).state, idle)
+
+  // Clicks while busy are queued; the last one wins.
+  let s = inbox.dndClick(idle, false).state // target on
+  let q = inbox.dndClick(s, false) // queue off
+  assert.equal(q.send, null, "nothing sent while busy")
+  assert.deepEqual(q.state, { target: true, queued: false })
+  assert.deepEqual(
+    inbox.dndView(q.state, false),
+    { on: false, busy: true },
+    "shows the queued state"
+  )
+  e = inbox.dndEcho(q.state, true)
+  assert.equal(e.send, false, "the queued state is sent after the echo")
+  assert.deepEqual(e.state, { target: false, queued: null })
+  assert.deepEqual(inbox.dndEcho(e.state, false).state, idle)
+
+  // An even number of clicks while busy cancels the queue.
+  q = inbox.dndClick(inbox.dndClick(s, false).state, false)
+  assert.deepEqual(q.state, { target: true, queued: null })
+  assert.deepEqual(inbox.dndView(q.state, false), { on: true, busy: true })
+  e = inbox.dndEcho(q.state, true)
+  assert.equal(e.send, null)
+  assert.deepEqual(e.state, idle)
+
+  // A rapid burst: on, off, on, off ends off and sends at most twice.
+  let state = idle
+  let actual = false
+  const sent = []
+  for (let i = 0; i < 4; i++) {
+    const c = inbox.dndClick(state, actual)
+    state = c.state
+    if (c.send !== null) sent.push(c.send)
+  }
+  for (let guard = 0; guard < 5 && state.target !== null; guard++) {
+    actual = state.target // the service applies the in-flight value
+    const echo = inbox.dndEcho(state, actual)
+    state = echo.state
+    if (echo.send !== null) sent.push(echo.send)
+  }
+  assert.deepEqual(sent, [true, false])
+  assert.equal(actual, false, "final state matches the last click")
+  assert.deepEqual(inbox.dndView(state, actual), { on: false, busy: false })
+
+  // A queued state equal to the echo sends nothing (undefined fields count as unset).
+  assert.deepEqual(inbox.dndEcho({ target: true, queued: true }, true), { state: idle, send: null })
+  assert.deepEqual(inbox.dndClick({ target: undefined, queued: undefined }, true).send, false)
+  assert.deepEqual(inbox.dndView({ target: true, queued: undefined }, false), {
+    on: true,
+    busy: true
+  })
+  assert.deepEqual(inbox.dndEcho({ target: true, queued: undefined }, true).state, idle)
 })

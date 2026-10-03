@@ -2,6 +2,14 @@
 // ListModel references. The popup container drives lifetime; the history
 // panel drives static rendering. Both use the same component: Service.qml's
 // toast stack and Panel.qml's center rows (compact).
+//
+// Toasts set neither hasCursor nor pointerGate and look and behave as they
+// always have: a light tint on hover, a plain HoverHandler, clicks that act
+// at once. Center rows (compact) draw no hover fill; the keyboard cursor
+// draws the mint outline only through hasCursor; the close tint follows
+// only real pointer moves (pointerGate); and the card records the row key
+// under each press and offers clickSettled() so NotificationList can refuse
+// a click whose row changed or moved under a still pointer.
 
 import QtQuick
 import QtQuick.Layouts
@@ -11,6 +19,7 @@ import qs.Ui
 import "../../araneadev.shared" as Aranea
 import "../NotificationLogic.js" as NotificationLogic
 import "../InboxLogic.js" as InboxLogic
+import "../../araneadev.shared/ClickSettle.js" as ClickSettle
 
 BorderSurface {
   id: root
@@ -39,8 +48,27 @@ BorderSurface {
   property bool compact: false
   // Relative age shown in compact rows, e.g. "5m".
   property string timeLabel: ""
-  // Keyboard cursor in the center.
-  property bool selected: false
+  // Whether the center's keyboard cursor is on this card: draws the mint
+  // outline. Toasts never set it.
+  property bool hasCursor: false
+  // Optional PointerMoveGate (qs.Ui) carrying layoutChangedAt; null in
+  // toasts. With it, the close tint and pointerMoved follow only real
+  // pointer moves and clickSettled() honours the layout stamp.
+  property var pointerGate: null
+  // The center row's key (InboxLogic.rowKey); "" in toasts. Recorded into
+  // pressedKey on every press.
+  property string rowKey: ""
+  // The row key under the last press (card or close), for the list's
+  // keyed refusal.
+  property string pressedKey: ""
+  // When the card was built (Date.now()), for clickSettled().
+  property real createdAt: 0
+  // When the gate last accepted a real pointer move onto the card or its
+  // close (Date.now()), 0 for never.
+  property real pointerMovedAt: 0
+  // Whether the close glyph is tinted: a real (gated) move onto it, or
+  // plain hover when there is no gate.
+  property bool closeHot: false
 
   // System monospace font injected by the container.
   property string fontFamily: ""
@@ -54,6 +82,9 @@ BorderSurface {
   signal cardClicked
   // Emitted once a swipe has carried the card off to the right.
   signal swipeDismissed
+  // Emitted when the pointer really moves over the card (through the gate;
+  // never without one).
+  signal pointerMoved
   // Off when Aranea motion is disabled: the card leaves without sliding.
   property bool motionEnabled: true
   // Turns swipe-to-dismiss on or off.
@@ -100,10 +131,26 @@ BorderSurface {
   readonly property color bodyColor: Qt.darker(Color.notifications.text, 1.15)
   // Color of the urgency rail on the card's left edge.
   readonly property color railColor: urgency === 2 ? Color.urgent : (urgency === 0 ? Color.notifications.border : Color.notifications.countdown)
-  // Card fill: red-tinted for critical, a light tint on hover, else the theme's.
-  readonly property color cardBackground: urgency === 2 ? Util.alpha(Color.urgent, 0.08) : (hovered ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
-  // Border: red for critical, the countdown color when selected, else the theme's.
-  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : (selected ? Color.notifications.countdown : Color.notifications.border), Math.max(1, Style.space(1)))
+  // Card fill: red-tinted for critical; a light tint on hover for toasts
+  // only (center rows draw no hover fill); else the theme's.
+  readonly property color cardBackground: urgency === 2 ? Util.alpha(Color.urgent, 0.08) : (hovered && !compact ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
+  // Border: red for critical, else the theme's. The keyboard cursor draws
+  // its own outline on top (hasCursor).
+  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1)))
+
+  // Whether a pointer click may act on this card: always without a gate
+  // (toasts); with one, ClickSettle over the card's creation, the gate's
+  // layoutChangedAt and the last real pointer move.
+  function clickSettled(): bool {
+    if (!root.pointerGate)
+      return true
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      createdAt: root.createdAt,
+      movedAt: root.pointerMovedAt,
+      layoutChangedAt: Number(root.pointerGate.layoutChangedAt) || 0
+    })
+  }
 
   // Sanitizes a body for this card's sender (NotificationLogic.sanitizeBody).
   function sanitizeBody(s: string): string {
@@ -132,10 +179,15 @@ BorderSurface {
   color: root.cardBackground
   borderSpec: cardBorderSpec
   clip: true
+  Component.onCompleted: root.createdAt = Date.now()
+  // Another entry now fills this row: a tint earned by the previous one
+  // does not carry over.
+  onRowKeyChanged: root.closeHot = false
 
   // A narrow semantic rail makes urgency legible at a glance without turning
   // every toast into a bright alert card.
   Rectangle {
+    objectName: "urgencyRail"
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
@@ -149,10 +201,22 @@ BorderSurface {
   }
 
   MouseArea {
+    id: cardArea
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
-    onPressed: root.dragMoved = false
+    // Position updates only matter through a gate (the center).
+    hoverEnabled: !!root.pointerGate
+    onPressed: {
+      root.dragMoved = false
+      root.pressedKey = root.rowKey
+    }
+    onPositionChanged: function (mouse) {
+      if (root.pointerGate && root.pointerGate.moved(cardArea, mouse)) {
+        root.pointerMovedAt = Date.now()
+        root.pointerMoved()
+      }
+    }
     onClicked: function (mouse) {
       // A swipe that started on the card must never count as a click.
       if (root.dragMoved)
@@ -161,6 +225,9 @@ BorderSurface {
         root.closeRequested()
       else
         root.cardClicked()
+      // A press is used once: a later click without a press of its own
+      // never reuses its key.
+      root.pressedKey = ""
     }
   }
 
@@ -218,6 +285,7 @@ BorderSurface {
 
   ColumnLayout {
     id: mainColumn
+    objectName: "mainColumn"
     // Inset by the card border so the content doesn't paint over the card's
     // outer border.
     anchors.top: parent.top
@@ -349,10 +417,11 @@ BorderSurface {
         }
 
         Text {
+          objectName: "closeButton"
           Layout.alignment: Qt.AlignRight
           textFormat: Text.PlainText
-          text: "✕"
-          color: closeArea.containsMouse ? Color.notifications.countdown : root.dimColor
+          text: String.fromCodePoint(0x2715)
+          color: (root.pointerGate ? root.closeHot : closeArea.containsMouse) ? Color.notifications.countdown : root.dimColor
           font.family: Style.font.family
           font.pixelSize: Style.font.body
           MouseArea {
@@ -361,10 +430,32 @@ BorderSurface {
             anchors.margins: -Style.space(4)
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.closeRequested()
+            onPressed: root.pressedKey = root.rowKey
+            onPositionChanged: function (mouse) {
+              if (root.pointerGate && root.pointerGate.moved(closeArea, mouse)) {
+                root.pointerMovedAt = Date.now()
+                root.closeHot = true
+              }
+            }
+            onExited: root.closeHot = false
+            onClicked: {
+              root.closeRequested()
+              root.pressedKey = ""
+            }
           }
         }
       }
     }
+  }
+
+  Rectangle {
+    // The keyboard cursor outline (mint, keyboard only); never in toasts.
+    objectName: "cursorOutline"
+    anchors.fill: parent
+    radius: root.radius
+    color: "transparent"
+    border.width: root.hasCursor ? 1 : 0
+    border.color: Aranea.DesignTokens.accent
+    visible: root.hasCursor
   }
 }

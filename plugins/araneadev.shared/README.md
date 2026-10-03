@@ -71,9 +71,11 @@ service contracts to the feature plugins.
 - `KeyboardInputFrame` owns key forwarding and focus targeting, including a
   `deleteRequested` signal forwarded from the key catcher's "x" key, and a
   `blocked` alias to the key catcher's own `blocked` (an inline editor with
-  focus short-circuits all key handling).
+  focus short-circuits all key handling). Keys the catcher leaves unaccepted
+  (Delete, for example) arrive as `unhandledKey(event)` while not blocked.
 - `KeyboardPanelFrame` adds the layer-shell panel contract around keyboard
-  input and forwards the same `deleteRequested` signal and `blocked` alias.
+  input and forwards the same `deleteRequested` and `unhandledKey` signals
+  and `blocked` alias.
 - `OverlayChrome` provides common overlay placement and dismiss behavior.
 - `ServiceRegistry.js` publishes isolated service slots for dependent plugins.
 - `ClickSettle.js` is the shared click-settling rule (`clickSettled`): a

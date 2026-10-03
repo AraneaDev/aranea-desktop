@@ -226,6 +226,68 @@ function sortForCenter(entries) {
   return rows
 }
 
+/** The fields of an inbox row, as Inbox.qml stores them in its ListModel. */
+var ROW_FIELDS = [
+  "fileName",
+  "id",
+  "originalId",
+  "app",
+  "appIcon",
+  "summary",
+  "body",
+  "image",
+  "glyph",
+  "execArgv",
+  "urgency",
+  "expireTimeout",
+  "timestamp",
+  "sourceKey"
+]
+
+/**
+ * Plain copies of inbox rows (ROW_FIELDS only). Inbox.qml publishes these as
+ * its snapshot, so bindings never hold live ListModel objects: a binding that
+ * hands those to a view re-enters itself through their change notifications
+ * (the `rows` binding loop).
+ * @param {Array<Dict>} rows - inbox rows, live or plain
+ * @returns {Array<Dict>} one new plain object per row, in order
+ */
+function snapshotOf(rows) {
+  var list = Array.isArray(rows) ? rows : []
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i] || {}
+    /** @type {Dict} */
+    var copy = {}
+    for (var k = 0; k < ROW_FIELDS.length; k++) copy[ROW_FIELDS[k]] = row[ROW_FIELDS[k]]
+    out.push(copy)
+  }
+  return out
+}
+
+/**
+ * The center's rows for an inbox snapshot: sorted critical first, grouped by
+ * app and flattened into group, entry and "more" rows.
+ * @param {Array<Dict>} entries - the inbox snapshot (snapshotOf)
+ * @param {?{[key: string]: boolean}} expanded - per-app expand overrides
+ * @returns {Array<Dict>} flattenGroups rows
+ */
+function centerRows(entries, expanded) {
+  return flattenGroups(groupView(sortForCenter(entries), expanded))
+}
+
+/**
+ * How many entries are critical (urgency 2).
+ * @param {Array<Dict>} entries - the inbox snapshot (snapshotOf)
+ * @returns {number} the critical count
+ */
+function criticalCount(entries) {
+  var list = Array.isArray(entries) ? entries : []
+  var n = 0
+  for (var i = 0; i < list.length; i++) if (list[i] && Number(list[i].urgency) === CRITICAL) n++
+  return n
+}
+
 /**
  * Stable identity for a center row, so the keyboard cursor follows its item
  * when arrivals shift the list.
@@ -257,7 +319,48 @@ function indexOfKey(rows, key) {
  * @returns {string} the bell_off glyph when silenced, else the bell
  */
 function bellGlyph(silenced) {
-  return silenced ? "󰂛" : "󰂚"
+  return String.fromCodePoint(silenced ? 0xf009b : 0xf009a)
+}
+
+/**
+ * The center list's height: its content, capped so the header above the
+ * list and the footer below it (the Clear row and the key hint) still fit
+ * inside the card's content area.
+ * @param {number} contentHeight - the list's full content height
+ * @param {number} innerMax - the card's largest content height (inside padding and border)
+ * @param {number} slotTop - the height above the list
+ * @param {number} footerHeight - the height below the list
+ * @returns {number} the list height, never below 0
+ */
+function listHeight(contentHeight, innerMax, slotTop, footerHeight) {
+  var room = (Number(innerMax) || 0) - (Number(slotTop) || 0) - (Number(footerHeight) || 0)
+  return Math.max(0, Math.min(Number(contentHeight) || 0, room))
+}
+
+/**
+ * The center header's caption: the quiet-hours text while quiet hours are
+ * active and the window parsed, else "N unread", or "Nothing new" at 0.
+ * @param {number} count - inbox entries
+ * @param {boolean} quiet - whether quiet hours are active
+ * @param {string} quietUntilText - the window's end ("HH:MM", quietUntil), "" when malformed
+ * @returns {string} the caption
+ */
+function centerCaption(count, quiet, quietUntilText) {
+  if (quiet && quietUntilText) return "Quiet until " + quietUntilText
+  var n = Number(count) || 0
+  return n > 0 ? n + " unread" : "Nothing new"
+}
+
+/**
+ * The center's key hint line, by state (the network dropdown's keyHint
+ * pattern): with entries, every row key; with none, only moving (the DND
+ * switch is still a stop) and Tab.
+ * @param {number} count - inbox entries
+ * @returns {string} the hint
+ */
+function centerKeyHint(count) {
+  if ((Number(count) || 0) > 0) return "↑↓ move · x dismiss · ⇧del group · tab next"
+  return "↑↓ move · tab next"
 }
 
 /**
@@ -313,6 +416,155 @@ function dismissAction(row, wholeGroup) {
 }
 
 /**
+ * The keyboard cursor's stops in the center, top to bottom: the "Do not
+ * disturb" switch (key "dnd"), every entry and "+N more" row (keyed by
+ * rowKey; group headers are passed over, as before), then the "Clear all"
+ * pill (key "clear") while it shows. Row keys start with "e:", "m:" or
+ * "g:", so they never collide with "dnd" or "clear".
+ * @param {Array<Dict>} rows - center rows (flattenGroups)
+ * @param {boolean} clearVisible - whether the Clear pill shows
+ * @returns {Array<{key: string, section: string, index: number}>} the stops; section is "dnd", "rows" or "clear", index the row's position (-1 off the list)
+ */
+function centerStops(rows, clearVisible) {
+  var stops = [{ key: "dnd", section: "dnd", index: -1 }]
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i]
+    if (row && (row.kind === "entry" || row.kind === "more"))
+      stops.push({ key: rowKey(row), section: "rows", index: i })
+  }
+  if (clearVisible) stops.push({ key: "clear", section: "clear", index: -1 })
+  return stops
+}
+
+/**
+ * Position of the stop with a given key.
+ * @param {Array<{key: string}>} stops - centerStops output
+ * @param {string} key - the cursor's key, or ""
+ * @returns {number} the index, or -1 when key is "" or gone
+ */
+function stopIndex(stops, key) {
+  if (!key || !Array.isArray(stops)) return -1
+  for (var i = 0; i < stops.length; i++) if (stops[i].key === key) return i
+  return -1
+}
+
+/**
+ * Where the first navigation key shows the cursor: the stop at `fallback`
+ * (where a vanished cursor last was) clamped into the stops, else the first
+ * row, else the first stop (the DND switch).
+ * @param {Array<{section: string}>} stops - centerStops output
+ * @param {number} fallback - the cursor's last stop, or -1 for none
+ * @returns {number} the stop index, or -1 with no stops
+ */
+function revealStop(stops, fallback) {
+  var list = Array.isArray(stops) ? stops : []
+  if (list.length === 0) return -1
+  if (typeof fallback === "number" && fallback >= 0)
+    return Math.min(list.length - 1, Math.floor(fallback))
+  for (var i = 0; i < list.length; i++) if (list[i].section === "rows") return i
+  return 0
+}
+
+/**
+ * Where the cursor stands after its stops changed: it keeps its key and
+ * visibility while that key is still a stop; otherwise the key is dropped
+ * and the cursor hides, so the same key coming back later never shows the
+ * outline again without a key press.
+ * @param {Array<{key: string}>} stops - centerStops output
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} shown - whether the keyboard cursor shows
+ * @returns {{key: string, shown: boolean}} the cursor's key and visibility
+ */
+function followStop(stops, key, shown) {
+  if (stopIndex(stops, key) >= 0) return { key: key, shown: !!shown }
+  return { key: "", shown: false }
+}
+
+/**
+ * The stop one step (`delta`) from `at`, held at both ends (no wrap, as in
+ * the other Aranea dropdowns).
+ * @param {Array<*>} stops - centerStops output
+ * @param {number} at - the cursor's stop
+ * @param {number} delta - -1 up, +1 down
+ * @returns {number} the next stop index, or -1 with no stops
+ */
+function moveStop(stops, at, delta) {
+  var n = Array.isArray(stops) ? stops.length : 0
+  if (n === 0) return -1
+  var from = Math.max(0, Math.min(n - 1, Math.floor(Number(at)) || 0))
+  var step = delta > 0 ? 1 : delta < 0 ? -1 : 0
+  return Math.max(0, Math.min(n - 1, from + step))
+}
+
+/**
+ * A pending Do Not Disturb change: `target` is the state sent to the
+ * service and not yet echoed back (null when idle), `queued` the state
+ * clicked while waiting (null for none).
+ * @typedef {{target: ?boolean, queued: ?boolean}} DndPending
+ */
+
+/**
+ * The idle DND state: nothing sent, nothing queued.
+ * @returns {DndPending} a fresh idle state
+ */
+function dndIdle() {
+  return { target: null, queued: null }
+}
+
+/**
+ * A click on the DND switch. Idle, it sends the opposite of the service's
+ * state at once. While a change is in flight it only queues the opposite of
+ * what the switch shows; the last click wins, and a click back to the
+ * in-flight state cancels the queue.
+ * @param {?DndPending} state - the pending state (null counts as idle)
+ * @param {boolean} actual - the service's doNotDisturb
+ * @returns {{state: DndPending, send: ?boolean}} the next state and the value to send now (null: send nothing)
+ */
+function dndClick(state, actual) {
+  var s = state || dndIdle()
+  if (s.target === null || s.target === undefined) {
+    var target = !actual
+    return { state: { target: target, queued: null }, send: target }
+  }
+  var shown = s.queued !== null && s.queued !== undefined ? s.queued : s.target
+  var next = !shown
+  return { state: { target: s.target, queued: next === s.target ? null : next }, send: null }
+}
+
+/**
+ * The service's doNotDisturb changed (or was read back). When it reaches the
+ * in-flight target, a queued state that differs is sent next; otherwise the
+ * switch goes idle. A value other than the target keeps waiting (a timeout
+ * calls dndIdle).
+ * @param {?DndPending} state - the pending state
+ * @param {boolean} actual - the service's doNotDisturb now
+ * @returns {{state: DndPending, send: ?boolean}} the next state and the value to send now (null: send nothing)
+ */
+function dndEcho(state, actual) {
+  var s = state || dndIdle()
+  if (s.target === null || s.target === undefined || s.target !== !!actual)
+    return { state: s, send: null }
+  if (s.queued !== null && s.queued !== undefined && s.queued !== !!actual)
+    return { state: { target: s.queued, queued: null }, send: s.queued }
+  return { state: dndIdle(), send: null }
+}
+
+/**
+ * What the DND switch shows: the queued state, else the in-flight one, else
+ * the service's; busy (pulsing) while a change is in flight.
+ * @param {?DndPending} state - the pending state
+ * @param {boolean} actual - the service's doNotDisturb
+ * @returns {{on: boolean, busy: boolean}} the header view's dnd part
+ */
+function dndView(state, actual) {
+  var s = state || dndIdle()
+  var busy = s.target !== null && s.target !== undefined
+  var on = s.queued !== null && s.queued !== undefined ? s.queued : busy ? s.target : !!actual
+  return { on: !!on, busy: busy }
+}
+
+/**
  * Merges the rows read from disk at startup with rows already in the model:
  * disk rows cleared or removed while the read ran are dropped, model rows not
  * on disk (arrived during the read) are kept; newest first.
@@ -341,6 +593,15 @@ function mergeLoaded(diskRows, liveRows, removed, cleared) {
 if (typeof module !== "undefined") {
   module.exports = {
     dismissAction: dismissAction,
+    centerStops: centerStops,
+    stopIndex: stopIndex,
+    followStop: followStop,
+    revealStop: revealStop,
+    moveStop: moveStop,
+    dndIdle: dndIdle,
+    dndClick: dndClick,
+    dndEcho: dndEcho,
+    dndView: dndView,
     mergeLoaded: mergeLoaded,
     MAX_ITEMS: MAX_ITEMS,
     MAX_AGE_MS: MAX_AGE_MS,
@@ -359,9 +620,16 @@ if (typeof module !== "undefined") {
     tooltipText: tooltipText,
     badgeState: badgeState,
     sortForCenter: sortForCenter,
+    ROW_FIELDS: ROW_FIELDS,
+    snapshotOf: snapshotOf,
+    centerRows: centerRows,
+    criticalCount: criticalCount,
     rowKey: rowKey,
     indexOfKey: indexOfKey,
     bellGlyph: bellGlyph,
+    centerCaption: centerCaption,
+    centerKeyHint: centerKeyHint,
+    listHeight: listHeight,
     needsClearConfirm: needsClearConfirm,
     quietUntil: quietUntil,
     relativeTime: relativeTime

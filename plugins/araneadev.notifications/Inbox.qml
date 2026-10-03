@@ -29,8 +29,12 @@ Item {
   property alias model: inboxModel
   // Number of inbox entries.
   readonly property int count: inboxModel.count
-  // Bumped on every model change, so bindings that read rows re-evaluate.
+  // Bumped on every model change, right after snapshot is republished.
   property int revision: 0
+  // Plain copies of the rows, newest first (InboxLogic.snapshotOf), replaced
+  // once per mutation. Bindings read this, never the model: live model
+  // objects handed to a view re-enter the binding (a binding loop).
+  property var snapshot: []
   // True once the first directory read has been merged in.
   property bool loadedOnce: false
 
@@ -64,25 +68,17 @@ Item {
   // A plain copy of the entry with this file name, or null.
   function get(fileName: string): var {
     var i = indexOf(fileName)
-    if (i < 0)
-      return null
-    var row = inboxModel.get(i)
-    return {
-      fileName: row.fileName,
-      id: row.id,
-      originalId: row.originalId,
-      app: row.app,
-      appIcon: row.appIcon,
-      summary: row.summary,
-      body: row.body,
-      image: row.image,
-      glyph: row.glyph,
-      execArgv: row.execArgv,
-      urgency: row.urgency,
-      expireTimeout: row.expireTimeout,
-      timestamp: row.timestamp,
-      sourceKey: row.sourceKey
-    }
+    return i < 0 ? null : InboxLogic.snapshotOf([inboxModel.get(i)])[0]
+  }
+
+  // Republishes snapshot from the model and bumps revision; every mutating
+  // function calls it once, after its last model change.
+  function publishSnapshot(): void {
+    var rows = []
+    for (var i = 0; i < inboxModel.count; i++)
+      rows.push(inboxModel.get(i))
+    snapshot = InboxLogic.snapshotOf(rows)
+    revision++
   }
 
   // Normalizes an entry (NotificationLogic.popupEntry) into a model row with its fileName.
@@ -119,7 +115,7 @@ Item {
     } else {
       inboxModel.insert(0, row)
     }
-    revision++
+    publishSnapshot()
     writeFile(entry, function (record, output) {
       inbox.showPersisted(record, entry, output)
     })
@@ -138,7 +134,7 @@ Item {
     var shown = NotificationLogic.shownImages(record, live, copied || [])
     inboxModel.setProperty(i, "image", shown.image || "")
     inboxModel.setProperty(i, "appIcon", shown.appIcon || "")
-    revision++
+    publishSnapshot()
   }
 
   // Removes an entry from the model and deletes its file and image copies.
@@ -148,7 +144,7 @@ Item {
     var i = indexOf(fileName)
     if (i >= 0) {
       inboxModel.remove(i)
-      revision++
+      publishSnapshot()
     }
     enqueue(["bash", "-c", "rm -f \"$1/$2\" \"$3/${2%.json}\"-*", "--", inboxDir, fileName, imagesDir])
   }
@@ -158,7 +154,7 @@ Item {
     if (!loadedOnce)
       clearedDuringLoad = true
     inboxModel.clear()
-    revision++
+    publishSnapshot()
     enqueue(["bash", "-c", "for f in \"$1\"/*.json; do\n" + "  [[ -e $f ]] || continue\n" + "  stale=\"${f##*/}\"\n" + "  rm -f \"$f\" \"$2/${stale%.json}\"-*\n" + "done", "--", inboxDir, imagesDir])
   }
 
@@ -353,7 +349,7 @@ Item {
     inboxModel.clear()
     for (var k = 0; k < rows.length; k++)
       inboxModel.append(rows[k])
-    revision++
+    publishSnapshot()
     // An entry dated in the future (the clock was ahead when it arrived) is
     // stored again under the current time, so it can age out; its file name
     // follows the timestamp, so the old file goes.

@@ -1,14 +1,15 @@
 // Notification bell + center. The bell shows the inbox count; the dropdown
-// lists inbox entries grouped by app. All state lives in the plugin's own
+// lists inbox entries grouped by app, drawn in the shared Aranea keyboard
+// frame with a keyboard-only cursor. All state lives in the plugin's own
 // service (Service.qml); this file only renders it and forwards actions.
 // Loaded by the Aranea bar as this plugin's bar widget (manifest.json).
 
 import QtQuick
-import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "InboxLogic.js" as InboxLogic
+import "../araneadev.shared/CursorLogic.js" as CursorLogic
 import "ServiceBridge.js" as ServiceBridge
 
 Panel {
@@ -41,18 +42,7 @@ Panel {
   // True while the service's quiet hours are active.
   readonly property bool quiet: service ? !!service.quietHours : false
   // Number of critical (urgency 2) inbox entries.
-  readonly property int criticalCount: {
-    if (!available)
-      return 0
-    var revision = service.inbox.revision
-    // re-evaluate on every inbox change
-    var n = 0
-    var model = service.inbox.model
-    for (var i = 0; i < model.count; i++)
-      if (model.get(i).urgency === 2)
-        n++
-    return n
-  }
+  readonly property int criticalCount: available ? InboxLogic.criticalCount(service.inbox.snapshot) : 0
   // Red with the critical count when anything critical waits; otherwise mint
   // with the total; DND hides the non-critical badge.
   readonly property var badge: InboxLogic.badgeState(count, criticalCount, dnd || quiet)
@@ -61,50 +51,125 @@ Panel {
 
   // Per-app expand overrides set by toggleGroup, fed to InboxLogic.groupView.
   property var expanded: ({})
-  // The keyboard cursor follows its item (InboxLogic.rowKey), so an arrival
-  // that shifts the list never redirects Enter/Delete to another entry.
+
+  // ---- The keyboard cursor. It moves through stops (InboxLogic.centerStops):
+  // the DND switch, every entry and "+N more" row, then the Clear pill. Up
+  // and Down step through them, held at both ends; Left and Right only
+  // reveal. The cursor follows its stop's key (InboxLogic.rowKey, "dnd" or
+  // "clear"), so an arrival that re-sorts the list never redirects Enter or
+  // Delete to another entry; when its key vanishes the cursor hides.
+  // The key of the stop the cursor is on, or "" for none.
   property string cursorKey: ""
-  // Index of cursorKey's row in rows, or -1 when there is no cursor.
-  readonly property int cursor: cursorKey ? InboxLogic.indexOfKey(rows, cursorKey) : -1
+  // True while the keyboard drives the cursor; any pointer use clears it.
+  // The outline shows only then; the first navigation key only reveals.
+  property bool keyboardCursor: false
+  // The stop the cursor was last on, so a cursor whose key vanished is
+  // revealed near where it was; -1 for none.
+  property int lastStop: -1
   // True while "Clear all" waits for its confirming click (reset after 4 s).
   property bool confirmingClear: false
   // Clock for the relative time labels: set on open, then every 30 s while open.
   property real now: Date.now()
+  // The pending Do Not Disturb change (InboxLogic.dndClick / dndEcho):
+  // the switch shows the new state at once and pulses until the service
+  // echoes it; clicks while it waits are queued, the last one wins.
+  property var dndPending: InboxLogic.dndIdle()
 
-  // Center rows: inbox entries sorted critical first, grouped by app and
-  // flattened into group, entry and "more" rows (InboxLogic).
-  readonly property var rows: {
-    if (!available)
-      return []
-    var revision = service.inbox.revision
-    // re-evaluate on every inbox change
-    var entries = []
-    var model = service.inbox.model
-    for (var i = 0; i < model.count; i++)
-      entries.push(model.get(i))
-    return InboxLogic.flattenGroups(InboxLogic.groupView(InboxLogic.sortForCenter(entries), root.expanded))
-  }
+  // Center rows: the inbox snapshot (plain copies, never live model objects)
+  // sorted critical first, grouped by app and flattened into group, entry and
+  // "more" rows (InboxLogic.centerRows).
+  readonly property var rows: available ? InboxLogic.centerRows(service.inbox.snapshot, root.expanded) : []
+  // The cursor's stops, top to bottom (InboxLogic.centerStops).
+  readonly property var stops: InboxLogic.centerStops(root.rows, root.count > 0)
+  // Index of cursorKey's stop, or -1 when there is no cursor or it vanished.
+  readonly property int cursorStop: InboxLogic.stopIndex(root.stops, root.cursorKey)
+  // Index of the cursor's row in rows, or -1 when it is not on a row.
+  readonly property int cursor: root.cursorStop >= 0 ? root.stops[root.cursorStop].index : -1
+  // Whether the cursor's outline shows: keyboard-driven and on a stop.
+  readonly property bool cursorShown: root.keyboardCursor && root.cursorStop >= 0
 
-  // Whether the row at index can hold the keyboard cursor (entry and "more" rows).
-  function selectable(index: int): bool {
-    var row = rows[index]
-    return !!row && (row.kind === "entry" || row.kind === "more")
-  }
+  // The quiet-hours end time ("HH:MM"), or "" when there is no window or it
+  // is malformed.
+  readonly property string quietUntilText: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
+  // The header caption (InboxLogic.centerCaption): the quiet-hours text
+  // while quiet hours are active and the window parses, else "N unread" or
+  // "Nothing new".
+  readonly property string centerCaption: InboxLogic.centerCaption(root.count, root.quiet, root.quietUntilText)
+  // NotificationCenterContent's view object (its Filament header and
+  // footer; the list sits in its slot).
+  readonly property var centerView: ({
+      count: root.count,
+      caption: root.centerCaption,
+      glyph: InboxLogic.bellGlyph(root.dnd || root.quiet),
+      dnd: InboxLogic.dndView(root.dndPending, root.dnd),
+      clear: {
+        visible: root.count > 0,
+        confirming: root.confirmingClear,
+        label: root.confirmingClear ? ("Confirm clear (" + root.count + ")") : "Clear all"
+      },
+      keyHint: InboxLogic.centerKeyHint(root.count)
+    })
 
-  // Moves the cursor by delta to the next selectable row, wrapping around, and
-  // scrolls it into view.
-  function moveCursor(delta: int): void {
-    if (rows.length === 0)
+  // Puts the cursor on stop INDEX and scrolls its row into view.
+  function placeCursor(index: int): void {
+    var stop = root.stops[index]
+    if (!stop)
       return
-    var i = root.cursor
-    for (var step = 0; step < rows.length; step++) {
-      i = i < 0 ? (delta > 0 ? 0 : rows.length - 1) : (i + delta + rows.length) % rows.length
-      if (selectable(i)) {
-        root.cursorKey = InboxLogic.rowKey(rows[i])
-        list.positionViewAtIndex(i, ListView.Contain)
-        return
-      }
+    root.cursorKey = stop.key
+    if (stop.index >= 0)
+      list.positionViewAtIndex(stop.index, ListView.Contain)
+  }
+
+  // Up or Down (DELTA -1 or +1; 0 for Left or Right): the first key after
+  // opening, after pointer use or after the cursor's key vanished only
+  // reveals the cursor; later ones step through the stops.
+  function moveCursor(delta: int): void {
+    list.disarmPointer()
+    centerContent.disarmPointer()
+    var revealing = !root.cursorShown
+    root.keyboardCursor = true
+    if (revealing) {
+      if (root.cursorStop < 0)
+        root.placeCursor(InboxLogic.revealStop(root.stops, root.lastStop))
+      else
+        root.placeCursor(root.cursorStop)
+      return
     }
+    if (delta !== 0)
+      root.placeCursor(InboxLogic.moveStop(root.stops, root.cursorStop, delta))
+  }
+
+  // Whether a key may act on the cursor (CursorLogic.pressIntent): with no
+  // cursor it does nothing, a hidden one is only revealed.
+  function keyMayAct(): bool {
+    list.disarmPointer()
+    centerContent.disarmPointer()
+    var intent = CursorLogic.pressIntent(root.cursorStop >= 0, root.keyboardCursor)
+    if (intent === "ignore")
+      return false
+    root.keyboardCursor = true
+    return intent === "act"
+  }
+
+  // Enter or Space: opens an entry, expands a "+N more" row, toggles DND or
+  // presses Clear, whichever the cursor is on.
+  function activateCursor(): void {
+    if (!root.keyMayAct())
+      return
+    if (root.cursorKey === "dnd")
+      root.toggleDnd()
+    else if (root.cursorKey === "clear")
+      root.clearAll()
+    else if (root.cursor >= 0)
+      root.activate(root.cursor)
+  }
+
+  // Delete (Shift sets wholeGroup) or x: on a row, see dismissAt; nothing on
+  // the DND switch or the Clear pill.
+  function deleteCursor(wholeGroup: bool): void {
+    if (!root.keyMayAct() || root.cursor < 0)
+      return
+    root.dismissAt(root.cursor, wholeGroup)
   }
 
   // Expands a collapsed app group, or collapses an expanded one.
@@ -119,15 +184,20 @@ Panel {
   }
 
   // Expands the "+N more" row at index and puts the cursor on the first
-  // entry it revealed (the more row itself is gone after the expand).
+  // entry it revealed (the more row itself is gone after the expand). The
+  // more row's key vanishing hides the cursor; a keyboard-shown cursor is
+  // shown again on the revealed entry, a pointer-placed one stays hidden.
   function expandAt(index: int): void {
     var row = rows[index]
     if (!row)
       return
+    var shown = root.keyboardCursor
     toggleGroup(row.app)
     var revealed = rows[index]
-    if (revealed && revealed.kind === "entry")
+    if (revealed && revealed.kind === "entry") {
       root.cursorKey = InboxLogic.rowKey(revealed)
+      root.keyboardCursor = shown
+    }
   }
 
   // Enter on a row: runs an entry's action, or toggles a group or "more" row.
@@ -167,17 +237,77 @@ Panel {
     service.clearInbox()
   }
 
+  // Applies a DND step RESULT ({state, send}, InboxLogic.dndClick or
+  // dndEcho): stores the state first, so an echo that arrives during the
+  // send (the service writes synchronously today) sees it, then sends.
+  function applyDnd(result: var): void {
+    root.dndPending = result.state
+    if (result.send !== null && root.service)
+      root.service.setDoNotDisturb(result.send)
+    // Still waiting after the send: give the echo a deadline.
+    if (root.dndPending.target === null)
+      dndTimeout.stop()
+    else if (result.send !== null)
+      dndTimeout.restart()
+  }
+
+  // The DND switch was clicked or activated.
+  function toggleDnd(): void {
+    if (root.service)
+      root.applyDnd(InboxLogic.dndClick(root.dndPending, root.dnd))
+  }
+
+  // A NotificationList action (open, dismiss, toggle, clearGroup, hover)
+  // with ARG {index, key}, checked again against the current rows. Pointer
+  // use hides the keyboard cursor; a hover only moves the hidden cursor
+  // onto the row (no fill, no outline), so the next key reveals it there.
+  function listAction(name: string, arg: var): void {
+    var row = root.rows[arg.index]
+    if (!row || InboxLogic.rowKey(row) !== arg.key)
+      return
+    root.keyboardCursor = false
+    if (name === "open")
+      root.activate(arg.index)
+    else if (name === "dismiss")
+      root.dismissAt(arg.index, false)
+    else if (name === "toggle")
+      root.toggleGroup(row.app)
+    else if (name === "clearGroup")
+      root.service.dismissGroup(row.app)
+    else if (name === "hover" && InboxLogic.stopIndex(root.stops, arg.key) >= 0)
+      root.cursorKey = arg.key
+  }
+
+  // A fresh open shows no cursor until the first navigation key.
   onOpenedChanged: {
+    root.keyboardCursor = false
+    root.cursorKey = ""
+    root.lastStop = -1
     if (opened) {
       root.now = Date.now()
-      root.cursorKey = ""
       root.confirmingClear = false
     }
   }
 
-  // The item under the cursor was dismissed: drop the cursor.
-  onRowsChanged: if (root.cursorKey && root.cursor < 0)
-    root.cursorKey = ""
+  // Remembers where the cursor is, for a reveal after its key vanished.
+  onCursorStopChanged: {
+    if (root.cursorStop >= 0)
+      root.lastStop = root.cursorStop
+    else if (root.cursorKey)
+      root.followStops()
+  }
+
+  // The cursor's stop vanished (dismissed, or the Clear pill hid): hide it
+  // and drop its key, so the outline never comes back without a key press
+  // when the same key reappears (InboxLogic.followStop).
+  function followStops(): void {
+    var next = InboxLogic.followStop(root.stops, root.cursorKey, root.keyboardCursor)
+    root.cursorKey = next.key
+    root.keyboardCursor = next.shown
+  }
+
+  // The service echoed a DND change (or something else changed it).
+  onDndChanged: root.applyDnd(InboxLogic.dndEcho(root.dndPending, root.dnd))
 
   Timer {
     id: confirmTimer
@@ -189,6 +319,13 @@ Panel {
     repeat: true
     running: root.opened
     onTriggered: root.now = Date.now()
+  }
+  // Gives up on a DND change the service never echoed: the switch shows
+  // the service's state again.
+  Timer {
+    id: dndTimeout
+    interval: 3000
+    onTriggered: root.dndPending = InboxLogic.dndIdle()
   }
 
   implicitWidth: button.implicitWidth
@@ -236,88 +373,75 @@ Panel {
     }
   }
 
-  KeyboardPanel {
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened && root.available
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(content.implicitHeight, panel.screenH * 0.6)
+    contentHeight: panel.fittedContentHeight(centerContent.implicitHeight, panel.screenH * 0.6)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      list.disarmPointer()
+      centerContent.disarmPointer()
+      root.switchPanel(direction)
+    }
+    onMoveRequested: function (dx, dy) {
+      root.moveCursor(dy)
+    }
+    onActivateRequested: root.activateCursor()
+    // "x", as the stock catcher sends it.
+    onDeleteRequested: root.deleteCursor(false)
+    // Delete and Shift+Delete are not catcher signals; they arrive here.
+    onUnhandledKey: function (event) {
+      if (event.key !== Qt.Key_Delete)
+        return
+      root.deleteCursor((event.modifiers & Qt.ShiftModifier) !== 0)
+      event.accepted = true
+    }
 
-    FocusScope {
-      anchors.fill: parent
-      // Delete / Shift+Delete are not PanelKeyCatcher signals; they propagate
-      // here unaccepted.
-      Keys.onPressed: function (event) {
-        if (event.key !== Qt.Key_Delete || root.cursor < 0)
-          return
-        root.dismissAt(root.cursor, (event.modifiers & Qt.ShiftModifier) !== 0)
-        event.accepted = true
+    NotificationCenterContent {
+      id: centerContent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      view: root.centerView
+      dndCursor: root.cursorShown && root.cursorKey === "dnd"
+      clearCursor: root.cursorShown && root.cursorKey === "clear"
+      onAction: function (name, arg) {
+        root.keyboardCursor = false
+        if (name === "toggleDnd")
+          root.toggleDnd()
+        else if (name === "clearAll")
+          root.clearAll()
       }
 
-      PanelKeyCatcher {
-        id: keyCatcher
-        anchors.fill: parent
-        onMoveRequested: function (dx, dy) {
-          if (dy !== 0)
-            root.moveCursor(dy)
-        }
-        onActivateRequested: if (root.cursor >= 0)
-          root.activate(root.cursor)
-        onDeleteRequested: if (root.cursor >= 0)
-          root.dismissAt(root.cursor, false)
-        onCloseRequested: root.close()
-        onTabRequested: function (direction) {
-          root.switchPanel(direction)
-        }
-
-        ColumnLayout {
-          id: content
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.top: parent.top
-          spacing: Style.space(10)
-
-          NotificationCenterContent {
-            Layout.fillWidth: true
-            count: root.count
-            dnd: root.dnd
-            confirmingClear: root.confirmingClear
-            quiet: root.quiet
-            quietUntil: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
-            foreground: Color.popups.text
-            focusAccent: root.focusAccent
-            onToggleDnd: root.service.setDoNotDisturb(!root.dnd)
-            onClearAll: root.clearAll()
-          }
-
-          NotificationList {
-            id: list
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(list.contentHeight, panel.screenH * 0.6 - Style.space(80))
-            visible: root.count > 0
-            rows: root.rows
-            cursor: root.cursor
-            now: root.now
-            service: root.service
-            bar: root.bar
-            motionEnabled: root.service ? root.service.motionEnabled : true
-            cornerRadius: root.service ? root.service.cornerRadius : 0
-            onActivated: function (index, row) {
-              root.activate(index)
-            }
-            onDismissed: function (index, row) {
-              root.dismissAt(index, false)
-            }
-            onGroupToggled: function (app) {
-              root.toggleGroup(app)
-            }
-            onGroupDismissed: function (app) {
-              root.service.dismissGroup(app)
-            }
-          }
+      NotificationList {
+        id: list
+        width: parent.width
+        // Capped so the header and the footer stay inside the card: the
+        // card's largest content height (the 60% cap, less its padding
+        // and border) less the space above and below the list.
+        height: root.count > 0 ? InboxLogic.listHeight(list.contentHeight, panel.fittedContentHeight(panel.screenH, panel.screenH * 0.6) - panel.verticalContentInset, centerContent.slotTop, centerContent.footerHeight) : 0
+        visible: root.count > 0
+        rows: root.rows
+        // The mint outline: only while the keyboard drives the cursor and
+        // it is on a row.
+        cursor: ({
+            active: root.cursorShown && root.cursor >= 0,
+            index: root.cursor
+          })
+        headerHeight: centerContent.slotTop
+        now: root.now
+        service: root.service
+        bar: root.bar
+        motionEnabled: root.service ? root.service.motionEnabled : true
+        cornerRadius: root.service ? root.service.cornerRadius : 0
+        // The list's height moves the Clear pill below it.
+        onHeightChanged: centerContent.noteLayoutChange()
+        onAction: function (name, arg) {
+          root.listAction(name, arg)
         }
       }
     }

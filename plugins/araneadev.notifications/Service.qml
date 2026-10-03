@@ -44,7 +44,7 @@ Item {
   // Inbox files, image copies and (legacy) popup files live here. See Inbox.qml.
   readonly property string popupStateDir: stateDir + "notifications/"
 
-  // The stored notifications; Panel.qml reads its model, count and revision.
+  // The stored notifications; Panel.qml reads its snapshot and count.
   property alias inbox: inbox
   Inbox {
     id: inbox

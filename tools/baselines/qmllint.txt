@@ -148,10 +148,12 @@
 3	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.notifications/Inbox.qml:unused-imports:Unused import
+2	plugins/araneadev.notifications/NotificationCenterContent.qml:missing-property:Member "body" not found on type "QObject"
+1	plugins/araneadev.notifications/NotificationCenterContent.qml:missing-property:Member "caption" not found on type "QObject"
+3	plugins/araneadev.notifications/NotificationCenterContent.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "countdown" not found on type "QObject"
 1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "family" not found on type "QObject"
-1	plugins/araneadev.notifications/Panel.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.notifications/Service.qml:missing-property:Member "sizeHorizontal" not found on type "QObject"
 1	plugins/araneadev.notifications/Service.qml:missing-property:Member "sizeVertical" not found on type "QObject"
 1	plugins/araneadev.notifications/Toasts.qml:uncreatable-type:Type PanelWindow is not creatable.
@@ -160,7 +162,7 @@
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "body" not found on type "QObject"
 2	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "border" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "caption" not found on type "QObject"
-4	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "countdown" not found on type "QObject"
+3	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "countdown" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "displayLarge" not found on type "QObject"
 4	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.notifications/components/NotificationCard.qml:missing-property:Member "icon" not found on type "QObject"
