@@ -35,6 +35,10 @@ Keys:
   first); Shift+Delete clears the entry's whole app group.
 - Esc closes; Tab and Shift+Tab switch to the next panel.
 
+The key hint line follows the state (`InboxLogic.centerKeyHint`): "↑↓ move
+· enter open · x dismiss · ⇧del group · tab next" with entries, shortened
+to fit the card, and "↑↓ move · tab next" when the center is empty.
+
 The cursor is keyboard-only. A fresh open shows none; the first navigation
 key only reveals it, and any pointer use hides it. It follows its entry by
 key across re-sorts and hides when that entry goes. A pointer move over a

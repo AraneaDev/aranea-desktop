@@ -3,9 +3,11 @@
 // from slotTop and footerHeight), so the whole footer, the Clear pill and
 // the key hint, stays at or above the content bottom and the list scrolls
 // inside the rest; a short list keeps its full height. The header shows
-// the bell glyph like the other dropdowns.
+// the bell glyph like the other dropdowns. Both key hints fit the card's
+// content width unelided.
 import QtQuick
 import Quickshell
+import qs.Commons
 import "lib"
 import "plugins/araneadev.notifications" as Notif
 import "plugins/araneadev.notifications/InboxLogic.js" as InboxLogic
@@ -62,9 +64,13 @@ ShellRoot {
         confirming: false,
         label: "Clear all"
       },
-      keyHint: "move · enter open · del dismiss"
+      keyHint: InboxLogic.centerKeyHint(count)
     }
   }
+
+  // The card's content width as Panel.qml sizes it: the panel width less
+  // its padding and border on both sides.
+  readonly property real innerWidth: Style.space(380) - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
 
   // The bottom of ITEM in FRAME's coordinates.
   function bottomIn(item, frame) {
@@ -81,7 +87,7 @@ ShellRoot {
       id: longFrame
       x: 20
       y: 20
-      width: 380
+      width: testRoot.innerWidth
       height: 400
 
       Notif.NotificationCenterContent {
@@ -105,7 +111,7 @@ ShellRoot {
       id: shortFrame
       x: 440
       y: 20
-      width: 380
+      width: testRoot.innerWidth
       height: 400
 
       Notif.NotificationCenterContent {
@@ -126,6 +132,21 @@ ShellRoot {
     }
   }
 
+  // The empty center: no list, the short hint.
+  FloatingWindow {
+    implicitWidth: 420
+    implicitHeight: 300
+    visible: true
+
+    Notif.NotificationCenterContent {
+      id: emptyCenter
+      x: 20
+      y: 20
+      width: testRoot.innerWidth
+      view: viewOf(0)
+    }
+  }
+
   Component.onCompleted: t.step(400, function () {
     t.check(longList.contentHeight > longList.height + 1, "a long list is capped (content " + longList.contentHeight + ", height " + longList.height + ")")
     t.check(longCenter.implicitHeight <= longFrame.height + 0.5, "the center fits the content area (" + longCenter.implicitHeight + " <= " + longFrame.height + ")")
@@ -136,6 +157,11 @@ ShellRoot {
     t.check(bottomIn(longList, longFrame) <= pill.mapToItem(longFrame, 0, 0).y + 0.5, "the list ends above the Clear pill")
     t.check(Math.abs(shortList.height - shortList.contentHeight) < 0.5 && shortList.height > 0, "a short list keeps its full height")
     t.check(bottomIn(t.findChild(shortCenter, "keyHint"), shortFrame) <= shortFrame.height, "and its footer fits too")
+    t.check(hint.implicitWidth <= hint.width + 0.5, "the full key hint fits the card unelided (" + hint.implicitWidth + " <= " + hint.width + ")")
+    t.equal(hint.text, InboxLogic.centerKeyHint(12), "with entries the hint names every key")
+    var emptyHint = t.findChild(emptyCenter, "keyHint")
+    t.equal(emptyHint.text, "↑↓ move · tab next", "the empty center shows the short hint")
+    t.check(emptyHint.implicitWidth <= emptyHint.width + 0.5, "and it fits")
     var title = t.findChild(longCenter, "centerHeader")
     t.equal(title.glyph, String.fromCodePoint(0xf009a), "the header shows the bell glyph when the view gives none")
     t.done()

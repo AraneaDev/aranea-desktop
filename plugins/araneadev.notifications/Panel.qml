@@ -91,10 +91,10 @@ Panel {
   // The quiet-hours end time ("HH:MM"), or "" when there is no window or it
   // is malformed.
   readonly property string quietUntilText: InboxLogic.quietUntil(root.service ? root.service.quietHoursWindow : "")
-  // The header caption: the quiet-hours text while quiet.hours is active and
-  // the window parses, else "N unread" or "Nothing new" (today's quietUntil
-  // text keeps its meaning; see NotificationCenterContent.qml).
-  readonly property string centerCaption: root.quiet && root.quietUntilText !== "" ? ("Quiet until " + root.quietUntilText) : (root.count > 0 ? root.count + " unread" : "Nothing new")
+  // The header caption (InboxLogic.centerCaption): the quiet-hours text
+  // while quiet hours are active and the window parses, else "N unread" or
+  // "Nothing new".
+  readonly property string centerCaption: InboxLogic.centerCaption(root.count, root.quiet, root.quietUntilText)
   // NotificationCenterContent's view object (its Filament header and
   // footer; the list sits in its slot).
   readonly property var centerView: ({
@@ -107,7 +107,7 @@ Panel {
         confirming: root.confirmingClear,
         label: root.confirmingClear ? ("Confirm clear (" + root.count + ")") : "Clear all"
       },
-      keyHint: "↑↓ move · enter open · del dismiss · ⇧del clear group"
+      keyHint: InboxLogic.centerKeyHint(root.count)
     })
 
   // Puts the cursor on stop INDEX and scrolls its row into view.
@@ -125,6 +125,7 @@ Panel {
   // reveals the cursor; later ones step through the stops.
   function moveCursor(delta: int): void {
     list.disarmPointer()
+    centerContent.disarmPointer()
     var revealing = !root.cursorShown
     root.keyboardCursor = true
     if (revealing) {
@@ -142,6 +143,7 @@ Panel {
   // cursor it does nothing, a hidden one is only revealed.
   function keyMayAct(): bool {
     list.disarmPointer()
+    centerContent.disarmPointer()
     var intent = CursorLogic.pressIntent(root.cursorStop >= 0, root.keyboardCursor)
     if (intent === "ignore")
       return false
@@ -382,6 +384,7 @@ Panel {
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
       list.disarmPointer()
+      centerContent.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {

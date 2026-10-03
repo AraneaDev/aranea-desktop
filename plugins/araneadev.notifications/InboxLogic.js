@@ -338,6 +338,32 @@ function listHeight(contentHeight, innerMax, slotTop, footerHeight) {
 }
 
 /**
+ * The center header's caption: the quiet-hours text while quiet hours are
+ * active and the window parsed, else "N unread", or "Nothing new" at 0.
+ * @param {number} count - inbox entries
+ * @param {boolean} quiet - whether quiet hours are active
+ * @param {string} quietUntilText - the window's end ("HH:MM", quietUntil), "" when malformed
+ * @returns {string} the caption
+ */
+function centerCaption(count, quiet, quietUntilText) {
+  if (quiet && quietUntilText) return "Quiet until " + quietUntilText
+  var n = Number(count) || 0
+  return n > 0 ? n + " unread" : "Nothing new"
+}
+
+/**
+ * The center's key hint line, by state (the network dropdown's keyHint
+ * pattern): with entries, every row key; with none, only moving (the DND
+ * switch is still a stop) and Tab.
+ * @param {number} count - inbox entries
+ * @returns {string} the hint
+ */
+function centerKeyHint(count) {
+  if ((Number(count) || 0) > 0) return "↑↓ move · enter open · x dismiss · ⇧del group · tab next"
+  return "↑↓ move · tab next"
+}
+
+/**
  * Whether clearing this many entries asks for confirmation first (more than
  * CONFIRM_CLEAR_ABOVE).
  * @param {number} count - inbox entries
@@ -601,6 +627,8 @@ if (typeof module !== "undefined") {
     rowKey: rowKey,
     indexOfKey: indexOfKey,
     bellGlyph: bellGlyph,
+    centerCaption: centerCaption,
+    centerKeyHint: centerKeyHint,
     listHeight: listHeight,
     needsClearConfirm: needsClearConfirm,
     quietUntil: quietUntil,

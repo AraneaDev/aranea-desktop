@@ -2,7 +2,7 @@
 // DropdownHeader (title "Notifications" plus the view's caption, "N
 // unread", "Nothing new" or the quiet-hours text), a "Do not disturb" row
 // with a FilamentSwitch, the empty state ("All caught up") when the inbox
-// is empty, a default slot where Task 4's host places the row list
+// is empty, a default slot where Panel.qml places the row list
 // between the header and the footer, a "Clear all" FilamentPill (two-step
 // confirm) and the key hint line. One plain view object in (see `view`),
 // every user action reported through a single action signal. No service
@@ -79,6 +79,13 @@ ColumnLayout {
   // height counts too; the host calls this directly for it).
   function noteLayoutChange() {
     root.layoutChangedAt = Date.now()
+  }
+
+  // Resets the pointer gate; the host calls it after every keyboard-driven
+  // change, as NotificationList's disarmPointer, so a stale pointer sample
+  // never counts as a real move.
+  function disarmPointer() {
+    gate.reset()
   }
 
   // Whether a pointer click on the DND switch may act: settled since this
