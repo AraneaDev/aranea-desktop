@@ -25,9 +25,15 @@ Column {
       muted: false,
       level: 0
     })
-  // Device rows: [{key, label, glyph, detail, active, available, busy}];
-  // the key is the node id, busy pulses the pending default's row.
+  // Device rows: [{key, label, glyph, detail, available}]; the key is the
+  // node's id and name (AudioLogic.deviceKey).
   property var devices: []
+  // The key of the device shown as the default (marked active), "" for
+  // none. Kept apart from devices, so a pending switch never rebuilds the
+  // rows.
+  property string shownKey: ""
+  // Whether a switch to the shown default is pending: its row pulses.
+  property bool shownBusy: false
   // Cursor here: -2 none, -1 the slider row, 0.. a device row.
   property int cursor: -2
   // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
@@ -145,9 +151,9 @@ Column {
       glyph: modelData.glyph
       label: modelData.label
       detail: modelData.detail
-      active: modelData.active
+      active: !!modelData.available && String(modelData.key) === section.shownKey
       available: modelData.available
-      busy: !!modelData.busy
+      busy: active && section.shownBusy
       hasCursor: section.cursor === index
       pointerGate: section.pointerGate
       onChosen: section.deviceChosen(index, String(modelData.key))

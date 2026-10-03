@@ -136,6 +136,8 @@ Column {
         level: 0
       })
     devices: dropdown.view.outputDevices || []
+    shownKey: dropdown.view.outputDefault ? String(dropdown.view.outputDefault.key || "") : ""
+    shownBusy: !!(dropdown.view.outputDefault && dropdown.view.outputDefault.busy)
     cursor: dropdown.cursorIn("output")
     pointerGate: dropdown.pointerGate
     onVolumeMoved: function (value) {
@@ -174,6 +176,8 @@ Column {
         level: 0
       })
     devices: dropdown.view.inputDevices || []
+    shownKey: dropdown.view.inputDefault ? String(dropdown.view.inputDefault.key || "") : ""
+    shownBusy: !!(dropdown.view.inputDefault && dropdown.view.inputDefault.busy)
     cursor: dropdown.cursorIn("input")
     pointerGate: dropdown.pointerGate
     onVolumeMoved: function (value) {

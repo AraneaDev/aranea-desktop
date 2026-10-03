@@ -130,9 +130,9 @@ function deviceDetail(props, isSink, headphones) {
 
 /**
  * A pending default-device switch for one channel: `target` is the device
- * key (its node id) sent as the new default and not yet reported by
- * PipeWire (null when idle), `queued` the key clicked while waiting (null
- * for none).
+ * key (deviceKey: its node id and name) sent as the new default and not
+ * yet reported by PipeWire (null when idle), `queued` the key clicked
+ * while waiting (null for none).
  * @typedef {{target: ?string, queued: ?string}} DefaultPending
  */
 
@@ -226,32 +226,55 @@ function defaultView(state, actual) {
 }
 
 /**
- * The node a keyed row action means: the one at INDEX, but only while its
- * id still reads as KEY. A list that changed underneath (a re-sort, a
- * stream leaving) refuses the action rather than hit another node.
- * @param {Array<{id: *}>|null|undefined} list - the nodes the rows were built from
- * @param {number} index - the row's index
- * @param {string} key - the row's key as the view held it (String(node.id))
- * @returns {{id: *}|null} the node, or null when it no longer matches
+ * A device's key: its node id and name together, so a node id PipeWire
+ * reuses for another device never reads as the old one.
+ * @param {{id: *, name?: *}|null|undefined} node - a PwNode-like object
+ * @returns {string} "id:name", or "" without a node
  */
-function nodeAt(list, index, key) {
-  var nodes = list || []
-  if (!hasKey(key) || !(index >= 0) || index >= nodes.length) return null
-  var node = nodes[index]
-  return node && String(node.id) === key ? node : null
+function deviceKey(node) {
+  if (!node) return ""
+  return String(node.id) + ":" + String(node.name || "")
 }
 
 /**
- * The node whose id reads as KEY, wherever it sits in LIST.
- * @param {Array<{id: *}>|null|undefined} list - nodes to search
- * @param {string} key - String(node.id) to find
- * @returns {{id: *}|null} the node, or null when none has that id
+ * A node's key: deviceKey when BY_NAME (devices), else its id (streams).
+ * @param {{id: *, name?: *}} node - a PwNode-like object
+ * @param {boolean|undefined} byName - key by id and name
+ * @returns {string} the key
  */
-function nodeByKey(list, key) {
+function keyOf(node, byName) {
+  return byName ? deviceKey(node) : String(node.id)
+}
+
+/**
+ * The node a keyed row action means: the one at INDEX, but only while its
+ * key still reads as KEY. A list that changed underneath (a re-sort, a
+ * stream leaving) refuses the action rather than hit another node.
+ * @param {Array<{id: *, name?: *}>|null|undefined} list - the nodes the rows were built from
+ * @param {number} index - the row's index
+ * @param {string} key - the row's key as the view held it
+ * @param {boolean} [byName] - KEY is a deviceKey (id and name), else the id
+ * @returns {{id: *}|null} the node, or null when it no longer matches
+ */
+function nodeAt(list, index, key, byName) {
+  var nodes = list || []
+  if (!hasKey(key) || !(index >= 0) || index >= nodes.length) return null
+  var node = nodes[index]
+  return node && keyOf(node, byName) === key ? node : null
+}
+
+/**
+ * The node whose key reads as KEY, wherever it sits in LIST.
+ * @param {Array<{id: *, name?: *}>|null|undefined} list - nodes to search
+ * @param {string} key - the key to find
+ * @param {boolean} [byName] - KEY is a deviceKey (id and name), else the id
+ * @returns {{id: *}|null} the node, or null when none has that key
+ */
+function nodeByKey(list, key, byName) {
   var nodes = list || []
   if (!hasKey(key)) return null
   for (var i = 0; i < nodes.length; i++)
-    if (nodes[i] && String(nodes[i].id) === key) return nodes[i]
+    if (nodes[i] && keyOf(nodes[i], byName) === key) return nodes[i]
   return null
 }
 
@@ -267,6 +290,7 @@ if (typeof module !== "undefined")
     defaultEcho,
     defaultAfter,
     defaultView,
+    deviceKey,
     nodeAt,
     nodeByKey
   }

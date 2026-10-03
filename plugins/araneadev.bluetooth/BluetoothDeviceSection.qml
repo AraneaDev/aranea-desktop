@@ -5,6 +5,8 @@
 // inputs in, signals out. Every action carries the row's key (the device
 // address) as the row held it, so the host can refuse one whose row
 // changed underneath; the right-click settles like the row's own click.
+// The Repeater runs over the row count, so a row's busy state or detail
+// changing (a new rows array from the host) never recreates its delegate.
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
@@ -82,13 +84,24 @@ Column {
       font.pixelSize: Style.font.body
     }
   }
+  // The model is the row count, not the array: a pending action arrives as
+  // a new rows array, and an array model would recreate every row then,
+  // resetting its settle window and restarting its pulse.
   Repeater {
     id: repeater
-    model: section.rows
+    model: section.rows.length
     Item {
       id: wrapper
-      required property var modelData
       required property int index
+      // This row's device, read from the live array.
+      readonly property var modelData: section.rows[wrapper.index] || ({
+          key: "",
+          label: "",
+          glyph: "",
+          detail: "",
+          busy: false,
+          forgettable: false
+        })
       // The row's key (the device address), sent with every action.
       readonly property string key: wrapper.modelData && typeof wrapper.modelData.key === "string" ? wrapper.modelData.key : ""
 

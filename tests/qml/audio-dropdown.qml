@@ -65,6 +65,14 @@ ShellRoot {
             available: false
           }
         ],
+        outputDefault: {
+          key: "1",
+          busy: false
+        },
+        inputDefault: {
+          key: "9",
+          busy: false
+        },
         inputVisible: true,
         input: {
           present: true,

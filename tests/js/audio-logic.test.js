@@ -223,3 +223,23 @@ test("a keyed node lookup refuses a row that changed underneath", () => {
   assert.equal(logic.nodeByKey(list, ""), null)
   assert.equal(logic.nodeByKey(undefined, "7"), null)
 })
+
+test("a device is keyed by its id and name, so a reused id never matches", () => {
+  const speakers = { id: 52, name: "alsa_output.analog" }
+  const reused = { id: 52, name: "bluez_output.headset" }
+  assert.equal(logic.deviceKey(speakers), "52:alsa_output.analog")
+  assert.equal(logic.deviceKey({ id: 3 }), "3:")
+  assert.equal(logic.deviceKey(null), "")
+  const key = logic.deviceKey(speakers)
+  assert.equal(logic.nodeAt([speakers], 0, key, true), speakers)
+  assert.equal(logic.nodeAt([reused], 0, key, true), null, "the reused id is refused")
+  assert.equal(logic.nodeAt([speakers], 0, "52"), speakers, "streams stay keyed by id")
+  assert.equal(logic.nodeByKey([reused, speakers], key, true), speakers)
+  assert.equal(logic.nodeByKey([reused], key, true), null)
+  const pending = logic.defaultClick(null, key, "47:alsa_output.hdmi").state
+  assert.deepEqual(
+    logic.defaultEcho(pending, logic.deviceKey(reused)).state,
+    pending,
+    "a reused id's echo keeps waiting"
+  )
+})

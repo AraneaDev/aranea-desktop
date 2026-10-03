@@ -146,6 +146,26 @@ ShellRoot {
         full.view = plain
         t.check(sw.checked && !sw.busy, "without a power state the switch follows the adapter")
 
+        // ---------- A pending change keeps the rows ----------
+        var before = pairedRows()
+        var created = before.map(function (row) {
+          return row.createdAt
+        })
+        var busyRows = knownRows.map(function (r) {
+          return Object.assign({}, r, {
+            busy: r.key === "BB:2",
+            detail: r.key === "BB:2" ? "Connecting" : ""
+          })
+        })
+        full.view = viewOf(busyRows, [dev("CC:1", "JBL Flip 6", true)], true)
+        var after = pairedRows()
+        t.check(after.length === 3 && after.every(function (row, i) {
+          return row === before[i] && row.createdAt === created[i]
+        }), "a row turning busy keeps every row delegate")
+        t.check(after[1].busy && after[1].detail === "Connecting" && !after[0].busy, "and the busy row pulses with its new detail")
+        full.view = plain
+        t.check(pairedRows()[1] === before[1] && !before[1].busy, "going idle keeps the delegate too")
+
         // ---------- Keyed row actions ----------
         actions = []
         pointer.mouseClick(pairedRows()[1], 60, pairedRows()[1].height / 2)

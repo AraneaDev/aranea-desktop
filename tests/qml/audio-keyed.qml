@@ -36,15 +36,13 @@ ShellRoot {
     when: false
   }
 
-  // An output device row: KEY and LABEL, ACTIVE and BUSY.
-  function device(key, label, active, busy) {
+  // An output device row: KEY and LABEL.
+  function device(key, label) {
     return {
       key: key,
       label: label,
       glyph: "",
       detail: "",
-      active: active,
-      busy: busy,
       available: true
     }
   }
@@ -61,7 +59,12 @@ ShellRoot {
   }
 
   // The output devices, the switch to "2" pending.
-  readonly property var outputRows: [device("1", "ALC236 Analog", false, false), device("2", "LG ULTRAGEAR", true, true), device("3", "WH-1000XM4", false, false)]
+  readonly property var outputRows: [device("1", "ALC236 Analog"), device("2", "LG ULTRAGEAR"), device("3", "WH-1000XM4")]
+  // The default output as the view shows it: the switch to "2" pending.
+  property var outputDefault: ({
+      key: "2",
+      busy: true
+    })
   // The streams, in their first order.
   readonly property var streamRows: [stream("7", "Spotify", 0.8), stream("8", "Firefox", 0.6)]
 
@@ -86,6 +89,11 @@ ShellRoot {
         level: 0
       },
       outputDevices: outputs,
+      outputDefault: outputDefault,
+      inputDefault: {
+        key: "9",
+        busy: false
+      },
       inputVisible: input,
       input: {
         present: input,
@@ -93,7 +101,7 @@ ShellRoot {
         muted: false,
         level: 0
       },
-      inputDevices: input ? [device("9", "Mic", true, false)] : [],
+      inputDevices: input ? [device("9", "Mic")] : [],
       streams: streams,
       nowPlaying: {
         visible: playing,
@@ -190,6 +198,34 @@ ShellRoot {
         var rows = outputDeviceRows()
         t.check(rows[1].active && rows[1].busy, "the pending default's row shows as active and pulses")
         t.check(!rows[0].busy && !rows[0].active && !rows[2].busy, "no other row is active or pulses")
+
+        // A pending change, as Panel sends it: the same row array, a new
+        // default. The row delegates must survive it.
+        var created = rows.map(function (row) {
+          return row.createdAt
+        })
+        var sameRows = full.view.outputDevices
+        outputDefault = {
+          key: "3",
+          busy: true
+        }
+        full.view = viewOf(sameRows, streamRows, true, true)
+        var after = outputDeviceRows()
+        t.check(after.length === 3 && after.every(function (row, i) {
+          return row === rows[i] && row.createdAt === created[i]
+        }), "a pending change keeps the row delegates")
+        t.check(after[2].active && after[2].busy && !after[1].active && !after[1].busy, "and moves the active pulse to the new row")
+        outputDefault = {
+          key: "3",
+          busy: false
+        }
+        full.view = viewOf(sameRows, streamRows, true, true)
+        t.check(outputDeviceRows()[2] === rows[2] && rows[2].active && !rows[2].busy, "the echo stops the pulse on the same delegate")
+        outputDefault = {
+          key: "2",
+          busy: true
+        }
+        full.view = viewOf(outputRows, streamRows, true, true)
 
         // ---------- Gradient progress bar ----------
         var fill = t.findChild(full, "progressFill")

@@ -40,10 +40,11 @@ Panel {
   property var outputPending: AudioLogic.defaultIdle()
   // The pending default-input switch (see outputPending).
   property var inputPending: AudioLogic.defaultIdle()
-  // The key (node id) of PipeWire's default output, "" for none.
-  readonly property string sinkKey: sink ? String(sink.id) : ""
-  // The key (node id) of PipeWire's default input, "" for none.
-  readonly property string sourceKey: source ? String(source.id) : ""
+  // The key (AudioLogic.deviceKey: node id and name) of PipeWire's
+  // default output, "" for none.
+  readonly property string sinkKey: AudioLogic.deviceKey(sink)
+  // The key of PipeWire's default input (see sinkKey).
+  readonly property string sourceKey: AudioLogic.deviceKey(source)
   // Which output the rows show as the default ({key, busy}, AudioLogic.defaultView).
   readonly property var outputShown: AudioLogic.defaultView(outputPending, sinkKey)
   // Which input the rows show as the default (see outputShown).
@@ -738,7 +739,7 @@ Panel {
     if (!node)
       return
     var output = channel === "output"
-    applyDefault(channel, AudioLogic.defaultClick(output ? outputPending : inputPending, String(node.id), output ? sinkKey : sourceKey))
+    applyDefault(channel, AudioLogic.defaultClick(output ? outputPending : inputPending, AudioLogic.deviceKey(node), output ? sinkKey : sourceKey))
   }
 
   // Applies a default-switch step RESULT ({state, send}) for CHANNEL:
@@ -752,7 +753,7 @@ Panel {
     else
       inputPending = result.state
     if (result.send !== null) {
-      var node = AudioLogic.nodeByKey(output ? audioSinks : audioSources, result.send)
+      var node = AudioLogic.nodeByKey(output ? audioSinks : audioSources, result.send, true)
       if (!node) {
         if (output)
           outputPending = AudioLogic.defaultAfter("timeout", outputPending)
@@ -879,32 +880,28 @@ Panel {
   }
 
   // Plain device rows for the view, from Pipewire NODES (outputs when
-  // IS_SINK); SHOWN ({key, busy}, AudioLogic.defaultView) marks the
-  // default, pulsing while a switch to it is pending.
-  function deviceRows(nodes, shown, isSink, unplugged) {
+  // IS_SINK), keyed by AudioLogic.deviceKey. Which row is the default (and
+  // pulses) comes apart, in the view's outputDefault/inputDefault, so a
+  // pending switch never rebuilds the rows.
+  function deviceRows(nodes, isSink, unplugged) {
     var rows = []
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i]
-      var key = String(n.id)
       rows.push({
-        key: key,
+        key: AudioLogic.deviceKey(n),
         label: nodeLabel(n),
         glyph: isSink ? sinkGlyph(n) : sourceGlyph(n),
         detail: AudioLogic.deviceDetail(nodeProps(n), isSink, isHeadphones(n)),
-        active: key === shown.key,
-        busy: shown.busy && key === shown.key,
         available: true
       })
     }
     for (var j = 0; j < (unplugged || []).length; j++) {
       var u = unplugged[j]
       rows.push({
-        key: String(u.id),
+        key: AudioLogic.deviceKey(u),
         label: nodeLabel(u),
         glyph: isSink ? sinkGlyph(u) : sourceGlyph(u),
         detail: "unplugged",
-        active: false,
-        busy: false,
         available: false
       })
     }
@@ -912,9 +909,9 @@ Panel {
   }
   // The view's output rows. Kept apart from audioView so the arrays keep
   // their identity while the levels tick ~30 times a second.
-  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, outputShown, true, displayUnpluggedSinks)
+  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, true, displayUnpluggedSinks)
   // The view's input rows (see outputDeviceRows).
-  readonly property var inputDeviceRows: deviceRows(displayAudioSources, inputShown, false, [])
+  readonly property var inputDeviceRows: deviceRows(displayAudioSources, false, [])
   // The view's stream rows (see outputDeviceRows).
   readonly property var streamRows: displayAudioStreams.map(function (s) {
     return {
@@ -944,6 +941,7 @@ Panel {
         level: outputSignal
       },
       outputDevices: outputDeviceRows,
+      outputDefault: outputShown,
       inputVisible: displayAudioSources.length > 0 || !!source,
       input: {
         present: hasInput,
@@ -952,6 +950,7 @@ Panel {
         level: inputSignal
       },
       inputDevices: inputDeviceRows,
+      inputDefault: inputShown,
       streams: streamRows,
       nowPlaying: nowPlaying
     })
@@ -968,13 +967,13 @@ Panel {
     else if (name === "outputMute")
       toggleOutputMute()
     else if (name === "outputDevice")
-      requestDefault("output", AudioLogic.nodeAt(displayAudioSinks, arg.index, arg.key))
+      requestDefault("output", AudioLogic.nodeAt(displayAudioSinks, arg.index, arg.key, true))
     else if (name === "inputVolume")
       setInputVolume(arg)
     else if (name === "inputMute")
       toggleInputMute()
     else if (name === "inputDevice")
-      requestDefault("input", AudioLogic.nodeAt(displayAudioSources, arg.index, arg.key))
+      requestDefault("input", AudioLogic.nodeAt(displayAudioSources, arg.index, arg.key, true))
     else if (name === "streamVolume") {
       var s = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
       if (s && s.audio)
