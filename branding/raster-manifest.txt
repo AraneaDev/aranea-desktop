@@ -1,5 +1,3 @@
 # Generated from design/brand.toml and design/tokens.toml. Do not edit directly.
 input_sha256=e67bdb8dae04527b75b1864acc864b3565ef8ffade35b161616b4328c3f3a16f
 unlock=640x640
-lock=3840x2160
-plymouth=1920x1080

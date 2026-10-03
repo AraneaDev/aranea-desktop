@@ -34,19 +34,18 @@ spacing, typography, or motion defaults. Regenerate the committed projections
 with `scripts/generate-tokens --write`. Edit `design/brand.toml` for visible
 identity strings and replace `branding/marks/aranea-primary.svg` for the source
 mark. The generator color-projects that source into the runtime
-`branding/brand.svg`, lock compatibility asset, static Plymouth/lock artwork,
-the motif/status glyph family, the Kvantum splash artwork, and
-`branding/brand.env` for shell scripts. The source templates for those
-projections live under `design/templates/assets/branding/`; edit the templates
-only when changing the shape or semantic role of an asset.
+`branding/brand.svg`, the `unlock.png` boot logo, the motif/status glyph
+family, the Kvantum splash artwork, and `branding/brand.env` for shell
+scripts. The source templates for those projections live under
+`design/templates/assets/branding/`; edit the templates only when changing the
+shape or semantic role of an asset.
 Platform projections are templated in
 `design/templates/`, and `scripts/generate-tokens --check` is the drift check
 used by the token contract test.
 
 The source SVG and both TOML files are the customization surface. Generated
-files, including `branding/brand.svg`, `unlock.png`, and the PNG artwork under
-`branding/screens/`, must not be edited directly. `rsvg-convert` is required
-when regenerating the raster outputs.
+files, including `branding/brand.svg` and `unlock.png`, must not be edited
+directly. `rsvg-convert` is required when regenerating the raster outputs.
 
 The GTK stylesheet and cursor families have explicit tokenized templates under
 `design/templates/gtk.css.in` and `design/templates/assets/`. The generator
@@ -129,8 +128,21 @@ captures with:
 scripts/capture-screenshots --all --output screenshots
 ```
 
-Lock and Plymouth use canonical artwork renders; the capture workflow should
-not lock the active session or reboot the machine.
+Lock and Plymouth are rendered rather than grabbed from the screen, so the
+capture workflow never locks the active session or reboots the machine:
+
+- `tools/render-lock-preview` runs the lock plugin's real `LockView`
+  offscreen under quickshell, at the screen size and scale, with a stand-in
+  clock and an empty password field, and grabs it to a PNG.
+- `tools/render-plymouth-preview` composes the disk-unlock prompt of
+  Omarchy's Plymouth theme from the same pieces that
+  `omarchy plymouth set-by-theme aranea` installs (`unlock.png`, the
+  `colors.toml` background and foreground, Omarchy's entry, lock and
+  bullet images) with the geometry of `omarchy.script`, and refuses to
+  render if that geometry has changed upstream.
+
+Either renderer exits non-zero and writes nothing when it fails, and so does
+the capture of that surface.
 
 The Network and Bluetooth captures never show real nearby names. After
 summoning the dropdown, the script hands it stand-in names through the
