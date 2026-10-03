@@ -46,6 +46,13 @@ ColumnLayout {
   // Default slot: the host's row list sits here, between the header and
   // the footer.
   default property alias content: slot.data
+  // Where the slot starts (the header, DND row and empty state above it),
+  // so the host can size its list and stamp its layout without reading
+  // this view's own height, which includes the list.
+  readonly property real slotTop: slot.y
+  // The height below the slot: the Clear row while it shows and the key
+  // hint line, each with the column spacing.
+  readonly property real footerHeight: (clearRow.visible ? clearRow.implicitHeight + root.spacing : 0) + keyHint.implicitHeight + root.spacing
 
   // The view's dnd part, or an off, idle one.
   readonly property var dnd: root.view && root.view.dnd ? root.view.dnd : ({
@@ -155,6 +162,7 @@ ColumnLayout {
     }
   }
   Text {
+    id: keyHint
     objectName: "keyHint"
     Layout.fillWidth: true
     text: root.view && root.view.keyHint ? String(root.view.keyHint) : ""

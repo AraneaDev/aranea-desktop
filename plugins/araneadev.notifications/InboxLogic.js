@@ -319,7 +319,7 @@ function indexOfKey(rows, key) {
  * @returns {string} the bell_off glyph when silenced, else the bell
  */
 function bellGlyph(silenced) {
-  return silenced ? "󰂛" : "󰂚"
+  return String.fromCodePoint(silenced ? 0xf009b : 0xf009a)
 }
 
 /**
@@ -375,6 +375,140 @@ function dismissAction(row, wholeGroup) {
 }
 
 /**
+ * The keyboard cursor's stops in the center, top to bottom: the "Do not
+ * disturb" switch (key "dnd"), every entry and "+N more" row (keyed by
+ * rowKey; group headers are passed over, as before), then the "Clear all"
+ * pill (key "clear") while it shows. Row keys start with "e:", "m:" or
+ * "g:", so they never collide with "dnd" or "clear".
+ * @param {Array<Dict>} rows - center rows (flattenGroups)
+ * @param {boolean} clearVisible - whether the Clear pill shows
+ * @returns {Array<{key: string, section: string, index: number}>} the stops; section is "dnd", "rows" or "clear", index the row's position (-1 off the list)
+ */
+function centerStops(rows, clearVisible) {
+  var stops = [{ key: "dnd", section: "dnd", index: -1 }]
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i]
+    if (row && (row.kind === "entry" || row.kind === "more"))
+      stops.push({ key: rowKey(row), section: "rows", index: i })
+  }
+  if (clearVisible) stops.push({ key: "clear", section: "clear", index: -1 })
+  return stops
+}
+
+/**
+ * Position of the stop with a given key.
+ * @param {Array<{key: string}>} stops - centerStops output
+ * @param {string} key - the cursor's key, or ""
+ * @returns {number} the index, or -1 when key is "" or gone
+ */
+function stopIndex(stops, key) {
+  if (!key || !Array.isArray(stops)) return -1
+  for (var i = 0; i < stops.length; i++) if (stops[i].key === key) return i
+  return -1
+}
+
+/**
+ * Where the first navigation key shows the cursor: the stop at `fallback`
+ * (where a vanished cursor last was) clamped into the stops, else the first
+ * row, else the first stop (the DND switch).
+ * @param {Array<{section: string}>} stops - centerStops output
+ * @param {number} fallback - the cursor's last stop, or -1 for none
+ * @returns {number} the stop index, or -1 with no stops
+ */
+function revealStop(stops, fallback) {
+  var list = Array.isArray(stops) ? stops : []
+  if (list.length === 0) return -1
+  if (typeof fallback === "number" && fallback >= 0)
+    return Math.min(list.length - 1, Math.floor(fallback))
+  for (var i = 0; i < list.length; i++) if (list[i].section === "rows") return i
+  return 0
+}
+
+/**
+ * The stop one step (`delta`) from `at`, held at both ends (no wrap, as in
+ * the other Aranea dropdowns).
+ * @param {Array<*>} stops - centerStops output
+ * @param {number} at - the cursor's stop
+ * @param {number} delta - -1 up, +1 down
+ * @returns {number} the next stop index, or -1 with no stops
+ */
+function moveStop(stops, at, delta) {
+  var n = Array.isArray(stops) ? stops.length : 0
+  if (n === 0) return -1
+  var from = Math.max(0, Math.min(n - 1, Math.floor(Number(at)) || 0))
+  var step = delta > 0 ? 1 : delta < 0 ? -1 : 0
+  return Math.max(0, Math.min(n - 1, from + step))
+}
+
+/**
+ * A pending Do Not Disturb change: `target` is the state sent to the
+ * service and not yet echoed back (null when idle), `queued` the state
+ * clicked while waiting (null for none).
+ * @typedef {{target: ?boolean, queued: ?boolean}} DndPending
+ */
+
+/**
+ * The idle DND state: nothing sent, nothing queued.
+ * @returns {DndPending} a fresh idle state
+ */
+function dndIdle() {
+  return { target: null, queued: null }
+}
+
+/**
+ * A click on the DND switch. Idle, it sends the opposite of the service's
+ * state at once. While a change is in flight it only queues the opposite of
+ * what the switch shows; the last click wins, and a click back to the
+ * in-flight state cancels the queue.
+ * @param {?DndPending} state - the pending state (null counts as idle)
+ * @param {boolean} actual - the service's doNotDisturb
+ * @returns {{state: DndPending, send: ?boolean}} the next state and the value to send now (null: send nothing)
+ */
+function dndClick(state, actual) {
+  var s = state || dndIdle()
+  if (s.target === null || s.target === undefined) {
+    var target = !actual
+    return { state: { target: target, queued: null }, send: target }
+  }
+  var shown = s.queued !== null && s.queued !== undefined ? s.queued : s.target
+  var next = !shown
+  return { state: { target: s.target, queued: next === s.target ? null : next }, send: null }
+}
+
+/**
+ * The service's doNotDisturb changed (or was read back). When it reaches the
+ * in-flight target, a queued state that differs is sent next; otherwise the
+ * switch goes idle. A value other than the target keeps waiting (a timeout
+ * calls dndIdle).
+ * @param {?DndPending} state - the pending state
+ * @param {boolean} actual - the service's doNotDisturb now
+ * @returns {{state: DndPending, send: ?boolean}} the next state and the value to send now (null: send nothing)
+ */
+function dndEcho(state, actual) {
+  var s = state || dndIdle()
+  if (s.target === null || s.target === undefined || s.target !== !!actual)
+    return { state: s, send: null }
+  if (s.queued !== null && s.queued !== undefined && s.queued !== !!actual)
+    return { state: { target: s.queued, queued: null }, send: s.queued }
+  return { state: dndIdle(), send: null }
+}
+
+/**
+ * What the DND switch shows: the queued state, else the in-flight one, else
+ * the service's; busy (pulsing) while a change is in flight.
+ * @param {?DndPending} state - the pending state
+ * @param {boolean} actual - the service's doNotDisturb
+ * @returns {{on: boolean, busy: boolean}} the header view's dnd part
+ */
+function dndView(state, actual) {
+  var s = state || dndIdle()
+  var busy = s.target !== null && s.target !== undefined
+  var on = s.queued !== null && s.queued !== undefined ? s.queued : busy ? s.target : !!actual
+  return { on: !!on, busy: busy }
+}
+
+/**
  * Merges the rows read from disk at startup with rows already in the model:
  * disk rows cleared or removed while the read ran are dropped, model rows not
  * on disk (arrived during the read) are kept; newest first.
@@ -403,6 +537,14 @@ function mergeLoaded(diskRows, liveRows, removed, cleared) {
 if (typeof module !== "undefined") {
   module.exports = {
     dismissAction: dismissAction,
+    centerStops: centerStops,
+    stopIndex: stopIndex,
+    revealStop: revealStop,
+    moveStop: moveStop,
+    dndIdle: dndIdle,
+    dndClick: dndClick,
+    dndEcho: dndEcho,
+    dndView: dndView,
     mergeLoaded: mergeLoaded,
     MAX_ITEMS: MAX_ITEMS,
     MAX_AGE_MS: MAX_AGE_MS,

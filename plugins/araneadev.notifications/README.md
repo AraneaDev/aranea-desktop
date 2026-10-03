@@ -17,6 +17,35 @@ placement, `Inbox.qml` owns the inbox surface, and `Panel.qml` owns the bar
 entry point. The components directory contains presentational cards and group
 rows.
 
+## The center
+
+The center draws in the shared `Aranea.KeyboardPanelFrame`: a Filament header
+(`NotificationCenterContent.qml`: caption, "Do not disturb" switch, the list in
+its slot, the "Clear all" pill and the key hint) around `NotificationList.qml`.
+
+Keys:
+
+- Up/Down (or k/j) move the cursor through its stops, top to bottom: the
+  "Do not disturb" switch, every entry and "+N more" row, then the "Clear
+  all" pill. The cursor stops at both ends. Group headers are not stops.
+- Left/Right (or h/l) only reveal the cursor.
+- Enter or Space acts on the cursor: an entry opens, "+N more" expands its
+  group, the switch toggles DND, the pill clears (two steps above 20 entries).
+- Delete or x dismisses the entry under the cursor (on "+N more" it expands
+  first); Shift+Delete clears the entry's whole app group.
+- Esc closes; Tab and Shift+Tab switch to the next panel.
+
+The cursor is keyboard-only. A fresh open shows none; the first navigation
+key only reveals it, and any pointer use hides it. It follows its entry by
+key across re-sorts and hides when that entry goes. A pointer move over a
+card draws nothing (no hover fill); it only moves the hidden cursor there,
+so the next key reveals it under the pointer.
+
+The DND switch shows the new state at once and pulses until the service
+echoes it. Clicks made while it waits are queued and the last one wins
+(`InboxLogic.dndClick`, `dndEcho` and `dndView`). The "+N more" row keeps its
+12 px left padding, so its text lines up with the cards' content.
+
 ## Logic boundaries
 
 - `NotificationLogic.js` owns normalization, persistence, quiet hours, and

@@ -35,7 +35,14 @@ jq -e '(.kinds | index("bar-widget")) and .entryPoints.barWidget == "Panel.qml" 
   "$plugin/manifest.json" >/dev/null
 jq -e '(.kinds | index("service")) and .entryPoints.service == "Service.qml"' "$plugin/manifest.json" >/dev/null
 test -f "$plugin/Panel.qml"
-grep -Fq 'KeyboardPanel' "$plugin/Panel.qml"
+grep -Fq 'Aranea.KeyboardPanelFrame {' "$plugin/Panel.qml"
+grep -Fq 'onUnhandledKey:' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.dndClick(' "$plugin/Panel.qml"
+grep -Fq 'InboxLogic.dndEcho(' "$plugin/Panel.qml"
+if grep -Eq 'PanelKeyCatcher|^  KeyboardPanel \{' "$plugin/Panel.qml"; then
+  echo "Panel.qml must use the shared Aranea keyboard frame" >&2
+  exit 1
+fi
 grep -Fq 'InboxLogic.centerRows(service.inbox.snapshot' "$plugin/Panel.qml"
 grep -Fq 'NotificationCenterContent {' "$plugin/Panel.qml"
 grep -Fq 'All caught up' "$plugin/NotificationCenterContent.qml"

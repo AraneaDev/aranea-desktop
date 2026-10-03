@@ -114,7 +114,11 @@ test("notifications logic", () => {
     inbox.tooltipText(0, 0, false, true) === "0 notifications · Quiet hours",
     "quiet-hours tooltip"
   )
-  assert(inbox.bellGlyph(false) === "󰂚" && inbox.bellGlyph(true) === "󰂛", "bell glyphs")
+  assert(
+    inbox.bellGlyph(false) === String.fromCodePoint(0xf009a) &&
+      inbox.bellGlyph(true) === String.fromCodePoint(0xf009b),
+    "bell glyphs"
+  )
   assert(
     inbox.needsClearConfirm(20) === false && inbox.needsClearConfirm(21) === true,
     "confirm above 20"
@@ -477,4 +481,138 @@ test("NotificationLogic isWithinQuietHours handles the overnight window", () => 
     throw new Error("quiet hours missed overnight window")
   if (notifications.isWithinQuietHours("22:00-07:00", day))
     throw new Error("quiet hours captured daytime")
+})
+
+test("notification center cursor stops", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const entry = (name) => ({ kind: "entry", app: "A", entry: { fileName: name } })
+  const rows = [{ kind: "group", app: "A" }, entry("a1"), { kind: "more", app: "A" }, entry("b1")]
+  const stops = inbox.centerStops(rows, true)
+  assert.deepEqual(
+    stops.map((s) => s.key),
+    ["dnd", "e:a1", "m:A", "e:b1", "clear"],
+    "DND, entries and more rows (no group headers), then Clear"
+  )
+  assert.deepEqual(stops[1], { key: "e:a1", section: "rows", index: 1 })
+  assert.deepEqual(stops[0], { key: "dnd", section: "dnd", index: -1 })
+  assert.deepEqual(
+    inbox.centerStops(rows, false).map((s) => s.key),
+    ["dnd", "e:a1", "m:A", "e:b1"],
+    "no Clear stop while the pill is hidden"
+  )
+  assert.deepEqual(
+    inbox.centerStops(undefined, false).map((s) => s.key),
+    ["dnd"]
+  )
+  assert.deepEqual(
+    inbox.centerStops([null, entry("x")], false).map((s) => s.key),
+    ["dnd", "e:x"]
+  )
+
+  assert.equal(inbox.stopIndex(stops, "e:b1"), 3)
+  assert.equal(inbox.stopIndex(stops, "e:gone"), -1)
+  assert.equal(inbox.stopIndex(stops, ""), -1)
+  assert.equal(inbox.stopIndex(null, "dnd"), -1)
+
+  assert.equal(inbox.revealStop(stops, -1), 1, "first reveal lands on the first row")
+  assert.equal(inbox.revealStop(stops, 2), 2, "a vanished cursor reveals where it was")
+  assert.equal(inbox.revealStop(stops, 9), 4, "clamped into the stops")
+  assert.equal(
+    inbox.revealStop(inbox.centerStops([], false), -1),
+    0,
+    "empty center: the DND switch"
+  )
+  assert.equal(inbox.revealStop([], -1), -1)
+  assert.equal(inbox.revealStop(undefined, 0), -1)
+
+  assert.equal(inbox.moveStop(stops, 1, -1), 0, "up from the first row reaches DND")
+  assert.equal(inbox.moveStop(stops, 0, -1), 0, "held at the top")
+  assert.equal(inbox.moveStop(stops, 3, 1), 4, "down from the last row reaches Clear")
+  assert.equal(inbox.moveStop(stops, 4, 1), 4, "held at the bottom")
+  assert.equal(inbox.moveStop(stops, 2, 0), 2)
+  assert.equal(inbox.moveStop(stops, "x", 1), 1)
+  assert.equal(inbox.moveStop([], 0, 1), -1)
+  assert.equal(inbox.moveStop(null, 0, 1), -1)
+})
+
+test("DND switch: pending, echo and queued clicks", () => {
+  const assert = require("node:assert/strict")
+  const inbox = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.notifications/InboxLogic.js")
+  )
+  const idle = inbox.dndIdle()
+  assert.deepEqual(idle, { target: null, queued: null })
+  assert.deepEqual(inbox.dndView(idle, false), { on: false, busy: false })
+  assert.deepEqual(inbox.dndView(null, true), { on: true, busy: false })
+
+  // A click shows the new state at once and pulses until the echo.
+  let r = inbox.dndClick(idle, false)
+  assert.equal(r.send, true)
+  assert.deepEqual(inbox.dndView(r.state, false), { on: true, busy: true })
+  assert.deepEqual(inbox.dndClick(null, true).send, false, "null counts as idle")
+
+  // The echo settles it.
+  let e = inbox.dndEcho(r.state, true)
+  assert.equal(e.send, null)
+  assert.deepEqual(e.state, idle)
+  assert.deepEqual(inbox.dndView(e.state, true), { on: true, busy: false })
+
+  // A value other than the target keeps waiting; idle ignores echoes.
+  assert.deepEqual(inbox.dndEcho(r.state, false), { state: r.state, send: null })
+  assert.deepEqual(inbox.dndEcho(idle, true), { state: idle, send: null })
+  assert.deepEqual(inbox.dndEcho(null, true).state, idle)
+
+  // Clicks while busy are queued; the last one wins.
+  let s = inbox.dndClick(idle, false).state // target on
+  let q = inbox.dndClick(s, false) // queue off
+  assert.equal(q.send, null, "nothing sent while busy")
+  assert.deepEqual(q.state, { target: true, queued: false })
+  assert.deepEqual(
+    inbox.dndView(q.state, false),
+    { on: false, busy: true },
+    "shows the queued state"
+  )
+  e = inbox.dndEcho(q.state, true)
+  assert.equal(e.send, false, "the queued state is sent after the echo")
+  assert.deepEqual(e.state, { target: false, queued: null })
+  assert.deepEqual(inbox.dndEcho(e.state, false).state, idle)
+
+  // An even number of clicks while busy cancels the queue.
+  q = inbox.dndClick(inbox.dndClick(s, false).state, false)
+  assert.deepEqual(q.state, { target: true, queued: null })
+  assert.deepEqual(inbox.dndView(q.state, false), { on: true, busy: true })
+  e = inbox.dndEcho(q.state, true)
+  assert.equal(e.send, null)
+  assert.deepEqual(e.state, idle)
+
+  // A rapid burst: on, off, on, off ends off and sends at most twice.
+  let state = idle
+  let actual = false
+  const sent = []
+  for (let i = 0; i < 4; i++) {
+    const c = inbox.dndClick(state, actual)
+    state = c.state
+    if (c.send !== null) sent.push(c.send)
+  }
+  for (let guard = 0; guard < 5 && state.target !== null; guard++) {
+    actual = state.target // the service applies the in-flight value
+    const echo = inbox.dndEcho(state, actual)
+    state = echo.state
+    if (echo.send !== null) sent.push(echo.send)
+  }
+  assert.deepEqual(sent, [true, false])
+  assert.equal(actual, false, "final state matches the last click")
+  assert.deepEqual(inbox.dndView(state, actual), { on: false, busy: false })
+
+  // A queued state equal to the echo sends nothing (undefined fields count as unset).
+  assert.deepEqual(inbox.dndEcho({ target: true, queued: true }, true), { state: idle, send: null })
+  assert.deepEqual(inbox.dndClick({ target: undefined, queued: undefined }, true).send, false)
+  assert.deepEqual(inbox.dndView({ target: true, queued: undefined }, false), {
+    on: true,
+    busy: true
+  })
+  assert.deepEqual(inbox.dndEcho({ target: true, queued: undefined }, true).state, idle)
 })
