@@ -1,8 +1,9 @@
 // Choice pill in the Filament style (the network dropdown's band and DNS
 // rows): a thin muted border and muted text, or, when selected, an accent
 // border, full text and a 2 px accent underline (selectedColor swaps the
-// accent for another token, e.g. the tray's violet Hidden pill). The keyboard cursor draws
-// the same mint outline as NodeDeviceRow; pointer hover never draws one.
+// accent for another token, e.g. the tray's violet Hidden pill). The
+// keyboard cursor draws the same mint outline as NodeDeviceRow; pointer
+// hover never draws one.
 // A busy pill breathes like a busy NodeDeviceRow marker. A pill sitting on
 // a row a Repeater can rebuild under a still pointer takes that row as
 // clickGate, as FilamentSwitch does. Without one, a pill with a
