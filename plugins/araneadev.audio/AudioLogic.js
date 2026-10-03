@@ -1,7 +1,8 @@
 // Pure rules for the Aranea audio dropdown (Panel.qml): the live signal
 // level behind the filament glow, which media player Now playing follows
-// when Omarchy's media service is missing, the Now playing state and the
-// device rows' trailing detail. No QML, no I/O;
+// when Omarchy's media service is missing, the Now playing state, the
+// device rows' trailing detail, the pending default-device switch and the
+// keyed node lookups behind every row action. No QML, no I/O;
 // tests/js/audio-logic.test.js runs this under Node.
 
 /**
@@ -127,5 +128,145 @@ function deviceDetail(props, isSink, headphones) {
   return isSink ? "speakers" : "mic"
 }
 
+/**
+ * A pending default-device switch for one channel: `target` is the device
+ * key (its node id) sent as the new default and not yet reported by
+ * PipeWire (null when idle), `queued` the key clicked while waiting (null
+ * for none).
+ * @typedef {{target: ?string, queued: ?string}} DefaultPending
+ */
+
+/** How long a default-device switch may stay pending, in ms. */
+var defaultTimeoutMs = 4000
+
+/**
+ * The idle default-device state: nothing sent, nothing queued.
+ * @returns {DefaultPending} a fresh idle state
+ */
+function defaultIdle() {
+  return { target: null, queued: null }
+}
+
+/**
+ * Whether a key is set (a string other than "").
+ * @param {*} key - a device key, or null/undefined
+ * @returns {boolean} true for a non-empty string
+ */
+function hasKey(key) {
+  return typeof key === "string" && key !== ""
+}
+
+/**
+ * A device row chosen as the new default (a click or Enter). Idle, it is
+ * sent at once; when it already is the default it is sent again without
+ * waiting (the helper re-applies it, as before) and nothing pulses. While
+ * a switch is in flight the choice only queues: the last one wins, and a
+ * choice of the in-flight device empties the queue.
+ * @param {?DefaultPending} state - the pending state (null counts as idle)
+ * @param {string} key - the chosen device's key
+ * @param {string} actual - the key of PipeWire's default now ("" for none)
+ * @returns {{state: DefaultPending, send: ?string}} the next state and the key to send now (null: send nothing)
+ */
+function defaultClick(state, key, actual) {
+  var s = state || defaultIdle()
+  if (!hasKey(key)) return { state: s, send: null }
+  if (!hasKey(s.target)) {
+    if (key === actual) return { state: defaultIdle(), send: key }
+    return { state: { target: key, queued: null }, send: key }
+  }
+  return { state: { target: s.target, queued: key === s.target ? null : key }, send: null }
+}
+
+/**
+ * PipeWire's default device changed (or was read back). When it reaches
+ * the in-flight target, a queued key that differs is sent next; otherwise
+ * the switch goes idle. Any other default keeps waiting (the timeout calls
+ * defaultAfter).
+ * @param {?DefaultPending} state - the pending state
+ * @param {string} actual - the key of PipeWire's default now ("" for none)
+ * @returns {{state: DefaultPending, send: ?string}} the next state and the key to send now (null: send nothing)
+ */
+function defaultEcho(state, actual) {
+  var s = state || defaultIdle()
+  if (!hasKey(s.target) || s.target !== actual) return { state: s, send: null }
+  if (hasKey(s.queued) && s.queued !== actual)
+    return { state: { target: s.queued, queued: null }, send: s.queued }
+  return { state: defaultIdle(), send: null }
+}
+
+/**
+ * The pending state after a lifetime EVENT: the timeout falls back to the
+ * real default; closing the panel drops the queued choice, so it never
+ * runs with nobody watching, but lets the one in flight finish; anything
+ * else keeps it.
+ * @param {string} event - "timeout", "close" or anything else
+ * @param {?DefaultPending} state - the pending state
+ * @returns {DefaultPending} the state to keep
+ */
+function defaultAfter(event, state) {
+  var s = state || defaultIdle()
+  if (event === "timeout") return defaultIdle()
+  if (event === "close") return { target: hasKey(s.target) ? s.target : null, queued: null }
+  return { target: s.target, queued: s.queued }
+}
+
+/**
+ * Which device the rows show as the default: the queued key, else the
+ * in-flight one, else PipeWire's; busy (its row pulses) while a switch is
+ * in flight.
+ * @param {?DefaultPending} state - the pending state
+ * @param {string} actual - the key of PipeWire's default now ("" for none)
+ * @returns {{key: string, busy: boolean}} the shown default's key and whether it pulses
+ */
+function defaultView(state, actual) {
+  var s = state || defaultIdle()
+  var busy = hasKey(s.target)
+  var key = hasKey(s.queued) ? s.queued : busy ? s.target : String(actual || "")
+  return { key: String(key), busy: busy }
+}
+
+/**
+ * The node a keyed row action means: the one at INDEX, but only while its
+ * id still reads as KEY. A list that changed underneath (a re-sort, a
+ * stream leaving) refuses the action rather than hit another node.
+ * @param {Array<{id: *}>|null|undefined} list - the nodes the rows were built from
+ * @param {number} index - the row's index
+ * @param {string} key - the row's key as the view held it (String(node.id))
+ * @returns {{id: *}|null} the node, or null when it no longer matches
+ */
+function nodeAt(list, index, key) {
+  var nodes = list || []
+  if (!hasKey(key) || !(index >= 0) || index >= nodes.length) return null
+  var node = nodes[index]
+  return node && String(node.id) === key ? node : null
+}
+
+/**
+ * The node whose id reads as KEY, wherever it sits in LIST.
+ * @param {Array<{id: *}>|null|undefined} list - nodes to search
+ * @param {string} key - String(node.id) to find
+ * @returns {{id: *}|null} the node, or null when none has that id
+ */
+function nodeByKey(list, key) {
+  var nodes = list || []
+  if (!hasKey(key)) return null
+  for (var i = 0; i < nodes.length; i++)
+    if (nodes[i] && String(nodes[i].id) === key) return nodes[i]
+  return null
+}
+
 if (typeof module !== "undefined")
-  module.exports = { signalLevel, pickPlayer, nowPlayingState, deviceDetail }
+  module.exports = {
+    signalLevel,
+    pickPlayer,
+    nowPlayingState,
+    deviceDetail,
+    defaultTimeoutMs,
+    defaultIdle,
+    defaultClick,
+    defaultEcho,
+    defaultAfter,
+    defaultView,
+    nodeAt,
+    nodeByKey
+  }

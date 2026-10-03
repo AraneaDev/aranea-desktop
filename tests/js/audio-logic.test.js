@@ -118,3 +118,108 @@ test("a plain device is speakers or a mic, even without properties", () => {
   assert.equal(logic.deviceDetail(null, true, false), "speakers")
   assert.equal(logic.deviceDetail(undefined, false, false), "mic")
 })
+
+test("an idle default-device choice is sent at once and pulses", () => {
+  const r = logic.defaultClick(logic.defaultIdle(), "52", "47")
+  assert.deepEqual(r, { state: { target: "52", queued: null }, send: "52" })
+  assert.deepEqual(logic.defaultView(r.state, "47"), { key: "52", busy: true })
+  assert.deepEqual(logic.defaultClick(null, "52", "47").send, "52")
+})
+
+test("choosing the current default re-sends it without a pulse", () => {
+  const r = logic.defaultClick(null, "47", "47")
+  assert.deepEqual(r, { state: { target: null, queued: null }, send: "47" })
+  assert.deepEqual(logic.defaultView(r.state, "47"), { key: "47", busy: false })
+})
+
+test("a choice without a key does nothing", () => {
+  const s = { target: "52", queued: null }
+  assert.deepEqual(logic.defaultClick(s, "", "47"), { state: s, send: null })
+  assert.deepEqual(logic.defaultClick(s, undefined, "47"), { state: s, send: null })
+})
+
+test("choices while a switch is in flight queue, and the last one wins", () => {
+  let s = logic.defaultClick(null, "52", "47").state
+  let r = logic.defaultClick(s, "60", "47")
+  assert.deepEqual(r, { state: { target: "52", queued: "60" }, send: null })
+  r = logic.defaultClick(r.state, "47", "47")
+  assert.deepEqual(r, { state: { target: "52", queued: "47" }, send: null })
+  assert.deepEqual(logic.defaultView(r.state, "47"), { key: "47", busy: true })
+  r = logic.defaultClick(r.state, "52", "47")
+  assert.deepEqual(
+    r,
+    { state: { target: "52", queued: null }, send: null },
+    "back to the in-flight one empties the queue"
+  )
+})
+
+test("the echo settles the switch or sends the queued choice", () => {
+  const busy = { target: "52", queued: null }
+  assert.deepEqual(
+    logic.defaultEcho(busy, "47"),
+    { state: busy, send: null },
+    "another default keeps waiting"
+  )
+  assert.deepEqual(logic.defaultEcho(busy, "52"), {
+    state: { target: null, queued: null },
+    send: null
+  })
+  const queued = { target: "52", queued: "60" }
+  assert.deepEqual(logic.defaultEcho(queued, "52"), {
+    state: { target: "60", queued: null },
+    send: "60"
+  })
+  const same = { target: "52", queued: "52" }
+  assert.deepEqual(logic.defaultEcho(same, "52").state, { target: null, queued: null })
+  assert.deepEqual(logic.defaultEcho(null, "52"), {
+    state: { target: null, queued: null },
+    send: null
+  })
+})
+
+test("rapid choices end on the last one with no pulse left", () => {
+  let s = logic.defaultIdle()
+  const sent = []
+  for (const key of ["52", "60", "61", "60"]) {
+    const r = logic.defaultClick(s, key, "47")
+    s = r.state
+    if (r.send) sent.push(r.send)
+  }
+  let r = logic.defaultEcho(s, "52")
+  s = r.state
+  if (r.send) sent.push(r.send)
+  r = logic.defaultEcho(s, "60")
+  s = r.state
+  assert.deepEqual(sent, ["52", "60"])
+  assert.deepEqual(logic.defaultView(s, "60"), { key: "60", busy: false })
+})
+
+test("the timeout falls back to the real default; closing drops the queue", () => {
+  assert.equal(logic.defaultTimeoutMs, 4000)
+  const s = { target: "52", queued: "60" }
+  assert.deepEqual(logic.defaultAfter("timeout", s), { target: null, queued: null })
+  assert.deepEqual(logic.defaultView(logic.defaultAfter("timeout", s), "47"), {
+    key: "47",
+    busy: false
+  })
+  assert.deepEqual(logic.defaultAfter("close", s), { target: "52", queued: null })
+  assert.deepEqual(logic.defaultAfter("close", null), { target: null, queued: null })
+  assert.deepEqual(logic.defaultAfter("open", s), s)
+  assert.notEqual(logic.defaultAfter("open", s), s, "never the same object")
+  assert.deepEqual(logic.defaultView(null, undefined), { key: "", busy: false })
+})
+
+test("a keyed node lookup refuses a row that changed underneath", () => {
+  const list = [{ id: 7 }, { id: 8 }, null]
+  assert.equal(logic.nodeAt(list, 1, "8"), list[1])
+  assert.equal(logic.nodeAt(list, 0, "8"), null, "a re-sort is refused")
+  assert.equal(logic.nodeAt(list, 2, "9"), null)
+  assert.equal(logic.nodeAt(list, 3, "8"), null)
+  assert.equal(logic.nodeAt(list, -1, "7"), null)
+  assert.equal(logic.nodeAt(list, 0, ""), null)
+  assert.equal(logic.nodeAt(null, 0, "7"), null)
+  assert.equal(logic.nodeByKey(list, "8"), list[1])
+  assert.equal(logic.nodeByKey(list, "9"), null)
+  assert.equal(logic.nodeByKey(list, ""), null)
+  assert.equal(logic.nodeByKey(undefined, "7"), null)
+})

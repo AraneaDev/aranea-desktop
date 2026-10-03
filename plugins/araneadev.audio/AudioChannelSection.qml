@@ -1,10 +1,15 @@
 // One audio channel (Output or Input) in the Aranea audio dropdown: the
 // caption and level, a filament slider with the live signal glow, and
-// the device list. Pure view: plain inputs in, signals out.
+// the device list. Pure view: plain inputs in, signals out. A press on
+// the slider within 300 ms of the dropdown's layout shifting
+// (pointerGate.layoutChangedAt) is ignored unless the pointer has really
+// moved onto it since; device rows settle their clicks the same way, and
+// the pending default's row pulses (busy).
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Column {
   id: section
@@ -20,7 +25,8 @@ Column {
       muted: false,
       level: 0
     })
-  // Device rows: [{key, label, glyph, detail, active, available}].
+  // Device rows: [{key, label, glyph, detail, active, available, busy}];
+  // the key is the node id, busy pulses the pending default's row.
   property var devices: []
   // Cursor here: -2 none, -1 the slider row, 0.. a device row.
   property int cursor: -2
@@ -30,10 +36,10 @@ Column {
 
   // Emitted with a new volume from the slider.
   signal volumeMoved(real value)
-  // Emitted when the slider is right-clicked.
+  // Emitted when the slider is right-clicked (settled, as a press is).
   signal muteToggled
-  // Emitted when device row INDEX is chosen.
-  signal deviceChosen(int index)
+  // Emitted when device row INDEX, holding KEY, is chosen.
+  signal deviceChosen(int index, string key)
   // Emitted when the pointer enters the slider row (-1) or device row INDEX.
   signal rowHovered(int index)
 
@@ -74,6 +80,21 @@ Column {
     font.pixelSize: Style.font.body
   }
   Item {
+    id: sliderRow
+    // When the gate last accepted a real pointer move over the slider row
+    // (Date.now()), 0 for never.
+    property real pointerMovedAt: 0
+
+    // Whether a pointer press may move the slider (its clickGate): settled
+    // since the dropdown's last layout shift, or moved onto since.
+    function clickSettled() {
+      return ClickSettle.clickSettled({
+        now: Date.now(),
+        movedAt: sliderRow.pointerMovedAt,
+        layoutChangedAt: section.pointerGate ? Number(section.pointerGate.layoutChangedAt) || 0 : 0
+      })
+    }
+
     width: parent.width
     height: slider.implicitHeight + Style.space(6)
     visible: section.channel.present
@@ -94,10 +115,12 @@ Column {
       value: section.channel.volume
       muted: section.channel.muted
       level: section.channel.level
+      clickGate: sliderRow
       onMoved: function (value) {
         section.volumeMoved(value)
       }
-      onRightClicked: section.muteToggled()
+      onRightClicked: if (sliderRow.clickSettled())
+        section.muteToggled()
     }
     HoverHandler {
       id: sliderHover
@@ -106,8 +129,10 @@ Column {
       onPointChanged: if (section.pointerGate && sliderHover.hovered && section.pointerGate.moved(sliderHover.parent, {
         x: sliderHover.point.position.x,
         y: sliderHover.point.position.y
-      }))
+      })) {
+        sliderRow.pointerMovedAt = Date.now()
         section.rowHovered(-1)
+      }
     }
   }
   Repeater {
@@ -122,9 +147,10 @@ Column {
       detail: modelData.detail
       active: modelData.active
       available: modelData.available
+      busy: !!modelData.busy
       hasCursor: section.cursor === index
       pointerGate: section.pointerGate
-      onChosen: section.deviceChosen(index)
+      onChosen: section.deviceChosen(index, String(modelData.key))
       onEntered: if (modelData.available)
         section.rowHovered(index)
     }

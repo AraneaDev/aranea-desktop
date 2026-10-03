@@ -1,10 +1,14 @@
 // Header of the Aranea audio dropdown: the shared DropdownHeader with a
 // mute-all switch in its trailing slot. Pure view: plain inputs in,
-// signals out. (glyph, title and caption come from DropdownHeader.)
+// signals out. (glyph, title and caption come from DropdownHeader.) A
+// click on the switch within 300 ms of the dropdown's layout shifting
+// (pointerGate.layoutChangedAt) is ignored unless the pointer has really
+// moved onto it since.
 import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Aranea.DropdownHeader {
   id: header
@@ -22,11 +26,24 @@ Aranea.DropdownHeader {
   // Optional PointerMoveGate (qs.Ui) filtering synthetic hover from the
   // switch moving under a still pointer.
   property var pointerGate: null
+  // When the gate last accepted a real pointer move onto the switch
+  // (Date.now()), 0 for never.
+  property real switchMovedAt: 0
 
   // Emitted when the mute-all switch is toggled.
   signal toggleAll
   // Emitted when the pointer enters the switch.
   signal entered
+
+  // Whether a pointer click may toggle the switch (its clickGate): settled
+  // since the dropdown's last layout shift, or moved onto since.
+  function clickSettled() {
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      movedAt: header.switchMovedAt,
+      layoutChangedAt: header.pointerGate ? Number(header.pointerGate.layoutChangedAt) || 0 : 0
+    })
+  }
 
   objectName: "audioHeader"
   title: "Audio"
@@ -44,9 +61,11 @@ Aranea.DropdownHeader {
       font.letterSpacing: 1.2
     }
     Aranea.FilamentSwitch {
+      objectName: "muteSwitch"
       anchors.verticalCenter: parent.verticalCenter
       checked: header.anyAudible
       hasCursor: header.hasCursor
+      clickGate: header
       onToggled: header.toggleAll()
       HoverHandler {
         id: switchHover
@@ -55,8 +74,10 @@ Aranea.DropdownHeader {
         onPointChanged: if (header.pointerGate && switchHover.hovered && header.pointerGate.moved(switchHover.parent, {
           x: switchHover.point.position.x,
           y: switchHover.point.position.y
-        }))
+        })) {
+          header.switchMovedAt = Date.now()
           header.entered()
+        }
       }
       PanelToolTip {
         id: tip

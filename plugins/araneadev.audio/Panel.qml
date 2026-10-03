@@ -32,6 +32,23 @@ Panel {
   // The media service's currently active player, if any.
   readonly property var activeMediaPlayer: mediaService ? mediaService.activePlayer : null
 
+  // The pending default-output switch (AudioLogic.defaultClick /
+  // defaultEcho): the chosen device shows as the default at once and its
+  // row pulses until PipeWire reports it; choices made meanwhile queue,
+  // the last one wins, and outputDefaultTimeout falls back to the real
+  // default.
+  property var outputPending: AudioLogic.defaultIdle()
+  // The pending default-input switch (see outputPending).
+  property var inputPending: AudioLogic.defaultIdle()
+  // The key (node id) of PipeWire's default output, "" for none.
+  readonly property string sinkKey: sink ? String(sink.id) : ""
+  // The key (node id) of PipeWire's default input, "" for none.
+  readonly property string sourceKey: source ? String(source.id) : ""
+  // Which output the rows show as the default ({key, busy}, AudioLogic.defaultView).
+  readonly property var outputShown: AudioLogic.defaultView(outputPending, sinkKey)
+  // Which input the rows show as the default (see outputShown).
+  readonly property var inputShown: AudioLogic.defaultView(inputPending, sourceKey)
+
   // Smoothed live levels behind the Output and Input filament glow.
   property real outputSignal: 0
   // (see above)
@@ -201,7 +218,13 @@ Panel {
 
   // Re-resolve whenever the selected output changes; the timer below is only a
   // safety net for the tuning being applied or removed underneath us.
-  onSinkChanged: resolveVolumeSink()
+  // A new default output also settles a pending switch to it.
+  onSinkChanged: {
+    resolveVolumeSink()
+    applyDefault("output", AudioLogic.defaultEcho(outputPending, sinkKey))
+  }
+  // A new default input settles a pending switch to it.
+  onSourceChanged: applyDefault("input", AudioLogic.defaultEcho(inputPending, sourceKey))
 
   // Kicks off omarchy-audio-output-sink to refresh volumeSinkName asynchronously.
   function resolveVolumeSink() {
@@ -430,7 +453,7 @@ Panel {
       }
       var sink = displayAudioSinks[selectedIndex]
       if (sink)
-        setDefaultSink(sink)
+        requestDefault("output", sink)
       return
     }
     if (focusSection === "input") {
@@ -440,7 +463,7 @@ Panel {
       }
       var src = displayAudioSources[selectedIndex]
       if (src)
-        setDefaultSource(src)
+        requestDefault("input", src)
       return
     }
     if (focusSection === "streams" && selectedIndex >= 0) {
@@ -463,6 +486,10 @@ Panel {
       keyboardCursor = false
       Qt.callLater(resetScroll)
     } else {
+      // A queued default never runs with nobody watching; one in flight
+      // finishes (or times out).
+      outputPending = AudioLogic.defaultAfter("close", outputPending)
+      inputPending = AudioLogic.defaultAfter("close", inputPending)
       clearDisplayAudioModels()
       outputSignal = 0
       inputSignal = 0
@@ -604,26 +631,26 @@ Panel {
     // Match the old Waybar pulseaudio glyph set. The Material Design speaker
     // icons render visually smaller in JetBrainsMono Nerd Font.
     if (!sink || !sink.audio)
-      return ""
+      return String.fromCodePoint(0xEEE8)
     if (isHeadphones(sink))
-      return "󰋋"
+      return String.fromCodePoint(0xF02CB)
     if (outputMuted)
-      return ""
+      return String.fromCodePoint(0xEEE8)
     var v = volume === undefined ? outputVolume : volume
     if (v >= 0.67)
-      return ""
+      return String.fromCodePoint(0xF028)
     if (v >= 0.34)
-      return ""
+      return String.fromCodePoint(0xF027)
     if (v > 0)
-      return ""
-    return ""
+      return String.fromCodePoint(0xF026)
+    return String.fromCodePoint(0xEEE8)
   }
 
   // The microphone glyph for the current input mute state.
   function inputIcon() {
     if (!source || !source.audio)
-      return "󰍭"
-    return inputMuted ? "󰍭" : "󰍬"
+      return String.fromCodePoint(0xF036D)
+    return inputMuted ? String.fromCodePoint(0xF036D) : String.fromCodePoint(0xF036C)
   }
 
   // Playful mood-name for a given output volume. Mirrors the brightness
@@ -702,6 +729,46 @@ Panel {
     if (node.id !== undefined && node.name) {
       Quickshell.execDetached(["omarchy-audio-input-set-default", String(node.id), String(node.name)])
     }
+  }
+
+  // Asks for NODE as CHANNEL's ("output" or "input") default, through the
+  // pending switch: shown at once, queued while another is in flight
+  // (AudioLogic.defaultClick).
+  function requestDefault(channel, node) {
+    if (!node)
+      return
+    var output = channel === "output"
+    applyDefault(channel, AudioLogic.defaultClick(output ? outputPending : inputPending, String(node.id), output ? sinkKey : sourceKey))
+  }
+
+  // Applies a default-switch step RESULT ({state, send}) for CHANNEL:
+  // stores the state, sends the device to switch to, if any (falling back
+  // to idle when that device has gone), and runs the timeout while a
+  // switch is in flight.
+  function applyDefault(channel, result) {
+    var output = channel === "output"
+    if (output)
+      outputPending = result.state
+    else
+      inputPending = result.state
+    if (result.send !== null) {
+      var node = AudioLogic.nodeByKey(output ? audioSinks : audioSources, result.send)
+      if (!node) {
+        if (output)
+          outputPending = AudioLogic.defaultAfter("timeout", outputPending)
+        else
+          inputPending = AudioLogic.defaultAfter("timeout", inputPending)
+      } else if (output)
+        setDefaultSink(node)
+      else
+        setDefaultSource(node)
+    }
+    // Read back: sending can echo at once and settle the switch.
+    var timer = output ? outputDefaultTimeout : inputDefaultTimeout
+    if ((output ? outputPending : inputPending).target === null)
+      timer.stop()
+    else if (result.send !== null)
+      timer.restart()
   }
 
   // Whether a sink is still physically available, per the last availability check.
@@ -811,17 +878,21 @@ Panel {
     return Model.streamRepresentsPlayer(node, player, mprisPlayers, displayAudioStreams)
   }
 
-  // Plain device rows for the view, from Pipewire NODES (outputs when IS_SINK).
-  function deviceRows(nodes, activeNode, isSink, unplugged) {
+  // Plain device rows for the view, from Pipewire NODES (outputs when
+  // IS_SINK); SHOWN ({key, busy}, AudioLogic.defaultView) marks the
+  // default, pulsing while a switch to it is pending.
+  function deviceRows(nodes, shown, isSink, unplugged) {
     var rows = []
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i]
+      var key = String(n.id)
       rows.push({
-        key: String(n.id),
+        key: key,
         label: nodeLabel(n),
         glyph: isSink ? sinkGlyph(n) : sourceGlyph(n),
         detail: AudioLogic.deviceDetail(nodeProps(n), isSink, isHeadphones(n)),
-        active: !!activeNode && activeNode.id === n.id,
+        active: key === shown.key,
+        busy: shown.busy && key === shown.key,
         available: true
       })
     }
@@ -833,6 +904,7 @@ Panel {
         glyph: isSink ? sinkGlyph(u) : sourceGlyph(u),
         detail: "unplugged",
         active: false,
+        busy: false,
         available: false
       })
     }
@@ -840,9 +912,9 @@ Panel {
   }
   // The view's output rows. Kept apart from audioView so the arrays keep
   // their identity while the levels tick ~30 times a second.
-  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, sink, true, displayUnpluggedSinks)
+  readonly property var outputDeviceRows: deviceRows(displayAudioSinks, outputShown, true, displayUnpluggedSinks)
   // The view's input rows (see outputDeviceRows).
-  readonly property var inputDeviceRows: deviceRows(displayAudioSources, source, false, [])
+  readonly property var inputDeviceRows: deviceRows(displayAudioSources, inputShown, false, [])
   // The view's stream rows (see outputDeviceRows).
   readonly property var streamRows: displayAudioStreams.map(function (s) {
     return {
@@ -884,7 +956,9 @@ Panel {
       nowPlaying: nowPlaying
     })
   // Carries out one AudioDropdown action. Every action comes from the
-  // pointer, so each one hands the cursor back from the keyboard.
+  // pointer, so each one hands the cursor back from the keyboard. Device
+  // and stream actions are keyed ({index, key}): one whose row no longer
+  // holds that node is refused (AudioLogic.nodeAt).
   function handleAction(name, arg) {
     keyboardCursor = false
     if (name === "toggleAll")
@@ -893,22 +967,20 @@ Panel {
       setOutputVolume(arg)
     else if (name === "outputMute")
       toggleOutputMute()
-    else if (name === "outputDevice") {
-      if (displayAudioSinks[arg])
-        setDefaultSink(displayAudioSinks[arg])
-    } else if (name === "inputVolume")
+    else if (name === "outputDevice")
+      requestDefault("output", AudioLogic.nodeAt(displayAudioSinks, arg.index, arg.key))
+    else if (name === "inputVolume")
       setInputVolume(arg)
     else if (name === "inputMute")
       toggleInputMute()
-    else if (name === "inputDevice") {
-      if (displayAudioSources[arg])
-        setDefaultSource(displayAudioSources[arg])
-    } else if (name === "streamVolume") {
-      var s = displayAudioStreams[arg.index]
+    else if (name === "inputDevice")
+      requestDefault("input", AudioLogic.nodeAt(displayAudioSources, arg.index, arg.key))
+    else if (name === "streamVolume") {
+      var s = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
       if (s && s.audio)
         s.audio.volume = Math.max(0, Math.min(1.5, arg.value))
     } else if (name === "streamMute") {
-      var m = displayAudioStreams[arg]
+      var m = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
       if (m && m.audio)
         m.audio.muted = !m.audio.muted
     } else if (name === "hover") {
@@ -1004,6 +1076,20 @@ Panel {
     repeat: true
     triggeredOnStart: true
     onTriggered: root.resolveVolumeSink()
+  }
+
+  // Falls a pending default-output switch back to the real default.
+  Timer {
+    id: outputDefaultTimeout
+    interval: AudioLogic.defaultTimeoutMs
+    onTriggered: root.outputPending = AudioLogic.defaultAfter("timeout", root.outputPending)
+  }
+
+  // Falls a pending default-input switch back to the real default.
+  Timer {
+    id: inputDefaultTimeout
+    interval: AudioLogic.defaultTimeoutMs
+    onTriggered: root.inputPending = AudioLogic.defaultAfter("timeout", root.inputPending)
   }
 
   Timer {

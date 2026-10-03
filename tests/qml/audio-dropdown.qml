@@ -315,7 +315,12 @@ ShellRoot {
     t.check(rows[0].active && !rows[1].active, "the active output is marked")
     rows[2].activate()
     rows[1].activate()
-    t.equal(JSON.stringify(actions), JSON.stringify([["outputDevice", 1]]), "only the available device is chosen")
+    t.equal(JSON.stringify(actions), JSON.stringify([["outputDevice",
+        {
+          index: 1,
+          key: "2"
+        }
+      ]]), "only the available device is chosen, with its key")
     var hoversBefore = actions.length
     rows[2].entered()
     t.equal(actions.length, hoversBefore, "hovering an unplugged device doesn't move the cursor")
