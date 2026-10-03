@@ -16,6 +16,13 @@ The plugin id is `araneadev.tray`. Pin and hide are saved under `root.moduleName
 overwrites with the entry's own id (`araneadev.tray` once retargeted), never a literal
 `"omarchy.tray"`.
 
+**The drawer** reserves no space when collapsed: the widget is the arrow plus the pinned icons,
+and it grows as the drawer slides open (600 ms, clipped). Hovering the drawer opens it, as in
+stock. A left-click on the arrow holds it open until the arrow is clicked again (or IPC `close`);
+the bar takes no keyboard focus and never sees outside clicks, so Esc and a click elsewhere
+cannot close it. A right-click on the arrow toggles the manage panel. There is no containment
+mask any more, since nothing in the widget's box is empty.
+
 Both popups are `Aranea.KeyboardPanelFrame` windows (layer-shell, focused when they map), anchored
 as stock's were: the app menu to the clicked icon (the drawer stays slid open under a drawer
 icon's menu), the manage panel to the whole tray. They draw `TrayMenuView` and `TrayManageView`.
@@ -34,8 +41,9 @@ icon's menu), the manage panel to the whole tray. They draw `TrayMenuView` and `
 - **Vanishing items:** the app menu closes when its item leaves the tray; pending state of a
   vanished manage row is dropped.
 - **IPC:** `omarchy-shell araneadev.tray manage`, `omarchy-shell araneadev.tray menu <index>`
-  (the pinned item at `index`, else the drawer item past the pinned ones; out of range is a
-  no-op) and `omarchy-shell araneadev.tray close`.
+  (the pinned item at `index`, else the drawer item past the pinned ones, anchored to its icon,
+  with the drawer slid open under a drawer item's menu; out of range is a no-op) and
+  `omarchy-shell araneadev.tray close` (which also lets a click-held drawer go).
 
 `omarchy.clonePaths` (stock's `Tray.manifest.json` lists `TrayModel.js`) is read only by the
 `omarchy-plugin-clone` dev command, to find a stock bar widget's extra files when its manifest
@@ -55,9 +63,12 @@ clicks and gated hover). They are tested on their own (`tests/qml/tray-menu.qml`
   (any section), once `araneadev.tray/manifest.json` is deployed beside `shell.json`; it keeps
   the entry's `pinned` and `hidden` settings and records `araneadev.tray` in
   `cloneSourceRestores`. Tray has no `bar.centerAnchor` handling: that anchor is the clock. The
-  bell and health icons, which place themselves just before whichever tray entry is live, look
-  for `araneadev.tray` first and fall back to `omarchy.tray`, so their placement is unaffected
-  by whether the retarget has run yet.
+  health and bell icons place themselves right after whichever tray entry is live (tray,
+  health, bell), looking for `araneadev.tray` first and falling back to `omarchy.tray`, so
+  their placement is unaffected by whether the retarget has run yet.
+- The Aranea bar (`araneadev.bar`'s `pinTrayToInner`) pins `araneadev.tray` to the inner edge
+  of its section as stock pins `omarchy.tray`: first in the right section, whatever its place
+  in `shell.json`.
 - `scripts/release-shell-config` reverses the retarget.
 - `scripts/deploy-plugins-safely` deploys the plugin directory.
 

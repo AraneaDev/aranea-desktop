@@ -33,9 +33,14 @@ BarWidget {
   // layer takes the pointer off the bar, which would otherwise collapse the
   // drawer and slide the anchor away).
   property bool drawerHeld: false
-  // Whether the collapsed drawer is slid open: hovered, or held under an
-  // open app menu of one of its icons.
-  readonly property bool expanded: drawerHovered || (trayMenuOpen && drawerHeld)
+  // Whether a left-click on the drawer arrow holds the drawer open; another
+  // click on the arrow (or IPC close) lets it go. The bar takes no keyboard
+  // focus and never sees clicks outside itself, so Esc and an outside click
+  // cannot close it.
+  property bool drawerClickedOpen: false
+  // Whether the collapsed drawer is slid open: hovered, held open by a click
+  // on the arrow, or held under an open app menu of one of its icons.
+  readonly property bool expanded: drawerHovered || drawerClickedOpen || (trayMenuOpen && drawerHeld)
   // Whether the manage (pin/hide) popup is open.
   property bool managePopupOpen: false
   // Whether an item's app menu popup is open.
@@ -285,6 +290,15 @@ BarWidget {
     trayMenuOpen = false
   }
 
+  // A press on the drawer arrow: left toggles the drawer held open, right
+  // toggles the manage popup (stock).
+  function arrowPressed(button) {
+    if (button === Qt.LeftButton)
+      root.drawerClickedOpen = !root.drawerClickedOpen
+    else if (button === Qt.RightButton)
+      root.toggleManage()
+  }
+
   // Opens or closes the manage popup (right-click on the drawer arrow),
   // closing the app menu first so one popup holds the keyboard.
   function toggleManage() {
@@ -337,8 +351,9 @@ BarWidget {
 
   // IPC `menu <index>`: opens the app menu of the pinned item at INDEX, or
   // of the drawer item past the pinned ones (TrayLogic.menuTarget),
-  // anchored to its icon, or to the drawer arrow while the drawer is
-  // collapsed. Out of range, or an item without a DBus menu: a no-op.
+  // anchored to its icon. A drawer item's menu holds the drawer open
+  // (drawerHeld), so a collapsed drawer slides open and the menu follows
+  // its icon. Out of range, or an item without a DBus menu: a no-op.
   function openMenuAt(index) {
     var target = TrayLogic.menuTarget(root.pinnedItems.length, root.drawerItems.length, index)
     if (!target)
@@ -346,9 +361,7 @@ BarWidget {
     var item = target.bucket === "pinned" ? root.pinnedItems[target.index] : root.drawerItems[target.index]
     if (!item || !item.menu)
       return
-    var icon = root.trayItemViewFor(item)
-    var anchor = target.bucket === "pinned" || root.expanded ? icon : root.drawerArrow
-    root.openTrayMenu(item, anchor || root, null)
+    root.openTrayMenu(item, root.trayItemViewFor(item) || root, null)
   }
 
   // IPC `manage`: opens the manage popup.
@@ -863,27 +876,15 @@ BarWidget {
       id: horizontalTrayRoot
 
       readonly property int pinnedWidth: pinnedRow.implicitWidth
-      readonly property int drawerBlockWidth: root.allItems.length > 0 ? expandIcon.implicitWidth + root.drawerExtent : 0
+      // The arrow plus the drawer's revealed part: nothing is reserved for
+      // the collapsed drawer, so the widget grows as it slides open.
+      readonly property int drawerBlockWidth: root.allItems.length > 0 ? expandIcon.implicitWidth + Math.round(root.revealExtent) : 0
 
       implicitWidth: pinnedWidth + drawerBlockWidth
       implicitHeight: root.barSize
 
-      // Mask out the empty area the collapsed drawer reserves for its slide-in,
-      // so hovering it doesn't trigger expand and clicks pass through.
-      containmentMask: QtObject {
-        function contains(point: point): bool {
-          if (point.y < 0 || point.y > horizontalTrayRoot.height)
-            return false
-          // Drawer reveals leftward; chevron sits at the right end when collapsed
-          // and slides left as it opens. The visible region starts at the chevron.
-          var chevronX = root.drawerExtent - root.revealExtent
-          if (point.x >= chevronX && point.x <= horizontalTrayRoot.drawerBlockWidth)
-            return true
-          // Pinned items, placed to the right of the drawer block.
-          var pinnedStart = horizontalTrayRoot.drawerBlockWidth
-          return point.x >= pinnedStart && point.x <= horizontalTrayRoot.implicitWidth
-        }
-      }
+      // No containment mask: the widget reserves no empty area for the
+      // collapsed drawer any more, so its whole box is live.
 
       Item {
         id: drawerArea
@@ -901,11 +902,10 @@ BarWidget {
           bar: root.bar
           width: implicitWidth
           height: implicitHeight
-          x: root.drawerExtent - root.revealExtent
+          x: 0
           text: "\uf053"
           onPressed: function (button: int) {
-            if (button === Qt.RightButton)
-              root.toggleManage()
+            root.arrowPressed(button)
           }
           Component.onCompleted: root.drawerArrow = expandIcon
           Component.onDestruction: if (root && root.drawerArrow === expandIcon)
@@ -916,13 +916,15 @@ BarWidget {
           id: trayClip
           x: expandIcon.width
           anchors.verticalCenter: parent.verticalCenter
-          width: root.drawerExtent
+          width: Math.round(root.revealExtent)
           height: root.barSize
           clip: true
 
+          // Pinned to the clip's far edge, so the widening clip uncovers
+          // the icons from the pinned side.
           Row {
             id: trayIcons
-            x: root.drawerExtent - root.revealExtent
+            x: trayClip.width - root.drawerExtent
             anchors.verticalCenter: parent.verticalCenter
             spacing: root.trayItemGap
             layer.enabled: true
@@ -956,22 +958,13 @@ BarWidget {
       id: verticalTrayRoot
 
       readonly property int pinnedHeight: pinnedCol.implicitHeight
-      readonly property int drawerBlockHeight: root.allItems.length > 0 ? expandIcon.implicitHeight + root.drawerExtent : 0
+      // The arrow plus the drawer's revealed part, as the horizontal tray.
+      readonly property int drawerBlockHeight: root.allItems.length > 0 ? expandIcon.implicitHeight + Math.round(root.revealExtent) : 0
 
       implicitWidth: root.barSize
       implicitHeight: pinnedHeight + drawerBlockHeight
 
-      containmentMask: QtObject {
-        function contains(point: point): bool {
-          if (point.x < 0 || point.x > verticalTrayRoot.width)
-            return false
-          var chevronY = root.drawerExtent - root.revealExtent
-          if (point.y >= chevronY && point.y <= verticalTrayRoot.drawerBlockHeight)
-            return true
-          var pinnedStart = verticalTrayRoot.drawerBlockHeight
-          return point.y >= pinnedStart && point.y <= verticalTrayRoot.implicitHeight
-        }
-      }
+      // No containment mask, as the horizontal tray.
 
       Item {
         id: drawerArea
@@ -989,12 +982,11 @@ BarWidget {
           bar: root.bar
           width: implicitWidth
           height: implicitHeight
-          y: root.drawerExtent - root.revealExtent
+          y: 0
           text: "\uf053"
           textRotation: 90
           onPressed: function (button: int) {
-            if (button === Qt.RightButton)
-              root.toggleManage()
+            root.arrowPressed(button)
           }
           Component.onCompleted: root.drawerArrow = expandIcon
           Component.onDestruction: if (root && root.drawerArrow === expandIcon)
@@ -1006,12 +998,13 @@ BarWidget {
           y: expandIcon.height
           anchors.horizontalCenter: parent.horizontalCenter
           width: root.barSize
-          height: root.drawerExtent
+          height: Math.round(root.revealExtent)
           clip: true
 
+          // Pinned to the clip's far edge, as the horizontal tray.
           Column {
             id: trayIcons
-            y: root.drawerExtent - root.revealExtent
+            y: trayClip.height - root.drawerExtent
             anchors.horizontalCenter: parent.horizontalCenter
             spacing: root.trayItemGap
             layer.enabled: true
@@ -1117,8 +1110,9 @@ BarWidget {
     function menu(index: int): void {
       root.openMenuAt(index)
     }
-    // Closes either popup.
+    // Closes either popup and lets a click-held drawer go.
     function close(): void {
+      root.drawerClickedOpen = false
       root.close()
     }
   }
