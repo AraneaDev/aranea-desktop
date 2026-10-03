@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Contract for tools/render-lock-preview: it renders the plugin's real
-# LockView offscreen at the device size (dark corners from the lock overlay,
-# the mint-to-violet field outline across the middle, the stand-in clock
-# below it), never through the session lock, and fails closed: a missing
-# background or shell exits non-zero with nothing written, also through
-# scripts/capture-screenshots. The render itself skips cleanly without
-# quickshell or the Omarchy shell; the fail-closed checks always run.
+# Contract for tools/render-lock-preview: the real LockView rendered
+# offscreen at the device size (dark corners, the mint-to-violet field
+# outline, the stand-in clock and its date in LockView's own format), never
+# through the session lock, failing closed (a missing background or shell
+# writes nothing, also through scripts/capture-screenshots). The render
+# skips without quickshell or the Omarchy shell; fail-closed checks always run.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +21,10 @@ if code_grep "$renderer" 'WlSessionLock' || code_grep "$renderer" 'omarchy-shell
 fi
 code_grep "$renderer" 'QT_QPA_PLATFORM=offscreen'
 code_grep "$repo_root/scripts/capture-screenshots" 'tools/render-lock-preview'
+# The stand-in date uses LockView's own format: editing one without the
+# other fails here.
+code_grep "$repo_root/plugins/araneadev.lock/LockView.qml" 'Qt.formatDate(now, "dddd • dd MMMM")'
+code_grep "$renderer" '"dddd • dd MMMM"'
 
 # Fail closed: no shell, no background.
 if "$renderer" --output "$out/none.png" --shell-dir "$TMPDIR/no-shell" 2>/dev/null; then
