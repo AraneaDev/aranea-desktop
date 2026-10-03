@@ -315,10 +315,14 @@ BarWidget {
     // One popup holds the keyboard at a time. Closed before the menu opens,
     // so the shared popout owner is released before it is requested again.
     managePopupOpen = false
+    var switching = trayMenuOpen
     activeTrayItem = item
     activeTrayAnchor = anchorItem
     drawerHeld = anchorItem !== root.drawerArrow && anchorItem !== root && classifyItem(item) === "drawer"
     trayMenuOpen = true
+    // Switching items while open changes no open state: start afresh here.
+    if (switching)
+      freshMenuCursor()
   }
 
   // The live TrayItem delegate showing ITEM, or null.
@@ -462,13 +466,36 @@ BarWidget {
     next[iid] = {
       pinned: lists.pinned.indexOf(iid) !== -1,
       hidden: lists.hidden.indexOf(iid) !== -1,
-      at: Date.now()
+      at: Date.now(),
+      sawChange: false
     }
     root.pendingState = next
   }
 
-  // Drops pending states the settings echo now matches, that timed out, or
-  // whose item left the tray.
+  // The saved pinned or hidden list changed: every pending state marked
+  // before now has seen a real settings write, so a match may end it.
+  function noteSettingsChange() {
+    var ids = Object.keys(root.pendingState)
+    var now = Date.now()
+    var next = {}
+    var changed = false
+    for (var i = 0; i < ids.length; i++) {
+      var p = root.pendingState[ids[i]]
+      if (!p.sawChange && now >= p.at) {
+        p = Object.assign({}, p, {
+          sawChange: true
+        })
+        changed = true
+      }
+      next[ids[i]] = p
+    }
+    if (changed)
+      root.pendingState = next
+    root.settlePending()
+  }
+
+  // Drops pending states a real settings echo (one seen after the change)
+  // now matches, that timed out, or whose item left the tray.
   function settlePending() {
     var ids = Object.keys(root.pendingState)
     if (ids.length === 0)
@@ -482,7 +509,7 @@ BarWidget {
     for (var i = 0; i < ids.length; i++) {
       var id = ids[i]
       var p = root.pendingState[id]
-      var echoed = (root.pinnedIds.indexOf(id) !== -1) === p.pinned && (root.hiddenIds.indexOf(id) !== -1) === p.hidden
+      var echoed = p.sawChange && (root.pinnedIds.indexOf(id) !== -1) === p.pinned && (root.hiddenIds.indexOf(id) !== -1) === p.hidden
       if (echoed || now - p.at >= root.pendingTimeoutMs || present.indexOf(id) === -1)
         changed = true
       else
@@ -553,6 +580,17 @@ BarWidget {
       checkState: state,
       icon: entry.icon
     }
+  }
+
+  // A menu shown afresh (opened, or switched to another item while open):
+  // no cursor until the first navigation key, keyboard off, and a click
+  // right after it is settled.
+  function freshMenuCursor() {
+    root.menuCursorActive = false
+    root.menuKeyboard = false
+    root.clearMenuCursor()
+    if (root.trayMenuOpen)
+      menuViewItem.noteLayoutChange()
   }
 
   // Hides the menu cursor (a new level or a new menu starts without one;
@@ -787,21 +825,15 @@ BarWidget {
   onAllItemsChanged: root.pruneVanished()
   onActiveTrayItemChanged: if (!root.activeTrayItem && root.trayMenuOpen)
     root.close()
-  onPinnedIdsChanged: root.settlePending()
-  onHiddenIdsChanged: root.settlePending()
+  onPinnedIdsChanged: root.noteSettingsChange()
+  onHiddenIdsChanged: root.noteSettingsChange()
   // The bucket lists changing moves the manage rows' state under a still
   // pointer: stamp the manage view's layout.
   onPinnedItemsChanged: manageViewItem.noteLayoutChange()
   onDrawerItemsChanged: manageViewItem.noteLayoutChange()
   // A fresh menu shows no cursor until the first navigation key, and a
   // click right after it opens is settled.
-  onTrayMenuOpenChanged: {
-    root.menuCursorActive = false
-    root.menuKeyboard = false
-    root.clearMenuCursor()
-    if (root.trayMenuOpen)
-      menuViewItem.noteLayoutChange()
-  }
+  onTrayMenuOpenChanged: root.freshMenuCursor()
   // The same for the manage panel.
   onManagePopupOpenChanged: {
     root.manageCursorActive = false
@@ -1137,6 +1169,8 @@ BarWidget {
 
     Component.onCompleted: root.trayItemViews.push(trayItemRoot)
     Component.onDestruction: {
+      if (!root || !root.trayItemViews)
+        return
       var at = root.trayItemViews.indexOf(trayItemRoot)
       if (at !== -1)
         root.trayItemViews.splice(at, 1)
