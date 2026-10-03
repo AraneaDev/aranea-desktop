@@ -110,12 +110,19 @@ Item {
   }
 
   component PanelContent: Item {
+    // The update status shown (see UpdatePanel.status).
     property var status: ({})
+    // Whether a check is running: the Refresh pill pulses and ignores clicks.
     property bool checking: false
+    // The pill the keyboard cursor is on.
     property int cursorIndex: 0
+    // Whether the keyboard cursor shows (keyboard use only).
     property bool keyboardCursor: false
+    // Emitted to open the updater.
     signal openUpdater
+    // Emitted to start a check.
     signal refresh
+    // Emitted when a real pointer move lands on pill INDEX.
     signal pillHovered(int index)
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight
@@ -141,12 +148,19 @@ Item {
 
   component TestPanelHost: Item {
     id: testHost
+    // The update status shown.
     property var status: ({})
+    // Whether a check is running.
     property bool checking: false
+    // The pill the keyboard cursor is on.
     property int cursorIndex: 0
+    // Whether the keyboard cursor shows.
     property bool keyboardCursor: false
+    // Whether the test host counts as open.
     property bool open: false
+    // Emitted to open the updater.
     signal openUpdater
+    // Emitted to start a check.
     signal refresh
     implicitWidth: content.implicitWidth
     implicitHeight: content.implicitHeight

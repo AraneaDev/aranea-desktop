@@ -96,7 +96,7 @@ Item {
     Aranea.DropdownHeader {
       id: header
       Layout.fillWidth: true
-      glyph: "↥"
+      glyph: String.fromCodePoint(0x21a5)
       glyphColor: panel.info.tone === "warn" ? Aranea.DesignTokens.attention : Aranea.DesignTokens.ceremony
       title: "Updates"
       caption: UpdateLogic.statusCaption(panel.status, panel.checking)
