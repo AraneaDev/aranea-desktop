@@ -33,6 +33,9 @@ Item {
   onRingColorChanged: canvas.requestPaint()
   onTrackColorChanged: canvas.requestPaint()
   onThicknessChanged: canvas.requestPaint()
+  // A canvas skips paints while hidden; showing again repaints it.
+  onVisibleChanged: if (ring.visible)
+    canvas.requestPaint()
 
   Canvas {
     id: canvas

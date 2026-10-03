@@ -21,6 +21,7 @@ Column {
   spacing: Style.space(6)
 
   Text {
+    textFormat: Text.PlainText
     text: "BALANCE"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
     font.family: Style.font.family
@@ -33,6 +34,7 @@ Column {
     implicitHeight: Math.max(balanceLabel.implicitHeight, balanceValue.implicitHeight)
     Text {
       id: balanceLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: "Prepaid credits"
@@ -42,6 +44,7 @@ Column {
     }
     Text {
       id: balanceValue
+      textFormat: Text.PlainText
       objectName: "balanceRemaining"
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -58,6 +61,7 @@ Column {
     value: section.balance ? Number(section.balance.fraction) || 0 : 0
   }
   Text {
+    textFormat: Text.PlainText
     objectName: "balanceDetail"
     width: parent.width
     visible: text !== ""

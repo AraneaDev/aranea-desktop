@@ -41,6 +41,7 @@ Column {
   spacing: Style.space(6)
 
   Text {
+    textFormat: Text.PlainText
     text: section.caption
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
     font.family: Style.font.family
@@ -80,6 +81,7 @@ Column {
 
       Text {
         id: labelText
+        textFormat: Text.PlainText
         objectName: "usageLabel"
         anchors.left: parent.left
         anchors.top: section.stacked ? parent.top : undefined
@@ -94,6 +96,7 @@ Column {
       }
       Text {
         id: valueText
+        textFormat: Text.PlainText
         objectName: "usageValue"
         anchors.right: parent.right
         anchors.top: section.stacked ? parent.top : undefined

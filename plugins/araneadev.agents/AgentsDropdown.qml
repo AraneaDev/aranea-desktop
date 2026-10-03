@@ -166,8 +166,9 @@ Column {
     id: agentsScroll
     objectName: "agentsScroll"
     width: parent.width
-    // Whatever the pinned rows leave of maxHeight.
-    height: Math.min(scrollColumn.implicitHeight, Math.max(Style.space(120), dropdown.maxHeight - (header.visible ? header.height + dropdown.spacing : 0) - (agentSwitch.visible ? agentSwitch.height + dropdown.spacing : 0) - keyHint.implicitHeight - dropdown.spacing))
+    // Whatever the pinned rows leave of maxHeight, never less than nothing,
+    // so the dropdown never grows past maxHeight.
+    height: Math.max(0, Math.min(scrollColumn.implicitHeight, dropdown.maxHeight - (header.visible ? header.height + dropdown.spacing : 0) - (agentSwitch.visible ? agentSwitch.height + dropdown.spacing : 0) - (keyHint.visible ? keyHint.implicitHeight + dropdown.spacing : 0)))
     contentWidth: width
     contentHeight: scrollColumn.implicitHeight
     clip: true
@@ -191,6 +192,7 @@ Column {
         border.color: Util.alpha(Aranea.DesignTokens.urgent, 0.35)
         Text {
           id: problemText
+          textFormat: Text.PlainText
           objectName: "problemText"
           anchors.left: parent.left
           anchors.right: parent.right
@@ -205,6 +207,7 @@ Column {
         }
       }
       Text {
+        textFormat: Text.PlainText
         objectName: "emptyText"
         width: parent.width
         visible: !!dropdown.view.empty
@@ -281,6 +284,7 @@ Column {
         }
       }
       Text {
+        textFormat: Text.PlainText
         objectName: "footerText"
         width: parent.width
         visible: text !== ""
@@ -295,8 +299,11 @@ Column {
   }
   Text {
     id: keyHint
+    textFormat: Text.PlainText
     objectName: "keyHint"
     width: parent.width
+    // No hint, no line: an empty hint takes no height.
+    visible: text !== ""
     text: String(dropdown.view.keyHint || "")
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
     font.family: Style.font.family

@@ -34,6 +34,7 @@ Item {
 
   Text {
     id: glyphText
+    textFormat: Text.PlainText
     objectName: "headerGlyph"
     width: Style.space(28)
     anchors.left: parent.left
@@ -66,6 +67,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     spacing: Style.space(2)
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: header.title
       elide: Text.ElideRight
@@ -75,6 +77,7 @@ Item {
       font.bold: true
     }
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       objectName: "headerCaption"
       text: header.caption.toUpperCase()

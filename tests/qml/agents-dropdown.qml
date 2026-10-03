@@ -9,7 +9,13 @@
 // the balance draw strand bars and a limit's pace draws its tick; warning
 // tones tint the percent text; the problem card, the empty text and the
 // scroll cap; hovering today or a model shows its detail and reports the
-// hover; and the ring hides at tone "none" and takes its colour per tone.
+// hover; and the ring hides at tone "none" and takes its colour per tone,
+// and a 0.3 ring that turns visible paints accent pixels from 12 o'clock
+// clockwise over a faint track. Data text is plain text (a "<synthetic>"
+// model label shows as is), pills cap at an even share of the row, a
+// press that ends without a choice forgets its key, the busy Refresh pill
+// pulses without the selected look, an empty key hint takes no line, and
+// the dropdown stays within maxHeight.
 import QtQuick
 import QtTest
 import Quickshell
@@ -189,12 +195,67 @@ ShellRoot {
     return t.findChildren(t.findChild(view, name), "usageRow")
   }
 
+  // Fix round checks: plain text, the even pill split, a canceled press,
+  // an empty key hint and the height cap; then finishes.
+  function finishFixes() {
+    var synthetic = viewOf(agentRows, false)
+    synthetic.models[0].label = "<synthetic>"
+    synthetic.models[0].key = "<synthetic>"
+    synthetic.hero.problem = "<b>sign in</b>"
+    view.view = synthetic
+    var modelLabel = t.findChildren(t.findChild(view, "modelsSection"), "usageLabel")[0]
+    t.check(modelLabel.text === "<synthetic>" && modelLabel.textFormat === Text.PlainText, "a <synthetic> model label shows as plain text")
+    var problem = t.findChild(view, "problemText")
+    t.check(problem.textFormat === Text.PlainText && problem.text === "<b>sign in</b>", "markup in a problem stays plain text")
+    t.check(["limitPercent", "limitResets", "usageValue", "balanceRemaining", "balanceDetail", "footerText", "keyHint", "emptyText"].every(function (name) {
+      var item = t.findChild(view, name)
+      return item !== null && item.textFormat === Text.PlainText
+    }), "every data text is plain text")
+
+    var long = "An agent with a very long subscription name indeed"
+    view.view = viewOf([agent("a", long, true), agent("b", long, false), agent("c", long, false)], false)
+    var sw = t.findChild(view, "agentSwitch")
+    var share = (sw.width - sw.spacing * 2) / 3
+    t.check(pills().every(function (p) {
+      return p.width <= share + 0.5 && p.implicitWidth > share
+    }), "long labels cap each pill at an even share of the row")
+    view.view = viewOf(agentRows, false)
+    t.check(pills()[0].width < share, "short labels keep their natural width")
+
+    // A press released outside the pill forgets its key.
+    var p0 = pills()[0]
+    pointer.mousePress(p0)
+    t.equal(p0.pressedKey, "claude", "a press remembers the pill's key")
+    pointer.mouseMove(view, view.width - 2, view.height - 2, -1, Qt.LeftButton)
+    pointer.mouseRelease(view, view.width - 2, view.height - 2)
+    t.equal(p0.pressedKey, "", "a press released outside forgets it")
+    // A press refused by the settle forgets it too.
+    view.noteLayoutChange()
+    pointer.mouseClick(p0)
+    t.equal(p0.pressedKey, "", "a press refused by the settle forgets it")
+
+    var noHint = viewOf(agentRows, false)
+    noHint.keyHint = ""
+    view.view = noHint
+    var hint = t.findChild(view, "keyHint")
+    t.check(!hint.visible, "an empty key hint takes no line")
+    view.maxHeight = 160
+    t.waitFor(function () {
+      return view.height > 0
+    }, 1000, "the capped view lays out", function () {
+      t.check(view.height <= 160 + 0.5, "the dropdown stays within maxHeight")
+      view.maxHeight = 20
+      t.check(view.scroll.height === 0 && view.scroll.height >= 0, "the scroll area never goes below nothing")
+      view.maxHeight = 2000
+      t.done()
+    })
+  }
+
   // Runs STEPS ([delay, fn] pairs) one after another, then finishes.
   function run(steps) {
-    if (steps.length === 0) {
-      t.done()
+    // The last step hands over to finishFixes, which finishes.
+    if (steps.length === 0)
       return
-    }
     t.step(steps[0][0], function () {
       steps[0][1]()
       run(steps.slice(1))
@@ -215,6 +276,65 @@ ShellRoot {
         actions.push([name, arg])
       }
     }
+  }
+
+  FloatingWindow {
+    implicitWidth: 160
+    implicitHeight: 60
+    visible: true
+
+    Row {
+      spacing: 10
+
+      Agents.AgentsRing {
+        id: ringProbe
+        width: 40
+        height: 40
+        thickness: 4
+        fraction: 0.3
+        // Hidden first: turning visible later must still paint.
+        tone: "none"
+      }
+      Image {
+        id: probeImage
+        width: 40
+        height: 40
+        onStatusChanged: if (status === Image.Ready)
+          probeCanvas.requestPaint()
+      }
+      Canvas {
+        id: probeCanvas
+        // RGBA pixels read back at the probe points, by name.
+        property var pixels: null
+
+        width: 40
+        height: 40
+        onPaint: {
+          if (probeImage.status !== Image.Ready)
+            return
+          var ctx = getContext("2d")
+          ctx.reset()
+          ctx.drawImage(probeImage, 0, 0)
+          var at = function (x, y) {
+            var d = ctx.getImageData(x, y, 1, 1).data
+            return [d[0], d[1], d[2], d[3]]
+          }
+          probeCanvas.pixels = {
+            top: at(21, 2),
+            clockwise: at(34, 9),
+            left: at(2, 20)
+          }
+        }
+      }
+    }
+  }
+
+  // Whether RGBA pixel PX is opaque and close to colour C.
+  function litAs(px, c) {
+    var near = function (a, b) {
+      return Math.abs(a - Math.round(b * 255)) <= 40
+    }
+    return !!px && px[3] > 200 && near(px[0], c.r) && near(px[1], c.g) && near(px[2], c.b)
   }
 
   Agents.AgentsRing {
@@ -305,6 +425,7 @@ ShellRoot {
         var refresh = t.findChild(view, "refreshPill")
         t.check(refresh.busy && refresh.text.indexOf("Refreshing") === 0, "a refresh in flight shows Refreshing at once")
         t.check(t.findChild(refresh, "busyPulse").running, "and pulses")
+        t.check(!refresh.selected && !t.findChild(refresh, "pillUnderline").visible, "the busy pill pulses without the selected look")
         pointer.mouseClick(refresh)
         refresh.activate()
         t.equal(nonHover().length, 0, "the busy pill ignores clicks")
@@ -475,5 +596,24 @@ ShellRoot {
         ringCalm.tone = "none"
         t.check(!ringCalm.visible, "the ring hides when its tone turns none")
         t.check(t.findChild(ringFull, "ringCanvas") !== null, "the ring draws on a canvas")
+
+        // ---------- Ring pixels, after turning visible ----------
+        t.check(!ringProbe.visible, "the probe ring starts hidden")
+        ringProbe.tone = "accent"
+        t.check(ringProbe.visible, "and turns visible with a tone")
+      }], [200, function () {
+        ringProbe.grabToImage(function (result) {
+          probeImage.source = result.url
+        })
+      }], [50, function () {
+        t.waitFor(function () {
+          return probeCanvas.pixels !== null
+        }, 3000, "the ring grab is read back", function () {
+          var px = probeCanvas.pixels
+          t.check(litAs(px.top, Shared.DesignTokens.accent), "a 0.3 ring that turned visible paints the accent near 12 o'clock")
+          t.check(litAs(px.clockwise, Shared.DesignTokens.accent), "and just clockwise of it")
+          t.check(px.left[3] > 0 && px.left[3] < 120 && !litAs(px.left, Shared.DesignTokens.accent), "9 o'clock shows the faint track, not the accent")
+          finishFixes()
+        })
       }]])
 }

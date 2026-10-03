@@ -27,6 +27,7 @@ Column {
   spacing: Style.space(6)
 
   Text {
+    textFormat: Text.PlainText
     text: "LIMITS"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
     font.family: Style.font.family
@@ -61,6 +62,7 @@ Column {
         implicitHeight: Math.max(limitLabel.implicitHeight, limitPercent.implicitHeight)
         Text {
           id: limitLabel
+          textFormat: Text.PlainText
           anchors.left: parent.left
           anchors.right: limitPercent.left
           anchors.rightMargin: Style.space(8)
@@ -75,6 +77,7 @@ Column {
         }
         Text {
           id: limitPercent
+          textFormat: Text.PlainText
           objectName: "limitPercent"
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
@@ -91,6 +94,7 @@ Column {
         pace: typeof limitRow.limit.pace === "number" ? limitRow.limit.pace : -1
       }
       Text {
+        textFormat: Text.PlainText
         objectName: "limitResets"
         width: parent.width
         visible: text !== ""

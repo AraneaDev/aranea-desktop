@@ -25,6 +25,12 @@ Row {
   // moving under a still pointer; its layoutChangedAt settles clicks.
   property var pointerGate: null
 
+  // An even share of the row per pill: the cap on each pill's width.
+  readonly property real cellWidth: {
+    var n = (section.agents || []).length
+    return n > 0 ? (section.width - section.spacing * (n - 1)) / n : section.width
+  }
+
   // Emitted when pill INDEX (holding KEY when pressed) is chosen.
   signal chosen(int index, string key)
   // Emitted when the pointer really moves onto pill INDEX.
@@ -59,11 +65,17 @@ Row {
       property string pressedKey: ""
 
       objectName: "agentPill"
+      // Natural width, capped at an even share of the row (stock's even
+      // split), so long labels elide instead of overflowing.
+      width: Math.min(chip.implicitWidth, section.cellWidth)
       text: chip.agent.label || ""
       selected: !!chip.agent.selected
       hasCursor: section.cursor === chip.index
       pointerGate: section.pointerGate
       onPressed: chip.pressedKey = chip.key
+      // A press that ends without a choice forgets its key, so a later
+      // keyboard activate() never sends a stale one.
+      onPressCanceled: chip.pressedKey = ""
       onClicked: {
         var key = chip.pressedKey !== "" ? chip.pressedKey : chip.key
         chip.pressedKey = ""

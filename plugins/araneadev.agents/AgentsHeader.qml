@@ -2,7 +2,8 @@
 // tool's mark (an image, falling back to the bar glyph), the tool as title,
 // the plan plus "updated HH:MM" as caption, and the Refresh pill in its
 // trailing slot. Pure view: plain inputs in, signals out. The pill shows
-// "Refreshing…" and breathes while a refresh is in flight, and ignores
+// "Refreshing…" and breathes (without the selected look) while a refresh
+// is in flight, and ignores
 // clicks then; a click within 300 ms of the dropdown's layout shifting
 // (pointerGate.layoutChangedAt) is ignored unless the pointer has really
 // moved onto it since (FilamentPill's own settle).
@@ -34,7 +35,6 @@ Aranea.DropdownHeader {
     id: pill
     objectName: "refreshPill"
     text: header.busy ? "Refreshing" + String.fromCodePoint(0x2026) : "Refresh"
-    selected: header.busy
     busy: header.busy
     hasCursor: header.hasCursor
     pointerGate: header.pointerGate

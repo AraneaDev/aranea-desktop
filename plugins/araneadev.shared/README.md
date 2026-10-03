@@ -60,7 +60,10 @@ service contracts to the feature plugins.
   or only on a real pointer move when a `pointerGate` is set. A pill on a
   row a Repeater can rebuild takes the row as `clickGate` (VPN's "open app"
   chip), as `FilamentSwitch` does; without one, a pill with a gate settles
-  its clicks after the dropdown's layout shifts on its own.
+  its clicks after the dropdown's layout shifts on its own. `pressCanceled`
+  fires when a press ends without a choice (released outside, canceled or
+  refused by the settle), so a host can forget what it noted on `pressed`.
+  Its label, like `DropdownHeader`'s title and caption, is plain text.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph
   (tinted by `glyphColor`), title/caption pair, and a trailing slot. An
   optional `markSource` (an image url, e.g. the Agents tool logo) replaces
