@@ -158,6 +158,10 @@ states and application surfaces behind it.
 | --------------------------------------- | ------------------------------------- | ----------------------------------------- |
 | ![Agents popup](screenshots/agents.png) | ![Power popup](screenshots/power.png) | ![Display popup](screenshots/monitor.png) |
 
+| Tray menu                                | Tray manage                                       |
+| ---------------------------------------- | ------------------------------------------------- |
+| ![Tray menu popup](screenshots/tray.png) | ![Tray manage popup](screenshots/tray-manage.png) |
+
 | Calendar                                 | Weather                                   | Wallpaper picker                                  |
 | ---------------------------------------- | ----------------------------------------- | ------------------------------------------------- |
 | ![Calendar popup](screenshots/clock.png) | ![Weather popup](screenshots/weather.png) | ![Wallpaper picker](screenshots/image-picker.png) |
