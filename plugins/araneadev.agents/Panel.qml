@@ -94,6 +94,16 @@ Panel {
     usage.refreshAll(true)
   }
 
+  // Offers Main's dataRevision to the pending refresh: idle, it keeps the
+  // baseline current for the next request; busy, it lands the refresh, but
+  // only once every shown agent's record was rewritten since the request
+  // (a fast collector's record alone would stop the pill early).
+  function noteRecords() {
+    if (root.refreshPending.busy && !AgentsLogic.recordsLandedSince(root.providers.map(root.updatedMsFor), root.refreshPending.startedAt))
+      return
+    root.refreshPending = AgentsLogic.refreshLanded(root.refreshPending, usage.dataRevision)
+  }
+
   // The one refresh path (r, Enter, the Refresh pill and IPC refresh): marks
   // the refresh pending and runs refreshNow, or does nothing while one is
   // already pending.
@@ -616,14 +626,12 @@ Panel {
 
   // The refresh landing baseline is taken here, before any click, so the
   // first refresh waits for a real change rather than the first revision.
-  Component.onCompleted: root.refreshPending = AgentsLogic.refreshLanded(root.refreshPending, usage.dataRevision)
+  Component.onCompleted: root.noteRecords()
 
   Main {
     id: usage
     settings: root.settings
-    // Every record change: lands a pending refresh, or keeps the idle
-    // baseline current for the next one.
-    onDataRevisionChanged: root.refreshPending = AgentsLogic.refreshLanded(root.refreshPending, usage.dataRevision)
+    onDataRevisionChanged: root.noteRecords()
   }
 
   // Cheap enough to keep running: it only re-evaluates text bindings, and a

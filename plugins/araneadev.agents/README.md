@@ -16,8 +16,9 @@ slot: it fills with the current agent's fullest limit window, in the accent belo
 80% and urgent from 95%, and is absent for an agent without limits.
 
 Refresh: `r`, Enter, the header's Refresh pill and IPC `refresh` share one path. The pill reads
-"Refreshing…" and pulses until Main's data revision moves past the one seen at the request (the
-records landed) or 30 s pass; requests while it is pending are ignored.
+"Refreshing…" and pulses until every shown agent's record has been rewritten since the request
+(`AgentsLogic.recordsLandedSince`, then Main's data revision lands it through `refreshLanded`) or
+30 s pass; requests while it is pending are ignored.
 
 Settings form: the manifest keeps stock's `defaults`, `schema` and `aliases` in the `barWidget`
 block, unlike Weather's named `settingsForm` string. The shell resolves a widget's settings
@@ -33,7 +34,7 @@ only while the keyboard drives it: after opening or any pointer use, the first n
 Enter only reveals it (on the selected agent pill, or on the Refresh pill with one agent); `r`
 refreshes at once.
 
-The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-pending state, the
+The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-pending state and its landing gate, the
 "updated HH:MM" caption; tested under Node). `Panel.qml` builds `agentsView` from stock's own
 limit/balance/day/model functions and adds the limits' pace tick (the elapsed share of each
 window's span) and the mark probe that walks stock's light-twin fallback for the header.

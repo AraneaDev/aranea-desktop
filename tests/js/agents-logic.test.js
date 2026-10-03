@@ -241,3 +241,35 @@ test("updatedCaption: both missing is ''", () => {
   assert.equal(logic.updatedCaption("", 0), "")
   assert.equal(logic.updatedCaption(null, null), "")
 })
+
+// --- recordsLandedSince ---------------------------------------------------------------
+
+test("recordsLandedSince: false while any shown record predates the refresh", () => {
+  assert.equal(logic.recordsLandedSince([2000, 900], 1000), false)
+})
+
+test("recordsLandedSince: true once every record is at or after the refresh", () => {
+  assert.equal(logic.recordsLandedSince([1000, 2500], 1000), true)
+})
+
+test("recordsLandedSince: records without a usable write time are skipped", () => {
+  assert.equal(logic.recordsLandedSince([0, -5, NaN, "x", 1500], 1000), true)
+  assert.equal(logic.recordsLandedSince([], 1000), true)
+  assert.equal(logic.recordsLandedSince(null, 1000), true)
+})
+
+test("recordsLandedSince: a missing start counts as 0, so everything landed", () => {
+  assert.equal(logic.recordsLandedSince([5], undefined), true)
+})
+
+test("recordsLandedSince gates refreshLanded: a fast record alone keeps it busy", () => {
+  let s = logic.refreshLanded(logic.refreshIdle(), 4)
+  s = logic.refreshClick(s, 1000).state
+  // The fast collector wrote; the slow one still holds its old time.
+  const early = logic.recordsLandedSince([1200, 500], s.startedAt)
+  assert.equal(early, false)
+  // Both written: offering the revision now lands it.
+  assert.equal(logic.recordsLandedSince([1200, 1800], s.startedAt), true)
+  s = logic.refreshLanded(s, 6)
+  assert.equal(s.busy, false)
+})

@@ -145,6 +145,27 @@ function refreshLanded(state, revision) {
 }
 
 /**
+ * Whether every shown agent's record has been rewritten since a refresh
+ * started, so the pill waits for the whole refresh instead of stopping at
+ * the first record a fast collector writes. Busy, the panel only offers a
+ * revision to `refreshLanded` once this holds. A record without a usable
+ * write time (0, negative or not a number, e.g. a synced-only agent with no
+ * local record) cannot be waited on and is skipped.
+ * @param {Array<number>} updatedMs - each shown agent's record write time (ms)
+ * @param {number} startedAt - the refresh's start (RefreshPending.startedAt)
+ * @returns {boolean} true when no usable write time predates startedAt
+ */
+function recordsLandedSince(updatedMs, startedAt) {
+  var list = Array.isArray(updatedMs) ? updatedMs : []
+  var since = Number(startedAt) || 0
+  for (var i = 0; i < list.length; i++) {
+    var ms = Number(list[i])
+    if (isFinite(ms) && ms > 0 && ms < since) return false
+  }
+  return true
+}
+
+/**
  * A refresh that never lands: once `timeoutMs` have passed since the click,
  * the pill stops pulsing and shows the last data instead of waiting
  * forever. The baseline revision is kept as it was, since nothing proved it
@@ -202,6 +223,7 @@ if (typeof module !== "undefined")
     refreshIdle: refreshIdle,
     refreshClick: refreshClick,
     refreshLanded: refreshLanded,
+    recordsLandedSince: recordsLandedSince,
     refreshTimeout: refreshTimeout,
     updatedCaption: updatedCaption
   }
