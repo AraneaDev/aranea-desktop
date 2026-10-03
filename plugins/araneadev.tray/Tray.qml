@@ -870,7 +870,7 @@ BarWidget {
           width: implicitWidth
           height: implicitHeight
           x: root.drawerExtent - root.revealExtent
-          text: ""
+          text: "\uf053"
           onPressed: function (button: int) {
             if (button === Qt.RightButton)
               root.toggleManage()
@@ -958,7 +958,7 @@ BarWidget {
           width: implicitWidth
           height: implicitHeight
           y: root.drawerExtent - root.revealExtent
-          text: ""
+          text: "\uf053"
           textRotation: 90
           onPressed: function (button: int) {
             if (button === Qt.RightButton)
