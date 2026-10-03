@@ -20,7 +20,7 @@ projected to `mark_start`, `mark_mid` and `mark_end` from
 colors, update the projection map in `tools/token-generator.mjs` as part of
 the same change. Keep some padding inside the viewBox: the generator also
 insets the mark when it renders the 640x640 `unlock.png`, so the spider never
-touches the edge of the boot and lock artwork.
+touches the edge of the boot screen.
 
 ## Make a rebrand
 
@@ -43,17 +43,25 @@ touches the edge of the boot and lock artwork.
    ```
 
 The generator updates the shared QML brand config, browser/session CSS,
-branding text, shell-readable `branding/brand.env`, lock compatibility asset,
-static lock and Plymouth artwork, motifs, status glyphs, icon projections,
+branding text, shell-readable `branding/brand.env`, the `unlock.png` boot
+logo, motifs, status glyphs, icon projections,
 cursor integrations, and platform theme files.
 
 ## What happens at boot and lock screen
 
-The same generated mark and palette produce:
+The same generated mark and palette drive both screens:
 
-- `unlock.png` for compatibility with the lock integration;
-- `branding/screens/lock.png` for the static lock artwork;
-- `branding/screens/plymouth.png` for the static boot artwork.
+- the lock screen (`plugins/araneadev.lock`) draws the generated brand mark,
+  the brand name and lock subtitle from `design/brand.toml` and the palette
+  directly, so it follows a rebrand with no extra artwork;
+- `unlock.png` is the boot logo: Omarchy's Plymouth theme draws it centred,
+  on the `colors.toml` background, with the password entry tinted in the
+  foreground colour below it.
+
+The README screenshots of both screens are real renders of these
+(`tools/render-lock-preview` and `tools/render-plymouth-preview`, run by
+`scripts/capture-screenshots --surface lock` and `--surface plymouth`), so
+they follow a rebrand when they are recaptured.
 
 Plymouth activation is still an Omarchy operation after installation:
 
@@ -61,7 +69,7 @@ Plymouth activation is still an Omarchy operation after installation:
 omarchy plymouth set-by-theme aranea
 ```
 
-The generator creates the artwork; it does not replace Plymouth's boot
+The generator creates the logo; it does not replace Plymouth's boot
 animation or system activation step.
 
 ## Generated files and templates

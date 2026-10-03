@@ -144,7 +144,7 @@ test("renderBrandShellEnv produces shell-safe visible identity values", async ()
 test("canonicalPng removes rasterizer-specific ancillary chunks", async () => {
   const { canonicalPng } = await generatorPromise
   const fs = require("node:fs")
-  const png = fs.readFileSync("branding/screens/plymouth.png")
+  const png = fs.readFileSync("unlock.png")
   const ancillary = Buffer.from("0000000662474b4400ff00ff00ff00000000", "hex")
   const withMetadata = Buffer.concat([png.subarray(0, 33), ancillary, png.subarray(33)])
   const canonical = canonicalPng(withMetadata)

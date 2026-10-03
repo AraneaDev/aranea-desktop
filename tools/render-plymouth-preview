@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+# Renders the Plymouth boot screen as it looks at the disk-unlock password
+# prompt, without plymouthd, sudo or a reboot. It composes the same pieces
+# Omarchy installs with `omarchy plymouth set-by-theme aranea`: the theme's
+# unlock.png as the logo, the background colour from colors.toml and
+# Omarchy's entry, lock and bullet images tinted with the foreground colour,
+# placed with the geometry of Omarchy's omarchy.script (logo centred, entry
+# 40 px below it, lock icon 15 px left of the entry at 80% of its height,
+# 7x7 bullets 12 px apart starting 20 px into the entry). Plymouth lays the
+# sprites out in logical pixels (--size) and draws each one scaled by the
+# device scale (--scale, 2 on a HiDPI panel), so every sprite is resampled
+# once, straight to its device size and position. To confirm the boot's
+# device scale after a real boot, check `journalctl -b` around plymouth
+# (e.g. `journalctl -b | grep -i -e plymouth -e 'device scale'`) for the
+# scale or the mode it reports.
+# The renderer refuses to run when omarchy.script no longer holds the
+# geometry it mirrors, so an upstream change cannot produce a wrong picture.
+# The output is written atomically and only on success.
+#
+# Usage: tools/render-plymouth-preview --output FILE [--size WxH] [--scale N]
+#          [--bullets N] [--logo FILE] [--colors FILE] [--dialog-dir DIR]
+#
+#   --output FILE     PNG to write (required)
+#   --size WxH        logical window size Plymouth reports (default 1920x1080)
+#   --scale N         Plymouth device scale, an integer (default 2)
+#   --bullets N       stand-in password bullets, 0 to 21 (default 6)
+#   --logo FILE       logo image (default: the repository's unlock.png)
+#   --colors FILE     colors.toml with background and foreground
+#                     (default: the repository's colors.toml)
+#   --dialog-dir DIR  directory with omarchy.script, entry.png, lock.png and
+#                     bullet.png (default: $OMARCHY_PATH/default/plymouth,
+#                     then /usr/share/omarchy/default/plymouth, then the
+#                     installed /usr/share/plymouth/themes/omarchy)
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+output=""
+size="1920x1080"
+scale=2
+bullets=6
+logo="$repo_root/unlock.png"
+colors="$repo_root/colors.toml"
+dialog_dir=""
+
+# Prints the usage text (the header's Usage block) to stdout.
+usage() {
+  sed -n '/^# Usage:/,/^set /{/^set /d;s/^# \{0,1\}//;p}' "${BASH_SOURCE[0]}"
+}
+
+# Prints MESSAGE to stderr and exits 1.
+die() {
+  printf 'render-plymouth-preview: %s\n' "$1" >&2
+  exit 1
+}
+
+while (($#)); do
+  case "$1" in
+    --output) output="${2:-}" ;;
+    --size) size="${2:-}" ;;
+    --scale) scale="${2:-}" ;;
+    --bullets) bullets="${2:-}" ;;
+    --logo) logo="${2:-}" ;;
+    --colors) colors="${2:-}" ;;
+    --dialog-dir) dialog_dir="${2:-}" ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+  (($# >= 2)) || {
+    usage >&2
+    exit 2
+  }
+  shift 2
+done
+
+[[ -n "$output" ]] || {
+  usage >&2
+  exit 2
+}
+[[ "$size" =~ ^([1-9][0-9]*)x([1-9][0-9]*)$ ]] || die "invalid --size: $size (expected WxH)"
+window_w="${BASH_REMATCH[1]}"
+window_h="${BASH_REMATCH[2]}"
+[[ "$scale" =~ ^[1-9]$ ]] || die "invalid --scale: $scale (expected 1 to 9)"
+if [[ ! "$bullets" =~ ^[0-9]+$ ]] || ((bullets > 21)); then
+  die "invalid --bullets: $bullets (expected 0 to 21)"
+fi
+command -v magick >/dev/null 2>&1 || die "ImageMagick (magick) is required"
+
+if [[ -z "$dialog_dir" ]]; then
+  for candidate in ${OMARCHY_PATH:+"$OMARCHY_PATH/default/plymouth"} /usr/share/omarchy/default/plymouth /usr/share/plymouth/themes/omarchy; do
+    if [[ -f "$candidate/omarchy.script" ]]; then
+      dialog_dir="$candidate"
+      break
+    fi
+  done
+  [[ -n "$dialog_dir" ]] || die "no Omarchy Plymouth theme found (pass --dialog-dir)"
+fi
+for file in "$logo" "$colors" "$dialog_dir/omarchy.script" "$dialog_dir/entry.png" "$dialog_dir/lock.png" "$dialog_dir/bullet.png"; do
+  [[ -f "$file" ]] || die "missing input: $file"
+done
+
+# The omarchy.script lines whose geometry this renderer reproduces.
+script_geometry=(
+  'logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);'
+  'logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);'
+  'entry.x = Window.GetWidth() / 2 - entry.image.GetWidth() / 2;'
+  'entry.y = logo.sprite.GetY() + logo.image.GetHeight() + 40;'
+  'lock_height = entry.image.GetHeight() * 0.8;'
+  'lock_scale = lock_height / 96;'
+  'lock_width = 84 * lock_scale;'
+  'lock.x = entry.x - lock_width - 15;'
+  'lock.y = entry.y + entry.image.GetHeight() / 2 - lock_height / 2;'
+  'scaled_bullet = bullet.image.Scale(7, 7);'
+  'bullet.x = entry.x + 20 + index * (7 + 5);'
+  'bullet.y = entry.y + entry.image.GetHeight() / 2 - 3.5;'
+)
+for line in "${script_geometry[@]}"; do
+  grep -Fq -- "$line" "$dialog_dir/omarchy.script" ||
+    die "omarchy.script no longer contains: $line (update the renderer to the new geometry)"
+done
+
+# Prints the "#rrggbb" value of KEY in the colors file, as
+# omarchy-plymouth-set-by-theme reads it.
+theme_color() {
+  local value
+  value="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\\(#[0-9a-fA-F]\\{6\\}\\)\".*/\\1/p" "$colors" | head -n1)"
+  [[ -n "$value" ]] || die "no $1 colour in $colors"
+  printf '%s\n' "$value"
+}
+background="$(theme_color background)"
+foreground="$(theme_color foreground)"
+
+# Prints the WIDTH HEIGHT of image FILE.
+image_size() {
+  magick identify -format '%w %h\n' "$1"
+}
+
+# Prints EXPR evaluated in floating point and truncated toward zero, as
+# Plymouth truncates sprite positions and Image.Scale sizes.
+trunc() {
+  awk "BEGIN { v = $1; printf \"%d\\n\", (v < 0 ? -int(-v) : int(v)) }"
+}
+
+read -r logo_w logo_h < <(image_size "$logo")
+read -r entry_w entry_h < <(image_size "$dialog_dir/entry.png")
+
+# Plymouth keeps sprite positions as numbers and truncates them when it
+# draws, so every coordinate is computed from the unrounded script values.
+logo_x_expr="$window_w / 2 - $logo_w / 2"
+logo_y_expr="$window_h / 2 - $logo_h / 2"
+entry_x_expr="$window_w / 2 - $entry_w / 2"
+entry_y_expr="($logo_y_expr) + $logo_h + 40"
+lock_h_expr="$entry_h * 0.8"
+lock_w_expr="84 * (($lock_h_expr) / 96)"
+logo_x="$(trunc "$logo_x_expr")"
+logo_y="$(trunc "$logo_y_expr")"
+entry_x="$(trunc "$entry_x_expr")"
+entry_y="$(trunc "$entry_y_expr")"
+lock_w="$(trunc "$lock_w_expr")"
+lock_h="$(trunc "$lock_h_expr")"
+lock_x="$(trunc "($entry_x_expr) - ($lock_w_expr) - 15")"
+lock_y="$(trunc "($entry_y_expr) + $entry_h / 2 - ($lock_h_expr) / 2")"
+bullet_y="$(trunc "($entry_y_expr) + $entry_h / 2 - 3.5")"
+
+work="$(mktemp -d)"
+staged=""
+# Removes the scratch directory and any half-written output.
+cleanup() {
+  rm -rf -- "$work"
+  [[ -z "$staged" ]] || rm -f -- "$staged"
+}
+trap cleanup EXIT
+
+# Omarchy tints the dialog images with the theme's foreground colour.
+for asset in entry lock bullet; do
+  magick "$dialog_dir/$asset.png" -channel RGB +level-colors "$foreground,$foreground" "$work/$asset.png"
+done
+
+layers=()
+# Appends FILE to the layers, resampled once to its logical W x H times the
+# device scale and placed at its logical X,Y times the device scale.
+add_sprite() {
+  layers+=('(' "$1" -filter Triangle -resize "$(($2 * scale))x$(($3 * scale))!" ')' -geometry "+$(($4 * scale))+$(($5 * scale))" -composite)
+}
+add_sprite "$logo" "$logo_w" "$logo_h" "$logo_x" "$logo_y"
+add_sprite "$work/entry.png" "$entry_w" "$entry_h" "$entry_x" "$entry_y"
+add_sprite "$work/lock.png" "$lock_w" "$lock_h" "$lock_x" "$lock_y"
+for ((index = 0; index < bullets; index++)); do
+  add_sprite "$work/bullet.png" 7 7 "$(trunc "($entry_x_expr) + 20 + $index * (7 + 5)")" "$bullet_y"
+done
+
+magick -size "$((window_w * scale))x$((window_h * scale))" "xc:$background" "${layers[@]}" \
+  -alpha off -strip "PNG24:$work/frame.png"
+
+mkdir -p -- "$(dirname -- "$output")"
+staged="$(mktemp "$(dirname -- "$output")/.render-plymouth.XXXXXX")"
+cp -- "$work/frame.png" "$staged"
+mv -f -- "$staged" "$output"
+staged=""
+printf 'rendered: %s (%dx%d)\n' "$output" "$((window_w * scale))" "$((window_h * scale))"

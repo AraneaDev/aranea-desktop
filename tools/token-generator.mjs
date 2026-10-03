@@ -255,46 +255,6 @@ function renderBrowserIndex(brand) {
 `
 }
 
-function xmlEscape(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-}
-
-function renderBrandRaster(brand, tokens, markSvg, width, height, filename) {
-  const markData = Buffer.from(markSvg).toString("base64")
-  const i = brand.identity
-  const c = tokens.colors
-  const markWidth = Math.round(width * 0.18)
-  const markHeight = Math.round(height * 0.42)
-  const markX = Math.round((width - markWidth) / 2)
-  const markY = Math.round(height * 0.18)
-  const textY = Math.round(height * 0.72)
-  const subtitleY = Math.round(height * 0.78)
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <defs><radialGradient id="bg"><stop stop-color="${c.surface_raised}"/><stop offset="1" stop-color="${c.darker_background}"/></radialGradient></defs>
-  <rect width="${width}" height="${height}" fill="url(#bg)"/>
-  <image href="data:image/svg+xml;base64,${markData}" x="${markX}" y="${markY}" width="${markWidth}" height="${markHeight}" preserveAspectRatio="xMidYMid meet"/>
-  <text x="${width / 2}" y="${textY}" fill="${c.foreground}" text-anchor="middle" font-family="sans-serif" font-size="${Math.max(24, Math.round(height * 0.035))}" letter-spacing="${Math.max(2, Math.round(height * 0.008))}">${xmlEscape(i.short_name)}</text>
-  <text x="${width / 2}" y="${subtitleY}" fill="${c.dark_foreground}" text-anchor="middle" font-family="sans-serif" font-size="${Math.max(14, Math.round(height * 0.018))}">${xmlEscape(i.tagline)}</text>
-</svg>
-`
-  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aranea-brand-"))
-  const input = path.join(temporaryRoot, "brand.svg")
-  const output = path.join(temporaryRoot, filename)
-  try {
-    fs.writeFileSync(input, svg)
-    execFileSync(rasterizer, ["-w", String(width), "-h", String(height), "-o", output, input], {
-      stdio: "ignore"
-    })
-    return canonicalPng(fs.readFileSync(output))
-  } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true })
-  }
-}
-
 // Edge length in pixels of the square unlock.png. Omarchy's Plymouth theme
 // draws it at native size, so it must be large enough to stay crisp on 4K.
 const unlockSize = 640
@@ -332,18 +292,10 @@ function renderBrandAssets(brand, tokens) {
     return new Map([
       [
         "branding/raster-manifest.txt",
-        `# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.\ninput_sha256=${fingerprint}\nunlock=${size}x${size}\nlock=3840x2160\nplymouth=1920x1080\n`
+        `# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.\ninput_sha256=${fingerprint}\nunlock=${size}x${size}\n`
       ],
       ["branding/brand.svg", markSvg],
-      ["unlock.png", canonicalPng(fs.readFileSync(output))],
-      [
-        "branding/screens/lock.png",
-        renderBrandRaster(brand, tokens, markSvg, 3840, 2160, "lock.png")
-      ],
-      [
-        "branding/screens/plymouth.png",
-        renderBrandRaster(brand, tokens, markSvg, 1920, 1080, "plymouth.png")
-      ]
+      ["unlock.png", canonicalPng(fs.readFileSync(output))]
     ])
   } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true })

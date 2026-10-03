@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+# Renders the Aranea lock screen to a PNG without locking the session. It
+# runs quickshell offscreen (no compositor, display or session bus) on a
+# throwaway config that instantiates the plugin's real LockView, the same
+# component the lock surface shows, the way Service.qml's preview window
+# does (input disabled, no failure message, empty password field), in a
+# plain window at the output's logical size and device pixel ratio. The
+# clock shows a fixed stand-in time and date instead of now, and the
+# background is the wallpaper the lock would blur. It waits until every
+# image has loaded, grabs the window content and writes the PNG atomically;
+# any failure (an image that does not load, no grab, a timeout, a wrong
+# size) exits non-zero and writes nothing.
+#
+# Usage: tools/render-lock-preview --output FILE [--size WxH] [--scale N]
+#          [--background FILE] [--clock HH:MM] [--date YYYY-MM-DD]
+#          [--shell-dir DIR] [--quickshell BIN] [--timeout SECONDS]
+#
+#   --output FILE      PNG to write (required)
+#   --size WxH         output size in device pixels (default 3840x2160)
+#   --scale N          device pixel ratio, an integer (default 3); the size
+#                      must divide by it
+#   --background FILE  wallpaper behind the lock (default: what the
+#                      ~/.local/state/omarchy/current/background link points
+#                      at, else the repository's backgrounds/background-night.png)
+#   --clock HH:MM      stand-in time (default 09:41)
+#   --date YYYY-MM-DD  stand-in date, formatted as the lock formats it
+#                      (default 2026-10-03)
+#   --shell-dir DIR    Omarchy shell with Commons/ and Ui/
+#                      (default: $OMARCHY_PATH/shell or /usr/share/omarchy/shell)
+#   --quickshell BIN   quickshell binary (default: quickshell on PATH)
+#   --timeout SECONDS  give up after this long (default 30)
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+output=""
+size="3840x2160"
+scale=3
+background=""
+clock="09:41"
+date="2026-10-03"
+shell_dir="${OMARCHY_PATH:-/usr/share/omarchy}/shell"
+quickshell_bin="quickshell"
+timeout_s=30
+
+# Prints the usage text (the header's Usage block) to stdout.
+usage() {
+  sed -n '/^# Usage:/,/^set /{/^set /d;s/^# \{0,1\}//;p}' "${BASH_SOURCE[0]}"
+}
+
+# Prints MESSAGE to stderr and exits 1.
+die() {
+  printf 'render-lock-preview: %s\n' "$1" >&2
+  exit 1
+}
+
+while (($#)); do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --output | --size | --scale | --background | --clock | --date | --shell-dir | --quickshell | --timeout)
+      (($# >= 2)) || {
+        usage >&2
+        exit 2
+      }
+      ;;
+    *)
+      usage >&2
+      exit 2
+      ;;
+  esac
+  case "$1" in
+    --output) output="$2" ;;
+    --size) size="$2" ;;
+    --scale) scale="$2" ;;
+    --background) background="$2" ;;
+    --clock) clock="$2" ;;
+    --date) date="$2" ;;
+    --shell-dir) shell_dir="$2" ;;
+    --quickshell) quickshell_bin="$2" ;;
+    --timeout) timeout_s="$2" ;;
+  esac
+  shift 2
+done
+
+[[ -n "$output" ]] || {
+  usage >&2
+  exit 2
+}
+[[ "$size" =~ ^([1-9][0-9]*)x([1-9][0-9]*)$ ]] || die "invalid --size: $size (expected WxH)"
+width="${BASH_REMATCH[1]}"
+height="${BASH_REMATCH[2]}"
+[[ "$scale" =~ ^[1-9]$ ]] || die "invalid --scale: $scale (expected 1 to 9)"
+((width % scale == 0 && height % scale == 0)) || die "--size $size does not divide by --scale $scale"
+[[ "$clock" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || die "invalid --clock: $clock (expected HH:MM)"
+[[ "$date" =~ ^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$ ]] || die "invalid --date: $date (expected YYYY-MM-DD)"
+[[ "$timeout_s" =~ ^[1-9][0-9]*$ ]] || die "invalid --timeout: $timeout_s"
+[[ -f "$shell_dir/Commons/qmldir" && -f "$shell_dir/Ui/qmldir" ]] || die "no Omarchy shell at $shell_dir"
+quickshell_path="$(command -v "$quickshell_bin" 2>/dev/null)" || die "quickshell is required ($quickshell_bin not found)"
+command -v magick >/dev/null 2>&1 || die "ImageMagick (magick) is required"
+
+if [[ -z "$background" ]]; then
+  background="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
+  [[ -f "$background" ]] || background="$repo_root/backgrounds/background-night.png"
+fi
+[[ -f "$background" ]] || die "missing background: $background"
+background="$(readlink -f -- "$background")"
+
+# Short path: the quickshell IPC socket path is limited to 108 bytes.
+work="$(mktemp -d /tmp/aranea-lock.XXXXXX)"
+staged=""
+qs_pid=""
+# Stops quickshell and everything it started, removes the scratch config
+# and any half-written output.
+cleanup() {
+  if [[ -n "$qs_pid" ]]; then
+    kill -- "-$qs_pid" 2>/dev/null || true
+    wait "$qs_pid" 2>/dev/null || true
+  fi
+  rm -rf -- "$work"
+  [[ -z "$staged" ]] || rm -f -- "$staged"
+}
+trap cleanup EXIT
+
+mkdir -p "$work/cfg/plugins" "$work/run"
+chmod 700 "$work/run"
+ln -s "$shell_dir/Commons" "$work/cfg/Commons"
+ln -s "$shell_dir/Ui" "$work/cfg/Ui"
+for plugin in "$repo_root"/plugins/araneadev.*; do
+  [[ -d "$plugin" ]] && ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"
+done
+
+cat >"$work/cfg/shell.qml" <<'QML'
+// Offscreen lock render: the real LockView in a plain window, grabbed to a
+// PNG once every image has loaded. Settings come from ARANEA_LOCK_RENDER_*.
+import QtQuick
+import Quickshell
+import "plugins/araneadev.lock" as Lock
+
+ShellRoot {
+  id: harness
+
+  // Fixed stand-in time.
+  readonly property string clockText: Quickshell.env("ARANEA_LOCK_RENDER_CLOCK")
+  // Fixed stand-in date, in LockView.updateClock's format.
+  readonly property string dateText: {
+    var parts = Quickshell.env("ARANEA_LOCK_RENDER_DATE").split("-")
+    return Qt.formatDate(new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])), "dddd • dd MMMM")
+  }
+  // Polls since start; at 100 ms each, the timeout.
+  property int polls: 0
+  // Grab attempts so far (one retries when the clock ticked in between).
+  property int grabs: 0
+
+  // Prints the result line the render script waits for and quits.
+  function finish(ok, message) {
+    console.log((ok ? "LOCKRENDER OK " : "LOCKRENDER FAIL ") + message)
+    Qt.quit()
+  }
+
+  // Appends every object below ITEM to OUT.
+  function collect(item, out) {
+    var kids = item.data || item.children || []
+    for (var i = 0; i < kids.length; i++) {
+      out.push(kids[i])
+      collect(kids[i], out)
+    }
+    return out
+  }
+
+  // Stops LockView's one-second clock timer, so the stand-in time stays.
+  function stopClock() {
+    var all = collect(view, [])
+    for (var i = 0; i < all.length; i++) {
+      var o = all[i]
+      if (o.interval === 1000 && o.repeat === true && typeof o.restart === "function")
+        o.running = false
+    }
+  }
+
+  // Returns "ready", "loading" or the source of an image that failed.
+  function imageState() {
+    var all = collect(view, [])
+    var state = "ready"
+    for (var i = 0; i < all.length; i++) {
+      var o = all[i]
+      if (o.status === undefined || o.source === undefined || o.progress === undefined)
+        continue
+      if (String(o.source) === "")
+        continue
+      if (o.status === Image.Error)
+        return String(o.source)
+      if (o.status !== Image.Ready)
+        state = "loading"
+    }
+    return state
+  }
+
+  // Sets the stand-in clock and grabs the window content to the output.
+  function grab() {
+    grabs += 1
+    stopClock()
+    view.clockText = harness.clockText
+    view.dateText = harness.dateText
+    var ok = view.grabToImage(function (result) {
+      if (view.clockText !== harness.clockText || view.dateText !== harness.dateText) {
+        if (harness.grabs < 3)
+          harness.grab()
+        else
+          harness.finish(false, "the clock kept changing")
+        return
+      }
+      if (!result.saveToFile(Quickshell.env("ARANEA_LOCK_RENDER_OUTPUT")))
+        harness.finish(false, "could not save the grab")
+      else
+        harness.finish(true, result.image.width + "x" + result.image.height)
+    }, Qt.size(view.width, view.height))
+    if (!ok)
+      finish(false, "grabToImage refused")
+  }
+
+  FloatingWindow {
+    implicitWidth: Number(Quickshell.env("ARANEA_LOCK_RENDER_WIDTH"))
+    implicitHeight: Number(Quickshell.env("ARANEA_LOCK_RENDER_HEIGHT"))
+    visible: true
+    color: "black"
+
+    Lock.LockView {
+      id: view
+      anchors.fill: parent
+      backgroundPath: Quickshell.env("ARANEA_LOCK_RENDER_BACKGROUND")
+      fingerprintConfigured: false
+      authenticatingPassword: false
+      failureMessage: ""
+      inputEnabled: false
+      loadBackground: true
+      passwordText: ""
+    }
+  }
+
+  Timer {
+    interval: 100
+    repeat: true
+    running: true
+    onTriggered: {
+      harness.polls += 1
+      var state = harness.imageState()
+      if (state !== "ready" && state !== "loading") {
+        stop()
+        harness.finish(false, "image did not load: " + state)
+      } else if (state === "ready" && harness.polls >= 10) {
+        // A second of frames, so the blur and the fonts have settled.
+        stop()
+        harness.grab()
+      } else if (harness.polls > Number(Quickshell.env("ARANEA_LOCK_RENDER_TIMEOUT")) * 10) {
+        stop()
+        harness.finish(false, "images still loading at the timeout")
+      }
+    }
+  }
+}
+QML
+
+# From the scratch directory with no display, compositor, session bus or
+# desktop platform theme; setsid makes it lead its own process group, so
+# cleanup also stops anything it started.
+(cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
+  -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
+  QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR="$scale" \
+  XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" \
+  ARANEA_LOCK_RENDER_OUTPUT="$work/grab.png" ARANEA_LOCK_RENDER_BACKGROUND="$background" \
+  ARANEA_LOCK_RENDER_WIDTH="$((width / scale))" ARANEA_LOCK_RENDER_HEIGHT="$((height / scale))" \
+  ARANEA_LOCK_RENDER_CLOCK="$clock" ARANEA_LOCK_RENDER_DATE="$date" ARANEA_LOCK_RENDER_TIMEOUT="$timeout_s" \
+  "$quickshell_path" -p "$work/cfg") >"$work/log" 2>&1 &
+qs_pid=$!
+
+waited=0
+while ((waited < (timeout_s + 10) * 5)); do
+  grep -q 'LOCKRENDER' "$work/log" && break
+  grep -q 'Failed to load configuration' "$work/log" && break
+  kill -0 "$qs_pid" 2>/dev/null || break
+  sleep 0.2
+  waited=$((waited + 1))
+done
+log="$(sed 's/\x1b\[[0-9;]*m//g' "$work/log")"
+
+if ! grep -q 'LOCKRENDER OK' <<<"$log"; then
+  printf 'render-lock-preview: the render failed\n' >&2
+  grep -E 'LOCKRENDER FAIL|ERROR|TypeError|ReferenceError' <<<"$log" | head -20 | sed 's/^/  /' >&2 || true
+  exit 1
+fi
+errors="$(grep -E 'TypeError|ReferenceError|is not a function|Cannot read property|Unable to assign|Binding loop detected' <<<"$log" || true)"
+[[ -z "$errors" ]] || die "the lock view reported errors: $(head -5 <<<"$errors")"
+[[ "$(magick identify -format '%wx%h' "$work/grab.png" 2>/dev/null)" == "$size" ]] ||
+  die "the grab is not $size"
+
+mkdir -p -- "$(dirname -- "$output")"
+staged="$(mktemp "$(dirname -- "$output")/.render-lock.XXXXXX")"
+magick "$work/grab.png" -alpha off -strip "PNG24:$staged"
+mv -f -- "$staged" "$output"
+staged=""
+printf 'rendered: %s (%s)\n' "$output" "$size"

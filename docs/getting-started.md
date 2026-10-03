@@ -39,8 +39,8 @@ scripts/generate-tokens --check
 ```
 
 The generated mark is used by the shell and lock screen. The same source also
-produces the static lock/Plymouth artwork, raster compatibility asset, motif
-and status glyph colors, Kvantum artwork, and shell-readable brand values.
+produces the `unlock.png` boot logo, motif and status glyph colors, Kvantum
+artwork, and shell-readable brand values.
 
 ## Activate the theme
 

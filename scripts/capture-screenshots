@@ -35,6 +35,13 @@ set -euo pipefail
 # fixtures, both tray captures are refused with no screenshot written, so a
 # real tray app can never reach one. Tray captures refuse while any real
 # tray app (for example LocalSend) is registered.
+#
+# Lock and Plymouth are rendered, not grabbed from the screen: lock runs the
+# plugin's real LockView offscreen with a stand-in clock
+# (tools/render-lock-preview; the session is never locked) and plymouth
+# composes the disk-unlock prompt from the boot theme's own assets and
+# omarchy.script geometry (tools/render-plymouth-preview; no plymouthd, sudo
+# or reboot). A render that fails exits non-zero with no screenshot written.
 #   ARANEA_CAPTURE_WIFI_NAMES    JSON array of Wi-Fi names (default below)
 #   ARANEA_CAPTURE_BT_NAMES      JSON array of Bluetooth names (default below)
 #   ARANEA_NETWORK_GRAPH_DELAY   seconds the Network graph records (default 20)
@@ -1247,8 +1254,13 @@ case "$surface" in
     exit 0
     ;;
   lock)
-    cp "$repo_root/branding/screens/lock.png" "$output/$surface.png"
-    printf 'captured: %s\n' "$output/$surface.png"
+    # The real LockView rendered offscreen with a stand-in clock; the session
+    # is never locked. The renderer writes nothing when it fails.
+    "$repo_root/tools/render-lock-preview" --output "$output/$surface.png" >/dev/null || {
+      echo 'Unable to render the lock screen' >&2
+      exit 1
+    }
+    printf 'captured: %s (offscreen LockView render)\n' "$output/$surface.png"
     exit 0
     ;;
   dawn)
@@ -1266,8 +1278,14 @@ case "$surface" in
     exit 0
     ;;
   plymouth)
-    cp "$repo_root/branding/screens/plymouth.png" "$output/$surface.png"
-    printf 'captured: %s\n' "$output/$surface.png"
+    # The disk-unlock prompt composed from the Plymouth theme's own assets
+    # and omarchy.script geometry; no plymouthd, sudo or reboot. The renderer
+    # writes nothing when it fails.
+    "$repo_root/tools/render-plymouth-preview" --output "$output/$surface.png" >/dev/null || {
+      echo 'Unable to render the Plymouth boot screen' >&2
+      exit 1
+    }
+    printf 'captured: %s (Plymouth password prompt render)\n' "$output/$surface.png"
     exit 0
     ;;
 esac
