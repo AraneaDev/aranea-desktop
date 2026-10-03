@@ -4,6 +4,7 @@
 const assert = require("node:assert/strict")
 const path = require("node:path")
 const { test } = require("node:test")
+const { loadPragma } = require("./lib/load-pragma.js")
 
 const logic = require(path.join(__dirname, "..", "..", "plugins/araneadev.shared/CursorLogic.js"))
 
@@ -127,4 +128,77 @@ test("rowKeyMatches checks a pointer action's row is still the one it names", ()
   assert.equal(logic.rowKeyMatches(rows, 4, "a"), false)
   assert.equal(logic.rowKeyMatches(rows, 0, undefined), false)
   assert.equal(logic.rowKeyMatches(undefined, 0, "a"), false)
+})
+
+// --- afterRemoval ----------------------------------------------------------
+
+test("afterRemoval lands on the stop that slid into the removed middle row's place", () => {
+  // "b" sat at index 1; after it leaves, "c" slides up into that index.
+  const after = [{ key: "a" }, { key: "c" }, { key: "d" }]
+  assert.deepEqual(logic.afterRemoval(after, "b", 1), { index: 1, key: "c" })
+})
+
+test("afterRemoval clamps to the previous stop when the removed row was last", () => {
+  const after = [{ key: "a" }, { key: "b" }]
+  assert.deepEqual(logic.afterRemoval(after, "c", 2), { index: 1, key: "b" })
+})
+
+test("afterRemoval returns no stop when the only row is gone", () => {
+  assert.deepEqual(logic.afterRemoval([], "a", 0), { index: -1, key: "" })
+})
+
+test("afterRemoval returns the row itself when its key survived the removal", () => {
+  // The read of `stops` hasn't caught up with the removal yet: "b" is still
+  // there, so it is its own neighbour, whatever lastIndex says.
+  const stops = [{ key: "a" }, { key: "b" }, { key: "c" }]
+  assert.deepEqual(logic.afterRemoval(stops, "b", 5), { index: 1, key: "b" })
+  assert.deepEqual(logic.afterRemoval(stops, "b", -1), { index: 1, key: "b" })
+})
+
+test("afterRemoval tolerates empty or invalid input", () => {
+  assert.deepEqual(logic.afterRemoval(undefined, "a", 0), { index: -1, key: "" })
+  assert.deepEqual(logic.afterRemoval(null, "a", 0), { index: -1, key: "" })
+  const rows = [{ key: "a" }, { key: "b" }]
+  assert.deepEqual(
+    logic.afterRemoval(rows, "", 0),
+    { index: 0, key: "a" },
+    "an empty removed key is never matched"
+  )
+  assert.deepEqual(logic.afterRemoval(rows, null, 0), { index: 0, key: "a" })
+  assert.deepEqual(logic.afterRemoval(rows, undefined, 9), { index: 1, key: "b" })
+  assert.deepEqual(logic.afterRemoval(rows, "z", Number.NaN), { index: 0, key: "a" })
+  assert.deepEqual(logic.afterRemoval([null, { key: "a" }], "z", 0), { index: 0, key: "" })
+})
+
+// --- NetworkLogic.js's generated copy (tools/js-facade-generator.mjs) ----
+
+test("NetworkLogic.js's generated copy of CursorLogic answers like the source", () => {
+  // Panel.qml (Network) imports CursorLogic.js directly; this generated
+  // copy only exists because NetworkLogic.js's own keyTargetConfirmed and
+  // pressOutcome call cursorConfirmed/pressIntent internally, with no
+  // cross-.js-file import usable from both QML and Node (NetworkLogic.js's
+  // own header comment). The rest of CursorLogic rides along unused by
+  // Network's logic; loadPragma runs the copy for real (not just this
+  // file's CursorLogic.js) so NetworkLogic.js's own function-coverage floor
+  // stays honest as CursorLogic grows (afterRemoval).
+  // A vm context is its own JS realm, so its plain objects fail
+  // reference-equal deepEqual against this file's; round-trip through JSON.
+  const plain = (value) => JSON.parse(JSON.stringify(value))
+  const copy = loadPragma("plugins/araneadev.network/NetworkLogic.js")
+  const rows = [{ key: "a" }, { key: "b" }, { key: "c" }]
+  assert.deepEqual(
+    plain(copy.reselectIndex(rows, "c", 0)),
+    plain(logic.reselectIndex(rows, "c", 0))
+  )
+  assert.deepEqual(plain(copy.followCursor(rows, "b", 0)), plain(logic.followCursor(rows, "b", 0)))
+  assert.equal(copy.cursorConfirmed(rows, "b", 1), logic.cursorConfirmed(rows, "b", 1))
+  assert.equal(copy.pressIntent(true, false), logic.pressIntent(true, false))
+  assert.deepEqual(plain(copy.keepRows({}, "x", rows)), plain(logic.keepRows({}, "x", rows)))
+  assert.equal(copy.rowKeyMatches(rows, 1, "b"), logic.rowKeyMatches(rows, 1, "b"))
+  assert.deepEqual(plain(copy.afterRemoval(rows, "b", 1)), plain(logic.afterRemoval(rows, "b", 1)))
+  assert.deepEqual(
+    plain(copy.afterRemoval([{ key: "c" }], "a", 5)),
+    plain(logic.afterRemoval([{ key: "c" }], "a", 5))
+  )
+  assert.deepEqual(plain(copy.afterRemoval([], "a", 0)), plain(logic.afterRemoval([], "a", 0)))
 })

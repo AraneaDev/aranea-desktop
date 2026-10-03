@@ -123,6 +123,32 @@ function rowKeyMatches(rows, index, key) {
   return !!row && row.key === key
 }
 
+/**
+ * Where the keyboard cursor goes after a row left the list (Bluetooth
+ * Forget, Notifications Delete): the stop now at `lastIndex` (the row that
+ * slid into the removed one's place), clamped to the last stop when it was
+ * the bottom one. If `removedKey` still names a stop in `stops` (this read
+ * hasn't caught up with the removal yet), that stop is returned as is
+ * instead, since nothing has actually moved.
+ * @param {Array<{key: string}|null|undefined>|undefined} stops - the stops, read after the removal
+ * @param {string|null|undefined} removedKey - the key of the row that was removed
+ * @param {number} lastIndex - the removed row's index before it left
+ * @returns {{index: number, key: string}} the stop to keep the cursor on, or {index: -1, key: ""} with none left
+ */
+function afterRemoval(stops, removedKey, lastIndex) {
+  var list = Array.isArray(stops) ? stops : []
+  if (list.length === 0) return { index: -1, key: "" }
+  if (typeof removedKey === "string" && removedKey !== "") {
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i]
+      if (row && row.key === removedKey) return { index: i, key: removedKey }
+    }
+  }
+  var idx = Math.max(0, Math.min(list.length - 1, Math.floor(Number(lastIndex)) || 0))
+  var stop = list[idx]
+  return { index: idx, key: stop && typeof stop.key === "string" ? stop.key : "" }
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     reselectIndex: reselectIndex,
@@ -130,7 +156,8 @@ if (typeof module !== "undefined")
     cursorConfirmed: cursorConfirmed,
     pressIntent: pressIntent,
     keepRows: keepRows,
-    rowKeyMatches: rowKeyMatches
+    rowKeyMatches: rowKeyMatches,
+    afterRemoval: afterRemoval
   }
 /* @aranea-facade-end */
 

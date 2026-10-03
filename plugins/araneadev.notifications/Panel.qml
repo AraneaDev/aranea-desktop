@@ -57,7 +57,9 @@ Panel {
   // and Down step through them, held at both ends; Left and Right only
   // reveal. The cursor follows its stop's key (InboxLogic.rowKey, "dnd" or
   // "clear"), so an arrival that re-sorts the list never redirects Enter or
-  // Delete to another entry; when its key vanishes the cursor hides.
+  // Delete to another entry. When its key vanishes it hides, except right
+  // after a keyboard Delete, where it stays shown on the neighbour
+  // (CursorLogic.afterRemoval; see followRemoval).
   // The key of the stop the cursor is on, or "" for none.
   property string cursorKey: ""
   // True while the keyboard drives the cursor; any pointer use clears it.
@@ -66,6 +68,13 @@ Panel {
   // The stop the cursor was last on, so a cursor whose key vanished is
   // revealed near where it was; -1 for none.
   property int lastStop: -1
+  // The key and stop of a row a keyboard Delete is removing, so the next
+  // stops change lands the cursor on CursorLogic.afterRemoval's neighbour
+  // instead of hiding it (InboxLogic.followStop); "" when the next loss
+  // should hide it as usual (a pointer dismiss or a background update).
+  property string pendingRemovalKey: ""
+  // The removed row's stop before it left, read by followRemoval.
+  property int pendingRemovalStop: -1
   // True while "Clear all" waits for its confirming click (reset after 4 s).
   property bool confirmingClear: false
   // Clock for the relative time labels: set on open, then every 30 s while open.
@@ -165,10 +174,17 @@ Panel {
   }
 
   // Delete (Shift sets wholeGroup) or x: on a row, see dismissAt; nothing on
-  // the DND switch or the Clear pill.
+  // the DND switch or the Clear pill. An actual removal (not a "+N more"
+  // expand) arms pendingRemovalKey, so the cursor stays shown on its
+  // neighbour once the row is gone (followRemoval).
   function deleteCursor(wholeGroup: bool): void {
     if (!root.keyMayAct() || root.cursor < 0)
       return
+    var action = InboxLogic.dismissAction(root.rows[root.cursor], wholeGroup)
+    if (action === "dismiss" || action === "group") {
+      root.pendingRemovalKey = root.cursorKey
+      root.pendingRemovalStop = root.cursorStop
+    }
     root.dismissAt(root.cursor, wholeGroup)
   }
 
@@ -266,6 +282,7 @@ Panel {
     if (!row || InboxLogic.rowKey(row) !== arg.key)
       return
     root.keyboardCursor = false
+    root.pendingRemovalKey = ""
     if (name === "open")
       root.activate(arg.index)
     else if (name === "dismiss")
@@ -283,6 +300,7 @@ Panel {
     root.keyboardCursor = false
     root.cursorKey = ""
     root.lastStop = -1
+    root.pendingRemovalKey = ""
     if (opened) {
       root.now = Date.now()
       root.confirmingClear = false
@@ -291,15 +309,37 @@ Panel {
 
   // Remembers where the cursor is, for a reveal after its key vanished.
   onCursorStopChanged: {
-    if (root.cursorStop >= 0)
+    if (root.cursorStop >= 0) {
       root.lastStop = root.cursorStop
-    else if (root.cursorKey)
-      root.followStops()
+      root.pendingRemovalKey = ""
+    } else if (root.cursorKey) {
+      root.followRemoval()
+    }
   }
 
-  // The cursor's stop vanished (dismissed, or the Clear pill hid): hide it
-  // and drop its key, so the outline never comes back without a key press
-  // when the same key reappears (InboxLogic.followStop).
+  // The cursor's stop vanished. After the row pendingRemovalKey named was
+  // removed by the keyboard (deleteCursor), the cursor stays shown on
+  // CursorLogic.afterRemoval's neighbour; any other loss (a pointer dismiss
+  // or a background update) hides it and drops its key as before, so the
+  // outline never comes back without a key press when the same key
+  // reappears (InboxLogic.followStop).
+  function followRemoval(): void {
+    if (root.pendingRemovalKey && root.pendingRemovalKey === root.cursorKey) {
+      var removed = root.pendingRemovalKey
+      var lastStop = root.pendingRemovalStop
+      root.pendingRemovalKey = ""
+      var next = CursorLogic.afterRemoval(root.stops, removed, lastStop)
+      root.cursorKey = next.key
+      root.keyboardCursor = next.key !== ""
+      return
+    }
+    root.pendingRemovalKey = ""
+    root.followStops()
+  }
+
+  // The cursor's stop vanished for a reason other than a keyboard removal:
+  // hide it and drop its key, so the outline never comes back without a
+  // key press when the same key reappears (InboxLogic.followStop).
   function followStops(): void {
     var next = InboxLogic.followStop(root.stops, root.cursorKey, root.keyboardCursor)
     root.cursorKey = next.key
