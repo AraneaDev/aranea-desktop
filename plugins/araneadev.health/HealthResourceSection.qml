@@ -2,8 +2,9 @@
 // trace is the shared Aranea.LinkGraph (the network graph's mint to violet
 // strand, here with a soft fill and no send line) over the last 60 one-
 // second samples; memory and disk use are Aranea.FilamentBar strand bars,
-// their values tinted by usage level. NET keeps its look, in tokens.
-// qmllint disable missing-property unqualified
+// their values tinted by usage level. NET keeps its content, with the
+// same caption label as the other sections.
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
@@ -145,13 +146,14 @@ Item {
       Repeater {
         model: root.diskRows
         delegate: ColumnLayout {
+          id: diskRow
           required property var modelData
           Layout.fillWidth: true
           spacing: Style.space(2)
           RowLayout {
             Layout.fillWidth: true
             Text {
-              text: modelData.target
+              text: diskRow.modelData.target
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
@@ -159,13 +161,13 @@ Item {
               elide: Text.ElideMiddle
             }
             Text {
-              text: modelData.percent + "%"
-              color: root.levelColor(MetricsLogic.usageLevel(modelData.percent))
+              text: diskRow.modelData.percent + "%"
+              color: root.levelColor(MetricsLogic.usageLevel(diskRow.modelData.percent))
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
             }
             Text {
-              text: MetricsLogic.humanBytes(modelData.avail) + " free"
+              text: MetricsLogic.humanBytes(diskRow.modelData.avail) + " free"
               color: root.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -174,7 +176,7 @@ Item {
           Aranea.FilamentBar {
             objectName: "diskBar"
             Layout.fillWidth: true
-            value: HealthLogic.barFraction(modelData.percent)
+            value: HealthLogic.barFraction(diskRow.modelData.percent)
           }
         }
       }
@@ -184,12 +186,8 @@ Item {
 
     RowLayout {
       Layout.fillWidth: true
-      Text {
+      Caption {
         text: "NET"
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: true
       }
       Text {
         text: root.networkLabel

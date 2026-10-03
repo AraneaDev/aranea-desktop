@@ -78,6 +78,10 @@
 1	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "family" not found on type "QObject"
+4	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "body" not found on type "QObject"
+6	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "hairline" not found on type "QObject"
 4	plugins/araneadev.health/Monitor.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.health/Panel.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.health/Panel.qml:missing-property:Member "family" not found on type "QObject"

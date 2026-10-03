@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 import "MetricsLogic.js" as MetricsLogic
 
 Item {
@@ -18,10 +19,11 @@ Item {
     spacing: Style.space(2)
     Text {
       text: "TOP"
-      color: Color.popups.text
+      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       font.family: Style.font.family
-      font.pixelSize: Style.font.body
+      font.pixelSize: Style.font.caption
       font.bold: true
+      font.letterSpacing: 1.2
     }
     RowLayout {
       Layout.fillWidth: true
@@ -69,8 +71,7 @@ Item {
     spacing: Style.space(8)
     Text {
       text: parent.name
-      color: Color.popups.text
-      opacity: parent.dim ? 0.55 : 1
+      color: parent.dim ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
       font.family: Style.font.family
       font.pixelSize: Style.font.caption
       Layout.fillWidth: true
@@ -78,8 +79,7 @@ Item {
     }
     Text {
       text: parent.value
-      color: Color.popups.text
-      opacity: parent.dim ? 0.55 : 1
+      color: parent.dim ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
       font.family: Style.font.family
       font.pixelSize: Style.font.caption
       horizontalAlignment: Text.AlignRight

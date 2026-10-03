@@ -233,7 +233,12 @@ Panel {
         active: root.opened
       }
 
+      Hairline {
+        visible: processSection.visible
+      }
+
       HealthProcessSection {
+        id: processSection
         visible: !!(root.m && (root.m.topProcs.cpu.length > 0 || root.m.topProcs.mem.length > 0))
         Layout.fillWidth: true
         cpuProcesses: root.m && root.m.topProcs ? root.m.topProcs.cpu : []

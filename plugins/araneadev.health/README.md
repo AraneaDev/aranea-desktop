@@ -38,7 +38,10 @@ hint at the bottom.
 - **Resources** (`HealthResourceSection.qml`): the CPU trace is the shared
   `LinkGraph` over the last 60 one-second samples (`cpuSamples`); memory and
   disk use are `FilamentBar` strand bars (`barFraction`), their values
-  tinted by usage level. NET and TOP keep their content.
+  tinted by usage level. NET and TOP keep their content, with the same
+  caption labels.
+- **Usage level colour:** the amber or urgent level now shows on the value
+  text, because the bars are always the mint to violet strand.
 
 ## Logic boundaries
 
