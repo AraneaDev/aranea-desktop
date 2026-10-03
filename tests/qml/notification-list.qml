@@ -236,8 +236,12 @@ ShellRoot {
         t.equal(JSON.stringify(toast.cardBorderSpec), todaysBorderSpec(1), "a toast's border spec is today's")
         t.equal(toast.radius, 6, "a toast keeps its corner radius")
         t.equal(toast.implicitWidth, Style.space(380), "a toast keeps its width")
-        t.equal(toast.implicitHeight, 64, "a normal toast keeps today's height (this harness: 380x64)")
-        t.equal(lowToast.implicitHeight, 56, "a low toast keeps today's height (no body: 380x56)")
+        // Heights depend on the installed fonts (64/56 here, 62/54 on CI), so pin
+        // today's sizing rule instead: content column plus the card's borders,
+        // and a body line making a normal toast taller than a low one.
+        t.equal(toast.implicitHeight, one(toast, "mainColumn").implicitHeight + toast.borderTop + toast.borderBottom, "a normal toast keeps today's sizing rule")
+        t.equal(lowToast.implicitHeight, one(lowToast, "mainColumn").implicitHeight + lowToast.borderTop + lowToast.borderBottom, "a low toast keeps today's sizing rule")
+        t.check(toast.implicitHeight > lowToast.implicitHeight, "a toast with a body is taller than one without")
         var rail = one(toast, "urgencyRail")
         t.equal(rail.width, Style.space(3), "the urgency rail keeps its width")
         t.check(sameColor(rail.color, Color.notifications.countdown), "a normal toast's rail is the countdown colour")

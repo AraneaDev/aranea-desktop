@@ -285,6 +285,7 @@ BorderSurface {
 
   ColumnLayout {
     id: mainColumn
+    objectName: "mainColumn"
     // Inset by the card border so the content doesn't paint over the card's
     // outer border.
     anchors.top: parent.top
