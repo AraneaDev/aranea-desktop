@@ -1,4 +1,5 @@
-// Offscreen QML coverage for the workspace bar widget.
+// Offscreen QML coverage for the workspace bar widget, including the test
+// panel host dropping its cursor key when that workspace goes away.
 import QtQuick
 import Quickshell
 import "lib"
@@ -78,6 +79,43 @@ ShellRoot {
     t.check(widget.implicitWidth > 0 && widget.implicitHeight > 0, "widget has bar geometry")
     fakeBar.vertical = true
     t.check(widget.implicitHeight > 0, "vertical bar geometry remains valid")
-    t.done()
+    var panelHost = t.findChild(widget, "testPanelHost")
+    t.check(panelHost !== null, "the test panel host is loaded")
+    panelHost.cursorKey = "3"
+    t.equal(panelHost.cursorRow, 1, "the cursor key names its workspace's row")
+    widget.testWorkspaces = [
+      {
+        id: 3,
+        windows: [
+          {
+            address: "c"
+          }
+        ]
+      },
+      {
+        id: 1,
+        windows: [
+          {
+            address: "a"
+          }
+        ]
+      }
+    ]
+    t.equal(panelHost.cursorKey, "3", "a refresh that keeps the workspace keeps the cursor key")
+    widget.testWorkspaces = [
+      {
+        id: 1,
+        windows: [
+          {
+            address: "a"
+          }
+        ]
+      }
+    ]
+    t.equal(panelHost.cursorRow, -1, "the workspace is gone")
+    t.step(50, function () {
+      t.equal(panelHost.cursorKey, "", "a workspace that goes away clears the cursor key")
+      t.done()
+    })
   }
 }

@@ -78,6 +78,8 @@
 1	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "family" not found on type "QObject"
+3	plugins/araneadev.health/HealthProcessSection.qml:missing-property:Member "caption" not found on type "QObject"
+3	plugins/araneadev.health/HealthProcessSection.qml:missing-property:Member "family" not found on type "QObject"
 4	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "body" not found on type "QObject"
 6	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.health/HealthResourceSection.qml:missing-property:Member "family" not found on type "QObject"

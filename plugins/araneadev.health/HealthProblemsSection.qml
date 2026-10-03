@@ -10,7 +10,8 @@
 // under a resting pointer. When the rows really move (the joined keys
 // change) the section stamps layoutChangedAt, which the rows read through
 // pointerGate: a click within 300 ms of it is ignored unless the pointer
-// has really moved onto the row since. The mint outline is drawn only on
+// has really moved onto the row since. The host's content height changing
+// (hostContentHeight) stamps too. The mint outline is drawn only on
 // cursor, which the host sets only while the keyboard drives it; pointer
 // hover never highlights a row.
 pragma ComponentBehavior: Bound
@@ -33,6 +34,11 @@ Column {
   property color amber: Aranea.DesignTokens.attention
   // When the rows last moved under the pointer (Date.now()), 0 for never.
   property real layoutChangedAt: 0
+  // The height of the host's whole content. On a left, right or bottom
+  // bar the card is centred or grows upwards, so content growing anywhere
+  // (TOP arriving, the swap line, a disk row) can move these rows under a
+  // still pointer: every change stamps the layout.
+  property real hostContentHeight: 0
   // The rows' keys joined, so an equal list rebuilt does not stamp.
   readonly property string rowKeys: HealthLogic.problemKeys(section.problems)
   // Filters synthetic hover from rows moving under a still pointer, and
@@ -68,6 +74,7 @@ Column {
 
   spacing: Style.space(4)
   onRowKeysChanged: section.noteLayoutChange()
+  onHostContentHeightChanged: section.noteLayoutChange()
 
   Text {
     objectName: "problemsCaption"

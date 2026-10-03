@@ -6,8 +6,9 @@
 // underneath is refused; the rows stay the same delegates across a refresh
 // that hands over a new array, and an equal list does not stamp the layout;
 // a click right after the rows re-sort is refused and accepted once
-// settled. The resources draw strand bars (gradient stops present) and the
-// CPU trace on the shared LinkGraph (a non-empty grab).
+// settled, as is a click right after the content grows (a side or bottom
+// bar moves the rows then). The resources draw strand bars (gradient stops
+// present) and the CPU trace on the shared LinkGraph (a non-empty grab).
 import QtQuick
 import QtTest
 import Quickshell
@@ -122,6 +123,7 @@ ShellRoot {
     }
 
     Column {
+      id: stack
       x: 20
       width: 360
       spacing: 10
@@ -130,6 +132,7 @@ ShellRoot {
         id: section
         width: 360
         problems: firstRows()
+        hostContentHeight: stack.implicitHeight
         cursor: HealthLogic.outlineIndex(section.problems, host.cursorKey, host.keyboard)
         onProblemActivated: function (index, key) {
           host.keyboard = false
@@ -171,6 +174,14 @@ ShellRoot {
             iface: "wlan0",
             rates: null
           })
+      }
+
+      // Content arriving below the problems (TOP, the swap line, a disk).
+      Rectangle {
+        id: grower
+        width: 360
+        height: 0
+        color: "transparent"
       }
     }
   }
@@ -260,5 +271,18 @@ ShellRoot {
         })
       }], [600, function () {
         t.check(probe.lit > 50, "the trace grab has drawn pixels (" + probe.lit + ")")
+
+        // ---------- Growth below the rows settles their clicks ----------
+        activated = []
+        stampBefore = section.layoutChangedAt
+        grower.height = 40
+      }], [40, function () {
+        // The Column lays out on the next frame, as the card does.
+        t.check(section.layoutChangedAt > stampBefore, "the content growing stamps the layout")
+        pointer.mouseClick(rows()[1], 60, rows()[1].height / 2)
+        t.equal(activated.length, 0, "a click within 300 ms of the growth is refused")
+      }], [350, function () {
+        pointer.mouseClick(rows()[1], 60, rows()[1].height / 2)
+        t.equal(JSON.stringify(activated), JSON.stringify([[1, HealthLogic.problemKey(section.problems[1])]]), "a click after 350 ms is accepted")
       }]])
 }

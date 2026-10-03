@@ -257,6 +257,19 @@ Item {
     // Row index of cursorKey, drawn with the mint outline only while the
     // keyboard shows it (WorkspaceModel.outlineIndex).
     readonly property int cursorIndex: WorkspaceModel.outlineIndex(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
+    // Row index of cursorKey whether or not it is shown, -1 when none.
+    readonly property int cursorRow: WorkspaceModel.indexOfKey(testHost.workspaceStates, testHost.cursorKey)
+    // A workspace that went away takes the cursor with it (after the
+    // change settles, so cursorRow never re-evaluates inside its own
+    // change signal).
+    onCursorRowChanged: if (testHost.cursorRow < 0 && testHost.cursorKey)
+      Qt.callLater(testHost.dropLostCursor)
+
+    // Clears cursorKey when it no longer names a shown workspace.
+    function dropLostCursor() {
+      if (testHost.cursorRow < 0)
+        testHost.cursorKey = ""
+    }
     // Whether the test host counts as open.
     property bool open: false
     // Emitted to focus a workspace.
@@ -315,7 +328,9 @@ Item {
 
   Component {
     id: testPanelHost
-    TestPanelHost {}
+    TestPanelHost {
+      objectName: "testPanelHost"
+    }
   }
   Loader {
     id: panelLoader

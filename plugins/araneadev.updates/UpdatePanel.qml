@@ -248,7 +248,7 @@ Item {
       id: keyHint
       objectName: "keyHint"
       Layout.fillWidth: true
-      text: "enter open updater · r refresh · tab next"
+      text: "enter select · r refresh · tab next"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
       font.family: Style.font.family
       font.pixelSize: Style.font.caption

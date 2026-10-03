@@ -52,9 +52,16 @@ Panel {
   property bool keyboardCursor: false
   // Index of cursorKey's row in problems, -1 when none.
   readonly property int cursor: HealthLogic.indexOfKey(root.problems, root.cursorKey)
-  // A problem that went away takes the cursor with it.
+  // A problem that went away takes the cursor with it (after the change
+  // settles, so cursor never re-evaluates inside its own change signal).
   onCursorChanged: if (root.cursor < 0 && root.cursorKey)
-    root.cursorKey = ""
+    Qt.callLater(root.dropLostCursor)
+
+  // Clears cursorKey when it no longer names an open problem.
+  function dropLostCursor(): void {
+    if (root.cursor < 0)
+      root.cursorKey = ""
+  }
 
   // Moves the keyboard cursor DY rows, wrapping; the first key after
   // opening or after pointer use only reveals it (HealthLogic.cursorMove).
@@ -215,6 +222,9 @@ Panel {
         id: problemsSection
         Layout.fillWidth: true
         problems: root.problems
+        // Growth anywhere in the card can move the rows (a side or bottom
+        // bar centres it or grows it upwards): it settles their clicks.
+        hostContentHeight: content.implicitHeight
         cursor: HealthLogic.outlineIndex(root.problems, root.cursorKey, root.keyboardCursor)
         amber: root.amber
         onProblemActivated: function (index, key) {
