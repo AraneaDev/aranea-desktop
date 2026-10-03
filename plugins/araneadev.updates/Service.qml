@@ -27,6 +27,10 @@ Item {
   property bool rebootFinished: false
   // Whether the update process failed.
   property bool updateFailed: false
+  // Whether an update or reboot-marker check is running right now; the
+  // dropdown's Refresh pill is busy and pulsing while this is true, and
+  // ignores clicks (refresh() below is already a no-op while it holds).
+  readonly property bool checking: updateProc.running || rebootProc.running
 
   onTestStatusChanged: if (testStatus !== null)
     applyStatus(testStatus)
