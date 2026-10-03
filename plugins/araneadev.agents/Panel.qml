@@ -56,6 +56,8 @@ Panel {
   property var refreshPending: AgentsLogic.refreshIdle()
   // How long a refresh may stay pending before the pill gives up.
   readonly property int refreshTimeoutMs: 30000
+  // Main's pendingUpdateKind as last seen, for notePendingKind.
+  property string lastPendingKind: ""
 
   // Countdowns and "updated" read this instead of Date.now() so the
   // panel keeps telling the truth while it sits open.
@@ -97,11 +99,29 @@ Panel {
   // Offers Main's dataRevision to the pending refresh: idle, it keeps the
   // baseline current for the next request; busy, it lands the refresh, but
   // only once every shown agent's record was rewritten since the request
-  // (a fast collector's record alone would stop the pill early).
+  // (a fast collector's record alone would stop the pill early). While the
+  // forced run is still queued behind another run (stock queues it as
+  // pendingUpdateKind "force"), that run's writes never land it; the
+  // queued run's start rebases the landing time (notePendingKind). A shown
+  // agent whose collector fails skips its write, so the pill pulses for
+  // the full refreshTimeoutMs before it settles.
   function noteRecords() {
+    if (root.refreshPending.busy && usage.pendingUpdateKind === "force")
+      return
     if (root.refreshPending.busy && !AgentsLogic.recordsLandedSince(root.providers.map(root.updatedMsFor), root.refreshPending.startedAt))
       return
     root.refreshPending = AgentsLogic.refreshLanded(root.refreshPending, usage.dataRevision)
+  }
+
+  // Main's queued update kind changed: a queued forced run going from
+  // "force" to "" has just started, so a pending refresh waits for records
+  // newer than now (AgentsLogic.refreshRebase); the 30 s cap still counts
+  // from the request.
+  function notePendingKind() {
+    var kind = String(usage.pendingUpdateKind || "")
+    if (root.lastPendingKind === "force" && kind === "")
+      root.refreshPending = AgentsLogic.refreshRebase(root.refreshPending, Date.now())
+    root.lastPendingKind = kind
   }
 
   // The one refresh path (r, Enter, the Refresh pill and IPC refresh): marks
@@ -632,6 +652,7 @@ Panel {
     id: usage
     settings: root.settings
     onDataRevisionChanged: root.noteRecords()
+    onPendingUpdateKindChanged: root.notePendingKind()
   }
 
   // Cheap enough to keep running: it only re-evaluates text bindings, and a

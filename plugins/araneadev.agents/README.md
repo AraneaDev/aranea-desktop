@@ -18,7 +18,10 @@ slot: it fills with the current agent's fullest limit window, in the accent belo
 Refresh: `r`, Enter, the header's Refresh pill and IPC `refresh` share one path. The pill reads
 "Refreshing…" and pulses until every shown agent's record has been rewritten since the request
 (`AgentsLogic.recordsLandedSince`, then Main's data revision lands it through `refreshLanded`) or
-30 s pass; requests while it is pending are ignored.
+30 s pass; requests while it is pending are ignored. A forced run that stock queued behind a
+run already going (any open starts a limits run) is waited for: that run's writes do not land it,
+and the queued run's start rebases the landing time (`refreshRebase`); the 30 s still count from
+the request. A shown agent whose collector fails writes nothing, so the pill pulses the full 30 s.
 
 Settings form: the manifest keeps stock's `defaults`, `schema` and `aliases` in the `barWidget`
 block, unlike Weather's named `settingsForm` string. The shell resolves a widget's settings

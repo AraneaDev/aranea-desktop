@@ -119,12 +119,18 @@ test("refreshIdle: nothing in flight, no baseline revision", () => {
 test("refreshClick: idle starts a refresh and freezes the baseline revision", () => {
   var idle = { busy: false, startedAt: 0, revision: 3 }
   var r = logic.refreshClick(idle, 1000)
-  assert.deepEqual(r, { state: { busy: true, startedAt: 1000, revision: 3 }, send: true })
+  assert.deepEqual(r, {
+    state: { busy: true, startedAt: 1000, clickedAt: 1000, revision: 3 },
+    send: true
+  })
 })
 
 test("refreshClick: null state counts as idle", () => {
   var r = logic.refreshClick(null, 500)
-  assert.deepEqual(r, { state: { busy: true, startedAt: 500, revision: null }, send: true })
+  assert.deepEqual(r, {
+    state: { busy: true, startedAt: 500, clickedAt: 500, revision: null },
+    send: true
+  })
 })
 
 test("refreshClick: busy ignores the click (no second refreshNow)", () => {
@@ -272,4 +278,44 @@ test("recordsLandedSince gates refreshLanded: a fast record alone keeps it busy"
   assert.equal(logic.recordsLandedSince([1200, 1800], s.startedAt), true)
   s = logic.refreshLanded(s, 6)
   assert.equal(s.busy, false)
+})
+
+// --- refreshRebase ----------------------------------------------------------------------
+
+test("refreshRebase: busy moves the landing time to now and keeps the click time", () => {
+  const busy = logic.refreshClick(logic.refreshLanded(logic.refreshIdle(), 3), 1000).state
+  assert.deepEqual(logic.refreshRebase(busy, 6000), {
+    busy: true,
+    startedAt: 6000,
+    clickedAt: 1000,
+    revision: 3
+  })
+})
+
+test("refreshRebase: a state without clickedAt takes startedAt as the click", () => {
+  const busy = { busy: true, startedAt: 1000, revision: 3 }
+  assert.deepEqual(logic.refreshRebase(busy, 6000), {
+    busy: true,
+    startedAt: 6000,
+    clickedAt: 1000,
+    revision: 3
+  })
+  assert.equal(logic.refreshRebase(busy, undefined).startedAt, 0)
+})
+
+test("refreshRebase: idle (or null) is unchanged", () => {
+  const idle = { busy: false, startedAt: 0, revision: 2 }
+  assert.deepEqual(logic.refreshRebase(idle, 6000), idle)
+  assert.deepEqual(logic.refreshRebase(null, 6000), logic.refreshIdle())
+})
+
+test("refreshRebase: the earlier run's records no longer land it, and the cap still counts from the click", () => {
+  let s = logic.refreshClick(logic.refreshLanded(logic.refreshIdle(), 3), 1000).state
+  s = logic.refreshRebase(s, 8000)
+  // Written by the earlier run (before the queued one started): not landed.
+  assert.equal(logic.recordsLandedSince([7000, 7500], s.startedAt), false)
+  assert.equal(logic.recordsLandedSince([8200, 9000], s.startedAt), true)
+  // 30 s from the click, not from the rebase.
+  assert.equal(logic.refreshTimeout(s, 30999, 30000).busy, true)
+  assert.equal(logic.refreshTimeout(s, 31000, 30000).busy, false)
 })

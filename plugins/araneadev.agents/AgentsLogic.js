@@ -91,11 +91,13 @@ function modelKey(m) {
 
 /**
  * The Refresh pill's pending state: `busy` while a refresh is in flight,
- * `startedAt` the click's timestamp (0 when idle, for the 30s timeout), and
- * `revision` the last provider revision this state has accounted for (the
+ * `startedAt` the time records must be newer than to land it (the click, or
+ * the start of a forced run that was queued behind another; 0 when idle),
+ * `clickedAt` the click's timestamp (busy only; the 30s timeout counts from
+ * it, so a rebase never extends the cap), and `revision` the last provider revision this state has accounted for (the
  * busy click's baseline to compare a landing against; kept current while
  * idle so the next click always has a fresh baseline).
- * @typedef {{busy: boolean, startedAt: number, revision: ?number}} RefreshPending
+ * @typedef {{busy: boolean, startedAt: number, clickedAt?: number, revision: ?number}} RefreshPending
  */
 
 /**
@@ -120,7 +122,8 @@ function refreshClick(state, nowMs) {
   var s = state || refreshIdle()
   if (s.busy) return { state: s, send: false }
   var revision = s.revision !== undefined ? s.revision : null
-  return { state: { busy: true, startedAt: Number(nowMs) || 0, revision: revision }, send: true }
+  var now = Number(nowMs) || 0
+  return { state: { busy: true, startedAt: now, clickedAt: now, revision: revision }, send: true }
 }
 
 /**
@@ -166,6 +169,22 @@ function recordsLandedSince(updatedMs, startedAt) {
 }
 
 /**
+ * A forced run that was queued behind another run has just started: records
+ * written by the earlier run must not land it, so busy, the landing time
+ * (`startedAt`) moves to now while `clickedAt` (the timeout's start) stays.
+ * Idle, nothing changes.
+ * @param {?RefreshPending} state - the pending state (null counts as idle)
+ * @param {number} nowMs - the queued run's start
+ * @returns {RefreshPending} the next state
+ */
+function refreshRebase(state, nowMs) {
+  var s = state || refreshIdle()
+  if (!s.busy) return s
+  var clickedAt = s.clickedAt !== undefined ? s.clickedAt : s.startedAt
+  return { busy: true, startedAt: Number(nowMs) || 0, clickedAt: clickedAt, revision: s.revision }
+}
+
+/**
  * A refresh that never lands: once `timeoutMs` have passed since the click,
  * the pill stops pulsing and shows the last data instead of waiting
  * forever. The baseline revision is kept as it was, since nothing proved it
@@ -178,7 +197,8 @@ function recordsLandedSince(updatedMs, startedAt) {
 function refreshTimeout(state, nowMs, timeoutMs) {
   var s = state || refreshIdle()
   if (!s.busy) return s
-  var elapsed = (Number(nowMs) || 0) - (Number(s.startedAt) || 0)
+  var from = s.clickedAt !== undefined ? s.clickedAt : s.startedAt
+  var elapsed = (Number(nowMs) || 0) - (Number(from) || 0)
   if (elapsed >= Number(timeoutMs)) return { busy: false, startedAt: 0, revision: s.revision }
   return s
 }
@@ -224,6 +244,7 @@ if (typeof module !== "undefined")
     refreshClick: refreshClick,
     refreshLanded: refreshLanded,
     recordsLandedSince: recordsLandedSince,
+    refreshRebase: refreshRebase,
     refreshTimeout: refreshTimeout,
     updatedCaption: updatedCaption
   }
