@@ -37,6 +37,7 @@ const specs = [
   ["plugins/araneadev.network/NetworkLogic.js", "plugins/araneadev.shared/CursorLogic.js"],
   ["plugins/araneadev.network/NetworkLogic.js", "plugins/araneadev.shared/NmcliTerse.js"],
   ["plugins/araneadev.notifications/InboxLogic.js", "plugins/araneadev.shared/CursorLogic.js"],
+  ["plugins/araneadev.bluetooth/BluetoothLogic.js", "plugins/araneadev.shared/CursorLogic.js"],
   ["plugins/araneadev.vpn/VpnLogic.js", "plugins/araneadev.shared/NmcliTerse.js"]
 ]
 

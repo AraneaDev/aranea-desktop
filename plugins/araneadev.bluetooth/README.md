@@ -8,6 +8,15 @@ keyboard cursor and the bar icon) and draws an Aranea view,
 pulse, and web-node device rows for Connected, Paired and Available, with a
 busy pulse while a device connects and a signal glow on nearby devices.
 
+The power switch shows its new state at once and pulses until BlueZ reports
+it; clicks made meanwhile queue (the last one wins), and after 5 s it falls
+back to the adapter's real state. Device actions are keyed by the device's
+address and refused when the row changed underneath the click; a click on a
+busy device queues until it is idle (the last one wins, and one equal to the
+action in flight is dropped). Clicks settle for 300 ms after the layout
+shifts. After `x` forgets a device, the keyboard cursor moves to the
+neighbouring row.
+
 The signal glow reads RSSI from BlueZ with one `busctl` call every 2 s, and
 only while the open panel is scanning and has devices under Available.
 
@@ -18,4 +27,4 @@ opens it.
 ## Validation
 
 Run `node --test tests/js/bluetooth-logic.test.js` and
-`tests/qml-behaviour.test.sh bluetooth-dropdown`.
+`tests/qml-behaviour.test.sh bluetooth-dropdown bluetooth-keyed`.

@@ -26,6 +26,20 @@ Panel {
   // The actual Bluetooth sequencing lives in bin/omarchy-bluetooth-device;
   // this map only keeps the panel responsive while BlueZ catches up.
   property var pendingActions: ({})
+  // Address -> the action ("connect", "disconnect" or "forget") asked for
+  // while that device was busy, run once it goes idle; the last one wins
+  // (BluetoothLogic.deviceClick / takeReady).
+  property var deviceQueue: ({})
+  // The pending power change (BluetoothLogic.powerClick / powerEcho): the
+  // switch shows the new state at once and pulses until BlueZ's Powered
+  // echoes it; clicks while it waits are queued, the last one wins.
+  property var powerPending: BluetoothLogic.powerIdle()
+  // The address a keyboard Forget is removing (deleteSelected arms it), read
+  // by BluetoothLogic.followForget so the cursor lands on the neighbour once
+  // the device leaves the remembered lists; "" for none.
+  property string pendingRemovalKey: ""
+  // The forgotten row's last stop index (BluetoothLogic.forgetStops).
+  property int pendingRemovalIndex: -1
 
   // The default Bluetooth adapter, or null when none.
   // qmllint disable unresolved-type
@@ -83,10 +97,10 @@ Panel {
     if (!adapter)
       return ""
     if (!adapter.enabled)
-      return "󰂲"
+      return String.fromCodePoint(0xf00b2)
     if (connectedDevices.length > 0)
-      return "󰂱"
-    return "󰂯"
+      return String.fromCodePoint(0xf00b1)
+    return String.fromCodePoint(0xf00af)
   }
 
   // Index into activePhrases for the rotating hero status line.
@@ -134,12 +148,15 @@ Panel {
   // address across section changes instead of preserving a stale row index.
   property string focusedDeviceAddress: ""
 
+  // What the power switch shows ({on, busy}, BluetoothLogic.powerView).
+  readonly property var powerShown: BluetoothLogic.powerView(root.powerPending, !!root.adapter && root.adapter.enabled)
+
   // "header" is a virtual section for the hero Bluetooth on/off toggle; it
   // sits above the device sections so the adapter can be toggled by keyboard
   // even when it is off and no device rows exist.
   readonly property bool headerHasCursor: cursorActive && focusSection === "header"
   // Tooltip text for the hero power switch.
-  readonly property string toggleHint: root.adapter && root.adapter.enabled ? "Turn Bluetooth off" : "Turn Bluetooth on"
+  readonly property string toggleHint: root.powerShown.on ? "Turn Bluetooth off" : "Turn Bluetooth on"
 
   // hoverFill, selectedFill, scrollRowIndex and scrollSectionTitle fed
   // stock's own rows and ListView. The Aranea view doesn't use them; they
@@ -352,6 +369,53 @@ Panel {
     Quickshell.execDetached(deviceCommand(action, device.address))
   }
 
+  // The action DEVICE is busy with (BluetoothLogic.inFlightIntent), "" when
+  // idle.
+  function deviceInFlight(device) {
+    if (!device)
+      return ""
+    return BluetoothLogic.inFlightIntent(pendingAction(device.address || ""), device.state !== undefined ? device.state : -1, device.pairing === true)
+  }
+
+  // Asks for INTENT ("connect", "disconnect" or "forget") on DEVICE: run at
+  // once when it is idle, else queued until it is (the last one wins; one
+  // equal to the action in flight is dropped).
+  function requestDeviceAction(device, intent) {
+    if (!device || !device.address)
+      return
+    var r = BluetoothLogic.deviceClick(root.deviceQueue, device.address, intent, root.deviceInFlight(device))
+    root.deviceQueue = r.queue
+    if (r.run !== "")
+      root.runIntent(device, r.run)
+  }
+
+  // Runs INTENT on DEVICE through stock's own action functions.
+  function runIntent(device, intent) {
+    if (intent === "connect")
+      connectDevice(device)
+    else if (intent === "disconnect")
+      disconnectDevice(device)
+    else if (intent === "forget")
+      forgetDevice(device)
+  }
+
+  // Runs the queued actions whose device went idle; a device that is gone
+  // drops its entry.
+  function drainDeviceQueue() {
+    if (Object.keys(root.deviceQueue).length === 0)
+      return
+    var busy = {}
+    for (var i = 0; i < devices.length; i++)
+      if (devices[i] && devices[i].address)
+        busy[devices[i].address] = root.deviceInFlight(devices[i])
+    var r = BluetoothLogic.takeReady(root.deviceQueue, busy)
+    root.deviceQueue = r.queue
+    for (var j = 0; j < r.run.length; j++)
+      for (var k = 0; k < devices.length; k++)
+        if (devices[k] && devices[k].address === r.run[j].key)
+          root.runIntent(devices[k], r.run[j].intent)
+  }
+
   // Connects (or pairs, if never paired) a device.
   function connectDevice(device) {
     if (!device || device.connected)
@@ -506,29 +570,64 @@ Panel {
       var dev = deviceAt(focusSection, selectedIndex)
       if (!dev)
         return
-      if (dev.connected)
-        disconnectDevice(dev)
-      else
-        connectDevice(dev)
+      requestDeviceAction(dev, BluetoothLogic.rowIntent("primary", !!dev.connected, focusSection))
       return
     }
     if (focusSection === "discovered") {
       var d = discoveredDevices[selectedIndex]
       if (!d)
         return
-      connectDevice(d)
+      requestDeviceAction(d, BluetoothLogic.rowIntent("primary", !!d.connected, "discovered"))
     }
   }
 
   // 'x' forgets remembered devices. For connected devices this first
   // disconnects, then removes the BlueZ pairing record via omarchy-bluetooth-device.
+  // Arms pendingRemovalKey, so the cursor stays shown on the neighbour once
+  // the device has left the remembered lists (followForget).
   function deleteSelected() {
     if (focusSection !== "known" && focusSection !== "connected")
       return
     var dev = deviceAt(focusSection, selectedIndex)
     if (!dev)
       return
-    forgetDevice(dev)
+    var stops = root.forgetStops()
+    for (var i = 0; i < stops.length; i++)
+      if (stops[i].key === dev.address) {
+        root.pendingRemovalKey = dev.address
+        root.pendingRemovalIndex = i
+      }
+    requestDeviceAction(dev, "forget")
+  }
+
+  // The keyboard cursor's stops for following a Forget
+  // (BluetoothLogic.forgetStops), from the lists as shown.
+  function forgetStops() {
+    var addr = function (list) {
+      return list.map(function (d) {
+        return d ? (d.address || "") : ""
+      })
+    }
+    return BluetoothLogic.forgetStops(addr(connectedDevices), addr(knownDevices), sectionVisible("discovered") ? addr(discoveredDevices) : [])
+  }
+
+  // After the device lists changed: lands the cursor on the neighbour once a
+  // keyboard-forgotten device has left the remembered lists
+  // (BluetoothLogic.followForget), else re-finds the focused device by
+  // address as stock did.
+  function followDevices() {
+    var r = BluetoothLogic.followForget(root.forgetStops(), root.pendingRemovalKey, root.pendingRemovalIndex)
+    root.pendingRemovalKey = r.pendingKey
+    root.pendingRemovalIndex = r.lastIndex
+    if (!r.follow) {
+      reselectFocusedDevice()
+      return
+    }
+    actionFocused = false
+    focusSection = r.section
+    if (r.index >= 0)
+      selectedIndex = r.index
+    updateFocusedAddress()
   }
 
   onOpenedChanged: {
@@ -553,6 +652,8 @@ Panel {
       actionFocused = false
       cursorActive = false
     }
+    pendingRemovalKey = ""
+    pendingRemovalIndex = -1
   }
 
   // Another per-monitor instance of this widget whose panel is open, if any.
@@ -607,18 +708,26 @@ Panel {
   onSelectedIndexChanged: updateFocusedAddress()
   onFocusSectionChanged: updateFocusedAddress()
   onConnectedDevicesChanged: {
-    reselectFocusedDevice()
+    followDevices()
     syncPendingActions()
   }
   onKnownDevicesChanged: {
-    reselectFocusedDevice()
+    followDevices()
     syncPendingActions()
   }
   onDiscoveredDevicesChanged: {
-    reselectFocusedDevice()
+    followDevices()
     syncPendingActions()
   }
   onVisibleSectionsChanged: clampCursor()
+  // A device's pending action cleared: run what was queued for it.
+  onPendingActionsChanged: Qt.callLater(root.drainDeviceQueue)
+  // A row's busy state may have cleared with BlueZ's own state.
+  onConnectedViewRowsChanged: Qt.callLater(root.drainDeviceQueue)
+  // (see onConnectedViewRowsChanged)
+  onKnownViewRowsChanged: Qt.callLater(root.drainDeviceQueue)
+  // (see onConnectedViewRowsChanged)
+  onDiscoveredViewRowsChanged: Qt.callLater(root.drainDeviceQueue)
 
   // Keeps the cursor within the current sections/rows after they change.
   function clampCursor() {
@@ -748,7 +857,26 @@ Panel {
     id: pendingTimeout
     interval: 20000
     repeat: false
-    onTriggered: root.pendingActions = ({})
+    onTriggered: {
+      root.pendingActions = ({})
+      root.pendingRemovalKey = ""
+    }
+  }
+
+  // Gives up on a power change BlueZ never echoed: the switch shows the
+  // adapter's state again.
+  Timer {
+    id: powerTimeout
+    interval: 5000
+    onTriggered: root.powerPending = BluetoothLogic.powerIdle()
+  }
+
+  // BlueZ echoed a power change (or something else changed it).
+  Connections {
+    target: root.adapter
+    function onEnabledChanged() {
+      root.applyPower(BluetoothLogic.powerEcho(root.powerPending, root.adapter.enabled))
+    }
   }
 
   Timer {
@@ -933,6 +1061,7 @@ Panel {
       hasAdapter: !!adapter,
       toggleHint: toggleHint,
       headerCursor: headerHasCursor && keyboardCursor,
+      power: powerShown,
       scanning: !!adapter && adapter.enabled && adapter.discovering,
       open: opened,
       cursor: {
@@ -966,6 +1095,7 @@ Panel {
   function handleAction(name, arg) {
     keyboardCursor = false
     if (name === "toggleBluetooth") {
+      pendingRemovalKey = ""
       toggleBluetooth()
       return
     }
@@ -977,6 +1107,8 @@ Panel {
           actionFocused = false
         return
       }
+      // Pointer use spends a keyboard Forget's follow.
+      pendingRemovalKey = ""
       if (arg.section === "header") {
         setHeaderCursor()
         return
@@ -987,21 +1119,26 @@ Panel {
       actionFocused = !!arg.action
       return
     }
-    var dev = viewDevice(arg.section, arg.index)
-    if (!dev)
+    // Pointer use spends a keyboard Forget's follow.
+    pendingRemovalKey = ""
+    // Keyed: the row must still carry the address the view saw there.
+    if (!BluetoothLogic.rowKeyMatches(viewRowsFor(arg.section), arg.index, arg.key))
       return
-    if (name === "primary") {
-      if (dev.connected)
-        disconnectDevice(dev)
-      else
-        connectDevice(dev)
-    } else if (name === "secondary") {
-      if (dev.connected)
-        disconnectDevice(dev)
-      else if (arg.section !== "discovered")
-        forgetDevice(dev)
-    } else if (name === "forget")
-      forgetDevice(dev)
+    var dev = viewDevice(arg.section, arg.index)
+    if (!dev || dev.address !== arg.key)
+      return
+    requestDeviceAction(dev, BluetoothLogic.rowIntent(name, !!dev.connected, arg.section))
+  }
+
+  // The view rows SECTION shows ("connected", "known" or "discovered").
+  function viewRowsFor(section) {
+    if (section === "connected")
+      return connectedViewRows
+    if (section === "known")
+      return knownViewRows
+    if (section === "discovered")
+      return discoveredViewRows
+    return []
   }
 
   // Scrolls the keyboard cursor's row into the view's Paired/Available
@@ -1020,10 +1157,26 @@ Panel {
   // Asking for a direction rather than a toggle: the helper runs detached and the
   // switch only moves once BlueZ catches up, so a second click inside that window
   // would re-read the old state and undo the first.
+  //
+  // The switch shows the new state at once and pulses until Powered echoes
+  // it; clicks while it waits queue (the last one wins), and powerTimeout
+  // falls back to the real state (BluetoothLogic.powerClick).
   function toggleBluetooth() {
     if (!adapter)
       return
-    Quickshell.execDetached(["omarchy-bluetooth-power", adapter.enabled ? "off" : "on"])
+    applyPower(BluetoothLogic.powerClick(root.powerPending, adapter.enabled))
+  }
+
+  // Applies a power step RESULT ({state, send}, BluetoothLogic.powerClick or
+  // powerEcho): stores the state, then sends the direction, if any.
+  function applyPower(result) {
+    root.powerPending = result.state
+    if (result.send !== null)
+      Quickshell.execDetached(["omarchy-bluetooth-power", result.send ? "on" : "off"])
+    if (root.powerPending.target === null)
+      powerTimeout.stop()
+    else if (result.send !== null)
+      powerTimeout.restart()
   }
 
   IpcHandler {
@@ -1095,6 +1248,8 @@ Panel {
     }
     onMoveRequested: function (dx, dy) {
       dropdown.disarmPointer()
+      // Moving on spends a keyboard Forget's follow.
+      root.pendingRemovalKey = ""
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
       if (!root.cursorActive || !root.keyboardCursor) {

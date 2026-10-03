@@ -87,3 +87,174 @@ test("RSSI readings count as changed only when a value or address differs", () =
   assert.equal(logic.rssiChanged(undefined, {}), false)
   assert.equal(logic.rssiChanged({}, undefined), false)
 })
+
+// --- Power switch: pending, echo, queue ------------------------------------
+
+test("power: a click shows the new state at once and pulses until the echo", () => {
+  const idle = logic.powerIdle()
+  assert.deepEqual(idle, { target: null, queued: null })
+  assert.deepEqual(logic.powerView(idle, false), { on: false, busy: false })
+  assert.deepEqual(logic.powerView(null, true), { on: true, busy: false })
+
+  let r = logic.powerClick(idle, false)
+  assert.equal(r.send, true)
+  assert.deepEqual(r.state, { target: true, queued: null })
+  assert.deepEqual(logic.powerView(r.state, false), { on: true, busy: true })
+
+  // An echo of the old state keeps waiting; the target's echo settles.
+  assert.deepEqual(logic.powerEcho(r.state, false), { state: r.state, send: null })
+  const done = logic.powerEcho(r.state, true)
+  assert.deepEqual(done, { state: { target: null, queued: null }, send: null })
+  assert.deepEqual(logic.powerView(done.state, true), { on: true, busy: false })
+  // An echo while idle changes nothing.
+  assert.deepEqual(logic.powerEcho(null, true), { state: logic.powerIdle(), send: null })
+})
+
+test("power: clicks while busy queue, the last one wins", () => {
+  let r = logic.powerClick(null, true) // turning off
+  assert.equal(r.send, false)
+  r = logic.powerClick(r.state, true) // back on: queued
+  assert.equal(r.send, null)
+  assert.deepEqual(r.state, { target: false, queued: true })
+  assert.deepEqual(logic.powerView(r.state, true), { on: true, busy: true })
+  // A third click returns to the in-flight state: the queue empties.
+  const third = logic.powerClick(r.state, true)
+  assert.deepEqual(third.state, { target: false, queued: null })
+  assert.equal(third.send, null)
+  // With "on" queued, the "off" echo sends it next.
+  const next = logic.powerEcho(r.state, false)
+  assert.deepEqual(next, { state: { target: true, queued: null }, send: true })
+  // And its echo settles to the last click's state.
+  assert.deepEqual(logic.powerEcho(next.state, true).state, logic.powerIdle())
+})
+
+test("power: a timeout (powerIdle) falls back to the real state", () => {
+  const r = logic.powerClick(null, false)
+  assert.deepEqual(logic.powerView(logic.powerIdle(), false), { on: false, busy: false })
+  assert.equal(logic.powerView(r.state, false).on, true)
+})
+
+// --- Device actions: intents, in-flight, queue -------------------------------
+
+test("row actions resolve to an intent as the panel's handler did", () => {
+  assert.equal(logic.rowIntent("primary", true, "connected"), "disconnect")
+  assert.equal(logic.rowIntent("primary", false, "known"), "connect")
+  assert.equal(logic.rowIntent("primary", false, "discovered"), "connect")
+  assert.equal(logic.rowIntent("secondary", true, "connected"), "disconnect")
+  assert.equal(logic.rowIntent("secondary", false, "known"), "forget")
+  assert.equal(logic.rowIntent("secondary", false, "discovered"), "")
+  assert.equal(logic.rowIntent("forget", true, "connected"), "forget")
+  assert.equal(logic.rowIntent("hover", false, "known"), "")
+})
+
+test("the intent in flight comes from the pending action, then BlueZ's state", () => {
+  assert.equal(logic.inFlightIntent("connecting", -1, false), "connect")
+  assert.equal(logic.inFlightIntent("disconnecting", -1, false), "disconnect")
+  assert.equal(logic.inFlightIntent("forgetting", 3, false), "forget")
+  assert.equal(logic.inFlightIntent("", 3, false), "connect")
+  assert.equal(logic.inFlightIntent(undefined, -1, true), "connect")
+  assert.equal(logic.inFlightIntent("", 2, false), "disconnect")
+  assert.equal(logic.inFlightIntent("", 1, false), "")
+  assert.equal(logic.inFlightIntent("", undefined, undefined), "")
+})
+
+test("device clicks: idle runs, busy queues (last wins), equal to in-flight drops", () => {
+  // Idle: runs at once, and clears any stale queue entry.
+  let r = logic.deviceClick({ A: "forget" }, "A", "connect", "")
+  assert.deepEqual(r, { queue: {}, run: "connect" })
+  // Busy: queued.
+  r = logic.deviceClick({}, "A", "forget", "connect")
+  assert.deepEqual(r, { queue: { A: "forget" }, run: "" })
+  // Last one wins.
+  r = logic.deviceClick(r.queue, "A", "disconnect", "connect")
+  assert.deepEqual(r, { queue: { A: "disconnect" }, run: "" })
+  // Equal to the action in flight: dropped (and the queue emptied).
+  r = logic.deviceClick(r.queue, "A", "connect", "connect")
+  assert.deepEqual(r, { queue: {}, run: "" })
+  // Other devices' entries are untouched; the input is never mutated.
+  const q = { B: "forget" }
+  r = logic.deviceClick(q, "A", "forget", "connect")
+  assert.deepEqual(r.queue, { B: "forget", A: "forget" })
+  assert.deepEqual(q, { B: "forget" })
+  // No intent or no key: nothing.
+  assert.deepEqual(logic.deviceClick(null, "A", "", ""), { queue: {}, run: "" })
+  assert.deepEqual(logic.deviceClick({}, "", "connect", ""), { queue: {}, run: "" })
+})
+
+test("queued device actions run once their device is idle; a gone device drops them", () => {
+  const queue = { A: "forget", B: "connect", C: "disconnect" }
+  const r = logic.takeReady(queue, { A: "", B: "connect" })
+  assert.deepEqual(r.run, [{ key: "A", intent: "forget" }])
+  assert.deepEqual(r.queue, { B: "connect" })
+  assert.deepEqual(queue, { A: "forget", B: "connect", C: "disconnect" })
+  assert.deepEqual(logic.takeReady(null, null), { queue: {}, run: [] })
+})
+
+// --- Keyboard Forget: the cursor follows to the neighbour --------------------
+
+test("forget stops list the header, the remembered rows, then the scan's", () => {
+  const stops = logic.forgetStops(["A"], ["B", "C"], ["D"])
+  assert.deepEqual(stops, [
+    { key: "header", section: "header", index: -1 },
+    { key: "A", section: "connected", index: 0 },
+    { key: "B", section: "known", index: 0 },
+    { key: "C", section: "known", index: 1 },
+    { key: "scan:D", section: "discovered", index: 0 }
+  ])
+  assert.deepEqual(logic.forgetStops(undefined, null, undefined), [
+    { key: "header", section: "header", index: -1 }
+  ])
+})
+
+test("followForget waits while the device is remembered, then lands on the neighbour", () => {
+  // Nothing armed: no follow.
+  assert.deepEqual(logic.followForget(logic.forgetStops([], ["B"], []), "", 1), {
+    follow: false,
+    pendingKey: "",
+    lastIndex: 1
+  })
+  // Still remembered (a connected device moving to Paired): wait, tracking its stop.
+  const waiting = logic.followForget(logic.forgetStops([], ["X", "B", "C"], []), "B", 1)
+  assert.deepEqual(waiting, { follow: false, pendingKey: "B", lastIndex: 2 })
+  // Gone (here back in Available as a scan row): the row now at its index.
+  const landed = logic.followForget(logic.forgetStops([], ["X", "C"], ["B"]), "B", 2)
+  assert.deepEqual(landed, {
+    follow: true,
+    pendingKey: "",
+    lastIndex: 2,
+    key: "C",
+    section: "known",
+    index: 1
+  })
+  // The last row: the one before it.
+  const last = logic.followForget(logic.forgetStops([], ["X"], []), "C", 2)
+  assert.equal(last.key, "X")
+  assert.equal(last.section, "known")
+  // Everything gone: the header.
+  const none = logic.followForget(logic.forgetStops([], [], []), "X", 1)
+  assert.deepEqual(none.section, "header")
+  assert.equal(none.index, -1)
+})
+
+test("BluetoothLogic.js's generated copy of CursorLogic answers like the source", () => {
+  const { loadPragma } = require("./lib/load-pragma.js")
+  const source = require(
+    path.join(__dirname, "..", "..", "plugins/araneadev.shared/CursorLogic.js")
+  )
+  const plain = (value) => JSON.parse(JSON.stringify(value))
+  const copy = loadPragma("plugins/araneadev.bluetooth/BluetoothLogic.js")
+  const rows = [{ key: "a" }, { key: "b" }, { key: "c" }]
+  assert.deepEqual(
+    plain(copy.reselectIndex(rows, "c", 0)),
+    plain(source.reselectIndex(rows, "c", 0))
+  )
+  assert.deepEqual(plain(copy.followCursor(rows, "b", 0)), plain(source.followCursor(rows, "b", 0)))
+  assert.equal(copy.cursorConfirmed(rows, "b", 1), source.cursorConfirmed(rows, "b", 1))
+  assert.equal(copy.pressIntent(true, false), source.pressIntent(true, false))
+  assert.deepEqual(plain(copy.keepRows({}, "x", rows)), plain(source.keepRows({}, "x", rows)))
+  assert.equal(copy.rowKeyMatches(rows, 1, "b"), source.rowKeyMatches(rows, 1, "b"))
+  assert.deepEqual(plain(copy.afterRemoval(rows, "b", 1)), plain(source.afterRemoval(rows, "b", 1)))
+  // And the keyed check is exported for Panel.qml.
+  assert.equal(logic.rowKeyMatches(rows, 0, "a"), true)
+  assert.equal(logic.rowKeyMatches(rows, 0, "b"), false)
+})
