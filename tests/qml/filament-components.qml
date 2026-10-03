@@ -4,6 +4,8 @@
 // glow follows the level along the lit strand. A NodeDeviceRow with a
 // PointerMoveGate never takes the cursor when it moves under a still
 // pointer, and KeyboardInputFrame/blocked forwards to its key catcher.
+// A key the catcher leaves unaccepted (Delete) reaches unhandledKey unless
+// the frame is blocked.
 import QtQuick
 import QtTest
 import Quickshell
@@ -201,11 +203,58 @@ ShellRoot {
     }
   }
 
+  // A focused frame in a real window, so Qt delivers real key events.
+  FloatingWindow {
+    id: keyWindow
+    implicitWidth: 160
+    implicitHeight: 100
+    visible: true
+
+    Aranea.KeyboardInputFrame {
+      id: keyedInput
+      anchors.fill: parent
+      property var unhandled: []
+      property int moves: 0
+      onMoveRequested: moves += 1
+      onUnhandledKey: function (event) {
+        // keyClick with a modifier presses the modifier first; only the
+        // keys under test are recorded.
+        if (event.key !== Qt.Key_Delete && event.key !== Qt.Key_Down)
+          return
+        unhandled = unhandled.concat([
+          {
+            key: event.key,
+            shift: (event.modifiers & Qt.ShiftModifier) !== 0
+          }
+        ])
+        event.accepted = true
+      }
+    }
+  }
+
   // Synthesizes the pointer events (TestCase's mouseMove), never run as a test.
   TestCase {
     id: pointer
     name: "pointer"
     when: false
+  }
+
+  // Keys the catcher leaves unaccepted reach unhandledKey (with their
+  // modifiers); keys it takes and keys while blocked do not.
+  function unhandledKeys() {
+    keyedInput.focusTarget.forceActiveFocus()
+    t.step(50, function () {
+      pointer.keyClick(Qt.Key_Delete, Qt.ShiftModifier)
+      t.equal(keyedInput.unhandled.length, 1, "an unaccepted key reaches unhandledKey")
+      t.check(keyedInput.unhandled.length === 1 && keyedInput.unhandled[0].key === Qt.Key_Delete && keyedInput.unhandled[0].shift, "with its key and Shift")
+      pointer.keyClick(Qt.Key_Down)
+      t.equal(keyedInput.moves, 1, "the catcher still takes its own keys")
+      t.equal(keyedInput.unhandled.length, 1, "a key the catcher took never reaches unhandledKey")
+      keyedInput.blocked = true
+      pointer.keyClick(Qt.Key_Delete)
+      t.equal(keyedInput.unhandled.length, 1, "nothing reaches unhandledKey while blocked")
+      t.done()
+    })
   }
 
   // Clicks on rows created under a still pointer: refused for about 300 ms
@@ -229,7 +278,7 @@ ShellRoot {
               t.step(30, function () {
                 pointer.mouseClick(freshHost, 50, 52)
                 t.equal(freshHost.chosenCount, 2, "a real move over a fresh row lets a click through at once")
-                t.done()
+                unhandledKeys()
               })
             })
           })

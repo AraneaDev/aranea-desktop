@@ -19,6 +19,9 @@ Item {
   signal returnRequested
   // Requests deletion of the current selection (stock emits it for "x").
   signal deleteRequested
+  // A key the catcher left unaccepted (Delete, for example) while not
+  // blocked; a handler sets event.accepted to take it.
+  signal unhandledKey(var event)
   // Item receiving keyboard focus.
   property alias focusTarget: keyCatcher
   // Content rendered inside the frame.
@@ -26,6 +29,12 @@ Item {
   // Blocks all keys (forwarded to descendants) while true, e.g. an inline
   // editor has focus and must receive keys normally.
   property alias blocked: keyCatcher.blocked
+
+  // Unaccepted keys propagate from the catcher to this item.
+  Keys.onPressed: function (event) {
+    if (!keyCatcher.blocked)
+      frame.unhandledKey(event)
+  }
 
   PanelKeyCatcher {
     id: keyCatcher

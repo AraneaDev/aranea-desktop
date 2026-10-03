@@ -19,6 +19,9 @@ KeyboardPanel {
   signal returnRequested
   // Emitted when the focused item's deletion is requested ("x").
   signal deleteRequested
+  // Emitted for a key the catcher left unaccepted (Delete, for example);
+  // a handler sets event.accepted to take it.
+  signal unhandledKey(var event)
   // Content rendered inside the keyboard frame.
   default property alias panelContent: input.content
   focusTarget: input.focusTarget
@@ -41,5 +44,8 @@ KeyboardPanel {
     onReturnRequested: frame.returnRequested()
     onActivateRequested: frame.activateRequested()
     onDeleteRequested: frame.deleteRequested()
+    onUnhandledKey: function (event) {
+      frame.unhandledKey(event)
+    }
   }
 }
