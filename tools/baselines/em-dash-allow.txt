@@ -1,9 +1,6 @@
 docs/cinematic-precision.md
 gtk.css
 integrations/icons/README.md
-plugins/araneadev.agents/Agent.qml
-plugins/araneadev.agents/Main.qml
-plugins/araneadev.agents/Panel.qml
 plugins/araneadev.audio/Panel.qml
 plugins/araneadev.bar/BarModel.js
 plugins/araneadev.bar/Bar.qml

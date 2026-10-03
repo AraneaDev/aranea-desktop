@@ -1,18 +1,21 @@
 // Aranea Agents (araneadev.agents, cloned from omarchy.agents): the bar
-// button and dashboard popup for Claude Code, Codex and Fireworks usage.
-// This is the Task 2 clone: the stock root logic and markup below are
-// unchanged from Omarchy's Agents, so the panel behaves identically until
-// the Aranea-native dropdown view lands in a later task. Temporary for this
-// clone (stock's dynamic root.bar.* access, its loosely typed Style/Color
-// property access, its bare identifiers inside bindings, and the unused
-// Quickshell import); Task 4 removes this once the view is rebuilt.
-// qmllint disable missing-property unqualified unused-imports
+// button and dropdown for Claude Code, Codex and Fireworks usage. Stock's
+// root logic stays (Main's discovery and watching, the 30 s clock, the IPC
+// target, the provider selection that follows the provider id, h/l, r,
+// Enter and the up/down scrolling, self-hiding with no usage, sync and the
+// bar entry's settings handed to Main). The pure view, AgentsDropdown,
+// draws it in the shared keyboard frame from agentsView; AgentsRing on the
+// bar button shows the current agent's fullest limit window. Added: the
+// keyboard cursor (shown only while the keyboard drives it; the first key
+// only reveals it), the Refresh pill's pending state (AgentsLogic), which
+// r, Enter, the pill and IPC refresh share, and the mark probe that walks
+// the light-twin fallback for the header.
 import QtQuick
-import QtQuick.Controls
-import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "AgentsLogic.js" as AgentsLogic
+import "../araneadev.shared" as Aranea
 
 Panel {
   id: root
@@ -20,18 +23,8 @@ Panel {
   ipcTarget: "omarchy.agents"
   manageIpc: false
 
-  // The bar's foreground colour, or the default when not hosted by a bar.
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
-  // The bar's urgent (alarm) colour, or the default when not hosted.
-  readonly property color urgent: bar ? bar.urgent : Color.urgent
-  // A dimmed tone of foreground, for secondary text.
-  readonly property color dim: Qt.darker(foreground, 1.55)
-  // The popup's background colour.
+  // The popup's background colour, for picking a light or dark mark.
   readonly property color surface: Color.popups.background
-  // The meter track colour behind a limit or usage bar.
-  readonly property color track: Style.selectedFillFor(foreground, Color.accent)
-  // The bar's font family, or the default when not hosted by a bar.
-  readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
 
   // The enabled agents that have recorded usage, in Main's discovery order.
   readonly property var providers: usage.enabledProviders
@@ -50,9 +43,19 @@ Panel {
   // The selected provider's record, or null when there are none.
   readonly property var provider: providers.length > 0 ? providers[providerIndex] : null
 
-  // Whether a navigation key has shown the provider-switch cursor (or a
-  // click/hover put it on a chip).
+  // Whether a navigation key has shown the cursor (or a click put it on a
+  // pill).
   property bool cursorActive: false
+  // True while the keyboard drives the cursor; any pointer action clears
+  // it. The view outlines the cursor only then, so the mouse never shows
+  // one.
+  property bool keyboardCursor: false
+  // The Refresh pill's pending state (AgentsLogic.refreshIdle shape): busy
+  // from a refresh request until Main's dataRevision moves past the
+  // revision frozen at the request, or until refreshTimeoutMs passes.
+  property var refreshPending: AgentsLogic.refreshIdle()
+  // How long a refresh may stay pending before the pill gives up.
+  readonly property int refreshTimeoutMs: 30000
 
   // Countdowns and "updated" read this instead of Date.now() so the
   // panel keeps telling the truth while it sits open.
@@ -77,10 +80,6 @@ Panel {
   function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v))
   }
-  // Returns c with its alpha channel replaced by a.
-  function alpha(c, a) {
-    return Qt.rgba(c.r, c.g, c.b, a)
-  }
 
   // Selects the provider at index, wrapping around the list.
   function selectProvider(index) {
@@ -95,10 +94,23 @@ Panel {
     usage.refreshAll(true)
   }
 
+  // The one refresh path (r, Enter, the Refresh pill and IPC refresh): marks
+  // the refresh pending and runs refreshNow, or does nothing while one is
+  // already pending.
+  function requestRefresh() {
+    var r = AgentsLogic.refreshClick(root.refreshPending, Date.now())
+    root.refreshPending = r.state
+    if (r.send)
+      root.refreshNow()
+  }
+
   // Runs the agent picker and closes the panel.
   function launchAgent() {
+    // The bar is a plain QtObject to qmllint; run() is the bar's own.
+    // qmllint disable missing-property
     if (root.bar)
       root.bar.run("omarchy-agent --pick")
+    // qmllint enable missing-property
     root.close()
   }
 
@@ -172,7 +184,7 @@ Panel {
     return out
   }
 
-  // The window that decides how much room is left — the fullest one, since
+  // The window that decides how much room is left: the fullest one, since
   // that is what stops the next prompt.
   function bindingWindow(p) {
     var windows = limitWindows(p)
@@ -374,6 +386,218 @@ Panel {
     return candidates
   }
 
+  // ------------------------------------------------------------------ view
+
+  // The mark candidates for the selected provider (iconCandidatesForProvider
+  // against the dropdown's surface).
+  readonly property var markCandidates: iconCandidatesForProvider(provider, surface)
+  // Provider objects are rebuilt on every refresh, which churns the array's
+  // identity without changing its content. Restart the fallback walk only
+  // when the URLs change: re-pointing source at a URL whose load already
+  // failed emits no statusChanged, so an identity-only reset would strand
+  // the walker on a missing -light twin.
+  readonly property string markCandidatesKey: markCandidates.join("\n")
+  // The candidate markProbe is trying.
+  property int markCandidateIndex: 0
+  onMarkCandidatesKeyChanged: markCandidateIndex = 0
+
+  // The header's mark: the first candidate that loaded, "" for the glyph.
+  readonly property string markUrl: markProbe.status === Image.Ready ? String(markProbe.source) : ""
+
+  // The bar ring's fill: the current agent's fullest limit window, -1 with
+  // none (a prepaid-only agent draws no ring).
+  readonly property real ringFraction: AgentsLogic.ringFraction(ringLimits(limits))
+  // The bar ring's tone for ringFraction.
+  readonly property string ringTone: AgentsLogic.ringTone(ringFraction)
+
+  // Limit windows W as ringFraction reads them: percent already a 0..1
+  // fraction, clamped, since a value above 1 would read as 0..100.
+  function ringLimits(w) {
+    return (w || []).map(function (entry) {
+      return {
+        percent: root.clamp(Number(entry.percent), 0, 1)
+      }
+    })
+  }
+
+  // The usage record's write time for provider p in milliseconds, 0 when
+  // unknown (a synced-only provider has no local record).
+  function updatedMsFor(p) {
+    if (!p)
+      return 0
+    var list = usage.agents || []
+    for (var i = 0; i < list.length; i++) {
+      var record = list[i] ? list[i].record : null
+      if (record && String(record.id || "") === p.providerId) {
+        var ms = Date.parse(String(record.updatedAt || ""))
+        return isFinite(ms) ? ms : 0
+      }
+    }
+    return 0
+  }
+
+  // The fraction of the window's span already elapsed (the pace tick):
+  // the span read from the collector's LABEL (else the window's title),
+  // the end from window w's reset time; -1 when either is unknown.
+  function paceFor(w, label) {
+    var span = windowSpanMs(String(label || "") !== "" ? label : (w ? w.title : ""))
+    var remainingMs = resetMsFor(w)
+    if (!(span > 0) || remainingMs < 0)
+      return -1
+    return clamp(1 - remainingMs / span, 0, 1)
+  }
+
+  // The view rows for provider p's limit windows, filtered and normalised
+  // the way limitWindows does, keeping each entry's label for the pace.
+  function limitViewRows(p) {
+    var list = p ? (p.limits || []) : []
+    var rows = []
+    for (var i = 0; i < list.length; i++) {
+      var entry = list[i] || {}
+      var percent = Number(entry.percent)
+      if (!(percent >= 0))
+        continue
+      var w = limitWindow(entry.label, percent, entry.resetsAt, entry.title)
+      var tone = AgentsLogic.ringTone(clamp(w.percent, 0, 1))
+      var remainingMs = resetMsFor(w)
+      rows.push({
+        key: w.title + "#" + rows.length,
+        label: w.title,
+        fraction: clamp(w.percent, 0, 1),
+        percent: Math.round(w.percent * 100) + "%",
+        tone: tone === "accent" ? "plain" : tone,
+        pace: paceFor(w, entry.label),
+        resets: remainingMs > 0 ? "Resets in " + formatDuration(remainingMs) : ""
+      })
+    }
+    return rows
+  }
+
+  // The view rows for p's recent days, scaled to the busiest one.
+  function dayViewRows(p) {
+    var days = p ? (p.recentDays || []) : []
+    var peak = Math.max(1, weekPeak(p))
+    var today = todayDate()
+    var rows = []
+    for (var i = 0; i < days.length; i++) {
+      var day = days[i] || {}
+      // By date, not by position: the Claude stats-cache fallback can hand
+      // us a window that stops short of today.
+      var isToday = String(day.date || "") === today
+      var count = Number(day.messageCount || 0)
+      rows.push({
+        key: AgentsLogic.dayKey(day),
+        label: dayLabel(day.date, isToday),
+        fraction: clamp(count / peak, 0, 1),
+        value: usage.formatTokenCount(count),
+        today: isToday,
+        detail: dayTooltip(day, isToday)
+      })
+    }
+    return rows
+  }
+
+  // The view rows for the model list, scaled to the heaviest model (the
+  // same scale-to-peak the day rows use).
+  function modelViewRows(list) {
+    var top = list.length > 0 ? Math.max(1, list[0].total) : 1
+    return list.map(function (row) {
+      return {
+        key: AgentsLogic.modelKey(row),
+        label: row.name,
+        fraction: root.clamp(row.total / top, 0, 1),
+        value: usage.formatTokenCount(row.total),
+        detail: root.modelTooltip(row)
+      }
+    })
+  }
+
+  // The balance view object, or null with no prepaid ledger.
+  function balanceView(b) {
+    if (!b)
+      return null
+    return {
+      remaining: formatMoney(b.remaining, b.currency),
+      // The meter shows what is left, not what is used: a prepaid account
+      // drains toward empty rather than filling toward a cap.
+      fraction: b.funded > 0 ? clamp(b.remaining / b.funded, 0, 1) : -1,
+      detail: balanceDetailText(b),
+      tone: balanceAlarming ? "urgent" : "plain"
+    }
+  }
+
+  // The header caption: an auth or endpoint problem replaces the plan
+  // (heroMeta), else the plan with the record's "updated HH:MM".
+  function heroCaption(p) {
+    if (!p)
+      return ""
+    if (String(p.usageStatusText || "") !== "")
+      return heroMeta(p)
+    return AgentsLogic.updatedCaption(heroMeta(p), updatedMsFor(p))
+  }
+
+  // The key hint under the dropdown.
+  function keyHint() {
+    var dot = " " + String.fromCodePoint(0xB7) + " "
+    var arrows = String.fromCodePoint(0x2191, 0x2193)
+    var parts = []
+    if (providers.length > 1)
+      parts.push("h/l agent")
+    parts.push("r refresh", arrows + " scroll", "tab next")
+    return parts.join(dot)
+  }
+
+  // Everything the Aranea view draws (AgentsDropdown.view).
+  readonly property var agentsView: ({
+      hero: {
+        mark: markUrl,
+        glyph: String.fromCodePoint(0xF16A3),
+        title: provider ? provider.providerName : "",
+        caption: heroCaption(provider),
+        problem: provider && String(provider.usageStatusText || "") !== "" ? String(provider.authHelpText || "") : ""
+      },
+      refresh: {
+        busy: !!refreshPending.busy
+      },
+      agents: providers.map(function (p, i) {
+        return {
+          key: AgentsLogic.providerKey(p),
+          label: p.providerName,
+          selected: i === root.providerIndex
+        }
+      }),
+      limits: limitViewRows(provider),
+      balance: balanceView(balance),
+      days: dayViewRows(provider),
+      models: modelViewRows(models),
+      footer: footerText(),
+      empty: providers.length === 0,
+      cursor: {
+        active: cursorActive && keyboardCursor,
+        section: providers.length > 1 ? "agents" : "refresh",
+        index: providers.length > 1 ? providerIndex : 0
+      },
+      keyHint: keyHint()
+    })
+
+  // Carries out one AgentsDropdown action. Every action comes from the
+  // pointer, so each one hands the cursor back from the keyboard.
+  function handleAction(name, arg) {
+    keyboardCursor = false
+    if (name === "refresh") {
+      requestRefresh()
+      return
+    }
+    if (name === "selectAgent") {
+      // Keyed: the provider at that index must still be the one the view
+      // showed there.
+      if (!arg || !providers[arg.index] || providers[arg.index].providerId !== arg.key)
+        return
+      cursorActive = true
+      selectProvider(arg.index)
+    }
+  }
+
   // Nothing to report, nothing in the bar: Bar.qml collapses a slot whose item
   // is invisible, so the icon appears the moment the first scan finds usage and
   // stays away entirely on a machine that has never run either CLI.
@@ -381,22 +605,25 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  onProviderIndexChanged: if (panelFlick)
-    panelFlick.contentY = 0
+  onProviderIndexChanged: dropdown.scrollToTop()
   onOpenedChanged: if (opened) {
     cursorActive = false
+    keyboardCursor = false
     nowMs = Date.now()
-    if (panelFlick)
-      panelFlick.contentY = 0
+    dropdown.scrollToTop()
     usage.refreshLimits()
-    Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
-    })
   }
+
+  // The refresh landing baseline is taken here, before any click, so the
+  // first refresh waits for a real change rather than the first revision.
+  Component.onCompleted: root.refreshPending = AgentsLogic.refreshLanded(root.refreshPending, usage.dataRevision)
 
   Main {
     id: usage
     settings: root.settings
+    // Every record change: lands a pending refresh, or keeps the idle
+    // baseline current for the next one.
+    onDataRevisionChanged: root.refreshPending = AgentsLogic.refreshLanded(root.refreshPending, usage.dataRevision)
   }
 
   // Cheap enough to keep running: it only re-evaluates text bindings, and a
@@ -406,6 +633,31 @@ Panel {
     running: root.opened
     repeat: true
     onTriggered: root.nowMs = Date.now()
+  }
+
+  // Gives up on a refresh that never lands (refreshTimeoutMs), checked once
+  // a second while one is pending.
+  Timer {
+    interval: 1000
+    running: !!root.refreshPending.busy
+    repeat: true
+    onTriggered: root.refreshPending = AgentsLogic.refreshTimeout(root.refreshPending, Date.now(), root.refreshTimeoutMs)
+  }
+
+  // Walks markCandidates until one loads; never shown (the header loads
+  // the same URL).
+  Image {
+    id: markProbe
+    visible: false
+    source: root.markCandidateIndex < root.markCandidates.length ? root.markCandidates[root.markCandidateIndex] : ""
+    sourceSize.width: Style.font.display * 2
+    sourceSize.height: Style.font.display * 2
+    // Advancing source from inside its own status change trips the
+    // binding-loop detector; defer the step one tick.
+    onStatusChanged: if (status === Image.Error && root.markCandidateIndex < root.markCandidates.length)
+      Qt.callLater(function () {
+        root.markCandidateIndex++
+      })
   }
 
   IpcHandler {
@@ -426,7 +678,7 @@ Panel {
       root.toggle()
     }
     function refresh(): string {
-      root.refreshNow()
+      root.requestRefresh()
       return "ok"
     }
     function next(): string {
@@ -439,9 +691,10 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󱚣"
+    text: String.fromCodePoint(0xF16A3)
     active: root.alarming
     onPressed: function (buttonCode) {
+      root.keyboardCursor = false
       if (buttonCode === Qt.RightButton)
         root.launchAgent()
       else if (buttonCode === Qt.MiddleButton)
@@ -449,610 +702,78 @@ Panel {
       else
         root.toggle()
     }
+
+    // Display only, drawn over the glyph slot: no layout change and no
+    // pointer input, so every click still reaches the button.
+    AgentsRing {
+      anchors.centerIn: parent
+      width: Math.min(Style.space(22), button.width, button.height)
+      height: width
+      fraction: root.ringFraction
+      tone: root.ringTone
+    }
   }
 
-  KeyboardPanel {
+  // The Aranea view in the shared keyboard frame. The view pins the header
+  // and the switch and scrolls the rest itself within maxHeight (stock's
+  // 640 cap, or less on a short screen), so the frame only sizes to it.
+  Aranea.KeyboardPanelFrame {
     id: panel
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    // Taller than the control panels on purpose: this one is a dashboard, and
-    // the whole point is reading limits and history without scrolling.
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(640))
-
-    PanelKeyCatcher {
-      id: keyCatcher
-      anchors.fill: parent
-
-      onMoveRequested: function (dx, dy) {
-        if (dx !== 0) {
-          root.cursorActive = true
-          root.selectProvider(root.providerIndex + dx)
-        }
-        if (dy !== 0)
-          panelFlick.contentY = root.clamp(panelFlick.contentY + dy * Style.space(56), 0, Math.max(0, panelFlick.contentHeight - panelFlick.height))
+    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    onCloseRequested: root.close()
+    onTabRequested: function (direction) {
+      dropdown.disarmPointer()
+      root.switchPanel(direction)
+    }
+    onMoveRequested: function (dx, dy) {
+      dropdown.disarmPointer()
+      // The first key after opening or after mouse use only reveals the
+      // cursor where it is.
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.cursorActive = true
+        root.keyboardCursor = true
+        return
       }
-      onActivateRequested: root.refreshNow()
-      onCloseRequested: root.close()
-      onTabRequested: function (direction) {
-        root.switchPanel(direction)
+      if (dx !== 0)
+        root.selectProvider(root.providerIndex + dx)
+      if (dy !== 0)
+        dropdown.scrollBy(dy)
+    }
+    onActivateRequested: {
+      dropdown.disarmPointer()
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.cursorActive = true
+        root.keyboardCursor = true
+        return
       }
-      onTextKey: function (t) {
-        if (t === "r" || t === "R")
-          root.refreshNow()
-      }
-
-      Flickable {
-        id: panelFlick
-        anchors.fill: parent
-        contentWidth: width
-        contentHeight: column.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        flickableDirection: Flickable.VerticalFlick
-        interactive: contentHeight > height
-        ScrollBar.vertical: ScrollBar {
-          policy: ScrollBar.AsNeeded
-        }
-
-        Column {
-          id: column
-          width: panelFlick.width
-          spacing: Style.space(12)
-
-          // ---------- Hero: provider mark · name · plan ----------
-          PanelHero {
-            id: hero
-            visible: !!root.provider
-            width: parent.width
-            title: root.provider ? root.provider.providerName : ""
-            meta: root.heroMeta(root.provider)
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-
-            iconComponent: Component {
-              Item {
-                id: heroMark
-                property var candidates: root.iconCandidatesForProvider(root.provider, root.surface)
-                // Provider objects are rebuilt on every refresh, which churns the
-                // array's identity without changing its content. Restart the fallback
-                // walk only when the URLs change: re-pointing source at a URL whose
-                // load already failed emits no statusChanged, so an identity-only
-                // reset would strand the walker on a missing -light twin.
-                property string candidatesKey: candidates.join("\n")
-                property int candidateIndex: 0
-                onCandidatesKeyChanged: candidateIndex = 0
-
-                width: Style.font.display
-                height: Style.font.display
-
-                Image {
-                  id: heroMarkImage
-                  anchors.fill: parent
-                  source: heroMark.candidateIndex < heroMark.candidates.length ? heroMark.candidates[heroMark.candidateIndex] : ""
-                  sourceSize.width: Style.font.display * 2
-                  sourceSize.height: Style.font.display * 2
-                  fillMode: Image.PreserveAspectFit
-                  // Advancing source from inside its own status change trips the
-                  // binding-loop detector; defer the step one tick.
-                  onStatusChanged: if (status === Image.Error && heroMark.candidateIndex < heroMark.candidates.length)
-                    Qt.callLater(function () {
-                      heroMark.candidateIndex++
-                    })
-                }
-
-                Text {
-                  textFormat: Text.PlainText
-                  anchors.centerIn: parent
-                  visible: heroMarkImage.status !== Image.Ready
-                  text: button.text
-                  color: root.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.display
-                }
-              }
-            }
-          }
-
-          Text {
-            visible: root.providers.length === 0
-            width: parent.width
-            topPadding: Style.space(24)
-            text: "No AI coding subscriptions found.\nAgents show up here once you've used them."
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-          }
-
-          // ---------- Provider switch ----------
-          Row {
-            id: providerSwitch
-            visible: root.providers.length > 1
-            width: parent.width
-            spacing: Style.spacing.md
-
-            readonly property real cellWidth: root.providers.length > 0 ? (width - spacing * (root.providers.length - 1)) / root.providers.length : 0
-
-            Repeater {
-              model: root.providers
-
-              Button {
-                required property var modelData
-                required property int index
-
-                width: providerSwitch.cellWidth
-                text: modelData.providerName
-                selected: index === root.providerIndex
-                hasCursor: root.cursorActive && index === root.providerIndex
-                bordered: true
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                fontSize: Style.font.bodySmall
-                verticalPadding: Style.spacing.controlPaddingY
-                onClicked: {
-                  root.cursorActive = true
-                  root.selectProvider(index)
-                }
-                onHovered: function (isHovered) {
-                  if (isHovered)
-                    root.cursorActive = true
-                }
-              }
-            }
-          }
-
-          // ---------- Status ----------
-          BorderSurface {
-            visible: !!root.provider && String(root.provider.usageStatusText || "") !== ""
-            width: parent.width
-            implicitHeight: statusText.implicitHeight + Style.spacing.xl * 2
-            color: root.alpha(root.urgent, 0.10)
-            borderSpec: Border.flat(root.alpha(root.urgent, 0.35), 1)
-            radius: Style.cornerRadius
-
-            Text {
-              id: statusText
-              textFormat: Text.PlainText
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(12)
-              anchors.rightMargin: Style.space(12)
-              text: root.provider ? String(root.provider.authHelpText || "") : ""
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              wrapMode: Text.WordWrap
-            }
-          }
-
-          // ---------- Balance / limits ----------
-          PanelSeparator {
-            visible: balanceSection.visible || limitsSection.visible
-            foreground: root.foreground
-          }
-
-          Column {
-            id: balanceSection
-            visible: !!root.balance
-            width: parent.width
-            spacing: Style.space(10)
-
-            // The meter shows what is left, not what is used: a prepaid
-            // account drains toward empty rather than filling toward a cap.
-            readonly property real ratio: root.balance && root.balance.funded > 0 ? root.clamp(root.balance.remaining / root.balance.funded, 0, 1) : -1
-
-            PanelSectionHeader {
-              width: parent.width
-              text: "BALANCE"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Item {
-              width: parent.width
-              implicitHeight: Math.max(balanceLabel.implicitHeight, balanceValue.implicitHeight)
-
-              Text {
-                id: balanceLabel
-                text: "Prepaid credits"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-              }
-
-              Text {
-                id: balanceValue
-                textFormat: Text.PlainText
-                text: root.balance ? root.formatMoney(root.balance.remaining, root.balance.currency) : ""
-                color: root.balanceAlarming ? root.urgent : root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-              }
-            }
-
-            Meter {
-              visible: balanceSection.ratio >= 0
-              width: parent.width
-              value: balanceSection.ratio
-              alarming: root.balanceAlarming
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              visible: text !== ""
-              width: parent.width
-              text: root.balanceDetailText(root.balance)
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
-
-          Column {
-            id: limitsSection
-            visible: root.limits.length > 0
-            width: parent.width
-            spacing: Style.space(10)
-
-            PanelSectionHeader {
-              text: "LIMITS"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Repeater {
-              model: root.limits
-
-              LimitRow {
-                required property var modelData
-                width: limitsSection.width
-                window: modelData
-              }
-            }
-          }
-
-          // ---------- Usage ----------
-          PanelSeparator {
-            visible: usageSection.visible
-            foreground: root.foreground
-          }
-
-          Column {
-            id: usageSection
-            visible: !!root.provider && root.provider.recentDays && root.provider.recentDays.length > 0
-            width: parent.width
-            spacing: Style.spacing.md
-
-            readonly property var days: root.provider ? (root.provider.recentDays || []) : []
-            readonly property real peak: Math.max(1, root.weekPeak(root.provider))
-
-            PanelSectionHeader {
-              width: parent.width
-              text: "TOKENS BY DAY"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Repeater {
-              model: usageSection.days
-
-              DayRow {
-                required property var modelData
-                required property int index
-
-                width: usageSection.width
-                day: modelData
-                ratio: Number(modelData.messageCount || 0) / usageSection.peak
-                // By date, not by position: the Claude stats-cache fallback can
-                // hand us a window that stops short of today.
-                today: String(modelData.date || "") === root.todayDate()
-              }
-            }
-          }
-
-          // ---------- Models ----------
-          PanelSeparator {
-            visible: modelSection.visible
-            foreground: root.foreground
-          }
-
-          Column {
-            id: modelSection
-            visible: root.models.length > 0
-            width: parent.width
-            spacing: Style.spacing.md
-
-            PanelSectionHeader {
-              width: parent.width
-              text: "TOKENS BY MODEL"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Repeater {
-              model: root.models
-
-              ModelRow {
-                required property var modelData
-                width: modelSection.width
-                row: modelData
-                // Scaled to the heaviest model, so the top row is always full —
-                // the same scale-to-peak the weekly chart uses for its busiest day.
-                share: modelData.total / Math.max(1, root.models[0].total)
-              }
-            }
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            visible: text !== ""
-            width: parent.width
-            topPadding: Style.space(2)
-            text: root.footerText()
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideRight
-          }
-        }
+      root.requestRefresh()
+    }
+    onTextKey: function (t) {
+      dropdown.disarmPointer()
+      if (t === "r" || t === "R") {
+        root.keyboardCursor = true
+        root.requestRefresh()
       }
     }
-  }
-
-  // A limit window: label and percentage, meter, and reset countdown.
-  component LimitRow: Column {
-    id: limitRow
-    property var window: null
-
-    readonly property bool alarming: window && window.percent >= 0.9
-
-    spacing: Style.space(6)
 
     Item {
-      width: parent.width
-      implicitHeight: Math.max(limitLabel.implicitHeight, limitValue.implicitHeight)
-
-      Text {
-        id: limitLabel
-        textFormat: Text.PlainText
-        // A model-scoped window is titled after its model, and those names run
-        // long enough to reach the percentage, so the title gives way first.
-        text: limitRow.window ? limitRow.window.title : ""
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-        anchors.left: parent.left
-        anchors.right: limitValue.left
-        anchors.rightMargin: Style.spacing.sm
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
-        id: limitValue
-        textFormat: Text.PlainText
-        text: limitRow.window && limitRow.window.percent >= 0 ? Math.round(limitRow.window.percent * 100) + "%" : "—"
-        color: limitRow.alarming ? root.urgent : root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-      }
-    }
-
-    Meter {
-      width: parent.width
-      value: limitRow.window ? limitRow.window.percent : -1
-      alarming: limitRow.alarming
-    }
-
-    Text {
-      id: resetText
-      textFormat: Text.PlainText
-      width: parent.width
-      text: {
-        var remainingMs = root.resetMsFor(limitRow.window)
-        return remainingMs > 0 ? "Resets in " + root.formatDuration(remainingMs) : ""
-      }
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-    }
-  }
-
-  // Rounded track showing the percentage of the allowance used.
-  component Meter: Item {
-    id: meter
-    property real value: -1
-    property bool alarming: false
-    property real thickness: Math.max(Style.space(4), Math.round(Style.spacing.controlHeight * 0.14))
-
-    implicitHeight: thickness
-
-    Rectangle {
-      id: meterTrack
       anchors.fill: parent
-      radius: height / 2
-      color: root.track
-    }
+      clip: true
 
-    Rectangle {
-      anchors.left: meterTrack.left
-      anchors.verticalCenter: meterTrack.verticalCenter
-      height: meterTrack.height
-      radius: meterTrack.radius
-      width: meterTrack.width * root.clamp(meter.value, 0, 1)
-      color: meter.alarming ? root.urgent : root.foreground
-
-      Behavior on width {
-        NumberAnimation {
-          duration: 160
-          easing.type: Easing.OutCubic
+      AgentsDropdown {
+        id: dropdown
+        width: parent.width
+        maxHeight: panel.availableCardHeight > 0 ? Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) : Style.space(640)
+        view: root.agentsView
+        onAction: function (name, arg) {
+          root.handleAction(name, arg)
         }
       }
-    }
-  }
-
-  // One row per day: label, bar, tokens. Today is picked out in full
-  // foreground so the week reads as a run-up to right now.
-  component DayRow: Item {
-    id: dayRow
-    property var day: null
-    property real ratio: 0
-    property bool today: false
-
-    implicitHeight: Math.max(dayLabel.implicitHeight, dayValue.implicitHeight) + Style.spacing.sm
-
-    Text {
-      id: dayLabel
-      textFormat: Text.PlainText
-      text: root.dayLabel(dayRow.day ? dayRow.day.date : "", dayRow.today)
-      color: dayRow.today ? root.foreground : root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: dayRow.today
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      width: Style.space(52)
-    }
-
-    Rectangle {
-      id: dayTrack
-      anchors.left: dayLabel.right
-      anchors.right: dayValue.left
-      anchors.leftMargin: Style.space(8)
-      anchors.rightMargin: Style.space(10)
-      anchors.verticalCenter: parent.verticalCenter
-      height: Math.max(Style.space(4), Math.round(Style.spacing.controlHeight * 0.14))
-      radius: height / 2
-      color: root.track
-
-      Rectangle {
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        height: parent.height
-        radius: parent.radius
-        width: parent.width * root.clamp(dayRow.ratio, 0, 1)
-        color: dayRow.today ? root.foreground : root.alpha(root.foreground, 0.55)
-
-        Behavior on width {
-          NumberAnimation {
-            duration: 160
-            easing.type: Easing.OutCubic
-          }
-        }
-      }
-    }
-
-    Text {
-      id: dayValue
-      textFormat: Text.PlainText
-      text: usage.formatTokenCount(dayRow.day ? Number(dayRow.day.messageCount || 0) : 0)
-      color: dayRow.today ? root.foreground : root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      horizontalAlignment: Text.AlignRight
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      width: Style.space(52)
-    }
-
-    MouseArea {
-      id: dayHover
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.NoButton
-    }
-
-    PanelToolTip {
-      visible: dayHover.containsMouse
-      text: root.dayTooltip(dayRow.day, dayRow.today)
-      fontFamily: root.fontFamily
-    }
-  }
-
-  // Model rows read as a table: the share bar fills the row behind the label
-  // instead of stacking under it, which keeps the whole dashboard on one screen.
-  component ModelRow: Item {
-    id: modelRow
-    property var row: null
-    property real share: 0
-
-    implicitHeight: modelName.implicitHeight + Style.spacing.lg
-
-    Rectangle {
-      anchors.fill: parent
-      radius: Style.cornerRadius
-      color: root.alpha(root.foreground, 0.05)
-    }
-
-    Rectangle {
-      anchors.left: parent.left
-      anchors.top: parent.top
-      anchors.bottom: parent.bottom
-      width: parent.width * root.clamp(modelRow.share, 0, 1)
-      radius: Style.cornerRadius
-      color: root.alpha(root.foreground, 0.14)
-
-      Behavior on width {
-        NumberAnimation {
-          duration: 160
-          easing.type: Easing.OutCubic
-        }
-      }
-    }
-
-    Text {
-      id: modelName
-      textFormat: Text.PlainText
-      text: modelRow.row ? modelRow.row.name : ""
-      color: root.foreground
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
-      elide: Text.ElideRight
-      anchors.left: parent.left
-      anchors.leftMargin: Style.space(8)
-      anchors.right: modelTokens.left
-      anchors.rightMargin: Style.space(8)
-      anchors.verticalCenter: parent.verticalCenter
-    }
-
-    Text {
-      id: modelTokens
-      textFormat: Text.PlainText
-      text: modelRow.row ? usage.formatTokenCount(modelRow.row.total) : ""
-      color: root.dim
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.bodySmall
-      font.bold: true
-      anchors.right: parent.right
-      anchors.rightMargin: Style.space(8)
-      anchors.verticalCenter: parent.verticalCenter
-    }
-
-    MouseArea {
-      id: modelHover
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.NoButton
-    }
-
-    PanelToolTip {
-      visible: modelHover.containsMouse
-      text: root.modelTooltip(modelRow.row)
-      fontFamily: root.fontFamily
     }
   }
 }

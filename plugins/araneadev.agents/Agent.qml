@@ -1,13 +1,12 @@
 // Aranea Agents (araneadev.agents, cloned from omarchy.agents): the
 // per-agent usage record watcher. Stock's logic stays unchanged (reading
-// the usage file through FileView and reparsing it on every change); the
-// Aranea-native dropdown view lands in a later task.
+// the usage file through FileView and reparsing it on every change).
 import QtQuick
 import Quickshell.Io
 
 // One agent's usage record, read straight off the data file that
 // omarchy-agent-usage-update maintains. The panel never learns how the
-// numbers were made — a record that appears in the usage directory is an
+// numbers were made: a record that appears in the usage directory is an
 // agent, whoever wrote it.
 Item {
   id: root

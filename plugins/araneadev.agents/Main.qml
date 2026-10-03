@@ -1,10 +1,7 @@
 // Aranea Agents (araneadev.agents, cloned from omarchy.agents): discovery,
 // watching and cross-device sync for agent usage records. Stock's logic
-// stays unchanged; the Aranea-native dropdown view lands in a later task.
-// Temporary for this clone (bare identifiers inside bindings, and the
-// Process onExited(exitCode) handlers below); Task 4 removes this once the
-// view is rebuilt.
-// qmllint disable unqualified signal-handler-parameters
+// stays unchanged; Panel.qml draws it in the Aranea dropdown.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -74,9 +71,10 @@ Item {
     model: root.agentIds
 
     delegate: Agent {
+      id: agentDelegate
       required property var modelData
-      agentId: modelData
-      path: root.usageDir + "/" + modelData + ".json"
+      agentId: agentDelegate.modelData
+      path: root.usageDir + "/" + agentDelegate.modelData + ".json"
       onRecordChanged: root.recordsChanged()
     }
 
@@ -104,8 +102,8 @@ Item {
     scheduleSync()
   }
 
-  // A collector that could not reach its limits endpoint at all — typically
-  // the seconds after login before the network is up — writes retryAdvised
+  // A collector that could not reach its limits endpoint at all (typically
+  // the seconds after login before the network is up) writes retryAdvised
   // into its record. Honor it with one sooner try instead of waiting out the
   // full refresh interval; a run that reaches the endpoint clears the flag.
   // Only the advising agents rerun, so an outage at one provider does not
@@ -159,6 +157,8 @@ Item {
   Process {
     id: updateProcess
     running: false
+    // Quickshell's ExitStatus type is not visible to qmllint.
+    // qmllint disable signal-handler-parameters
     onExited: {
       root.rescanAgents()
       if (root.pendingUpdateKind !== "") {
@@ -167,6 +167,7 @@ Item {
         root.runUpdate(kind)
       }
     }
+    // qmllint enable signal-handler-parameters
 
     stderr: StdioCollector {
       waitForEnd: true
@@ -218,7 +219,7 @@ Item {
   }
 
   // Opening the panel wants the numbers that go stale on the wire, not
-  // another walk over every transcript on disk — the collectors reuse their
+  // another walk over every transcript on disk: the collectors reuse their
   // recent scans in this mode.
   function refreshLimits() {
     runUpdate("limits")
@@ -227,7 +228,7 @@ Item {
   // ------------------------------------------------------------- providers
 
   // An agent earns a place in the bar and the panel by being switched on in
-  // settings and having actually produced numbers — locally or on a synced
+  // settings and having actually produced numbers, locally or on a synced
   // device. With nothing to show, the whole module collapses out of the bar
   // rather than sitting there dimmed.
   property var enabledProviders: {
@@ -248,7 +249,7 @@ Item {
         result.push(display)
     }
     // An agent that only ever ran on another machine has no local record, but
-    // its synced numbers still deserve a tab. Rate limits stay blank — they
+    // its synced numbers still deserve a tab. Rate limits stay blank; they
     // are per-account and never travel.
     var syncedProviders = syncConfigured() && aggregateData && aggregateData.providers ? aggregateData.providers : {}
     for (var syncedId in syncedProviders) {
@@ -392,6 +393,8 @@ Item {
     id: syncMkdirProcess
     running: false
     onRunningChanged: root.updateSyncRunning()
+    // Quickshell's ExitStatus type is not visible to qmllint.
+    // qmllint disable signal-handler-parameters
     onExited: function (exitCode) {
       if (exitCode !== 0) {
         if (root.syncConfigured())
@@ -401,17 +404,21 @@ Item {
       }
       root.writeSyncSnapshot()
     }
+    // qmllint enable signal-handler-parameters
   }
 
   Process {
     id: syncScanProcess
     running: false
     onRunningChanged: root.updateSyncRunning()
+    // Quickshell's ExitStatus type is not visible to qmllint.
+    // qmllint disable signal-handler-parameters
     onExited: function (exitCode) {
       if (exitCode !== 0 && root.syncConfigured())
         root.syncStatusText = "Usage sync scan failed"
       root.finishSyncRun()
     }
+    // qmllint enable signal-handler-parameters
 
     stdout: StdioCollector {
       waitForEnd: true
@@ -663,7 +670,7 @@ Item {
 
   // Device-scoped stats add up across machines; account-scoped stats
   // (Fireworks' billing API) are replicas of the same upstream truth on
-  // every synced device, so the widest value wins — summing them would
+  // every synced device, so the widest value wins; summing them would
   // double every token per machine.
   function combineNumber(additive, current, value) {
     return additive ? numberValue(current) + numberValue(value) : Math.max(numberValue(current), numberValue(value))
