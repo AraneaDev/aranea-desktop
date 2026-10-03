@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.2...v2.16.3) (2026-10-03)
+
+
+### Fixes
+
+* bring the status dropdowns up to the Filament standard ([#109](https://github.com/AraneaDev/aranea-desktop/issues/109)) ([93d7936](https://github.com/AraneaDev/aranea-desktop/commit/93d7936679cd36947e969b8610ea2633ec00ab7e))
+
 ## [2.16.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.1...v2.16.2) (2026-10-03)
 
 
