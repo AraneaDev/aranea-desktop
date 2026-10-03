@@ -55,7 +55,7 @@ cat >"$config" <<'EOF'
 {"bar": {"layout": {"left": [], "center": [], "right": [{"id": "omarchy.microphone"}, {"id": "omarchy.tray"}, {"id": "omarchy.network"}]}}}
 EOF
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[].id] == ["omarchy.microphone", "araneadev.notifications", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+jq -e '[.bar.layout.right[].id] == ["omarchy.microphone", "omarchy.tray", "araneadev.notifications", "omarchy.network"]' "$config" >/dev/null
 test -f "$marker"
 
 # Idempotent: a second run adds nothing.
@@ -97,7 +97,7 @@ cat >"$config" <<'EOF'
 {"bar": {"layout": {"right": ["omarchy.clock", {"id": "omarchy.tray"}]}}}
 EOF
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '.bar.layout.right[1].id == "araneadev.notifications" and .bar.id == "araneadev.bar"' "$config" >/dev/null
+jq -e '.bar.layout.right[2].id == "araneadev.notifications" and .bar.id == "araneadev.bar"' "$config" >/dev/null
 rm -f "$marker"
 cat >"$config" <<'EOF'
 {"bar": {"layout": {"right": ["araneadev.notifications", "omarchy.tray"]}}}
@@ -123,7 +123,7 @@ jq -e '((.cloneSourceRestores // []) | index("araneadev.menu")) == null' "$confi
 test -f "$parked"
 
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[].id] == ["araneadev.notifications", "omarchy.tray"]' "$config" >/dev/null
+jq -e '[.bar.layout.right[].id] == ["omarchy.tray", "araneadev.notifications"]' "$config" >/dev/null
 jq -e '(.disabledPlugins | index("omarchy.notifications")) != null' "$config" >/dev/null
 jq -e '(.cloneSourceRestores | index("araneadev.notifications")) != null' "$config" >/dev/null
 test ! -e "$parked"
@@ -145,24 +145,24 @@ cat >"$config" <<'EOF'
 {"bar": {"layout": {"right": [{"id": "omarchy.tray"}, {"id": "omarchy.network"}]}}}
 EOF
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[].id] == ["araneadev.health", "araneadev.notifications", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+jq -e '[.bar.layout.right[].id] == ["omarchy.tray", "araneadev.health", "araneadev.notifications", "omarchy.network"]' "$config" >/dev/null
 test -f "$hmarker"
 # Bell removed by hand, health kept: nothing moves, nothing re-added (Review Focus 4)
 jq '.bar.layout.right |= map(select(.id != "araneadev.notifications"))' "$config" >"$config.tmp" && mv "$config.tmp" "$config"
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[].id] == ["araneadev.health", "omarchy.tray", "omarchy.network"]' "$config" >/dev/null
+jq -e '[.bar.layout.right[].id] == ["omarchy.tray", "araneadev.health", "omarchy.network"]' "$config" >/dev/null
 # Health removed by hand stays removed
 jq '.bar.layout.right |= map(select(.id != "araneadev.health"))' "$config" >"$config.tmp" && mv "$config.tmp" "$config"
 "$repo_root/scripts/repair-shell-config" "$config"
 jq -e '[.bar.layout.right[].id] | index("araneadev.health") == null' "$config" >/dev/null
-# No bell: placed before the tray
+# No bell: placed right after the tray
 rm -f "$hmarker"
 cat >"$config" <<'EOF'
 {"bar": {"layout": {"right": ["omarchy.clock", {"id": "omarchy.tray"}]}}}
 EOF
 touch "$marker"
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.clock", "araneadev.health", "omarchy.tray"]' "$config" >/dev/null
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.clock", "omarchy.tray", "araneadev.health"]' "$config" >/dev/null
 # Leave and return
 "$repo_root/scripts/release-shell-config" "$config"
 jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.health") == null' "$config" >/dev/null
@@ -887,9 +887,10 @@ jq -e '.bar.layout.right == ["araneadev.tray"]' "$tray_real" >/dev/null || {
   exit 1
 }
 
-# The bell and health icons place themselves just before the tray entry,
-# looking it up as araneadev.tray once installed and retargeted (not the
-# now-stale literal "omarchy.tray"), all in the same repair pass.
+# The bell and health icons place themselves right after the tray entry
+# (tray, health, bell), looking it up as araneadev.tray once installed and
+# retargeted (not the now-stale literal "omarchy.tray"), all in the same
+# repair pass.
 tray_bell_config="$test_root/tray-bell-config/shell.json"
 mkdir -p "$(dirname "$tray_bell_config")/plugins/araneadev.tray"
 : >"$(dirname "$tray_bell_config")/plugins/araneadev.tray/manifest.json"
@@ -898,8 +899,35 @@ cat >"$tray_bell_config" <<'EOF'
 {"bar": {"layout": {"right": [{"id": "omarchy.network"}, {"id": "omarchy.tray"}]}}}
 EOF
 "$repo_root/scripts/repair-shell-config" "$tray_bell_config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.health", "araneadev.notifications", "araneadev.tray"]' "$tray_bell_config" >/dev/null || {
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.network", "araneadev.tray", "araneadev.health", "araneadev.notifications"]' "$tray_bell_config" >/dev/null || {
   cat "$tray_bell_config"
+  exit 1
+}
+export ARANEA_STATE_ROOT="$state_root"
+
+# A tray that leads the right section stays first: tray, health, bell, then
+# the rest. Without the tray plugin installed, omarchy.tray is the anchor.
+tray_first_config="$test_root/tray-first-config/shell.json"
+mkdir -p "$(dirname "$tray_first_config")"
+export ARANEA_STATE_ROOT="$test_root/tray-first-state"
+cat >"$tray_first_config" <<'EOF'
+{"bar": {"layout": {"right": ["omarchy.tray", {"id": "omarchy.network"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$tray_first_config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["omarchy.tray", "araneadev.health", "araneadev.notifications", "omarchy.network"]' "$tray_first_config" >/dev/null || {
+  cat "$tray_first_config"
+  exit 1
+}
+# A layout with no tray gets both icons first, health before the bell.
+no_tray_config="$test_root/no-tray-config/shell.json"
+mkdir -p "$(dirname "$no_tray_config")"
+export ARANEA_STATE_ROOT="$test_root/no-tray-state"
+cat >"$no_tray_config" <<'EOF'
+{"bar": {"layout": {"right": [{"id": "omarchy.network"}]}}}
+EOF
+"$repo_root/scripts/repair-shell-config" "$no_tray_config"
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.health", "araneadev.notifications", "omarchy.network"]' "$no_tray_config" >/dev/null || {
+  cat "$no_tray_config"
   exit 1
 }
 export ARANEA_STATE_ROOT="$state_root"

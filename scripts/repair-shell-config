@@ -213,12 +213,14 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
       + (if $power then ["araneadev.power"] else [] end)
       + (if $weather then ["araneadev.weather"] else [] end)
       + (if $tray then ["araneadev.tray"] else [] end) | unique)
-  # Place the notification bell once. Layout entries may be plain id strings
-  # or {id: ...} objects; both count. Only a layout the user already owns is
-  # touched: writing a partial layout would replace the host defaults. The
-  # tray entry is looked up as araneadev.tray first (it may already have
-  # been retargeted above, in the same pass) and omarchy.tray otherwise, so
-  # placement is unaffected by whether the tray retarget has run yet.
+  # Place the notification bell once, right after the tray (the tray leads
+  # the right section, then health, then the bell). Layout entries may be
+  # plain id strings or {id: ...} objects; both count. Only a layout the
+  # user already owns is touched: writing a partial layout would replace the
+  # host defaults. The tray entry is looked up as araneadev.tray first (it
+  # may already have been retargeted above, in the same pass) and
+  # omarchy.tray otherwise, so placement is unaffected by whether the tray
+  # retarget has run yet.
   | if $place
        and ((.bar.layout.right | type) == "array")
        and ([.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") == null)
@@ -226,10 +228,10 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
       (map(if type == "string" then . else .id? end)) as $ids
       | (($ids | index("araneadev.tray")) // ($ids | index("omarchy.tray"))) as $tray
       | if $tray == null then [{id: "araneadev.notifications"}] + .
-        else .[:$tray] + [{id: "araneadev.notifications"}] + .[$tray:] end)
+        else .[:$tray + 1] + [{id: "araneadev.notifications"}] + .[$tray + 1:] end)
     else . end
   # Place the health icon once: before the bell when the bell is in the right
-  # section, else before the tray, else first.
+  # section, else right after the tray, else first.
   | if $placeHealth
        and ((.bar.layout.right | type) == "array")
        and ([.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.health") == null)
@@ -238,7 +240,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
       | ($ids | index("araneadev.notifications")) as $bell
       | (($ids | index("araneadev.tray")) // ($ids | index("omarchy.tray"))) as $tray
       | if $bell != null then .[:$bell] + [{id: "araneadev.health"}] + .[$bell:]
-        elif $tray != null then .[:$tray] + [{id: "araneadev.health"}] + .[$tray:]
+        elif $tray != null then .[:$tray + 1] + [{id: "araneadev.health"}] + .[$tray + 1:]
         else [{id: "araneadev.health"}] + . end)
     else . end
 ' "$config_file" >"$tmp_file"
