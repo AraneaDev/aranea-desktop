@@ -9,7 +9,7 @@
 // clickGate, as FilamentSwitch does. Without one, a pill with a
 // pointerGate ignores a click within settleMs of its dropdown's layout
 // shifting (pointerGate.layoutChangedAt) unless the gate accepted a real
-// move onto it since.
+// move onto it since. Labels are plain text, never markup.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -54,6 +54,10 @@ Item {
   // Emitted when a pointer press lands on the pill, so a host can remember
   // what the pill stood for when pressed and refuse a changed release.
   signal pressed
+  // Emitted when a pointer press ends without choosing the pill: released
+  // outside it, canceled (a Flickable stole it), or refused by the settle,
+  // so a host can forget what it remembered on pressed.
+  signal pressCanceled
 
   // Chooses the pill, as a click does.
   function activate() {
@@ -107,6 +111,7 @@ Item {
   }
   Text {
     id: label
+    textFormat: Text.PlainText
     anchors.centerIn: parent
     width: Math.min(implicitWidth, pill.width - Style.space(8))
     horizontalAlignment: Text.AlignHCenter
@@ -141,8 +146,15 @@ Item {
     anchors.fill: parent
     cursorShape: Qt.PointingHandCursor
     onPressed: pill.pressed()
-    onClicked: if (pill.clickSettled())
-      pill.activate()
+    onReleased: if (!containsMouse)
+      pill.pressCanceled()
+    onCanceled: pill.pressCanceled()
+    onClicked: {
+      if (pill.clickSettled())
+        pill.activate()
+      else
+        pill.pressCanceled()
+    }
   }
   HoverHandler {
     id: hover

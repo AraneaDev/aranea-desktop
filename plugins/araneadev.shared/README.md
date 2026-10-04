@@ -16,7 +16,9 @@ service contracts to the feature plugins.
 - `FilamentBar` is the read-only strand bar for a level (`value`, 0..1,
   clamped into `fraction`): a hairline track whose lit part runs mint to
   violet like the slider's, with no node and no pointer input. Health's
-  memory and disk bars use it; the OSD's level bar will too.
+  memory and disk bars use it; the OSD's level bar will too. An optional
+  `pace` (0..1, negative hides it, the default) draws a thin tick across
+  the track, as the Agents limit windows' pace marker.
 - `FilamentSwitch` is the Filament-style compact on/off switch. An optional
   `clickGate` (the `NodeDeviceRow` hosting it, or anything with
   `clickSettled()`) makes its pointer clicks settle like that row's, as
@@ -58,9 +60,14 @@ service contracts to the feature plugins.
   or only on a real pointer move when a `pointerGate` is set. A pill on a
   row a Repeater can rebuild takes the row as `clickGate` (VPN's "open app"
   chip), as `FilamentSwitch` does; without one, a pill with a gate settles
-  its clicks after the dropdown's layout shifts on its own.
+  its clicks after the dropdown's layout shifts on its own. `pressCanceled`
+  fires when a press ends without a choice (released outside, canceled or
+  refused by the settle), so a host can forget what it noted on `pressed`.
+  Its label, like `DropdownHeader`'s title and caption, is plain text.
 - `DropdownHeader` is the Filament-style dropdown header with a glyph
-  (tinted by `glyphColor`), title/caption pair, and a trailing slot.
+  (tinted by `glyphColor`), title/caption pair, and a trailing slot. An
+  optional `markSource` (an image url, e.g. the Agents tool logo) replaces
+  the glyph once it loads; empty or failing, the glyph shows as before.
 - `CredentialPrompt` is the inline credential prompt (Network's passphrase,
   VPN's password and 2FA code): an accent-to-violet frame around `fields`
   (`{key, label, placeholder, secret, readOnly, optional, hidden, value}`)

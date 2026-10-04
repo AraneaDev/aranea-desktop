@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn|clock|audio`:
+# Behaviour of `scripts/capture-screenshots --surface network|bluetooth|vpn|clock|audio|agents`:
 # the dropdown is summoned, handed stand-in display data (names for
-# Network/Bluetooth, a place for Clock, labels and a track for Audio, all
-# via `showcase`; rows for VPN via
-# `showcaseFixture`; defaults, or ARANEA_CAPTURE_* overrides), given time to
+# Network/Bluetooth, a place for Clock, labels and a track for Audio, agents
+# for Agents, all via `showcase`; rows for VPN via `showcaseFixture`;
+# defaults, or ARANEA_CAPTURE_* overrides), given time to
 # draw, grabbed and hidden. A non-"ok" answer, or a failed summon, fails the
 # surface with exit 3 and no screenshot, so no real data ever reaches one.
 set -euo pipefail
@@ -60,6 +60,7 @@ bt_default='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","X
 vpn_default='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
 clock_default='{"name":"Amsterdam","latitude":52.37,"longitude":4.90}'
 audio_default='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["Desk Mic","WH-1000XM5"],"apps":["Spotify","Firefox"],"track":{"title":"Midnight City","artist":"M83","player":"Spotify","progress":0.4}}'
+agents_default='{"agents":[{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
 
 # Fails with MESSAGE unless the call log holds LINES in this order (other
 # calls may come between them).
@@ -182,9 +183,38 @@ rm -f "$out/audio.png"
 ARANEA_CAPTURE_AUDIO_SHOWCASE='{"outputs":["A"]}' "$capture" --surface audio --output "$out" >/dev/null
 grep -Fxq 'omarchy-shell [omarchy.audio] [showcase] [ {"outputs":["A"]}]' "$log"
 
+# --- Agents: default stand-in agents, then grim, then hide. The README must
+# never show the user's real usage, plans or balance.
+: >"$log"
+"$capture" --surface agents --output "$out" >/dev/null
+test -f "$out/agents.png"
+assert_calls_in_order 'agents: summon, showcase defaults, wait, grim, hide' \
+  'omarchy-shell [shell] [summon] [omarchy.agents]' \
+  "omarchy-shell [omarchy.agents] [showcase] [ $agents_default]" \
+  'sleep 1' \
+  'grim' \
+  'omarchy-shell [shell] [hide] [omarchy.agents]'
+# The default is what AgentsLogic.parseShowcase accepts: three agents, with
+# limits (so the ring and pace show) and a prepaid balance.
+node -e '
+  const logic = require(process.argv[1])
+  const s = logic.parseShowcase(process.argv[2], Date.now())
+  if (!s || s.length !== 3) process.exit(1)
+  if (!s.some((p) => p.limits.length > 0) || !s.some((p) => p.balance)) process.exit(1)
+' "$repo_root/plugins/araneadev.agents/AgentsLogic.js" "$agents_default" || {
+  echo 'agents: the default stand-ins must parse, with limits and a balance' >&2
+  exit 1
+}
+
+# --- Agents: the stand-ins are overridable.
+: >"$log"
+rm -f "$out/agents.png"
+ARANEA_CAPTURE_AGENTS_SHOWCASE='{"agents":[]}' "$capture" --surface agents --output "$out" >/dev/null
+grep -Fxq 'omarchy-shell [omarchy.agents] [showcase] [ {"agents":[]}]' "$log"
+
 # --- A showcase call that isn't "ok" (the stock panel, no answer, bad JSON)
 # fails the surface: exit 3, a clear message, no screenshot, dropdown hidden.
-for surface in network bluetooth audio; do
+for surface in network bluetooth audio agents; do
   for answer in 'Function not found.' 'invalid' 'closed' ''; do
     : >"$log"
     rm -f "$out/$surface.png"
@@ -251,7 +281,7 @@ done
 
 # --- A summon that fails (omarchy-shell down) is the scripted exit 3 with
 # no screenshot and no showcase call, not a set -e abort.
-for surface in network bluetooth clock audio; do
+for surface in network bluetooth clock audio agents; do
   : >"$log"
   rm -f "$out/$surface.png"
   status=0

@@ -6,7 +6,9 @@
 // pointer, and KeyboardInputFrame/blocked forwards to its key catcher.
 // A key the catcher leaves unaccepted (Delete) reaches unhandledKey unless
 // the frame is blocked. The strand bar lights its clamped value mint to
-// violet, and a row's nodeColor tints its lit node.
+// violet, and a row's nodeColor tints its lit node. A bar's pace tick
+// shows only with a pace and stays on the track, and a header's image mark
+// replaces its glyph only once it loads.
 import QtQuick
 import QtTest
 import Quickshell
@@ -53,6 +55,26 @@ ShellRoot {
     id: strandBar
     width: 300
     value: 0.58
+  }
+  Aranea.FilamentBar {
+    id: pacedBar
+    width: 300
+    value: 0.3
+    pace: 0.4
+  }
+  Aranea.DropdownHeader {
+    id: markedHeader
+    width: 300
+    glyph: "x"
+    title: "Claude Code"
+    markSource: Qt.resolvedUrl("plugins/araneadev.agents/assets/claude.svg")
+  }
+  Aranea.DropdownHeader {
+    id: brokenMarkHeader
+    width: 300
+    glyph: "x"
+    title: "Missing"
+    markSource: Qt.resolvedUrl("plugins/araneadev.agents/assets/no-such-mark.svg")
   }
   Aranea.NodeDeviceRow {
     id: tinted
@@ -313,6 +335,19 @@ ShellRoot {
     t.check(strandBar.fraction === 0 && !barFill.visible, "a value under 0 lights nothing")
     strandBar.value = NaN
     t.equal(strandBar.fraction, 0, "NaN lights nothing")
+    var plainPace = t.findChild(strandBar, "filamentBarPace")
+    t.check(plainPace !== null && !plainPace.visible, "a bar without a pace draws no pace tick")
+    var paceTick = t.findChild(pacedBar, "filamentBarPace")
+    t.check(paceTick !== null && paceTick.visible, "a bar with a pace draws its tick")
+    t.check(Math.abs(paceTick.x + paceTick.width / 2 - 300 * 0.4) < 0.5, "the tick sits at the pace along the track")
+    pacedBar.pace = 1.5
+    t.check(paceTick.visible && paceTick.x + paceTick.width <= 300.01, "a pace past 1 keeps its tick inside the track")
+    pacedBar.pace = NaN
+    t.check(!paceTick.visible, "a NaN pace hides the tick")
+    pacedBar.pace = -1
+    t.check(!paceTick.visible, "a negative pace hides the tick")
+    t.check(markedHeader.markShown && t.findChild(markedHeader, "headerMark").visible && !t.findChild(markedHeader, "headerGlyph").visible, "a header's image mark replaces the glyph once loaded")
+    t.check(!brokenMarkHeader.markShown && !t.findChild(brokenMarkHeader, "headerMark").visible && t.findChild(brokenMarkHeader, "headerGlyph").visible, "a mark that fails to load leaves the glyph")
     var tintedNode = t.findChild(tinted, "nodeMarker")
     t.check(Qt.colorEqual(tintedNode.color, Aranea.DesignTokens.urgent) && Qt.colorEqual(tintedNode.border.color, Aranea.DesignTokens.urgent), "nodeColor tints the lit node")
     t.check(Qt.colorEqual(t.findChild(speakers, "nodeMarker").color, Aranea.DesignTokens.accent), "the node stays mint by default")
