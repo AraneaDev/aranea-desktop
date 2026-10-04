@@ -20,7 +20,9 @@
 // araneadev.vpn can reuse them: a cursor follows the row key it was put on
 // (never its position), a lost or evacuated key is refused rather than
 // retargeted, and a pointer action only ever lands on the row it names. No
-// QML, no I/O; tests/js/cursor-logic.test.js runs this under Node.
+// QML, no I/O; tests/js/cursor-logic.test.js runs this under Node. The
+// keyed helpers (keyIndex, keyStep, keyedMove, keyedPress, keyedOutline)
+// are Health's and Workspaces' dropdown cursors, keyed by a host function.
 
 /**
  * The index a list cursor should sit on after its rows changed: the row
@@ -149,6 +151,93 @@ function afterRemoval(stops, removedKey, lastIndex) {
   return { index: idx, key: stop && typeof stop.key === "string" ? stop.key : "" }
 }
 
+/**
+ * Position of the row whose `keyOf(row)` is `key`. The keyed-cursor helpers
+ * below (keyStep, keyedMove, keyedPress, keyedOutline) follow a cursor by
+ * the row key a host's `keyOf` gives (Health's problemKey, Workspaces'
+ * workspaceKey), never by position.
+ * @param {*} rows - the dropdown rows (anything but an array counts as none)
+ * @param {string} key - the row key, or ""
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {number} its index, or -1 (always for an empty key)
+ */
+function keyIndex(rows, key, keyOf) {
+  if (!key) return -1
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) if (keyOf(list[i]) === key) return i
+  return -1
+}
+
+/**
+ * Key of the row `delta` steps from the row with this key, wrapping; the
+ * first (delta > 0) or last row when the key is empty or gone.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the current cursor key, or ""
+ * @param {number} delta - rows to move (sign matters)
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {string} the new cursor key, or "" when there are no rows
+ */
+function keyStep(rows, key, delta, keyOf) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return ""
+  var i = keyIndex(list, key, keyOf)
+  if (i < 0) return keyOf(list[delta < 0 ? list.length - 1 : 0])
+  return keyOf(list[(i + delta + list.length) % list.length])
+}
+
+/**
+ * The cursor after an up or down key. Dropdowns are reveal-first: the first
+ * key after opening or after pointer use (keyboard false) only reveals the
+ * cursor, on the row the pointer left it on, else the first (dy > 0) or
+ * last row. Later keys move it, wrapping.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {number} dy - rows to move (sign matters); 0 does nothing
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {{key: string, keyboard: boolean}} the new cursor key and mode
+ */
+function keyedMove(rows, key, keyboard, dy, keyOf) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0 || !dy) return { key: key, keyboard: keyboard }
+  if (!keyboard)
+    return {
+      key: keyIndex(list, key, keyOf) >= 0 ? key : keyStep(list, "", dy, keyOf),
+      keyboard: true
+    }
+  return { key: keyStep(list, key, dy, keyOf), keyboard: true }
+}
+
+/**
+ * What Enter or Space does on a keyed list, by pressIntent: nothing without
+ * a cursor on a shown row, only reveal one the keyboard is not showing,
+ * else hand back the cursor's row to act on.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {{keyboard: boolean, row: ?object}} the new mode and the row to act on, or null
+ */
+function keyedPress(rows, key, keyboard, keyOf) {
+  var i = keyIndex(rows, key, keyOf)
+  var intent = pressIntent(i >= 0, keyboard)
+  if (intent === "ignore") return { keyboard: keyboard, row: null }
+  return { keyboard: true, row: intent === "act" ? rows[i] : null }
+}
+
+/**
+ * The row the mint outline is drawn on: the cursor's, only while the
+ * keyboard drives it.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {number} the row index, or -1 for no outline
+ */
+function keyedOutline(rows, key, keyboard, keyOf) {
+  return keyboard ? keyIndex(rows, key, keyOf) : -1
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     reselectIndex: reselectIndex,
@@ -157,7 +246,12 @@ if (typeof module !== "undefined")
     pressIntent: pressIntent,
     keepRows: keepRows,
     rowKeyMatches: rowKeyMatches,
-    afterRemoval: afterRemoval
+    afterRemoval: afterRemoval,
+    keyIndex: keyIndex,
+    keyStep: keyStep,
+    keyedMove: keyedMove,
+    keyedPress: keyedPress,
+    keyedOutline: keyedOutline
   }
 /* @aranea-facade-end */
 

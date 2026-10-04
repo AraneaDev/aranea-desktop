@@ -258,8 +258,9 @@ Column {
     })
   }
   Text {
+    objectName: "keyHint"
     width: parent.width
-    text: "↑↓ move · ←→ adjust · enter select · m mute · tab next"
+    text: "↑↓ move · ←→ adjust · m mute · tab next"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption

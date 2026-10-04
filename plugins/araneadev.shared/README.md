@@ -119,6 +119,12 @@ service contracts to the feature plugins.
   docs/development.md's "JavaScript facades"), since a plain `.js` logic
   file can't import another `.js` file in a way both QML and Node can
   load. Either way there is exactly one hand-written implementation, here.
+  Its keyed dropdown cursor (`keyIndex`, `keyStep`, `keyedMove`,
+  `keyedPress`, `keyedOutline`) takes a row-key function: Health's
+  `HealthLogic.js` (with `problemKey`) and Workspaces' `WorkspaceModel.js`
+  (with `workspaceKey`) wrap it from their own generated copies. It is
+  reveal-first: the first key after opening or after pointer use, Enter
+  included, only reveals the cursor (`keyedPress` decides by `pressIntent`).
 - `GraphLogic.js` is the shared rolling-sample and plot-point math behind
   `LinkGraph` (`pushSample`, `graphPoints`), also moved from the Network
   plugin. `Panel.qml` and `LinkGraph.qml` both import it directly.

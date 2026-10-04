@@ -155,8 +155,8 @@ function isHeadphones(node) {
  * @returns {string} the glyph
  */
 function sinkGlyph(node) {
-  if (!node) return "󰓃"
-  if (isHeadphones(node)) return "󰋋"
+  if (!node) return String.fromCodePoint(0xf04c3)
+  if (isHeadphones(node)) return String.fromCodePoint(0xf02cb)
   var p = nodeProps(node)
   var blob = String(
     [
@@ -167,9 +167,10 @@ function sinkGlyph(node) {
       p["device.product.name"] || ""
     ].join(" ")
   ).toLowerCase()
-  if (blob.indexOf("bluetooth") !== -1) return "󰂯"
-  if (blob.indexOf("hdmi") !== -1 || blob.indexOf("display") !== -1) return "󰍹"
-  return "󰓃"
+  if (blob.indexOf("bluetooth") !== -1) return String.fromCodePoint(0xf00af)
+  if (blob.indexOf("hdmi") !== -1 || blob.indexOf("display") !== -1)
+    return String.fromCodePoint(0xf0379)
+  return String.fromCodePoint(0xf04c3)
 }
 
 /**
@@ -178,15 +179,16 @@ function sinkGlyph(node) {
  * @returns {string} the glyph
  */
 function sourceGlyph(node) {
-  if (!node) return "󰍬"
+  if (!node) return String.fromCodePoint(0xf036c)
   var p = nodeProps(node)
   var blob = String(
     [node.name, node.description, node.nickname, p["device.icon-name"] || ""].join(" ")
   ).toLowerCase()
-  if (blob.indexOf("headset") !== -1) return "󰋋"
-  if (blob.indexOf("bluetooth") !== -1) return "󰂯"
-  if (blob.indexOf("webcam") !== -1 || blob.indexOf("camera") !== -1) return "󰄀"
-  return "󰍬"
+  if (blob.indexOf("headset") !== -1) return String.fromCodePoint(0xf02cb)
+  if (blob.indexOf("bluetooth") !== -1) return String.fromCodePoint(0xf00af)
+  if (blob.indexOf("webcam") !== -1 || blob.indexOf("camera") !== -1)
+    return String.fromCodePoint(0xf0100)
+  return String.fromCodePoint(0xf036c)
 }
 
 /**

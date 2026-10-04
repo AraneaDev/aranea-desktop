@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
-import "../araneadev.shared/CursorLogic.js" as CursorLogic
 import "WorkspaceModel.js" as WorkspaceModel
 
 Aranea.KeyboardPanelFrame {
@@ -63,11 +62,6 @@ Aranea.KeyboardPanelFrame {
   }
   onActivateRequested: {
     panel.disarmPointer()
-    var intent = CursorLogic.pressIntent(host.cursorKey !== "", host.keyboardCursor)
-    if (intent === "reveal") {
-      host.keyboardCursor = true
-      return
-    }
     var press = WorkspaceModel.cursorPress(host.workspaceStates, host.cursorKey, host.keyboardCursor)
     host.keyboardCursor = press.keyboard
     if (press.row)

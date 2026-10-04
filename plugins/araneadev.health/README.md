@@ -33,7 +33,8 @@ hint at the bottom.
   (its `execArgv`), Esc closes, Tab switches dropdowns. The mint outline
   shows only while the keyboard drives the cursor, and the first key after
   opening or after pointer use only reveals it (`cursorMove`,
-  `cursorPress`, `outlineIndex`). Pointer hover places the cursor without
+  `cursorPress`, `outlineIndex`, which wrap the shared keyed cursor in
+  `araneadev.shared/CursorLogic.js`). Pointer hover places the cursor without
   outlining it.
 - **Resources** (`HealthResourceSection.qml`): the CPU trace is the shared
   `LinkGraph` over the last 60 one-second samples (`cpuSamples`); memory and

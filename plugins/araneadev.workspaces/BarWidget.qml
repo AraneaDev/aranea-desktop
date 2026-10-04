@@ -6,7 +6,6 @@ import qs.Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
 import "../araneadev.shared" as Aranea
-import "../araneadev.shared/CursorLogic.js" as CursorLogic
 
 Item {
   id: root
@@ -300,11 +299,6 @@ Item {
       }
       onActivateRequested: {
         content.disarmPointer()
-        var intent = CursorLogic.pressIntent(testHost.cursorKey !== "", testHost.keyboardCursor)
-        if (intent === "reveal") {
-          testHost.keyboardCursor = true
-          return
-        }
         var press = WorkspaceModel.cursorPress(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
         testHost.keyboardCursor = press.keyboard
         if (press.row)

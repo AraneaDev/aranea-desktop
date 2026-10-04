@@ -20,7 +20,7 @@ test("facades contain every generator-owned source region", () => {
       "ClipboardPresentation.js",
       "ClipboardNormalization.js"
     ],
-    "plugins/araneadev.health/HealthLogic.js": ["HealthPresentation.js"],
+    "plugins/araneadev.health/HealthLogic.js": ["HealthPresentation.js", "CursorLogic.js"],
     "plugins/araneadev.notifications/NotificationLogic.js": [
       "NotificationPresentation.js",
       "NotificationSettings.js"
@@ -30,7 +30,8 @@ test("facades contain every generator-owned source region", () => {
     "plugins/araneadev.network/NetworkLogic.js": ["CursorLogic.js", "NmcliTerse.js"],
     "plugins/araneadev.vpn/VpnLogic.js": ["NmcliTerse.js"],
     "plugins/araneadev.bluetooth/BluetoothLogic.js": ["CursorLogic.js"],
-    "plugins/araneadev.notifications/InboxLogic.js": ["CursorLogic.js"]
+    "plugins/araneadev.notifications/InboxLogic.js": ["CursorLogic.js"],
+    "plugins/araneadev.workspaces/WorkspaceModel.js": ["CursorLogic.js"]
   }
   for (const [file, sources] of Object.entries(expected)) {
     const source = fs.readFileSync(path.join(root, file), "utf8")

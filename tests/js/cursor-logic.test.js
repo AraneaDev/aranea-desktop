@@ -202,3 +202,95 @@ test("NetworkLogic.js's generated copy of CursorLogic answers like the source", 
   )
   assert.deepEqual(plain(copy.afterRemoval([], "a", 0)), plain(logic.afterRemoval([], "a", 0)))
 })
+
+// --- keyed cursor helpers (Health, Workspaces) ---------------------------
+
+const byId = (row) => (row && row.id !== undefined ? String(row.id) : "")
+
+test("keyIndex finds a row by its keyOf key, -1 for an empty or missing key", () => {
+  const rows = [{ id: 1 }, null, { id: 3 }]
+  assert.equal(logic.keyIndex(rows, "3", byId), 2)
+  assert.equal(logic.keyIndex(rows, "9", byId), -1)
+  assert.equal(logic.keyIndex(rows, "", byId), -1, "an empty key never matches a keyless row")
+  assert.equal(logic.keyIndex(null, "1", byId), -1, "non-array rows count as none")
+})
+
+test("keyStep wraps across rows and starts from an end when the key is empty or gone", () => {
+  const rows = [{ id: 1 }, { id: 2 }, { id: 3 }]
+  assert.equal(logic.keyStep(rows, "1", 1, byId), "2")
+  assert.equal(logic.keyStep(rows, "3", 1, byId), "1")
+  assert.equal(logic.keyStep(rows, "1", -1, byId), "3")
+  assert.equal(logic.keyStep(rows, "", 1, byId), "1")
+  assert.equal(logic.keyStep(rows, "gone", -1, byId), "3")
+  assert.equal(logic.keyStep([], "1", 1, byId), "")
+  assert.equal(logic.keyStep(undefined, "1", 1, byId), "")
+})
+
+test("keyedMove is reveal-first: the first key shows the cursor, later keys move it", () => {
+  const rows = [{ id: 1 }, { id: 2 }, { id: 3 }]
+  assert.deepEqual(logic.keyedMove(rows, "2", false, 1, byId), { key: "2", keyboard: true })
+  assert.deepEqual(logic.keyedMove(rows, "", false, 1, byId), { key: "1", keyboard: true })
+  assert.deepEqual(logic.keyedMove(rows, "gone", false, -1, byId), { key: "3", keyboard: true })
+  assert.deepEqual(logic.keyedMove(rows, "3", true, 1, byId), { key: "1", keyboard: true })
+  assert.deepEqual(logic.keyedMove(rows, "1", true, 0, byId), { key: "1", keyboard: true })
+  assert.deepEqual(logic.keyedMove([], "", false, 1, byId), { key: "", keyboard: false })
+  assert.deepEqual(logic.keyedMove(null, "", false, 1, byId), { key: "", keyboard: false })
+})
+
+test("keyedPress follows pressIntent: ignore without a cursor, reveal, then act", () => {
+  const rows = [{ id: 1 }, { id: 2 }]
+  assert.deepEqual(logic.keyedPress(rows, "", false, byId), { keyboard: false, row: null })
+  assert.deepEqual(logic.keyedPress(rows, "gone", true, byId), { keyboard: true, row: null })
+  assert.deepEqual(logic.keyedPress(rows, "2", false, byId), { keyboard: true, row: null })
+  assert.deepEqual(logic.keyedPress(rows, "2", true, byId), { keyboard: true, row: { id: 2 } })
+})
+
+test("keyedOutline draws only on the keyboard's cursor row", () => {
+  const rows = [{ id: 1 }, { id: 2 }]
+  assert.equal(logic.keyedOutline(rows, "2", true, byId), 1)
+  assert.equal(logic.keyedOutline(rows, "2", false, byId), -1)
+  assert.equal(logic.keyedOutline(rows, "gone", true, byId), -1)
+})
+
+// --- HealthLogic.js's and WorkspaceModel.js's generated copies -----------
+
+/**
+ * Runs every CursorLogic export through a generated copy and the source, so
+ * the copy answers alike and its host file's coverage counts it.
+ * @param {Object<string, Function>} copy - the host module's globals or exports
+ */
+function sameAsSource(copy) {
+  const plain = (value) => JSON.parse(JSON.stringify(value))
+  const rows = [{ key: "a" }, { key: "b" }, { key: "c" }]
+  const key = (row) => (row ? row.key : "")
+  const pairs = [
+    ["reselectIndex", [rows, "c", 0]],
+    ["followCursor", [rows, "b", 0]],
+    ["cursorConfirmed", [rows, "b", 1]],
+    ["pressIntent", [true, false]],
+    ["keepRows", [{}, "x", rows]],
+    ["rowKeyMatches", [rows, 1, "b"]],
+    ["afterRemoval", [rows, "b", 1]],
+    ["keyIndex", [rows, "b", key]],
+    ["keyStep", [rows, "c", 1, key]],
+    ["keyedMove", [rows, "", false, -1, key]],
+    ["keyedPress", [rows, "b", true, key]],
+    ["keyedOutline", [rows, "b", true, key]]
+  ]
+  for (const [name, args] of pairs)
+    assert.deepEqual(plain(copy[name](...args)), plain(logic[name](...args)), name)
+}
+
+test("HealthLogic.js's generated copy of CursorLogic answers like the source", () => {
+  sameAsSource(loadPragma("plugins/araneadev.health/HealthLogic.js"))
+})
+
+test("WorkspaceModel.js's generated copy of CursorLogic answers like the source", () => {
+  sameAsSource(loadPragma("plugins/araneadev.workspaces/WorkspaceModel.js"))
+})
+
+test("Network's, Bluetooth's and Inbox's generated copies answer the keyed helpers alike", () => {
+  sameAsSource(loadPragma("plugins/araneadev.network/NetworkLogic.js"))
+  sameAsSource(loadPragma("plugins/araneadev.bluetooth/BluetoothLogic.js"))
+  sameAsSource(loadPragma("plugins/araneadev.notifications/InboxLogic.js"))
+})
