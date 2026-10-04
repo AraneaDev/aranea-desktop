@@ -74,7 +74,15 @@ Item {
   }
 
   // One key map for the menu (the window forwards its key presses here).
+  // Any key the menu handles reveals the keyboard outline.
   function handleKey(event): void {
+    root.handleMenuKey(event)
+    if (event.accepted && root.opened)
+      root.keyboardCursor = true
+  }
+
+  // The key map behind handleKey.
+  function handleMenuKey(event): void {
     if (history.deleteConfirmOpen) {
       if (root.view && root.view.deleteConfirmHandleKey(event))
         event.accepted = true
@@ -204,8 +212,15 @@ Item {
   property string filterText: ""
   // Index of the cursor row in displayModel.
   property int selectedIndex: 0
-  // Whether the cursor row is highlighted and Enter activates it.
+  // Whether the cursor row is live: Enter activates it (the top row on
+  // open and after typing, so type-then-Enter launches the top match).
   property bool cursorActive: false
+  // True once a key has been used since the menu opened or a click opened
+  // a submenu: the mint outline shows only then. Hover never sets it or
+  // moves the cursor.
+  property bool keyboardCursor: false
+  // Whether the mint keyboard outline is drawn on the cursor row.
+  readonly property bool outlineShown: root.cursorActive && root.keyboardCursor
   // Bumped on every open; compared with applySerial when a result write finishes.
   property int requestSerial: 0
   // requestSerial at the time a selection was applied.
@@ -792,6 +807,7 @@ Item {
     filterText = ""
     selectedIndex = 0
     cursorActive = true
+    keyboardCursor = false
     root.disarmPointer()
     guards.evaluate(root.items)
     opened = true
@@ -818,6 +834,7 @@ Item {
     filterText = ""
     selectedIndex = 0
     cursorActive = mode !== "input"
+    keyboardCursor = false
     root.disarmPointer()
     opened = true
     rebuildDisplay()
@@ -891,11 +908,12 @@ Item {
   // moves the cursor there and activates it. Refused (false) when the row
   // no longer holds KEY, so a click never lands on a row that changed
   // between press and release. Hover never moves the cursor; only the
-  // keyboard and a click do.
+  // keyboard and a click do, and a click hides the outline again.
   function activateKey(index: int, key: string): bool {
     if (!key || index < 0 || index >= displayModel.count || displayModel.get(index).itemId !== key)
       return false
     root.cursorActive = true
+    root.keyboardCursor = false
     root.selectedIndex = index
     root.activateIndex(index)
     return true

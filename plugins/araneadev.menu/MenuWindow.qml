@@ -271,7 +271,7 @@ PanelWindow {
           foldPeek: panel.root.style.rowPeek
           model: panel.root.displayModel
           selectedIndex: panel.root.selectedIndex
-          cursorActive: panel.root.cursorActive
+          cursorActive: panel.root.outlineShown
           filterText: panel.root.filterText
           fullRootHeader: panel.root.fullRootHeader
           appLibrary: panel.root.appLibrary

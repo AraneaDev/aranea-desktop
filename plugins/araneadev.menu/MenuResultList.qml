@@ -1,11 +1,15 @@
 // Result list and fold affordances for the menu card.
 //
-// The highlight is the keyboard cursor only: hover never moves it. Clicks
-// are keyed by the row's item id: a press records it and the release is
-// refused when the row holds another item by then, or within 300 ms of the
-// rows changing or scrolling under the pointer (layoutChangedAt, the
-// list's own scroll stamp) unless the pointer has really moved onto the
-// row since, through the PointerMoveGate (ClickSettle).
+// Two separate highlights. The keyboard cursor is the mint outline on
+// selectedIndex, drawn only while cursorActive (Menu.qml shows it once a
+// key has been used); hover never moves it. Hover draws the menu's
+// selected fill on the row under the pointer, but only after a real
+// pointer move (PointerMoveGate), and it clears when the rows change or
+// scroll under the pointer. Clicks are keyed by the row's item id: a
+// press records it and the release is refused when the row holds another
+// item by then, or within 300 ms of the rows changing or scrolling under
+// the pointer (layoutChangedAt, the list's own scroll stamp) unless the
+// pointer has really moved onto the row since (ClickSettle).
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
@@ -21,7 +25,7 @@ Item {
   property var appLibrary: null
   // Public contract member.
   property int selectedIndex: -1
-  // Public contract member.
+  // Whether the keyboard outline shows on selectedIndex.
   property bool cursorActive: false
   // Public contract member.
   property string filterText: ""
@@ -72,6 +76,19 @@ Item {
   // The gate that tells real pointer moves from rows moving under a still
   // pointer; the window shares its own, else the list's.
   property var pointerGate: ownGate
+  // The row the pointer really moved onto (hover fill), -1 for none.
+  property int hoveredIndex: -1
+  // The item id that row held when hovered; the fill shows only while the
+  // row still holds it.
+  property string hoveredKey: ""
+
+  // Drops the hover fill: the rows moved or changed under the pointer.
+  function clearHover(): void {
+    results.hoveredIndex = -1
+    results.hoveredKey = ""
+  }
+
+  onLayoutChangedAtChanged: results.clearHover()
   // Emitted for a settled left click on row INDEX that still holds KEY
   // (its item id) on release.
   signal rowActivated(int index, string key)
@@ -89,7 +106,10 @@ Item {
     clip: true
     spacing: parent.rowSpacing
     boundsBehavior: Flickable.StopAtBounds
-    onContentYChanged: results.scrolledAt = Date.now()
+    onContentYChanged: {
+      results.scrolledAt = Date.now()
+      results.clearHover()
+    }
     section.property: "section"
     section.criteria: ViewSection.FullString
 
@@ -123,6 +143,11 @@ Item {
       required property string detail
       required property int childCount
       readonly property bool hasCursor: results.cursorActive && index === results.selectedIndex
+      // Whether the pointer really moved onto this row and it still holds
+      // the same item (the hover fill).
+      readonly property bool hovered: results.hoveredIndex === index && results.hoveredKey === itemId
+      // Whether the row's text is lit (hovered or under the keyboard cursor).
+      readonly property bool lit: hovered || hasCursor
       readonly property bool isApp: kind === "app"
       readonly property bool hasIcon: icon.length > 0 || isApp
       // When this row was built (Date.now()).
@@ -147,14 +172,25 @@ Item {
       width: ListView.view.width
       height: results.rowHeightForDetail ? results.rowHeightForDetail(detail) : Style.space(44)
       radius: results.cornerRadius
-      color: hasCursor ? results.selectedBackground : "transparent"
-      borderSpec: hasCursor ? results.selectedBorderSpec : Border.none()
+      color: hovered ? results.selectedBackground : "transparent"
+      borderSpec: hovered ? results.selectedBorderSpec : Border.none()
+
+      Rectangle {
+        // The keyboard cursor outline (mint, keyboard only).
+        objectName: "cursorOutline"
+        anchors.fill: parent
+        radius: results.cornerRadius
+        visible: row.hasCursor
+        color: Util.alpha(Aranea.DesignTokens.accent, 0.08)
+        border.width: 1
+        border.color: Aranea.DesignTokens.accent
+      }
 
       Aranea.InkText {
         id: iconText
         visible: row.hasIcon && !row.isApp
         text: row.icon
-        color: row.hasCursor ? results.selectedText : results.foreground
+        color: row.lit ? results.selectedText : results.foreground
         font.family: row.iconFont.length > 0 ? row.iconFont : results.fontFamily
         font.pixelSize: Style.font.iconLarge
         horizontalAlignment: Text.AlignLeft
@@ -190,7 +226,7 @@ Item {
         Text {
           width: parent.width
           text: row.label
-          color: row.hasCursor ? results.selectedText : results.foreground
+          color: row.lit ? results.selectedText : results.foreground
           font.family: results.fontFamily
           font.pixelSize: results.menuFontScale * Style.font.bodySmall
           font.letterSpacing: results.menuLetterSpacing
@@ -200,8 +236,8 @@ Item {
           width: parent.width
           text: row.detail
           visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.detail.length > 0
-          color: row.hasCursor ? results.selectedText : results.foreground
-          opacity: row.hasCursor ? 0.7 : 0.52
+          color: row.lit ? results.selectedText : results.foreground
+          opacity: row.lit ? 0.7 : 0.52
           font.family: results.fontFamily
           font.pixelSize: results.menuFontScale * Style.font.caption
           elide: Text.ElideRight
@@ -214,7 +250,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Text.AlignRight
         text: row.kind === "menu" || row.kind === "link" ? "›" : ""
-        color: row.hasCursor ? results.selectedText : results.foreground
+        color: row.lit ? results.selectedText : results.foreground
         opacity: 0.36
         font.family: results.fontFamily
         font.pixelSize: results.menuFontScale * Style.font.body
@@ -226,11 +262,17 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        // Hover only feeds the settle rule; it never moves the highlight.
+        // Hover fills the row and feeds the settle rule; it never moves
+        // the keyboard cursor.
         onPositionChanged: function (mouse) {
-          if (results.pointerGate && results.pointerGate.moved(rowArea, mouse))
+          if (results.pointerGate && results.pointerGate.moved(rowArea, mouse)) {
             row.pointerMovedAt = Date.now()
+            results.hoveredIndex = row.index
+            results.hoveredKey = row.itemId
+          }
         }
+        onExited: if (results.hoveredIndex === row.index)
+          results.clearHover()
         onPressed: row.pressedKey = row.itemId
         onClicked: function (mouse) {
           var key = row.pressedKey

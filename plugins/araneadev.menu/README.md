@@ -51,11 +51,16 @@ modules own history, search, and tree traversal.
   and swapping provider rows), and `MenuGuardScript.js` (building the
   batched guard script).
 - QML owns focus, navigation, and user interaction.
-- The highlight is the keyboard cursor only: hover never moves it. The
-  first row is highlighted on open and after each keystroke, so Enter
-  launches the top match. Root tiles tint on hover only after a real
-  pointer move (PointerMoveGate). Row and tile clicks are keyed by item
-  or tile id and settled (`ClickSettle`): a release on a row that holds
+- The keyboard cursor and hover are separate. The cursor is the row
+  Enter acts on: the top row on open and after each keystroke, so
+  type-then-Enter launches the top match. It shows as the mint outline,
+  only once a key has been used (not on open, nor after a click opens a
+  submenu), and only the keyboard moves it. Hover draws the menu's
+  selected fill on the row under the pointer, and root tiles their tint,
+  only after a real pointer move (PointerMoveGate); hover never moves the
+  cursor, and the fill clears when the rows change or scroll under the
+  pointer. Row and tile clicks act on the clicked item, keyed by item or
+  tile id and settled (`ClickSettle`): a release on a row that holds
   another item is refused, and so is a click within 300 ms of the rows
   changing, scrolling or appearing under a still pointer.
 
