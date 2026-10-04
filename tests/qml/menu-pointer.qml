@@ -1,17 +1,17 @@
 // The Aranea menu's pointer rules, with real pointer events on the result
 // list and a root tile in a window, wired to the real Menu.qml (its own
-// window off) the way MenuWindow wires them: the mint keyboard outline is
-// hidden on open and shows only after a key; hover fills the row under
-// the pointer after a real move but never moves the keyboard cursor; the
-// arrows move the outline; typing keeps the cursor on the top match so
-// Enter launches it even with the pointer over another row; the hover
-// fill clears when the rows change under a still pointer; a click is
-// keyed by the row's item id and refused when the row holds another item
-// on release; the rows changing stamps the layout (an equal rebuild does
-// not) and a click inside the 300 ms settle window is refused; rows
-// survive a rebuild; a click into a submenu hides the outline again; and
-// a root tile tints only after a real pointer move and settles and keys
-// its clicks.
+// window off) the way MenuWindow wires them: the mint outline marks Enter's
+// target and shows from open on the first row; hover fills the row under
+// the pointer after a real move but never moves the outline; the first
+// Down moves it straight to the second row; typing keeps it on the top
+// match so Enter launches that match even with the pointer over another
+// row; the hover fill clears when the rows change under a still pointer;
+// the empty state shows no outline; a click is keyed by the row's item id
+// and refused when the row holds another item on release; the rows
+// changing stamps the layout (an equal rebuild does not) and a click
+// inside the 300 ms settle window is refused; rows survive a rebuild; a
+// click into a submenu puts the outline on its first row; and a root tile
+// tints only after a real pointer move and settles and keys its clicks.
 import QtQuick
 import QtTest
 import Quickshell
@@ -200,9 +200,9 @@ ShellRoot {
       return menu.rowsLoaded && menu.opened && menu.displayModel.count >= 3
     }, 10000, "menu sources load and the root opens", function () {
       run([[400, function () {
-            // ---------- Open: the cursor is on the top row, outline hidden ----------
+            // ---------- Open: the outline is on the top row ----------
             t.check(menu.cursorActive && menu.selectedIndex === 0, "the cursor is on the first row on open")
-            t.check(!menu.outlineShown && !rowAt(0).hasCursor && !t.findChild(rowAt(0), "cursorOutline").visible, "the outline is hidden until a key is used")
+            t.check(menu.outlineShown && rowAt(0).hasCursor && t.findChild(rowAt(0), "cursorOutline").visible, "the outline marks Enter's target from open")
             t.check(!rowAt(0).hovered && !rowAt(1).hovered && !rowAt(2).hovered, "no row is hover-filled under a still pointer")
 
             // ---------- Hover fills, never moves the cursor ----------
@@ -211,11 +211,11 @@ ShellRoot {
             t.check(rowAt(2).hovered, "a real move onto a row fills it")
             t.check(!rowAt(0).hovered && !rowAt(1).hovered, "and only that row")
             t.equal(menu.selectedIndex, 0, "hovering another row does not move the keyboard cursor")
-            t.check(!menu.keyboardCursor && !rowAt(2).hasCursor, "nor shows the outline")
+            t.check(rowAt(0).hasCursor && !rowAt(2).hasCursor, "the outline stays on the first row")
 
             // ---------- The arrows move the outline ----------
             menu.handleKey(key(Qt.Key_Down))
-            t.equal(menu.selectedIndex, 1, "Down moves the keyboard cursor")
+            t.equal(menu.selectedIndex, 1, "the first Down moves the keyboard cursor to the second row")
             t.check(rowAt(1).hasCursor && t.findChild(rowAt(1), "cursorOutline").visible && !rowAt(0).hasCursor, "and shows the outline on the next row")
             t.check(rowAt(2).hovered && !rowAt(2).hasCursor, "the hover fill stays where the pointer is")
             menu.handleKey(key(Qt.Key_Up))
@@ -247,6 +247,16 @@ ShellRoot {
             }).length, 1, "and only it")
             t.check(!menu.opened, "and closes the menu")
             menu.openRoute("root")
+          }], [400, function () {
+            // ---------- Typing keeps the outline on row 0; none when empty ----------
+            type("s")
+            t.check(menu.outlineShown && menu.selectedIndex === 0 && rowAt(0).hasCursor, "typing keeps the outline on the top row")
+            type("qqq")
+            t.check(menu.displayModel.count === 0 && !menu.outlineShown, "the empty state shows no outline")
+            shell.ran = []
+            menu.handleKey(key(Qt.Key_Return))
+            t.check(menu.opened && shell.ran.length === 0, "and Enter does nothing there")
+            menu.setFilter("")
           }], [400, function () {
             // ---------- Keyed refusal ----------
             t.check(!menu.activateKey(0, "no.such.item"), "a key the row does not hold is refused")
@@ -281,9 +291,7 @@ ShellRoot {
             pointer.mouseClick(rowAt(setup), 40, rowAt(setup).height / 2)
             t.equal(menu.activeMenu, "setup", "a settled click opens the clicked row")
             t.equal(menu.selectedIndex, 0, "the new menu puts the cursor on its first row")
-            t.check(!menu.outlineShown, "and hides the outline until a key is used")
-            menu.handleKey(key(Qt.Key_Down))
-            t.check(menu.outlineShown, "a key shows it again")
+            t.check(menu.outlineShown && rowAt(0).hasCursor, "with the outline on it")
 
             // ---------- Root tile: gated tint, keyed and settled click ----------
             tile.pointerGate.reset()

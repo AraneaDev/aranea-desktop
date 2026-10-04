@@ -1,8 +1,8 @@
 // Result list and fold affordances for the menu card.
 //
 // Two separate highlights. The keyboard cursor is the mint outline on
-// selectedIndex, drawn only while cursorActive (Menu.qml shows it once a
-// key has been used); hover never moves it. Hover draws the menu's
+// selectedIndex, drawn while cursorActive (Menu.qml: whenever Enter has a
+// target); hover never moves it. Hover draws the menu's
 // selected fill on the row under the pointer, but only after a real
 // pointer move (PointerMoveGate), and it clears when the rows change or
 // scroll under the pointer. Clicks are keyed by the row's item id: a

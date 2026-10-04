@@ -78,6 +78,27 @@ if grep -Eq 'selectFromPointer|rowHovered|allowInitialPointerSample' "$menu_qml"
   exit 1
 fi
 grep -Fq 'panel.root.activateKey(index, key)' "$menu_window"
+grep -Fq 'cursorActive: panel.root.outlineShown' "$menu_window"
+[[ "$(grep -c 'pointerGate: pointerGate' "$menu_window")" -ge 2 ]] || {
+  echo "the window must share its PointerMoveGate with the chrome and the result list" >&2
+  exit 1
+}
+[[ "$(grep -c 'layoutChangedAt: panel.root.layoutChangedAt' "$menu_window")" -ge 2 ]] || {
+  echo "the chrome and the result list must read the menu's layout stamp" >&2
+  exit 1
+}
+# Prints the MenuWindow block that opens with the line containing $1.
+window_block() {
+  awk -v open="$1" 'index($0, open) { f = 1; depth = 0 } f { depth += gsub(/\{/, "{"); depth -= gsub(/\}/, "}"); print; if (depth <= 0) exit }' "$menu_window"
+}
+for component in 'MenuCardChrome {' 'MenuResultList {'; do
+  for wire in 'layoutChangedAt: panel.root.layoutChangedAt' 'pointerGate: pointerGate'; do
+    window_block "$component" | grep -Fq "$wire" || {
+      echo "MenuWindow's $component must wire $wire" >&2
+      exit 1
+    }
+  done
+done
 grep -Fq 'ClickSettle.clickSettled(' "$menu_results"
 grep -Fq 'ClickSettle.clickSettled(' "$repo_root/plugins/araneadev.menu/MenuRootTile.qml"
 # --- 4b final review: state loads before use; stale routes never reopen; clock only when open
