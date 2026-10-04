@@ -967,6 +967,18 @@ function keyHint(editing, section) {
   return "↑↓ move · enter edit place · r refresh"
 }
 
+/**
+ * The controls the keyboard cursor walks, in order: the place label, which
+ * always shows (the edit glyph alone before a place is known), so Enter and
+ * the outline agree even with no place and no fetch; then the updated
+ * label once a forecast has been fetched.
+ * @param {number} fetchedAtMs - when the forecast was last fetched, 0 for never
+ * @returns {Array<string>} the stops
+ */
+function cursorSections(fetchedAtMs) {
+  return Number(fetchedAtMs) > 0 ? ["place", "refresh"] : ["place"]
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     buildForecastUrl: buildForecastUrl,
@@ -1001,5 +1013,6 @@ if (typeof module !== "undefined")
     sharedBundle: sharedBundle,
     refreshPlan: refreshPlan,
     saveEnds: saveEnds,
-    keyHint: keyHint
+    keyHint: keyHint,
+    cursorSections: cursorSections
   }

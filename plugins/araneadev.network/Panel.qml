@@ -2093,27 +2093,38 @@ Panel {
     }
     function onWifiNetworksChanged() {
       if (root.wifiNetworks.length === 0) {
+        // The list emptied under the chosen Wi-Fi row (stock bounces the
+        // cursor to DNS): the outline hides until the next key.
+        if (root.cursorChosenSection === "wifi")
+          root.keyboardCursor = false
         root.wifiCursorSsid = ""
         return
       }
-      // An open prompt pins its own row, as stock's handler does.
+      // An open prompt pins its own row, as stock's handler does. A lost
+      // row under the outline hides it (CursorLogic.followShown).
       var key = root.passwordSsid !== "" ? root.passwordSsid : root.wifiCursorSsid
-      var next = CursorLogic.followCursor(root.wifiKeyRows(), key, root.selectedIndex)
+      var next = CursorLogic.followShown(root.wifiKeyRows(), key, root.selectedIndex, root.keyboardCursor)
       root.selectedIndex = next.index
       root.wifiCursorSsid = next.key
+      if (root.focusSection === "wifi")
+        root.keyboardCursor = next.keyboard
       // A lost row, or one that can no longer be forgotten, drops the
       // forget focus, so Enter can't turn into a disconnect.
       if (!next.confirmed || !root.canForgetNetwork(root.wifiNetworks[next.index]))
         root.wifiActionFocused = false
     }
     function onSavedRowsChanged() {
-      var next = CursorLogic.followCursor(root.savedRows, root.savedCursorKey, root.savedIndex)
+      var next = CursorLogic.followShown(root.savedRows, root.savedCursorKey, root.savedIndex, root.keyboardCursor)
       root.savedIndex = Math.max(0, next.index)
       root.savedCursorKey = next.key
       if (!next.confirmed)
         root.savedActionFocused = false
+      if (root.focusSection === "saved")
+        root.keyboardCursor = next.keyboard
       if (root.focusSection === "saved" && root.savedRows.length === 0) {
+        // An automatic move: the outline hides until the next key.
         var fallback = NetworkLogic.savedEmptyFallback(root.wifiNetworks.length)
+        root.keyboardCursor = false
         root.focusSection = fallback.section
         if (fallback.section === "wifi") {
           root.selectedIndex = fallback.index
@@ -2125,13 +2136,21 @@ Panel {
     function onBandAvailableChanged() {
       if (root.bandCursorKey === "auto")
         return
-      var next = CursorLogic.followCursor(root.bandKeyRows(), root.bandCursorKey, root.bandIndex)
+      var next = CursorLogic.followShown(root.bandKeyRows(), root.bandCursorKey, root.bandIndex, root.keyboardCursor)
       if (next.index >= 0)
         root.bandIndex = next.index
       root.bandCursorKey = next.key
+      if (root.focusSection === "band")
+        root.keyboardCursor = next.keyboard
     }
     function onCanShareWifiChanged() {
       root.followHeaderCursor()
+    }
+    function onCanSelectBandChanged() {
+      // The band section hiding under the chosen band control (stock
+      // bounces the cursor to DNS): the outline hides until the next key.
+      if (!root.canSelectBand && root.cursorChosenSection === "band")
+        root.keyboardCursor = false
     }
     function onCanRunSpeedTestChanged() {
       root.followHeaderCursor()
@@ -2142,12 +2161,15 @@ Panel {
   }
 
   // Keeps the header cursor on the action it was put on as actions appear
-  // and vanish (stock only clamps the index).
+  // and vanish (stock only clamps the index); a lost action under the
+  // outline hides it (CursorLogic.followShown).
   function followHeaderCursor() {
-    var next = CursorLogic.followCursor(headerKeyRows(), headerCursorKey, headerIndex)
+    var next = CursorLogic.followShown(headerKeyRows(), headerCursorKey, headerIndex, keyboardCursor)
     if (next.index >= 0)
       headerIndex = next.index
     headerCursorKey = next.key
+    if (focusSection === "header")
+      keyboardCursor = next.keyboard
   }
 
   // Stock's per-row NetworkManager hooks, moved out of the stock row (the

@@ -337,9 +337,11 @@ Panel {
         profileIndex = idx
     }
     if (profileKey !== "") {
-      var next = CursorLogic.followCursor(profileKeyRows(), profileKey, profileIndex)
+      // A lost profile hides the outline too (CursorLogic.followShown).
+      var next = CursorLogic.followShown(profileKeyRows(), profileKey, profileIndex, keyboardCursor)
       profileIndex = Math.max(0, next.index)
       profileKey = next.key
+      keyboardCursor = next.keyboard
     }
   }
 

@@ -478,7 +478,7 @@ ShellRoot {
         var empty = t.findChild(bare, "emptyText")
         t.check(empty.visible && empty.text === "Wi-Fi is off", "no Wi-Fi at all shows the empty text")
         t.check(!t.findChild(full, "emptyText").visible, "Wi-Fi rows hide the empty text")
-        t.equal(t.findChild(full, "keyHint").text, "↑↓ move · ←→ pick · enter connect · x forget", "the key hint")
+        t.equal(t.findChild(full, "keyHint").text, "↑↓ move · ←→ pick · enter toggle · x forget", "the key hint")
         t.check(t.findChild(full, "scanningCaption").visible, "scanning shows SCANNING WI-FI…")
         t.equal(t.findChild(full, "scanningCaption").text, "SCANNING WI-FI…", "the scanning caption's text")
         var scroll = t.findChild(full, "wifiScroll")
@@ -800,7 +800,7 @@ ShellRoot {
         full.view = withCursor(cur(true, "dns", 0))
         t.equal(hint.text, "↑↓ move · ←→ pick · enter apply", "on DNS, Enter applies")
         full.view = withCursor(cur(false, "saved", 0))
-        t.equal(hint.text, "↑↓ move · ←→ pick · enter connect · x forget", "without a cursor, the Wi-Fi hint")
+        t.equal(hint.text, "↑↓ move · ←→ pick · enter toggle · x forget", "without a cursor, the Wi-Fi hint")
 
         // ---------- A running Wi-Fi action dims the rows ----------
         var busyView = withCursor(cur(true, "wifi", 0))

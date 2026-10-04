@@ -320,16 +320,11 @@ Panel {
   // reveal; never an open or a hover); Enter refuses while it is "" or not
   // the cursor's (CursorLogic.cursorConfirmed).
   property string cursorKey: ""
-  // The controls the keyboard walks, in order: the place label (while a
-  // place shows) and the updated label (once fetched).
-  readonly property var cursorSections: {
-    var list = []
-    if (root.reportLocation !== "")
-      list.push("place")
-    if (root.fetchedAtMs > 0)
-      list.push("refresh")
-    return list
-  }
+  // The controls the keyboard walks, in order: the place label (always
+  // shown, the edit glyph alone before a place is known, and always a
+  // stop, so the outline and Enter agree even with no place and no fetch)
+  // and the updated label (once fetched).
+  readonly property var cursorSections: WeatherLogic.cursorSections(root.fetchedAtMs)
 
   // The forecast days the view shows (today first, up to 4), each keyed
   // by its date.

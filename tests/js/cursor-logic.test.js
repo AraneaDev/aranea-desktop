@@ -266,6 +266,29 @@ test("keyedOutline draws only on the keyboard's cursor row", () => {
   assert.equal(logic.keyedOutline(rows, "gone", true, byId), -1)
 })
 
+test("followShown hides the outline only when the chosen row is gone", () => {
+  const rows = [{ key: "a" }, { key: "b" }]
+  assert.deepEqual(logic.followShown(rows, "b", 0, true), {
+    index: 1,
+    key: "b",
+    confirmed: true,
+    keyboard: true
+  })
+  assert.deepEqual(logic.followShown(rows, "gone", 1, true), {
+    index: 1,
+    key: "",
+    confirmed: false,
+    keyboard: false
+  })
+  assert.deepEqual(logic.followShown(rows, "", 0, true), {
+    index: 0,
+    key: "",
+    confirmed: false,
+    keyboard: true
+  })
+  assert.deepEqual(logic.followShown(rows, "gone", 0, false).keyboard, false)
+})
+
 // --- HealthLogic.js's and WorkspaceModel.js's generated copies -----------
 
 /**
@@ -280,6 +303,7 @@ function sameAsSource(copy) {
   const pairs = [
     ["reselectIndex", [rows, "c", 0]],
     ["followCursor", [rows, "b", 0]],
+    ["followShown", [rows, "z", 1, true]],
     ["cursorConfirmed", [rows, "b", 1]],
     ["pressIntent", [true, false]],
     ["keepRows", [{}, "x", rows]],

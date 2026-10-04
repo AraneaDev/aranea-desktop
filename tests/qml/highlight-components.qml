@@ -140,6 +140,28 @@ ShellRoot {
           width: 300
           value: 0.5
         }
+        Aranea.NodeDeviceRow {
+          id: pillRow
+          width: 360
+          label: "Row with a pill and a forget button"
+          pointerGate: gate
+
+          Row {
+            spacing: 6
+
+            Aranea.FilamentPill {
+              id: rowPill
+              text: "Open"
+              pointerGate: gate
+            }
+            Aranea.ForgetButton {
+              id: rowForget
+              forgettable: true
+              hasCursor: true
+              pointerGate: gate
+            }
+          }
+        }
         Aranea.ForgetButton {
           id: forget
           forgettable: true
@@ -205,6 +227,26 @@ ShellRoot {
         pointer.mouseMove(stage, 400, 390)
       }], [60, function () {
         t.check(!forget.pointerHovered && !shows(slider, "hoverFill"), "leaving drops every hover fill")
+
+        // ---------- Gated controls on a gated row (one shared gate) ----------
+        realMove(pillRow, 40, pillRow.height / 2)
+      }], [60, function () {
+        t.check(shows(pillRow, "hoverFill"), "the gated row lights first")
+        var p = rowPill.mapToItem(pillRow, rowPill.width / 2, rowPill.height / 2)
+        pointer.mouseMove(pillRow, p.x, p.y)
+      }], [60, function () {
+        var p = rowPill.mapToItem(pillRow, rowPill.width / 2, rowPill.height / 2)
+        pointer.mouseMove(pillRow, p.x + 3, p.y)
+      }], [60, function () {
+        t.check(shows(rowPill, "hoverFill"), "a gated pill on a gated row lights on a real move")
+        var f = rowForget.mapToItem(pillRow, rowForget.width / 2, rowForget.height / 2)
+        pointer.mouseMove(pillRow, f.x, f.y)
+      }], [60, function () {
+        var f = rowForget.mapToItem(pillRow, rowForget.width / 2, rowForget.height / 2)
+        pointer.mouseMove(pillRow, f.x + 3, f.y)
+      }], [60, function () {
+        t.check(rowForget.pointerHovered && !shows(rowPill, "hoverFill"), "a gated forget button on a gated row lights too, and the pill's fill drops")
+        pointer.mouseMove(stage, 400, 390)
 
         // ---------- Content sliding under a still pointer ----------
         pointer.mouseMove(stage, 200, 368)

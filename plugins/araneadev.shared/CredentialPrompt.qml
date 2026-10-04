@@ -142,18 +142,45 @@ Item {
       input.forceActiveFocus()
   }
 
-  // Empties every editable field.
+  // Empties every editable field and forgets every recorded text, so no
+  // typed secret outlives the clear (a field gone since keeps none either).
   function clearFields() {
     for (var i in prompt.inputs)
       if (prompt.inputs[i])
         prompt.inputs[i].text = ""
+    prompt.texts = ({})
+  }
+
+  // Whether KEY names one of the current fields.
+  function hasField(key) {
+    var list = prompt.fields || []
+    for (var i = 0; i < list.length; i++)
+      if (list[i] && list[i].key === key)
+        return true
+    return false
+  }
+
+  // Forgets the recorded text of every field no longer shown (a field
+  // slot went away, or the fields were rebuilt with other keys).
+  function pruneTexts() {
+    var copy = {}
+    var dropped = false
+    for (var k in prompt.texts) {
+      if (prompt.hasField(k))
+        copy[k] = prompt.texts[k]
+      else
+        dropped = true
+    }
+    if (dropped)
+      prompt.texts = copy
   }
 
   // Records TEXT as field KEY's current text.
   function noteText(key, text) {
     var copy = {}
     for (var k in prompt.texts)
-      copy[k] = prompt.texts[k]
+      if (prompt.hasField(k))
+        copy[k] = prompt.texts[k]
     copy[key] = text
     prompt.texts = copy
   }
@@ -173,6 +200,7 @@ Item {
   }
 
   objectName: "promptPanel"
+  onFieldsChanged: prompt.pruneTexts()
   height: visible ? content.implicitHeight + Style.space(16) : 0
   onVisibleChanged: if (visible) {
     prompt.openedAt = Date.now()
@@ -273,8 +301,11 @@ Item {
             if (prompt.visible)
               Qt.callLater(prompt.focusFirst)
           }
-          Component.onDestruction: if (prompt.inputs[slot.index] === input)
-            delete prompt.inputs[slot.index]
+          Component.onDestruction: {
+            if (prompt.inputs[slot.index] === input)
+              delete prompt.inputs[slot.index]
+            prompt.pruneTexts()
+          }
 
           Text {
             id: fieldGlyph

@@ -67,6 +67,28 @@ function followCursor(rows, key, index) {
 }
 
 /**
+ * followCursor for a cursor that may be showing its outline: when the row
+ * whose key the cursor held is gone, the outline hides too (`keyboard`
+ * false), so it never marks a row Enter would refuse. The next key only
+ * reveals the cursor again, where it now sits, and a later Enter acts.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
+ * @param {string|null|undefined} key - the key the cursor was deliberately put on, or ""
+ * @param {number} index - the cursor's index before the change
+ * @param {boolean} keyboard - whether the keyboard shows the outline
+ * @returns {{index: number, key: string, confirmed: boolean, keyboard: boolean}} followCursor's answer and whether the outline still shows
+ */
+function followShown(rows, key, index, keyboard) {
+  var next = followCursor(rows, key, index)
+  var lost = typeof key === "string" && key !== "" && !next.confirmed
+  return {
+    index: next.index,
+    key: next.key,
+    confirmed: next.confirmed,
+    keyboard: !!keyboard && !lost
+  }
+}
+
+/**
  * Whether the cursor's row is still the one the user chose: `key` isn't
  * empty (a hidden SSID or no choice never is) and the row at `index` has it.
  * Keyboard actions refuse otherwise.
@@ -244,6 +266,7 @@ if (typeof module !== "undefined")
   module.exports = {
     reselectIndex: reselectIndex,
     followCursor: followCursor,
+    followShown: followShown,
     cursorConfirmed: cursorConfirmed,
     pressIntent: pressIntent,
     keepRows: keepRows,
@@ -850,7 +873,7 @@ function keyHint(section) {
   if (section === "saved") return "↑↓ move · enter/→ select forget · x forget"
   if (section === "header" || section === "band" || section === "dns")
     return "↑↓ move · ←→ pick · enter apply"
-  return "↑↓ move · ←→ pick · enter connect · x forget"
+  return "↑↓ move · ←→ pick · enter toggle · x forget"
 }
 
 /**

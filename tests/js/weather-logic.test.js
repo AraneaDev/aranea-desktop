@@ -816,3 +816,12 @@ test("keyHint names Enter's action: save in the field, else edit or refresh", ()
   assert.equal(logic.keyHint(false, "place"), "↑↓ move · enter edit place · r refresh")
   assert.equal(logic.keyHint(false, "refresh"), "↑↓ move · enter refresh · e edit place")
 })
+
+test("cursorSections always keeps the place stop, so the outline and Enter agree", () => {
+  assert.deepEqual(logic.cursorSections(0), ["place"])
+  assert.deepEqual(logic.cursorSections(1700000000000), ["place", "refresh"])
+  assert.equal(
+    logic.keyHint(false, logic.cursorSections(0)[0]),
+    "↑↓ move · enter edit place · r refresh"
+  )
+})

@@ -416,7 +416,8 @@ Panel {
 
   // Keeps focusSection/selectedIndex inside the currently visible sections
   // and rows after the data they point at changes, following cursorKey
-  // (CursorLogic.followCursor).
+  // (CursorLogic.followShown). A section hiding under the cursor, or its
+  // row going, also hides the outline, so the next key only reveals it.
   function clampCursor() {
     var sections = visibleSections
     if (!sections || !sections.length)
@@ -425,13 +426,15 @@ Panel {
       focusSection = sections[0]
       selectedIndex = sectionLanding(focusSection)
       cursorKey = ""
+      keyboardCursor = false
       return
     }
     var rows = sectionRows(focusSection)
     if (cursorKey !== "") {
-      var next = CursorLogic.followCursor(rows, cursorKey, selectedIndex)
+      var next = CursorLogic.followShown(rows, cursorKey, selectedIndex, keyboardCursor)
       selectedIndex = Math.max(0, next.index)
       cursorKey = next.key
+      keyboardCursor = next.keyboard
       return
     }
     if (selectedIndex > rows.length - 1)

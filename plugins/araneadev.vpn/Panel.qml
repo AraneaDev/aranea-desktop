@@ -581,11 +581,13 @@ Panel {
   }
 
   // The keyboard cursor follows the row it was put on, across re-sorts and
-  // between sections; a lost row drops the key, so Enter refuses.
+  // between sections; a lost row drops the key and hides the outline
+  // (CursorLogic.followShown), so the next key only reveals it again.
   onFlatRowsChanged: {
-    var next = CursorLogic.followCursor(flatRows, cursorKey, cursorFlat)
+    var next = CursorLogic.followShown(flatRows, cursorKey, cursorFlat, keyboardCursor)
     cursorFlat = Math.max(0, next.index)
     cursorKey = next.key
+    keyboardCursor = next.keyboard
     Qt.callLater(root.sync)
   }
 
