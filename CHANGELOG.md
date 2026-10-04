@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.17.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.17.0...v2.17.1) (2026-10-04)
+
+
+### Fixes
+
+* bring the overlays up to the Filament standard and unify highlights ([#115](https://github.com/AraneaDev/aranea-desktop/issues/115)) ([c5fd2e3](https://github.com/AraneaDev/aranea-desktop/commit/c5fd2e37e624e3d5d33ce9276456dc51631029a7))
+
 ## [2.17.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.4...v2.17.0) (2026-10-04)
 
 
