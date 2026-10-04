@@ -319,3 +319,153 @@ test("refreshRebase: the earlier run's records no longer land it, and the cap st
   assert.equal(logic.refreshTimeout(s, 30999, 30000).busy, true)
   assert.equal(logic.refreshTimeout(s, 31000, 30000).busy, false)
 })
+
+// --- showcase ---------------------------------------------------------------------------
+
+/**
+ * One valid stand-in agent; tests break one field at a time.
+ * @param {object} [extra] - fields to override
+ * @returns {object} the stand-in agent
+ */
+function standIn(extra) {
+  return Object.assign(
+    {
+      id: "claude",
+      name: "Claude Code",
+      plan: "Pro",
+      updatedMinutesAgo: 3,
+      todayPrompts: 46,
+      todaySessions: 5,
+      limits: [{ label: "Session (5-hour)", percent: 0.42, resetsInMinutes: 134 }],
+      days: [10, 20, 30],
+      models: [{ id: "claude-sonnet-5", input: 1, output: 2, cacheRead: 3, cacheWrite: 4 }]
+    },
+    extra || {}
+  )
+}
+const showcaseNow = new Date(2026, 9, 4, 12, 0, 0).getTime()
+
+test("parseShowcase: builds the provider records the panel draws, relative to now", () => {
+  const json = JSON.stringify({
+    agents: [
+      standIn(),
+      standIn({
+        id: "fireworks",
+        name: "Fireworks",
+        limits: [],
+        balance: { remaining: 18.4, funded: 50, spent: 31.6, currency: "USD" }
+      })
+    ]
+  })
+  const out = logic.parseShowcase(json, showcaseNow)
+  assert.equal(out.length, 2)
+  const c = out[0]
+  assert.equal(c.providerId, "claude")
+  assert.equal(c.providerName, "Claude Code")
+  assert.equal(c.tierLabel, "Pro")
+  assert.equal(c.usageStatusText, "")
+  assert.equal(c.balance, null)
+  assert.deepEqual(c.limits, [
+    {
+      label: "Session (5-hour)",
+      percent: 0.42,
+      resetsAt: new Date(showcaseNow + 134 * 60000).toISOString()
+    }
+  ])
+  // The last day is today, the ones before it count back.
+  assert.deepEqual(c.recentDays, [
+    { date: "2026-10-02", messageCount: 10 },
+    { date: "2026-10-03", messageCount: 20 },
+    { date: "2026-10-04", messageCount: 30 }
+  ])
+  assert.deepEqual(c.modelUsage, {
+    "claude-sonnet-5": {
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheReadInputTokens: 3,
+      cacheCreationInputTokens: 4
+    }
+  })
+  assert.equal(c.showcaseUpdatedMs, showcaseNow - 3 * 60000)
+  assert.equal(c.syncEnabled, false)
+  assert.deepEqual(out[1].balance, {
+    remaining: 18.4,
+    funded: 50,
+    spent: 31.6,
+    currency: "USD",
+    estimated: false
+  })
+})
+
+test("parseShowcase: a missing now counts as 0", () => {
+  const out = logic.parseShowcase(JSON.stringify({ agents: [standIn({ days: [] })] }), undefined)
+  assert.equal(out[0].showcaseUpdatedMs, -180000)
+})
+
+test("parseShowcase: refuses anything but a well-formed stand-in list", () => {
+  const bad = [
+    undefined,
+    "not json",
+    "[]",
+    "null",
+    "{}",
+    JSON.stringify({ agents: [] }),
+    JSON.stringify({ agents: "x" }),
+    JSON.stringify({
+      agents: [standIn(), standIn(), standIn(), standIn(), standIn(), standIn(), standIn()]
+    }),
+    JSON.stringify({ agents: [standIn(), standIn()] }),
+    JSON.stringify({ agents: [null] }),
+    JSON.stringify({ agents: [standIn({ id: "Claude Code" })] }),
+    JSON.stringify({ agents: [standIn({ id: 5 })] }),
+    JSON.stringify({ agents: [standIn({ name: "" })] }),
+    JSON.stringify({ agents: [standIn({ plan: 1 })] }),
+    JSON.stringify({ agents: [standIn({ updatedMinutesAgo: -1 })] }),
+    JSON.stringify({ agents: [standIn({ todayPrompts: "4" })] }),
+    JSON.stringify({ agents: [standIn({ todaySessions: null })] }),
+    JSON.stringify({ agents: [standIn({ limits: {} })] }),
+    JSON.stringify({ agents: [standIn({ days: {} })] }),
+    JSON.stringify({ agents: [standIn({ models: {} })] }),
+    JSON.stringify({ agents: [standIn({ days: new Array(15).fill(1) })] }),
+    JSON.stringify({ agents: [standIn({ days: [1, -2] })] }),
+    JSON.stringify({
+      agents: [standIn({ limits: [{ label: "S", percent: 1.2, resetsInMinutes: 1 }] })]
+    }),
+    JSON.stringify({
+      agents: [standIn({ limits: [{ label: "", percent: 0.2, resetsInMinutes: 1 }] })]
+    }),
+    JSON.stringify({ agents: [standIn({ limits: [{ label: "S", percent: 0.2 }] })] }),
+    JSON.stringify({ agents: [standIn({ limits: [[1]] })] }),
+    JSON.stringify({
+      agents: [standIn({ models: [{ id: "m", input: 1, output: 1, cacheRead: 1 }] })]
+    }),
+    JSON.stringify({
+      agents: [standIn({ models: [{ id: "", input: 1, output: 1, cacheRead: 1, cacheWrite: 1 }] })]
+    }),
+    JSON.stringify({ agents: [standIn({ balance: null })] }),
+    JSON.stringify({
+      agents: [standIn({ balance: { remaining: 1, funded: 2, spent: 1, currency: "usd" } })]
+    }),
+    JSON.stringify({
+      agents: [standIn({ balance: { remaining: -1, funded: 2, spent: 1, currency: "USD" } })]
+    })
+  ]
+  bad.forEach(function (json) {
+    assert.equal(logic.parseShowcase(json, showcaseNow), null, String(json))
+  })
+})
+
+test("showcaseCall: closed refuses, invalid refuses, valid is ok", () => {
+  const json = JSON.stringify({ agents: [standIn()] })
+  assert.deepEqual(logic.showcaseCall(false, json, showcaseNow), {
+    answer: "closed",
+    showcase: null
+  })
+  assert.deepEqual(logic.showcaseCall(true, "{}", showcaseNow), {
+    answer: "invalid",
+    showcase: null
+  })
+  const ok = logic.showcaseCall(true, json, showcaseNow)
+  assert.equal(ok.answer, "ok")
+  assert.equal(ok.showcase[0].providerId, "claude")
+})

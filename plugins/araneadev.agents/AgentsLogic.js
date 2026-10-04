@@ -233,6 +233,208 @@ function updatedCaption(plan, updatedMs) {
   return p || updated
 }
 
+/**
+ * A stand-in agent for README screenshots, as the `showcase` IPC method
+ * takes it (see parseShowcase).
+ * @typedef {{id: string, name: string, plan: string, updatedMinutesAgo: number,
+ *   limits: Array<{label: string, percent: number, resetsInMinutes: number}>,
+ *   days: Array<number>, models: Array<{id: string, input: number, output: number,
+ *   cacheRead: number, cacheWrite: number}>, todayPrompts: number, todaySessions: number,
+ *   balance?: {remaining: number, funded: number, spent: number, currency: string}}} ShowcaseAgent
+ */
+
+/**
+ * Whether V is a finite number of at least 0.
+ * @param {*} v - the value to test
+ * @returns {boolean} true for a usable count or amount
+ */
+function isCount(v) {
+  return typeof v === "number" && isFinite(v) && v >= 0
+}
+
+/**
+ * Whether V is a non-empty string.
+ * @param {*} v - the value to test
+ * @returns {boolean} true for a usable label
+ */
+function isLabel(v) {
+  return typeof v === "string" && v !== ""
+}
+
+/**
+ * Whether V is a plain (non-array) object.
+ * @param {*} v - the value to test
+ * @returns {boolean} true for an object
+ */
+function isObject(v) {
+  return !!v && typeof v === "object" && !Array.isArray(v)
+}
+
+/**
+ * The local calendar date of MS as "YYYY-MM-DD" (stock's day key format).
+ * @param {number} ms - a timestamp
+ * @returns {string} the local date
+ */
+function localDate(ms) {
+  var d = new Date(ms)
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+}
+
+/**
+ * Whether A is a valid stand-in agent (ShowcaseAgent): a lower-case id
+ * (it names the mark asset), name, plan, the minutes since its update,
+ * limit windows with a 0..1 percent and the minutes to their reset, up to
+ * 14 day counts (oldest first, the last one today), models with their
+ * token split, today's prompt and session counts, and an optional prepaid
+ * balance.
+ * @param {*} a - one entry of the showcase's "agents"
+ * @returns {boolean} true when every field is usable
+ */
+function validShowcaseAgent(a) {
+  if (!isObject(a)) return false
+  if (typeof a.id !== "string" || !/^[a-z0-9-]+$/.test(a.id)) return false
+  if (!isLabel(a.name) || typeof a.plan !== "string" || !isCount(a.updatedMinutesAgo)) return false
+  if (!isCount(a.todayPrompts) || !isCount(a.todaySessions)) return false
+  if (!Array.isArray(a.limits) || !Array.isArray(a.days) || !Array.isArray(a.models)) return false
+  if (a.days.length > 14 || !a.days.every(isCount)) return false
+  var limitsOk = a.limits.every(function (/** @type {any} */ l) {
+    return (
+      isObject(l) &&
+      isLabel(l.label) &&
+      isCount(l.percent) &&
+      l.percent <= 1 &&
+      isCount(l.resetsInMinutes)
+    )
+  })
+  var modelsOk = a.models.every(function (/** @type {any} */ m) {
+    return (
+      isObject(m) &&
+      isLabel(m.id) &&
+      isCount(m.input) &&
+      isCount(m.output) &&
+      isCount(m.cacheRead) &&
+      isCount(m.cacheWrite)
+    )
+  })
+  if (!limitsOk || !modelsOk) return false
+  if (a.balance === undefined) return true
+  var b = a.balance
+  return (
+    isObject(b) &&
+    isCount(b.remaining) &&
+    isCount(b.funded) &&
+    isCount(b.spent) &&
+    typeof b.currency === "string" &&
+    /^[A-Z]{3}$/.test(b.currency)
+  )
+}
+
+/**
+ * The display record Main's displayProvider would build for stand-in agent
+ * A, with its reset times, days and update time placed relative to NOWMS.
+ * @param {ShowcaseAgent} a - a valid stand-in agent
+ * @param {number} nowMs - the current timestamp
+ * @returns {object} the provider record the panel draws
+ */
+function showcaseProvider(a, nowMs) {
+  /** @type {{[key: string]: object}} */
+  var modelUsage = {}
+  a.models.forEach(function (m) {
+    modelUsage[m.id] = {
+      inputTokens: m.input,
+      outputTokens: m.output,
+      cacheReadInputTokens: m.cacheRead,
+      cacheCreationInputTokens: m.cacheWrite
+    }
+  })
+  var dayMs = 24 * 3600 * 1000
+  return {
+    providerId: a.id,
+    providerName: a.name,
+    ready: true,
+    usageStatusText: "",
+    authHelpText: "",
+    limits: a.limits.map(function (l) {
+      return {
+        label: l.label,
+        percent: l.percent,
+        resetsAt: new Date(nowMs + l.resetsInMinutes * 60000).toISOString()
+      }
+    }),
+    tierLabel: a.plan,
+    balance: a.balance
+      ? {
+          remaining: a.balance.remaining,
+          funded: a.balance.funded,
+          spent: a.balance.spent,
+          currency: a.balance.currency,
+          estimated: false
+        }
+      : null,
+    todayPrompts: a.todayPrompts,
+    todaySessions: a.todaySessions,
+    recentDays: a.days.map(function (count, i) {
+      return { date: localDate(nowMs - (a.days.length - 1 - i) * dayMs), messageCount: count }
+    }),
+    modelUsage: modelUsage,
+    hasPromptStats: true,
+    syncEnabled: false,
+    syncDeviceCount: 0,
+    showcaseUpdatedMs: nowMs - a.updatedMinutesAgo * 60000
+  }
+}
+
+/**
+ * Reads the stand-ins handed to the `showcase` IPC method: a JSON object
+ * whose "agents" is a non-empty array (at most 6) of valid stand-in agents
+ * with distinct ids (validShowcaseAgent). Anything else is refused, so a
+ * capture never falls back to the real usage.
+ * @param {string|undefined} json - the call's JSON
+ * @param {number} nowMs - the current timestamp
+ * @returns {Array<object>|null} the stand-in provider records, or null when invalid
+ */
+function parseShowcase(json, nowMs) {
+  var parsed
+  try {
+    parsed = JSON.parse(String(json))
+  } catch (e) {
+    return null
+  }
+  if (!isObject(parsed) || !Array.isArray(parsed.agents)) return null
+  var agents = parsed.agents
+  if (agents.length === 0 || agents.length > 6 || !agents.every(validShowcaseAgent)) return null
+  var ids = agents.map(function (/** @type {any} */ a) {
+    return a.id
+  })
+  if (
+    ids.some(function (/** @type {string} */ id, /** @type {number} */ i) {
+      return ids.indexOf(id) !== i
+    })
+  )
+    return null
+  var now = Number(nowMs) || 0
+  return agents.map(function (/** @type {ShowcaseAgent} */ a) {
+    return showcaseProvider(a, now)
+  })
+}
+
+/**
+ * The answer to a `showcase` IPC call. Stand-ins are taken only while the
+ * dropdown is open (it clears them on open and on close).
+ * @param {boolean} opened - the dropdown is open
+ * @param {string|undefined} json - the call's JSON
+ * @param {number} nowMs - the current timestamp
+ * @returns {{answer: string, showcase: Array<object>|null}} "ok" with the
+ *   stand-in providers, or "closed" / "invalid" with null
+ */
+function showcaseCall(opened, json, nowMs) {
+  if (!opened) return { answer: "closed", showcase: null }
+  var showcase = parseShowcase(json, nowMs)
+  return showcase === null
+    ? { answer: "invalid", showcase: null }
+    : { answer: "ok", showcase: showcase }
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     ringFraction: ringFraction,
@@ -246,5 +448,7 @@ if (typeof module !== "undefined")
     recordsLandedSince: recordsLandedSince,
     refreshRebase: refreshRebase,
     refreshTimeout: refreshTimeout,
-    updatedCaption: updatedCaption
+    updatedCaption: updatedCaption,
+    parseShowcase: parseShowcase,
+    showcaseCall: showcaseCall
   }

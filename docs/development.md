@@ -150,17 +150,21 @@ dropdown's `showcase` IPC method. The names are display only and are cleared
 when the dropdown closes. The Audio capture works the same way: its
 `showcase` method takes stand-in output, input and app labels and a made-up
 track with a position (so the progress strand shows), and the transport
-controls are refused while it is shown. If the dropdown doesn't answer `ok`
+controls are refused while it is shown. The Agents capture hands its
+`showcase` method stand-in agents (Claude Code, Codex and Fireworks with
+made-up plans, limits, days, models and a prepaid balance), and refresh and
+the agent picker are refused while they are shown. If the dropdown doesn't answer `ok`
 (for example, the stock panel is active), that surface fails and no
 screenshot is written. These variables override the defaults:
 
-| Variable                        | Default                                                        |
-| ------------------------------- | -------------------------------------------------------------- |
-| `ARANEA_CAPTURE_WIFI_NAMES`     | JSON array of eight made-up SSIDs (`Aranea-Home`, ...)         |
-| `ARANEA_CAPTURE_BT_NAMES`       | JSON array of eight common device models (`WH-1000XM5`, ...)   |
-| `ARANEA_NETWORK_GRAPH_DELAY`    | `20`: seconds the link graph records before the grab           |
-| `ARANEA_BLUETOOTH_SCAN_DELAY`   | `3`: extra seconds for the scan to find devices                |
-| `ARANEA_CAPTURE_AUDIO_SHOWCASE` | JSON `{outputs, inputs, apps, track}` (`Studio Monitors`, ...) |
+| Variable                         | Default                                                        |
+| -------------------------------- | -------------------------------------------------------------- |
+| `ARANEA_CAPTURE_WIFI_NAMES`      | JSON array of eight made-up SSIDs (`Aranea-Home`, ...)         |
+| `ARANEA_CAPTURE_BT_NAMES`        | JSON array of eight common device models (`WH-1000XM5`, ...)   |
+| `ARANEA_NETWORK_GRAPH_DELAY`     | `20`: seconds the link graph records before the grab           |
+| `ARANEA_BLUETOOTH_SCAN_DELAY`    | `3`: extra seconds for the scan to find devices                |
+| `ARANEA_CAPTURE_AUDIO_SHOWCASE`  | JSON `{outputs, inputs, apps, track}` (`Studio Monitors`, ...) |
+| `ARANEA_CAPTURE_AGENTS_SHOWCASE` | JSON `{agents: [...]}` (`Claude Code`, `Codex`, `Fireworks`)   |
 
 ## Tracking upstream
 

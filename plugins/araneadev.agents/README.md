@@ -42,6 +42,16 @@ The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-p
 limit/balance/day/model functions and adds the limits' pace tick (the elapsed share of each
 window's span) and the mark probe that walks stock's light-twin fallback for the header.
 
+- **`showcase` IPC:** for README captures (`scripts/capture-screenshots --surface agents`),
+  stand-in agents replace the real ones: `{"agents": [{id, name, plan, updatedMinutesAgo,
+todayPrompts, todaySessions, limits: [{label, percent, resetsInMinutes}], days: [...counts,
+oldest first, today last], models: [{id, input, output, cacheRead, cacheWrite}], balance?:
+{remaining, funded, spent, currency}}]}` (`AgentsLogic.parseShowcase`, which refuses anything
+  malformed). The first stand-in is selected. Display only: no collector runs, the sync footer
+  hides, IPC `refresh` answers `refused` and the Refresh pill, `r`, Enter and the right-click
+  agent picker do nothing while it is shown, and it clears when the dropdown opens or closes.
+  Closed, the call answers `closed`; a bad payload, `invalid`.
+
 ## View
 
 `AgentsDropdown.qml` is the pure Aranea view: one plain view

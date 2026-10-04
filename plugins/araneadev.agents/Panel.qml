@@ -26,8 +26,13 @@ Panel {
   // The popup's background colour, for picking a light or dark mark.
   readonly property color surface: Color.popups.background
 
-  // The enabled agents that have recorded usage, in Main's discovery order.
-  readonly property var providers: usage.enabledProviders
+  // Stand-in agents for README screenshots (the showcase IPC method,
+  // AgentsLogic.parseShowcase); null outside a capture, and cleared
+  // whenever the dropdown opens or closes.
+  property var agentsShowcase: null
+  // The enabled agents that have recorded usage, in Main's discovery order;
+  // the stand-ins instead while showcasing.
+  readonly property var providers: agentsShowcase ? agentsShowcase : usage.enabledProviders
   // The selection follows the provider, not the slot it happens to sit in: a
   // provider whose first scan lands while the panel is open would otherwise
   // shift the list underneath you and swap out what you were reading.
@@ -126,16 +131,21 @@ Panel {
 
   // The one refresh path (r, Enter, the Refresh pill and IPC refresh): marks
   // the refresh pending and runs refreshNow, or does nothing while one is
-  // already pending.
+  // already pending. Refused while showcasing: the stand-ins are display
+  // only.
   function requestRefresh() {
+    if (root.agentsShowcase)
+      return
     var r = AgentsLogic.refreshClick(root.refreshPending, Date.now())
     root.refreshPending = r.state
     if (r.send)
       root.refreshNow()
   }
 
-  // Runs the agent picker and closes the panel.
+  // Runs the agent picker and closes the panel; refused while showcasing.
   function launchAgent() {
+    if (root.agentsShowcase)
+      return
     // The bar is a plain QtObject to qmllint; run() is the bar's own.
     // qmllint disable missing-property
     if (root.bar)
@@ -455,6 +465,9 @@ Panel {
   function updatedMsFor(p) {
     if (!p)
       return 0
+    // A stand-in agent carries its own made-up update time.
+    if (p.showcaseUpdatedMs !== undefined)
+      return Number(p.showcaseUpdatedMs) || 0
     var list = usage.agents || []
     for (var i = 0; i < list.length; i++) {
       var record = list[i] ? list[i].record : null
@@ -600,7 +613,8 @@ Panel {
       balance: balanceView(balance),
       days: dayViewRows(provider),
       models: modelViewRows(models),
-      footer: footerText(),
+      // The sync footer speaks for the real machine, never for stand-ins.
+      footer: agentsShowcase ? "" : footerText(),
       empty: providers.length === 0,
       cursor: {
         active: cursorActive && keyboardCursor,
@@ -636,7 +650,11 @@ Panel {
   implicitHeight: button.implicitHeight
 
   onProviderIndexChanged: dropdown.scrollToTop()
-  onOpenedChanged: if (opened) {
+  onOpenedChanged: {
+    // Stand-ins never carry over into an open or past a close.
+    agentsShowcase = null
+    if (!opened)
+      return
     cursorActive = false
     keyboardCursor = false
     nowMs = Date.now()
@@ -707,8 +725,25 @@ Panel {
       root.toggle()
     }
     function refresh(): string {
+      if (root.agentsShowcase)
+        return "refused"
       root.requestRefresh()
       return "ok"
+    }
+    // Screenshot stand-ins (scripts/capture-screenshots): SHOWCASEJSON, a
+    // JSON object (AgentsLogic.parseShowcase), replaces the agents with
+    // made-up ones (plans, limits, days, models, a balance) and selects
+    // the first, until the dropdown closes; while it is closed the answer
+    // is "closed" and nothing is set. Display only: no collector runs, and
+    // refresh and the agent picker are refused meanwhile.
+    function showcase(showcaseJson: string): string {
+      var call = AgentsLogic.showcaseCall(root.opened, showcaseJson, Date.now())
+      if (call.showcase !== null) {
+        root.agentsShowcase = call.showcase
+        root.selectedProviderId = call.showcase[0].providerId
+        root.nowMs = Date.now()
+      }
+      return call.answer
     }
     function next(): string {
       root.selectProvider(root.providerIndex + 1)
