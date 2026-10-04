@@ -469,3 +469,43 @@ test("showcaseCall: closed refuses, invalid refuses, valid is ok", () => {
   assert.equal(ok.answer, "ok")
   assert.equal(ok.showcase[0].providerId, "claude")
 })
+
+// --- over-cap fractions, refreshCancel, selection ---------------------------------------
+
+test("ringFraction: a fraction just over its cap (1, 1.5] is full, not a 0..100 percent", () => {
+  assert.equal(logic.ringFraction([{ percent: 1.05 }]), 1)
+  assert.equal(logic.ringFraction([{ percent: 1.5 }]), 1)
+  assert.equal(logic.ringFraction([{ percent: 1.6 }]), 0.016)
+})
+
+test("refreshCancel: a pending refresh goes idle and keeps its baseline", () => {
+  const busy = logic.refreshClick(logic.refreshLanded(logic.refreshIdle(), 7), 1000).state
+  assert.deepEqual(logic.refreshCancel(busy), { busy: false, startedAt: 0, revision: 7 })
+  assert.deepEqual(logic.refreshCancel(null), logic.refreshIdle())
+  assert.deepEqual(logic.refreshCancel({ busy: true, startedAt: 5 }), logic.refreshIdle())
+})
+
+test("selection: a showcase and a close leave the real choice untouched", () => {
+  let sel = { real: "codex", showcase: "" }
+  assert.equal(logic.selectedId(sel, false), "codex")
+  // The showcase picks its first stand-in, then h/l move within it.
+  sel = logic.selectId(sel, true, "claude")
+  assert.equal(logic.selectedId(sel, true), "claude")
+  sel = logic.selectId(sel, true, "fireworks")
+  assert.equal(logic.selectedId(sel, true), "fireworks")
+  assert.equal(sel.real, "codex")
+  // The dropdown closes: the stand-in choice goes, the real one is back.
+  sel = logic.showcaseSelectionCleared(sel)
+  assert.deepEqual(sel, { real: "codex", showcase: "" })
+  assert.equal(logic.selectedId(sel, false), "codex")
+  // Outside a showcase only the real choice moves.
+  assert.deepEqual(logic.selectId(sel, false, "claude"), { real: "claude", showcase: "" })
+})
+
+test("selection: missing selections and ids read as empty", () => {
+  assert.equal(logic.selectedId(null, false), "")
+  assert.equal(logic.selectedId({}, true), "")
+  assert.deepEqual(logic.selectId(null, true, null), { real: "", showcase: "" })
+  assert.deepEqual(logic.selectId(undefined, false, undefined), { real: "", showcase: "" })
+  assert.deepEqual(logic.showcaseSelectionCleared(null), { real: "", showcase: "" })
+})

@@ -24,8 +24,12 @@
  * The bar ring's fill: the highest fraction used across a provider's limit
  * windows (session, weekly, ...), so the ring tracks whichever window is
  * closest to stopping the next prompt. Entries missing both `percent` and
- * `used`, or carrying a non-finite value, are ignored; a 0..100 value is
- * rescaled to 0..1 to tolerate either shape.
+ * `used`, or carrying a non-finite value, are ignored. A value in (1, 1.5]
+ * is a fraction slightly over its cap (stock's percent is a 0..1 fraction
+ * that a collector may report past 1) and counts as full; only a value
+ * above 1.5 is read as a 0..100 percentage and rescaled. The panel clamps
+ * its fractions to 0..1 before calling, so neither case reaches the ring
+ * from stock data.
  * @param {Array<LimitLike>} limits - a provider's limit windows
  * @returns {number} the max fraction used (0..1), or -1 with no usable limits
  */
@@ -37,7 +41,7 @@ function ringFraction(limits) {
     var raw = entry.percent !== undefined ? entry.percent : entry.used
     var value = Number(raw)
     if (!isFinite(value) || value < 0) continue
-    var fraction = value > 1 ? value / 100 : value
+    var fraction = value > 1.5 ? value / 100 : value
     if (fraction > best) best = fraction
   }
   return best < 0 ? -1 : Math.min(1, best)
@@ -201,6 +205,62 @@ function refreshTimeout(state, nowMs, timeoutMs) {
   var elapsed = (Number(nowMs) || 0) - (Number(from) || 0)
   if (elapsed >= Number(timeoutMs)) return { busy: false, startedAt: 0, revision: s.revision }
   return s
+}
+
+/**
+ * Abandons a pending refresh (the showcase taking over the dropdown): idle,
+ * keeping the baseline revision so the next real refresh still has one.
+ * @param {?RefreshPending} state - the pending state (null counts as idle)
+ * @returns {RefreshPending} an idle state with the same revision
+ */
+function refreshCancel(state) {
+  var s = state || refreshIdle()
+  return { busy: false, startedAt: 0, revision: s.revision === undefined ? null : s.revision }
+}
+
+/**
+ * The agent selection: the user's real choice, and the stand-in choice made
+ * while a showcase is shown, kept apart so a capture never moves the real
+ * one.
+ * @typedef {{real: string, showcase: string}} AgentSelection
+ */
+
+/**
+ * The provider id the dropdown shows as selected.
+ * @param {AgentSelection} selection - both choices
+ * @param {boolean} showcasing - a showcase is shown
+ * @returns {string} the showcase choice while showcasing, else the real one
+ */
+function selectedId(selection, showcasing) {
+  var sel = selection || { real: "", showcase: "" }
+  return String((showcasing ? sel.showcase : sel.real) || "")
+}
+
+/**
+ * Selects provider ID: while showcasing only the stand-in choice moves,
+ * otherwise only the real one.
+ * @param {AgentSelection} selection - both choices
+ * @param {boolean} showcasing - a showcase is shown
+ * @param {string} id - the provider id chosen
+ * @returns {AgentSelection} the next selection
+ */
+function selectId(selection, showcasing, id) {
+  var sel = selection || { real: "", showcase: "" }
+  var real = String(sel.real || "")
+  var showcase = String(sel.showcase || "")
+  if (showcasing) return { real: real, showcase: String(id || "") }
+  return { real: String(id || ""), showcase: showcase }
+}
+
+/**
+ * Drops the stand-in choice (the showcase cleared on open or close); the
+ * real choice is untouched.
+ * @param {AgentSelection} selection - both choices
+ * @returns {AgentSelection} the selection without a stand-in choice
+ */
+function showcaseSelectionCleared(selection) {
+  var sel = selection || { real: "", showcase: "" }
+  return { real: String(sel.real || ""), showcase: "" }
 }
 
 /**
@@ -448,6 +508,10 @@ if (typeof module !== "undefined")
     recordsLandedSince: recordsLandedSince,
     refreshRebase: refreshRebase,
     refreshTimeout: refreshTimeout,
+    refreshCancel: refreshCancel,
+    selectedId: selectedId,
+    selectId: selectId,
+    showcaseSelectionCleared: showcaseSelectionCleared,
     updatedCaption: updatedCaption,
     parseShowcase: parseShowcase,
     showcaseCall: showcaseCall

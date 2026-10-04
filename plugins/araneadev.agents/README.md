@@ -50,7 +50,13 @@ oldest first, today last], models: [{id, input, output, cacheRead, cacheWrite}],
   malformed). The first stand-in is selected. Display only: no collector runs, the sync footer
   hides, IPC `refresh` answers `refused` and the Refresh pill, `r`, Enter and the right-click
   agent picker do nothing while it is shown, and it clears when the dropdown opens or closes.
-  Closed, the call answers `closed`; a bad payload, `invalid`.
+  Closed, the call answers `closed`; a bad payload, `invalid`. The stand-in choice of agent is
+  kept apart from the real one (`AgentsLogic.selectId`), so a capture never changes which agent
+  the user had selected, and a refresh pending when it starts is dropped.
+
+  ```bash
+  omarchy-shell omarchy.agents showcase ' {"agents":[{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134}],"days":[182400000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000}]}]}'
+  ```
 
 ## View
 

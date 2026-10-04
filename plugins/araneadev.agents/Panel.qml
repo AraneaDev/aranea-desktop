@@ -37,11 +37,20 @@ Panel {
   // provider whose first scan lands while the panel is open would otherwise
   // shift the list underneath you and swap out what you were reading.
   property string selectedProviderId: ""
-  // The providers array position of selectedProviderId, or 0 when it is
-  // not (yet) among them.
+  // The stand-in agent chosen while a showcase is shown, kept apart from
+  // selectedProviderId so a capture never moves the user's real choice
+  // (AgentsLogic.selectId); "" outside a showcase.
+  property string showcaseSelectedId: ""
+  // The providers array position of the shown selection (the real one, or
+  // the stand-in one while showcasing), or 0 when it is not (yet) among
+  // them.
   readonly property int providerIndex: {
+    var id = AgentsLogic.selectedId({
+      real: selectedProviderId,
+      showcase: showcaseSelectedId
+    }, !!agentsShowcase)
     for (var i = 0; i < providers.length; i++)
-      if (providers[i].providerId === selectedProviderId)
+      if (providers[i].providerId === id)
         return i
     return 0
   }
@@ -93,7 +102,13 @@ Panel {
     if (providers.length === 0)
       return
     var wrapped = ((index % providers.length) + providers.length) % providers.length
-    selectedProviderId = providers[wrapped].providerId
+    // While showcasing only the stand-in choice moves.
+    var next = AgentsLogic.selectId({
+      real: selectedProviderId,
+      showcase: showcaseSelectedId
+    }, !!agentsShowcase, providers[wrapped].providerId)
+    selectedProviderId = next.real
+    showcaseSelectedId = next.showcase
   }
 
   // Forces every collector to re-run now, ignoring refreshIntervalSec.
@@ -490,6 +505,17 @@ Panel {
     return clamp(1 - remainingMs / span, 0, 1)
   }
 
+  // A limit row's key: its title, with "#n" added only when an earlier row
+  // in ROWS already took that title.
+  function limitKey(rows, title) {
+    var key = title
+    for (var n = 2; rows.some(function (r) {
+      return r.key === key
+    }); n++)
+      key = title + "#" + n
+    return key
+  }
+
   // The view rows for provider p's limit windows, filtered and normalised
   // the way limitWindows does, keeping each entry's label for the pace.
   function limitViewRows(p) {
@@ -504,7 +530,7 @@ Panel {
       var tone = AgentsLogic.ringTone(clamp(w.percent, 0, 1))
       var remainingMs = resetMsFor(w)
       rows.push({
-        key: w.title + "#" + rows.length,
+        key: limitKey(rows, w.title),
         label: w.title,
         fraction: clamp(w.percent, 0, 1),
         percent: Math.round(w.percent * 100) + "%",
@@ -651,8 +677,13 @@ Panel {
 
   onProviderIndexChanged: dropdown.scrollToTop()
   onOpenedChanged: {
-    // Stand-ins never carry over into an open or past a close.
+    // Stand-ins never carry over into an open or past a close; the real
+    // selection was never touched.
     agentsShowcase = null
+    showcaseSelectedId = AgentsLogic.showcaseSelectionCleared({
+      real: selectedProviderId,
+      showcase: showcaseSelectedId
+    }).showcase
     if (!opened)
       return
     cursorActive = false
@@ -733,14 +764,16 @@ Panel {
     // Screenshot stand-ins (scripts/capture-screenshots): SHOWCASEJSON, a
     // JSON object (AgentsLogic.parseShowcase), replaces the agents with
     // made-up ones (plans, limits, days, models, a balance) and selects
-    // the first, until the dropdown closes; while it is closed the answer
+    // the first (without touching the real selection), until the dropdown closes; while it is closed the answer
     // is "closed" and nothing is set. Display only: no collector runs, and
     // refresh and the agent picker are refused meanwhile.
     function showcase(showcaseJson: string): string {
       var call = AgentsLogic.showcaseCall(root.opened, showcaseJson, Date.now())
       if (call.showcase !== null) {
         root.agentsShowcase = call.showcase
-        root.selectedProviderId = call.showcase[0].providerId
+        root.showcaseSelectedId = call.showcase[0].providerId
+        // A capture never shows a real refresh's pulse.
+        root.refreshPending = AgentsLogic.refreshCancel(root.refreshPending)
         root.nowMs = Date.now()
       }
       return call.answer

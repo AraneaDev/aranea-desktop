@@ -10,9 +10,9 @@
 //
 // Anything that moves the pills under a still pointer without the pointer
 // moving (the agents changing or re-sorting, the switch or the header
-// showing or hiding) stamps layoutChangedAt, which the pills read through
-// pointerGate: a click within 300 ms of it is ignored unless the pointer
-// has really moved there since. Agent choices carry the pill's key (the
+// showing or hiding, the header changing height) stamps layoutChangedAt,
+// which the pills read through pointerGate: a click within 300 ms of it is
+// ignored unless the pointer has really moved there since. Agent choices carry the pill's key (the
 // provider id) and are never sent when the pill at that index holds
 // another key. The keyboard outline only follows view.cursor; pointer
 // hover never draws one, it only reports a hover action.
@@ -139,6 +139,9 @@ Column {
     busy: !!(dropdown.view.refresh && dropdown.view.refresh.busy)
     hasCursor: dropdown.cursorIn("refresh") >= 0
     pointerGate: dropdown.pointerGate
+    // A taller or shorter header (a mark loading, a caption change) moves
+    // the pills below it as surely as showing or hiding it does.
+    onHeightChanged: dropdown.noteLayoutChange()
     onRefreshRequested: dropdown.action("refresh", null)
     onEntered: dropdown.action("hover", {
       section: "refresh",

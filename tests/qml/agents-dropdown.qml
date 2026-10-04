@@ -535,6 +535,13 @@ ShellRoot {
         view.view = single
         t.check(!t.findChild(view, "agentSwitch").visible, "one agent shows no switch")
         t.check(view.layoutChangedAt > stampBefore, "the switch hiding stamps the layout")
+        var header = t.findChild(view, "agentsHeader")
+        view.layoutChangedAt = 0
+        header.height = header.implicitHeight + 10
+        t.check(view.layoutChangedAt > 0, "the header changing height stamps the layout")
+        header.height = Qt.binding(function () {
+          return header.implicitHeight
+        })
         view.view = {
           empty: true,
           agents: [],
