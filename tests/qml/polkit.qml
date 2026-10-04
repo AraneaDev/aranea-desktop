@@ -145,6 +145,12 @@ ShellRoot {
     t.equal(fakeView.password, "", "a failure clears the field")
     t.check(!prompt.submitted, "a failure ends the wait for PAM")
 
+    // The field's authorize (its own Enter) submits like the key map's Enter.
+    fakeView.password = "retry"
+    prompt.authorize()
+    t.equal(fakeFlow.submitted, ["hunter2", "retry"], "authorize sends the typed password")
+    t.check(prompt.submitted, "and waits for PAM again")
+
     // Tab opens the details.
     t.check(!prompt.detailsOpen, "details start collapsed")
     press(Qt.Key_Tab)

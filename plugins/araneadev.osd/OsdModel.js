@@ -34,31 +34,32 @@ function clamp(value, min, max) {
  */
 function iconFor(name, percent) {
   var n = String(name || "").toLowerCase()
-  if (n === "volume-muted" || n === "volume-mute" || n === "muted" || n === "mute") return ""
-  if (n === "volume-low") return ""
-  if (n === "volume-medium") return ""
-  if (n === "volume-high" || n === "volume") return ""
+  if (n === "volume-muted" || n === "volume-mute" || n === "muted" || n === "mute")
+    return String.fromCodePoint(0xeee8)
+  if (n === "volume-low") return String.fromCodePoint(0xf026)
+  if (n === "volume-medium") return String.fromCodePoint(0xf027)
+  if (n === "volume-high" || n === "volume") return String.fromCodePoint(0xf028)
   if (n === "microphone-muted" || n === "microphone-off" || n === "mic-muted" || n === "mic-off")
-    return "󰍭"
-  if (n === "microphone" || n === "mic") return "󰍬"
-  if (n === "keyboard") return "󰌌"
-  if (n === "brightness" || n === "display") return "󰍹"
-  if (n === "touchpad") return "󰟸"
-  if (n === "touch" || n === "touchscreen") return "󰝁"
-  if (n === "reboot" || n === "restart") return "󰜉"
-  if (n === "shutdown" || n === "power" || n === "poweroff") return "󰐥"
-  if (n === "logout" || n === "sign-out" || n === "leave") return "󰍃"
-  if (n === "media" || n === "player") return "󰝚"
-  if (n === "media-source" || n === "player-source") return "󰝚"
-  if (n === "media-play" || n === "player-play") return "󰐊"
-  if (n === "media-pause" || n === "player-pause") return "󰏤"
-  if (n === "media-next" || n === "player-next") return "󰒭"
-  if (n === "media-previous" || n === "player-previous") return "󰒮"
+    return String.fromCodePoint(0xf036d)
+  if (n === "microphone" || n === "mic") return String.fromCodePoint(0xf036c)
+  if (n === "keyboard") return String.fromCodePoint(0xf030c)
+  if (n === "brightness" || n === "display") return String.fromCodePoint(0xf0379)
+  if (n === "touchpad") return String.fromCodePoint(0xf07f8)
+  if (n === "touch" || n === "touchscreen") return String.fromCodePoint(0xf0741)
+  if (n === "reboot" || n === "restart") return String.fromCodePoint(0xf0709)
+  if (n === "shutdown" || n === "power" || n === "poweroff") return String.fromCodePoint(0xf0425)
+  if (n === "logout" || n === "sign-out" || n === "leave") return String.fromCodePoint(0xf0343)
+  if (n === "media" || n === "player") return String.fromCodePoint(0xf075a)
+  if (n === "media-source" || n === "player-source") return String.fromCodePoint(0xf075a)
+  if (n === "media-play" || n === "player-play") return String.fromCodePoint(0xf040a)
+  if (n === "media-pause" || n === "player-pause") return String.fromCodePoint(0xf03e4)
+  if (n === "media-next" || n === "player-next") return String.fromCodePoint(0xf04ad)
+  if (n === "media-previous" || n === "player-previous") return String.fromCodePoint(0xf04ae)
   if (n.length > 0) return name
-  if (percent <= 0) return ""
-  if (percent <= 33) return ""
-  if (percent <= 66) return ""
-  return ""
+  if (percent <= 0) return String.fromCodePoint(0xeee8)
+  if (percent <= 33) return String.fromCodePoint(0xf026)
+  if (percent <= 66) return String.fromCodePoint(0xf027)
+  return String.fromCodePoint(0xf028)
 }
 
 // Canonical icon names, one per distinct glyph iconFor can return; alias

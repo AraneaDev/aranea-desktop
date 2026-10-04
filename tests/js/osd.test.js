@@ -29,7 +29,71 @@ test("a zero maximum and a negative duration are safe", () => {
 })
 
 test("brightness keeps its icon", () => {
-  if (model.iconFor("brightness", 50) !== "󰍹") throw new Error("icon mapping changed")
+  if (model.iconFor("brightness", 50) !== String.fromCodePoint(0xf0379))
+    throw new Error("icon mapping changed")
+})
+
+test("every icon name keeps its code point", () => {
+  const expected = {
+    "volume-muted": 0xeee8,
+    "volume-mute": 0xeee8,
+    muted: 0xeee8,
+    mute: 0xeee8,
+    "volume-low": 0xf026,
+    "volume-medium": 0xf027,
+    "volume-high": 0xf028,
+    volume: 0xf028,
+    "microphone-muted": 0xf036d,
+    "microphone-off": 0xf036d,
+    "mic-muted": 0xf036d,
+    "mic-off": 0xf036d,
+    microphone: 0xf036c,
+    mic: 0xf036c,
+    keyboard: 0xf030c,
+    brightness: 0xf0379,
+    display: 0xf0379,
+    touchpad: 0xf07f8,
+    touch: 0xf0741,
+    touchscreen: 0xf0741,
+    reboot: 0xf0709,
+    restart: 0xf0709,
+    shutdown: 0xf0425,
+    power: 0xf0425,
+    poweroff: 0xf0425,
+    logout: 0xf0343,
+    "sign-out": 0xf0343,
+    leave: 0xf0343,
+    media: 0xf075a,
+    player: 0xf075a,
+    "media-source": 0xf075a,
+    "player-source": 0xf075a,
+    "media-play": 0xf040a,
+    "player-play": 0xf040a,
+    "media-pause": 0xf03e4,
+    "player-pause": 0xf03e4,
+    "media-next": 0xf04ad,
+    "player-next": 0xf04ad,
+    "media-previous": 0xf04ae,
+    "player-previous": 0xf04ae
+  }
+  Object.keys(expected).forEach((name) => {
+    eq(model.iconFor(name, -1).codePointAt(0), expected[name], `${name} glyph`)
+    eq(model.iconFor(name.toUpperCase(), -1).codePointAt(0), expected[name], `${name} ignores case`)
+  })
+  eq(model.iconFor("", 0).codePointAt(0), 0xeee8, "0% falls back to muted")
+  eq(model.iconFor("", 33).codePointAt(0), 0xf026, "33% falls back to low")
+  eq(model.iconFor("", 66).codePointAt(0), 0xf027, "66% falls back to medium")
+  eq(model.iconFor("", 67).codePointAt(0), 0xf028, "67% falls back to high")
+  eq(model.iconFor("X", 50), "X", "an unknown name is its own glyph")
+})
+
+test("OsdModel.js spells its glyphs as code points, never literal private-use characters", () => {
+  const fs = require("node:fs")
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "..", "plugins/araneadev.osd/OsdModel.js"),
+    "utf8"
+  )
+  eq(/[\uE000-\uF8FF]|[\u{F0000}-\u{10FFFF}]/u.test(source), false, "no literal glyphs")
 })
 
 test("a non-numeric maximum means 100 and never shows NaN%", () => {

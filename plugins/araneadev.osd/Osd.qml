@@ -1,7 +1,8 @@
 // Aranea on-screen display (the araneadev.osd plugin's "panel" entry point,
 // replacing the stock Omarchy OSD): a bottom-centre card with an icon, a
-// filament progress strand and a value or message. Driven through the "osd"
-// IPC target (show/close/state/ping); display rules live in OsdModel.js.
+// filament progress strand (OsdStrand.qml) and a value or message. Driven
+// through the "osd" IPC target (show/close/state/ping); display rules live
+// in OsdModel.js.
 
 import QtQuick
 import Quickshell
@@ -17,7 +18,7 @@ Item {
   // Whether the card is shown; cleared by the hide timer or close().
   property bool opened: false
   // Glyph shown in the icon column.
-  property string icon: ""
+  property string icon: String.fromCodePoint(0xf028)
   // Value text (progress) or message text.
   property string message: ""
   // Progress value, 0..maxValue.
@@ -254,48 +255,13 @@ Item {
           font.pixelSize: Style.font.title
         }
 
-        Item {
+        OsdStrand {
           width: root.strandWidth
           height: Style.space(16)
           anchors.verticalCenter: parent.verticalCenter
-
-          Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            height: Math.max(1, Style.spacing.hairline)
-            color: Util.alpha(Color.popups.text, 0.3)
-          }
-          Rectangle {
-            width: root.hasProgress ? parent.width * root.fraction : parent.width * 0.28
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            height: Math.max(2, Style.spacing.sm)
-            radius: height / 2
-            color: Color.accent
-            Behavior on width {
-              enabled: root.motionEnabled
-              NumberAnimation {
-                duration: 140
-                easing.type: Easing.OutCubic
-              }
-            }
-          }
-          Rectangle {
-            width: Style.space(8)
-            height: width
-            radius: width / 2
-            x: root.hasProgress ? parent.width * root.fraction - width / 2 : parent.width * 0.28 - width / 2
-            anchors.verticalCenter: parent.verticalCenter
-            color: Color.accent
-            Behavior on x {
-              enabled: root.motionEnabled
-              NumberAnimation {
-                duration: 140
-                easing.type: Easing.OutCubic
-              }
-            }
-          }
+          fraction: root.fraction
+          hasProgress: root.hasProgress
+          motionEnabled: root.motionEnabled
         }
 
         Aranea.InkText {

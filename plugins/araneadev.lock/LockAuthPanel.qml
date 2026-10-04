@@ -85,7 +85,7 @@ Item {
     font.family: root.fontFamily
     font.pixelSize: root.passwordDotFontSize
     font.letterSpacing: root.passwordDotLetterSpacing
-    text: "●".repeat(passwordInput.text.length)
+    text: String.fromCodePoint(0x25cf).repeat(passwordInput.text.length)
   }
 
   BorderSurface {
@@ -173,7 +173,7 @@ Item {
       anchors.rightMargin: inputField.borderRight + 18
       anchors.verticalCenter: parent.verticalCenter
       visible: root.fingerprintConfigured
-      text: "󰈷"
+      text: String.fromCodePoint(0xf0237)
       color: root.placeholderColor
       font.family: root.fontFamily
       font.pixelSize: Math.round(root.fieldFontSize * 1.1)

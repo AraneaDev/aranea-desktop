@@ -29,6 +29,7 @@ ShellRoot {
 
   Component.onCompleted: {
     t.equal(lockAuth.failureMessage, "Wrong", "lock auth panels expose failure state")
+    t.equal(t.findChild(lockAuth, "fingerprintIndicator").text, String.fromCodePoint(0xf0237), "the lock keeps its fingerprint glyph")
     t.equal(emojiChrome.selectedName, "smile", "emoji chrome exposes selection label")
     t.equal(polkitCard.currentPrompt, "Password", "polkit cards expose prompt state")
     t.equal(polkitCard.currentMessage, "Authentication required for pkexec", "polkit cards expose request state")

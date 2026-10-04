@@ -69,13 +69,18 @@ service contracts to the feature plugins.
   optional `markSource` (an image url, e.g. the Agents tool logo) replaces
   the glyph once it loads; empty or failing, the glyph shows as before.
 - `CredentialPrompt` is the inline credential prompt (Network's passphrase,
-  VPN's password and 2FA code): an accent-to-violet frame around `fields`
-  (`{key, label, placeholder, secret, readOnly, optional, hidden, value}`)
+  VPN's password and 2FA code, the Polkit password): an accent-to-violet
+  frame around `fields` (`{key, label, placeholder, secret, readOnly,
+optional, hidden, value, glyph}`)
   and a check-glyph connect button. Opening focuses the first editable
   field; Enter moves on and `submit`s from the last; Esc `cancel`s; typing
   emits `edited(key, text)`; the button emits `connectClicked`, settled
   through an optional `pointerGate`. `busy`/`failed` show `busyText` /
-  `failedText` instead of the fields. Its Repeater counts fields, so a
+  `failedText` instead of the fields; with `inlineStatus` (Polkit) they show
+  on the fields instead: busy pulses them read-only, failed turns them
+  urgent with `failedText` as the placeholder. `connectShown: false` hides
+  the button, `clearFields()` empties the fields, and keys other than
+  Enter/Esc reach `unhandledKey(event)`. Its Repeater counts fields, so a
   host echoing typed values back never rebuilds a field.
 - `LinkGraph` is the 60 s receive/send `Canvas` trace for a link's
   throughput, shared by the Network and VPN dropdowns. It draws

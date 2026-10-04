@@ -17,6 +17,8 @@ PanelWindow {
 
   // The polkit entry (PolkitAgent.qml) this window draws; set at creation.
   required property var root
+  // When the card last moved or resized (Date.now()), settling DETAILS clicks.
+  property real layoutChangedAt: 0
   // Never wider than the screen (minus gaps), even on a very narrow one.
   readonly property int cardWidth: Math.max(Style.space(120), Math.min(Style.space(380), panel.width - Style.gapsOut * 2))
 
@@ -168,6 +170,8 @@ PanelWindow {
     contentPadding: panel.root.contentMargin
     clipContent: true  // content never spills past the card on very short screens
     clip: true
+    onHeightChanged: panel.layoutChangedAt = Date.now()
+    onXChanged: panel.layoutChangedAt = Date.now()
 
     MouseArea {
       anchors.fill: parent
@@ -212,18 +216,22 @@ PanelWindow {
         dim: panel.root.dim
         accent: panel.root.accent
         letterSpacing: panel.root.letterSpacing
+        openedAt: panel.root.requestStartedAt
+        layoutChangedAt: panel.layoutChangedAt
         onDetailsToggled: panel.root.toggleDetails()
         onKeyPressed: function (event) {
           panel.root.handleKey(event)
         }
       }
 
-      // Password field (or the sensor in fingerprint mode).
+      // Password field (the shared credential prompt), or the sensor in
+      // fingerprint mode.
       PolkitAuthField {
         id: authField
+        Layout.fillWidth: true
+        Layout.preferredHeight: authField.implicitHeight
         fingerprintMode: panel.root.fingerprintMode
         fieldHeight: panel.root.fieldHeight
-        cornerRadius: panel.root.cornerRadius
         foreground: panel.root.foreground
         accent: panel.root.accent
         errorColor: Color.polkit.textError
@@ -231,10 +239,11 @@ PanelWindow {
         responseVisible: panel.root.responseVisible
         submitted: panel.root.submitted
         dialogVisible: panel.root.dialogVisible
-        currentPrompt: panel.root.currentPrompt
         placeholderText: PolkitLogic.promptPlaceholder(panel.root.currentPrompt)
         fontFamily: panel.root.fontFamily
         letterSpacing: panel.root.letterSpacing
+        onAuthorize: panel.root.authorize()
+        onCancel: panel.root.cancelRequest()
         onKeyPressed: function (event) {
           panel.root.handleKey(event)
         }
