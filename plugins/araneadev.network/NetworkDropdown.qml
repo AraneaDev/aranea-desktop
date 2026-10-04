@@ -214,6 +214,10 @@ Column {
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
 
+    Aranea.HoverTint {
+      z: -1
+      pointerGate: dropdown.pointerGate
+    }
     // Pointer only: opening the VPN dropdown isn't part of the keyboard
     // chain, so this draws no cursor outline and takes no keyboard focus.
     MouseArea {

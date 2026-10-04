@@ -504,11 +504,11 @@ function keyHint(section, kbdMode) {
     section === "monitors" ||
     (section === "kbdlight" && kbdMode === "switch")
   )
-    return "↑↓ move · enter toggle · tab next"
-  if (section === "scale") return "↑↓ move · ←→ pick · tab next"
+    return "↑↓ move · enter toggle"
+  if (section === "scale") return "↑↓ move · ←→ pick · enter set"
   if (section === "brightness" || section === "kbdlight" || section === "textsize")
-    return "↑↓ move · ←→ adjust · tab next"
-  return "esc close · tab next"
+    return "↑↓ move · ←→ adjust"
+  return "esc close"
 }
 
 if (typeof module !== "undefined")

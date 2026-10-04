@@ -20,7 +20,9 @@
 // araneadev.vpn can reuse them: a cursor follows the row key it was put on
 // (never its position), a lost or evacuated key is refused rather than
 // retargeted, and a pointer action only ever lands on the row it names. No
-// QML, no I/O; tests/js/cursor-logic.test.js runs this under Node.
+// QML, no I/O; tests/js/cursor-logic.test.js runs this under Node. The
+// keyed helpers (keyIndex, keyStep, keyedMove, keyedPress, keyedOutline)
+// are Health's and Workspaces' dropdown cursors, keyed by a host function.
 
 /**
  * The index a list cursor should sit on after its rows changed: the row
@@ -62,6 +64,28 @@ function followCursor(rows, key, index) {
   var row = next >= 0 ? list[next] : null
   var confirmed = chosen !== null && !!row && row.key === chosen
   return { index: next, key: confirmed ? chosen : "", confirmed: confirmed }
+}
+
+/**
+ * followCursor for a cursor that may be showing its outline: when the row
+ * whose key the cursor held is gone, the outline hides too (`keyboard`
+ * false), so it never marks a row Enter would refuse. The next key only
+ * reveals the cursor again, where it now sits, and a later Enter acts.
+ * @param {Array<{key: string}|null|undefined>|undefined} rows - the new rows
+ * @param {string|null|undefined} key - the key the cursor was deliberately put on, or ""
+ * @param {number} index - the cursor's index before the change
+ * @param {boolean} keyboard - whether the keyboard shows the outline
+ * @returns {{index: number, key: string, confirmed: boolean, keyboard: boolean}} followCursor's answer and whether the outline still shows
+ */
+function followShown(rows, key, index, keyboard) {
+  var next = followCursor(rows, key, index)
+  var lost = typeof key === "string" && key !== "" && !next.confirmed
+  return {
+    index: next.index,
+    key: next.key,
+    confirmed: next.confirmed,
+    keyboard: !!keyboard && !lost
+  }
 }
 
 /**
@@ -149,15 +173,110 @@ function afterRemoval(stops, removedKey, lastIndex) {
   return { index: idx, key: stop && typeof stop.key === "string" ? stop.key : "" }
 }
 
+/**
+ * Position of the row whose `keyOf(row)` is `key`. The keyed-cursor helpers
+ * below (keyStep, keyedMove, keyedPress, keyedOutline) follow a cursor by
+ * the row key a host's `keyOf` gives (Health's problemKey, Workspaces'
+ * workspaceKey), never by position.
+ * @param {*} rows - the dropdown rows (anything but an array counts as none)
+ * @param {string} key - the row key, or ""
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {number} its index, or -1 (always for an empty key)
+ */
+function keyIndex(rows, key, keyOf) {
+  if (!key) return -1
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) if (keyOf(list[i]) === key) return i
+  return -1
+}
+
+/**
+ * Key of the row `delta` steps from the row with this key, wrapping; the
+ * first (delta > 0) or last row when the key is empty or gone.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the current cursor key, or ""
+ * @param {number} delta - rows to move (sign matters)
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {string} the new cursor key, or "" when there are no rows
+ */
+function keyStep(rows, key, delta, keyOf) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return ""
+  var i = keyIndex(list, key, keyOf)
+  if (i < 0) return keyOf(list[delta < 0 ? list.length - 1 : 0])
+  return keyOf(list[(i + delta + list.length) % list.length])
+}
+
+/**
+ * The cursor after an up or down key. Dropdowns are reveal-first: the first
+ * key after opening or after pointer use (keyboard false) only reveals the
+ * cursor, on the row the pointer left it on, else the first (dy > 0) or
+ * last row. Later keys move it, wrapping.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {number} dy - rows to move (sign matters); 0 does nothing
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {{key: string, keyboard: boolean}} the new cursor key and mode
+ */
+function keyedMove(rows, key, keyboard, dy, keyOf) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0 || !dy) return { key: key, keyboard: keyboard }
+  if (!keyboard)
+    return {
+      key: keyIndex(list, key, keyOf) >= 0 ? key : keyStep(list, "", dy, keyOf),
+      keyboard: true
+    }
+  return { key: keyStep(list, key, dy, keyOf), keyboard: true }
+}
+
+/**
+ * What Enter or Space does on a keyed list. Like an arrow, it first only
+ * reveals a cursor the keyboard is not showing: on its row when that is
+ * still shown, else on the first row. Only on a shown cursor's row does it
+ * hand that row back to act on. With no rows it does nothing.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {{key: string, keyboard: boolean, row: ?object}} the cursor key, the new mode and the row to act on, or null
+ */
+function keyedPress(rows, key, keyboard, keyOf) {
+  var list = Array.isArray(rows) ? rows : []
+  var i = keyIndex(list, key, keyOf)
+  if (pressIntent(i >= 0, keyboard) === "act") return { key: key, keyboard: true, row: list[i] }
+  if (list.length === 0) return { key: key, keyboard: keyboard, row: null }
+  return { key: i >= 0 ? key : keyOf(list[0]), keyboard: true, row: null }
+}
+
+/**
+ * The row the mint outline is drawn on: the cursor's, only while the
+ * keyboard drives it.
+ * @param {*} rows - the dropdown rows
+ * @param {string} key - the cursor's key, or ""
+ * @param {boolean} keyboard - whether the keyboard is showing the cursor
+ * @param {(row: any) => string} keyOf - a row's key
+ * @returns {number} the row index, or -1 for no outline
+ */
+function keyedOutline(rows, key, keyboard, keyOf) {
+  return keyboard ? keyIndex(rows, key, keyOf) : -1
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     reselectIndex: reselectIndex,
     followCursor: followCursor,
+    followShown: followShown,
     cursorConfirmed: cursorConfirmed,
     pressIntent: pressIntent,
     keepRows: keepRows,
     rowKeyMatches: rowKeyMatches,
-    afterRemoval: afterRemoval
+    afterRemoval: afterRemoval,
+    keyIndex: keyIndex,
+    keyStep: keyStep,
+    keyedMove: keyedMove,
+    keyedPress: keyedPress,
+    keyedOutline: keyedOutline
   }
 /* @aranea-facade-end */
 
@@ -610,8 +729,8 @@ function keyTargetConfirmed(target) {
 /**
  * The choice a fresh open makes: stock's open handler puts the Wi-Fi cursor
  * on row 0, a deliberate placement, so that row (and its section) count as
- * chosen. With no Wi-Fi rows nothing is chosen. (A keyboard reveal, by
- * contrast, never chooses: see pressOutcome.)
+ * chosen. With no Wi-Fi rows nothing is chosen until a move, a click or a
+ * keyboard reveal (revealTarget).
  * @param {Array<{key: string}|null|undefined>|undefined} wifiRows - the Wi-Fi rows at open
  * @returns {{chosen: string, key: string}} the chosen section ("wifi" or "") and row 0's key
  */
@@ -636,9 +755,8 @@ function savedEmptyFallback(wifiCount) {
 
 /**
  * What Enter or `x` does to the cursor's target. Before any cursor exists
- * it's ignored; on a cursor the keyboard isn't showing it only reveals the
- * outline, which never changes the chosen section or key (a reveal is not
- * a choice: the row that slid into a lost key's place stays unchosen);
+ * or on a cursor the keyboard isn't showing it only reveals the outline
+ * (`ignore` or `reveal`; the host reveals either way, see `revealTarget`);
  * otherwise it acts only when `keyTargetConfirmed`, else it's refused. The
  * ignore/reveal/act split is the generated `pressIntent`, shared with
  * `araneadev.shared/CursorLogic.js` via `tools/js-facade-generator.mjs`.
@@ -651,6 +769,29 @@ function pressOutcome(target, cursorActive, keyboardCursor) {
   var intent = pressIntent(cursorActive, keyboardCursor)
   if (intent !== "act") return intent
   return keyTargetConfirmed(target) ? "act" : "refuse"
+}
+
+/**
+ * The choice a keyboard reveal makes: the outline marks Enter's target, so
+ * revealing it chooses the cursor's section and adopts the key of the row
+ * (or band control) it now shows. Only the next Enter, on the visible
+ * outline, acts, so joining a network still takes a deliberate second key.
+ * @param {{section: string, chosen?: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key?: string, index?: number}|null|undefined} target - the cursor's target, as for keyTargetConfirmed
+ * @returns {{section: string, chosen: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key: string, index?: number}} the target as the reveal leaves it
+ */
+function revealTarget(target) {
+  var t = target || { section: "" }
+  var rows = Array.isArray(t.rows) ? t.rows : []
+  var row = rows[Math.floor(Number(t.index))]
+  var key = !t.fixed && row && typeof row.key === "string" ? row.key : ""
+  return {
+    section: t.section,
+    chosen: t.section || "",
+    fixed: t.fixed,
+    rows: t.rows,
+    key: key,
+    index: t.index
+  }
 }
 
 /**
@@ -729,10 +870,10 @@ function savedStatusMap(forgettingUuid, failedUuid) {
  * @returns {string} the hint
  */
 function keyHint(section) {
-  if (section === "saved") return "↑↓ move · enter/→ select forget · x forget · tab next"
+  if (section === "saved") return "↑↓ move · enter/→ select forget · x forget"
   if (section === "header" || section === "band" || section === "dns")
-    return "↑↓ move · ←→ pick · enter apply · tab next"
-  return "↑↓ move · ←→ pick · enter connect · x forget · tab next"
+    return "↑↓ move · ←→ pick · enter apply"
+  return "↑↓ move · ←→ pick · enter toggle · x forget"
 }
 
 /**
@@ -765,6 +906,7 @@ if (typeof module !== "undefined")
     keyTargetConfirmed: keyTargetConfirmed,
     openChoice: openChoice,
     pressOutcome: pressOutcome,
+    revealTarget: revealTarget,
     sidewaysChooses: sidewaysChooses,
     extrasExitFollowUp: extrasExitFollowUp,
     savedStatusMap: savedStatusMap,

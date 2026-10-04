@@ -22,3 +22,11 @@ if grep -Eq 'mediaOsd|iconKey' "$repo_root/plugins/araneadev.osd/Osd.qml"; then
   echo "unused mediaOsd/iconKey are back" >&2
   exit 1
 fi
+
+# --- consistency pass 4: glyphs are code points, never literal private-use characters
+glyph_status=0
+LC_ALL=C.UTF-8 grep -P '[\x{E000}-\x{F8FF}\x{F0000}-\x{10FFFF}]' "$repo_root/plugins/araneadev.osd/"*.qml "$repo_root/plugins/araneadev.osd/"*.js || glyph_status=$?
+if [[ "$glyph_status" -ne 1 ]]; then
+  echo "spell OSD glyphs with String.fromCodePoint" >&2
+  exit 1
+fi

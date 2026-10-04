@@ -12,7 +12,9 @@
 
 `PolkitAgent.qml` and `PolkitAgentService.qml` own service registration and
 request lifecycle. `PolkitWindow.qml` owns the window. `PolkitPromptCard.qml`
-composes the shared `BrandHeader`, details, and authentication field.
+composes the shared `BrandHeader` and details. `PolkitAuthField.qml` is the
+shared `CredentialPrompt` (inline status: busy pulse while checking, "Wrong"
+on failure) or the fingerprint sensor prompt.
 
 ## Logic boundaries
 

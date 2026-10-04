@@ -495,10 +495,26 @@ test("the keyboard cursor: the first key only reveals", () => {
 
 test("Enter reveals before it opens, and only a keyed row", () => {
   const rows = [{ key: "disk:/" }, { key: "reboot" }]
-  deepEq(h.cursorPress(rows, "", false), { keyboard: false, row: null }, "no cursor: nothing")
-  deepEq(h.cursorPress(rows, "gone", true), { keyboard: true, row: null }, "a lost key: nothing")
-  deepEq(h.cursorPress(rows, "reboot", false), { keyboard: true, row: null }, "hover: reveal")
+  deepEq(
+    h.cursorPress(rows, "", false),
+    { key: h.problemKey(rows[0]), keyboard: true, row: null },
+    "no cursor: reveal on the first row"
+  )
+  deepEq(
+    h.cursorPress(rows, "gone", true),
+    { key: h.problemKey(rows[0]), keyboard: true, row: null },
+    "a lost key: reveal on the first row"
+  )
+  deepEq(
+    h.cursorPress(rows, "reboot", false),
+    { key: "reboot", keyboard: true, row: null },
+    "a hidden cursor: reveal in place"
+  )
   eq(h.cursorPress(rows, "reboot", true).row, rows[1], "keyboard: open")
   eq(h.outlineIndex(rows, "reboot", true), 1, "the outline follows the keyboard")
   eq(h.outlineIndex(rows, "reboot", false), -1, "never the pointer")
+})
+
+test("keyHint names Enter's open", () => {
+  eq(h.keyHint(), "↑↓ move · enter open", "the hint")
 })

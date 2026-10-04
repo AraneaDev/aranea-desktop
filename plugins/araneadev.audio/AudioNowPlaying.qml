@@ -141,6 +141,12 @@ Column {
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
             font.family: Style.font.family
             font.pixelSize: Style.font.body
+            Aranea.HoverTint {
+              z: -1
+              anchors.margins: -Style.space(3)
+              active: strip.info.canPrevious
+              pointerGate: strip.pointerGate
+            }
             MouseArea {
               objectName: "previousButton"
               anchors.fill: parent
@@ -156,6 +162,11 @@ Column {
             color: Aranea.DesignTokens.accent
             font.family: Style.font.family
             font.pixelSize: Style.font.body
+            Aranea.HoverTint {
+              z: -1
+              anchors.margins: -Style.space(3)
+              pointerGate: strip.pointerGate
+            }
             MouseArea {
               objectName: "playPauseButton"
               anchors.fill: parent
@@ -171,6 +182,12 @@ Column {
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
             font.family: Style.font.family
             font.pixelSize: Style.font.body
+            Aranea.HoverTint {
+              z: -1
+              anchors.margins: -Style.space(3)
+              active: strip.info.canNext
+              pointerGate: strip.pointerGate
+            }
             MouseArea {
               objectName: "nextButton"
               anchors.fill: parent

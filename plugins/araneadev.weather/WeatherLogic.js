@@ -954,6 +954,31 @@ function saveEnds(saving, queryStarted, saveRunning) {
   return !!saving && !!queryStarted && !saveRunning
 }
 
+/**
+ * The key-hint line: the place field's keys while editing, else what Enter
+ * does on the cursor's label (edit the place, or refresh).
+ * @param {boolean} editing - whether the place field is open
+ * @param {string|undefined} section - the cursor's control ("place", "refresh" or "clear")
+ * @returns {string} the hint
+ */
+function keyHint(editing, section) {
+  if (editing) return "↑↓ pick · enter save · esc cancel"
+  if (section === "refresh") return "↑↓ move · enter refresh · e edit place"
+  return "↑↓ move · enter edit place · r refresh"
+}
+
+/**
+ * The controls the keyboard cursor walks, in order: the place label, which
+ * always shows (the edit glyph alone before a place is known), so Enter and
+ * the outline agree even with no place and no fetch; then the updated
+ * label once a forecast has been fetched.
+ * @param {number} fetchedAtMs - when the forecast was last fetched, 0 for never
+ * @returns {Array<string>} the stops
+ */
+function cursorSections(fetchedAtMs) {
+  return Number(fetchedAtMs) > 0 ? ["place", "refresh"] : ["place"]
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     buildForecastUrl: buildForecastUrl,
@@ -987,5 +1012,7 @@ if (typeof module !== "undefined")
     detailCells: detailCells,
     sharedBundle: sharedBundle,
     refreshPlan: refreshPlan,
-    saveEnds: saveEnds
+    saveEnds: saveEnds,
+    keyHint: keyHint,
+    cursorSections: cursorSections
   }

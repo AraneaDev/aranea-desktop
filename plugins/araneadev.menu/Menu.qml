@@ -123,9 +123,9 @@ Item {
         if (root.mode === "input")
           root.applyDmenuSelection(root.filterText)
         else if (displayModel.count > 0)
-          root.activateIndex(root.cursorActive ? root.selectedIndex : 0, false)
+          root.activateIndex(root.cursorActive ? root.selectedIndex : 0)
       } else if (root.cursorActive)
-        root.activateIndex(root.selectedIndex, false)
+        root.activateIndex(root.selectedIndex)
       else if (displayModel.count > 0)
         root.cursorActive = true
       event.accepted = true
@@ -204,8 +204,13 @@ Item {
   property string filterText: ""
   // Index of the cursor row in displayModel.
   property int selectedIndex: 0
-  // Whether the cursor row is highlighted and Enter activates it.
+  // Whether the cursor row is live: Enter activates it (the top row on
+  // open and after typing, so type-then-Enter launches the top match).
   property bool cursorActive: false
+  // Whether the mint outline is drawn on the cursor row: whenever Enter has
+  // a target (from open, after typing, after a click into a submenu), and
+  // never on the empty state. Hover never moves it.
+  readonly property bool outlineShown: root.cursorActive && displayModel.count > 0
   // Bumped on every open; compared with applySerial when a result write finishes.
   property int requestSerial: 0
   // requestSerial at the time a selection was applied.
@@ -305,6 +310,14 @@ Item {
   property bool searchDivider: false
   // Bumped after each display rebuild so row-height bindings recompute.
   property int layoutSerial: 0
+  // When the rows last changed under a still pointer (Date.now()), 0 for
+  // never: the shown item ids changing, the menu opening or the root
+  // header showing or hiding. Pointer clicks within 300 ms of it are
+  // refused unless the pointer really moved onto the row (ClickSettle).
+  property real layoutChangedAt: 0
+  // The shown item ids joined, so an equal rebuild (a guard or provider
+  // refresh) does not stamp the layout.
+  property string displayKeys: ""
   // Card width: depends on mode and menu, capped to the screen.
   property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), root.screenWidth - Style.gapsOut * 2)
   // Height given to the row list for the current rows.
@@ -330,9 +343,35 @@ Item {
       root.opened = false
   }
 
-  // Ends a display rebuild: bumps layoutSerial, keeps the cursor in range and reveals it.
+  // Stamps layoutChangedAt: the rows moved or changed under the pointer.
+  function noteLayoutChange(): void {
+    root.layoutChangedAt = Date.now()
+  }
+
+  // Replaces the shown rows with ROWS in place: rows that stay keep their
+  // delegates (set), so a rebuild never recreates rows under the pointer.
+  function syncRows(rows: var): void {
+    var keep = Math.min(displayModel.count, rows.length)
+    for (var i = 0; i < keep; i++)
+      displayModel.set(i, rows[i])
+    if (displayModel.count > rows.length)
+      displayModel.remove(rows.length, displayModel.count - rows.length)
+    for (var j = keep; j < rows.length; j++)
+      displayModel.append(rows[j])
+  }
+
+  // Ends a display rebuild: bumps layoutSerial, stamps the layout when the
+  // shown ids changed, keeps the cursor in range and reveals it.
   function finishDisplayRebuild(): void {
     layoutSerial += 1
+    var keys = []
+    for (var k = 0; k < displayModel.count; k++)
+      keys.push(displayModel.get(k).itemId)
+    var joined = keys.join("\n")
+    if (joined !== root.displayKeys) {
+      root.displayKeys = joined
+      root.noteLayoutChange()
+    }
     if (displayModel.count === 0)
       selectedIndex = 0
     else if (selectedIndex >= displayModel.count)
@@ -500,13 +539,8 @@ Item {
 
   // Refills displayModel with the dmenu options that match the filter.
   function rebuildDmenuDisplay(): void {
-    displayModel.clear()
     root.searchDivider = false
-    if (root.mode !== "input") {
-      var rows = dmenuRequest.rowsFor(root.filterText)
-      for (var i = 0; i < rows.length; i++)
-        displayModel.append(rows[i])
-    }
+    root.syncRows(root.mode !== "input" ? dmenuRequest.rowsFor(root.filterText) : [])
     root.finishDisplayRebuild()
   }
 
@@ -517,10 +551,10 @@ Item {
       return
     }
 
-    displayModel.clear()
-
-    if (!root.rowsLoaded)
+    if (!root.rowsLoaded) {
+      root.syncRows([])
       return
+    }
     var active = root.item(root.activeMenu) ? root.activeMenu : "root"
     root.activeMenu = active
     var rows = []
@@ -589,8 +623,7 @@ Item {
         rows = MenuModel.sortAppsMenu(rows)
     }
 
-    for (var k = 0; k < rows.length; k++)
-      displayModel.append(rows[k])
+    root.syncRows(rows)
     root.finishDisplayRebuild()
   }
 
@@ -620,8 +653,10 @@ Item {
     root.rebuildDisplay()
   }
 
-  // Shows submenu `id` (root if unknown), optionally pushing the current one onto navStack.
-  function setActiveMenu(id: string, pushHistory: bool, fromPointer: bool): void {
+  // Shows submenu `id` (root if unknown), optionally pushing the current one
+  // onto navStack. The pointer is disarmed either way: the new rows under a
+  // still pointer take neither hover nor a click until it really moves.
+  function setActiveMenu(id: string, pushHistory: bool): void {
     root.freezeCardTop()
     if (!root.item(id))
       id = "root"
@@ -631,10 +666,7 @@ Item {
     root.filterText = ""
     root.selectedIndex = 0
     root.cursorActive = true
-    if (fromPointer && root.view)
-      root.view.allowInitialPointerSample()
-    else if (!fromPointer)
-      root.disarmPointer()
+    root.disarmPointer()
     root.rebuildDisplay()
     providers.invalidateVolatile(id)
     providers.load(id)
@@ -648,17 +680,17 @@ Item {
     if (root.navStack.length > 0) {
       var previous = root.navStack[root.navStack.length - 1]
       root.navStack = root.navStack.slice(0, root.navStack.length - 1)
-      root.setActiveMenu(previous, false, false)
+      root.setActiveMenu(previous, false)
       return true
     }
 
     var active = root.item(root.activeMenu)
-    root.setActiveMenu((active && active.parent) ? active.parent : "root", false, false)
+    root.setActiveMenu((active && active.parent) ? active.parent : "root", false)
     return true
   }
 
   // Activates row `index`: open a submenu, launch an app, run an action, or answer a dmenu request.
-  function activateIndex(index: int, fromPointer: bool): void {
+  function activateIndex(index: int): void {
     if (history.deleteConfirmOpen)
       return
     if (root.dmenuActive) {
@@ -677,7 +709,7 @@ Item {
       return
     var row = displayModel.get(index)
     if (row.kind === "menu" || row.kind === "link") {
-      root.setActiveMenu(row.target || row.itemId, true, fromPointer)
+      root.setActiveMenu(row.target || row.itemId, true)
     } else if (row.kind === "app") {
       var appId = row.appId
       var label = row.label
@@ -853,19 +885,32 @@ Item {
     root.openExistingMenu(root.item(route) ? route : "apps")
   }
 
-  // Ignores the pointer until it actually moves, so a still mouse cannot steal the cursor.
+  // Ignores the pointer until it actually moves, so a still mouse can
+  // neither tint a tile nor settle a click on rows that moved under it.
   function disarmPointer() {
     if (root.view)
       root.view.disarmPointer()
   }
 
-  // Moves the cursor to row `index` when the pointer has really moved over it.
-  function selectFromPointer(index, item, mouse) {
-    if (!root.view || !root.view.pointerMoved(item, mouse))
-      return
+  // A pointer click on row INDEX, pressed while it held KEY (its item id):
+  // moves the cursor there and activates it. Refused (false) when the row
+  // no longer holds KEY, so a click never lands on a row that changed
+  // between press and release. Hover never moves the cursor; only the
+  // keyboard and a click do.
+  function activateKey(index: int, key: string): bool {
+    if (!key || index < 0 || index >= displayModel.count || displayModel.get(index).itemId !== key)
+      return false
     root.cursorActive = true
     root.selectedIndex = index
+    root.activateIndex(index)
+    return true
   }
+
+  // Opening the menu or showing/hiding the root header moves the rows
+  // under a still pointer.
+  onOpenedChanged: if (root.opened)
+    root.noteLayoutChange()
+  onFullRootHeaderChanged: root.noteLayoutChange()
 
   Connections {
     target: DesktopEntries.applications

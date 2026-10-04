@@ -329,3 +329,12 @@ test("showcaseNowPlaying shows the stand-in track, even without a real player", 
     canNext: true
   })
 })
+
+test("keyHint names Enter's action on each stop", () => {
+  assert.equal(logic.keyHint("header", -1), "↑↓ move · enter mute all")
+  assert.equal(logic.keyHint("nowplaying", 0), "↑↓ move · enter play/pause")
+  assert.equal(logic.keyHint("output", 1), "↑↓ move · enter use · ←→ adjust · m mute")
+  assert.equal(logic.keyHint("input", 0), "↑↓ move · enter use · ←→ adjust · m mute")
+  assert.equal(logic.keyHint("output", -1), "↑↓ move · ←→ adjust · enter/m mute")
+  assert.equal(logic.keyHint("streams", 0), "↑↓ move · ←→ adjust · enter/m mute")
+})

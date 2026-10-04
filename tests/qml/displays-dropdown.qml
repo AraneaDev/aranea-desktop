@@ -109,7 +109,7 @@ ShellRoot {
       displays: o.displays || displayRows,
       scaleCaption: o.scaleCaption || "",
       cursor: cursor,
-      keyHint: "↑↓ move · ←→ adjust · tab next"
+      keyHint: "↑↓ move · ←→ adjust"
     }
   }
 
@@ -310,8 +310,9 @@ ShellRoot {
           return r.label
         }), ["eDP-1", "DP-2"], "a row per display")
         t.check(rowsOf(full)[0].active && !rowsOf(full)[1].active, "an enabled display's node is lit")
+        t.check(t.findChild(rowsOf(full)[0], "selectedFill").visible && !t.findChild(rowsOf(full)[1], "selectedFill").visible, "a display in use carries the selected highlight")
         t.check(switchesOf(full)[0].checked && !switchesOf(full)[1].checked, "the switches follow enabledDisplays")
-        t.equal(one(full, "keyHint").text, "↑↓ move · ←→ adjust · tab next", "the key hint is the view's")
+        t.equal(one(full, "keyHint").text, "↑↓ move · ←→ adjust", "the key hint is the view's")
 
         t.check(!one(bare, "brightnessSection").visible, "no backlight hides brightness")
         t.check(!one(bare, "nightlightRow").visible, "night light hides")

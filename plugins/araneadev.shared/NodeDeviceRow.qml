@@ -9,9 +9,16 @@
 // pointer has really moved over it since (through pointerGate): a Repeater
 // rebuild or a section growing can put this row under a pointer that was
 // aimed at another.
+// Three separate looks: the selected highlight (an accent fill and a left
+// marker) on the current item (the default device, the connected network,
+// the current workspace); the hover fill, only after a real pointer move
+// (pointerGate, else the row's own gate), cleared when the row is left or
+// the dropdown's layout shifts; and the mint keyboard outline (hasCursor).
+// Hover never moves the outline.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
+import qs.Ui
 import "ClickSettle.js" as ClickSettle
 
 Item {
@@ -32,6 +39,13 @@ Item {
   property color nodeColor: DesignTokens.accent
   // Whether the device can be chosen.
   property bool available: true
+  // Whether this is the selected or current item: draws the selected
+  // highlight. A host sets it; it is independent of the lit node (Health
+  // lights every problem's node and selects none).
+  property bool selected: false
+  // Whether the row is clickable at all: false (an informational row)
+  // draws no hover fill and keeps the arrow cursor.
+  property bool interactive: true
   // Whether the keyboard cursor is on this row.
   property bool hasCursor: false
   // Whether a background operation (pairing, connecting) is in progress:
@@ -59,6 +73,15 @@ Item {
   // When the gate last accepted a real pointer move over this row
   // (Date.now()), 0 for never.
   property real pointerMovedAt: 0
+  // Whether the pointer really moved onto the row (gated) and is still
+  // over it, with the layout unchanged since.
+  property bool pointerHovered: false
+  // Whether the hover fill shows: a real move onto a clickable, available row.
+  readonly property bool hoverLit: pointerHovered && interactive && available
+  // The gate the hover fill uses: the dropdown's, else the row's own.
+  readonly property var hoverGate: pointerGate || ownGate
+  // The dropdown's last layout shift; a change drops the hover fill.
+  readonly property real layoutStamp: pointerGate ? Number(pointerGate.layoutChangedAt) || 0 : 0
 
   // Emitted when an available row is clicked or activated.
   signal chosen
@@ -87,7 +110,38 @@ Item {
   implicitHeight: Style.space(30)
   opacity: available ? 1 : 0.45
   Component.onCompleted: createdAt = Date.now()
+  onLayoutStampChanged: row.pointerHovered = false
 
+  // The row's own gate when the dropdown passes none, measuring in
+  // window coordinates so content moving under a still pointer is no move.
+  PointerMoveGate {
+    id: ownGate
+    referenceItem: row.Window.contentItem
+  }
+  Rectangle {
+    // The selected highlight's fill.
+    objectName: "selectedFill"
+    anchors.fill: parent
+    color: DesignTokens.selectedFill
+    visible: row.selected
+  }
+  Rectangle {
+    // The selected highlight's left marker.
+    objectName: "selectedMarker"
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    width: DesignTokens.selectedMarkerWidth
+    color: DesignTokens.accent
+    visible: row.selected
+  }
+  Rectangle {
+    // The hover fill.
+    objectName: "hoverFill"
+    anchors.fill: parent
+    color: DesignTokens.hoverFill
+    visible: row.hoverLit
+  }
   Rectangle {
     // The keyboard cursor outline.
     objectName: "cursorOutline"
@@ -202,11 +256,19 @@ Item {
     id: rowMouse
     anchors.fill: parent
     hoverEnabled: true
-    cursorShape: row.available ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onContainsMouseChanged: if (containsMouse && !row.pointerGate)
-      row.entered()
+    cursorShape: row.available && row.interactive ? Qt.PointingHandCursor : Qt.ArrowCursor
+    onContainsMouseChanged: {
+      if (!containsMouse) {
+        row.pointerHovered = false
+        ownGate.reset()
+      } else if (!row.pointerGate)
+        row.entered()
+    }
     onPositionChanged: function (mouse) {
-      if (row.pointerGate && row.pointerGate.moved(rowMouse, mouse)) {
+      if (!row.hoverGate.moved(rowMouse, mouse))
+        return
+      row.pointerHovered = true
+      if (row.pointerGate) {
         row.pointerMovedAt = Date.now()
         row.entered()
       }

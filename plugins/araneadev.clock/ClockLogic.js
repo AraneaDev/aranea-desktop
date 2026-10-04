@@ -510,8 +510,18 @@ function firstOpen(items) {
   return null
 }
 
+/**
+ * The key-hint line. The calendar has no cursor, so Enter does nothing and
+ * the hint names none.
+ * @returns {string} the hint
+ */
+function keyHint() {
+  return "←→ month · ↑↓ year · t today"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    keyHint: keyHint,
     sunTimes: sunTimes,
     formatClock: formatClock,
     daylightText: daylightText,

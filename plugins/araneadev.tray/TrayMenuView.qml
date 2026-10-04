@@ -9,7 +9,8 @@
 //
 // The keyboard cursor outline shows only while view.cursor.active, never on
 // hover; hover goes through a PointerMoveGate only, and only onto rows that
-// can be activated. Rows are keyed by the DBus entry id plus label and are
+// can be activated, where it draws the row's fill. A lit check or radio
+// entry carries the selected highlight. Rows are keyed by the DBus entry id plus label and are
 // never rebuilt for a cursor change (the Repeater's model is the row
 // count). The rows' keys changing (an equal list does not), the depth
 // changing, the menu emptying or filling and the list scrolling stamp
@@ -197,6 +198,9 @@ Column {
       visible: menu.depth > 0
       anchors.fill: parent
 
+      Aranea.HoverTint {
+        pointerGate: gate
+      }
       Text {
         id: crumbBack
         objectName: "crumbBack"
@@ -305,6 +309,18 @@ Column {
           opacity: !row.isSeparator && row.entry.enabled === false ? 0.45 : 1
           Component.onCompleted: row.createdAt = Date.now()
 
+          Rectangle {
+            // The selected highlight: a lit check or radio entry is a
+            // current choice.
+            objectName: "selectedFill"
+            anchors.fill: parent
+            color: Aranea.DesignTokens.selectedFill
+            visible: !row.isSeparator && !!row.entry.markOn
+          }
+          Aranea.HoverTint {
+            active: row.selectable
+            pointerGate: gate
+          }
           Rectangle {
             // The keyboard cursor outline.
             objectName: "cursorOutline"

@@ -1,9 +1,10 @@
 // Choice pill in the Filament style (the network dropdown's band and DNS
 // rows): a thin muted border and muted text, or, when selected, an accent
-// border, full text and a 2 px accent underline (selectedColor swaps the
-// accent for another token, e.g. the tray's violet Hidden pill). The
-// keyboard cursor draws the same mint outline as NodeDeviceRow; pointer
-// hover never draws one.
+// border, full text, a 2 px accent underline and the selected fill
+// (selectedColor swaps the accent for another token, e.g. the tray's violet
+// Hidden pill). The keyboard cursor draws the same mint outline as
+// NodeDeviceRow; pointer hover never draws one, only the hover fill, and
+// only after a real pointer move (pointerGate, else the pill's own gate).
 // A busy pill breathes like a busy NodeDeviceRow marker. A pill sitting on
 // a row a Repeater can rebuild under a still pointer takes that row as
 // clickGate, as FilamentSwitch does. Without one, a pill with a
@@ -46,6 +47,13 @@ Item {
   // When the gate last accepted a real pointer move onto the pill
   // (Date.now()), 0 for never.
   property real pointerMovedAt: 0
+  // Whether the pointer really moved onto the pill (gated) and is still
+  // over it, with the layout unchanged since: draws the hover fill.
+  property bool pointerHovered: false
+  // The gate the hover fill uses: the dropdown's, else the pill's own.
+  readonly property var hoverGate: pointerGate || ownGate
+  // The dropdown's last layout shift; a change drops the hover fill.
+  readonly property real layoutStamp: pointerGate ? Number(pointerGate.layoutChangedAt) || 0 : 0
 
   // Emitted when the pill is clicked or activated.
   signal clicked
@@ -81,7 +89,28 @@ Item {
   objectName: "pill"
   implicitWidth: label.implicitWidth + Style.space(16)
   implicitHeight: label.implicitHeight + Style.space(8)
+  onLayoutStampChanged: pill.pointerHovered = false
 
+  // The pill's own gate when the dropdown passes none, measuring in
+  // window coordinates so content moving under a still pointer is no move.
+  PointerMoveGate {
+    id: ownGate
+    referenceItem: pill.Window.contentItem
+  }
+  Rectangle {
+    // The selected fill (the chosen option).
+    objectName: "selectedFill"
+    anchors.fill: parent
+    color: Util.alpha(pill.selectedColor, DesignTokens.selectedFill.a)
+    visible: pill.selected
+  }
+  Rectangle {
+    // The hover fill.
+    objectName: "hoverFill"
+    anchors.fill: parent
+    color: DesignTokens.hoverFill
+    visible: pill.pointerHovered && pill.enabled
+  }
   Rectangle {
     // The keyboard cursor outline.
     objectName: "cursorOutline"
@@ -158,14 +187,24 @@ Item {
   }
   HoverHandler {
     id: hover
-    onHoveredChanged: if (hovered && !pill.pointerGate)
-      pill.hoveredMoved()
-    onPointChanged: if (pill.pointerGate && hover.hovered && pill.pointerGate.moved(hover.parent, {
-      x: hover.point.position.x,
-      y: hover.point.position.y
-    })) {
-      pill.pointerMovedAt = Date.now()
-      pill.hoveredMoved()
+    onHoveredChanged: {
+      if (!hovered) {
+        pill.pointerHovered = false
+        ownGate.reset()
+      } else if (!pill.pointerGate)
+        pill.hoveredMoved()
+    }
+    onPointChanged: {
+      if (!hover.hovered || !pill.hoverGate.moved(hover.parent, {
+        x: hover.point.position.x,
+        y: hover.point.position.y
+      }))
+        return
+      pill.pointerHovered = true
+      if (pill.pointerGate) {
+        pill.pointerMovedAt = Date.now()
+        pill.hoveredMoved()
+      }
     }
   }
   PanelToolTip {

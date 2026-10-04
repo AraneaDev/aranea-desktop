@@ -171,6 +171,8 @@ Column {
         detail: wrapper.promptOpen ? "" : (wrapper.rowStatus.text || wrapper.modelData.label || "")
         detailColor: wrapper.rowStatus.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
         active: section.connected
+        // A connected VPN carries the selected highlight.
+        selected: active
         busy: wrapper.rowStatus.busy
         hasCursor: section.cursorIndex === wrapper.index
         pointerGate: section.pointerGate
@@ -190,6 +192,9 @@ Column {
             // A re-sort can rebuild this row under a still pointer: the
             // row's settle guard covers its switch too.
             clickGate: vpnRow
+            // The row's own hover fill covers the switch.
+            ownHover: false
+            pointerGate: section.pointerGate
             checked: section.connected
             onToggled: section.toggle(wrapper.index)
           }

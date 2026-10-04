@@ -571,3 +571,7 @@ test("firstOpen: the first item whose dropdown is open, else null", () => {
   assert.equal(logic.firstOpen([a, null]), null)
   assert.equal(logic.firstOpen(undefined), null)
 })
+
+test("keyHint names no Enter: the calendar has no cursor", () => {
+  assert.equal(logic.keyHint(), "←→ month · ↑↓ year · t today")
+})

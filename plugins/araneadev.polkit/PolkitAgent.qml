@@ -46,7 +46,7 @@ Item {
 
   // True while the close delay runs after success or cancel; keeps the dialog visible until resetSnapshot.
   property bool closing: false
-  // A response was submitted and PAM has not asked again yet; shows "Checking..." and makes the field read-only.
+  // A response was submitted and PAM has not asked again yet; the field pulses busy and is read-only.
   property bool submitted: false
   // The flow's request message ("Authentication is needed..." when polkit gives none).
   property string currentMessage: ""
@@ -60,13 +60,15 @@ Item {
   property bool responseRequired: false
   // The response may be echoed (not a secret), so the field shows plain text.
   property bool responseVisible: false
-  // Failure feedback is on (red border and text, "Wrong"); errorTimer clears it after 1.2 s.
+  // Failure feedback is on (red border and text, "Wrong", read-only field); errorTimer clears it after 1.2 s.
   property bool errorFlash: false
   // pam_fprintd appears in the polkit PAM stack (a sensor is enrolled).
   property bool fingerprintConfigured: false
   // Lid shut right now: the reader is physically unreachable, so we fall back
   // to the password even when a sensor is enrolled. Refreshed per request.
   property bool laptopClosed: false
+  // When the current request started (Date.now()), settling DETAILS clicks.
+  property real requestStartedAt: 0
   // Horizontal offset of the card, animated by shakeAnimation on failure.
   property int shakeOffset: 0
 
@@ -253,6 +255,7 @@ Item {
 
   // Prepares the dialog for a new request: resets state, checks the lid, syncs the flow, looks up the action, plays the open animation and focuses.
   function beginFlow() {
+    requestStartedAt = Date.now()
     closeTimer.stop()
     closing = false
     submitted = false
@@ -302,8 +305,7 @@ Item {
       cancelRequest()
       event.accepted = true
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-      if (responseRequired)
-        submitResponse()
+      authorize()
       event.accepted = true
     } else if (event.key === Qt.Key_Tab) {
       toggleDetails()
@@ -312,6 +314,13 @@ Item {
       cycleIdentity()
       event.accepted = true
     }
+  }
+
+  // Enter (from the key map or the password field's own Enter): submits
+  // only while PAM waits for a response.
+  function authorize() {
+    if (responseRequired)
+      submitResponse()
   }
 
   // Sends the typed password to the flow when PAM wants a response, clears

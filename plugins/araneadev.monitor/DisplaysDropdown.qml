@@ -254,6 +254,7 @@ Column {
         value: dropdown.brightnessPercent
         busy: dropdown.brightnessBusy
         clickGate: brightRow
+        pointerGate: dropdown.pointerGate
         gateWheel: true
         wheelHeld: dropdown.reflowing
         onMoved: function (value) {
@@ -345,6 +346,7 @@ Column {
         value: dropdown.textIndex
         busy: dropdown.textPending
         clickGate: textRow
+        pointerGate: dropdown.pointerGate
         gateWheel: true
         wheelHeld: dropdown.reflowing
         onCommitted: function (value) {

@@ -33,9 +33,10 @@ up (as there is for Weather), so no further fix was needed for settings-form par
 
 Keys: left/right (or `h`/`l`) switch the selected agent, up/down scroll the panel, Enter or
 `r`/`R` refresh, Esc closes and Tab moves to the bar's next dropdown. The keyboard outline shows
-only while the keyboard drives it: after opening or any pointer use, the first navigation key or
-Enter only reveals it (on the selected agent pill, or on the Refresh pill with one agent); `r`
-refreshes at once.
+only while the keyboard drives it: after opening or any pointer click, the first navigation key or
+Enter only reveals it, always on the Refresh pill (Enter's target; h/l switch agents without moving it); `r`
+refreshes at once. Hover only draws a pill's fill and never hides the outline; the selected agent's
+pill carries the selected highlight.
 
 The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-pending state and its landing gate, the
 "updated HH:MM" caption; tested under Node). `Panel.qml` builds `agentsView` from stock's own

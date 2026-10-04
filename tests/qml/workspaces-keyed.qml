@@ -1,8 +1,10 @@
 // The Workspaces dropdown's Filament rules, in a real window with real
 // pointer events: the mint outline shows only with the keyboard and never
 // on hover (WorkspaceModel.cursorMove reveals the row cursor on its first
-// key, then moves and wraps it; a real pointer move onto a row places the
-// cursor there, hidden); rows are keyed by workspace id and a keyed action
+// key, then moves and wraps it; Enter as the first key only reveals it
+// too); a real pointer move onto a row draws its hover fill but never
+// moves the cursor or the outline; the current workspace carries the
+// selected highlight; rows are keyed by workspace id and a keyed action
 // whose row no longer carries that id is refused; the rows stay the same
 // delegates across a refresh that hands over a new (but equal) array, and
 // a click right after the rows change is refused until it settles. A
@@ -98,8 +100,6 @@ ShellRoot {
         host.focused = host.focused.concat([id])
       }
       onRowHovered: function (index) {
-        host.keyboard = false
-        host.cursorKey = WorkspaceModel.workspaceKey(panel.workspaceStates[index])
         host.hovered = host.hovered.concat([index])
       }
     }
@@ -138,6 +138,11 @@ ShellRoot {
 
         // ---------- Outline: keyboard only ----------
         t.equal(outlined(), 0, "no outline before the keyboard")
+        var first = WorkspaceModel.cursorPress(panel.workspaceStates, "", false)
+        t.check(first.key === "1" && first.keyboard && first.row === null, "Enter as the first key only reveals the cursor on the first row")
+        t.check(t.findChild(panel.rowAt(0), "selectedFill").visible && t.findChild(panel.rowAt(0), "selectedMarker").visible, "the current workspace carries the selected highlight")
+        t.check(!t.findChild(panel.rowAt(1), "selectedFill").visible && !t.findChild(panel.rowAt(2), "selectedFill").visible, "other workspaces do not")
+        t.check(!t.findChild(panel.rowAt(0), "hoverFill").visible, "no hover fill without a pointer")
         var next = WorkspaceModel.cursorMove(panel.workspaceStates, host.cursorKey, host.keyboard, 1)
         host.cursorKey = next.key
         host.keyboard = next.keyboard
@@ -199,9 +204,14 @@ ShellRoot {
         pointer.mouseMove(panel, stillPoint.x + 4, stillPoint.y)
       }], [200, function () {
         t.check(hovered.indexOf(2) >= 0, "a real move over a row reports hover")
-        t.equal(host.cursorKey, WorkspaceModel.workspaceKey(panel.workspaceStates[2]), "hover places the cursor key")
-        t.equal(outlined(), 0, "and hover never outlines a row")
+        t.check(t.findChild(panel.rowAt(2), "hoverFill").visible, "a real move draws the hover fill on that row")
+        t.check(!t.findChild(panel.rowAt(0), "hoverFill").visible && !t.findChild(panel.rowAt(1), "hoverFill").visible, "and only there")
+        t.equal(host.cursorKey, "3", "hover never moves the cursor key")
+        t.check(outlined() === 1 && panel.rowAt(0).hasCursor && !panel.rowAt(2).hasCursor, "the outline stays on the keyboard's row")
         var press = WorkspaceModel.cursorPress(panel.workspaceStates, host.cursorKey, host.keyboard)
-        t.check(press.keyboard && press.row === null, "Enter after hover only reveals")
+        t.check(!!press.row && press.row.id === 3, "Enter acts on the outlined row, not the hovered one")
+        panel.workspaceStates = firstRows()
+      }], [40, function () {
+        t.check(!t.findChild(panel.rowAt(2), "hoverFill").visible, "the rows changing under a still pointer drop the hover fill")
       }]])
 }

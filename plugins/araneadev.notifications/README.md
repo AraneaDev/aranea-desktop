@@ -36,15 +36,15 @@ Keys:
 - Esc closes; Tab and Shift+Tab switch to the next panel.
 
 The key hint line follows the state (`InboxLogic.centerKeyHint`): "↑↓ move
-· x dismiss · ⇧del group · tab next" with entries and "↑↓ move · tab next"
-when the center is empty. The full set of keys did not fit the card, so the
-hint leaves out Enter (open), the most guessable key.
+· enter open · x dismiss · ⇧del group" with entries and "↑↓ move · enter
+toggle" when the center is empty. Like every dropdown hint, it leaves out
+Tab (next dropdown) so the Enter verb fits.
 
-The cursor is keyboard-only. A fresh open shows none; the first navigation
-key only reveals it, and any pointer use hides it. It follows its entry by
-key across re-sorts and hides when that entry goes. A pointer move over a
-card draws nothing (no hover fill); it only moves the hidden cursor there,
-so the next key reveals it under the pointer.
+The cursor is keyboard-only. A fresh open shows none; the first key
+(Enter included) only reveals it, and any pointer click hides it. It
+follows its entry by key across re-sorts and hides when that entry goes. A
+real pointer move over a card, a group header or "+N more" draws the shared
+hover fill there; it never moves the cursor or the outline.
 
 The DND switch shows the new state at once and pulses until the service
 echoes it. Clicks made while it waits are queued and the last one wins

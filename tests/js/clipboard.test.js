@@ -249,6 +249,27 @@ test("toggleSecret is a no-op for images (final review m1)", () => {
   )
 })
 
+test("rowId keys rows by entry without carrying secret text", () => {
+  const plain = c.enrich({ type: "text", text: "hello world" }, now)
+  const other = c.enrich({ type: "text", text: "hello there" }, now)
+  const secret = c.enrich({ type: "text", text: "ghp_0123456789abcdefghijABCDEFGHIJ0123" }, now)
+  const image = { type: "image", path: "/tmp/a.png", mime: "image/png", capturedAtMs: now }
+  eq(c.rowId(plain, 0), c.rowId(plain, 7), "a text id does not depend on the history index")
+  assert(c.rowId(plain, 0) !== c.rowId(other, 0), "different text gives a different id")
+  assert(
+    c.rowId(secret, 1).indexOf("ghp_") < 0 && c.rowId(secret, 1) !== c.rowId(secret, 2),
+    "a secret id is its time and index"
+  )
+  assert(
+    c.rowId(image, 0).startsWith("image:") &&
+      c.rowId(image, 0) !== c.rowId({ ...image, path: "/tmp/b.png" }, 0),
+    "images are keyed by path"
+  )
+  eq(c.rowId(null, 0), "", "a missing entry has no id")
+  const rows = c.displayRows([plain, secret], "", 50, now)
+  eq(rows[0].entryId, c.rowId(plain, 0), "display rows carry their id")
+})
+
 test("displayRows keeps kind and first line for a large code paste (final review m2)", () => {
   const big = "function f() {\n" + "  x()\n".repeat(3000) + "}"
   const bigRow = c.displayRows([c.enrich({ type: "text", text: big }, now)], "", 50, now)[0]

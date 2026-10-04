@@ -6,7 +6,6 @@ import qs.Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
 import "../araneadev.shared" as Aranea
-import "../araneadev.shared/CursorLogic.js" as CursorLogic
 
 Item {
   id: root
@@ -248,7 +247,7 @@ Item {
     // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
     // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
-    // none); the pointer places it too, without showing it.
+    // none); only the keyboard places it, hover never does.
     property string cursorKey: ""
     // True while the keyboard drives the cursor; any pointer use clears
     // it. The mint outline shows only then, and the first key only
@@ -300,12 +299,8 @@ Item {
       }
       onActivateRequested: {
         content.disarmPointer()
-        var intent = CursorLogic.pressIntent(testHost.cursorKey !== "", testHost.keyboardCursor)
-        if (intent === "reveal") {
-          testHost.keyboardCursor = true
-          return
-        }
         var press = WorkspaceModel.cursorPress(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
+        testHost.cursorKey = press.key
         testHost.keyboardCursor = press.keyboard
         if (press.row)
           testHost.focusWorkspace(press.row.id)
@@ -317,10 +312,6 @@ Item {
         cursorIndex: testHost.cursorIndex
         onFocusWorkspace: function (id) {
           testHost.focusWorkspace(id)
-        }
-        onRowHovered: function (index) {
-          testHost.keyboardCursor = false
-          testHost.cursorKey = WorkspaceModel.workspaceKey(testHost.workspaceStates[index])
         }
       }
     }

@@ -162,7 +162,7 @@ ShellRoot {
     t.check(hint.implicitWidth <= hint.width * 0.9, "the full key hint fits the card unelided, with a margin (" + hint.implicitWidth + " <= 0.9 * " + hint.width + ")")
     t.equal(hint.text, InboxLogic.centerKeyHint(12), "with entries the hint names every key")
     var emptyHint = t.findChild(emptyCenter, "keyHint")
-    t.equal(emptyHint.text, "↑↓ move · tab next", "the empty center shows the short hint")
+    t.equal(emptyHint.text, "↑↓ move · enter toggle", "the empty center shows the short hint")
     t.check(emptyHint.implicitWidth <= emptyHint.width + 0.5, "and it fits")
     var title = t.findChild(longCenter, "centerHeader")
     t.equal(title.glyph, String.fromCodePoint(0xf009a), "the header shows the bell glyph when the view gives none")

@@ -478,7 +478,7 @@ ShellRoot {
         var empty = t.findChild(bare, "emptyText")
         t.check(empty.visible && empty.text === "Wi-Fi is off", "no Wi-Fi at all shows the empty text")
         t.check(!t.findChild(full, "emptyText").visible, "Wi-Fi rows hide the empty text")
-        t.equal(t.findChild(full, "keyHint").text, "↑↓ move · ←→ pick · enter connect · x forget · tab next", "the key hint")
+        t.equal(t.findChild(full, "keyHint").text, "↑↓ move · ←→ pick · enter toggle · x forget", "the key hint")
         t.check(t.findChild(full, "scanningCaption").visible, "scanning shows SCANNING WI-FI…")
         t.equal(t.findChild(full, "scanningCaption").text, "SCANNING WI-FI…", "the scanning caption's text")
         var scroll = t.findChild(full, "wifiScroll")
@@ -495,6 +495,9 @@ ShellRoot {
         t.equal(rows.map(function (r) {
           return r.label
         }), ["Interwebz24Ghz", "HomeOpen", "Ziggo-5G", "CorpEAP", "Hidden"], "labels, Hidden for a nameless network")
+        t.equal(rows.map(function (r) {
+          return t.findChild(r, "selectedFill").visible
+        }), [true, false, false, false, false], "only the connected network carries the selected highlight")
         t.equal(rows.map(function (r) {
           return t.findChild(r, "wifiLock").visible
         }), [true, false, true, true, false], "a lock on secured rows only")
@@ -724,6 +727,7 @@ ShellRoot {
         t.check(id.visible && id.activeFocus, "enterprise focuses the identity field first")
         t.equal(id.placeholderText, "Identity (user@domain)", "the identity placeholder")
         t.check(id.y < t.findChild(w, "passphraseField").mapToItem(id.parent, 0, 0).y, "identity sits above the passphrase")
+        t.check(Math.abs(id.width - t.findChild(w, "passphraseField").width) < 0.5, "identity is as wide as the passphrase beside the connect button")
         pointer.keyClick(Qt.Key_U)
       }], [60, function () {
         var w = t.findChildren(t.findChild(full, "wifiSection"), "wifiRowWrapper")[3]
@@ -792,11 +796,11 @@ ShellRoot {
         // ---------- The key hint says what Enter does ----------
         var hint = t.findChild(full, "keyHint")
         full.view = withCursor(cur(true, "saved", 0))
-        t.equal(hint.text, "↑↓ move · enter/→ select forget · x forget · tab next", "on Saved, Enter selects forget")
+        t.equal(hint.text, "↑↓ move · enter/→ select forget · x forget", "on Saved, Enter selects forget")
         full.view = withCursor(cur(true, "dns", 0))
-        t.equal(hint.text, "↑↓ move · ←→ pick · enter apply · tab next", "on DNS, Enter applies")
+        t.equal(hint.text, "↑↓ move · ←→ pick · enter apply", "on DNS, Enter applies")
         full.view = withCursor(cur(false, "saved", 0))
-        t.equal(hint.text, "↑↓ move · ←→ pick · enter connect · x forget · tab next", "without a cursor, the Wi-Fi hint")
+        t.equal(hint.text, "↑↓ move · ←→ pick · enter toggle · x forget", "without a cursor, the Wi-Fi hint")
 
         // ---------- A running Wi-Fi action dims the rows ----------
         var busyView = withCursor(cur(true, "wifi", 0))

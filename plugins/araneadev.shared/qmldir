@@ -23,3 +23,4 @@ FilamentPill 1.0 FilamentPill.qml
 ForgetButton 1.0 ForgetButton.qml
 LinkGraph 1.0 LinkGraph.qml
 CredentialPrompt 1.0 CredentialPrompt.qml
+HoverTint 1.0 HoverTint.qml

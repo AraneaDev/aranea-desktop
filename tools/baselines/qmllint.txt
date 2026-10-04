@@ -79,6 +79,7 @@
 1	plugins/araneadev.clock/ClockLink.qml:missing-property:Member "family" not found on type "QObject"
 6	plugins/araneadev.clock/ClockSky.qml:missing-property:Member "caption" not found on type "QObject"
 6	plugins/araneadev.clock/ClockSky.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.emojis/EmojiWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "border" not found on type "QObject"
 2	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "display" not found on type "QObject"
@@ -89,7 +90,6 @@
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "selectedBackground" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "selectedText" not found on type "QObject"
 1	plugins/araneadev.emojis/Emojis.qml:missing-property:Member "text" not found on type "QObject"
-1	plugins/araneadev.emojis/Emojis.qml:uncreatable-type:Type PanelWindow is not creatable.
 1	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.health/HealthProblemsSection.qml:missing-property:Member "family" not found on type "QObject"
@@ -192,11 +192,12 @@
 3	plugins/araneadev.osd/Osd.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.osd/Osd.qml:missing-property:Member "border" not found on type "QObject"
 6	plugins/araneadev.osd/Osd.qml:missing-property:Member "family" not found on type "QObject"
-1	plugins/araneadev.osd/Osd.qml:missing-property:Member "hairline" not found on type "QObject"
-1	plugins/araneadev.osd/Osd.qml:missing-property:Member "sm" not found on type "QObject"
-4	plugins/araneadev.osd/Osd.qml:missing-property:Member "text" not found on type "QObject"
+3	plugins/araneadev.osd/Osd.qml:missing-property:Member "text" not found on type "QObject"
 4	plugins/araneadev.osd/Osd.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.osd/Osd.qml:uncreatable-type:Type PanelWindow is not creatable.
+1	plugins/araneadev.osd/OsdStrand.qml:missing-property:Member "hairline" not found on type "QObject"
+1	plugins/araneadev.osd/OsdStrand.qml:missing-property:Member "sm" not found on type "QObject"
+1	plugins/araneadev.osd/OsdStrand.qml:missing-property:Member "text" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "accent" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "border" not found on type "QObject"
@@ -208,6 +209,11 @@
 1	plugins/araneadev.polkit/PolkitAgent.qml:missing-property:Member "text" not found on type "QObject"
 2	plugins/araneadev.polkit/PolkitAgent.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 2	plugins/araneadev.polkit/PolkitAgent.qml:unqualified:Unqualified access
+1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "accent" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "caption" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "text" not found on type "QObject"
+1	plugins/araneadev.polkit/PolkitAuthField.qml:missing-property:Member "textError" not found on type "QObject"
 1	plugins/araneadev.polkit/PolkitWindow.qml:uncreatable-type:Type PanelWindow is not creatable.
 1	plugins/araneadev.power/Panel.qml:missing-property:Member "iconSlot" not found on type "QObject"
 7	plugins/araneadev.power/PowerDropdown.qml:missing-property:Member "caption" not found on type "QObject"
@@ -220,7 +226,8 @@
 3	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "controlGap" not found on type "QObject"
 1	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
-3	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "family" not found on type "QObject"
+4	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "iconLarge" not found on type "QObject"
 1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "caption" not found on type "QObject"
 5	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "display" not found on type "QObject"
 3	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "family" not found on type "QObject"

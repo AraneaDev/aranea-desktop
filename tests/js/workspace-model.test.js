@@ -206,9 +206,10 @@ test("cursorMove reveals the current cursor on the first key, then moves it", ()
 
 test("cursorPress only reveals the cursor before acting on it", () => {
   const rows = [{ id: 1 }, { id: 2 }]
-  assert.deepEqual(model.cursorPress(rows, "1", false), { keyboard: true, row: null })
-  assert.deepEqual(model.cursorPress(rows, "1", true), { keyboard: true, row: { id: 1 } })
-  assert.deepEqual(model.cursorPress(rows, "", true), { keyboard: true, row: null })
+  assert.deepEqual(model.cursorPress(rows, "1", false), { key: "1", keyboard: true, row: null })
+  assert.deepEqual(model.cursorPress(rows, "1", true), { key: "1", keyboard: true, row: { id: 1 } })
+  assert.deepEqual(model.cursorPress(rows, "", true), { key: "1", keyboard: true, row: null })
+  assert.deepEqual(model.cursorPress(rows, "", false), { key: "1", keyboard: true, row: null })
 })
 
 test("outlineIndex draws the outline only while the keyboard shows the cursor", () => {

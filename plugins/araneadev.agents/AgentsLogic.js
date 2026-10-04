@@ -495,8 +495,33 @@ function showcaseCall(opened, json, nowMs) {
     : { answer: "ok", showcase: showcase }
 }
 
+/**
+ * The view's keyboard cursor. Enter refreshes, so the outline always sits
+ * on the Refresh pill, whatever agent h/l picks.
+ * @param {boolean} shown - whether the keyboard shows the cursor
+ * @returns {{active: boolean, section: string, index: number}} the cursor
+ */
+function cursorView(shown) {
+  return { active: !!shown, section: "refresh", index: 0 }
+}
+
+/**
+ * The key hint under the dropdown: the agent switch when there is more
+ * than one agent, then Enter's refresh and the scroll keys.
+ * @param {number} providerCount - how many agents show
+ * @returns {string} the hint
+ */
+function keyHint(providerCount) {
+  var parts = []
+  if ((Number(providerCount) || 0) > 1) parts.push("h/l agent")
+  parts.push("enter refresh", String.fromCodePoint(0x2191, 0x2193) + " scroll")
+  return parts.join(" " + String.fromCodePoint(0xb7) + " ")
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    cursorView: cursorView,
+    keyHint: keyHint,
     ringFraction: ringFraction,
     ringTone: ringTone,
     providerKey: providerKey,

@@ -364,6 +364,8 @@ ShellRoot {
     t.equal(connectedRows.length, 1, "one connected device")
     t.equal(pairedRows.length, 3, "three paired devices")
     t.equal(availableRows.length, 3, "three available devices")
+    t.check(t.findChild(connectedRows[0], "selectedFill").visible, "a connected device carries the selected highlight")
+    t.check(!t.findChild(pairedRows[0], "selectedFill").visible && !t.findChild(availableRows[0], "selectedFill").visible, "paired and available devices do not")
 
     // Glyphs come straight from the fixture rows.
     t.equal(connectedRows[0].glyph, full.view.connected[0].glyph, "connected row glyph comes from the fixture")

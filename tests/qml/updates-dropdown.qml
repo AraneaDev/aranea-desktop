@@ -1,8 +1,8 @@
 // The Updates dropdown's Filament rules, in a real window with real pointer
 // events: the mint outline shows only with the keyboard and never on hover
 // (UpdateLogic.moveCursor reveals the pill cursor on its first key, then
-// moves and wraps it; a real pointer move onto a pill places the cursor
-// there, hidden); the status row's node and tone word read warn or ok
+// moves and wraps it); a real pointer move onto a pill draws its hover fill
+// but never moves the cursor or the outline; the status row's node and tone word read warn or ok
 // (UpdateLogic.statusRow); the Refresh pill reads "Refreshing..." and
 // pulses busy while checking, and ignores a click then; and a click on a
 // pill right after this panel's layout shifts (the group list appearing)
@@ -26,6 +26,8 @@ ShellRoot {
   property int cursorIndex: 0
   // The host's keyboard mode, as UpdatePanelHost.keyboardCursor.
   property bool keyboard: false
+  // Pills the panel reported a real pointer move onto, in order.
+  property var hovered: []
   // Actions reported by the panel, as [name], in emission order.
   property var actions: []
   // The pointer's resting point, for the two-phase hover checks.
@@ -88,8 +90,7 @@ ShellRoot {
       onOpenUpdater: host.actions = host.actions.concat([["openUpdater"]])
       onRefresh: host.actions = host.actions.concat([["refresh"]])
       onPillHovered: function (index) {
-        host.keyboard = false
-        host.cursorIndex = index
+        host.hovered = host.hovered.concat([index])
       }
     }
   }
@@ -181,7 +182,10 @@ ShellRoot {
       }], [80, function () {
         pointer.mouseMove(panel, stillPoint.x + 4, stillPoint.y)
       }], [120, function () {
-        t.check(!host.keyboard && host.cursorIndex === 1, "a real pointer move over Refresh places the cursor there")
-        t.equal(outlined(), 0, "and hover never outlines a pill")
+        t.check(hovered.indexOf(1) >= 0, "a real pointer move over Refresh reports hover")
+        t.check(t.findChild(t.findChild(panel, "refreshPill"), "hoverFill").visible, "and draws its hover fill")
+        t.check(!t.findChild(t.findChild(panel, "openUpdaterPill"), "hoverFill").visible, "but not on the other pill")
+        t.check(host.keyboard && host.cursorIndex === 0, "hover never moves the cursor")
+        t.check(outlined() === 1 && t.findChild(panel, "openUpdaterPill").hasCursor, "the outline stays on the keyboard's pill")
       }]])
 }

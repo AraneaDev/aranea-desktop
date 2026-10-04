@@ -12,6 +12,7 @@ ShellRoot {
   ClipboardComponents.ClipboardResultRow {
     id: row
     index: 2
+    entryId: "text:0:5:abc"
     kind: "text"
     title: "hello"
     detail: "today"
@@ -25,6 +26,7 @@ ShellRoot {
   ListModel {
     id: clipboardRows
     ListElement {
+      entryId: "text:0:5:abc"
       historyIndex: 0
       kind: "text"
       title: "hello"

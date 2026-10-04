@@ -36,4 +36,12 @@ QtObject {
   readonly property int rowPadding: Style.spacing.rowPaddingX
   // Whether motion effects are enabled.
   readonly property bool motionEnabled: MotionState.motionEnabled
+  // Fill of a clickable element under the pointer, shown only after a real
+  // pointer move (the menu's and the pickers' hover fill).
+  readonly property color hoverFill: Util.alpha(Color.foreground, 0.08)
+  // Fill of the selected or current item (the default device, the chosen
+  // option, the current workspace), apart from the keyboard outline.
+  readonly property color selectedFill: Util.alpha(Color.accent, 0.12)
+  // Width of the accent marker on a selected row's left edge.
+  readonly property int selectedMarkerWidth: Math.max(2, Style.space(2))
 }

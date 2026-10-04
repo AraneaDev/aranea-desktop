@@ -19,8 +19,10 @@ The view, `PowerDropdown.qml` (with `PowerHero.qml`, `PowerHistory.qml` and
 
 Nothing polls while the dropdown is closed; the bar glyph comes from
 Quickshell's UPower service. The cursor outline shows only during keyboard
-navigation; a keyboard reveal never chooses a profile, and Enter applies
-only the profile the user chose and still sees.
+navigation: the first key (Enter included) only reveals it, on the active
+profile, and Enter then applies the outlined profile, only while it is
+still the one shown there. Hover only draws a pill's fill; the active
+profile's pill carries the selected highlight.
 
 `Panel.qml` keeps stock's `manageIpc: false` and owns the `omarchy.power`
 IpcHandler itself, so `omarchy-shell shell summon omarchy.power` still opens

@@ -571,3 +571,8 @@ test("displayName: 'Unknown' when nothing names the item", () => {
   assert.equal(logic.displayName(undefined), "Unknown")
   assert.equal(logic.displayName({ title: "", tooltipTitle: "", id: "" }), "Unknown")
 })
+
+test("menuKeyHint and manageKeyHint name what Enter does", () => {
+  assert.equal(logic.menuKeyHint(), "↑↓ move · → open · ← back · enter select")
+  assert.equal(logic.manageKeyHint(), "↑↓ move · ←→ pin / hide · enter toggle")
+})

@@ -18,8 +18,8 @@ Column {
   // Rate samples for the graph, oldest first: [{rx, tx}]. Separate from
   // stats so a sample tick never rebuilds the grid.
   property var samples: []
-  // Optional PointerMoveGate (qs.Ui); unused (nothing here moves the
-  // keyboard cursor) but accepted like every other section.
+  // Optional PointerMoveGate (qs.Ui): its layout stamp drops the copyable
+  // values' hover fill (nothing here moves the keyboard cursor).
   property var pointerGate: null
 
   // Emitted when a copyable value (IP address or gateway) is clicked.
@@ -37,6 +37,8 @@ Column {
     id: value
     // Whether a click copies this value ("--" never does).
     property bool copyable: false
+    // The dropdown's PointerMoveGate, whose layout stamp drops the hover fill.
+    property var pointerGate: null
     // Emitted when a copyable value is clicked.
     signal copyRequested(string value)
     Layout.fillWidth: true
@@ -45,6 +47,11 @@ Column {
     color: Aranea.DesignTokens.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
+    Aranea.HoverTint {
+      z: -1
+      active: copyMouse.enabled
+      pointerGate: value.pointerGate
+    }
     MouseArea {
       id: copyMouse
       anchors.fill: parent
@@ -109,18 +116,21 @@ Column {
       text: "Receiving"
     }
     StatValue {
+      pointerGate: section.pointerGate
       text: section.stat("receiving")
     }
     StatLabel {
       text: "Sending"
     }
     StatValue {
+      pointerGate: section.pointerGate
       text: section.stat("sending")
     }
     StatLabel {
       text: "Ping"
     }
     StatValue {
+      pointerGate: section.pointerGate
       text: section.stat("ping")
       color: section.stats && section.stats.lossy ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.foreground
     }
@@ -128,6 +138,7 @@ Column {
       text: "Packet loss"
     }
     StatValue {
+      pointerGate: section.pointerGate
       text: section.stat("loss")
       color: section.stats && section.stats.lossy ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.foreground
     }
@@ -135,18 +146,21 @@ Column {
       text: "Downloaded"
     }
     StatValue {
+      pointerGate: section.pointerGate
       text: section.stat("downloaded")
     }
     StatLabel {
       text: "Uploaded"
     }
     StatValue {
+      pointerGate: section.pointerGate
       text: section.stat("uploaded")
     }
     StatLabel {
       text: "IP address"
     }
     StatValue {
+      pointerGate: section.pointerGate
       objectName: "ipValue"
       text: section.stat("ip")
       copyable: true
@@ -158,6 +172,7 @@ Column {
       text: "Gateway"
     }
     StatValue {
+      pointerGate: section.pointerGate
       objectName: "gatewayValue"
       text: section.stat("gateway")
       copyable: true

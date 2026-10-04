@@ -78,9 +78,5 @@ Aranea.KeyboardPanelFrame {
     maxContentHeight: Math.max(0, Math.min(Style.space(520), host.availableCardHeight) - host.verticalContentInset)
     onOpenUpdater: host.openUpdater()
     onRefresh: host.refresh()
-    onPillHovered: function (index) {
-      host.keyboardCursor = false
-      host.cursorIndex = index
-    }
   }
 }

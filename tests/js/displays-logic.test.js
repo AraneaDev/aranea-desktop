@@ -429,24 +429,24 @@ test("takeQueued on missing state never throws", () => {
 // --- keyHint -------------------------------------------------------------------------
 
 test("keyHint: brightness, kbdlight and textsize adjust with the arrow keys", () => {
-  assert.equal(logic.keyHint("brightness"), "↑↓ move · ←→ adjust · tab next")
-  assert.equal(logic.keyHint("kbdlight"), "↑↓ move · ←→ adjust · tab next")
-  assert.equal(logic.keyHint("textsize"), "↑↓ move · ←→ adjust · tab next")
+  assert.equal(logic.keyHint("brightness"), "↑↓ move · ←→ adjust")
+  assert.equal(logic.keyHint("kbdlight"), "↑↓ move · ←→ adjust")
+  assert.equal(logic.keyHint("textsize"), "↑↓ move · ←→ adjust")
 })
 
 test("keyHint: nightlight and monitors toggle with enter", () => {
-  assert.equal(logic.keyHint("nightlight"), "↑↓ move · enter toggle · tab next")
-  assert.equal(logic.keyHint("monitors"), "↑↓ move · enter toggle · tab next")
+  assert.equal(logic.keyHint("nightlight"), "↑↓ move · enter toggle")
+  assert.equal(logic.keyHint("monitors"), "↑↓ move · enter toggle")
 })
 
 test("keyHint: scale picks a pill with the arrow keys", () => {
-  assert.equal(logic.keyHint("scale"), "↑↓ move · ←→ pick · tab next")
+  assert.equal(logic.keyHint("scale"), "↑↓ move · ←→ pick · enter set")
 })
 
-test("keyHint: any other section (or none) defaults to esc close / tab next", () => {
-  assert.equal(logic.keyHint("unknown"), "esc close · tab next")
-  assert.equal(logic.keyHint(undefined), "esc close · tab next")
-  assert.equal(logic.keyHint(""), "esc close · tab next")
+test("keyHint: any other section (or none) defaults to esc close", () => {
+  assert.equal(logic.keyHint("unknown"), "esc close")
+  assert.equal(logic.keyHint(undefined), "esc close")
+  assert.equal(logic.keyHint(""), "esc close")
 })
 
 // --- mayDisable / lastEnabledName (C1: never switch off the last display) ----------
@@ -821,11 +821,11 @@ test("nightToggleTarget: missing state predicts on (no temperature) without thro
 // --- keyHint with the keyboard light mode ------------------------------------------
 
 test("keyHint: the keyboard light switch toggles with enter", () => {
-  assert.equal(logic.keyHint("kbdlight", "switch"), "↑↓ move · enter toggle · tab next")
+  assert.equal(logic.keyHint("kbdlight", "switch"), "↑↓ move · enter toggle")
 })
 
 test("keyHint: the keyboard light slider adjusts with the arrow keys", () => {
-  assert.equal(logic.keyHint("kbdlight", "slider"), "↑↓ move · ←→ adjust · tab next")
+  assert.equal(logic.keyHint("kbdlight", "slider"), "↑↓ move · ←→ adjust")
 })
 
 // --- scaleCaption -----------------------------------------------------------------

@@ -15,6 +15,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "AudioLogic.js" as AudioLogic
 
 Column {
   id: dropdown
@@ -258,8 +259,10 @@ Column {
     })
   }
   Text {
+    objectName: "keyHint"
     width: parent.width
-    text: "↑↓ move · ←→ adjust · enter select · m mute · tab next"
+    // What Enter does on the cursor's stop (AudioLogic.keyHint).
+    text: AudioLogic.keyHint(dropdown.cursor.section, dropdown.cursor.index)
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption

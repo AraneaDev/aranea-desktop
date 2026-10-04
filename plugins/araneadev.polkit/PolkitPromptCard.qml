@@ -1,11 +1,16 @@
 // Polkit request, identity, and details presentation.
 // Authentication input and focus/animation policy remain in PolkitWindow.qml.
+// A pointer click on DETAILS within settleMs of the request opening or of
+// the card shifting under a still pointer is ignored unless the pointer
+// really moved onto it since (ClickSettle).
 // qmllint disable missing-property unqualified
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import qs.Ui
 import "PolkitLogic.js" as PolkitLogic
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 ColumnLayout {
   id: root
@@ -48,12 +53,41 @@ ColumnLayout {
   property color accent: Color.polkit.accent
   // Public contract member.
   property real letterSpacing: 0
+  // When the request opened (Date.now()), for the DETAILS click settle.
+  property real openedAt: 0
+  // When the card last shifted under the pointer (Date.now()), for the
+  // DETAILS click settle.
+  property real layoutChangedAt: 0
+  // How long after opening or a shift a DETAILS click is ignored, in ms.
+  property int settleMs: 300
+  // When the pointer last really moved onto DETAILS (Date.now()), 0 for never.
+  property real pointerMovedAt: 0
   // Public contract member.
   signal detailsToggled
   // Public contract member.
   signal keyPressed(var event)
 
+  // Whether a pointer click on DETAILS counts (ClickSettle.clickSettled).
+  function detailsClickSettled() {
+    return ClickSettle.clickSettled({
+      now: Date.now(),
+      createdAt: root.openedAt,
+      movedAt: root.pointerMovedAt,
+      layoutChangedAt: root.layoutChangedAt,
+      settleMs: root.settleMs
+    })
+  }
+
   spacing: Style.space(10)
+  onOpenedAtChanged: {
+    root.pointerMovedAt = 0
+    detailsGate.reset()
+  }
+
+  // Filters synthetic hover from the card moving under a still pointer.
+  PointerMoveGate {
+    id: detailsGate
+  }
 
   Aranea.BrandHeader {
     Layout.fillWidth: true
@@ -109,17 +143,32 @@ ColumnLayout {
       elide: Text.ElideRight
     }
     Text {
+      id: detailsToggle
+      objectName: "detailsToggle"
       textFormat: Text.PlainText
-      text: (root.detailsOpen ? "▴" : "▾") + " DETAILS"
+      text: String.fromCodePoint(root.detailsOpen ? 0x25b4 : 0x25be) + " DETAILS"
       color: root.accent
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
       font.weight: Font.Medium
       font.letterSpacing: root.letterSpacing
+      Aranea.HoverTint {
+        z: -1
+        anchors.margins: -Style.space(3)
+      }
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.detailsToggled()
+        onClicked: if (root.detailsClickSettled())
+          root.detailsToggled()
+      }
+      HoverHandler {
+        id: detailsHover
+        onPointChanged: if (detailsHover.hovered && detailsGate.moved(detailsToggle, {
+          x: detailsHover.point.position.x,
+          y: detailsHover.point.position.y
+        }))
+          root.pointerMovedAt = Date.now()
       }
     }
   }

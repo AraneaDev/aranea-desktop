@@ -42,7 +42,20 @@ service contracts to the feature plugins.
   growing turns a click aimed at one row into a click on another. A
   dropdown reports layout shifts by declaring `layoutChangedAt` (a
   `Date.now()` stamp) on the gate it hands down; `ClickSettle.clickSettled`
-  holds the rule.
+  holds the rule. Three looks stay apart: `selected` (set by the host for
+  the current item: the default device, the connected network, the
+  current workspace) draws the selected highlight (`DesignTokens.selectedFill`
+  and an accent left marker); a real pointer move draws the hover fill
+  (`DesignTokens.hoverFill`, gated, cleared on leaving or a layout shift);
+  `hasCursor` draws the mint outline. `interactive: false` marks an
+  informational row (no hover fill, arrow cursor).
+- `HoverTint` is the shared hover fill for any other clickable element: it
+  fills its parent with `DesignTokens.hoverFill` once the pointer really
+  moved over it (its own `PointerMoveGate`, in window coordinates), never
+  because the parent slid under a still pointer, and drops it on leaving or
+  on the host gate's layout stamp. `FilamentSwitch` and `FilamentSlider`
+  use it (a switch on a self-lit row turns it off with `ownHover: false`,
+  so the row keeps the hover); `ForgetButton` lights the same fill.
 - `ForgetButton` is the soft red "forget" button a row puts in its trailing
   slot (Bluetooth devices, Network's Wi-Fi and Saved rows). It shows on a
   `forgettable` row while the row (`rowHovered`), the button or the
@@ -54,8 +67,9 @@ service contracts to the feature plugins.
   clicks settle like `NodeDeviceRow`'s.
 - `FilamentPill` is the Filament-style choice pill (the network dropdown's
   band and DNS rows): a thin muted border, or an accent border with a 2 px
-  accent underline when `selected`; the keyboard cursor (`hasCursor`) draws
-  the same mint outline as `NodeDeviceRow`, pointer hover never does. A
+  accent underline and the selected fill when `selected`; the keyboard
+  cursor (`hasCursor`) draws the same mint outline as `NodeDeviceRow`,
+  pointer hover never does: it draws the hover fill after a real move. A
   `busy` pill breathes. It emits `clicked`, and `hoveredMoved` on entering,
   or only on a real pointer move when a `pointerGate` is set. A pill on a
   row a Repeater can rebuild takes the row as `clickGate` (VPN's "open app"
@@ -69,13 +83,18 @@ service contracts to the feature plugins.
   optional `markSource` (an image url, e.g. the Agents tool logo) replaces
   the glyph once it loads; empty or failing, the glyph shows as before.
 - `CredentialPrompt` is the inline credential prompt (Network's passphrase,
-  VPN's password and 2FA code): an accent-to-violet frame around `fields`
-  (`{key, label, placeholder, secret, readOnly, optional, hidden, value}`)
+  VPN's password and 2FA code, the Polkit password): an accent-to-violet
+  frame around `fields` (each
+  `{key, label, placeholder, secret, readOnly, optional, hidden, value, glyph}`)
   and a check-glyph connect button. Opening focuses the first editable
   field; Enter moves on and `submit`s from the last; Esc `cancel`s; typing
   emits `edited(key, text)`; the button emits `connectClicked`, settled
   through an optional `pointerGate`. `busy`/`failed` show `busyText` /
-  `failedText` instead of the fields. Its Repeater counts fields, so a
+  `failedText` instead of the fields; with `inlineStatus` (Polkit) they show
+  on the fields instead: busy pulses them read-only, failed turns them
+  urgent with `failedText` as the placeholder. `connectShown: false` hides
+  the button, `clearFields()` empties the fields, and keys other than
+  Enter/Esc reach `unhandledKey(event)`. Its Repeater counts fields, so a
   host echoing typed values back never rebuilds a field.
 - `LinkGraph` is the 60 s receive/send `Canvas` trace for a link's
   throughput, shared by the Network and VPN dropdowns. It draws
@@ -114,6 +133,13 @@ service contracts to the feature plugins.
   docs/development.md's "JavaScript facades"), since a plain `.js` logic
   file can't import another `.js` file in a way both QML and Node can
   load. Either way there is exactly one hand-written implementation, here.
+  Its keyed dropdown cursor (`keyIndex`, `keyStep`, `keyedMove`,
+  `keyedPress`, `keyedOutline`) takes a row-key function: Health's
+  `HealthLogic.js` (with `problemKey`) and Workspaces' `WorkspaceModel.js`
+  (with `workspaceKey`) wrap it from their own generated copies. It is
+  reveal-first: the first key after opening or after pointer use, Enter
+  included, only reveals the cursor, on its row or else the first row
+  (`keyedPress` hands back the revealed key; it acts only by `pressIntent`).
 - `GraphLogic.js` is the shared rolling-sample and plot-point math behind
   `LinkGraph` (`pushSample`, `graphPoints`), also moved from the Network
   plugin. `Panel.qml` and `LinkGraph.qml` both import it directly.

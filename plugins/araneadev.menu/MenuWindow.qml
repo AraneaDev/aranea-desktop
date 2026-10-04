@@ -26,16 +26,6 @@ PanelWindow {
     pointerGate.reset()
   }
 
-  // Lets the first pointer sample select (a click that opened a submenu).
-  function allowInitialPointerSample(): void {
-    pointerGate.allowInitialSample()
-  }
-
-  // Whether the pointer really moved over item (see PointerMoveGate).
-  function pointerMoved(item, mouse): bool {
-    return pointerGate.moved(item, mouse)
-  }
-
   // Preselects "cancel" in the uninstall confirmation.
   function resetDeleteConfirm(): void {
     deleteConfirm.selectedIndex = 1
@@ -214,6 +204,8 @@ PanelWindow {
         rootContextHeight: panel.root.style.rootContextHeight
         rootTileHeight: panel.root.style.rootTileHeight
         footerHeight: panel.root.style.footerHeight
+        pointerGate: pointerGate
+        layoutChangedAt: panel.root.layoutChangedAt
         onTileActivated: function (tile) {
           panel.root.activateTile(tile)
         }
@@ -279,7 +271,7 @@ PanelWindow {
           foldPeek: panel.root.style.rowPeek
           model: panel.root.displayModel
           selectedIndex: panel.root.selectedIndex
-          cursorActive: panel.root.cursorActive
+          cursorActive: panel.root.outlineShown
           filterText: panel.root.filterText
           fullRootHeader: panel.root.fullRootHeader
           appLibrary: panel.root.appLibrary
@@ -288,7 +280,6 @@ PanelWindow {
           selectedBackground: panel.root.style.selectedBackground
           selectedText: panel.root.style.selectedText
           border: panel.root.style.border
-          selectedBorderSpec: panel.root.style.selectedBorderSpec
           fontFamily: panel.root.style.fontFamily
           menuFontScale: panel.root.style.menuFontScale
           menuLetterSpacing: panel.root.style.menuLetterSpacing
@@ -298,13 +289,10 @@ PanelWindow {
           rowReservedBorderRight: panel.root.style.rowReservedBorderRight
           dividerHeight: panel.root.style.dividerHeight
           rowHeightForDetail: panel.root.rowHeightForDetail
-          onRowHovered: function (index, row, point) {
-            panel.root.selectFromPointer(index, row, point)
-          }
-          onRowActivated: function (index, row, button) {
-            panel.root.cursorActive = true
-            panel.root.selectedIndex = index
-            panel.root.activateIndex(index, true)
+          pointerGate: pointerGate
+          layoutChangedAt: panel.root.layoutChangedAt
+          onRowActivated: function (index, key) {
+            panel.root.activateKey(index, key)
           }
           onAppContextRequested: function (appId) {
             panel.root.toggleFavoriteApp(appId)

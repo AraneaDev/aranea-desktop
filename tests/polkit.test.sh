@@ -103,4 +103,18 @@ if grep -Eq 'property bool failed|failed = ' "${polkit_files[@]}"; then
   exit 1
 fi
 
+# --- consistency pass 4: glyphs are code points (polkit and the lock field)
+glyph_status=0
+LC_ALL=C.UTF-8 grep -P '[\x{E000}-\x{F8FF}\x{F0000}-\x{10FFFF}]' "$plugin/"*.qml "$repo_root/plugins/araneadev.lock/LockAuthPanel.qml" || glyph_status=$?
+if [[ "$glyph_status" -ne 1 ]]; then
+  echo "spell polkit and lock glyphs with String.fromCodePoint" >&2
+  exit 1
+fi
+# The password field is the shared credential prompt, not a hand-rolled input.
+grep -Fq 'Aranea.CredentialPrompt {' "$plugin/PolkitAuthField.qml"
+if grep -Fq 'TextInput {' "$plugin/PolkitAuthField.qml"; then
+  echo "the polkit field must use the shared CredentialPrompt" >&2
+  exit 1
+fi
+
 echo "polkit contract passed"

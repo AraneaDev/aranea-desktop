@@ -129,9 +129,8 @@ Panel {
   //   "connected"  — currently connected devices; Enter disconnects.
   //   "known"      — remembered devices; Enter connects.
   //   "discovered" — unremembered devices visible while scanning; Enter connects.
-  // Visuals always come from CursorSurface (hasCursor / current),
-  // never from containsMouse. Mouse hover updates root cursor state too,
-  // guaranteeing one highlight on screen.
+  // The outline comes from this cursor (hasCursor), never from the
+  // pointer: hover only draws the rows' own fill and never moves it.
   property string focusSection: "connected"
   // Row index within focusSection.
   property int selectedIndex: 0
@@ -1133,31 +1132,15 @@ Panel {
   }
 
   // Carries out one BluetoothDropdown action. Every action comes from the
-  // pointer, so each one hands the cursor back from the keyboard.
+  // pointer, so each one hands the cursor back from the keyboard. A hover
+  // is only the rows' own fill: it never moves the cursor or hides the
+  // outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     keyboardCursor = false
     if (name === "toggleBluetooth") {
       toggleBluetooth()
-      return
-    }
-    if (name === "hover") {
-      // Leaving a forget button only drops the action focus on that row,
-      // as stock's button did; the row's own hover places the cursor.
-      if (arg.leave) {
-        if (focusSection === arg.section && selectedIndex === arg.index)
-          actionFocused = false
-        return
-      }
-      // Pointer use spends a keyboard Forget's follow.
-      pendingRemovalKey = ""
-      if (arg.section === "header") {
-        setHeaderCursor()
-        return
-      }
-      cursorActive = true
-      focusSection = arg.section
-      selectedIndex = arg.index
-      actionFocused = !!arg.action
       return
     }
     // Pointer use spends a keyboard Forget's follow.
@@ -1305,18 +1288,24 @@ Panel {
       else if (dx !== 0)
         root.moveCursorH(dx)
     }
+    // Enter and x, like any first key, only reveal a hidden cursor; they
+    // act only on the outlined row.
     onActivateRequested: {
       dropdown.disarmPointer()
-      if (!root.cursorActive)
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.cursorActive = true
+        root.keyboardCursor = true
         return
-      root.keyboardCursor = true
+      }
       root.activateCursor()
     }
     onDeleteRequested: {
       dropdown.disarmPointer()
-      if (!root.cursorActive)
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.cursorActive = true
+        root.keyboardCursor = true
         return
-      root.keyboardCursor = true
+      }
       root.deleteSelected()
     }
     onTextKey: function (t) {

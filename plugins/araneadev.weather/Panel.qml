@@ -314,25 +314,17 @@ Panel {
   // True while the keyboard drives the cursor; any pointer action clears
   // it. The view outlines the cursor only then.
   property bool keyboardCursor: false
-  // True between the frame's returnRequested and the activateRequested
-  // that follows it (Return or Enter, not Space).
-  property bool returnPressed: false
   // The control the cursor is on: "place", "refresh" or "clear".
   property string cursorSection: "place"
-  // The control the cursor was deliberately put on (a move or a hover;
-  // never an open or a reveal); Enter refuses while it is "" or not the
-  // cursor's (CursorLogic.cursorConfirmed).
+  // The control the cursor was deliberately put on (a move or a keyboard
+  // reveal; never an open or a hover); Enter refuses while it is "" or not
+  // the cursor's (CursorLogic.cursorConfirmed).
   property string cursorKey: ""
-  // The controls the keyboard walks, in order: the place label (while a
-  // place shows) and the updated label (once fetched).
-  readonly property var cursorSections: {
-    var list = []
-    if (root.reportLocation !== "")
-      list.push("place")
-    if (root.fetchedAtMs > 0)
-      list.push("refresh")
-    return list
-  }
+  // The controls the keyboard walks, in order: the place label (always
+  // shown, the edit glyph alone before a place is known, and always a
+  // stop, so the outline and Enter agree even with no place and no fetch)
+  // and the updated label (once fetched).
+  readonly property var cursorSections: WeatherLogic.cursorSections(root.fetchedAtMs)
 
   // The forecast days the view shows (today first, up to 4), each keyed
   // by its date.
@@ -394,7 +386,7 @@ Panel {
         section: root.cursorSection,
         index: 0
       },
-      keyHint: editing ? "↑↓ pick · enter save · esc cancel" : "e edit place · r refresh · tab next"
+      keyHint: WeatherLogic.keyHint(editing, root.cursorSection)
     }
   }
 
@@ -751,6 +743,9 @@ Panel {
       root.cancelEditingLocation()
     } else if (name === "step") {
       root.stepSuggestion(Number(a.delta) || 0)
+    } else if (name === "hover") {
+      // Only the control's own fill: a hover never moves the cursor or the
+      // highlighted suggestion, nor hides the outline.
     } else {
       root.keyboardCursor = false
       if (name === "editPlace") {
@@ -763,26 +758,8 @@ Panel {
           root.clearLocation()
       } else if (name === "refresh") {
         root.refresh()
-      } else if (name === "hover") {
-        root.hoverAt(a)
       }
     }
-  }
-
-  // A real pointer move onto a control (ARG {section, index, key}): a
-  // suggestion becomes the highlighted one (stock), any other control
-  // takes the cursor without showing it.
-  function hoverAt(arg) {
-    if (arg.section === "suggestions") {
-      if (WeatherLogic.suggestionAt(root.locationSuggestions, arg.index, arg.key))
-        root.suggestionIndex = arg.index
-      return
-    }
-    if (["place", "refresh", "clear"].indexOf(arg.section) < 0 || arg.key !== arg.section)
-      return
-    root.cursorActive = true
-    root.cursorSection = arg.section
-    root.cursorKey = arg.key
   }
 
   // Keeps the cursor on a control the keyboard can reach.
@@ -806,23 +783,24 @@ Panel {
     root.cursorKey = root.cursorSection
   }
 
+  // Shows the keyboard cursor where it is, on the control it sits on: the
+  // outline marks Enter's target, so the revealed control is the one Enter
+  // then acts on.
+  function revealCursor() {
+    root.clampCursor()
+    root.cursorActive = true
+    root.keyboardCursor = true
+    root.cursorKey = root.cursorSection
+  }
+
   // Enter or Space in the frame (never in the place field, which takes its
-  // own keys): with no cursor yet, Return / Enter opens the place editor as
-  // in stock (Space does nothing); a
-  // pointer-placed cursor is only revealed; else the chosen control acts
-  // (CursorLogic.pressIntent, cursorConfirmed).
+  // own keys): like any first key, it only reveals a hidden cursor; else
+  // the chosen control acts (CursorLogic.pressIntent, cursorConfirmed).
   function activateCursor() {
-    var byReturn = root.returnPressed
-    root.returnPressed = false
-    var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
-    if (intent === "ignore") {
-      if (byReturn)
-        root.startEditingLocation()
+    if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) !== "act") {
+      root.revealCursor()
       return
     }
-    root.keyboardCursor = true
-    if (intent === "reveal")
-      return
     if (!CursorLogic.cursorConfirmed([
       {
         key: root.cursorSection
@@ -1093,18 +1071,14 @@ Panel {
     onMoveRequested: function (dx, dy) {
       dropdown.disarmPointer()
       // The first key after opening or after pointer use only reveals the
-      // cursor where it is; a reveal never chooses.
-      var revealing = !root.cursorActive || !root.keyboardCursor
-      root.cursorActive = true
-      root.keyboardCursor = true
-      root.clampCursor()
-      if (revealing)
+      // cursor where it is.
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.revealCursor()
         return
+      }
+      root.clampCursor()
       root.moveCursor(dy !== 0 ? dy : dx)
     }
-    // Return or Enter (never Space) marks the activation that follows, so
-    // only they open the editor with no cursor, as stock's catcher did.
-    onReturnRequested: root.returnPressed = true
     onActivateRequested: {
       dropdown.disarmPointer()
       root.activateCursor()

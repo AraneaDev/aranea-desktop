@@ -201,6 +201,9 @@ Item {
           implicitHeight: moreText.implicitHeight
           Component.onCompleted: more.createdAt = Date.now()
 
+          Aranea.HoverTint {
+            pointerGate: gate
+          }
           Rectangle {
             // The keyboard cursor outline (mint, keyboard only).
             objectName: "cursorOutline"

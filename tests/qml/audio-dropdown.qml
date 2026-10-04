@@ -321,6 +321,7 @@ ShellRoot {
     var rows = t.findChildren(output, "deviceRow")
     t.equal(rows.length, 3, "all three outputs are listed, unplugged included")
     t.check(rows[0].active && !rows[1].active, "the active output is marked")
+    t.check(t.findChild(rows[0], "selectedFill").visible && !t.findChild(rows[1], "selectedFill").visible, "the default output carries the selected highlight")
     rows[2].activate()
     rows[1].activate()
     t.equal(JSON.stringify(actions), JSON.stringify([["outputDevice",

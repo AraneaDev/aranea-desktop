@@ -51,6 +51,21 @@ modules own history, search, and tree traversal.
   and swapping provider rows), and `MenuGuardScript.js` (building the
   batched guard script).
 - QML owns focus, navigation, and user interaction.
+- The keyboard cursor and hover are separate. The cursor is the row
+  Enter acts on: the top row on open and after each keystroke, so
+  type-then-Enter launches the top match. It shows as the mint outline
+  whenever Enter has a target: from open, after typing and after a click
+  into a submenu (on its first row); never on the empty state. Only the
+  keyboard moves it, and the first Down goes straight to the second row. Hover draws the menu's
+  selected fill (fill only, no border, as the pickers') on the row under the pointer, and root
+  tiles their tint,
+  only after a real pointer move (PointerMoveGate); hover never moves the
+  cursor, and the fill clears when the rows change or scroll under the
+  pointer. Row and tile clicks act on the clicked item, keyed by item or
+  tile id and settled (`ClickSettle`): a release on a row that holds
+  another item is refused, and so is a click within 300 ms of the rows
+  changing, scrolling or appearing under a still pointer. A right click
+  only pins or unpins an app row; it no longer activates other rows.
 
 Shared keyboard and panel behavior comes from `araneadev.shared`.
 
@@ -58,4 +73,4 @@ Shared keyboard and panel behavior comes from `araneadev.shared`.
 
 Run `tests/qml-behaviour.test.sh menu menu-root menu-style menu-sources
 menu-guards menu-app-history menu-providers menu-dmenu menu-components
-menu-window-components` and the menu JS suites.
+menu-window-components menu-pointer` and the menu JS suites.

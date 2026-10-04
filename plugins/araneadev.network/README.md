@@ -86,9 +86,10 @@ the keyboard drives it.
 
 - Each section's cursor holds the key of the row (header action, band pill
   or Automatic switch, network or profile) it was deliberately put on
-  (an arrow, a left/right pick in the header, band or DNS, a hover, a
-  click, or open's Wi-Fi row 0) and follows that row when the list
-  re-sorts. Revealing the outline never chooses a row.
+  (an arrow, a left/right pick in the header, band or DNS, a click, a
+  keyboard reveal, or open's Wi-Fi row 0) and follows that row when the
+  list re-sorts. Hover never moves the cursor: it only draws the control's
+  hover fill.
 - When the row disappears, the cursor is clamped but its key is dropped.
   Enter and `x` then do nothing until the user picks a row
   (`CursorLogic.followCursor`, `araneadev.shared`, imported directly; `cursorConfirmed`
@@ -97,9 +98,12 @@ the keyboard drives it.
 - The same goes for a cursor moved automatically into another section, for
   example when Saved or the band section empties or hides under it
   (`NetworkLogic.keyTargetConfirmed`).
-- Enter or `x` on a cursor the pointer placed (no outline) only reveals it
-  (`NetworkLogic.pressOutcome`), so the row that slid into a lost key's
-  place is never adopted by a reveal.
+- Enter or `x` on a hidden cursor (a fresh open, or after pointer use)
+  only reveals it, as an arrow does (`NetworkLogic.pressOutcome`). The
+  outline marks Enter's target, so a reveal chooses the section and row it
+  shows (`NetworkLogic.revealTarget`): with no Wi-Fi rows, the first Enter
+  outlines DNS and the second applies it. Joining a network still takes a
+  second, deliberate Enter on a visible outline.
 - Pointer actions carry their row's key and are refused when the row
   changed.
 - A row or forget button created under a still pointer ignores clicks for

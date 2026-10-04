@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
-import "../araneadev.shared/CursorLogic.js" as CursorLogic
 import "WorkspaceModel.js" as WorkspaceModel
 
 Aranea.KeyboardPanelFrame {
@@ -13,8 +12,8 @@ Aranea.KeyboardPanelFrame {
   property var workspaceStates: []
   // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
   // none); rows re-sort as workspaces come and go, so the cursor follows
-  // the workspace, not a position. The pointer places it too, without
-  // showing it.
+  // the workspace, not a position. Only the keyboard places it; hover never
+  // does.
   property string cursorKey: ""
   // True while the keyboard drives the cursor; any pointer use clears it.
   // The mint outline shows only then, and the first key after opening or
@@ -63,12 +62,8 @@ Aranea.KeyboardPanelFrame {
   }
   onActivateRequested: {
     panel.disarmPointer()
-    var intent = CursorLogic.pressIntent(host.cursorKey !== "", host.keyboardCursor)
-    if (intent === "reveal") {
-      host.keyboardCursor = true
-      return
-    }
     var press = WorkspaceModel.cursorPress(host.workspaceStates, host.cursorKey, host.keyboardCursor)
+    host.cursorKey = press.key
     host.keyboardCursor = press.keyboard
     if (press.row)
       host.focusWorkspace(press.row.id)
@@ -90,10 +85,6 @@ Aranea.KeyboardPanelFrame {
       maxContentHeight: Math.max(0, Math.min(Style.space(520), host.availableCardHeight) - host.verticalContentInset)
       onFocusWorkspace: function (id) {
         host.focusWorkspace(id)
-      }
-      onRowHovered: function (index) {
-        host.keyboardCursor = false
-        host.cursorKey = WorkspaceModel.workspaceKey(host.workspaceStates[index])
       }
     }
   }

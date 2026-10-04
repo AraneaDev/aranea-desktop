@@ -1,9 +1,15 @@
 // Clipboard result list, selected preview, and empty state.
 // Keyboard policy and clipboard actions remain owned by ClipboardWindow.qml.
+// The mint outline marks the keyboard cursor (selectedIndex while
+// cursorActive) and only the keyboard moves it; hover fills the row the
+// pointer really moved onto (PointerMoveGate) and clears when the rows
+// change or scroll under the pointer. Clicks are keyed by entry id and
+// settled against layoutChangedAt and the list's own scroll stamp.
 // qmllint disable missing-property unqualified
 
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "../ClipboardLogic.js" as ClipboardLogic
 import "../../araneadev.shared" as Aranea
 
@@ -20,8 +26,23 @@ Item {
   property real secretTtlMs: 600000
   // Currently selected display-row index.
   property int selectedIndex: -1
-  // Whether keyboard selection is active.
+  // Whether the keyboard outline shows on selectedIndex.
   property bool cursorActive: false
+  // The gate that tells real pointer moves from rows moving under a still
+  // pointer; the window shares its own, else the pane's.
+  property var pointerGate: ownGate
+  // When the rows last changed under a still pointer (Clipboard.qml's
+  // layoutChangedAt), 0 for never.
+  property real layoutChangedAt: 0
+  // When the list last scrolled (Date.now()), 0 for never.
+  property real scrolledAt: 0
+  // The row the pointer really moved onto (hover fill), -1 for none.
+  property int hoveredIndex: -1
+  // The entry id that row held when hovered; the fill shows only while the
+  // row still holds it.
+  property string hoveredKey: ""
+  // The list of rows (tests read its delegates).
+  readonly property alias list: resultList
   // Index of a revealed secret, or -1 while masked.
   property int revealedIndex: -1
   // Row height supplied by the clipboard window.
@@ -47,10 +68,17 @@ Item {
     return kind || ""
   }
 
-  // Emitted when pointer movement should update clipboard selection.
-  signal pointerMoved(int rowIndex, var item, var mouse)
-  // Emitted when a row is activated.
-  signal activated(int rowIndex)
+  // Emitted for a settled click on row ROWINDEX that still holds KEY (its
+  // entry id) on release.
+  signal rowActivated(int rowIndex, string key)
+
+  // Drops the hover fill: the rows moved or changed under the pointer.
+  function clearHover(): void {
+    pane.hoveredIndex = -1
+    pane.hoveredKey = ""
+  }
+
+  onLayoutChangedAtChanged: pane.clearHover()
 
   // Scroll the selected result into view.
   function reveal(index: int): void {
@@ -99,6 +127,10 @@ Item {
         clip: true
         spacing: Style.space(2)
         boundsBehavior: Flickable.StopAtBounds
+        onContentYChanged: {
+          pane.scrolledAt = Date.now()
+          pane.clearHover()
+        }
 
         section.property: "section"
         section.delegate: Item {
@@ -134,7 +166,11 @@ Item {
         }
 
         delegate: ClipboardResultRow {
+          objectName: "clipboardRow"
           hasCursor: pane.cursorActive && index === pane.selectedIndex
+          hovered: pane.hoveredIndex === index && pane.hoveredKey === entryId
+          pointerGate: pane.pointerGate
+          layoutChangedAt: Math.max(pane.layoutChangedAt, pane.scrolledAt)
           width: ListView.view.width
           height: pane.rowHeight
           glyph: pane.kindGlyph(kind)
@@ -143,11 +179,16 @@ Item {
           selectedText: pane.selectedText
           selectedBackground: pane.selectedBackground
           cornerRadius: pane.cornerRadius
-          onPointerMoved: function (rowIndex, item, mouse) {
-            pane.pointerMoved(rowIndex, item, mouse)
+          onHoverMoved: function (rowIndex, key) {
+            pane.hoveredIndex = rowIndex
+            pane.hoveredKey = key
           }
-          onActivated: function (rowIndex) {
-            pane.activated(rowIndex)
+          onHoverLeft: function (rowIndex) {
+            if (pane.hoveredIndex === rowIndex)
+              pane.clearHover()
+          }
+          onActivated: function (rowIndex, key) {
+            pane.rowActivated(rowIndex, key)
           }
         }
       }
@@ -182,10 +223,16 @@ Item {
     }
   }
 
+  // The pane's own gate, used when the window shares none (tests).
+  PointerMoveGate {
+    id: ownGate
+    referenceItem: pane
+  }
+
   Aranea.EmptyState {
     anchors.fill: parent
     visible: !pane.model || pane.model.count === 0
-    icon: "󰅌"
+    icon: String.fromCodePoint(0xf014c)
     message: pane.emptyMessage
     fontFamily: pane.fontFamily
     iconColor: pane.selectedText
