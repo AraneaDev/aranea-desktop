@@ -1,9 +1,17 @@
 // Result list and fold affordances for the menu card.
+//
+// The highlight is the keyboard cursor only: hover never moves it. Clicks
+// are keyed by the row's item id: a press records it and the release is
+// refused when the row holds another item by then, or within 300 ms of the
+// rows changing or scrolling under the pointer (layoutChangedAt, the
+// list's own scroll stamp) unless the pointer has really moved onto the
+// row since, through the PointerMoveGate (ClickSettle).
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Item {
   id: results
@@ -55,11 +63,20 @@ Item {
   property int iconSlot: Style.space(24)
   // Height of the peeking row at the fold (MenuStyle.rowPeek).
   property int foldPeek: Style.space(22)
-  // Public contract member.
-  signal rowHovered(int index, var row, var point)
-  // Public contract member.
-  signal rowActivated(int index, var row, int button)
-  // Public contract member.
+  // When the menu's rows last changed under a still pointer (Menu.qml's
+  // layoutChangedAt), 0 for never.
+  property real layoutChangedAt: 0
+  // When the list last scrolled (Date.now()), 0 for never: a scroll moves
+  // the rows under a still pointer.
+  property real scrolledAt: 0
+  // The gate that tells real pointer moves from rows moving under a still
+  // pointer; the window shares its own, else the list's.
+  property var pointerGate: ownGate
+  // Emitted for a settled left click on row INDEX that still holds KEY
+  // (its item id) on release.
+  signal rowActivated(int index, string key)
+  // Emitted for a settled right click on an app row that still holds its
+  // item id on release, with the row's APPID.
   signal appContextRequested(string appId)
 
   // Public contract member.
@@ -72,6 +89,7 @@ Item {
     clip: true
     spacing: parent.rowSpacing
     boundsBehavior: Flickable.StopAtBounds
+    onContentYChanged: results.scrolledAt = Date.now()
     section.property: "section"
     section.criteria: ViewSection.FullString
 
@@ -93,7 +111,9 @@ Item {
 
     delegate: BorderSurface {
       id: row
+      objectName: "menuRow"
       required property int index
+      required property string itemId
       required property string kind
       required property string icon
       required property string iconFont
@@ -105,6 +125,24 @@ Item {
       readonly property bool hasCursor: results.cursorActive && index === results.selectedIndex
       readonly property bool isApp: kind === "app"
       readonly property bool hasIcon: icon.length > 0 || isApp
+      // When this row was built (Date.now()).
+      property real createdAt: 0
+      // When the gate last accepted a real pointer move onto this row.
+      property real pointerMovedAt: 0
+      // The item id under the last press, compared on release.
+      property string pressedKey: ""
+
+      // Whether a pointer click may act on this row (ClickSettle).
+      function clickSettled(): bool {
+        return ClickSettle.clickSettled({
+          now: Date.now(),
+          createdAt: row.createdAt,
+          movedAt: row.pointerMovedAt,
+          layoutChangedAt: Math.max(results.layoutChangedAt, results.scrolledAt)
+        })
+      }
+
+      Component.onCompleted: row.createdAt = Date.now()
 
       width: ListView.view.width
       height: results.rowHeightForDetail ? results.rowHeightForDetail(detail) : Style.space(44)
@@ -183,25 +221,37 @@ Item {
       }
 
       MouseArea {
+        id: rowArea
+        objectName: "rowArea"
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onEntered: results.rowHovered(row.index, row, {
-          x: mouseX,
-          y: mouseY
-        })
+        // Hover only feeds the settle rule; it never moves the highlight.
         onPositionChanged: function (mouse) {
-          results.rowHovered(row.index, row, mouse)
+          if (results.pointerGate && results.pointerGate.moved(rowArea, mouse))
+            row.pointerMovedAt = Date.now()
         }
+        onPressed: row.pressedKey = row.itemId
         onClicked: function (mouse) {
-          if (mouse.button === Qt.RightButton && row.isApp) {
-            results.appContextRequested(row.appId)
+          var key = row.pressedKey
+          row.pressedKey = ""
+          if (!key || key !== row.itemId || !row.clickSettled())
+            return
+          if (mouse.button === Qt.RightButton) {
+            if (row.isApp)
+              results.appContextRequested(row.appId)
             return
           }
-          results.rowActivated(row.index, row, mouse.button)
+          results.rowActivated(row.index, key)
         }
       }
     }
+  }
+
+  // The list's own gate, used when the window shares none (tests).
+  PointerMoveGate {
+    id: ownGate
+    referenceItem: results
   }
 
   Rectangle {

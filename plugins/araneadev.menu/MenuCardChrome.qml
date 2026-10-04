@@ -56,6 +56,12 @@ Item {
   property int footerHeight: Style.space(30)
   // Gap between header, context band, tiles and footer on the root.
   property int sectionSpacing: Style.spacing.md
+  // The window's PointerMoveGate, shared with the tiles (null: each tile
+  // uses its own).
+  property var pointerGate: null
+  // When the menu's layout last changed under the pointer, for the tiles'
+  // settled clicks.
+  property real layoutChangedAt: 0
   // Public contract member.
   signal tileActivated(var tile)
 
@@ -199,6 +205,8 @@ Item {
           menuFontScale: chrome.menuFontScale
           menuLetterSpacing: chrome.menuLetterSpacing
           motionEnabled: chrome.motionEnabled
+          sharedGate: chrome.pointerGate
+          layoutChangedAt: chrome.layoutChangedAt
           onActivated: chrome.tileActivated(modelData)
         }
       }

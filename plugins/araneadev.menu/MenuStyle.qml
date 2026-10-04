@@ -113,19 +113,19 @@ QtObject {
         id: "tile.files",
         label: "Files",
         detail: "BROWSE  ·  ^1",
-        icon: "󰉋",
+        icon: String.fromCodePoint(0xf024b),
         source: "fixed"
       }), ({
         id: "tile.terminal",
         label: "Terminal",
         detail: "EXECUTE  ·  ^2",
-        icon: "\uF489",
+        icon: String.fromCodePoint(0xf489),
         source: "fixed"
       }), ({
         id: "tile.setup",
         label: "Setup",
         detail: "CONFIGURE  ·  ^3",
-        icon: "\uE615",
+        icon: String.fromCodePoint(0xe615),
         source: "fixed"
       })]
 

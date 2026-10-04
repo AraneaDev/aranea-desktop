@@ -80,10 +80,11 @@ function emptyState(state) {
   /** @type {{[key: string]: *}} */
   var s = state || {}
   var filter = String(s.filter || "")
-  if (filter) return { icon: "󰈉", text: "No matches for “" + filter + "”" }
-  if (s.loading) return { icon: "󰑐", text: "Loading…" }
-  if (s.error) return { icon: "󰀦", text: "Couldn’t load this list" }
-  return { icon: "󰈉", text: "Nothing here yet" }
+  if (filter)
+    return { icon: String.fromCodePoint(0xf0209), text: "No matches for “" + filter + "”" }
+  if (s.loading) return { icon: String.fromCodePoint(0xf0450), text: "Loading…" }
+  if (s.error) return { icon: String.fromCodePoint(0xf0026), text: "Couldn’t load this list" }
+  return { icon: String.fromCodePoint(0xf0209), text: "Nothing here yet" }
 }
 
 /**

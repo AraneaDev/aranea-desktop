@@ -175,6 +175,12 @@ test("menu model (4b)", () => {
     "Nothing here yet",
     "empty"
   )
+  // empty-state glyphs, by code point
+  const cp = (state) => menu.emptyState(state).icon.codePointAt(0)
+  eq(cp({ filter: "fox" }), 0xf0209, "no-match glyph")
+  eq(cp({ loading: true }), 0xf0450, "loading glyph")
+  eq(cp({ error: true }), 0xf0026, "error glyph")
+  eq(cp({}), 0xf0209, "empty glyph")
   // taglines by id
   eq(
     menu.semanticDetail({ id: "system", parent: "root", label: "System" }, "desc"),

@@ -68,10 +68,18 @@ if grep -Eq 'tileBackground|TileBackground|hoveredTileBorder|compactHeaderHeight
   echo "menu dead code or stale comments are back" >&2
   exit 1
 fi
-if grep -Eq 'root\.setActiveMenu\([^,()]+, (true|false)\)|root\.activateIndex\([^,()]+\)$' "$menu_qml"; then
-  echo "setActiveMenu/activateIndex must receive every declared argument" >&2
+if grep -Eq 'root\.setActiveMenu\([^,()]+\)' "$menu_qml"; then
+  echo "setActiveMenu must receive every declared argument" >&2
   exit 1
 fi
+# --- consistency part 4: hover never moves the highlight; clicks are keyed
+if grep -Eq 'selectFromPointer|rowHovered|allowInitialPointerSample' "$menu_qml" "$menu_window" "$menu_results"; then
+  echo "hover must never move the menu highlight" >&2
+  exit 1
+fi
+grep -Fq 'panel.root.activateKey(index, key)' "$menu_window"
+grep -Fq 'ClickSettle.clickSettled(' "$menu_results"
+grep -Fq 'ClickSettle.clickSettled(' "$repo_root/plugins/araneadev.menu/MenuRootTile.qml"
 # --- 4b final review: state loads before use; stale routes never reopen; clock only when open
 block_grep "$menu_history" 'id: appHistoryFile' 'blockLoading: true'
 block_grep "$menu_style" 'id: menuClock' 'enabled: style.opened'

@@ -65,13 +65,14 @@ test("menu QML exposes its typed function signatures", () => {
   requiresSignature(menuQml, "function select(delta: int): void", "menu select")
   requiresSignature(
     menuQml,
-    "function setActiveMenu(id: string, pushHistory: bool, fromPointer: bool): void",
+    "function setActiveMenu(id: string, pushHistory: bool): void",
     "menu setActiveMenu"
   )
+  requiresSignature(menuQml, "function activateIndex(index: int): void", "menu activateIndex")
   requiresSignature(
     menuQml,
-    "function activateIndex(index: int, fromPointer: bool): void",
-    "menu activateIndex"
+    "function activateKey(index: int, key: string): bool",
+    "menu activateKey"
   )
   requiresSignature(
     menuQml,
