@@ -65,4 +65,24 @@ if grep -Eq 'property int (headerHeight|contentSpacing)' "$entry" "$window"; the
   exit 1
 fi
 
+# --- consistency part 4: the outline marks Enter's target; hover only fills
+# (gated) and never moves it; clicks are keyed by entry id and settled
+pane="$plugin/components/ClipboardResultsPane.qml"
+row="$plugin/components/ClipboardResultRow.qml"
+if grep -Eq 'selectFromPointer|pointerMoved\b|signal pointerMoved' "$entry" "$window" "$pane" "$row"; then
+  echo "hover must never move the clipboard cursor" >&2
+  exit 1
+fi
+grep -Fq 'cursorActive: panel.root.outlineShown' "$window"
+grep -Fq 'pointerGate: pointerGate' "$window"
+grep -Fq 'layoutChangedAt: panel.root.layoutChangedAt' "$window"
+grep -Fq 'panel.root.activateKey(rowIndex, key)' "$window"
+grep -Fq 'if (panel.root.handleKey(event))' "$window"
+grep -Fq 'ClickSettle.clickSettled(' "$row"
+grep -Fq 'displayModel.get(index).entryId !== key' "$entry"
+if grep -Fq 'displayModel.clear()' "$entry"; then
+  echo "rebuildDisplay must update the rows in place (syncRows)" >&2
+  exit 1
+fi
+
 echo "clipboard contract passed"

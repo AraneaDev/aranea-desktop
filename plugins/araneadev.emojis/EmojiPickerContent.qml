@@ -1,10 +1,13 @@
 // Emoji picker presentation: overlay chrome, recents, results, and footer.
 // Filtering, recents persistence, keyboard navigation, and insertion remain
-// owned by Emojis.qml.
+// owned by Emojis.qml. The mint outline marks the keyboard cursor; hover
+// only fills (gated by PointerMoveGate) and clicks are keyed by emoji and
+// settled, in the RECENT row and the grid alike.
 // qmllint disable missing-property unqualified
 
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
 
 Item {
@@ -20,8 +23,18 @@ Item {
   property bool showRecents: false
   // Selected result index.
   property int selectedIndex: -1
-  // Whether keyboard selection styling is active.
+  // Whether the keyboard outline shows.
   property bool cursorActive: false
+  // The gate that tells real pointer moves from cells moving under a still
+  // pointer; the window shares its own, else the content's.
+  property var pointerGate: ownGate
+  // When the cells last changed under a still pointer (Emojis.qml's
+  // layoutChangedAt), 0 for never.
+  property real layoutChangedAt: 0
+  // The RECENT cell the pointer really moved onto (hover fill), -1 for none.
+  property int hoveredRecent: -1
+  // The emoji that RECENT cell held when hovered.
+  property string hoveredRecentKey: ""
   // Whether the current cursor belongs to recents.
   property bool inRecents: false
   // Selected recent index.
@@ -51,11 +64,23 @@ Item {
 
   // Current result-grid height used by page navigation in Emojis.qml.
   readonly property real resultHeight: resultGrid.height
+  // The result grid (tests read its cells).
+  readonly property alias grid: resultGrid
+  // The RECENT row's cells (tests read them).
+  readonly property alias recentCells: recentRepeater
 
-  // Emitted when a recent emoji is chosen.
-  signal recentPicked(string emoji)
-  // Emitted when a result emoji is chosen.
-  signal resultPicked(string emoji, int index)
+  // Emitted for a settled click on RECENT cell INDEX that still holds KEY.
+  signal recentPicked(int index, string key)
+  // Emitted for a settled click on result cell INDEX that still holds KEY.
+  signal resultPicked(int index, string key)
+
+  // Drops the RECENT row's hover fill.
+  function clearRecentHover(): void {
+    content.hoveredRecent = -1
+    content.hoveredRecentKey = ""
+  }
+
+  onLayoutChangedAtChanged: content.clearRecentHover()
 
   // Scroll a result into view after keyboard navigation.
   function reveal(index: int): void {
@@ -89,13 +114,26 @@ Item {
         // Split the remainder of the content width on both sides.
         x: Math.round((parent.width - width) / 2)
         Repeater {
+          id: recentRepeater
           model: content.showRecents ? content.recentModel : []
           delegate: EmojiCell {
             required property string modelData
             required property int index
+            objectName: "recentCell"
             glyph: modelData
-            hasCursor: content.inRecents && content.recentIndex === index
-            onPicked: content.recentPicked(modelData)
+            hasCursor: content.cursorActive && content.inRecents && content.recentIndex === index
+            hovered: content.hoveredRecent === index && content.hoveredRecentKey === modelData
+            pointerGate: content.pointerGate
+            layoutChangedAt: content.layoutChangedAt
+            onHoverMoved: function (key) {
+              content.hoveredRecent = index
+              content.hoveredRecentKey = key
+            }
+            onHoverLeft: if (content.hoveredRecent === index)
+              content.clearRecentHover()
+            onPicked: function (key) {
+              content.recentPicked(index, key)
+            }
           }
         }
       }
@@ -122,7 +160,11 @@ Item {
         selectedBackground: content.selectedBackground
         selectedText: content.selectedText
         foreground: content.foreground
-        onPicked: content.resultPicked(emoji, index)
+        pointerGate: content.pointerGate
+        layoutChangedAt: content.layoutChangedAt
+        onPicked: function (index, key) {
+          content.resultPicked(index, key)
+        }
       }
 
       // Name of the emoji under the cursor.
@@ -135,6 +177,12 @@ Item {
         foreground: content.foreground
       }
     }
+  }
+
+  // The content's own gate, used when the window shares none (tests).
+  PointerMoveGate {
+    id: ownGate
+    referenceItem: content
   }
 
   component Caption: Aranea.InkText {

@@ -8,7 +8,6 @@
 
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
@@ -24,6 +23,15 @@ Item {
   // Host plugin-shell handle, injected by the Omarchy shell; dismiss() calls
   // its hide().
   property var shell: null
+  // Whether to create the on-screen window; tests switch it off to run the
+  // picker offscreen.
+  property bool windowEnabled: true
+  // The window, once created; null offscreen.
+  property var view: null
+  // Runs a detached command (argv); tests replace it with a recorder.
+  property var run: function (argv) {
+    Quickshell.execDetached(argv)
+  }
   // Public manifest of this plugin, injected by the host; its id is what
   // dismiss() asks the shell to hide.
   property var manifest: null
@@ -34,8 +42,18 @@ Item {
   property string filterText: ""
   // Index of the selected cell in the filtered grid.
   property int selectedIndex: 0
-  // Whether a selection highlight is shown (false when nothing is selectable).
+  // Whether the cursor is on (false when nothing is selectable).
   property bool cursorActive: false
+  // Whether the mint outline shows on the cursor: whenever Enter has a
+  // target (from open, after typing; never with no results).
+  readonly property bool outlineShown: root.cursorActive && (root.inRecents ? root.recents.length > 0 : displayModel.count > 0)
+  // When the cells last changed under a still pointer (Date.now()), 0 for
+  // never: the picker opening, the shown emojis changing or the RECENT row
+  // showing or hiding. Pointer clicks within 300 ms of it are refused unless
+  // the pointer really moved onto the cell (ClickSettle).
+  property real layoutChangedAt: 0
+  // The shown emojis joined, so an equal rebuild does not stamp the layout.
+  property string displayKeys: ""
   // The cursor is either in the RECENT row or in the grid.
   property bool inRecents: false
   // Index of the selected emoji in the RECENT row, used while inRecents.
@@ -76,10 +94,10 @@ Item {
   property string fontFamily: Style.font.menuFamily
   // Inner padding of the card.
   property int contentMargin: Style.spacing.panelPadding
-  // Card width: 440 scaled units, capped to the panel minus outer gaps.
-  property int cardWidth: Math.min(Style.space(440), panel.width - Style.gapsOut * 2)
-  // Card height: 560 scaled units, capped to the panel minus outer gaps.
-  property int cardHeight: Math.min(Style.space(560), panel.height - Style.gapsOut * 2)
+  // Card width: 440 scaled units, capped to the window minus outer gaps.
+  property int cardWidth: root.view ? Math.min(Style.space(440), root.view.width - Style.gapsOut * 2) : Style.space(440)
+  // Card height: 560 scaled units, capped to the window minus outer gaps.
+  property int cardHeight: root.view ? Math.min(Style.space(560), root.view.height - Style.gapsOut * 2) : Style.space(560)
 
   // Width of one emoji cell (at least 44 scaled units, or the display font plus spacing).
   property int cellWidth: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
@@ -110,9 +128,34 @@ Item {
     root.inRecents = root.recents.length > 0
     root.cursorActive = true
     root.rebuildDisplay()
+    if (root.view)
+      root.view.disarmPointer()
     Qt.callLater(function () {
-      keyCatcher.forceActiveFocus()
+      if (root.view)
+        root.view.focusKeys()
     })
+  }
+
+  // Opening the picker or showing/hiding the RECENT row moves the cells
+  // under a still pointer.
+  onOpenedChanged: if (root.opened)
+    root.noteLayoutChange()
+  onShowRecentsChanged: root.noteLayoutChange()
+
+  // Stamps layoutChangedAt: the cells moved or changed under the pointer.
+  function noteLayoutChange(): void {
+    root.layoutChangedAt = Date.now()
+  }
+
+  // Scrolls grid cell INDEX into view (no-op offscreen).
+  function reveal(index: int): void {
+    if (root.view)
+      root.view.reveal(index)
+  }
+
+  // Height of the result grid, for page moves (one row offscreen).
+  function resultHeight(): real {
+    return root.view ? root.view.resultHeight : root.cellHeight
   }
 
   // Hides the overlay without notifying the host shell.
@@ -147,19 +190,41 @@ Item {
       root.rebuildDisplay()
   }
 
-  // Re-runs the search over all emojis, refills the grid model, clamps the
-  // selection and leaves the RECENT row when it is hidden.
+  // Replaces the grid's cells with ROWS in place: cells that stay keep
+  // their delegates (set), so a rebuild never recreates cells under the
+  // pointer.
+  function syncRows(rows: var): void {
+    var keep = Math.min(displayModel.count, rows.length)
+    for (var i = 0; i < keep; i++)
+      displayModel.set(i, rows[i])
+    if (displayModel.count > rows.length)
+      displayModel.remove(rows.length, displayModel.count - rows.length)
+    for (var j = keep; j < rows.length; j++)
+      displayModel.append(rows[j])
+  }
+
+  // Re-runs the search over all emojis, refills the grid model in place,
+  // stamps the layout when the shown emojis changed, clamps the selection
+  // and leaves the RECENT row when it is hidden.
   function rebuildDisplay() {
     // No cap below the data size, so the count and the grid cover every emoji.
     var out = EmojiSearch.filterEmojis(root.emojis, root.filterText, Math.max(1000, root.emojis.length))
     root.filteredEmojis = out
 
-    displayModel.clear()
+    var rows = []
+    var keys = []
     for (var j = 0; j < out.length; j++) {
-      displayModel.append({
+      keys.push(out[j].e)
+      rows.push({
         emoji: out[j].e,
         index: j
       })
+    }
+    root.syncRows(rows)
+    var joined = keys.join("\n")
+    if (joined !== root.displayKeys) {
+      root.displayKeys = joined
+      root.noteLayoutChange()
     }
 
     if (displayModel.count === 0)
@@ -174,13 +239,13 @@ Item {
 
     Qt.callLater(function () {
       if (displayModel.count > 0 && !root.inRecents)
-        pickerContent.reveal(root.selectedIndex)
+        root.reveal(root.selectedIndex)
     })
   }
 
   // Moves the cursor by delta cells, wrapping, within the RECENT row or the
-  // grid; the first move after the cursor was inactive jumps to the first or
-  // last cell.
+  // grid; the outline is already on Enter's target, so the first move moves
+  // it straight away.
   function select(delta) {
     if (root.inRecents) {
       root.recentIndex = (root.recentIndex + delta + root.recents.length) % root.recents.length
@@ -188,13 +253,9 @@ Item {
     }
     if (displayModel.count === 0)
       return
-    if (!cursorActive) {
-      cursorActive = true
-      selectedIndex = delta < 0 ? displayModel.count - 1 : 0
-    } else {
-      selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count
-    }
-    pickerContent.reveal(selectedIndex)
+    cursorActive = true
+    selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count
+    root.reveal(selectedIndex)
   }
 
   // Moves the cursor by delta rows, crossing between the RECENT row and the
@@ -211,7 +272,7 @@ Item {
           return
         root.inRecents = false
         root.selectedIndex = Math.min(column, displayModel.count - 1)
-        pickerContent.reveal(root.selectedIndex)
+        root.reveal(root.selectedIndex)
       } else if (delta > 0) {
         root.recentIndex = Math.min(root.recentIndex + columns, count - 1)
       } else if (row > 0) {
@@ -221,12 +282,7 @@ Item {
     }
     if (displayModel.count === 0)
       return
-    if (!cursorActive) {
-      cursorActive = true
-      selectedIndex = delta < 0 ? displayModel.count - 1 : 0
-      pickerContent.reveal(selectedIndex)
-      return
-    }
+    cursorActive = true
     var newIndex = selectedIndex + delta * columns
     if (newIndex < 0) {
       // Up out of the first grid row enters the last recent row.
@@ -241,7 +297,7 @@ Item {
     if (newIndex >= displayModel.count)
       newIndex = displayModel.count - 1
     selectedIndex = newIndex
-    pickerContent.reveal(selectedIndex)
+    root.reveal(selectedIndex)
   }
 
   // Moves the grid cursor by delta pages (the rows visible in the grid),
@@ -249,14 +305,14 @@ Item {
   function selectPage(delta) {
     if (root.inRecents || displayModel.count === 0)
       return
-    var visibleRows = Math.max(1, Math.floor(pickerContent.resultHeight / cellHeight))
+    var visibleRows = Math.max(1, Math.floor(root.resultHeight() / cellHeight))
     var newIndex = selectedIndex + delta * columns * visibleRows
     if (newIndex < 0)
       newIndex = 0
     if (newIndex >= displayModel.count)
       newIndex = displayModel.count - 1
     selectedIndex = newIndex
-    pickerContent.reveal(selectedIndex)
+    root.reveal(selectedIndex)
   }
 
   // Sets the search text, resets the cursor to the first grid cell and
@@ -284,9 +340,79 @@ Item {
     root.remember(emoji)
     root.dismiss()
     if (copyOnly)
-      Quickshell.execDetached(["wl-copy", "--", emoji])
+      root.run(["wl-copy", "--", emoji])
     else
-      Quickshell.execDetached([root.omarchyPath + "/bin/omarchy-menu-emoji-insert", emoji])
+      root.run([root.omarchyPath + "/bin/omarchy-menu-emoji-insert", emoji])
+  }
+
+  // A pointer click on grid cell INDEX, pressed while it held KEY (its
+  // emoji): moves the cursor there and inserts it. Refused (false) when the
+  // cell no longer holds KEY, so a click never lands on an emoji that
+  // changed between press and release. Hover never moves the cursor.
+  function activateKey(index: int, key: string): bool {
+    if (!key || index < 0 || index >= displayModel.count || displayModel.get(index).emoji !== key)
+      return false
+    root.inRecents = false
+    root.cursorActive = true
+    root.selectedIndex = index
+    root.applySelected(key, false)
+    return true
+  }
+
+  // A pointer click on RECENT cell INDEX, pressed while it held KEY: inserts
+  // it, or is refused (false) when the cell no longer holds KEY.
+  function activateRecentKey(index: int, key: string): bool {
+    if (!key || !root.showRecents || root.recents[index] !== key)
+      return false
+    root.inRecents = true
+    root.cursorActive = true
+    root.recentIndex = index
+    root.applySelected(key, false)
+    return true
+  }
+
+  // Handles a key press in the picker: Esc clears the search, then closes;
+  // arrows and PageUp/PageDown move the cursor; Enter inserts the outlined
+  // emoji (Shift copies; nothing with no results); other text edits the
+  // search. Returns whether the key was handled.
+  function handleKey(event: var): bool {
+    if (event.key === Qt.Key_Escape) {
+      if (root.filterText)
+        root.setFilter("")
+      else
+        root.dismiss()
+      return true
+    } else if (Util.editsFilter(event, root.filterText)) {
+      root.setFilter(Util.editedFilter(event, root.filterText))
+      return true
+    } else if (event.key === Qt.Key_Left) {
+      root.select(-1)
+      return true
+    } else if (event.key === Qt.Key_Right) {
+      root.select(1)
+      return true
+    } else if (event.key === Qt.Key_Up) {
+      root.selectRow(-1)
+      return true
+    } else if (event.key === Qt.Key_Down) {
+      root.selectRow(1)
+      return true
+    } else if (event.key === Qt.Key_PageUp) {
+      root.selectPage(-1)
+      return true
+    } else if (event.key === Qt.Key_PageDown) {
+      root.selectPage(1)
+      return true
+    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+      // Enter acts on the outlined emoji; with no results it does nothing.
+      if (root.outlineShown)
+        root.applySelected(root.selectedEmoji, (event.modifiers & Qt.ShiftModifier) !== 0)
+      return true
+    } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127) {
+      root.setFilter(root.filterText + event.text)
+      return true
+    }
+    return false
   }
 
   // Key hints for the chrome footer; Esc reads CLEAR while searching, else CLOSE.
@@ -297,31 +423,12 @@ Item {
   // Menu-like entrance (fade + slight scale), unless Aranea motion is off
   // (shared Aranea.MotionState).
   property bool motionEnabled: Aranea.MotionState.motionEnabled
-  onOpenedChanged: if (opened && root.motionEnabled)
-    openAnimation.restart()
-  ParallelAnimation {
-    id: openAnimation
-    NumberAnimation {
-      target: card
-      property: "opacity"
-      from: 0
-      to: 1
-      duration: 180
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: card
-      property: "scale"
-      from: 0.97
-      to: 1
-      duration: 180
-      easing.type: Easing.OutCubic
-    }
-  }
 
   ListModel {
-    id: displayModel
+    id: rowsModel
   }
+  // The grid's cells (the shown emojis), read by the window.
+  readonly property alias displayModel: rowsModel
 
   FileView {
     path: String(Qt.resolvedUrl("emojis.json")).replace(/^file:\/\//, "")
@@ -342,128 +449,15 @@ Item {
     command: ["mkdir", "-p", root.stateRoot]
   }
 
-  PanelWindow {
-    id: panel
-    visible: root.opened
-    anchors {
-      top: true
-      bottom: true
-      left: true
-      right: true
-    }
-    color: "transparent"
-    WlrLayershell.namespace: "omarchy-emojis"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-    exclusionMode: ExclusionMode.Ignore
-
-    Rectangle {
-      anchors.fill: parent
-      color: root.scrim
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.dismiss()
-    }
-
-    Aranea.SurfaceCard {
-      id: card
-      width: root.cardWidth
-      height: root.cardHeight
-      cornerRadius: root.cornerRadius
-      anchors.centerIn: parent
-      fillColor: root.background
-      borderSpecOverride: root.borderSpec
-      contentPadding: root.contentMargin
-
-      MouseArea {
-        anchors.fill: parent
-        onClicked: {}
-      }
-
-      Item {
-        id: keyCatcher
-        anchors.fill: parent
-        focus: true
-
-        Keys.priority: Keys.BeforeItem
-        Keys.onPressed: function (event) {
-          if (event.key === Qt.Key_Escape) {
-            if (root.filterText)
-              root.setFilter("")
-            else
-              root.dismiss()
-            event.accepted = true
-          } else if (Util.editsFilter(event, root.filterText)) {
-            root.setFilter(Util.editedFilter(event, root.filterText))
-            event.accepted = true
-          } else if (event.key === Qt.Key_Left) {
-            root.select(-1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Right) {
-            root.select(1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Up) {
-            root.selectRow(-1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Down) {
-            root.selectRow(1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_PageUp) {
-            root.selectPage(-1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_PageDown) {
-            root.selectPage(1)
-            event.accepted = true
-          } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.cursorActive)
-              root.applySelected(root.selectedEmoji, (event.modifiers & Qt.ShiftModifier) !== 0)
-            else if (displayModel.count > 0)
-              root.cursorActive = true
-            event.accepted = true
-          } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127) {
-            root.setFilter(root.filterText + event.text)
-            event.accepted = true
-          }
-        }
-      }
-
-      EmojiPickerContent {
-        id: pickerContent
-        anchors.fill: parent
-        anchors.topMargin: card.contentTopInset
-        anchors.rightMargin: card.contentRightInset
-        anchors.bottomMargin: card.contentBottomInset
-        anchors.leftMargin: card.contentLeftInset
-        filterText: root.filterText
-        resultModel: displayModel
-        recentModel: root.recents
-        showRecents: root.showRecents
-        selectedIndex: root.selectedIndex
-        cursorActive: root.cursorActive
-        inRecents: root.inRecents
-        recentIndex: root.recentIndex
-        selectedEmoji: root.selectedEmoji
-        selectedName: root.selectedName
-        hintText: root.opened ? root.hintText() : ""
-        fontFamily: root.fontFamily
-        foreground: root.foreground
-        cellWidth: root.cellWidth
-        cellHeight: root.cellHeight
-        columns: root.columns
-        cornerRadius: root.cornerRadius
-        selectedBackground: root.selectedBackground
-        selectedText: root.selectedText
-        onRecentPicked: function (emoji) {
-          root.applySelected(emoji, false)
-        }
-        onResultPicked: function (emoji, index) {
-          root.inRecents = false
-          root.selectedIndex = index
-          root.applySelected(emoji, false)
-        }
-      }
+  Component.onCompleted: {
+    if (root.windowEnabled) {
+      var windowComponent = Qt.createComponent(Qt.resolvedUrl("EmojiWindow.qml"))
+      if (windowComponent.status === Component.Ready)
+        root.view = windowComponent.createObject(root, {
+          root: root
+        })
+      else
+        console.warn("emojis: window failed to load:", windowComponent.errorString())
     }
   }
 }

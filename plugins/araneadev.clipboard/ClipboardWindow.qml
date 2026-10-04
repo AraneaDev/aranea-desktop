@@ -36,11 +36,6 @@ PanelWindow {
     pointerGate.reset()
   }
 
-  // Whether the pointer really moved over item (see PointerMoveGate).
-  function pointerMoved(item, mouse): bool {
-    return pointerGate.moved(item, mouse)
-  }
-
   // Preselects "cancel" in the clear-history confirmation.
   function resetClearConfirm(): void {
     clearConfirm.selectedIndex = 1
@@ -132,63 +127,8 @@ PanelWindow {
           return
         }
 
-        var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
-        if (event.key === Qt.Key_Escape) {
-          if (panel.root.filterText)
-            panel.root.setFilter("")
-          else
-            panel.root.close()
+        if (panel.root.handleKey(event))
           event.accepted = true
-        } else if (ctrl && event.key === Qt.Key_P) {
-          panel.root.togglePinnedIndex(panel.root.selectedIndex)
-          event.accepted = true
-        } else if (ctrl && event.key === Qt.Key_S) {
-          panel.root.toggleSecretIndex(panel.root.selectedIndex)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Delete) {
-          if (ctrl && (event.modifiers & Qt.ShiftModifier))
-            panel.root.requestClearHistory()
-          else
-            panel.root.removeDisplayIndex(panel.root.selectedIndex)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Space && !panel.root.filterText && panel.root.displayModel.count > 0 && panel.root.displayModel.get(panel.root.selectedIndex).secret) {
-          panel.root.revealIndex(panel.root.selectedIndex)
-          event.accepted = true
-        } else if (Util.editsFilter(event, panel.root.filterText)) {
-          panel.root.setFilter(Util.editedFilter(event, panel.root.filterText))
-          event.accepted = true
-        } else if (event.key === Qt.Key_Up) {
-          panel.root.select(-1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Down) {
-          panel.root.select(1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_PageUp) {
-          panel.root.select(-6)
-          event.accepted = true
-        } else if (event.key === Qt.Key_PageDown) {
-          panel.root.select(6)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Home) {
-          panel.root.selectAbsolute(0)
-          event.accepted = true
-        } else if (event.key === Qt.Key_End) {
-          panel.root.selectAbsolute(panel.root.displayModel.count - 1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          if (panel.root.cursorActive && (event.modifiers & Qt.AltModifier))
-            panel.root.openIndex(panel.root.selectedIndex)
-          else if (panel.root.cursorActive && (event.modifiers & Qt.ShiftModifier))
-            panel.root.copyIndex(panel.root.selectedIndex)
-          else if (panel.root.cursorActive)
-            panel.root.activateIndex(panel.root.selectedIndex)
-          else if (panel.root.displayModel.count > 0)
-            panel.root.cursorActive = true
-          event.accepted = true
-        } else if (!ctrl && event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127) {
-          panel.root.setFilter(panel.root.filterText + event.text)
-          event.accepted = true
-        }
       }
 
       ConfirmDialog {
@@ -235,7 +175,9 @@ PanelWindow {
         nowMs: panel.root.nowMs
         secretTtlMs: panel.root.secretTtlMs
         selectedIndex: panel.root.selectedIndex
-        cursorActive: panel.root.cursorActive
+        cursorActive: panel.root.outlineShown
+        pointerGate: pointerGate
+        layoutChangedAt: panel.root.layoutChangedAt
         revealedIndex: panel.root.revealedIndex
         rowHeight: panel.root.rowHeight
         contentMargin: panel.root.contentMargin
@@ -247,13 +189,8 @@ PanelWindow {
         cornerRadius: panel.root.cornerRadius
         emptyMessage: panel.root.history.length === 0 ? "Clipboard is empty" : "No matches for “" + panel.root.filterText + "”"
         kindGlyph: panel.root.kindGlyph
-        onPointerMoved: function (rowIndex, item, mouse) {
-          panel.root.selectFromPointer(rowIndex, item, mouse)
-        }
-        onActivated: function (rowIndex) {
-          panel.root.cursorActive = true
-          panel.root.selectedIndex = rowIndex
-          panel.root.activateIndex(rowIndex)
+        onRowActivated: function (rowIndex, key) {
+          panel.root.activateKey(rowIndex, key)
         }
       }
     }

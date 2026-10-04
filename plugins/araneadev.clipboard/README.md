@@ -15,6 +15,16 @@ history remains available between openings.
 is the visual window. The components under `components/` own result rows and
 preview composition.
 
+## Pointer rules
+
+The mint outline marks the row Enter will paste: it shows from open and after
+typing on the top row, and never with no rows. Only the keyboard moves it.
+Hover only fills the row the pointer really moved onto (PointerMoveGate).
+Clicks are keyed by the row's entry id (`ClipboardLogic.rowId`, which never
+carries secret text) and settled: a release on a row that now holds another
+entry, or within 300 ms of the rows changing or scrolling under a still
+pointer, is refused.
+
 ## Logic boundaries
 
 - `ClipboardLogic.js` owns history policy and secret handling.
@@ -27,6 +37,6 @@ rebuild runtime paths in this plugin.
 
 ## Validation
 
-Coverage includes `tests/qml/clipboard.qml`,
+Coverage includes `tests/qml/clipboard.qml`, `tests/qml/clipboard-pointer.qml`,
 `tests/qml/clipboard-components.qml`, and
 `tests/qml/clipboard-preview-components.qml`, plus the clipboard JS suites.

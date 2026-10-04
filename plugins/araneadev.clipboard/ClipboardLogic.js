@@ -65,6 +65,7 @@ if (typeof module !== "undefined")
  * One row of the picker list, built by displayRows.
  * @typedef {object} ClipboardRow
  * @property {string} section - "pinned" or "recent".
+ * @property {string} entryId - The entry's row id (see rowId), which pointer clicks are keyed by.
  * @property {number} historyIndex - Index of the entry in the history array.
  * @property {string} kind - The entry's kind.
  * @property {boolean} secret - Whether the row is masked.
@@ -154,6 +155,35 @@ function entryKey(entry) {
   if (!entry) return ""
   if (entry.type === "image") return "image:" + String(entry.path || "")
   return "text:" + String(entry.text || "")
+}
+
+/**
+ * A stable id for the row showing an entry, so a pointer click can check on
+ * release that the row still holds the entry it was pressed on. It never
+ * carries entry text: a secret's id is its capture time and history index,
+ * any other entry's id its type, capture time, length and a hash of its
+ * first 4096 characters (or its image path).
+ * @param {?ClipboardEntry} entry - The entry.
+ * @param {number} index - The entry's index in the history.
+ * @returns {string} The id, or "" for a missing entry.
+ */
+function rowId(entry, index) {
+  if (!entry) return ""
+  var at = Number(entry.capturedAtMs) || 0
+  if (entry.secret) return "secret:" + at + ":" + index
+  var source = entry.type === "image" ? String(entry.path || "") : String(entry.text || "")
+  var hash = 5381
+  var end = Math.min(source.length, 4096)
+  for (var i = 0; i < end; i++) hash = ((hash << 5) + hash + source.charCodeAt(i)) | 0
+  return (
+    (entry.type === "image" ? "image" : "text") +
+    ":" +
+    at +
+    ":" +
+    source.length +
+    ":" +
+    (hash >>> 0).toString(16)
+  )
 }
 
 /**
@@ -905,6 +935,7 @@ function displayRows(history, query, limit, now) {
     /** @type {ClipboardRow} */
     var row = {
       section: entry.pinned ? "pinned" : "recent",
+      entryId: rowId(entry, i),
       historyIndex: i,
       kind: entry.kind || "text",
       secret: !!entry.secret,
@@ -937,6 +968,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     normalizeEntry: normalizeEntry,
     entryKey: entryKey,
+    rowId: rowId,
     removeEntryAt: removeEntryAt,
     parseEntryJson: parseEntryJson,
     filePaths: filePaths,

@@ -22,10 +22,21 @@ Item {
   property bool opened: false
   // Current search text typed into the picker.
   property string filterText: ""
-  // Cursor position in the displayed rows (display index, not history index).
+  // Cursor position in the displayed rows (display index, not history index):
+  // the row Enter acts on. Only the keyboard (and a click) moves it.
   property int selectedIndex: 0
-  // Whether the cursor is shown; keys that act on a row need it.
+  // Whether the cursor is on; keys that act on a row need it.
   property bool cursorActive: false
+  // Whether the mint outline shows on selectedIndex: whenever Enter has a
+  // target (from open, after typing; never in the empty state).
+  readonly property bool outlineShown: root.cursorActive && rowsModel.count > 0
+  // When the rows last changed under a still pointer (Date.now()), 0 for
+  // never: the picker opening or the shown entry ids changing. Pointer
+  // clicks within 300 ms of it are refused unless the pointer really moved
+  // onto the row (ClickSettle).
+  property real layoutChangedAt: 0
+  // The shown entry ids joined, so an equal rebuild does not stamp the layout.
+  property string displayKeys: ""
   // Whether the "clear history" confirmation dialog is open.
   property bool clearConfirmOpen: false
   // All history entries (ClipboardLogic entries), newest first, as saved to historyPath.
@@ -117,6 +128,15 @@ Item {
     Qt.callLater(function () {
       root.focusKeys()
     })
+  }
+
+  // Opening the picker moves the rows under a still pointer.
+  onOpenedChanged: if (root.opened)
+    root.noteLayoutChange()
+
+  // Stamps layoutChangedAt: the rows moved or changed under the pointer.
+  function noteLayoutChange(): void {
+    root.layoutChangedAt = Date.now()
   }
 
   // Hides the picker and dismisses the clear confirmation.
@@ -270,7 +290,7 @@ Item {
     root.history = ClipboardLogic.clearUnpinned(root.history)
     root.saveHistory()
     root.selectedIndex = 0
-    root.cursorActive = false
+    root.cursorActive = true
     root.disarmPointer()
     root.clearConfirmOpen = false
     root.rebuildDisplay()
@@ -289,7 +309,6 @@ Item {
 
     if (displayModel.count <= 1) {
       root.selectedIndex = 0
-      root.cursorActive = false
     } else if (root.selectedIndex >= displayModel.count - 1) {
       root.selectedIndex = displayModel.count - 2
     }
@@ -298,17 +317,33 @@ Item {
     root.rebuildDisplay()
   }
 
+  // Replaces the shown rows with ROWS in place: rows that stay keep their
+  // delegates (set), so a rebuild never recreates rows under the pointer.
+  function syncRows(rows: var): void {
+    var keep = Math.min(displayModel.count, rows.length)
+    for (var i = 0; i < keep; i++)
+      displayModel.set(i, rows[i])
+    if (displayModel.count > rows.length)
+      displayModel.remove(rows.length, displayModel.count - rows.length)
+    for (var j = keep; j < rows.length; j++)
+      displayModel.append(rows[j])
+  }
+
   // Rebuilds the list model from history and the filter (at most 50 recent
-  // rows plus pinned ones), clamps the cursor and scrolls it into view.
+  // rows plus pinned ones) in place, stamps the layout when the shown
+  // entries changed, clamps the cursor and scrolls it into view.
   function rebuildDisplay() {
     root.revealedIndex = -1
     // list changed: rows may have moved under the cursor
     var rows = ClipboardLogic.displayRows(root.history, root.filterText, 50, Date.now())
 
-    displayModel.clear()
+    var items = []
+    var keys = []
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i]
-      displayModel.append({
+      keys.push(row.entryId)
+      items.push({
+        entryId: row.entryId,
         section: row.section,
         kind: row.kind,
         secret: row.secret,
@@ -325,6 +360,12 @@ Item {
         historyIndex: row.historyIndex
       })
     }
+    root.syncRows(items)
+    var joined = keys.join("\n")
+    if (joined !== root.displayKeys) {
+      root.displayKeys = joined
+      root.noteLayoutChange()
+    }
 
     if (displayModel.count === 0)
       selectedIndex = 0
@@ -339,18 +380,14 @@ Item {
     })
   }
 
-  // Moves the cursor by delta rows, wrapping around; the first move only
-  // shows the cursor at the top (or bottom for a negative delta).
+  // Moves the cursor by delta rows, wrapping around; the outline is already
+  // on Enter's target, so the first move moves it straight away.
   function select(delta) {
     if (displayModel.count === 0)
       return
     root.disarmPointer()
-    if (!cursorActive) {
-      cursorActive = true
-      selectedIndex = delta < 0 ? displayModel.count - 1 : 0
-    } else {
-      selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count
-    }
+    root.cursorActive = true
+    selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count
     root.reveal(selectedIndex)
   }
 
@@ -379,12 +416,84 @@ Item {
       root.view.disarmPointer()
   }
 
-  // Moves the cursor to the hovered row, but only after real pointer movement.
-  function selectFromPointer(index, item, mouse) {
-    if (!root.view || !root.view.pointerMoved(item, mouse))
-      return
+  // Handles a key press in the picker (the window forwards every key while
+  // the clear confirmation is closed): Esc clears the search, then closes;
+  // arrows, PageUp/PageDown, Home/End move the cursor; Enter pastes the
+  // outlined row (Shift copies, Alt opens; nothing with no rows); Ctrl+P
+  // pins, Ctrl+S marks secret, Delete drops (Ctrl+Shift+Delete clears),
+  // Space reveals a secret; other text edits the search. Returns whether
+  // the key was handled.
+  function handleKey(event: var): bool {
+    var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+    if (event.key === Qt.Key_Escape) {
+      if (root.filterText)
+        root.setFilter("")
+      else
+        root.close()
+      return true
+    } else if (ctrl && event.key === Qt.Key_P) {
+      root.togglePinnedIndex(root.selectedIndex)
+      return true
+    } else if (ctrl && event.key === Qt.Key_S) {
+      root.toggleSecretIndex(root.selectedIndex)
+      return true
+    } else if (event.key === Qt.Key_Delete) {
+      if (ctrl && (event.modifiers & Qt.ShiftModifier))
+        root.requestClearHistory()
+      else
+        root.removeDisplayIndex(root.selectedIndex)
+      return true
+    } else if (event.key === Qt.Key_Space && !root.filterText && root.displayModel.count > 0 && root.displayModel.get(root.selectedIndex).secret) {
+      root.revealIndex(root.selectedIndex)
+      return true
+    } else if (Util.editsFilter(event, root.filterText)) {
+      root.setFilter(Util.editedFilter(event, root.filterText))
+      return true
+    } else if (event.key === Qt.Key_Up) {
+      root.select(-1)
+      return true
+    } else if (event.key === Qt.Key_Down) {
+      root.select(1)
+      return true
+    } else if (event.key === Qt.Key_PageUp) {
+      root.select(-6)
+      return true
+    } else if (event.key === Qt.Key_PageDown) {
+      root.select(6)
+      return true
+    } else if (event.key === Qt.Key_Home) {
+      root.selectAbsolute(0)
+      return true
+    } else if (event.key === Qt.Key_End) {
+      root.selectAbsolute(root.displayModel.count - 1)
+      return true
+    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+      // Enter acts on the outlined row; with no rows it does nothing.
+      if (root.outlineShown && (event.modifiers & Qt.AltModifier))
+        root.openIndex(root.selectedIndex)
+      else if (root.outlineShown && (event.modifiers & Qt.ShiftModifier))
+        root.copyIndex(root.selectedIndex)
+      else if (root.outlineShown)
+        root.activateIndex(root.selectedIndex)
+      return true
+    } else if (!ctrl && event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127) {
+      root.setFilter(root.filterText + event.text)
+      return true
+    }
+    return false
+  }
+
+  // A pointer click on row INDEX, pressed while it held KEY (its entry id):
+  // moves the cursor there and pastes it. Refused (false) when the row no
+  // longer holds KEY, so a click never lands on an entry that changed
+  // between press and release. Hover never moves the cursor.
+  function activateKey(index: int, key: string): bool {
+    if (!key || index < 0 || index >= displayModel.count || displayModel.get(index).entryId !== key)
+      return false
     root.cursorActive = true
     root.selectedIndex = index
+    root.activateIndex(index)
+    return true
   }
 
   // Pastes the row at display index.
@@ -608,14 +717,14 @@ Item {
   // Nerd Font icon for a row kind (link, path, code, image; text otherwise).
   function kindGlyph(kind) {
     if (kind === "link")
-      return "󰌷"
+      return String.fromCodePoint(0xf0337)
     if (kind === "path")
-      return "󰉋"
+      return String.fromCodePoint(0xf024b)
     if (kind === "code")
-      return "󰅩"
+      return String.fromCodePoint(0xf0169)
     if (kind === "image")
-      return "󰋩"
-    return "󰦨"
+      return String.fromCodePoint(0xf02e9)
+    return String.fromCodePoint(0xf09a8)
   }
 
   // Key-hint line for the current state and the row under the cursor.
