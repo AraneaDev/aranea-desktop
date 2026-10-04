@@ -381,8 +381,37 @@ function displayName(item) {
   return slash !== -1 ? id.substring(slash + 1) : id || "Unknown"
 }
 
+/**
+ * The app menu's key-hint line: Enter runs the entry (or opens a submenu).
+ * @returns {string} the hint
+ */
+function menuKeyHint() {
+  var dot = " " + String.fromCodePoint(0xb7) + " "
+  return [
+    String.fromCodePoint(0x2191, 0x2193) + " move",
+    String.fromCodePoint(0x2192) + " open",
+    String.fromCodePoint(0x2190) + " back",
+    "enter select"
+  ].join(dot)
+}
+
+/**
+ * The manage panel's key-hint line: Enter toggles the outlined pill.
+ * @returns {string} the hint
+ */
+function manageKeyHint() {
+  var dot = " " + String.fromCodePoint(0xb7) + " "
+  return [
+    String.fromCodePoint(0x2191, 0x2193) + " move",
+    String.fromCodePoint(0x2190, 0x2192) + " pin / hide",
+    "enter toggle"
+  ].join(dot)
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    menuKeyHint: menuKeyHint,
+    manageKeyHint: manageKeyHint,
     labelOf: labelOf,
     rowKey: rowKey,
     menuRows: menuRows,

@@ -954,6 +954,19 @@ function saveEnds(saving, queryStarted, saveRunning) {
   return !!saving && !!queryStarted && !saveRunning
 }
 
+/**
+ * The key-hint line: the place field's keys while editing, else what Enter
+ * does on the cursor's label (edit the place, or refresh).
+ * @param {boolean} editing - whether the place field is open
+ * @param {string|undefined} section - the cursor's control ("place", "refresh" or "clear")
+ * @returns {string} the hint
+ */
+function keyHint(editing, section) {
+  if (editing) return "↑↓ pick · enter save · esc cancel"
+  if (section === "refresh") return "↑↓ move · enter refresh · e edit place"
+  return "↑↓ move · enter edit place · r refresh"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     buildForecastUrl: buildForecastUrl,
@@ -987,5 +1000,6 @@ if (typeof module !== "undefined")
     detailCells: detailCells,
     sharedBundle: sharedBundle,
     refreshPlan: refreshPlan,
-    saveEnds: saveEnds
+    saveEnds: saveEnds,
+    keyHint: keyHint
   }

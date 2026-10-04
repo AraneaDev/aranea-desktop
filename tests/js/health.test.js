@@ -514,3 +514,7 @@ test("Enter reveals before it opens, and only a keyed row", () => {
   eq(h.outlineIndex(rows, "reboot", true), 1, "the outline follows the keyboard")
   eq(h.outlineIndex(rows, "reboot", false), -1, "never the pointer")
 })
+
+test("keyHint names Enter's open", () => {
+  eq(h.keyHint(), "↑↓ move · enter open", "the hint")
+})

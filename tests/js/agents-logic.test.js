@@ -509,3 +509,14 @@ test("selection: missing selections and ids read as empty", () => {
   assert.deepEqual(logic.selectId(undefined, false, undefined), { real: "", showcase: "" })
   assert.deepEqual(logic.showcaseSelectionCleared(null), { real: "", showcase: "" })
 })
+
+test("cursorView keeps the outline on Refresh, Enter's target", () => {
+  assert.deepEqual(logic.cursorView(true), { active: true, section: "refresh", index: 0 })
+  assert.deepEqual(logic.cursorView(false), { active: false, section: "refresh", index: 0 })
+})
+
+test("keyHint names the agent switch only with several agents, and Enter's refresh", () => {
+  assert.equal(logic.keyHint(3), "h/l agent · enter refresh · ↑↓ scroll")
+  assert.equal(logic.keyHint(1), "enter refresh · ↑↓ scroll")
+  assert.equal(logic.keyHint(undefined), "enter refresh · ↑↓ scroll")
+})

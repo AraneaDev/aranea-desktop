@@ -165,8 +165,20 @@ function moveCursor(index, keyboardCursor, dy) {
   return { index: (i + dy + 2) % 2, keyboardCursor: true }
 }
 
+/**
+ * The key-hint line, naming what Enter does on the cursor's pill: open the
+ * updater (pill 0) or refresh (pill 1).
+ * @param {number} cursorIndex - the cursor's pill
+ * @returns {string} the hint
+ */
+function keyHint(cursorIndex) {
+  if (cursorIndex === 1) return "↑↓ move · enter refresh"
+  return "↑↓ move · enter open updater · r refresh"
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    keyHint,
     parseStatus,
     groupUpdates,
     mergeRefresh,

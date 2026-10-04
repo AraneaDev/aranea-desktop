@@ -810,3 +810,9 @@ test("airView: bands the rounded value the chip shows (UV 2.6, 5.6, 10.5; AQI 19
     tone: "plain"
   })
 })
+
+test("keyHint names Enter's action: save in the field, else edit or refresh", () => {
+  assert.equal(logic.keyHint(true, "place"), "↑↓ pick · enter save · esc cancel")
+  assert.equal(logic.keyHint(false, "place"), "↑↓ move · enter edit place · r refresh")
+  assert.equal(logic.keyHint(false, "refresh"), "↑↓ move · enter refresh · e edit place")
+})

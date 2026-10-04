@@ -377,8 +377,25 @@ function showcaseNowPlaying(showcase, real) {
   }
 }
 
+/**
+ * The key-hint line for the cursor's stop, naming what Enter does there:
+ * mute all on the header, mute on a volume slider or a stream, use a
+ * device, play or pause Now playing.
+ * @param {string|undefined} section - the cursor's section ("header", "output", "input", "streams" or "nowplaying")
+ * @param {number|undefined} index - the cursor's index there (-1 for the volume slider)
+ * @returns {string} the hint
+ */
+function keyHint(section, index) {
+  if (section === "header") return "↑↓ move · enter mute all"
+  if (section === "nowplaying") return "↑↓ move · enter play/pause"
+  if ((section === "output" || section === "input") && Number(index) >= 0)
+    return "↑↓ move · enter use · ←→ adjust · m mute"
+  return "↑↓ move · ←→ adjust · enter/m mute"
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    keyHint,
     signalLevel,
     pickPlayer,
     nowPlayingState,

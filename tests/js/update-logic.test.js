@@ -121,3 +121,8 @@ test("the pill cursor only reveals on its first key, then moves and wraps", () =
   assert.deepEqual(logic.moveCursor(0, true, -1), { index: 1, keyboardCursor: true })
   assert.deepEqual(logic.moveCursor(1, true, 0), { index: 1, keyboardCursor: true })
 })
+
+test("keyHint names Enter's action on the cursor's pill", () => {
+  assert.equal(logic.keyHint(0), "↑↓ move · enter open updater · r refresh")
+  assert.equal(logic.keyHint(1), "↑↓ move · enter refresh")
+})

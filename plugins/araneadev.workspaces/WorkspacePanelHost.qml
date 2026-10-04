@@ -12,8 +12,8 @@ Aranea.KeyboardPanelFrame {
   property var workspaceStates: []
   // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
   // none); rows re-sort as workspaces come and go, so the cursor follows
-  // the workspace, not a position. The pointer places it too, without
-  // showing it.
+  // the workspace, not a position. Only the keyboard places it; hover never
+  // does.
   property string cursorKey: ""
   // True while the keyboard drives the cursor; any pointer use clears it.
   // The mint outline shows only then, and the first key after opening or

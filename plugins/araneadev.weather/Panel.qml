@@ -391,7 +391,7 @@ Panel {
         section: root.cursorSection,
         index: 0
       },
-      keyHint: editing ? "↑↓ pick · enter save · esc cancel" : "enter select · e edit place · r refresh"
+      keyHint: WeatherLogic.keyHint(editing, root.cursorSection)
     }
   }
 

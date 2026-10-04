@@ -217,7 +217,7 @@ ShellRoot {
         section: "",
         index: -1
       },
-      keyHint: "enter select · e edit place · r refresh"
+      keyHint: "↑↓ move · enter edit place · r refresh"
     }
   }
 
@@ -480,7 +480,7 @@ ShellRoot {
         }), ["11°", "10°", "9°", "8°"], "lows")
         t.equal(one(full, "dayGlyph").text, String.fromCodePoint(0xf0595), "and glyphs")
         t.check(Math.abs(days[0].width - days[3].width) < 0.5, "equal widths")
-        t.equal(one(full, "keyHint").text, "enter select · e edit place · r refresh", "the key hint is the view's")
+        t.equal(one(full, "keyHint").text, "↑↓ move · enter edit place · r refresh", "the key hint is the view's")
 
         // ---------- Sections hide individually ----------
         t.check(!one(bare, "rainSoonRow").visible, "rain soon hides when empty")

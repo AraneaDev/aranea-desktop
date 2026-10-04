@@ -38,8 +38,8 @@ Item {
   // Request a status refresh.
   signal refresh
   // Emitted when the pointer really moves onto pill INDEX (through the
-  // gate); the host places the cursor there, hidden, so a following key
-  // reveals it in place.
+  // gate). Informational: hover only draws the pill's fill and never moves
+  // the cursor.
   signal pillHovered(int index)
 
   // Maximum height this panel's content (this Item, not the host's card) may
@@ -248,7 +248,8 @@ Item {
       id: keyHint
       objectName: "keyHint"
       Layout.fillWidth: true
-      text: "↑↓ move · enter select · r refresh"
+      // What Enter does on the cursor's pill (UpdateLogic.keyHint).
+      text: UpdateLogic.keyHint(panel.cursorIndex)
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
       font.family: Style.font.family
       font.pixelSize: Style.font.caption

@@ -217,7 +217,7 @@ Panel {
         editing: root.editingLife
       },
       sky: root.skyView,
-      keyHint: "←→ month · ↑↓ year · t today"
+      keyHint: ClockLogic.keyHint()
     })
   // Refreshes to today and reveals the popup.
   function open() {

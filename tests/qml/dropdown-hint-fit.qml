@@ -3,8 +3,10 @@
 // both sides, as each Panel.qml sizes it) unelided, with a 10% margin, as
 // the notification center's hint does (notification-center-fit.qml). The
 // Audio and Bluetooth hints are measured in their real dropdowns; the rest
-// are measured in a Text styled as every footer hint is (Style.font.family
-// at Style.font.caption). Every hint follows one pattern: no "tab next",
+// (and Workspaces') are measured in their real views; the rest are read
+// from each plugin's logic (the same function its Panel uses) and measured
+// in a Text styled as every footer hint is (Style.font.family at
+// Style.font.caption). Every hint follows one pattern: no "tab next",
 // and the Enter verb wherever Enter acts.
 import QtQuick
 import Quickshell
@@ -17,6 +19,14 @@ import "plugins/araneadev.power/PowerLogic.js" as PowerLogic
 import "plugins/araneadev.monitor/DisplaysLogic.js" as DisplaysLogic
 import "plugins/araneadev.network/NetworkLogic.js" as NetworkLogic
 import "plugins/araneadev.vpn/VpnLogic.js" as VpnLogic
+import "plugins/araneadev.audio/AudioLogic.js" as AudioLogic
+import "plugins/araneadev.health/HealthLogic.js" as HealthLogic
+import "plugins/araneadev.updates/UpdateLogic.js" as UpdateLogic
+import "plugins/araneadev.agents/AgentsLogic.js" as AgentsLogic
+import "plugins/araneadev.weather/WeatherLogic.js" as WeatherLogic
+import "plugins/araneadev.clock/ClockLogic.js" as ClockLogic
+import "plugins/araneadev.tray/TrayLogic.js" as TrayLogic
+import "plugins/araneadev.workspaces" as Workspaces
 
 ShellRoot {
   id: testRoot
@@ -140,6 +150,21 @@ ShellRoot {
             canNext: true
           }
         })
+    }
+
+    Workspaces.WorkspacePanel {
+      id: workspaces
+      x: 20
+      y: 700
+      width: testRoot.innerWidth
+      workspaceStates: [
+        {
+          id: 1,
+          name: "1",
+          windows: 1,
+          active: true
+        }
+      ]
     }
 
     Bluetooth.BluetoothDropdown {
@@ -279,15 +304,20 @@ ShellRoot {
     add("VPN unchosen", 380, VpnLogic.hintFor(false, "available", "vpn", true, false))
     add("VPN empty", 380, VpnLogic.hintFor(false, "", "", false, false))
     add("VPN prompt", 380, VpnLogic.hintFor(true, "available", "vpn", true, true))
-    add("Health", 380, "↑↓ move · enter open")
-    add("Workspaces", 380, "↑↓ move · enter focus · wheel cycle")
-    add("Updates", 380, "↑↓ move · enter select · r refresh")
-    add("Agents", 380, "h/l agent · enter/r refresh · ↑↓ scroll")
-    add("Weather", 380, "enter select · e edit place · r refresh")
-    add("Weather (editing)", 380, "↑↓ pick · enter save · esc cancel")
-    add("Clock", 440, "←→ month · ↑↓ year · t today")
-    add("Tray menu", 320, String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2192) + " open " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190) + " back " + String.fromCodePoint(0xB7) + " enter select")
-    add("Tray manage", 340, String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190, 0x2192) + " pin / hide " + String.fromCodePoint(0xB7) + " enter toggle")
+    var audioStops = [["header", -1], ["output", -1], ["output", 0], ["streams", 0], ["nowplaying", 0]]
+    audioStops.forEach(function (stop) {
+      add("Audio " + stop[0] + " " + stop[1], 380, AudioLogic.keyHint(stop[0], stop[1]))
+    })
+    add("Health", 380, HealthLogic.keyHint())
+    add("Updates (Open updater)", 380, UpdateLogic.keyHint(0))
+    add("Updates (Refresh)", 380, UpdateLogic.keyHint(1))
+    add("Agents", 380, AgentsLogic.keyHint(3))
+    add("Weather (place)", 380, WeatherLogic.keyHint(false, "place"))
+    add("Weather (refresh)", 380, WeatherLogic.keyHint(false, "refresh"))
+    add("Weather (editing)", 380, WeatherLogic.keyHint(true, "place"))
+    add("Clock", 440, ClockLogic.keyHint())
+    add("Tray menu", 320, TrayLogic.menuKeyHint())
+    add("Tray manage", 340, TrayLogic.manageKeyHint())
     return list
   }
 
@@ -300,10 +330,13 @@ ShellRoot {
     })
     var audioHint = t.findChild(audio, "keyHint")
     checkFits(audioHint, "Audio")
-    t.equal(audioHint.text, "↑↓ move · enter select · ←→ adjust · m mute", "the Audio hint names move, Enter, adjust and mute")
+    t.equal(audioHint.text, "↑↓ move · ←→ adjust · enter/m mute", "on the output slider the Audio hint names Enter's mute")
     var bluetoothHint = t.findChild(bluetooth, "keyHint")
     checkFits(bluetoothHint, "Bluetooth")
-    t.equal(bluetoothHint.text, "↑↓ move · enter connect · x forget · b power", "the Bluetooth hint names move, Enter, forget and power")
+    t.equal(bluetoothHint.text, "↑↓ move · enter toggle · x forget · b power", "the Bluetooth hint names move, Enter's toggle, forget and power")
+    var workspacesHint = t.findChild(workspaces, "keyHint")
+    checkFits(workspacesHint, "Workspaces")
+    t.check(workspacesHint.text.indexOf("enter focus") >= 0, "the Workspaces hint names Enter's focus")
     t.done()
   })
 }

@@ -44,7 +44,7 @@ Panel {
   readonly property color statusColor: status === "critical" ? Aranea.DesignTokens.urgent : (status === "attention" ? amber : Aranea.DesignTokens.ceremony)
   // Key of the cursor's problem (HealthLogic.problemKey, "" for none);
   // rows re-sort as checks run, so the cursor follows the problem, not a
-  // position. The pointer places it too, without showing it.
+  // position. Only the keyboard (and a click) places it; hover never does.
   property string cursorKey: ""
   // True while the keyboard drives the cursor; any pointer use clears it.
   // The mint outline shows only then, and the first key after opening or
@@ -250,7 +250,7 @@ Panel {
       Text {
         objectName: "keyHint"
         Layout.fillWidth: true
-        text: "↑↓ move · enter open"
+        text: HealthLogic.keyHint()
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
         font.family: Style.font.family
         font.pixelSize: Style.font.caption

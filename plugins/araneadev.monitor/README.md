@@ -22,8 +22,10 @@ Added to stock:
   size, scale, displays (`DisplaysLogic.sectionsFor`). The outline shows only
   while the keyboard drives it, the first key (Enter included) only reveals
   it, and Enter then acts on the outlined row while it still shows there.
-  Hover only draws the control's fill; the current scale and the displays
-  in use carry the selected highlight.
+  On a slider stop (brightness, text size, a slider keyboard light) the
+  outline marks the arrow keys' target and Enter does nothing there; the
+  hint then names only the arrows. Hover only draws the control's fill;
+  the current scale and the displays in use carry the selected highlight.
 
 The brightness slider's wheel steps 5 per event; the sub-notch accumulator
 stays on the bar icon's wheel, as in stock.

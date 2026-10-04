@@ -333,7 +333,7 @@ Column {
   Text {
     objectName: "keyHint"
     width: parent.width
-    text: "↑↓ move · enter connect · x forget · b power"
+    text: "↑↓ move · enter toggle · x forget · b power"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption

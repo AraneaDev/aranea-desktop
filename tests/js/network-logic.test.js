@@ -519,11 +519,12 @@ test("parseSsids treats an empty SSID as no mapping", () => {
   assert.deepEqual(logic.parseSsids("uuid-1\t\nuuid-2\tHome\n"), { "uuid-2": "Home" })
 })
 
-// --- a reveal never chooses (fix wave 2, R1) ------------------------------
+// --- no key acts on a row it was not revealed on ----------------------------
 // followCursor/cursorConfirmed moved to shared CursorLogic.js (their own
 // contract lives in tests/js/cursor-logic.test.js); these pressOutcome
-// scenarios still drive them as setup, since pressOutcome's job is to
-// respect exactly this cursor-follow safety invariant.
+// scenarios still drive them as setup. A press on a hidden cursor only
+// reveals; the host then applies revealTarget (tested below), so a row
+// acts only after the outline has shown on it.
 
 test("pressOutcome: Enter, Enter after Saved empties under the pointer never connects", () => {
   // Mouse-forget the last Saved row: Saved empties and the cursor drops to
@@ -539,8 +540,13 @@ test("pressOutcome: Enter, Enter after Saved empties under the pointer never con
   }
   // The first Enter only reveals the outline (the pointer had the cursor)...
   assert.equal(logic.pressOutcome(target, true, false), "reveal")
-  // ...and choosing nothing, so the second Enter is refused.
+  // ...and without the reveal's choice nothing acts.
   assert.equal(logic.pressOutcome(target, true, true), "refuse")
+  // The reveal chooses the row the outline now shows: the next Enter acts
+  // on that visible row, never on one it was not shown on.
+  const revealed = logic.revealTarget(target)
+  assert.equal(revealed.key, "OpenStranger")
+  assert.equal(logic.pressOutcome(revealed, true, true), "act")
   // Even had the section been chosen, the lost key still refuses.
   assert.equal(logic.pressOutcome({ ...target, chosen: "wifi" }, true, true), "refuse")
 })
@@ -592,6 +598,45 @@ test("openChoice preselects Wi-Fi row 0 as the open's deliberate placement", () 
   assert.deepEqual(logic.openChoice([]), { chosen: "", key: "" })
   assert.deepEqual(logic.openChoice(undefined), { chosen: "", key: "" })
   assert.deepEqual(logic.openChoice([null]), { chosen: "wifi", key: "" })
+})
+
+test("revealTarget: with no Wi-Fi rows, the first Enter outlines DNS and the second applies it", () => {
+  const open = logic.openChoice([])
+  const dns = { section: "dns", chosen: open.chosen, fixed: true }
+  // Fresh open: the first Enter is no act (the host reveals)...
+  assert.equal(logic.pressOutcome(dns, false, false), "ignore")
+  // ...and the reveal chooses DNS, so the second Enter applies the pill.
+  const revealed = logic.revealTarget(dns)
+  assert.equal(revealed.chosen, "dns")
+  assert.equal(revealed.key, "")
+  assert.equal(logic.pressOutcome(revealed, true, true), "act")
+})
+
+test("revealTarget adopts the shown row's key, or the Automatic switch", () => {
+  const rows = [{ key: "Home" }, { key: "Cafe" }]
+  assert.deepEqual(
+    logic.revealTarget({ section: "wifi", chosen: "", rows: rows, key: "", index: 1 }),
+    {
+      section: "wifi",
+      chosen: "wifi",
+      fixed: undefined,
+      rows: rows,
+      key: "Cafe",
+      index: 1
+    }
+  )
+  const auto = logic.revealTarget({
+    section: "band",
+    chosen: "",
+    rows: [{ key: "auto" }],
+    key: "",
+    index: 0
+  })
+  assert.equal(auto.key, "auto")
+  assert.equal(logic.pressOutcome(auto, true, true), "act")
+  // No row under the cursor: the section is chosen, the key stays empty.
+  assert.equal(logic.revealTarget({ section: "wifi", rows: [], index: -1 }).key, "")
+  assert.equal(logic.revealTarget(null).chosen, "")
 })
 
 // --- sidewaysChooses (R3) ---------------------------------------------------

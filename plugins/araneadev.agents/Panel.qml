@@ -605,17 +605,6 @@ Panel {
     return AgentsLogic.updatedCaption(heroMeta(p), updatedMsFor(p))
   }
 
-  // The key hint under the dropdown.
-  function keyHint() {
-    var dot = " " + String.fromCodePoint(0xB7) + " "
-    var arrows = String.fromCodePoint(0x2191, 0x2193)
-    var parts = []
-    if (providers.length > 1)
-      parts.push("h/l agent")
-    parts.push("enter/r refresh", arrows + " scroll")
-    return parts.join(dot)
-  }
-
   // Everything the Aranea view draws (AgentsDropdown.view).
   readonly property var agentsView: ({
       hero: {
@@ -642,12 +631,10 @@ Panel {
       // The sync footer speaks for the real machine, never for stand-ins.
       footer: agentsShowcase ? "" : footerText(),
       empty: providers.length === 0,
-      cursor: {
-        active: cursorActive && keyboardCursor,
-        section: providers.length > 1 ? "agents" : "refresh",
-        index: providers.length > 1 ? providerIndex : 0
-      },
-      keyHint: keyHint()
+      // The outline marks Enter's target: always Refresh (h/l only picks
+      // the agent).
+      cursor: AgentsLogic.cursorView(cursorActive && keyboardCursor),
+      keyHint: AgentsLogic.keyHint(providers.length)
     })
 
   // Carries out one AgentsDropdown action. Every action comes from the

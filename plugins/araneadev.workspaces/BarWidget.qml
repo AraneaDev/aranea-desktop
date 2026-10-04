@@ -247,7 +247,7 @@ Item {
     // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
     // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
-    // none); the pointer places it too, without showing it.
+    // none); only the keyboard places it, hover never does.
     property string cursorKey: ""
     // True while the keyboard drives the cursor; any pointer use clears
     // it. The mint outline shows only then, and the first key only

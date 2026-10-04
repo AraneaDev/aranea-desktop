@@ -950,8 +950,17 @@ function outlineIndex(rows, key, keyboard) {
   return keyedOutline(rows, key, keyboard, problemKey)
 }
 
+/**
+ * The key-hint line: Enter opens the outlined problem.
+ * @returns {string} the hint
+ */
+function keyHint() {
+  return "↑↓ move · enter open"
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    keyHint: keyHint,
     isFailedExit: isFailedExit,
     indexOfKey: indexOfKey,
     moveCursorKey: moveCursorKey,

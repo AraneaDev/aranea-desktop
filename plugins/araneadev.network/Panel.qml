@@ -1298,7 +1298,7 @@ Panel {
   // Whether the cursor sits on the Saved row's forget button.
   property bool savedActionFocused: false
   // The SSID of the Wi-Fi row the cursor was deliberately put on (a move,
-  // click or open; never a keyboard reveal or a hover), so the cursor follows that
+  // click, open or keyboard reveal; never a hover), so the cursor follows that
   // network when a scan re-sorts the list. Never adopted from a clamp: when
   // the network is gone it's "" and keyboard actions refuse until the user
   // picks a row (CursorLogic.followCursor).
@@ -1312,8 +1312,8 @@ Panel {
   // the Automatic switch (see headerCursorKey).
   property string bandCursorKey: ""
   // The section the user last deliberately put the cursor in (a move,
-  // click, or "wifi" from open's row-0 placement; never a keyboard reveal
-  // or a hover). An automatic move (a section emptying or hiding under the
+  // click, a keyboard reveal, or "wifi" from open's row-0 placement; never
+  // a hover). An automatic move (a section emptying or hiding under the
   // cursor) changes focusSection but not this, so keyboard actions there
   // refuse until the user picks a row.
   property string cursorChosenSection: ""
@@ -1409,6 +1409,19 @@ Panel {
     }
     var row = sectionKeyRows(section)[cursorIndexIn(section)]
     setSectionKey(section, row && typeof row.key === "string" ? row.key : "")
+  }
+
+  // Shows the keyboard cursor where it is and makes that its choice: the
+  // outline marks Enter's target, so the revealed section and row
+  // (NetworkLogic.revealTarget) are what the next Enter acts on. Nothing
+  // else changes.
+  function revealCursor() {
+    cursorActive = true
+    keyboardCursor = true
+    var next = NetworkLogic.revealTarget(cursorTarget(focusSection))
+    cursorChosenSection = next.chosen
+    if (!next.fixed)
+      setSectionKey(focusSection, next.key)
   }
 
   // Whether the keyboard may act on the cursor in SECTION: it's the section
@@ -2063,8 +2076,8 @@ Panel {
         root.ssidLookupPending = true
         // Stock's open handler puts the Wi-Fi cursor on row 0, a deliberate
         // placement, so that row is chosen (NetworkLogic.openChoice); with
-        // no Wi-Fi rows nothing is until the user moves or clicks. A
-        // keyboard reveal never chooses. Saved starts on its first row
+        // no Wi-Fi rows nothing is until the user moves, clicks or reveals
+        // the outline (which chooses what it shows). Saved starts on its first row
         // too, followed until the user picks; the header and band take
         // theirs on a move or click.
         var open = NetworkLogic.openChoice(root.wifiKeyRows())
@@ -2297,9 +2310,8 @@ Panel {
       // The first key after opening or after mouse use only reveals the
       // cursor where it is; stock lets an upward first press move as well.
       var revealing = !root.cursorActive || !root.keyboardCursor
-      root.cursorActive = true
-      root.keyboardCursor = true
-      // A reveal only shows the outline: it never chooses a row.
+      if (revealing)
+        root.revealCursor()
       if (!revealing || dy < 0) {
         if (dy !== 0)
           root.moveVerticalBy(dy)
@@ -2310,24 +2322,24 @@ Panel {
     }
     // Enter and x act only on a cursor the keyboard is showing; on a hidden
     // one (a fresh open, or after pointer use) they only reveal it, as
-    // arrows do, and the reveal chooses nothing. A row the user didn't
-    // choose is refused (NetworkLogic.pressOutcome).
+    // arrows do, and the revealed row is Enter's next target. A row that
+    // changed under a shown outline is refused (NetworkLogic.pressOutcome).
     onActivateRequested: {
       dropdown.disarmPointer()
       var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
-      root.cursorActive = true
-      root.keyboardCursor = true
       if (outcome === "act")
         root.activateCursor()
+      else if (outcome !== "refuse")
+        root.revealCursor()
       Qt.callLater(root.ensureCursorVisible)
     }
     onDeleteRequested: {
       dropdown.disarmPointer()
       var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
-      root.cursorActive = true
-      root.keyboardCursor = true
       if (outcome === "act")
         root.deleteCursor()
+      else if (outcome !== "refuse")
+        root.revealCursor()
       Qt.callLater(root.ensureCursorVisible)
     }
     onTextKey: function (t) {

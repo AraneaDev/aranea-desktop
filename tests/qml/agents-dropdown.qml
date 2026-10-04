@@ -21,6 +21,7 @@ import QtTest
 import Quickshell
 import "lib"
 import "plugins/araneadev.agents" as Agents
+import "plugins/araneadev.agents/AgentsLogic.js" as AgentsLogic
 import "plugins/araneadev.shared" as Shared
 
 ShellRoot {
@@ -155,7 +156,7 @@ ShellRoot {
         section: "",
         index: -1
       },
-      keyHint: "h/l agent · enter/r refresh · ↑↓ scroll"
+      keyHint: AgentsLogic.keyHint(3)
     }
   }
 
@@ -469,6 +470,11 @@ ShellRoot {
         t.check(outlined(t.findChild(view, "refreshPill")) && pills().every(function (p) {
           return !outlined(p)
         }), "the keyboard cursor on Refresh outlines the Refresh pill")
+        view.view = viewOf(agentRows, false, AgentsLogic.cursorView(true))
+        t.check(agentRows.length === 3 && outlined(t.findChild(view, "refreshPill")) && pills().every(function (p) {
+          return !outlined(p)
+        }), "with three agents, a revealed cursor sits on Refresh, Enter's target")
+        t.equal(t.findChild(view, "keyHint").text, "h/l agent · enter refresh · ↑↓ scroll", "the hint names Enter's refresh")
         view.view = viewOf(agentRows, false)
 
         // ---------- Stable rows ----------

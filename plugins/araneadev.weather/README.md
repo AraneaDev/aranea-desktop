@@ -21,12 +21,13 @@ block. The shell resolves a widget's settings form from its own manifest (keyed 
 plugin id, via `BarWidgetRegistry.metadataFor`), not from `clonedFrom`, so `araneadev.weather`
 registers its own `weatherSettings` entry the same way `omarchy.weather` would.
 
-Keys: up / down / left / right walk the place and "updated" labels (the first key only shows
-the cursor), Enter acts on the cursor (with no cursor yet it opens the place editor, as in
-stock), `e` edits the place, `r` refreshes, Esc closes and Tab moves to the bar's next
-dropdown. In the place field, typing looks places up, up / down move the highlighted
-suggestion, Enter saves it (or the typed name; an empty field goes back to automatic) and Esc
-cancels.
+Keys: up / down / left / right walk the place and "updated" labels. The first key, Enter
+included, only shows the cursor (on the place label after opening); then Enter acts on the
+outlined label (edit the place, or refresh). `e` edits the place, `r` refreshes, Esc closes and
+Tab moves to the bar's next dropdown. Hover only draws a label's tint and never moves the cursor.
+In the place field, typing looks places up, up / down move the highlighted suggestion (outlined
+from the start, as Enter's target; hover never moves it), Enter saves it (or the typed name; an
+empty field goes back to automatic) and Esc cancels.
 
 Added to stock, all from open-meteo on the same refresh:
 

@@ -74,6 +74,8 @@ Column {
     property bool hasCursor: false
     // Whether the pointer is over it.
     readonly property alias hovered: actionHover.hovered
+    // The dropdown's PointerMoveGate, whose layout stamp drops the hover fill.
+    property var pointerGate: null
     // Emitted on a click.
     signal clicked
     // Emitted when the pointer enters it.
@@ -82,7 +84,9 @@ Column {
     signal pointerMoved(var handler)
     implicitWidth: glyphText.implicitWidth + Style.space(10)
     implicitHeight: glyphText.implicitHeight + Style.space(4)
-    Aranea.HoverTint {}
+    Aranea.HoverTint {
+      pointerGate: action.pointerGate
+    }
     Rectangle {
       // The keyboard cursor outline.
       objectName: "cursorOutline"
@@ -124,6 +128,7 @@ Column {
 
       GlyphAction {
         id: qrAction
+        pointerGate: header.pointerGate
         objectName: "qrAction"
         anchors.verticalCenter: parent.verticalCenter
         visible: header.canQr
@@ -143,6 +148,7 @@ Column {
       }
       GlyphAction {
         id: speedAction
+        pointerGate: header.pointerGate
         objectName: "speedAction"
         anchors.verticalCenter: parent.verticalCenter
         visible: header.canSpeed

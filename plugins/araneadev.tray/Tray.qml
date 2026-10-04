@@ -162,7 +162,7 @@ BarWidget {
         active: root.menuCursorActive && root.menuKeyboard,
         index: root.menuCursorIndex
       },
-      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2192) + " open " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190) + " back " + String.fromCodePoint(0xB7) + " enter select"
+      keyHint: TrayLogic.menuKeyHint()
     })
 
   // ---- The manage panel's view.
@@ -208,7 +208,7 @@ BarWidget {
         row: root.manageCursor.row,
         pill: root.manageCursor.pill
       },
-      keyHint: String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190, 0x2192) + " pin / hide " + String.fromCodePoint(0xB7) + " enter toggle"
+      keyHint: TrayLogic.manageKeyHint()
     })
 
   Component {

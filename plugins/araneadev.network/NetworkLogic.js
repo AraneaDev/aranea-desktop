@@ -706,8 +706,8 @@ function keyTargetConfirmed(target) {
 /**
  * The choice a fresh open makes: stock's open handler puts the Wi-Fi cursor
  * on row 0, a deliberate placement, so that row (and its section) count as
- * chosen. With no Wi-Fi rows nothing is chosen. (A keyboard reveal, by
- * contrast, never chooses: see pressOutcome.)
+ * chosen. With no Wi-Fi rows nothing is chosen until a move, a click or a
+ * keyboard reveal (revealTarget).
  * @param {Array<{key: string}|null|undefined>|undefined} wifiRows - the Wi-Fi rows at open
  * @returns {{chosen: string, key: string}} the chosen section ("wifi" or "") and row 0's key
  */
@@ -732,9 +732,8 @@ function savedEmptyFallback(wifiCount) {
 
 /**
  * What Enter or `x` does to the cursor's target. Before any cursor exists
- * it's ignored; on a cursor the keyboard isn't showing it only reveals the
- * outline, which never changes the chosen section or key (a reveal is not
- * a choice: the row that slid into a lost key's place stays unchosen);
+ * or on a cursor the keyboard isn't showing it only reveals the outline
+ * (`ignore` or `reveal`; the host reveals either way, see `revealTarget`);
  * otherwise it acts only when `keyTargetConfirmed`, else it's refused. The
  * ignore/reveal/act split is the generated `pressIntent`, shared with
  * `araneadev.shared/CursorLogic.js` via `tools/js-facade-generator.mjs`.
@@ -747,6 +746,29 @@ function pressOutcome(target, cursorActive, keyboardCursor) {
   var intent = pressIntent(cursorActive, keyboardCursor)
   if (intent !== "act") return intent
   return keyTargetConfirmed(target) ? "act" : "refuse"
+}
+
+/**
+ * The choice a keyboard reveal makes: the outline marks Enter's target, so
+ * revealing it chooses the cursor's section and adopts the key of the row
+ * (or band control) it now shows. Only the next Enter, on the visible
+ * outline, acts, so joining a network still takes a deliberate second key.
+ * @param {{section: string, chosen?: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key?: string, index?: number}|null|undefined} target - the cursor's target, as for keyTargetConfirmed
+ * @returns {{section: string, chosen: string, fixed?: boolean, rows?: Array<{key: string}|null|undefined>, key: string, index?: number}} the target as the reveal leaves it
+ */
+function revealTarget(target) {
+  var t = target || { section: "" }
+  var rows = Array.isArray(t.rows) ? t.rows : []
+  var row = rows[Math.floor(Number(t.index))]
+  var key = !t.fixed && row && typeof row.key === "string" ? row.key : ""
+  return {
+    section: t.section,
+    chosen: t.section || "",
+    fixed: t.fixed,
+    rows: t.rows,
+    key: key,
+    index: t.index
+  }
 }
 
 /**
@@ -861,6 +883,7 @@ if (typeof module !== "undefined")
     keyTargetConfirmed: keyTargetConfirmed,
     openChoice: openChoice,
     pressOutcome: pressOutcome,
+    revealTarget: revealTarget,
     sidewaysChooses: sidewaysChooses,
     extrasExitFollowUp: extrasExitFollowUp,
     savedStatusMap: savedStatusMap,
