@@ -148,16 +148,17 @@ Panel {
       root.placeCursor(InboxLogic.moveStop(root.stops, root.cursorStop, delta))
   }
 
-  // Whether a key may act on the cursor (CursorLogic.pressIntent): with no
-  // cursor it does nothing, a hidden one is only revealed.
+  // Whether a key may act on the cursor (CursorLogic.pressIntent): a
+  // hidden cursor is only revealed, as an arrow reveals it (with no cursor
+  // yet, on the stop an arrow would reveal); a shown one acts.
   function keyMayAct(): bool {
-    list.disarmPointer()
-    centerContent.disarmPointer()
-    var intent = CursorLogic.pressIntent(root.cursorStop >= 0, root.keyboardCursor)
-    if (intent === "ignore")
-      return false
-    root.keyboardCursor = true
-    return intent === "act"
+    if (CursorLogic.pressIntent(root.cursorStop >= 0, root.keyboardCursor) === "act") {
+      list.disarmPointer()
+      centerContent.disarmPointer()
+      return true
+    }
+    root.moveCursor(0)
+    return false
   }
 
   // Enter or Space: opens an entry, expands a "+N more" row, toggles DND or
@@ -273,9 +274,11 @@ Panel {
 
   // A NotificationList action (open, dismiss, toggle, clearGroup, hover)
   // with ARG {index, key}, checked again against the current rows. Pointer
-  // use hides the keyboard cursor; a hover only moves the hidden cursor
-  // onto the row (no fill, no outline), so the next key reveals it there.
+  // use hides the keyboard cursor. A hover is only the row's own fill: it
+  // never moves the cursor or hides the outline.
   function listAction(name: string, arg: var): void {
+    if (name === "hover")
+      return
     var row = root.rows[arg.index]
     if (!row || InboxLogic.rowKey(row) !== arg.key)
       return
@@ -288,8 +291,6 @@ Panel {
       root.toggleGroup(row.app)
     else if (name === "clearGroup")
       root.service.dismissGroup(row.app)
-    else if (name === "hover" && InboxLogic.stopIndex(root.stops, arg.key) >= 0)
-      root.cursorKey = arg.key
   }
 
   // A fresh open shows no cursor until the first navigation key.

@@ -5,8 +5,9 @@
 //
 // Toasts set neither hasCursor nor pointerGate and look and behave as they
 // always have: a light tint on hover, a plain HoverHandler, clicks that act
-// at once. Center rows (compact) draw no hover fill; the keyboard cursor
-// draws the mint outline only through hasCursor; the close tint follows
+// at once. Center rows (compact) draw the shared hover fill (HoverTint)
+// only after a real pointer move; the keyboard cursor draws the mint
+// outline only through hasCursor, and hover never moves it; the close tint follows
 // only real pointer moves (pointerGate); and the card records the row key
 // under each press and offers clickSettled() so NotificationList can refuse
 // a click whose row changed or moved under a still pointer.
@@ -198,6 +199,12 @@ BorderSurface {
 
   HoverHandler {
     id: hoverTracker
+  }
+
+  // The center row's hover fill, after a real pointer move only.
+  Aranea.HoverTint {
+    active: root.compact
+    pointerGate: root.pointerGate
   }
 
   MouseArea {

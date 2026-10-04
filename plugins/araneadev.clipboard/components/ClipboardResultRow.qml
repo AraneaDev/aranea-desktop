@@ -103,18 +103,6 @@ Rectangle {
     border.color: Aranea.DesignTokens.accent
   }
 
-  Rectangle {
-    visible: row.hasCursor
-    width: Style.space(2)
-    height: parent.height - Style.space(14)
-    radius: Style.space(1)
-    color: row.selectedText
-    opacity: 0.9
-    anchors.left: parent.left
-    anchors.leftMargin: Style.space(4)
-    anchors.verticalCenter: parent.verticalCenter
-  }
-
   Row {
     anchors.fill: parent
     anchors.leftMargin: Style.spacing.rowPaddingX

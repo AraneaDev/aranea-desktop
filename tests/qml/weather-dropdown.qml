@@ -12,8 +12,10 @@
 // refuses to edit; opening or closing the editor stamps the layout; the trace
 // paints; a click right after a layout stamp (a section showing or hiding,
 // the suggestions changing) or on a row whose key changed is refused; rows
-// moving under a still pointer emit no hover; no outline shows without
-// cursor.active and hover never draws one; and every trailing element ends on
+// moving under a still pointer emit no hover; outside the editor no outline
+// shows without cursor.active; the suggestions, a search list, outline the
+// highlighted one (Enter's target) from the start; hover draws a row's fill
+// but never an outline nor moves it; and every trailing element ends on
 // one right content edge.
 import QtQuick
 import QtTest
@@ -215,7 +217,7 @@ ShellRoot {
         section: "",
         index: -1
       },
-      keyHint: "e edit place · r refresh · tab next"
+      keyHint: "enter select · e edit place · r refresh"
     }
   }
 
@@ -478,7 +480,7 @@ ShellRoot {
         }), ["11°", "10°", "9°", "8°"], "lows")
         t.equal(one(full, "dayGlyph").text, String.fromCodePoint(0xf0595), "and glyphs")
         t.check(Math.abs(days[0].width - days[3].width) < 0.5, "equal widths")
-        t.equal(one(full, "keyHint").text, "e edit place · r refresh · tab next", "the key hint is the view's")
+        t.equal(one(full, "keyHint").text, "enter select · e edit place · r refresh", "the key hint is the view's")
 
         // ---------- Sections hide individually ----------
         t.check(!one(bare, "rainSoonRow").visible, "rain soon hides when empty")
@@ -564,7 +566,7 @@ ShellRoot {
           return n.text
         }), ["Amsterdam", "Amstelveen"], "with names")
         t.check(rows[0].highlighted && !rows[1].highlighted, "the edit cursor highlights the first")
-        t.equal(litOutlines(full), 0, "but no outline without cursor.active")
+        t.check(litOutlines(full) === 1 && litOutlines(rows[0]) === 1, "and the outline marks it from the start: Enter commits it")
 
         // ---------- Edit: typing ----------
         pointer.keyClick(Qt.Key_End)
@@ -698,7 +700,8 @@ ShellRoot {
           index: 1,
           key: "Amstelveen|52.30|4.86"
         }), "a real move over a suggestion reports hover with its key")
-        t.equal(litOutlines(full), 0, "hover draws no outline")
+        t.check(t.findChild(shown(full, "suggestionRow")[1], "hoverFill").visible && !t.findChild(shown(full, "suggestionRow")[0], "hoverFill").visible, "and draws its hover fill")
+        t.check(litOutlines(full) === 1 && litOutlines(shown(full, "suggestionRow")[0]) === 1, "hover never moves the outline off the highlighted suggestion")
         actions = []
         full.view = viewOf({
           edit: editing(amsterdam.slice().reverse(), 0)

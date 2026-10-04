@@ -124,6 +124,7 @@ Column {
       clickGate: sliderRow
       // A wheel step right after a layout shift is settled too.
       gateWheel: true
+      pointerGate: section.pointerGate
       onMoved: function (value) {
         section.volumeMoved(value)
       }
@@ -154,6 +155,8 @@ Column {
       label: modelData.label
       detail: modelData.detail
       active: !!modelData.available && String(modelData.key) === section.shownKey
+      // The default device carries the selected highlight.
+      selected: active
       available: modelData.available
       busy: active && section.shownBusy
       hasCursor: section.cursor === index

@@ -3,7 +3,8 @@
 // gate, no cursor) keep today's look: the same fill, border spec, radius,
 // width and urgency rail for normal, critical and low urgency, today's
 // light tint on hover, no outline, and clicks that are never settled. In
-// the center: hover draws no fill and no outline; the mint outline shows
+// the center: a real move draws the shared hover fill, never an outline,
+// and leaves the card's own colour alone; the mint outline shows
 // only on the cursor's row while cursor.active; clicks act with the row's
 // index and key (open, dismiss, toggle, clearGroup); a press released after a
 // re-sort moved another entry under it is refused, even past the settle
@@ -263,6 +264,7 @@ ShellRoot {
         t.check(toast.hovered, "a toast under the pointer is hovered (its countdown pauses)")
         t.check(sameColor(toast.color, Util.alpha(Color.notifications.countdown, 0.045)), "and keeps today's hover tint")
         t.equal(litOutlines(toasts), 0, "hover draws no outline on a toast")
+        t.check(!one(toast, "hoverFill").visible, "a toast draws no center hover fill")
 
         // ---------- Rows ----------
         t.equal(shown(list, "entryCard").length, 3, "one card per visible entry")
@@ -271,7 +273,7 @@ ShellRoot {
         t.equal(one(list.itemAtIndex(6), "moreText").text, "+3 more", "the +N more text")
         t.equal(list.itemAtIndex(3).rowKey, "e:b1", "a card holds its entry's key")
 
-        // ---------- Hover draws no fill and no outline ----------
+        // ---------- Hover draws the hover fill, never an outline ----------
         actions = []
         list.disarmPointer()
         var card = list.itemAtIndex(3)
@@ -282,7 +284,9 @@ ShellRoot {
       }], [80, function () {
         var card = list.itemAtIndex(3)
         t.check(card.hovered, "the center card is under the pointer")
-        t.check(sameColor(card.color, Color.notifications.background), "hover draws no fill on a center card")
+        t.check(sameColor(card.color, Color.notifications.background), "hover keeps a center card's own colour")
+        t.check(one(card, "hoverFill").visible, "and draws the shared hover fill over it")
+        t.check(!one(list.itemAtIndex(4), "hoverFill").visible, "on that card only")
         t.equal(litOutlines(list), 0, "hover draws no outline")
         t.check(reported("hover", {
           index: 3,

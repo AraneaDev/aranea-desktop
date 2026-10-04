@@ -237,12 +237,26 @@ test("keyedMove is reveal-first: the first key shows the cursor, later keys move
   assert.deepEqual(logic.keyedMove(null, "", false, 1, byId), { key: "", keyboard: false })
 })
 
-test("keyedPress follows pressIntent: ignore without a cursor, reveal, then act", () => {
+test("keyedPress reveals like an arrow (Enter included), then acts on the shown row", () => {
   const rows = [{ id: 1 }, { id: 2 }]
-  assert.deepEqual(logic.keyedPress(rows, "", false, byId), { keyboard: false, row: null })
-  assert.deepEqual(logic.keyedPress(rows, "gone", true, byId), { keyboard: true, row: null })
-  assert.deepEqual(logic.keyedPress(rows, "2", false, byId), { keyboard: true, row: null })
-  assert.deepEqual(logic.keyedPress(rows, "2", true, byId), { keyboard: true, row: { id: 2 } })
+  assert.deepEqual(logic.keyedPress(rows, "", false, byId), { key: "1", keyboard: true, row: null })
+  assert.deepEqual(logic.keyedPress(rows, "gone", true, byId), {
+    key: "1",
+    keyboard: true,
+    row: null
+  })
+  assert.deepEqual(logic.keyedPress(rows, "2", false, byId), {
+    key: "2",
+    keyboard: true,
+    row: null
+  })
+  assert.deepEqual(logic.keyedPress(rows, "2", true, byId), {
+    key: "2",
+    keyboard: true,
+    row: { id: 2 }
+  })
+  assert.deepEqual(logic.keyedPress([], "", false, byId), { key: "", keyboard: false, row: null })
+  assert.deepEqual(logic.keyedPress(null, "", false, byId), { key: "", keyboard: false, row: null })
 })
 
 test("keyedOutline draws only on the keyboard's cursor row", () => {

@@ -215,7 +215,9 @@ Column {
     visible: dropdown.editing && !dropdown.edit.saving && dropdown.suggestions.length > 0
     rows: dropdown.suggestions
     highlight: dropdown.highlight
-    cursorActive: !!dropdown.cursor.active
+    // A search list: Enter commits the highlighted suggestion, so the
+    // outline marks it whenever the list shows.
+    cursorActive: true
     pointerGate: dropdown.pointerGate
     onVisibleChanged: dropdown.noteLayoutChange()
     onHeightChanged: dropdown.noteLayoutChange()

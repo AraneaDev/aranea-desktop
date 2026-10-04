@@ -55,9 +55,11 @@ the cursor); Enter toggles a NetworkManager row or opens an app; Tab and
 Shift+Tab switch dropdowns; Esc closes. While the prompt is open it owns
 the keys: Enter moves to the next field and connects from the last, Esc
 cancels. The cursor follows the profile it was put on, never a position:
-a row that vanished or moved under it is refused, not replaced, and an
-open (or a reveal) chooses no row until you move or hover. Until a row
-is chosen, the key hint offers only the moves, Tab and Esc.
+a row that vanished or moved under it is refused, not replaced. An open
+chooses no row: the first key (Enter included) only reveals the cursor,
+and the revealed row is the one Enter then acts on. Hover only draws the
+row's fill and never moves the cursor. Until a row is chosen, the key hint
+offers the moves, Enter (reveal) and Esc.
 
 ## The config file
 

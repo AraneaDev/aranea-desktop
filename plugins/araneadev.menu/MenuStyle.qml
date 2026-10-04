@@ -43,13 +43,14 @@ QtObject {
   property color contextText: Util.alpha(style.foreground, 0.58)
   // Color of the root footer text.
   property color footerText: Util.alpha(style.foreground, 0.58)
-  // Background of the cursor row.
+  // Hover fill of the row under the pointer (fill only, as the pickers').
   property color selectedBackground: Color.menu.selectedBackground
-  // Text color of the cursor row; also tints hovered tiles and the cursor bar.
+  // Text color of the outlined row; also tints hovered tiles.
   property color selectedText: Color.menu.selectedText
-  // Border color of the cursor row.
+  // Color of the shell's menu selected-border spec.
   property color selectedBorder: Color.menu.selectedBorder
-  // Border spec for the cursor row.
+  // The shell's menu selected-border spec: rows draw no border on hover,
+  // but its side widths still reserve the rows' content insets.
   property var selectedBorderSpec: Border.surfaceSpec("menu", "selected-border", style.selectedBorder, 0)
   // Left border width of the cursor row, added to every row's content inset.
   readonly property real rowReservedBorderLeft: Border.left(style.selectedBorderSpec)

@@ -415,9 +415,8 @@ Panel {
 
   // Single cursor model: exactly one highlighted spot across the whole
   // panel, located via `focusSection` + (`headerIndex` | `dnsIndex` |
-  // `selectedIndex`). Mouse hover and keyboard nav both mutate this state
-  // at the root; items never read containsMouse for visuals. See
-  // CursorSurface for the shared chrome shared by rows and pills.
+  // `selectedIndex`). Keyboard nav and clicks mutate this state at the
+  // root; hover only draws the controls' own fill and never moves it.
   //
   // hoverFill and selectedFill fed stock's own rows and pills. The Aranea
   // view doesn't use them; they stay as stock wrote them so
@@ -1299,7 +1298,7 @@ Panel {
   // Whether the cursor sits on the Saved row's forget button.
   property bool savedActionFocused: false
   // The SSID of the Wi-Fi row the cursor was deliberately put on (a move,
-  // hover, click or open; never a keyboard reveal), so the cursor follows that
+  // click or open; never a keyboard reveal or a hover), so the cursor follows that
   // network when a scan re-sorts the list. Never adopted from a clamp: when
   // the network is gone it's "" and keyboard actions refuse until the user
   // picks a row (CursorLogic.followCursor).
@@ -1313,8 +1312,8 @@ Panel {
   // the Automatic switch (see headerCursorKey).
   property string bandCursorKey: ""
   // The section the user last deliberately put the cursor in (a move,
-  // hover, click, or "wifi" from open's row-0 placement; never a keyboard
-  // reveal). An automatic move (a section emptying or hiding under the
+  // click, or "wifi" from open's row-0 placement; never a keyboard reveal
+  // or a hover). An automatic move (a section emptying or hiding under the
   // cursor) changes focusSection but not this, so keyboard actions there
   // refuse until the user picks a row.
   property string cursorChosenSection: ""
@@ -1401,7 +1400,7 @@ Panel {
 
   // Puts SECTION's cursor key on whatever row (or band control) it now
   // shows and records SECTION as chosen: only for deliberate placements (a
-  // move, hover or click).
+  // move or click).
   function chooseCursorRow(section) {
     cursorChosenSection = section
     if (section === "band" && bandAutoFocused) {
@@ -2000,15 +1999,14 @@ Panel {
 
   // Carries out one NetworkDropdown action. Pointer actions hand the cursor
   // back from the keyboard; the prompt's own actions (typing, Enter, Esc)
-  // are keyboard input and leave it alone.
+  // are keyboard input and leave it alone. A hover is only the control's
+  // own fill: it never moves the cursor or hides the outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     var promptKey = name === "promptSubmit" || name === "promptCancel" || name === "passphraseEdited" || name === "identityEdited"
     if (!promptKey)
       keyboardCursor = false
-    if (name === "hover") {
-      handleHover(arg)
-      return
-    }
     if (name === "qr")
       summonWifiQr()
     else if (name === "speed")
@@ -2047,42 +2045,6 @@ Panel {
     }
   }
 
-  // A pointer hover: moves the cursor there, as stock's rows and pills did.
-  // Leaving a forget button only drops the action focus on that row.
-  function handleHover(arg) {
-    if (arg.leave) {
-      if (arg.section === "wifi" && focusSection === "wifi" && selectedIndex === arg.index)
-        wifiActionFocused = false
-      else if (arg.section === "saved" && focusSection === "saved" && savedIndex === arg.index)
-        savedActionFocused = false
-      return
-    }
-    if (arg.section === "header") {
-      setHeaderCursor(arg.index)
-      chooseCursorRow("header")
-      return
-    }
-    cursorActive = true
-    if (arg.section === "band") {
-      if (arg.auto)
-        bandAutoFocused = true
-      else {
-        bandIndex = arg.index
-        bandAutoFocused = false
-      }
-    } else if (arg.section === "dns") {
-      dnsIndex = arg.index
-    } else if (arg.section === "wifi") {
-      selectedIndex = arg.index
-      wifiActionFocused = !!arg.action
-    } else if (arg.section === "saved") {
-      savedIndex = arg.index
-      savedActionFocused = !!arg.action
-    }
-    focusSection = arg.section
-    chooseCursorRow(arg.section)
-  }
-
   // Additions to stock's open handler: a fresh open starts with the mouse's
   // (outline-free) cursor and asks for the saved SSIDs; a close drops the
   // Link history. When rows change, every keyed cursor follows the
@@ -2101,10 +2063,10 @@ Panel {
         root.ssidLookupPending = true
         // Stock's open handler puts the Wi-Fi cursor on row 0, a deliberate
         // placement, so that row is chosen (NetworkLogic.openChoice); with
-        // no Wi-Fi rows nothing is until the user moves, hovers or clicks.
-        // A keyboard reveal never chooses. Saved starts on its first row
+        // no Wi-Fi rows nothing is until the user moves or clicks. A
+        // keyboard reveal never chooses. Saved starts on its first row
         // too, followed until the user picks; the header and band take
-        // theirs on a move, hover or click.
+        // theirs on a move or click.
         var open = NetworkLogic.openChoice(root.wifiKeyRows())
         root.cursorChosenSection = open.chosen
         root.wifiCursorSsid = open.key
@@ -2346,15 +2308,14 @@ Panel {
       }
       Qt.callLater(root.ensureCursorVisible)
     }
-    // Enter and x act only on a cursor the keyboard is showing; on one the
-    // pointer placed (no outline) they only reveal it, as arrows do, and
-    // the reveal chooses nothing. A row the user didn't choose is refused
-    // (NetworkLogic.pressOutcome).
+    // Enter and x act only on a cursor the keyboard is showing; on a hidden
+    // one (a fresh open, or after pointer use) they only reveal it, as
+    // arrows do, and the reveal chooses nothing. A row the user didn't
+    // choose is refused (NetworkLogic.pressOutcome).
     onActivateRequested: {
       dropdown.disarmPointer()
       var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
-      if (outcome === "ignore")
-        return
+      root.cursorActive = true
       root.keyboardCursor = true
       if (outcome === "act")
         root.activateCursor()
@@ -2363,8 +2324,7 @@ Panel {
     onDeleteRequested: {
       dropdown.disarmPointer()
       var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
-      if (outcome === "ignore")
-        return
+      root.cursorActive = true
       root.keyboardCursor = true
       if (outcome === "act")
         root.deleteCursor()

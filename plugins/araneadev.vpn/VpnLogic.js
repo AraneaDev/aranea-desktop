@@ -555,9 +555,9 @@ function headerCaption(nUp, nTotal) {
  * @returns {string} the hint
  */
 function keyHint(section, rowKind) {
-  if (rowKind === "app") return "↑↓ move · enter open app · tab next"
-  if (section === "connected") return "↑↓ move · enter disconnect · tab next"
-  return "↑↓ move · enter connect · tab next"
+  if (rowKind === "app") return "↑↓ move · enter open app"
+  if (section === "connected") return "↑↓ move · enter disconnect"
+  return "↑↓ move · enter connect"
 }
 
 // --- Panel wiring rules (Panel.qml) -------------------------------------------
@@ -989,9 +989,8 @@ function emptyText(nmOk, rowCount) {
 
 /**
  * The key hint: the prompt's own keys while it's open, the cursor row's
- * Enter action (`keyHint`) once a row is chosen, the moves alone before
- * that (Enter does nothing yet, so the hint never promises it), else Tab
- * and Esc.
+ * Enter action (`keyHint`) once a row is chosen, the moves and Enter's
+ * reveal ("select") before that, else Esc alone. No hint names Tab.
  * @param {boolean} promptOpen - whether the credential prompt is open
  * @param {string} section - the cursor's section
  * @param {string} rowKind - the cursor row's kind ("nm" or "app")
@@ -1001,8 +1000,8 @@ function emptyText(nmOk, rowCount) {
  */
 function hintFor(promptOpen, section, rowKind, hasRows, chosen) {
   if (promptOpen) return "enter connect · esc cancel"
-  if (!hasRows) return "tab next · esc close"
-  if (!chosen) return "↑↓ move · esc close · tab next"
+  if (!hasRows) return "esc close"
+  if (!chosen) return "↑↓ move · enter select · esc close"
   return keyHint(section, rowKind)
 }
 

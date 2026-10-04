@@ -577,13 +577,13 @@ test("headerCaption on missing/negative input never throws", () => {
 // --- keyHint -----------------------------------------------------------------------
 
 test("keyHint: an app row always says open app", () => {
-  assert.equal(logic.keyHint("available", "app"), "↑↓ move · enter open app · tab next")
-  assert.equal(logic.keyHint("connected", "app"), "↑↓ move · enter open app · tab next")
+  assert.equal(logic.keyHint("available", "app"), "↑↓ move · enter open app")
+  assert.equal(logic.keyHint("connected", "app"), "↑↓ move · enter open app")
 })
 
 test("keyHint: a NetworkManager row says connect from available, disconnect from connected", () => {
-  assert.equal(logic.keyHint("available", "nm"), "↑↓ move · enter connect · tab next")
-  assert.equal(logic.keyHint("connected", "nm"), "↑↓ move · enter disconnect · tab next")
+  assert.equal(logic.keyHint("available", "nm"), "↑↓ move · enter connect")
+  assert.equal(logic.keyHint("connected", "nm"), "↑↓ move · enter disconnect")
 })
 
 // --- Panel wiring rules -------------------------------------------------------
@@ -861,17 +861,17 @@ test("emptyText and hintFor", () => {
   assert.equal(logic.emptyText(false, 0), "NetworkManager isn't running")
   assert.equal(logic.emptyText(false, 2), "")
   assert.equal(logic.hintFor(true, "available", "nm", true), "enter connect · esc cancel")
-  assert.equal(logic.hintFor(false, "", "", false), "tab next · esc close")
+  assert.equal(logic.hintFor(false, "", "", false), "esc close")
   assert.equal(
     logic.hintFor(false, "connected", "nm", true, true),
     logic.keyHint("connected", "nm")
   )
   assert.equal(
     logic.hintFor(false, "available", "nm", true, false),
-    "↑↓ move · esc close · tab next",
+    "↑↓ move · enter select · esc close",
     "no Enter promise before a row is chosen"
   )
-  assert.equal(logic.hintFor(false, "available", "app", true), "↑↓ move · esc close · tab next")
+  assert.equal(logic.hintFor(false, "available", "app", true), "↑↓ move · enter select · esc close")
 })
 
 test("moveFlat and cursorPlace walk Connected then Available", () => {

@@ -954,9 +954,11 @@ Panel {
 
   // Carries out one DisplaysDropdown action. Pointer actions hand the
   // cursor back from the keyboard; a keyed action whose row changed under
-  // it is refused; a hover moves the cursor (never during a text-size
-  // reflow); the rest map onto the setters above.
+  // it is refused; the rest map onto the setters above. A hover is only
+  // the control's own fill: it never moves the cursor or hides the outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     keyboardCursor = false
     if (name === "brightnessPreview") {
       if (brightnessAvailable && arg)
@@ -982,14 +984,16 @@ Panel {
     } else if (name === "display") {
       if (pointerRowMatches("monitors", arg) && typeof arg.enable === "boolean" && arg.enable !== displayShownOn(arg.key))
         toggleDisplay(arg.key, !arg.enable)
-    } else if (name === "hover") {
-      if (reflowingText || !arg || visibleSections.indexOf(arg.section) < 0 || !pointerRowMatches(arg.section, arg))
-        return
-      cursorActive = true
-      focusSection = arg.section
-      selectedIndex = arg.index
-      cursorKey = arg.key
     }
+  }
+
+  // Shows the keyboard cursor where it is, on the control it sits on: the
+  // outline marks Enter's target, so the revealed control is the one Enter
+  // then acts on.
+  function revealCursor() {
+    cursorActive = true
+    keyboardCursor = true
+    cursorKey = keyAt(focusSection, selectedIndex)
   }
 
   implicitWidth: button.implicitWidth
@@ -999,8 +1003,8 @@ Panel {
 
   // KeyboardPanel primes focus at open-time, so SUPER-bound IPC summons land
   // with the arrows ready to navigate. Keep a default landing point, but
-  // don't paint the cursor until the first navigation key; a fresh open
-  // chooses nothing, so Enter is refused until a move, adjustment or hover.
+  // don't paint the cursor until the first key; a fresh open chooses
+  // nothing, and the first key (Enter included) only reveals the cursor.
   onOpenedChanged: {
     keyboardCursor = false
     cursorKey = ""
@@ -1259,12 +1263,11 @@ Panel {
     onMoveRequested: function (dx, dy) {
       dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
-      // cursor where it is; a reveal never chooses or adjusts.
-      var revealing = !root.cursorActive || !root.keyboardCursor
-      root.cursorActive = true
-      root.keyboardCursor = true
-      if (revealing)
+      // cursor where it is; a reveal never adjusts.
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.revealCursor()
         return
+      }
       if (dy !== 0) {
         root.moveCursor(dy)
         return
@@ -1284,17 +1287,15 @@ Panel {
       // An adjustment is a deliberate choice of the control it lands on.
       root.cursorKey = root.keyAt(root.focusSection, root.selectedIndex)
     }
-    // Enter acts only on a cursor the keyboard is showing, on the row the
-    // user chose and still sees (CursorLogic.pressIntent, cursorConfirmed);
-    // a pointer-placed cursor is only revealed.
+    // Enter, like any first key, only reveals a hidden cursor; it acts only
+    // on a cursor the keyboard is showing, on the row the user chose and
+    // still sees (CursorLogic.pressIntent, cursorConfirmed).
     onActivateRequested: {
       dropdown.disarmPointer()
-      var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
-      if (intent === "ignore")
-        return
-      root.keyboardCursor = true
-      if (intent === "act")
+      if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) === "act")
         root.activateCursor()
+      else
+        root.revealCursor()
     }
     onDeleteRequested: {
       dropdown.disarmPointer()

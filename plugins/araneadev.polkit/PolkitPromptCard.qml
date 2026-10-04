@@ -152,6 +152,10 @@ ColumnLayout {
       font.pixelSize: Style.font.caption
       font.weight: Font.Medium
       font.letterSpacing: root.letterSpacing
+      Aranea.HoverTint {
+        z: -1
+        anchors.margins: -Style.space(3)
+      }
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor

@@ -436,6 +436,9 @@ ShellRoot {
     t.check(ifRows[0].active && !ifRows[1].active, "active comes from the row")
     t.equal(t.findChild(ifaceTwo, "interfacesCount").text, "2", "the count shows")
     t.equal(litOutlines(ifaceTwo), 0, "interface rows never outline")
+    t.check(ifRows.every(function (r) {
+      return !r.interactive && !t.findChild(r, "selectedFill").visible
+    }), "interface rows are informational: no hover fill, no selected highlight")
 
     // ---------- Band ----------
     t.check(!bandHidden.visible, "the band hides with visible false")

@@ -322,8 +322,8 @@ function heroStatus(s, phrases, phraseIndex, modeLabel) {
  * @returns {string} the hint
  */
 function keyHint(section) {
-  if (section === "profiles") return "←→ pick · enter set · tab next"
-  return "esc close · tab next"
+  if (section === "profiles") return "←→ pick · enter set"
+  return "esc close"
 }
 
 /**

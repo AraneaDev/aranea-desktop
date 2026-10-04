@@ -71,10 +71,12 @@ Panel {
     root.keyboardCursor = next.keyboard
   }
 
-  // Enter or Space: reveals a cursor the keyboard is not showing, else
-  // opens the cursor's problem (HealthLogic.cursorPress).
+  // Enter or Space: reveals a cursor the keyboard is not showing (on the
+  // first problem after opening), else opens the cursor's problem
+  // (HealthLogic.cursorPress).
   function activateCursor(): void {
     var press = HealthLogic.cursorPress(root.problems, root.cursorKey, root.keyboardCursor)
+    root.cursorKey = press.key
     root.keyboardCursor = press.keyboard
     root.runRow(press.row)
   }
@@ -88,13 +90,6 @@ Panel {
       return
     root.cursorKey = key
     root.runRow(row)
-  }
-
-  // The pointer really moved onto row INDEX: the cursor goes there,
-  // hidden, so a following key reveals it in place.
-  function hoverRow(index: int): void {
-    root.keyboardCursor = false
-    root.cursorKey = HealthLogic.problemKey(root.problems[index])
   }
 
   // Runs a problem row's click command, if it has one.
@@ -230,9 +225,6 @@ Panel {
         onProblemActivated: function (index, key) {
           root.activateRow(index, key)
         }
-        onRowHovered: function (index) {
-          root.hoverRow(index)
-        }
       }
 
       Hairline {}
@@ -258,7 +250,7 @@ Panel {
       Text {
         objectName: "keyHint"
         Layout.fillWidth: true
-        text: "↑↓ move · enter open · tab next"
+        text: "↑↓ move · enter open"
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
         font.family: Style.font.family
         font.pixelSize: Style.font.caption

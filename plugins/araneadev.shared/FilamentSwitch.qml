@@ -5,6 +5,9 @@
 // was aimed at another row's switch is ignored until the row settles.
 // A busy switch (a change in flight) breathes like a busy FilamentPill; a
 // disabled one (enabled: false) is dimmed and never toggles.
+// The pointer over it draws the hover fill (HoverTint), only after a real
+// move; the keyboard cursor draws the mint outline. Its on state is its
+// selected look (the lit node).
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -24,6 +27,12 @@ Item {
   property bool busy: false
   // Opacity the busy animation drives, 0.45..1.
   property real pulseOpacity: 1
+  // Optional host PointerMoveGate (qs.Ui) carrying layoutChangedAt: a
+  // layout shift drops the hover fill.
+  property var pointerGate: null
+  // Whether the switch draws its own hover fill; false on a NodeDeviceRow,
+  // whose own fill covers it and whose hover must reach the row.
+  property bool ownHover: true
 
   // Emitted when the switch is clicked or activated.
   signal toggled
@@ -38,6 +47,11 @@ Item {
   implicitHeight: Style.space(16)
   opacity: sw.enabled ? 1 : 0.5
 
+  HoverTint {
+    anchors.margins: -Style.space(3)
+    active: sw.enabled && sw.ownHover
+    pointerGate: sw.pointerGate
+  }
   Rectangle {
     // The keyboard cursor outline.
     objectName: "cursorOutline"

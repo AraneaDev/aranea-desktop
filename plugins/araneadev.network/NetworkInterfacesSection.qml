@@ -53,6 +53,8 @@ Column {
       detail: modelData.detail
       active: !!modelData.active
       available: true
+      // Informational: no hover fill, no pointing cursor.
+      interactive: false
       hasCursor: false
     }
   }

@@ -82,6 +82,7 @@ Column {
     signal pointerMoved(var handler)
     implicitWidth: glyphText.implicitWidth + Style.space(10)
     implicitHeight: glyphText.implicitHeight + Style.space(4)
+    Aranea.HoverTint {}
     Rectangle {
       // The keyboard cursor outline.
       objectName: "cursorOutline"

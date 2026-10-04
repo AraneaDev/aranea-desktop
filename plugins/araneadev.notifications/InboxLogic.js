@@ -357,14 +357,14 @@ function centerCaption(count, quiet, quietUntilText) {
 
 /**
  * The center's key hint line, by state (the network dropdown's keyHint
- * pattern): with entries, every row key; with none, only moving (the DND
- * switch is still a stop) and Tab.
+ * pattern): with entries, every row key; with none, moving and Enter (the
+ * DND switch is still a stop). No hint names Tab.
  * @param {number} count - inbox entries
  * @returns {string} the hint
  */
 function centerKeyHint(count) {
-  if ((Number(count) || 0) > 0) return "↑↓ move · x dismiss · ⇧del group · tab next"
-  return "↑↓ move · tab next"
+  if ((Number(count) || 0) > 0) return "↑↓ move · enter open · x dismiss · ⇧del group"
+  return "↑↓ move · enter toggle"
 }
 
 /**
@@ -679,20 +679,22 @@ function keyedMove(rows, key, keyboard, dy, keyOf) {
 }
 
 /**
- * What Enter or Space does on a keyed list, by pressIntent: nothing without
- * a cursor on a shown row, only reveal one the keyboard is not showing,
- * else hand back the cursor's row to act on.
+ * What Enter or Space does on a keyed list. Like an arrow, it first only
+ * reveals a cursor the keyboard is not showing: on its row when that is
+ * still shown, else on the first row. Only on a shown cursor's row does it
+ * hand that row back to act on. With no rows it does nothing.
  * @param {*} rows - the dropdown rows
  * @param {string} key - the cursor's key, or ""
  * @param {boolean} keyboard - whether the keyboard is showing the cursor
  * @param {(row: any) => string} keyOf - a row's key
- * @returns {{keyboard: boolean, row: ?object}} the new mode and the row to act on, or null
+ * @returns {{key: string, keyboard: boolean, row: ?object}} the cursor key, the new mode and the row to act on, or null
  */
 function keyedPress(rows, key, keyboard, keyOf) {
-  var i = keyIndex(rows, key, keyOf)
-  var intent = pressIntent(i >= 0, keyboard)
-  if (intent === "ignore") return { keyboard: keyboard, row: null }
-  return { keyboard: true, row: intent === "act" ? rows[i] : null }
+  var list = Array.isArray(rows) ? rows : []
+  var i = keyIndex(list, key, keyOf)
+  if (pressIntent(i >= 0, keyboard) === "act") return { key: key, keyboard: true, row: list[i] }
+  if (list.length === 0) return { key: key, keyboard: keyboard, row: null }
+  return { key: i >= 0 ? key : keyOf(list[0]), keyboard: true, row: null }
 }
 
 /**

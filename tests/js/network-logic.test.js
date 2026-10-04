@@ -663,12 +663,12 @@ test("extrasFollowUp re-reads after a forget that landed mid-poll, and settles o
 // --- keyHint ----------------------------------------------------------------------------
 
 test("keyHint says what Enter does in each section", () => {
-  assert.equal(logic.keyHint("wifi"), "↑↓ move · ←→ pick · enter connect · x forget · tab next")
-  assert.equal(logic.keyHint("saved"), "↑↓ move · enter/→ select forget · x forget · tab next")
-  assert.equal(logic.keyHint("dns"), "↑↓ move · ←→ pick · enter apply · tab next")
-  assert.equal(logic.keyHint("band"), "↑↓ move · ←→ pick · enter apply · tab next")
-  assert.equal(logic.keyHint("header"), "↑↓ move · ←→ pick · enter apply · tab next")
-  assert.equal(logic.keyHint(""), "↑↓ move · ←→ pick · enter connect · x forget · tab next")
+  assert.equal(logic.keyHint("wifi"), "↑↓ move · ←→ pick · enter connect · x forget")
+  assert.equal(logic.keyHint("saved"), "↑↓ move · enter/→ select forget · x forget")
+  assert.equal(logic.keyHint("dns"), "↑↓ move · ←→ pick · enter apply")
+  assert.equal(logic.keyHint("band"), "↑↓ move · ←→ pick · enter apply")
+  assert.equal(logic.keyHint("header"), "↑↓ move · ←→ pick · enter apply")
+  assert.equal(logic.keyHint(""), "↑↓ move · ←→ pick · enter connect · x forget")
 })
 
 // --- selectedDnsProvider ------------------------------------------------------------

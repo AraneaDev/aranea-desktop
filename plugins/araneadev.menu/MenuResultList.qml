@@ -42,8 +42,6 @@ Item {
   // Public contract member.
   property color border: Color.menu.border
   // Public contract member.
-  property var selectedBorderSpec: Border.none()
-  // Public contract member.
   property string fontFamily: Style.font.menuFamily
   // Public contract member.
   property real menuFontScale: 1
@@ -172,8 +170,8 @@ Item {
       width: ListView.view.width
       height: results.rowHeightForDetail ? results.rowHeightForDetail(detail) : Style.space(44)
       radius: results.cornerRadius
+      // The hover fill only, as the pickers draw it: no border.
       color: hovered ? results.selectedBackground : "transparent"
-      borderSpec: hovered ? results.selectedBorderSpec : Border.none()
 
       Rectangle {
         // The keyboard cursor outline (mint, keyboard only).

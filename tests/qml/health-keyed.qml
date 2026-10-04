@@ -1,7 +1,10 @@
 // The health dropdown's Filament rules, in a real window with real pointer
 // events. A host wired like Panel.qml (the cursor key, the keyboard mode and
 // HealthLogic.outlineIndex) drives the problems section: the mint outline
-// shows only with the keyboard and never on hover; problem rows are keyed
+// shows only with the keyboard and never on hover, and Enter as the first
+// key only reveals it; a real pointer move draws a row's hover fill but
+// never moves the cursor or the outline; no problem row carries the
+// selected highlight (problems are not a choice); problem rows are keyed
 // (by id, falling back to the text) and a keyed action whose row changed
 // underneath is refused; the rows stay the same delegates across a refresh
 // that hands over a new array, and an equal list does not stamp the layout;
@@ -139,8 +142,6 @@ ShellRoot {
           host.activated = host.activated.concat([[index, key]])
         }
         onRowHovered: function (index) {
-          host.keyboard = false
-          host.cursorKey = HealthLogic.problemKey(section.problems[index])
           host.hovered = host.hovered.concat([index])
         }
       }
@@ -190,6 +191,11 @@ ShellRoot {
         // ---------- Outline: keyboard only ----------
         t.equal(rows().length, 3, "one row per problem")
         t.equal(outlined(), 0, "no outline before the keyboard")
+        var first = HealthLogic.cursorPress(section.problems, "", false)
+        t.check(first.key === HealthLogic.problemKey(section.problems[0]) && first.keyboard && first.row === null, "Enter as the first key only reveals the cursor on the first problem")
+        t.check(rows().every(function (r) {
+          return !t.findChild(r, "selectedFill").visible
+        }), "no problem row carries the selected highlight")
         t.equal(rows()[2].key, "Container web exited (code 1)", "a row without an id is keyed by its text")
         var next = HealthLogic.cursorMove(section.problems, host.cursorKey, host.keyboard, 1)
         host.cursorKey = next.key
@@ -249,10 +255,12 @@ ShellRoot {
         pointer.mouseMove(section, stillPoint.x + 4, stillPoint.y)
       }], [200, function () {
         t.check(hovered.indexOf(2) >= 0, "a real move over a row reports hover")
-        t.equal(host.cursorKey, HealthLogic.problemKey(section.problems[2]), "hover places the cursor key")
-        t.equal(outlined(), 0, "and hover never outlines a row")
+        t.check(t.findChild(rows()[2], "hoverFill").visible, "a real move draws the hover fill on that row")
+        t.check(!t.findChild(rows()[0], "hoverFill").visible && !t.findChild(rows()[1], "hoverFill").visible, "and only there")
+        t.equal(host.cursorKey, "reboot", "hover never moves the cursor key")
+        t.check(outlined() === 1 && rows()[1].hasCursor && !rows()[2].hasCursor, "the outline stays on the keyboard's row")
         var press = HealthLogic.cursorPress(section.problems, host.cursorKey, host.keyboard)
-        t.check(press.keyboard && press.row === null, "Enter after hover only reveals")
+        t.check(!!press.row && HealthLogic.problemKey(press.row) === "reboot", "Enter acts on the outlined row, not the hovered one")
 
         // ---------- Strand bars and the trace ----------
         var memBar = t.findChild(resources, "memBar")

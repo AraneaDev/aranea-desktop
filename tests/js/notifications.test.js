@@ -129,11 +129,14 @@ test("notifications logic", () => {
   )
   assert(inbox.centerCaption(undefined, false, "") === "Nothing new", "a missing count reads as 0")
   assert(
-    inbox.centerKeyHint(4) === "↑↓ move · x dismiss · ⇧del group · tab next",
+    inbox.centerKeyHint(4) === "↑↓ move · enter open · x dismiss · ⇧del group",
     "the full hint with entries"
   )
-  assert(inbox.centerKeyHint(0) === "↑↓ move · tab next", "the short hint when empty")
-  assert(inbox.centerKeyHint(undefined) === "↑↓ move · tab next", "a missing count reads as empty")
+  assert(inbox.centerKeyHint(0) === "↑↓ move · enter toggle", "the short hint when empty")
+  assert(
+    inbox.centerKeyHint(undefined) === "↑↓ move · enter toggle",
+    "a missing count reads as empty"
+  )
   assert(inbox.listHeight(200, 400, 100, 60) === 200, "a short list keeps its content height")
   assert(inbox.listHeight(900, 400, 100, 60) === 240, "a long list is capped above the footer")
   assert(inbox.listHeight(900, 100, 80, 60) === 0, "never below 0")

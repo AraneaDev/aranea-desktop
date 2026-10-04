@@ -8,6 +8,8 @@
 // breathes its node; a clickGate refuses a press aimed before a layout
 // shift, as FilamentSwitch's does. Opt-in (gateWheel), the wheel is refused
 // the same way, and while wheelHeld (e.g. during a text-size reflow).
+// The pointer over it draws the hover fill (HoverTint), only after a real
+// move.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -47,6 +49,9 @@ Item {
   // With gateWheel, ignore wheel steps while true (e.g. while the host's
   // layout is reflowing under the pointer).
   property bool wheelHeld: false
+  // Optional host PointerMoveGate (qs.Ui) carrying layoutChangedAt: a
+  // layout shift drops the hover fill.
+  property var pointerGate: null
   // Lit fraction of the strand, 0..1.
   readonly property real progress: Math.max(0, Math.min(1, (liveValue - minimum) / Math.max(0.0001, maximum - minimum)))
   // Colour of the lit strand and the node when muted.
@@ -99,6 +104,10 @@ Item {
   implicitWidth: Style.space(200)
   implicitHeight: Style.space(20)
 
+  HoverTint {
+    active: slider.interactive
+    pointerGate: slider.pointerGate
+  }
   Rectangle {
     id: strand
     anchors.left: parent.left

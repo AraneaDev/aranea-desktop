@@ -139,6 +139,8 @@ Column {
         detail: wrapper.promptOpen ? "" : wrapper.rowStatus.text
         detailColor: wrapper.rowStatus.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
         active: !!wrapper.modelData.connected
+        // The connected network carries the selected highlight.
+        selected: active
         available: !section.disabled
         busy: wrapper.rowStatus.busy
         signal: -1

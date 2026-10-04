@@ -57,7 +57,8 @@ modules own history, search, and tree traversal.
   whenever Enter has a target: from open, after typing and after a click
   into a submenu (on its first row); never on the empty state. Only the
   keyboard moves it, and the first Down goes straight to the second row. Hover draws the menu's
-  selected fill on the row under the pointer, and root tiles their tint,
+  selected fill (fill only, no border, as the pickers') on the row under the pointer, and root
+  tiles their tint,
   only after a real pointer move (PointerMoveGate); hover never moves the
   cursor, and the fill clears when the rows change or scroll under the
   pointer. Row and tile clicks act on the clicked item, keyed by item or

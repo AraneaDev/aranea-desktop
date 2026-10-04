@@ -118,7 +118,7 @@ ShellRoot {
           illumination: 68
         }
       },
-      keyHint: "←→ month · ↑↓ year · t today · tab next"
+      keyHint: "←→ month · ↑↓ year · t today"
     }
   }
 
@@ -414,7 +414,7 @@ ShellRoot {
         t.equal(one(full, "lifePercent").text, "49%", "the life percent")
         t.check(!one(polar, "lifeRow").visible, "and hides when not")
         t.check(!one(full, "lifeEdit").visible, "no edit row while not editing")
-        t.equal(one(full, "keyHint").text, "←→ month · ↑↓ year · t today · tab next", "the key hint is the view's")
+        t.equal(one(full, "keyHint").text, "←→ month · ↑↓ year · t today", "the key hint is the view's")
 
         // ---------- No stray outline ----------
         t.equal(t.findChildren(full, "cursorOutline").length, 0, "no cursor outline anywhere")
@@ -584,5 +584,15 @@ ShellRoot {
           life: false
         })
         t.check(full.layoutChangedAt > stampBefore, "and Back to today coming back stamps it too")
+      }], [350, function () {
+        // ---------- Hover fill on a double-clickable strand ----------
+        var year = one(full, "yearRow")
+        t.check(!one(year, "hoverFill").visible, "the year strand is unlit before the pointer moves")
+        pointer.mouseMove(year, year.width / 2, year.height / 2)
+      }], [60, function () {
+        var year = one(full, "yearRow")
+        pointer.mouseMove(year, year.width / 2 + 4, year.height / 2)
+      }], [60, function () {
+        t.check(one(one(full, "yearRow"), "hoverFill").visible, "a real move onto the year strand draws its hover fill")
       }]])
 }

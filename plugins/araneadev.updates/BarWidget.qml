@@ -212,10 +212,6 @@ Item {
         keyboardCursor: testHost.keyboardCursor
         onOpenUpdater: testHost.openUpdater()
         onRefresh: testHost.refresh()
-        onPillHovered: function (index) {
-          testHost.keyboardCursor = false
-          testHost.cursorIndex = index
-        }
       }
     }
   }

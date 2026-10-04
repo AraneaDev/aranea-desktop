@@ -1,5 +1,6 @@
 // Presentational group header for the notification inbox: the collapse
-// glyph, the app and its count, and a close glyph. The close tint follows
+// glyph, the app and its count, and a close glyph. The header lights with
+// the shared hover fill after a real pointer move. The close tint follows
 // only real pointer moves when a PointerMoveGate is set (plain hover
 // without one). The row records its key under each press and offers
 // clickSettled() so NotificationList can refuse a click whose row changed
@@ -8,6 +9,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../../araneadev.shared" as Aranea
 import "../../araneadev.shared/ClickSettle.js" as ClickSettle
 
 RowLayout {
@@ -79,6 +81,10 @@ RowLayout {
     font.bold: true
     Layout.fillWidth: true
 
+    Aranea.HoverTint {
+      z: -1
+      pointerGate: row.pointerGate
+    }
     MouseArea {
       id: titleArea
       anchors.fill: parent

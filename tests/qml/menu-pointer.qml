@@ -209,6 +209,7 @@ ShellRoot {
             hoverRow(2)
           }], [60, function () {
             t.check(rowAt(2).hovered, "a real move onto a row fills it")
+            t.check(rowAt(2).borderLeft === 0 && rowAt(2).borderTop === 0 && rowAt(2).borderRight === 0 && rowAt(2).borderBottom === 0, "with the fill only, no border, as the pickers' hover")
             t.check(!rowAt(0).hovered && !rowAt(1).hovered, "and only that row")
             t.equal(menu.selectedIndex, 0, "hovering another row does not move the keyboard cursor")
             t.check(rowAt(0).hasCursor && !rowAt(2).hasCursor, "the outline stays on the first row")

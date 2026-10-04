@@ -45,6 +45,10 @@ Column {
     color: Aranea.DesignTokens.foreground
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
+    Aranea.HoverTint {
+      z: -1
+      active: copyMouse.enabled
+    }
     MouseArea {
       id: copyMouse
       anchors.fill: parent

@@ -544,13 +544,13 @@ test("heroStatus on missing state never throws", () => {
 // --- keyHint -------------------------------------------------------------------------
 
 test("keyHint: the profiles section picks with arrows", () => {
-  assert.equal(logic.keyHint("profiles"), "←→ pick · enter set · tab next")
+  assert.equal(logic.keyHint("profiles"), "←→ pick · enter set")
 })
 
-test("keyHint: any other section (or none) defaults to esc close / tab next", () => {
-  assert.equal(logic.keyHint("details"), "esc close · tab next")
-  assert.equal(logic.keyHint(undefined), "esc close · tab next")
-  assert.equal(logic.keyHint(""), "esc close · tab next")
+test("keyHint: any other section (or none) defaults to esc close", () => {
+  assert.equal(logic.keyHint("details"), "esc close")
+  assert.equal(logic.keyHint(undefined), "esc close")
+  assert.equal(logic.keyHint(""), "esc close")
 })
 
 // --- selectedProfile -----------------------------------------------------------------

@@ -96,6 +96,15 @@ Column {
 
     implicitHeight: strandCaption.implicitHeight + Style.space(6) + strandTrack.height
 
+    Rectangle {
+      // The hover fill, after a real pointer move onto a double-clickable
+      // strand (hot is gated).
+      objectName: "hoverFill"
+      anchors.fill: parent
+      anchors.margins: -Style.space(3)
+      color: Aranea.DesignTokens.hoverFill
+      visible: strand.hot && strand.tappable
+    }
     Text {
       id: strandCaption
       anchors.left: parent.left

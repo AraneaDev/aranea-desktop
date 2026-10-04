@@ -612,7 +612,7 @@ Panel {
     var parts = []
     if (providers.length > 1)
       parts.push("h/l agent")
-    parts.push("r refresh", arrows + " scroll", "tab next")
+    parts.push("enter/r refresh", arrows + " scroll")
     return parts.join(dot)
   }
 
@@ -651,8 +651,12 @@ Panel {
     })
 
   // Carries out one AgentsDropdown action. Every action comes from the
-  // pointer, so each one hands the cursor back from the keyboard.
+  // pointer, so each one hands the cursor back from the keyboard, except a
+  // hover: that is only the control's own fill and never moves the cursor
+  // or hides the outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     keyboardCursor = false
     if (name === "refresh") {
       requestRefresh()

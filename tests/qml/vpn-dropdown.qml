@@ -104,7 +104,7 @@ ShellRoot {
       available: available,
       cursor: cursor,
       emptyText: "",
-      keyHint: "↑↓ move · enter connect · esc close · tab next"
+      keyHint: "↑↓ move · enter connect · esc close"
     }
   }
 
@@ -315,7 +315,7 @@ ShellRoot {
               index: -1
             },
             emptyText: "No VPNs yet",
-            keyHint: "esc close · tab next"
+            keyHint: "esc close"
           })
       }
 
@@ -357,8 +357,8 @@ ShellRoot {
         var empty = t.findChild(bare, "emptyText")
         t.check(empty.visible && empty.text === "No VPNs yet", "no rows shows the empty text")
         t.check(!t.findChild(full, "emptyText").visible, "rows hide the empty text")
-        t.equal(t.findChild(full, "keyHint").text, "↑↓ move · enter connect · esc close · tab next", "the key hint is the view's")
-        t.equal(t.findChild(bare, "keyHint").text, "esc close · tab next", "the bare key hint")
+        t.equal(t.findChild(full, "keyHint").text, "↑↓ move · enter connect · esc close", "the key hint is the view's")
+        t.equal(t.findChild(bare, "keyHint").text, "esc close", "the bare key hint")
 
         // ---------- Rows ----------
         var crows = rowsOf("connected")
@@ -374,6 +374,11 @@ ShellRoot {
         }) && arows.every(function (r) {
           return !r.active
         }), "connected rows are lit, available ones not")
+        t.check(crows.every(function (r) {
+          return t.findChild(r, "selectedFill").visible
+        }) && arows.every(function (r) {
+          return !t.findChild(r, "selectedFill").visible
+        }), "connected rows carry the selected highlight, available ones not")
         t.equal(crows[0].glyph, vpnGlyph, "rows carry their glyph")
         t.equal(crows.concat(arows).map(function (r) {
           return !!t.findChild(r, "vpnSwitch")

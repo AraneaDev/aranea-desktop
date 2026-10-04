@@ -63,6 +63,7 @@ Aranea.KeyboardPanelFrame {
   onActivateRequested: {
     panel.disarmPointer()
     var press = WorkspaceModel.cursorPress(host.workspaceStates, host.cursorKey, host.keyboardCursor)
+    host.cursorKey = press.key
     host.keyboardCursor = press.keyboard
     if (press.row)
       host.focusWorkspace(press.row.id)
@@ -84,10 +85,6 @@ Aranea.KeyboardPanelFrame {
       maxContentHeight: Math.max(0, Math.min(Style.space(520), host.availableCardHeight) - host.verticalContentInset)
       onFocusWorkspace: function (id) {
         host.focusWorkspace(id)
-      }
-      onRowHovered: function (index) {
-        host.keyboardCursor = false
-        host.cursorKey = WorkspaceModel.workspaceKey(host.workspaceStates[index])
       }
     }
   }

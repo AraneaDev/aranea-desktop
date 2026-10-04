@@ -215,6 +215,7 @@ ShellRoot {
         t.equal(one(rowAt(0), "rowLabel").text, "Open Courier", "a row's label")
         t.equal(one(rowAt(2), "rowMark").text, String.fromCodePoint(0x2713), "a lit check shows a check mark")
         t.equal(one(rowAt(0), "rowMark").text, "", "a plain row shows no mark")
+        t.check(one(rowAt(2), "selectedFill").visible && !one(rowAt(0), "selectedFill").visible, "a lit check carries the selected highlight, a plain row none")
         t.check(one(rowAt(1), "childGlyph").visible, "a submenu row shows the child glyph")
         t.equal(one(rowAt(1), "childGlyph").text, String.fromCodePoint(0x203A), "the child glyph is a right angle quote")
         t.check(!one(rowAt(0), "childGlyph").visible, "a leaf row shows none")
@@ -351,6 +352,7 @@ ShellRoot {
         t.check(reported("hover", {
           index: 1
         }), "a real move over a row reports hover")
+        t.check(one(rowAt(1), "hoverFill").visible && !one(rowAt(0), "hoverFill").visible, "and draws that row's hover fill")
         t.equal(litOutlines(menu), 0, "hover draws no outline")
         actions = []
         var moved = rootRows()
@@ -387,5 +389,6 @@ ShellRoot {
         pointer.mouseMove(menu, q.x + 6, q.y)
       }], [80, function () {
         t.equal(named("hover"), [], "a disabled row or separator is no hover target")
+        t.check(!one(rowAt(3), "hoverFill").visible && !one(rowAt(4), "hoverFill").visible, "and draws no hover fill")
       }]])
 }

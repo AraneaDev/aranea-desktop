@@ -2,9 +2,9 @@
 // per geocoding suggestion (a web node, the name and its region), keyed by
 // name and coordinates. The Repeater's model is the row count, so a new
 // highlight, or an equal list rebuilt by the host, never rebuilds a row.
-// The highlighted row (the one Enter commits) lights its node and name; the
-// keyboard cursor outline shows on it only while the host's cursor is
-// active, never on hover. A click remembers the key under the press and is
+// The highlighted row (the one Enter commits) lights its node and name and
+// carries the mint outline while the host shows it (a search list: from
+// the start); hover only draws the row's fill and never moves either. A click remembers the key under the press and is
 // refused when the row's key has changed by the release, or within 300 ms
 // of the dropdown's layout shifting unless the pointer has really moved
 // onto it since. Pure view: plain inputs in, signals out.
@@ -75,6 +75,9 @@ Column {
       implicitHeight: Style.space(28)
       Component.onCompleted: row.createdAt = Date.now()
 
+      Aranea.HoverTint {
+        pointerGate: list.pointerGate
+      }
       Rectangle {
         // The keyboard cursor outline.
         objectName: "cursorOutline"

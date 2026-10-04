@@ -84,5 +84,10 @@ if grep -Fq 'displayModel.clear()' "$entry"; then
   echo "rebuildDisplay must update the rows in place (syncRows)" >&2
   exit 1
 fi
+# The outline alone marks Enter's target, as in the menu: no accent bar.
+if grep -Fq 'color: row.selectedText' "$row" && grep -Fq 'width: Style.space(2)' "$row"; then
+  echo "the cursor row must not draw an accent bar beside the outline" >&2
+  exit 1
+fi
 
 echo "clipboard contract passed"

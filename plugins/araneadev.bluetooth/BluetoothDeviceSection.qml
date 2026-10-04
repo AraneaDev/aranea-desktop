@@ -119,6 +119,8 @@ Column {
         label: wrapper.modelData.label
         detail: wrapper.modelData.detail
         active: section.sectionName === "connected"
+        // A connected device carries the selected highlight.
+        selected: active
         busy: !!wrapper.modelData.busy
         signal: section.sectionName === "discovered" ? (section.signals[wrapper.modelData.key] !== undefined ? section.signals[wrapper.modelData.key] : -1) : -1
         hasCursor: section.cursor === wrapper.index

@@ -68,6 +68,8 @@ Column {
       label: displayRow.modelData.label || ""
       detail: displayRow.modelData.detail || ""
       active: list.onOf(displayRow.modelData.key)
+      // A display in use carries the selected highlight.
+      selected: active
       busy: list.busyOf(displayRow.modelData.key)
       hasCursor: list.cursorIndex === displayRow.index
       pointerGate: list.pointerGate
@@ -79,6 +81,8 @@ Column {
         // A rebuild or a section growing can put this row under a still
         // pointer: the row's settle guard covers its switch too.
         clickGate: displayRow
+        // The row's own hover fill covers the switch.
+        ownHover: false
         checked: list.onOf(displayRow.modelData.key)
         busy: list.busyOf(displayRow.modelData.key)
         enabled: !list.locked && (list.lastEnabled === "" || list.lastEnabled !== displayRow.modelData.key)

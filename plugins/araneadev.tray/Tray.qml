@@ -631,8 +631,8 @@ BarWidget {
   }
 
   // The first key after opening or after pointer use only reveals the
-  // cursor: on the row the pointer put it on, else on the first selectable
-  // row. Returns true when this key was that reveal.
+  // cursor: on the row it was on, else on the first selectable row.
+  // Returns true when this key was that reveal.
   function revealMenuCursor() {
     if (root.menuCursorActive && root.menuKeyboard)
       return false
@@ -723,10 +723,12 @@ BarWidget {
       root.placeMenuCursor(TrayLogic.jumpTo(root.menuRowList, root.menuCursorIndex, text))
   }
 
-  // Carries out one TrayMenuView action: a keyed activate, back, or a
-  // real pointer move onto a row (which takes the cursor without showing
-  // it). Pointer clicks also wait out stock's level settle.
+  // Carries out one TrayMenuView action: a keyed activate or back. Pointer
+  // clicks also wait out stock's level settle. A hover is only the row's
+  // own fill: it never moves the cursor or hides the outline.
   function handleMenuAction(name, arg) {
+    if (name === "hover")
+      return
     var a = arg || ({})
     root.menuKeyboard = false
     if (name === "activate") {
@@ -735,12 +737,6 @@ BarWidget {
     } else if (name === "back") {
       if (!root.menuLevelSettling)
         root.menuBack()
-    } else if (name === "hover") {
-      var row = root.menuRowList[a.index]
-      if (!row || !row.selectable)
-        return
-      root.menuCursorActive = true
-      root.placeMenuCursor(a.index)
     }
   }
 
@@ -756,7 +752,7 @@ BarWidget {
   }
 
   // The first key after opening or after pointer use only reveals the
-  // manage cursor (where the pointer put it, else the first row's Pin).
+  // manage cursor (where it was, else the first row's Pin).
   function revealManageCursor() {
     if (root.manageCursorActive && root.manageKeyboard)
       return false
@@ -819,22 +815,16 @@ BarWidget {
       root.toggleManageRow(root.manageCursor.pill === 1 ? "hide" : "pin", root.manageCursor.row, root.manageCursorKey)
   }
 
-  // Carries out one TrayManageView action: a keyed pin or hide, or a real
-  // pointer move onto a row (which takes the cursor without showing it).
+  // Carries out one TrayManageView action: a keyed pin or hide. A hover
+  // is only the pill's own fill: it never moves the cursor or hides the
+  // outline.
   function handleManageAction(name, arg) {
+    if (name === "hover")
+      return
     var a = arg || ({})
     root.manageKeyboard = false
-    if (name === "pin" || name === "hide") {
+    if (name === "pin" || name === "hide")
       root.toggleManageRow(name, a.index, a.key)
-    } else if (name === "hover") {
-      if (!root.manageRowList[a.row])
-        return
-      root.manageCursorActive = true
-      root.placeManageCursor({
-        row: a.row,
-        pill: root.manageCursor.pill
-      })
-    }
   }
 
   visible: pinnedItems.length > 0 || drawerCount > 0
@@ -1180,6 +1170,14 @@ BarWidget {
         root.trayItemViews.splice(at, 1)
     }
 
+    Rectangle {
+      // The selected highlight: the item whose menu is open.
+      objectName: "selectedFill"
+      anchors.fill: parent
+      color: Aranea.DesignTokens.selectedFill
+      visible: root.trayMenuOpen && root.activeTrayItem === trayItemRoot.modelData
+    }
+    Aranea.HoverTint {}
     TrayIcon {
       anchors.centerIn: parent
       width: Style.space(12)

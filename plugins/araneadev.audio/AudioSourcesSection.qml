@@ -132,6 +132,11 @@ Column {
               color: Aranea.DesignTokens.foreground
               font.family: Style.font.family
               font.pixelSize: Style.font.body
+              Aranea.HoverTint {
+                z: -1
+                anchors.margins: -Style.space(3)
+                pointerGate: section.pointerGate
+              }
               MouseArea {
                 objectName: "streamMute"
                 anchors.fill: parent
@@ -178,6 +183,7 @@ Column {
               clickGate: card
               // A wheel step right after a layout shift is settled too.
               gateWheel: true
+              pointerGate: section.pointerGate
               // A drag keeps the key it started on.
               onDraggingChanged: row.dragKey = dragging ? String(row.modelData.key) : ""
               onMoved: function (value) {

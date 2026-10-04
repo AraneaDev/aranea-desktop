@@ -1004,8 +1004,11 @@ Panel {
   // Carries out one AudioDropdown action. Every action comes from the
   // pointer, so each one hands the cursor back from the keyboard. Device
   // and stream actions are keyed ({index, key}): one whose row no longer
-  // holds that node is refused (AudioLogic.nodeAt).
+  // holds that node is refused (AudioLogic.nodeAt). A hover is only the
+  // rows' own fill: it never moves the cursor or hides the outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     keyboardCursor = false
     if (name === "toggleAll")
       toggleAllMuted()
@@ -1029,10 +1032,6 @@ Panel {
       var m = AudioLogic.nodeAt(displayAudioStreams, arg.index, arg.key)
       if (m && m.audio)
         m.audio.muted = !m.audio.muted
-    } else if (name === "hover") {
-      cursorActive = true
-      focusSection = arg.section
-      selectedIndex = arg.index
     } else if (name === "previous" && transportPlayer && transportPlayer.canGoPrevious)
       transportPlayer.previous()
     else if (name === "playPause" && transportPlayer && transportPlayer.canTogglePlaying)
@@ -1198,11 +1197,15 @@ Panel {
       else if (dx !== 0)
         root.adjustVolume(dx * 0.05)
     }
+    // Enter, like any first key, only reveals a hidden cursor; it acts only
+    // on the outlined row.
     onActivateRequested: {
       dropdown.disarmPointer()
-      if (!root.cursorActive)
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.cursorActive = true
+        root.keyboardCursor = true
         return
-      root.keyboardCursor = true
+      }
       root.activateCursor()
     }
     onTextKey: function (t) {

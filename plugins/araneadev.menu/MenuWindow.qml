@@ -280,7 +280,6 @@ PanelWindow {
           selectedBackground: panel.root.style.selectedBackground
           selectedText: panel.root.style.selectedText
           border: panel.root.style.border
-          selectedBorderSpec: panel.root.style.selectedBorderSpec
           fontFamily: panel.root.style.fontFamily
           menuFontScale: panel.root.style.menuFontScale
           menuLetterSpacing: panel.root.style.menuLetterSpacing

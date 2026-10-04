@@ -155,7 +155,7 @@ ShellRoot {
         section: "",
         index: -1
       },
-      keyHint: "h/l agent · r refresh · ↑↓ scroll · tab next"
+      keyHint: "h/l agent · enter/r refresh · ↑↓ scroll"
     }
   }
 
@@ -363,6 +363,7 @@ ShellRoot {
         var p = pills()
         t.equal(p.length, 3, "one pill per agent")
         t.check(p[0].selected && !p[1].selected && !p[2].selected, "the current agent's pill is selected")
+        t.check(t.findChild(p[0], "selectedFill").visible && !t.findChild(p[1], "selectedFill").visible, "and carries the selected fill")
         actions = []
         pointer.mouseClick(p[1])
         t.check(reported("selectAgent", {

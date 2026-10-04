@@ -9,6 +9,7 @@
 // NodeDeviceRow, a click within settleMs of the button being created, or
 // of its dropdown's layout shifting (pointerGate.layoutChangedAt), is
 // ignored unless the gate accepted a real pointer move onto it since.
+// A real move onto it (gated, as its entering) draws the hover fill.
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -46,6 +47,9 @@ Item {
   // When the gate last accepted a real pointer move onto the button
   // (Date.now()), 0 for never.
   property real pointerMovedAt: 0
+  // Whether the pointer entered the button through the gate (or plainly
+  // without one) and is still over it: draws the hover fill.
+  property bool pointerHovered: false
 
   // Emitted when the button is clicked.
   signal clicked
@@ -81,7 +85,7 @@ Item {
   Rectangle {
     objectName: "forgetBorder"
     anchors.fill: parent
-    color: "transparent"
+    color: forgetBtn.pointerHovered ? DesignTokens.hoverFill : "transparent"
     border.width: 1
     border.color: forgetBtn.bright ? DesignTokens.urgent : Util.alpha(DesignTokens.foreground, 0.22)
   }
@@ -105,15 +109,18 @@ Item {
   HoverHandler {
     id: forgetHover
     onHoveredChanged: {
-      if (!hovered)
+      if (!hovered) {
+        forgetBtn.pointerHovered = false
         forgetBtn.pointerLeft()
-      else if (!forgetBtn.pointerGate)
+      } else if (!forgetBtn.pointerGate) {
+        forgetBtn.pointerHovered = true
         forgetBtn.pointerEntered()
-      else if (forgetBtn.pointerGate.moved(forgetHover.parent, {
+      } else if (forgetBtn.pointerGate.moved(forgetHover.parent, {
         x: forgetHover.point.position.x,
         y: forgetHover.point.position.y
       })) {
         forgetBtn.pointerMovedAt = Date.now()
+        forgetBtn.pointerHovered = true
         forgetBtn.pointerEntered()
       }
     }

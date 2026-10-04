@@ -32,10 +32,11 @@ hint at the bottom.
 - **Keyboard:** up and down walk the problems; Enter or Space opens one
   (its `execArgv`), Esc closes, Tab switches dropdowns. The mint outline
   shows only while the keyboard drives the cursor, and the first key after
-  opening or after pointer use only reveals it (`cursorMove`,
-  `cursorPress`, `outlineIndex`, which wrap the shared keyed cursor in
-  `araneadev.shared/CursorLogic.js`). Pointer hover places the cursor without
-  outlining it.
+  opening or after pointer use (Enter included) only reveals it, on the
+  first problem after opening (`cursorMove`, `cursorPress`,
+  `outlineIndex`, which wrap the shared keyed cursor in
+  `araneadev.shared/CursorLogic.js`). Pointer hover only draws the row's
+  hover fill, after a real move; it never moves the cursor or the outline.
 - **Resources** (`HealthResourceSection.qml`): the CPU trace is the shared
   `LinkGraph` over the last 60 one-second samples (`cpuSamples`); memory and
   disk use are `FilamentBar` strand bars (`barFraction`), their values

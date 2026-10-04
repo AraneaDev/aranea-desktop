@@ -100,7 +100,7 @@ ShellRoot {
       selectedProfile: selectedProfile !== undefined ? selectedProfile : "balanced",
       pendingProfile: pendingProfile !== undefined ? pendingProfile : "",
       cursor: cursor,
-      keyHint: "←→ pick · enter set · tab next"
+      keyHint: "←→ pick · enter set"
     }
   }
 
@@ -304,7 +304,8 @@ ShellRoot {
           return p.text
         }), [profileRows[0].glyph + " Power saver", profileRows[1].glyph + " Balanced", profileRows[2].glyph + " Performance"], "a pill per profile with its glyph")
         t.check(pillsOf(full)[1].selected && !pillsOf(full)[0].selected, "the selected profile's pill is selected")
-        t.equal(t.findChild(full, "keyHint").text, "←→ pick · enter set · tab next", "the key hint is the view's")
+        t.check(t.findChild(pillsOf(full)[1], "selectedFill").visible && !t.findChild(pillsOf(full)[0], "selectedFill").visible, "and carries the selected fill")
+        t.equal(t.findChild(full, "keyHint").text, "←→ pick · enter set", "the key hint is the view's")
 
         t.check(!t.findChild(bare, "historySection").visible, "history hides")
         t.check(!t.findChild(bare, "drawSection").visible, "draw hides")

@@ -40,8 +40,8 @@ Panel {
   // True while the keyboard drives the cursor; any pointer action clears it.
   // The view outlines the cursor only then, so the mouse never shows one.
   property bool keyboardCursor: false
-  // The profile the cursor was deliberately put on (a move, hover or
-  // click; never an open or a keyboard reveal), so the cursor follows that
+  // The profile the cursor was deliberately put on (a move or a keyboard
+  // reveal; never an open or a hover), so the cursor follows that
   // profile when the list changes. "" until the user picks one, and
   // dropped when it's gone, so Enter refuses (CursorLogic.followCursor).
   property string profileKey: ""
@@ -86,6 +86,15 @@ Panel {
   function selectProfileByDelta(delta) {
     profileIndex = Model.selectProfileIndex(profileIndex, delta, profiles)
     profileKey = profileIndex < profiles.length ? String(profiles[profileIndex]) : ""
+  }
+
+  // Shows the keyboard cursor where it is, on the profile it sits on: the
+  // outline marks Enter's target, so the revealed profile is the one Enter
+  // then applies.
+  function revealCursor() {
+    cursorActive = true
+    keyboardCursor = true
+    profileKey = profileIndex >= 0 && profileIndex < profiles.length ? String(profiles[profileIndex]) : ""
   }
 
   // Applies the profile under the keyboard cursor, only when it is still
@@ -427,21 +436,18 @@ Panel {
     return !!arg && CursorLogic.rowKeyMatches(profileRows, arg.index, arg.key)
   }
 
-  // Carries out one PowerDropdown action. Pointer actions hand the cursor
-  // back from the keyboard; a hover moves it (as stock's pills did) and
-  // chooses that profile; a click sets the profile it was reported for, or
-  // nothing when the pill changed underneath it.
+  // Carries out one PowerDropdown action. A click hands the cursor back
+  // from the keyboard and sets the profile it was reported for, or nothing
+  // when the pill changed underneath it. A hover is only the pill's own
+  // fill: it never moves the cursor or hides the outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     keyboardCursor = false
     if (!pointerRowMatches(arg))
       return
-    if (name === "hover") {
-      cursorActive = true
-      profileIndex = arg.index
-      profileKey = arg.key
-    } else if (name === "setProfile") {
+    if (name === "setProfile")
       setProfile(arg.key)
-    }
   }
 
   IpcHandler {
@@ -468,8 +474,8 @@ Panel {
   }
 
   onOpenedChanged: {
-    // A fresh open starts with the mouse's (outline-free) cursor and
-    // chooses nothing: Enter is refused until a move, hover or click.
+    // A fresh open starts with the outline hidden and chooses nothing: the
+    // first key (Enter included) reveals the cursor on the active profile.
     keyboardCursor = false
     profileKey = ""
     if (opened) {
@@ -683,28 +689,25 @@ Panel {
     onMoveRequested: function (dx, dy) {
       dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
-      // cursor where it is; a reveal never chooses a profile.
-      var revealing = !root.cursorActive || !root.keyboardCursor
-      root.cursorActive = true
-      root.keyboardCursor = true
-      if (revealing)
+      // cursor where it is.
+      if (!root.cursorActive || !root.keyboardCursor) {
+        root.revealCursor()
         return
+      }
       if (dx !== 0)
         root.selectProfileByDelta(dx)
       else if (dy !== 0)
         root.selectProfileByDelta(dy)
     }
-    // Enter acts only on a cursor the keyboard is showing, on the profile
-    // the user chose and still sees (CursorLogic.pressIntent,
-    // cursorConfirmed); a pointer-placed cursor is only revealed.
+    // Enter, like any first key, only reveals a hidden cursor; it acts only
+    // on a cursor the keyboard is showing, on the profile the user chose
+    // and still sees (CursorLogic.pressIntent, cursorConfirmed).
     onActivateRequested: {
       dropdown.disarmPointer()
-      var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
-      if (intent === "ignore")
-        return
-      root.keyboardCursor = true
-      if (intent === "act")
+      if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) === "act")
         root.activateSelectedProfile()
+      else
+        root.revealCursor()
     }
     onDeleteRequested: {
       dropdown.disarmPointer()

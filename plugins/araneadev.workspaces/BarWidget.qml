@@ -300,6 +300,7 @@ Item {
       onActivateRequested: {
         content.disarmPointer()
         var press = WorkspaceModel.cursorPress(testHost.workspaceStates, testHost.cursorKey, testHost.keyboardCursor)
+        testHost.cursorKey = press.key
         testHost.keyboardCursor = press.keyboard
         if (press.row)
           testHost.focusWorkspace(press.row.id)
@@ -311,10 +312,6 @@ Item {
         cursorIndex: testHost.cursorIndex
         onFocusWorkspace: function (id) {
           testHost.focusWorkspace(id)
-        }
-        onRowHovered: function (index) {
-          testHost.keyboardCursor = false
-          testHost.cursorKey = WorkspaceModel.workspaceKey(testHost.workspaceStates[index])
         }
       }
     }

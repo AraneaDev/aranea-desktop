@@ -1,14 +1,22 @@
-// The Audio and Bluetooth dropdown footers' key hints fit the card at its
-// real content width (the panel's Style.space(380) less its padding and
-// border on both sides, as Panel.qml sizes it) unelided, with a 10%
-// margin, as the notification center's hint does
-// (notification-center-fit.qml).
+// Every dropdown footer's key hint fits its card at the card's real
+// content width (the panel's Style.space(W) less its padding and border on
+// both sides, as each Panel.qml sizes it) unelided, with a 10% margin, as
+// the notification center's hint does (notification-center-fit.qml). The
+// Audio and Bluetooth hints are measured in their real dropdowns; the rest
+// are measured in a Text styled as every footer hint is (Style.font.family
+// at Style.font.caption). Every hint follows one pattern: no "tab next",
+// and the Enter verb wherever Enter acts.
 import QtQuick
 import Quickshell
 import qs.Commons
 import "lib"
 import "plugins/araneadev.audio" as Audio
 import "plugins/araneadev.bluetooth" as Bluetooth
+import "plugins/araneadev.notifications/InboxLogic.js" as InboxLogic
+import "plugins/araneadev.power/PowerLogic.js" as PowerLogic
+import "plugins/araneadev.monitor/DisplaysLogic.js" as DisplaysLogic
+import "plugins/araneadev.network/NetworkLogic.js" as NetworkLogic
+import "plugins/araneadev.vpn/VpnLogic.js" as VpnLogic
 
 ShellRoot {
   id: testRoot
@@ -19,7 +27,12 @@ ShellRoot {
 
   // The card's content width as Panel.qml sizes it: the panel width less
   // its padding and border on both sides.
-  readonly property real innerWidth: Style.space(380) - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
+  readonly property real innerWidth: testRoot.cardInner(380)
+
+  // The content width of a card whose panel is Style.space(PANEL) wide.
+  function cardInner(panel) {
+    return Style.space(panel) - 2 * Style.spacing.popupPadding - 2 * Math.max(1, Style.space(2))
+  }
 
   FloatingWindow {
     implicitWidth: 840
@@ -229,13 +242,68 @@ ShellRoot {
     t.check(hint.implicitWidth <= hint.width * 0.9, name + "'s hint fits with a margin (" + hint.implicitWidth + " <= 0.9 * " + hint.width + ")")
   }
 
+  // A footer hint as every dropdown styles it, sized by the checks.
+  Text {
+    id: probe
+    font.family: Style.font.family
+    font.pixelSize: Style.font.caption
+    elide: Text.ElideRight
+  }
+
+  // Every other dropdown's hints, with the panel width (Style.space units)
+  // their card is built at.
+  function otherHints() {
+    var list = []
+    var add = function (name, panel, text) {
+      list.push({
+        name: name,
+        panel: panel,
+        text: text
+      })
+    }
+    add("Notifications", 380, InboxLogic.centerKeyHint(3))
+    add("Notifications (empty)", 380, InboxLogic.centerKeyHint(0))
+    add("Power", 380, PowerLogic.keyHint("profiles"))
+    add("Power (none)", 380, PowerLogic.keyHint(""))
+    var displaySections = ["nightlight", "scale", "brightness", ""]
+    displaySections.forEach(function (section) {
+      add("Displays " + section, 380, DisplaysLogic.keyHint(section, "switch"))
+    })
+    var networkSections = ["saved", "header", "wifi"]
+    networkSections.forEach(function (section) {
+      add("Network " + section, 380, NetworkLogic.keyHint(section))
+    })
+    add("VPN app", 380, VpnLogic.hintFor(false, "available", "app", true, true))
+    add("VPN connected", 380, VpnLogic.hintFor(false, "connected", "vpn", true, true))
+    add("VPN available", 380, VpnLogic.hintFor(false, "available", "vpn", true, true))
+    add("VPN unchosen", 380, VpnLogic.hintFor(false, "available", "vpn", true, false))
+    add("VPN empty", 380, VpnLogic.hintFor(false, "", "", false, false))
+    add("VPN prompt", 380, VpnLogic.hintFor(true, "available", "vpn", true, true))
+    add("Health", 380, "↑↓ move · enter open")
+    add("Workspaces", 380, "↑↓ move · enter focus · wheel cycle")
+    add("Updates", 380, "↑↓ move · enter select · r refresh")
+    add("Agents", 380, "h/l agent · enter/r refresh · ↑↓ scroll")
+    add("Weather", 380, "enter select · e edit place · r refresh")
+    add("Weather (editing)", 380, "↑↓ pick · enter save · esc cancel")
+    add("Clock", 440, "←→ month · ↑↓ year · t today")
+    add("Tray menu", 320, String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2192) + " open " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190) + " back " + String.fromCodePoint(0xB7) + " enter select")
+    add("Tray manage", 340, String.fromCodePoint(0x2191, 0x2193) + " move " + String.fromCodePoint(0xB7) + " " + String.fromCodePoint(0x2190, 0x2192) + " pin / hide " + String.fromCodePoint(0xB7) + " enter toggle")
+    return list
+  }
+
   Component.onCompleted: t.step(300, function () {
+    otherHints().forEach(function (hint) {
+      probe.width = testRoot.cardInner(hint.panel)
+      probe.text = hint.text
+      t.check(probe.text.indexOf("tab next") < 0, hint.name + "'s hint drops tab next, as every hint does")
+      t.check(!probe.truncated && probe.lineCount === 1 && probe.implicitWidth <= probe.width * 0.9, hint.name + "'s hint fits its card with a margin (" + probe.implicitWidth + " <= 0.9 * " + probe.width + ")")
+    })
     var audioHint = t.findChild(audio, "keyHint")
     checkFits(audioHint, "Audio")
-    t.equal(audioHint.text, "↑↓ move · ←→ adjust · m mute · tab next", "the Audio hint keeps move, adjust, mute and tab")
+    t.equal(audioHint.text, "↑↓ move · enter select · ←→ adjust · m mute", "the Audio hint names move, Enter, adjust and mute")
     var bluetoothHint = t.findChild(bluetooth, "keyHint")
     checkFits(bluetoothHint, "Bluetooth")
-    t.equal(bluetoothHint.text, "↑↓ move · x forget · b power · tab next", "the Bluetooth hint keeps move, forget, power and tab")
+    t.equal(bluetoothHint.text, "↑↓ move · enter connect · x forget · b power", "the Bluetooth hint names move, Enter, forget and power")
     t.done()
   })
 }

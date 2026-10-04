@@ -231,6 +231,8 @@ Item {
               // urgent one even when it is not current, so attention is
               // visible wherever the workspace is.
               active: !!(rowWrap.workspace.active || rowWrap.workspace.urgent)
+              // The current workspace carries the selected highlight.
+              selected: !!rowWrap.workspace.active
               hasCursor: panel.cursorIndex === rowWrap.index
               pointerGate: panel.pointerGate
               onChosen: panel.activateRow(rowWrap.index, rowWrap.key)
@@ -263,7 +265,7 @@ Item {
       id: keyHint
       objectName: "keyHint"
       Layout.fillWidth: true
-      text: "↑↓ move · enter focus · wheel cycle · tab next"
+      text: "↑↓ move · enter focus · wheel cycle"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
       font.family: Style.font.family
       font.pixelSize: Style.font.caption

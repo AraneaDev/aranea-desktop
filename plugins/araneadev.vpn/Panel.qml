@@ -500,18 +500,15 @@ Panel {
 
   // Carries out one VpnDropdown action. Pointer actions hand the cursor
   // back from the keyboard; the prompt's typing, Enter and Esc are
-  // keyboard input and leave it alone.
+  // keyboard input and leave it alone. A hover is only the row's own fill:
+  // it never moves the cursor or hides the outline.
   function handleAction(name, arg) {
+    if (name === "hover")
+      return
     var promptKeyInput = name === "promptSubmit" || name === "promptCancel" || name === "passwordEdited" || name === "codeEdited"
     if (!promptKeyInput)
       keyboardCursor = false
-    if (name === "hover") {
-      if (!arg || !CursorLogic.rowKeyMatches(arg.section === "connected" ? shownConnected : shownAvailable, arg.index, arg.key))
-        return
-      cursorActive = true
-      cursorFlat = arg.section === "connected" ? arg.index : shownConnected.length + arg.index
-      cursorKey = arg.key
-    } else if (name === "toggle" || name === "openApp") {
+    if (name === "toggle" || name === "openApp") {
       // A click aimed at a row that changed underneath is refused.
       if (fixture || !pointerRowMatches(arg))
         return
@@ -544,6 +541,16 @@ Panel {
     cursorKey = flatRows[next].key
   }
 
+  // Shows the keyboard cursor where it is, on the row it sits on: the
+  // outline marks Enter's target, so the revealed row is the one Enter
+  // then acts on.
+  function revealCursor() {
+    cursorActive = true
+    keyboardCursor = true
+    if (cursorFlat >= 0 && cursorFlat < flatRows.length)
+      cursorKey = flatRows[cursorFlat].key
+  }
+
   // Scrolls the keyboard cursor's row into view (Available only).
   function ensureCursorVisible() {
     if (!opened || !cursorActive || !keyboardCursor)
@@ -556,7 +563,8 @@ Panel {
   onOpenedChanged: {
     keyboardCursor = false
     cursorActive = false
-    // An open chooses nothing: Enter is refused until a move or hover.
+    // An open chooses nothing: the first key (Enter included) reveals the
+    // cursor on the first row.
     cursorFlat = 0
     cursorKey = ""
     // Stand-ins never carry over into an open or past a close.
@@ -996,24 +1004,22 @@ Panel {
     onMoveRequested: function (dx, dy) {
       dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
-      // cursor where it is; a reveal never chooses a row.
-      var revealing = !root.cursorActive || !root.keyboardCursor
-      root.cursorActive = true
-      root.keyboardCursor = true
-      if (!revealing && dy !== 0)
+      // cursor where it is.
+      if (!root.cursorActive || !root.keyboardCursor)
+        root.revealCursor()
+      else if (dy !== 0)
         root.moveCursor(dy)
       Qt.callLater(root.ensureCursorVisible)
     }
-    // Enter acts only on a cursor the keyboard is showing, on the row the
-    // user chose and still sees (CursorLogic.pressIntent, cursorConfirmed);
-    // a pointer-placed cursor is only revealed. Fixture rows never act.
+    // Enter, like any first key, only reveals a hidden cursor; it acts only
+    // on a cursor the keyboard is showing, on the row the user chose and
+    // still sees (CursorLogic.pressIntent, cursorConfirmed). Fixture rows
+    // never act.
     onActivateRequested: {
       dropdown.disarmPointer()
-      var intent = CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor)
-      if (intent === "ignore")
-        return
-      root.keyboardCursor = true
-      if (intent === "act" && !root.fixture && CursorLogic.cursorConfirmed(root.flatRows, root.cursorKey, root.cursorFlat))
+      if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) !== "act")
+        root.revealCursor()
+      else if (!root.fixture && CursorLogic.cursorConfirmed(root.flatRows, root.cursorKey, root.cursorFlat))
         root.activateKey(root.cursorKey)
       Qt.callLater(root.ensureCursorVisible)
     }
