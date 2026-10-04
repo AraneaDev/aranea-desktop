@@ -37,6 +37,8 @@ Item {
   property string fontFamily: Style.font.family
   // Letter spacing for the fingerprint prompt.
   property real letterSpacing: 0.20
+  // Corner radius of the fingerprint prompt's frame.
+  property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Password text entered by the user.
   readonly property string passwordText: credential.texts.password || ""
 
@@ -63,10 +65,14 @@ Item {
   implicitHeight: field.fingerprintMode ? field.fieldHeight : credential.height
   height: implicitHeight
 
-  Item {
+  Rectangle {
     objectName: "fingerprintPrompt"
     anchors.fill: parent
     visible: field.fingerprintMode
+    radius: field.cornerRadius
+    color: Util.alpha(field.foreground, 0.04)
+    border.width: 1
+    border.color: field.errorFlash ? field.errorColor : Util.alpha(field.foreground, 0.10)
 
     Row {
       anchors.centerIn: parent

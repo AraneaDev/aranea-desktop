@@ -295,8 +295,10 @@ Item {
             objectName: slot.editable ? (slot.field.key || "") + "Field" : ""
             anchors.left: fieldGlyph.visible ? fieldGlyph.right : parent.left
             anchors.leftMargin: fieldGlyph.visible ? Style.space(8) : 0
-            anchors.right: connect.visible ? connect.left : parent.right
-            anchors.rightMargin: connect.visible ? Style.space(6) : 0
+            // Every field leaves room for the connect button (hidden on all
+            // but the last), so the fields line up; none without it.
+            anchors.right: prompt.connectShown ? connect.left : parent.right
+            anchors.rightMargin: prompt.connectShown ? Style.space(6) : 0
             anchors.verticalCenter: parent.verticalCenter
             visible: slot.editable
             readOnly: prompt.locked
@@ -307,7 +309,6 @@ Item {
             accent: prompt.accentColor
             horizontalPadding: Style.spacing.controlGap
             verticalPadding: Style.spacing.controlPaddingY
-            text: slot.field.value || ""
             onAccepted: prompt.advance(slot.index)
             onTextChanged: {
               prompt.noteText(slot.field.key || "", text)
@@ -315,6 +316,13 @@ Item {
                 prompt.edited(slot.field.key || "", text)
             }
             Keys.onEscapePressed: prompt.cancel()
+            // A host's echoed value drives the text; a field without one
+            // (Polkit) is never rewritten when `fields` is rebuilt.
+            Binding on text {
+              when: slot.field.value !== undefined
+              value: slot.field.value || ""
+              restoreMode: Binding.RestoreNone
+            }
             Keys.onPressed: function (event) {
               if (event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter && event.key !== Qt.Key_Escape)
                 prompt.unhandledKey(event)

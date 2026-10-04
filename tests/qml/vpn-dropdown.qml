@@ -493,6 +493,7 @@ ShellRoot {
         t.equal(code.placeholderText, "2FA code (optional)", "the code placeholder")
         t.equal(code.echoMode, TextInput.Normal, "the code is shown")
         t.check(user.mapToItem(full, 0, 0).y < pw.mapToItem(full, 0, 0).y && pw.mapToItem(full, 0, 0).y < code.mapToItem(full, 0, 0).y, "username, password, then code")
+        t.check(Math.abs(pw.width - code.width) < 0.5, "the password is as wide as the code beside the connect button")
         var btn = t.findChild(w, "connectButton")
         t.equal(btn.tooltipText, "Connect", "the connect button explains itself")
         t.check(!btn.enabled, "connect waits for a password")

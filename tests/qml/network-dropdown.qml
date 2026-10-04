@@ -724,6 +724,7 @@ ShellRoot {
         t.check(id.visible && id.activeFocus, "enterprise focuses the identity field first")
         t.equal(id.placeholderText, "Identity (user@domain)", "the identity placeholder")
         t.check(id.y < t.findChild(w, "passphraseField").mapToItem(id.parent, 0, 0).y, "identity sits above the passphrase")
+        t.check(Math.abs(id.width - t.findChild(w, "passphraseField").width) < 0.5, "identity is as wide as the passphrase beside the connect button")
         pointer.keyClick(Qt.Key_U)
       }], [60, function () {
         var w = t.findChildren(t.findChild(full, "wifiSection"), "wifiRowWrapper")[3]

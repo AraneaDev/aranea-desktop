@@ -232,6 +232,7 @@ PanelWindow {
         Layout.preferredHeight: authField.implicitHeight
         fingerprintMode: panel.root.fingerprintMode
         fieldHeight: panel.root.fieldHeight
+        cornerRadius: panel.root.cornerRadius
         foreground: panel.root.foreground
         accent: panel.root.accent
         errorColor: Color.polkit.textError

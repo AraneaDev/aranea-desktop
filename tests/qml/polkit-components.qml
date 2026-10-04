@@ -168,6 +168,10 @@ ShellRoot {
           pointer.keyClick(Qt.Key_C)
         }], [50, function () {
           t.equal(field.passwordText, "c", "a retry can be typed")
+          field.placeholderText = "Password for root"
+        }], [50, function () {
+          t.equal(input().placeholderText, "Password for root", "a new PAM prompt updates the placeholder")
+          t.equal(field.passwordText, "c", "and never wipes the typed text")
           field.responseVisible = true
         }], [50, function () {
           t.equal(input().echoMode, TextInput.Normal, "a visible response is not masked")
@@ -178,6 +182,10 @@ ShellRoot {
           t.check(sensor.visible, "fingerprint mode shows the sensor prompt")
           t.equal(t.findChild(field, "fingerprintGlyph").text, String.fromCodePoint(0xf0237), "with the fingerprint glyph")
           t.equal(field.height, 44, "at the field height")
+          t.check(sensor.border.width > 0 && !Qt.colorEqual(sensor.border.color, "#ff3355"), "in a framed surface")
+          field.errorFlash = true
+          t.check(Qt.colorEqual(sensor.border.color, "#ff3355"), "whose border turns the error colour on failure")
+          field.errorFlash = false
 
           // DETAILS: a click right after opening is ignored, a settled one toggles.
           var link = t.findChild(card, "detailsToggle")

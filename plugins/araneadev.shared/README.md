@@ -70,8 +70,8 @@ service contracts to the feature plugins.
   the glyph once it loads; empty or failing, the glyph shows as before.
 - `CredentialPrompt` is the inline credential prompt (Network's passphrase,
   VPN's password and 2FA code, the Polkit password): an accent-to-violet
-  frame around `fields` (`{key, label, placeholder, secret, readOnly,
-optional, hidden, value, glyph}`)
+  frame around `fields` (each
+  `{key, label, placeholder, secret, readOnly, optional, hidden, value, glyph}`)
   and a check-glyph connect button. Opening focuses the first editable
   field; Enter moves on and `submit`s from the last; Esc `cancel`s; typing
   emits `edited(key, text)`; the button emits `connectClicked`, settled
