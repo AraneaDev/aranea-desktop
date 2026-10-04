@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.17.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.4...v2.17.0) (2026-10-04)
+
+
+### Features
+
+* Aranea-native Agents dropdown ([#113](https://github.com/AraneaDev/aranea-desktop/issues/113)) ([5a827a1](https://github.com/AraneaDev/aranea-desktop/commit/5a827a1c4308d72a3c713c45e4f32157576668ae))
+
 ## [2.16.4](https://github.com/AraneaDev/aranea-desktop/compare/v2.16.3...v2.16.4) (2026-10-03)
 
 
