@@ -100,7 +100,7 @@ Column {
       anchors.centerIn: parent
       text: action.glyph
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.iconFamily
       font.pixelSize: Style.font.title
     }
     MouseArea {
@@ -117,6 +117,7 @@ Column {
   }
 
   Aranea.DropdownHeader {
+    refined: true
     width: parent.width
     glyph: header.glyph
     title: header.title
@@ -141,6 +142,7 @@ Column {
         onPointerEntered: if (!header.pointerGate)
           header.hoverAction(header.qrIndex)
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "qrTip"
           visible: qrAction.hovered
           text: "Show QR code"
@@ -161,6 +163,7 @@ Column {
         onPointerEntered: if (!header.pointerGate)
           header.hoverAction(header.speedIndex)
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "speedTip"
           visible: speedAction.hovered
           text: "Run a speed test"
@@ -181,6 +184,7 @@ Column {
             header.hoverAction(header.toggleIndex)
         }
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "toggleTip"
           visible: switchHover.hovered && header.toggleHint !== ""
           text: header.toggleHint

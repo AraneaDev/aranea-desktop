@@ -99,6 +99,7 @@ Column {
   }
 
   Aranea.DropdownHeader {
+    refined: true
     objectName: "clockHeader"
     width: parent.width
     glyph: String.fromCodePoint(0xf00ed)
@@ -111,6 +112,7 @@ Column {
 
       ClockLink {
         objectName: "prevMonth"
+        fontFamily: Aranea.Typography.iconFamily
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(18)
         text: String.fromCodePoint(0xf0141)
@@ -127,18 +129,19 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         text: dropdown.view && dropdown.view.monthLabel ? dropdown.view.monthLabel : ""
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
 
         TextMetrics {
           id: monthMetrics
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           text: "September 0000"
         }
       }
       ClockLink {
         objectName: "nextMonth"
+        fontFamily: Aranea.Typography.iconFamily
         anchors.verticalCenter: parent.verticalCenter
         width: Style.space(18)
         text: String.fromCodePoint(0xf0142)
@@ -235,7 +238,7 @@ Column {
     width: parent.width
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

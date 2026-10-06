@@ -29,7 +29,7 @@ Column {
   component StatLabel: Text {
     objectName: "statLabel"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }
   // A stat's value, right-aligned; copyable values take a click and say so.
@@ -45,7 +45,7 @@ Column {
     horizontalAlignment: Text.AlignRight
     elide: Text.ElideLeft
     color: Aranea.DesignTokens.foreground
-    font.family: Style.font.family
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Style.font.caption
     Aranea.HoverTint {
       z: -1
@@ -61,6 +61,7 @@ Column {
       onClicked: value.copyRequested(value.text)
     }
     PanelToolTip {
+      fontFamily: Aranea.Typography.uiFamily
       // "ipValue" names its tip "ipTip", for tests.
       objectName: value.objectName.replace("Value", "Tip")
       visible: copyMouse.enabled && copyMouse.containsMouse
@@ -87,10 +88,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "LINK"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       objectName: "linkCount"
@@ -98,7 +99,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "last 60 s"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
   }

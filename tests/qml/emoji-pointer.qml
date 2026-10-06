@@ -38,6 +38,8 @@ ShellRoot {
     id: pointer
     name: "pointer"
     when: false
+    // Quickshell owns readiness; QtTest's runner-only root can be absent.
+    windowShown: false
   }
 
   Emoji.Emojis {

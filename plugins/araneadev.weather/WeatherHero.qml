@@ -68,7 +68,7 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         text: hero.heroView.glyph || ""
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.iconFamily
         font.pixelSize: Style.font.displayLarge
       }
       Column {
@@ -80,16 +80,16 @@ Column {
           textFormat: Text.PlainText
           text: hero.heroView.temp || ""
           color: Aranea.DesignTokens.foreground
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Math.round(Style.font.displayLarge * 1.4)
           font.bold: true
         }
         Text {
           objectName: "heroLabel"
           textFormat: Text.PlainText
-          text: String(hero.heroView.label || "").toUpperCase()
+          text: String(hero.heroView.label || "")
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           font.letterSpacing: 1.6
         }
@@ -105,11 +105,12 @@ Column {
         objectName: "placeLabel"
         anchors.right: parent.right
         visible: !hero.editing
-        text: String(hero.heroView.place || "").toUpperCase() + " " + String.fromCodePoint(0xf03eb)
+        text: String(hero.heroView.place || "")
+        glyph: String.fromCodePoint(0xf03eb)
         restColor: Aranea.DesignTokens.foreground
         pixelSize: Style.font.subtitle
         bold: true
-        letterSpacing: 0.6
+        letterSpacing: 0
         tooltipText: "Edit place"
         busy: hero.saving
         hasCursor: hero.cursorSection === "place"
@@ -170,10 +171,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "RAIN SOON"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       id: rainText
@@ -183,7 +184,7 @@ Column {
       textFormat: Text.PlainText
       text: hero.rainSoon
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.bodySmall
     }
   }

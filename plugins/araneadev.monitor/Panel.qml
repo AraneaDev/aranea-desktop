@@ -1251,6 +1251,7 @@ Panel {
   // The Aranea view in the shared keyboard frame, sized to the view.
   Aranea.KeyboardPanelFrame {
     id: panel
+    refined: true
     anchorItem: button
     owner: root
     bar: root.bar

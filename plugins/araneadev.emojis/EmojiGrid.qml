@@ -21,7 +21,7 @@ GridView {
   // Whether selection currently belongs to the recents flow.
   property bool inRecents: false
   // Font used by result cells and the empty state.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Corner radius passed to result cells.
   property int cornerRadius: Style.cornerRadius
   // Fill used for the hovered result cell.
@@ -103,6 +103,7 @@ GridView {
     icon: String.fromCodePoint(0xf0209)
     message: "No matches for “" + grid.filterText + "”"
     fontFamily: grid.fontFamily
+    iconFontFamily: Aranea.Typography.iconFamily
     iconColor: grid.selectedText
     foreground: grid.foreground
   }

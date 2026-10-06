@@ -274,7 +274,7 @@ ShellRoot {
 
   Component.onCompleted: run([[350, function () {
         // ---------- Header and sections ----------
-        t.equal(one(full, "headerCaption").text, "EDP-1 · 3840×2160 · 2.67×", "the header caption is the view's, uppercased")
+        t.equal(one(full, "headerCaption").text, "eDP-1 · 3840×2160 · 2.67×", "the header caption preserves the view's connector case")
         t.check(one(full, "brightnessSection").visible, "brightness shows")
         t.equal(one(full, "brightnessCaption").text, "72% · Bright", "with its percent and level name")
         t.check(Math.abs(one(full, "brightnessSlider").value - 72) < 0.01, "the brightness slider sits at the percent")

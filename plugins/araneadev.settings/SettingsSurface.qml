@@ -35,6 +35,11 @@ Item {
       pageOffsets: pageOffsets,
       scrollSection: scrollSection,
       contentY: scroller.contentY,
+      fonts: {
+        uiDraft: appearancePage.fontDrafts.uiDraft,
+        technicalDraft: appearancePage.fontDrafts.technicalDraft,
+        dirty: appearancePage.fontDrafts.dirty
+      },
       selectedId: appearancePage.selectedId,
       wallpaperDirty: appearancePage.wallpaperDirty,
       galleryExpanded: appearancePage.galleryExpanded,
@@ -47,6 +52,11 @@ Item {
   }
   // Restore local capture state after restoring owner observations and section.
   function captureRestore(saved) {
+    if (saved.fonts) {
+      appearancePage.fontDrafts.uiDraft = saved.fonts.uiDraft
+      appearancePage.fontDrafts.technicalDraft = saved.fonts.technicalDraft
+      appearancePage.fontDrafts.dirty = saved.fonts.dirty
+    }
     appearancePage.selectedId = saved.selectedId
     appearancePage.wallpaperDirty = saved.wallpaperDirty
     appearancePage.galleryExpanded = saved.galleryExpanded
@@ -64,6 +74,8 @@ Item {
   }
   // Reset only capture-local presentation, never apply owner preferences.
   function captureReset(fixture) {
+    appearancePage.fontDrafts.dirty = false
+    appearancePage.fontDrafts.syncDraft()
     appearancePage.wallpaperDirty = false
     appearancePage.discardWallpaper()
     appearancePage.galleryExpanded = false
@@ -159,6 +171,10 @@ Item {
   Connections {
     target: panel.controller
     function onMutationCompleted(operation, args, succeeded) {
+      if (operation === 'configure fonts' && succeeded && panel.controller.resultFor('fonts') === 'Applied') {
+        appearancePage.fontDrafts.dirty = false
+        appearancePage.fontDrafts.syncDraft()
+      }
       if (operation === 'configure schedule' && succeeded)
         schedulePage.acceptSaved(args)
     }

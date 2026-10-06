@@ -318,7 +318,7 @@ Item {
             text: slot.glyph
             horizontalAlignment: Text.AlignHCenter
             color: prompt.failedInline ? prompt.urgentColor : prompt.accentColor
-            font.family: Style.font.family
+            font.family: Typography.iconFamily
             font.pixelSize: Style.font.iconLarge
           }
           TextField {
@@ -381,7 +381,7 @@ Item {
             visible: !slot.editable && (slot.field.value || "") !== ""
             text: slot.field.label || ""
             color: Util.alpha(DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Typography.uiFamily
             font.pixelSize: Style.font.caption
           }
           Text {
@@ -395,7 +395,7 @@ Item {
             text: (slot.field.value || "") !== "" ? slot.field.value : (slot.field.placeholder || "")
             elide: Text.ElideRight
             color: (slot.field.value || "") !== "" ? Util.alpha(DesignTokens.foreground, 0.82) : Util.alpha(DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Typography.technicalFamily
             font.pixelSize: Style.font.caption
           }
         }
@@ -408,7 +408,7 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       text: prompt.failed ? prompt.failedText : prompt.busyText
       color: prompt.failed ? DesignTokens.urgent : DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
   }

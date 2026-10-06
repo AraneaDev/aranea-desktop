@@ -157,10 +157,10 @@ Column {
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
-      text: String(menu.view && menu.view.title ? menu.view.title : "").toUpperCase()
+      text: String(menu.view && menu.view.title ? menu.view.title : "")
       elide: Text.ElideRight
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 1.4
@@ -173,7 +173,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "app menu"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
 
@@ -210,7 +210,7 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         text: String.fromCodePoint(0x2039)
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.iconFamily
         font.pixelSize: Style.font.body
       }
       Text {
@@ -220,10 +220,10 @@ Column {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
-        text: String(menu.view && menu.view.crumb ? menu.view.crumb : "").toUpperCase()
+        text: String(menu.view && menu.view.crumb ? menu.view.crumb : "")
         elide: Text.ElideRight
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
         font.letterSpacing: 1.4
@@ -347,7 +347,7 @@ Column {
             horizontalAlignment: Text.AlignHCenter
             text: row.markText
             color: Aranea.DesignTokens.accent
-            font.family: Style.font.family
+            font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.body
           }
           Image {
@@ -377,7 +377,7 @@ Column {
             text: String(row.entry.label || "")
             elide: Text.ElideRight
             color: Aranea.DesignTokens.foreground
-            font.family: Style.font.family
+            font.family: Aranea.Typography.uiFamily
             font.pixelSize: Style.font.body
           }
           Text {
@@ -389,7 +389,7 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             text: String.fromCodePoint(0x203A)
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.body
           }
           MouseArea {
@@ -426,7 +426,7 @@ Column {
     bottomPadding: Style.space(4)
     text: "No menu entries"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
   }
   Text {
@@ -435,7 +435,7 @@ Column {
     topPadding: Style.space(4)
     text: menu.view && menu.view.keyHint ? menu.view.keyHint : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

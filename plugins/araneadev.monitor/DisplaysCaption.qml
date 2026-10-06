@@ -23,10 +23,10 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     text: caption.title
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
   Text {
     id: captionTrailing
@@ -35,7 +35,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     text: caption.trailing
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Style.font.caption
   }
 }

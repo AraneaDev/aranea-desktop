@@ -380,7 +380,7 @@ ShellRoot {
     t.check(switchAll.checked, "the switch follows wifiOn")
     t.check(t.findChild(hdrAll, "scanPulse").visible, "the pulse shows while scanning")
     t.check(!t.findChild(hdrNone, "scanPulse").visible, "the pulse hides without scanning")
-    t.equal(t.findChild(hdrAll, "headerCaption").text, "WIRING BITS", "the caption reaches DropdownHeader")
+    t.equal(t.findChild(hdrAll, "headerCaption").text, "Wiring bits", "the caption reaches DropdownHeader")
 
     pointer.mouseClick(qrAll)
     t.equal(last(), JSON.stringify(["qr"]), "clicking QR emits qr")

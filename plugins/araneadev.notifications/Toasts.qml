@@ -6,6 +6,7 @@
 // passive surfaces and must never steal input from the focused application.
 
 import QtQuick
+import "../araneadev.shared" as Aranea
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
@@ -136,7 +137,7 @@ Scope {
               image: cardSlot.image
               urgency: cardSlot.urgency
               cornerRadius: cardSlot.svc.cornerRadius
-              fontFamily: cardSlot.svc.shell && cardSlot.svc.shell.bar ? cardSlot.svc.shell.bar.fontFamily : ""
+              fontFamily: Aranea.Typography.uiFamily
               glyph: cardSlot.glyph
 
               motionEnabled: cardSlot.svc.motionEnabled

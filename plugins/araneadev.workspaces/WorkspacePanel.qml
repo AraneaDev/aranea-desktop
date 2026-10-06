@@ -156,6 +156,7 @@ Item {
 
     Aranea.DropdownHeader {
       id: header
+      refined: true
       Layout.fillWidth: true
       glyph: String.fromCodePoint(0x283f)
       title: "Workspaces"
@@ -219,7 +220,9 @@ Item {
 
             Aranea.NodeDeviceRow {
               id: node
+              refined: true
               objectName: "workspaceNode"
+              labelFontFamily: Aranea.Typography.technicalFamily
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.top: parent.top
@@ -253,7 +256,7 @@ Item {
               text: rowWrap.titles
               elide: Text.ElideRight
               color: Util.alpha(Aranea.DesignTokens.foreground, 0.5)
-              font.family: Style.font.family
+              font.family: Aranea.Typography.uiFamily
               font.pixelSize: Style.font.caption
             }
           }
@@ -267,7 +270,7 @@ Item {
       Layout.fillWidth: true
       text: "↑↓ move · enter focus · wheel cycle"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight
     }

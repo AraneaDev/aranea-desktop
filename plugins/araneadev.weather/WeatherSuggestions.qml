@@ -109,7 +109,7 @@ Column {
         text: row.suggestion.name || ""
         elide: Text.ElideRight
         color: row.highlighted ? Aranea.DesignTokens.accent : Aranea.DesignTokens.foreground
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
       }
       Text {
@@ -121,7 +121,7 @@ Column {
         textFormat: Text.PlainText
         text: row.suggestion.description || ""
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
       }
       MouseArea {

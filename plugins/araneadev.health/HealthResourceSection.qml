@@ -32,7 +32,7 @@ Item {
   // Upload and download rates, an em dash without a reading.
   property string networkRateText: "↑ " + root.rateText(metrics && metrics.rates ? metrics.rates.up : null) + "   ↓ " + root.rateText(metrics && metrics.rates ? metrics.rates.down : null)
   // Font family of every text here.
-  property string fontFamily: Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Colour of the values and labels.
   property color foreground: Aranea.DesignTokens.foreground
   // Colour of captions and secondary text.
@@ -63,7 +63,7 @@ Item {
     font.family: root.fontFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
 
   // The hairline between sections.
@@ -90,7 +90,7 @@ Item {
           objectName: "cpuValue"
           text: root.cpu === null ? "—" : Math.round(root.cpu) + "%"
           color: root.foreground
-          font.family: root.fontFamily
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.body
           Layout.fillWidth: true
         }
@@ -100,7 +100,7 @@ Item {
               return value === null ? "—" : value.toFixed(2)
             }).join(" ") : "—")
           color: root.muted
-          font.family: root.fontFamily
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.caption
         }
       }
@@ -133,7 +133,7 @@ Item {
           objectName: "memValue"
           text: root.summary.memory ? MetricsLogic.humanBytes(root.summary.memory.used) + " / " + MetricsLogic.humanBytes(root.summary.memory.total) : "—"
           color: root.levelColor(MetricsLogic.usageLevel(root.memoryPercent))
-          font.family: root.fontFamily
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.body
         }
       }
@@ -145,7 +145,7 @@ Item {
       Text {
         text: "swap " + root.bytesText(root.metrics && root.metrics.mem ? root.metrics.mem.swapUsed : null) + " / " + root.bytesText(root.metrics && root.metrics.mem ? root.metrics.mem.swapTotal : null)
         color: root.muted
-        font.family: root.fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
       }
     }
@@ -170,7 +170,7 @@ Item {
             Text {
               text: diskRow.modelData.target
               color: root.foreground
-              font.family: root.fontFamily
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.body
               Layout.fillWidth: true
               elide: Text.ElideMiddle
@@ -178,13 +178,13 @@ Item {
             Text {
               text: SummaryLogic.knownNumber(diskRow.modelData.percent) === null ? "—" : diskRow.modelData.percent + "%"
               color: root.levelColor(MetricsLogic.usageLevel(diskRow.modelData.percent))
-              font.family: root.fontFamily
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.body
             }
             Text {
               text: root.bytesText(diskRow.modelData.avail) + " free"
               color: root.muted
-              font.family: root.fontFamily
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.caption
             }
           }
@@ -207,14 +207,14 @@ Item {
       Text {
         text: root.networkLabel
         color: root.muted
-        font.family: root.fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
         Layout.fillWidth: true
       }
       Text {
         text: root.networkRateText
         color: root.foreground
-        font.family: root.fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
       }
     }

@@ -95,6 +95,7 @@ Item {
 
     Aranea.DropdownHeader {
       id: header
+      refined: true
       Layout.fillWidth: true
       glyph: String.fromCodePoint(0x21a5)
       glyphColor: panel.info.tone === "warn" ? Aranea.DesignTokens.attention : Aranea.DesignTokens.ceremony
@@ -137,7 +138,7 @@ Item {
           text: panel.info.title
           elide: Text.ElideRight
           color: Aranea.DesignTokens.foreground
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.body
           font.bold: true
         }
@@ -147,7 +148,7 @@ Item {
           text: panel.info.subtitle
           elide: Text.ElideRight
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
         }
       }
@@ -158,7 +159,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         text: panel.info.tone
         color: panel.info.tone === "warn" ? Aranea.DesignTokens.attention : Aranea.DesignTokens.ceremony
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
       }
@@ -196,7 +197,7 @@ Item {
               color: Color.popups.text
               font.bold: true
               font.pixelSize: Style.font.body
-              font.family: Style.font.family
+              font.family: Aranea.Typography.uiFamily
               Layout.preferredWidth: Style.space(90)
             }
 
@@ -205,7 +206,7 @@ Item {
               color: Color.popups.text
               opacity: 0.7
               font.pixelSize: Style.font.caption
-              font.family: Style.font.family
+              font.family: Aranea.Typography.technicalFamily
               Layout.fillWidth: true
             }
           }
@@ -221,6 +222,7 @@ Item {
 
       Aranea.FilamentPill {
         id: openPill
+        refined: true
         objectName: "openUpdaterPill"
         Layout.fillWidth: true
         text: "Open updater"
@@ -232,6 +234,7 @@ Item {
 
       Aranea.FilamentPill {
         id: refreshPill
+        refined: true
         objectName: "refreshPill"
         Layout.fillWidth: true
         text: panel.checking ? "Refreshing…" : "Refresh"
@@ -251,7 +254,7 @@ Item {
       // What Enter does on the cursor's pill (UpdateLogic.keyHint).
       text: UpdateLogic.keyHint(panel.cursorIndex)
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight
     }

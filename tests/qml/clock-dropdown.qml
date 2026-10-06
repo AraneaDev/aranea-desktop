@@ -246,7 +246,7 @@ ShellRoot {
 
   Component.onCompleted: run([[350, function () {
         // ---------- Header ----------
-        t.equal(one(full, "headerCaption").text, "16:58 · WEEK 40", "the header caption is the subtitle, uppercased")
+        t.equal(one(full, "headerCaption").text, "16:58 · Week 40", "the header caption preserves subtitle casing")
         t.equal(one(full, "monthLabel").text, "October 2026", "the trailing month label is the view's")
         t.check(one(full, "prevMonth").visible && one(full, "nextMonth").visible, "both chevrons show")
 

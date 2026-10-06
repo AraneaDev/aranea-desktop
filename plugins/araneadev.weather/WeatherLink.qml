@@ -19,6 +19,8 @@ Item {
 
   // The label or glyph.
   property string text: ""
+  // Optional trailing action glyph stays on the dedicated icon font.
+  property string glyph: ""
   // The text colour at rest.
   property color restColor: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
   // The text size in px.
@@ -66,7 +68,7 @@ Item {
     })
   }
 
-  implicitWidth: label.implicitWidth
+  implicitWidth: label.implicitWidth + (glyphLabel.visible ? glyphLabel.implicitWidth + Style.space(4) : 0)
   implicitHeight: label.implicitHeight
   Component.onCompleted: link.createdAt = Date.now()
   onBusyChanged: if (!link.busy)
@@ -84,16 +86,29 @@ Item {
   Text {
     id: label
     anchors.fill: parent
+    anchors.rightMargin: glyphLabel.visible ? glyphLabel.implicitWidth + Style.space(4) : 0
     horizontalAlignment: link.horizontalAlignment
     verticalAlignment: Text.AlignVCenter
     textFormat: Text.PlainText
     text: link.text
     color: link.hot || link.hasCursor ? Aranea.DesignTokens.accent : link.restColor
     opacity: link.busy ? (Aranea.DesignTokens.motionEnabled ? link.pulseOpacity : 0.7) : 1
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: link.pixelSize
     font.bold: link.bold
     font.letterSpacing: link.letterSpacing
+  }
+  Text {
+    id: glyphLabel
+    visible: link.glyph !== ""
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    textFormat: Text.PlainText
+    text: link.glyph
+    color: label.color
+    opacity: label.opacity
+    font.family: Aranea.Typography.iconFamily
+    font.pixelSize: link.pixelSize
   }
   // Breathing while busy; static at 0.7 when motion is disabled.
   SequentialAnimation {
@@ -135,6 +150,7 @@ Item {
     }
   }
   PanelToolTip {
+    fontFamily: Aranea.Typography.uiFamily
     visible: link.hot && link.tooltipText !== ""
     text: link.tooltipText
   }

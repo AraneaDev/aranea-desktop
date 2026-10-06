@@ -8,6 +8,7 @@ import "UpdateLogic.js" as UpdateLogic
 
 Aranea.KeyboardPanelFrame {
   id: host
+  refined: true
   // Current update status rendered by the panel.
   property var status: ({})
   // Whether Service is running a check right now.

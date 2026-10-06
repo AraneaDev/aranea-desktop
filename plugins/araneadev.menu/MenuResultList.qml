@@ -43,7 +43,7 @@ Item {
   // Public contract member.
   property color border: Color.menu.border
   // Public contract member.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
   property real menuFontScale: 1
   // Public contract member.
@@ -195,7 +195,7 @@ Item {
         visible: row.hasIcon && !row.isApp && !row.hasBrandIcon
         text: row.icon
         color: row.lit ? results.selectedText : results.foreground
-        font.family: row.iconFont.length > 0 ? row.iconFont : results.fontFamily
+        font.family: row.iconFont.length > 0 ? row.iconFont : Aranea.Typography.iconFamily
         font.pixelSize: Style.font.iconLarge
         horizontalAlignment: Text.AlignLeft
         anchors.left: parent.left

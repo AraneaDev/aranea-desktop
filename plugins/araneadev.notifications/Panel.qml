@@ -382,7 +382,7 @@ Panel {
         anchors.centerIn: parent
         text: root.badge.label
         color: Color.background
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
       }
@@ -391,6 +391,7 @@ Panel {
 
   Aranea.KeyboardPanelFrame {
     id: panel
+    refined: true
     anchorItem: button
     owner: root
     bar: root.bar

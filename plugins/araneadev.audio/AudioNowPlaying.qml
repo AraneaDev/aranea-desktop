@@ -85,17 +85,17 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           text: "NOW PLAYING"
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           font.bold: true
-          font.letterSpacing: 1.2
+          font.letterSpacing: 0
         }
         Text {
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
           text: strip.info.player
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           font.bold: true
         }
@@ -115,7 +115,7 @@ Column {
             elide: Text.ElideRight
             text: strip.info.title
             color: Aranea.DesignTokens.foreground
-            font.family: Style.font.family
+            font.family: Aranea.Typography.uiFamily
             font.pixelSize: Style.font.body
           }
           Text {
@@ -125,7 +125,7 @@ Column {
               return part !== ""
             }).join(" · ")
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.uiFamily
             font.pixelSize: Style.font.caption
           }
         }
@@ -139,7 +139,7 @@ Column {
             text: String.fromCodePoint(0xF04AE)
             opacity: strip.info.canPrevious ? 1 : 0.35
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.body
             Aranea.HoverTint {
               z: -1
@@ -160,7 +160,7 @@ Column {
             anchors.verticalCenter: parent.verticalCenter
             text: strip.info.playing ? String.fromCodePoint(0xF03E4) : String.fromCodePoint(0xF040A)
             color: Aranea.DesignTokens.accent
-            font.family: Style.font.family
+            font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.body
             Aranea.HoverTint {
               z: -1
@@ -180,7 +180,7 @@ Column {
             text: String.fromCodePoint(0xF04AD)
             opacity: strip.info.canNext ? 1 : 0.35
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.body
             Aranea.HoverTint {
               z: -1

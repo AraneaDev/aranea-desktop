@@ -384,8 +384,8 @@ ShellRoot {
         // ---------- Hero ----------
         t.equal(one(full, "heroGlyph").text, String.fromCodePoint(0xf0595), "the hero glyph")
         t.equal(one(full, "heroTemp").text, "17°", "the big temperature")
-        t.equal(one(full, "heroLabel").text, "PARTLY CLOUDY", "the condition, uppercased")
-        t.equal(one(full, "placeLabel").text, "AMSTERDAM " + String.fromCodePoint(0xf03eb), "the place, uppercased, with the edit glyph")
+        t.equal(one(full, "heroLabel").text, "Partly cloudy", "the native condition")
+        t.equal(one(full, "placeLabel").text, "Amsterdam", "the native place label")
         t.equal(one(full, "updatedLabel").text, "updated 20:15", "the updated label")
         t.check(!one(full, "loadingPulse").visible, "no loading strand when loaded")
         t.check(one(partial, "loadingPulse").visible, "a loading strand while loading")
@@ -741,7 +741,7 @@ ShellRoot {
           }
         })
         var place = one(full, "placeLabel")
-        t.check(place.visible && place.text === "UTRECHT " + String.fromCodePoint(0xf03eb), "the new place shows at once")
+        t.check(place.visible && place.text === "Utrecht", "the new place shows at once")
         t.check(place.busy, "and pulses while saving")
         t.equal(one(place, "busyPulse").running, Aranea.DesignTokens.motionEnabled, "the pulse runs with motion")
         t.check(!one(full, "placeEdit").visible && !one(full, "suggestionsSection").visible, "the editor is gone")

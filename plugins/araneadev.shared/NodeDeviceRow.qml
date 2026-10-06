@@ -24,6 +24,13 @@ import "ClickSettle.js" as ClickSettle
 Item {
   id: row
 
+  // Opt into proportional labels without changing selection or input policy.
+  property bool refined: false
+  // Font for the device label; hosts may override it independently.
+  property string labelFontFamily: refined ? Typography.uiFamily : Style.font.family
+  // Font for trailing detail; technical content can use Typography.technicalFamily.
+  property string detailFontFamily: labelFontFamily
+
   // Device glyph (a Nerd Font icon).
   property string glyph: ""
   // Device name.
@@ -215,7 +222,7 @@ Item {
     horizontalAlignment: Text.AlignHCenter
     text: row.glyph
     color: Util.alpha(DesignTokens.foreground, 0.82)
-    font.family: Style.font.family
+    font.family: Typography.iconFamily
     font.pixelSize: Style.font.body
   }
   Text {
@@ -227,7 +234,7 @@ Item {
     text: row.label
     elide: Text.ElideRight
     color: DesignTokens.foreground
-    font.family: Style.font.family
+    font.family: row.labelFontFamily
     font.pixelSize: Style.font.body
   }
   Text {
@@ -238,7 +245,7 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     text: row.detail
     color: row.detailColor
-    font.family: Style.font.family
+    font.family: row.detailFontFamily
     font.pixelSize: Style.font.caption
   }
   // Trailing action slot, flush with the row's right edge so a forget/

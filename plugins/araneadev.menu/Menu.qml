@@ -496,8 +496,7 @@ Item {
   // Height the card can devote to rows (MenuLayout.availableRowsHeight). Uses
   // root.viewCardTop rather than effectiveCardTop: the centered top is derived
   // from the card height, which this value feeds. The root surface is a
-  // shorter command viewport, so its header, band, tiles and footer read as
-  // one composition.
+  // screen-relative command viewport, so root rows have room beneath the chrome.
   function availableRowsHeight(): int {
     return MenuLayout.availableRowsHeight({
       screenHeight: root.screenHeight,
@@ -509,7 +508,7 @@ Item {
       rootExtrasHeight: 0,
       borderInsetY: Math.ceil(root.style.borderInsetY),
       maxRowsHeight: root.viewMaxRowsHeight,
-      ceiling: root.fullRootHeader ? Style.space(250) : Math.round(root.screenHeight * 0.7)
+      ceiling: Math.round(root.screenHeight * 0.7)
     })
   }
 

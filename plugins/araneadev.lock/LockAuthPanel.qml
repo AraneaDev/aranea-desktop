@@ -1,6 +1,7 @@
 // Password and fingerprint field presentation for the lock surface.
 // qmllint disable missing-property unqualified
 import QtQuick
+import "../araneadev.shared" as Aranea
 import qs.Commons
 import qs.Ui
 
@@ -37,7 +38,7 @@ Item {
   // Public contract member.
   property int cornerRadius: Style.space(10)
   // Public contract member.
-  property string fontFamily: Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
   property color foreground: Color.lock.text
   // Public contract member.
@@ -175,7 +176,7 @@ Item {
       visible: root.fingerprintConfigured
       text: String.fromCodePoint(0xf0237)
       color: root.placeholderColor
-      font.family: root.fontFamily
+      font.family: Aranea.Typography.iconFamily
       font.pixelSize: Math.round(root.fieldFontSize * 1.1)
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter

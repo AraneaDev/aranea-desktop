@@ -78,6 +78,10 @@ jq -e '.schemaVersion == 1 and .operation == "status" and .ok
   and (.state.wallpapers[] | (.path | startswith("/")) and (.available | type == "boolean"))' "$sandbox_root/status.json" >/dev/null
 [[ "$(jq -s length "$sandbox_root/status.json")" == 1 ]]
 test ! -e "$ARANEA_STATE_ROOT" # Reads do not create state.
+# Real adapter exposes persisted defaults and validates the font boundary.
+"$ctl" configure fonts '' '' --json >"$sandbox_root/fonts.json"
+jq -e '.ok and .operation == "configure fonts" and .state.fonts.uiFamily == "" and .state.fonts.technicalFamily == "" and .state.fonts.availability == "available"' "$sandbox_root/fonts.json" >/dev/null
+rm "$XDG_CONFIG_HOME/aranea/fonts.json"
 # Exact argv validation prevents additional arguments, IDs, and shell text.
 reject() {
   local want="$1" rc=0

@@ -133,7 +133,7 @@ ColumnLayout {
               verticalAlignment: TextInput.AlignVCenter
               text: page.draft[phase.index] || ''
               color: Color.foreground
-              font.family: Style.font.menuFamily
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.body
               enabled: page.available && !page.displayOnly && !page.pending
               activeFocusOnTab: true

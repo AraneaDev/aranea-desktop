@@ -1654,7 +1654,7 @@ Item {
       TooltipBubble {
         id: tooltipBubble
         text: root.tooltipText
-        fontFamily: root.fontFamily
+        fontFamily: Aranea.Typography.uiFamily
       }
     }
 

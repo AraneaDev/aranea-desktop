@@ -111,10 +111,10 @@ Column {
       anchors.top: parent.top
       text: strand.title
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       objectName: strand.percentName
@@ -122,7 +122,7 @@ Column {
       anchors.verticalCenter: strandCaption.verticalCenter
       text: Math.round(strand.percent) + "%"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
     }
     Rectangle {
@@ -170,6 +170,7 @@ Column {
         strand.doubleClicked()
     }
     PanelToolTip {
+      fontFamily: Aranea.Typography.uiFamily
       visible: strand.hot && strand.tooltipText !== ""
       text: strand.tooltipText
     }
@@ -209,10 +210,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "BORN"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     TextField {
       id: bornField
@@ -231,10 +232,10 @@ Column {
       leftPadding: Style.space(6)
       text: "LIVE TO"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     TextField {
       id: liveToField

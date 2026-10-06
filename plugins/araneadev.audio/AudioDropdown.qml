@@ -264,7 +264,7 @@ Column {
     // What Enter does on the cursor's stop (AudioLogic.keyHint).
     text: AudioLogic.keyHint(dropdown.cursor.section, dropdown.cursor.index)
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

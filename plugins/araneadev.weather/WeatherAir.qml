@@ -47,9 +47,9 @@ Item {
       textFormat: Text.PlainText
       text: chip.text
       color: chip.toneColor
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
-      font.letterSpacing: 0.6
+      font.letterSpacing: 0
     }
   }
 
@@ -61,10 +61,10 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     text: "AIR & UV"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
   Row {
     id: chips

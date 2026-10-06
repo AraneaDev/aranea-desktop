@@ -56,7 +56,7 @@ Column {
       text: pair.label
       elide: Text.ElideRight
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
     Text {
@@ -66,7 +66,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: pair.value
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
     }
   }
@@ -80,10 +80,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "SUN & MOON"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       id: skyPlace
@@ -95,7 +95,7 @@ Column {
       elide: Text.ElideRight
       text: sky.skyView && sky.skyView.place ? String(sky.skyView.place) : ""
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
   }
@@ -112,7 +112,7 @@ Column {
     visible: sky.polar !== ""
     text: sky.polar === "day" ? "Sun up all day" : sky.polar === "night" ? "Sun down all day" : ""
     color: Aranea.DesignTokens.foreground
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }
   Text {
@@ -121,7 +121,7 @@ Column {
     visible: sky.timesShown && !!sky.sun.night
     text: "Night"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }
   Grid {

@@ -297,3 +297,46 @@ test("Display normalizes alongside existing stable destinations", () => {
   for (const section of ["appearance", "display", "schedule", "integrations", "notifications"])
     assert.equal(logic.normalizeSection(section), section)
 })
+
+test("font selection uses installed roles and exact argv, defaults and owner readback", () => {
+  const state = {
+    fonts: {
+      availability: "available",
+      uiFamily: "Example Sans",
+      technicalFamily: "Example Mono",
+      families: ["Example Sans", "Example Mono"],
+      monospaceFamilies: ["Example Mono"]
+    }
+  }
+  assert.deepEqual(
+    logic.command("/theme/settings", "configure fonts", ["Example Sans", "Example Mono"], state),
+    ["/theme/settings", "configure", "fonts", "Example Sans", "Example Mono", "--json"]
+  )
+  assert.deepEqual(logic.command("/theme/settings", "configure fonts", ["", ""], state), [
+    "/theme/settings",
+    "configure",
+    "fonts",
+    "",
+    "",
+    "--json"
+  ])
+  assert.equal(
+    logic.command("/theme/settings", "configure fonts", ["Missing", "Example Mono"], state),
+    null
+  )
+  assert.equal(
+    logic.command("/theme/settings", "configure fonts", ["Example Sans", "Example Sans"], state),
+    null
+  )
+  assert.equal(
+    logic.command("/theme/settings", "configure fonts", ["", ""], {
+      fonts: { ...state.fonts, availability: "unavailable" }
+    }),
+    null
+  )
+  assert.equal(
+    logic.outcome("configure fonts", ["Example Sans", "Example Mono"], state, true),
+    "Applied"
+  )
+  assert.equal(logic.outcome("configure fonts", ["", ""], state, true), "Save not confirmed")
+})

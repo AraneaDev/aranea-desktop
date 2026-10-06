@@ -60,6 +60,7 @@ Column {
     model: list.rows
     Aranea.NodeDeviceRow {
       id: displayRow
+      refined: true
       required property var modelData
       required property int index
       objectName: "displayRow"

@@ -160,7 +160,7 @@ Item {
       anchors.centerIn: parent
       text: "☷"
       color: root.bar ? root.bar.foreground : Color.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.iconFamily
       font.pixelSize: Style.font.title
       enabled: false
     }

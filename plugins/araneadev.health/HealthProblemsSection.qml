@@ -81,10 +81,10 @@ Column {
     width: parent.width
     text: "PROBLEMS · " + section.problems.length
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
 
   Row {
@@ -102,7 +102,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "All systems healthy"
       color: Aranea.DesignTokens.ceremony
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
     }
   }
@@ -113,6 +113,7 @@ Column {
     model: section.problems.length
     Aranea.NodeDeviceRow {
       id: row
+      refined: true
       required property int index
       // This row's problem, read from the live array.
       readonly property var problem: section.problems[row.index] || ({})

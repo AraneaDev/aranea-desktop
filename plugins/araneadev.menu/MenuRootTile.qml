@@ -24,7 +24,7 @@ BorderSurface {
   // External selection state.
   property bool selected: false
   // Font family used for all tile text.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main tile text colour.
   property color foreground: Color.menu.text
   // Secondary tile text colour.
@@ -34,7 +34,7 @@ BorderSurface {
   // Scale applied to the shell font sizes.
   property real menuFontScale: 1.0
   // Letter spacing applied to tile text.
-  property real menuLetterSpacing: 0.2
+  property real menuLetterSpacing: 0
   // Whether parent animations are enabled.
   property bool motionEnabled: true
   // Whether the pointer really moved onto the tile and is still over it.
@@ -71,7 +71,7 @@ BorderSurface {
   // Emitted when the tile is clicked.
   signal activated
 
-  implicitHeight: Style.space(96)
+  implicitHeight: Style.space(64)
   radius: Aranea.DesignTokens.cornerRadius
   color: tile.selected || tile.hovered ? Util.alpha(tile.selectedText, 0.12) : "transparent"
   borderSpec: Border.none()
@@ -82,7 +82,7 @@ BorderSurface {
     width: Style.space(18)
     height: Style.space(2)
     color: tile.selectedText
-    opacity: tile.selected || tile.hovered ? 0.9 : 0.25
+    opacity: tile.selected || tile.hovered ? 0.7 : 0.12
   }
 
   Rectangle {
@@ -91,19 +91,19 @@ BorderSurface {
     width: Style.space(18)
     height: Style.space(2)
     color: tile.selectedText
-    opacity: tile.selected || tile.hovered ? 0.9 : 0.25
+    opacity: tile.selected || tile.hovered ? 0.7 : 0.12
   }
 
   Column {
     width: parent.width - Style.space(28)
     anchors.centerIn: parent
-    spacing: Style.space(11)
+    spacing: Style.space(4)
 
     Aranea.InkText {
       width: parent.width
       text: tile.icon
       color: tile.selectedText
-      font.family: tile.fontFamily
+      font.family: Aranea.Typography.iconFamily
       font.pixelSize: Style.font.iconLarge
       horizontalAlignment: Text.AlignHCenter
     }

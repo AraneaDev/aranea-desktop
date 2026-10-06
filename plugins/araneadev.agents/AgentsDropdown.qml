@@ -238,7 +238,7 @@ Column {
           text: String(dropdown.hero.problem || "")
           wrapMode: Text.WordWrap
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.7)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
         }
       }
@@ -253,7 +253,7 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
       }
       Rectangle {
@@ -371,7 +371,7 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
       }
     }
@@ -385,7 +385,7 @@ Column {
     visible: text !== ""
     text: String(dropdown.view.keyHint || "")
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

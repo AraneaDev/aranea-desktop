@@ -32,7 +32,7 @@ Rectangle {
   // The emoji under the last press, compared on release.
   property string pressedKey: ""
   // Font used for the emoji glyph.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Cell width used by the picker grid.
   property int cellWidth: Math.max(Style.space(44), Style.font.display + Style.spacing.md)
   // Cell height used by the picker grid.
@@ -82,7 +82,7 @@ Rectangle {
     anchors.centerIn: parent
     textFormat: Text.PlainText
     text: cell.glyph
-    font.family: cell.fontFamily
+    font.family: "Noto Color Emoji"
     font.pixelSize: Style.font.display
   }
 

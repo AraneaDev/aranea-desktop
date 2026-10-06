@@ -1033,6 +1033,7 @@ BarWidget {
 
   Aranea.KeyboardPanelFrame {
     id: managePopup
+    refined: true
     anchorItem: root
     owner: root
     bar: root.bar
@@ -1062,6 +1063,7 @@ BarWidget {
 
   Aranea.KeyboardPanelFrame {
     id: trayMenuPopup
+    refined: true
     anchorItem: root.activeTrayAnchor || root
     owner: root
     bar: root.bar

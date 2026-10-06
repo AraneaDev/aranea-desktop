@@ -15,13 +15,13 @@ ColumnLayout {
   SettingsLabel {
     Layout.fillWidth: true
     text: header.title
-    font.pixelSize: Style.font.title
+    font.pixelSize: Style.font.heading
     font.bold: true
   }
   SettingsLabel {
     Layout.fillWidth: true
     visible: !!header.description
     text: header.description
-    opacity: 0.65
+    opacity: 0.75
   }
 }

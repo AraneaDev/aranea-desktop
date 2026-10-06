@@ -52,6 +52,9 @@ QtObject {
   // Compatibility alias for components that still call this a glyph.
   readonly property string glyphUrl: brandUrl
 
+  // User-owned shared interface and technical font preferences.
+  readonly property string fontsConfigPath: araneaConfigRoot + "/fonts.json"
+
   // File storing the shared reduced-motion preference.
   readonly property string motionStatePath: araneaStateRoot + "/motion"
 

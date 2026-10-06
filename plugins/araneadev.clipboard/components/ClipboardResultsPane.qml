@@ -50,7 +50,7 @@ Item {
   // Content margin shared with the containing card.
   property int contentMargin: Style.spacing.panelPadding
   // Font family used by rows and the preview.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main content colour.
   property color foreground: Color.menu.text
   // Selected-row foreground colour.
@@ -235,6 +235,7 @@ Item {
     icon: String.fromCodePoint(0xf014c)
     message: pane.emptyMessage
     fontFamily: pane.fontFamily
+    iconFontFamily: Aranea.Typography.iconFamily
     iconColor: pane.selectedText
     foreground: pane.foreground
   }

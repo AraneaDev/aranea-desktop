@@ -16,7 +16,7 @@ QtObject {
   property bool fullRootHeader: false
 
   // Font for all menu text; a payload's fontFamily overrides it.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Quickshell.env("OMARCHY_MENU_FONT") || Aranea.Typography.uiFamily
   // Directory of the current theme's branding marks (the header logo).
   readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
   // Directory of the current theme's branding motifs (header art, dividers).
@@ -63,7 +63,7 @@ QtObject {
   // Scale applied to shell font sizes by menuFontSize().
   readonly property real menuFontScale: 1.10
   // Letter spacing for menu labels.
-  readonly property real menuLetterSpacing: 0.20
+  readonly property real menuLetterSpacing: 0
   // Scales a shell font size by menuFontScale, rounded, at least 1.
   function menuFontSize(size: real): int {
     return Math.max(1, Math.round(size * style.menuFontScale))
@@ -76,13 +76,13 @@ QtObject {
   // one panel padding below the border, like its left edge.
   property int rootHeaderHeight: Math.max(Style.space(48), style.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
   // Height of the root tile row.
-  property int rootTileHeight: Style.space(96)
+  property int rootTileHeight: Style.space(64)
   // Height of the root context band (status, workspace, clock).
   property int rootContextHeight: Style.space(20)
   // Height of the root footer.
-  property int footerHeight: Style.space(26)
+  property int footerHeight: Style.space(20)
   // Gap between the root chrome's header, context band, tiles and footer.
-  property int rootChromeSpacing: Style.spacing.md
+  property int rootChromeSpacing: Style.space(8)
   // Extra card height for the root context band, tiles and footer and the
   // three gaps between the chrome's four parts (0 elsewhere).
   property int rootExtrasHeight: style.fullRootHeader ? style.rootContextHeight + style.rootTileHeight + style.footerHeight + style.rootChromeSpacing * 3 : 0

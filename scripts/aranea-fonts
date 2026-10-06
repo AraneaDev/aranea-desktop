@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Usage: scripts/aranea-fonts status --json | configure UI_FONT MONOSPACE_FONT
+# Installed font catalogs and atomic, user-owned Aranea font preferences.
+set -euo pipefail
+# shellcheck source=scripts/lib/paths.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/paths.sh"
+config_root="$(xdg_config_home)/aranea"
+config_file="$config_root/fonts.json"
+scratch="$(mktemp -d)"
+trap 'rm -rf -- "$scratch"' EXIT
+command -v jq >/dev/null || {
+  echo 'jq is required for font preferences' >&2
+  exit 2
+}
+catalogs_available=true
+if ! command -v fc-list >/dev/null ||
+  ! fc-list ':lang=en' -f '%{family[0]}\n' >"$scratch/all" ||
+  ! fc-list ':lang=en:spacing=100' -f '%{family[0]}\n' >"$scratch/mono"; then
+  catalogs_available=false
+  : >"$scratch/all"
+  : >"$scratch/mono"
+fi
+jq -Rsc 'split("\n") | map(select(length > 0)) | unique' "$scratch/all" >"$scratch/families"
+jq -Rsc 'split("\n") | map(select(length > 0)) | unique' "$scratch/mono" >"$scratch/monospace"
+# Both roles accept the empty default; named choices must be installed.
+valid_choice() {
+  local value="$1" catalog="$2"
+  [[ -z "$value" ]] || jq -e --arg value "$value" 'index($value) != null' "$catalog" >/dev/null
+}
+case "${1:-}" in
+  status)
+    [[ $# == 2 && "$2" == --json ]] || exit 2
+    availability=available
+    ui_family=''
+    technical_family=''
+    if [[ -e "$config_file" || -L "$config_file" ]]; then
+      if [[ -f "$config_file" && -r "$config_file" ]] &&
+        jq -e 'type == "object" and (.uiFamily | type == "string") and (.technicalFamily | type == "string")' "$config_file" >/dev/null 2>&1; then
+        ui_family="$(jq -r .uiFamily "$config_file")"
+        technical_family="$(jq -r .technicalFamily "$config_file")"
+      else availability=unavailable; fi
+    fi
+    if [[ "$catalogs_available" != true ]] ||
+      ! valid_choice "$ui_family" "$scratch/families" ||
+      ! valid_choice "$technical_family" "$scratch/monospace"; then availability=unavailable; fi
+    jq -cn --arg ui "$ui_family" --arg technical "$technical_family" --arg availability "$availability" --argjson catalogAvailable "$catalogs_available" \
+      --slurpfile families "$scratch/families" --slurpfile monospace "$scratch/monospace" \
+      '{uiFamily:$ui,technicalFamily:$technical,families:$families[0],monospaceFamilies:$monospace[0],availability:$availability,catalogAvailable:$catalogAvailable}'
+    [[ "$availability" == available ]]
+    ;;
+  configure)
+    [[ $# == 3 ]] || {
+      echo 'Expected configure UI_FONT MONOSPACE_FONT (empty for default)' >&2
+      exit 2
+    }
+    [[ "$catalogs_available" == true ]] || {
+      echo 'Installed font catalog unavailable' >&2
+      exit 1
+    }
+    if ! valid_choice "$2" "$scratch/families" || ! valid_choice "$3" "$scratch/monospace"; then
+      echo 'Choose an installed interface font and an installed monospace font' >&2
+      exit 2
+    fi
+    mkdir -p "$config_root"
+    # Use a temporary file on the destination filesystem for atomic replacement.
+    staged="$(mktemp "$config_root/.fonts.XXXXXX")"
+    trap 'rm -rf -- "$scratch"; rm -f -- "$staged"' EXIT
+    jq -cn --arg ui "$2" --arg technical "$3" '{uiFamily:$ui,technicalFamily:$technical}' >"$staged"
+    mv -- "$staged" "$config_file"
+    ;;
+  *)
+    echo 'Expected status --json or configure UI_FONT MONOSPACE_FONT' >&2
+    exit 2
+    ;;
+esac

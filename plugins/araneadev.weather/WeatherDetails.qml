@@ -47,7 +47,7 @@ Column {
             textFormat: Text.PlainText
             text: cell.detail.label || ""
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.uiFamily
             font.pixelSize: Style.font.bodySmall
           }
           Row {
@@ -62,7 +62,7 @@ Column {
               textFormat: Text.PlainText
               text: cell.detail.value || ""
               color: Aranea.DesignTokens.foreground
-              font.family: Style.font.family
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.bodySmall
             }
             Text {
@@ -72,7 +72,7 @@ Column {
               text: "↑"
               rotation: visible ? cell.detail.arrow : 0
               color: Aranea.DesignTokens.accent
-              font.family: Style.font.family
+              font.family: Aranea.Typography.iconFamily
               font.pixelSize: Style.font.bodySmall
             }
             Text {
@@ -82,7 +82,7 @@ Column {
               textFormat: Text.PlainText
               text: cell.detail.dir || ""
               color: Aranea.DesignTokens.foreground
-              font.family: Style.font.family
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.bodySmall
             }
             Text {
@@ -92,7 +92,7 @@ Column {
               textFormat: Text.PlainText
               text: cell.detail.trend || ""
               color: Aranea.DesignTokens.accent
-              font.family: Style.font.family
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.bodySmall
             }
           }

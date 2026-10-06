@@ -91,7 +91,7 @@ Item {
       color: DesignTokens.foreground
       // The host exposes its font tokens as a dynamic QObject.
       // qmllint disable missing-property
-      font.family: Style.font.family
+      font.family: Typography.uiFamily
       font.pixelSize: Style.font.body
       // qmllint enable missing-property
       font.bold: true

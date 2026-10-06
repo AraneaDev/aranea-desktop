@@ -152,6 +152,7 @@ PanelWindow {
     }
 
     Aranea.OverlayChrome {
+      refined: true
       anchors.fill: parent
       anchors.topMargin: card.contentTopInset
       anchors.rightMargin: card.contentRightInset

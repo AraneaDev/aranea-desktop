@@ -5,6 +5,9 @@ import qs.Ui
 
 KeyboardPanel {
   id: frame
+  // Opt into neutral panel chrome while keeping the configured width and radius.
+  property bool refined: false
+  borderSpec: PanelChrome.popupBorder(refined)
   // Emitted when the panel should close.
   signal closeRequested
   // Emitted when focus moves between tabs.

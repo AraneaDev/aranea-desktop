@@ -203,6 +203,7 @@ Panel {
   // The view keeps primary state above a capped body and a fixed key hint.
   Aranea.KeyboardPanelFrame {
     id: panel
+    refined: true
     anchorItem: button
     owner: root
     bar: root.bar

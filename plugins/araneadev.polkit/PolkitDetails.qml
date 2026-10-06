@@ -1,6 +1,7 @@
 // Presentational, selectable details list for the polkit prompt.
 // qmllint disable missing-property unqualified
 import QtQuick
+import "../araneadev.shared" as Aranea
 import QtQuick.Layouts
 import qs.Commons
 
@@ -10,7 +11,7 @@ ColumnLayout {
   // Detail rows with key and value fields.
   property var rows: []
   // Font family used for both columns.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main value text colour.
   property color foreground: Color.polkit.text
   // Muted key text colour.
@@ -57,7 +58,7 @@ ColumnLayout {
         color: details.foreground
         selectionColor: Util.alpha(details.accent, 0.45)
         selectedTextColor: details.foreground
-        font.family: details.fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.bodySmall
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: function (event) {

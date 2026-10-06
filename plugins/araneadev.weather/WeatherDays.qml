@@ -45,7 +45,7 @@ Row {
           textFormat: Text.PlainText
           text: cell.modelData.label || ""
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.bodySmall
         }
         Text {
@@ -53,7 +53,7 @@ Row {
           anchors.horizontalCenter: parent.horizontalCenter
           text: cell.modelData.glyph || ""
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.display
         }
         Row {
@@ -65,7 +65,7 @@ Row {
             textFormat: Text.PlainText
             text: cell.modelData.hi || ""
             color: Aranea.DesignTokens.foreground
-            font.family: Style.font.family
+            font.family: Aranea.Typography.technicalFamily
             font.pixelSize: Style.font.bodySmall
           }
           Text {
@@ -73,7 +73,7 @@ Row {
             textFormat: Text.PlainText
             text: cell.modelData.lo || ""
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.technicalFamily
             font.pixelSize: Style.font.bodySmall
           }
         }

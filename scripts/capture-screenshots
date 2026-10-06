@@ -459,6 +459,7 @@ capture_settings_surface() (
   fixture="$(jq -cn --arg section "$([[ "$surface" == settings-scaling ]] && echo display || echo appearance)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
     {section: $section, snapshot: $snapshot, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
       display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
+      fonts:{uiFamily:"",technicalFamily:"",families:["Liberation Sans","Liberation Mono"],monospaceFamilies:["Liberation Mono"],availability:"available"},
       motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
       wallpaper:{activeId:"day",availability:"available"},
       wallpapers:[{id:"day",label:"Day",path:($artwork+"background-day.png"),available:true},{id:"night",label:"Night",path:($artwork+"background-night.png"),available:true}],wallpapersAvailability:"available",
@@ -1210,7 +1211,8 @@ case "$surface" in
     }
     trap finish_polkit EXIT
     shown=0
-    for _ in $(seq 1 20); do
+    # PAM/reader startup can outlast ten seconds; keep the wait bounded.
+    for _ in $(seq 1 120); do
       if prompt_visible; then
         shown=1
         break
@@ -1218,7 +1220,7 @@ case "$surface" in
       sleep 0.5
     done
     if ((! shown)); then
-      echo "polkit prompt never appeared; is a polkit agent registered?" >&2
+      echo "polkit prompt never appeared within 60 seconds; is a polkit agent registered?" >&2
       exit 3
     fi
     # Give the pkaction lookup a moment, then open the details.

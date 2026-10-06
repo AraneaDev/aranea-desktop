@@ -26,6 +26,27 @@ separates proportional UI labels from monospace telemetry and technical
 values. The center of a wallpaper stays quiet so bars, menus, and lock
 surfaces remain readable.
 
+Settings uses the desktop `sans-serif` alias for headings, labels and actions.
+Monitor observations, scale presets and editable scales and times retain the
+desktop monospace family. Its compact controls use neutral hover and press
+feedback, with mint reserved for selection and keyboard focus. Wallpaper
+choices adapt from four columns to two or one as the content width narrows.
+
+Shared `Typography` keeps UI labels, technical values and icon glyphs on
+separate roles across the launcher, bar tooltips, device/control panels,
+notifications, Health, Agents, updates, pickers, calendar, weather, Settings,
+OSD, authentication and lock. Appearance can select installed interface and
+monospace families with samples and explicit Apply. Icon glyphs remain on
+the dedicated font, including mixed icon/label actions. Explicit menu font
+and payload overrides retain precedence.
+
+Refined frames use neutral borders while preserving configured widths,
+including zero and individual edge overrides. Urgent/error surfaces retain
+semantic colors; the launcher and lock keep their restrained ceremonial marks.
+The launcher adapts its row viewport to available logical screen height rather
+than forcing early scrolling at a fixed 250-pixel ceiling. Shared controls
+retain legacy opt-in defaults for external consumers.
+
 ## Motion
 
 Feedback should feel immediate, panels should settle gently, and ceremonial
@@ -49,9 +70,9 @@ families intentionally share one geometry source so Xcursor and Hyprcursor
 variants stay visually identical. Stable wallpaper IDs live in
 `backgrounds/manifest.toml`.
 
-## Pilot panel hierarchy
+## Information panel hierarchy
 
-Health and Agents retain the current font family and external mint/violet frame.
+Health and Agents use shared font roles and neutral panel frames.
 Identity leads, followed by the decision state, compact context and optional details.
 Summary values use the subtitle token with bold weight. Sections use `Style.space(16)`,
 rows use `Style.space(8)`, and adjacent labels use `Style.space(4)`. Neutral hairlines

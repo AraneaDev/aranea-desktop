@@ -16,6 +16,7 @@ case "${1:-} ${2:-}" in
   'set wallpaper') operation='set wallpaper' ;;
   'set schedule') operation='set schedule' ;;
   'configure schedule') operation='configure schedule' ;;
+  'configure fonts') operation='configure fonts' ;;
   'set display-scale') operation='set display-scale' ;;
   'set integration') operation='set integration' ;;
 esac
@@ -56,6 +57,7 @@ case "$operation" in
       else display_guard="$5"; fi
     fi
     ;;
+  'configure fonts') [[ $# -eq 5 && "${5:-}" == --json ]] || invalid INVALID_ARGUMENTS 'Expected configure fonts UI_FONT MONOSPACE_FONT --json' ;;
   'set wallpaper') [[ $# -eq 4 && "$4" == --json && -n "$3" ]] || invalid INVALID_ARGUMENTS 'Expected set wallpaper <manifest-id> --json' ;;
   'set integration')
     if [[ $# -ne 5 || "${5:-}" != --json || -z "${3:-}" || ("${4:-}" != active && "${4:-}" != inactive) ]]; then
@@ -113,11 +115,12 @@ refresh_state() {
     integrations_availability=unavailable
     reads_failed=1
   fi
+  read_section fonts '{"uiFamily":"","technicalFamily":"","families":[],"monospaceFamilies":[],"availability":"unavailable"}' "$script_dir/aranea-fonts" status --json
   read_display
-  jq -cn --slurpfile display "$scratch/display" --slurpfile motion "$scratch/motion" --slurpfile wallpaper "$scratch/wallpaper" \
+  jq -cn --slurpfile fonts "$scratch/fonts" --slurpfile display "$scratch/display" --slurpfile motion "$scratch/motion" --slurpfile wallpaper "$scratch/wallpaper" \
     --slurpfile schedule "$scratch/schedule" --slurpfile integrations "$scratch/integrations" \
     --slurpfile wallpapers "$scratch/wallpapers" --arg catalog "$catalog_availability" --arg integrationsAvailability "$integrations_availability" \
-    '{display:$display[0],motion:$motion[0],wallpaper:$wallpaper[0],schedule:$schedule[0],integrations:$integrations[0],
+    '{fonts:$fonts[0],display:$display[0],motion:$motion[0],wallpaper:$wallpaper[0],schedule:$schedule[0],integrations:$integrations[0],
       wallpapers:$wallpapers[0],wallpapersAvailability:$catalog,integrationsAvailability:$integrationsAvailability}' >"$scratch/state"
 }
 refresh_state
@@ -165,6 +168,7 @@ if [[ -z "$error_code" && "$operation" != status ]]; then
   # Arguments are passed as arrays, never assembled into shell commands.
   case "$operation" in
     'set display-scale') argv=("$display_owner" hyprland monitor scaling "$3") ;;
+    'configure fonts') argv=("$script_dir/aranea-fonts" configure "$3" "$4") ;;
     'set motion') argv=("$script_dir/aranea-motion" set "$3") ;;
     'set wallpaper') argv=("$script_dir/aranea-wallpaper" set "$3") ;;
     'set schedule') argv=("$script_dir/aranea-wallpaper" schedule "$3") ;;

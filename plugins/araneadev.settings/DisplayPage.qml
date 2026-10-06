@@ -69,6 +69,7 @@ ColumnLayout {
     title: 'Scale'
     SettingsLabel {
       objectName: 'displayObservation'
+      technical: true
       Layout.fillWidth: true
       text: page.display.monitor ? page.display.monitor + (page.display.width && page.display.height ? ' · ' + page.display.width + ' × ' + page.display.height : '') + ' · Current scale: ' + page.display.scale : 'Focused display: Unavailable'
       opacity: 0.7
@@ -127,7 +128,7 @@ ColumnLayout {
           verticalAlignment: TextInput.AlignVCenter
           text: page.scaleDraft
           color: Color.foreground
-          font.family: Style.font.menuFamily
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.body
           enabled: page.displayAvailable && !page.displayOnly && !page.pending
           activeFocusOnTab: true
