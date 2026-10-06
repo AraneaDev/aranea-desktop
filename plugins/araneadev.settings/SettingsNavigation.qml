@@ -91,6 +91,8 @@ Item {
           spacing: Style.space(8)
           Text {
             objectName: 'navigationIcon'
+            Layout.preferredWidth: Style.space(16)
+            horizontalAlignment: Text.AlignHCenter
             text: categoryButton.modelData.icon
             textFormat: Text.PlainText
             font.family: Style.font.menuFamily

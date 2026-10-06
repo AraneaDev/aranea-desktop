@@ -79,8 +79,8 @@ ColumnLayout {
       columnSpacing: Style.space(12)
       rowSpacing: Style.space(8)
       Rectangle {
-        Layout.preferredWidth: Math.min(Style.space(180), parent.width)
-        Layout.preferredHeight: Style.space(101)
+        Layout.preferredWidth: Math.min(Style.space(224), parent.width)
+        Layout.preferredHeight: Style.space(126)
         color: Util.alpha(Color.foreground, 0.04)
         radius: Style.space(3)
         clip: true
@@ -105,7 +105,7 @@ ColumnLayout {
         }
         SettingsLabel {
           text: 'Current wallpaper'
-          opacity: 0.6
+          opacity: 0.75
         }
         SettingsButton {
           objectName: 'wallpaperChoose'
@@ -118,7 +118,7 @@ ColumnLayout {
     GridLayout {
       Layout.fillWidth: true
       visible: page.galleryExpanded
-      columns: width < Style.space(420) ? 1 : 2
+      columns: width >= Style.space(480) ? 4 : width >= Style.space(300) ? 2 : 1
       rowSpacing: Style.space(8)
       columnSpacing: Style.space(8)
       Repeater {
@@ -129,7 +129,7 @@ ColumnLayout {
           objectName: 'wallpaperThumbnail:' + modelData.id
           Layout.fillWidth: true
           Layout.minimumWidth: 0
-          Layout.preferredHeight: Style.space(108)
+          Layout.preferredHeight: Math.max(Style.space(88), (width - Style.space(8)) * 9 / 16 + Style.space(28))
           text: ''
           variant: 'quiet'
           Accessible.name: 'Select ' + modelData.label + ' wallpaper'
@@ -141,7 +141,7 @@ ColumnLayout {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: Style.space(4)
-            height: Style.space(74)
+            height: Math.max(0, width * 9 / 16)
             source: wallpaperOption.modelData.available && wallpaperOption.modelData.path ? 'file://' + wallpaperOption.modelData.path : ''
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
@@ -202,7 +202,7 @@ ColumnLayout {
       Layout.fillWidth: true
       visible: !!page.backendState.schedule && page.backendState.schedule.enabled === true
       text: 'Schedule enabled · your wallpaper may change at the next phase.'
-      opacity: 0.65
+      opacity: 0.75
     }
     SettingsLabel {
       Layout.fillWidth: true
@@ -213,11 +213,10 @@ ColumnLayout {
   }
   SettingsSection {
     Layout.fillWidth: true
-    title: 'Motion'
     RowLayout {
       Layout.fillWidth: true
       SettingsLabel {
-        text: 'Enable animations'
+        text: 'Animations'
         font.bold: true
       }
       SettingsToggle {
@@ -236,7 +235,7 @@ ColumnLayout {
     SettingsLabel {
       Layout.fillWidth: true
       text: page.pendingKey === 'motion' ? 'Applying…' : page.results.motion || (page.backendState.motion && page.backendState.motion.availability === 'available' ? page.backendState.motion.application === 'deferred' ? 'Saved · application deferred' : page.backendState.motion.application === 'unavailable' ? 'Live motion state unavailable' : 'Use desktop and panel animations.' : 'Motion: Unavailable')
-      opacity: 0.65
+      opacity: 0.75
     }
     SettingsLabel {
       Layout.fillWidth: true

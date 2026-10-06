@@ -26,6 +26,12 @@ separates proportional UI labels from monospace telemetry and technical
 values. The center of a wallpaper stays quiet so bars, menus, and lock
 surfaces remain readable.
 
+Settings uses the desktop `sans-serif` alias for headings, labels and actions.
+Monitor observations, scale presets and editable scales and times retain the
+desktop monospace family. Its compact controls use neutral hover and press
+feedback, with mint reserved for selection and keyboard focus. Wallpaper
+choices adapt from four columns to two or one as the content width narrows.
+
 ## Motion
 
 Feedback should feel immediate, panels should settle gently, and ceremonial

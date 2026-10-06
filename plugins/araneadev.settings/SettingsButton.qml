@@ -9,6 +9,8 @@ Aranea.FilamentPill {
   id: button
   // Presentation only: primary, secondary, navigation, segment or quiet.
   property string variant: 'secondary'
+  // Pointer press feedback is presentation only; inherited guards own activation.
+  property bool pointerPressed: false
   // Guard keyboard and programmatic activation while disabled.
   function activate() {
     if (enabled)
@@ -21,10 +23,12 @@ Aranea.FilamentPill {
   selected: variant === 'primary'
   borderVisible: false
   underlineVisible: false
-  labelVisible: variant !== 'navigation'
+  labelVisible: false
   labelColor: Aranea.DesignTokens.foreground
-  labelFontFamily: Style.font.menuFamily
-  opacity: enabled ? 1 : 0.45
+  labelFontFamily: variant === 'segment' ? Style.font.family : 'sans-serif'
+  opacity: enabled ? 1 : 0.55
+  onEnabledChanged: if (!enabled)
+    pointerPressed = false
   Accessible.role: Accessible.Button
   Accessible.name: text
   Keys.onPressed: function (event) {
@@ -37,15 +41,39 @@ Aranea.FilamentPill {
     anchors.fill: parent
     z: -1
     radius: Style.space(3)
-    color: Util.alpha(Color.foreground, 0.04)
-    visible: button.variant === 'secondary'
+    color: Util.alpha(Color.foreground, button.pointerPressed ? 0.14 : button.variant === 'secondary' ? 0.065 : 0)
+    Behavior on color {
+      enabled: Aranea.DesignTokens.motionEnabled
+      ColorAnimation {
+        duration: 90
+      }
+    }
+  }
+  Connections {
+    target: button
+    function onPressed() {
+      button.pointerPressed = true
+    }
+    function onPressCanceled() {
+      button.pointerPressed = false
+    }
+    function onClicked() {
+      button.pointerPressed = false
+    }
   }
   Text {
     id: labelMeasure
-    visible: false
+    objectName: 'settingsActionLabel'
+    visible: button.variant !== 'navigation' && !!button.text
+    anchors.centerIn: parent
+    width: Math.max(0, Math.min(implicitWidth, button.width - Style.space(8)))
+    horizontalAlignment: Text.AlignHCenter
+    elide: Text.ElideRight
+    textFormat: Text.PlainText
+    color: button.labelColor
     text: button.text
-    font.family: Style.font.menuFamily
+    font.family: button.labelFontFamily
     font.pixelSize: Style.font.caption
-    font.letterSpacing: 0.6
+    font.letterSpacing: 0
   }
 }
