@@ -2,7 +2,6 @@
 // own cursor and activation policy through the forwarded signals.
 import QtQuick
 import qs.Ui
-import qs.Commons
 
 KeyboardPanel {
   id: frame
