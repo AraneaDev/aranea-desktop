@@ -85,6 +85,7 @@ Aranea.SurfaceCard {
       activeTitle: card.root.item(card.root.activeMenu) ? (card.root.item(card.root.activeMenu).title || card.root.item(card.root.activeMenu).label || "GO") : "GO"
       dmenuPrompt: card.root.dmenu.prompt
       hint: card.root.hint
+      rootSearchHint: card.root.fullRootHeader && !card.root.notice ? "Type to search apps, windows and commands" : ""
       workspaceContext: card.root.style.workspaceContext
       clockContext: card.root.style.clockContext
       rootTiles: card.root.style.rootTiles

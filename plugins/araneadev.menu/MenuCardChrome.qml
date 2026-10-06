@@ -22,6 +22,8 @@ Item {
   property string dmenuPrompt: ""
   // Public contract member.
   property string hint: ""
+  // Optional unfiltered root search guidance; empty preserves the supplied hint.
+  property string rootSearchHint: ""
   // Matched menu query; special modes and no-match presentation keep their own text.
   property string matchedQuery: ""
   // Public contract member.
@@ -141,7 +143,7 @@ Item {
         Text {
           textFormat: Text.PlainText
           width: parent.width - (chrome.scopedSearch ? globalSearch.width + Style.spacing.md : 0)
-          text: hint
+          text: chrome.rootSearchHint || hint
           color: chrome.fullRootHeader ? Util.alpha(chrome.foreground, 0.8) : contextText
           font.family: fontFamily
           font.pixelSize: scaled(chrome.fullRootHeader ? Style.font.bodySmall : Style.font.caption)
