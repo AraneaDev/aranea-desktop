@@ -40,6 +40,10 @@ for surface in "${surfaces[@]}"; do
   fi
 done
 
+test -f "$repo_root/screenshots/settings-scaling.png"
+grep -Fq 'screenshots/settings-scaling.png' "$readme"
+[[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings-scaling.png")" == 840x620 ]]
+
 test -f "$repo_root/screenshots/dawn.png"
 test -f "$repo_root/screenshots/osd.png"
 grep -Fq 'ARANEA_OSD_CAPTURE_COMMAND' "$capture_script"

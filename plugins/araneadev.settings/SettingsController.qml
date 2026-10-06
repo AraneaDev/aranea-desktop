@@ -235,12 +235,14 @@ QtObject {
     runCommand(argv, function (code, stdout, stderr) {
       var mutation = Logic.parseResponse(stdout, code)
       // STATE_UNAVAILABLE may describe an unrelated section after helper success.
-      var succeeded = mutation.ok || !!(mutation.error && mutation.error.code === 'STATE_UNAVAILABLE')
+      var succeeded = operation === 'set display-scale' ? !!(mutation.result && mutation.result.displayScale && mutation.result.displayScale.confirmed && (mutation.ok || mutation.error && mutation.error.code === 'STATE_UNAVAILABLE')) : mutation.ok || !!(mutation.error && mutation.error.code === 'STATE_UNAVAILABLE')
       refresh(function (response) {
-        setResult(key, Logic.outcome(operation, args, response.state, succeeded), succeeded ? '' : mutation.error ? mutation.error.message : stderr || 'The settings change failed.')
+        var outcome = Logic.outcome(operation, args, response.state, succeeded, mutation.result)
+        var message = succeeded ? operation === 'set display-scale' && outcome === 'Application not confirmed' ? 'Focused display or effective scale changed during confirmation. Review the current display and Apply again.' : '' : mutation.error ? mutation.error.message : stderr || 'The settings change failed.'
+        setResult(key, outcome, message)
         pending = false
         pendingKey = ''
-        mutationCompleted(operation, args, succeeded)
+        mutationCompleted(operation, args, succeeded && (operation !== 'set display-scale' || outcome.indexOf('Applied') === 0))
       })
     })
     return true

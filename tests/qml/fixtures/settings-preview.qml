@@ -50,6 +50,15 @@ ShellRoot {
     Style.spacingScale = 1
     Style.spacingScaleWithFont = false
     var state = {
+      display: {
+        monitor: 'eDP-1',
+        scale: 2,
+        width: 3840,
+        height: 2160,
+        availability: 'available',
+        persistenceSupport: 'supported',
+        configuredScale: 2
+      },
       motion: {
         configured: 'on',
         applied: 'on',
@@ -112,6 +121,11 @@ ShellRoot {
       itemErrors: {}
     }
     var section = 'appearance'
+    if (fixture === 'scaling') {
+      state.display.scale = 2.666667
+      state.display.configuredScale = 2.66667
+      sample.results['display-scale'] = 'Applied · 2.666667 · saved'
+    }
     if (fixture === 'dirty' || fixture === 'narrow')
       section = 'schedule'
     else if (fixture === 'integration-failed') {
@@ -131,10 +145,12 @@ ShellRoot {
     entry.open(JSON.stringify({
       section: section
     }))
-    if (fixture === 'dirty') {
+    if (fixture === 'dirty' || fixture === 'scaling') {
       var objects = collect(surface, [])
       for (var i = 0; i < objects.length; i++)
-        if (typeof objects[i].setDraft === 'function')
+        if (fixture === 'scaling' && typeof objects[i].setScaleDraft === 'function')
+          objects[i].setScaleDraft('2.667')
+        else if (fixture === 'dirty' && typeof objects[i].setDraft === 'function')
           objects[i].setDraft(0, '07:00')
     }
   }
@@ -145,6 +161,11 @@ ShellRoot {
     onTriggered: {
       harness.polls++
       var objects = harness.collect(surface, [])
+      if (harness.fixture === 'scaling') {
+        for (var j = 0; j < objects.length; j++)
+          if (objects[j].contentY !== undefined && objects[j].contentHeight !== undefined && objects[j].height !== undefined)
+            objects[j].contentY = Math.max(0, objects[j].contentHeight - objects[j].height)
+      }
       var loading = false
       for (var i = 0; i < objects.length; i++) {
         var item = objects[i]

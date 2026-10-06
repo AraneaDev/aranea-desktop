@@ -17,6 +17,8 @@ fi
 out="$ARANEA_TEST_SANDBOX/shots"
 ARANEA_SETTINGS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface settings-narrow --output "$out"
 [[ "$(magick identify -format '%wx%h' "$out/settings-narrow.png")" == 652x452 ]]
+ARANEA_SETTINGS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface settings-scaling --output "$out"
+[[ "$(magick identify -format '%wx%h' "$out/settings-scaling.png")" == 840x620 ]]
 # Isolated preview must never summon or mutate the active desktop owners.
 # Shared host Style probes compositor geometry read-only. With session sockets
 # removed these cannot contact the desktop; no settings owner commands may run.

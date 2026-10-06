@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders real SettingsSurface content in an inert offscreen host. No live
 # desktop owner is contacted; fixture mode rejects reads and mutations.
-# Usage: tools/render-settings-preview --output FILE [--fixture wide|narrow|dirty|unavailable|integration-failed|notifications]
+# Usage: tools/render-settings-preview --output FILE [--fixture wide|narrow|dirty|unavailable|integration-failed|notifications|scaling]
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output=""
@@ -24,7 +24,7 @@ while (($#)); do
 done
 [[ -n "$output" ]] || exit 2
 case "$fixture" in
-  wide | dirty | integration-failed | notifications)
+  wide | scaling | dirty | integration-failed | notifications)
     width=840
     height=620
     ;;

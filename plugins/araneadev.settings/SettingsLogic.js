@@ -3,7 +3,10 @@
 /** @typedef {{enabled?:boolean|null,applied?:boolean|null,availability?:string,dawn?:string|null,day?:string|null,dusk?:string|null,night?:string|null}} ScheduleState */
 /** @typedef {{id:string,status?:string,availability?:string}} IntegrationState */
 /** @typedef {{id:string,label?:string,path?:string,available:boolean}} WallpaperAsset */
-/** @typedef {{motion?:MotionState,wallpaper?:WallpaperState,schedule?:ScheduleState,integrations?:Array<IntegrationState>,wallpapers?:Array<WallpaperAsset>,integrationsAvailability?:string,wallpapersAvailability?:string}} SettingsState */
+/** @typedef {{monitor?:string|null,scale?:number|null,width?:number|null,height?:number|null,availability?:string,persistenceSupport?:string,configuredScale?:number|null}} DisplayState */
+/** @typedef {{display?:DisplayState,motion?:MotionState,wallpaper?:WallpaperState,schedule?:ScheduleState,integrations?:Array<IntegrationState>,wallpapers?:Array<WallpaperAsset>,integrationsAvailability?:string,wallpapersAvailability?:string}} SettingsState */
+/** @typedef {{requested:string,monitor:string,width:number,height:number,expectedScale:number,effectiveScale?:number|null,confirmed:boolean,persistence:string}} DisplayScaleResult */
+/** @typedef {{displayScale?:DisplayScaleResult}} MutationResult */
 /** Normalize a requested settings destination.
  * @param {string} value Requested section.
  * @returns {string} Supported section.
@@ -31,6 +34,21 @@ function validateSchedule(times) {
   }
   return { ok: true, message: "" }
 }
+/** Validate a typed custom scale without trimming or normalizing the request.
+ * @param {string} value Typed scale.
+ * @returns {{ok:boolean,message:string}} Validation result.
+ */
+function validateScale(value) {
+  var valid =
+    typeof value === "string" &&
+    /^[0-9]+([.][0-9]+)?$/.test(value) &&
+    Number(value) >= 1 &&
+    Number(value) <= 4
+  return {
+    ok: valid,
+    message: valid ? "" : "Enter a decimal scale from 1 to 4, such as 2.5 or 2.667."
+  }
+}
 /** Reject stale asynchronous reads.
  * @param {number} currentRevision Latest dispatched revision.
  * @param {number} responseRevision Completed revision.
@@ -51,7 +69,18 @@ function command(path, operation, args, state) {
   state = state || {}
   if (operation === "status" && args.length === 0) return [path, "status", "--json"]
   var section = operation.split(" ")[1]
-  if (section === "integration") {
+  if (section === "display-scale") {
+    if (
+      operation !== "set display-scale" ||
+      args.length !== 1 ||
+      !validateScale(args[0]).ok ||
+      !state.display ||
+      state.display.availability !== "available" ||
+      !/^[A-Za-z0-9._-]+$/.test(state.display.monitor || "")
+    )
+      return null
+    return [path, "set", "display-scale", args[0], "--monitor", state.display.monitor, "--json"]
+  } else if (section === "integration") {
     if (
       operation !== "set integration" ||
       args.length !== 2 ||
@@ -105,6 +134,7 @@ function parseResponse(stdout, exitCode) {
     return {
       ok: exitCode === 0 && value.ok,
       state: value.state,
+      result: value.result || null,
       error:
         value.error ||
         (exitCode !== 0 ? { code: "HELPER_FAILED", message: "The settings command failed." } : null)
@@ -125,11 +155,44 @@ function parseResponse(stdout, exitCode) {
  * @param {Array<string>} args Requested values.
  * @param {SettingsState} state Owner readback.
  * @param {boolean} succeeded Helper success, including unrelated partial reads.
+ * @param {MutationResult} [result] Mutation confirmation metadata.
  * @returns {string} User-facing result.
  */
-function outcome(operation, args, state, succeeded) {
+function outcome(operation, args, state, succeeded, result) {
   if (!succeeded) return "Failed"
   state = state || {}
+  if (operation === "set display-scale") {
+    var display = state.display || {}
+    var scale = result && result.displayScale
+    if (
+      !scale ||
+      scale.confirmed !== true ||
+      scale.requested !== args[0] ||
+      display.availability !== "available" ||
+      display.monitor !== scale.monitor ||
+      typeof display.scale !== "number" ||
+      typeof scale.expectedScale !== "number" ||
+      Math.abs(display.scale - scale.expectedScale) >= 0.00001 ||
+      typeof scale.width !== "number" ||
+      typeof scale.height !== "number" ||
+      display.width !== scale.width ||
+      display.height !== scale.height
+    )
+      return "Application not confirmed"
+    return (
+      "Applied · " +
+      display.scale +
+      " · " +
+      (scale.persistence === "persisted" &&
+      display.persistenceSupport === "supported" &&
+      typeof display.configuredScale === "number" &&
+      Math.abs(display.configuredScale - scale.expectedScale) < 0.00001
+        ? "saved"
+        : scale.persistence === "session-only"
+          ? "session only"
+          : "persistence unconfirmed")
+    )
+  }
   if (operation === "set motion") {
     var motion = state.motion || {}
     if (motion.configured !== args[0]) return "Save not confirmed"
@@ -186,6 +249,7 @@ if (typeof module !== "undefined")
   module.exports = {
     normalizeSection: normalizeSection,
     validateSchedule: validateSchedule,
+    validateScale: validateScale,
     acceptRead: acceptRead,
     command: command,
     parseResponse: parseResponse,

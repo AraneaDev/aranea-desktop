@@ -14,7 +14,23 @@ cat >"$ARANEA_HYPRCTL" <<'STUB'
 #!/usr/bin/env bash
 set -eu
 printf '%s\n' "$*" >>"$ARANEA_TEST_SANDBOX/hyprctl.log"
-if [[ "$*" == '-j getoption animations:enabled' ]]; then
+if [[ "$*" == 'monitors -j' ]]; then
+  [[ "${FAIL_DISPLAY_READ:-0}" != 1 && ! -e "$ARANEA_TEST_SANDBOX/lost-display" ]] || exit 7
+  if [[ "${FOCUS_BEFORE_DISPATCH:-0}" == 1 ]]; then
+    count="$(cat "$ARANEA_TEST_SANDBOX/display-reads" 2>/dev/null || echo 0)"
+    count=$((count + 1))
+    echo "$count" >"$ARANEA_TEST_SANDBOX/display-reads"
+    if ((count > 1)); then
+      jq '.[0].name = "DP-1"' "$ARANEA_TEST_SANDBOX/monitors.json"
+      exit
+    fi
+  fi
+  cat "$ARANEA_TEST_SANDBOX/monitors.json"
+elif [[ "$*" == reload ]]; then
+  [[ "${FAIL_DISPLAY_RELOAD:-0}" != 1 ]] || exit 12
+elif [[ "$*" == configerrors ]]; then
+  [[ "${FAIL_DISPLAY_CONFIG:-0}" != 1 ]] || echo 'invalid monitor config'
+elif [[ "$*" == '-j getoption animations:enabled' ]]; then
   [[ "${FAIL_READ:-0}" != 1 ]] || exit 7
   printf '{"int":%s}\n' "$(cat "$ARANEA_TEST_SANDBOX/live-motion" 2>/dev/null || echo 1)"
 else
@@ -271,6 +287,107 @@ grep -Fq 'registry read rejected' "$sandbox_root/error"
 # A successfully read registry containing no IDs remains a valid empty catalog.
 printf '# A valid empty integration registry.\n' >"$sandbox_root/empty-registry.toml"
 PATH="$registry_bin:$PATH" REGISTRY_MODE=empty "$ctl" status --json | jq -e '.ok and .state.integrations == [] and .state.integrationsAvailability == "available"' >/dev/null
+# Custom fractions delegate exact argv; silent owner failures need live evidence.
+export ARANEA_DISPLAY_OWNER="$sandbox_root/display-owner"
+mkdir -p "$HOME/.config/hypr"
+printf 'local omarchy_monitor_scale = 2\nlocal omarchy_gdk_scale = 2\n' >"$HOME/.config/hypr/monitors.lua"
+reset_display() {
+  printf '[{"name":"eDP-1","focused":true,"scale":2,"width":3840,"height":2160}]\n' >"$sandbox_root/monitors.json"
+}
+reset_display
+cat >"$ARANEA_DISPLAY_OWNER" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$@" >"$ARANEA_TEST_SANDBOX/display-argv"
+[[ "$1 $2 $3" == 'hyprland monitor scaling' && $# == 4 ]] || exit 13
+[[ "${SCALE_MODE:-}" != fail ]] || { echo 'scale owner failed' >&2; exit 19; }
+scale="$4"
+[[ "$scale" != 2.667 ]] || scale=2.666667
+[[ "${SCALE_MODE:-}" != wrong ]] || scale=3
+if [[ "${SCALE_MODE:-}" != silent ]]; then
+  jq --argjson scale "$scale" '.[0].scale = $scale' "$ARANEA_TEST_SANDBOX/monitors.json" >"$ARANEA_TEST_SANDBOX/next.json"
+  mv "$ARANEA_TEST_SANDBOX/next.json" "$ARANEA_TEST_SANDBOX/monitors.json"
+fi
+if [[ "${SCALE_MODE:-}" == focus ]]; then
+  jq '.[0].focused = false | . + [{name:"DP-1",focused:true,scale:3.5,width:3840,height:2160}]' "$ARANEA_TEST_SANDBOX/monitors.json" >"$ARANEA_TEST_SANDBOX/next.json"
+  mv "$ARANEA_TEST_SANDBOX/next.json" "$ARANEA_TEST_SANDBOX/monitors.json"
+fi
+if [[ "${SCALE_MODE:-}" != persistfail ]]; then
+  sed -i -E "s/^local omarchy_monitor_scale = .*/local omarchy_monitor_scale = $scale/" "$HOME/.config/hypr/monitors.lua"
+fi
+[[ "${SCALE_MODE:-}" != lost ]] || touch "$ARANEA_TEST_SANDBOX/lost-display"
+echo 'Scaling applied successfully'
+STUB
+chmod +x "$ARANEA_DISPLAY_OWNER"
+"$ctl" status --json | jq -e '.state.display.monitor == "eDP-1" and .state.display.scale == 2 and .state.display.persistenceSupport == "supported" and .state.display.availability == "available"' >/dev/null
+for scale in 2.5 2.667; do
+  reset_display
+  "$ctl" set display-scale "$scale" --monitor eDP-1 --json >"$sandbox_root/result.json"
+  printf 'hyprland\nmonitor\nscaling\n%s\n' "$scale" >"$sandbox_root/expected-argv"
+  cmp "$sandbox_root/expected-argv" "$sandbox_root/display-argv"
+  jq -e --arg scale "$scale" '.ok and .result.displayScale.requested == $scale and .result.displayScale.confirmed and .result.displayScale.persistence == "persisted" and .result.displayScale.monitor == "eDP-1" and ((.result.displayScale.expectedScale - .state.display.scale) | fabs) < 0.00001' "$sandbox_root/result.json" >/dev/null
+done
+cp "$sandbox_root/display-argv" "$sandbox_root/argv-before"
+for scale in 0 4.1 2e0 '2;touch /tmp/scale-injection' nan -2 '' ' 2.5'; do
+  reject INVALID_ARGUMENTS set display-scale "$scale" --json
+  cmp "$sandbox_root/argv-before" "$sandbox_root/display-argv"
+done
+reject INVALID_ARGUMENTS set display-scale 2.5 --monitor 'hostile"' --json
+reset_display
+reject FOCUS_CHANGED set display-scale 2.5 --monitor DP-1 --json
+cmp "$sandbox_root/argv-before" "$sandbox_root/display-argv"
+# Missing executable, malformed observations, multiple focus and unsafe connectors
+# cannot invoke an owner, even if other settings remain readable.
+for observation in 'invalid' '[]' '[{"name":"unsafe\\\"","focused":true,"scale":2,"width":3840,"height":2160}]' '[{"name":"eDP-1","focused":true,"scale":2,"width":3840,"height":2160},{"name":"DP-1","focused":true,"scale":2,"width":3840,"height":2160}]'; do
+  printf '%s\n' "$observation" >"$sandbox_root/monitors.json"
+  reject STATE_UNAVAILABLE set display-scale 2.5 --json
+  cmp "$sandbox_root/argv-before" "$sandbox_root/display-argv"
+done
+ARANEA_HYPRCTL="$sandbox_root/missing-compositor" reject STATE_UNAVAILABLE set display-scale 2.5 --json
+reset_display
+rm -f "$sandbox_root/display-reads"
+FOCUS_BEFORE_DISPATCH=1 reject FOCUS_CHANGED set display-scale 2.5 --monitor eDP-1 --json
+jq -e '.state.display.monitor == "DP-1"' "$sandbox_root/result.json" >/dev/null
+cmp "$sandbox_root/argv-before" "$sandbox_root/display-argv"
+reset_display
+SCALE_MODE=lost reject APPLICATION_NOT_CONFIRMED set display-scale 2.5 --json
+jq -e '.result.displayScale.confirmed == false and .result.displayScale.effectiveScale == null' "$sandbox_root/result.json" >/dev/null
+rm "$sandbox_root/lost-display"
+for mode in silent wrong focus; do
+  reset_display
+  code=APPLICATION_NOT_CONFIRMED
+  [[ "$mode" != focus ]] || code=FOCUS_CHANGED
+  SCALE_MODE="$mode" reject "$code" set display-scale 2.5 --json
+  jq -e '.result.displayScale.confirmed == false' "$sandbox_root/result.json" >/dev/null
+  if [[ "$mode" == focus ]]; then jq -e '.result.displayScale.effectiveScale == 2.5 and .state.display.scale == 3.5' "$sandbox_root/result.json" >/dev/null; fi
+done
+reset_display
+rc=0
+SCALE_MODE=fail "$ctl" set display-scale 2.5 --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
+[[ "$rc" == 19 ]]
+jq -e '.error.code == "HELPER_FAILED" and .state.display.scale == 2' "$sandbox_root/result.json" >/dev/null
+reset_display
+printf 'local omarchy_monitor_scale = 2\n' >"$HOME/.config/hypr/monitors.lua"
+SCALE_MODE=persistfail "$ctl" set display-scale 2.5 --json | jq -e '.ok and .result.displayScale.persistence == "unconfirmed"' >/dev/null
+printf 'hl.monitor({ output = "DP-1", scale = 2 })\n' >"$HOME/.config/hypr/monitors.lua"
+reset_display
+"$ctl" set display-scale 2.667 --json | jq -e '.ok and .state.display.persistenceSupport == "unsupported" and .result.displayScale.persistence == "session-only"' >/dev/null
+# Unsupported Lua is never interpreted or executed by the adapter.
+printf 'local omarchy_monitor_scale = os.execute("touch %s")\n' "$sandbox_root/lua-executed" >"$HOME/.config/hypr/monitors.lua"
+"$ctl" status --json | jq -e '.state.display.persistenceSupport == "unsupported" and .state.display.configuredScale == null' >/dev/null
+test ! -e "$sandbox_root/lua-executed"
+printf 'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })\n' >"$HOME/.config/hypr/monitors.lua"
+"$ctl" status --json | jq -e '.state.display.persistenceSupport == "supported" and .state.display.configuredScale == null' >/dev/null
+# Changed config must reload and validate, even when the owner swallowed errors.
+printf 'local omarchy_monitor_scale = 2\n' >"$HOME/.config/hypr/monitors.lua"
+reset_display
+FAIL_DISPLAY_CONFIG=1 reject CONFIG_VALIDATION_FAILED set display-scale 2.5 --json
+printf 'local omarchy_monitor_scale = 2\n' >"$HOME/.config/hypr/monitors.lua"
+reset_display
+FAIL_DISPLAY_RELOAD=1 reject CONFIG_VALIDATION_FAILED set display-scale 2.5 --json
+ARANEA_DISPLAY_OWNER="$sandbox_root/missing-owner" reject STATE_UNAVAILABLE set display-scale 2.5 --json
+FAIL_DISPLAY_READ=1 reject STATE_UNAVAILABLE set display-scale 2.5 --json
+ARANEA_DISPLAY_OWNER="$sandbox_root/missing-owner" "$ctl" status --json | jq -e '.ok and .state.display.availability == "unavailable" and .state.motion.availability == "available"' >/dev/null
 # Unreadable/corrupt preferences produce partial state, never a guessed value.
 printf corrupt >"$ARANEA_STATE_ROOT/motion"
 reject STATE_UNAVAILABLE status --json

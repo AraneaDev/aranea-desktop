@@ -95,7 +95,7 @@ the Aranea state directory before changes are made.
 | Surface             | Experience                                                                                                                                                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Command center      | A compact Omarchy menu with Aranea identity, Files, Terminal, Setup, Favorites, and Recent                                                                                                                                      |
-| Settings            | Setup → Aranea settings: wallpaper, motion, schedule, integrations and DND; quiet hours shown read-only                                                                                                                         |
+| Settings            | Setup → Aranea settings: wallpaper, motion, custom display scale, schedule, integrations and DND; quiet hours shown read-only                                                                                                   |
 | Notifications       | A quiet center with critical-state emphasis instead of interruptive popups                                                                                                                                                      |
 | System health       | Live CPU, memory, disk, network, process, service, reboot, and container status                                                                                                                                                 |
 | VPN                 | Connect NetworkManager and app-based VPNs (OpenVPN, WireGuard, Azure VPN Client, GlobalProtect) from one dropdown; see [plugins/araneadev.vpn/README.md](plugins/araneadev.vpn/README.md) for the apps file and client installs |
@@ -110,8 +110,11 @@ the Aranea state directory before changes are made.
 
 Open **Setup → Aranea settings** or search for “settings”. Changes use the
 existing helpers; wallpaper selection and schedule drafts wait for explicit
-Apply or Save. Quiet hours is read-only. See [Configuration](docs/configuration.md)
+Apply or Save. Custom display scales from 1 to 4 apply to the focused display
+and show the observed effective fraction. Quiet hours is read-only. See [Configuration](docs/configuration.md)
 for destinations, CLI state, and safe fixture captures.
+The [display scaling preview](screenshots/settings-scaling.png) shows a custom
+request and its adjusted effective fraction.
 
 ![Aranea settings with inert display fixtures](screenshots/settings.png)
 

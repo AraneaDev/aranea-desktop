@@ -2,6 +2,7 @@
 # Versioned JSON boundary for settings. Helpers retain preference ownership.
 # Usage: scripts/aranea-settings status --json | set motion|schedule on|off --json
 #        scripts/aranea-settings set wallpaper ID --json | set integration ID active|inactive --json
+#        scripts/aranea-settings set display-scale SCALE [--monitor NAME] --json
 #        scripts/aranea-settings configure schedule DAWN DAY DUSK NIGHT --json
 set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +16,7 @@ case "${1:-} ${2:-}" in
   'set wallpaper') operation='set wallpaper' ;;
   'set schedule') operation='set schedule' ;;
   'configure schedule') operation='configure schedule' ;;
+  'set display-scale') operation='set display-scale' ;;
   'set integration') operation='set integration' ;;
 esac
 # Even without the serializer this constant object is one valid JSON result.
@@ -25,6 +27,10 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 scratch="$(mktemp -d)"
 trap 'rm -rf -- "$scratch"' EXIT
+echo null >"$scratch/result"
+# shellcheck source=scripts/lib/settings-display.sh
+source "$script_dir/lib/settings-display.sh"
+display_guard=''
 # Invalid requests never reach helper mutation branches.
 invalid() {
   error_code="$1"
@@ -38,6 +44,16 @@ case "$operation" in
   'set motion' | 'set schedule')
     if [[ $# -ne 4 || "${4:-}" != --json || ("${3:-}" != on && "${3:-}" != off) ]]; then
       invalid INVALID_ARGUMENTS 'Expected set motion|schedule on|off --json'
+    fi
+    ;;
+  'set display-scale')
+    if [[ ($# != 4 && $# != 6) || "${!#}" != --json || ! "${3:-}" =~ ^[0-9]+([.][0-9]+)?$ ]] ||
+      ! awk -v scale="${3:-}" 'BEGIN { exit !(scale >= 1 && scale <= 4) }'; then
+      invalid INVALID_ARGUMENTS 'Enter a decimal display scale from 1 to 4'
+    elif [[ $# == 6 ]]; then
+      if [[ "$4" != --monitor || ! "$5" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        invalid INVALID_ARGUMENTS 'Expected --monitor <connector-name>'
+      else display_guard="$5"; fi
     fi
     ;;
   'set wallpaper') [[ $# -eq 4 && "$4" == --json && -n "$3" ]] || invalid INVALID_ARGUMENTS 'Expected set wallpaper <manifest-id> --json' ;;
@@ -97,15 +113,34 @@ refresh_state() {
     integrations_availability=unavailable
     reads_failed=1
   fi
-  jq -cn --slurpfile motion "$scratch/motion" --slurpfile wallpaper "$scratch/wallpaper" \
+  read_display
+  jq -cn --slurpfile display "$scratch/display" --slurpfile motion "$scratch/motion" --slurpfile wallpaper "$scratch/wallpaper" \
     --slurpfile schedule "$scratch/schedule" --slurpfile integrations "$scratch/integrations" \
     --slurpfile wallpapers "$scratch/wallpapers" --arg catalog "$catalog_availability" --arg integrationsAvailability "$integrations_availability" \
-    '{motion:$motion[0],wallpaper:$wallpaper[0],schedule:$schedule[0],integrations:$integrations[0],
+    '{display:$display[0],motion:$motion[0],wallpaper:$wallpaper[0],schedule:$schedule[0],integrations:$integrations[0],
       wallpapers:$wallpapers[0],wallpapersAvailability:$catalog,integrationsAvailability:$integrationsAvailability}' >"$scratch/state"
 }
 refresh_state
 if [[ -z "$error_code" && "$operation" != status ]]; then
   case "$operation" in
+    'set display-scale')
+      # Focus may have changed since the initial aggregate read or the UI snapshot.
+      read_display
+      jq --slurpfile display "$scratch/display" '.display = $display[0]' "$scratch/state" >"$scratch/latest-state"
+      mv "$scratch/latest-state" "$scratch/state"
+      if [[ "$(jq -r '.availability' "$scratch/display")" != available ]]; then
+        invalid STATE_UNAVAILABLE 'Focused display or Omarchy scaling helper unavailable. Check the compositor and installed helper, then Retry.' 1
+      elif [[ -n "$display_guard" && "$(jq -r '.monitor' "$scratch/display")" != "$display_guard" ]]; then
+        invalid FOCUS_CHANGED 'Focused display changed. Review the focused display and Apply again.' 1
+      else
+        display_target="$(jq -r '.monitor' "$scratch/display")"
+        display_width="$(jq -r '.width' "$scratch/display")"
+        display_height="$(jq -r '.height' "$scratch/display")"
+        display_expected="$(display_expected_scale "$3" "$display_width" "$display_height")"
+        display_validation_failed=false
+        [[ ! -r "$display_config" ]] || cp -- "$display_config" "$scratch/display-config-before"
+      fi
+      ;;
     'set motion') [[ "$(jq -r '.motion.availability' "$scratch/state")" == available ]] || invalid STATE_UNAVAILABLE 'Motion preference is unreadable' 1 ;;
     'set schedule' | 'configure schedule') [[ "$(jq -r '.schedule.availability' "$scratch/state")" == available ]] || invalid STATE_UNAVAILABLE 'Schedule preference is unreadable' 1 ;;
     'set wallpaper')
@@ -129,6 +164,7 @@ fi
 if [[ -z "$error_code" && "$operation" != status ]]; then
   # Arguments are passed as arrays, never assembled into shell commands.
   case "$operation" in
+    'set display-scale') argv=("$display_owner" hyprland monitor scaling "$3") ;;
     'set motion') argv=("$script_dir/aranea-motion" set "$3") ;;
     'set wallpaper') argv=("$script_dir/aranea-wallpaper" set "$3") ;;
     'set schedule') argv=("$script_dir/aranea-wallpaper" schedule "$3") ;;
@@ -146,11 +182,24 @@ if [[ -z "$error_code" && "$operation" != status ]]; then
     error_message="$(cat "$scratch/mutation.err")"
     [[ -n "$error_message" ]] || error_message='Settings helper failed; see diagnostics'
   fi
+  if [[ "$operation" == 'set display-scale' && -f "$display_config" ]] &&
+    { [[ ! -f "$scratch/display-config-before" ]] || ! cmp -s "$display_config" "$scratch/display-config-before"; }; then
+    # The installed owner can swallow config write errors: validate changed Lua.
+    validation_rc=0
+    "$display_hyprctl" reload >"$scratch/display-reload" 2>"$scratch/display-reload.err" || validation_rc=$?
+    "$display_hyprctl" configerrors >"$scratch/display-configerrors" 2>"$scratch/display-configerrors.err" || validation_rc=$?
+    cat "$scratch/display-reload.err" "$scratch/display-configerrors.err" >&2
+    if ((validation_rc != 0)) || [[ -n "$(tr -d '[:space:]' <"$scratch/display-configerrors")" ]]; then
+      display_validation_failed=true
+      [[ -n "$error_code" ]] || invalid CONFIG_VALIDATION_FAILED 'Monitor configuration changed but validation failed. Check hyprctl configerrors before applying again.' 1
+    fi
+  fi
   refresh_state
+  if [[ "$operation" == 'set display-scale' ]]; then confirm_display_scale "$@"; fi
 fi
 if [[ -z "$error_code" ]] && ((reads_failed)); then invalid STATE_UNAVAILABLE 'Some settings could not be read; retry the affected section' 1; fi
 jq -cn --arg operation "$operation" --argjson ok "$([[ "$result_status" == 0 ]] && echo true || echo false)" \
-  --slurpfile state "$scratch/state" --arg code "$error_code" --arg message "$error_message" \
+  --slurpfile result "$scratch/result" --slurpfile state "$scratch/state" --arg code "$error_code" --arg message "$error_message" \
   '{schemaVersion:1,ok:$ok,operation:$operation,state:$state[0],
-    error:(if $code == "" then null else {code:$code,message:$message} end)}'
+    error:(if $code == "" then null else {code:$code,message:$message} end)} + (if $result[0] == null then {} else {result:$result[0]} end)'
 exit "$result_status"

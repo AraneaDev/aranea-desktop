@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "SettingsLogic.js" as Logic
 
 ColumnLayout {
   id: page
@@ -31,6 +32,29 @@ ColumnLayout {
   readonly property var selectedAsset: (page.backendState.wallpapers || []).filter(function (asset) {
     return asset.id === page.selectedId
   })[0] || null
+  // Current focused-display observation from the compositor, never a default.
+  readonly property var display: page.backendState.display || ({})
+  // Whether this focused display and its scaling owner can accept changes.
+  readonly property bool displayAvailable: display.availability === 'available'
+  // Exact locally typed fraction, retained after owner adjustment and reopen.
+  property string scaleDraft: ''
+  // Whether the user has edited the local scale entry.
+  property bool scaleDirty: false
+  // Typed decimal validation; never restrict to the owner's presets.
+  readonly property var scaleValidation: Logic.validateScale(scaleDraft)
+  // Adopt an owner observation only before the user edits the scale.
+  onDisplayChanged: if (!scaleDirty)
+    scaleDraft = typeof display.scale === 'number' ? String(display.scale) : ''
+  // Change a local scale draft without dispatching commands.
+  function setScaleDraft(value) {
+    scaleDirty = true
+    scaleDraft = value
+  }
+  // Apply the exact decimal through the controller's focused-display guard.
+  function applyScale() {
+    if (!displayOnly && !pending && displayAvailable && scaleValidation.ok)
+      request('set display-scale', [scaleDraft])
+  }
   // Ask the persistent controller to perform an explicit operation.
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
@@ -158,11 +182,77 @@ ColumnLayout {
     text: page.errors.motion || ''
     color: Aranea.DesignTokens.attention
   }
+  Rectangle {
+    Layout.fillWidth: true
+    implicitHeight: 1
+    color: Util.alpha(Color.foreground, 0.12)
+  }
+  SettingsLabel {
+    Layout.fillWidth: true
+    text: 'Display scale'
+    font.bold: true
+  }
+  SettingsLabel {
+    Layout.fillWidth: true
+    text: page.display.monitor ? 'Focused display: ' + page.display.monitor + ' · Current scale: ' + page.display.scale : 'Focused display: Unavailable'
+    opacity: 0.65
+  }
+  RowLayout {
+    Layout.fillWidth: true
+    Rectangle {
+      Layout.fillWidth: true
+      Layout.preferredHeight: Style.space(36)
+      color: Util.alpha(Color.foreground, 0.04)
+      border.width: 1
+      border.color: scaleField.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
+      TextInput {
+        id: scaleField
+        objectName: 'displayScaleInput'
+        anchors.fill: parent
+        anchors.margins: Style.space(8)
+        text: page.scaleDraft
+        color: Color.foreground
+        font.family: Style.font.menuFamily
+        font.pixelSize: Style.font.body
+        enabled: page.displayAvailable && !page.displayOnly && !page.pending
+        activeFocusOnTab: true
+        selectByMouse: true
+        inputMethodHints: Qt.ImhFormattedNumbersOnly
+        Accessible.name: 'Custom display scale from 1 to 4'
+        onTextEdited: page.setScaleDraft(text)
+      }
+    }
+    SettingsButton {
+      objectName: 'displayScaleApply'
+      text: 'Apply scale'
+      selected: true
+      enabled: page.displayAvailable && !page.displayOnly && !page.pending && page.scaleValidation.ok
+      pointerGate: page.pointerGate
+      onClicked: page.applyScale()
+    }
+  }
+  SettingsLabel {
+    Layout.fillWidth: true
+    text: page.scaleDirty && !page.scaleValidation.ok ? page.scaleValidation.message : !page.displayAvailable ? 'Scaling unavailable. Check the compositor and installed Omarchy helper, then Retry.' : page.display.persistenceSupport === 'supported' ? 'Custom scales from 1 to 4. Saved through the standard monitor configuration; the effective fraction may adjust.' : page.display.persistenceSupport === 'unsupported' ? 'Custom scales from 1 to 4. Session only: your monitor configuration does not support saving this control.' : 'Custom scales from 1 to 4. Persistence support could not be read.'
+    color: page.scaleDirty && !page.scaleValidation.ok ? Aranea.DesignTokens.attention : Color.foreground
+    opacity: 0.75
+  }
+  SettingsLabel {
+    Layout.fillWidth: true
+    visible: page.pendingKey === 'display-scale' || !!page.results['display-scale']
+    text: page.pendingKey === 'display-scale' ? 'Applying…' : page.results['display-scale'] || ''
+  }
+  SettingsLabel {
+    Layout.fillWidth: true
+    visible: !!page.errors['display-scale']
+    text: page.errors['display-scale'] || ''
+    color: Aranea.DesignTokens.attention
+  }
   SettingsButton {
     text: 'Retry'
     enabled: !page.displayOnly && !page.pending
     pointerGate: page.pointerGate
-    visible: page.backendState.wallpapersAvailability !== 'available' || !page.backendState.wallpaper || page.backendState.wallpaper.availability !== 'available' || !page.backendState.motion || page.backendState.motion.availability !== 'available'
+    visible: !page.displayAvailable || page.backendState.wallpapersAvailability !== 'available' || !page.backendState.wallpaper || page.backendState.wallpaper.availability !== 'available' || !page.backendState.motion || page.backendState.motion.availability !== 'available'
     onClicked: page.retryRequested()
   }
 }
