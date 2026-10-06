@@ -12,6 +12,8 @@ ColumnLayout {
   id: page
   // Current backend snapshot; partial sections retain their own availability.
   property var backendState: ({})
+  // Whether controls show inert capture fixtures and refuse changes.
+  property bool displayOnly: false
   // Whether a settings mutation is in flight.
   property bool pending: false
   // Stable key of the affected control while applying.
@@ -50,7 +52,7 @@ ColumnLayout {
   }
   // Emit explicit Save only when all phase times are valid.
   function save() {
-    if (!pending && available && validation.ok)
+    if (!displayOnly && !pending && available && validation.ok)
       request('configure schedule', draft.slice())
   }
   // Mark an explicitly saved draft clean only when owner configuration matches.
@@ -90,7 +92,7 @@ ColumnLayout {
       objectName: 'scheduleToggle'
       Accessible.name: 'Enable wallpaper schedule'
       checked: page.schedule.enabled === true
-      enabled: !page.pending && page.available
+      enabled: !page.displayOnly && !page.pending && page.available
       busy: page.pendingKey === 'schedule'
       pointerGate: page.pointerGate
       onToggled: page.request('set schedule', [checked ? 'off' : 'on'])
@@ -131,7 +133,7 @@ ColumnLayout {
             color: Color.foreground
             font.family: Style.font.menuFamily
             font.pixelSize: Style.font.body
-            enabled: page.available && !page.pending
+            enabled: page.available && !page.displayOnly && !page.pending
             activeFocusOnTab: true
             selectByMouse: true
             maximumLength: 5
@@ -153,13 +155,13 @@ ColumnLayout {
       objectName: 'scheduleSave'
       text: 'Save times'
       selected: true
-      enabled: page.available && !page.pending && page.validation.ok
+      enabled: page.available && !page.displayOnly && !page.pending && page.validation.ok
       pointerGate: page.pointerGate
       onClicked: page.save()
     }
     SettingsButton {
       text: 'Use current times'
-      enabled: page.available && !page.pending
+      enabled: page.available && !page.displayOnly && !page.pending
       pointerGate: page.pointerGate
       onClicked: page.useCurrentTimes()
     }
@@ -173,7 +175,7 @@ ColumnLayout {
   SettingsButton {
     text: 'Retry'
     visible: !page.available
-    enabled: !page.pending
+    enabled: !page.displayOnly && !page.pending
     pointerGate: page.pointerGate
     onClicked: page.retryRequested()
   }

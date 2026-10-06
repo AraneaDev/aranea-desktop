@@ -70,8 +70,10 @@ power_installed=false
 weather_installed=false
 tray_installed=false
 agents_installed=false
+settings_installed=false
 vpn_installed=false
 for dir in "$given_config_dir" "$config_dir"; do
+  [[ -f "$dir/plugins/araneadev.settings/manifest.json" ]] && settings_installed=true
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
   [[ -f "$dir/plugins/araneadev.bluetooth/manifest.json" ]] && bluetooth_installed=true
   [[ -f "$dir/plugins/araneadev.clock/manifest.json" ]] && clock_installed=true
@@ -104,7 +106,7 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+jq --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -194,7 +196,7 @@ jq --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson
       {id: "araneadev.polkit"},
       {id: "araneadev.workspaces"},
       {id: "araneadev.updates"}
-    ] | dedupe_by_id)
+    ] + (if $settings then [{id: "araneadev.settings"}] else [] end) | dedupe_by_id)
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
       "omarchy.clipboard",

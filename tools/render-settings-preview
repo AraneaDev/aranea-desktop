@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Renders real SettingsSurface content in an inert offscreen host. No live
+# desktop owner is contacted; fixture mode rejects reads and mutations.
+# Usage: tools/render-settings-preview --output FILE [--fixture wide|narrow|dirty|unavailable|integration-failed|notifications]
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+output=""
+fixture=wide
+while (($#)); do
+  case "$1" in
+    --output | --fixture)
+      (($# >= 2)) || exit 2
+      case "$1" in
+        --output) output="$2" ;;
+        --fixture) fixture="$2" ;;
+      esac
+      shift 2
+      ;;
+    *)
+      echo 'Usage: tools/render-settings-preview --output FILE [--fixture NAME]' >&2
+      exit 2
+      ;;
+  esac
+done
+[[ -n "$output" ]] || exit 2
+case "$fixture" in
+  wide | dirty | integration-failed | notifications)
+    width=840
+    height=620
+    ;;
+  narrow | unavailable)
+    width=652
+    height=452
+    ;;
+  *)
+    echo "Unknown settings fixture: $fixture" >&2
+    exit 2
+    ;;
+esac
+shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
+quickshell_bin="${ARANEA_SETTINGS_PREVIEW_QUICKSHELL:-quickshell}"
+[[ -f "$shell_dir/Commons/qmldir" && -f "$shell_dir/Ui/qmldir" ]] || {
+  echo "Settings preview needs Omarchy shell at $shell_dir" >&2
+  exit 1
+}
+quickshell_path="$(command -v "$quickshell_bin")"
+command -v magick >/dev/null
+work="$(mktemp -d /tmp/aranea-settings.XXXXXX)"
+qs_pid=""
+staged=""
+# Stop only the isolated preview process group and discard partial images.
+cleanup() {
+  if [[ -n "$qs_pid" ]]; then
+    kill -- "-$qs_pid" 2>/dev/null || true
+    wait "$qs_pid" 2>/dev/null || true
+  fi
+  rm -rf -- "$work"
+  [[ -z "$staged" ]] || rm -f -- "$staged"
+}
+trap cleanup EXIT
+mkdir -p "$work/cfg/plugins" "$work/run" "$work/state/omarchy/current"
+ln -s "$repo_root" "$work/state/omarchy/current/theme"
+chmod 700 "$work/run"
+ln -s "$shell_dir/Commons" "$work/cfg/Commons"
+ln -s "$shell_dir/Ui" "$work/cfg/Ui"
+for plugin in "$repo_root"/plugins/araneadev.*; do
+  [[ -d "$plugin" ]] && ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"
+done
+cp "$repo_root/tests/qml/fixtures/settings-preview.qml" "$work/cfg/shell.qml"
+(cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
+  -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
+  QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=1 ARANEA_REDUCED_MOTION=1 \
+  XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
+  ARANEA_SETTINGS_RENDER_ROOT="$repo_root" ARANEA_SETTINGS_RENDER_FIXTURE="$fixture" \
+  ARANEA_SETTINGS_RENDER_WIDTH="$width" ARANEA_SETTINGS_RENDER_HEIGHT="$height" \
+  ARANEA_SETTINGS_RENDER_OUTPUT="$work/grab.png" \
+  "$quickshell_path" -p "$work/cfg") >"$work/log" 2>&1 &
+qs_pid=$!
+waited=0
+while ((waited < 200)); do
+  grep -q 'SETTINGSRENDER\|Failed to load configuration' "$work/log" && break
+  kill -0 "$qs_pid" 2>/dev/null || break
+  sleep 0.2
+  waited=$((waited + 1))
+done
+if ! grep -q 'SETTINGSRENDER OK' "$work/log" || grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop detected' "$work/log"; then
+  echo 'Settings preview failed:' >&2
+  tail -20 "$work/log" >&2
+  exit 1
+fi
+[[ "$(magick identify -format '%wx%h' "$work/grab.png")" == "${width}x${height}" ]] || exit 1
+mkdir -p -- "$(dirname -- "$output")"
+staged="$(mktemp "$(dirname -- "$output")/.render-settings.XXXXXX")"
+magick "$work/grab.png" -strip "PNG32:$staged"
+mv -f -- "$staged" "$output"
+staged=""
+printf 'rendered: %s (%sx%s)\n' "$output" "$width" "$height"

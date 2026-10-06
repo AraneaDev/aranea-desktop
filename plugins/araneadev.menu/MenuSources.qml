@@ -15,6 +15,13 @@ Item {
   property string defaultMenuPath: sources.omarchyPath + "/default/omarchy/omarchy-menu.jsonc"
   // User extension file merged over the defaults.
   property string userMenuPath: Quickshell.env("HOME") + "/.config/omarchy/extensions/omarchy-menu.jsonc"
+  // Installed settings manifest; fixtures may point this at a scratch plugin.
+  property string settingsManifestPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/araneadev.settings/manifest.json"
+  // Optional manifest has reported, including a missing or malformed file.
+  property bool settingsManifestSeen: false
+  // Whether the optional settings destination is installed.
+  property bool settingsAvailable: false
+  onSettingsAvailableChanged: updated()
   // Items parsed from the default file.
   property var defaultMenuItems: []
   // Items parsed from the user file ([] when it is missing).
@@ -23,19 +30,20 @@ Item {
   property bool defaultMenuSeen: false
   // The user file has loaded (or is missing).
   property bool userMenuSeen: false
-  // Both files have reported: a pending route can only resolve then.
-  readonly property bool ready: sources.defaultMenuSeen && sources.userMenuSeen
+  // All three sources have reported: a pending route can only resolve then.
+  readonly property bool ready: sources.defaultMenuSeen && sources.userMenuSeen && sources.settingsManifestSeen
 
   // Emitted whenever a file loaded, failed to load or changed.
   signal updated
 
   // Merges the user file over the defaults ({items, itemOrder}); later keys win per item.
   function merge(): var {
-    return MenuModel.mergeMenuSources(sources.defaultMenuItems, sources.userMenuItems)
+    return MenuModel.mergeMenuSources(sources.defaultMenuItems, sources.userMenuItems, sources.settingsAvailable)
   }
 
-  // Reads both files again.
+  // Reads all menu sources and optional plugin availability again.
   function reload(): void {
+    settingsManifestFile.reload()
     defaultMenuFile.reload()
     userMenuFile.reload()
   }
@@ -43,6 +51,28 @@ Item {
   // The JSONC sources are watched so live edits to the default file (or the
   // user extension at ~/.config/omarchy/extensions/omarchy-menu.jsonc) take
   // effect without restarting the shell.
+  FileView {
+    id: settingsManifestFile
+    path: sources.settingsManifestPath
+    watchChanges: true
+    printErrors: false
+    onLoaded: {
+      try {
+        sources.settingsAvailable = JSON.parse(text()).id === "araneadev.settings"
+      } catch (e) {
+        sources.settingsAvailable = false
+      }
+      sources.settingsManifestSeen = true
+      sources.updated()
+    }
+    onLoadFailed: {
+      sources.settingsAvailable = false
+      sources.settingsManifestSeen = true
+      sources.updated()
+    }
+    onFileChanged: reload()
+  }
+
   FileView {
     id: defaultMenuFile
     path: sources.defaultMenuPath

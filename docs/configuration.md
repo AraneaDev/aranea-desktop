@@ -1,5 +1,47 @@
 # Configuration
 
+## Aranea settings
+
+Open **Setup → Aranea settings**, or search for “settings” in the menu.
+The dedicated window covers wallpaper selection and explicit Apply, motion,
+wallpaper schedule enablement and validated Save, integration activation, and
+Do not disturb. Navigation and thumbnail selection never change preferences.
+Reopening reads the existing CLI and service owners; closing leaves an active
+integration installation running until its result is confirmed.
+
+Quiet hours shows the effective state and configured window read-only. Set
+`ARANEA_QUIET_HOURS` through your notification service configuration to change it;
+settings does not write `notifications.json`. Bar layout, fonts and editable
+quiet hours are outside this release.
+
+Direct destinations use the existing summon contract:
+
+```bash
+omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'
+omarchy-shell shell summon araneadev.settings '{"section":"schedule"}'
+omarchy-shell shell summon araneadev.settings '{"section":"integrations"}'
+omarchy-shell shell summon araneadev.settings '{"section":"notifications"}'
+scripts/aranea-settings status --json
+```
+
+Unknown sections open Appearance. Unavailable reads show Retry and disable
+only the affected changes. Saved, deferred, failed, and confirmed Applied
+outcomes remain distinct. Changes reuse the existing helper ownership and
+backup behavior.
+
+Installation and theme activation deploy and register `araneadev.settings`
+when its manifest is present; repair adds it once and preserves other plugin
+settings. Leaving Aranea releases the registration, and uninstall removes its
+owned folder. It has no stock plugin replacement or bar icon. User-defined
+`aranea.settings` menu entries take precedence over the generated route.
+
+For display-only captures, run `scripts/capture-screenshots --surface settings
+--output screenshots` on one line. Additional variants are `settings-narrow`,
+`settings-dirty`, `settings-unavailable`, `settings-integration-failed`, and
+`settings-notifications`. These render the production content offscreen with
+fixed fixtures and refuse reads and changes through both controls and the
+controller; they do not summon the live desktop or change notifications.
+
 ## Profiles
 
 Profiles control application integrations during installation:

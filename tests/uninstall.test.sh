@@ -11,7 +11,7 @@ source "$repo_root/tests/lib/sandbox.sh"
 hooks="$HOME/.config/omarchy/hooks"
 plugins="$HOME/.config/omarchy/plugins"
 units="$HOME/.config/systemd/user"
-mkdir -p "$hooks/theme-set.d" "$hooks/post-boot.d" "$plugins/araneadev.bar" "$plugins/other.plugin" \
+mkdir -p "$hooks/theme-set.d" "$hooks/post-boot.d" "$plugins/araneadev.bar" "$plugins/araneadev.settings" "$plugins/other.plugin" \
   "$units" "$XDG_STATE_HOME/aranea/gsettings" "$XDG_DATA_HOME/icons/Aranea/cursors"
 cp "$repo_root/hooks/theme-set" "$hooks/theme-set.d/theme-set"
 cp "$repo_root/hooks/post-boot" "$hooks/post-boot.d/post-boot"
@@ -19,7 +19,7 @@ printf '#!/bin/bash\n# my own hook\n' >"$hooks/theme-set.d/mine"
 : >"$units/aranea-wallpaper-day-night.timer"
 : >"$units/aranea-wallpaper-day-night.service"
 printf "'Adwaita'\n" >"$XDG_STATE_HOME/aranea/gsettings/org.gnome.desktop.interface.icon-theme"
-printf '{"bar":{"id":"araneadev.bar"},"plugins":[]}\n' >"$HOME/.config/omarchy/shell.json"
+printf '{"bar":{"id":"araneadev.bar"},"plugins":[{"id":"araneadev.settings"},{"id":"user.widget","option":7}],"userSettings":{"keep":true}}\n' >"$HOME/.config/omarchy/shell.json"
 mkdir -p "$XDG_CONFIG_HOME/aranea"
 printf 'dawn=06:00\n' >"$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
 
@@ -27,7 +27,8 @@ printf 'dawn=06:00\n' >"$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
 
 [[ ! -e "$hooks/theme-set.d/theme-set" && ! -e "$hooks/post-boot.d/post-boot" ]]
 [[ -e "$hooks/theme-set.d/mine" ]]
-[[ ! -e "$plugins/araneadev.bar" && -e "$plugins/other.plugin" ]]
+[[ ! -e "$plugins/araneadev.bar" && ! -e "$plugins/araneadev.settings" && -e "$plugins/other.plugin" ]]
+jq -e ' .plugins == [{id:"user.widget",option:7}] and .userSettings.keep' "$HOME/.config/omarchy/shell.json" >/dev/null
 [[ ! -e "$units/aranea-wallpaper-day-night.timer" && ! -e "$units/aranea-wallpaper-day-night.service" ]]
 [[ ! -e "$XDG_STATE_HOME/aranea" ]]
 [[ ! -e "$XDG_CONFIG_HOME/aranea" ]]

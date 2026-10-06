@@ -107,3 +107,33 @@ test("MenuGuardScript answers like the facade", () => {
   sameAsFacade(guards, "guardScript", [items])
   sameAsFacade(guards, "guardScript", [{}])
 })
+
+test("settings route is guarded, unique, and searchable under Setup", () => {
+  const defaults = parsing.parseMenuJsonc(fixture)
+  const merged = parsing.mergeMenuSources(defaults, [], true)
+  const item = merged.items["aranea.settings"]
+  assert.ok(item, "installed settings adds its route")
+  assert.equal(item.parent, "setup")
+  assert.equal(item.label, "Aranea settings")
+  assert.equal(
+    item.action,
+    `omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'`
+  )
+  assert.ok(item.when, "activation remains guarded")
+  assert.equal(merged.itemOrder.at(-1), "aranea.settings", "settings appends to existing order")
+  assert.equal(merged.itemOrder.filter((id) => id === "aranea.settings").length, 1)
+  sameAsFacade(parsing, "mergeMenuSources", [defaults, [], true])
+  assert.equal(parsing.mergeMenuSources(defaults, [], false).items["aranea.settings"], undefined)
+})
+
+test("settings route preserves user overrides and unrelated commands", () => {
+  const custom = parsing.parseMenuJsonc(
+    '{"aranea.settings":{"parent":"setup","label":"My settings","action":"custom-settings","when":"true"},"setup.custom":{"label":"Mine","action":"custom"}}'
+  )
+  const merged = parsing.mergeMenuSources(parsing.parseMenuJsonc(fixture), custom, true)
+  assert.equal(merged.items["aranea.settings"].label, "My settings")
+  assert.equal(merged.items["aranea.settings"].action, "custom-settings")
+  assert.equal(merged.items["aranea.settings"].when, "true")
+  assert.equal(merged.items["setup.custom"].action, "custom")
+  assert.equal(merged.itemOrder.filter((id) => id === "aranea.settings").length, 1)
+})

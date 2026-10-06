@@ -863,12 +863,25 @@ function parseMenuJsonc(raw) {
  * Merges user items over default items key by key, adding a root item if missing.
  * @param {Array<MenuItem>} defaultItems - items from the shipped menu
  * @param {Array<MenuItem>} userItems - items from the user extension file
+ * @param {boolean} [settingsAvailable] - whether the settings plugin manifest is installed
  * @returns {{items: ItemMap, itemOrder: Array<string>}} items by id and their order
  */
-function mergeMenuSources(defaultItems, userItems) {
+function mergeMenuSources(defaultItems, userItems, settingsAvailable) {
   /** @type {{[key: string]: *}} */
   var nextItems = {}
   var nextOrder = []
+  var settings = settingsAvailable
+    ? [
+        normalizeItem("aranea.settings", {
+          parent: "setup",
+          label: "Aranea settings",
+          description: "Wallpaper, motion, schedule, integrations and notifications",
+          aliases: ["settings", "aranea-settings"],
+          action: 'omarchy-shell shell summon araneadev.settings \'{"section":"appearance"}\'',
+          when: 'test -f "$HOME/.config/omarchy/plugins/araneadev.settings/manifest.json"'
+        })
+      ]
+    : []
   var sources = [defaultItems || [], userItems || []]
 
   for (var s = 0; s < sources.length; s++) {
@@ -886,6 +899,11 @@ function mergeMenuSources(defaultItems, userItems) {
       merged.id = entry.id
       nextItems[entry.id] = merged
     }
+  }
+
+  if (settings.length && !nextItems["aranea.settings"]) {
+    nextItems["aranea.settings"] = settings[0]
+    nextOrder.push("aranea.settings")
   }
 
   if (!nextItems.root) {

@@ -11,6 +11,8 @@ ColumnLayout {
   id: page
   // Current backend snapshot; partial sections retain their own availability.
   property var backendState: ({})
+  // Whether controls show inert capture fixtures and refuse changes.
+  property bool displayOnly: false
   // Whether a settings mutation is in flight.
   property bool pending: false
   // Stable key of the affected control while applying.
@@ -39,7 +41,7 @@ ColumnLayout {
   }
   // Emit explicit Apply only for an available asset and idle controller.
   function applyWallpaper() {
-    if (!pending && selectedAsset && selectedAsset.available && page.backendState.wallpapersAvailability === 'available')
+    if (!displayOnly && !pending && selectedAsset && selectedAsset.available && page.backendState.wallpapersAvailability === 'available')
       request('set wallpaper', [selectedId])
   }
   spacing: Style.space(16)
@@ -108,7 +110,7 @@ ColumnLayout {
       objectName: 'wallpaperApply'
       text: 'Apply wallpaper'
       selected: true
-      enabled: !page.pending && !!page.selectedAsset && page.selectedAsset.available && page.backendState.wallpapersAvailability === 'available'
+      enabled: !page.displayOnly && !page.pending && !!page.selectedAsset && page.selectedAsset.available && page.backendState.wallpapersAvailability === 'available'
       pointerGate: page.pointerGate
       onClicked: page.applyWallpaper()
     }
@@ -139,7 +141,7 @@ ColumnLayout {
       objectName: 'motionToggle'
       Accessible.name: 'Motion'
       checked: !!page.backendState.motion && page.backendState.motion.configured === 'on'
-      enabled: !page.pending && !!page.backendState.motion && page.backendState.motion.availability === 'available'
+      enabled: !page.displayOnly && !page.pending && !!page.backendState.motion && page.backendState.motion.availability === 'available'
       busy: page.pendingKey === 'motion'
       pointerGate: page.pointerGate
       onToggled: page.request('set motion', [checked ? 'off' : 'on'])
@@ -158,7 +160,7 @@ ColumnLayout {
   }
   SettingsButton {
     text: 'Retry'
-    enabled: !page.pending
+    enabled: !page.displayOnly && !page.pending
     pointerGate: page.pointerGate
     visible: page.backendState.wallpapersAvailability !== 'available' || !page.backendState.wallpaper || page.backendState.wallpaper.availability !== 'available' || !page.backendState.motion || page.backendState.motion.availability !== 'available'
     onClicked: page.retryRequested()

@@ -41,6 +41,9 @@ set -euo pipefail
 # real tray app can never reach one. Tray captures refuse while any real
 # tray app (for example LocalSend) is registered.
 #
+# Settings uses inert production SettingsSurface fixtures offscreen. Variants:
+# settings-narrow, settings-dirty, settings-unavailable, settings-integration-failed,
+# settings-notifications. All mutation controls and controller requests refuse changes.
 # Lock and Plymouth are rendered, not grabbed from the screen: lock runs the
 # plugin's real LockView offscreen with a stand-in clock
 # (tools/render-lock-preview; the session is never locked) and plymouth
@@ -217,7 +220,7 @@ default_audio_showcase='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["D
 default_agents_showcase='{"agents":[{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
 
 # The surfaces --all captures.
-all_surfaces=(menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
+all_surfaces=(settings menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
 # magick or a frame is missing.
@@ -395,6 +398,7 @@ fi
 }
 showcase_surface="$surface"
 case "$surface" in
+  settings | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
@@ -402,6 +406,16 @@ case "$surface" in
 esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
+
+# Settings captures use production content offscreen with inert owner fixtures.
+case "$surface" in
+  settings | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications)
+    settings_fixture="${surface#settings-}"
+    [[ "$surface" != settings ]] || settings_fixture=wide
+    "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$settings_fixture"
+    exit 0
+    ;;
+esac
 
 # Opens the Aranea menu page for $surface and grabs the screen with grim.
 capture_menu_surface() {

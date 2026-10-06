@@ -103,7 +103,7 @@ Item {
           Aranea.BrandHeader {
             Layout.fillWidth: true
             title: 'Aranea settings'
-            subtitle: 'Your desktop, configured in one place'
+            subtitle: panel.controller.showcaseActive ? 'Preview · controls are read-only' : 'Your desktop, configured in one place'
             fontFamily: Style.font.menuFamily
           }
           SettingsButton {
@@ -122,8 +122,9 @@ Item {
             color: Aranea.DesignTokens.attention
           }
           SettingsButton {
+            objectName: 'settingsRetry'
             text: 'Retry'
-            enabled: !panel.controller.pending
+            enabled: !panel.controller.pending && !panel.controller.showcaseActive
             pointerGate: pointerGate
             onClicked: panel.controller.refresh()
           }
@@ -162,6 +163,7 @@ Item {
               AppearancePage {
                 Layout.fillHeight: false
                 backendState: panel.controller.state
+                displayOnly: panel.controller.showcaseActive
                 pending: panel.controller.pending
                 pendingKey: panel.controller.pendingKey
                 results: panel.controller.results
@@ -176,6 +178,7 @@ Item {
                 id: schedulePage
                 Layout.fillHeight: false
                 backendState: panel.controller.state
+                displayOnly: panel.controller.showcaseActive
                 pending: panel.controller.pending
                 pendingKey: panel.controller.pendingKey
                 result: panel.controller.resultFor('schedule')
@@ -189,6 +192,7 @@ Item {
               IntegrationsPage {
                 Layout.fillHeight: false
                 backendState: panel.controller.state
+                displayOnly: panel.controller.showcaseActive
                 pending: panel.controller.pending
                 pendingKey: panel.controller.pendingKey
                 results: panel.controller.results
@@ -202,6 +206,7 @@ Item {
               NotificationsPage {
                 Layout.fillHeight: false
                 notifications: panel.controller.notifications
+                displayOnly: panel.controller.showcaseActive
                 pending: panel.controller.pending
                 pendingKey: panel.controller.pendingKey
                 result: panel.controller.resultFor('dnd')

@@ -10,6 +10,8 @@ ColumnLayout {
   id: page
   // Independently observed notifications IPC state and per-field availability.
   property var notifications: ({})
+  // Whether controls show inert capture fixtures and refuse changes.
+  property bool displayOnly: false
   // Whether a settings mutation is in flight.
   property bool pending: false
   // Stable key of the affected control while applying.
@@ -53,7 +55,7 @@ ColumnLayout {
       objectName: 'dndToggle'
       Accessible.name: 'Do not disturb'
       checked: page.notifications.dnd === 'on'
-      enabled: !page.pending && page.notifications.dndAvailability === 'available'
+      enabled: !page.displayOnly && !page.pending && page.notifications.dndAvailability === 'available'
       busy: page.pendingKey === 'dnd'
       pointerGate: page.pointerGate
       onToggled: page.request('set dnd', [checked ? 'off' : 'on'])
@@ -100,7 +102,7 @@ ColumnLayout {
   }
   SettingsButton {
     text: 'Retry'
-    enabled: !page.pending
+    enabled: !page.displayOnly && !page.pending
     pointerGate: page.pointerGate
     onClicked: page.retryRequested()
   }

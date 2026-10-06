@@ -95,6 +95,7 @@ the Aranea state directory before changes are made.
 | Surface             | Experience                                                                                                                                                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Command center      | A compact Omarchy menu with Aranea identity, Files, Terminal, Setup, Favorites, and Recent                                                                                                                                      |
+| Settings            | Setup → Aranea settings: wallpaper, motion, schedule, integrations and DND; quiet hours shown read-only                                                                                                                         |
 | Notifications       | A quiet center with critical-state emphasis instead of interruptive popups                                                                                                                                                      |
 | System health       | Live CPU, memory, disk, network, process, service, reboot, and container status                                                                                                                                                 |
 | VPN                 | Connect NetworkManager and app-based VPNs (OpenVPN, WireGuard, Azure VPN Client, GlobalProtect) from one dropdown; see [plugins/araneadev.vpn/README.md](plugins/araneadev.vpn/README.md) for the apps file and client installs |
@@ -104,6 +105,15 @@ the Aranea state directory before changes are made.
 | Integrations        | Cursor, icons, terminal, browser, media, Qt, session, developer, and application styling                                                                                                                                        |
 
 ## Showcase
+
+### Settings
+
+Open **Setup → Aranea settings** or search for “settings”. Changes use the
+existing helpers; wallpaper selection and schedule drafts wait for explicit
+Apply or Save. Quiet hours is read-only. See [Configuration](docs/configuration.md)
+for destinations, CLI state, and safe fixture captures.
+
+![Aranea settings with inert display fixtures](screenshots/settings.png)
 
 ### Command center
 
@@ -207,16 +217,17 @@ already know what kind of information you need.
 The helpers are available as `scripts/<name>` from a checkout or as
 `~/.config/omarchy/themes/aranea/scripts/<name>` after installation.
 
-| Script                        | Purpose                                           |
-| ----------------------------- | ------------------------------------------------- |
-| `scripts/install.sh`          | Install or update Aranea with a selected profile. |
-| `scripts/uninstall.sh`        | Remove the integration or complete installation.  |
-| `scripts/aranea-doctor`       | Check or repair the installation.                 |
-| `scripts/aranea-integrations` | Inspect and toggle supported integrations.        |
-| `scripts/aranea-wallpaper`    | List, select, schedule, and animate wallpapers.   |
-| `scripts/aranea-motion`       | Inspect or toggle Hyprland and shell animations.  |
-| `scripts/aranea-about`        | Print version, active theme, and health summary.  |
-| `scripts/aranea-showcase`     | List documented surfaces.                         |
+| Script                        | Purpose                                                  |
+| ----------------------------- | -------------------------------------------------------- |
+| `scripts/install.sh`          | Install or update Aranea with a selected profile.        |
+| `scripts/uninstall.sh`        | Remove the integration or complete installation.         |
+| `scripts/aranea-doctor`       | Check or repair the installation.                        |
+| `scripts/aranea-integrations` | Inspect and toggle supported integrations.               |
+| `scripts/aranea-wallpaper`    | List, select, schedule, and animate wallpapers.          |
+| `scripts/aranea-settings`     | Read versioned settings JSON or invoke existing helpers. |
+| `scripts/aranea-motion`       | Inspect or toggle Hyprland and shell animations.         |
+| `scripts/aranea-about`        | Print version, active theme, and health summary.         |
+| `scripts/aranea-showcase`     | List documented surfaces.                                |
 
 The command menu keeps Favorites and Recent in `~/.local/state/aranea/menu.json`;
 `Ctrl+P` pins the app under the cursor. The complete icon and mark inventory is

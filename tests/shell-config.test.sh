@@ -976,4 +976,34 @@ jq -e '.bar.layout.right == ["araneadev.agents"]' "$agents_real" >/dev/null || {
   exit 1
 }
 
+# Settings is an owned menu plugin, never a clone or bar entry. Missing
+# manifests do not create dangling registrations; repeat repair is idempotent.
+settings_dir="$test_root/settings-config"
+mkdir -p "$settings_dir"
+settings_cfg="$settings_dir/shell.json"
+printf '%s\n' '{"plugins":[{"id":"user.widget","option":7}],"disabledPlugins":["user.disabled"],"userSettings":{"keep":true}}' >"$settings_cfg"
+"$repo_root/scripts/repair-shell-config" "$settings_cfg"
+jq -e '[.plugins[].id] | index("araneadev.settings") == null' "$settings_cfg" >/dev/null
+mkdir -p "$settings_dir/plugins/araneadev.settings"
+cp "$repo_root/plugins/araneadev.settings/manifest.json" "$settings_dir/plugins/araneadev.settings/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$settings_cfg"
+"$repo_root/scripts/repair-shell-config" "$settings_cfg"
+jq -e '([.plugins[].id | select(. == "araneadev.settings")] | length) == 1
+  and .plugins[0] == {"id":"user.widget","option":7}
+  and .userSettings == {"keep":true}
+  and (.disabledPlugins | index("user.disabled")) != null
+  and ((.cloneSourceRestores // []) | index("araneadev.settings")) == null
+  and ([.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id end)] | index("araneadev.settings")) == null' "$settings_cfg" >/dev/null
+"$repo_root/scripts/release-shell-config" "$settings_cfg"
+jq -e '.plugins == [{"id":"user.widget","option":7}] and .userSettings == {"keep":true}
+  and (.disabledPlugins | index("user.disabled")) != null' "$settings_cfg" >/dev/null
+"$repo_root/scripts/repair-shell-config" "$settings_cfg"
+jq -e '([.plugins[].id | select(. == "araneadev.settings")] | length) == 1' "$settings_cfg" >/dev/null
+# Existing inline settings are retained, including string-form entries.
+printf '%s\n' '{"plugins":[{"id":"araneadev.settings","preferred":"notifications"},"user.widget"]}' >"$settings_cfg"
+"$repo_root/scripts/repair-shell-config" "$settings_cfg"
+jq -e '.plugins[0] == {"id":"araneadev.settings","preferred":"notifications"} and .plugins[1] == "user.widget"' "$settings_cfg" >/dev/null
+"$repo_root/scripts/release-shell-config" "$settings_cfg"
+jq -e '.plugins == ["user.widget"]' "$settings_cfg" >/dev/null
+
 echo "shell config contract passed"

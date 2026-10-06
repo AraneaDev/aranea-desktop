@@ -25,6 +25,16 @@ Item {
   SettingsController {
     id: controller
   }
+  // Accept display-only snapshot JSON; owned mutations and malformed data refuse it.
+  function showcase(payloadJson) {
+    var fixture
+    try {
+      fixture = JSON.parse(payloadJson || '{}')
+    } catch (e) {
+      return 'invalid'
+    }
+    return controller.beginShowcase(fixture)
+  }
   // Open a supported payload destination and refresh owner state.
   function open(payloadJson) {
     var payload = ({})
@@ -40,6 +50,7 @@ Item {
   // Hide the window without cancelling owned processes.
   function close() {
     opened = false
+    controller.endShowcase()
   }
   Component.onCompleted: {
     if (!windowEnabled)

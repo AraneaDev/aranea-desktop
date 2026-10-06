@@ -17,6 +17,7 @@ mapfile -t surfaces < <(
   sed -n 's/^all_surfaces=(\(.*\))$/\1/p' "$capture_script" | tr ' ' '\n'
 )
 expected_surfaces=(
+  settings
   menu menu-submenu menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network vpn audio bluetooth agents

@@ -11,6 +11,8 @@ ColumnLayout {
   id: page
   // Current backend snapshot; partial sections retain their own availability.
   property var backendState: ({})
+  // Whether controls show inert capture fixtures and refuse changes.
+  property bool displayOnly: false
   // Whether a settings mutation is in flight.
   property bool pending: false
   // Stable key of the affected control while applying.
@@ -59,7 +61,7 @@ ColumnLayout {
         SettingsButton {
           objectName: 'integrationAction'
           text: integrationRow.modelData.status === 'active' ? 'Deactivate' : 'Activate'
-          enabled: !page.pending && page.backendState.integrationsAvailability === 'available' && integrationRow.modelData.availability === 'available'
+          enabled: !page.displayOnly && !page.pending && page.backendState.integrationsAvailability === 'available' && integrationRow.modelData.availability === 'available'
           busy: page.pendingKey === 'integration:' + integrationRow.modelData.id
           pointerGate: page.pointerGate
           onClicked: page.request('set integration', [integrationRow.modelData.id, integrationRow.modelData.status === 'active' ? 'inactive' : 'active'])
@@ -85,7 +87,7 @@ ColumnLayout {
   }
   SettingsButton {
     text: 'Retry'
-    enabled: !page.pending
+    enabled: !page.displayOnly && !page.pending
     pointerGate: page.pointerGate
     onClicked: page.retryRequested()
   }

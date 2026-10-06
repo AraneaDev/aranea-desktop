@@ -19,6 +19,50 @@ QtObject {
     process.startRequested = true
     process.running = true
   }
+  // Whether an inert display fixture replaces observed owner state.
+  property bool showcaseActive: false
+  // Observed state saved while a display fixture is visible.
+  property var showcaseSaved: null
+  // Start an inert showcase only when no owned mutation is running.
+  function beginShowcase(fixture) {
+    if (pending)
+      return 'busy'
+    if (!fixture || !fixture.state || typeof fixture.state !== 'object' || Array.isArray(fixture.state))
+      return 'invalid'
+    if (!showcaseActive)
+      showcaseSaved = {
+        state: state,
+        error: error,
+        notifications: notifications,
+        notificationErrors: notificationErrors,
+        results: results,
+        itemErrors: itemErrors
+      }
+    readRevision++
+    notificationsRevision++
+    showcaseActive = true
+    state = fixture.state
+    error = fixture.error || ''
+    notifications = fixture.notifications || ({})
+    notificationErrors = fixture.notificationErrors || ({})
+    results = fixture.results || ({})
+    itemErrors = fixture.itemErrors || ({})
+    return 'ok'
+  }
+  // Restore observations without issuing reads or changing owner preferences.
+  function endShowcase() {
+    if (!showcaseActive)
+      return
+    var saved = showcaseSaved
+    state = saved.state
+    error = saved.error
+    notifications = saved.notifications
+    notificationErrors = saved.notificationErrors
+    results = saved.results
+    itemErrors = saved.itemErrors
+    showcaseSaved = null
+    showcaseActive = false
+  }
   // Latest adapter snapshot; unreadable sections are never replaced with defaults.
   property var state: ({})
   // Whether a settings mutation is in flight.
@@ -110,7 +154,7 @@ QtObject {
   }
   // Read backend state, discarding old generations and protecting confirmation reads.
   function refresh(done) {
-    if (pending && !done)
+    if (showcaseActive || (pending && !done))
       return false
     var revision = ++readRevision
     runCommand([adapterPath, 'status', '--json'], function (code, stdout, stderr) {
@@ -134,7 +178,7 @@ QtObject {
   }
   // Read each notification field independently from the service IPC.
   function refreshNotifications() {
-    if (pending && pendingKey === 'dnd')
+    if (showcaseActive || (pending && pendingKey === 'dnd'))
       return false
     var revision = ++notificationsRevision
     readNotification('dndState', 'dnd', revision)
@@ -162,7 +206,7 @@ QtObject {
   // Validate and serialize mutations, then confirm against independent owner readback.
   function request(operation, args) {
     args = args || []
-    if (pending)
+    if (showcaseActive || pending)
       return false
     if (operation === 'set dnd') {
       if (notifications.dndAvailability !== 'available' || args.length !== 1 || ['on', 'off'].indexOf(args[0]) < 0)
