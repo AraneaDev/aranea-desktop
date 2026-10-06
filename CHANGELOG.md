@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.18.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.17.1...v2.18.0) (2026-10-06)
+
+
+### Features
+
+* refine desktop panels, settings and search ([#120](https://github.com/AraneaDev/aranea-desktop/issues/120)) ([dd31b8d](https://github.com/AraneaDev/aranea-desktop/commit/dd31b8d07023cee9144fff832146000fbd18bb02))
+
 ## [2.17.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.17.0...v2.17.1) (2026-10-04)
 
 
