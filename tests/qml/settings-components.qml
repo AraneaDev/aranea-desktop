@@ -140,7 +140,7 @@ ShellRoot {
     window.width = 840
     t.check(!window.compact, 'wide surface uses side navigation')
     window.width = 652
-    t.check(hasText(appearance, 'Current wallpaper: day'), 'appearance renders owner wallpaper identity')
+    t.check(hasText(appearance, 'Current wallpaper: Day'), 'appearance renders owner wallpaper identity')
     appearance.selectWallpaper('night')
     navigation.choose('notifications')
     t.equal(root.requests, 0, 'thumbnail and category selection issue zero mutations')

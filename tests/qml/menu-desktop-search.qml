@@ -129,7 +129,7 @@ ShellRoot {
       menu.setFilter("workspace: Project")
       t.equal(menu.displayModel.get(0).desktopKey, "workspace:2", "workspace prefix finds typed workspace")
       menu.setFilter("setting: scale")
-      t.equal(menu.displayModel.get(0).desktopKey, "setting:appearance", "settings aliases find section destinations")
+      t.equal(menu.displayModel.get(0).desktopKey, "setting:display", "settings aliases find section destinations")
       menu.setFilter("command: power")
       t.equal(menu.displayModel.get(0).desktopKey, "command:setup.power", "command prefix finds existing item")
       menu.handleKey(key(Qt.Key_Return))

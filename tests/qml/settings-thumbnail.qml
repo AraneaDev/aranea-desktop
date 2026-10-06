@@ -78,7 +78,8 @@ ShellRoot {
     return null
   }
   Component.onCompleted: t.step(400, function () {
-    var target = option(page, 'night').children[0]
+    page.galleryExpanded = true
+    var target = t.findChild(page, 'wallpaperThumbnail:night')
     page.selectWallpaper('day')
     pointer.mouseMove(target, target.width / 2, target.height / 2)
     gate.reset()
@@ -90,7 +91,7 @@ ShellRoot {
       t.equal(page.selectedId, 'night', 'settled pointer click selects the wallpaper image')
       t.equal(page.appliedId, 'day', 'image selection preserves owner wallpaper')
       t.equal(requests.length, 0, 'thumbnail click emits no mutation')
-      var label = option(page, 'day').children[1]
+      var label = t.findChild(page, 'wallpaperThumbnail:day')
       label.forceActiveFocus()
       pointer.keyClick(Qt.Key_Return)
       t.equal(page.selectedId, 'day', 'existing label keyboard selection remains available')

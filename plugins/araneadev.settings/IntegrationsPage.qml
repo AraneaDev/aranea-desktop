@@ -27,7 +27,7 @@ ColumnLayout {
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
   signal retryRequested
-  spacing: Style.space(16)
+  spacing: Style.space(8)
   SettingsLabel {
     Layout.fillWidth: true
     text: 'Integrations'
@@ -36,7 +36,7 @@ ColumnLayout {
   }
   SettingsLabel {
     Layout.fillWidth: true
-    text: 'Activate the integrations you use. Existing settings and conflicts are handled by each integration.'
+    text: 'Activate the integrations you use.'
     opacity: 0.65
   }
   SettingsLabel {
@@ -51,8 +51,10 @@ ColumnLayout {
       required property var modelData
       Layout.fillWidth: true
       spacing: Style.space(8)
-      RowLayout {
+      GridLayout {
         Layout.fillWidth: true
+        columns: page.width < Style.space(300) ? 1 : 2
+        rowSpacing: Style.space(8)
         SettingsLabel {
           Layout.fillWidth: true
           text: integrationRow.modelData.label || integrationRow.modelData.id
@@ -69,7 +71,7 @@ ColumnLayout {
       }
       SettingsLabel {
         Layout.fillWidth: true
-        text: page.pendingKey === 'integration:' + integrationRow.modelData.id ? 'Applying…' : page.results['integration:' + integrationRow.modelData.id] || (integrationRow.modelData.availability !== 'available' ? 'Unavailable' : integrationRow.modelData.status === 'active' ? 'Active' : 'Inactive')
+        text: page.pendingKey === 'integration:' + integrationRow.modelData.id ? 'Applying…' : page.results['integration:' + integrationRow.modelData.id] || (integrationRow.modelData.availability !== 'available' ? integrationRow.modelData.reason || 'Unavailable' : integrationRow.modelData.status === 'active' ? 'Active' : 'Inactive')
         opacity: 0.65
       }
       SettingsLabel {

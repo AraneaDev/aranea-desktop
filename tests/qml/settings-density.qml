@@ -72,7 +72,7 @@ ShellRoot {
       t.check(t.findChild(button, 'selectedFill').visible, 'primary action retains accent emphasis')
     }
     var categories = t.findChildren(navigation, 'pill')
-    t.equal(categories.length, 4, 'existing destinations remain available')
+    t.equal(categories.length, 5, 'existing destinations remain available')
     for (var i = 0; i < categories.length; i++) {
       t.check(!t.findChild(categories[i], 'pillBorder').visible, 'navigation has no persistent full border ' + i)
       t.check(!!t.findChild(categories[i], 'navigationIcon'), 'navigation has an icon ' + i)

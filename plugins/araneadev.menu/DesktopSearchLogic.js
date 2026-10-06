@@ -221,7 +221,7 @@ function normalizeRecord(record) {
   }
   if (
     type === "setting" &&
-    ["appearance", "schedule", "integrations", "notifications"].indexOf(identity) < 0
+    ["appearance", "display", "schedule", "integrations", "notifications"].indexOf(identity) < 0
   )
     return null
   /** @type {DesktopTarget & {[key: string]: *}} */

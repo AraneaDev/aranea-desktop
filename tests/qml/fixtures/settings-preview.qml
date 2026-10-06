@@ -122,6 +122,7 @@ ShellRoot {
     }
     var section = 'appearance'
     if (fixture === 'scaling') {
+      section = 'display'
       state.display.scale = 2.666667
       state.display.configuredScale = 2.66667
       sample.results['display-scale'] = 'Applied · 2.666667 · saved'
@@ -161,11 +162,6 @@ ShellRoot {
     onTriggered: {
       harness.polls++
       var objects = harness.collect(surface, [])
-      if (harness.fixture === 'scaling') {
-        for (var j = 0; j < objects.length; j++)
-          if (objects[j].contentY !== undefined && objects[j].contentHeight !== undefined && objects[j].height !== undefined)
-            objects[j].contentY = Math.max(0, objects[j].contentHeight - objects[j].height)
-      }
       var loading = false
       for (var i = 0; i < objects.length; i++) {
         var item = objects[i]

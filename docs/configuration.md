@@ -3,14 +3,21 @@
 ## Aranea settings
 
 Open **Setup → Aranea settings**, or search for “settings” in the menu.
-The dedicated window covers wallpaper selection and explicit Apply, motion,
+The centered window uses a compact 840×460 logical size capped to the screen,
+with scrolling for longer pages. It covers wallpaper selection and explicit Apply, motion,
 custom display scaling, wallpaper schedule enablement and validated Save, integration activation, and
 Do not disturb. Navigation and thumbnail selection never change preferences.
+Appearance initially shows the current wallpaper preview. **Choose wallpaper**
+expands an inline chooser; thumbnail and label are one selection target.
+**Apply** changes the desktop, while **Discard** restores the observed wallpaper.
+Collapsing the chooser and navigating retain drafts and page scroll positions.
+
 Reopening reads the existing CLI and service owners; closing leaves an active
 integration installation running until its result is confirmed.
 
-Appearance's **Display scale** accepts decimal values from 1 to 4, including
-`2.5` and `2.667`. Editing the field does nothing until **Apply scale**.
+**Display** accepts decimal values from 1 to 4, including
+`2.5` and `2.667`. Editing the field does nothing until **Apply**. Presets for 2x, 2.5x, 2.667x and 3x also edit only
+the local draft. **Discard** restores the current observed scale.
 The focused display and current effective scale are shown separately from your
 entry. Omarchy adjusts fractions to clean logical pixels for the display mode;
 for example, `2.667` on a 3840×2160 display can become about `2.666667`.
@@ -61,6 +68,7 @@ Direct destinations use the existing summon contract:
 
 ```bash
 omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'
+omarchy-shell shell summon araneadev.settings '{"section":"display"}'
 omarchy-shell shell summon araneadev.settings '{"section":"schedule"}'
 omarchy-shell shell summon araneadev.settings '{"section":"integrations"}'
 omarchy-shell shell summon araneadev.settings '{"section":"notifications"}'

@@ -96,8 +96,16 @@ function settingRecords(available) {
       "appearance",
       "Appearance",
       { section: "appearance" },
-      "Wallpaper, motion and display scale",
-      ["wallpaper", "motion", "display", "scale", "scaling", "custom scale"]
+      "Wallpaper and motion",
+      ["wallpaper", "motion"]
+    ),
+    sourceRecord(
+      "setting",
+      "display",
+      "Display",
+      { section: "display" },
+      "Focused display scaling",
+      ["display", "scale", "scaling", "custom scale"]
     ),
     sourceRecord(
       "setting",

@@ -113,8 +113,14 @@ test("Applied requires independent owner match; deferred and saved differ from a
     "Failed"
   )
 })
-test("window caps preserve 24-unit margins and switch navigation at 720", () => {
-  assert.deepEqual(logic.geometry(1920, 1080, 1), { width: 840, height: 620, compact: false })
+test("compact window height preserves 24-unit caps and navigation threshold", () => {
+  assert.deepEqual(logic.geometry(1920, 1080, 1), { width: 840, height: 460, compact: false })
+  assert.deepEqual(logic.geometry(1920, 1080, 2), { width: 1680, height: 920, compact: false })
+  assert.deepEqual(logic.geometry(1280 / 2.667, 720 / 2.667, 1), {
+    width: 1280 / 2.667 - 48,
+    height: 720 / 2.667 - 48,
+    compact: true
+  })
   assert.deepEqual(logic.geometry(700, 500, 1), { width: 652, height: 452, compact: true })
   assert.deepEqual(logic.geometry(1280, 720, 1.5), { width: 1208, height: 648, compact: false })
 })
@@ -285,4 +291,9 @@ test("failed motion preserves saved preference while live failure stays unsucces
     "Failed"
   )
   assert.equal(logic.outcome("set motion", ["on"], null, false), "Failed")
+})
+
+test("Display normalizes alongside existing stable destinations", () => {
+  for (const section of ["appearance", "display", "schedule", "integrations", "notifications"])
+    assert.equal(logic.normalizeSection(section), section)
 })

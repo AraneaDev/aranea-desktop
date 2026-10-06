@@ -25,6 +25,11 @@ Item {
       icon: String.fromCodePoint(0xf0303)
     },
     {
+      id: 'display',
+      label: 'Display',
+      icon: String.fromCodePoint(0xf0379)
+    },
+    {
       id: 'schedule',
       label: 'Schedule',
       icon: String.fromCodePoint(0xf0150)

@@ -19,6 +19,11 @@ Item {
   readonly property bool compact: width < Style.space(720)
   // Reduce fixed chrome on short logical screens while retaining full-size controls.
   readonly property bool shortScreen: height < Style.space(400)
+  // Scroll offsets retained independently for each persistent page.
+  property var pageOffsets: ({})
+  // Section whose scroll offset is currently shown.
+  property string scrollSection: 'appearance'
+  Component.onCompleted: scrollSection = root.section
   // Time of the last geometry, category, content or scroll change.
   property real layoutChangedAt: 0
   // Close the summoned surface on Escape.
@@ -76,7 +81,13 @@ Item {
     target: panel.root
     function onSectionChanged() {
       panel.stampLayout()
-      scroller.contentY = 0
+      var next = Object.assign({}, panel.pageOffsets)
+      next[panel.scrollSection] = scroller.contentY
+      panel.pageOffsets = next
+      panel.scrollSection = panel.root.section
+      Qt.callLater(function () {
+        panel.scrollTo(panel.pageOffsets[panel.root.section] || 0)
+      })
       closeButton.forceActiveFocus()
     }
   }
@@ -98,24 +109,45 @@ Item {
   Aranea.SurfaceCard {
     id: card
     anchors.fill: parent
-    contentPadding: Style.space(24)
+    contentPadding: Style.space(16)
     FocusScope {
       anchors.fill: parent
-      anchors.margins: Style.space(panel.shortScreen ? 16 : 24)
+      anchors.margins: Style.space(panel.shortScreen ? 12 : 16)
       focus: true
       Keys.onPressed: function (event) {
         panel.handleKey(event)
       }
       ColumnLayout {
         anchors.fill: parent
-        spacing: Style.space(panel.shortScreen ? 8 : 16)
+        spacing: Style.space(panel.shortScreen ? 8 : 12)
         RowLayout {
           Layout.fillWidth: true
-          Aranea.BrandHeader {
+          Image {
+            objectName: 'settingsGlyph'
+            visible: !panel.shortScreen
+            Layout.preferredWidth: Style.space(18)
+            Layout.preferredHeight: Style.space(18)
+            source: Aranea.RuntimePaths.glyphUrl
+            sourceSize: Qt.size(Style.space(36), Style.space(36))
+            fillMode: Image.PreserveAspectFit
+          }
+          ColumnLayout {
             Layout.fillWidth: true
-            title: 'Aranea settings'
-            subtitle: panel.controller.showcaseActive ? 'Preview · controls are read-only' : 'Your desktop, configured in one place'
-            fontFamily: Style.font.menuFamily
+            spacing: Style.space(4)
+            SettingsLabel {
+              Layout.fillWidth: true
+              text: 'Aranea settings'
+              font.pixelSize: Style.font.body
+              font.bold: true
+              wrapMode: Text.NoWrap
+              elide: Text.ElideRight
+            }
+            SettingsLabel {
+              Layout.fillWidth: true
+              visible: !panel.shortScreen
+              text: panel.controller.showcaseActive ? 'Preview · read-only' : 'Your desktop preferences'
+              opacity: 0.65
+            }
           }
           SettingsButton {
             id: closeButton
@@ -128,11 +160,11 @@ Item {
           Layout.fillWidth: true
           Layout.fillHeight: true
           columns: panel.compact ? 1 : 2
-          rowSpacing: Style.space(panel.shortScreen ? 8 : 16)
-          columnSpacing: Style.space(24)
+          rowSpacing: Style.space(panel.shortScreen ? 8 : 12)
+          columnSpacing: Style.space(16)
           SettingsNavigation {
             Layout.fillWidth: panel.compact
-            Layout.preferredWidth: panel.compact ? -1 : Style.space(168)
+            Layout.preferredWidth: panel.compact ? -1 : Style.space(148)
             Layout.alignment: Qt.AlignTop
             compact: panel.compact
             selectedSection: panel.root.section
@@ -151,6 +183,7 @@ Item {
             contentHeight: scrollContent.implicitHeight
             boundsBehavior: Flickable.StopAtBounds
             onContentYChanged: panel.stampLayout()
+            onContentHeightChanged: panel.stampLayout()
             ScrollBar.vertical: ScrollBar {
               objectName: 'settingsScrollBar'
               width: Style.space(8)
@@ -188,8 +221,22 @@ Item {
                 id: pages
                 width: scroller.contentWidth
                 height: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
-                currentIndex: ['appearance', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
+                currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
                 AppearancePage {
+                  Layout.fillHeight: false
+                  backendState: panel.controller.state
+                  displayOnly: panel.controller.showcaseActive
+                  pending: panel.controller.pending
+                  pendingKey: panel.controller.pendingKey
+                  results: panel.controller.results
+                  errors: panel.controller.itemErrors
+                  pointerGate: pointerGate
+                  onRequest: function (operation, args) {
+                    panel.controller.request(operation, args)
+                  }
+                  onRetryRequested: panel.controller.refresh()
+                }
+                DisplayPage {
                   Layout.fillHeight: false
                   backendState: panel.controller.state
                   displayOnly: panel.controller.showcaseActive
@@ -254,7 +301,7 @@ Item {
         }
         SettingsLabel {
           Layout.fillWidth: true
-          text: 'Tab move · Space / Enter select · Esc close'
+          text: 'Tab move · Enter select · Esc close'
           opacity: 0.65
           font.pixelSize: Style.font.caption
         }

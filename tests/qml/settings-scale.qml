@@ -22,7 +22,7 @@ ShellRoot {
       root.callbacks.push(done)
     }
   }
-  Settings.AppearancePage {
+  Settings.DisplayPage {
     id: page
     width: 560
     backendState: entry.controller.state
@@ -59,7 +59,7 @@ ShellRoot {
     entry.controller.state = state
     var input = t.findChild(page, 'displayScaleInput')
     var apply = t.findChild(page, 'displayScaleApply')
-    t.check(!!input && !!apply, 'production Appearance includes decimal scale control')
+    t.check(!!input && !!apply, 'production Display includes decimal scale control')
     page.setScaleDraft('2.667')
     t.equal(calls.length, 0, 'editing scale issues zero commands')
     page.applyScale()
@@ -68,7 +68,7 @@ ShellRoot {
     t.check(!apply.enabled && !input.enabled, 'competing controls disabled during application')
     t.equal(entry.controller.request('set display-scale', ['2.5']), false, 'one mutation lock covers scale')
     entry.close()
-    entry.open('{"section":"appearance"}')
+    entry.open('{"section":"display"}')
     t.equal(calls.length, 1, 'reopen preserves one in-flight scale request')
     t.equal(page.scaleDraft, '2.667', 'reopen keeps exact requested fraction')
     var result = {
