@@ -45,17 +45,17 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "SOURCES"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: String(section.streams.length)
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
   }
@@ -130,7 +130,7 @@ Column {
               anchors.verticalCenter: parent.verticalCenter
               text: row.modelData.muted ? String.fromCodePoint(0xF075F) : String.fromCodePoint(0xF057E)
               color: Aranea.DesignTokens.foreground
-              font.family: Style.font.family
+              font.family: Aranea.Typography.iconFamily
               font.pixelSize: Style.font.body
               Aranea.HoverTint {
                 z: -1
@@ -155,7 +155,7 @@ Column {
               elide: Text.ElideRight
               text: row.modelData.label
               color: row.modelData.current ? Aranea.DesignTokens.accent : Util.alpha(Aranea.DesignTokens.foreground, row.modelData.muted ? 0.55 : 1)
-              font.family: Style.font.family
+              font.family: Aranea.Typography.uiFamily
               font.pixelSize: Style.font.body
             }
             Text {
@@ -164,7 +164,7 @@ Column {
               anchors.verticalCenter: parent.verticalCenter
               text: row.modelData.muted ? "muted" : Math.round((streamSlider.dragging ? streamSlider.liveValue : row.modelData.volume) * 100) + "%"
               color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-              font.family: Style.font.family
+              font.family: Aranea.Typography.technicalFamily
               font.pixelSize: Style.font.body
             }
           }

@@ -12,6 +12,7 @@ import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Aranea.DropdownHeader {
   id: header
+  refined: true
 
   // Mood caption under the title, e.g. "Cranked up".
   property string mood: ""
@@ -55,10 +56,10 @@ Aranea.DropdownHeader {
       anchors.verticalCenter: parent.verticalCenter
       text: "MUTE ALL"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Aranea.FilamentSwitch {
       objectName: "muteSwitch"

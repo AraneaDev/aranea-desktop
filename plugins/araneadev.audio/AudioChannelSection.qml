@@ -60,10 +60,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: section.caption
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       id: levelText
@@ -73,7 +73,7 @@ Column {
       visible: section.channel.present
       text: section.channel.muted ? "muted" : Math.round((slider.dragging ? slider.liveValue : section.channel.volume) * 100) + "%"
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
   }
@@ -82,7 +82,7 @@ Column {
     visible: !section.channel.present
     text: section.emptyText
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
   }
   Item {
@@ -147,6 +147,7 @@ Column {
   Repeater {
     model: section.devices
     Aranea.NodeDeviceRow {
+      refined: true
       required property var modelData
       required property int index
       objectName: "deviceRow"
