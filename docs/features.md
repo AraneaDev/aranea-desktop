@@ -81,7 +81,9 @@ page explains what each surface is for.
 ## Desktop settings
 
 Setup opens a compact, centered Settings window with Appearance, Display,
-Schedule, Integrations and Notifications destinations. Appearance keeps its
+Schedule, Integrations and Notifications destinations. Appearance offers
+searchable interface/monospace font choices with samples and explicit Apply;
+icons keep their dedicated family. Appearance keeps its
 wallpaper chooser collapsed until requested. Wallpaper selection and Display
 presets edit local drafts, with explicit Apply and Discard. Display accepts
 exact decimal scales and reports effective scale and persistence separately.

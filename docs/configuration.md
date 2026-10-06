@@ -7,7 +7,14 @@ The centered window uses a compact 840×460 logical size capped to the screen,
 with scrolling for longer pages. It covers wallpaper selection and explicit Apply, motion,
 custom display scaling, wallpaper schedule enablement and validated Save, integration activation, and
 Do not disturb. Navigation and thumbnail selection never change preferences.
-Appearance initially shows the current wallpaper preview. **Choose wallpaper**
+Appearance includes searchable **Interface font** and **Monospace font**
+choices for Aranea panels and controls. Samples preview each draft; **Apply**
+saves both choices and updates open surfaces. **Reset to defaults** edits the
+draft and also requires Apply. Icon glyphs retain their dedicated font.
+Preferences live in `~/.config/aranea/fonts.json`; changing these choices does
+not replace the native fonts used by applications or terminal content.
+
+Appearance also shows the current wallpaper preview. **Choose wallpaper**
 expands an inline chooser; thumbnail and label are one selection target.
 **Apply** changes the desktop, while **Discard** restores the observed wallpaper.
 Collapsing the chooser and navigating retain drafts and page scroll positions.
@@ -61,8 +68,7 @@ must still match the target before the UI reports Applied.
 
 Quiet hours shows the effective state and configured window read-only. Set
 `ARANEA_QUIET_HOURS` through your notification service configuration to change it;
-settings does not write `notifications.json`. Bar layout, fonts and editable
-quiet hours are outside this release.
+settings does not write `notifications.json`. Bar layout and editable quiet hours are outside this release.
 
 Direct destinations use the existing summon contract:
 
