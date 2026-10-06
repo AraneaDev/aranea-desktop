@@ -78,10 +78,11 @@ if grep -Fq 'readonly property var c: root.m.topProcs' "$plugin/Panel.qml"; then
   exit 1
 fi
 # 4: the CPU trace follows the samples only while the dropdown is open
-grep -Fq 'HealthResourceSection {' "$plugin/Panel.qml"
+grep -Fq 'HealthDropdown {' "$plugin/Panel.qml"
+grep -Fq 'HealthResourceSection {' "$plugin/HealthDropdown.qml"
 grep -Fq 'samples: root.active && root.metrics ? HealthLogic.cpuSamples(' "$plugin/HealthResourceSection.qml"
-# 5: opening without a service closes again instead of sticking open
-grep -Fq 'if (opened && !root.available)' "$plugin/Panel.qml"
+# 5: missing-service summary remains readable; unavailable and empty states
+# are exercised by tests/qml/health-panel-components.qml.
 # 9: branding paths honour XDG_STATE_HOME everywhere
 # (Omarchy's own state files, e.g. clipboard-history.json, stay at the
 # $HOME path its scripts hard-code; only branding assets are theme-owned.)
