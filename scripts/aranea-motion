@@ -20,6 +20,36 @@ motion_status() {
   fi
 }
 
+# JSON reads preserve the text default while reporting invalid stored values.
+motion_status_json() {
+  local configured=on applied=null application=deferred availability=available observed
+  if [[ -e "$state_file" || -L "$state_file" ]]; then
+    if [[ -f "$state_file" && -r "$state_file" ]]; then
+      configured="$(cat "$state_file")"
+      [[ "$configured" == on || "$configured" == off ]] || configured=null
+    else configured=null; fi
+  fi
+  [[ "$configured" != null ]] || availability=unavailable
+  if command -v "${ARANEA_HYPRCTL:-hyprctl}" >/dev/null 2>&1; then
+    application=unavailable
+    if observed="$("${ARANEA_HYPRCTL:-hyprctl}" -j getoption animations:enabled)"; then
+      case "$(jq -r 'if .int == 1 then "on" elif .int == 0 then "off" else "unknown" end' <<<"$observed" 2>/dev/null)" in
+        on) applied='"on"' ;;
+        off) applied='"off"' ;;
+      esac
+      if [[ "$applied" != null ]]; then
+        application=pending
+        [[ "$applied" == \"$configured\" ]] && application=applied
+      fi
+    fi
+  fi
+  jq -cn --arg configured "$configured" --argjson applied "$applied" \
+    --arg availability "$availability" --arg application "$application" \
+    '{configured:(if $configured == "null" then null else $configured end),
+      applied:$applied, availability:$availability, application:$application}'
+  [[ "$availability" == available ]]
+}
+
 # Applies the stored mode to Hyprland (animations off, or on with Aranea's
 # curves) and prints it; only prints it when hyprctl is missing.
 apply_motion() {
@@ -41,6 +71,15 @@ apply_motion() {
 
 case "${1:-status}" in
   status)
+    if [[ "${2:-}" == --json ]]; then
+      [[ $# -eq 2 ]] || exit 2
+      command -v jq >/dev/null 2>&1 || {
+        echo 'jq is required for --json' >&2
+        exit 2
+      }
+      motion_status_json
+      exit $?
+    fi
     printf 'motion: %s\n' "$(motion_status)"
     ;;
   set)

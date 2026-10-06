@@ -85,3 +85,8 @@ grep -Fq 'Unknown wallpaper: da\y' <<<"$bs_out"
 rm -f "$wp_manifest"
 
 echo "wallpaper contract passed"
+
+# Optional catalog is machine-readable; the default text list stays intact.
+"$repo_root/scripts/aranea-wallpaper" list --json | jq -e 'length == 8 and all(.[]; (.path | startswith("/")) and .available)' >/dev/null
+# Missing current-background owner reports unavailable, never last selection.
+"$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == null and .availability == "unavailable"' >/dev/null

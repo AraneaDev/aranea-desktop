@@ -67,3 +67,7 @@ for qml in \
 done
 
 echo "motion contract passed"
+
+# JSON status separates configured motion from unavailable live observation.
+ARANEA_HYPRCTL="$state_root/missing-hyprctl" ARANEA_STATE_ROOT="$state_root" \
+  "$repo_root/scripts/aranea-motion" status --json | jq -e '.configured == "on" and .applied == null and .application == "deferred"' >/dev/null

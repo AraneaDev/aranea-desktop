@@ -32,9 +32,31 @@ load_schedule() {
   day=08:00
   dusk=18:00
   night=20:00
-  if [[ -f "$schedule_config" ]]; then
-    # shellcheck disable=SC1090
-    source "$schedule_config"
+  if [[ -e "$schedule_config" || -L "$schedule_config" ]]; then
+    [[ -f "$schedule_config" && -r "$schedule_config" ]] || {
+      echo 'Schedule config is unreadable' >&2
+      return 1
+    }
+    local key value line
+    local assignment='^[[:space:]]*(dawn|day|dusk|night)[[:space:]]*=[[:space:]]*(.*)$'
+    local plain='^([0-9]{2}:[0-9]{2})[[:space:]]*(#.*)?$'
+    local double_quoted='^"([0-9]{2}:[0-9]{2})"[[:space:]]*(#.*)?$'
+    local single_quoted="^'([0-9]{2}:[0-9]{2})'[[:space:]]*(#.*)?$"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ "$line" =~ ^[[:space:]]*(#.*)?$ ]] && continue
+      [[ "$line" =~ $assignment ]] || {
+        echo 'Invalid schedule configuration' >&2
+        return 1
+      }
+      key="${BASH_REMATCH[1]}"
+      value="${BASH_REMATCH[2]}"
+      if [[ "$value" =~ $plain || "$value" =~ $double_quoted || "$value" =~ $single_quoted ]]; then
+        printf -v "$key" '%s' "${BASH_REMATCH[1]}"
+      else
+        echo 'Invalid schedule time assignment' >&2
+        return 1
+      fi
+    done <"$schedule_config"
   fi
 }
 # True when $1 is a 24-hour HH:MM time.
@@ -54,15 +76,26 @@ validate_schedule() {
 }
 # Writes the current phase times to the schedule config file.
 write_schedule_config() {
-  mkdir -p "$config_root"
-  printf 'dawn=%s\nday=%s\ndusk=%s\nnight=%s\n' "$dawn" "$day" "$dusk" "$night" >"$schedule_config"
+  local temporary rc=0
+  mkdir -p "$config_root" || return $?
+  temporary="$(mktemp "$config_root/.wallpaper-schedule.XXXXXX")" || return $?
+  printf 'dawn=%s\nday=%s\ndusk=%s\nnight=%s\n' "$dawn" "$day" "$dusk" "$night" >"$temporary" && mv -f -- "$temporary" "$schedule_config" || rc=$?
+  rm -f -- "$temporary"
+  return "$rc"
 }
 # Writes the systemd user service and a timer that fires at each phase time.
 write_schedule_units() {
-  load_schedule
-  validate_schedule
-  mkdir -p "$systemd_user_dir"
-  cat >"$systemd_user_dir/$service_unit" <<'UNIT'
+  local temporary_service temporary_timer rc=0
+  load_schedule || return $?
+  validate_schedule || return $?
+  mkdir -p "$systemd_user_dir" || return $?
+  temporary_service="$(mktemp "$systemd_user_dir/.wallpaper-service.XXXXXX")" || return $?
+  temporary_timer="$(mktemp "$systemd_user_dir/.wallpaper-timer.XXXXXX")" || {
+    rc=$?
+    rm -f -- "$temporary_service"
+    return "$rc"
+  }
+  cat >"$temporary_service" <<'UNIT'
 [Unit]
 Description=Apply the Aranea phase wallpaper
 
@@ -70,7 +103,7 @@ Description=Apply the Aranea phase wallpaper
 Type=oneshot
 ExecStart=%h/.config/omarchy/themes/aranea/scripts/aranea-wallpaper set-phase
 UNIT
-  cat >"$systemd_user_dir/$timer_unit" <<UNIT
+  cat >"$temporary_timer" <<UNIT
 [Unit]
 Description=Schedule the Aranea phase wallpaper
 
@@ -84,6 +117,9 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+  mv -f -- "$temporary_service" "$systemd_user_dir/$service_unit" && mv -f -- "$temporary_timer" "$systemd_user_dir/$timer_unit" || rc=$?
+  rm -f -- "$temporary_service" "$temporary_timer"
+  return "$rc"
 }
 # Prints "id<TAB>path" for every [[wallpapers]] block of the manifest (other
 # sections are ignored; any spacing around = is accepted).
@@ -130,8 +166,139 @@ phase_for_now() {
   fi
 }
 
+# Optional JSON catalog uses the same path resolution as set.
+wallpaper_catalog_json() {
+  local id relative path label available
+  [[ -r "$manifest" ]] || {
+    printf '[]\n'
+    echo 'Wallpaper manifest is unreadable' >&2
+    return 1
+  }
+  while IFS=$'\t' read -r id relative; do
+    path="$repo_root/$relative"
+    label="${id//-/ }"
+    label="${label//_/ }"
+    label="${label^}"
+    available=false
+    [[ -f "$path" && -r "$path" ]] && available=true
+    jq -cn --arg id "$id" --arg path "$path" --arg label "$label" \
+      --argjson available "$available" '{id:$id,label:$label,path:$path,available:$available}'
+  done < <(wallpaper_rows) | jq -s .
+}
+# Host source matches omarchy-theme-bg-switcher and omarchy-theme-bg-current.
+wallpaper_status_json() {
+  local active=null availability=unavailable target id relative candidate
+  target="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
+  if [[ -n "$target" && -f "$target" && -r "$target" ]]; then
+    availability=available
+    if [[ -r "$manifest" ]]; then
+      while IFS=$'\t' read -r id relative; do
+        candidate="$(readlink -f -- "$repo_root/$relative" 2>/dev/null || true)"
+        if [[ "$candidate" == "$target" ]]; then
+          active="$(jq -cn --arg id "$id" '$id')"
+          break
+        fi
+      done < <(wallpaper_rows)
+    else availability=unavailable; fi
+  fi
+  jq -cn --argjson active "$active" --arg availability "$availability" \
+    '{activeId:$active,availability:$availability}'
+}
+# Applied means observed active timer, not that a phase image was applied.
+schedule_status_json() {
+  local enabled=false applied=null availability=available live
+  if [[ -e "$state_root/wallpaper-schedule" || -L "$state_root/wallpaper-schedule" ]]; then
+    case "$(cat "$state_root/wallpaper-schedule" 2>/dev/null)" in
+      on) enabled=true ;;
+      off) enabled=false ;;
+      *)
+        enabled=null
+        availability=unavailable
+        ;;
+    esac
+  fi
+  if ! load_schedule || ! validate_schedule; then
+    availability=unavailable
+    dawn=""
+    day=""
+    dusk=""
+    night=""
+  fi
+  if live="$(systemctl_user is-active "$timer_unit" 2>/dev/null)"; then
+    [[ "$live" == active ]] && applied=true
+  else
+    [[ "$live" == inactive || "$live" == failed ]] && applied=false
+  fi
+  jq -cn --argjson enabled "$enabled" --argjson applied "$applied" \
+    --arg availability "$availability" --arg dawn "$dawn" --arg day "$day" \
+    --arg dusk "$dusk" --arg night "$night" \
+    '{enabled:$enabled,applied:$applied,availability:$availability,
+      dawn:(if $dawn == "" then null else $dawn end),day:(if $day == "" then null else $day end),
+      dusk:(if $dusk == "" then null else $dusk end),night:(if $night == "" then null else $night end)}'
+  [[ "$availability" == available ]]
+}
+# Preserve exactly the existing files (including symlinks) on apply failure.
+schedule_transaction() {
+  local mode="$1" snapshot rc=0 file index=0
+  local -a files=("$schedule_config" "$systemd_user_dir/$service_unit" "$systemd_user_dir/$timer_unit" "$state_root/wallpaper-schedule")
+  snapshot="$(mktemp -d)" || return $?
+  for file in "${files[@]}"; do
+    if [[ -e "$file" || -L "$file" ]]; then
+      cp -a -- "$file" "$snapshot/$index" || {
+        rc=$?
+        rm -rf -- "$snapshot"
+        return "$rc"
+      }
+    fi
+    index=$((index + 1))
+  done
+  if [[ "$mode" == off ]]; then
+    systemctl_user disable --now "$timer_unit" || rc=$?
+    if ((rc == 0)); then rm -f -- "$systemd_user_dir/$timer_unit" "$systemd_user_dir/$service_unit" || rc=$?; fi
+    if ((rc == 0)); then systemctl_user daemon-reload || rc=$?; fi
+  else
+    if [[ "$mode" == configure || ! -f "$schedule_config" ]]; then write_schedule_config || rc=$?; fi
+    if ((rc == 0)) && { [[ "$mode" == on ]] || [[ -f "$state_root/wallpaper-schedule" && "$(cat "$state_root/wallpaper-schedule")" == on ]]; }; then
+      write_schedule_units || rc=$?
+      if ((rc == 0)); then systemctl_user daemon-reload || rc=$?; fi
+      if ((rc == 0)); then systemctl_user enable --now "$timer_unit" || rc=$?; fi
+    fi
+  fi
+  if ((rc == 0)) && [[ "$mode" != configure ]]; then
+    mkdir -p "$state_root" && printf '%s' "$mode" >"$state_root/wallpaper-schedule" || rc=$?
+  fi
+  if ((rc != 0)); then
+    index=0
+    for file in "${files[@]}"; do
+      rm -f -- "$file"
+      if [[ -e "$snapshot/$index" || -L "$snapshot/$index" ]]; then cp -a -- "$snapshot/$index" "$file"; fi
+      index=$((index + 1))
+    done
+    systemctl_user daemon-reload >/dev/null 2>&1 || true
+  fi
+  rm -rf -- "$snapshot"
+  return "$rc"
+}
+
+# JSON reads require jq before doing any work; existing text commands do not.
+if [[ "${*: -1}" == --json ]]; then
+  command -v jq >/dev/null 2>&1 || {
+    echo 'jq is required for --json' >&2
+    exit 2
+  }
+fi
+
 case "${1:-list}" in
-  list) wallpaper_rows ;;
+  list)
+    if [[ "${2:-}" == --json ]]; then
+      [[ $# -eq 2 ]] || exit 2
+      wallpaper_catalog_json
+    else wallpaper_rows; fi
+    ;;
+  status)
+    [[ $# -eq 2 && "$2" == --json ]] || exit 2
+    wallpaper_status_json
+    ;;
   set)
     id="${2:-}"
     path="$(wallpaper_path "$id")"
@@ -139,7 +306,7 @@ case "${1:-list}" in
       printf 'Unknown wallpaper: %s\n' "$id" >&2
       exit 1
     }
-    [[ -f "$path" ]] || {
+    [[ -f "$path" && -r "$path" ]] || {
       printf 'Wallpaper asset is missing: %s\n' "$path" >&2
       exit 1
     }
@@ -169,12 +336,7 @@ case "${1:-list}" in
       dusk="$5"
       night="$6"
       validate_schedule
-      write_schedule_config
-      if [[ -f "$state_root/wallpaper-schedule" ]] && [[ "$(<"$state_root/wallpaper-schedule")" == on ]]; then
-        write_schedule_units
-        systemctl_user daemon-reload
-        systemctl_user enable --now "$timer_unit"
-      fi
+      schedule_transaction configure
       printf 'wallpaper schedule: configured\n'
       exit 0
     fi
@@ -182,8 +344,12 @@ case "${1:-list}" in
       printf 'Usage: %s schedule on|off|status|configure\n' "$0" >&2
       exit 2
     }
-    mkdir -p "$state_root"
     if [[ "$mode" == status ]]; then
+      if [[ "${3:-}" == --json ]]; then
+        [[ $# -eq 3 ]] || exit 2
+        schedule_status_json
+        exit $?
+      fi
       state=off
       [[ -f "$state_root/wallpaper-schedule" ]] && state="$(<"$state_root/wallpaper-schedule")"
       load_schedule
@@ -193,19 +359,9 @@ case "${1:-list}" in
     if [[ "$mode" == on ]]; then
       load_schedule
       validate_schedule
-      [[ -f "$schedule_config" ]] || write_schedule_config
-      write_schedule_units
-      systemctl_user daemon-reload
-      systemctl_user enable --now "$timer_unit"
-      printf on >"$state_root/wallpaper-schedule"
-      printf 'wallpaper schedule: on\n'
-    else
-      systemctl_user disable --now "$timer_unit" >/dev/null 2>&1 || true
-      systemctl_user daemon-reload >/dev/null 2>&1 || true
-      rm -f "$systemd_user_dir/$timer_unit" "$systemd_user_dir/$service_unit"
-      printf off >"$state_root/wallpaper-schedule"
-      printf 'wallpaper schedule: off\n'
     fi
+    schedule_transaction "$mode"
+    printf 'wallpaper schedule: %s\n' "$mode"
     ;;
   motion)
     mode="${2:-}"
