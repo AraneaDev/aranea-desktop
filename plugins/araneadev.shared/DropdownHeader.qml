@@ -9,6 +9,11 @@ import qs.Commons
 Item {
   id: header
 
+  // Opt into proportional labels and quieter captions; legacy hosts retain their look.
+  property bool refined: false
+  // Overridable font for title and caption labels.
+  property string labelFontFamily: refined ? Typography.uiFamily : Style.font.family
+
   // Leading glyph (a Nerd Font icon).
   property string glyph: ""
   // Optional image mark shown in the glyph slot instead of the glyph (an
@@ -43,7 +48,7 @@ Item {
     text: header.glyph
     visible: !header.markShown
     color: header.glyphColor
-    font.family: Style.font.family
+    font.family: Typography.iconFamily
     font.pixelSize: Style.font.display
   }
   Image {
@@ -72,7 +77,7 @@ Item {
       text: header.title
       elide: Text.ElideRight
       color: DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: header.labelFontFamily
       font.pixelSize: Style.font.title
       font.bold: true
     }
@@ -80,14 +85,14 @@ Item {
       textFormat: Text.PlainText
       width: parent.width
       objectName: "headerCaption"
-      text: header.caption.toUpperCase()
+      text: header.refined ? header.caption : header.caption.toUpperCase()
       opacity: header.captionOpacity
       elide: Text.ElideRight
       color: Util.alpha(DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: header.labelFontFamily
       font.pixelSize: Style.font.caption
-      font.bold: true
-      font.letterSpacing: 1.2
+      font.bold: !header.refined
+      font.letterSpacing: header.refined ? 0 : 1.2
     }
   }
   Item {

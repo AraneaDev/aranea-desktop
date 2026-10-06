@@ -36,7 +36,11 @@ Item {
   // Label colour, preserving the shared selected and muted defaults.
   property color labelColor: selected ? DesignTokens.foreground : Util.alpha(DesignTokens.foreground, 0.55)
   // Label font family, with Settings opting into the host menu font.
-  property string labelFontFamily: Style.font.family
+  property string labelFontFamily: refined ? Typography.uiFamily : Style.font.family
+  // Opt into proportional choice labels; interaction remains host-owned.
+  property bool refined: false
+  // Tracking applied to the label, separately overridable for glyph-only actions.
+  property real labelLetterSpacing: refined ? 0 : 0.6
   // Whether a change to this option is in progress (a pending band).
   property bool busy: false
   // Hover tooltip; empty shows none.
@@ -161,7 +165,7 @@ Item {
     color: pill.labelColor
     font.family: pill.labelFontFamily
     font.pixelSize: Style.font.caption
-    font.letterSpacing: 0.6
+    font.letterSpacing: pill.labelLetterSpacing
   }
   // Breathing while busy; static at 0.7 when motion is disabled.
   SequentialAnimation {

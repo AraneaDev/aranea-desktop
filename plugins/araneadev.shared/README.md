@@ -4,6 +4,18 @@
 It is not a plugin surface. It provides stable visual, input, path, token, and
 service contracts to the feature plugins.
 
+## Typography and refinement
+
+`Typography.uiFamily` uses the system `sans-serif` alias unless
+`OMARCHY_MENU_FONT` explicitly overrides it. `technicalFamily` and `iconFamily`
+retain the desktop monospace alias so values and Nerd Font glyphs stay legible.
+`DropdownHeader`, `NodeDeviceRow`, `FilamentPill` and `KeyboardPanelFrame` expose
+`refined: false` for a deliberate host migration. Refined presentation uses
+proportional labels, untracked captions and neutral panel borders; selection,
+pointer gates and keyboard signals keep their existing contracts. Label fonts
+remain overridable, and `StatusTextPair.valueFontFamily` independently controls
+technical subtitles.
+
 ## Components
 
 - `DesignTokens`, `MotionState`, and `RuntimePaths` expose canonical runtime

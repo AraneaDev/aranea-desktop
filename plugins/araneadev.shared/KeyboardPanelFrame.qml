@@ -2,9 +2,13 @@
 // own cursor and activation policy through the forwarded signals.
 import QtQuick
 import qs.Ui
+import qs.Commons
 
 KeyboardPanel {
   id: frame
+  // Opt into neutral panel chrome while keeping the configured width and radius.
+  property bool refined: false
+  borderSpec: refined ? Border.flat(DesignTokens.surfaceBorder, DesignTokens.borderWidth) : Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
   // Emitted when the panel should close.
   signal closeRequested
   // Emitted when focus moves between tabs.

@@ -26,6 +26,8 @@ ColumnLayout {
   property int subtitleElide: Text.ElideNone
   // Font family for both labels.
   property string fontFamily: Style.font.family
+  // Subtitle font can retain technical values while the title uses UI typography.
+  property string valueFontFamily: fontFamily
   spacing: 0
 
   Text {
@@ -42,7 +44,7 @@ ColumnLayout {
     color: pair.subtitleColor
     opacity: pair.subtitleOpacity
     font.pixelSize: pair.subtitleSize
-    font.family: pair.fontFamily
+    font.family: pair.valueFontFamily
     elide: pair.subtitleElide
     Layout.fillWidth: true
   }
