@@ -10,6 +10,8 @@
 // of its dropdown's layout shifting (pointerGate.layoutChangedAt), is
 // ignored unless the gate accepted a real pointer move onto it since.
 // A real move onto it (gated, as its entering) draws the hover fill.
+// Host font tokens are dynamic QObject properties.
+// qmllint disable missing-property
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -78,8 +80,8 @@ Item {
 
   objectName: "forgetButton"
   visible: shown
-  width: shown ? forgetLabel.implicitWidth + Style.space(12) : 0
-  height: shown ? forgetLabel.implicitHeight + Style.space(4) : 0
+  width: shown ? forgetContent.implicitWidth + Style.space(12) : 0
+  height: shown ? forgetContent.implicitHeight + Style.space(4) : 0
   Component.onCompleted: createdAt = Date.now()
 
   Rectangle {
@@ -89,14 +91,24 @@ Item {
     border.width: 1
     border.color: forgetBtn.bright ? DesignTokens.urgent : Util.alpha(DesignTokens.foreground, 0.22)
   }
-  Text {
-    id: forgetLabel
-    objectName: "forgetLabel"
+  Row {
+    id: forgetContent
     anchors.centerIn: parent
-    text: String.fromCodePoint(0xf0156) + " forget"
-    color: forgetBtn.bright ? DesignTokens.urgent : Util.alpha(DesignTokens.urgent, 0.7)
-    font.family: Style.font.family
-    font.pixelSize: Style.font.caption
+    spacing: Style.space(4)
+    Text {
+      text: String.fromCodePoint(0xf0156)
+      color: forgetLabel.color
+      font.family: Typography.iconFamily
+      font.pixelSize: Style.font.caption
+    }
+    Text {
+      id: forgetLabel
+      objectName: "forgetLabel"
+      text: "Forget"
+      color: forgetBtn.bright ? DesignTokens.urgent : Util.alpha(DesignTokens.urgent, 0.7)
+      font.family: Typography.uiFamily
+      font.pixelSize: Style.font.caption
+    }
   }
   MouseArea {
     anchors.fill: parent
@@ -126,6 +138,7 @@ Item {
     }
   }
   PanelToolTip {
+    fontFamily: Typography.uiFamily
     objectName: "forgetTip"
     visible: forgetHover.hovered
     text: forgetBtn.tooltipText

@@ -11,6 +11,9 @@ import qs.Commons
 Item {
   id: chrome
 
+  // First-party refined typography; external callers retain legacy defaults.
+  property bool refined: false
+
   // Header title, shown as given (the pickers pass uppercase text).
   property string title: ""
   // Dimmed line under the title.
@@ -24,7 +27,7 @@ Item {
   // Key-hint text for the strip at the bottom.
   property string hints: ""
   // Font for every text in the frame; defaults to the menu font.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: refined ? Typography.uiFamily : Style.font.menuFamily
   // Main text colour; also the base for the dimmed colour and the search box tints.
   property color foreground: Color.menu.text
   // Colour of the counts and of the search glyph while a filter is set.
@@ -32,7 +35,7 @@ Item {
   // foreground at 58% alpha, for the subtitle, hints and idle search glyph.
   readonly property color dim: Util.alpha(foreground, 0.58)
   // Letter spacing of the header, counts and hint texts.
-  readonly property real letterSpacing: 0.20
+  readonly property real letterSpacing: refined ? 0 : 0.20
   // file:// URL of the Aranea glyph in the current theme's branding
   // ($XDG_STATE_HOME, falling back to ~/.local/state).
   readonly property string glyphSource: RuntimePaths.glyphUrl
@@ -77,7 +80,7 @@ Item {
           textFormat: Text.PlainText
           text: "⌕"
           color: chrome.searchText ? chrome.accent : chrome.dim
-          font.family: chrome.fontFamily
+          font.family: Typography.iconFamily
           font.pixelSize: Style.font.subtitle
         }
         Text {

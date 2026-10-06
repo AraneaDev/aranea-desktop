@@ -11,6 +11,8 @@
 // pointerGate ignores a click within settleMs of its dropdown's layout
 // shifting (pointerGate.layoutChangedAt) unless the gate accepted a real
 // move onto it since. Labels are plain text, never markup.
+// Host font tokens are dynamic QObject properties.
+// qmllint disable missing-property
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -21,6 +23,8 @@ Item {
 
   // The label, e.g. "Cloudflare".
   property string text: ""
+  // Optional icon kept independent from configurable label typography.
+  property string glyph: ""
   // Whether this is the chosen option.
   property bool selected: false
   // The border and underline colour when selected (DesignTokens only).
@@ -101,7 +105,7 @@ Item {
   }
 
   objectName: "pill"
-  implicitWidth: label.implicitWidth + Style.space(16)
+  implicitWidth: label.implicitWidth + (glyphLabel.visible ? glyphLabel.implicitWidth + Style.space(4) : 0) + Style.space(16)
   implicitHeight: label.implicitHeight + Style.space(8)
   onLayoutStampChanged: pill.pointerHovered = false
 
@@ -153,19 +157,40 @@ Item {
     visible: pill.selected && pill.underlineVisible
     opacity: pill.busy ? (DesignTokens.motionEnabled ? pill.pulseOpacity : 0.7) : 1
   }
-  Text {
-    id: label
+  Item {
+    id: labelRow
     visible: pill.labelVisible
-    textFormat: Text.PlainText
     anchors.centerIn: parent
-    width: Math.min(implicitWidth, pill.width - Style.space(8))
-    horizontalAlignment: Text.AlignHCenter
-    elide: Text.ElideRight
-    text: pill.text
-    color: pill.labelColor
-    font.family: pill.labelFontFamily
-    font.pixelSize: Style.font.caption
-    font.letterSpacing: pill.labelLetterSpacing
+    readonly property real glyphSpace: glyphLabel.visible ? glyphLabel.implicitWidth + Style.space(4) : 0
+    implicitWidth: label.implicitWidth + glyphSpace
+    implicitHeight: Math.max(label.implicitHeight, glyphLabel.implicitHeight)
+    width: Math.min(implicitWidth, Math.max(0, pill.width - Style.space(8)))
+    Text {
+      id: glyphLabel
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      visible: pill.glyph !== ""
+      textFormat: Text.PlainText
+      text: pill.glyph
+      color: pill.labelColor
+      font.family: Typography.iconFamily
+      font.pixelSize: Style.font.caption
+    }
+    Text {
+      id: label
+      anchors.left: parent.left
+      anchors.leftMargin: labelRow.glyphSpace
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      width: Math.max(0, Math.min(implicitWidth, labelRow.width - labelRow.glyphSpace))
+      horizontalAlignment: Text.AlignHCenter
+      elide: Text.ElideRight
+      text: pill.text
+      color: pill.labelColor
+      font.family: pill.labelFontFamily
+      font.pixelSize: Style.font.caption
+      font.letterSpacing: pill.labelLetterSpacing
+    }
   }
   // Breathing while busy; static at 0.7 when motion is disabled.
   SequentialAnimation {
@@ -224,6 +249,7 @@ Item {
     }
   }
   PanelToolTip {
+    fontFamily: Typography.uiFamily
     objectName: "pillTip"
     visible: hover.hovered && pill.tooltipText !== ""
     text: pill.tooltipText
