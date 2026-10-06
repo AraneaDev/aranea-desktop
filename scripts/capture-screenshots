@@ -1211,7 +1211,8 @@ case "$surface" in
     }
     trap finish_polkit EXIT
     shown=0
-    for _ in $(seq 1 20); do
+    # PAM/reader startup can outlast ten seconds; keep the wait bounded.
+    for _ in $(seq 1 120); do
       if prompt_visible; then
         shown=1
         break
@@ -1219,7 +1220,7 @@ case "$surface" in
       sleep 0.5
     done
     if ((! shown)); then
-      echo "polkit prompt never appeared; is a polkit agent registered?" >&2
+      echo "polkit prompt never appeared within 60 seconds; is a polkit agent registered?" >&2
       exit 3
     fi
     # Give the pkaction lookup a moment, then open the details.
