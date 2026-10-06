@@ -291,6 +291,7 @@ PATH="$registry_bin:$PATH" REGISTRY_MODE=empty "$ctl" status --json | jq -e '.ok
 export ARANEA_DISPLAY_OWNER="$sandbox_root/display-owner"
 mkdir -p "$HOME/.config/hypr"
 printf 'local omarchy_monitor_scale = 2\nlocal omarchy_gdk_scale = 2\n' >"$HOME/.config/hypr/monitors.lua"
+# Restore the sandbox focused-display observation for each isolated case.
 reset_display() {
   printf '[{"name":"eDP-1","focused":true,"scale":2,"width":3840,"height":2160}]\n' >"$sandbox_root/monitors.json"
 }
@@ -372,9 +373,26 @@ SCALE_MODE=persistfail "$ctl" set display-scale 2.5 --json | jq -e '.ok and .res
 printf 'hl.monitor({ output = "DP-1", scale = 2 })\n' >"$HOME/.config/hypr/monitors.lua"
 reset_display
 "$ctl" set display-scale 2.667 --json | jq -e '.ok and .state.display.persistenceSupport == "unsupported" and .result.displayScale.persistence == "session-only"' >/dev/null
-# Unsupported Lua is never interpreted or executed by the adapter.
-printf 'local omarchy_monitor_scale = os.execute("touch %s")\n' "$sandbox_root/lua-executed" >"$HOME/.config/hypr/monitors.lua"
+# Owner-recognized generic config retains saving support with trailing Lua comments.
+for generic in 'local omarchy_monitor_scale = 2 -- standard Lua comment' 'local omarchy_monitor_scale = 2.667  -- custom fraction' 'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 2 }) -- standard Lua comment'; do
+  printf '%s\n' "$generic" >"$HOME/.config/hypr/monitors.lua"
+  literal=2
+  [[ "$generic" != *2.667* ]] || literal=2.667
+  "$ctl" status --json | jq -e --argjson literal "$literal" '.state.display.persistenceSupport == "supported" and .state.display.configuredScale == $literal' >/dev/null || {
+    echo 'commented generic config must remain save-capable with its literal scale' >&2
+    exit 1
+  }
+done
+# Recognized saving support does not permit guessing or evaluating arbitrary Lua.
+printf 'local omarchy_monitor_scale = 2 + 1\n' >"$HOME/.config/hypr/monitors.lua"
+"$ctl" status --json | jq -e '.state.display.persistenceSupport == "supported" and .state.display.configuredScale == null' >/dev/null
+printf 'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 2 }) ; os.execute("touch %s")\n' "$sandbox_root/lua-executed" >"$HOME/.config/hypr/monitors.lua"
+"$ctl" status --json | jq -e '.state.display.persistenceSupport == "supported" and .state.display.configuredScale == null' >/dev/null
+printf 'hl.monitor({ output = "DP-1", scale = 2 }) -- custom monitor rule\n' >"$HOME/.config/hypr/monitors.lua"
 "$ctl" status --json | jq -e '.state.display.persistenceSupport == "unsupported" and .state.display.configuredScale == null' >/dev/null
+# Nonliteral Lua is never interpreted or executed by the adapter.
+printf 'local omarchy_monitor_scale = os.execute("touch %s")\n' "$sandbox_root/lua-executed" >"$HOME/.config/hypr/monitors.lua"
+"$ctl" status --json | jq -e '.state.display.persistenceSupport == "supported" and .state.display.configuredScale == null' >/dev/null
 test ! -e "$sandbox_root/lua-executed"
 printf 'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })\n' >"$HOME/.config/hypr/monitors.lua"
 "$ctl" status --json | jq -e '.state.display.persistenceSupport == "supported" and .state.display.configuredScale == null' >/dev/null

@@ -6,22 +6,25 @@
 display_owner="${ARANEA_DISPLAY_OWNER:-omarchy}"
 display_hyprctl="${ARANEA_HYPRCTL:-hyprctl}"
 display_config="$HOME/.config/hypr/monitors.lua"
-# Recognize only the installed owner's standard generic literal config forms.
+# Recognize owner saving support separately from conservative literal readback.
 display_persistence() {
   display_support=unsupported
   display_configured=null
   if [[ -e "$display_config" && ! -r "$display_config" ]]; then
     display_support=unknown
   elif [[ -f "$display_config" ]]; then
-    local literal
-    literal="$(sed -nE 's/^local omarchy_monitor_scale = ([0-9]+([.][0-9]+)?)$/\1/p' "$display_config")"
+    local literal=''
+    # Match the owner's generic-config predicates, including trailing comments.
+    if grep -q '^local omarchy_monitor_scale = ' "$display_config"; then
+      display_support=supported
+      literal="$(sed -nE 's/^local omarchy_monitor_scale = ([0-9]+([.][0-9]+)?)([[:space:]]*--.*)?[[:space:]]*$/\1/p' "$display_config")"
+    elif grep -Eq '^hl\.monitor\(\{ output = "", mode = "preferred", position = "auto", scale = ("auto"|[0-9.]+) \}\)' "$display_config"; then
+      display_support=supported
+      literal="$(sed -nE 's/^hl\.monitor\(\{ output = "", mode = "preferred", position = "auto", scale = ([0-9]+([.][0-9]+)?) \}\)([[:space:]]*--.*)?[[:space:]]*$/\1/p' "$display_config")"
+    fi
+    # Nonliteral expressions may be save-capable but are never interpreted.
     if [[ "$literal" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-      display_support=supported
       display_configured="$(jq -cn --arg scale "$literal" '$scale | tonumber')"
-    elif grep -Eq '^hl\.monitor\(\{ output = "", mode = "preferred", position = "auto", scale = ("auto"|[0-9]+([.][0-9]+)?) \}\)$' "$display_config"; then
-      display_support=supported
-      literal="$(sed -nE 's/^hl\.monitor\(\{ output = "", mode = "preferred", position = "auto", scale = ([0-9]+([.][0-9]+)?) \}\)$/\1/p' "$display_config")"
-      [[ ! "$literal" =~ ^[0-9]+([.][0-9]+)?$ ]] || display_configured="$(jq -cn --arg scale "$literal" '$scale | tonumber')"
     fi
   fi
 }
