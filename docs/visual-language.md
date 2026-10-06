@@ -32,6 +32,13 @@ desktop monospace family. Its compact controls use neutral hover and press
 feedback, with mint reserved for selection and keyboard focus. Wallpaper
 choices adapt from four columns to two or one as the content width narrows.
 
+The first desktop checkpoint extends native typography to the launcher,
+bar tooltips, audio and network. Shared `Typography` keeps UI labels, technical
+values and icon glyphs on separate font roles. Refined popup frames use a
+neutral border color while preserving configured widths, including zero and
+individual edge overrides. Shared components migrate through explicit opt-in;
+the remaining component families follow the whole-desktop rollout plan.
+
 ## Motion
 
 Feedback should feel immediate, panels should settle gently, and ceremonial

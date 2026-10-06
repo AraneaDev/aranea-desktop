@@ -43,33 +43,33 @@ multiple tasks exist. Independent review uses the explicitly invoked review skil
 
 ## Branch and dependency handling
 
-- [ ] Verify master, open PR #125 and installed theme state before creating the execution branch.
-- [ ] Preserve the existing native Settings preview by basing the execution branch on the verified PR #125 head if that PR is still open. Include this design/plan commit by cherry-pick. If #125 is already merged, use updated master instead.
+- [x] Verify master, open PR #125 and installed theme state before creating the execution branch.
+- [x] Preserve the existing native Settings preview by basing the execution branch on the verified PR #125 head if that PR is still open. Include this design/plan commit by cherry-pick. If #125 is already merged, use updated master instead.
 - [ ] Treat those Settings changes as an existing dependency during checkpoints 1-3; checkpoint 4 adapts them to the shared roles. Do not silently downgrade the installed preview.
 - [ ] Keep master clean. Do not merge or release this rollout without explicit instruction.
 
 ## Coverage tracking
 
-| Family                                          | Delivery checkpoint | Outcome / capture / checks |
-| ----------------------------------------------- | ------------------- | -------------------------- |
-| Shared typography, chrome and controls          | 1, consolidated 4   | Pending execution          |
-| Bar and tooltips                                | 1                   | Pending execution          |
-| Launcher and unified search                     | 1, completed 2      | Pending execution          |
-| Audio and network                               | 1                   | Pending execution          |
-| Bluetooth and VPN                               | 2                   | Pending execution          |
-| Displays and power                              | 2                   | Pending execution          |
-| Tray and workspaces                             | 2                   | Pending execution          |
-| Apps, favorites, recent, submenus and input     | 2                   | Pending execution          |
-| Notifications                                   | 3                   | Pending execution          |
-| Health, Agents and updates                      | 3                   | Pending execution          |
-| Clipboard, emoji and image picker               | 3                   | Pending execution          |
-| Clock and weather                               | 3                   | Pending execution          |
-| Settings and OSD                                | 4                   | Pending execution          |
-| Authentication, lock and idle                   | 4                   | Pending execution          |
-| Boot and identity assets                        | 4                   | Pending execution          |
-| GTK, Qt, file manager and browser               | 4                   | Pending execution          |
-| Terminal, editor/developer tools and media/Cava | 4                   | Pending execution          |
-| Icons, cursors and wallpaper variants           | 4                   | Pending execution          |
+| Family                                          | Delivery checkpoint | Outcome / capture / checks                                                                                                                                                                        |
+| ----------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared typography, chrome and controls          | 1, consolidated 4   | Checkpoint 1 implemented; configured border widths preserved; shared and popup regression checks pass. Consolidation remains checkpoint 4.                                                        |
+| Bar and tooltips                                | 1                   | Checkpoint 1 implemented: proportional tooltips and quieter indicators; numeric glyphs/composition preserved; desktop capture and bar suites pass.                                                |
+| Launcher and unified search                     | 1, completed 2      | Checkpoint 1 preview implemented: compact tiles, explicit search guidance, native labels and dedicated icons; seven normal-flow menu captures refreshed. Checkpoint 2 completes command variants. |
+| Audio and network                               | 1                   | Checkpoint 1 implemented: neutral frames and readable label/value hierarchy; full checks, scale renders and normal desktop captures pass.                                                         |
+| Bluetooth and VPN                               | 2                   | Pending execution                                                                                                                                                                                 |
+| Displays and power                              | 2                   | Pending execution                                                                                                                                                                                 |
+| Tray and workspaces                             | 2                   | Pending execution                                                                                                                                                                                 |
+| Apps, favorites, recent, submenus and input     | 2                   | Pending execution                                                                                                                                                                                 |
+| Notifications                                   | 3                   | Pending execution                                                                                                                                                                                 |
+| Health, Agents and updates                      | 3                   | Pending execution                                                                                                                                                                                 |
+| Clipboard, emoji and image picker               | 3                   | Pending execution                                                                                                                                                                                 |
+| Clock and weather                               | 3                   | Pending execution                                                                                                                                                                                 |
+| Settings and OSD                                | 4                   | Pending execution                                                                                                                                                                                 |
+| Authentication, lock and idle                   | 4                   | Pending execution                                                                                                                                                                                 |
+| Boot and identity assets                        | 4                   | Pending execution                                                                                                                                                                                 |
+| GTK, Qt, file manager and browser               | 4                   | Pending execution                                                                                                                                                                                 |
+| Terminal, editor/developer tools and media/Cava | 4                   | Pending execution                                                                                                                                                                                 |
+| Icons, cursors and wallpaper variants           | 4                   | Pending execution                                                                                                                                                                                 |
 
 Pending execution is a progress state, not an unspecified task: each row maps
 to the concrete files, actions and checks in its child plan. Record an inspected
