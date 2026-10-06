@@ -5,6 +5,7 @@ singleton BrandConfig 1.0 BrandConfig.qml
 OverlayChrome 1.0 OverlayChrome.qml
 SurfaceCard 1.0 SurfaceCard.qml
 PanelHeader 1.0 PanelHeader.qml
+DisclosureSection 1.0 DisclosureSection.qml
 StatusRail 1.0 StatusRail.qml
 StatusTextPair 1.0 StatusTextPair.qml
 EmptyState 1.0 EmptyState.qml

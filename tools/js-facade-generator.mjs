@@ -6,6 +6,11 @@ import path from "node:path"
 const root = process.cwd()
 
 const specs = [
+  ["plugins/araneadev.menu/DesktopSearchLogic.js", "plugins/araneadev.menu/MenuSearch.js"],
+  [
+    "plugins/araneadev.menu/DesktopSearchLogic.js",
+    "plugins/araneadev.menu/DesktopSearchRanking.js"
+  ],
   ["plugins/araneadev.menu/MenuModel.js", "plugins/araneadev.menu/MenuPresentation.js"],
   ["plugins/araneadev.menu/MenuModel.js", "plugins/araneadev.menu/MenuSearch.js"],
   ["plugins/araneadev.menu/MenuModel.js", "plugins/araneadev.menu/MenuTree.js"],
@@ -43,10 +48,12 @@ const specs = [
   ["plugins/araneadev.vpn/VpnLogic.js", "plugins/araneadev.shared/NmcliTerse.js"]
 ]
 
+/** Returns the source region marker used by each facade. */
 function marker(target, source) {
   return `/* @aranea-facade-start: ${source} */`
 }
 
+/** Reads a focused source module and wraps it as a generated facade region. */
 function generatedRegion(target, source) {
   const sourceText = fs
     .readFileSync(path.join(root, source), "utf8")
@@ -55,6 +62,7 @@ function generatedRegion(target, source) {
   return `${marker(target, source)}\n${sourceText}\n/* @aranea-facade-end */`
 }
 
+/** Replaces one marked facade region with its canonical source. */
 function render(target, source) {
   const file = path.join(root, target)
   const input = fs.readFileSync(file, "utf8")
@@ -69,6 +77,7 @@ function render(target, source) {
   return before + generatedRegion(target, source) + after
 }
 
+/** Writes generated facades or checks that their regions are current. */
 function main() {
   const write = process.argv.includes("--write")
   const check = process.argv.includes("--check")

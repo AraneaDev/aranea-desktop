@@ -18,6 +18,7 @@
 // the dropdown stays within maxHeight.
 import QtQuick
 import QtTest
+import qs.Commons
 import Quickshell
 import "lib"
 import "plugins/araneadev.agents" as Agents
@@ -133,6 +134,10 @@ ShellRoot {
           detail: "Sun 10/4 · 525.9M tokens · 41 prompts · 3 sessions"
         }
       ],
+      details: {
+        historyExpanded: true,
+        modelsExpanded: true
+      },
       models: [
         {
           key: "Sonnet 5",
@@ -245,10 +250,32 @@ ShellRoot {
       return view.height > 0
     }, 1000, "the capped view lays out", function () {
       t.check(view.height <= 160 + 0.5, "the dropdown stays within maxHeight")
+      var primary = t.findChild(view, "agentsPrimaryScroll")
+      t.check(primary !== null && primary.contentHeight > primary.height, "unusually tall primary state falls back to scrolling")
       view.maxHeight = 20
       t.check(view.scroll.height === 0 && view.scroll.height >= 0, "the scroll area never goes below nothing")
-      view.maxHeight = 2000
-      t.done()
+      view.maxHeight = 300
+      var focused = viewOf(agentRows, false, {
+        active: true,
+        section: "details",
+        index: 1
+      })
+      view.view = focused
+      t.step(60, function () {
+        var heading = t.findChild(t.findChild(view, "modelsDisclosure"), "disclosureHeading")
+        var top = heading.mapToItem(view.scroll.contentItem, 0, 0).y
+        t.check(top >= view.scroll.contentY && top + heading.height <= view.scroll.contentY + view.scroll.height + 0.5, "keyboard navigation keeps the models heading reachable")
+        t.check(outlined(heading), "keyboard focus outlines its disclosure heading")
+        var primary = t.findChild(view, "agentsPrimaryScroll")
+        var before = primary.y
+        view.scrollBy(1000)
+        t.equal(primary.y, before, "detail scrolling keeps primary state above its viewport")
+        var hint = t.findChild(view, "keyHint")
+        var caption = t.findChild(view, "footerText")
+        t.check(Qt.colorEqual(hint.color, caption.color) && hint.color.a > 0.3, "keyboard hint is as readable as existing muted captions")
+        view.maxHeight = 2000
+        t.done()
+      })
     })
   }
 
@@ -360,6 +387,32 @@ ShellRoot {
   }
 
   Component.onCompleted: run([[400, function () {
+        // Primary values remain visible while telemetry starts collapsed.
+        var collapsed = viewOf(agentRows, false)
+        collapsed.details = {
+          historyExpanded: false,
+          modelsExpanded: false
+        }
+        view.view = collapsed
+        t.check(t.findChild(view, "limitsSection").visible && t.findChild(view, "balanceSection").visible, "limits and prepaid balance are visible on open")
+        t.check(!t.findChild(view, "daysSection").visible && !t.findChild(view, "modelsSection").visible, "collapsed telemetry is absent from layout")
+        var history = t.findChild(view, "historyDisclosure")
+        var modelsHeading = t.findChild(view, "modelsDisclosure")
+        t.check(history !== null && modelsHeading !== null, "both telemetry headings remain reachable")
+        if (history && modelsHeading) {
+          actions = []
+          history.activate()
+          t.check(reported("toggleDetails", {
+            section: "history"
+          }), "history activation requests the host toggle")
+          t.check(!history.expanded, "pure view cannot expand itself")
+          modelsHeading.activate()
+          t.check(reported("toggleDetails", {
+            section: "models"
+          }), "models activation requests the host toggle")
+        }
+        view.view = viewOf(agentRows, false)
+      }], [350, function () {
         // ---------- Keyed pills ----------
         var p = pills()
         t.equal(p.length, 3, "one pill per agent")
@@ -474,7 +527,7 @@ ShellRoot {
         t.check(agentRows.length === 3 && outlined(t.findChild(view, "refreshPill")) && pills().every(function (p) {
           return !outlined(p)
         }), "with three agents, a revealed cursor sits on Refresh, Enter's target")
-        t.equal(t.findChild(view, "keyHint").text, "h/l agent · enter refresh · ↑↓ scroll", "the hint names Enter's refresh")
+        t.equal(t.findChild(view, "keyHint").text, "h/l agent · ↑↓ move · enter refresh · r refresh", "the hint names Enter's refresh")
         view.view = viewOf(agentRows, false)
 
         // ---------- Stable rows ----------
@@ -531,6 +584,7 @@ ShellRoot {
         view.view = withProblem
         t.check(t.findChild(view, "problemCard").visible && t.findChild(view, "problemText").text === "Run claude to sign in again.", "an auth problem shows its card")
         t.check(t.findChild(view, "footerText").visible, "the sync footer shows")
+        t.check(t.findChild(view, "problemCard").y < t.findChild(view, "limitsSection").y, "authentication error remains above limits")
         var noBalance = viewOf(agentRows, false)
         noBalance.balance = null
         view.view = noBalance
@@ -566,8 +620,10 @@ ShellRoot {
         t.check(Math.abs(scroll.contentY - (scroll.contentHeight - scroll.height)) < 0.5, "scrolling stops at the end")
         view.scrollToTop()
         t.equal(scroll.contentY, 0, "and returns to the top")
+        var primary = t.findChild(view, "agentsPrimaryScroll")
+        t.check(primary !== null && primary.contentHeight > primary.height, "unusually tall primary state falls back to scrolling")
         view.maxHeight = 2000
-
+      }], [60, function () {
         // ---------- Hover detail on today ----------
         view.disarmPointer()
         actions = []

@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
 import "MetricsLogic.js" as MetricsLogic
+import "HealthSummaryLogic.js" as SummaryLogic
 
 Item {
   id: root
@@ -17,16 +18,18 @@ Item {
   ColumnLayout {
     id: content
     anchors.fill: parent
-    spacing: Style.space(2)
+    spacing: Style.space(8)
     Text {
-      text: "TOP"
+      visible: root.cpuProcesses.length === 0 && root.memoryProcesses.length === 0
+      text: "No process data"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      // qmllint disable missing-property
       font.family: Style.font.family
-      font.pixelSize: Style.font.caption
-      font.bold: true
-      font.letterSpacing: 1.2
+      font.pixelSize: Style.font.body
+      // qmllint enable missing-property
     }
     RowLayout {
+      visible: root.cpuProcesses.length > 0 || root.memoryProcesses.length > 0
       Layout.fillWidth: true
       spacing: Style.space(16)
       ProcessCell {
@@ -35,7 +38,7 @@ Item {
         dim: true
       }
       ProcessCell {
-        name: "MEM"
+        name: "Memory"
         value: "RSS"
         dim: true
       }
@@ -53,11 +56,11 @@ Item {
         spacing: Style.space(16)
         ProcessCell {
           name: processRow.cpuProcess ? processRow.cpuProcess.comm : ""
-          value: processRow.cpuProcess ? processRow.cpuProcess.percent + "%" : ""
+          value: !processRow.cpuProcess ? "" : SummaryLogic.knownNumber(processRow.cpuProcess.percent) === null ? "—" : processRow.cpuProcess.percent + "%"
         }
         ProcessCell {
           name: processRow.memoryProcess ? processRow.memoryProcess.comm : ""
-          value: processRow.memoryProcess ? MetricsLogic.humanBytes(processRow.memoryProcess.rss) : ""
+          value: !processRow.memoryProcess ? "" : SummaryLogic.knownNumber(processRow.memoryProcess.rss) === null ? "—" : MetricsLogic.humanBytes(processRow.memoryProcess.rss)
         }
       }
     }

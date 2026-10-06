@@ -72,7 +72,7 @@ Column {
     return repeater.itemAt(index)
   }
 
-  spacing: Style.space(4)
+  spacing: Style.space(8)
   onRowKeysChanged: section.noteLayoutChange()
   onHostContentHeightChanged: section.noteLayoutChange()
 

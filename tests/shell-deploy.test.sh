@@ -28,7 +28,10 @@ work_dir="$(mktemp -d)"
 export ARANEA_STATE_ROOT="$work_dir/state"
 config_dir="$work_dir/config"
 plugins_dir="$config_dir/plugins"
-mkdir -p "$plugins_dir"
+mkdir -p "$plugins_dir" "$work_dir/bin"
+printf '#!/usr/bin/env bash\nexit 1\n' >"$work_dir/bin/omarchy-hyprland-session-locked"
+chmod +x "$work_dir/bin/omarchy-hyprland-session-locked"
+export PATH="$work_dir/bin:$PATH"
 cat >"$config_dir/shell.json" <<'EOF'
 {"plugins": [{"id": "araneadev.lock"}], "disabledPlugins": []}
 EOF
@@ -39,7 +42,22 @@ done
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
 
 jq -e '.bar.id == "araneadev.bar"' "$config_dir/shell.json" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.settings", "araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
+
+# A settings plugin missing from the target is deployed and registered; the
+# unrelated plugin and its inline settings survive deployment/release/return.
+jq '.plugins += [{id:"user.widget", option:7}] | .userSettings = {keep:true}' "$config_dir/shell.json" >"$config_dir/shell.next"
+mv "$config_dir/shell.next" "$config_dir/shell.json"
+"$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
+test -f "$plugins_dir/araneadev.settings/Settings.qml"
+diff -qr "$repo_root/plugins/araneadev.settings" "$plugins_dir/araneadev.settings"
+jq -e '([.plugins[].id | select(. == "araneadev.settings")] | length) == 1
+  and (.plugins | map(select(.id == "user.widget"))) == [{id:"user.widget", option:7}]
+  and .userSettings.keep' "$config_dir/shell.json" >/dev/null
+"$repo_root/scripts/release-shell-config" "$config_dir/shell.json"
+jq -e '([.plugins[].id] | index("araneadev.settings")) == null and .userSettings.keep' "$config_dir/shell.json" >/dev/null
+"$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
+jq -e '([.plugins[].id | select(. == "araneadev.settings")] | length) == 1 and .userSettings.keep' "$config_dir/shell.json" >/dev/null
 
 # --- 4d: a missing argument prints a usage line and exits 2
 rc=0

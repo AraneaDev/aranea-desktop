@@ -18,7 +18,7 @@ Column {
 
   objectName: "balanceSection"
   visible: !!section.balance
-  spacing: Style.space(6)
+  spacing: Style.space(4)
 
   Text {
     textFormat: Text.PlainText
@@ -51,7 +51,11 @@ Column {
       text: section.balance ? String(section.balance.remaining || "") : ""
       color: section.balance && section.balance.tone === "urgent" ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.foreground
       font.family: Style.font.family
-      font.pixelSize: Style.font.body
+      // The host exposes font tokens as a dynamic QObject.
+      // qmllint disable missing-property
+      font.pixelSize: Style.font.subtitle
+      // qmllint enable missing-property
+      font.bold: true
     }
   }
   Aranea.FilamentBar {

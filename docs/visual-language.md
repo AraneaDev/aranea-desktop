@@ -48,3 +48,22 @@ cursor, icon, and Qt palette outputs follow the same generation path. Cursor
 families intentionally share one geometry source so Xcursor and Hyprcursor
 variants stay visually identical. Stable wallpaper IDs live in
 `backgrounds/manifest.toml`.
+
+## Pilot panel hierarchy
+
+Health and Agents retain the current font family and external mint/violet frame.
+Identity leads, followed by the decision state, compact context and optional details.
+Summary values use the subtitle token with bold weight. Sections use `Style.space(16)`,
+rows use `Style.space(8)`, and adjacent labels use `Style.space(4)`. Neutral hairlines
+separate content; mint outlines identify keyboard targets. Pilot keyboard hints use the
+existing muted-caption foreground treatment (55% foreground alpha).
+
+Health keeps its severity text and actionable problems visible before Resource details
+and Processes. Unavailable data displays an em dash and an explicit unavailable summary.
+Agents keeps authentication errors, all limit windows and prepaid balance above Usage
+history and Models. These technical details begin collapsed and reset on close; Agents
+also resets them when providers change. Hosts own expansion and keyed navigation.
+Headings show expansion, accept pointer and keyboard activation, and scroll into view
+within the available panel height. Long primary Agents content gets a capped fallback
+viewport. The fixed hint stays reachable. Layout changes preserve pointer settling and
+reduced motion conveys the same state without animation.

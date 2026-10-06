@@ -15,7 +15,7 @@ The bar button keeps its glyph, clicks and alarm state, with `AgentsRing` drawn 
 slot: it fills with the current agent's fullest limit window, in the accent below 80%, amber from
 80% and urgent from 95%, and is absent for an agent without limits.
 
-Refresh: `r`, Enter, the header's Refresh pill and IPC `refresh` share one path. The pill reads
+Refresh: `r`, Enter on Refresh, the header's Refresh pill and IPC `refresh` share one path. The pill reads
 "Refreshing…" and pulses until every shown agent's record has been rewritten since the request
 (`AgentsLogic.recordsLandedSince`, then Main's data revision lands it through `refreshLanded`) or
 30 s pass; requests while it is pending are ignored. A forced run that stock queued behind a
@@ -31,12 +31,19 @@ block, unlike Weather's named `settingsForm` string. The shell resolves a widget
 `syncDeviceId` schema entries independently of `omarchy.agents`; there is no named form to look
 up (as there is for Weather), so no further fix was needed for settings-form parity.
 
-Keys: left/right (or `h`/`l`) switch the selected agent, up/down scroll the panel, Enter or
-`r`/`R` refresh, Esc closes and Tab moves to the bar's next dropdown. The keyboard outline shows
-only while the keyboard drives it: after opening or any pointer click, the first navigation key or
-Enter only reveals it, always on the Refresh pill (Enter's target; h/l switch agents without moving it); `r`
-refreshes at once. Hover only draws a pill's fill and never hides the outline; the selected agent's
-pill carries the selected highlight.
+The dropdown opens with every limit window (percentage, reset time and pace tick) and prepaid
+balance visible. Usage history and Models start collapsed. Their headings indicate expansion;
+click or Enter requests a host-owned toggle. Closing or changing providers resets both details,
+while a refresh of the same provider preserves them. Primary state remains above the detail
+viewport; unusually long errors or limit lists get a separate capped scrolling fallback.
+
+Keys: left/right (or `h`/`l`) switch the selected agent; up/down move between Refresh and the
+available detail headings; Enter or Space activates the focused target. `r`/`R` refreshes at once,
+Esc closes and Tab moves to the bar's next dropdown. After opening or a pointer click, the first
+navigation key or Enter only reveals the cursor. Focus follows stable keys and scrolls headings
+into view; a removed target cannot activate its replacement. Hover only draws a fill and never
+hides the outline. Expansion, scrolling and real re-sorts stamp layout changes so stale pointer
+clicks settle for 300 ms. The font family and external mint/violet frame remain host-controlled.
 
 The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-pending state and its landing gate, the
 "updated HH:MM" caption; tested under Node). `Panel.qml` builds `agentsView` from stock's own
@@ -49,7 +56,7 @@ todayPrompts, todaySessions, limits: [{label, percent, resetsInMinutes}], days: 
 oldest first, today last], models: [{id, input, output, cacheRead, cacheWrite}], balance?:
 {remaining, funded, spent, currency}}]}` (`AgentsLogic.parseShowcase`, which refuses anything
   malformed). The first stand-in is selected. Display only: no collector runs, the sync footer
-  hides, IPC `refresh` answers `refused` and the Refresh pill, `r`, Enter and the right-click
+  hides, IPC `refresh` answers `refused` and the Refresh pill, `r`, Enter on Refresh and the right-click
   agent picker do nothing while it is shown, and it clears when the dropdown opens or closes.
   Closed, the call answers `closed`; a bad payload, `invalid`. The stand-in choice of agent is
   kept apart from the real one (`AgentsLogic.selectId`), so a capture never changes which agent
@@ -63,8 +70,8 @@ oldest first, today last], models: [{id, input, output, cacheRead, cacheWrite}],
 
 `AgentsDropdown.qml` is the pure Aranea view: one plain view
 object in (`hero`, `refresh`, `agents`, `limits`, `balance`, `days`, `models`, `footer`, `empty`,
-`cursor`, `keyHint`), one `action(name, arg)` signal out (`refresh`, `selectAgent` with
-`{index, key}`, `hover` with `{section, index}`). Its sections are `AgentsHeader.qml` (mark,
+`details` (`historyExpanded`, `modelsExpanded`), `cursor`, `keyHint`), one `action(name, arg)` signal out (`refresh`, `selectAgent` with
+`{index, key}`, `toggleDetails` with `{section: "history" | "models"}`, `hover` with `{section, index}`). Its sections are `AgentsHeader.qml` (mark,
 tool, plan and the Refresh pill), `AgentsSwitch.qml` (agent pills), `AgentsBalanceSection.qml`,
 `AgentsLimitsSection.qml` and `AgentsUsageSection.qml` (days and models). `AgentsRing.qml` is
 the bar ring: a canvas arc taking `fraction` and `tone` from `AgentsLogic.js`, hidden at tone

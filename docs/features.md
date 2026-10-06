@@ -9,9 +9,17 @@ wallpapers, cursors, icons, and application integrations.
 The bar opens an Omarchy command menu with Aranea identity, Files, Terminal,
 and Setup tiles. Apps keeps Favorites and Recent state in
 `~/.local/state/aranea/menu.json`. The menu uses a compact network-and-node
-motif and supports keyboard navigation, search, and pinned applications.
+motif and supports keyboard navigation and pinned applications. Typing at the
+root searches apps, menu commands, windows, workspaces and settings sections.
+Use `app:`, `command:`, `window:`, `workspace:` or `setting:` to restrict results.
+Submenu searches stay scoped; Search everywhere or Ctrl+F keeps the query while
+returning to root. Enter uses the selected current target, and a disappearing
+window clears that selection. The list caps at 50 matches with a refinement hint.
+Dmenu choices and input answers keep their existing behavior.
 
 ![Aranea command menu](../screenshots/menu.png)
+
+![Unified desktop search with type labels](../screenshots/menu-search-mixed.png)
 
 ## Notifications and health
 

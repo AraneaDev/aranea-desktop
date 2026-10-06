@@ -38,10 +38,11 @@ Column {
   }
 
   visible: (section.rows || []).length > 0
-  spacing: Style.space(6)
+  spacing: Style.space(8)
 
   Text {
     textFormat: Text.PlainText
+    visible: section.caption !== ""
     text: section.caption
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
     font.family: Style.font.family

@@ -1,5 +1,91 @@
 # Configuration
 
+## Aranea settings
+
+Open **Setup → Aranea settings**, or search for “settings” in the menu.
+The dedicated window covers wallpaper selection and explicit Apply, motion,
+custom display scaling, wallpaper schedule enablement and validated Save, integration activation, and
+Do not disturb. Navigation and thumbnail selection never change preferences.
+Reopening reads the existing CLI and service owners; closing leaves an active
+integration installation running until its result is confirmed.
+
+Appearance's **Display scale** accepts decimal values from 1 to 4, including
+`2.5` and `2.667`. Editing the field does nothing until **Apply scale**.
+The focused display and current effective scale are shown separately from your
+entry. Omarchy adjusts fractions to clean logical pixels for the display mode;
+for example, `2.667` on a 3840×2160 display can become about `2.666667`.
+The typed request stays visible after applying; the
+[scaling preview](../screenshots/settings-scaling.png) shows both values. See the
+[Hyprland monitor contract](https://wiki.hypr.land/configuring/core/monitors/).
+
+The existing `omarchy hyprland monitor scaling` helper owns display changes.
+Standard generic Omarchy monitor configuration supports saving the scale;
+custom monitor rules can leave a session-only change. Settings reports whether
+saving is supported and whether literal persistence was confirmed, without
+interpreting arbitrary Lua or creating a second display preference store.
+A changed focused display or unconfirmed effective scale shows an actionable
+error; review the current display before applying again. There are no automatic
+retries. This control offers scaling only; the installed owner retains its
+existing monitor-application behavior.
+
+```bash
+scripts/aranea-settings set display-scale 2.667 --json
+# Optional stale-focus guard used by the UI:
+scripts/aranea-settings set display-scale 2.5 --monitor eDP-1 --json
+```
+
+Schema version 1 retains its existing fields and adds optional `state.display`:
+`monitor` (focused connector or null), `scale` (observed number or null), `width`
+and `height` (observed mode or null), `availability` (`available` or
+`unavailable`), `persistenceSupport` (`supported`, `unsupported`, or `unknown`),
+and `configuredScale` (recognized literal number or null). An unavailable
+scaling owner does not make other sections unavailable.
+
+A dispatched scale mutation adds `result.displayScale`: `requested` (exact
+string), `monitor` (original target), `width` and `height` (original mode),
+`expectedScale` (owner's clean fraction), `effectiveScale` (observed target
+scale or null), `confirmed` (boolean), and `persistence` (`persisted`,
+`session-only`, or `unconfirmed`). `state.display` always describes the current
+focused display, which can differ from that target on failure. Confirmation
+checks exit status, identity, mode and effective scale; changed monitor config
+is reloaded and checked with `hyprctl configerrors`. A successful-looking helper
+message alone never confirms application. A later independent controller read
+must still match the target before the UI reports Applied.
+
+Quiet hours shows the effective state and configured window read-only. Set
+`ARANEA_QUIET_HOURS` through your notification service configuration to change it;
+settings does not write `notifications.json`. Bar layout, fonts and editable
+quiet hours are outside this release.
+
+Direct destinations use the existing summon contract:
+
+```bash
+omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'
+omarchy-shell shell summon araneadev.settings '{"section":"schedule"}'
+omarchy-shell shell summon araneadev.settings '{"section":"integrations"}'
+omarchy-shell shell summon araneadev.settings '{"section":"notifications"}'
+scripts/aranea-settings status --json
+```
+
+Unknown sections open Appearance. Unavailable reads show Retry and disable
+only the affected changes. Saved, deferred, failed, and confirmed Applied
+outcomes remain distinct. Changes reuse the existing helper ownership and
+backup behavior.
+
+Installation and theme activation deploy and register `araneadev.settings`
+when its manifest is present; repair adds it once and preserves other plugin
+settings. Leaving Aranea releases the registration, and uninstall removes its
+owned folder. It has no stock plugin replacement or bar icon. User-defined
+`aranea.settings` menu entries take precedence over the generated route.
+
+For display-only captures, run `scripts/capture-screenshots --surface settings
+--output screenshots` on one line. Additional variants are `settings-narrow`,
+`settings-dirty`, `settings-unavailable`, `settings-integration-failed`,
+`settings-notifications`, and `settings-scaling`. These render the production
+content offscreen with
+fixed fixtures and refuse reads and changes through both controls and the
+controller; they do not summon the live desktop or change notifications.
+
 ## Profiles
 
 Profiles control application integrations during installation:

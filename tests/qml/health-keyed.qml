@@ -18,6 +18,7 @@ import Quickshell
 import "lib"
 import "plugins/araneadev.health" as Health
 import "plugins/araneadev.health/HealthLogic.js" as HealthLogic
+import "plugins/araneadev.health/HealthSummaryLogic.js" as SummaryLogic
 import "plugins/araneadev.shared" as Aranea
 
 ShellRoot {
@@ -187,6 +188,50 @@ ShellRoot {
     }
   }
 
+  // The production dropdown fixture cursor key.
+  property string detailKey: ""
+  // Whether the fixture shows its keyboard cursor.
+  property bool detailKeyboard: false
+  // Host-owned resource expansion for the view fixture.
+  property bool resourceOpen: false
+  // Host-owned process expansion for the view fixture.
+  property bool processOpen: false
+  // Number of settled disclosure requests emitted by the real view.
+  property int detailRequests: 0
+
+  // The production view receives host-owned state and emits toggle requests.
+  FloatingWindow {
+    implicitWidth: 400
+    implicitHeight: 700
+    visible: true
+    Health.HealthDropdown {
+      id: dropdown
+      x: 20
+      y: 20
+      width: 360
+      maxContentHeight: 640
+      available: true
+      problems: firstRows()
+      metrics: resources.metrics
+      cursorKey: host.detailKey
+      keyboardCursor: host.detailKeyboard
+      resourcesExpanded: host.resourceOpen
+      processesExpanded: host.processOpen
+      onResourcesToggleRequested: {
+        host.detailKeyboard = false
+        host.detailKey = "details:resources"
+        host.resourceOpen = !host.resourceOpen
+        host.detailRequests++
+      }
+      onProcessesToggleRequested: {
+        host.detailKeyboard = false
+        host.detailKey = "details:processes"
+        host.processOpen = !host.processOpen
+        host.detailRequests++
+      }
+    }
+  }
+
   Component.onCompleted: run([[400, function () {
         // ---------- Outline: keyboard only ----------
         t.equal(rows().length, 3, "one row per problem")
@@ -292,5 +337,40 @@ ShellRoot {
       }], [350, function () {
         pointer.mouseClick(rows()[1], 60, rows()[1].height / 2)
         t.equal(JSON.stringify(activated), JSON.stringify([[1, HealthLogic.problemKey(section.problems[1])]]), "a click after 350 ms is accepted")
+      }], [100, function () {
+        var stops = SummaryLogic.keyboardStops(dropdown.problems)
+        var first = HealthLogic.cursorPress(stops, "", false)
+        t.check(first.row === null && first.key === "unit:system:a.service", "combined keyboard stops preserve first-key reveal")
+        var next = HealthLogic.cursorMove(stops, "Container web exited (code 1)", true, 1)
+        host.detailKey = next.key
+        host.detailKeyboard = next.keyboard
+        t.equal(host.detailKey, "details:resources", "navigation proceeds from the last problem to Resource details")
+        t.check(dropdown.resourcesDisclosure.keyboardFocused, "resource heading receives the keyboard outline")
+        t.check(!dropdown.processesDisclosure.keyboardFocused, "only the focused disclosure is outlined")
+        stampBefore = dropdown.problemsView.layoutChangedAt
+        host.resourceOpen = true
+        host.detailKey = "details:processes"
+      }], [50, function () {
+        t.check(dropdown.problemsView.layoutChangedAt > stampBefore, "expansion stamps shifted problems and disclosure headings")
+        t.check(t.findChild(dropdown.resourcesDisclosure, "disclosureContent").visible, "expanded resource details reveal technical content")
+        var heading = t.findChild(dropdown.processesDisclosure, "disclosureHeading")
+        pointer.mouseClick(heading, 60, heading.height / 2)
+        t.equal(host.detailRequests, 0, "a click on a shifted disclosure is refused before settling")
+      }], [350, function () {
+        var heading = t.findChild(dropdown.processesDisclosure, "disclosureHeading")
+        pointer.mouseClick(heading, 60, heading.height / 2)
+        t.equal(host.detailRequests, 1, "a settled pointer click requests a host-owned toggle")
+        t.check(host.processOpen && dropdown.processesDisclosure.expanded, "host expansion reaches the production Processes view")
+        t.check(!host.detailKeyboard, "pointer activation clears the keyboard outline")
+        host.detailKey = "details:processes"
+        host.detailKeyboard = true
+        dropdown.ensureCursorVisible()
+        var stops = SummaryLogic.keyboardStops(dropdown.problems)
+        t.equal(HealthLogic.cursorPress(stops, host.detailKey, true).row.key, "details:processes", "keyboard activation resolves the processes key")
+        host.resourceOpen = false
+        host.processOpen = false
+      }], [50, function () {
+        t.check(!t.findChild(dropdown.resourcesDisclosure, "disclosureContent").visible && !t.findChild(dropdown.processesDisclosure, "disclosureContent").visible, "collapsed disclosures hide both technical sections")
+        t.check(dropdown.processesDisclosure.keyboardFocused, "collapse retains the heading's keyboard target")
       }]])
 }

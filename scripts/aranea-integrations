@@ -67,7 +67,12 @@ case "$command_name" in
       printf '%s\n' 'jq is required for --json' >&2
       exit 2
     fi
-    while read -r id; do [[ -n "$id" ]] && emit_status "$id"; done < <(known_ids)
+    # Capture the owner read status; process substitution would hide failure.
+    ids="$(known_ids)" || exit $?
+    while IFS= read -r id; do
+      [[ -n "$id" ]] || continue
+      emit_status "$id"
+    done <<<"$ids"
     ;;
   activate)
     id="${2:-}"

@@ -45,6 +45,46 @@ boundaries are:
 | Generated facades    | Stable compatibility exports for QML                        | Hand-edited business logic                                 |
 | Hooks and scripts    | Installation, activation, repair, and host integration      | Presentation decisions that belong in QML or templates     |
 
+Desktop search normalization and ranking live in `DesktopSearchRanking.js`.
+The generated `DesktopSearchLogic.js` facade composes it with `MenuSearch.js`,
+so matching shares the menu’s existing name, alias, and whole-word description
+semantics. The menu host owns source refresh and activation; canonical result
+keys and typed targets let it re-resolve a selection against current state.
+
+`DesktopSearchSources.qml` consumes the menu host's existing `appRows`, merged
+`menuItems`/`itemOrder`, guard results and app history. It uses `MenuModel.isVisible`
+for command destinations and the existing settings manifest availability. Its
+`setActive(bool)` boundary gates compositor subscriptions and snapshot iteration;
+a 100 ms timer coalesces changes, and generation checks discard old completions.
+`records`, `available` (live compositor availability) and `revision` expose source
+state; query ranking and selected-key ownership remain in the menu host.
+
+`DesktopSearchTargets.js` adapts those raw snapshots into typed records and
+returns host requests or argument arrays. On `activate(key)`, the controller
+reads a fresh synchronous snapshot and re-resolves the key through
+`DesktopSearchLogic.resolveTarget`, independently of cached refresh records.
+`appRequested(appId, label)` and `commandRequested(itemId)` preserve the existing
+launch and menu handlers. Settings results summon one of four static sections;
+window/workspace targets use validated exact identities in the installed Lua
+focus dispatcher. Titles, descriptions and queries stay display data. Missing
+compositor data affects only live results. Failed or vanished activation emits
+`failed(message)` without closing; `activated()` reports an accepted argument-array
+submission. Apps and commands leave closing/navigation to their existing handlers.
+
+`Menu.qml` owns root-only ranking and selected-key reconciliation. Query changes
+select the highest-ranked row; refreshes retain its canonical identity or clear
+selection if it disappears. The optional desktop roles are cleared when returning
+to scoped/dmenu rows, including reused ListModel delegates. `MenuSurface.qml` shares
+the production card with `MenuWindow.qml` and the inert offscreen renderer; window
+placement, pointer gate, lifecycle and cursor state stay in the existing hosts.
+
+Tests can replace the compositor, raw window/workspace fixtures, synchronous
+`snapshotReader()`, asynchronous `refreshReader(generation, complete)` and
+`runner(argv)` boundaries. Refresh completion must echo its generation; it never
+becomes the activation snapshot. The production runner uses
+`Quickshell.execDetached` with argument arrays, so accepted dispatch does not
+claim the external command completed successfully.
+
 ## Token flow
 
 `design/tokens.toml` is the source of truth. Templates describe the target

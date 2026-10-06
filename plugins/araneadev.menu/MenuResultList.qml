@@ -12,6 +12,7 @@
 // pointer has really moved onto the row since (ClickSettle).
 // qmllint disable missing-property unqualified
 import QtQuick
+import QtQuick.Effects
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
@@ -138,6 +139,9 @@ Item {
       required property string appIcon
       required property string appId
       required property string label
+      required property var model
+      // Optional desktop type role; ordinary menu and dmenu rows have no badge.
+      readonly property string resultType: model.resultType || ""
       required property string detail
       required property int childCount
       readonly property bool hasCursor: results.cursorActive && index === results.selectedIndex
@@ -147,6 +151,8 @@ Item {
       // Whether the row's text is lit (hovered or under the keyboard cursor).
       readonly property bool lit: hovered || hasCursor
       readonly property bool isApp: kind === "app"
+      // Reserved menu icon token draws the canonical mark as a white silhouette.
+      readonly property bool hasBrandIcon: !isApp && icon === "aranea-brand"
       readonly property bool hasIcon: icon.length > 0 || isApp
       // When this row was built (Date.now()).
       property real createdAt: 0
@@ -186,7 +192,7 @@ Item {
 
       Aranea.InkText {
         id: iconText
-        visible: row.hasIcon && !row.isApp
+        visible: row.hasIcon && !row.isApp && !row.hasBrandIcon
         text: row.icon
         color: row.lit ? results.selectedText : results.foreground
         font.family: row.iconFont.length > 0 ? row.iconFont : results.fontFamily
@@ -199,14 +205,19 @@ Item {
 
       Image {
         id: appIconImage
-        visible: row.isApp
+        visible: row.isApp || row.hasBrandIcon
         width: Style.font.iconLarge
         height: Style.font.iconLarge
         fillMode: Image.PreserveAspectFit
         // Decode at physical pixels so desktop icons remain sharp on HiDPI.
         sourceSize.width: width * Screen.devicePixelRatio
         sourceSize.height: height * Screen.devicePixelRatio
-        source: row.isApp && results.appLibrary && results.appLibrary.iconSource ? results.appLibrary.iconSource(row.appIcon) : ""
+        source: row.hasBrandIcon ? Aranea.RuntimePaths.brandUrl : row.isApp && results.appLibrary && results.appLibrary.iconSource ? results.appLibrary.iconSource(row.appIcon) : ""
+        // Brightness preserves alpha while making every painted part monochrome white.
+        layer.enabled: row.hasBrandIcon
+        layer.effect: MultiEffect {
+          brightness: 1
+        }
         asynchronous: true
         anchors.left: parent.left
         anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset
@@ -218,11 +229,13 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset + (row.hasIcon ? results.iconSlot + Style.space(10) : 0)
         anchors.right: parent.right
-        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset + Style.space(14)
+        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset + (row.resultType ? typeBadge.width + Style.space(12) : Style.space(14))
         anchors.verticalCenter: parent.verticalCenter
         spacing: Style.space(4)
         Text {
           width: parent.width
+          textFormat: Text.PlainText
+          objectName: "rowLabel"
           text: row.label
           color: row.lit ? results.selectedText : results.foreground
           font.family: results.fontFamily
@@ -232,6 +245,7 @@ Item {
         }
         Text {
           width: parent.width
+          textFormat: Text.PlainText
           text: row.detail
           visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.detail.length > 0
           color: row.lit ? results.selectedText : results.foreground
@@ -242,12 +256,33 @@ Item {
         }
       }
 
+      Text {
+        id: typeBadge
+        objectName: "typeBadge"
+        visible: !!row.resultType
+        anchors.right: parent.right
+        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset
+        anchors.verticalCenter: parent.verticalCenter
+        textFormat: Text.PlainText
+        text: ({
+            app: "App",
+            command: "Command",
+            window: "Window",
+            workspace: "Workspace",
+            setting: "Setting"
+          })[row.resultType] || ""
+        color: row.lit ? results.selectedText : results.foreground
+        opacity: 0.58
+        font.family: results.fontFamily
+        font.pixelSize: results.menuFontScale * Style.font.caption
+      }
+
       Aranea.InkText {
         anchors.right: parent.right
         anchors.rightMargin: results.rowReservedBorderRight + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Text.AlignRight
-        text: row.kind === "menu" || row.kind === "link" ? "›" : ""
+        text: !row.resultType && (row.kind === "menu" || row.kind === "link") ? "›" : ""
         color: row.lit ? results.selectedText : results.foreground
         opacity: 0.36
         font.family: results.fontFamily

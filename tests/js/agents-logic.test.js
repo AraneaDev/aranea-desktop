@@ -516,7 +516,65 @@ test("cursorView keeps the outline on Refresh, Enter's target", () => {
 })
 
 test("keyHint names the agent switch only with several agents, and Enter's refresh", () => {
-  assert.equal(logic.keyHint(3), "h/l agent · enter refresh · ↑↓ scroll")
-  assert.equal(logic.keyHint(1), "enter refresh · ↑↓ scroll")
-  assert.equal(logic.keyHint(undefined), "enter refresh · ↑↓ scroll")
+  assert.equal(logic.keyHint(3), "h/l agent · ↑↓ move · enter refresh · r refresh")
+  assert.equal(logic.keyHint(1), "↑↓ move · enter refresh · r refresh")
+  assert.equal(logic.keyHint(3, "details:models"), "h/l agent · ↑↓ move · enter toggle · r refresh")
+  assert.equal(logic.keyHint(undefined), "↑↓ move · enter refresh · r refresh")
+})
+
+test("detail state resets on provider change or close, retaining equal-provider refreshes", () => {
+  const expanded = { historyExpanded: true, modelsExpanded: true }
+  assert.deepEqual(logic.detailsForProvider(expanded, "claude", "codex", true), {
+    historyExpanded: false,
+    modelsExpanded: false
+  })
+  assert.deepEqual(logic.detailsForProvider(expanded, "claude", "claude", false), {
+    historyExpanded: false,
+    modelsExpanded: false
+  })
+  assert.deepEqual(logic.detailsForProvider(expanded, "claude", "claude", true), expanded)
+})
+
+test("keyboard stops prioritize Refresh and retain only available disclosure targets", () => {
+  assert.deepEqual(logic.keyboardStops(true, true), [
+    "refresh",
+    "details:history",
+    "details:models"
+  ])
+  assert.deepEqual(logic.keyboardStops(false, true), ["refresh", "details:models"])
+  assert.deepEqual(logic.keyboardStops(false, false), ["refresh"])
+})
+
+test("navigation reveals first and refuses a lost disclosure target", () => {
+  const stops = ["refresh", "details:history", "details:models"]
+  assert.deepEqual(logic.cursorStep(stops, "refresh", false, 1), {
+    key: "refresh",
+    keyboard: true,
+    activate: false
+  })
+  assert.deepEqual(logic.cursorStep(stops, "refresh", true, 1), {
+    key: "details:history",
+    keyboard: true,
+    activate: false
+  })
+  assert.deepEqual(logic.cursorStep(stops, "details:models", true, 1), {
+    key: "refresh",
+    keyboard: true,
+    activate: false
+  })
+  assert.deepEqual(logic.cursorStep(stops, "details:history", true, 0), {
+    key: "details:history",
+    keyboard: true,
+    activate: true
+  })
+  assert.deepEqual(logic.cursorStep(["refresh"], "details:history", true, 0), {
+    key: "refresh",
+    keyboard: true,
+    activate: false
+  })
+  assert.deepEqual(logic.cursorView(true, "details:models"), {
+    active: true,
+    section: "details",
+    index: 1
+  })
 })

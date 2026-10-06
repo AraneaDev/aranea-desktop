@@ -17,6 +17,7 @@ mapfile -t surfaces < <(
   sed -n 's/^all_surfaces=(\(.*\))$/\1/p' "$capture_script" | tr ' ' '\n'
 )
 expected_surfaces=(
+  settings
   menu menu-submenu menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network vpn audio bluetooth agents
@@ -38,6 +39,10 @@ for surface in "${surfaces[@]}"; do
     grep -Fq "screenshots/$surface.png" "$readme"
   fi
 done
+
+test -f "$repo_root/screenshots/settings-scaling.png"
+grep -Fq 'screenshots/settings-scaling.png' "$readme"
+[[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings-scaling.png")" == 840x620 ]]
 
 test -f "$repo_root/screenshots/dawn.png"
 test -f "$repo_root/screenshots/osd.png"

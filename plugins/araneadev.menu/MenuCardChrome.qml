@@ -2,12 +2,18 @@
 // qmllint disable missing-property unqualified
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
+import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Item {
   id: chrome
   // Public contract member.
   property bool fullRootHeader: false
+  // Scoped queries expose a query-preserving global search route.
+  property bool scopedSearch: false
+  // Requests the owning menu to return to global search.
+  signal searchEverywhereRequested
   // Public contract member.
   property bool dmenuActive: false
   // Public contract member.
@@ -16,6 +22,8 @@ Item {
   property string dmenuPrompt: ""
   // Public contract member.
   property string hint: ""
+  // Matched menu query; special modes and no-match presentation keep their own text.
+  property string matchedQuery: ""
   // Public contract member.
   property string workspaceContext: ""
   // Public contract member.
@@ -59,6 +67,12 @@ Item {
   // The window's PointerMoveGate, shared with the tiles (null: each tile
   // uses its own).
   property var pointerGate: null
+  // Shared gate for the search control, with a local fallback for standalone chrome.
+  readonly property var searchPointerGate: chrome.pointerGate || ownSearchGate
+  PointerMoveGate {
+    id: ownSearchGate
+    referenceItem: chrome
+  }
   // When the menu's layout last changed under the pointer, for the tiles'
   // settled clicks.
   property real layoutChangedAt: 0
@@ -113,19 +127,20 @@ Item {
         spacing: Style.space(4)
 
         Text {
+          objectName: "menuHeaderTitle"
           width: parent.width
           textFormat: Text.PlainText
-          text: fullRootHeader ? Aranea.BrandConfig.shortName : (dmenuActive ? dmenuPrompt : Aranea.BrandConfig.shortName + " / " + activeTitle)
+          text: chrome.matchedQuery ? "› " + chrome.matchedQuery : fullRootHeader ? Aranea.BrandConfig.shortName : (dmenuActive ? dmenuPrompt : Aranea.BrandConfig.shortName + " / " + activeTitle)
           color: foreground
           font.family: fontFamily
           font.pixelSize: scaled(fullRootHeader ? Style.font.title : Style.font.body)
           font.weight: Font.Medium
           font.letterSpacing: menuLetterSpacing
-          elide: Text.ElideRight
+          elide: chrome.matchedQuery ? Text.ElideLeft : Text.ElideRight
         }
         Text {
-          width: parent.width
           textFormat: Text.PlainText
+          width: parent.width - (chrome.scopedSearch ? globalSearch.width + Style.spacing.md : 0)
           text: hint
           color: contextText
           font.family: fontFamily
@@ -133,6 +148,58 @@ Item {
           font.weight: Font.Medium
           font.letterSpacing: menuLetterSpacing
           elide: Text.ElideRight
+        }
+      }
+
+      Text {
+        id: globalSearch
+        objectName: "searchEverywhere"
+        visible: chrome.scopedSearch && !chrome.dmenuActive
+        // Last appearance is independent of whether the result identities changed.
+        property real appearedAt: 0
+        // Real movement after appearance can lift the existing settling guard.
+        property real pointerMovedAt: 0
+        onVisibleChanged: if (visible) {
+          appearedAt = Date.now()
+          pointerMovedAt = 0
+        }
+        Component.onCompleted: if (visible)
+          appearedAt = Date.now()
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        textFormat: Text.PlainText
+        text: "Search everywhere · ^F"
+        color: chrome.selectedText
+        font.family: chrome.fontFamily
+        font.pixelSize: chrome.scaled(Style.font.caption)
+        MouseArea {
+          id: searchArea
+          anchors.fill: parent
+          hoverEnabled: true
+          // An affordance changing under a held pointer cannot navigate.
+          property real pressedStamp: -1
+          // A hide/reappear cycle invalidates a press even with identical result keys.
+          property real pressedAppearance: -1
+          onPositionChanged: function (mouse) {
+            if (chrome.searchPointerGate.moved(searchArea, mouse))
+              globalSearch.pointerMovedAt = Date.now()
+          }
+          onPressed: {
+            pressedStamp = chrome.layoutChangedAt
+            pressedAppearance = globalSearch.appearedAt
+          }
+          onClicked: {
+            var unchanged = pressedStamp === chrome.layoutChangedAt && pressedAppearance === globalSearch.appearedAt
+            pressedStamp = -1
+            pressedAppearance = -1
+            if (chrome.scopedSearch && unchanged && ClickSettle.clickSettled({
+              now: Date.now(),
+              createdAt: globalSearch.appearedAt,
+              movedAt: globalSearch.pointerMovedAt,
+              layoutChangedAt: chrome.layoutChangedAt
+            }))
+              chrome.searchEverywhereRequested()
+          }
         }
       }
 

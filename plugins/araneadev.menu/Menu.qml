@@ -7,6 +7,7 @@ import qs.Commons
 import "../araneadev.shared" as Aranea
 import "MenuModel.js" as MenuModel
 import "MenuLayout.js" as MenuLayout
+import "DesktopSearchLogic.js" as DesktopSearch
 
 Item {
   id: root
@@ -53,7 +54,7 @@ Item {
     input: root.mode === "input",
     count: displayModel.count,
     appRow: root.cursorRowIsApp()
-  })
+  }) + (root.desktopSearchActive && displayModel.count === 50 ? "  ·  Refine your search" : "")
 
   // Freezes the card's top edge in the window (no-op offscreen).
   function freezeCardTop(): void {
@@ -81,7 +82,10 @@ Item {
       return
     }
 
-    if (event.key === Qt.Key_Delete) {
+    if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_F && root.scopedSearch) {
+      root.searchEverywhere()
+      event.accepted = true
+    } else if (event.key === Qt.Key_Delete) {
       root.requestDeleteSelected()
       event.accepted = true
     } else if (event.key === Qt.Key_Escape) {
@@ -126,7 +130,7 @@ Item {
           root.activateIndex(root.cursorActive ? root.selectedIndex : 0)
       } else if (root.cursorActive)
         root.activateIndex(root.selectedIndex)
-      else if (displayModel.count > 0)
+      else if (displayModel.count > 0 && !root.desktopSearchActive)
         root.cursorActive = true
       event.accepted = true
     } else if (event.text && event.text.length === 1 && event.text.charCodeAt(0) >= 32 && event.text.charCodeAt(0) !== 127 && (event.modifiers === Qt.NoModifier || event.modifiers === Qt.ShiftModifier)) {
@@ -190,6 +194,21 @@ Item {
   property string mode: "menu"
   // True while serving a dmenu (select or input) request.
   readonly property bool dmenuActive: mode === "select" || mode === "input"
+  // Root queries share all desktop sources; dmenu always has first priority.
+  readonly property bool desktopSearchActive: root.opened && !root.dmenuActive && root.activeMenu === "root" && !!root.filterText.trim()
+  // Scoped queries offer a keyboard and pointer route to global search.
+  readonly property bool scopedSearch: !root.dmenuActive && root.activeMenu !== "root" && !!root.filterText.trim()
+  // Stable keyboard identity retained through background display refreshes.
+  property string selectedDesktopKey: ""
+  // Query edits select the highest ranked result once, including empty results.
+  property bool resetDesktopSelection: false
+  // Suppresses index-derived identity changes while replacing rows.
+  property bool syncingDesktopRows: false
+  onSelectedIndexChanged: {
+    if (!root.syncingDesktopRows && root.desktopSearchActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count)
+      root.selectedDesktopKey = displayModel.get(root.selectedIndex).desktopKey || ""
+  }
+
   // What the empty list shows for the active menu (its own provider only).
   readonly property var emptyStateInfo: MenuModel.emptyState({
     loading: !!providers.loadingMenus[root.activeMenu],
@@ -259,6 +278,33 @@ Item {
   readonly property alias appHistory: history
   // Pinned app ids.
   readonly property alias favoriteAppIds: history.favoriteAppIds
+
+  // Existing watchers supply static inputs; only the local controller owns live reads.
+  DesktopSearchSources {
+    id: desktopSources
+    active: root.opened && !root.dmenuActive
+    appRows: root.appRows
+    menuItems: root.items
+    itemOrder: root.itemOrder
+    whenResults: guards.whenResults
+    favoriteAppIds: history.favoriteAppIds
+    recentAppIds: history.recentAppIds
+    settingsAvailable: sources.settingsAvailable
+    onRevisionChanged: if (root.desktopSearchActive)
+      root.rebuildDisplay()
+    onAppRequested: function (appId, label) {
+      root.launchApp(appId, label)
+    }
+    onCommandRequested: function (itemId) {
+      root.activateMenuItem(root.item(itemId))
+    }
+    onActivated: root.cancel()
+    onFailed: function (message) {
+      root.showNotice(message)
+    }
+  }
+  // Source controller boundary used by inert previews and integration fixtures.
+  readonly property alias desktopSearch: desktopSources
 
   // Regenerates the Apps rows (apps, Favorites, Recent) from the app library,
   // merges them into the items and resolves a waiting Favorites/Recent route.
@@ -351,6 +397,13 @@ Item {
   // Replaces the shown rows with ROWS in place: rows that stay keep their
   // delegates (set), so a rebuild never recreates rows under the pointer.
   function syncRows(rows: var): void {
+    rows = rows.map(function (row) {
+      return Object.assign({}, row, {
+        desktopKey: row.desktopKey || "",
+        resultType: row.resultType || "",
+        targetKey: row.targetKey || ""
+      })
+    })
     var keep = Math.min(displayModel.count, rows.length)
     for (var i = 0; i < keep; i++)
       displayModel.set(i, rows[i])
@@ -561,7 +614,38 @@ Item {
     var query = root.filterText.trim()
     root.searchDivider = false
 
-    if (query) {
+    if (query && active === "root") {
+      var ranked = DesktopSearch.rankResults(desktopSources.records, root.filterText)
+      for (var r = 0; r < ranked.length; r++) {
+        var record = ranked[r]
+        var entry = record.type === "command" ? root.item(record.target.itemId) : null
+        var appEntry = record.type === "app" ? root.appRows.find(function (app) {
+          return app.appId === record.target.appId
+        }) : null
+        var base = entry || appEntry
+        var desktopRow = base ? MenuModel.displayRow(root.items, root.itemOrder, guards.checkedResults, base, record.detail, r) : {
+          kind: record.type,
+          target: "",
+          action: "",
+          icon: "",
+          iconFont: "",
+          appIcon: "",
+          appId: "",
+          childCount: 0,
+          section: "",
+          score: r,
+          path: ""
+        }
+        desktopRow.itemId = record.key
+        desktopRow.desktopKey = record.key
+        desktopRow.targetKey = record.key
+        desktopRow.resultType = record.type
+        if (!base)
+          desktopRow.label = record.label
+        desktopRow.detail = record.detail
+        rows.push(desktopRow)
+      }
+    } else if (query) {
       var currentRows = []
       var drilldownRows = []
 
@@ -623,8 +707,23 @@ Item {
         rows = MenuModel.sortAppsMenu(rows)
     }
 
+    root.syncingDesktopRows = true
     root.syncRows(rows)
     root.finishDisplayRebuild()
+    if (root.desktopSearchActive) {
+      var selected = -1
+      if (root.resetDesktopSelection && rows.length)
+        selected = 0
+      else if (!root.resetDesktopSelection && root.selectedDesktopKey)
+        selected = rows.findIndex(function (row) {
+          return row.desktopKey === root.selectedDesktopKey
+        })
+      root.selectedIndex = selected
+      root.cursorActive = selected >= 0
+      root.selectedDesktopKey = selected >= 0 ? rows[selected].desktopKey : ""
+      root.resetDesktopSelection = false
+    }
+    root.syncingDesktopRows = false
   }
 
   // Moves the cursor by `delta` rows, wrapping; the first move activates the cursor.
@@ -644,12 +743,29 @@ Item {
   // Sets the search text, resets the cursor and rebuilds the rows.
   function setFilter(nextFilter: string): void {
     root.freezeCardTop()
+    if (nextFilter === root.filterText)
+      return
+    root.resetDesktopSelection = true
+    root.selectedDesktopKey = ""
     root.filterText = nextFilter
     root.selectedIndex = 0
     root.cursorActive = root.mode !== "input"
     root.disarmPointer()
     if (!root.dmenuActive && root.filterText.trim())
       providers.loadForSearch(root.activeMenu)
+    root.rebuildDisplay()
+  }
+
+  // Returns scoped search to root with its query intact; Ctrl+F uses the same route.
+  function searchEverywhere(): void {
+    if (!root.scopedSearch)
+      return
+    root.freezeCardTop()
+    root.activeMenu = "root"
+    root.resetDesktopSelection = true
+    root.selectedDesktopKey = ""
+    root.disarmPointer()
+    providers.loadForSearch("root")
     root.rebuildDisplay()
   }
 
@@ -708,20 +824,33 @@ Item {
     if (index < 0 || index >= displayModel.count)
       return
     var row = displayModel.get(index)
-    if (row.kind === "menu" || row.kind === "link") {
-      root.setActiveMenu(row.target || row.itemId, true)
-    } else if (row.kind === "app") {
-      var appId = row.appId
-      var label = row.label
-      root.recordRecentApp(appId)
-      applySerial = requestSerial
-      opened = false
-      filterText = ""
-      if (root.appLibrary)
-        root.appLibrary.launch(appId, label)
-    } else {
-      root.applySelected(row.itemId, row.action)
+    if (root.desktopSearchActive && row.desktopKey) {
+      desktopSources.activate(row.targetKey)
+      return
     }
+    root.activateMenuItem(row)
+  }
+
+  // Existing command navigation and leaf semantics, shared by scoped/global results.
+  function activateMenuItem(row: var): void {
+    if (!row)
+      return
+    if (row.kind === "menu" || row.kind === "link")
+      root.setActiveMenu(row.target || row.id || row.itemId, true)
+    else if (row.kind === "app")
+      root.launchApp(row.appId, row.label)
+    else
+      root.applySelected(row.id || row.itemId, row.action)
+  }
+
+  // Launches through the existing library while preserving history and close policy.
+  function launchApp(appId: string, label: string): void {
+    root.recordRecentApp(appId)
+    applySerial = requestSerial
+    opened = false
+    filterText = ""
+    if (root.appLibrary)
+      root.appLibrary.launch(appId, label)
   }
 
   // Asks to uninstall the app under the cursor (app rows only).
@@ -922,8 +1051,7 @@ Item {
   Connections {
     target: root.appLibrary
     function onAppsChanged() {
-      if (providers.loaded["apps"])
-        root.loadApps()
+      root.loadApps()
     }
   }
 

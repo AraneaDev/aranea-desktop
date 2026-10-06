@@ -19,8 +19,12 @@ resource groups.
 ## The dropdown
 
 `Panel.qml` draws the dropdown in the shared `KeyboardPanelFrame`, with a
-`DropdownHeader` (the health glyph, the hostname and the uptime) and a key
-hint at the bottom.
+pure `HealthDropdown` view: hostname and uptime, a severity-aware decision summary,
+all actionable problems, compact CPU/memory/fullest-disk values, Resource details and
+Processes disclosure headings, and a fixed muted keyboard hint. The host owns expansion,
+lifecycle and keyed cursor state. Unknown metrics display an em dash; an unavailable service
+reads “Health data unavailable”. Details start collapsed and reset when the dropdown closes.
+Expanded content scrolls within the host's available-height budget.
 
 - **Problems** (`HealthProblemsSection.qml`): one `NodeDeviceRow` per open
   problem, its node tinted urgent (critical) or amber (attention). Rows are
@@ -29,7 +33,7 @@ hint at the bottom.
   carries its key is refused (`keyedProblem`). The Repeater runs over the
   row count, so a refresh never recreates a row; a real re-sort stamps the
   layout and clicks settle for 300 ms after it.
-- **Keyboard:** up and down walk the problems; Enter or Space opens one
+- **Keyboard:** up and down walk problems and disclosure headings; Enter or Space opens a problem or toggles details
   (its `execArgv`), Esc closes, Tab switches dropdowns. The mint outline
   shows only while the keyboard drives the cursor, and the first key after
   opening or after pointer use (Enter included) only reveals it, on the
@@ -37,11 +41,12 @@ hint at the bottom.
   `outlineIndex`, which wrap the shared keyed cursor in
   `araneadev.shared/CursorLogic.js`). Pointer hover only draws the row's
   hover fill, after a real move; it never moves the cursor or the outline.
-- **Resources** (`HealthResourceSection.qml`): the CPU trace is the shared
+  Keyed focus stays visible even when problems reorder without changing total height.
+- **Resource details** (`HealthResourceSection.qml`): the CPU trace is the shared
   `LinkGraph` over the last 60 one-second samples (`cpuSamples`); memory and
   disk use are `FilamentBar` strand bars (`barFraction`), their values
   tinted by usage level. NET and TOP keep their content, with the same
-  caption labels.
+  caption labels. Processes has its own optional disclosure, including a readable empty state.
 - **Usage level colour:** the amber or urgent level now shows on the value
   text, because the bars are always the mint to violet strand.
 
