@@ -45,6 +45,12 @@ boundaries are:
 | Generated facades    | Stable compatibility exports for QML                        | Hand-edited business logic                                 |
 | Hooks and scripts    | Installation, activation, repair, and host integration      | Presentation decisions that belong in QML or templates     |
 
+Desktop search normalization and ranking live in `DesktopSearchRanking.js`.
+The generated `DesktopSearchLogic.js` facade composes it with `MenuSearch.js`,
+so matching shares the menu’s existing name, alias, and whole-word description
+semantics. The menu host owns source refresh and activation; canonical result
+keys and typed targets let it re-resolve a selection against current state.
+
 ## Token flow
 
 `design/tokens.toml` is the source of truth. Templates describe the target
