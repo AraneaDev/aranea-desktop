@@ -44,9 +44,10 @@ set -euo pipefail
 # Menu search variants menu-search-mixed, menu-search-no-match,
 # menu-search-no-compositor and menu-search-vanished render production MenuSurface
 # offscreen with inert sources and dispatch.
-# Settings uses inert production SettingsSurface fixtures offscreen. Variants:
-# settings-narrow, settings-dirty, settings-unavailable, settings-integration-failed,
-# settings-notifications, settings-scaling. All mutation controls and controller requests refuse changes.
+# Settings and Display use the normal production window in full-desktop frames.
+# Diagnostic variants settings-narrow, settings-dirty, settings-unavailable,
+# settings-integration-failed and settings-notifications use offscreen fixtures.
+# All fixture mutation controls and controller requests refuse changes.
 # Lock and Plymouth are rendered, not grabbed from the screen: lock runs the
 # plugin's real LockView offscreen with a stand-in clock
 # (tools/render-lock-preview; the session is never locked) and plymouth
@@ -223,7 +224,7 @@ default_audio_showcase='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["D
 default_agents_showcase='{"agents":[{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
 
 # The surfaces --all captures.
-all_surfaces=(settings menu menu-submenu menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
+all_surfaces=(menu menu-submenu settings settings-scaling menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
 # magick or a frame is missing.
@@ -236,7 +237,7 @@ build_hero_showcase() {
   # application launchers, notifications and panels, then system controls and
   # the workspace/update finish. Terminal-heavy captures stay in the gallery
   # but are omitted from the short showcase loop.
-  local frames=(desktop menu menu-submenu menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents power monitor tray tray-manage clock weather lock osd)
+  local frames=(desktop menu menu-submenu settings settings-scaling menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents power monitor tray tray-manage clock weather lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -417,13 +418,111 @@ case "$surface" in
     "$repo_root/tools/render-menu-preview" --output "$output/$surface.png" --fixture "${surface#menu-search-}"
     exit 0
     ;;
-  settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications)
+  settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications)
     settings_fixture="${surface#settings-}"
     [[ "$surface" != settings ]] || settings_fixture=wide
     "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$settings_fixture"
     exit 0
     ;;
 esac
+
+# Capture the normal production Settings layer with acknowledged inert owner state.
+# The private transaction restores UI/showcase; the shell restores workspace/focus.
+capture_settings_surface() (
+  command -v omarchy-shell >/dev/null && command -v grim >/dev/null && command -v jq >/dev/null || exit 3
+  local snapshot fixture answer previous_workspace previous_focus staged restore_needed=0
+  snapshot="$(omarchy-shell aranea.settings.capture captureSnapshot 2>/dev/null)" || exit 3
+  jq -e 'type == "object" and (.opened | type == "boolean") and (.section | type == "string")' <<<"$snapshot" >/dev/null || exit 3
+  local workspace_snapshot focus_snapshot
+  workspace_snapshot="$(hyprctl activeworkspace -j 2>/dev/null)" || {
+    echo 'Unable to read Settings capture workspace' >&2
+    exit 3
+  }
+  previous_workspace="$(jq -er -s '
+    if length == 1 and (.[0] | type == "object") and (.[0].id | type == "number")
+      and (.[0].id | . > 0 and . <= 2147483647 and floor == .)
+    then .[0].id else error("invalid workspace snapshot") end' <<<"$workspace_snapshot" 2>/dev/null)" || {
+    echo 'Invalid Settings capture workspace snapshot' >&2
+    exit 3
+  }
+  focus_snapshot="$(hyprctl activewindow -j 2>/dev/null)" || {
+    echo 'Unable to read Settings capture focus' >&2
+    exit 3
+  }
+  previous_focus="$(jq -er -s '
+    if length == 1 and (.[0] | type == "object") and
+      (.[0] == {} or ((.[0].address | type == "string") and (.[0].address | test("^0x[0-9a-fA-F]+$"))))
+    then .[0].address // "" else error("invalid focus snapshot") end' <<<"$focus_snapshot" 2>/dev/null)" || {
+    echo 'Invalid Settings capture focus snapshot' >&2
+    exit 3
+  }
+  fixture="$(jq -cn --arg section "$([[ "$surface" == settings-scaling ]] && echo display || echo appearance)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
+    {section: $section, snapshot: $snapshot, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
+      display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
+      motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
+      wallpaper:{activeId:"day",availability:"available"},
+      wallpapers:[{id:"day",label:"Day",path:($artwork+"background-day.png"),available:true},{id:"night",label:"Night",path:($artwork+"background-night.png"),available:true}],wallpapersAvailability:"available",
+      schedule:{enabled:true,applied:true,availability:"available",dawn:"06:00",day:"08:00",dusk:"18:00",night:"20:00"},
+      integrations:[{id:"session",status:"inactive",availability:"available"},{id:"terminal",status:"active",availability:"available"}],integrationsAvailability:"available"},
+      notifications:{dnd:"off",dndAvailability:"available",quiet:"scheduled",quietAvailability:"available",window:"22:00-07:00",windowAvailability:"available"},
+      results:(if $section == "display" then {"display-scale":"Applied · 2.666667 · saved"} else {} end), itemErrors:{}}}')"
+  staged="$(mktemp "$output/.settings-capture.XXXXXX.png")"
+  # Restore only Settings by identity, then the previously focused workspace/client.
+  restore_settings_capture() {
+    local failed=0
+    if ((restore_needed)); then
+      answer="$(omarchy-shell aranea.settings.capture captureRestore "$snapshot" 2>/dev/null || true)"
+      [[ "$answer" == ok ]] || {
+        echo 'Settings capture restoration failed' >&2
+        failed=1
+      }
+      if [[ -n "$previous_workspace" ]]; then
+        hyprctl dispatch "hl.dsp.focus({ workspace = \"$previous_workspace\" })" >/dev/null 2>&1 || failed=1
+      fi
+      if [[ "$previous_focus" =~ ^0x[[:xdigit:]]+$ ]]; then
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$previous_focus\" })" >/dev/null 2>&1 || failed=1
+      fi
+      restore_needed=0
+    fi
+    rm -f -- "$staged"
+    return "$failed"
+  }
+  trap 'restore_settings_capture || exit 3' EXIT
+  answer="$(omarchy-shell aranea.settings.capture captureBegin "$fixture" 2>/dev/null || true)"
+  if [[ "$answer" != ok ]]; then
+    printf 'Settings capture fixture refused: %s\n' "$answer" >&2
+    exit 3
+  fi
+  restore_needed=1
+  hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || exit 3
+  local attempt ready=0
+  for ((attempt = 0; attempt < 30; attempt++)); do
+    answer="$(omarchy-shell aranea.settings.capture captureState 2>/dev/null || true)"
+    jq -e '.readOnly == true' <<<"$answer" >/dev/null 2>&1 || exit 3
+    if jq -e '.ready == true' <<<"$answer" >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 0.1
+  done
+  ((ready)) || {
+    echo 'Settings capture never became ready' >&2
+    exit 3
+  }
+  sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
+  grim "$staged" && [[ -s "$staged" ]] || exit 3
+  # Restoration failure keeps the old output, just like failed screenshot capture.
+  local completed
+  completed="$(mktemp "$output/.settings-complete.XXXXXX.png")"
+  mv -- "$staged" "$completed"
+  restore_settings_capture || {
+    rm -f -- "$completed"
+    exit 3
+  }
+  trap - EXIT
+  mv -f -- "$completed" "$output/$surface.png"
+  printf 'captured: %s\n' "$output/$surface.png"
+)
 
 # Opens the Aranea menu page for $surface and grabs the screen with grim.
 capture_menu_surface() {
@@ -904,6 +1003,10 @@ capture_osd_surface() {
 }
 
 case "$surface" in
+  settings | settings-scaling)
+    capture_settings_surface
+    exit 0
+    ;;
   menu | menu-submenu | menu-search | menu-input | apps | favorites | recent)
     capture_menu_surface
     exit 0

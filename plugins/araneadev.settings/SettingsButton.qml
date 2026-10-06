@@ -7,6 +7,8 @@ import "../araneadev.shared" as Aranea
 
 Aranea.FilamentPill {
   id: button
+  // Presentation only: primary, secondary, navigation or quiet.
+  property string variant: 'secondary'
   // Guard keyboard and programmatic activation while disabled.
   function activate() {
     if (enabled)
@@ -14,15 +16,20 @@ Aranea.FilamentPill {
   }
   activeFocusOnTab: enabled && visible
   hasCursor: activeFocus
-  implicitHeight: Style.space(32)
-  implicitWidth: Math.max(Style.space(92), labelMeasure.implicitWidth + Style.space(24))
+  implicitHeight: Style.space(28)
+  implicitWidth: labelMeasure.implicitWidth + Style.space(16)
+  selected: variant === 'primary'
+  borderVisible: variant === 'primary'
+  underlineVisible: variant !== 'navigation'
+  labelVisible: variant !== 'navigation'
+  labelColor: Aranea.DesignTokens.foreground
+  labelFontFamily: Style.font.menuFamily
   opacity: enabled ? 1 : 0.45
   Accessible.role: Accessible.Button
   Accessible.name: text
   Keys.onPressed: function (event) {
     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
-      if (enabled)
-        clicked()
+      activate()
       event.accepted = true
     }
   }
@@ -32,5 +39,6 @@ Aranea.FilamentPill {
     text: button.text
     font.family: Style.font.menuFamily
     font.pixelSize: Style.font.caption
+    font.letterSpacing: 0.6
   }
 }

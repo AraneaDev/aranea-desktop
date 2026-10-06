@@ -12,7 +12,7 @@
  * @returns {string} Supported section.
  */
 function normalizeSection(value) {
-  return ["appearance", "schedule", "integrations", "notifications"].indexOf(value) >= 0
+  return ["appearance", "display", "schedule", "integrations", "notifications"].indexOf(value) >= 0
     ? value
     : "appearance"
 }
@@ -250,7 +250,7 @@ function geometry(screenWidth, screenHeight, scale) {
   var width = Math.max(1, Math.min(840 * scale, screenWidth - 48 * scale))
   return {
     width: width,
-    height: Math.max(1, Math.min(620 * scale, screenHeight - 48 * scale)),
+    height: Math.max(1, Math.min(460 * scale, screenHeight - 48 * scale)),
     compact: width < 720 * scale
   }
 }

@@ -17,15 +17,14 @@ mapfile -t surfaces < <(
   sed -n 's/^all_surfaces=(\(.*\))$/\1/p' "$capture_script" | tr ' ' '\n'
 )
 expected_surfaces=(
-  settings
-  menu menu-submenu menu-search menu-input desktop health lock plymouth
+  menu menu-submenu settings settings-scaling menu-search menu-input desktop health lock plymouth
   btop file-manager neovim notifications notifications-empty clipboard emojis polkit
   network vpn audio bluetooth agents
   power monitor tray tray-manage clock weather image-picker apps favorites recent
   dawn osd workspaces updates
 )
 expected_hero_frames=(
-  desktop menu menu-submenu menu-search menu-input apps favorites recent
+  desktop menu menu-submenu settings settings-scaling menu-search menu-input apps favorites recent
   notifications notifications-empty health updates workspaces clipboard emojis
   image-picker network vpn audio bluetooth agents power monitor tray tray-manage clock weather lock osd
 )
@@ -40,9 +39,10 @@ for surface in "${surfaces[@]}"; do
   fi
 done
 
+[[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings.png")" == "$(identify -format '%wx%h' "$repo_root/screenshots/desktop.png")" ]]
 test -f "$repo_root/screenshots/settings-scaling.png"
 grep -Fq 'screenshots/settings-scaling.png' "$readme"
-[[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings-scaling.png")" == 840x620 ]]
+[[ "$(identify -format '%wx%h' "$repo_root/screenshots/settings-scaling.png")" == "$(identify -format '%wx%h' "$repo_root/screenshots/desktop.png")" ]]
 
 test -f "$repo_root/screenshots/dawn.png"
 test -f "$repo_root/screenshots/osd.png"

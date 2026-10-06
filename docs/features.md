@@ -77,3 +77,14 @@ scripts/aranea-integrations deactivate <id> --yes
 The repository also contains lock, Plymouth, Cava, cursor, icon, GTK, browser,
 terminal, and media styling. The README contains the visual showcase; this
 page explains what each surface is for.
+
+## Desktop settings
+
+Setup opens a compact, centered Settings window with Appearance, Display,
+Schedule, Integrations and Notifications destinations. Appearance keeps its
+wallpaper chooser collapsed until requested. Wallpaper selection and Display
+presets edit local drafts, with explicit Apply and Discard. Display accepts
+exact decimal scales and reports effective scale and persistence separately.
+Drafts and scroll positions survive page navigation; long content scrolls
+inside the window. Motion, integration and Do not disturb toggles keep their
+immediate behavior.

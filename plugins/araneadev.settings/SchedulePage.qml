@@ -69,7 +69,7 @@ ColumnLayout {
   onScheduleChanged: syncDraft()
   onAvailableChanged: syncDraft()
   Component.onCompleted: syncDraft()
-  spacing: Style.space(16)
+  spacing: Style.space(8)
   SettingsLabel {
     Layout.fillWidth: true
     text: 'Wallpaper schedule'
@@ -106,7 +106,7 @@ ColumnLayout {
   GridLayout {
     Layout.fillWidth: true
     columns: page.width < Style.space(420) ? 1 : 2
-    columnSpacing: Style.space(16)
+    columnSpacing: Style.space(12)
     rowSpacing: Style.space(8)
     Repeater {
       model: ['Dawn', 'Day', 'Dusk', 'Night']
@@ -120,7 +120,7 @@ ColumnLayout {
         }
         Rectangle {
           Layout.fillWidth: true
-          Layout.preferredHeight: Style.space(36)
+          Layout.preferredHeight: Style.space(28)
           color: Util.alpha(Color.foreground, 0.04)
           border.width: 1
           border.color: field.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
@@ -128,7 +128,9 @@ ColumnLayout {
             id: field
             objectName: 'phaseTime'
             anchors.fill: parent
-            anchors.margins: Style.space(8)
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(8)
+            verticalAlignment: TextInput.AlignVCenter
             text: page.draft[phase.index] || ''
             color: Color.foreground
             font.family: Style.font.menuFamily
@@ -150,17 +152,21 @@ ColumnLayout {
     color: page.dirty && !page.validation.ok ? Aranea.DesignTokens.attention : Color.foreground
     opacity: 0.75
   }
-  RowLayout {
+  GridLayout {
+    Layout.fillWidth: true
+    columns: page.width < Style.space(220) ? 1 : 2
+    columnSpacing: Style.space(8)
+    rowSpacing: Style.space(8)
     SettingsButton {
       objectName: 'scheduleSave'
       text: 'Save times'
-      selected: true
+      variant: 'primary'
       enabled: page.available && !page.displayOnly && !page.pending && page.validation.ok
       pointerGate: page.pointerGate
       onClicked: page.save()
     }
     SettingsButton {
-      text: 'Use current times'
+      text: 'Discard'
       enabled: page.available && !page.displayOnly && !page.pending
       pointerGate: page.pointerGate
       onClicked: page.useCurrentTimes()

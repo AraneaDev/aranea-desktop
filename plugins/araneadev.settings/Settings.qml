@@ -1,5 +1,6 @@
 // Keep-loaded settings plugin lifecycle entry.
 import QtQuick
+import Quickshell.Io
 import "SettingsLogic.js" as Logic
 
 Item {
@@ -24,6 +25,101 @@ Item {
   property alias adapterPath: controller.adapterPath
   SettingsController {
     id: controller
+  }
+  // Internal transaction state; JSON snapshots cannot overwrite arbitrary owner data.
+  property var captureSaved: null
+  // Serialize current presentation and prior showcase observations without reading owners.
+  function captureSnapshot() {
+    return JSON.stringify({
+      opened: opened,
+      section: section,
+      ui: view ? view.captureSnapshot() : null,
+      showcase: controller.showcaseActive,
+      fixture: {
+        state: controller.state,
+        error: controller.error,
+        notifications: controller.notifications,
+        notificationErrors: controller.notificationErrors,
+        results: controller.results,
+        itemErrors: controller.itemErrors
+      }
+    })
+  }
+  // Atomically accept an inert fixture before changing visibility or presentation.
+  function captureBegin(payloadJson) {
+    if (controller.pending || captureSaved)
+      return 'busy'
+    var payload
+    try {
+      payload = JSON.parse(payloadJson)
+    } catch (e) {
+      return 'invalid'
+    }
+    if (!payload || ['appearance', 'display'].indexOf(payload.section) < 0)
+      return 'invalid'
+    if (payload.fixture && payload.fixture.displayDraft && (typeof payload.fixture.displayDraft !== 'string' || !Logic.validateScale(payload.fixture.displayDraft).ok))
+      return 'invalid'
+    var saved = captureSnapshot()
+    if (payload.snapshot !== saved)
+      return 'invalid'
+    var focus = view && typeof view.captureFocus === 'function' ? view.captureFocus() : null
+    var result = controller.beginShowcase(payload.fixture)
+    if (result !== 'ok')
+      return result
+    captureSaved = {
+      json: saved,
+      ownerSaved: controller.showcaseSaved,
+      focus: focus
+    }
+    section = payload.section
+    if (view)
+      view.captureReset(payload.fixture)
+    opened = true
+    return 'ok'
+  }
+  // Report explicitly inert readiness; capture callers must check both flags.
+  function captureState() {
+    return JSON.stringify({
+      readOnly: !!captureSaved && controller.showcaseActive && !controller.pending,
+      ready: !!captureSaved && opened && !!view && view.captureReady()
+    })
+  }
+  // Restore only the snapshot belonging to this capture, including a prior showcase.
+  function captureRestore(payloadJson) {
+    if (!captureSaved || payloadJson !== captureSaved.json)
+      return 'invalid'
+    var saved = JSON.parse(captureSaved.json)
+    var focus = captureSaved.focus
+    controller.endShowcase()
+    if (saved.showcase) {
+      controller.beginShowcase(saved.fixture)
+      controller.showcaseSaved = captureSaved.ownerSaved
+    }
+    section = saved.section
+    opened = saved.opened
+    if (view && saved.ui)
+      view.captureRestore(saved.ui)
+    captureSaved = null
+    if (opened && focus)
+      Qt.callLater(function () {
+        focus.forceActiveFocus()
+      })
+    return 'ok'
+  }
+  IpcHandler {
+    target: 'aranea.settings.capture'
+    function captureSnapshot(): string {
+      return root.captureSnapshot()
+    }
+    function captureBegin(payload: string): string {
+      return root.captureBegin(payload)
+    }
+    function captureState(): string {
+      return root.captureState()
+    }
+    function captureRestore(payload: string): string {
+      return root.captureRestore(payload)
+    }
   }
   // Accept display-only snapshot JSON; owned mutations and malformed data refuse it.
   function showcase(payloadJson) {

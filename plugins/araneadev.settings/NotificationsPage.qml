@@ -32,7 +32,7 @@ ColumnLayout {
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
   signal retryRequested
-  spacing: Style.space(16)
+  spacing: Style.space(8)
   SettingsLabel {
     Layout.fillWidth: true
     text: 'Notifications'
@@ -41,7 +41,7 @@ ColumnLayout {
   }
   SettingsLabel {
     Layout.fillWidth: true
-    text: 'Manage interruptions and check the current quiet-hours window.'
+    text: 'Manage interruptions.'
     opacity: 0.65
   }
   RowLayout {
@@ -91,7 +91,7 @@ ColumnLayout {
   }
   SettingsLabel {
     Layout.fillWidth: true
-    text: 'Quiet hours are configured by the notification service and shown here read-only.'
+    text: 'Configured by the notification service.'
     opacity: 0.65
   }
   SettingsLabel {

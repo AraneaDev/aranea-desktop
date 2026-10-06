@@ -1,4 +1,5 @@
 // Keyboard-capable Filament switch using owner-observed values.
+// Inherits the compact 34 by 16 strand without increasing its visible size.
 import QtQuick
 import qs.Ui
 import "../araneadev.shared" as Aranea

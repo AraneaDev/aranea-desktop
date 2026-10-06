@@ -207,3 +207,14 @@ test("normalization creates typed canonical keys and omits invalid targets", () 
     record("app", "app", "App")
   ])
 })
+
+test("Display survives settings normalization and typed scale searches", () => {
+  const row = record("setting", "display", "Display", { aliases: ["scale", "custom scale"] })
+  assert.deepEqual(
+    plain(search.normalizeRecords([row])).map((item) => item.key),
+    ["setting:display"]
+  )
+  assert.deepEqual(keys([row], "setting: scale"), ["setting:display"])
+  const ranking = loadPragma("plugins/araneadev.menu/DesktopSearchRanking.js")
+  assert.equal(ranking.normalizeRecord(row)?.key, "setting:display")
+})

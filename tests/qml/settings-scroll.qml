@@ -20,7 +20,7 @@ ShellRoot {
   // Repeat the matrix with a real wrapped read failure visible.
   property bool withError: false
   // Stable category identities used by the production host.
-  readonly property var sections: ['appearance', 'schedule', 'integrations', 'notifications']
+  readonly property var sections: ['appearance', 'display', 'schedule', 'integrations', 'notifications']
   QmlTest {
     id: t
   }
@@ -79,9 +79,21 @@ ShellRoot {
     var pos = item.mapToItem(container, 0, 0)
     return pos.x >= -1 && pos.x + item.width <= container.width + 1 && pos.y >= -1 && pos.y + item.height <= container.height + 1
   }
+  // Check actual visible actionable bounds, including expanded thumbnail targets.
+  function checkHorizontal(item, container, label) {
+    if (item.visible && (typeof item.activate === 'function' || item.selectByMouse !== undefined || item.objectName === 'toggle')) {
+      var pos = item.mapToItem(container, 0, 0)
+      t.check(pos.x >= -1 && pos.x + item.width <= container.contentWidth + 1, label + ': horizontal reachability ' + item.objectName)
+    }
+    var kids = t.childrenOf(item)
+    for (var i = 0; i < kids.length; i++)
+      checkHorizontal(kids[i], container, label)
+  }
   // Pick a late control on every real page, rather than only the first row.
   function lastControl() {
     if (entry.section === 'appearance')
+      return t.findChild(surface, 'motionToggle')
+    if (entry.section === 'display')
       return t.findChild(surface, 'displayScaleApply')
     if (entry.section === 'schedule')
       return t.findChild(surface, 'scheduleSave')
@@ -98,13 +110,20 @@ ShellRoot {
     surface.width = geometry.width
     surface.height = geometry.height
     entry.section = sections[sectionIndex]
+    if (entry.section === 'appearance') {
+      var chooser = t.findChild(surface, 'wallpaperChoose')
+      if (chooser.text === 'Choose wallpaper')
+        chooser.activate()
+    }
     t.step(120, function () {
       var scroll = viewport(surface)
       var label = size.join('/') + ' ' + entry.section + (withError ? ' error' : '')
       t.check(Math.abs(surface.width - geometry.width) <= 1 && Math.abs(surface.height - geometry.height) <= 1, label + ': production surface uses capped logical geometry ' + surface.width + 'x' + surface.height)
       t.check(!!scroll && scroll.height >= 36, label + ': viewport can expose a complete control')
       t.check(inside(textItem(surface, 'Close'), surface), label + ': Close stays reachable')
-      t.check(inside(textItem(surface, 'Tab move · Space / Enter select · Esc close'), surface), label + ': hint stays within window')
+      checkHorizontal(scroll.contentItem, scroll, label)
+
+      t.check(inside(textItem(surface, 'Tab move · Enter select · Esc close'), surface), label + ': hint stays within window')
       scroll.contentY = 0
       var overflow = scroll.contentHeight > scroll.height + 1
       var bar = t.findChild(surface, 'settingsScrollBar')

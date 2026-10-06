@@ -27,6 +27,16 @@ Item {
   property color selectedColor: DesignTokens.accent
   // Whether the keyboard cursor is on this pill.
   property bool hasCursor: false
+  // Draw the persistent outline; Settings quiet rows opt out.
+  property bool borderVisible: true
+  // Draw the selected underline; Settings navigation uses a side marker.
+  property bool underlineVisible: true
+  // Show the centered label; Settings navigation supplies an icon-label row.
+  property bool labelVisible: true
+  // Label colour, preserving the shared selected and muted defaults.
+  property color labelColor: selected ? DesignTokens.foreground : Util.alpha(DesignTokens.foreground, 0.55)
+  // Label font family, with Settings opting into the host menu font.
+  property string labelFontFamily: Style.font.family
   // Whether a change to this option is in progress (a pending band).
   property bool busy: false
   // Hover tooltip; empty shows none.
@@ -122,6 +132,7 @@ Item {
   }
   Rectangle {
     objectName: "pillBorder"
+    visible: pill.borderVisible
     anchors.fill: parent
     color: "transparent"
     border.width: 1
@@ -135,19 +146,20 @@ Item {
     anchors.bottom: parent.bottom
     height: 2
     color: pill.selectedColor
-    visible: pill.selected
+    visible: pill.selected && pill.underlineVisible
     opacity: pill.busy ? (DesignTokens.motionEnabled ? pill.pulseOpacity : 0.7) : 1
   }
   Text {
     id: label
+    visible: pill.labelVisible
     textFormat: Text.PlainText
     anchors.centerIn: parent
     width: Math.min(implicitWidth, pill.width - Style.space(8))
     horizontalAlignment: Text.AlignHCenter
     elide: Text.ElideRight
     text: pill.text
-    color: pill.selected ? DesignTokens.foreground : Util.alpha(DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    color: pill.labelColor
+    font.family: pill.labelFontFamily
     font.pixelSize: Style.font.caption
     font.letterSpacing: 0.6
   }

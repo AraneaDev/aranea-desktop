@@ -7,7 +7,7 @@ import qs.Commons
 Text {
   textFormat: Text.PlainText
   font.family: Style.font.menuFamily
-  font.pixelSize: Style.font.body
+  font.pixelSize: Style.font.caption
   color: Color.foreground
   wrapMode: Text.Wrap
 }

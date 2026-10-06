@@ -3,14 +3,21 @@
 ## Aranea settings
 
 Open **Setup → Aranea settings**, or search for “settings” in the menu.
-The dedicated window covers wallpaper selection and explicit Apply, motion,
+The centered window uses a compact 840×460 logical size capped to the screen,
+with scrolling for longer pages. It covers wallpaper selection and explicit Apply, motion,
 custom display scaling, wallpaper schedule enablement and validated Save, integration activation, and
 Do not disturb. Navigation and thumbnail selection never change preferences.
+Appearance initially shows the current wallpaper preview. **Choose wallpaper**
+expands an inline chooser; thumbnail and label are one selection target.
+**Apply** changes the desktop, while **Discard** restores the observed wallpaper.
+Collapsing the chooser and navigating retain drafts and page scroll positions.
+
 Reopening reads the existing CLI and service owners; closing leaves an active
 integration installation running until its result is confirmed.
 
-Appearance's **Display scale** accepts decimal values from 1 to 4, including
-`2.5` and `2.667`. Editing the field does nothing until **Apply scale**.
+**Display** accepts decimal values from 1 to 4, including
+`2.5` and `2.667`. Editing the field does nothing until **Apply**. Presets for 2x, 2.5x, 2.667x and 3x also edit only
+the local draft. **Discard** restores the current observed scale.
 The focused display and current effective scale are shown separately from your
 entry. Omarchy adjusts fractions to clean logical pixels for the display mode;
 for example, `2.667` on a 3840×2160 display can become about `2.666667`.
@@ -61,6 +68,7 @@ Direct destinations use the existing summon contract:
 
 ```bash
 omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'
+omarchy-shell shell summon araneadev.settings '{"section":"display"}'
 omarchy-shell shell summon araneadev.settings '{"section":"schedule"}'
 omarchy-shell shell summon araneadev.settings '{"section":"integrations"}'
 omarchy-shell shell summon araneadev.settings '{"section":"notifications"}'
@@ -78,13 +86,20 @@ settings. Leaving Aranea releases the registration, and uninstall removes its
 owned folder. It has no stock plugin replacement or bar icon. User-defined
 `aranea.settings` menu entries take precedence over the generated route.
 
-For display-only captures, run `scripts/capture-screenshots --surface settings
---output screenshots` on one line. Additional variants are `settings-narrow`,
-`settings-dirty`, `settings-unavailable`, `settings-integration-failed`,
-`settings-notifications`, and `settings-scaling`. These render the production
-content offscreen with
-fixed fixtures and refuse reads and changes through both controls and the
-controller; they do not summon the live desktop or change notifications.
+For display-only full-desktop captures, run `scripts/capture-screenshots --surface
+settings --output screenshots` on one line. Use `settings-scaling` for Display.
+These show the normal centered compact window with the bar and wallpaper. Capture
+refuses an in-flight mutation, waits for an acknowledged inert fixture and ready
+artwork, and restores prior visibility, section, drafts, scroll positions, showcase
+state, workspace and focus. Preference mutations and owner refreshes are disabled.
+The `--all` batch and hero include both frames after menu navigation.
+
+Diagnostic variants `settings-narrow`, `settings-dirty`, `settings-unavailable`,
+`settings-integration-failed` and `settings-notifications` render production content
+offscreen with fixed fixtures and refuse reads and changes. The standalone
+`tools/render-settings-preview --fixture scaling --output FILE` retains the cropped
+Display diagnostic. Offscreen diagnostics do not summon the live desktop or change
+notifications.
 
 ## Profiles
 
