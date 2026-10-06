@@ -157,11 +157,75 @@ ShellRoot {
     t.check(retry && !retry.enabled, 'global Retry remains disabled in display-only mode')
     entry.close()
     t.equal(entry.showcase('{"state":null}'), 'invalid', 'malformed fixture refused')
+    entry.view = surface
+    entry.opened = true
+    entry.section = 'schedule'
+    appearance.selectedId = 'night'
+    appearance.wallpaperDirty = true
+    appearance.galleryExpanded = true
+    var schedule = pageWith(surface, 'save')
+    schedule.setDraft(0, '07:15')
+    var uiBefore = surface.captureSnapshot()
+    var captureBefore = entry.captureSnapshot()
+    t.equal(entry.captureBegin(JSON.stringify({
+      section: 'appearance',
+      snapshot: '{}',
+      fixture: {
+        state: sample
+      }
+    })), 'invalid', 'stale snapshot cannot start capture')
+    t.equal(entry.captureSnapshot(), captureBefore, 'refused stale snapshot leaves UI and owner intact')
+    t.equal(entry.captureBegin(JSON.stringify({
+      section: 'display',
+      snapshot: captureBefore,
+      fixture: {
+        state: sample
+      }
+    })), 'ok', 'capture accepts fixture before opening')
+    t.equal(entry.section, 'display', 'capture routes Display explicitly')
+    t.check(entry.controller.showcaseActive, 'capture enables read-only owner')
+    t.equal(entry.controller.request('set wallpaper', ['day']), false, 'capture cannot mutate owner')
+    t.equal(entry.captureRestore(captureBefore), 'ok', 'capture restores matching snapshot')
+    t.equal(entry.section, 'schedule', 'capture restores section')
+    t.check(entry.opened, 'capture restores previously opened surface')
+    t.equal(surface.captureSnapshot(), uiBefore, 'capture restores gallery, dirty drafts and scroll state')
+    t.equal(entry.controller.state, original, 'capture restores owner observation')
+    t.equal(entry.captureBegin('{"section":"unknown","fixture":{"state":{}}}'), 'invalid', 'invalid destination cannot change owner')
+    var displayPage = pageWith(surface, 'setScaleDraft')
+    displayPage.setScaleDraft('2.5')
+    displayPage.detailsExpanded = true
+    entry.showcase(JSON.stringify({
+      state: sample
+    }))
+    var priorShowcase = entry.captureSnapshot()
+    var priorUi = surface.captureSnapshot()
+    t.equal(entry.captureBegin(JSON.stringify({
+      section: 'appearance',
+      snapshot: priorShowcase,
+      fixture: {
+        state: fixture
+      }
+    })), 'ok', 'nested capture accepts prior showcase')
+    t.equal(entry.captureRestore('{}'), 'invalid', 'foreign snapshot cannot restore capture')
+    t.equal(entry.captureRestore(priorShowcase), 'ok', 'prior showcase restored')
+    t.check(entry.controller.showcaseActive, 'prior read-only mode survives capture')
+    t.equal(entry.controller.state, sample, 'prior fixture observations restored')
+    t.equal(surface.captureSnapshot(), priorUi, 'Display draft and Details survive capture')
+    entry.close()
+    t.equal(entry.controller.state, original, 'ending restored prior showcase still restores original owner')
+
     entry.controller.request('set integration', ['session', 'active'])
     before = calls.length
     t.equal(entry.showcase(JSON.stringify({
       state: sample
     })), 'busy', 'showcase cannot replace running installation')
+    t.equal(entry.captureBegin(JSON.stringify({
+      section: 'appearance',
+      snapshot: priorShowcase,
+      fixture: {
+        state: sample
+      }
+    })), 'busy', 'capture refuses in-flight mutation')
     t.check(entry.controller.pending, 'installation remains owned')
     t.equal(calls.length, before, 'no retry when showcase refused')
     t.done()

@@ -4,6 +4,7 @@
 // qmllint disable uncreatable-type
 // Centered layer surface avoids dependence on compositor floating-window rules.
 import QtQuick
+import QtQuick.Window
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
@@ -18,6 +19,26 @@ PanelWindow {
   // Give the first keyboard target focus on summon.
   function focusKeys() {
     surface.focusKeys()
+  }
+  // Snapshot local presentation for the scoped capture transaction.
+  function captureSnapshot() {
+    return surface.captureSnapshot()
+  }
+  // Restore local presentation without invoking an owner operation.
+  function captureRestore(saved) {
+    surface.captureRestore(saved)
+  }
+  // Reset the capture view after fixture acceptance.
+  function captureReset() {
+    surface.captureReset()
+  }
+  // Confirm visible artwork and layout have settled.
+  function captureReady() {
+    return visible && surface.captureReady()
+  }
+  // Remember the keyboard target for an already open Settings window.
+  function captureFocus() {
+    return panel.contentItem.Window.window.activeFocusItem
   }
   visible: root.opened
   implicitWidth: geometry.width

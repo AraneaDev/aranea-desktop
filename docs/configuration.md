@@ -86,13 +86,20 @@ settings. Leaving Aranea releases the registration, and uninstall removes its
 owned folder. It has no stock plugin replacement or bar icon. User-defined
 `aranea.settings` menu entries take precedence over the generated route.
 
-For display-only captures, run `scripts/capture-screenshots --surface settings
---output screenshots` on one line. Additional variants are `settings-narrow`,
-`settings-dirty`, `settings-unavailable`, `settings-integration-failed`,
-`settings-notifications`, and `settings-scaling`. These render the production
-content offscreen with
-fixed fixtures and refuse reads and changes through both controls and the
-controller; they do not summon the live desktop or change notifications.
+For display-only full-desktop captures, run `scripts/capture-screenshots --surface
+settings --output screenshots` on one line. Use `settings-scaling` for Display.
+These show the normal centered compact window with the bar and wallpaper. Capture
+refuses an in-flight mutation, waits for an acknowledged inert fixture and ready
+artwork, and restores prior visibility, section, drafts, scroll positions, showcase
+state, workspace and focus. Preference mutations and owner refreshes are disabled.
+The `--all` batch and hero include both frames after menu navigation.
+
+Diagnostic variants `settings-narrow`, `settings-dirty`, `settings-unavailable`,
+`settings-integration-failed` and `settings-notifications` render production content
+offscreen with fixed fixtures and refuse reads and changes. The standalone
+`tools/render-settings-preview --fixture scaling --output FILE` retains the cropped
+Display diagnostic. Offscreen diagnostics do not summon the live desktop or change
+notifications.
 
 ## Profiles
 

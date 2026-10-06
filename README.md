@@ -114,7 +114,9 @@ Apply or Save. Custom display scales from 1 to 4 apply to the focused display
 and show the observed effective fraction. Quiet hours is read-only. See [Configuration](docs/configuration.md)
 for destinations, CLI state, and safe fixture captures.
 The [display scaling preview](screenshots/settings-scaling.png) shows a custom
-request and its adjusted effective fraction.
+request and its adjusted effective fraction. Both Settings captures show the normal
+compact window within the full desktop, including the bar and wallpaper. The hero
+visits Appearance and Display after menu navigation.
 
 ![Aranea settings with inert display fixtures](screenshots/settings.png)
 

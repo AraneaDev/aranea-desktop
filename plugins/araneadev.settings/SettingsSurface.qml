@@ -24,6 +24,64 @@ Item {
   // Section whose scroll offset is currently shown.
   property string scrollSection: 'appearance'
   Component.onCompleted: scrollSection = root.section
+  // Save local drafts and independent scroll positions without owner reads.
+  function captureSnapshot() {
+    return {
+      pageOffsets: pageOffsets,
+      scrollSection: scrollSection,
+      contentY: scroller.contentY,
+      selectedId: appearancePage.selectedId,
+      wallpaperDirty: appearancePage.wallpaperDirty,
+      galleryExpanded: appearancePage.galleryExpanded,
+      scaleDraft: displayPage.scaleDraft,
+      scaleDirty: displayPage.scaleDirty,
+      detailsExpanded: displayPage.detailsExpanded,
+      scheduleDraft: schedulePage.draft,
+      scheduleDirty: schedulePage.dirty
+    }
+  }
+  // Restore local capture state after restoring owner observations and section.
+  function captureRestore(saved) {
+    appearancePage.selectedId = saved.selectedId
+    appearancePage.wallpaperDirty = saved.wallpaperDirty
+    appearancePage.galleryExpanded = saved.galleryExpanded
+    displayPage.scaleDraft = saved.scaleDraft
+    displayPage.scaleDirty = saved.scaleDirty
+    displayPage.detailsExpanded = saved.detailsExpanded
+    schedulePage.draft = saved.scheduleDraft
+    schedulePage.dirty = saved.scheduleDirty
+    pageOffsets = saved.pageOffsets
+    scrollSection = saved.scrollSection
+    scrollTo(saved.contentY)
+    Qt.callLater(function () {
+      panel.scrollTo(saved.contentY)
+    })
+  }
+  // Reset only capture-local presentation, never apply owner preferences.
+  function captureReset() {
+    appearancePage.wallpaperDirty = false
+    appearancePage.discardWallpaper()
+    appearancePage.galleryExpanded = false
+    displayPage.discardScale()
+    displayPage.detailsExpanded = false
+    schedulePage.dirty = false
+    schedulePage.syncDraft()
+    pageOffsets = ({})
+    scrollTo(0)
+  }
+  // Wait for production artwork and settled geometry before full-screen capture.
+  function captureReady() {
+    function ready(item) {
+      if (item instanceof Image && item.visible && item.source.toString() && item.status !== Image.Ready)
+        return false
+      var children = item.children || []
+      for (var i = 0; i < children.length; i++)
+        if (!ready(children[i]))
+          return false
+      return true
+    }
+    return Date.now() - layoutChangedAt >= 250 && ready(panel)
+  }
   // Time of the last geometry, category, content or scroll change.
   property real layoutChangedAt: 0
   // Close the summoned surface on Escape.
@@ -223,6 +281,7 @@ Item {
                 height: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
                 currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
                 AppearancePage {
+                  id: appearancePage
                   Layout.fillHeight: false
                   backendState: panel.controller.state
                   displayOnly: panel.controller.showcaseActive
@@ -237,6 +296,7 @@ Item {
                   onRetryRequested: panel.controller.refresh()
                 }
                 DisplayPage {
+                  id: displayPage
                   Layout.fillHeight: false
                   backendState: panel.controller.state
                   displayOnly: panel.controller.showcaseActive
