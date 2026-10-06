@@ -45,7 +45,7 @@ Item {
   // Public contract member.
   property color footerText: contextText
   // Public contract member.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
   property real menuFontScale: 1
   // Public contract member.
@@ -142,10 +142,10 @@ Item {
           textFormat: Text.PlainText
           width: parent.width - (chrome.scopedSearch ? globalSearch.width + Style.spacing.md : 0)
           text: hint
-          color: contextText
+          color: chrome.fullRootHeader ? Util.alpha(chrome.foreground, 0.8) : contextText
           font.family: fontFamily
-          font.pixelSize: scaled(Style.font.caption)
-          font.weight: Font.Medium
+          font.pixelSize: scaled(chrome.fullRootHeader ? Style.font.bodySmall : Style.font.caption)
+          font.weight: Font.Normal
           font.letterSpacing: menuLetterSpacing
           elide: Text.ElideRight
         }
@@ -226,7 +226,7 @@ Item {
       Text {
         text: "◈"
         color: contextText
-        font.family: fontFamily
+        font.family: Aranea.Typography.iconFamily
         font.pixelSize: scaled(Style.font.caption)
         anchors.verticalCenter: parent.verticalCenter
       }
@@ -238,7 +238,7 @@ Item {
         verticalAlignment: Text.AlignVCenter
       }
       Text {
-        text: "SYSTEM READY"
+        text: "System ready"
         color: contextText
         font.family: fontFamily
         font.pixelSize: scaled(Style.font.caption)
@@ -247,7 +247,7 @@ Item {
       Text {
         text: clockContext
         color: contextText
-        font.family: fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: scaled(Style.font.caption)
         verticalAlignment: Text.AlignVCenter
       }
@@ -286,7 +286,7 @@ Item {
       Text {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
-        text: "COMMANDS  ·  QUICK ACCESS  ·  ENTER TO OPEN"
+        text: "Quick access · Enter to open"
         color: footerText
         font.family: fontFamily
         font.pixelSize: scaled(Style.font.bodySmall)
