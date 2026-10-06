@@ -100,7 +100,7 @@ Column {
       anchors.centerIn: parent
       text: action.glyph
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.iconFamily
       font.pixelSize: Style.font.title
     }
     MouseArea {
@@ -117,6 +117,7 @@ Column {
   }
 
   Aranea.DropdownHeader {
+    refined: true
     width: parent.width
     glyph: header.glyph
     title: header.title

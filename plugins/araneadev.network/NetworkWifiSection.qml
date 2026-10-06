@@ -90,10 +90,10 @@ Column {
     visible: section.scanning
     text: "SCANNING WI-FI…"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
   Repeater {
     id: repeater
@@ -124,13 +124,14 @@ Column {
         visible: (wrapper.modelData.title || "") !== ""
         text: wrapper.modelData.title || ""
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
-        font.letterSpacing: 1.2
+        font.letterSpacing: 0
       }
       Aranea.NodeDeviceRow {
         id: wifiRow
+        refined: true
         objectName: "wifiRow"
         width: wrapper.width
         glyph: wrapper.modelData.glyph || ""
@@ -160,7 +161,7 @@ Column {
             visible: !!wrapper.modelData.secured && !forgetBtn.shown
             text: String.fromCodePoint(0xf033e)
             color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-            font.family: Style.font.family
+            font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.caption
           }
           Aranea.ForgetButton {

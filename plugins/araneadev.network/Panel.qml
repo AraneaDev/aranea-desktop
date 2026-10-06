@@ -2312,6 +2312,7 @@ Panel {
   // to it.
   Aranea.KeyboardPanelFrame {
     id: panel
+    refined: true
     anchorItem: button
     owner: root
     bar: root.bar

@@ -27,10 +27,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "INTERFACES"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       objectName: "interfacesCount"
@@ -38,19 +38,22 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: String(section.rows.length)
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
   }
   Repeater {
     model: section.rows
     Aranea.NodeDeviceRow {
+      refined: true
       required property var modelData
       objectName: "interfaceRow"
       width: section.width
       glyph: modelData.glyph
       label: modelData.label
       detail: modelData.detail
+      labelFontFamily: Aranea.Typography.technicalFamily
+      detailFontFamily: Aranea.Typography.technicalFamily
       active: !!modelData.active
       available: true
       // Informational: no hover fill, no pointing cursor.
