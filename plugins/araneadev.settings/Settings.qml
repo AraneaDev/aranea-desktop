@@ -57,6 +57,8 @@ Item {
     }
     if (!payload || ['appearance', 'display'].indexOf(payload.section) < 0)
       return 'invalid'
+    if (payload.fixture && payload.fixture.displayDraft && (typeof payload.fixture.displayDraft !== 'string' || !Logic.validateScale(payload.fixture.displayDraft).ok))
+      return 'invalid'
     var saved = captureSnapshot()
     if (payload.snapshot !== saved)
       return 'invalid'
@@ -71,7 +73,7 @@ Item {
     }
     section = payload.section
     if (view)
-      view.captureReset()
+      view.captureReset(payload.fixture)
     opened = true
     return 'ok'
   }

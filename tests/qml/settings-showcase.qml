@@ -168,6 +168,19 @@ ShellRoot {
     schedule.setDraft(0, '07:15')
     var uiBefore = surface.captureSnapshot()
     var captureBefore = entry.captureSnapshot()
+    sample.display = {
+      scale: 2.666667,
+      configuredScale: 2.66667,
+      availability: 'available'
+    }
+    t.equal(entry.captureBegin(JSON.stringify({
+      section: 'display',
+      snapshot: captureBefore,
+      fixture: {
+        state: sample,
+        displayDraft: 'invalid'
+      }
+    })), 'invalid', 'malformed fixture draft refuses before capture')
     t.equal(entry.captureBegin(JSON.stringify({
       section: 'appearance',
       snapshot: '{}',
@@ -180,10 +193,13 @@ ShellRoot {
       section: 'display',
       snapshot: captureBefore,
       fixture: {
+        displayDraft: '2.667',
         state: sample
       }
     })), 'ok', 'capture accepts fixture before opening')
     t.equal(entry.section, 'display', 'capture routes Display explicitly')
+    t.equal(pageWith(surface, 'setScaleDraft').scaleDraft, '2.667', 'capture fixture preserves exact requested scale')
+    t.equal(entry.controller.state.display.scale, 2.666667, 'fixture requested fraction stays independent from effective scale')
     t.check(entry.controller.showcaseActive, 'capture enables read-only owner')
     t.equal(entry.controller.request('set wallpaper', ['day']), false, 'capture cannot mutate owner')
     t.equal(entry.captureRestore(captureBefore), 'ok', 'capture restores matching snapshot')

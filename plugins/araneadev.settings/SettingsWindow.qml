@@ -28,8 +28,8 @@ PanelWindow {
     surface.captureRestore(saved)
   }
   // Reset the capture view after fixture acceptance.
-  function captureReset() {
-    surface.captureReset()
+  function captureReset(fixture) {
+    surface.captureReset(fixture)
   }
   // Confirm visible artwork and layout have settled.
   function captureReady() {

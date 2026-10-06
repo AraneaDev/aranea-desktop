@@ -63,11 +63,13 @@ Item {
     })
   }
   // Reset only capture-local presentation, never apply owner preferences.
-  function captureReset() {
+  function captureReset(fixture) {
     appearancePage.wallpaperDirty = false
     appearancePage.discardWallpaper()
     appearancePage.galleryExpanded = false
     displayPage.discardScale()
+    if (fixture && fixture.displayDraft)
+      displayPage.setScaleDraft(fixture.displayDraft)
     displayPage.detailsExpanded = false
     schedulePage.dirty = false
     schedulePage.syncDraft()

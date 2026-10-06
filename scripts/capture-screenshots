@@ -435,7 +435,7 @@ capture_settings_surface() (
   previous_workspace="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // empty' || true)"
   previous_focus="$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty' || true)"
   fixture="$(jq -cn --arg section "$([[ "$surface" == settings-scaling ]] && echo display || echo appearance)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
-    {section: $section, snapshot: $snapshot, fixture: {state: {
+    {section: $section, snapshot: $snapshot, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
       display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
       motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
       wallpaper:{activeId:"day",availability:"available"},
