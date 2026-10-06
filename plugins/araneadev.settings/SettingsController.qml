@@ -8,12 +8,15 @@ QtObject {
   id: controller
   // Backend executable, resolved from the active theme root by default.
   property string adapterPath: Aranea.RuntimePaths.themeRoot + '/scripts/aranea-settings'
+  // Notifications wrapper executable; injectable for isolated IPC fixtures.
+  property string notificationsPath: 'omarchy-shell'
   // Injection boundary: runner(argv, callback(exitCode, stdout, stderr)).
   property var runner: function (argv, done) {
     var process = processComponent.createObject(controller, {
       command: argv,
       completion: done
     })
+    process.startRequested = true
     process.running = true
   }
   // Latest adapter snapshot; unreadable sections are never replaced with defaults.
@@ -52,6 +55,20 @@ QtObject {
     Process {
       id: process
       property var completion
+      property bool startRequested: false
+      property bool startedSuccessfully: false
+      property bool completed: false
+      function finish(code, stdout, stderr) {
+        if (completed)
+          return
+        completed = true
+        completion(code, stdout, stderr)
+        process.destroy()
+      }
+      onStarted: process.startedSuccessfully = true
+      // Failed launch has no exited signal; a real exit must wait for collectors.
+      onRunningChanged: if (process.startRequested && !running && !process.startedSuccessfully)
+        process.finish(-1, '', 'Could not start ' + process.command[0] + '. Check that it is installed and executable.')
       stdout: StdioCollector {
         id: output
       }
@@ -61,8 +78,7 @@ QtObject {
       // Quickshell metadata omits the unused QProcess exit-status enum.
       // qmllint disable signal-handler-parameters
       onExited: function (exitCode) {
-        process.completion(exitCode, output.text, diagnostics.text)
-        process.destroy()
+        process.finish(exitCode, output.text, diagnostics.text)
       }
       // qmllint enable signal-handler-parameters
     }
@@ -127,7 +143,7 @@ QtObject {
   }
   // Validate one IPC field and preserve other available notification fields.
   function readNotification(method, key, revision, done) {
-    runCommand(['omarchy-shell', 'notifications', method], function (code, stdout, stderr) {
+    runCommand([notificationsPath, 'notifications', method], function (code, stdout, stderr) {
       if (revision !== notificationsRevision)
         return
       var value = String(stdout || '').trim()
@@ -155,7 +171,7 @@ QtObject {
       pendingKey = 'dnd'
       notificationsRevision++
       setResult('dnd', '', '')
-      runCommand(['omarchy-shell', 'notifications', 'setDnd', args[0]], function (code, stdout, stderr) {
+      runCommand([notificationsPath, 'notifications', 'setDnd', args[0]], function (code, stdout, stderr) {
         readNotification('dndState', 'dnd', notificationsRevision, function (valid, value) {
           setResult('dnd', code !== 0 ? 'Failed' : valid && value === args[0] ? 'Applied' : 'Application not confirmed', code !== 0 ? stderr || 'DND change failed.' : valid ? '' : notificationErrors.dnd)
           pending = false
