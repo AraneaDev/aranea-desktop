@@ -54,6 +54,17 @@ ShellRoot {
     }
   }
 
+  Component {
+    id: freshSection
+    Shared.DisclosureSection {
+      objectName: "freshDisclosure"
+      width: 360
+      y: 180
+      title: "Fresh heading"
+      onToggleRequested: requests += 1
+    }
+  }
+
   Component.onCompleted: t.step(400, function () {
     var heading = t.findChild(section, "disclosureHeading")
     collapsedHeight = section.height
@@ -90,7 +101,19 @@ ShellRoot {
         t.step(350, function () {
           pointer.mouseClick(t.findChild(section, "disclosureHeading"), 40, collapsedHeight / 2)
           t.equal(requests, 3, "settled heading accepts pointer clicks again")
-          t.done()
+          // The standalone fallback gate must release the initial settle guard.
+          freshSection.createObject(stage)
+          t.step(25, function () {
+            var fresh = t.findChild(stage, "freshDisclosure")
+            var freshHeading = t.findChild(fresh, "disclosureHeading")
+            pointer.mouseMove(freshHeading, 20, freshHeading.height / 2)
+            pointer.mouseMove(freshHeading, 30, freshHeading.height / 2)
+            t.step(15, function () {
+              pointer.mouseClick(freshHeading, 30, freshHeading.height / 2)
+              t.equal(requests, 4, "real fallback-gate movement permits a click during initial settling")
+              t.done()
+            })
+          })
         })
       })
     })

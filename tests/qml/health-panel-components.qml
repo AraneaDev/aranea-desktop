@@ -158,23 +158,28 @@ ShellRoot {
   }
 
   // Many problems and expanded sections share the same capped viewport.
-  HealthComponents.HealthDropdown {
-    id: cappedView
-    width: 380
-    maxContentHeight: 300
-    available: true
-    status: "critical"
-    problems: Array.from({
-      length: 25
-    }, function (_, i) {
-      return {
-        key: "problem:" + i,
-        summary: "Issue " + i,
-        urgency: 2
-      }
-    })
-    resourcesExpanded: true
-    processesExpanded: true
+  FloatingWindow {
+    visible: true
+    implicitWidth: 400
+    implicitHeight: 320
+    HealthComponents.HealthDropdown {
+      id: cappedView
+      width: 380
+      maxContentHeight: 300
+      available: true
+      status: "critical"
+      problems: Array.from({
+        length: 25
+      }, function (_, i) {
+        return {
+          key: "problem:" + i,
+          summary: "Issue " + i,
+          urgency: 2
+        }
+      })
+      resourcesExpanded: true
+      processesExpanded: true
+    }
   }
 
   Component.onCompleted: {
@@ -213,7 +218,18 @@ ShellRoot {
         cappedView.keyboardCursor = true
         t.step(50, function () {
           t.check(cappedView.scrollViewport.contentY > 0, "first-key reveal scrolls an unchanged cursor key back into view")
-          t.done()
+          cappedView.cursorKey = "problem:0"
+          t.step(50, function () {
+            var before = cappedView.scrollViewport.contentHeight
+            cappedView.problems = cappedView.problems.slice(1).concat([cappedView.problems[0]])
+            t.step(50, function () {
+              var row = cappedView.problemsView.rowAt(24)
+              var top = row.mapToItem(cappedView.scrollViewport.contentItem, 0, 0).y
+              t.equal(cappedView.scrollViewport.contentHeight, before, "same-height problem reorder preserves total content height")
+              t.check(top >= cappedView.scrollViewport.contentY && top + row.height <= cappedView.scrollViewport.contentY + cappedView.scrollViewport.height + 0.5, "selected keyed problem remains visible after a same-height reorder")
+              t.done()
+            })
+          })
         })
       })
     })

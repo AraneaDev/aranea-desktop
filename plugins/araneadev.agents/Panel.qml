@@ -64,6 +64,57 @@ Panel {
   // it. The view outlines the cursor only then, so the mouse never shows
   // one.
   property bool keyboardCursor: false
+  // Hosts own expansion and stable heading focus across equal data refreshes.
+  // Current optional telemetry expansion state.
+  property var details: ({
+      historyExpanded: false,
+      modelsExpanded: false
+    })
+  // Stable Refresh or disclosure target key.
+  property string cursorKey: "refresh"
+  // Selected identity independent of provider-array positions.
+  readonly property string displayedProviderId: provider ? AgentsLogic.providerKey(provider) : ""
+  // Provider that owns the current expansion state.
+  property string detailsProviderId: ""
+  // Available keyboard target keys, in display order.
+  readonly property var keyboardStops: AgentsLogic.keyboardStops(dayViewRows(provider).length > 0, models.length > 0)
+  onDisplayedProviderIdChanged: {
+    details = AgentsLogic.detailsForProvider(details, detailsProviderId, displayedProviderId, opened)
+    detailsProviderId = displayedProviderId
+    cursorKey = "refresh"
+    dropdown.scrollToTop()
+  }
+  onKeyboardStopsChanged: if (keyboardStops.indexOf(cursorKey) < 0) {
+    cursorKey = ""
+    keyboardCursor = false
+  }
+
+  // Toggle only a currently available section; restore internal focus on collapse.
+  function toggleDetails(section) {
+    var key = "details:" + section
+    if (keyboardStops.indexOf(key) < 0)
+      return
+    if (cursorKey.indexOf(key + ":") === 0)
+      cursorKey = key
+    details = {
+      historyExpanded: section === "history" ? !details.historyExpanded : details.historyExpanded,
+      modelsExpanded: section === "models" ? !details.modelsExpanded : details.modelsExpanded
+    }
+  }
+
+  // Reveal first, then move or activate the currently confirmed target.
+  function moveCursor(direction) {
+    var next = AgentsLogic.cursorStep(keyboardStops, cursorKey, cursorActive && keyboardCursor, direction)
+    cursorKey = next.key
+    cursorActive = true
+    keyboardCursor = next.keyboard
+    if (!next.activate)
+      return
+    if (cursorKey === "refresh")
+      requestRefresh()
+    else
+      toggleDetails(cursorKey.slice("details:".length))
+  }
   // The Refresh pill's pending state (AgentsLogic.refreshIdle shape): busy
   // from a refresh request until Main's dataRevision moves past the
   // revision frozen at the request, or until refreshTimeoutMs passes.
@@ -628,13 +679,13 @@ Panel {
       balance: balanceView(balance),
       days: dayViewRows(provider),
       models: modelViewRows(models),
+      details: root.details,
       // The sync footer speaks for the real machine, never for stand-ins.
       footer: agentsShowcase ? "" : footerText(),
       empty: providers.length === 0,
-      // The outline marks Enter's target: always Refresh (h/l only picks
-      // the agent).
-      cursor: AgentsLogic.cursorView(cursorActive && keyboardCursor),
-      keyHint: AgentsLogic.keyHint(providers.length)
+      // The outline marks Enter's current keyed Refresh or detail target.
+      cursor: AgentsLogic.cursorView(cursorActive && keyboardCursor, cursorKey),
+      keyHint: AgentsLogic.keyHint(providers.length, cursorKey)
     })
 
   // Carries out one AgentsDropdown action. Every action comes from the
@@ -647,6 +698,14 @@ Panel {
     keyboardCursor = false
     if (name === "refresh") {
       requestRefresh()
+      return
+    }
+    if (name === "toggleDetails") {
+      if (!arg || keyboardStops.indexOf("details:" + arg.section) < 0)
+        return
+      cursorKey = "details:" + arg.section
+      cursorActive = true
+      toggleDetails(arg.section)
       return
     }
     if (name === "selectAgent") {
@@ -675,6 +734,8 @@ Panel {
       real: selectedProviderId,
       showcase: showcaseSelectedId
     }).showcase
+    details = AgentsLogic.detailsForProvider(details, detailsProviderId, displayedProviderId, false)
+    cursorKey = "refresh"
     if (!opened)
       return
     cursorActive = false
@@ -823,23 +884,17 @@ Panel {
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
       if (!root.cursorActive || !root.keyboardCursor) {
-        root.cursorActive = true
-        root.keyboardCursor = true
+        root.moveCursor(0)
         return
       }
       if (dx !== 0)
         root.selectProvider(root.providerIndex + dx)
       if (dy !== 0)
-        dropdown.scrollBy(dy)
+        root.moveCursor(dy)
     }
     onActivateRequested: {
       dropdown.disarmPointer()
-      if (!root.cursorActive || !root.keyboardCursor) {
-        root.cursorActive = true
-        root.keyboardCursor = true
-        return
-      }
-      root.requestRefresh()
+      root.moveCursor(0)
     }
     onTextKey: function (t) {
       dropdown.disarmPointer()

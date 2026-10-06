@@ -1,8 +1,8 @@
 // The Aranea agents dropdown's view: the header (tool mark, tool, plan and
 // "updated" caption, Refresh pill), the agent switch, then, scrolling
 // together inside a Flickable (objectName "agentsScroll") so the whole
-// dropdown stays within maxHeight (stock's 640 cap), the auth problem
-// card, BALANCE, LIMITS, TOKENS BY DAY, TOKENS BY MODEL, the sync footer
+// dropdown stays within maxHeight (stock's 640 cap), the optional history
+// and models and sync footer. Errors, balance and limits remain above it,
 // and the empty text; a key hint closes it. Drawn from one plain view
 // object (Panel's agents view) and reporting every user action through a
 // single action signal. No usage records here, so tests drive it with
@@ -32,7 +32,7 @@ Column {
   //   days [{key, label, fraction, value, today, detail}];
   //   models [{key, label, fraction, value, detail}];
   //   footer (optional sync text); empty; cursor {active, section, index};
-  //   keyHint.
+  //   details {historyExpanded, modelsExpanded}; keyHint.
   property var view: ({})
   // Cursor object from the view, or a neutral one.
   readonly property var cursor: view && view.cursor ? view.cursor : ({
@@ -70,6 +70,7 @@ Column {
   //   selectAgent ({index, key}): an agent pill was chosen; it carries the
   //     pill's key (the provider id) as the view held it, and is never
   //     sent when the pill's key changed underneath;
+  //   toggleDetails ({section: "history" | "models"}): disclosure activation;
   //   hover ({section, index}): the pointer really moved onto the Refresh
   //     pill (section "refresh", index 0), an agent pill ("agents"), a day
   //     row ("days") or a model row ("models").
@@ -122,9 +123,39 @@ Column {
   // Scrolls the sections back to the top (opening, switching agent).
   function scrollToTop() {
     agentsScroll.contentY = 0
+    primaryScroll.contentY = 0
   }
 
-  spacing: Style.space(12)
+  // Shared budget after identity, provider selection and the fixed hint.
+  readonly property real bodyBudget: Math.max(0, maxHeight - (header.visible ? header.height + spacing : 0) - (agentSwitch.visible ? agentSwitch.height + spacing : 0) - (keyHint.visible ? keyHint.implicitHeight + spacing : 0))
+  // Reserve collapsed heading space, so expansion never crowds out decisions.
+  readonly property real detailReserve: Math.min(scrollColumn.implicitHeight, (historyDisclosure.visible ? historyDisclosure.children[0].height : 0) + (modelsDisclosure.visible ? modelsDisclosure.children[0].height : 0) + (footerText.visible ? footerText.implicitHeight : 0) + Math.max(0, Number(historyDisclosure.visible) + Number(modelsDisclosure.visible) + Number(footerText.visible) - 1) * spacing)
+
+  // Keep focused headings visible after expansion or a smaller height budget.
+  function ensureCursorVisible() {
+    if (!dropdown.cursor.active || dropdown.cursor.section !== "details")
+      return
+    var section = dropdown.cursor.index === 0 ? historyDisclosure : modelsDisclosure
+    if (!section.visible)
+      return
+    var heading = section.children[0]
+    var top = heading.mapToItem(scrollColumn, 0, 0).y
+    var bottom = top + heading.height
+    var limit = Math.max(0, agentsScroll.contentHeight - agentsScroll.height)
+    if (top < agentsScroll.contentY)
+      agentsScroll.contentY = Math.max(0, top)
+    else if (bottom > agentsScroll.contentY + agentsScroll.height)
+      agentsScroll.contentY = Math.min(limit, bottom - agentsScroll.height)
+  }
+
+  // Equal refreshes keep the stamp; actual detail changes settle pointer input.
+  readonly property string detailLayout: String(!!(view.details && view.details.historyExpanded)) + String(!!(view.details && view.details.modelsExpanded)) + joinKeys(view.days) + joinKeys(view.models)
+  onDetailLayoutChanged: {
+    dropdown.noteLayoutChange()
+    Qt.callLater(dropdown.ensureCursorVisible)
+  }
+  onCursorChanged: Qt.callLater(dropdown.ensureCursorVisible)
+  spacing: Style.space(16)
   onAgentKeysChanged: dropdown.noteLayoutChange()
   onPinnedShownChanged: dropdown.noteLayoutChange()
 
@@ -165,24 +196,26 @@ Column {
       })
     }
   }
+  // Primary state stays above optional telemetry. Only unusually long errors
+  // or limit lists need their own fallback viewport on constrained screens.
   Flickable {
-    id: agentsScroll
-    objectName: "agentsScroll"
+    id: primaryScroll
+    objectName: "agentsPrimaryScroll"
     width: parent.width
-    // Whatever the pinned rows leave of maxHeight, never less than nothing,
-    // so the dropdown never grows past maxHeight.
-    height: Math.max(0, Math.min(scrollColumn.implicitHeight, dropdown.maxHeight - (header.visible ? header.height + dropdown.spacing : 0) - (agentSwitch.visible ? agentSwitch.height + dropdown.spacing : 0) - (keyHint.visible ? keyHint.implicitHeight + dropdown.spacing : 0)))
+    visible: primaryColumn.implicitHeight > 0
+    height: Math.min(primaryColumn.implicitHeight, Math.max(0, dropdown.bodyBudget - dropdown.detailReserve - (agentsScroll.visible ? dropdown.spacing : 0)))
     contentWidth: width
-    contentHeight: scrollColumn.implicitHeight
+    contentHeight: primaryColumn.implicitHeight
     clip: true
     interactive: contentHeight > height
     boundsBehavior: Flickable.StopAtBounds
-
+    onContentYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: dropdown.noteLayoutChange()
     Column {
-      id: scrollColumn
-      width: agentsScroll.width
-      spacing: Style.space(12)
-
+      id: primaryColumn
+      width: primaryScroll.width
+      spacing: Style.space(16)
+      onImplicitHeightChanged: dropdown.noteLayoutChange()
       Rectangle {
         id: problemCard
         objectName: "problemCard"
@@ -245,48 +278,91 @@ Column {
         width: parent.width
         rows: dropdown.view.limits || []
       }
-      Rectangle {
-        width: parent.width
-        height: Math.max(1, Style.spacing.hairline)
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
-        visible: daysSection.visible
+    }
+  }
+  Flickable {
+    id: agentsScroll
+    objectName: "agentsScroll"
+    width: parent.width
+    // Whatever the pinned rows leave of maxHeight, never less than nothing,
+    // so the dropdown never grows past maxHeight.
+    visible: scrollColumn.implicitHeight > 0
+    height: Math.max(0, Math.min(scrollColumn.implicitHeight, dropdown.bodyBudget - (primaryScroll.visible ? primaryScroll.height + dropdown.spacing : 0)))
+    contentWidth: width
+    contentHeight: scrollColumn.implicitHeight
+    clip: true
+    interactive: contentHeight > height
+    boundsBehavior: Flickable.StopAtBounds
+    onContentYChanged: dropdown.noteLayoutChange()
+    onHeightChanged: {
+      dropdown.noteLayoutChange()
+      Qt.callLater(dropdown.ensureCursorVisible)
+    }
+
+    Column {
+      id: scrollColumn
+      width: agentsScroll.width
+      spacing: Style.space(16)
+      onImplicitHeightChanged: {
+        dropdown.noteLayoutChange()
+        Qt.callLater(dropdown.ensureCursorVisible)
       }
-      AgentsUsageSection {
-        id: daysSection
-        objectName: "daysSection"
+
+      Aranea.DisclosureSection {
+        id: historyDisclosure
+        objectName: "historyDisclosure"
         width: parent.width
-        caption: "TOKENS BY DAY"
-        rows: dropdown.view.days || []
+        visible: (dropdown.view.days || []).length > 0
+        title: "Usage history"
+        expanded: !!(dropdown.view.details && dropdown.view.details.historyExpanded)
+        keyboardFocused: dropdown.cursorIn("details") === 0
         pointerGate: dropdown.pointerGate
-        onRowHovered: function (index) {
-          dropdown.action("hover", {
-            section: "days",
-            index: index
-          })
+        onToggleRequested: dropdown.action("toggleDetails", {
+          section: "history"
+        })
+        AgentsUsageSection {
+          id: daysSection
+          objectName: "daysSection"
+          width: parent.width
+          rows: dropdown.view.days || []
+          pointerGate: dropdown.pointerGate
+          onRowHovered: function (index) {
+            dropdown.action("hover", {
+              section: "days",
+              index: index
+            })
+          }
         }
       }
-      Rectangle {
+      Aranea.DisclosureSection {
+        id: modelsDisclosure
+        objectName: "modelsDisclosure"
         width: parent.width
-        height: Math.max(1, Style.spacing.hairline)
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
-        visible: modelsSection.visible
-      }
-      AgentsUsageSection {
-        id: modelsSection
-        objectName: "modelsSection"
-        width: parent.width
-        caption: "TOKENS BY MODEL"
-        stacked: true
-        rows: dropdown.view.models || []
+        visible: (dropdown.view.models || []).length > 0
+        title: "Models"
+        expanded: !!(dropdown.view.details && dropdown.view.details.modelsExpanded)
+        keyboardFocused: dropdown.cursorIn("details") === 1
         pointerGate: dropdown.pointerGate
-        onRowHovered: function (index) {
-          dropdown.action("hover", {
-            section: "models",
-            index: index
-          })
+        onToggleRequested: dropdown.action("toggleDetails", {
+          section: "models"
+        })
+        AgentsUsageSection {
+          id: modelsSection
+          objectName: "modelsSection"
+          width: parent.width
+          stacked: true
+          rows: dropdown.view.models || []
+          pointerGate: dropdown.pointerGate
+          onRowHovered: function (index) {
+            dropdown.action("hover", {
+              section: "models",
+              index: index
+            })
+          }
         }
       }
       Text {
+        id: footerText
         textFormat: Text.PlainText
         objectName: "footerText"
         width: parent.width
@@ -308,7 +384,7 @@ Column {
     // No hint, no line: an empty hint takes no height.
     visible: text !== ""
     text: String(dropdown.view.keyHint || "")
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

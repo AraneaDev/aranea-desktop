@@ -84,6 +84,9 @@ Item {
     else if (top + targetHeight > bodyScroll.contentY + bodyScroll.height)
       bodyScroll.contentY = Math.min(maxY, top + targetHeight - bodyScroll.height)
   }
+  // Same-height reorders still move the keyed target outside the viewport.
+  readonly property string problemLayout: HealthLogic.problemKeys(root.problems)
+  onProblemLayoutChanged: Qt.callLater(root.ensureCursorVisible)
   onCursorKeyChanged: Qt.callLater(root.ensureCursorVisible)
   onKeyboardCursorChanged: Qt.callLater(root.ensureCursorVisible)
 

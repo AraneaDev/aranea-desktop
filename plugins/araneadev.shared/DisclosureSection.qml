@@ -123,8 +123,7 @@ Item {
         if (!heading.hoverGate.moved(pointer, mouse))
           return
         heading.pointerHovered = true
-        if (section.pointerGate)
-          heading.pointerMovedAt = Date.now()
+        heading.pointerMovedAt = Date.now()
       }
       onClicked: if (heading.clickSettled())
         section.activate()

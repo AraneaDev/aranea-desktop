@@ -496,31 +496,88 @@ function showcaseCall(opened, json, nowMs) {
 }
 
 /**
- * The view's keyboard cursor. Enter refreshes, so the outline always sits
- * on the Refresh pill, whatever agent h/l picks.
+ * The view's keyboard cursor on Refresh or a stable detail heading.
  * @param {boolean} shown - whether the keyboard shows the cursor
+ * @param {string} [key] - stable Refresh/history/models target
  * @returns {{active: boolean, section: string, index: number}} the cursor
  */
-function cursorView(shown) {
-  return { active: !!shown, section: "refresh", index: 0 }
+function cursorView(shown, key) {
+  var details = key === "details:history" || key === "details:models"
+  return {
+    active: !!shown,
+    section: details ? "details" : "refresh",
+    index: key === "details:models" ? 1 : 0
+  }
+}
+
+/**
+ * Reset optional telemetry when its provider or dropdown lifecycle changes.
+ * @param {object} details - host-owned expansion state
+ * @param {string} previous - preceding provider id
+ * @param {string} current - currently displayed provider id
+ * @param {boolean} opened - whether the dropdown is open
+ * @returns {object} expansion state for the current provider
+ */
+function detailsForProvider(details, previous, current, opened) {
+  return opened && previous === current
+    ? details
+    : { historyExpanded: false, modelsExpanded: false }
+}
+
+/**
+ * Visible keyboard targets, in decision/detail order.
+ * @param {boolean} history - whether daily telemetry is available
+ * @param {boolean} models - whether model telemetry is available
+ * @returns {Array<string>} stable target keys
+ */
+function keyboardStops(history, models) {
+  var stops = ["refresh"]
+  if (history) stops.push("details:history")
+  if (models) stops.push("details:models")
+  return stops
+}
+
+/**
+ * Reveal first, navigate by key, and refuse activation of a lost target.
+ * @param {Array<string>} stops - available target keys
+ * @param {string} key - host-owned target key
+ * @param {boolean} keyboard - whether its keyboard outline is shown
+ * @param {number} direction - +/-1 movement, zero activation
+ * @returns {{key: string, keyboard: boolean, activate: boolean}} next cursor
+ */
+function cursorStep(stops, key, keyboard, direction) {
+  var index = stops.indexOf(key)
+  if (index < 0 || !keyboard)
+    return { key: index < 0 ? stops[0] : key, keyboard: true, activate: false }
+  if (direction === 0) return { key: key, keyboard: true, activate: true }
+  var next = (((index + direction) % stops.length) + stops.length) % stops.length
+  return { key: stops[next], keyboard: true, activate: false }
 }
 
 /**
  * The key hint under the dropdown: the agent switch when there is more
- * than one agent, then Enter's refresh and the scroll keys.
+ * than one agent, then movement, activation and the direct refresh key.
  * @param {number} providerCount - how many agents show
+ * @param {string} [key] - current Refresh or disclosure target
  * @returns {string} the hint
  */
-function keyHint(providerCount) {
+function keyHint(providerCount, key) {
   var parts = []
   if ((Number(providerCount) || 0) > 1) parts.push("h/l agent")
-  parts.push("enter refresh", String.fromCodePoint(0x2191, 0x2193) + " scroll")
+  parts.push(
+    String.fromCodePoint(0x2191, 0x2193) + " move",
+    key === "details:history" || key === "details:models" ? "enter toggle" : "enter refresh",
+    "r refresh"
+  )
   return parts.join(" " + String.fromCodePoint(0xb7) + " ")
 }
 
 if (typeof module !== "undefined")
   module.exports = {
     cursorView: cursorView,
+    detailsForProvider: detailsForProvider,
+    keyboardStops: keyboardStops,
+    cursorStep: cursorStep,
     keyHint: keyHint,
     ringFraction: ringFraction,
     ringTone: ringTone,

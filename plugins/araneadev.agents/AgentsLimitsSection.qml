@@ -24,7 +24,7 @@ Column {
 
   objectName: "limitsSection"
   visible: (section.rows || []).length > 0
-  spacing: Style.space(6)
+  spacing: Style.space(8)
 
   Text {
     textFormat: Text.PlainText
@@ -84,7 +84,11 @@ Column {
           text: limitRow.limit.percent || ""
           color: section.toneColor(String(limitRow.limit.tone || ""))
           font.family: Style.font.family
-          font.pixelSize: Style.font.body
+          // The host exposes font tokens as a dynamic QObject.
+          // qmllint disable missing-property
+          font.pixelSize: Style.font.subtitle
+          // qmllint enable missing-property
+          font.bold: true
         }
       }
       Aranea.FilamentBar {
