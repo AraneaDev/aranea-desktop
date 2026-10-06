@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 import "Model.js" as Model
 import "ClockLogic.js" as ClockLogic
 
@@ -250,6 +251,7 @@ BarWidget {
 
   WidgetButton {
     id: button
+    fontFamily: Aranea.Typography.technicalFamily
     anchors.fill: parent
     bar: root.bar
     text: root.vertical ? "" : root.displayText

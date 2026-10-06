@@ -3,14 +3,15 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 BorderSurface {
   id: bubble
 
   // Plain-text tooltip content supplied by the bar root.
   property string text: ""
-  // Font family shared with the active bar configuration.
-  property string fontFamily: Style.font.menuFamily
+  // Proportional tooltip font, overridable independently from bar glyphs.
+  property string fontFamily: Aranea.Typography.uiFamily
   // Tooltip fill colour from the semantic palette.
   property color backgroundColor: Color.tooltip.background
   // Tooltip border colour from the semantic palette.

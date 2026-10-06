@@ -140,10 +140,10 @@ Item {
 
   Rectangle {
     id: openPanelIndicator
-    readonly property int inset: Style.space(2)
+    readonly property int inset: Style.space(3)
 
     visible: opacity > 0
-    opacity: (slot.panelOpen || slot.openIndicatorVisible) && !slot.dragSource ? 0.9 : 0
+    opacity: (slot.panelOpen || slot.openIndicatorVisible) && !slot.dragSource ? 0.75 : 0
     color: Color.accent
     radius: Math.min(width, height) / 2
     width: owner && owner.vertical ? Style.space(2) : (slot.openIndicatorVisible ? Style.space(12) : slot.panelIndicatorExtent)
@@ -153,6 +153,7 @@ Item {
     z: 50
 
     Behavior on opacity {
+      enabled: !!(slot.owner && slot.owner.motionEnabled)
       NumberAnimation {
         duration: 120
         easing.type: Easing.OutCubic
