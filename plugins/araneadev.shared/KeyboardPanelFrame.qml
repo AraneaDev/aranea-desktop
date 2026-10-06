@@ -8,10 +8,7 @@ KeyboardPanel {
   id: frame
   // Opt into neutral panel chrome while keeping the configured width and radius.
   property bool refined: false
-  // The host exposes popup colors dynamically through Color.popups.
-  // qmllint disable missing-property
-  borderSpec: refined ? Border.flat(DesignTokens.surfaceBorder, DesignTokens.borderWidth) : Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
-  // qmllint enable missing-property
+  borderSpec: PanelChrome.popupBorder(refined)
   // Emitted when the panel should close.
   signal closeRequested
   // Emitted when focus moves between tabs.

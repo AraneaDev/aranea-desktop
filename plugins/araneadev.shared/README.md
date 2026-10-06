@@ -14,7 +14,9 @@ retain the desktop monospace alias so values and Nerd Font glyphs stay legible.
 proportional labels, untracked captions and neutral panel borders; selection,
 pointer gates and keyboard signals keep their existing contracts. Label fonts
 remain overridable, and `StatusTextPair.valueFontFamily` independently controls
-technical subtitles.
+technical subtitles. `PanelChrome.popupBorder(refined)` keeps the host's resolved
+popup border widths, including zero and individual side overrides, when
+refined hosts select a neutral color.
 
 ## Components
 

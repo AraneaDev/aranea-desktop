@@ -44,6 +44,7 @@ contracts and never reimplement focus or activation.
 **Files:**
 
 - `plugins/araneadev.shared/Typography.qml`
+- `plugins/araneadev.shared/PanelChrome.qml`
 - `plugins/araneadev.shared/qmldir`
 - `plugins/araneadev.shared/DropdownHeader.qml`
 - `plugins/araneadev.shared/NodeDeviceRow.qml`
@@ -51,13 +52,14 @@ contracts and never reimplement focus or activation.
 - `plugins/araneadev.shared/KeyboardPanelFrame.qml`
 - `plugins/araneadev.shared/StatusTextPair.qml`
 - `plugins/araneadev.shared/README.md`
+- `tests/qml/panel-border-preferences.qml`
 - `tests/qml/shared.qml`
 - `tests/qml/filament-components.qml`
 
 **Interfaces:** Consume `Style.font.family` and the existing host action signals. Produce singleton string properties `Typography.uiFamily`, `Typography.technicalFamily`, `Typography.iconFamily`; opt-in boolean `refined = false` on DropdownHeader, NodeDeviceRow, FilamentPill and KeyboardPanelFrame; and an overridable `StatusTextPair.valueFontFamily` defaulting to its current `fontFamily`. Preserve every existing signal and view-model key.
 
 - [ ] Read these files and their listed behavior tests. Confirm the baseline with the command below before editing.
-- [ ] Create the font roles below. Add documented `refined` properties defaulting false to the existing header, row, pill and panel frame. Keep header and row glyph Text on `iconFamily`; refine labels/captions without uppercasing or tracking. Preserve explicit font properties. Use `Border.flat(DesignTokens.surfaceBorder, DesignTokens.borderWidth)` for refined panel frames and preserve the current `Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))` fallback. Add a separately overridable value font to StatusTextPair, defaulting to its existing fontFamily. Keep pointer gates, key handling and selected/focus rectangles intact.
+- [ ] Create the font roles below. Add documented `refined` properties defaulting false to the existing header, row, pill and panel frame. Keep header and row glyph Text on `iconFamily`; refine labels/captions without uppercasing or tracking. Preserve explicit font properties. Use `PanelChrome.popupBorder(refined)` to start from `Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))`, retaining its resolved widths. For refined frames replace only color with `DesignTokens.surfaceBorder` and disable the gradient. The popup width preferences, including zero and side overrides, remain authoritative. Add a separately overridable value font to StatusTextPair, defaulting to its existing fontFamily. Keep pointer gates, key handling and selected/focus rectangles intact.
 
 ```qml
 pragma Singleton
