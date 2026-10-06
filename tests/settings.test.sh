@@ -27,6 +27,11 @@ cat >"$ARANEA_SYSTEMCTL" <<'STUB'
 set -eu
 printf '%s\n' "$*" >>"$ARANEA_TEST_SANDBOX/systemctl.log"
 [[ "${FAIL_TIMER:-0}" != 1 ]] || { echo 'timer rejected request' >&2; exit 9; }
+if [[ "${FAIL_SYSTEMCTL_COMMAND:-}" == enable && "$*" == *' enable '* ]] ||
+  [[ "${FAIL_RELOAD_AFTER_REMOVAL:-0}" == 1 && "$*" == *daemon-reload* && ! -e "$ARANEA_SYSTEMD_USER_DIR/aranea-wallpaper-day-night.timer" ]]; then
+  echo 'selective timer request rejected' >&2
+  exit 11
+fi
 case "$*" in
   *is-active*) if [[ "$(cat "$ARANEA_TEST_SANDBOX/live-timer" 2>/dev/null || echo inactive)" == active ]]; then echo active; else echo inactive; exit 3; fi ;;
   *enable*) echo active >"$ARANEA_TEST_SANDBOX/live-timer" ;;
@@ -112,6 +117,61 @@ jq -e '.ok == false and .state.schedule.dawn == "05:30"' "$sandbox_root/result.j
 diff -r "$sandbox_root/config-before" "$XDG_CONFIG_HOME/aranea"
 diff -r "$sandbox_root/units-before" "$ARANEA_SYSTEMD_USER_DIR"
 [[ "$(cat "$ARANEA_STATE_ROOT/wallpaper-schedule")" == on ]]
+# Both heredoc writes must fail before replacing either existing unit.
+write_fail_bin="$(mktemp -d)"
+ARANEA_REAL_CAT="$(command -v cat)"
+export ARANEA_REAL_CAT
+cat >"$write_fail_bin/cat" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+if [[ $# == 0 ]]; then
+  count="$("$ARANEA_REAL_CAT" "$ARANEA_TEST_SANDBOX/unit-write-count" 2>/dev/null || echo 0)"
+  count=$((count + 1))
+  echo "$count" >"$ARANEA_TEST_SANDBOX/unit-write-count"
+  if [[ "$count" == "${FAIL_UNIT_WRITE:-0}" ]]; then
+    echo 'partial unit content'
+    echo 'unit content write rejected' >&2
+    exit 23
+  fi
+fi
+exec "$ARANEA_REAL_CAT" "$@"
+STUB
+chmod +x "$write_fail_bin/cat"
+for failed_write in 1 2; do
+  rm -f "$sandbox_root/unit-write-count"
+  : >"$sandbox_root/systemctl.log"
+  rc=0
+  PATH="$write_fail_bin:$PATH" FAIL_UNIT_WRITE="$failed_write" "$ctl" configure schedule 04:00 07:00 17:00 22:00 --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
+  [[ $rc == 23 ]]
+  jq -e '.ok == false and .error.code == "HELPER_FAILED" and .state.schedule.dawn == "05:30"' "$sandbox_root/result.json" >/dev/null
+  grep -Fq 'unit content write rejected' "$sandbox_root/error"
+  diff -r "$sandbox_root/config-before" "$XDG_CONFIG_HOME/aranea"
+  diff -r "$sandbox_root/units-before" "$ARANEA_SYSTEMD_USER_DIR"
+  [[ "$(cat "$ARANEA_STATE_ROOT/wallpaper-schedule")" == on ]]
+  if grep -Eq -- '--user (enable|disable)' "$sandbox_root/systemctl.log"; then exit 1; fi
+  [[ -z "$(find "$ARANEA_SYSTEMD_USER_DIR" -name '.wallpaper-*' -print)" ]]
+done
+# Enable failure after a successful reload restores configured files.
+: >"$sandbox_root/systemctl.log"
+rc=0
+FAIL_SYSTEMCTL_COMMAND=enable "$ctl" configure schedule 04:00 07:00 17:00 22:00 --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
+[[ $rc == 11 ]]
+mapfile -t timer_calls < <(sed '/--user is-active/d' "$sandbox_root/systemctl.log")
+[[ "${timer_calls[0]}" == '--user daemon-reload' && "${timer_calls[1]}" == '--user enable --now aranea-wallpaper-day-night.timer' ]]
+jq -e '.ok == false and .state.schedule.enabled == true and .state.schedule.applied == true' "$sandbox_root/result.json" >/dev/null
+diff -r "$sandbox_root/config-before" "$XDG_CONFIG_HOME/aranea"
+diff -r "$sandbox_root/units-before" "$ARANEA_SYSTEMD_USER_DIR"
+# Reload failure after disable/removal restores files but reports inactive live timer.
+: >"$sandbox_root/systemctl.log"
+rc=0
+FAIL_RELOAD_AFTER_REMOVAL=1 "$ctl" set schedule off --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
+[[ $rc == 11 ]]
+mapfile -t timer_calls < <(sed '/--user is-active/d' "$sandbox_root/systemctl.log")
+[[ "${timer_calls[0]}" == '--user disable --now aranea-wallpaper-day-night.timer' && "${timer_calls[1]}" == '--user daemon-reload' ]]
+jq -e '.ok == false and .state.schedule.enabled == true and .state.schedule.applied == false' "$sandbox_root/result.json" >/dev/null
+diff -r "$sandbox_root/units-before" "$ARANEA_SYSTEMD_USER_DIR"
+[[ "$(cat "$ARANEA_STATE_ROOT/wallpaper-schedule")" == on ]]
+"$ctl" set schedule on --json >/dev/null
 # Failed disable remains configured on; no files removed on failed live apply.
 rc=0
 FAIL_TIMER=1 "$ctl" set schedule off --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
@@ -180,6 +240,37 @@ printf off >"$ARANEA_STATE_ROOT/motion"
 test -L "$XDG_CONFIG_HOME/omarchy/session/aranea.css"
 "$ctl" set integration session inactive --json | jq -e '.ok and any(.state.integrations[]; .id == "session" and .status == "inactive")' >/dev/null
 test ! -e "$XDG_CONFIG_HOME/omarchy/session/aranea.css"
+# A registry read failure must not masquerade as an available empty catalog.
+registry_bin="$(mktemp -d)"
+ARANEA_REAL_AWK="$(command -v awk)"
+export ARANEA_REAL_AWK
+cat >"$registry_bin/awk" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+for argument in "$@"; do
+  if [[ "$argument" == */theme-manifest.toml ]]; then
+    if [[ "${REGISTRY_MODE:-}" == fail ]]; then echo 'registry read rejected' >&2; exit 24; fi
+    if [[ "${REGISTRY_MODE:-}" == empty ]]; then
+      argv=("$@")
+      argv[$(($# - 1))]="$ARANEA_TEST_SANDBOX/empty-registry.toml"
+      exec "$ARANEA_REAL_AWK" "${argv[@]}"
+    fi
+  fi
+done
+exec "$ARANEA_REAL_AWK" "$@"
+STUB
+chmod +x "$registry_bin/awk"
+rc=0
+PATH="$registry_bin:$PATH" REGISTRY_MODE=fail "$repo_root/scripts/aranea-integrations" status --json >"$sandbox_root/owner-status" 2>"$sandbox_root/error" || rc=$?
+[[ $rc == 24 ]]
+rc=0
+PATH="$registry_bin:$PATH" REGISTRY_MODE=fail "$ctl" status --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
+[[ $rc == 1 ]]
+jq -e '.ok == false and .error.code == "STATE_UNAVAILABLE" and .state.integrations == [] and .state.integrationsAvailability == "unavailable" and .state.motion.configured == "off" and .state.schedule.dawn == "05:30"' "$sandbox_root/result.json" >/dev/null
+grep -Fq 'registry read rejected' "$sandbox_root/error"
+# A successfully read registry containing no IDs remains a valid empty catalog.
+printf '# A valid empty integration registry.\n' >"$sandbox_root/empty-registry.toml"
+PATH="$registry_bin:$PATH" REGISTRY_MODE=empty "$ctl" status --json | jq -e '.ok and .state.integrations == [] and .state.integrationsAvailability == "available"' >/dev/null
 # Unreadable/corrupt preferences produce partial state, never a guessed value.
 printf corrupt >"$ARANEA_STATE_ROOT/motion"
 reject STATE_UNAVAILABLE status --json

@@ -95,7 +95,7 @@ write_schedule_units() {
     rm -f -- "$temporary_service"
     return "$rc"
   }
-  cat >"$temporary_service" <<'UNIT'
+  cat >"$temporary_service" <<'UNIT' || rc=$?
 [Unit]
 Description=Apply the Aranea phase wallpaper
 
@@ -103,7 +103,11 @@ Description=Apply the Aranea phase wallpaper
 Type=oneshot
 ExecStart=%h/.config/omarchy/themes/aranea/scripts/aranea-wallpaper set-phase
 UNIT
-  cat >"$temporary_timer" <<UNIT
+  if ((rc != 0)); then
+    rm -f -- "$temporary_service" "$temporary_timer"
+    return "$rc"
+  fi
+  cat >"$temporary_timer" <<UNIT || rc=$?
 [Unit]
 Description=Schedule the Aranea phase wallpaper
 
@@ -117,6 +121,10 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+  if ((rc != 0)); then
+    rm -f -- "$temporary_service" "$temporary_timer"
+    return "$rc"
+  fi
   mv -f -- "$temporary_service" "$systemd_user_dir/$service_unit" && mv -f -- "$temporary_timer" "$systemd_user_dir/$timer_unit" || rc=$?
   rm -f -- "$temporary_service" "$temporary_timer"
   return "$rc"
