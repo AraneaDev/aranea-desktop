@@ -80,7 +80,7 @@ Item {
   // Border colour (menu border token); also tints the preview divider.
   property color border: Color.menu.border
   // Border description for the card, from the theme's [menu] border settings.
-  property var borderSpec: Border.surfaceSpec("menu", "border", border, Aranea.DesignTokens.borderWidth)
+  property var borderSpec: Aranea.PanelChrome.surfaceBorder("menu", "border", border, Aranea.DesignTokens.borderWidth, true)
   // Colour laid over the screen behind the card.
   property color scrim: Color.menu.scrim
   // Background of the row under the cursor.
@@ -90,7 +90,7 @@ Item {
   // Corner radius of the card and rows.
   readonly property int cornerRadius: Aranea.DesignTokens.cornerRadius
   // Font for all picker text (the menu font).
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Inner padding of the card and the preview pane.
   property int contentMargin: Style.spacing.panelPadding
   // Height of one history row (title plus detail line).

@@ -38,7 +38,7 @@ Item {
   // Card corner radius when there is no service.
   property real cornerRadius: 0
   // Font family for the group rows and "+N more" rows.
-  property string fontFamily: bar && bar.fontFamily ? bar.fontFamily : Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Whether cards animate swipes when there is no service.
   property bool motionEnabled: true
   // The height of the header above the list; a change moves the rows under
@@ -268,7 +268,7 @@ Item {
           urgency: typeof rowLoader.entry.urgency === "number" ? rowLoader.entry.urgency : 1
           timeLabel: InboxLogic.relativeTime(rowLoader.entry.timestamp, root.now)
           cornerRadius: root.service ? root.service.cornerRadius : root.cornerRadius
-          fontFamily: root.bar ? root.bar.fontFamily : root.fontFamily
+          fontFamily: root.fontFamily
           onPointerMoved: root.action("hover", {
             index: rowLoader.index,
             key: rowLoader.key

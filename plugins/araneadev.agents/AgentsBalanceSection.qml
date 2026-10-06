@@ -24,10 +24,10 @@ Column {
     textFormat: Text.PlainText
     text: "BALANCE"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
   Item {
     width: parent.width
@@ -39,7 +39,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "Prepaid credits"
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
     }
     Text {
@@ -50,7 +50,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: section.balance ? String(section.balance.remaining || "") : ""
       color: section.balance && section.balance.tone === "urgent" ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       // The host exposes font tokens as a dynamic QObject.
       // qmllint disable missing-property
       font.pixelSize: Style.font.subtitle
@@ -72,7 +72,7 @@ Column {
     text: section.balance ? String(section.balance.detail || "") : ""
     elide: Text.ElideRight
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Style.font.caption
   }
 }

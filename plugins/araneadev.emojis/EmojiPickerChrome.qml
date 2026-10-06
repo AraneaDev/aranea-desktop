@@ -1,6 +1,7 @@
 // Header and footer presentation for the emoji picker.
 // qmllint disable missing-property unqualified
 import QtQuick
+import "../araneadev.shared" as Aranea
 import qs.Commons
 
 Item {
@@ -18,7 +19,7 @@ Item {
   // Public contract member.
   property bool recentVisible: false
   // Public contract member.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
   property color foreground: Color.menu.text
   // Public contract member.

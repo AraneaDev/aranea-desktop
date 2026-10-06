@@ -45,10 +45,10 @@ Column {
     visible: section.caption !== ""
     text: section.caption
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
 
   Repeater {
@@ -91,7 +91,7 @@ Column {
         text: usageRow.row.label || ""
         elide: Text.ElideRight
         color: usageRow.textColor
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: section.stacked ? Style.font.body : Style.font.caption
         font.bold: usageRow.today
       }
@@ -106,7 +106,7 @@ Column {
         horizontalAlignment: Text.AlignRight
         text: usageRow.row.value || ""
         color: usageRow.textColor
-        font.family: Style.font.family
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: section.stacked ? Style.font.body : Style.font.caption
         font.bold: usageRow.today || section.stacked
       }
@@ -129,6 +129,7 @@ Column {
           section.rowHovered(usageRow.index)
       }
       PanelToolTip {
+        fontFamily: Aranea.Typography.uiFamily
         objectName: "usageTip"
         visible: usageRow.detailShown
         text: String(usageRow.row.detail || "")

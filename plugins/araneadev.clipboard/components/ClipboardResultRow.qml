@@ -53,7 +53,7 @@ Rectangle {
   // Glyph shown when there is no image or colour swatch.
   property string glyph: ""
   // Font family supplied by the clipboard window.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main row text colour.
   property color foreground: Color.menu.text
   // Accent colour for the selected row and icon.
@@ -143,7 +143,7 @@ Rectangle {
         textFormat: Text.PlainText
         text: row.secret ? String.fromCodePoint(0xf033e) : row.glyph
         color: row.lit ? row.selectedText : Util.alpha(row.foreground, 0.7)
-        font.family: row.fontFamily
+        font.family: Aranea.Typography.iconFamily
         font.pixelSize: Style.font.icon
       }
     }

@@ -46,7 +46,7 @@ Item {
   // Footer and keyboard guidance text.
   property string hintText: ""
   // Font family used by picker components.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main picker foreground colour.
   property color foreground: Color.menu.text
   // Selected result foreground colour.
@@ -88,6 +88,7 @@ Item {
   }
 
   Aranea.OverlayChrome {
+    refined: true
     anchors.fill: parent
     title: "EMOJI"
     subtitle: "SEARCH // INSERT // COPY"

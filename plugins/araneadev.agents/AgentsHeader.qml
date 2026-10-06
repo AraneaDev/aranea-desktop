@@ -12,6 +12,7 @@ import "../araneadev.shared" as Aranea
 
 Aranea.DropdownHeader {
   id: header
+  refined: true
 
   // Whether a refresh is in flight: the pill reads "Refreshing…", pulses
   // and ignores clicks.
@@ -33,6 +34,7 @@ Aranea.DropdownHeader {
 
   Aranea.FilamentPill {
     id: pill
+    refined: true
     objectName: "refreshPill"
     text: header.busy ? "Refreshing" + String.fromCodePoint(0x2026) : "Refresh"
     busy: header.busy

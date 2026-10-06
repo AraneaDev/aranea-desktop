@@ -24,7 +24,7 @@ Item {
       text: "No process data"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       // qmllint disable missing-property
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
       // qmllint enable missing-property
     }
@@ -82,7 +82,7 @@ Item {
     Text {
       text: cell.name
       color: cell.dim ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       Layout.fillWidth: true
       elide: Text.ElideRight
@@ -90,7 +90,7 @@ Item {
     Text {
       text: cell.value
       color: cell.dim ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
       horizontalAlignment: Text.AlignRight
     }

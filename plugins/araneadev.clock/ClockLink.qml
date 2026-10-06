@@ -13,6 +13,8 @@ ClockTarget {
 
   // The label or glyph.
   property string text: ""
+  // Glyph-only controls can override the configurable UI label font.
+  property string fontFamily: Aranea.Typography.uiFamily
   // The text colour at rest.
   property color restColor: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
   // The text size in px.
@@ -39,7 +41,7 @@ ClockTarget {
     verticalAlignment: Text.AlignVCenter
     text: link.text
     color: link.hot ? Aranea.DesignTokens.accent : link.restColor
-    font.family: Style.font.family
+    font.family: link.fontFamily
     font.pixelSize: link.pixelSize
     font.bold: link.bold
     font.letterSpacing: link.letterSpacing
@@ -51,6 +53,7 @@ ClockTarget {
       link.clicked()
   }
   PanelToolTip {
+    fontFamily: Aranea.Typography.uiFamily
     visible: link.hot && link.tooltipText !== ""
     text: link.tooltipText
   }

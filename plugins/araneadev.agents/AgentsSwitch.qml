@@ -51,6 +51,7 @@ Row {
 
     Aranea.FilamentPill {
       id: chip
+      refined: true
       required property int index
       // This pill's agent, read from the live array.
       readonly property var agent: section.agents[chip.index] || ({

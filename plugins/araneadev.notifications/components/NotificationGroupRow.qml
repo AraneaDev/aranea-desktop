@@ -22,7 +22,7 @@ RowLayout {
   // Whether the group's entries are currently hidden.
   property bool collapsed: false
   // Font family supplied by the containing panel.
-  property string fontFamily: Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main text colour.
   property color foreground: Color.popups.text
   // Accent colour used while the close action is hovered.
@@ -108,7 +108,7 @@ RowLayout {
     objectName: "groupClose"
     text: String.fromCodePoint(0x2715)
     color: (row.pointerGate ? row.closeHot : closeArea.containsMouse) ? row.accent : row.dim
-    font.family: row.fontFamily
+    font.family: Aranea.Typography.iconFamily
     font.pixelSize: Style.font.body
     // Same right inset as the card's close button: the card border plus its
     // content margin (NotificationCard: border Math.max(1, Style.space(1)), Layout.rightMargin Style.space(12)).

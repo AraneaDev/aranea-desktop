@@ -103,6 +103,7 @@ ColumnLayout {
 
   Aranea.DropdownHeader {
     id: header
+    refined: true
     objectName: "centerHeader"
     Layout.fillWidth: true
     glyph: root.view && root.view.glyph ? String(root.view.glyph) : String.fromCodePoint(0xf009a)
@@ -119,7 +120,7 @@ ColumnLayout {
       Layout.fillWidth: true
       text: "Do not disturb"
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
     }
     Aranea.FilamentSwitch {
@@ -143,7 +144,7 @@ ColumnLayout {
     message: "All caught up"
     messageSize: Style.font.body
     spacing: Style.space(6)
-    fontFamily: Style.font.family
+    fontFamily: Aranea.Typography.uiFamily
     foreground: Aranea.DesignTokens.foreground
   }
   Item {
@@ -163,6 +164,7 @@ ColumnLayout {
     }
     Aranea.FilamentPill {
       id: clearPill
+      refined: true
       objectName: "clearPill"
       text: String(root.clear.label)
       hasCursor: root.clearCursor
@@ -176,7 +178,7 @@ ColumnLayout {
     Layout.fillWidth: true
     text: root.view && root.view.keyHint ? String(root.view.keyHint) : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

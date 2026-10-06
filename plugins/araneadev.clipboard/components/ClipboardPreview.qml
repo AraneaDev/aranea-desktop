@@ -1,6 +1,7 @@
 // Presentational preview of the currently selected clipboard entry.
 // qmllint disable missing-property
 import QtQuick
+import "../../araneadev.shared" as Aranea
 import qs.Commons
 
 Item {
@@ -25,7 +26,7 @@ Item {
   // Padding from the containing picker card.
   property int contentMargin: Style.spacing.panelPadding
   // Font family supplied by the clipboard window.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Main preview text colour.
   property color foreground: Color.menu.text
   // Preview border colour.
@@ -95,7 +96,7 @@ Item {
       textFormat: Text.PlainText
       text: preview.colourText
       color: preview.foreground
-      font.family: preview.fontFamily
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.title
     }
   }
@@ -109,7 +110,7 @@ Item {
     textFormat: Text.PlainText
     text: preview.textValue
     color: preview.foreground
-    font.family: preview.isCode ? "monospace" : preview.fontFamily
+    font.family: preview.isCode ? Aranea.Typography.technicalFamily : preview.fontFamily
     font.pixelSize: preview.isCode ? Style.font.body : Style.font.title
     wrapMode: Text.WrapAnywhere
     elide: Text.ElideRight

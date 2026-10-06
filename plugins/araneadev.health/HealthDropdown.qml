@@ -108,6 +108,7 @@ Item {
 
     Aranea.DropdownHeader {
       id: header
+      refined: true
       Layout.fillWidth: true
       glyph: String.fromCodePoint(0xf05f6)
       glyphColor: root.statusColor
@@ -212,7 +213,7 @@ Item {
       text: "↑↓ move · enter open / expand"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       // qmllint disable missing-property
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       // qmllint enable missing-property
       elide: Text.ElideRight

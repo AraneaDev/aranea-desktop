@@ -137,7 +137,7 @@ BorderSurface {
   readonly property color cardBackground: urgency === 2 ? Util.alpha(Color.urgent, 0.08) : (hovered && !compact ? Util.alpha(Color.notifications.countdown, 0.045) : Color.notifications.background)
   // Border: red for critical, else the theme's. The keyboard cursor draws
   // its own outline on top (hasCursor).
-  readonly property var cardBorderSpec: Border.surfaceSpec("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1)))
+  readonly property var cardBorderSpec: Aranea.PanelChrome.surfaceBorder("notifications", "border", urgency === 2 ? Color.urgent : Color.notifications.border, Math.max(1, Style.space(1)), urgency !== 2)
 
   // Whether a pointer click may act on this card: always without a gate
   // (toasts); with one, ClickSettle over the card's creation, the gate's
@@ -308,8 +308,8 @@ BorderSurface {
       Layout.fillWidth: true
       Layout.leftMargin: Style.space(12)
       Layout.rightMargin: Style.space(12)
-      Layout.topMargin: root.singleLineToast ? Style.space(7) : Style.space(10)
-      Layout.bottomMargin: root.singleLineToast ? Style.space(7) : Style.space(10)
+      Layout.topMargin: root.singleLineToast ? Style.space(7) : Style.space(8)
+      Layout.bottomMargin: root.singleLineToast ? Style.space(7) : Style.space(8)
       spacing: root.collapseRedundantIcon ? 0 : (root.compactGlyph ? Style.space(8) : Style.space(12))
 
       Item {
@@ -356,7 +356,7 @@ BorderSurface {
           visible: root.hasGlyph && smallIconImage.status !== Image.Ready
           text: root.glyph
           color: Color.notifications.text
-          font.family: root.fontFamily
+          font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.displayLarge
         }
       }
@@ -367,7 +367,7 @@ BorderSurface {
         visible: root.compactGlyph
         text: root.glyph
         color: Color.notifications.text
-        font.family: root.fontFamily
+        font.family: Aranea.Typography.iconFamily
         font.pixelSize: Style.font.icon
       }
 
@@ -385,7 +385,7 @@ BorderSurface {
           Layout.fillWidth: true
           visible: root.summary.length > 0
           text: root.summary
-          font.family: root.fontFamily.length > 0 ? root.fontFamily : Style.font.family
+          font.family: root.fontFamily.length > 0 ? root.fontFamily : Aranea.Typography.uiFamily
           color: Color.notifications.text
           font.pixelSize: Style.font.title
           font.bold: true
@@ -400,7 +400,7 @@ BorderSurface {
           visible: root.sanitizedBody.length > 0
           text: root.styledBody
           textFormat: Text.StyledText
-          font.family: root.fontFamily.length > 0 ? root.fontFamily : Style.font.family
+          font.family: root.fontFamily.length > 0 ? root.fontFamily : Aranea.Typography.uiFamily
           color: root.bodyColor
           font.pixelSize: Style.font.title
           wrapMode: Text.WordWrap
@@ -419,7 +419,7 @@ BorderSurface {
           textFormat: Text.PlainText
           text: root.timeLabel
           color: root.dimColor
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.caption
         }
 
@@ -429,7 +429,7 @@ BorderSurface {
           textFormat: Text.PlainText
           text: String.fromCodePoint(0x2715)
           color: (root.pointerGate ? root.closeHot : closeArea.containsMouse) ? Color.notifications.countdown : root.dimColor
-          font.family: Style.font.family
+          font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.body
           MouseArea {
             id: closeArea

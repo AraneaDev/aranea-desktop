@@ -45,7 +45,7 @@ Item {
         wrapMode: Text.Wrap
         color: root.toneColor
         // qmllint disable missing-property
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.subtitle
         // qmllint enable missing-property
         font.bold: true
@@ -56,7 +56,7 @@ Item {
         text: root.summary.tone
         color: root.toneColor
         // qmllint disable missing-property
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         // qmllint enable missing-property
       }
@@ -88,7 +88,7 @@ Item {
       text: parent.label
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
       // qmllint disable missing-property
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       // qmllint enable missing-property
     }
@@ -98,7 +98,7 @@ Item {
       elide: Text.ElideMiddle
       color: Aranea.DesignTokens.foreground
       // qmllint disable missing-property
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.subtitle
       // qmllint enable missing-property
       font.bold: true

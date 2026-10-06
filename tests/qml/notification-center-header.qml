@@ -133,9 +133,9 @@ ShellRoot {
   Component.onCompleted: run([[350, function () {
         // ---------- Caption states ----------
         t.equal(one(full, "centerHeader").title, "Notifications", "the header's title")
-        t.equal(one(full, "headerCaption").text, "3 UNREAD", "3 unread, uppercased by DropdownHeader")
-        t.equal(one(empty, "headerCaption").text, "NOTHING NEW", "nothing new at count 0")
-        t.equal(one(quiet, "headerCaption").text, "QUIET UNTIL 08:00", "the quiet-hours text")
+        t.equal(one(full, "headerCaption").text, "3 unread", "3 unread, with native casing")
+        t.equal(one(empty, "headerCaption").text, "Nothing new", "nothing new at count 0")
+        t.equal(one(quiet, "headerCaption").text, "Quiet until 08:00", "the quiet-hours text")
 
         // ---------- Empty state ----------
         t.check(!one(full, "emptyState").visible, "no empty state with unread entries")

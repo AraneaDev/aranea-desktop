@@ -289,7 +289,7 @@ Column {
     topPadding: Style.space(4)
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

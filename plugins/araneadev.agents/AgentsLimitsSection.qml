@@ -30,10 +30,10 @@ Column {
     textFormat: Text.PlainText
     text: "LIMITS"
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
-    font.letterSpacing: 1.2
+    font.letterSpacing: 0
   }
 
   Repeater {
@@ -72,7 +72,7 @@ Column {
           text: limitRow.limit.label || ""
           elide: Text.ElideRight
           color: Aranea.DesignTokens.foreground
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.body
         }
         Text {
@@ -83,7 +83,7 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           text: limitRow.limit.percent || ""
           color: section.toneColor(String(limitRow.limit.tone || ""))
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           // The host exposes font tokens as a dynamic QObject.
           // qmllint disable missing-property
           font.pixelSize: Style.font.subtitle
@@ -105,7 +105,7 @@ Column {
         text: limitRow.limit.resets || ""
         elide: Text.ElideRight
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
       }
     }

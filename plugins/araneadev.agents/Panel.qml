@@ -868,6 +868,7 @@ Panel {
   // 640 cap, or less on a short screen), so the frame only sizes to it.
   Aranea.KeyboardPanelFrame {
     id: panel
+    refined: true
     anchorItem: button
     owner: root
     bar: root.bar

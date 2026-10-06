@@ -132,10 +132,10 @@ Column {
         verticalAlignment: Text.AlignVCenter
         text: String(modelData)
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
-        font.letterSpacing: 1
+        font.letterSpacing: 0
       }
     }
   }
@@ -156,7 +156,7 @@ Column {
           verticalAlignment: Text.AlignVCenter
           text: String(week)
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.caption
         }
       }
@@ -201,7 +201,7 @@ Column {
             text: String(cell.day)
             opacity: cell.inMonth || cell.isToday ? 1 : 0.3
             color: cell.isToday ? Aranea.DesignTokens.background : Aranea.DesignTokens.foreground
-            font.family: Style.font.family
+            font.family: Aranea.Typography.technicalFamily
             font.pixelSize: Style.font.bodySmall
             font.bold: cell.isToday
           }

@@ -30,10 +30,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: "NEXT 24 H"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       id: summary
@@ -43,7 +43,7 @@ Column {
       textFormat: Text.PlainText
       text: hourly.caption
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.bodySmall
     }
   }
@@ -68,7 +68,7 @@ Column {
         textFormat: Text.PlainText
         text: String(hourLabel.modelData)
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
       }
     }
