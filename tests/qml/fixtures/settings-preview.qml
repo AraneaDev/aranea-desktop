@@ -84,6 +84,13 @@ ShellRoot {
         }
       ],
       wallpapersAvailability: 'available',
+      fonts: {
+        uiFamily: '',
+        technicalFamily: '',
+        families: ['Liberation Sans', 'Liberation Mono'],
+        monospaceFamilies: ['Liberation Mono'],
+        availability: 'available'
+      },
       schedule: {
         enabled: true,
         applied: true,

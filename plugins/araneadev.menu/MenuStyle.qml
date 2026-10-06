@@ -16,7 +16,7 @@ QtObject {
   property bool fullRootHeader: false
 
   // Font for all menu text; a payload's fontFamily overrides it.
-  property string fontFamily: Aranea.Typography.uiFamily
+  property string fontFamily: Quickshell.env("OMARCHY_MENU_FONT") || Aranea.Typography.uiFamily
   // Directory of the current theme's branding marks (the header logo).
   readonly property string brandingMarksPath: Aranea.RuntimePaths.brandingMarksPath
   // Directory of the current theme's branding motifs (header art, dividers).

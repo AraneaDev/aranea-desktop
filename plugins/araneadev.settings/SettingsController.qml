@@ -163,6 +163,8 @@ QtObject {
       var response = Logic.parseResponse(stdout, code)
       state = response.state || ({})
       error = response.error ? response.error.message : ''
+      if (response.state && response.state.fonts)
+        Aranea.Typography.refresh()
       stateRead()
       if (done)
         done(response)

@@ -35,6 +35,8 @@ ColumnLayout {
   property bool wallpaperDirty: false
   // Whether the inline chooser is expanded; collapsing preserves local choice.
   property bool galleryExpanded: false
+  // Font draft owner, retained independently of wallpaper choices.
+  readonly property alias fontDrafts: fontsSection
   // Current catalog asset, independent of pending choice.
   readonly property var appliedAsset: (page.backendState.wallpapers || []).filter(function (asset) {
     return asset.id === page.appliedId
@@ -68,7 +70,21 @@ ColumnLayout {
   SettingsPageHeader {
     Layout.fillWidth: true
     title: 'Appearance'
-    description: 'Personalize your wallpaper and desktop motion.'
+    description: 'Choose your fonts, wallpaper and desktop motion.'
+  }
+  FontsSection {
+    id: fontsSection
+    Layout.fillWidth: true
+    fonts: page.backendState.fonts || ({})
+    pending: page.pending
+    displayOnly: page.displayOnly
+    pointerGate: page.pointerGate
+    result: page.pending && page.pendingKey === 'fonts' ? 'Applying…' : page.results.fonts || ''
+    error: page.errors.fonts || ''
+    onRequest: function (operation, args) {
+      page.request(operation, args)
+    }
+    onRetryRequested: page.retryRequested()
   }
   SettingsSection {
     Layout.fillWidth: true

@@ -25,7 +25,7 @@ Aranea.FilamentPill {
   underlineVisible: false
   labelVisible: false
   labelColor: Aranea.DesignTokens.foreground
-  labelFontFamily: variant === 'segment' ? Style.font.family : 'sans-serif'
+  labelFontFamily: variant === 'segment' ? Aranea.Typography.technicalFamily : Aranea.Typography.uiFamily
   opacity: enabled ? 1 : 0.55
   onEnabledChanged: if (!enabled)
     pointerPressed = false

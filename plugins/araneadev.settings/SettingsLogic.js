@@ -4,7 +4,8 @@
 /** @typedef {{id:string,status?:string,availability?:string}} IntegrationState */
 /** @typedef {{id:string,label?:string,path?:string,available:boolean}} WallpaperAsset */
 /** @typedef {{monitor?:string|null,scale?:number|null,width?:number|null,height?:number|null,availability?:string,persistenceSupport?:string,configuredScale?:number|null}} DisplayState */
-/** @typedef {{display?:DisplayState,motion?:MotionState,wallpaper?:WallpaperState,schedule?:ScheduleState,integrations?:Array<IntegrationState>,wallpapers?:Array<WallpaperAsset>,integrationsAvailability?:string,wallpapersAvailability?:string}} SettingsState */
+/** @typedef {{uiFamily:string,technicalFamily:string,families:Array<string>,monospaceFamilies:Array<string>,availability:string,catalogAvailable?:boolean}} FontsState */
+/** @typedef {{fonts?:FontsState,display?:DisplayState,motion?:MotionState,wallpaper?:WallpaperState,schedule?:ScheduleState,integrations?:Array<IntegrationState>,wallpapers?:Array<WallpaperAsset>,integrationsAvailability?:string,wallpapersAvailability?:string}} SettingsState */
 /** @typedef {{requested:string,monitor:string,width:number,height:number,expectedScale:number,effectiveScale?:number|null,confirmed:boolean,persistence:string}} DisplayScaleResult */
 /** @typedef {{displayScale?:DisplayScaleResult}} MutationResult */
 /** Normalize a requested settings destination.
@@ -69,7 +70,23 @@ function command(path, operation, args, state) {
   state = state || {}
   if (operation === "status" && args.length === 0) return [path, "status", "--json"]
   var section = operation.split(" ")[1]
-  if (section === "display-scale") {
+  if (section === "fonts") {
+    var fonts = state.fonts
+    if (
+      operation !== "configure fonts" ||
+      args.length !== 2 ||
+      !fonts ||
+      (fonts.availability !== "available" &&
+        !(fonts.catalogAvailable === true && args[0] === "" && args[1] === "")) ||
+      !Array.isArray(fonts.families) ||
+      !Array.isArray(fonts.monospaceFamilies) ||
+      typeof args[0] !== "string" ||
+      typeof args[1] !== "string" ||
+      (args[0] !== "" && fonts.families.indexOf(args[0]) < 0) ||
+      (args[1] !== "" && fonts.monospaceFamilies.indexOf(args[1]) < 0)
+    )
+      return null
+  } else if (section === "display-scale") {
     if (
       operation !== "set display-scale" ||
       args.length !== 1 ||
@@ -170,6 +187,12 @@ function outcome(operation, args, state, succeeded, result) {
         : "unconfirmed")
     )
   }
+  if (operation === "configure fonts")
+    return state.fonts &&
+      state.fonts.uiFamily === args[0] &&
+      state.fonts.technicalFamily === args[1]
+      ? "Applied"
+      : "Save not confirmed"
   if (operation === "set display-scale") {
     var display = state.display || {}
     var scale = result && result.displayScale

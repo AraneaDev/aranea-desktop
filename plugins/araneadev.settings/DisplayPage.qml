@@ -128,7 +128,7 @@ ColumnLayout {
           verticalAlignment: TextInput.AlignVCenter
           text: page.scaleDraft
           color: Color.foreground
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.body
           enabled: page.displayAvailable && !page.displayOnly && !page.pending
           activeFocusOnTab: true
