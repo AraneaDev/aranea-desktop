@@ -44,7 +44,7 @@ ColumnLayout {
   // Public contract member.
   property url glyphSource: ""
   // Public contract member.
-  property string fontFamily: Style.font.menuFamily
+  property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
   property color foreground: Color.polkit.text
   // Public contract member.
@@ -124,7 +124,7 @@ ColumnLayout {
       textFormat: Text.PlainText
       text: root.targetText
       color: root.accent
-      font.family: root.fontFamily
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.subtitle
       wrapMode: Text.Wrap
     }

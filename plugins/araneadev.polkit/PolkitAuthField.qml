@@ -34,7 +34,7 @@ Item {
   // Placeholder text resolved by the owning polkit logic.
   property string placeholderText: "Password"
   // Font family used by the fingerprint prompt.
-  property string fontFamily: Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Letter spacing for the fingerprint prompt.
   property real letterSpacing: 0.20
   // Corner radius of the fingerprint prompt's frame.
@@ -83,7 +83,7 @@ Item {
         width: Math.round(field.fieldHeight * 0.55)
         height: width
         text: String.fromCodePoint(0xf0237)
-        fontFamily: field.fontFamily
+        fontFamily: Aranea.Typography.iconFamily
         fontSize: Math.round(field.fieldHeight * 0.55)
         color: field.errorFlash ? field.errorColor : field.accent
       }

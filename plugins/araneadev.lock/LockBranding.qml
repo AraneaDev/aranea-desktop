@@ -12,7 +12,7 @@ Item {
   // URL of the lock spider artwork (the generated vector brand mark).
   property string logoSource: ""
   // Font family shared by the lock surface.
-  property string fontFamily: Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Primary branding text colour.
   property color textColor: Color.lock.text
   // Secondary branding text colour.

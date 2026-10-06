@@ -140,7 +140,7 @@ Item {
 
   TextMetrics {
     id: messageMetrics
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
     text: root.message
   }
@@ -148,7 +148,7 @@ Item {
   // "100%" at the value font: the value column's floor width (valueWidth).
   TextMetrics {
     id: valueFloorInk
-    font.family: Style.font.family
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Style.font.title
     text: "100%"
   }
@@ -168,7 +168,7 @@ Item {
   // glyph in turn, at the icon font.
   TextMetrics {
     id: iconProbeMetrics
-    font.family: Style.font.family
+    font.family: Aranea.Typography.iconFamily
     font.pixelSize: Style.font.title
   }
 
@@ -217,6 +217,7 @@ Item {
       fillColor: Util.alpha(Color.background, 0.9)
       surface: "popups"
       borderColor: Color.popups.border
+      borderSpecOverride: Aranea.PanelChrome.popupBorder(true)
       opacity: root.opened ? 1 : 0
       transform: Translate {
         y: card.revealOffset
@@ -251,7 +252,7 @@ Item {
           horizontalAlignment: Text.AlignLeft
           text: root.icon
           color: Color.popups.text
-          font.family: Style.font.family
+          font.family: Aranea.Typography.iconFamily
           font.pixelSize: Style.font.title
         }
 
@@ -272,7 +273,7 @@ Item {
           text: root.message
           elide: Text.ElideNone
           color: Color.popups.text
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.title
         }
         Text {
@@ -281,7 +282,7 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           text: root.message
           color: Color.popups.text
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.body
           elide: Text.ElideRight
         }

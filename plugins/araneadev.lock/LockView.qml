@@ -209,7 +209,7 @@ Item {
       passwordDotLetterSpacing: root.passwordDotLetterSpacing
       inputBorderSpec: root.inputBorderSpec
       cornerRadius: Style.space(6)
-      fontFamily: Style.font.family
+      fontFamily: Aranea.Typography.uiFamily
       foreground: Color.lock.text
       placeholderColor: Color.lock.placeholder
       errorColor: Color.lock.textError
@@ -230,7 +230,7 @@ Item {
       y: Math.max(32, inputField.y - height - 49)
       z: 1
       logoSource: Aranea.RuntimePaths.brandUrl
-      fontFamily: Style.font.family
+      fontFamily: Aranea.Typography.uiFamily
       textColor: Color.lock.text
       placeholderColor: Color.lock.placeholder
     }
@@ -241,7 +241,7 @@ Item {
       z: 1
       clockText: root.clockText
       dateText: root.dateText
-      fontFamily: Style.font.family
+      fontFamily: Aranea.Typography.uiFamily
       textColor: Color.lock.text
       placeholderColor: Color.lock.placeholder
     }
@@ -253,7 +253,7 @@ Item {
       y: parent.height - height - 54
       text: root.fingerprintConfigured ? "TOUCH SENSOR OR ENTER PASSWORD" : "ENTER PASSWORD TO CONTINUE"
       color: Color.lock.placeholder
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Math.round(Style.font.bodySmall * 0.82)
       font.letterSpacing: 1.5
       z: 1

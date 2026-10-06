@@ -2,6 +2,7 @@
 // and spaced to the compact 24-Sep lock design.
 // qmllint disable missing-property
 import QtQuick
+import "../araneadev.shared" as Aranea
 import qs.Commons
 
 Column {
@@ -12,7 +13,7 @@ Column {
   // Current date formatted by the lock service.
   property string dateText: ""
   // Font family shared by the lock surface.
-  property string fontFamily: Style.font.family
+  property string fontFamily: Aranea.Typography.uiFamily
   // Primary time colour.
   property color textColor: Color.lock.text
   // Secondary date colour.
@@ -24,7 +25,7 @@ Column {
     anchors.horizontalCenter: parent.horizontalCenter
     text: clock.clockText
     color: clock.textColor
-    font.family: clock.fontFamily
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Math.round(Style.font.heading * 1.94)
     font.bold: true
   }
@@ -37,6 +38,6 @@ Column {
     color: clock.placeholderColor
     font.family: clock.fontFamily
     font.pixelSize: Math.round(Style.font.bodySmall * 0.82)
-    font.letterSpacing: 1
+    font.letterSpacing: 0
   }
 }
