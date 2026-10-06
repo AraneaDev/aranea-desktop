@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.20.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.19.0...v2.20.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** unify visuals and add font preferences ([#126](https://github.com/AraneaDev/aranea-desktop/issues/126)) ([8d2cdb9](https://github.com/AraneaDev/aranea-desktop/commit/8d2cdb922adfa10dbdf1f7b8ff4a35d940e137b9))
+
 ## [2.19.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.18.0...v2.19.0) (2026-10-06)
 
 
