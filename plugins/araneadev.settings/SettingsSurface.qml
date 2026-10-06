@@ -24,6 +24,11 @@ Item {
   // Section whose scroll offset is currently shown.
   property string scrollSection: 'appearance'
   Component.onCompleted: scrollSection = root.section
+  // Hidden layers and offscreen content may have no backing keyboard Window.
+  function captureFocus() {
+    var window = panel.Window.window
+    return window ? window.activeFocusItem : null
+  }
   // Save local drafts and independent scroll positions without owner reads.
   function captureSnapshot() {
     return {

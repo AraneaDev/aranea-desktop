@@ -157,6 +157,7 @@ ShellRoot {
     t.check(retry && !retry.enabled, 'global Retry remains disabled in display-only mode')
     entry.close()
     t.equal(entry.showcase('{"state":null}'), 'invalid', 'malformed fixture refused')
+    t.equal(surface.captureFocus(), null, 'hidden capture surface without backing Window has no keyboard target')
     entry.view = surface
     entry.opened = true
     entry.section = 'schedule'
