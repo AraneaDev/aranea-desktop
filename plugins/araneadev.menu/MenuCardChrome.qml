@@ -8,6 +8,10 @@ Item {
   id: chrome
   // Public contract member.
   property bool fullRootHeader: false
+  // Scoped queries expose a query-preserving global search route.
+  property bool scopedSearch: false
+  // Requests the owning menu to return to global search.
+  signal searchEverywhereRequested
   // Public contract member.
   property bool dmenuActive: false
   // Public contract member.
@@ -124,8 +128,8 @@ Item {
           elide: Text.ElideRight
         }
         Text {
-          width: parent.width
           textFormat: Text.PlainText
+          width: parent.width - (chrome.scopedSearch ? globalSearch.width + Style.spacing.md : 0)
           text: hint
           color: contextText
           font.family: fontFamily
@@ -133,6 +137,29 @@ Item {
           font.weight: Font.Medium
           font.letterSpacing: menuLetterSpacing
           elide: Text.ElideRight
+        }
+      }
+
+      Text {
+        id: globalSearch
+        objectName: "searchEverywhere"
+        visible: chrome.scopedSearch && !chrome.dmenuActive
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        textFormat: Text.PlainText
+        text: "Search everywhere · ^F"
+        color: chrome.selectedText
+        font.family: chrome.fontFamily
+        font.pixelSize: chrome.scaled(Style.font.caption)
+        MouseArea {
+          anchors.fill: parent
+          // An affordance changing under a held pointer cannot navigate.
+          property real pressedStamp: -1
+          onPressed: pressedStamp = chrome.layoutChangedAt
+          onClicked: {
+            if (chrome.scopedSearch && pressedStamp === chrome.layoutChangedAt && Date.now() - chrome.layoutChangedAt >= 300)
+              chrome.searchEverywhereRequested()
+          }
         }
       }
 

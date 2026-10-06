@@ -8,6 +8,7 @@ ShellRoot {
   id: root
   // Captured subprocess argv and held callbacks, never real desktop commands.
   property var calls: []
+  // Pending settings runner callbacks controlled by this fixture.
   property var callbacks: []
   QmlTest {
     id: t

@@ -317,6 +317,40 @@ ShellRoot {
             }
             pointer.mouseRelease(tile, 50, 40)
             t.equal(tileClicks, 1, "a release on a tile that changed underneath is refused")
+            menu.openRoute("root")
+            menu.desktopSearch.compositor = null
+            menu.desktopSearch.fixtureWindows = [
+              {
+                address: "0xaaa",
+                title: "Fixture A"
+              },
+              {
+                address: "0xbbb",
+                title: "Fixture B"
+              }
+            ]
+            menu.desktopSearch.runner = function (argv) {
+              shell.ran = shell.ran.concat([argv])
+              return true
+            }
+            menu.desktopSearch.refreshNow()
+            menu.setFilter("window: Fixture")
+          }], [400, function () {
+            pressedRow = rowAt(0)
+            pointer.mousePress(pressedRow, 40, pressedRow.height / 2)
+            menu.desktopSearch.fixtureWindows = [
+              {
+                address: "0xbbb",
+                title: "Fixture B"
+              }
+            ]
+            menu.desktopSearch.refreshNow()
+            t.check(rowAt(0) === pressedRow, "desktop window delegate survives replacement")
+            shell.ran = []
+          }], [400, function () {
+            pointer.mouseRelease(pressedRow, 40, pressedRow.height / 2)
+            t.equal(shell.ran.length, 0, "closing a window during pointer press cannot launch its replacement")
+            t.check(menu.opened && !menu.cursorActive, "vanished pointer target clears selection and retains menu")
           }]])
     })
   }

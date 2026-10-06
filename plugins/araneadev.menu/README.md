@@ -8,13 +8,15 @@
 - Load and merge the shipped menu model with user overrides.
 - Resolve routes, aliases, parent paths, and visible descendants.
 - Batch guard checks so rows share command and package readers.
-- Search applications and menu rows while preserving favorites and recents.
+- Search apps, menu commands, windows, workspaces and settings destinations
+  while preserving favorites and recents.
 - Compose the menu window, card chrome, root tiles, result list, and app
   library.
 
 `Menu.qml` is the composition root and the menu's core: it owns items,
 display, selection, navigation, routes, and keys, and wires up the
 child components below. `MenuWindow.qml` owns the window contract.
+`MenuSurface.qml` draws the same production card in the window and inert previews.
 `MenuModel.js` remains a stable QML-compatible facade while focused
 modules own history, search, and tree traversal.
 
@@ -39,6 +41,34 @@ modules own history, search, and tree traversal.
   cursor row visible with a peek of its neighbor (`revealContentY`), and
   the screen dimension to lay the card out against before the layer
   surface reports its own size (`screenExtent`).
+
+## Desktop search
+
+Typing at the root searches applications, commands, open windows, workspaces,
+and settings sections. Results carry App, Command, Window, Workspace or Setting
+labels. Use `app:`, `command:`, `window:`, `workspace:` or `setting:` to restrict
+results; unknown prefixes are ordinary text. Matching uses name and alias
+substrings and whole words in descriptions. The list shows up to 50 matches;
+“Refine your search” appears at the cap.
+
+Submenu searches stay scoped. “Search everywhere” or Ctrl+F returns to root
+with the query intact. Empty root tiles, Favorites, Recent, dmenu and input
+answers retain their existing behavior.
+
+Query edits select the top match. Background updates preserve the selected
+identity; if it disappears, the outline clears and Enter does nothing until
+an arrow, click or query edit selects a target. Activation checks the current
+source again. A closed window shows “Window is no longer open” and retains the
+menu. Missing compositor data removes live results while apps, commands and
+settings stay usable. Settings results open a section; searches never execute
+query text or change a setting.
+
+`DesktopSearchSources.qml` reuses app, menu, guard, manifest and history inputs.
+Only its live compositor refresh is local, active while the menu is open and
+coalesced by 100 ms. `DesktopSearchLogic.js` supplies pure ranking and typed
+identity resolution. Apps and commands return to the menu's existing launch,
+history and navigation handlers; accepted argument-array submissions close the
+menu, while failures show notices.
 
 ## Logic boundaries
 
@@ -73,4 +103,16 @@ Shared keyboard and panel behavior comes from `araneadev.shared`.
 
 Run `tests/qml-behaviour.test.sh menu menu-root menu-style menu-sources
 menu-guards menu-app-history menu-providers menu-dmenu menu-components
-menu-window-components menu-pointer` and the menu JS suites.
+menu-window-components menu-pointer menu-desktop-search menu-desktop-guards desktop-search-sources` and the menu JS suites.
+
+Capture the actual production card without contacting the desktop:
+
+```bash
+scripts/capture-screenshots --surface menu-search-mixed --output screenshots
+scripts/capture-screenshots --surface menu-search-no-match --output screenshots
+scripts/capture-screenshots --surface menu-search-no-compositor --output screenshots
+scripts/capture-screenshots --surface menu-search-vanished --output screenshots
+```
+
+These use `tools/render-menu-preview` with inert fixture sources and refused
+dispatch. Captures share `MenuSurface.qml` with the real layer window.

@@ -51,7 +51,7 @@ test("recognized type prefixes filter results while unknown prefixes remain quer
 test("match quality outranks pinned apps and all other preferences", () => {
   const rows = [
     record("app", "prefix", "Firefox Nightly", { pinned: true, recentRank: 0 }),
-    record("window", "0x1", "Project — Firefox", { activeWorkspace: true }),
+    record("window", "0x1", "Project \u2014 Firefox", { activeWorkspace: true }),
     record("app", "exact", "Firefox")
   ]
   assert.deepEqual(keys(rows, "firefox"), ["app:exact", "app:prefix", "window:0x1"])

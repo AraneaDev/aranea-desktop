@@ -66,7 +66,7 @@ Item {
   signal appRequested(string appId, string label)
   // Host activates this current menu item through its existing handler.
   signal commandRequested(string itemId)
-  // Dispatch accepted; host retains close and navigation ownership.
+  // Argument-array dispatch accepted; app/menu handlers retain their close policy.
   signal activated
   // Display a notice and keep the menu open on invalid or rejected dispatch.
   signal failed(string message)
@@ -210,7 +210,8 @@ Item {
       sources.failed("Could not open target")
       return false
     }
-    sources.activated()
+    if (request.kind === "argv")
+      sources.activated()
     return true
   }
 

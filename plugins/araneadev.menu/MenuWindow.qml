@@ -7,7 +7,6 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "../araneadev.shared" as Aranea
 import "MenuLayout.js" as MenuLayout
 
 PanelWindow {
@@ -18,7 +17,7 @@ PanelWindow {
 
   // Gives the menu's key handler the keyboard focus.
   function focusKeys(): void {
-    keyCatcher.forceActiveFocus()
+    card.focusKeys()
   }
 
   // Makes the mouse ignore hover until it really moves.
@@ -28,12 +27,12 @@ PanelWindow {
 
   // Preselects "cancel" in the uninstall confirmation.
   function resetDeleteConfirm(): void {
-    deleteConfirm.selectedIndex = 1
+    card.resetDeleteConfirm()
   }
 
   // Lets the uninstall confirmation handle a key; true when it did.
   function deleteConfirmHandleKey(event): bool {
-    return deleteConfirm.handleKey(event)
+    return card.deleteConfirmHandleKey(event)
   }
 
   // Contain alone parks the cursor row flush with the viewport edge, hiding
@@ -43,7 +42,7 @@ PanelWindow {
   function revealCursor(): void {
     if (panel.root.displayModel.count === 0)
       return
-    var list = resultListComponent.list
+    var list = card.resultList
     list.positionViewAtIndex(panel.root.selectedIndex, ListView.Contain)
     var item = list.itemAtIndex(panel.root.selectedIndex)
     if (!item)
@@ -120,197 +119,13 @@ PanelWindow {
     onClicked: panel.root.cancel()
   }
 
-  Aranea.SurfaceCard {
+  MenuSurface {
     id: card
+    root: panel.root
+    pointerGate: pointerGate
     width: panel.root.cardWidth
     height: Math.min(panel.root.cardHeight, panel.height - Style.gapsOut - panel.effectiveCardTop)
-    cornerRadius: panel.root.style.cornerRadius
     anchors.horizontalCenter: parent.horizontalCenter
     y: panel.effectiveCardTop
-    fillColor: panel.root.style.background
-    borderSpecOverride: panel.root.style.borderSpec
-    contentPadding: panel.root.style.contentMargin
-
-    MouseArea {
-      anchors.fill: parent
-      onClicked: {}
-    }
-
-    Item {
-      id: keyCatcher
-      anchors.fill: parent
-      z: panel.root.appHistory.deleteConfirmOpen ? 20 : 0
-      focus: true
-
-      Keys.priority: Keys.BeforeItem
-      Keys.onPressed: function (event) {
-        panel.root.handleKey(event)
-      }
-
-      ConfirmDialog {
-        id: deleteConfirm
-
-        anchors.fill: parent
-        opened: panel.root.appHistory.deleteConfirmOpen
-        z: 10
-        message: "Do you want to uninstall " + ((panel.root.appHistory.deleteTarget && panel.root.appHistory.deleteTarget.label) || "") + "?"
-        confirmText: "Uninstall"
-        background: panel.root.style.background
-        foreground: panel.root.style.foreground
-        scrim: panel.root.style.scrim
-        selectedBackground: panel.root.style.selectedBackground
-        selectedText: panel.root.style.selectedText
-        fontFamily: panel.root.style.fontFamily
-        cornerRadius: panel.root.style.cornerRadius
-        onCanceled: panel.root.cancelDelete()
-        onConfirmed: panel.root.confirmDelete()
-      }
-    }
-
-    // qmllint enable missing-property
-    Column {
-      anchors.fill: parent
-      anchors.topMargin: card.contentTopInset
-      anchors.rightMargin: card.contentRightInset
-      anchors.bottomMargin: card.contentBottomInset
-      anchors.leftMargin: card.contentLeftInset
-      spacing: panel.root.style.sectionSpacing
-
-      MenuCardChrome {
-        width: parent.width
-        height: panel.root.style.chromeHeight
-        sectionSpacing: panel.root.style.rootChromeSpacing
-        fullRootHeader: panel.root.fullRootHeader
-        dmenuActive: panel.root.dmenuActive
-        activeTitle: panel.root.item(panel.root.activeMenu) ? (panel.root.item(panel.root.activeMenu).title || panel.root.item(panel.root.activeMenu).label || "GO") : "GO"
-        dmenuPrompt: panel.root.dmenu.prompt
-        hint: panel.root.hint
-        workspaceContext: panel.root.style.workspaceContext
-        clockContext: panel.root.style.clockContext
-        rootTiles: panel.root.style.rootTiles
-        brandingMarksPath: panel.root.style.brandingMarksPath
-        brandingMotifsPath: panel.root.style.brandingMotifsPath
-        brandingGlyphsPath: panel.root.style.brandingGlyphsPath
-        foreground: panel.root.style.foreground
-        contextText: panel.root.style.contextText
-        selectedText: panel.root.style.selectedText
-        footerText: panel.root.style.footerText
-        fontFamily: panel.root.style.fontFamily
-        menuFontScale: panel.root.style.menuFontScale
-        menuLetterSpacing: panel.root.style.menuLetterSpacing
-        motionEnabled: panel.root.style.motionEnabled
-        rootHeaderHeight: panel.root.style.rootHeaderHeight
-        headerHeight: panel.root.style.headerHeight
-        rootContextHeight: panel.root.style.rootContextHeight
-        rootTileHeight: panel.root.style.rootTileHeight
-        footerHeight: panel.root.style.footerHeight
-        pointerGate: pointerGate
-        layoutChangedAt: panel.root.layoutChangedAt
-        onTileActivated: function (tile) {
-          panel.root.activateTile(tile)
-        }
-      }
-
-      // Input mode: the line that shows what is typed (the filter text).
-      Rectangle {
-        visible: panel.root.mode === "input"
-        width: parent.width
-        height: panel.root.style.inputLineHeight
-        radius: panel.root.style.cornerRadius
-        color: Util.alpha(panel.root.style.foreground, 0.04)
-        border.width: 1
-        border.color: Util.alpha(panel.root.style.foreground, panel.root.filterText ? 0.22 : 0.10)
-
-        Row {
-          anchors.fill: parent
-          anchors.leftMargin: Style.space(12)
-          anchors.rightMargin: Style.space(12)
-          spacing: Style.space(8)
-
-          Text {
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: "›"
-            color: panel.root.filterText ? panel.root.style.selectedText : Util.alpha(panel.root.style.foreground, 0.58)
-            font.family: panel.root.style.fontFamily
-            font.pixelSize: panel.root.style.menuFontSize(Style.font.subtitle)
-          }
-          Text {
-            id: inputValue
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, parent.width - x - inputCaret.width - parent.spacing)
-            textFormat: Text.PlainText
-            text: panel.root.filterText || "Type a value…"
-            color: panel.root.style.foreground
-            opacity: panel.root.filterText ? 1 : 0.58
-            font.family: panel.root.style.fontFamily
-            font.pixelSize: panel.root.style.menuFontSize(Style.font.subtitle)
-            elide: Text.ElideLeft
-          }
-          Rectangle {
-            id: inputCaret
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(1, Style.space(2))
-            height: inputValue.font.pixelSize + Style.space(2)
-            color: panel.root.style.selectedText
-          }
-        }
-      }
-
-      Item {
-        width: parent.width
-        height: panel.root.visibleRowsHeight
-        MenuResultList {
-          id: resultListComponent
-          anchors.fill: parent
-          // Row highlights bleed into the card padding so row content meets the
-          // chrome's content edges.
-          anchors.leftMargin: -panel.root.style.rowBleed
-          anchors.rightMargin: -panel.root.style.rowBleed
-          rowInset: panel.root.style.rowBleed
-          foldPeek: panel.root.style.rowPeek
-          model: panel.root.displayModel
-          selectedIndex: panel.root.selectedIndex
-          cursorActive: panel.root.outlineShown
-          filterText: panel.root.filterText
-          fullRootHeader: panel.root.fullRootHeader
-          appLibrary: panel.root.appLibrary
-          background: panel.root.style.background
-          foreground: panel.root.style.foreground
-          selectedBackground: panel.root.style.selectedBackground
-          selectedText: panel.root.style.selectedText
-          border: panel.root.style.border
-          fontFamily: panel.root.style.fontFamily
-          menuFontScale: panel.root.style.menuFontScale
-          menuLetterSpacing: panel.root.style.menuLetterSpacing
-          cornerRadius: panel.root.style.cornerRadius
-          rowSpacing: panel.root.style.rowSpacing
-          rowReservedBorderLeft: panel.root.style.rowReservedBorderLeft
-          rowReservedBorderRight: panel.root.style.rowReservedBorderRight
-          dividerHeight: panel.root.style.dividerHeight
-          rowHeightForDetail: panel.root.rowHeightForDetail
-          pointerGate: pointerGate
-          layoutChangedAt: panel.root.layoutChangedAt
-          onRowActivated: function (index, key) {
-            panel.root.activateKey(index, key)
-          }
-          onAppContextRequested: function (appId) {
-            panel.root.toggleFavoriteApp(appId)
-          }
-        }
-
-        Aranea.EmptyState {
-          anchors.fill: parent
-          visible: panel.root.displayModel.count === 0 && panel.root.mode !== "input"
-          icon: panel.root.emptyStateInfo.icon
-          message: panel.root.emptyStateInfo.text
-          fontFamily: panel.root.style.fontFamily
-          iconColor: panel.root.style.selectedText
-          foreground: panel.root.style.foreground
-          iconSize: panel.root.style.menuFontSize(Style.font.displayLarge)
-          messageSize: panel.root.style.menuFontSize(Style.font.title)
-        }
-      }
-    }
   }
 }

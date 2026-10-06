@@ -126,6 +126,7 @@ ShellRoot {
           sources.activate("app:browser")
           sources.activate("command:vpn")
           t.equal(shell.requests, [["app", "browser", "Browser"], ["command", "vpn"]], "host handler requests preserve app and command identities")
+          t.equal(shell.successes, 0, "app and command requests preserve host close policy without argv success signal")
           sources.activate("setting:appearance")
           t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"appearance"}'], "settings only opens destination")
           sources.fixtureWindows = [

@@ -1,0 +1,7 @@
+// Read-only guards and redirects used by the real unified Menu integration.
+{
+  "setup": {"label": "Setup"},
+  "setup.checked": {"label": "Checked control", "action": "fixture-checked", "checked": "true"},
+  "setup.hidden": {"label": "Hidden control", "action": "fixture-hidden", "when": "false"},
+  "shortcut": {"label": "Shortcut", "target": "setup", "aliases": ["custom-route"]}
+}

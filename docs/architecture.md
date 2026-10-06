@@ -68,8 +68,15 @@ launch and menu handlers. Settings results summon one of four static sections;
 window/workspace targets use validated exact identities in the installed Lua
 focus dispatcher. Titles, descriptions and queries stay display data. Missing
 compositor data affects only live results. Failed or vanished activation emits
-`failed(message)` without closing; `activated()` means a request was accepted,
-and the menu host retains close/navigation policy.
+`failed(message)` without closing; `activated()` reports an accepted argument-array
+submission. Apps and commands leave closing/navigation to their existing handlers.
+
+`Menu.qml` owns root-only ranking and selected-key reconciliation. Query changes
+select the highest-ranked row; refreshes retain its canonical identity or clear
+selection if it disappears. The optional desktop roles are cleared when returning
+to scoped/dmenu rows, including reused ListModel delegates. `MenuSurface.qml` shares
+the production card with `MenuWindow.qml` and the inert offscreen renderer; window
+placement, pointer gate, lifecycle and cursor state stay in the existing hosts.
 
 Tests can replace the compositor, raw window/workspace fixtures, synchronous
 `snapshotReader()`, asynchronous `refreshReader(generation, complete)` and

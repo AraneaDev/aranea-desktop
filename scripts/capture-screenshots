@@ -41,6 +41,9 @@ set -euo pipefail
 # real tray app can never reach one. Tray captures refuse while any real
 # tray app (for example LocalSend) is registered.
 #
+# Menu search variants menu-search-mixed, menu-search-no-match,
+# menu-search-no-compositor and menu-search-vanished render production MenuSurface
+# offscreen with inert sources and dispatch.
 # Settings uses inert production SettingsSurface fixtures offscreen. Variants:
 # settings-narrow, settings-dirty, settings-unavailable, settings-integration-failed,
 # settings-notifications, settings-scaling. All mutation controls and controller requests refuse changes.
@@ -399,6 +402,7 @@ fi
 showcase_surface="$surface"
 case "$surface" in
   settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished) showcase_surface=menu ;;
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
@@ -407,8 +411,12 @@ esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
 
-# Settings captures use production content offscreen with inert owner fixtures.
+# Settings and search captures use production content with inert owner fixtures.
 case "$surface" in
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished)
+    "$repo_root/tools/render-menu-preview" --output "$output/$surface.png" --fixture "${surface#menu-search-}"
+    exit 0
+    ;;
   settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications)
     settings_fixture="${surface#settings-}"
     [[ "$surface" != settings ]] || settings_fixture=wide

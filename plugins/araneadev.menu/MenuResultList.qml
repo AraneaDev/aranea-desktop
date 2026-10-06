@@ -138,6 +138,9 @@ Item {
       required property string appIcon
       required property string appId
       required property string label
+      required property var model
+      // Optional desktop type role; ordinary menu and dmenu rows have no badge.
+      readonly property string resultType: model.resultType || ""
       required property string detail
       required property int childCount
       readonly property bool hasCursor: results.cursorActive && index === results.selectedIndex
@@ -218,11 +221,13 @@ Item {
         anchors.left: parent.left
         anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset + (row.hasIcon ? results.iconSlot + Style.space(10) : 0)
         anchors.right: parent.right
-        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset + Style.space(14)
+        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset + (row.resultType ? typeBadge.width + Style.space(12) : Style.space(14))
         anchors.verticalCenter: parent.verticalCenter
         spacing: Style.space(4)
         Text {
           width: parent.width
+          textFormat: Text.PlainText
+          objectName: "rowLabel"
           text: row.label
           color: row.lit ? results.selectedText : results.foreground
           font.family: results.fontFamily
@@ -232,6 +237,7 @@ Item {
         }
         Text {
           width: parent.width
+          textFormat: Text.PlainText
           text: row.detail
           visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.detail.length > 0
           color: row.lit ? results.selectedText : results.foreground
@@ -242,12 +248,33 @@ Item {
         }
       }
 
+      Text {
+        id: typeBadge
+        objectName: "typeBadge"
+        visible: !!row.resultType
+        anchors.right: parent.right
+        anchors.rightMargin: results.rowReservedBorderRight + results.rowInset
+        anchors.verticalCenter: parent.verticalCenter
+        textFormat: Text.PlainText
+        text: ({
+            app: "App",
+            command: "Command",
+            window: "Window",
+            workspace: "Workspace",
+            setting: "Setting"
+          })[row.resultType] || ""
+        color: row.lit ? results.selectedText : results.foreground
+        opacity: 0.58
+        font.family: results.fontFamily
+        font.pixelSize: results.menuFontScale * Style.font.caption
+      }
+
       Aranea.InkText {
         anchors.right: parent.right
         anchors.rightMargin: results.rowReservedBorderRight + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Text.AlignRight
-        text: row.kind === "menu" || row.kind === "link" ? "›" : ""
+        text: !row.resultType && (row.kind === "menu" || row.kind === "link") ? "›" : ""
         color: row.lit ? results.selectedText : results.foreground
         opacity: 0.36
         font.family: results.fontFamily

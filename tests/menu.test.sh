@@ -11,7 +11,7 @@ source "$repo_root/tests/lib/assert.sh"
 menu_qml="$repo_root/plugins/araneadev.menu/Menu.qml"
 menu_providers="$repo_root/plugins/araneadev.menu/MenuProviders.qml"
 menu_style="$repo_root/plugins/araneadev.menu/MenuStyle.qml"
-menu_window="$repo_root/plugins/araneadev.menu/MenuWindow.qml"
+menu_window="$repo_root/plugins/araneadev.menu/MenuSurface.qml"
 menu_results="$repo_root/plugins/araneadev.menu/MenuResultList.qml"
 menu_history="$repo_root/plugins/araneadev.menu/MenuAppHistory.qml"
 # Behaviour (pin limit and notice, search dedupe, hints, Ctrl+P, Ctrl+1..3,
@@ -24,7 +24,7 @@ if grep -Eq 'PanelWindow|import Quickshell.Wayland' "$menu_qml"; then
   exit 1
 fi
 grep -Fq 'Qt.createComponent(Qt.resolvedUrl("MenuWindow.qml"))' "$menu_qml"
-grep -Fq 'panel.root.handleKey(event)' "$menu_window"
+grep -Fq 'card.root.handleKey(event)' "$menu_window"
 # App rows must render their desktop-entry icon through the shared app-library
 # resolver; carrying appIcon in the model alone is not enough.
 grep -Fq 'id: appIconImage' "$menu_results"
@@ -77,13 +77,13 @@ if grep -Eq 'selectFromPointer|rowHovered|allowInitialPointerSample' "$menu_qml"
   echo "hover must never move the menu highlight" >&2
   exit 1
 fi
-grep -Fq 'panel.root.activateKey(index, key)' "$menu_window"
-grep -Fq 'cursorActive: panel.root.outlineShown' "$menu_window"
-[[ "$(grep -c 'pointerGate: pointerGate' "$menu_window")" -ge 2 ]] || {
+grep -Fq 'card.root.activateKey(index, key)' "$menu_window"
+grep -Fq 'cursorActive: card.root.outlineShown' "$menu_window"
+[[ "$(grep -c 'pointerGate: card.pointerGate' "$menu_window")" -ge 2 ]] || {
   echo "the window must share its PointerMoveGate with the chrome and the result list" >&2
   exit 1
 }
-[[ "$(grep -c 'layoutChangedAt: panel.root.layoutChangedAt' "$menu_window")" -ge 2 ]] || {
+[[ "$(grep -c 'layoutChangedAt: card.root.layoutChangedAt' "$menu_window")" -ge 2 ]] || {
   echo "the chrome and the result list must read the menu's layout stamp" >&2
   exit 1
 }
@@ -92,7 +92,7 @@ window_block() {
   awk -v open="$1" 'index($0, open) { f = 1; depth = 0 } f { depth += gsub(/\{/, "{"); depth -= gsub(/\}/, "}"); print; if (depth <= 0) exit }' "$menu_window"
 }
 for component in 'MenuCardChrome {' 'MenuResultList {'; do
-  for wire in 'layoutChangedAt: panel.root.layoutChangedAt' 'pointerGate: pointerGate'; do
+  for wire in 'layoutChangedAt: card.root.layoutChangedAt' 'pointerGate: card.pointerGate'; do
     window_block "$component" | grep -Fq "$wire" || {
       echo "MenuWindow's $component must wire $wire" >&2
       exit 1
