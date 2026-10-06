@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.19.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.18.0...v2.19.0) (2026-10-06)
+
+
+### Features
+
+* **settings:** compact pages and full-desktop showcase ([#122](https://github.com/AraneaDev/aranea-desktop/issues/122)) ([ad379a5](https://github.com/AraneaDev/aranea-desktop/commit/ad379a5c56657f266535bb178e19c8c6f5a32215))
+* **settings:** refine quiet visual hierarchy ([#124](https://github.com/AraneaDev/aranea-desktop/issues/124)) ([323c422](https://github.com/AraneaDev/aranea-desktop/commit/323c422181def6d1e186ad16ee4c72b7ad5a2ef1))
+
 ## [2.18.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.17.1...v2.18.0) (2026-10-06)
 
 
