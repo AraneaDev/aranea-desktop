@@ -15,18 +15,13 @@
 2	plugins/araneadev.agents/Panel.qml:missing-property:Member "display" not found on type "QObject"
 2	plugins/araneadev.audio/AudioChannelSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.audio/AudioChannelSection.qml:missing-property:Member "caption" not found on type "QObject"
-3	plugins/araneadev.audio/AudioChannelSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.audio/AudioDropdown.qml:missing-property:Member "caption" not found on type "QObject"
-1	plugins/araneadev.audio/AudioDropdown.qml:missing-property:Member "family" not found on type "QObject"
 4	plugins/araneadev.audio/AudioDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
 1	plugins/araneadev.audio/AudioHeader.qml:missing-property:Member "caption" not found on type "QObject"
-1	plugins/araneadev.audio/AudioHeader.qml:missing-property:Member "family" not found on type "QObject"
 4	plugins/araneadev.audio/AudioNowPlaying.qml:missing-property:Member "body" not found on type "QObject"
 3	plugins/araneadev.audio/AudioNowPlaying.qml:missing-property:Member "caption" not found on type "QObject"
-7	plugins/araneadev.audio/AudioNowPlaying.qml:missing-property:Member "family" not found on type "QObject"
 4	plugins/araneadev.audio/AudioSourcesSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.audio/AudioSourcesSection.qml:missing-property:Member "caption" not found on type "QObject"
-5	plugins/araneadev.audio/AudioSourcesSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "active" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "background" not found on type "QObject"
 1	plugins/araneadev.bar/Bar.qml:missing-property:Member "family" not found on type "QObject"
@@ -40,7 +35,7 @@
 1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "edges". This may be due to a missing import statement or incomplete qmltypes files.
 1	plugins/araneadev.bar/Bar.qml:missing-type:No type found for property "gravity". This may be due to a missing import statement or incomplete qmltypes files.
 3	plugins/araneadev.bar/Bar.qml:uncreatable-type:Type PanelWindow is not creatable.
-111	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access
+110	plugins/araneadev.bar/Bar.qml:unqualified:Unqualified access
 1	plugins/araneadev.bar/Bar.qml:unqualified:unknown grouped property scope margins.
 2	plugins/araneadev.bar/Bar.qml:unresolved-type:Type "PopupAnchor" of property "anchor" not found. This is likely due to a missing dependency entry or a type not being exposed declaratively.
 1	plugins/araneadev.bar/Bar.qml:unresolved-type:Type margins is used but it is not resolved
@@ -122,8 +117,6 @@
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "border" not found on type "QObject"
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "caption" not found on type "QObject"
 2	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "controlPaddingY" not found on type "QObject"
-1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "md" not found on type "QObject"
-1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "menuFamily" not found on type "QObject"
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "panelPadding" not found on type "QObject"
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "rowPaddingX" not found on type "QObject"
 1	plugins/araneadev.menu/MenuStyle.qml:missing-property:Member "scrim" not found on type "QObject"
@@ -141,26 +134,18 @@
 1	plugins/araneadev.monitor/DisplaysDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
 4	plugins/araneadev.monitor/Panel.qml:missing-property:Member "baseSize" not found on type "QObject"
 2	plugins/araneadev.network/NetworkBandSection.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.network/NetworkBandSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkDnsSection.qml:missing-property:Member "caption" not found on type "QObject"
-1	plugins/araneadev.network/NetworkDnsSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "body" not found on type "QObject"
 2	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "caption" not found on type "QObject"
-3	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkDropdown.qml:missing-property:Member "hairline" not found on type "QObject"
-1	plugins/araneadev.network/NetworkHeader.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkHeader.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.network/NetworkInterfacesSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.network/NetworkInterfacesSection.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.network/NetworkInterfacesSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkLinkSection.qml:missing-property:Member "body" not found on type "QObject"
 3	plugins/araneadev.network/NetworkLinkSection.qml:missing-property:Member "caption" not found on type "QObject"
-4	plugins/araneadev.network/NetworkLinkSection.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.network/NetworkSavedSection.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.network/NetworkSavedSection.qml:missing-property:Member "caption" not found on type "QObject"
-2	plugins/araneadev.network/NetworkSavedSection.qml:missing-property:Member "family" not found on type "QObject"
 3	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "caption" not found on type "QObject"
-3	plugins/araneadev.network/NetworkWifiSection.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.notifications/Inbox.qml:signal-handler-parameters:Type QProcess::ExitStatus of parameter exitStatus in signal called exited was not found, but is required to compile onExited. Did you add all imports and dependencies?
 1	plugins/araneadev.notifications/Inbox.qml:unused-imports:Unused import
 2	plugins/araneadev.notifications/NotificationCenterContent.qml:missing-property:Member "body" not found on type "QObject"
@@ -224,7 +209,7 @@
 1	plugins/araneadev.shared/CredentialPrompt.qml:missing-property:Member "iconLarge" not found on type "QObject"
 1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "caption" not found on type "QObject"
 5	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "display" not found on type "QObject"
-3	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "family" not found on type "QObject"
 1	plugins/araneadev.shared/DropdownHeader.qml:missing-property:Member "title" not found on type "QObject"
 1	plugins/araneadev.shared/FilamentPill.qml:missing-property:Member "caption" not found on type "QObject"
 1	plugins/araneadev.shared/FilamentPill.qml:missing-property:Member "family" not found on type "QObject"
@@ -232,7 +217,7 @@
 1	plugins/araneadev.shared/ForgetButton.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "body" not found on type "QObject"
 1	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "caption" not found on type "QObject"
-3	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "family" not found on type "QObject"
+1	plugins/araneadev.shared/NodeDeviceRow.qml:missing-property:Member "family" not found on type "QObject"
 2	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "body" not found on type "QObject"
 2	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "caption" not found on type "QObject"
 5	plugins/araneadev.tray/TrayManageView.qml:missing-property:Member "family" not found on type "QObject"
