@@ -24,8 +24,16 @@ cat >"$bin/hyprctl" <<'STUB'
 printf 'hyprctl %s\n' "$*" >>"$ARANEA_TEST_SANDBOX/calls"
 case "$1" in
   dispatch) [[ "$2" != focuswindow ]] || exit 7 ;;
-  activeworkspace) echo '{"id":7}' ;;
-  activewindow) echo '{"address":"0xabc"}' ;;
+  activeworkspace)
+    workspace='{"id":7}'
+    echo "${CAPTURE_WORKSPACE_JSON-$workspace}"
+    exit "${CAPTURE_WORKSPACE_STATUS:-0}"
+    ;;
+  activewindow)
+    focus='{"address":"0xabc"}'
+    echo "${CAPTURE_FOCUS_JSON-$focus}"
+    exit "${CAPTURE_FOCUS_STATUS:-0}"
+    ;;
 esac
 STUB
 cat >"$bin/grim" <<'STUB'
@@ -38,6 +46,40 @@ printf '#!/usr/bin/env bash\nexit 0\n' >"$bin/sleep"
 chmod +x "$bin"/*
 export PATH="$bin:$PATH"
 capture="$repo_root/scripts/capture-screenshots"
+# Failed compositor commands and malformed snapshots must refuse before accepting fixtures.
+printf old >"$out/settings.png"
+for failure in workspace-command focus-command; do
+  : >"$log"
+  rc=0
+  case "$failure" in
+    workspace-command) CAPTURE_WORKSPACE_STATUS=1 "$capture" --surface settings --output "$out" >/dev/null 2>&1 || rc=$? ;;
+    focus-command) CAPTURE_FOCUS_STATUS=1 "$capture" --surface settings --output "$out" >/dev/null 2>&1 || rc=$? ;;
+  esac
+  [[ "$rc" == 3 && "$(cat "$out/settings.png")" == old ]]
+  if grep -Eq 'captureBegin|captureRestore|dispatch|^grim$' "$log"; then exit 1; fi
+done
+for response in '' invalid '[]' null '{}' '{"id":null}' '{"id":"7"}' '{"id":0}' '{"id":-1}' '{"id":7.5}' $'{"id":7}\n{"id":8}'; do
+  : >"$log"
+  rc=0
+  CAPTURE_WORKSPACE_JSON="$response" "$capture" --surface settings --output "$out" >/dev/null 2>&1 || rc=$?
+  [[ "$rc" == 3 && "$(cat "$out/settings.png")" == old ]]
+  if grep -Eq 'captureBegin|captureRestore|dispatch|^grim$' "$log"; then exit 1; fi
+done
+for response in '' invalid '[]' null '{"address":null}' '{"address":42}' '{"address":""}' '{"address":"not-an-address"}' '{"title":"missing-address"}' $'{}\n{}'; do
+  : >"$log"
+  rc=0
+  CAPTURE_FOCUS_JSON="$response" "$capture" --surface settings --output "$out" >/dev/null 2>&1 || rc=$?
+  [[ "$rc" == 3 && "$(cat "$out/settings.png")" == old ]]
+  if grep -Eq 'captureBegin|captureRestore|dispatch|^grim$' "$log"; then exit 1; fi
+done
+# A successfully read empty activewindow object is a legitimate unfocused desktop.
+: >"$log"
+CAPTURE_FOCUS_JSON='{}' "$capture" --surface settings --output "$out" >/dev/null
+[[ "$(cat "$out/settings.png")" == frame ]]
+grep -Fq captureRestore "$log"
+grep -Fq 'workspace = "7"' "$log"
+if grep -Fq 'window = ' "$log"; then exit 1; fi
+rm "$out/settings.png"
 for answer in busy invalid 'Function not found.' ''; do
   : >"$log"
   rc=0
@@ -65,6 +107,8 @@ for ready in '{"ready":true,"readOnly":false}' invalid; do
   [[ "$rc" == 3 && ! -e "$out/settings.png" ]]
   if grep -Fxq grim "$log"; then exit 1; fi
   grep -Fq captureRestore "$log"
+  grep -Fq 'workspace = "7"' "$log"
+  grep -Fq 'window = "address:0xabc"' "$log"
 done
 : >"$log"
 printf old >"$out/settings.png"
@@ -72,6 +116,7 @@ rc=0
 CAPTURE_GRIM_FAIL=1 "$capture" --surface settings --output "$out" >/dev/null 2>&1 || rc=$?
 [[ "$rc" == 3 && "$(cat "$out/settings.png")" == old ]]
 grep -Fq captureRestore "$log"
+grep -Fq 'workspace = "7"' "$log"
 grep -Fq 'window = "address:0xabc"' "$log"
 for failure in snapshot restore timeout; do
   : >"$log"
@@ -83,5 +128,10 @@ for failure in snapshot restore timeout; do
   esac
   [[ "$rc" == 3 && "$(cat "$out/settings.png")" == old ]]
   [[ "$failure" == restore ]] || ! grep -Fxq grim "$log"
+  if [[ "$failure" != snapshot ]]; then
+    grep -Fq captureRestore "$log"
+    grep -Fq 'workspace = "7"' "$log"
+    grep -Fq 'window = "address:0xabc"' "$log"
+  fi
 done
 echo 'Settings capture contract passed'

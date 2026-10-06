@@ -433,8 +433,29 @@ capture_settings_surface() (
   local snapshot fixture answer previous_workspace previous_focus staged restore_needed=0
   snapshot="$(omarchy-shell aranea.settings.capture captureSnapshot 2>/dev/null)" || exit 3
   jq -e 'type == "object" and (.opened | type == "boolean") and (.section | type == "string")' <<<"$snapshot" >/dev/null || exit 3
-  previous_workspace="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // empty' || true)"
-  previous_focus="$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty' || true)"
+  local workspace_snapshot focus_snapshot
+  workspace_snapshot="$(hyprctl activeworkspace -j 2>/dev/null)" || {
+    echo 'Unable to read Settings capture workspace' >&2
+    exit 3
+  }
+  previous_workspace="$(jq -er -s '
+    if length == 1 and (.[0] | type == "object") and (.[0].id | type == "number")
+      and (.[0].id | . > 0 and . <= 2147483647 and floor == .)
+    then .[0].id else error("invalid workspace snapshot") end' <<<"$workspace_snapshot" 2>/dev/null)" || {
+    echo 'Invalid Settings capture workspace snapshot' >&2
+    exit 3
+  }
+  focus_snapshot="$(hyprctl activewindow -j 2>/dev/null)" || {
+    echo 'Unable to read Settings capture focus' >&2
+    exit 3
+  }
+  previous_focus="$(jq -er -s '
+    if length == 1 and (.[0] | type == "object") and
+      (.[0] == {} or ((.[0].address | type == "string") and (.[0].address | test("^0x[0-9a-fA-F]+$"))))
+    then .[0].address // "" else error("invalid focus snapshot") end' <<<"$focus_snapshot" 2>/dev/null)" || {
+    echo 'Invalid Settings capture focus snapshot' >&2
+    exit 3
+  }
   fixture="$(jq -cn --arg section "$([[ "$surface" == settings-scaling ]] && echo display || echo appearance)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
     {section: $section, snapshot: $snapshot, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
       display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
