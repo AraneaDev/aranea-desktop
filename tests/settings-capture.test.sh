@@ -23,6 +23,7 @@ cat >"$bin/hyprctl" <<'STUB'
 #!/usr/bin/env bash
 printf 'hyprctl %s\n' "$*" >>"$ARANEA_TEST_SANDBOX/calls"
 case "$1" in
+  dispatch) [[ "$2" != focuswindow ]] || exit 7 ;;
   activeworkspace) echo '{"id":7}' ;;
   activewindow) echo '{"address":"0xabc"}' ;;
 esac
@@ -53,7 +54,7 @@ for surface in settings settings-scaling; do
   [[ "$(grep -n '^grim$' "$log" | cut -d: -f1)" -lt "$(grep -n captureRestore "$log" | cut -d: -f1)" ]]
   grep -Fq 'captureRestore {"opened":true,"section":"schedule","ui":{"draft":["07:00"]},"showcase":true}' "$log"
   grep -Fq 'workspace = "7"' "$log"
-  grep -Fq 'focuswindow address:0xabc' "$log"
+  grep -Fq 'window = "address:0xabc"' "$log"
   if grep -Eq 'aranea-settings.*close| set | refresh| summon' "$log"; then exit 1; fi
   rm "$out/$surface.png"
 done
@@ -71,7 +72,7 @@ rc=0
 CAPTURE_GRIM_FAIL=1 "$capture" --surface settings --output "$out" >/dev/null 2>&1 || rc=$?
 [[ "$rc" == 3 && "$(cat "$out/settings.png")" == old ]]
 grep -Fq captureRestore "$log"
-grep -Fq 'focuswindow address:0xabc' "$log"
+grep -Fq 'window = "address:0xabc"' "$log"
 for failure in snapshot restore timeout; do
   : >"$log"
   rc=0

@@ -458,7 +458,7 @@ capture_settings_surface() (
         hyprctl dispatch "hl.dsp.focus({ workspace = \"$previous_workspace\" })" >/dev/null 2>&1 || failed=1
       fi
       if [[ "$previous_focus" =~ ^0x[[:xdigit:]]+$ ]]; then
-        hyprctl dispatch focuswindow "address:$previous_focus" >/dev/null 2>&1 || failed=1
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$previous_focus\" })" >/dev/null 2>&1 || failed=1
       fi
       restore_needed=0
     fi
