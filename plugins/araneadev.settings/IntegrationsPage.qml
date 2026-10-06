@@ -27,17 +27,11 @@ ColumnLayout {
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
   signal retryRequested
-  spacing: Style.space(8)
-  SettingsLabel {
+  spacing: Style.space(12)
+  SettingsPageHeader {
     Layout.fillWidth: true
-    text: 'Integrations'
-    font.pixelSize: Style.font.title
-    font.bold: true
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: 'Activate the integrations you use.'
-    opacity: 0.65
+    title: 'Integrations'
+    description: 'Choose which integrations follow Aranea.'
   }
   SettingsLabel {
     Layout.fillWidth: true
@@ -46,11 +40,10 @@ ColumnLayout {
   }
   Repeater {
     model: page.backendState.integrations || []
-    ColumnLayout {
+    SettingsSection {
       id: integrationRow
       required property var modelData
       Layout.fillWidth: true
-      spacing: Style.space(8)
       GridLayout {
         Layout.fillWidth: true
         columns: page.width < Style.space(300) ? 1 : 2
@@ -79,11 +72,6 @@ ColumnLayout {
         visible: !!page.errors['integration:' + integrationRow.modelData.id]
         text: page.errors['integration:' + integrationRow.modelData.id] || ''
         color: Aranea.DesignTokens.attention
-      }
-      Rectangle {
-        Layout.fillWidth: true
-        implicitHeight: 1
-        color: Util.alpha(Color.foreground, 0.12)
       }
     }
   }

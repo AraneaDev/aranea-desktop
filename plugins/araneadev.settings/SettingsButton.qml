@@ -7,7 +7,7 @@ import "../araneadev.shared" as Aranea
 
 Aranea.FilamentPill {
   id: button
-  // Presentation only: primary, secondary, navigation or quiet.
+  // Presentation only: primary, secondary, navigation, segment or quiet.
   property string variant: 'secondary'
   // Guard keyboard and programmatic activation while disabled.
   function activate() {
@@ -19,8 +19,8 @@ Aranea.FilamentPill {
   implicitHeight: Style.space(28)
   implicitWidth: labelMeasure.implicitWidth + Style.space(16)
   selected: variant === 'primary'
-  borderVisible: variant === 'primary'
-  underlineVisible: variant !== 'navigation'
+  borderVisible: false
+  underlineVisible: false
   labelVisible: variant !== 'navigation'
   labelColor: Aranea.DesignTokens.foreground
   labelFontFamily: Style.font.menuFamily
@@ -32,6 +32,13 @@ Aranea.FilamentPill {
       activate()
       event.accepted = true
     }
+  }
+  Rectangle {
+    anchors.fill: parent
+    z: -1
+    radius: Style.space(3)
+    color: Util.alpha(Color.foreground, 0.04)
+    visible: button.variant === 'secondary'
   }
   Text {
     id: labelMeasure

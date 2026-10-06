@@ -175,6 +175,7 @@ Item {
     id: card
     anchors.fill: parent
     contentPadding: Style.space(16)
+    borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
     FocusScope {
       anchors.fill: parent
       anchors.margins: Style.space(panel.shortScreen ? 12 : 16)
@@ -210,13 +211,14 @@ Item {
             SettingsLabel {
               Layout.fillWidth: true
               visible: !panel.shortScreen
-              text: panel.controller.showcaseActive ? 'Preview · read-only' : 'Your desktop preferences'
+              text: panel.controller.showcaseActive ? 'Preview · read-only' : 'Desktop preferences'
               opacity: 0.65
             }
           }
           SettingsButton {
             id: closeButton
             text: 'Close'
+            variant: 'quiet'
             pointerGate: pointerGate
             onClicked: panel.root.close()
           }
@@ -284,7 +286,7 @@ Item {
               }
               StackLayout {
                 id: pages
-                width: scroller.contentWidth
+                width: Math.min(scroller.contentWidth, Style.space(560))
                 height: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
                 currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
                 AppearancePage {
@@ -368,8 +370,9 @@ Item {
         }
         SettingsLabel {
           Layout.fillWidth: true
-          text: 'Tab move · Enter select · Esc close'
-          opacity: 0.65
+          objectName: 'settingsKeyboardHint'
+          text: 'Tab navigate · Esc close'
+          opacity: 0.45
           font.pixelSize: Style.font.caption
         }
       }

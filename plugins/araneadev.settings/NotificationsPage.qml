@@ -32,73 +32,73 @@ ColumnLayout {
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
   signal retryRequested
-  spacing: Style.space(8)
-  SettingsLabel {
+  spacing: Style.space(12)
+  SettingsPageHeader {
     Layout.fillWidth: true
-    text: 'Notifications'
-    font.pixelSize: Style.font.title
-    font.bold: true
+    title: 'Notifications'
+    description: 'Control interruptions and quiet hours.'
   }
-  SettingsLabel {
+  SettingsSection {
     Layout.fillWidth: true
-    text: 'Manage interruptions.'
-    opacity: 0.65
-  }
-  RowLayout {
-    Layout.fillWidth: true
+    title: 'Interruptions'
+    RowLayout {
+      Layout.fillWidth: true
+      SettingsLabel {
+        text: 'Do not disturb'
+        font.bold: true
+      }
+      SettingsToggle {
+        objectName: 'dndToggle'
+        Accessible.name: 'Do not disturb'
+        checked: page.notifications.dnd === 'on'
+        enabled: !page.displayOnly && !page.pending && page.notifications.dndAvailability === 'available'
+        busy: page.pendingKey === 'dnd'
+        pointerGate: page.pointerGate
+        onToggled: page.request('set dnd', [checked ? 'off' : 'on'])
+      }
+      Item {
+        Layout.fillWidth: true
+      }
+    }
     SettingsLabel {
       Layout.fillWidth: true
-      text: 'Do not disturb'
+      text: page.pendingKey === 'dnd' ? 'Applying…' : page.result || (page.notifications.dndAvailability === 'available' ? page.notifications.dnd === 'on' ? 'On' : 'Off' : 'Unavailable')
+      opacity: 0.65
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      visible: !!page.error || !!page.readErrors.dnd
+      text: page.error || page.readErrors.dnd || ''
+      color: Aranea.DesignTokens.attention
+    }
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: 1
+      color: Util.alpha(Color.foreground, 0.12)
+    }
+    SettingsLabel {
+      text: 'Quiet hours'
       font.bold: true
     }
-    SettingsToggle {
-      objectName: 'dndToggle'
-      Accessible.name: 'Do not disturb'
-      checked: page.notifications.dnd === 'on'
-      enabled: !page.displayOnly && !page.pending && page.notifications.dndAvailability === 'available'
-      busy: page.pendingKey === 'dnd'
-      pointerGate: page.pointerGate
-      onToggled: page.request('set dnd', [checked ? 'off' : 'on'])
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Effective state: ' + page.quietDescription
     }
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: page.pendingKey === 'dnd' ? 'Applying…' : page.result || (page.notifications.dndAvailability === 'available' ? page.notifications.dnd === 'on' ? 'On' : 'Off' : 'Unavailable')
-    opacity: 0.65
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: !!page.error || !!page.readErrors.dnd
-    text: page.error || page.readErrors.dnd || ''
-    color: Aranea.DesignTokens.attention
-  }
-  Rectangle {
-    Layout.fillWidth: true
-    implicitHeight: 1
-    color: Util.alpha(Color.foreground, 0.12)
-  }
-  SettingsLabel {
-    text: 'Quiet hours'
-    font.bold: true
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: 'Effective state: ' + page.quietDescription
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: 'Configured window: ' + page.windowDescription
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: 'Configured by the notification service.'
-    opacity: 0.65
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: !!page.readErrors.quiet || !!page.readErrors.window
-    text: page.readErrors.quiet || page.readErrors.window || ''
-    color: Aranea.DesignTokens.attention
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Configured window: ' + page.windowDescription
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Configured by the notification service.'
+      opacity: 0.65
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      visible: !!page.readErrors.quiet || !!page.readErrors.window
+      text: page.readErrors.quiet || page.readErrors.window || ''
+      color: Aranea.DesignTokens.attention
+    }
   }
   SettingsButton {
     text: 'Retry'

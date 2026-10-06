@@ -123,7 +123,7 @@ ShellRoot {
       t.check(inside(textItem(surface, 'Close'), surface), label + ': Close stays reachable')
       checkHorizontal(scroll.contentItem, scroll, label)
 
-      t.check(inside(textItem(surface, 'Tab move · Enter select · Esc close'), surface), label + ': hint stays within window')
+      t.check(inside(t.findChild(surface, 'settingsKeyboardHint'), surface), label + ': hint stays within window')
       scroll.contentY = 0
       var overflow = scroll.contentHeight > scroll.height + 1
       var bar = t.findChild(surface, 'settingsScrollBar')
