@@ -58,82 +58,102 @@ ColumnLayout {
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
   signal retryRequested
-  spacing: Style.space(8)
-  SettingsLabel {
+  spacing: Style.space(12)
+  SettingsPageHeader {
     Layout.fillWidth: true
-    text: 'Display'
-    font.pixelSize: Style.font.title
-    font.bold: true
+    title: 'Display'
+    description: 'Choose a comfortable size for your desktop.'
   }
-  SettingsLabel {
+  SettingsSection {
     Layout.fillWidth: true
-    text: page.display.monitor ? page.display.monitor + (page.display.width && page.display.height ? ' · ' + page.display.width + ' × ' + page.display.height : '') + ' · Current scale: ' + page.display.scale : 'Focused display: Unavailable'
-    opacity: 0.65
-  }
-  GridLayout {
-    Layout.fillWidth: true
-    columns: page.width < Style.space(260) ? 2 : 4
-    columnSpacing: Style.space(8)
-    rowSpacing: Style.space(8)
-    Repeater {
-      model: ['2', '2.5', '2.667', '3']
-      SettingsButton {
-        required property string modelData
-        objectName: 'displayScalePreset'
-        text: modelData + 'x'
-        selected: page.scaleDraft === modelData
-        enabled: page.displayAvailable && !page.displayOnly && !page.pending
-        pointerGate: page.pointerGate
-        onClicked: page.setScaleDraft(modelData)
-      }
-    }
-  }
-  GridLayout {
-    Layout.fillWidth: true
-    columns: page.width < Style.space(300) ? 1 : 3
-    columnSpacing: Style.space(8)
-    rowSpacing: Style.space(8)
-    Rectangle {
+    title: 'Scale'
+    SettingsLabel {
+      objectName: 'displayObservation'
       Layout.fillWidth: true
-      Layout.preferredHeight: Style.space(28)
-      color: Util.alpha(Color.foreground, 0.04)
+      text: page.display.monitor ? page.display.monitor + (page.display.width && page.display.height ? ' · ' + page.display.width + ' × ' + page.display.height : '') + ' · Current scale: ' + page.display.scale : 'Focused display: Unavailable'
+      opacity: 0.7
+    }
+    Rectangle {
+      Layout.preferredWidth: Math.min(Style.space(248), parent.width)
+      Layout.preferredHeight: presetGrid.implicitHeight + Style.space(8)
+      color: Util.alpha(Color.foreground, 0.025)
+      radius: Style.space(3)
       border.width: 1
-      border.color: scaleField.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
-      TextInput {
-        id: scaleField
-        objectName: 'displayScaleInput'
-        anchors.fill: parent
-        anchors.leftMargin: Style.space(8)
-        anchors.rightMargin: Style.space(8)
-        verticalAlignment: TextInput.AlignVCenter
-        text: page.scaleDraft
-        color: Color.foreground
-        font.family: Style.font.menuFamily
-        font.pixelSize: Style.font.body
-        enabled: page.displayAvailable && !page.displayOnly && !page.pending
-        activeFocusOnTab: true
-        selectByMouse: true
-        inputMethodHints: Qt.ImhFormattedNumbersOnly
-        Accessible.name: 'Custom display scale from 1 to 4'
-        onTextEdited: page.setScaleDraft(text)
+      border.color: Util.alpha(Color.foreground, 0.08)
+      GridLayout {
+        id: presetGrid
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: Style.space(4)
+        columns: parent.width < Style.space(230) ? 2 : 4
+        columnSpacing: Style.space(2)
+        rowSpacing: Style.space(2)
+        Repeater {
+          model: ['2', '2.5', '2.667', '3']
+          SettingsButton {
+            required property string modelData
+            objectName: 'displayScalePreset'
+            Layout.fillWidth: true
+            variant: 'segment'
+            text: modelData + '×'
+            selected: page.scaleDraft === modelData
+            enabled: page.displayAvailable && !page.displayOnly && !page.pending
+            pointerGate: page.pointerGate
+            onClicked: page.setScaleDraft(modelData)
+          }
+        }
       }
     }
-    SettingsButton {
-      objectName: 'displayScaleApply'
-      Accessible.name: 'Apply display scale'
-      text: 'Apply'
-      variant: 'primary'
-      enabled: page.displayAvailable && !page.displayOnly && !page.pending && page.scaleValidation.ok
-      pointerGate: page.pointerGate
-      onClicked: page.applyScale()
-    }
-    SettingsButton {
-      objectName: 'displayScaleDiscard'
-      Accessible.name: 'Discard display scale draft'
-      text: 'Discard'
-      enabled: !page.displayOnly && !page.pending && page.scaleDirty
-      pointerGate: page.pointerGate
-      onClicked: page.discardScale()
+
+    GridLayout {
+      Layout.preferredWidth: Math.min(implicitWidth, parent.width)
+      columns: parent.width < Style.space(280) ? 1 : 3
+      columnSpacing: Style.space(8)
+      rowSpacing: Style.space(8)
+      Rectangle {
+        Layout.preferredWidth: Math.min(Style.space(136), parent.width)
+        Layout.preferredHeight: Style.space(28)
+        radius: Style.space(3)
+        color: Util.alpha(Color.foreground, 0.04)
+        border.width: 1
+        border.color: scaleField.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
+        TextInput {
+          id: scaleField
+          objectName: 'displayScaleInput'
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          verticalAlignment: TextInput.AlignVCenter
+          text: page.scaleDraft
+          color: Color.foreground
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.body
+          enabled: page.displayAvailable && !page.displayOnly && !page.pending
+          activeFocusOnTab: true
+          selectByMouse: true
+          inputMethodHints: Qt.ImhFormattedNumbersOnly
+          Accessible.name: 'Custom display scale from 1 to 4'
+          onTextEdited: page.setScaleDraft(text)
+        }
+      }
+      SettingsButton {
+        objectName: 'displayScaleApply'
+        Accessible.name: 'Apply display scale'
+        text: 'Apply'
+        variant: 'primary'
+        enabled: page.displayAvailable && !page.displayOnly && !page.pending && page.scaleValidation.ok
+        pointerGate: page.pointerGate
+        onClicked: page.applyScale()
+      }
+      SettingsButton {
+        objectName: 'displayScaleDiscard'
+        Accessible.name: 'Discard display scale draft'
+        text: 'Discard'
+        enabled: !page.displayOnly && !page.pending && page.scaleDirty
+        pointerGate: page.pointerGate
+        onClicked: page.discardScale()
+      }
     }
   }
   SettingsLabel {

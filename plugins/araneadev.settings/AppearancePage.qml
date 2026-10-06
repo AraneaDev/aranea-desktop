@@ -64,163 +64,186 @@ ColumnLayout {
     wallpaperDirty = false
     selectedId = appliedId
   }
-  spacing: Style.space(8)
-  SettingsLabel {
+  spacing: Style.space(12)
+  SettingsPageHeader {
     Layout.fillWidth: true
-    text: 'Appearance'
-    font.pixelSize: Style.font.title
-    font.bold: true
+    title: 'Appearance'
+    description: 'Personalize your wallpaper and desktop motion.'
   }
-  GridLayout {
+  SettingsSection {
     Layout.fillWidth: true
-    columns: page.width < Style.space(300) ? 1 : 2
-    columnSpacing: Style.space(12)
-    rowSpacing: Style.space(8)
-    Rectangle {
-      Layout.preferredWidth: Math.min(Style.space(112), page.width)
-      Layout.preferredHeight: Style.space(63)
-      color: Util.alpha(Color.foreground, 0.04)
-      clip: true
-      Image {
-        anchors.fill: parent
-        source: page.appliedAsset && page.appliedAsset.available && page.appliedAsset.path ? 'file://' + page.appliedAsset.path : ''
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-      }
-    }
-    ColumnLayout {
+    title: 'Wallpaper'
+    GridLayout {
       Layout.fillWidth: true
-      Layout.minimumWidth: 0
-      spacing: Style.space(8)
-      SettingsLabel {
-        Layout.fillWidth: true
-        text: page.backendState.wallpapersAvailability === 'available' ? page.appliedId ? 'Current wallpaper: ' + (page.appliedAsset ? page.appliedAsset.label : page.appliedId) : page.backendState.wallpaper && page.backendState.wallpaper.availability === 'available' ? 'Current wallpaper: custom image' : 'Current wallpaper: Unavailable' : 'Wallpaper catalog: Unavailable'
-      }
-      SettingsButton {
-        objectName: 'wallpaperChoose'
-        text: page.galleryExpanded ? 'Hide chooser' : 'Choose wallpaper'
-        pointerGate: page.pointerGate
-        onClicked: page.galleryExpanded = !page.galleryExpanded
-      }
-    }
-  }
-  GridLayout {
-    Layout.fillWidth: true
-    visible: page.galleryExpanded
-    columns: page.width < Style.space(420) ? 1 : 2
-    rowSpacing: Style.space(8)
-    columnSpacing: Style.space(8)
-    Repeater {
-      model: page.backendState.wallpapers || []
-      SettingsButton {
-        id: wallpaperOption
-        required property var modelData
-        objectName: 'wallpaperThumbnail:' + modelData.id
-        Layout.fillWidth: true
-        Layout.minimumWidth: 0
-        Layout.preferredHeight: Style.space(92)
-        text: ''
-        Accessible.name: 'Select ' + modelData.label + ' wallpaper'
-        selected: page.selectedId === modelData.id
-        pointerGate: page.pointerGate
-        onClicked: page.selectWallpaper(modelData.id)
+      columns: width < Style.space(360) ? 1 : 2
+      columnSpacing: Style.space(12)
+      rowSpacing: Style.space(8)
+      Rectangle {
+        Layout.preferredWidth: Math.min(Style.space(180), parent.width)
+        Layout.preferredHeight: Style.space(101)
+        color: Util.alpha(Color.foreground, 0.04)
+        radius: Style.space(3)
+        clip: true
         Image {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.top: parent.top
-          anchors.margins: Style.space(4)
-          height: Style.space(58)
-          source: wallpaperOption.modelData.available && wallpaperOption.modelData.path ? 'file://' + wallpaperOption.modelData.path : ''
+          anchors.fill: parent
+          anchors.margins: Style.space(2)
+          source: page.appliedAsset && page.appliedAsset.available && page.appliedAsset.path ? 'file://' + page.appliedAsset.path : ''
           fillMode: Image.PreserveAspectCrop
           asynchronous: true
-          clip: true
+        }
+      }
+      ColumnLayout {
+        Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        spacing: Style.space(8)
+        SettingsLabel {
+          Layout.fillWidth: true
+          objectName: 'wallpaperCurrentName'
+          font.pixelSize: Style.font.body
+          font.bold: true
+          text: page.backendState.wallpapersAvailability === 'available' ? page.appliedId ? (page.appliedAsset ? page.appliedAsset.label : page.appliedId) : page.backendState.wallpaper && page.backendState.wallpaper.availability === 'available' ? 'Custom image' : 'Wallpaper unavailable' : 'Wallpaper catalog: Unavailable'
         }
         SettingsLabel {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: parent.bottom
-          anchors.margins: Style.space(8)
-          text: wallpaperOption.modelData.label + (wallpaperOption.modelData.id === page.appliedId ? ' · Current' : '') + (!wallpaperOption.modelData.available ? ' · Unavailable' : '')
-          wrapMode: Text.NoWrap
-          elide: Text.ElideRight
+          text: 'Current wallpaper'
+          opacity: 0.6
+        }
+        SettingsButton {
+          objectName: 'wallpaperChoose'
+          text: page.galleryExpanded ? 'Hide chooser' : 'Choose wallpaper'
+          pointerGate: page.pointerGate
+          onClicked: page.galleryExpanded = !page.galleryExpanded
         }
       }
     }
-  }
-  GridLayout {
-    Layout.fillWidth: true
-    visible: page.selectedId !== page.appliedId
-    columns: page.width < Style.space(220) ? 1 : 2
-    columnSpacing: Style.space(8)
-    rowSpacing: Style.space(8)
-    SettingsButton {
-      objectName: 'wallpaperApply'
-      Accessible.name: 'Apply wallpaper'
-      text: 'Apply'
-      variant: 'primary'
-      enabled: !page.displayOnly && !page.pending && !!page.selectedAsset && page.selectedAsset.available && page.backendState.wallpapersAvailability === 'available'
-      pointerGate: page.pointerGate
-      onClicked: page.applyWallpaper()
+    GridLayout {
+      Layout.fillWidth: true
+      visible: page.galleryExpanded
+      columns: width < Style.space(420) ? 1 : 2
+      rowSpacing: Style.space(8)
+      columnSpacing: Style.space(8)
+      Repeater {
+        model: page.backendState.wallpapers || []
+        SettingsButton {
+          id: wallpaperOption
+          required property var modelData
+          objectName: 'wallpaperThumbnail:' + modelData.id
+          Layout.fillWidth: true
+          Layout.minimumWidth: 0
+          Layout.preferredHeight: Style.space(108)
+          text: ''
+          variant: 'quiet'
+          Accessible.name: 'Select ' + modelData.label + ' wallpaper'
+          selected: page.selectedId === modelData.id
+          pointerGate: page.pointerGate
+          onClicked: page.selectWallpaper(modelData.id)
+          Image {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Style.space(4)
+            height: Style.space(74)
+            source: wallpaperOption.modelData.available && wallpaperOption.modelData.path ? 'file://' + wallpaperOption.modelData.path : ''
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            clip: true
+          }
+          SettingsLabel {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: Style.space(8)
+            anchors.rightMargin: Style.space(28)
+            text: wallpaperOption.modelData.label + (wallpaperOption.modelData.id === page.appliedId ? ' · Current' : '') + (!wallpaperOption.modelData.available ? ' · Unavailable' : '')
+            wrapMode: Text.NoWrap
+            elide: Text.ElideRight
+          }
+          SettingsLabel {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: Style.space(8)
+            text: '✓'
+            color: Aranea.DesignTokens.accent
+            visible: wallpaperOption.selected
+          }
+        }
+      }
     }
-    SettingsButton {
-      objectName: 'wallpaperDiscard'
-      Accessible.name: 'Discard wallpaper draft'
-      text: 'Discard'
-      enabled: !page.displayOnly && !page.pending
-      pointerGate: page.pointerGate
-      onClicked: page.discardWallpaper()
+    GridLayout {
+      Layout.fillWidth: true
+      visible: page.selectedId !== page.appliedId
+      columns: page.width < Style.space(220) ? 1 : 2
+      columnSpacing: Style.space(8)
+      rowSpacing: Style.space(8)
+      SettingsButton {
+        objectName: 'wallpaperApply'
+        Accessible.name: 'Apply wallpaper'
+        text: 'Apply'
+        variant: 'primary'
+        enabled: !page.displayOnly && !page.pending && !!page.selectedAsset && page.selectedAsset.available && page.backendState.wallpapersAvailability === 'available'
+        pointerGate: page.pointerGate
+        onClicked: page.applyWallpaper()
+      }
+      SettingsButton {
+        objectName: 'wallpaperDiscard'
+        Accessible.name: 'Discard wallpaper draft'
+        text: 'Discard'
+        enabled: !page.displayOnly && !page.pending
+        pointerGate: page.pointerGate
+        onClicked: page.discardWallpaper()
+      }
     }
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: page.pendingKey === 'wallpaper' || !!page.results.wallpaper
-    text: page.pendingKey === 'wallpaper' ? 'Applying…' : page.results.wallpaper || ''
-  }
-  SettingsLabel {
-    objectName: 'wallpaperScheduleNote'
-    Layout.fillWidth: true
-    visible: !!page.backendState.schedule && page.backendState.schedule.enabled === true
-    text: 'Wallpaper scheduling is enabled. The next phase may replace your manually applied wallpaper.'
-    opacity: 0.65
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: !!page.errors.wallpaper
-    text: page.errors.wallpaper || ''
-    color: Aranea.DesignTokens.attention
-  }
-  Rectangle {
-    Layout.fillWidth: true
-    implicitHeight: 1
-    color: Util.alpha(Color.foreground, 0.12)
-  }
-  RowLayout {
-    Layout.fillWidth: true
     SettingsLabel {
       Layout.fillWidth: true
-      text: 'Motion'
-      font.bold: true
+      visible: page.pendingKey === 'wallpaper' || !!page.results.wallpaper
+      text: page.pendingKey === 'wallpaper' ? 'Applying…' : page.results.wallpaper || ''
     }
-    SettingsToggle {
-      objectName: 'motionToggle'
-      Accessible.name: 'Motion'
-      checked: !!page.backendState.motion && page.backendState.motion.configured === 'on'
-      enabled: !page.displayOnly && !page.pending && !!page.backendState.motion && page.backendState.motion.availability === 'available'
-      busy: page.pendingKey === 'motion'
-      pointerGate: page.pointerGate
-      onToggled: page.request('set motion', [checked ? 'off' : 'on'])
+    SettingsLabel {
+      objectName: 'wallpaperScheduleNote'
+      Layout.fillWidth: true
+      visible: !!page.backendState.schedule && page.backendState.schedule.enabled === true
+      text: 'Schedule enabled · your wallpaper may change at the next phase.'
+      opacity: 0.65
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      visible: !!page.errors.wallpaper
+      text: page.errors.wallpaper || ''
+      color: Aranea.DesignTokens.attention
     }
   }
-  SettingsLabel {
+  SettingsSection {
     Layout.fillWidth: true
-    text: page.pendingKey === 'motion' ? 'Applying…' : page.results.motion || (page.backendState.motion && page.backendState.motion.availability === 'available' ? page.backendState.motion.application === 'deferred' ? 'Saved · application deferred' : page.backendState.motion.application === 'unavailable' ? 'Live motion state unavailable' : 'Use desktop and panel animations.' : 'Motion: Unavailable')
-    opacity: 0.65
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: !!page.errors.motion
-    text: page.errors.motion || ''
-    color: Aranea.DesignTokens.attention
+    title: 'Motion'
+    RowLayout {
+      Layout.fillWidth: true
+      SettingsLabel {
+        text: 'Enable animations'
+        font.bold: true
+      }
+      SettingsToggle {
+        objectName: 'motionToggle'
+        Accessible.name: 'Motion'
+        checked: !!page.backendState.motion && page.backendState.motion.configured === 'on'
+        enabled: !page.displayOnly && !page.pending && !!page.backendState.motion && page.backendState.motion.availability === 'available'
+        busy: page.pendingKey === 'motion'
+        pointerGate: page.pointerGate
+        onToggled: page.request('set motion', [checked ? 'off' : 'on'])
+      }
+      Item {
+        Layout.fillWidth: true
+      }
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: page.pendingKey === 'motion' ? 'Applying…' : page.results.motion || (page.backendState.motion && page.backendState.motion.availability === 'available' ? page.backendState.motion.application === 'deferred' ? 'Saved · application deferred' : page.backendState.motion.application === 'unavailable' ? 'Live motion state unavailable' : 'Use desktop and panel animations.' : 'Motion: Unavailable')
+      opacity: 0.65
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      visible: !!page.errors.motion
+      text: page.errors.motion || ''
+      color: Aranea.DesignTokens.attention
+    }
   }
   SettingsButton {
     text: 'Retry'

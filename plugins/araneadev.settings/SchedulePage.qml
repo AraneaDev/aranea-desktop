@@ -69,114 +69,115 @@ ColumnLayout {
   onScheduleChanged: syncDraft()
   onAvailableChanged: syncDraft()
   Component.onCompleted: syncDraft()
-  spacing: Style.space(8)
-  SettingsLabel {
+  spacing: Style.space(12)
+  SettingsPageHeader {
     Layout.fillWidth: true
-    text: 'Wallpaper schedule'
-    font.pixelSize: Style.font.title
-    font.bold: true
+    title: 'Wallpaper schedule'
+    description: 'Move through dawn, day, dusk and night.'
   }
-  SettingsLabel {
+  SettingsSection {
     Layout.fillWidth: true
-    text: 'Set when your wallpaper moves from dawn through night.'
-    opacity: 0.65
-  }
-  RowLayout {
-    Layout.fillWidth: true
+    title: 'Schedule'
+    RowLayout {
+      Layout.fillWidth: true
+      SettingsLabel {
+        text: 'Enable schedule'
+        font.bold: true
+      }
+      SettingsToggle {
+        objectName: 'scheduleToggle'
+        Accessible.name: 'Enable wallpaper schedule'
+        checked: page.schedule.enabled === true
+        enabled: !page.displayOnly && !page.pending && page.available
+        busy: page.pendingKey === 'schedule'
+        pointerGate: page.pointerGate
+        onToggled: page.request('set schedule', [checked ? 'off' : 'on'])
+      }
+      Item {
+        Layout.fillWidth: true
+      }
+    }
     SettingsLabel {
       Layout.fillWidth: true
-      text: 'Enable schedule'
-      font.bold: true
+      text: !page.available ? 'Unavailable' : page.pendingKey === 'schedule' ? 'Applying…' : page.result || (page.schedule.applied === null ? 'Timer state unavailable' : page.schedule.applied ? 'Timer active' : 'Timer inactive')
+      opacity: 0.65
     }
-    SettingsToggle {
-      objectName: 'scheduleToggle'
-      Accessible.name: 'Enable wallpaper schedule'
-      checked: page.schedule.enabled === true
-      enabled: !page.displayOnly && !page.pending && page.available
-      busy: page.pendingKey === 'schedule'
-      pointerGate: page.pointerGate
-      onToggled: page.request('set schedule', [checked ? 'off' : 'on'])
-    }
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: !page.available ? 'Unavailable' : page.pendingKey === 'schedule' ? 'Applying…' : page.result || (page.schedule.applied === null ? 'Timer state unavailable' : page.schedule.applied ? 'Timer active' : 'Timer inactive')
-    opacity: 0.65
-  }
-  GridLayout {
-    Layout.fillWidth: true
-    columns: page.width < Style.space(420) ? 1 : 2
-    columnSpacing: Style.space(12)
-    rowSpacing: Style.space(8)
-    Repeater {
-      model: ['Dawn', 'Day', 'Dusk', 'Night']
-      ColumnLayout {
-        id: phase
-        required property int index
-        required property string modelData
-        Layout.fillWidth: true
-        SettingsLabel {
-          text: phase.modelData
-        }
-        Rectangle {
+    GridLayout {
+      Layout.fillWidth: true
+      columns: width < Style.space(420) ? 1 : 2
+      columnSpacing: Style.space(12)
+      rowSpacing: Style.space(8)
+      Repeater {
+        model: ['Dawn', 'Day', 'Dusk', 'Night']
+        ColumnLayout {
+          id: phase
+          required property int index
+          required property string modelData
           Layout.fillWidth: true
-          Layout.preferredHeight: Style.space(28)
-          color: Util.alpha(Color.foreground, 0.04)
-          border.width: 1
-          border.color: field.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
-          TextInput {
-            id: field
-            objectName: 'phaseTime'
-            anchors.fill: parent
-            anchors.leftMargin: Style.space(8)
-            anchors.rightMargin: Style.space(8)
-            verticalAlignment: TextInput.AlignVCenter
-            text: page.draft[phase.index] || ''
-            color: Color.foreground
-            font.family: Style.font.menuFamily
-            font.pixelSize: Style.font.body
-            enabled: page.available && !page.displayOnly && !page.pending
-            activeFocusOnTab: true
-            selectByMouse: true
-            maximumLength: 5
-            Accessible.name: phase.modelData + ' time'
-            onTextEdited: page.setDraft(phase.index, text)
+          SettingsLabel {
+            text: phase.modelData
+          }
+          Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Style.space(28)
+            color: Util.alpha(Color.foreground, 0.04)
+            radius: Style.space(3)
+            border.width: 1
+            border.color: field.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
+            TextInput {
+              id: field
+              objectName: 'phaseTime'
+              anchors.fill: parent
+              anchors.leftMargin: Style.space(8)
+              anchors.rightMargin: Style.space(8)
+              verticalAlignment: TextInput.AlignVCenter
+              text: page.draft[phase.index] || ''
+              color: Color.foreground
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
+              enabled: page.available && !page.displayOnly && !page.pending
+              activeFocusOnTab: true
+              selectByMouse: true
+              maximumLength: 5
+              Accessible.name: phase.modelData + ' time'
+              onTextEdited: page.setDraft(phase.index, text)
+            }
           }
         }
       }
     }
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    text: page.dirty && !page.validation.ok ? page.validation.message : 'Use 24-hour times. Saving times keeps the schedule enabled setting.'
-    color: page.dirty && !page.validation.ok ? Aranea.DesignTokens.attention : Color.foreground
-    opacity: 0.75
-  }
-  GridLayout {
-    Layout.fillWidth: true
-    columns: page.width < Style.space(220) ? 1 : 2
-    columnSpacing: Style.space(8)
-    rowSpacing: Style.space(8)
-    SettingsButton {
-      objectName: 'scheduleSave'
-      text: 'Save times'
-      variant: 'primary'
-      enabled: page.available && !page.displayOnly && !page.pending && page.validation.ok
-      pointerGate: page.pointerGate
-      onClicked: page.save()
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: page.dirty && !page.validation.ok ? page.validation.message : 'Use 24-hour times. Saving times keeps the schedule enabled setting.'
+      color: page.dirty && !page.validation.ok ? Aranea.DesignTokens.attention : Color.foreground
+      opacity: 0.75
     }
-    SettingsButton {
-      text: 'Discard'
-      enabled: page.available && !page.displayOnly && !page.pending
-      pointerGate: page.pointerGate
-      onClicked: page.useCurrentTimes()
+    GridLayout {
+      Layout.fillWidth: true
+      columns: page.width < Style.space(220) ? 1 : 2
+      columnSpacing: Style.space(8)
+      rowSpacing: Style.space(8)
+      SettingsButton {
+        objectName: 'scheduleSave'
+        text: 'Save times'
+        variant: 'primary'
+        enabled: page.available && !page.displayOnly && !page.pending && page.validation.ok
+        pointerGate: page.pointerGate
+        onClicked: page.save()
+      }
+      SettingsButton {
+        text: 'Discard'
+        enabled: page.available && !page.displayOnly && !page.pending
+        pointerGate: page.pointerGate
+        onClicked: page.useCurrentTimes()
+      }
     }
-  }
-  SettingsLabel {
-    Layout.fillWidth: true
-    visible: !!page.error
-    text: page.error
-    color: Aranea.DesignTokens.attention
+    SettingsLabel {
+      Layout.fillWidth: true
+      visible: !!page.error
+      text: page.error
+      color: Aranea.DesignTokens.attention
+    }
   }
   SettingsButton {
     text: 'Retry'

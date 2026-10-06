@@ -49,11 +49,18 @@ Item {
   function choose(section) {
     sectionRequested(section)
   }
-  implicitHeight: categoryGrid.implicitHeight
+  implicitHeight: categoryGrid.implicitHeight + (navigation.compact ? 0 : Style.space(8))
+  Rectangle {
+    anchors.fill: parent
+    color: Util.alpha(Color.foreground, 0.025)
+    radius: Style.space(4)
+  }
   GridLayout {
     id: categoryGrid
     anchors.left: parent.left
     anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.margins: navigation.compact ? 0 : Style.space(4)
     columns: navigation.compact ? 2 : 1
     rowSpacing: Style.space(4)
     columnSpacing: Style.space(8)

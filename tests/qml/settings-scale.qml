@@ -91,6 +91,8 @@ ShellRoot {
     t.check(!entry.controller.pending, 'readback releases lock')
     t.equal(page.scaleDraft, '2.667', 'effective adjustment never overwrites typed request')
     t.check(entry.controller.resultFor('display-scale').indexOf('2.666667') >= 0, 'result includes observed adjusted scale')
+    var observation = t.findChild(page, 'displayObservation')
+    t.check(!!observation && observation.text.indexOf('eDP-1') >= 0 && observation.text.indexOf('2.666667') >= 0, 'Display shows observed monitor and effective scale separately from the draft')
     page.setScaleDraft('2.5')
     page.applyScale()
     reply(2, state, null, {
