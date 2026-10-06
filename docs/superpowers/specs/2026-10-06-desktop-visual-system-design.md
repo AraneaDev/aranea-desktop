@@ -1,6 +1,6 @@
 # Aranea desktop visual system
 
-Status: design direction approved in conversation; written specification awaiting review.
+Status: written specification approved in conversation; implementation planning complete.
 
 ## Objective
 
@@ -164,6 +164,6 @@ feature.
 ## Specification review
 
 This document describes the approved visual direction and full component scope.
-The written specification is the next review checkpoint before a concrete
-implementation plan is prepared. The plan must preserve the complete coverage
-and representative-first rollout above.
+The written specification was approved in conversation. The four checkpoint
+plans are indexed in [the rollout plan](../plans/2026-10-06-desktop-visual-system.md).
+They preserve the complete coverage and representative-first rollout above.
