@@ -2,6 +2,7 @@
 // qmllint disable missing-property
 // Persistent responsive settings content; window owns the summoned surface.
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import qs.Commons
@@ -16,6 +17,8 @@ Item {
   readonly property var controller: root.controller
   // Whether category controls belong above the content.
   readonly property bool compact: width < Style.space(720)
+  // Reduce fixed chrome on short logical screens while retaining full-size controls.
+  readonly property bool shortScreen: height < Style.space(400)
   // Time of the last geometry, category, content or scroll change.
   property real layoutChangedAt: 0
   // Close the summoned surface on Escape.
@@ -23,7 +26,15 @@ Item {
     if (event.key === Qt.Key_Escape) {
       root.close()
       event.accepted = true
+    } else if (event.key === Qt.Key_PageDown || event.key === Qt.Key_PageUp) {
+      scrollTo(scroller.contentY + (event.key === Qt.Key_PageDown ? 1 : -1) * Math.max(Style.space(36), scroller.height * 0.9))
+      event.accepted = true
     }
+  }
+  // Keep explicit scroll requests inside the currently selected page.
+  function scrollTo(position) {
+    scroller.cancelFlick()
+    scroller.contentY = Math.max(0, Math.min(position, Math.max(0, scroller.contentHeight - scroller.height)))
   }
   // Scroll a keyboard-focused control into the visible content area.
   function revealFocus(item) {
@@ -36,9 +47,9 @@ Item {
       return
     var pos = item.mapToItem(scroller.contentItem, 0, 0)
     if (pos.y < scroller.contentY)
-      scroller.contentY = pos.y
+      scrollTo(pos.y)
     else if (pos.y + item.height > scroller.contentY + scroller.height)
-      scroller.contentY = pos.y + item.height - scroller.height
+      scrollTo(pos.y + item.height - scroller.height)
   }
   Connections {
     target: panel.Window.window
@@ -90,14 +101,14 @@ Item {
     contentPadding: Style.space(24)
     FocusScope {
       anchors.fill: parent
-      anchors.margins: Style.space(24)
+      anchors.margins: Style.space(panel.shortScreen ? 16 : 24)
       focus: true
       Keys.onPressed: function (event) {
         panel.handleKey(event)
       }
       ColumnLayout {
         anchors.fill: parent
-        spacing: Style.space(16)
+        spacing: Style.space(panel.shortScreen ? 8 : 16)
         RowLayout {
           Layout.fillWidth: true
           Aranea.BrandHeader {
@@ -113,27 +124,11 @@ Item {
             onClicked: panel.root.close()
           }
         }
-        RowLayout {
-          Layout.fillWidth: true
-          visible: !!panel.controller.error
-          SettingsLabel {
-            Layout.fillWidth: true
-            text: panel.controller.error
-            color: Aranea.DesignTokens.attention
-          }
-          SettingsButton {
-            objectName: 'settingsRetry'
-            text: 'Retry'
-            enabled: !panel.controller.pending && !panel.controller.showcaseActive
-            pointerGate: pointerGate
-            onClicked: panel.controller.refresh()
-          }
-        }
         GridLayout {
           Layout.fillWidth: true
           Layout.fillHeight: true
           columns: panel.compact ? 1 : 2
-          rowSpacing: Style.space(16)
+          rowSpacing: Style.space(panel.shortScreen ? 8 : 16)
           columnSpacing: Style.space(24)
           SettingsNavigation {
             Layout.fillWidth: panel.compact
@@ -151,72 +146,108 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            contentWidth: width
-            contentHeight: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
+            // Reserve a stable scrollbar gutter to avoid width/overflow binding loops.
+            contentWidth: Math.max(1, width - Style.space(12))
+            contentHeight: scrollContent.implicitHeight
             boundsBehavior: Flickable.StopAtBounds
             onContentYChanged: panel.stampLayout()
-            StackLayout {
-              id: pages
-              width: scroller.width
-              height: scroller.contentHeight
-              currentIndex: ['appearance', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
-              AppearancePage {
-                Layout.fillHeight: false
-                backendState: panel.controller.state
-                displayOnly: panel.controller.showcaseActive
-                pending: panel.controller.pending
-                pendingKey: panel.controller.pendingKey
-                results: panel.controller.results
-                errors: panel.controller.itemErrors
-                pointerGate: pointerGate
-                onRequest: function (operation, args) {
-                  panel.controller.request(operation, args)
-                }
-                onRetryRequested: panel.controller.refresh()
+            ScrollBar.vertical: ScrollBar {
+              objectName: 'settingsScrollBar'
+              width: Style.space(8)
+              policy: scroller.contentHeight > scroller.height + 1 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+              contentItem: Rectangle {
+                implicitWidth: Style.space(4)
+                radius: width / 2
+                color: Util.alpha(Color.foreground, 0.45)
               }
-              SchedulePage {
-                id: schedulePage
-                Layout.fillHeight: false
-                backendState: panel.controller.state
-                displayOnly: panel.controller.showcaseActive
-                pending: panel.controller.pending
-                pendingKey: panel.controller.pendingKey
-                result: panel.controller.resultFor('schedule')
-                error: panel.controller.errorFor('schedule')
-                pointerGate: pointerGate
-                onRequest: function (operation, args) {
-                  panel.controller.request(operation, args)
-                }
-                onRetryRequested: panel.controller.refresh()
+              background: Rectangle {
+                color: 'transparent'
               }
-              IntegrationsPage {
-                Layout.fillHeight: false
-                backendState: panel.controller.state
-                displayOnly: panel.controller.showcaseActive
-                pending: panel.controller.pending
-                pendingKey: panel.controller.pendingKey
-                results: panel.controller.results
-                errors: panel.controller.itemErrors
-                pointerGate: pointerGate
-                onRequest: function (operation, args) {
-                  panel.controller.request(operation, args)
+            }
+            Column {
+              id: scrollContent
+              width: scroller.contentWidth
+              spacing: Style.space(16)
+              RowLayout {
+                width: parent.width
+                visible: !!panel.controller.error
+                SettingsLabel {
+                  Layout.fillWidth: true
+                  text: panel.controller.error
+                  color: Aranea.DesignTokens.attention
                 }
-                onRetryRequested: panel.controller.refresh()
+                SettingsButton {
+                  objectName: 'settingsRetry'
+                  text: 'Retry'
+                  enabled: !panel.controller.pending && !panel.controller.showcaseActive
+                  pointerGate: pointerGate
+                  onClicked: panel.controller.refresh()
+                }
               }
-              NotificationsPage {
-                Layout.fillHeight: false
-                notifications: panel.controller.notifications
-                displayOnly: panel.controller.showcaseActive
-                pending: panel.controller.pending
-                pendingKey: panel.controller.pendingKey
-                result: panel.controller.resultFor('dnd')
-                error: panel.controller.errorFor('dnd')
-                readErrors: panel.controller.notificationErrors
-                pointerGate: pointerGate
-                onRequest: function (operation, args) {
-                  panel.controller.request(operation, args)
+              StackLayout {
+                id: pages
+                width: scroller.contentWidth
+                height: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
+                currentIndex: ['appearance', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
+                AppearancePage {
+                  Layout.fillHeight: false
+                  backendState: panel.controller.state
+                  displayOnly: panel.controller.showcaseActive
+                  pending: panel.controller.pending
+                  pendingKey: panel.controller.pendingKey
+                  results: panel.controller.results
+                  errors: panel.controller.itemErrors
+                  pointerGate: pointerGate
+                  onRequest: function (operation, args) {
+                    panel.controller.request(operation, args)
+                  }
+                  onRetryRequested: panel.controller.refresh()
                 }
-                onRetryRequested: panel.controller.refreshNotifications()
+                SchedulePage {
+                  id: schedulePage
+                  Layout.fillHeight: false
+                  backendState: panel.controller.state
+                  displayOnly: panel.controller.showcaseActive
+                  pending: panel.controller.pending
+                  pendingKey: panel.controller.pendingKey
+                  result: panel.controller.resultFor('schedule')
+                  error: panel.controller.errorFor('schedule')
+                  pointerGate: pointerGate
+                  onRequest: function (operation, args) {
+                    panel.controller.request(operation, args)
+                  }
+                  onRetryRequested: panel.controller.refresh()
+                }
+                IntegrationsPage {
+                  Layout.fillHeight: false
+                  backendState: panel.controller.state
+                  displayOnly: panel.controller.showcaseActive
+                  pending: panel.controller.pending
+                  pendingKey: panel.controller.pendingKey
+                  results: panel.controller.results
+                  errors: panel.controller.itemErrors
+                  pointerGate: pointerGate
+                  onRequest: function (operation, args) {
+                    panel.controller.request(operation, args)
+                  }
+                  onRetryRequested: panel.controller.refresh()
+                }
+                NotificationsPage {
+                  objectName: "notificationsPage"
+                  Layout.fillHeight: false
+                  notifications: panel.controller.notifications
+                  displayOnly: panel.controller.showcaseActive
+                  pending: panel.controller.pending
+                  pendingKey: panel.controller.pendingKey
+                  result: panel.controller.resultFor('dnd')
+                  error: panel.controller.errorFor('dnd')
+                  readErrors: panel.controller.notificationErrors
+                  pointerGate: pointerGate
+                  onRequest: function (operation, args) {
+                    panel.controller.request(operation, args)
+                  }
+                  onRetryRequested: panel.controller.refreshNotifications()
+                }
               }
             }
           }

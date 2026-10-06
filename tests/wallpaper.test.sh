@@ -84,9 +84,29 @@ bs_out="$(ARANEA_WALLPAPER_MANIFEST="$wp_manifest" ARANEA_WALLPAPER_DRY_RUN=1 "$
 grep -Fq 'Unknown wallpaper: da\y' <<<"$bs_out"
 rm -f "$wp_manifest"
 
-echo "wallpaper contract passed"
-
 # Optional catalog is machine-readable; the default text list stays intact.
 "$repo_root/scripts/aranea-wallpaper" list --json | jq -e 'length == 8 and all(.[]; (.path | startswith("/")) and .available)' >/dev/null
 # Missing current-background owner reports unavailable, never last selection.
 "$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == null and .availability == "unavailable"' >/dev/null
+
+# Omarchy stages the active theme separately from the installed timer owner.
+current="$HOME/.local/state/omarchy/current"
+stable="$HOME/.config/omarchy/themes/aranea"
+mkdir -p "$current/theme/backgrounds" "$stable/backgrounds"
+cp "$repo_root/backgrounds/background-day.png" "$current/theme/backgrounds/background-day.png"
+cp "$repo_root/backgrounds/background-day.png" "$stable/backgrounds/background-day.png"
+printf 'aranea\n' >"$current/theme.name"
+for theme_root in "$current/theme" "$stable"; do
+  ln -sfn "$theme_root/backgrounds/background-day.png" "$current/background"
+  "$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == "day" and .availability == "available"' >/dev/null
+done
+# A foreign theme, modified staged asset or arbitrary custom copy stays unknown.
+printf 'other\n' >"$current/theme.name"
+"$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == null' >/dev/null
+printf 'aranea\n' >"$current/theme.name"
+printf 'different image' >"$stable/backgrounds/background-day.png"
+"$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == null' >/dev/null
+cp "$repo_root/backgrounds/background-day.png" "$HOME/custom-day.png"
+ln -sfn "$HOME/custom-day.png" "$current/background"
+"$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == null and .availability == "available"' >/dev/null
+echo "wallpaper contract passed"

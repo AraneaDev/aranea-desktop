@@ -147,6 +147,7 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable) {
         normalizeItem("aranea.settings", {
           parent: "setup",
           label: "Aranea settings",
+          icon: "aranea-brand",
           description: "Wallpaper, motion, schedule, integrations and notifications",
           aliases: ["settings", "aranea-settings"],
           action: 'omarchy-shell shell summon araneadev.settings \'{"section":"appearance"}\'',

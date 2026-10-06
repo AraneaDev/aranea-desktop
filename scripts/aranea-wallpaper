@@ -195,13 +195,26 @@ wallpaper_catalog_json() {
 }
 # Host source matches omarchy-theme-bg-switcher and omarchy-theme-bg-current.
 wallpaper_status_json() {
-  local active=null availability=unavailable target id relative candidate
+  local active=null availability=unavailable target id relative candidate host_root host_candidate
+  local current_theme=""
+  current_theme="$(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null || true)"
   target="$(readlink -f -- "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true)"
   if [[ -n "$target" && -f "$target" && -r "$target" ]]; then
     availability=available
     if [[ -r "$manifest" ]]; then
       while IFS=$'\t' read -r id relative; do
         candidate="$(readlink -f -- "$repo_root/$relative" 2>/dev/null || true)"
+        # Match the host's staged/installed copies only for the active Aranea
+        # theme and byte-identical manifest assets, never a custom basename.
+        if [[ "$candidate" != "$target" && "$current_theme" == aranea ]]; then
+          for host_root in "$HOME/.local/state/omarchy/current/theme" "$HOME/.config/omarchy/themes/aranea"; do
+            host_candidate="$(readlink -f -- "$host_root/$relative" 2>/dev/null || true)"
+            if [[ "$host_candidate" == "$target" ]] && cmp -s -- "$candidate" "$target"; then
+              candidate="$target"
+              break
+            fi
+          done
+        fi
         if [[ "$candidate" == "$target" ]]; then
           active="$(jq -cn --arg id "$id" '$id')"
           break

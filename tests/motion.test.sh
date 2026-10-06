@@ -66,8 +66,30 @@ for qml in \
   fi
 done
 
-echo "motion contract passed"
-
 # JSON status separates configured motion from unavailable live observation.
 ARANEA_HYPRCTL="$state_root/missing-hyprctl" ARANEA_STATE_ROOT="$state_root" \
   "$repo_root/scripts/aranea-motion" status --json | jq -e '.configured == "on" and .applied == null and .application == "deferred"' >/dev/null
+
+# Current Hyprland exposes boolean options as .bool; older hosts used .int.
+observer="$state_root/motion-observer"
+cat >"$observer" <<'EOF'
+#!/usr/bin/env bash
+# Isolated compositor JSON observation, never a live mutation.
+[[ "$*" == '-j getoption animations:enabled' ]] || exit 3
+printf '%s\n' "$ARANEA_MOTION_OBSERVATION"
+EOF
+chmod +x "$observer"
+for observation in '{"option":"animations:enabled","bool":true,"set":true}' '{"int":1}'; do
+  ARANEA_MOTION_OBSERVATION="$observation" ARANEA_HYPRCTL="$observer" ARANEA_STATE_ROOT="$state_root" \
+    "$repo_root/scripts/aranea-motion" status --json | jq -e '.configured == "on" and .applied == "on" and .application == "applied"' >/dev/null
+done
+for observation in '{"option":"animations:enabled","bool":false,"set":true}' '{"int":0}'; do
+  ARANEA_MOTION_OBSERVATION="$observation" ARANEA_HYPRCTL="$observer" ARANEA_STATE_ROOT="$state_root" \
+    "$repo_root/scripts/aranea-motion" status --json | jq -e '.configured == "on" and .applied == "off" and .application == "pending"' >/dev/null
+done
+for observation in '{"bool":"false"}' '{"bool":null}' '{"int":2}' '{}'; do
+  ARANEA_MOTION_OBSERVATION="$observation" ARANEA_HYPRCTL="$observer" ARANEA_STATE_ROOT="$state_root" \
+    "$repo_root/scripts/aranea-motion" status --json | jq -e '.applied == null and .application == "unavailable"' >/dev/null
+done
+
+echo "motion contract passed"

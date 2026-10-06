@@ -33,7 +33,7 @@ motion_status_json() {
   if command -v "${ARANEA_HYPRCTL:-hyprctl}" >/dev/null 2>&1; then
     application=unavailable
     if observed="$("${ARANEA_HYPRCTL:-hyprctl}" -j getoption animations:enabled)"; then
-      case "$(jq -r 'if .int == 1 then "on" elif .int == 0 then "off" else "unknown" end' <<<"$observed" 2>/dev/null)" in
+      case "$(jq -r 'if .bool == true then "on" elif .bool == false then "off" elif .int == 1 then "on" elif .int == 0 then "off" else "unknown" end' <<<"$observed" 2>/dev/null)" in
         on) applied='"on"' ;;
         off) applied='"off"' ;;
       esac

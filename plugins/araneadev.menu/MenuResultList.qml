@@ -12,6 +12,7 @@
 // pointer has really moved onto the row since (ClickSettle).
 // qmllint disable missing-property unqualified
 import QtQuick
+import QtQuick.Effects
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
@@ -150,6 +151,8 @@ Item {
       // Whether the row's text is lit (hovered or under the keyboard cursor).
       readonly property bool lit: hovered || hasCursor
       readonly property bool isApp: kind === "app"
+      // Reserved menu icon token draws the canonical mark as a white silhouette.
+      readonly property bool hasBrandIcon: !isApp && icon === "aranea-brand"
       readonly property bool hasIcon: icon.length > 0 || isApp
       // When this row was built (Date.now()).
       property real createdAt: 0
@@ -189,7 +192,7 @@ Item {
 
       Aranea.InkText {
         id: iconText
-        visible: row.hasIcon && !row.isApp
+        visible: row.hasIcon && !row.isApp && !row.hasBrandIcon
         text: row.icon
         color: row.lit ? results.selectedText : results.foreground
         font.family: row.iconFont.length > 0 ? row.iconFont : results.fontFamily
@@ -202,14 +205,19 @@ Item {
 
       Image {
         id: appIconImage
-        visible: row.isApp
+        visible: row.isApp || row.hasBrandIcon
         width: Style.font.iconLarge
         height: Style.font.iconLarge
         fillMode: Image.PreserveAspectFit
         // Decode at physical pixels so desktop icons remain sharp on HiDPI.
         sourceSize.width: width * Screen.devicePixelRatio
         sourceSize.height: height * Screen.devicePixelRatio
-        source: row.isApp && results.appLibrary && results.appLibrary.iconSource ? results.appLibrary.iconSource(row.appIcon) : ""
+        source: row.hasBrandIcon ? Aranea.RuntimePaths.brandUrl : row.isApp && results.appLibrary && results.appLibrary.iconSource ? results.appLibrary.iconSource(row.appIcon) : ""
+        // Brightness preserves alpha while making every painted part monochrome white.
+        layer.enabled: row.hasBrandIcon
+        layer.effect: MultiEffect {
+          brightness: 1
+        }
         asynchronous: true
         anchors.left: parent.left
         anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset

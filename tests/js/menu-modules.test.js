@@ -116,6 +116,11 @@ test("settings route is guarded, unique, and searchable under Setup", () => {
   assert.equal(item.parent, "setup")
   assert.equal(item.label, "Aranea settings")
   assert.equal(
+    item.icon,
+    "aranea-brand",
+    "settings has a monochrome brand icon instead of an empty icon slot"
+  )
+  assert.equal(
     item.action,
     `omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'`
   )
