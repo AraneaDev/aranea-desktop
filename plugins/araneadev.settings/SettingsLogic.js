@@ -159,8 +159,17 @@ function parseResponse(stdout, exitCode) {
  * @returns {string} User-facing result.
  */
 function outcome(operation, args, state, succeeded, result) {
-  if (!succeeded) return "Failed"
   state = state || {}
+  if (!succeeded) {
+    var failedMotion = operation === "set motion" && state.motion
+    if (!failedMotion || failedMotion.configured !== args[0]) return "Failed"
+    return (
+      "Saved · live application " +
+      (["on", "off"].indexOf(failedMotion.applied) >= 0 && failedMotion.applied !== args[0]
+        ? "failed"
+        : "unconfirmed")
+    )
+  }
   if (operation === "set display-scale") {
     var display = state.display || {}
     var scale = result && result.displayScale

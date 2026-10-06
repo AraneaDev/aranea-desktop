@@ -237,7 +237,18 @@ QtObject {
       // STATE_UNAVAILABLE may describe an unrelated section after helper success.
       var succeeded = operation === 'set display-scale' ? !!(mutation.result && mutation.result.displayScale && mutation.result.displayScale.confirmed && (mutation.ok || mutation.error && mutation.error.code === 'STATE_UNAVAILABLE')) : mutation.ok || !!(mutation.error && mutation.error.code === 'STATE_UNAVAILABLE')
       refresh(function (response) {
-        var outcome = Logic.outcome(operation, args, response.state, succeeded, mutation.result)
+        var observed = response.state
+        // A failed motion helper can confirm persistence before live application fails.
+        // If the later config read is unavailable, retain that confirmation only for
+        // feedback; never reuse its earlier live state or populate unavailable controls.
+        if (!succeeded && operation === 'set motion' && mutation.state && mutation.state.motion && mutation.state.motion.configured === args[0] && (!observed || !observed.motion || ['on', 'off'].indexOf(observed.motion.configured) < 0))
+          observed = {
+            motion: {
+              configured: args[0],
+              applied: null
+            }
+          }
+        var outcome = Logic.outcome(operation, args, observed, succeeded, mutation.result)
         var message = succeeded ? operation === 'set display-scale' && outcome === 'Application not confirmed' ? 'Focused display or effective scale changed during confirmation. Review the current display and Apply again.' : '' : mutation.error ? mutation.error.message : stderr || 'The settings change failed.'
         setResult(key, outcome, message)
         pending = false

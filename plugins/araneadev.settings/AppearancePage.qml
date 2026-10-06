@@ -96,12 +96,15 @@ ColumnLayout {
         required property var modelData
         Layout.fillWidth: true
         spacing: Style.space(4)
-        Rectangle {
+        SettingsButton {
+          objectName: 'wallpaperThumbnail:' + wallpaperOption.modelData.id
           Layout.fillWidth: true
           Layout.preferredHeight: Style.space(105)
-          color: Util.alpha(Color.foreground, 0.04)
-          border.color: page.selectedId === wallpaperOption.modelData.id ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.12)
-          border.width: 1
+          text: ''
+          Accessible.name: 'Select ' + wallpaperOption.modelData.label + ' wallpaper'
+          selected: page.selectedId === wallpaperOption.modelData.id
+          pointerGate: page.pointerGate
+          onClicked: page.selectWallpaper(wallpaperOption.modelData.id)
           Image {
             anchors.fill: parent
             anchors.margins: 1
@@ -142,6 +145,13 @@ ColumnLayout {
       Layout.fillWidth: true
       text: page.pendingKey === 'wallpaper' ? 'Applying…' : page.results.wallpaper || ''
     }
+  }
+  SettingsLabel {
+    objectName: 'wallpaperScheduleNote'
+    Layout.fillWidth: true
+    visible: !!page.backendState.schedule && page.backendState.schedule.enabled === true
+    text: 'Wallpaper scheduling is enabled. The next phase may replace your manually applied wallpaper.'
+    opacity: 0.65
   }
   SettingsLabel {
     Layout.fillWidth: true

@@ -55,6 +55,8 @@ ShellRoot {
       ],
       integrationsAvailability: 'available'
     })
+  // Last completion preserves the authoritative helper failure.
+  property var completion: null
   QmlTest {
     id: t
   }
@@ -65,6 +67,12 @@ ShellRoot {
     runner: function (argv, done) {
       testRoot.calls.push(argv)
       testRoot.callbacks.push(done)
+    }
+  }
+  Connections {
+    target: entry.controller
+    function onMutationCompleted(operation, args, succeeded) {
+      testRoot.completion = [operation, args, succeeded]
     }
   }
   // Complete a held subprocess with a versioned adapter envelope.
@@ -111,6 +119,61 @@ ShellRoot {
     reply(start + 1, deferred)
     t.equal(entry.controller.resultFor('motion'), 'Saved · application deferred', 'saved deferred motion is never Applied')
     t.check(!entry.controller.pending, 'readback releases lock')
+    start = calls.length
+    entry.controller.request('set motion', ['on'])
+    var partial = JSON.parse(JSON.stringify(healthy))
+    partial.motion.applied = 'off'
+    partial.motion.application = 'pending'
+    reply(start, partial, 7, {
+      code: 'HELPER_FAILED',
+      message: 'compositor rejected animations'
+    })
+    t.check(entry.controller.pending, 'failed motion still waits for independent readback')
+    reply(start + 1, partial)
+    t.equal(entry.controller.resultFor('motion'), 'Saved · live application failed', 'failed live motion still reports confirmed saved config')
+    t.equal(entry.controller.errorFor('motion'), 'compositor rejected animations', 'saved motion retains failed helper diagnostic')
+    t.equal(completion, ['set motion', ['on'], false], 'saved config never converts helper failure into successful completion')
+    t.check(!entry.controller.pending, 'partial motion failure releases mutation lock')
+    start = calls.length
+    entry.controller.request('set motion', ['on'])
+    reply(start, partial, 7, {
+      code: 'HELPER_FAILED',
+      message: 'compositor rejected animations'
+    })
+    reply(start + 1, null, 2, {
+      code: 'STATE_UNAVAILABLE',
+      message: 'readback unavailable'
+    })
+    t.equal(entry.controller.resultFor('motion'), 'Saved · live application unconfirmed', 'confirmed mutation config survives unavailable later live readback')
+    t.equal(entry.controller.state, ({}), 'unavailable owner readback still clears live controls')
+    t.equal(entry.controller.errorFor('motion'), 'compositor rejected animations', 'read failure cannot hide failed helper diagnostic')
+    t.equal(completion, ['set motion', ['on'], false], 'unknown live readback cannot convert failed helper into success')
+    entry.controller.refresh()
+    reply(calls.length - 1, healthy)
+    for (var live of [null, 'on']) {
+      start = calls.length
+      entry.controller.request('set motion', ['on'])
+      var uncertain = JSON.parse(JSON.stringify(partial))
+      uncertain.motion.applied = live
+      reply(start, partial, 7, {
+        code: 'HELPER_FAILED',
+        message: 'compositor rejected animations'
+      })
+      reply(start + 1, uncertain)
+      t.equal(entry.controller.resultFor('motion'), 'Saved · live application unconfirmed', 'unknown or matching live state never marks failed helper Applied')
+      t.equal(completion, ['set motion', ['on'], false], 'matching state retains unsuccessful completion')
+    }
+    start = calls.length
+    entry.controller.request('set motion', ['on'])
+    reply(start, partial, 7, {
+      code: 'HELPER_FAILED',
+      message: 'compositor rejected animations'
+    })
+    var changed = JSON.parse(JSON.stringify(partial))
+    changed.motion.configured = 'off'
+    reply(start + 1, changed)
+    t.equal(entry.controller.resultFor('motion'), 'Failed', 'newer contradictory config outranks mutation persistence snapshot')
+
     start = calls.length
     entry.controller.request('set integration', ['session', 'active'])
     entry.close()

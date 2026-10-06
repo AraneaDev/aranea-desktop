@@ -257,3 +257,32 @@ test("scale confirmation needs complete mode metadata and a boolean confirmation
     "Application not confirmed"
   )
 })
+
+// Catches the generic failure branch hiding independently confirmed persistence.
+test("failed motion preserves saved preference while live failure stays unsuccessful", () => {
+  for (const [applied, expected] of [
+    ["off", "Saved · live application failed"],
+    [null, "Saved · live application unconfirmed"],
+    ["on", "Saved · live application unconfirmed"]
+  ]) {
+    const envelope = logic.parseResponse(
+      JSON.stringify({
+        schemaVersion: 1,
+        ok: false,
+        state: {
+          motion: { configured: "on", applied, availability: "available", application: "pending" }
+        },
+        error: { code: "HELPER_FAILED", message: "compositor rejected animations" }
+      }),
+      7
+    )
+    assert.equal(envelope.ok, false)
+    assert.equal(logic.outcome("set motion", ["on"], envelope.state, envelope.ok), expected)
+    assert.equal(envelope.error.message, "compositor rejected animations")
+  }
+  assert.equal(
+    logic.outcome("set motion", ["on"], { motion: { configured: "off", applied: "on" } }, false),
+    "Failed"
+  )
+  assert.equal(logic.outcome("set motion", ["on"], null, false), "Failed")
+})

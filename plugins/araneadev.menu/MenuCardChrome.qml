@@ -22,6 +22,8 @@ Item {
   property string dmenuPrompt: ""
   // Public contract member.
   property string hint: ""
+  // Matched menu query; special modes and no-match presentation keep their own text.
+  property string matchedQuery: ""
   // Public contract member.
   property string workspaceContext: ""
   // Public contract member.
@@ -125,15 +127,16 @@ Item {
         spacing: Style.space(4)
 
         Text {
+          objectName: "menuHeaderTitle"
           width: parent.width
           textFormat: Text.PlainText
-          text: fullRootHeader ? Aranea.BrandConfig.shortName : (dmenuActive ? dmenuPrompt : Aranea.BrandConfig.shortName + " / " + activeTitle)
+          text: chrome.matchedQuery ? "› " + chrome.matchedQuery : fullRootHeader ? Aranea.BrandConfig.shortName : (dmenuActive ? dmenuPrompt : Aranea.BrandConfig.shortName + " / " + activeTitle)
           color: foreground
           font.family: fontFamily
           font.pixelSize: scaled(fullRootHeader ? Style.font.title : Style.font.body)
           font.weight: Font.Medium
           font.letterSpacing: menuLetterSpacing
-          elide: Text.ElideRight
+          elide: chrome.matchedQuery ? Text.ElideLeft : Text.ElideRight
         }
         Text {
           textFormat: Text.PlainText

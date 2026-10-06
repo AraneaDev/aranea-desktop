@@ -79,6 +79,7 @@ Aranea.SurfaceCard {
       sectionSpacing: card.root.style.rootChromeSpacing
       fullRootHeader: card.root.fullRootHeader
       dmenuActive: card.root.dmenuActive
+      matchedQuery: !card.root.dmenuActive && card.root.displayModel.count > 0 && card.root.filterText.trim() ? card.root.filterText : ""
       scopedSearch: card.root.scopedSearch
       onSearchEverywhereRequested: card.root.searchEverywhere()
       activeTitle: card.root.item(card.root.activeMenu) ? (card.root.item(card.root.activeMenu).title || card.root.item(card.root.activeMenu).label || "GO") : "GO"
