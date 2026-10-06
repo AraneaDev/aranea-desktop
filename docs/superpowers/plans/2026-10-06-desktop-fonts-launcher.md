@@ -42,4 +42,4 @@
 
 - [x] Execute the remaining everyday-controls, information-pickers and complete-system plans. Apply shared role choices to labels/technical values/glyphs deliberately, preserving host lifecycle and actions.
 - [x] Review generated application integrations/assets against the same visual language, retaining native content fonts and documenting unchanged outcomes with visual evidence.
-- [ ] Run the stable full gate, independent review and complete visual captures. Update PR #126 and install the reviewed source with backup/background-preservation and owner-state comparison. No merge or release.
+- [x] Run the stable full gate, independent review and complete visual captures. Update PR #126 and install the reviewed source with backup/background-preservation and owner-state comparison. No merge or release.
