@@ -44,9 +44,10 @@ set -euo pipefail
 # Menu search variants menu-search-mixed, menu-search-no-match,
 # menu-search-no-compositor and menu-search-vanished render production MenuSurface
 # offscreen with inert sources and dispatch.
-# Settings uses inert production SettingsSurface fixtures offscreen. Variants:
-# settings-narrow, settings-dirty, settings-unavailable, settings-integration-failed,
-# settings-notifications. Normal settings/settings-scaling use full-desktop capture. All mutation controls and controller requests refuse changes.
+# Settings and Display use the normal production window in full-desktop frames.
+# Diagnostic variants settings-narrow, settings-dirty, settings-unavailable,
+# settings-integration-failed and settings-notifications use offscreen fixtures.
+# All fixture mutation controls and controller requests refuse changes.
 # Lock and Plymouth are rendered, not grabbed from the screen: lock runs the
 # plugin's real LockView offscreen with a stand-in clock
 # (tools/render-lock-preview; the session is never locked) and plymouth
