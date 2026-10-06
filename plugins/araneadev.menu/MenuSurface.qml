@@ -213,6 +213,7 @@ Aranea.SurfaceCard {
         icon: card.root.emptyStateInfo.icon
         message: card.root.emptyStateInfo.text
         fontFamily: card.root.style.fontFamily
+        iconFontFamily: Aranea.Typography.iconFamily
         iconColor: card.root.style.selectedText
         foreground: card.root.style.foreground
         // Host font tokens are exposed through a dynamic QObject map.

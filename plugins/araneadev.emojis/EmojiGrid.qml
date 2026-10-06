@@ -103,6 +103,7 @@ GridView {
     icon: String.fromCodePoint(0xf0209)
     message: "No matches for “" + grid.filterText + "”"
     fontFamily: grid.fontFamily
+    iconFontFamily: Aranea.Typography.iconFamily
     iconColor: grid.selectedText
     foreground: grid.foreground
   }

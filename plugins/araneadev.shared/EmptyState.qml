@@ -12,8 +12,10 @@ Item {
   property string icon: ""
   // User-facing empty-state message.
   property string message: ""
-  // Font family used by both labels.
+  // Font family used by the message.
   property string fontFamily: Style.font.family
+  // Separate glyph family; legacy consumers retain their existing override.
+  property string iconFontFamily: fontFamily
   // Accent colour for the icon.
   property color iconColor: Color.accent
   // Foreground colour for the message.
@@ -48,7 +50,7 @@ Item {
       text: empty.icon
       color: empty.iconColor
       opacity: empty.iconOpacity
-      font.family: empty.fontFamily
+      font.family: empty.iconFontFamily
       font.pixelSize: empty.iconSize
       horizontalAlignment: Text.AlignHCenter
       width: empty.contentWidth

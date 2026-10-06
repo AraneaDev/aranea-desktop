@@ -235,6 +235,7 @@ Item {
     icon: String.fromCodePoint(0xf014c)
     message: pane.emptyMessage
     fontFamily: pane.fontFamily
+    iconFontFamily: Aranea.Typography.iconFamily
     iconColor: pane.selectedText
     foreground: pane.foreground
   }
