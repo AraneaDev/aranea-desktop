@@ -253,7 +253,7 @@ bash tests/qml-behaviour.test.sh network-dropdown network-sections credential-pr
 - [x] Capture the checkpoint surfaces with `for surface in desktop menu menu-submenu menu-search menu-input apps favorites recent audio network; do scripts/capture-screenshots --surface "$surface" --output screenshots || exit 1; done`. Check every result and stop delivery if any capture fails. First verify the capture workspace is empty. Preserve and compare Settings/owner state, focus and workspace; never publish private app content. Secure/boot captures use the existing inert renderer flow.
 - [x] Regenerate `scripts/capture-screenshots --hero --output screenshots` after PNGs are complete. Verify the existing 31-frame order/count and inspect changed frames. Keep cropped diagnostics out of published screenshots.
 - [x] Run `tools/check` once on the stable checkpoint tree and inspect all eight stage results. Use `tools/check --only format,lint,docs,validate,qml` for earlier static checks; `--fast` also runs QML behavior and is not a static-only shortcut.
-- [ ] Publish a draft PR with the repository template after the gate and review pass. Leave the installed preview available, with an explicit list of covered and remaining families.
+- [x] Publish a draft PR with the repository template after the gate and review pass. Leave the installed preview available, with an explicit list of covered and remaining families. Draft: [PR #126](https://github.com/AraneaDev/aranea-desktop/pull/126).
 - [ ] Ask for visual feedback on this concrete preview before the next checkpoint. Merge and release only when explicitly requested.
 
 ## Checkpoint evidence
