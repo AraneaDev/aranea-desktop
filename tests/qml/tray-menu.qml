@@ -209,7 +209,7 @@ ShellRoot {
 
   Component.onCompleted: run([[350, function () {
         // ---------- Rows and marks ----------
-        t.equal(one(menu, "menuTitle").text, "COURIER", "the app title, uppercased")
+        t.equal(one(menu, "menuTitle").text, "Courier", "the native app title")
         t.check(!one(menu, "crumbRow").visible, "no breadcrumb at the root")
         t.equal(shown(menu, "menuRow").length, 6, "one row per view row")
         t.equal(one(rowAt(0), "rowLabel").text, "Open Courier", "a row's label")
@@ -289,7 +289,7 @@ ShellRoot {
         t.check(menu.layoutChangedAt > stampBefore, "drilling in stamps the layout")
         t.check(one(menu, "crumbRow").visible, "the breadcrumb shows below the root")
         t.equal(one(menu, "crumbBack").text, String.fromCodePoint(0x2039), "with the back glyph")
-        t.equal(one(menu, "crumbText").text, "COURIER › SEND A FILE", "and the crumb, uppercased")
+        t.equal(one(menu, "crumbText").text, "Courier › Send a file", "and the native crumb")
         t.check(!one(menu, "menuTitle").visible, "the root title gives way to it")
         t.equal(one(rowAt(2), "rowMark").text, String.fromCodePoint(0x25CF), "a lit radio shows a dot")
         t.equal(one(rowAt(1), "rowMark").text, "", "an unlit radio shows none")

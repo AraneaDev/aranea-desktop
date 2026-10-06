@@ -8,6 +8,7 @@ import "../araneadev.shared" as Aranea
 
 Aranea.DropdownHeader {
   id: header
+  refined: true
 
   // The icon state from VpnLogic.iconState: "idle", "up" or "alert".
   property string iconState: "idle"

@@ -70,17 +70,17 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: section.caption
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: section.countText
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
   }
@@ -111,6 +111,7 @@ Column {
 
       Aranea.NodeDeviceRow {
         id: devRow
+        refined: true
         objectName: "deviceRow"
         anchors.left: parent.left
         anchors.right: parent.right
@@ -146,6 +147,7 @@ Column {
       // The row's Connect/Disconnect/Pair tooltip, hidden while the forget
       // button's own tooltip is showing instead.
       PanelToolTip {
+        fontFamily: Aranea.Typography.uiFamily
         visible: devRow.hovered && !forgetBtn.hovered && section.rowTooltip !== ""
         text: section.rowTooltip
       }

@@ -98,7 +98,7 @@ Item {
       text: "Battery"
       elide: Text.ElideRight
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.title
       font.bold: true
     }
@@ -109,10 +109,10 @@ Item {
       opacity: hero.statusOpacity
       elide: Text.ElideRight
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.capitalization: Font.AllUppercase
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
   }
   Row {
@@ -127,7 +127,7 @@ Item {
       objectName: "heroPercent"
       text: hero.percent
       color: Aranea.DesignTokens.foreground
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.displayLarge
       font.bold: true
     }
@@ -135,7 +135,7 @@ Item {
       anchors.baseline: percentText.baseline
       text: "%"
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.title
       font.bold: true
     }

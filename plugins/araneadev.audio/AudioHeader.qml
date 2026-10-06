@@ -82,6 +82,7 @@ Aranea.DropdownHeader {
       }
       PanelToolTip {
         id: tip
+        fontFamily: Aranea.Typography.uiFamily
         visible: switchHover.hovered && header.hint !== ""
         text: header.hint
       }

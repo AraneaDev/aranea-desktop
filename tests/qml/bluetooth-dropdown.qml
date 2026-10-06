@@ -434,7 +434,7 @@ ShellRoot {
       t.check(connectedForgetOnCursor[0].width > 0, "a shown forget button has real width")
       var connectedBorder = t.findChild(connectedForgetOnCursor[0], "forgetBorder")
       var connectedLabel = t.findChild(connectedForgetOnCursor[0], "forgetLabel")
-      t.check(connectedLabel.text.indexOf("forget") !== -1, "the forget button reads \"forget\"")
+      t.check(connectedLabel.text === "Forget", "the forget button reads \"Forget\"")
       t.check(connectedBorder.border.color !== Aranea.DesignTokens.urgent, "forget is muted, not bright, with the cursor on the row but not its action")
       full.view = cursorTick(full.view, true, "connected", 0, true)
       // Past the settle window of the pulse's stamp above, so the
@@ -534,7 +534,7 @@ ShellRoot {
               t.check(caption !== null && caption.opacity === 1, "the caption starts fully opaque")
               full.captionOpacity = 0.25
               t.check(caption !== null && Math.abs(caption.opacity - 0.25) < 0.001, "the caption opacity follows captionOpacity")
-              t.check(caption !== null && caption.text === "HERDING HEADSETS", "fading the caption keeps its text")
+              t.check(caption !== null && caption.text === "Herding headsets", "fading the caption keeps its text")
               full.captionOpacity = 1
               var edge = rightEdge(full, full)
               var cursorForget = t.findChildren(paired, "forgetButton").filter(function (b) {

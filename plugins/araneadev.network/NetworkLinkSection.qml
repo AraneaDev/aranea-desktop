@@ -61,6 +61,7 @@ Column {
       onClicked: value.copyRequested(value.text)
     }
     PanelToolTip {
+      fontFamily: Aranea.Typography.uiFamily
       // "ipValue" names its tip "ipTip", for tests.
       objectName: value.objectName.replace("Value", "Tip")
       visible: copyMouse.enabled && copyMouse.containsMouse

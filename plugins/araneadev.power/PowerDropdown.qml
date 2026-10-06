@@ -131,10 +131,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: caption.title
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       id: captionTrailing
@@ -143,7 +143,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: caption.trailing
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
     }
   }
@@ -191,7 +191,7 @@ Column {
           text: pair.modelData.label || ""
           elide: Text.ElideRight
           color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
         }
         Text {
@@ -201,7 +201,7 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           text: pair.modelData.value || ""
           color: Aranea.DesignTokens.foreground
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.caption
         }
       }
@@ -238,7 +238,7 @@ Column {
         anchors.left: parent.left
         text: dropdown.history.startLabel || ""
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
       }
       Text {
@@ -247,7 +247,7 @@ Column {
         anchors.right: parent.right
         text: "now"
         color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-        font.family: Style.font.family
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
       }
     }
@@ -323,9 +323,11 @@ Column {
 
           Aranea.FilamentPill {
             id: pill
+            refined: true
             objectName: "profilePill"
             anchors.fill: parent
-            text: (cell.modelData.glyph ? cell.modelData.glyph + " " : "") + (cell.modelData.label || "")
+            text: cell.modelData.label || ""
+            glyph: cell.modelData.glyph || ""
             selected: cell.modelData.key !== undefined && cell.modelData.key === dropdown.selectedProfile
             busy: dropdown.pendingProfile !== "" && cell.modelData.key === dropdown.pendingProfile
             hasCursor: dropdown.cursorIn("profiles") === cell.index
@@ -351,7 +353,7 @@ Column {
     topPadding: Style.space(4)
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

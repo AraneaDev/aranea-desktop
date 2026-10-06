@@ -26,13 +26,13 @@ Column {
   // A muted key in the details grid.
   component Key: Text {
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }
   // A value in the details grid.
   component Value: Text {
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.82)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

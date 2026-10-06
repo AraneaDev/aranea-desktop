@@ -117,6 +117,7 @@ Column {
           }
         }
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "autoTip"
           visible: autoHover.hovered
           text: section.auto ? "Stay on " + section.currentLabel : "Let Wi-Fi pick the band"

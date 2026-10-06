@@ -211,6 +211,7 @@ Column {
   }
 
   Aranea.DropdownHeader {
+    refined: true
     objectName: "displaysHeader"
     width: parent.width
     glyph: dropdown.header.glyph || String.fromCodePoint(0xf0379)
@@ -375,7 +376,7 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           text: String(stopLabel.modelData)
           color: stopLabel.index === textSection.shownIndex ? Aranea.DesignTokens.foreground : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-          font.family: Style.font.family
+          font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.caption
         }
       }
@@ -433,6 +434,7 @@ Column {
 
           Aranea.FilamentPill {
             id: pill
+            refined: true
             objectName: "scalePill"
             anchors.fill: parent
             text: cell.modelData.label || ""
@@ -482,7 +484,7 @@ Column {
     topPadding: Style.space(4)
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

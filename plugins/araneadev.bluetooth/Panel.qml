@@ -1261,6 +1261,7 @@ Panel {
   // sizes to it; stock's 400 px list cap becomes the view's scroll cap.
   Aranea.KeyboardPanelFrame {
     id: panel
+    refined: true
     anchorItem: button
     owner: root
     bar: root.bar

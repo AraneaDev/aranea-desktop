@@ -142,6 +142,7 @@ Column {
         onPointerEntered: if (!header.pointerGate)
           header.hoverAction(header.qrIndex)
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "qrTip"
           visible: qrAction.hovered
           text: "Show QR code"
@@ -162,6 +163,7 @@ Column {
         onPointerEntered: if (!header.pointerGate)
           header.hoverAction(header.speedIndex)
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "speedTip"
           visible: speedAction.hovered
           text: "Run a speed test"
@@ -182,6 +184,7 @@ Column {
             header.hoverAction(header.toggleIndex)
         }
         PanelToolTip {
+          fontFamily: Aranea.Typography.uiFamily
           objectName: "toggleTip"
           visible: switchHover.hovered && header.toggleHint !== ""
           text: header.toggleHint

@@ -117,7 +117,7 @@ Column {
     text: "Tray icons"
     elide: Text.ElideRight
     color: Aranea.DesignTokens.foreground
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.title
     font.bold: true
   }
@@ -127,7 +127,7 @@ Column {
     text: "Pinned icons stay visible. Hidden icons never show."
     wrapMode: Text.WordWrap
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }
   Rectangle {
@@ -250,7 +250,7 @@ Column {
           text: String(row.entry.name || "")
           elide: Text.ElideRight
           color: row.hidden ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
-          font.family: Style.font.family
+          font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.body
         }
         Row {
@@ -261,6 +261,7 @@ Column {
           spacing: Style.space(6)
 
           Aranea.FilamentPill {
+            refined: true
             objectName: "pinPill"
             text: row.entry.pinned ? "Pinned" : "Pin"
             selected: !!row.entry.pinned
@@ -273,6 +274,7 @@ Column {
             onHoveredMoved: row.noteMove()
           }
           Aranea.FilamentPill {
+            refined: true
             objectName: "hidePill"
             text: row.hidden ? "Hidden" : "Hide"
             selected: row.hidden
@@ -295,7 +297,7 @@ Column {
     width: parent.width
     text: "No tray items reporting."
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
   }
   Text {
@@ -304,7 +306,7 @@ Column {
     topPadding: Style.space(4)
     text: manage.view && manage.view.keyHint ? manage.view.keyHint : ""
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
-    font.family: Style.font.family
+    font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
   }

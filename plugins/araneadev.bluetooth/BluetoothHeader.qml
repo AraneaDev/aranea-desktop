@@ -11,6 +11,7 @@ import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
 Aranea.DropdownHeader {
   id: header
+  refined: true
 
   // Whether the adapter is powered on. Named "powered", not "enabled": the
   // latter shadows QQuickItem.enabled and would make the whole header stop
@@ -77,6 +78,7 @@ Aranea.DropdownHeader {
     }
     PanelToolTip {
       id: tip
+      fontFamily: Aranea.Typography.uiFamily
       visible: switchHover.hovered && header.hint !== ""
       text: header.hint
     }

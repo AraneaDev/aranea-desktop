@@ -124,10 +124,10 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: section.title
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
-      font.letterSpacing: 1.2
+      font.letterSpacing: 0
     }
     Text {
       objectName: "sectionCount"
@@ -135,7 +135,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: String(section.rows.length)
       color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
-      font.family: Style.font.family
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
   }
@@ -163,6 +163,7 @@ Column {
 
       Aranea.NodeDeviceRow {
         id: vpnRow
+        refined: true
         objectName: "vpnRow"
         width: wrapper.width
         glyph: wrapper.modelData.glyph || ""
@@ -200,6 +201,7 @@ Column {
           }
           Aranea.FilamentPill {
             id: chip
+            refined: true
             objectName: wrapper.isApp ? "openAppChip" : ""
             visible: wrapper.isApp
             anchors.verticalCenter: parent.verticalCenter

@@ -8,6 +8,7 @@ import "WorkspaceModel.js" as WorkspaceModel
 
 Aranea.KeyboardPanelFrame {
   id: host
+  refined: true
   // Normalized workspace rows supplied by the bar widget.
   property var workspaceStates: []
   // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for

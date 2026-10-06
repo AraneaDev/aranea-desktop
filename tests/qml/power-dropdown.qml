@@ -302,7 +302,7 @@ ShellRoot {
         t.check(t.findChild(full, "profilesSection").visible, "the profiles show")
         t.equal(pillsOf(full).map(function (p) {
           return p.text
-        }), [profileRows[0].glyph + " Power saver", profileRows[1].glyph + " Balanced", profileRows[2].glyph + " Performance"], "a pill per profile with its glyph")
+        }), ["Power saver", "Balanced", "Performance"], "a native label per profile")
         t.check(pillsOf(full)[1].selected && !pillsOf(full)[0].selected, "the selected profile's pill is selected")
         t.check(t.findChild(pillsOf(full)[1], "selectedFill").visible && !t.findChild(pillsOf(full)[0], "selectedFill").visible, "and carries the selected fill")
         t.equal(t.findChild(full, "keyHint").text, "←→ pick · enter set", "the key hint is the view's")
