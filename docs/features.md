@@ -10,16 +10,25 @@ The bar opens an Omarchy command menu with Aranea identity, Files, Terminal,
 and Setup tiles. Apps keeps Favorites and Recent state in
 `~/.local/state/aranea/menu.json`. The menu uses a compact network-and-node
 motif and supports keyboard navigation and pinned applications. Typing at the
-root searches apps, menu commands, windows, workspaces and settings sections.
-Use `app:`, `command:`, `window:`, `workspace:` or `setting:` to restrict results.
+root searches apps, menu commands, windows, workspaces, settings and quick actions.
+Use `app:`, `command:`, `window:`, `workspace:`, `setting:` or `action:` to restrict results.
 Submenu searches stay scoped; Search everywhere or Ctrl+F keeps the query while
 returning to root. Enter uses the selected current target, and a disappearing
 window clears that selection. The list caps at 50 matches with a refinement hint.
 Dmenu choices and input answers keep their existing behavior.
 
+Quick actions toggle manual Do not disturb, select an available audio output, or
+apply an installed wallpaper while keeping the menu open. Current choices, quiet
+hours and active schedules are labelled; those schedules remain in place. Pending
+changes wait for confirmation. Failed actions can be retried with Enter; Tab
+reaches the offered audio controls or Appearance recovery destination. Missing
+capabilities are omitted.
+
 ![Aranea command menu](../screenshots/menu.png)
 
 ![Unified desktop search with type labels](../screenshots/menu-search-mixed.png)
+
+![Desktop quick actions](../screenshots/menu-search-actions.png)
 
 ## Notifications and health
 

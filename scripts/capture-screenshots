@@ -403,7 +403,7 @@ fi
 showcase_surface="$surface"
 case "$surface" in
   settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
-  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished) showcase_surface=menu ;;
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label) showcase_surface=menu ;;
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
@@ -414,7 +414,7 @@ mkdir -p "$output"
 
 # Settings and search captures use production content with inert owner fixtures.
 case "$surface" in
-  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished)
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label)
     "$repo_root/tools/render-menu-preview" --output "$output/$surface.png" --fixture "${surface#menu-search-}"
     exit 0
     ;;
