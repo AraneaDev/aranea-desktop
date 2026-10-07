@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.22.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.21.1...v2.22.0) (2026-10-07)
+
+
+### Features
+
+* **desktop:** add search quick actions and refine desktop hierarchy ([#132](https://github.com/AraneaDev/aranea-desktop/issues/132)) ([68afaed](https://github.com/AraneaDev/aranea-desktop/commit/68afaed3147da0bcd4cb5c61572fdcef43abeee4))
+
 ## [2.21.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.21.0...v2.21.1) (2026-10-07)
 
 
