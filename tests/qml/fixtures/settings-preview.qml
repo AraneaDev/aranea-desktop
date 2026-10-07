@@ -85,10 +85,10 @@ ShellRoot {
       ],
       wallpapersAvailability: 'available',
       fonts: {
-        uiFamily: '',
-        technicalFamily: '',
-        families: ['Liberation Sans', 'Liberation Mono'],
-        monospaceFamilies: ['Liberation Mono'],
+        uiFamily: 'Inter',
+        technicalFamily: 'JetBrains Mono',
+        families: ['Inter', 'IBM Plex Sans', 'Source Sans 3', 'JetBrains Mono'],
+        monospaceFamilies: ['JetBrains Mono', 'JetBrains Mono NL'],
         availability: 'available'
       },
       schedule: {
