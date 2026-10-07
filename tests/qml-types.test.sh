@@ -8,6 +8,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 qml_files=(
+  "$repo_root/plugins/araneadev.audio/Service.qml"
+  "$repo_root/plugins/araneadev.audio/AudioDefaults.qml"
   "$repo_root/plugins/araneadev.bar/Bar.qml"
   "$repo_root/plugins/araneadev.notifications/Service.qml"
   "$repo_root/plugins/araneadev.notifications/Inbox.qml"

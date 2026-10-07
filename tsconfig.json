@@ -13,6 +13,7 @@
   },
   "include": ["plugins/**/*.js", "types/**/*.d.ts"],
   "exclude": [
+    "plugins/araneadev.audio/AudioBridge.js",
     "plugins/araneadev.health/HealthBridge.js",
     "plugins/araneadev.notifications/ServiceBridge.js",
     "node_modules"

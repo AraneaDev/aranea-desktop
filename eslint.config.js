@@ -44,6 +44,7 @@ module.exports = [
     // functions are the public API, not unused code.
     files: [
       "plugins/araneadev.health/HealthBridge.js",
+      "plugins/araneadev.audio/AudioBridge.js",
       "plugins/araneadev.notifications/ServiceBridge.js"
     ],
     rules: { "no-unused-vars": ["error", { vars: "local", caughtErrors: "none" }] }

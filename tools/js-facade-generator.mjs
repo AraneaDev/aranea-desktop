@@ -6,6 +6,7 @@ import path from "node:path"
 const root = process.cwd()
 
 const specs = [
+  ["plugins/araneadev.audio/AudioBridge.js", "plugins/araneadev.shared/ServiceRegistry.js"],
   ["plugins/araneadev.menu/DesktopSearchLogic.js", "plugins/araneadev.menu/MenuSearch.js"],
   [
     "plugins/araneadev.menu/DesktopSearchLogic.js",
