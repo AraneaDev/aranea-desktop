@@ -40,6 +40,10 @@ set -euo pipefail
 # fixtures, both tray captures are refused with no screenshot written, so a
 # real tray app can never reach one. Tray captures refuse while any real
 # tray app (for example LocalSend) is registered.
+# If staging a separate shell for fixture-only tray captures, run it and its
+# capture commands through tools/with-capture-session. Never use a private
+# D-Bus bus with the live XDG_RUNTIME_DIR: a second document portal would
+# unmount the session's document filesystem. See docs/agent-development.md.
 #
 # Menu search variants menu-search-mixed, menu-search-no-match,
 # menu-search-no-compositor and menu-search-vanished render production MenuSurface

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Runs a capture command on a private D-Bus bus and runtime directory.
+# Shares only the Wayland socket; callers still own shell/config staging.
+set -euo pipefail
+
+if (($# == 0)); then
+  echo 'Usage: tools/with-capture-session <command> [args...]' >&2
+  exit 2
+fi
+if [[ -z "${XDG_RUNTIME_DIR:-}" || -z "${WAYLAND_DISPLAY:-}" ]]; then
+  echo 'A Wayland session with XDG_RUNTIME_DIR is required' >&2
+  exit 2
+fi
+case "$WAYLAND_DISPLAY" in
+  /*) display_socket="$WAYLAND_DISPLAY" ;;
+  *) display_socket="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ;;
+esac
+if [[ ! -S "$display_socket" ]]; then
+  echo 'The Wayland display socket is unavailable' >&2
+  exit 2
+fi
+
+capture_runtime="$(mktemp -d "${TMPDIR:-/tmp}/aranea-capture-run.XXXXXX")"
+capture_pid=""
+# Private D-Bus services can outlive the foreground command. Stop only this
+# capture's process group before removing its runtime and temporary mounts.
+cleanup_capture() {
+  local attempt
+  if [[ -n "$capture_pid" ]]; then
+    kill -- "-$capture_pid" 2>/dev/null || true
+    for ((attempt = 0; attempt < 20; attempt++)); do
+      kill -0 -- "-$capture_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -9 -- "-$capture_pid" 2>/dev/null || true
+    wait "$capture_pid" 2>/dev/null || true
+  fi
+  # GVfs/FUSE may still be completing its unmount after the bus closes.
+  for ((attempt = 0; attempt < 30; attempt++)); do
+    if rm -rf -- "$capture_runtime" 2>/dev/null; then return 0; fi
+    sleep 0.1
+  done
+  echo "Unable to remove private capture runtime: $capture_runtime" >&2
+  return 1
+}
+trap cleanup_capture EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+chmod 700 "$capture_runtime"
+ln -s "$display_socket" "$capture_runtime/wayland-capture"
+mkdir -p "$capture_runtime/data"
+
+# A private bus alone is insufficient: portal startup unmounts any existing
+# FUSE filesystem at $XDG_RUNTIME_DIR/doc. Accessibility also uses this dir.
+# Give the private portal its own document database as well as its own mount.
+unset DBUS_SESSION_BUS_ADDRESS DBUS_STARTER_ADDRESS DBUS_STARTER_BUS_TYPE AT_SPI_BUS_ADDRESS
+export XDG_RUNTIME_DIR="$capture_runtime"
+export XDG_DATA_HOME="$capture_runtime/data"
+export WAYLAND_DISPLAY=wayland-capture
+setsid dbus-run-session -- "$@" &
+capture_pid=$!
+wait "$capture_pid"
