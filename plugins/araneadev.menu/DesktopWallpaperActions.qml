@@ -245,6 +245,15 @@ Item {
     running: owner.pending && owner.commandSucceeded && owner.observationsEnabled
     onTriggered: owner.requestRefresh()
   }
+  // Watching the containing directory catches symlink replacement even when
+  // the target file content is unchanged. No wallpaper bytes are loaded.
+  FileView {
+    path: owner.observationsEnabled && owner.active ? Aranea.RuntimePaths.omarchyStateRoot + "/current" : ""
+    preload: false
+    watchChanges: true
+    printErrors: false
+    onFileChanged: owner.requestRefresh()
+  }
   FileView {
     path: owner.observationsEnabled && owner.active ? Aranea.RuntimePaths.omarchyStateRoot + "/current/background" : ""
     preload: false
