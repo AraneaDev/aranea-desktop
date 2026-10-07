@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.22.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.0...v2.22.1) (2026-10-07)
+
+
+### Fixes
+
+* **showcase:** reject blank startup captures and rebuild desktop tour ([#134](https://github.com/AraneaDev/aranea-desktop/issues/134)) ([0bcf3f9](https://github.com/AraneaDev/aranea-desktop/commit/0bcf3f93acb7fda36d067593b3bd761768efd09a))
+
 ## [2.22.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.21.1...v2.22.0) (2026-10-07)
 
 
