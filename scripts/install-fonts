@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Install the theme's licensed fonts per user; preserve preferences.
+# Usage: scripts/install-fonts
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$repo_root/scripts/lib/paths.sh"
+[[ $# == 0 ]] || {
+  echo 'Usage: scripts/install-fonts' >&2
+  exit 2
+}
+target="$(xdg_data_home)/fonts/aranea"
+changed=0
+for family in ibm-plex-sans source-sans-3 inter jetbrains-mono; do
+  for source in "$repo_root/fonts/$family/"*.ttf "$repo_root/fonts/$family/"*.txt; do
+    destination="$target/$family/$(basename "$source")"
+    if ! cmp -s "$source" "$destination"; then
+      install -Dm644 "$source" "$destination"
+      changed=1
+    fi
+  done
+done
+if ((changed)) && command -v fc-cache >/dev/null 2>&1; then
+  fc-cache -f "$target"
+fi

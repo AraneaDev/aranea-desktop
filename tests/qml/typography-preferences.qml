@@ -68,7 +68,9 @@ ShellRoot {
     onExited: t.waitFor(function () {
       return Shared.Typography.preferences.uiFamily === undefined
     }, 3000, 'malformed replacement falls back to defaults', function () {
-      t.equal(label.font.family, 'sans-serif', 'invalid preferences retain readable UI default')
+      t.equal(label.font.family, 'Inter', 'invalid preferences retain the theme UI default')
+      t.equal(value.font.family, 'JetBrains Mono', 'invalid preferences retain the theme technical default')
+      t.equal(Shared.Typography.iconFamily, root.originalIconFamily, 'fallback preserves the dedicated icon font')
       t.done()
     })
   }

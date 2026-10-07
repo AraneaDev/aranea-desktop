@@ -6,9 +6,11 @@ service contracts to the feature plugins.
 
 ## Typography and refinement
 
-`Typography.uiFamily` uses the system `sans-serif` alias unless
-`OMARCHY_MENU_FONT` explicitly overrides it. `technicalFamily` and `iconFamily`
-retain the desktop monospace alias so values and Nerd Font glyphs stay legible.
+`Typography.uiFamily` follows `~/.config/aranea/fonts.json`, defaulting to the
+bundled Inter. `defaultUiFamily` also drives the Settings default preview.
+`technicalFamily` follows the saved monospace choice or bundled JetBrains Mono;
+`defaultTechnicalFamily` also drives its Settings default preview.
+`iconFamily` retains the dedicated desktop font so Nerd Font glyphs stay legible.
 `DropdownHeader`, `NodeDeviceRow`, `FilamentPill` and `KeyboardPanelFrame` expose
 `refined: false` for a deliberate host migration. Refined presentation uses
 proportional labels, untracked captions and neutral panel borders; selection,

@@ -1,0 +1,2 @@
+# Preserve upstream font notices verbatim, including their original whitespace.
+fonts/*/*.txt whitespace=-blank-at-eol
