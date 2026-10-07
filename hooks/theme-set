@@ -38,6 +38,9 @@ if [[ $1 != aranea && $1 != aranea-* ]]; then
 fi
 
 theme_root="$current_theme"
+if [[ -x "$theme_root/scripts/install-fonts" ]]; then
+  "$theme_root/scripts/install-fonts" || true
+fi
 profile_file="$state_home/aranea/profile"
 profile="${ARANEA_INSTALL_PROFILE:-}"
 if [[ -z "$profile" && -f "$profile_file" ]]; then

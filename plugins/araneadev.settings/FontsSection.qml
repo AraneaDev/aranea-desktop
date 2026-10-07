@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "SettingsLogic.js" as Logic
+import "../araneadev.shared" as Aranea
 
 SettingsSection {
   id: section
@@ -97,13 +98,13 @@ SettingsSection {
   SettingsLabel {
     Layout.fillWidth: true
     text: 'The quick brown fox · Aranea desktop'
-    font.family: section.uiDraft || 'sans-serif'
+    font.family: section.uiDraft || Aranea.Typography.defaultUiFamily
     font.pixelSize: Style.font.body
   }
   SettingsLabel {
     Layout.fillWidth: true
     text: '0123456789 · 2.667× · 3840 × 2160'
-    font.family: section.technicalDraft || Style.font.family
+    font.family: section.technicalDraft || Aranea.Typography.defaultTechnicalFamily
     font.pixelSize: Style.font.body
   }
   Flow {

@@ -7,12 +7,16 @@ import qs.Commons
 
 Item {
   id: typography
-  // Valid font preferences, with empty families retaining the desktop defaults.
+  // Valid font preferences, with empty families retaining the role defaults.
   property var preferences: ({})
-  // Interface text follows the user's choice, then the desktop default.
-  readonly property string uiFamily: preferences.uiFamily || "sans-serif"
-  // Technical values use the user's monospace choice, then the desktop alias.
-  readonly property string technicalFamily: preferences.technicalFamily || Style.font.family
+  // Bundled role defaults remain consistent with the Settings previews.
+  readonly property string defaultUiFamily: "Inter"
+  // Technical text uses the original JetBrains face, independently of icons.
+  readonly property string defaultTechnicalFamily: "JetBrains Mono"
+  // Interface text follows the user's choice, then the bundled theme default.
+  readonly property string uiFamily: preferences.uiFamily || defaultUiFamily
+  // Technical values use the user's monospace choice, then the theme default.
+  readonly property string technicalFamily: preferences.technicalFamily || defaultTechnicalFamily
   // Icon glyphs always retain the host's dedicated Nerd Font alias.
   readonly property string iconFamily: Style.font.family
   // Reject malformed file contents without disrupting text rendering.

@@ -14,6 +14,19 @@ draft and also requires Apply. Icon glyphs retain their dedicated font.
 Preferences live in `~/.config/aranea/fonts.json`; changing these choices does
 not replace the native fonts used by applications or terminal content.
 
+The theme defaults to **Inter** for the interface and **JetBrains Mono** for
+technical text. It also bundles **IBM Plex Sans**, **Source Sans 3**,
+**Inter Display**, **Inter Variable** and **JetBrains Mono NL** (without ligatures).
+Plex and Source Sans include Regular, Medium, Semibold, Bold and Italic;
+Inter and JetBrains Mono include all weights with italics.
+Installation and Aranea activation install them under
+`~/.local/share/fonts/aranea/` (or `$XDG_DATA_HOME/fonts/aranea/`); no package
+manager or network access is needed. Existing saved choices are preserved.
+**Reset to defaults** uses Inter for the interface and JetBrains Mono for
+technical text; icons retain their dedicated Nerd Font. To install just the fonts, run
+`scripts/install-fonts`. The fonts stay installed after theme removal so
+documents and other applications that use them keep rendering correctly.
+
 Appearance also shows the current wallpaper preview. **Choose wallpaper**
 expands an inline chooser; thumbnail and label are one selection target.
 **Apply** changes the desktop, while **Discard** restores the observed wallpaper.

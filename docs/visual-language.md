@@ -26,9 +26,16 @@ separates proportional UI labels from monospace telemetry and technical
 values. The center of a wallpaper stays quiet so bars, menus, and lock
 surfaces remain readable.
 
-Settings uses the desktop `sans-serif` alias for headings, labels and actions.
+Inter is the default for interface headings, labels and actions, paired with
+JetBrains Mono for technical text. Its clean, neutral forms keep compact
+controls legible while the monospace gives telemetry a clear, stable rhythm.
+Regular handles body text; Medium and Semibold provide emphasis, with Bold
+reserved for existing headings. IBM Plex Sans offers a more engineered
+character; Source Sans 3 is the softer, humanist alternative in the picker.
+Inter's display and variable cuts and the no-ligature JetBrains Mono NL are
+also available. Nerd Font glyphs keep their dedicated face.
 Monitor observations, scale presets and editable scales and times retain the
-desktop monospace family. Its compact controls use neutral hover and press
+selected technical family. Its compact controls use neutral hover and press
 feedback, with mint reserved for selection and keyboard focus. Wallpaper
 choices adapt from four columns to two or one as the content width narrows.
 

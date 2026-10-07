@@ -190,12 +190,14 @@ if ((dry_run)); then
   if ((json_mode)); then
     json_step install ok persist-profile 'would persist installation profile'
     json_step install ok install-theme "would install theme from: $theme_source"
+    json_step install ok install-fonts 'would install bundled interface fonts'
     json_step install ok install-hooks 'would install theme hooks'
     json_step install ok activate-theme 'would set theme to aranea'
   else
     say "would persist profile: $profile"
     say "would install theme from: $theme_source"
     say "would install theme hooks"
+    say "would install bundled interface fonts"
     say "would set theme to aranea"
   fi
   if [[ "$profile" == full || "$profile" == no_apps ]]; then
@@ -250,6 +252,9 @@ else
   run omarchy theme install "$theme_source"
   adopt_installed_theme "$theme_source"
   ((json_mode)) && json_step install ok install-theme 'theme installed as aranea'
+  ((json_mode)) && json_step install running install-fonts 'install bundled interface fonts'
+  run "$repo_root/scripts/install-fonts"
+  ((json_mode)) && json_step install ok install-fonts 'bundled interface fonts installed'
   ((json_mode)) && json_step install running install-hooks 'install theme hooks'
   run omarchy hook install theme-set "$repo_root/hooks/theme-set"
   run omarchy hook install post-boot "$repo_root/hooks/post-boot"

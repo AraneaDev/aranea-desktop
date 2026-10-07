@@ -34,7 +34,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick librsvg2-bin ripgrep python3 lua5.4
+          sudo apt-get install --no-install-recommends --yes jq libxml2-utils imagemagick librsvg2-bin ripgrep python3 lua5.4 fontconfig
           # Pinned binaries, the same versions as local development.
           sudo tools/install-shellcheck
           sudo tools/install-shfmt
