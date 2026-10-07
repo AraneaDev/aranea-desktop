@@ -45,7 +45,7 @@ Aranea.FilamentPill {
     Behavior on color {
       enabled: Aranea.DesignTokens.motionEnabled
       ColorAnimation {
-        duration: 90
+        duration: Aranea.DesignTokens.feedbackDuration
       }
     }
   }

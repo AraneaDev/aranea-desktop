@@ -40,9 +40,9 @@ QtObject {
   // shell's menu parser intentionally exposes only the established surface
   // tokens, so these are composited here instead of reaching for ad-hoc
   // Color.menu members that older shells do not publish.
-  property color contextText: Util.alpha(style.foreground, 0.58)
+  property color contextText: Util.alpha(style.foreground, Aranea.DesignTokens.secondaryOpacity)
   // Color of the root footer text.
-  property color footerText: Util.alpha(style.foreground, 0.58)
+  property color footerText: Util.alpha(style.foreground, Aranea.DesignTokens.secondaryOpacity)
   // Hover fill of the row under the pointer (fill only, as the pickers').
   property color selectedBackground: Color.menu.selectedBackground
   // Text color of the outlined row; also tints hovered tiles.

@@ -48,7 +48,7 @@ Item {
     Behavior on width {
       enabled: strand.motionEnabled
       NumberAnimation {
-        duration: 140
+        duration: Aranea.DesignTokens.feedbackDuration
         easing.type: Easing.OutCubic
       }
     }
@@ -64,7 +64,7 @@ Item {
     Behavior on x {
       enabled: strand.motionEnabled
       NumberAnimation {
-        duration: 140
+        duration: Aranea.DesignTokens.feedbackDuration
         easing.type: Easing.OutCubic
       }
     }

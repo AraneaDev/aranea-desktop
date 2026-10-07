@@ -825,7 +825,7 @@ ShellRoot {
         var savedRows = t.findChildren(t.findChild(full, "savedSection"), "savedRow")
         t.check(savedRows[0].busy && savedRows[0].detail === "Forgetting…", "a profile being forgotten breathes and reads Forgetting…")
         t.check(!savedRows[1].busy && savedRows[1].detail === "never used", "the others keep their detail")
-        t.check(Qt.colorEqual(savedRows[1].detailColor, Util.alpha(Aranea.DesignTokens.foreground, 0.55)), "a plain Saved detail is muted")
+        t.check(Qt.colorEqual(savedRows[1].detailColor, Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)), "a plain Saved detail is muted")
         full.savedStatus = {
           "uuid-guest": {
             busy: false,

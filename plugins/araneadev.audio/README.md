@@ -6,6 +6,12 @@ icon's scroll and right-click) and draws an Aranea view: Filament sliders
 with a live signal glow, web-node device rows, per-app sources and a Now
 playing strip whose progress bar is lit as the filament strand.
 
+The keep-loaded `Service.qml` owns default-device selection through
+`AudioDefaults.qml`. Panels on multiple monitors and desktop search share that
+owner, its exact device identities, and its confirmation state. Closing a panel
+does not cancel a search request. Search results use fresh available devices;
+the panel's cached display fallback cannot dispatch a removed device.
+
 ## Behaviour
 
 - Choosing a device (a click or Enter) shows it as the default at once.

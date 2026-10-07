@@ -7,6 +7,8 @@ import qs.Commons
 RowLayout {
   id: header
 
+  // First-party hierarchy; external hosts retain the legacy spacing.
+  property bool refined: false
   // Primary heading text.
   property string title: ""
   // Secondary heading text.
@@ -43,7 +45,7 @@ RowLayout {
 
   ColumnLayout {
     Layout.fillWidth: true
-    spacing: Style.space(2)
+    spacing: Style.space(header.refined ? 4 : 2)
 
     Text {
       Layout.fillWidth: true
@@ -61,7 +63,7 @@ RowLayout {
       Layout.fillWidth: true
       textFormat: Text.PlainText
       text: header.subtitle
-      color: Util.alpha(header.foreground, 0.58)
+      color: Util.alpha(header.foreground, header.refined ? DesignTokens.secondaryOpacity : 0.58)
       font.family: header.fontFamily
       font.pixelSize: header.subtitleSize
       font.weight: Font.Medium

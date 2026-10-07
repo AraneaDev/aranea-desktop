@@ -177,7 +177,7 @@ ColumnLayout {
     objectName: "keyHint"
     Layout.fillWidth: true
     text: root.view && root.view.keyHint ? String(root.view.keyHint) : ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

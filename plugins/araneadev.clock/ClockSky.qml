@@ -55,7 +55,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: pair.label
       elide: Text.ElideRight
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
@@ -79,7 +79,7 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: "SUN & MOON"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -94,7 +94,7 @@ Column {
       horizontalAlignment: Text.AlignRight
       elide: Text.ElideRight
       text: sky.skyView && sky.skyView.place ? String(sky.skyView.place) : ""
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
@@ -120,7 +120,7 @@ Column {
     width: sky.width
     visible: sky.timesShown && !!sky.sun.night
     text: "Night"
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }

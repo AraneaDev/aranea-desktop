@@ -17,6 +17,7 @@ import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
+import "DesktopResultPresentation.js" as ResultPresentation
 
 Item {
   id: results
@@ -142,6 +143,12 @@ Item {
       required property var model
       // Optional desktop type role; ordinary menu and dmenu rows have no badge.
       readonly property string resultType: model.resultType || ""
+      // Transient outcome is presentation context, never part of search matching.
+      readonly property string actionStatus: model.actionStatus || ""
+      // Safe owner-produced feedback, independent of labels and executable data.
+      readonly property string actionMessage: model.actionMessage || ""
+      // Current action outcome takes precedence over the ordinary detail line.
+      readonly property string shownDetail: actionStatus === "pending" ? "Pending…" : actionStatus === "failed" ? actionMessage || "Could not complete action" : detail
       required property string detail
       required property int childCount
       readonly property bool hasCursor: results.cursorActive && index === results.selectedIndex
@@ -154,6 +161,8 @@ Item {
       // Reserved menu icon token draws the canonical mark as a white silhouette.
       readonly property bool hasBrandIcon: !isApp && icon === "aranea-brand"
       readonly property bool hasIcon: icon.length > 0 || isApp
+      // Typed results always align text after one consistent icon column.
+      readonly property bool reserveIcon: !!row.resultType || row.hasIcon
       // When this row was built (Date.now()).
       property real createdAt: 0
       // When the gate last accepted a real pointer move onto this row.
@@ -192,12 +201,13 @@ Item {
 
       Aranea.InkText {
         id: iconText
-        visible: row.hasIcon && !row.isApp && !row.hasBrandIcon
+        visible: row.hasIcon && (!row.isApp || !appIconImage.source || appIconImage.status === Image.Error) && !row.hasBrandIcon
         text: row.icon
-        color: row.lit ? results.selectedText : results.foreground
+        color: row.resultType ? results.foreground : row.lit ? results.selectedText : results.foreground
         font.family: row.iconFont.length > 0 ? row.iconFont : Aranea.Typography.iconFamily
         font.pixelSize: Style.font.iconLarge
-        horizontalAlignment: Text.AlignLeft
+        width: results.iconSlot
+        horizontalAlignment: Text.AlignHCenter
         anchors.left: parent.left
         anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
@@ -205,7 +215,7 @@ Item {
 
       Image {
         id: appIconImage
-        visible: row.isApp || row.hasBrandIcon
+        visible: row.hasBrandIcon || row.isApp && !!source && status !== Image.Error
         width: Style.font.iconLarge
         height: Style.font.iconLarge
         fillMode: Image.PreserveAspectFit
@@ -220,14 +230,14 @@ Item {
         }
         asynchronous: true
         anchors.left: parent.left
-        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset
+        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset + (results.iconSlot - width) / 2
         anchors.verticalCenter: parent.verticalCenter
       }
 
       Column {
         // One label column for every row with an icon, whatever the glyph's width.
         anchors.left: parent.left
-        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset + (row.hasIcon ? results.iconSlot + Style.space(10) : 0)
+        anchors.leftMargin: results.rowReservedBorderLeft + results.rowInset + (row.reserveIcon ? results.iconSlot + Style.space(10) : 0)
         anchors.right: parent.right
         anchors.rightMargin: results.rowReservedBorderRight + results.rowInset + (row.resultType ? typeBadge.width + Style.space(12) : Style.space(14))
         anchors.verticalCenter: parent.verticalCenter
@@ -237,7 +247,7 @@ Item {
           textFormat: Text.PlainText
           objectName: "rowLabel"
           text: row.label
-          color: row.lit ? results.selectedText : results.foreground
+          color: row.resultType ? results.foreground : row.lit ? results.selectedText : results.foreground
           font.family: results.fontFamily
           font.pixelSize: results.menuFontScale * Style.font.bodySmall
           font.letterSpacing: results.menuLetterSpacing
@@ -246,10 +256,10 @@ Item {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: row.detail
-          visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.detail.length > 0
-          color: row.lit ? results.selectedText : results.foreground
-          opacity: row.lit ? 0.7 : 0.52
+          text: row.shownDetail
+          visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.shownDetail.length > 0
+          color: row.actionStatus === "failed" ? Aranea.DesignTokens.urgent : row.resultType ? Util.alpha(results.foreground, Aranea.DesignTokens.secondaryOpacity) : row.lit ? results.selectedText : results.foreground
+          opacity: row.resultType ? 1 : row.lit ? 0.7 : 0.52
           font.family: results.fontFamily
           font.pixelSize: results.menuFontScale * Style.font.caption
           elide: Text.ElideRight
@@ -264,15 +274,8 @@ Item {
         anchors.rightMargin: results.rowReservedBorderRight + results.rowInset
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
-        text: ({
-            app: "App",
-            command: "Command",
-            window: "Window",
-            workspace: "Workspace",
-            setting: "Setting"
-          })[row.resultType] || ""
-        color: row.lit ? results.selectedText : results.foreground
-        opacity: 0.58
+        text: ResultPresentation.typeLabel(row.resultType)
+        color: Util.alpha(results.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: results.fontFamily
         font.pixelSize: results.menuFontScale * Style.font.caption
       }

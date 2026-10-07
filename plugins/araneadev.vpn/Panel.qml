@@ -979,7 +979,7 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: String.fromCodePoint(0xf0582)
-    foreground: root.iconState === "alert" ? Aranea.DesignTokens.urgent : root.iconState === "up" ? Aranea.DesignTokens.accent : Util.alpha(root.barForeground, 0.55)
+    foreground: root.iconState === "alert" ? Aranea.DesignTokens.urgent : root.iconState === "up" ? Aranea.DesignTokens.accent : Util.alpha(root.barForeground, Aranea.DesignTokens.secondaryOpacity)
     onPressed: {
       root.keyboardCursor = false
       root.toggle()

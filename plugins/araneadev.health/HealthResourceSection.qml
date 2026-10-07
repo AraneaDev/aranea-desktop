@@ -36,7 +36,7 @@ Item {
   // Colour of the values and labels.
   property color foreground: Aranea.DesignTokens.foreground
   // Colour of captions and secondary text.
-  readonly property color muted: Util.alpha(root.foreground, 0.55)
+  readonly property color muted: Util.alpha(root.foreground, Aranea.DesignTokens.secondaryOpacity)
 
   // Maps metric severity to the panel's semantic foreground colour.
   function levelColor(level: string): color {

@@ -86,8 +86,9 @@ Rectangle {
   color: row.hovered ? row.selectedBackground : "transparent"
 
   Behavior on color {
+    enabled: Aranea.DesignTokens.motionEnabled
     ColorAnimation {
-      duration: 120
+      duration: Aranea.DesignTokens.feedbackDuration
       easing.type: Easing.OutCubic
     }
   }

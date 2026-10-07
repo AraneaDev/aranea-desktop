@@ -88,7 +88,7 @@ Column {
           objectName: "heroLabel"
           textFormat: Text.PlainText
           text: String(hero.heroView.label || "")
-          color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           font.letterSpacing: 1.6
@@ -170,7 +170,7 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: "RAIN SOON"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true

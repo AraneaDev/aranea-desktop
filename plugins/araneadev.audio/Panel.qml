@@ -3,7 +3,6 @@
 // the stock one. Added: the showcase IPC method's display-only stand-ins
 // for README captures.
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
@@ -11,6 +10,7 @@ import qs.Ui
 import qs.Commons
 import "Model.js" as Model
 import "AudioLogic.js" as AudioLogic
+import "AudioBridge.js" as AudioBridge
 import "../araneadev.shared/ShowcaseLogic.js" as Showcase
 import "../araneadev.shared" as Aranea
 
@@ -73,23 +73,43 @@ Panel {
   // The media service's currently active player, if any.
   readonly property var activeMediaPlayer: mediaService ? mediaService.activePlayer : null
 
-  // The pending default-output switch (AudioLogic.defaultClick /
-  // defaultEcho): the chosen device shows as the default at once and its
-  // row pulses until PipeWire reports it; choices made meanwhile queue,
-  // the last one wins, and outputDefaultTimeout falls back to the real
-  // default.
-  property var outputPending: AudioLogic.defaultIdle()
-  // The pending default-input switch (see outputPending).
-  property var inputPending: AudioLogic.defaultIdle()
-  // The key (AudioLogic.deviceKey: node id and name) of PipeWire's
-  // default output, "" for none.
+  // Persistent default owner published by the keep-loaded audio service.
+  property var defaultOwner: AudioBridge.current()
+  // Owner currently leased by this open panel.
+  property var leasedOwner: null
+  // Output pending projection, shared with search and other panels.
+  readonly property var outputPending: defaultOwner ? defaultOwner.outputPending : AudioLogic.defaultIdle()
+  // Input pending projection.
+  readonly property var inputPending: defaultOwner ? defaultOwner.inputPending : AudioLogic.defaultIdle()
+  // Observed output identity.
   readonly property string sinkKey: AudioLogic.deviceKey(sink)
-  // The key of PipeWire's default input (see sinkKey).
+  // Observed input identity.
   readonly property string sourceKey: AudioLogic.deviceKey(source)
-  // Which output the rows show as the default ({key, busy}, AudioLogic.defaultView).
+  // Existing optimistic output presentation from the shared owner.
   readonly property var outputShown: AudioLogic.defaultView(outputPending, sinkKey)
-  // Which input the rows show as the default (see outputShown).
+  // Existing optimistic input presentation from the shared owner.
   readonly property var inputShown: AudioLogic.defaultView(inputPending, sourceKey)
+  // Reacquire an owner after plugin load/reload and balance the panel lease.
+  function syncDefaultOwner(): void {
+    defaultOwner = AudioBridge.current()
+    if (leasedOwner && (leasedOwner !== defaultOwner || !opened)) {
+      leasedOwner.panelClosed()
+      leasedOwner = null
+    }
+    if (opened && defaultOwner && leasedOwner !== defaultOwner) {
+      defaultOwner.panelOpened()
+      leasedOwner = defaultOwner
+    }
+  }
+  Component.onDestruction: if (leasedOwner)
+    leasedOwner.panelClosed()
+  Timer {
+    interval: 1000
+    running: true
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.syncDefaultOwner()
+  }
 
   // Smoothed live levels behind the Output and Input filament glow.
   property real outputSignal: 0
@@ -109,31 +129,10 @@ Panel {
   onNowPlayingPlayerChanged: if (nowPlayingPlayer)
     lastPlayerKey = String(nowPlayingPlayer.dbusName || "")
 
-  // Real (non-stream) sink nodes that could be the default output.
-  readonly property var candidateSinks: {
-    var list = []
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i]
-      if (n && n.isSink && !n.isStream)
-        list.push(n)
-    }
-    return list
-  }
-
-  // Real (non-stream) source nodes that could be the default input, excluding this shell's own capture.
-  readonly property var candidateSources: {
-    var list = []
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i]
-      if (n && !n.isSink && !n.isStream && isAudioSource(n)) {
-        var name = n.name || ""
-        if (name === "quickshell")
-          continue
-        list.push(n)
-      }
-    }
-    return list
-  }
+  // Fresh candidate output devices from the persistent owner.
+  readonly property var candidateSinks: defaultOwner ? defaultOwner.candidateSinks : []
+  // Fresh candidate input devices from the persistent owner.
+  readonly property var candidateSources: defaultOwner ? defaultOwner.candidateSources : []
 
   // Per-app playback streams, excluding the speaker-tuning's own output.
   readonly property var candidateStreams: {
@@ -151,11 +150,6 @@ Panel {
     return list
   }
 
-  // Per-sink name -> available flag reported by omarchy-audio-sink-availability.
-  property var sinkAvailability: ({})
-  // True once sinkAvailability has been read at least once.
-  property bool sinkAvailabilityLoaded: false
-
   // Identify true playback streams without reading node.properties here:
   // PwNode.properties is invalid until the node is bound, and reading it while
   // capture streams are appearing (for example, when Voxtype starts recording)
@@ -172,43 +166,12 @@ Panel {
     return Model.isAudioSource(node)
   }
 
-  // Last non-empty audio sink list, kept while Pipewire's set is momentarily empty.
-  property var cachedAudioSinks: []
-  // Last non-empty audio source list, kept while Pipewire's set is momentarily empty.
-  property var cachedAudioSources: []
-
-  // Candidate sinks filtered by availability, with the current default always included.
-  readonly property var rawAudioSinks: {
-    var list = []
-    for (var i = 0; i < candidateSinks.length; i++)
-      if (sinkAvailable(candidateSinks[i]))
-        list.push(candidateSinks[i])
-    if (sink && list.indexOf(sink) < 0)
-      list.unshift(sink)
-    return list
-  }
-
-  // Sinks stock hides as unplugged; shown dimmed and never chosen.
-  readonly property var unpluggedSinks: {
-    var list = []
-    for (var i = 0; i < candidateSinks.length; i++)
-      if (!sinkAvailable(candidateSinks[i]))
-        list.push(candidateSinks[i])
-    return list
-  }
-
-  // Candidate sources, with the current default always included.
-  readonly property var rawAudioSources: {
-    var list = candidateSources.slice()
-    if (source && list.indexOf(source) < 0)
-      list.unshift(source)
-    return list
-  }
-
-  // The output devices to show: raw when non-empty, else the cached fallback.
-  readonly property var audioSinks: rawAudioSinks.length > 0 ? rawAudioSinks : cachedAudioSinks
-  // The input devices to show: raw when non-empty, else the cached fallback.
-  readonly property var audioSources: rawAudioSources.length > 0 ? rawAudioSources : cachedAudioSources
+  // Shared output presentation including its transient cached fallback.
+  readonly property var audioSinks: defaultOwner ? defaultOwner.audioSinks : []
+  // Shared input presentation including its transient cached fallback.
+  readonly property var audioSources: defaultOwner ? defaultOwner.audioSources : []
+  // Shared unavailable outputs, never selectable.
+  readonly property var unpluggedSinks: defaultOwner ? defaultOwner.unpluggedSinks : []
 
   // Candidate streams that actually carry an audio channel.
   readonly property var audioStreams: {
@@ -264,12 +227,7 @@ Panel {
   // Re-resolve whenever the selected output changes; the timer below is only a
   // safety net for the tuning being applied or removed underneath us.
   // A new default output also settles a pending switch to it.
-  onSinkChanged: {
-    resolveVolumeSink()
-    applyDefault("output", AudioLogic.defaultEcho(outputPending, sinkKey))
-  }
-  // A new default input settles a pending switch to it.
-  onSourceChanged: applyDefault("input", AudioLogic.defaultEcho(inputPending, sourceKey))
+  onSinkChanged: resolveVolumeSink()
 
   // Kicks off omarchy-audio-output-sink to refresh volumeSinkName asynchronously.
   function resolveVolumeSink() {
@@ -285,11 +243,6 @@ Panel {
   readonly property real inputVolume: source && source.audio ? source.audio.volume : 0
   // Whether the default input device is muted.
   readonly property bool inputMuted: source && source.audio ? source.audio.muted : false
-
-  onRawAudioSinksChanged: if (rawAudioSinks.length > 0)
-    cachedAudioSinks = rawAudioSinks
-  onRawAudioSourcesChanged: if (rawAudioSources.length > 0)
-    cachedAudioSources = rawAudioSources
 
   // Single cursor model shared by keyboard and mouse. Sections:
   //   "output"  — output slider + sink device list
@@ -522,6 +475,7 @@ Panel {
   }
 
   onOpenedChanged: {
+    syncDefaultOwner()
     // Stand-ins never carry over into an open or past a close.
     audioShowcase = null
     if (opened) {
@@ -535,8 +489,6 @@ Panel {
     } else {
       // A queued default never runs with nobody watching; one in flight
       // finishes (or times out).
-      outputPending = AudioLogic.defaultAfter("close", outputPending)
-      inputPending = AudioLogic.defaultAfter("close", inputPending)
       clearDisplayAudioModels()
       outputSignal = 0
       inputSignal = 0
@@ -758,78 +710,11 @@ Panel {
       source.audio.muted = mute
   }
 
-  // Makes node the default output, in Pipewire and via the helper script.
-  function setDefaultSink(node) {
-    if (!node)
-      return
-    Pipewire.preferredDefaultAudioSink = node
-    if (node.id !== undefined && node.name) {
-      Quickshell.execDetached(["omarchy-audio-output-set-default", String(node.id), String(node.name)])
-    }
-  }
-
-  // Makes node the default input, in Pipewire and via the helper script.
-  function setDefaultSource(node) {
-    if (!node)
-      return
-    Pipewire.preferredDefaultAudioSource = node
-    if (node.id !== undefined && node.name) {
-      Quickshell.execDetached(["omarchy-audio-input-set-default", String(node.id), String(node.name)])
-    }
-  }
-
-  // Asks for NODE as CHANNEL's ("output" or "input") default, through the
-  // pending switch: shown at once, queued while another is in flight
-  // (AudioLogic.defaultClick).
+  // Route default picks to one owner without duplicating its queue or timers.
   function requestDefault(channel, node) {
-    if (!node)
-      return
-    var output = channel === "output"
-    applyDefault(channel, AudioLogic.defaultClick(output ? outputPending : inputPending, AudioLogic.deviceKey(node), output ? sinkKey : sourceKey))
-  }
-
-  // Applies a default-switch step RESULT ({state, send}) for CHANNEL:
-  // stores the state, sends the device to switch to, if any (falling back
-  // to idle when that device has gone), and runs the timeout while a
-  // switch is in flight.
-  function applyDefault(channel, result) {
-    var output = channel === "output"
-    if (output)
-      outputPending = result.state
-    else
-      inputPending = result.state
-    if (result.send !== null) {
-      var node = AudioLogic.nodeByKey(output ? audioSinks : audioSources, result.send, true)
-      if (!node) {
-        if (output)
-          outputPending = AudioLogic.defaultAfter("timeout", outputPending)
-        else
-          inputPending = AudioLogic.defaultAfter("timeout", inputPending)
-      } else if (output)
-        setDefaultSink(node)
-      else
-        setDefaultSource(node)
-    }
-    // Read back: sending can echo at once and settle the switch.
-    var timer = output ? outputDefaultTimeout : inputDefaultTimeout
-    if ((output ? outputPending : inputPending).target === null)
-      timer.stop()
-    else if (result.send !== null)
-      timer.restart()
-  }
-
-  // Whether a sink is still physically available, per the last availability check.
-  function sinkAvailable(node) {
-    if (!node || !node.name || !sinkAvailabilityLoaded)
-      return true
-    var name = String(node.name)
-    return sinkAvailability[name] !== false
-  }
-
-  // Parses omarchy-audio-sink-availability's output into sinkAvailability.
-  function updateSinkAvailability(raw) {
-    sinkAvailability = Model.parseSinkAvailability(raw)
-    sinkAvailabilityLoaded = true
+    syncDefaultOwner()
+    if (defaultOwner && !audioShowcase)
+      defaultOwner.requestDefault(channel, node)
   }
 
   // Delegates to Model.js's device label cleanup.
@@ -1044,12 +929,6 @@ Panel {
   implicitHeight: button.implicitHeight
 
   PwObjectTracker {
-    objects: root.candidateSinks
-  }
-  PwObjectTracker {
-    objects: root.candidateSources
-  }
-  PwObjectTracker {
     objects: root.audioStreams
   }
 
@@ -1086,30 +965,12 @@ Panel {
   }
 
   Process {
-    id: sinkAvailabilityProc
-    command: ["omarchy-audio-sink-availability"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.updateSinkAvailability(text)
-    }
-  }
-
-  Process {
     id: volumeSinkProc
     command: ["omarchy-audio-output-sink"]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.volumeSinkName = String(text).trim()
     }
-  }
-
-  Timer {
-    interval: 5000
-    running: root.opened
-    repeat: true
-    triggeredOnStart: true
-    onTriggered: if (!sinkAvailabilityProc.running)
-      sinkAvailabilityProc.running = true
   }
 
   // Runs whether or not the panel is open: the bar shows and scrolls the output
@@ -1121,20 +982,6 @@ Panel {
     repeat: true
     triggeredOnStart: true
     onTriggered: root.resolveVolumeSink()
-  }
-
-  // Falls a pending default-output switch back to the real default.
-  Timer {
-    id: outputDefaultTimeout
-    interval: AudioLogic.defaultTimeoutMs
-    onTriggered: root.outputPending = AudioLogic.defaultAfter("timeout", root.outputPending)
-  }
-
-  // Falls a pending default-input switch back to the real default.
-  Timer {
-    id: inputDefaultTimeout
-    interval: AudioLogic.defaultTimeoutMs
-    onTriggered: root.inputPending = AudioLogic.defaultAfter("timeout", root.inputPending)
   }
 
   Timer {

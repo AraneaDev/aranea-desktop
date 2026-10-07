@@ -55,7 +55,7 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: "SAVED, OUT OF RANGE"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -66,7 +66,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: String(section.rows.length)
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.body
     }
@@ -87,7 +87,7 @@ Column {
       // This row's action state.
       readonly property var actionState: section.status ? section.status[savedRow.modelData.key] : undefined
       detail: savedRow.actionState && savedRow.actionState.text ? String(savedRow.actionState.text) : (savedRow.modelData.detail || "")
-      detailColor: savedRow.actionState && savedRow.actionState.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      detailColor: savedRow.actionState && savedRow.actionState.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       busy: !!(savedRow.actionState && savedRow.actionState.busy)
       available: true
       hasCursor: section.cursorIndex === savedRow.index

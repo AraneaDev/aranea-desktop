@@ -76,7 +76,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       text: section.title
       elide: Text.ElideRight
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -90,7 +90,7 @@ Column {
       Text {
         anchors.verticalCenter: parent.verticalCenter
         text: "AUTOMATIC"
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true

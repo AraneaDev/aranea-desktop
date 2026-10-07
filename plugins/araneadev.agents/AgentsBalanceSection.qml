@@ -23,7 +23,7 @@ Column {
   Text {
     textFormat: Text.PlainText
     text: "BALANCE"
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
@@ -71,7 +71,7 @@ Column {
     visible: text !== ""
     text: section.balance ? String(section.balance.detail || "") : ""
     elide: Text.ElideRight
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Style.font.caption
   }

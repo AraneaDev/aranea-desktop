@@ -48,7 +48,7 @@ ColumnLayout {
   // Public contract member.
   property color foreground: Color.polkit.text
   // Public contract member.
-  property color dim: Util.alpha(Color.polkit.text, 0.58)
+  property color dim: Util.alpha(Color.polkit.text, Aranea.DesignTokens.secondaryOpacity)
   // Public contract member.
   property color accent: Color.polkit.accent
   // Public contract member.
@@ -90,6 +90,7 @@ ColumnLayout {
   }
 
   Aranea.BrandHeader {
+    refined: true
     Layout.fillWidth: true
     title: "AUTHENTICATION REQUIRED"
     subtitle: "SYSTEM // PRIVILEGED"

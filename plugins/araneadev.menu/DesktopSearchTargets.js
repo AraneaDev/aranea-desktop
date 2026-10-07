@@ -205,6 +205,12 @@ function sourceRecords(snapshot) {
     )
   })
   rows = rows.concat(settingRecords(data.settingsAvailable === true))
+  if (Array.isArray(data.actionRecords))
+    rows = rows.concat(
+      data.actionRecords.filter(function (row) {
+        return row && row.type === "action"
+      })
+    )
   if (data.compositorAvailable !== true) return rows
   collectionValues(data.windows).forEach(function (window) {
     if (!window) return
@@ -263,6 +269,8 @@ function dispatchTarget(record, snapshot) {
     return row.key === record.key
   })[0]
   if (!current) return null
+  // Actions belong to the persistent action controller, never the argv fallback.
+  if (current.type === "action") return null
   if (current.type === "app")
     return { kind: "app", appId: current.target.appId, label: current.label }
   if (current.type === "command") return { kind: "command", itemId: current.target.itemId }

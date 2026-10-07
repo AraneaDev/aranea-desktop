@@ -340,7 +340,7 @@ ShellRoot {
         t.equal(header.title, "VPN", "the header title")
         t.equal(t.findChild(header, "headerCaption").text, "2 of 5 connected", "the header caption")
         t.check(Qt.colorEqual(header.glyphColor, Aranea.DesignTokens.accent), "an up VPN lights the header glyph")
-        t.check(Qt.colorEqual(t.findChild(bare, "vpnHeader").glyphColor, Util.alpha(Aranea.DesignTokens.foreground, 0.55)), "an idle header glyph is dim")
+        t.check(Qt.colorEqual(t.findChild(bare, "vpnHeader").glyphColor, Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)), "an idle header glyph is dim")
         t.equal(t.findChild(header, "headerTrailing").children.length, 0, "the header has no switch")
         var conn = t.findChild(full, "connectedSection")
         var avail = t.findChild(full, "availableSection")

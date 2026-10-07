@@ -209,7 +209,7 @@ Item {
     Behavior on x {
       enabled: !slider.dragging && DesignTokens.motionEnabled
       NumberAnimation {
-        duration: 140
+        duration: DesignTokens.feedbackDuration
         easing.type: Easing.OutCubic
       }
     }

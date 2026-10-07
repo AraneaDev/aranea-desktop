@@ -375,7 +375,7 @@ Column {
           x: Math.max(0, Math.min(stopRow.width - stopLabel.width, stopLabel.centre - stopLabel.width / 2))
           anchors.verticalCenter: parent.verticalCenter
           text: String(stopLabel.modelData)
-          color: stopLabel.index === textSection.shownIndex ? Aranea.DesignTokens.foreground : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+          color: stopLabel.index === textSection.shownIndex ? Aranea.DesignTokens.foreground : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: Aranea.Typography.technicalFamily
           font.pixelSize: Style.font.caption
         }
@@ -483,7 +483,7 @@ Column {
     width: parent.width
     topPadding: Style.space(4)
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

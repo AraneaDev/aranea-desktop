@@ -16,7 +16,7 @@ ClockTarget {
   // Glyph-only controls can override the configurable UI label font.
   property string fontFamily: Aranea.Typography.uiFamily
   // The text colour at rest.
-  property color restColor: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+  property color restColor: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
   // The text size in px.
   property real pixelSize: Style.font.caption
   // Whether the text is bold.

@@ -85,8 +85,8 @@ BarWidget {
   readonly property int trayJoinGap: 0
   // The drawer's full extent (icon count times their slot, plus gaps).
   readonly property int drawerExtent: drawerCount > 0 ? drawerCount * trayItemExtent + (drawerCount - 1) * trayItemGap : 0
-  // Match Waybar's group/tray-expander drawer transition-duration.
-  readonly property int animationDuration: 600
+  // Drawer disclosure uses the same settling rhythm as other panels.
+  readonly property int animationDuration: Aranea.DesignTokens.settleDuration
   // 0 when the drawer is collapsed, 1 when fully revealed.
   property real revealProgress: expanded ? 1 : 0
   // The drawer's currently revealed extent (drawerExtent times revealProgress).
@@ -857,6 +857,7 @@ BarWidget {
   }
 
   Behavior on revealProgress {
+    enabled: Aranea.DesignTokens.motionEnabled
     NumberAnimation {
       duration: root.animationDuration
       easing.type: Easing.OutCubic

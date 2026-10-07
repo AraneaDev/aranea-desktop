@@ -126,7 +126,7 @@ Column {
     width: parent.width
     text: "Pinned icons stay visible. Hidden icons never show."
     wrapMode: Text.WordWrap
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
   }
@@ -249,7 +249,7 @@ Column {
           textFormat: Text.PlainText
           text: String(row.entry.name || "")
           elide: Text.ElideRight
-          color: row.hidden ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
+          color: row.hidden ? Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity) : Aranea.DesignTokens.foreground
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.body
         }
@@ -296,7 +296,7 @@ Column {
     visible: manage.empty
     width: parent.width
     text: "No tray items reporting."
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
   }
@@ -305,7 +305,7 @@ Column {
     width: parent.width
     topPadding: Style.space(4)
     text: manage.view && manage.view.keyHint ? manage.view.keyHint : ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

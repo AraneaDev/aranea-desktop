@@ -22,7 +22,7 @@ Item {
     Text {
       visible: root.cpuProcesses.length === 0 && root.memoryProcesses.length === 0
       text: "No process data"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       // qmllint disable missing-property
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.body
@@ -81,7 +81,7 @@ Item {
     spacing: Style.space(8)
     Text {
       text: cell.name
-      color: cell.dim ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
+      color: cell.dim ? Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity) : Aranea.DesignTokens.foreground
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       Layout.fillWidth: true
@@ -89,7 +89,7 @@ Item {
     }
     Text {
       text: cell.value
-      color: cell.dim ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : Aranea.DesignTokens.foreground
+      color: cell.dim ? Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity) : Aranea.DesignTokens.foreground
       font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
       horizontalAlignment: Text.AlignRight

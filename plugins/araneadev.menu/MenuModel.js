@@ -55,7 +55,7 @@ if (typeof module !== "undefined") module.exports = { slugify: slugify }
 
 /**
  * The key hint line for the menu's current state.
- * @param {{root: boolean, filter: boolean, dmenu: boolean, input: boolean, count: number, appRow: boolean}} state - root: root menu without a search; filter: a search is typed; dmenu/input: a dmenu request and its input mode; count: rows shown; appRow: the cursor row is an app
+ * @param {{root: boolean, filter: boolean, dmenu: boolean, input: boolean, count: number, appRow: boolean, actionRow?: boolean}} state - root: root menu without a search; filter: a search is typed; dmenu/input: a dmenu request and its input mode; count: rows shown; appRow: the cursor row is an app
  * @returns {string} the hints
  */
 function hintText(state) {
@@ -66,7 +66,7 @@ function hintText(state) {
       ? "TYPE TO ENTER  ·  ENTER CONFIRM  ·  ESC CANCEL"
       : (Number(s.count) || 0) + " RESULTS  ·  ENTER SELECT  ·  ESC CANCEL"
   if (s.root) return "SYSTEM // READY"
-  if (s.filter) return "ESC CLEAR  ·  ENTER OPEN"
+  if (s.filter) return "ESC CLEAR  ·  ENTER " + (s.actionRow ? "APPLY" : "OPEN")
   return "⌫ BACK  ·  ENTER OPEN" + (s.appRow ? "  ·  ^P PIN" : "") + "  ·  ESC CLOSE"
 }
 

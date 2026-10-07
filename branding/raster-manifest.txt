@@ -1,3 +1,3 @@
 # Generated from design/brand.toml and design/tokens.toml. Do not edit directly.
-input_sha256=e67bdb8dae04527b75b1864acc864b3565ef8ffade35b161616b4328c3f3a16f
+input_sha256=447bfa9c985c99b285a1e125f430de950dbf96bcf4c23f2edea4ef071a0949fe
 unlock=640x640

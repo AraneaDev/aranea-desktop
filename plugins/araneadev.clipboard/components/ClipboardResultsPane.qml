@@ -157,7 +157,7 @@ Item {
             horizontalAlignment: Text.AlignLeft
             textFormat: Text.PlainText
             text: parent.section === "pinned" ? "PINNED" : "RECENT"
-            color: Util.alpha(pane.foreground, 0.58)
+            color: Util.alpha(pane.foreground, Aranea.DesignTokens.secondaryOpacity)
             font.family: pane.fontFamily
             font.pixelSize: Style.font.caption
             font.weight: Font.Medium
