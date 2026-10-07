@@ -71,8 +71,17 @@ jobs:
     container: archlinux:latest
     timeout-minutes: 30
     steps:
+      # Qt 6.12 adds a QtQuick.Color singleton that conflicts with the
+      # pinned Omarchy shell. Keep the entire Arch package set on the
+      # verified Qt 6.11 snapshot, including its matching dependencies.
+      - name: Pin the supported Arch toolchain
+        run: |
+          # Pacman expands these variables when reading the mirror list.
+          # shellcheck disable=SC2016
+          echo 'Server = https://archive.archlinux.org/repos/2026/10/06/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+
       - name: Install packages
-        run: pacman -Syu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap
+        run: pacman -Syyuu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap
 
       # Arch's sway carries cap_sys_nice as a file capability, and a container
       # that may not grant it cannot exec sway at all ("Operation not
@@ -100,7 +109,7 @@ jobs:
           tools/install-shfmt /usr/local/bin
 
       # QML formatting, strict QML against the shrink-only baseline and the
-      # runtime smoke test, with Arch's current Qt; skipping is not allowed.
+      # runtime smoke test, with the pinned Qt toolchain; skipping is not allowed.
       # The Omarchy path is built from $RUNNER_TEMP here: in container jobs
       # ${{ runner.temp }} is the host path, not the container's.
       - name: QML format, strict QML and runtime smoke
