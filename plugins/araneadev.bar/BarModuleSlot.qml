@@ -4,6 +4,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 Item {
   id: slot
