@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Runs a capture command on a private D-Bus bus and runtime directory.
 # Shares only the Wayland socket; callers still own shell/config staging.
+#
+# Usage: tools/with-capture-session <command> [args...]
 set -euo pipefail
 
 if (($# == 0)); then
