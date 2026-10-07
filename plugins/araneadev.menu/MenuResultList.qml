@@ -143,6 +143,12 @@ Item {
       required property var model
       // Optional desktop type role; ordinary menu and dmenu rows have no badge.
       readonly property string resultType: model.resultType || ""
+      // Transient outcome is presentation context, never part of search matching.
+      readonly property string actionStatus: model.actionStatus || ""
+      // Safe owner-produced feedback, independent of labels and executable data.
+      readonly property string actionMessage: model.actionMessage || ""
+      // Current action outcome takes precedence over the ordinary detail line.
+      readonly property string shownDetail: actionStatus === "pending" ? "Pending…" : actionStatus === "failed" ? actionMessage || "Could not complete action" : detail
       required property string detail
       required property int childCount
       readonly property bool hasCursor: results.cursorActive && index === results.selectedIndex
@@ -250,9 +256,9 @@ Item {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: row.detail
-          visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.detail.length > 0
-          color: row.resultType ? Util.alpha(results.foreground, 0.64) : row.lit ? results.selectedText : results.foreground
+          text: row.shownDetail
+          visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.shownDetail.length > 0
+          color: row.actionStatus === "failed" ? Aranea.DesignTokens.urgent : row.resultType ? Util.alpha(results.foreground, 0.64) : row.lit ? results.selectedText : results.foreground
           opacity: row.resultType ? 1 : row.lit ? 0.7 : 0.52
           font.family: results.fontFamily
           font.pixelSize: results.menuFontScale * Style.font.caption

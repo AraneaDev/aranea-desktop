@@ -54,7 +54,8 @@ Item {
     dmenu: root.dmenuActive,
     input: root.mode === "input",
     count: displayModel.count,
-    appRow: root.cursorRowIsApp()
+    appRow: root.cursorRowIsApp(),
+    actionRow: root.desktopSearchActive && root.cursorActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count && !!displayModel.get(root.selectedIndex) && displayModel.get(root.selectedIndex).resultType === "action"
   }) + (root.desktopSearchActive && displayModel.count === 50 ? "  ·  Refine your search" : "")
 
   // Freezes the card's top edge in the window (no-op offscreen).
@@ -83,7 +84,16 @@ Item {
       return
     }
 
-    if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_F && root.scopedSearch) {
+    if (event.key === Qt.Key_Tab && root.recoveryLabel) {
+      root.recoveryFocused = !root.recoveryFocused
+      event.accepted = true
+    } else if (event.key === Qt.Key_Escape && root.recoveryFocused) {
+      root.recoveryFocused = false
+      event.accepted = true
+    } else if (root.recoveryFocused && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space)) {
+      root.recoverSelected()
+      event.accepted = true
+    } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_F && root.scopedSearch) {
       root.searchEverywhere()
       event.accepted = true
     } else if (event.key === Qt.Key_Delete) {
@@ -206,6 +216,7 @@ Item {
   // Suppresses index-derived identity changes while replacing rows.
   property bool syncingDesktopRows: false
   onSelectedIndexChanged: {
+    root.recoveryFocused = false
     if (!root.syncingDesktopRows && root.desktopSearchActive && root.selectedIndex >= 0 && root.selectedIndex < displayModel.count)
       root.selectedDesktopKey = displayModel.get(root.selectedIndex).desktopKey || ""
   }
@@ -281,6 +292,15 @@ Item {
   readonly property alias favoriteAppIds: history.favoriteAppIds
 
   // Existing watchers supply static inputs; only the local controller owns live reads.
+  DesktopActionController {
+    id: desktopActions
+    active: root.desktopSearchActive
+    observationsEnabled: root.windowEnabled
+  }
+  // Persistent action owner, also used by inert render and integration fixtures.
+  readonly property alias desktopActions: desktopActions
+
+  // Existing watchers supply static inputs; only the local controller owns live reads.
   DesktopSearchSources {
     id: desktopSources
     active: root.opened && !root.dmenuActive
@@ -291,6 +311,7 @@ Item {
     favoriteAppIds: history.favoriteAppIds
     recentAppIds: history.recentAppIds
     settingsAvailable: sources.settingsAvailable
+    actionController: desktopActions
     onRevisionChanged: if (root.desktopSearchActive)
       root.rebuildDisplay()
     onAppRequested: function (appId, label) {
@@ -306,6 +327,39 @@ Item {
   }
   // Source controller boundary used by inert previews and integration fixtures.
   readonly property alias desktopSearch: desktopSources
+
+  // Explicit recovery control focus remains separate from the selected row.
+  property bool recoveryFocused: false
+  // Selected failed action, recomputed after keyed row updates.
+  readonly property var recoveryRow: {
+    var serial = root.layoutSerial
+    if (serial < 0 || !root.desktopSearchActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
+      return null
+    var row = displayModel.get(root.selectedIndex)
+    return row.actionStatus === "failed" ? row : null
+  }
+  // Available recovery destination for the selected failed action.
+  readonly property string recoveryLabel: !recoveryRow ? "" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
+  // Space reserved beneath results so recovery never clips outside the card.
+  readonly property int recoveryHeight: recoveryLabel ? Style.space(28) + root.style.sectionSpacing : 0
+  onRecoveryLabelChanged: if (!recoveryLabel)
+    recoveryFocused = false
+  // Recovery uses existing control destinations rather than inventing another UI.
+  function recoverSelected(): void {
+    if (!root.recoveryLabel || desktopActions.showcaseActive)
+      return
+    var argv = root.recoveryLabel === "Open audio controls" ? ["omarchy-shell", "omarchy.audio", "open"] : ["omarchy-shell", "shell", "summon", "araneadev.settings", JSON.stringify({
+        section: "appearance"
+      })]
+    try {
+      if (desktopSources.runner(argv) !== false)
+        root.cancel()
+      else
+        root.showNotice("Could not open controls")
+    } catch (error) {
+      root.showNotice("Could not open controls")
+    }
+  }
 
   // Regenerates the Apps rows (apps, Favorites, Recent) from the app library,
   // merges them into the items and resolves a waiting Favorites/Recent route.
@@ -371,7 +425,7 @@ Item {
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   // Total card height: borders, padding, chrome, one section gap and the rows
   // (or the input line), exactly what MenuWindow lays out; capped to the screen.
-  property int cardHeight: Math.min(Math.ceil(root.style.borderInsetY) + root.style.contentMargin * 2 + root.style.chromeHeight + root.style.sectionSpacing + (root.mode === "input" ? root.style.inputLineHeight : visibleRowsHeight), root.screenHeight - Style.gapsOut * 2)
+  property int cardHeight: Math.min(Math.ceil(root.style.borderInsetY) + root.style.contentMargin * 2 + root.style.chromeHeight + root.style.sectionSpacing + root.recoveryHeight + (root.mode === "input" ? root.style.inputLineHeight : visibleRowsHeight), root.screenHeight - Style.gapsOut * 2)
 
   // The dmenu (select or input) request being served.
   MenuDmenu {
@@ -402,7 +456,9 @@ Item {
       return Object.assign({}, row, {
         desktopKey: row.desktopKey || "",
         resultType: row.resultType || "",
-        targetKey: row.targetKey || ""
+        targetKey: row.targetKey || "",
+        actionStatus: row.actionStatus || "",
+        actionMessage: row.actionMessage || ""
       })
     })
     var keep = Math.min(displayModel.count, rows.length)
@@ -506,7 +562,7 @@ Item {
       contentMargin: root.style.contentMargin,
       headerHeight: root.style.chromeHeight,
       contentSpacing: root.style.sectionSpacing,
-      rootExtrasHeight: 0,
+      rootExtrasHeight: root.recoveryHeight,
       borderInsetY: Math.ceil(root.style.borderInsetY),
       maxRowsHeight: root.viewMaxRowsHeight,
       ceiling: Math.round(root.screenHeight * 0.7)
@@ -645,6 +701,9 @@ Item {
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
+        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : null
+        desktopRow.actionStatus = feedback ? feedback.status : ""
+        desktopRow.actionMessage = feedback ? feedback.message : ""
         rows.push(desktopRow)
       }
     } else if (query) {

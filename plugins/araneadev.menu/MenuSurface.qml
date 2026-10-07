@@ -85,7 +85,7 @@ Aranea.SurfaceCard {
       activeTitle: card.root.item(card.root.activeMenu) ? (card.root.item(card.root.activeMenu).title || card.root.item(card.root.activeMenu).label || "GO") : "GO"
       dmenuPrompt: card.root.dmenu.prompt
       hint: card.root.hint
-      rootSearchHint: card.root.fullRootHeader && !card.root.notice ? "Type to search apps, windows and commands" : ""
+      rootSearchHint: card.root.fullRootHeader && !card.root.notice ? "Type to search apps, windows and actions" : ""
       workspaceContext: card.root.style.workspaceContext
       clockContext: card.root.style.clockContext
       rootTiles: card.root.style.rootTiles
@@ -224,6 +224,35 @@ Aranea.SurfaceCard {
         // qmllint disable missing-property
         messageSize: card.root.style.menuFontSize(Style.font.title)
         // qmllint enable missing-property
+      }
+    }
+
+    Aranea.FilamentPill {
+      id: actionRecovery
+      objectName: "actionRecovery"
+      visible: !!card.root.recoveryLabel
+      width: Math.min(parent.width, implicitWidth)
+      height: visible ? Style.space(28) : 0
+      text: card.root.recoveryLabel
+      refined: true
+      labelFontFamily: card.root.style.fontFamily
+      pointerGate: card.pointerGate
+      hasCursor: card.root.recoveryFocused
+      labelColor: card.root.style.foreground
+      onClicked: card.root.recoverSelected()
+      Keys.onPressed: function (event) {
+        card.root.handleKey(event)
+      }
+      Accessible.role: Accessible.Button
+      Accessible.name: text
+    }
+    Connections {
+      target: card.root
+      function onRecoveryFocusedChanged() {
+        if (card.root.recoveryFocused)
+          actionRecovery.forceActiveFocus()
+        else
+          keyCatcher.forceActiveFocus()
       }
     }
   }
