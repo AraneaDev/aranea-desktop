@@ -32,6 +32,12 @@ expected_hero_frames=(
 
 for surface in "${surfaces[@]}"; do
   test -f "$repo_root/screenshots/$surface.png"
+  # A decoded PNG can still be a near-uniform shell startup frame.
+  deviation="$(convert "$repo_root/screenshots/$surface.png" -resize '160x90!' -format '%[fx:standard_deviation]' info: 2>/dev/null)"
+  if ! awk -v deviation="$deviation" 'BEGIN { exit !(deviation > 0.02) }'; then
+    echo "blank release capture: $surface" >&2
+    exit 1
+  fi
   if [[ "$surface" == dawn ]]; then
     grep -Eq 'screenshots/dawn\.png|backgrounds/variants/dawn\.png' "$readme"
   else
