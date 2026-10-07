@@ -126,10 +126,13 @@ ShellRoot {
       t.equal(menu.displayModel.count, 1, "root window prefix finds live window")
 
       t.equal(menu.displayModel.get(0).label, "Project <b>Window</b>", "untrusted display text remains literal data")
+      t.check(menu.displayModel.get(0).icon.length > 0, "window result has a type icon without a desktop app icon")
       menu.setFilter("workspace: Project")
       t.equal(menu.displayModel.get(0).desktopKey, "workspace:2", "workspace prefix finds typed workspace")
+      t.check(menu.displayModel.get(0).icon.length > 0, "workspace result reserves a recognizable icon")
       menu.setFilter("setting: scale")
       t.equal(menu.displayModel.get(0).desktopKey, "setting:display", "settings aliases find section destinations")
+      t.check(menu.displayModel.get(0).icon.length > 0, "settings result has a type icon")
       menu.setFilter("command: power")
       t.equal(menu.displayModel.get(0).desktopKey, "command:setup.power", "command prefix finds existing item")
       menu.handleKey(key(Qt.Key_Return))

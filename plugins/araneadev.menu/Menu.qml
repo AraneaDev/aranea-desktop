@@ -8,6 +8,7 @@ import "../araneadev.shared" as Aranea
 import "MenuModel.js" as MenuModel
 import "MenuLayout.js" as MenuLayout
 import "DesktopSearchLogic.js" as DesktopSearch
+import "DesktopResultPresentation.js" as ResultPresentation
 
 Item {
   id: root
@@ -639,6 +640,8 @@ Item {
         desktopRow.desktopKey = record.key
         desktopRow.targetKey = record.key
         desktopRow.resultType = record.type
+        if (!desktopRow.icon)
+          desktopRow.icon = ResultPresentation.fallbackIcon(record.type)
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
