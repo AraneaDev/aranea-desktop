@@ -1,8 +1,8 @@
 // Pure desktop record normalization and ranking. Matching is injected by the
 // generated DesktopSearchLogic facade from the canonical MenuSearch module.
 
-/** @typedef {"app"|"command"|"window"|"workspace"|"setting"} DesktopType */
-/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string}} DesktopTarget */
+/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"} DesktopType */
+/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string}} DesktopTarget */
 /** @typedef {{key: string, type: DesktopType, label: string, detail: string, aliases: Array<string>, target: DesktopTarget, available: boolean, pinned: boolean, recentRank: ?number, activeWorkspace: boolean}} DesktopRecord */
 /** @typedef {{id: string, label: string, aliases: Array<string>, description: string}} DesktopMatchEntry */
 /**
@@ -15,13 +15,13 @@
  */
 
 /**
- * Parses the five optional type prefixes, leaving unknown prefixes as text.
+ * Parses optional type prefixes, leaving unknown prefixes as text.
  * @param {*} text - query text
  * @returns {{type: ?DesktopType, text: string}} the filter and trimmed query
  */
 function parseQuery(text) {
   var raw = String(text || "").trim()
-  var prefix = /^(app|command|window|workspace|setting):\s*/i.exec(raw)
+  var prefix = /^(app|command|window|workspace|setting|action):\s*/i.exec(raw)
   return {
     type: prefix ? /** @type {DesktopType} */ (prefix[1].toLowerCase()) : null,
     text: prefix ? raw.slice(prefix[0].length).trim() : raw
@@ -44,7 +44,8 @@ function normalizeRecord(record) {
     command: "itemId",
     window: "address",
     workspace: "workspaceId",
-    setting: "section"
+    setting: "section",
+    action: "actionId"
   }
   if (!Object.prototype.hasOwnProperty.call(fields, type)) return null
   var label = typeof record.label === "string" ? record.label.trim() : ""
