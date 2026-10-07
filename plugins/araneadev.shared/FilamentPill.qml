@@ -38,7 +38,7 @@ Item {
   // Show the centered label; Settings navigation supplies an icon-label row.
   property bool labelVisible: true
   // Label colour, preserving the shared selected and muted defaults.
-  property color labelColor: selected ? DesignTokens.foreground : Util.alpha(DesignTokens.foreground, 0.55)
+  property color labelColor: selected ? DesignTokens.foreground : Util.alpha(DesignTokens.foreground, refined ? DesignTokens.secondaryOpacity : 0.55)
   // Label font family, with Settings opting into the host menu font.
   property string labelFontFamily: refined ? Typography.uiFamily : Style.font.family
   // Opt into proportional choice labels; interaction remains host-owned.

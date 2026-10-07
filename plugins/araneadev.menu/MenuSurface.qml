@@ -132,7 +132,7 @@ Aranea.SurfaceCard {
           anchors.verticalCenter: parent.verticalCenter
           textFormat: Text.PlainText
           text: "›"
-          color: card.root.filterText ? card.root.style.selectedText : Util.alpha(card.root.style.foreground, 0.58)
+          color: card.root.filterText ? card.root.style.selectedText : Util.alpha(card.root.style.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: card.root.style.fontFamily
           // Host font tokens are exposed through a dynamic QObject map.
           // qmllint disable missing-property

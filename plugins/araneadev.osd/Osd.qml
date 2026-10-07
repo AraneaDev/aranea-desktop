@@ -226,14 +226,14 @@ Item {
       Behavior on opacity {
         enabled: root.motionEnabled
         NumberAnimation {
-          duration: 160
+          duration: Aranea.DesignTokens.settleDuration
           easing.type: Easing.OutCubic
         }
       }
       Behavior on revealOffset {
         enabled: root.motionEnabled
         NumberAnimation {
-          duration: 160
+          duration: Aranea.DesignTokens.settleDuration
           easing.type: Easing.OutCubic
         }
       }

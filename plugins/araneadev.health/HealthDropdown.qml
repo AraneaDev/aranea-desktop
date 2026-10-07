@@ -29,7 +29,7 @@ Item {
   // Attention foreground token.
   readonly property color amber: Aranea.DesignTokens.attention
   // Availability-aware identity glyph foreground.
-  readonly property color statusColor: !available ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : status === "critical" ? Aranea.DesignTokens.urgent : status === "attention" ? root.amber : Aranea.DesignTokens.ceremony
+  readonly property color statusColor: !available ? Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity) : status === "critical" ? Aranea.DesignTokens.urgent : status === "attention" ? root.amber : Aranea.DesignTokens.ceremony
   // Reports a settled, keyed problem activation.
   signal problemActivated(int index, string key)
   // Requests a host-owned Resource details toggle.
@@ -211,7 +211,7 @@ Item {
       objectName: "keyHint"
       Layout.fillWidth: true
       text: "↑↓ move · enter open / expand"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       // qmllint disable missing-property
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption

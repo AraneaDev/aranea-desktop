@@ -1837,8 +1837,9 @@ Item {
         opacity: root.barMoveCandidate === modelData ? (root.transparent ? 0.45 : 0.7) : 0
 
         Behavior on opacity {
+          enabled: Aranea.DesignTokens.motionEnabled
           NumberAnimation {
-            duration: 140
+            duration: Aranea.DesignTokens.feedbackDuration
             easing.type: Easing.OutCubic
           }
         }

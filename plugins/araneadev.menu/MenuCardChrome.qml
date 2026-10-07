@@ -41,7 +41,7 @@ Item {
   // Public contract member.
   property color foreground: Color.menu.text
   // Public contract member.
-  property color contextText: Util.alpha(foreground, 0.58)
+  property color contextText: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Public contract member.
   property color selectedText: Color.menu.selectedText
   // Public contract member.

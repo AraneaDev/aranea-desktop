@@ -43,7 +43,12 @@ surface_border = "#33424b"
 surface_border_alpha = 0.48
 surface_shadow_alpha = 0.42
 
+[typography]
+secondary_opacity = 0.64
+
 [motion]
+feedback_ms = 120
+settle_ms = 160
 enabled = true
 reduced_motion_fallback = "static"
 

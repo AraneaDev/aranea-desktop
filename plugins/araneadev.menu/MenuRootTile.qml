@@ -28,7 +28,7 @@ BorderSurface {
   // Main tile text colour.
   property color foreground: Color.menu.text
   // Secondary tile text colour.
-  property color contextText: Util.alpha(foreground, 0.58)
+  property color contextText: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Accent colour for the icon and edge marks.
   property color selectedText: Color.menu.selectedText
   // Scale applied to the shell font sizes.

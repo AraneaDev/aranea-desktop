@@ -943,7 +943,7 @@ Panel {
       target: root
       property: "captionOpacity"
       to: 0.0
-      duration: 180
+      duration: Aranea.DesignTokens.motionEnabled ? Aranea.DesignTokens.feedbackDuration : 0
       easing.type: Easing.OutQuad
     }
     ScriptAction {
@@ -953,7 +953,7 @@ Panel {
       target: root
       property: "captionOpacity"
       to: 1.0
-      duration: 260
+      duration: Aranea.DesignTokens.motionEnabled ? Aranea.DesignTokens.feedbackDuration : 0
       easing.type: Easing.InQuad
     }
   }

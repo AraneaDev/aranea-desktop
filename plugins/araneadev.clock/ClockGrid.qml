@@ -131,7 +131,7 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: String(modelData)
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true

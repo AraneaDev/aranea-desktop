@@ -38,7 +38,7 @@ Item {
   // Trailing detail, e.g. "unplugged".
   property string detail: ""
   // The detail's colour; a host passes DesignTokens.urgent for a failure.
-  property color detailColor: Util.alpha(DesignTokens.foreground, 0.55)
+  property color detailColor: Util.alpha(DesignTokens.foreground, refined ? DesignTokens.secondaryOpacity : 0.55)
   // Whether this is the active device.
   property bool active: false
   // The lit node's colour and glow; a host tints it by state (Health's
@@ -115,7 +115,8 @@ Item {
   }
 
   implicitHeight: Style.space(30)
-  opacity: available ? 1 : 0.45
+  // Keep unavailable refined text readable while retaining a distinct dim state.
+  opacity: available ? 1 : refined ? 0.75 : 0.45
   Component.onCompleted: createdAt = Date.now()
   onLayoutStampChanged: row.pointerHovered = false
 
@@ -240,6 +241,9 @@ Item {
   Text {
     id: detailText
     objectName: "detailText"
+    // A long status must leave a primary label column and trailing action.
+    width: row.refined ? Math.min(implicitWidth, Math.max(0, row.width - glyphText.x - glyphText.width - Style.space(26) - (trailingSlot.width > 0 ? trailingSlot.width + Style.space(8) : 0)) * 0.4) : implicitWidth
+    elide: row.refined ? Text.ElideRight : Text.ElideNone
     anchors.right: parent.right
     anchors.rightMargin: Style.space(8) + (trailingSlot.width > 0 ? trailingSlot.width + Style.space(8) : 0)
     anchors.verticalCenter: parent.verticalCenter

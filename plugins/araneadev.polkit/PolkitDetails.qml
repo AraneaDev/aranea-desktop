@@ -15,7 +15,7 @@ ColumnLayout {
   // Main value text colour.
   property color foreground: Color.polkit.text
   // Muted key text colour.
-  property color dim: Util.alpha(foreground, 0.58)
+  property color dim: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Selection highlight colour for copied values.
   property color accent: Color.polkit.accent
   // Letter spacing applied to keys.

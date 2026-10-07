@@ -41,7 +41,7 @@ Panel {
   // Colour of the "attention" status and levels.
   readonly property color amber: Aranea.DesignTokens.attention
   // Icon colour for the current status.
-  readonly property color statusColor: !available ? Util.alpha(Aranea.DesignTokens.foreground, 0.55) : status === "critical" ? Aranea.DesignTokens.urgent : (status === "attention" ? amber : Aranea.DesignTokens.ceremony)
+  readonly property color statusColor: !available ? Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity) : status === "critical" ? Aranea.DesignTokens.urgent : (status === "attention" ? amber : Aranea.DesignTokens.ceremony)
   // Key of the cursor's problem or disclosure heading ("" for none);
   // rows re-sort as checks run, so the cursor follows the problem, not a
   // position. Only the keyboard (and a click) places it; hover never does.

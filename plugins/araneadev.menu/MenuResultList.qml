@@ -258,7 +258,7 @@ Item {
           textFormat: Text.PlainText
           text: row.shownDetail
           visible: (results.fullRootHeader || results.filterText || row.kind === "dmenu") && row.shownDetail.length > 0
-          color: row.actionStatus === "failed" ? Aranea.DesignTokens.urgent : row.resultType ? Util.alpha(results.foreground, 0.64) : row.lit ? results.selectedText : results.foreground
+          color: row.actionStatus === "failed" ? Aranea.DesignTokens.urgent : row.resultType ? Util.alpha(results.foreground, Aranea.DesignTokens.secondaryOpacity) : row.lit ? results.selectedText : results.foreground
           opacity: row.resultType ? 1 : row.lit ? 0.7 : 0.52
           font.family: results.fontFamily
           font.pixelSize: results.menuFontScale * Style.font.caption
@@ -275,7 +275,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
         text: ResultPresentation.typeLabel(row.resultType)
-        color: Util.alpha(results.foreground, 0.64)
+        color: Util.alpha(results.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: results.fontFamily
         font.pixelSize: results.menuFontScale * Style.font.caption
       }

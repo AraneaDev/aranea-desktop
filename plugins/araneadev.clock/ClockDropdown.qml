@@ -128,7 +128,7 @@ Column {
         width: Math.ceil(monthMetrics.advanceWidth)
         horizontalAlignment: Text.AlignHCenter
         text: dropdown.view && dropdown.view.monthLabel ? dropdown.view.monthLabel : ""
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
 
@@ -237,7 +237,7 @@ Column {
     objectName: "keyHint"
     width: parent.width
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

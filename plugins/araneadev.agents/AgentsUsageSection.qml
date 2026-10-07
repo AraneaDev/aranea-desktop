@@ -44,7 +44,7 @@ Column {
     textFormat: Text.PlainText
     visible: section.caption !== ""
     text: section.caption
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
@@ -74,7 +74,7 @@ Column {
       // Whether the row's detail tooltip shows.
       readonly property bool detailShown: hover.hovered && String(usageRow.row.detail || "") !== ""
       // Label and value colour: full for today and models, muted otherwise.
-      readonly property color textColor: usageRow.today || section.stacked ? Aranea.DesignTokens.foreground : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      readonly property color textColor: usageRow.today || section.stacked ? Aranea.DesignTokens.foreground : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
 
       objectName: "usageRow"
       width: section.width

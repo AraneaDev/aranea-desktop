@@ -70,7 +70,7 @@ Item {
     anchors.right: trailingSlot.left
     anchors.rightMargin: Style.space(12)
     anchors.verticalCenter: parent.verticalCenter
-    spacing: Style.space(2)
+    spacing: Style.space(header.refined ? 4 : 2)
     Text {
       textFormat: Text.PlainText
       width: parent.width
@@ -88,7 +88,7 @@ Item {
       text: header.refined ? header.caption : header.caption.toUpperCase()
       opacity: header.captionOpacity
       elide: Text.ElideRight
-      color: Util.alpha(DesignTokens.foreground, 0.55)
+      color: Util.alpha(DesignTokens.foreground, header.refined ? DesignTokens.secondaryOpacity : 0.55)
       font.family: header.labelFontFamily
       font.pixelSize: Style.font.caption
       font.bold: !header.refined

@@ -31,7 +31,7 @@ function fallbackIcon(type) {
     window: 0xf02d1,
     workspace: 0xf0099,
     setting: 0xf0493,
-    action: 0xf0e0b
+    action: 0xf0e7
   }
   return codes[type] ? String.fromCodePoint(codes[type]) : ""
 }

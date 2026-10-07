@@ -325,7 +325,7 @@ Column {
     width: parent.width
     visible: (dropdown.view.emptyText || "") !== ""
     text: dropdown.view.emptyText || ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
     wrapMode: Text.WordWrap
@@ -334,7 +334,7 @@ Column {
     objectName: "keyHint"
     width: parent.width
     text: "↑↓ move · enter toggle · x forget · b power"
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

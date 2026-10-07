@@ -159,7 +159,7 @@ Column {
       textFormat: Text.PlainText
       text: String(menu.view && menu.view.title ? menu.view.title : "")
       elide: Text.ElideRight
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -172,7 +172,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: "app menu"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
     }
@@ -209,7 +209,7 @@ Column {
         anchors.verticalCenter: parent.verticalCenter
         horizontalAlignment: Text.AlignHCenter
         text: String.fromCodePoint(0x2039)
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.iconFamily
         font.pixelSize: Style.font.body
       }
@@ -222,7 +222,7 @@ Column {
         textFormat: Text.PlainText
         text: String(menu.view && menu.view.crumb ? menu.view.crumb : "")
         elide: Text.ElideRight
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
@@ -388,7 +388,7 @@ Column {
             anchors.rightMargin: Style.space(6)
             anchors.verticalCenter: parent.verticalCenter
             text: String.fromCodePoint(0x203A)
-            color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+            color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
             font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.body
           }
@@ -425,7 +425,7 @@ Column {
     topPadding: Style.space(4)
     bottomPadding: Style.space(4)
     text: "No menu entries"
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
   }
@@ -434,7 +434,7 @@ Column {
     width: parent.width
     topPadding: Style.space(4)
     text: menu.view && menu.view.keyHint ? menu.view.keyHint : ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

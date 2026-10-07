@@ -9,7 +9,7 @@ with enough neutral space for information to remain legible.
 - Obsidian background: `#08090b`
 - Mint signal accent: `#3bff9e`
 - Violet secondary accent: `#7a5cff`
-- Foreground: `#e7ecf3`
+- Foreground: `#edf3f6`
 - Muted foreground: `#8b96a6`
 
 Mint communicates active, ready, or healthy. Violet marks identity and
@@ -52,14 +52,20 @@ including zero and individual edge overrides. Urgent/error surfaces retain
 semantic colors; the launcher and lock keep their restrained ceremonial marks.
 The launcher adapts its row viewport to available logical screen height rather
 than forcing early scrolling at a fixed 250-pixel ceiling. Shared controls
-retain legacy opt-in defaults for external consumers.
+retain legacy opt-in defaults for external consumers. Refined headers separate
+related labels by four pixels. Secondary captions and hints use the shared 64%
+foreground role, leaving primary names and decisions brighter. Device rows bound
+and elide long details before they can crowd labels or trailing controls.
 
 ## Motion
 
 Feedback should feel immediate, panels should settle gently, and ceremonial
 transitions should have room to breathe. Reduced motion is a first-class
 behavior, not an afterthought. A static state must remain understandable when
-animations are disabled.
+animations are disabled. Existing hover and selection feedback uses 120 ms;
+panels and disclosures settle in 160 ms. Reduced motion displays the final state
+immediately, including picker hover, tray disclosure and bar move feedback.
+Busy pulses retain their established ceremonial rhythm and static fallback.
 
 ## Identity system
 
@@ -84,7 +90,7 @@ Identity leads, followed by the decision state, compact context and optional det
 Summary values use the subtitle token with bold weight. Sections use `Style.space(16)`,
 rows use `Style.space(8)`, and adjacent labels use `Style.space(4)`. Neutral hairlines
 separate content; mint outlines identify keyboard targets. Pilot keyboard hints use the
-existing muted-caption foreground treatment (55% foreground alpha).
+shared secondary foreground treatment (64% foreground alpha).
 
 Health keeps its severity text and actionable problems visible before Resource details
 and Processes. Unavailable data displays an em dash and an explicit unavailable summary.

@@ -130,7 +130,7 @@ Column {
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: caption.title
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -142,7 +142,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: caption.trailing
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
     }
@@ -190,7 +190,7 @@ Column {
           anchors.verticalCenter: parent.verticalCenter
           text: pair.modelData.label || ""
           elide: Text.ElideRight
-          color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
         }
@@ -237,7 +237,7 @@ Column {
         objectName: "historyStart"
         anchors.left: parent.left
         text: dropdown.history.startLabel || ""
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.caption
       }
@@ -246,7 +246,7 @@ Column {
         objectName: "historyNow"
         anchors.right: parent.right
         text: "now"
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
       }
@@ -352,7 +352,7 @@ Column {
     width: parent.width
     topPadding: Style.space(4)
     text: dropdown.view && dropdown.view.keyHint ? dropdown.view.keyHint : ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

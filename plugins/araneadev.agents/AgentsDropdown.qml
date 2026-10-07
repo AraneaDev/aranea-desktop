@@ -252,7 +252,7 @@ Column {
         text: "No AI coding subscriptions found.\nAgents show up here once you've used them."
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
       }
@@ -370,7 +370,7 @@ Column {
         text: String(dropdown.view.footer || "")
         horizontalAlignment: Text.AlignHCenter
         elide: Text.ElideRight
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
       }
@@ -384,7 +384,7 @@ Column {
     // No hint, no line: an empty hint takes no height.
     visible: text !== ""
     text: String(dropdown.view.keyHint || "")
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight

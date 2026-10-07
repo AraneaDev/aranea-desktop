@@ -32,7 +32,7 @@ Item {
   // Lock-grade dim: at least 0.72, whatever the theme's scrim alpha is.
   readonly property color scrim: Qt.rgba(Color.polkit.scrim.r, Color.polkit.scrim.g, Color.polkit.scrim.b, Math.max(Color.polkit.scrim.a, 0.72))
   // Secondary text colour: foreground at 58% alpha.
-  readonly property color dim: Util.alpha(foreground, 0.58)
+  readonly property color dim: Util.alpha(foreground, Aranea.DesignTokens.secondaryOpacity)
   // Letter spacing for the uppercase labels.
   readonly property real letterSpacing: 0
   // file:// URL of the Aranea glyph from the current theme's branding, shown in the header.

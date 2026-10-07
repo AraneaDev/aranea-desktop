@@ -15,8 +15,13 @@ bundled Inter. `defaultUiFamily` also drives the Settings default preview.
 `refined: false` for a deliberate host migration. Refined presentation uses
 proportional labels, untracked captions and neutral panel borders; selection,
 pointer gates and keyboard signals keep their existing contracts. Label fonts
-remain overridable, and `StatusTextPair.valueFontFamily` independently controls
-technical subtitles. `PanelChrome.popupBorder(refined)` keeps the host's resolved
+remain overridable. Refined captions use the shared 64% foreground role; related
+header labels use the four-pixel spacing step. Long device details elide in a
+bounded column so labels and trailing actions keep their space. Existing
+feedback uses 120 ms and panel settling 160 ms, with immediate final states
+under reduced motion. These values come from `design/tokens.toml`.
+
+`StatusTextPair.valueFontFamily` independently controls technical subtitles. `PanelChrome.popupBorder(refined)` keeps the host's resolved
 popup border widths, including zero and individual side overrides, when
 refined hosts select a neutral color.
 

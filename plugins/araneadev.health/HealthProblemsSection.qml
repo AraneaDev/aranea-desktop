@@ -80,7 +80,7 @@ Column {
     objectName: "problemsCaption"
     width: parent.width
     text: "PROBLEMS · " + section.problems.length
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true

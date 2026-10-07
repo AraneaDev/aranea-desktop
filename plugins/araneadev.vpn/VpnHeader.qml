@@ -15,5 +15,5 @@ Aranea.DropdownHeader {
 
   objectName: "vpnHeader"
   title: "VPN"
-  glyphColor: header.iconState === "alert" ? Aranea.DesignTokens.urgent : header.iconState === "up" ? Aranea.DesignTokens.accent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+  glyphColor: header.iconState === "alert" ? Aranea.DesignTokens.urgent : header.iconState === "up" ? Aranea.DesignTokens.accent : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
 }

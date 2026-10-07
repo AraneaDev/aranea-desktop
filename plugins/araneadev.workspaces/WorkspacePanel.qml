@@ -228,7 +228,7 @@ Item {
               anchors.top: parent.top
               label: WorkspaceModel.workspaceLabel(rowWrap.workspace)
               detail: WorkspaceModel.workspaceDetail(rowWrap.workspace)
-              detailColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+              detailColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
               nodeColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.accent
               // Lit (filled, glowing) for the current workspace, and for an
               // urgent one even when it is not current, so attention is
@@ -269,7 +269,7 @@ Item {
       objectName: "keyHint"
       Layout.fillWidth: true
       text: "↑↓ move · enter focus · wheel cycle"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight
