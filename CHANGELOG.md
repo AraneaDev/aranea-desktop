@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.21.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.21.0...v2.21.1) (2026-10-07)
+
+
+### Fixes
+
+* **showcase:** refresh fonts and reorganize README ([#130](https://github.com/AraneaDev/aranea-desktop/issues/130)) ([db7db8d](https://github.com/AraneaDev/aranea-desktop/commit/db7db8d2d5c80d791f1dfe5ceaf2aca9cf94562a))
+
 ## [2.21.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.20.0...v2.21.0) (2026-10-07)
 
 
