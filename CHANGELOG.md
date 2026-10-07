@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.22.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.1...v2.22.2) (2026-10-07)
+
+
+### Fixes
+
+* isolate screenshot sessions from live desktop services ([#136](https://github.com/AraneaDev/aranea-desktop/issues/136)) ([834a0af](https://github.com/AraneaDev/aranea-desktop/commit/834a0af66f575bfa016f6df658569b479d1d60eb))
+
 ## [2.22.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.0...v2.22.1) (2026-10-07)
 
 
