@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.21.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.20.0...v2.21.0) (2026-10-07)
+
+
+### Features
+
+* bundle fonts and default to Inter and JetBrains Mono ([#128](https://github.com/AraneaDev/aranea-desktop/issues/128)) ([cdf524a](https://github.com/AraneaDev/aranea-desktop/commit/cdf524a5e2353699905a7a494555f4759c515f5b))
+
 ## [2.20.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.19.0...v2.20.0) (2026-10-06)
 
 
