@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.22.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.2...v2.22.3) (2026-10-08)
+
+
+### Fixes
+
+* restore tray icon clicks and respect drawer clipping ([#138](https://github.com/AraneaDev/aranea-desktop/issues/138)) ([ed9205b](https://github.com/AraneaDev/aranea-desktop/commit/ed9205b8967706642dfd018aa2f8126b733539ee))
+
 ## [2.22.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.1...v2.22.2) (2026-10-07)
 
 
