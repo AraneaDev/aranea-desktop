@@ -7,10 +7,15 @@ import "plugins/araneadev.tray" as Tray
 
 ShellRoot {
   id: testRoot
+  // Primary activations reported by the fixture app.
   property int activations: 0
+  // Secondary activations reported by the fixture app.
   property int secondaryActivations: 0
+  // Live button targets registered with the fixture bar.
   property var targets: []
+  // Menu requests reported by the tray button.
   property int menus: 0
+  // Coordinates of the last menu request.
   property var menuPoint: null
   QmlTest {
     id: t

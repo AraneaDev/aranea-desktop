@@ -9,6 +9,12 @@ const body = source.slice(
 )
 const makeRouter = new Function("clickTargets", body + "\n return {moduleClickTargetAt};")
 
+/**
+ * Build a tray drawer scene with native clipping geometry for the router.
+ * @param {boolean} vertical - whether the bar is vertical
+ * @param {number} reveal - currently visible drawer extent
+ * @returns {*} the slot, drawer icon, chevron, and actual host router
+ */
 function scene(vertical, reveal) {
   const slot = {
     width: vertical ? 30 : 25 + reveal,

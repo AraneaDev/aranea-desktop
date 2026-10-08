@@ -4,7 +4,7 @@ const fs = require("node:fs")
 const { test } = require("node:test")
 const source = fs.readFileSync("plugins/araneadev.bar/Bar.qml", "utf8")
 const body = source.match(
-  /function syncPluginBarApiObjects\(api\) \{([\s\S]*?)\n  \}\n\n  \/\/ Ownership/
+  /function syncPluginBarApiObjects\(api\) \{([\s\S]*?)\n {2}\}\n\n {2}\/\/ Ownership/
 )[1]
 const sync = new Function("root", "api", body)
 
