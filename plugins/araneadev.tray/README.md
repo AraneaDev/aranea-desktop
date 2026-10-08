@@ -73,7 +73,12 @@ clicks and gated hover). They are tested on their own (`tests/qml/tray-menu.qml`
 - `scripts/release-shell-config` reverses the retarget.
 - `scripts/deploy-plugins-safely` deploys the plugin directory.
 
+`TrayItemButton.qml` registers each app icon with the bar click router so the
+bar's drag surface can forward a completed click. Native clicks use the same
+dispatch, and right-click menus open on release, after the icon's click completes.
+
 ## Validation
 
-Run `tests/shell-config.test.sh`, `tests/shell-deploy.test.sh` and `tools/check-docs --root .
+Run `tests/qml-behaviour.test.sh tray-widget tray-menu tray-manage`,
+`tests/shell-config.test.sh`, `tests/shell-deploy.test.sh` and `tools/check-docs --root .
 plugins/araneadev.tray/Tray.qml`.
