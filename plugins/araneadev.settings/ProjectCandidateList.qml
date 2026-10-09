@@ -10,6 +10,8 @@ ColumnLayout {
   property var candidates: []
   // Exact checkout paths explicitly selected for Add selected.
   property var selectedPaths: []
+  // Already approved checkout members stay separate from selectable review paths.
+  property var registeredPaths: []
   // Disable every action during inert capture or another registry mutation.
   property bool displayOnly: false
   // Shared pointer/layout settling gate.
@@ -36,7 +38,9 @@ ColumnLayout {
       }))
         result.push(checkouts[i])
     }
-    return result
+    return result.filter(function (checkout) {
+      return list.registeredPaths.indexOf(checkout.path) < 0
+    })
   }
   // Candidate selection changes presentation only, never the registry.
   function select(path: string, selected: bool): void {
@@ -56,13 +60,18 @@ ColumnLayout {
       next.push(path)
     selectedPaths = next
   }
-  onCandidatesChanged: selectedPaths = selectedPaths.filter(function (path) {
-    return candidates.some(function (c) {
-      return paths(c).some(function (p) {
-        return p.path === path
+  // Remove selected members after backend approval without discarding their siblings.
+  function reconcileSelection(): void {
+    selectedPaths = selectedPaths.filter(function (path) {
+      return candidates.some(function (c) {
+        return paths(c).some(function (p) {
+          return p.path === path
+        })
       })
     })
-  })
+  }
+  onCandidatesChanged: reconcileSelection()
+  onRegisteredPathsChanged: reconcileSelection()
   spacing: Style.space(12)
   Repeater {
     model: list.groups

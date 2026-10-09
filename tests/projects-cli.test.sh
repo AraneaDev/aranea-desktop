@@ -135,8 +135,21 @@ jq -se 'last.code=="OPERATION_LOST"' "$events" >/dev/null
 git -C "$checkout" -c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty -qm initial
 alternate="$ARANEA_TEST_SANDBOX/alternate"
 git -C "$checkout" worktree add -q -b alternate "$alternate"
+# An explicitly scanned anchor retains its unregistered external sibling for review.
+run_cli 0 projects roots add "$checkout"
+review_root=$(jq -r --arg path "$checkout" 'select(.event=="completed")|.data.state.roots[]|select(.path==$path)|.id' "$events")
+run_cli 0 projects discover --root "$review_root"
+jq -se --arg anchor "$checkout" --arg sibling "$alternate" 'any(.[];.event=="step" and .data.candidate.path==$anchor and any(.data.candidate.checkouts[];.path==$sibling))' "$events" >/dev/null || {
+  echo 'Anchor registration hid its unregistered external sibling on refresh' >&2
+  exit 1
+}
+run_cli 0 projects inspect "$project"
+jq -se 'last.data.project.checkouts|length==1' "$events" >/dev/null
 run_cli 0 projects register --path "$alternate"
 alternate_id=$(jq -r --arg path "$alternate" 'select(.event=="completed") | .data.state.projects[0].checkouts[]|select(.path==$path)|.id' "$events")
+run_cli 0 projects discover --root "$review_root"
+jq -se 'all(.[];.event!="step" or .data.candidate==null)' "$events" >/dev/null
+run_cli 0 projects roots remove "$review_root"
 jq -cn --arg project "$project" --arg checkout "$alternate_id" '{action:"select-checkout",args:{projectId:$project,checkoutId:$checkout}}' | "$repo_root/scripts/aranea-project-store" mutate >/dev/null
 CLI_MODE=observed run_cli 0 projects open "$project" --separate
 jq -se --arg checkout "$alternate_id" 'map(select(.[1]=="request"))|last|.[2]|fromjson|.checkoutId==$checkout and .separate==true' "$CLI_CALLS" >/dev/null

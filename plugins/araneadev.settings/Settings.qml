@@ -51,9 +51,13 @@ Item {
         if (added)
           root.projectId = added.id
         discoveryClient.candidates = discoveryClient.candidates.filter(function (c) {
-          return !state.projects.some(function (p) {
-            return p.checkouts.some(function (checkout) {
-              return checkout.path === c.path
+          return [c.path].concat((c.checkouts || []).map(function (checkout) {
+            return checkout.path
+          })).some(function (path) {
+            return !state.projects.some(function (p) {
+              return p.checkouts.some(function (checkout) {
+                return checkout.path === path
+              })
             })
           })
         })

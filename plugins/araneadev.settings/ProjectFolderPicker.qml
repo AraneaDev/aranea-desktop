@@ -16,6 +16,8 @@ ColumnLayout {
   property bool displayOnly: false
   // Draft is presentation only; backend remains the canonical path validator.
   property string pathDraft: ''
+  // An owning presentation model can retain drafts across checkout delegate recreation.
+  property bool externalDraft: false
   // Shared pointer/layout settling gate.
   property var pointerGate: null
   // Explain chooser errors while keeping the manual alternative accessible.
@@ -28,9 +30,18 @@ ColumnLayout {
   readonly property bool validPath: Logic.normalizeFolder(pathDraft) !== ''
   // User confirmed a folder; consumers decide whether to add a root or relocate.
   signal folderRequested(string path)
+  // Draft edits remain presentation only when a parent supplies the draft value.
+  signal pathEdited(string path)
+  // Keep externally supplied path bindings intact while typing or choosing a folder.
+  function editPath(value: string): void {
+    if (externalDraft)
+      pathEdited(value)
+    else
+      pathDraft = value
+  }
   // Normalize local file URLs without interpreting folder text as commands.
   function setPath(value: string): void {
-    pathDraft = Logic.normalizeFolder(value) || value
+    editPath(Logic.normalizeFolder(value) || value)
   }
   // Confirm the edited folder through the typed view boundary.
   function confirm(): void {
@@ -69,7 +80,7 @@ ColumnLayout {
     placeholderText: '/home/you/Projects'
     enabled: !picker.displayOnly
     font.family: Style.font.family
-    onTextEdited: picker.pathDraft = text
+    onTextEdited: picker.editPath(text)
     onAccepted: picker.confirm()
     Accessible.name: 'Absolute project folder path'
   }

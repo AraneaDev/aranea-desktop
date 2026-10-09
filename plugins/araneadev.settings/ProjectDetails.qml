@@ -32,6 +32,8 @@ ColumnLayout {
   property bool dirty: false
   // Identity whose local draft is currently being edited.
   property string draftProjectId: ''
+  // Locate-folder presentation drafts survive delegate recreation under stable identities.
+  property var relocationDrafts: ({})
   // Show installed tool choices whenever saved adapters are missing or unavailable.
   readonly property bool toolChoiceRequired: !supported('editors', project && project.tools ? project.tools.editorId || (tools.defaults || {}).editorId : null) || !supported('terminals', project && project.tools ? project.tools.terminalId || (tools.defaults || {}).terminalId : null)
   // Explicit backend configuration request.
@@ -44,6 +46,19 @@ ColumnLayout {
   signal locateRequested(string projectId, string checkoutId, string path)
   // Removing registration never closes windows or deletes repository files.
   signal removeRequested(string projectId)
+  // Edit one exact checkout relocation draft without persisting or launching anything.
+  function setRelocationDraft(projectId: string, checkoutId: string, path: string): void {
+    if (!project || project.id !== projectId || !(project.checkouts || []).some(function (c) {
+      return c.id === checkoutId
+    }))
+      return
+    var key = projectId + ':' + checkoutId
+    if (relocationDrafts[key] === path)
+      return
+    var next = Object.assign({}, relocationDrafts)
+    next[key] = path
+    relocationDrafts = next
+  }
   // Return installed supported choices only.
   function choices(role: string): var {
     return (tools[role] || []).filter(function (t) {
@@ -256,7 +271,13 @@ ColumnLayout {
           })
         }
         ProjectFolderPicker {
+          objectName: 'locateFolder:' + details.project.id + ':' + checkout.modelData.id
           buttonText: 'Locate folder'
+          externalDraft: true
+          pathDraft: details.relocationDrafts[details.project.id + ':' + checkout.modelData.id] || ''
+          onPathEdited: function (path) {
+            details.setRelocationDraft(details.project.id, checkout.modelData.id, path)
+          }
           Layout.fillWidth: true
           displayOnly: details.displayOnly || details.pending
           pointerGate: details.pointerGate

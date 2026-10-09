@@ -6,6 +6,16 @@ test("unknown sections fall back while supported destinations survive", () => {
   assert.equal(logic.normalizeSection("unknown"), "appearance")
   assert.equal(logic.normalizeSection("schedule"), "schedule")
 })
+test("local file URLs reject query and fragment components without changing path identity", () => {
+  assert.equal(logic.normalizeFolder("file:///tmp/repo?revision=1"), "")
+  assert.equal(logic.normalizeFolder("file:///tmp/repo#main"), "")
+  assert.equal(
+    logic.normalizeFolder("file:///tmp/repo%23main%3Frevision%3D1"),
+    "/tmp/repo#main?revision=1"
+  )
+  assert.equal(logic.normalizeFolder("/tmp/repo#main?revision=1"), "/tmp/repo#main?revision=1")
+  assert.equal(logic.normalizeFolder("file://localhost/tmp/repo%23main"), "/tmp/repo#main")
+})
 test("schedule rejects invalid clock values, missing phases and nonascending times", () => {
   assert.equal(logic.validateSchedule(["06:00", "08:00", "18:00", "20:00"]).ok, true)
   for (const times of [

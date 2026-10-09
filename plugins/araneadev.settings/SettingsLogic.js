@@ -33,7 +33,7 @@ function normalizeProjectId(value) {
 function normalizeFolder(value) {
   if (typeof value !== "string") return ""
   if (value.indexOf("file://") === 0) {
-    if (!/^file:\/\/(localhost)?\//.test(value)) return ""
+    if (!/^file:\/\/(localhost)?\//.test(value) || /[?#]/.test(value)) return ""
     try {
       value = decodeURIComponent(value.replace(/^file:\/\/(localhost)?/, ""))
     } catch (e) {

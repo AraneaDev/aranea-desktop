@@ -75,6 +75,21 @@ ShellRoot {
       host.sent = host.sent.concat([paths])
     }
   }
+  QtObject {
+    id: owner
+    property var snapshot: ({
+        sessionId: 'session-one',
+        availability: {
+          compositor: true
+        },
+        operations: []
+      })
+    property bool available: true
+    property bool pending: false
+    property string error: ''
+    // Inert owner operation observations never submit or launch desktop work.
+    signal operationChanged(var operation)
+  }
   Settings.ProjectFolderPicker {
     id: picker
     chooserAvailable: false
@@ -103,9 +118,201 @@ ShellRoot {
     page.candidateList.select('/outside/worktree', true)
     t.equal(page.candidateList.selectedPaths, ['/tmp/fixture/repo', '/outside/worktree'], 'external worktree selected separately')
     t.equal(page.candidateList.groups.length, 2, 'duplicate names retain distinct groups')
+    page.registryState = {
+      roots: [],
+      ignored: [],
+      projects: [
+        {
+          id: 'p-review',
+          name: 'Same',
+          commonDir: '/tmp/fixture/repo/.git',
+          tools: {},
+          workspaceMode: 'dedicated',
+          lastCheckoutId: 'c-anchor',
+          checkouts: [
+            {
+              id: 'c-anchor',
+              path: '/tmp/fixture/repo'
+            }
+          ]
+        }
+      ]
+    }
+    t.equal(page.candidateList.groups.length, 2, 'anchor registration preserves unregistered related worktree group')
+    page.candidateList.select('/tmp/fixture/repo', true)
+    t.equal(page.candidateList.selectedPaths, ['/outside/worktree'], 'registered anchor cannot be reselected')
+    page.addSelected()
+    t.equal(sent[1], ['/outside/worktree'], 'external sibling can be added after anchor registration')
+    page.registryState = {
+      roots: [],
+      ignored: [],
+      projects: [
+        {
+          id: 'p-review',
+          name: 'Same',
+          commonDir: '/tmp/fixture/repo/.git',
+          tools: {},
+          workspaceMode: 'dedicated',
+          lastCheckoutId: 'c-anchor',
+          checkouts: [
+            {
+              id: 'c-anchor',
+              path: '/tmp/fixture/repo'
+            },
+            {
+              id: 'c-external',
+              path: '/outside/worktree'
+            }
+          ]
+        }
+      ]
+    }
+    t.equal(page.candidateList.groups.length, 1, 'fully registered group disappears after last selectable checkout is added')
+    page.projectClient = owner
+    page.projectId = 'p-review'
+    owner.operationChanged({
+      id: 'op-old',
+      generation: 1,
+      sessionId: 'session-one',
+      projectId: 'p-review',
+      checkoutId: 'c-anchor',
+      state: 'completed',
+      steps: [
+        {
+          role: 'terminal',
+          status: 'unconfirmed'
+        }
+      ]
+    })
+    t.check(page.details.recoveryAllowed('terminal', 'new'), 'exact observed unconfirmed role offers explicit recovery')
+    owner.snapshot = {
+      sessionId: 'session-one',
+      availability: {
+        compositor: true
+      },
+      operations: [
+        {
+          id: 'op-old',
+          generation: 1,
+          sessionId: 'session-one',
+          projectId: 'p-review',
+          checkoutId: 'c-anchor',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'unconfirmed'
+            }
+          ]
+        },
+        {
+          id: 'op-new',
+          generation: 2,
+          sessionId: 'session-one',
+          projectId: 'p-review',
+          checkoutId: 'c-anchor',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'observed'
+            }
+          ]
+        }
+      ]
+    }
+    t.check(!page.details.recoveryAllowed('terminal', 'new'), 'newer observed owner snapshot clears old unconfirmed recovery')
+    t.equal(page.details.operation.id, 'op-new', 'snapshot selects latest exact checkout outcome')
+    owner.snapshot = {
+      sessionId: 'session-one',
+      availability: {
+        compositor: true
+      },
+      operations: [
+        {
+          id: 'op-other-checkout',
+          generation: 3,
+          sessionId: 'session-one',
+          projectId: 'p-review',
+          checkoutId: 'c-external',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'unconfirmed'
+            }
+          ]
+        },
+        {
+          id: 'op-new',
+          generation: 2,
+          sessionId: 'session-one',
+          projectId: 'p-review',
+          checkoutId: 'c-anchor',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'observed'
+            }
+          ]
+        }
+      ]
+    }
+    t.equal(page.details.operation.id, 'op-new', 'another checkout outcome does not replace exact checkout recovery')
+    owner.operationChanged({
+      id: 'op-delayed',
+      generation: 1,
+      sessionId: 'session-one',
+      projectId: 'p-review',
+      checkoutId: 'c-anchor',
+      state: 'completed',
+      steps: [
+        {
+          role: 'terminal',
+          status: 'unconfirmed'
+        }
+      ]
+    })
+    t.equal(page.details.operation.id, 'op-new', 'delayed client outcome cannot supersede newer snapshot generation')
+    var recoverySnapshot = page.captureSnapshot()
+    page.recoveryCheckoutId = 'c-external'
+    page.captureRestore(recoverySnapshot)
+    t.equal(page.recoveryCheckoutId, 'c-anchor', 'capture retains exact owner recovery checkout destination')
+    owner.snapshot = {
+      sessionId: 'session-two',
+      availability: {
+        compositor: true
+      },
+      operations: []
+    }
+    t.equal(page.details.operation, null, 'session change clears stale recovery')
+    owner.operationChanged({
+      id: 'op-stale',
+      generation: 9,
+      sessionId: 'session-one',
+      projectId: 'p-review',
+      checkoutId: 'c-anchor',
+      state: 'completed',
+      steps: [
+        {
+          role: 'terminal',
+          status: 'unconfirmed'
+        }
+      ]
+    })
+    t.equal(page.details.operation, null, 'old-session event cannot resurrect recovery')
     page.displayOnly = true
     page.addSelected()
-    t.equal(sent.length, 1, 'inert capture refuses registration')
+    t.equal(sent.length, 2, 'inert capture refuses registration')
+    page.registryState = Object.assign({}, page.registryState, {
+      ignored: [
+        {
+          path: '/ignored',
+          commonDir: '/ignored/.git'
+        }
+      ]
+    })
     t.check(page.partial, 'partial scan remains actionable')
     t.equal(page.ignored.length, 1, 'ignored review comes from durable metadata')
     picker.setPath('file:///tmp/a%20folder')
@@ -136,8 +343,15 @@ ShellRoot {
             terminalId: 'kitty'
           },
           workspaceMode: 'dedicated',
-          checkouts: [],
-          lastCheckoutId: null
+          checkouts: [
+            {
+              id: 'c-real',
+              path: '/real',
+              branch: 'main',
+              primary: true
+            }
+          ],
+          lastCheckoutId: 'c-real'
         }
       ]
     }
@@ -196,6 +410,10 @@ ShellRoot {
     var realPage = t.findChild(surface, 'projectsPage')
     realPage.details.setDraft('name', 'Unsaved')
     realPage.details.customized = true
+    var locate = t.findChild(realPage, 'locateFolder:p-one:c-real')
+    t.check(!!locate, 'registered checkout exposes stable Locate folder draft')
+    if (locate)
+      locate.setPath('/replacement draft')
     realPage.candidateList.select('/review', true)
     var snapshot = entry.captureSnapshot()
     var before = sent.length
@@ -208,7 +426,23 @@ ShellRoot {
         projectsState: {
           roots: [],
           ignored: [],
-          projects: []
+          projects: [
+            {
+              id: 'p-fixture',
+              name: 'Fixture',
+              tools: {},
+              workspaceMode: 'dedicated',
+              checkouts: [
+                {
+                  id: 'c-fixture',
+                  path: '/fixture',
+                  branch: 'fixture',
+                  primary: true
+                }
+              ],
+              lastCheckoutId: 'c-fixture'
+            }
+          ]
         }
       }
     })), 'ok', 'Projects accepts typed inert fixtures')
@@ -232,6 +466,8 @@ ShellRoot {
     t.equal(realPage.details.draft.name, 'Unsaved', 'capture restores unsaved project details draft')
     t.check(realPage.details.dirty && realPage.details.customized, 'capture restores draft status and customization disclosure')
     t.equal(realPage.candidateList.selectedPaths, ['/review'], 'capture restores explicit candidate selection')
+    var restoredLocate = t.findChild(realPage, 'locateFolder:p-one:c-real')
+    t.check(!!restoredLocate && restoredLocate.pathDraft === '/replacement draft', 'capture with different project restores Locate folder draft by stable IDs')
     t.check(surface.compact, 'Projects uses compact navigation on small screens')
     entry.section = 'appearance'
     var beforeNavigation = sent.length
@@ -245,6 +481,36 @@ ShellRoot {
       error: null
     }), '')
     entryResponses[entryResponses.length - 1](0, JSON.stringify(entry.projectController.tools), '')
+    entry.discoveryClient.candidates = [discovery.candidates[0]]
+    entry.projectController.request('register', {
+      paths: ['/tmp/fixture/repo']
+    })
+    entryResponses[entryResponses.length - 1](0, JSON.stringify({
+      ok: true,
+      state: {
+        revision: 2,
+        roots: [],
+        ignored: [],
+        projects: [
+          {
+            id: 'p-review',
+            name: 'Same',
+            commonDir: '/tmp/fixture/repo/.git',
+            tools: {},
+            workspaceMode: 'dedicated',
+            lastCheckoutId: 'c-anchor',
+            checkouts: [
+              {
+                id: 'c-anchor',
+                path: '/tmp/fixture/repo'
+              }
+            ]
+          }
+        ]
+      },
+      error: null
+    }), '')
+    t.equal(entry.discoveryClient.candidates.length, 1, 'Settings registration retains sibling discovery cache')
     entry.discoveryClient.runner = function (argv, line, done) {
       return function () {}
     }

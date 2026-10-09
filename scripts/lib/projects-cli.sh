@@ -374,8 +374,13 @@ projects_cli_main() {
       if ! "$script_dir/aranea-project-discover" "${discovery_args[@]}" --json >"$scan_result"; then outcome=partial; fi
       while IFS= read -r line; do
         if [[ $(jq -r .event <<<"$line") == candidate ]]; then
-          # Ignored/registered candidates stay outside the public review list.
-          jq -e --argjson candidate "$(jq -c .candidate <<<"$line")" 'any(.ignored[];.path==$candidate.path or .commonDir==$candidate.commonDir) or any(.projects[].checkouts[];.path==$candidate.path)' <<<"$cli_state" >/dev/null && continue
+          # Ignored and fully registered groups stay outside the review list;
+          # partially registered groups retain individually selectable siblings.
+          jq -e --argjson candidate "$(jq -c .candidate <<<"$line")" '. as $registry |
+            any(.ignored[];.path==$candidate.path or .commonDir==$candidate.commonDir) or
+            ([$candidate.path, ($candidate.checkouts[]?.path)] | unique |
+              all(.[]; . as $path | any($registry.projects[];
+                .commonDir==$candidate.commonDir and any(.checkouts[];.path==$path))))' <<<"$cli_state" >/dev/null && continue
           projects_cli_event step observed candidate 'Discovered repository; registration requires explicit selection.' '' "$line"
         elif [[ $(jq -r .outcome <<<"$line") == partial ]]; then outcome=partial; fi
       done <"$scan_result"

@@ -27,6 +27,12 @@ ColumnLayout {
   property var pointerGate: null
   // Toggle durable ignored review without rescanning.
   property bool ignoredExpanded: false
+  // Exact checkout whose latest owner outcome is shown, including separate opens.
+  property string recoveryCheckoutId: ''
+  // Saved selection observations reset recovery when its project/checkout changes.
+  property string recoveryProjectId: ''
+  // Last persisted default selection distinguishes refreshed records from actual selection changes.
+  property string recoverySelectedCheckoutId: ''
   // Public explicit-selection contract for review consumers.
   property alias candidateList: candidates
   // Public detail draft boundary used by capture snapshot restoration.
@@ -72,13 +78,50 @@ ColumnLayout {
     if (!displayOnly && !pending && candidates.selectedPaths.length)
       registerRequested(candidates.selectedPaths.slice())
   }
+  // Reconcile owner-wide operation snapshots rather than retaining this client's older result.
+  function reconcileOperation(reported: var): void {
+    var project = selectedProject
+    var snapshot = projectClient ? projectClient.snapshot : {}
+    if (!project || !projectClient || !projectClient.available || !snapshot.sessionId) {
+      details.operation = null
+      return
+    }
+    if (recoveryProjectId !== project.id || recoverySelectedCheckoutId !== project.lastCheckoutId) {
+      recoveryProjectId = project.id
+      recoverySelectedCheckoutId = project.lastCheckoutId || ''
+      recoveryCheckoutId = project.lastCheckoutId || ''
+    }
+    var checkouts = project.checkouts || []
+    if (reported && reported.sessionId === snapshot.sessionId && reported.projectId === project.id && checkouts.some(function (c) {
+      return c.id === reported.checkoutId
+    }))
+      recoveryCheckoutId = reported.checkoutId
+    var observations = (snapshot.operations || []).concat(reported ? [reported] : [])
+    var latest = null
+    for (var i = 0; i < observations.length; i++) {
+      var operation = observations[i]
+      if (!operation || operation.sessionId !== snapshot.sessionId || operation.projectId !== project.id || operation.checkoutId !== recoveryCheckoutId || !checkouts.some(function (c) {
+        return c.id === operation.checkoutId
+      }))
+        continue
+      if (!latest || (operation.generation || 0) > (latest.generation || 0) || (operation.generation || 0) === (latest.generation || 0) && (operation.completedAt || 0) >= (latest.completedAt || 0))
+        latest = operation
+    }
+    details.operation = latest
+  }
+  onProjectClientChanged: reconcileOperation(null)
+  onSelectedProjectChanged: reconcileOperation(null)
   // Save all presentation-only drafts and candidate selections for inert capture.
   function captureSnapshot(): var {
     return {
       selectedPaths: candidates.selectedPaths.slice(),
       ignoredExpanded: ignoredExpanded,
       detailsDraft: Object.assign({}, details.draft),
+      relocationDrafts: Object.assign({}, details.relocationDrafts),
       detailsOperation: details.operation,
+      recoveryCheckoutId: recoveryCheckoutId,
+      recoveryProjectId: recoveryProjectId,
+      recoverySelectedCheckoutId: recoverySelectedCheckoutId,
       detailsDirty: details.dirty,
       customized: details.customized,
       folderPath: picker.pathDraft
@@ -91,6 +134,10 @@ ColumnLayout {
     candidates.selectedPaths = saved.selectedPaths
     ignoredExpanded = saved.ignoredExpanded
     details.operation = saved.detailsOperation || null
+    recoveryCheckoutId = saved.recoveryCheckoutId || (details.operation ? details.operation.checkoutId : '')
+    recoveryProjectId = saved.recoveryProjectId || (selectedProject ? selectedProject.id : '')
+    recoverySelectedCheckoutId = saved.recoverySelectedCheckoutId || (selectedProject ? selectedProject.lastCheckoutId || '' : '')
+    details.relocationDrafts = saved.relocationDrafts || {}
     details.draft = saved.detailsDraft
     details.dirty = saved.detailsDirty
     details.customized = saved.customized
@@ -101,6 +148,7 @@ ColumnLayout {
     candidates.selectedPaths = []
     ignoredExpanded = false
     details.discardDraft()
+    details.relocationDrafts = {}
     details.operation = null
     details.customized = false
     picker.pathDraft = ''
@@ -193,12 +241,13 @@ ColumnLayout {
     candidates: page.discoveryClient ? page.discoveryClient.candidates.filter(function (c) {
       return !page.ignored.some(function (i) {
         return i.path === c.path || i.commonDir === c.commonDir
-      }) && !(page.registryState.projects || []).some(function (p) {
-        return p.checkouts.some(function (checkout) {
-          return checkout.path === c.path
-        })
-      })
+      }) && candidates.paths(c).length > 0
     }) : []
+    registeredPaths: (page.registryState.projects || []).reduce(function (paths, p) {
+      return paths.concat((p.checkouts || []).map(function (c) {
+        return c.path
+      }))
+    }, [])
     displayOnly: page.displayOnly || page.pending
     pointerGate: page.pointerGate
     onIgnoreRequested: function (path) {
@@ -301,8 +350,13 @@ ColumnLayout {
   Connections {
     target: page.projectClient
     function onOperationChanged(operation) {
-      if (operation.projectId === page.projectId)
-        details.operation = operation
+      page.reconcileOperation(operation)
+    }
+    function onSnapshotChanged() {
+      page.reconcileOperation(null)
+    }
+    function onAvailableChanged() {
+      page.reconcileOperation(null)
     }
   }
 }
