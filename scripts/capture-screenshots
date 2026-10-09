@@ -40,6 +40,10 @@ set -euo pipefail
 # fixtures, both tray captures are refused with no screenshot written, so a
 # real tray app can never reach one. Tray captures refuse while any real
 # tray app (for example LocalSend) is registered.
+# If staging a separate shell for fixture-only tray captures, run it and its
+# capture commands through tools/with-capture-session. Never use a private
+# D-Bus bus with the live XDG_RUNTIME_DIR: a second document portal would
+# unmount the session's document filesystem. See docs/agent-development.md.
 #
 # Menu search variants menu-search-mixed, menu-search-no-match,
 # menu-search-no-compositor and menu-search-vanished render production MenuSurface
@@ -403,7 +407,7 @@ fi
 showcase_surface="$surface"
 case "$surface" in
   settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
-  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished) showcase_surface=menu ;;
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label) showcase_surface=menu ;;
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
@@ -414,7 +418,7 @@ mkdir -p "$output"
 
 # Settings and search captures use production content with inert owner fixtures.
 case "$surface" in
-  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished)
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label)
     "$repo_root/tools/render-menu-preview" --output "$output/$surface.png" --fixture "${surface#menu-search-}"
     exit 0
     ;;
@@ -1014,9 +1018,23 @@ case "$surface" in
     ;;
   desktop)
     hyprctl dismissnotify >/dev/null 2>&1 || true
-    grim "$output/$surface.png"
-    printf 'captured: %s\n' "$output/$surface.png"
-    exit 0
+    # IPC can answer before the wallpaper and bar finish mapping after a
+    # shell restart. Retry startup frames without replacing the old capture.
+    desktop_staged="$(mktemp "$output/.desktop.XXXXXX.png")"
+    trap 'rm -f -- "$desktop_staged"' EXIT
+    for _ in {1..20}; do
+      sleep "${ARANEA_SCREENSHOT_DELAY:-0.5}"
+      grim "$desktop_staged"
+      desktop_deviation="$(convert "$desktop_staged" -resize '160x90!' -format '%[fx:standard_deviation]' info: 2>/dev/null)"
+      if awk -v deviation="$desktop_deviation" 'BEGIN { exit !(deviation > 0.02) }'; then
+        mv -f -- "$desktop_staged" "$output/$surface.png"
+        trap - EXIT
+        printf 'captured: %s\n' "$output/$surface.png"
+        exit 0
+      fi
+    done
+    echo 'desktop capture stayed blank; previous image preserved' >&2
+    exit 3
     ;;
   notifications | notifications-empty)
     mkdir -p "$(aranea_state_root)"

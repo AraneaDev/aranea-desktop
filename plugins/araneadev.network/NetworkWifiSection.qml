@@ -89,7 +89,7 @@ Column {
     objectName: "scanningCaption"
     visible: section.scanning
     text: "SCANNING WI-FI…"
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     font.bold: true
@@ -123,7 +123,7 @@ Column {
         objectName: "wifiTitle"
         visible: (wrapper.modelData.title || "") !== ""
         text: wrapper.modelData.title || ""
-        color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.caption
         font.bold: true
@@ -138,7 +138,7 @@ Column {
         label: wrapper.modelData.label || "Hidden"
         // Stock hides the status while the prompt is open for the row.
         detail: wrapper.promptOpen ? "" : wrapper.rowStatus.text
-        detailColor: wrapper.rowStatus.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+        detailColor: wrapper.rowStatus.failed ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
         active: !!wrapper.modelData.connected
         // The connected network carries the selected highlight.
         selected: active
@@ -160,7 +160,7 @@ Column {
             // Forget takes the lock's place, as stock does.
             visible: !!wrapper.modelData.secured && !forgetBtn.shown
             text: String.fromCodePoint(0xf033e)
-            color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+            color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
             font.family: Aranea.Typography.iconFamily
             font.pixelSize: Style.font.caption
           }

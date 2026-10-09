@@ -84,7 +84,7 @@ Column {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           text: "NOW PLAYING"
-          color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           font.bold: true
@@ -94,7 +94,7 @@ Column {
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
           text: strip.info.player
-          color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
           font.bold: true
@@ -124,7 +124,7 @@ Column {
             text: [strip.info.artist, strip.info.album].filter(function (part) {
               return part !== ""
             }).join(" · ")
-            color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+            color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
             font.family: Aranea.Typography.uiFamily
             font.pixelSize: Style.font.caption
           }

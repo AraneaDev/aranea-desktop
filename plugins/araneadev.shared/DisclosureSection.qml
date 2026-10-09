@@ -103,7 +103,7 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       text: section.expanded ? "▾" : "▸"
-      color: Util.alpha(DesignTokens.foreground, 0.55)
+      color: Util.alpha(DesignTokens.foreground, DesignTokens.secondaryOpacity)
       // The host exposes its font tokens as a dynamic QObject.
       // qmllint disable missing-property
       font.family: Style.font.family

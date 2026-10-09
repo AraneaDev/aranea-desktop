@@ -85,6 +85,21 @@ becomes the activation snapshot. The production runner uses
 `Quickshell.execDetached` with argument arrays, so accepted dispatch does not
 claim the external command completed successfully.
 
+`DesktopActionRecords.js` projects DND, audio and wallpaper snapshots into typed
+Action records; `DesktopActionState.js` tracks one request per family with
+generation IDs and keyed feedback. `DesktopActionController.qml` lives outside
+the menu window. It observes notification preference echoes and the audio
+plugin’s keep-loaded `AudioDefaults.qml` service, which also owns the panel’s
+default-device queue. Search never duplicates device state.
+
+`DesktopWallpaperActions.qml` owns tracked processes, fresh manifest validation
+and active-ID readback. Confirmation deadlines are three seconds for DND, four
+for audio and fifteen for wallpaper. Menu closure releases observation leases
+without cancelling submitted work. Activation resolves current exact identities;
+feedback is excluded from matching. Accepted actions retain the menu, unlike
+normal argument-array launch requests. Inert showcase snapshots refuse dispatch
+and cannot replace outstanding requests.
+
 ## Token flow
 
 `design/tokens.toml` is the source of truth. Templates describe the target

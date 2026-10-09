@@ -15,7 +15,7 @@ if [[ -z "$quickshell_bin" || ! -f /usr/share/omarchy/shell/Commons/qmldir ]] ||
   exit 0
 fi
 out="$ARANEA_TEST_SANDBOX/shots"
-for fixture in mixed no-match no-compositor vanished; do
+for fixture in mixed no-match no-compositor vanished actions action-pending action-error action-long-label; do
   ARANEA_MENU_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface "menu-search-$fixture" --output "$out"
   [[ "$(magick identify -format '%w' "$out/menu-search-$fixture.png")" == 480 ]]
 done

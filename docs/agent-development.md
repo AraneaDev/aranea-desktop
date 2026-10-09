@@ -72,6 +72,24 @@ reproduces in isolation. Do not weaken a baseline or skip a test to make the
 run green. Fix the cause or document a host dependency when the check is
 genuinely unavailable.
 
+## Isolated screenshot sessions
+
+`scripts/capture-screenshots` captures the running shell and refuses tray
+captures while real tray apps are registered. For a separately staged shell,
+run the shell and its capture commands together under
+`tools/with-capture-session <command> [args...]`. The helper creates a private
+D-Bus bus, runtime directory and document data directory, shares only the
+Wayland display socket, and removes the temporary runtime on exit. The caller
+is responsible for staging shell configuration. Private capture processes
+run in their own process group and are stopped before runtime cleanup.
+
+Never run `dbus-run-session` against the live `XDG_RUNTIME_DIR`. A second
+document portal unmounts an existing document filesystem at that path; the
+accessibility bus also uses runtime sockets. Do not expose the live `doc`,
+`at-spi`, `bus` or `systemd` paths inside the capture runtime. This helper is
+session separation for captures, not a security sandbox. It does not stop or
+restart the user's shell or change workspaces.
+
 ## Documentation and review handoff
 
 Update the closest documentation when behavior, ownership, or a workflow

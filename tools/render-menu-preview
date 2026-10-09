@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders real MenuSurface content in an inert offscreen host. No live
 # desktop owner is contacted; fixture mode rejects reads and mutations.
-# Usage: tools/render-menu-preview --output FILE [--fixture mixed|no-match|no-compositor|vanished]
+# Usage: tools/render-menu-preview --output FILE [--fixture NAME]
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output=""
@@ -24,7 +24,7 @@ while (($#)); do
 done
 [[ -n "$output" ]] || exit 2
 case "$fixture" in
-  mixed | no-match | no-compositor | vanished) ;;
+  mixed | no-match | no-compositor | vanished | actions | action-pending | action-error | action-long-label) ;;
   *)
     echo "Unknown menu fixture: $fixture" >&2
     exit 2
@@ -64,7 +64,7 @@ done
 cp "$repo_root/tests/qml/fixtures/menu-preview.qml" "$work/cfg/shell.qml"
 (cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
   -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
-  QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=1 ARANEA_REDUCED_MOTION=1 \
+  QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR="${ARANEA_MENU_RENDER_SCALE:-1}" ARANEA_REDUCED_MOTION="${ARANEA_MENU_RENDER_REDUCED_MOTION:-1}" \
   HOME="$work/home" XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
   ARANEA_MENU_RENDER_ROOT="$repo_root" ARANEA_MENU_RENDER_FIXTURE="$fixture" \
   ARANEA_MENU_RENDER_OUTPUT="$work/grab.png" \

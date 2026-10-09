@@ -4,6 +4,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../araneadev.shared" as Aranea
 
 Item {
   id: slot
@@ -155,7 +156,7 @@ Item {
     Behavior on opacity {
       enabled: !!(slot.owner && slot.owner.motionEnabled)
       NumberAnimation {
-        duration: 120
+        duration: Aranea.DesignTokens.feedbackDuration
         easing.type: Easing.OutCubic
       }
     }

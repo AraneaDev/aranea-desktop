@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.22.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.2...v2.22.3) (2026-10-08)
+
+
+### Fixes
+
+* restore tray icon clicks and respect drawer clipping ([#138](https://github.com/AraneaDev/aranea-desktop/issues/138)) ([ed9205b](https://github.com/AraneaDev/aranea-desktop/commit/ed9205b8967706642dfd018aa2f8126b733539ee))
+
+## [2.22.2](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.1...v2.22.2) (2026-10-07)
+
+
+### Fixes
+
+* isolate screenshot sessions from live desktop services ([#136](https://github.com/AraneaDev/aranea-desktop/issues/136)) ([834a0af](https://github.com/AraneaDev/aranea-desktop/commit/834a0af66f575bfa016f6df658569b479d1d60eb))
+
+## [2.22.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.0...v2.22.1) (2026-10-07)
+
+
+### Fixes
+
+* **showcase:** reject blank startup captures and rebuild desktop tour ([#134](https://github.com/AraneaDev/aranea-desktop/issues/134)) ([0bcf3f9](https://github.com/AraneaDev/aranea-desktop/commit/0bcf3f93acb7fda36d067593b3bd761768efd09a))
+
+## [2.22.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.21.1...v2.22.0) (2026-10-07)
+
+
+### Features
+
+* **desktop:** add search quick actions and refine desktop hierarchy ([#132](https://github.com/AraneaDev/aranea-desktop/issues/132)) ([68afaed](https://github.com/AraneaDev/aranea-desktop/commit/68afaed3147da0bcd4cb5c61572fdcef43abeee4))
+
 ## [2.21.1](https://github.com/AraneaDev/aranea-desktop/compare/v2.21.0...v2.21.1) (2026-10-07)
 
 

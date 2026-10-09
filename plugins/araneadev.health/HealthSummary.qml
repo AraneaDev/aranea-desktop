@@ -26,7 +26,7 @@ Item {
   // Known CPU/memory/fullest-disk values, with null for missing readings.
   readonly property var resourceValues: SummaryLogic.resourceSummary(available ? metrics : null)
   // Semantic severity color; the label also conveys the state.
-  readonly property color toneColor: summary.tone === "critical" ? Aranea.DesignTokens.urgent : summary.tone === "attention" ? Aranea.DesignTokens.attention : summary.tone === "healthy" ? Aranea.DesignTokens.ceremony : Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+  readonly property color toneColor: summary.tone === "critical" ? Aranea.DesignTokens.urgent : summary.tone === "attention" ? Aranea.DesignTokens.attention : summary.tone === "healthy" ? Aranea.DesignTokens.ceremony : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
   implicitHeight: content.implicitHeight
 
   ColumnLayout {
@@ -86,7 +86,7 @@ Item {
     spacing: Style.space(4)
     Text {
       text: parent.label
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       // qmllint disable missing-property
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption

@@ -380,7 +380,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: !slot.editable && (slot.field.value || "") !== ""
             text: slot.field.label || ""
-            color: Util.alpha(DesignTokens.foreground, 0.55)
+            color: Util.alpha(DesignTokens.foreground, DesignTokens.secondaryOpacity)
             font.family: Typography.uiFamily
             font.pixelSize: Style.font.caption
           }
@@ -394,7 +394,7 @@ Item {
             visible: !slot.editable
             text: (slot.field.value || "") !== "" ? slot.field.value : (slot.field.placeholder || "")
             elide: Text.ElideRight
-            color: (slot.field.value || "") !== "" ? Util.alpha(DesignTokens.foreground, 0.82) : Util.alpha(DesignTokens.foreground, 0.55)
+            color: (slot.field.value || "") !== "" ? Util.alpha(DesignTokens.foreground, 0.82) : Util.alpha(DesignTokens.foreground, DesignTokens.secondaryOpacity)
             font.family: Typography.technicalFamily
             font.pixelSize: Style.font.caption
           }

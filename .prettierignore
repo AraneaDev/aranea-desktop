@@ -8,4 +8,5 @@ plugins/araneadev.emojis/emojis.json
 package-lock.json
 # QML ".pragma library" files are not plain JavaScript (Prettier cannot parse them).
 plugins/araneadev.health/HealthBridge.js
+plugins/araneadev.audio/AudioBridge.js
 plugins/araneadev.notifications/ServiceBridge.js

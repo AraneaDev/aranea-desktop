@@ -85,8 +85,8 @@ BarWidget {
   readonly property int trayJoinGap: 0
   // The drawer's full extent (icon count times their slot, plus gaps).
   readonly property int drawerExtent: drawerCount > 0 ? drawerCount * trayItemExtent + (drawerCount - 1) * trayItemGap : 0
-  // Match Waybar's group/tray-expander drawer transition-duration.
-  readonly property int animationDuration: 600
+  // Drawer disclosure uses the same settling rhythm as other panels.
+  readonly property int animationDuration: Aranea.DesignTokens.settleDuration
   // 0 when the drawer is collapsed, 1 when fully revealed.
   property real revealProgress: expanded ? 1 : 0
   // The drawer's currently revealed extent (drawerExtent times revealProgress).
@@ -857,6 +857,7 @@ BarWidget {
   }
 
   Behavior on revealProgress {
+    enabled: Aranea.DesignTokens.motionEnabled
     NumberAnimation {
       duration: root.animationDuration
       easing.type: Easing.OutCubic
@@ -1150,10 +1151,19 @@ BarWidget {
     }
   }
 
-  component TrayItem: Item {
+  component TrayItem: TrayItemButton {
     id: trayItemRoot
 
-    required property var modelData
+    bar: root.bar
+    onMenuRequested: function (mouse) {
+      trayItemRoot.displayMenu(mouse)
+    }
+    // qmllint disable missing-property
+    onHoverEntered: if (root.bar)
+      root.bar.showTooltip(trayItemRoot, root.trayTooltip(trayItemRoot.modelData))
+    onHoverExited: if (root.bar)
+      root.bar.hideTooltip(trayItemRoot)
+    // qmllint enable missing-property
 
     visible: modelData.status !== Status.Passive
     implicitWidth: visible ? root.trayItemExtent : 0
@@ -1186,41 +1196,5 @@ BarWidget {
       height: Style.space(12)
       icon: trayItemRoot.modelData.icon
     }
-
-    MouseArea {
-      id: mouseArea
-      anchors.fill: parent
-      acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      // qmllint disable missing-property
-      onEntered: if (root.bar)
-        root.bar.showTooltip(trayItemRoot, root.trayTooltip(trayItemRoot.modelData))
-      onExited: if (root.bar)
-        root.bar.hideTooltip(trayItemRoot)
-      // qmllint enable missing-property
-      onPressed: function (mouse: MouseEvent) {
-        if (mouse.button === Qt.RightButton) {
-          trayItemRoot.displayMenu(mouse)
-          mouse.accepted = true
-        }
-      }
-      onClicked: function (mouse: MouseEvent) {
-        if (mouse.button === Qt.RightButton) {
-          mouse.accepted = true
-        } else if (mouse.button === Qt.MiddleButton) {
-          trayItemRoot.modelData.secondaryActivate()
-        } else if (trayItemRoot.modelData.onlyMenu) {
-          trayItemRoot.displayMenu(mouse)
-        } else {
-          trayItemRoot.modelData.activate()
-        }
-      }
-      onWheel: function (wheel: WheelEvent) {
-        trayItemRoot.modelData.scroll(wheel.angleDelta.y, false)
-      }
-    }
-
-    readonly property bool tooltipHovered: visible && opacity > 0 && mouseArea.containsMouse
   }
 }

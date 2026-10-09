@@ -251,7 +251,12 @@ Item {
       return
     api.activePopout = root.pluginOwnsBarObject(api.pluginId, root.activePopout) ? root.activePopout : (root.activePopout ? api.foreignPopoutMarker : null)
     api.clickTargets = root.pluginClickTargets(api.pluginId)
-    api.layoutConfig = root.publicLayoutConfig()
+    // Click registrations also refresh this facade. Preserve an equal
+    // layout so tray bucket bindings do not rebuild their own delegates
+    // while those delegates are registering or unregistering click targets.
+    var layout = root.publicLayoutConfig()
+    if (JSON.stringify(api.layoutConfig) !== JSON.stringify(layout))
+      api.layoutConfig = layout
   }
 
   // Ownership record for a bar object, or null when no plugin claimed it.
@@ -1286,24 +1291,32 @@ Item {
     return target && target.visible !== false && target.opacity !== 0 && target.interactive !== false && target.pressable !== false && target.concealed !== true && typeof target.triggerPress === "function"
   }
 
+  // Match native hit testing: a target must belong to this slot, and the
+  // point must be inside the target and every clipping ancestor.
+  function moduleTargetContainsPoint(slot, target, localX, localY) {
+    for (var item = target; item && item !== slot; item = item.parent) {
+      if (item.visible === false || item.opacity === 0)
+        return false
+      if (item === target || item.clip) {
+        var point = slot.mapToItem(item, localX, localY)
+        if (point.x < 0 || point.x >= item.width || point.y < 0 || point.y >= item.height)
+          return false
+      }
+    }
+    return item === slot
+  }
+
   // Topmost click target under a point in slot, else the slot's widget if clickable; null if none.
   function moduleClickTargetAt(slot, localX, localY) {
     for (var i = clickTargets.length - 1; i >= 0; i--) {
       var target = clickTargets[i]
       if (!moduleTargetClickable(target))
         continue
-      var targetPoint = {
-        x: localX,
-        y: localY
-      }
       try {
-        targetPoint = slot.mapToItem(target, localX, localY)
+        if (moduleTargetContainsPoint(slot, target, localX, localY))
+          return target
       } catch (e) {
         continue
-      }
-
-      if (targetPoint.x >= 0 && targetPoint.x <= target.width && targetPoint.y >= 0 && targetPoint.y <= target.height) {
-        return target
       }
     }
 
@@ -1837,8 +1850,9 @@ Item {
         opacity: root.barMoveCandidate === modelData ? (root.transparent ? 0.45 : 0.7) : 0
 
         Behavior on opacity {
+          enabled: Aranea.DesignTokens.motionEnabled
           NumberAnimation {
-            duration: 140
+            duration: Aranea.DesignTokens.feedbackDuration
             easing.type: Easing.OutCubic
           }
         }

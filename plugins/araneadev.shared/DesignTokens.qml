@@ -34,6 +34,12 @@ QtObject {
   readonly property int panelPadding: Style.spacing.panelPadding
   // Shared row horizontal padding.
   readonly property int rowPadding: Style.spacing.rowPaddingX
+  // Readable secondary labels, distinct from primary names and decisions.
+  readonly property real secondaryOpacity: 0.64
+  // Duration of existing hover and selection feedback.
+  readonly property int feedbackDuration: 120
+  // Duration of existing panel and disclosure settling.
+  readonly property int settleDuration: 160
   // Whether motion effects are enabled.
   readonly property bool motionEnabled: MotionState.motionEnabled
   // Fill of a clickable element under the pointer, shown only after a real

@@ -113,7 +113,7 @@ PanelWindow {
       property: "opacity"
       from: 0
       to: 1
-      duration: 160
+      duration: Aranea.DesignTokens.settleDuration
       easing.type: Easing.OutCubic
     }
     NumberAnimation {
@@ -121,7 +121,7 @@ PanelWindow {
       property: "opacity"
       from: 0
       to: 1
-      duration: 180
+      duration: Aranea.DesignTokens.settleDuration
       easing.type: Easing.OutCubic
     }
     NumberAnimation {
@@ -129,7 +129,7 @@ PanelWindow {
       property: "scale"
       from: 0.97
       to: 1
-      duration: 180
+      duration: Aranea.DesignTokens.settleDuration
       easing.type: Easing.OutCubic
     }
   }

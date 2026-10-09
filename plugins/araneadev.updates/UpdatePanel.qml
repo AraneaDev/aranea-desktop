@@ -147,7 +147,7 @@ Item {
           width: parent.width
           text: panel.info.subtitle
           elide: Text.ElideRight
-          color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
           font.family: Aranea.Typography.uiFamily
           font.pixelSize: Style.font.caption
         }
@@ -253,7 +253,7 @@ Item {
       Layout.fillWidth: true
       // What Enter does on the cursor's pill (UpdateLogic.keyHint).
       text: UpdateLogic.keyHint(panel.cursorIndex)
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       elide: Text.ElideRight

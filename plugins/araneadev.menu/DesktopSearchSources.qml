@@ -24,6 +24,8 @@ Item {
   property var recentAppIds: []
   // Availability from the existing settings manifest watcher.
   property bool settingsAvailable: false
+  // Persistent quick-action owner; null when that capability is unavailable.
+  property var actionController: null
   // Replaceable compositor and raw fixtures for offscreen integration tests.
   property var compositor: Hyprland
   // Optional raw window collection replacing the compositor model.
@@ -86,7 +88,8 @@ Item {
       whenResults: sources.whenResults,
       favoriteAppIds: sources.favoriteAppIds,
       recentAppIds: sources.recentAppIds,
-      settingsAvailable: sources.settingsAvailable
+      settingsAvailable: sources.settingsAvailable,
+      actionRecords: sources.actionController ? sources.actionController.records : []
     }
   }
 
@@ -191,7 +194,15 @@ Item {
     } catch (error) {
       data = sources.joinedSnapshot(null)
     }
+    if (sources.actionController)
+      data.actionRecords = sources.actionController.currentRecords()
     var record = Search.resolveTarget(Targets.sourceRecords(data), key)
+    if (record && record.type === "action") {
+      if (sources.actionController.activate(record.key))
+        return true
+      sources.failed("Action is busy or no longer available")
+      return false
+    }
     var request = Targets.dispatchTarget(record, data)
     if (!request) {
       sources.failed(key.indexOf("window:") === 0 ? "Window is no longer open" : "Target is no longer available")
@@ -222,6 +233,7 @@ Item {
   onFavoriteAppIdsChanged: publish()
   onRecentAppIdsChanged: publish()
   onSettingsAvailableChanged: publish()
+  onActionControllerChanged: publish()
   onFixtureWindowsChanged: requestRefresh()
   onFixtureWorkspacesChanged: requestRefresh()
   onFixtureFocusedWorkspaceIdChanged: requestRefresh()
@@ -233,6 +245,12 @@ Item {
     interval: 100
     repeat: false
     onTriggered: sources.refreshNow()
+  }
+  Connections {
+    target: sources.actionController
+    function onRevisionChanged() {
+      sources.publish()
+    }
   }
   Connections {
     target: sources.subscribed ? sources.compositor : null

@@ -32,8 +32,8 @@ Item {
   property color foreground: Color.menu.text
   // Colour of the counts and of the search glyph while a filter is set.
   property color accent: Color.menu.selectedText
-  // foreground at 58% alpha, for the subtitle, hints and idle search glyph.
-  readonly property color dim: Util.alpha(foreground, 0.58)
+  // Muted subtitle, hints and idle glyph; refined hosts use the shared role.
+  readonly property color dim: Util.alpha(foreground, refined ? DesignTokens.secondaryOpacity : 0.58)
   // Letter spacing of the header, counts and hint texts.
   readonly property real letterSpacing: refined ? 0 : 0.20
   // file:// URL of the Aranea glyph in the current theme's branding
@@ -50,6 +50,7 @@ Item {
 
     // Header: glyph, title and subtitle, counts.
     BrandHeader {
+      refined: chrome.refined
       Layout.fillWidth: true
       title: chrome.title
       subtitle: chrome.subtitle
@@ -88,7 +89,7 @@ Item {
           textFormat: Text.PlainText
           text: chrome.searchText || chrome.searchPlaceholder
           color: chrome.foreground
-          opacity: chrome.searchText ? 1 : 0.58
+          opacity: chrome.searchText ? 1 : chrome.refined ? DesignTokens.secondaryOpacity : 0.58
           font.family: chrome.fontFamily
           font.pixelSize: Style.font.subtitle
           elide: Text.ElideLeft

@@ -22,7 +22,7 @@ Item {
   // Optional trailing action glyph stays on the dedicated icon font.
   property string glyph: ""
   // The text colour at rest.
-  property color restColor: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+  property color restColor: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
   // The text size in px.
   property real pixelSize: Style.font.caption
   // Whether the text is bold.

@@ -27,6 +27,19 @@ const record = (type, id, label, extra = {}) => ({
 })
 const keys = (records, query) => plain(search.rankResults(records, query)).map((row) => row.key)
 
+test("quick actions are searchable by prefix without outranking exact application names", () => {
+  const action = {
+    type: "action",
+    label: "Use Studio audio output",
+    aliases: ["audio"],
+    target: { actionId: "audio:7:speaker" }
+  }
+  const app = record("app", "audio", "Audio")
+  assert.deepEqual(plain(search.parseQuery("ACTION: audio")), { type: "action", text: "audio" })
+  assert.deepEqual(keys([action, app], "audio"), ["app:audio", "action:audio:7:speaker"])
+  assert.deepEqual(keys([action, app], "action: audio"), ["action:audio:7:speaker"])
+})
+
 test("recognized type prefixes filter results while unknown prefixes remain query text", () => {
   assert.deepEqual(plain(search.parseQuery("window: firefox")), { type: "window", text: "firefox" })
   assert.deepEqual(plain(search.parseQuery("https: example")), {

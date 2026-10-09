@@ -110,7 +110,7 @@ Column {
       anchors.left: parent.left
       anchors.top: parent.top
       text: strand.title
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -121,7 +121,7 @@ Column {
       anchors.right: parent.right
       anchors.verticalCenter: strandCaption.verticalCenter
       text: Math.round(strand.percent) + "%"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption
     }
@@ -209,7 +209,7 @@ Column {
     Text {
       anchors.verticalCenter: parent.verticalCenter
       text: "BORN"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
@@ -231,7 +231,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       leftPadding: Style.space(6)
       text: "LIVE TO"
-      color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+      color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true

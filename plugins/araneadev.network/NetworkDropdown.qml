@@ -209,7 +209,7 @@ Column {
     width: parent.width
     visible: (dropdown.view.vpnLine || "") !== ""
     text: dropdown.view.vpnLine || ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
@@ -406,7 +406,7 @@ Column {
     width: parent.width
     visible: (dropdown.view.emptyText || "") !== "" && (dropdown.wifi.rows || []).length === 0 && (dropdown.view.saved || []).length === 0 && !dropdown.wifi.available
     text: dropdown.view.emptyText || ""
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.55)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.body
     wrapMode: Text.WordWrap
@@ -416,7 +416,7 @@ Column {
     width: parent.width
     // What Enter does where the keyboard cursor is.
     text: NetworkLogic.keyHint(dropdown.cursor.active ? dropdown.cursor.section : "")
-    color: Util.alpha(Aranea.DesignTokens.foreground, 0.3)
+    color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
     elide: Text.ElideRight
