@@ -18,6 +18,7 @@ json_event() {
   local message="${5:-}"
   local code="${6:-}"
   local data="${7:-}"
+  local operation_id="${8:-}"
   local timestamp
 
   timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -30,12 +31,14 @@ json_event() {
     --arg message "$message" \
     --arg code "$code" \
     --arg data "$data" \
+    --arg operationId "$operation_id" \
     '({schema: 1, event: $event, operation: $operation, timestamp: $timestamp} |
       if $status != "" then .status = $status else . end |
       if $id != "" then .id = $id else . end |
       if $message != "" then .message = $message else . end |
       if $code != "" then .code = $code else . end |
-      if $data != "" then .data = ($data | fromjson) else . end)'
+      if $data != "" then .data = ($data | fromjson) else . end |
+      if $operationId != "" then .operationId = $operationId else . end)'
 }
 
 # Emits the start event for an operation.

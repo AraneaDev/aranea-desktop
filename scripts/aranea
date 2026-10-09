@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Public project commands: validate, submit once, and observe the live owner.
+# Usage: aranea capabilities | projects COMMAND [OPTIONS] | desktop status [--json]
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/json-events.sh
+source "$script_dir/lib/json-events.sh"
+# shellcheck source=scripts/lib/projects-cli.sh
+source "$script_dir/lib/projects-cli.sh"
+projects_cli_main "$@"

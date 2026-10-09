@@ -92,3 +92,97 @@ from the same group; when moving a whole repository, locate its moved checkouts
 explicitly. `REGISTRY_CONFLICT` requires refreshing the snapshot and retrying
 with its current revision. Invalid or unsupported registry data returns
 `REGISTRY_INVALID` and leaves the original file intact for backup and repair.
+
+## Public project commands
+
+Use `scripts/aranea` for the public Phase 1 interface. Every command accepts
+`--json`; without it, output is human readable. `capabilities --json` describes
+all argument schemas, installed supported tools, dependency availability, and
+owner availability. Capabilities does not initialize or mutate the registry.
+
+```text
+aranea capabilities
+aranea projects list
+aranea projects inspect PROJECT_ID
+aranea projects roots add PATH
+aranea projects roots remove ROOT_ID
+aranea projects discover [--root ROOT_ID]
+aranea projects register --path PATH [--path PATH ...]
+aranea projects ignore --path PATH
+aranea projects ignored
+aranea projects unignore --path PATH
+aranea projects configure PROJECT_ID [--name NAME] [--editor code|nvim]
+    [--terminal alacritty|kitty|foot|ghostty] [--workspace dedicated|current]
+aranea projects relocate PROJECT_ID --checkout CHECKOUT_ID --path PATH
+aranea projects remove PROJECT_ID
+aranea projects open PROJECT_ID [--checkout CHECKOUT_ID] [--separate]
+    [--use-current-workspace] [--new-window editor|terminal]
+    [--retry-role editor|terminal]
+aranea projects operation OPERATION_ID
+aranea projects details PROJECT_ID
+aranea desktop status
+```
+
+For example, review candidates with `scripts/aranea projects discover --json`,
+then explicitly register selected folders:
+
+```bash
+scripts/aranea projects roots add '/home/me/Work' --json
+scripts/aranea projects register --path '/home/me/Work/My Project' --json
+scripts/aranea projects list --json
+scripts/aranea projects open p-REPLACE-WITH-REGISTERED-ID --json
+scripts/aranea projects operation op-REPLACE-WITH-RETURNED-ID --json
+```
+
+IDs come from registry responses; names and paths are never IDs. `inspect`
+returns the registered record, and `desktop status` returns the timestamped
+owner snapshot, including raw registered projects, current session, availability,
+operations, and independently validated bindings. An unavailable owner prevents
+live observations while registration and inspection remain usable. Removing a
+root or registration never deletes repository files or closes applications.
+
+The selected checkout is resolved from a fresh registry snapshot and validated
+against its exact canonical Git path and common-directory identity before Open.
+A missing selected checkout is never silently replaced. Discovery alone does
+not register anything; register and relocate revalidate under the store lock.
+Mutations carry the snapshot revision and return `REGISTRY_CONFLICT` if another
+writer changes it. Invalid IDs and contradictory options are rejected before
+IPC. `--separate` and `--use-current-workspace` are mutually exclusive;
+`--new-window` and `--retry-role` are mutually exclusive. Tool arguments are
+fixed supported adapter IDs; custom shell commands are unsupported.
+
+New CLI envelopes use the existing schema 1 lifecycle and add `operationId`
+when an owner operation exists. Existing installer/helper envelopes remain
+unchanged. A `step` with `status: accepted` means the owner accepted the request;
+only `completed.data.outcome: observed` reports observed success. Role steps
+retain their own status/code, and changed step records are emitted once per
+observer. A configured `TOOL_MISSING` role can produce a partial result while
+another role succeeds.
+
+Open submits one accepted operation and polls that ID every 250 ms for up to
+30 seconds. Only rejected `OWNER_NOT_READY` responses with a null operation ID
+may be retried, for at most five seconds. Accepted requests are never
+resubmitted automatically. Timeout (`OBSERVATION_TIMEOUT`), disconnection
+(`OWNER_UNAVAILABLE`), and interruption (`OBSERVER_CANCELLED`) stop only the
+CLI observer; owner work continues. Preserve the returned operation ID and
+reconnect with `projects operation OPERATION_ID --json`. A session/generation
+change or evicted result returns `OPERATION_LOST`; inspect state before deciding
+to create a new operation. A submission whose reply is lost may already have
+been accepted: inspect owner state before submitting again.
+
+`details` sends a Settings summon payload `{section:"projects",projectId:ID}`.
+It reports observed only after the read-only
+`aranea.settings.capture captureSnapshot` endpoint confirms `opened`, the
+Projects section, and the exact `projectId`. The Settings Projects destination
+must provide this field; earlier Settings versions return partial
+`DETAILS_UNCONFIRMED` with `data.accepted: true`. The CLI never invokes capture
+mutation methods or claims that summon acceptance proves the destination.
+
+For this public CLI, exit codes are `0` observed, `1` partial/failed,
+`2` invalid usage, `3` missing required choice (including `TOOL_CHOICE_REQUIRED`),
+and `4` missing dependency. Stable failure codes include `CHECKOUT_MISSING`,
+`REGISTRY_CONFLICT`, `TOOL_MISSING`, `COMPOSITOR_UNAVAILABLE`,
+`OWNER_UNAVAILABLE`, `OBSERVATION_TIMEOUT`, and `OPERATION_LOST`. Missing Git or
+flock is actionable only for commands that need them. Missing jq still emits a
+fixed valid dependency-failure JSONL envelope and exits `4`; its unavailable
+clock placeholder is `1970-01-01T00:00:00Z`.

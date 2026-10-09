@@ -43,3 +43,7 @@ for event in "$prompt_event" "$recovery_event"; do
 done
 
 echo "json event contract passed"
+
+operation_event="$(json_event step projects.open accepted request '' '' '{}' op-123-1)"
+jq -e '.operationId == "op-123-1"' <<<"$operation_event" >/dev/null
+jq -e 'has("operationId")|not' <<<"$line" >/dev/null
