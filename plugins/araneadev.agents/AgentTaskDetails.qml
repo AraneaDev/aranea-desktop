@@ -86,7 +86,7 @@ Item {
   }
   // Fixed local report inspection scrolls bounded plaintext without owner I/O.
   function inspectReport(kind) {
-    var target = kind === 'inspect-failure' ? diagnosticsSection : resultSection
+    var target = kind === 'inspect-failure' && !(row && row.result) ? diagnosticsSection : resultSection
     scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height, target.y))
   }
   // Tab switches and panel reopen require a fresh keyboard reveal.
@@ -125,7 +125,7 @@ Item {
         width: parent.width
         text: details.row ? details.row.summary : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
@@ -135,7 +135,7 @@ Item {
         width: parent.width
         text: details.row ? details.row.providerLabel + ' · ' + details.row.stateLabel + '\nReported: ' + details.row.reportedLabel + ' · ' + details.row.freshnessLabel : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
@@ -171,7 +171,7 @@ Item {
         width: parent.width
         text: details.row ? details.row.result || 'No result reported' : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
@@ -186,7 +186,7 @@ Item {
         width: parent.width
         text: details.row ? details.row.question || 'No question reported' : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
@@ -195,7 +195,7 @@ Item {
         visible: text !== ''
         text: details.row ? details.row.blockers : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
@@ -211,7 +211,7 @@ Item {
         width: parent.width
         text: details.row ? details.row.diagnostics || 'No diagnostics reported' : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
@@ -220,7 +220,7 @@ Item {
         width: parent.width
         text: details.row ? details.row.verificationLabel : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
         font.bold: true
@@ -230,7 +230,7 @@ Item {
         visible: text !== ''
         text: details.row ? [details.row.verificationSummary, details.row.verificationCommands].filter(Boolean).join('\n') : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
@@ -280,7 +280,7 @@ Item {
         visible: text !== ''
         text: [details.outcome.message, details.outcome.recovery].filter(Boolean).join('\n')
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }

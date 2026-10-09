@@ -173,7 +173,7 @@ Item {
         visible: text !== ''
         text: tasks.error ? [Logic.text(tasks.error.message), Logic.text(tasks.error.recovery)].filter(Boolean).join('\n') : ''
         textFormat: Text.PlainText
-        wrapMode: Text.WrapAnywhere
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.attention
         font.pixelSize: Style.font.body
       }
@@ -203,7 +203,7 @@ Item {
             width: parent.width
             text: taskRow.modelData.summary
             textFormat: Text.PlainText
-            wrapMode: Text.WrapAnywhere
+            wrapMode: Text.Wrap
             color: Aranea.DesignTokens.foreground
             font.family: Aranea.Typography.uiFamily
             font.pixelSize: Style.font.body

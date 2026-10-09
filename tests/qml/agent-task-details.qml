@@ -210,12 +210,36 @@ ShellRoot {
     t.check(view.actionKinds.indexOf('reopen') >= 0 && view.actionKinds.indexOf('focus') < 0, 'failure offers explicit resume without working-session focus')
     t.check(view.actionKinds.indexOf('dismiss') < 0, 'fresh failed record has no dismissal control')
     view.row = Object.assign({}, view.row, {
+      result: 'Native or explicitly reported failure reason',
+      question: new Array(30).fill('Earlier question details').join('\n'),
+      diagnostics: ''
+    })
+    t.step(50, function () {
+      view.activateKind('inspect-failure', false)
+      var result = t.findChild(view, 'reportedResult')
+      t.check(result.y >= view.scroll.contentY && result.y + result.height <= view.scroll.contentY + view.scroll.height, 'failure inspection reveals the reported failure result')
+      view.row = Object.assign({}, view.row, {
+        result: '',
+        diagnostics: 'Diagnostic-only failure reason'
+      })
+      t.step(50, function () {
+        view.activateKind('inspect-failure', false)
+        var diagnostics = t.findChild(view, 'reportedDiagnostics')
+        t.check(diagnostics.y >= view.scroll.contentY && diagnostics.y + diagnostics.height <= view.scroll.contentY + view.scroll.height, 'failure inspection falls back to diagnostics without a result')
+        staleFailureChecks()
+      })
+    })
+  })
+
+  // Local failure inspection preserves the existing stale-task action contract.
+  function staleFailureChecks() {
+    view.row = Object.assign({}, view.row, {
       canDismiss: true,
       freshnessLabel: 'Connection lost'
     })
     t.check(view.actionKinds.indexOf('dismiss') >= 0, 'owner-stale failure makes dismissal reachable')
     pointerIdentityChecks()
-  })
+  }
 
   // Real press/release must never transfer an action to a new task or operation.
   function pointerIdentityChecks() {
