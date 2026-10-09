@@ -2,14 +2,14 @@
 def fields($required;$optional): type=="object" and (keys-($required+$optional)|length)==0 and ($required-keys|length)==0;
 def integer: type=="number" and .==floor and .>=0;
 def plain: type=="string" and (test("[\\x00-\\x1f\\x7f]")|not);
-def uuid: type=="string" and test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
+def uuid: plain and test("\\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\z");
 def id($p): type=="string" and startswith($p+"-") and (ltrimstr($p+"-")|uuid);
-def hash: type=="string" and test("^[0-9a-f]{64}$");
-def invocation: .==null or (type=="string" and test("^[0-9a-f]{32}$"));
+def hash: plain and test("\\A[0-9a-f]{64}\\z");
+def invocation: .==null or (plain and test("\\A[0-9a-f]{32}\\z"));
 def distinct: length==(unique|length);
 def absolute: plain and startswith("/") and length>1;
 def relative: plain and length>0 and length<=512 and (startswith("/")|not) and (split("/")|all(.[];.!=".." and .!=""));
-def url: .==null or (plain and length<=2048 and test("^https?://(127\\.0\\.0\\.1|\\[::1\\]):[0-9]{1,5}([/?][^#\\s]*)?$") and (capture("^https?://(?:127\\.0\\.0\\.1|\\[::1\\]):(?<port>[0-9]+)").port|tonumber|.>=1 and .<=65535));
+def url: .==null or (plain and length<=2048 and test("\\Ahttps?://(127\\.0\\.0\\.1|\\[::1\\]):[0-9]{1,5}([/?][^#\\s]*)?\\z") and (capture("^https?://(?:127\\.0\\.0\\.1|\\[::1\\]):(?<port>[0-9]+)").port|tonumber|.>=1 and .<=65535));
 def draft:
   fields(["name","kind","argv","cwdRelative","previewUrl"];["id","timeoutSeconds"])
   and ((has("id")|not) or (.id|id("a")))
@@ -18,7 +18,7 @@ def draft:
   and (.argv|type=="array" and length>=1 and length<=64 and all(.[];plain and length<=1024) and (map(utf8bytelength)|add)<=16384
     and (.[0]|length>0 and (startswith("/") or startswith("./") or (contains("/")|not))))
   and (.cwdRelative|relative) and (.previewUrl|url)
-  and (if .kind=="command" then .previewUrl==null and ((.timeoutSeconds//300)|integer and .>=1 and .<=3600) and (.timeoutSeconds!=null or (has("timeoutSeconds")|not)) else .timeoutSeconds==null end);
+  and (if .kind=="command" then .previewUrl==null and (if has("timeoutSeconds") then (.timeoutSeconds|integer and .>=1 and .<=3600) else true end) else .timeoutSeconds==null end);
 def definition:
   fields(["id","projectId","name","kind","argv","cwdRelative","timeoutSeconds","previewUrl","revision","createdAt","updatedAt"];[])
   and (del(.projectId,.revision,.createdAt,.updatedAt)|draft) and (.projectId|id("p"))
@@ -78,7 +78,7 @@ def mutate($r;$ctx):
   if $r.action=="configure" then
     if $a.definition.id and (any(.definitions[];.id==$a.definition.id and .projectId==$a.projectId)|not) then error("ACTION_NOT_FOUND") else . end
     | ([.definitions[]|select(.id==$a.definition.id)][0]//null) as $old
-    | ($a.definition+{id:($old.id//("a-"+$ctx.uuid)),projectId:$a.projectId,revision:(($old.revision//0)+1),createdAt:($old.createdAt//$ctx.now),updatedAt:$ctx.now,timeoutSeconds:(if $a.definition.kind=="command" then $a.definition.timeoutSeconds//300 else null end)}) as $d
+    | ($a.definition+{id:($old.id//("a-"+$ctx.uuid)),projectId:$a.projectId,revision:(($old.revision//0)+1),createdAt:($old.createdAt//$ctx.now),updatedAt:$ctx.now,timeoutSeconds:(if $a.definition.kind=="command" then (if $a.definition|has("timeoutSeconds") then $a.definition.timeoutSeconds else 300 end) else null end)}) as $d
     | .definitions=([.definitions[]|select(.id!=$d.id)]+[$d])
     | if (.definitions|length)>200 or ([.definitions[]|select(.projectId==$a.projectId)]|length)>50 then error("CAPACITY_EXCEEDED") else . end
   elif $r.action=="remove" then

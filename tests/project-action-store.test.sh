@@ -42,6 +42,46 @@ mutate <"$TMPDIR/reserve"
 run=$(jq -r .run.id "$TMPDIR/result")
 jq -e '.ok and .reused==false and .run.processState=="pending" and .run.submissionUnconfirmed and .run.definitionSnapshot.name=="Updated"' "$TMPDIR/result" >/dev/null
 cp "$TMPDIR/result" "$TMPDIR/accepted"
+# Malformed timeout/identity requests must fail at validation, not at lookup.
+# Accumulate each real-store regression and restore the exact baseline after it.
+strict_refuse() {
+  local label=$1
+  if "$store" mutate >"$TMPDIR/strict-result" ||
+    ! jq -e '.ok==false and .error.code=="INVALID_REQUEST"' "$TMPDIR/strict-result" >/dev/null ||
+    ! cmp -s "$TMPDIR/strict-state" "$ARANEA_STATE_ROOT/project-actions.json"; then
+    printf '%s: expected INVALID_REQUEST and unchanged bytes; received ' "$label" >>"$TMPDIR/strict-failures"
+    jq -c '{ok,error}' "$TMPDIR/strict-result" >>"$TMPDIR/strict-failures"
+  fi
+  cp "$TMPDIR/strict-state" "$ARANEA_STATE_ROOT/project-actions.json"
+}
+cp "$ARANEA_STATE_ROOT/project-actions.json" "$TMPDIR/strict-state"
+for timeout in false null true '"300"'; do
+  jq --argjson timeout "$timeout" '.args.definition.timeoutSeconds=$timeout' "$TMPDIR/configure" | strict_refuse "command timeout $timeout"
+done
+jq '.args.definition.kind="service" | .args.definition.timeoutSeconds=false' "$TMPDIR/configure" | strict_refuse 'service false timeout'
+for field in projectId checkoutId actionId requestId bootId definitionHash; do
+  jq --arg field "$field" '.args[$field]+="\n"' "$TMPDIR/reserve" | strict_refuse "newline $field"
+done
+jq --arg id "$action" '.args.definition.id=($id+"\n")' "$TMPDIR/configure" | strict_refuse 'newline definition id'
+strict_revision=$(jq .revision "$TMPDIR/strict-state")
+jq -cn --arg run "$run" --argjson rev "$strict_revision" '{action:"observe",expectedRevision:$rev,args:{runId:$run,expectedInvocationId:null,patch:{invocationId:"11111111111111111111111111111111\n"}}}' | strict_refuse 'newline pinned invocation'
+jq -cn --arg run "$run" --argjson rev "$strict_revision" '{action:"observe",expectedRevision:$rev,args:{runId:$run,expectedInvocationId:"11111111111111111111111111111111\n",patch:{readiness:"unknown"}}}' | strict_refuse 'newline expected invocation'
+jq -cn --arg run "$run" '{action:"request-stop",args:{runId:($run+"\n")}}' | strict_refuse 'newline run id'
+# Persisted schema uses the same strict types and preserves malformed bytes.
+for change in '.definitions[0].timeoutSeconds=false' '.runs[0].bootId+="\n"' '.runs[0].definitionHash+="\n"' '.runs[0].invocationId="11111111111111111111111111111111\n"' '.runs[0].requestId+="\n" | .requests[0].requestId+="\n"'; do
+  jq "$change" "$TMPDIR/strict-state" >"$ARANEA_STATE_ROOT/project-actions.json"
+  cp "$ARANEA_STATE_ROOT/project-actions.json" "$TMPDIR/strict-corrupt"
+  if "$store" snapshot >"$TMPDIR/strict-result" ||
+    ! jq -e '.ok==false and .error.code=="ACTION_STATE_INVALID"' "$TMPDIR/strict-result" >/dev/null ||
+    ! cmp -s "$TMPDIR/strict-corrupt" "$ARANEA_STATE_ROOT/project-actions.json"; then
+    printf 'persisted %s: expected ACTION_STATE_INVALID and unchanged bytes\n' "$change" >>"$TMPDIR/strict-failures"
+  fi
+  cp "$TMPDIR/strict-state" "$ARANEA_STATE_ROOT/project-actions.json"
+done
+if [[ -s "$TMPDIR/strict-failures" ]]; then
+  cat "$TMPDIR/strict-failures" >&2
+  exit 1
+fi
 mutate <"$TMPDIR/reserve"
 jq -e --arg run "$run" '.reused and .run.id==$run and (.state.runs|length)==1' "$TMPDIR/result" >/dev/null
 jq '.args.checkoutId="c-00000000-0000-0000-0000-000000000000"' "$TMPDIR/reserve" | refuse REQUEST_CONFLICT
