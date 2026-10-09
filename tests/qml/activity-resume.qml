@@ -12,6 +12,8 @@ ShellRoot {
   property string epoch: 'old'
   // Kernel proof can disappear while the same title/class remains visible.
   property bool nativeValid: true
+  // Transport faults cannot establish that no detached provider was launched.
+  property string launchMode: 'accepted'
   // Retained resume arguments remain data passed to the fixed launcher.
   property var launchRequest: null
   // No observer is allowed to dispatch a focus or move.
@@ -22,7 +24,7 @@ ShellRoot {
   Activity.ActivityRuntime {
     id: runtime
     processRunner: function (argv, input, done) {
-      var name = argv[0].split('/').pop(), response
+      var name = ((argv[0] === '/usr/bin/timeout' || argv[0] === 'timeout') ? argv[2] : argv[0]).split('/').pop(), response
       if (name === 'aranea-project-discover')
         response = {
           ok: true,
@@ -42,6 +44,27 @@ ShellRoot {
           defaults: {}
         }
       else if (name === 'aranea-agent-launch') {
+        t.equal(argv.slice(0, 2), ['/usr/bin/timeout', '2s'], 'only short-lived native launcher transport is bounded')
+        if (root.launchMode === 'timeout') {
+          done(124, '', 'deadline')
+          return
+        }
+        if (root.launchMode === 'malformed') {
+          done(0, '{broken', '')
+          return
+        }
+        if (root.launchMode === 'missing-identity') {
+          done(0, '{"ok":true}', '')
+          return
+        }
+        if (root.launchMode === 'invalid-identity') {
+          done(0, '{"ok":true,"identity":{"pid":0,"startTime":"x"}}', '')
+          return
+        }
+        if (root.launchMode === 'refused') {
+          done(1, '{"ok":false,"code":"TOOL_MISSING","message":"Missing terminal"}', '')
+          return
+        }
         root.launchRequest = JSON.parse(input)
         response = {
           ok: true,
@@ -165,6 +188,31 @@ ShellRoot {
       })
       runtime.validateReobserve(op, function (valid) {
         t.check(valid, 'retained launch can be explicitly reobserved')
+      });
+      ['timeout', 'malformed', 'missing-identity', 'invalid-identity'].forEach(function (mode) {
+        root.launchMode = mode
+        runtime.launch(task, {
+          cwd: '/repo',
+          commonDir: '/repo/.git',
+          terminalId: 'kitty',
+          workspaceId: 2,
+          projectId: 'p',
+          checkoutId: 'c'
+        }, function (reply) {
+          t.equal(reply.ok, false, 'uncertain transport does not claim launch acceptance: ' + mode)
+          t.equal(reply.submissionUnconfirmed, true, 'uncertain transport preserves no-repeat authority: ' + mode)
+        })
+      })
+      root.launchMode = 'refused'
+      runtime.launch(task, {
+        cwd: '/repo',
+        commonDir: '/repo/.git',
+        terminalId: 'kitty',
+        workspaceId: 2,
+        projectId: 'p',
+        checkoutId: 'c'
+      }, function (reply) {
+        t.equal(reply.submissionUnconfirmed, false, 'structured prelaunch refusal is authoritative')
       })
       runtime.engine.sessionId = 'new-desktop'
       runtime.validateReobserve(op, function (valid) {

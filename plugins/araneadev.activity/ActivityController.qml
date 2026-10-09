@@ -148,6 +148,7 @@ Item {
         operationId: null,
         error: failure('DEPENDENCY_MISSING', 'Activity runtime unavailable. Activate the activity plugin.')
       }
+    invalidateSubmissions()
     var task = payload && storeState.tasks.filter(function (row) {
       return row.taskId === payload.taskId
     })[0]
@@ -201,6 +202,28 @@ Item {
     var op = operation(id)
     return !captureActive && op.id && op.state !== 'completed' && op.ownerId === ownerId && (attempt === undefined || op.attempt === attempt) && runtime && op.desktopId === runtime.sessionId
   }
+  // Submission ownership outlives an observation deadline but never its desktop/attempt.
+  function submissionCurrent(id: string, attempt: int): bool {
+    var op = operation(id)
+    return !captureActive && op.id && op.submissionPending === true && op.ownerId === ownerId && op.attempt === attempt && runtime && op.desktopId === runtime.sessionId
+  }
+  // Desktop loss invalidates evidence but cannot prove that a submitted provider never started.
+  function invalidateSubmissions(): void {
+    if (!runtime || captureActive)
+      return
+    operations.filter(function (op) {
+      return (op.submissionPending || op.submissionUnconfirmed) && op.desktopId !== runtime.sessionId && (!op.error || op.error.code !== 'OPERATION_LOST')
+    }).forEach(function (op) {
+      var problem = failure('OPERATION_LOST', 'The desktop lifetime changed while launch acceptance was unresolved. Inspect running terminals; this retained session will not be submitted again.')
+      publish(Object.assign({}, op, {
+        submissionPending: true,
+        submissionUnconfirmed: true,
+        error: problem
+      }))
+      if (op.state !== 'completed')
+        finish(op.id, 'partial', problem, null)
+    })
+  }
   // Complete a navigation request without changing the reported task lifecycle.
   function finish(id: string, outcome: string, problem: var, steps: var): void {
     var op = operation(id)
@@ -219,7 +242,7 @@ Item {
       Qt.callLater(drain)
     }
     var completed = operations.filter(function (row) {
-      return row.state === 'completed'
+      return row.state === 'completed' && !row.submissionPending && !row.submissionUnconfirmed
     })
     var remove = completed.slice(0, Math.max(0, completed.length - 100)).map(function (row) {
       return row.id
@@ -303,19 +326,41 @@ Item {
         finish(id, preparation.outcome || 'observed', null, preparation.steps)
         return
       }
+      publish(Object.assign({}, operation(id), {
+        submissionPending: true,
+        submissionUnconfirmed: false
+      }))
       runtime.launch(op.task, preparation, function (response) {
-        if (!current(id, attempt))
+        if (!submissionCurrent(id, attempt))
           return
+        var retained = operation(id), observationEnded = retained.state === 'completed'
         if (!response || !response.ok) {
-          finish(id, 'failed', failure(response && response.code || 'LAUNCH_FAILED', response && response.message || 'Resume launch failed.'), null)
+          var uncertain = !response || response.submissionUnconfirmed === true
+          var problem = failure(uncertain ? 'LAUNCH_UNCONFIRMED' : response.code || 'LAUNCH_FAILED', uncertain ? 'Launch submission may have started an agent, but acceptance could not be read. Inspect the retained operation and running terminals; this session will not be submitted again.' : response.message || 'Resume launch failed.')
+          publish(Object.assign({}, retained, {
+            submissionPending: uncertain,
+            submissionUnconfirmed: uncertain,
+            error: problem
+          }))
+          if (observationEnded)
+            publish(Object.assign({}, operation(id), {
+              outcome: uncertain ? 'partial' : 'failed'
+            }))
+          else
+            finish(id, uncertain ? 'partial' : 'failed', problem, null)
           return
         }
-        publish(Object.assign({}, operation(id), {
+        publish(Object.assign({}, retained, {
+          submissionPending: false,
+          submissionUnconfirmed: false,
           launchIdentity: response.identity,
           spec: response.spec,
           baseline: response.baseline,
           preparation: preparation
         }))
+        // A late acceptance is inspectable and explicitly reobservable, never automatic placement.
+        if (observationEnded)
+          return
         runtime.observeTerminal(operation(id), function (terminal) {
           if (!current(id, attempt))
             return
@@ -354,6 +399,12 @@ Item {
         ok: false,
         operationId: id,
         error: failure('INERT_MODE', 'Inert activity fixture.')
+      }
+    if (op.id && op.ownerId === ownerId && runtime && op.desktopId === runtime.sessionId && (op.submissionPending || op.submissionUnconfirmed))
+      return {
+        ok: false,
+        operationId: id,
+        error: failure('SUBMISSION_PENDING', 'Launch acceptance is unresolved. Inspect this operation and running terminals; another launch will not be submitted.')
       }
     if (!op.id || op.ownerId !== ownerId || !runtime || op.desktopId !== runtime.sessionId || !op.launchIdentity || op.action !== 'reopen')
       return {
@@ -416,6 +467,7 @@ Item {
     running: !controller.captureActive
     onTriggered: {
       controller.elapsedSinceRead += interval
+      controller.invalidateSubmissions()
       controller.operations.filter(function (op) {
         return op.validating && op.state !== 'completed'
       }).forEach(function (op) {

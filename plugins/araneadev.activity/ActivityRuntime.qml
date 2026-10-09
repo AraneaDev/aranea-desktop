@@ -46,6 +46,7 @@ Item {
         } catch (e) {}
         done(code === 0 && data ? data : {
           ok: false,
+          transportUnconfirmed: !data || code === 124 || code === 137 || data.ok === true,
           error: data && data.error || {
             code: data && data.code || 'DEPENDENCY_MISSING',
             message: data && data.message || diagnostics || 'Activity dependency unavailable.'
@@ -55,6 +56,7 @@ Item {
     } catch (e) {
       done({
         ok: false,
+        transportUnconfirmed: true,
         error: {
           code: 'DEPENDENCY_MISSING',
           message: String(e)
@@ -225,10 +227,13 @@ Item {
             terminalId: terminal,
             token: token
           }
-          json([scriptsPath + '/aranea-agent-launch'], JSON.stringify(spec), function (response) {
-            if (!response.ok || lifetime !== runtime.sessionId) {
+          json(['/usr/bin/timeout', '2s', scriptsPath + '/aranea-agent-launch'], JSON.stringify(spec), function (response) {
+            var accepted = response.ok === true && response.identity && Number.isInteger(response.identity.pid) && response.identity.pid > 0 && typeof response.identity.startTime === 'string' && /^[0-9]+$/.test(response.identity.startTime)
+            if (!accepted || lifetime !== runtime.sessionId) {
+              var refusal = response.ok === false && response.error && ['RESUME_UNAVAILABLE', 'INVALID_LAUNCH', 'CHECKOUT_INVALID', 'TOOL_MISSING', 'DEPENDENCY_MISSING'].indexOf(response.error.code) >= 0
               done({
                 ok: false,
+                submissionUnconfirmed: response.transportUnconfirmed === true || lifetime !== runtime.sessionId || !refusal,
                 code: response.error && response.error.code || 'LAUNCH_UNCONFIRMED',
                 message: response.error && response.error.message || 'Launch remains unconfirmed.'
               })

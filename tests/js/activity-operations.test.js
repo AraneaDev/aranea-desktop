@@ -66,3 +66,38 @@ test("terminal observation cannot stand in for fresh native resumed evidence", (
     "observed"
   )
 })
+test("unresolved launch submission remains authoritative after observation timeout", () => {
+  const accepted = ops.request(
+    [],
+    { action: "reopen", taskId: "t" },
+    "one",
+    "owner",
+    "native"
+  ).operation
+  const timedOut = { ...accepted, state: "completed", outcome: "partial", submissionPending: true }
+  assert.equal(
+    ops.request([timedOut], { action: "reopen", taskId: "other-turn" }, "two", "owner", "native")
+      .operation.id,
+    "one"
+  )
+  assert.equal(
+    ops.request(
+      [{ ...timedOut, submissionPending: false, submissionUnconfirmed: true }],
+      { action: "reopen", taskId: "t" },
+      "two",
+      "owner",
+      "native"
+    ).operation.id,
+    "one"
+  )
+  assert.equal(
+    ops.request(
+      [{ ...timedOut, submissionPending: false }],
+      { action: "reopen", taskId: "t" },
+      "two",
+      "owner",
+      "native"
+    ).operation.id,
+    "two"
+  )
+})

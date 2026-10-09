@@ -37,7 +37,9 @@ function request(operations, payload, id, ownerId, sessionKey) {
       op.ownerId === ownerId &&
       op.sessionKey === sessionKey &&
       op.action === payload.action &&
-      op.state !== "completed"
+      (op.state !== "completed" ||
+        op.submissionPending === true ||
+        op.submissionUnconfirmed === true)
     )
   })[0]
   var operation =

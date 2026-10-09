@@ -22,6 +22,17 @@ refusals retry the original submission. Reconnect reads the accepted ID.
 Reobserve explicitly checks a retained partial resume without launching,
 preparing, moving or focusing anything.
 
+A launch submission outlives the observation deadline. `submissionPending`
+protects its operation from eviction and repeat submission; unrelated actions
+can continue. A late accepted identity remains on the original partial operation
+for reconnect and explicit reobserve. The short-lived launcher transport is
+bounded to two seconds. Timeout or malformed acceptance sets
+`submissionUnconfirmed`; it does not prove that no agent started and does not
+permit another automatic or duplicate submission. Inspect the retained operation
+and running terminals. Until identity is known, reobserve returns
+`SUBMISSION_PENDING`; neither observer timeout nor transport timeout terminates a
+detached agent.
+
 Focus proves the actual native process, its executable/hash and ancestor chain,
 then the exact hosting terminal PID/address and current compositor instance.
 It makes no multiplexer pane claim. Resume supports native Claude UUID session

@@ -2,7 +2,7 @@
 # Usage: aranea-agent-launch (reads one fixed provider resume specification)
 # Compose the shared detached launcher; never accept agent-authored argv.
 set -euo pipefail
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd -- "$(/usr/bin/dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 [[ -x /usr/bin/jq ]] || {
   echo '{"ok":false,"code":"DEPENDENCY_MISSING","message":"Install jq."}'
   exit 4
@@ -16,4 +16,4 @@ fi
  elif .terminalId=="foot" then ["foot","--app-id",.token,"--working-directory",.cwd]
  elif .terminalId=="alacritty" then ["alacritty","--class",.token,"--working-directory",.cwd,"--command"]
  else ["ghostty","--class="+.token,"--gtk-single-instance=false","--working-directory="+.cwd,"-e"] end) as $base |
- {cwd:.cwd,argv:($base+["claude","--resume",.providerSessionId])}' <<<"$request" | "$script_dir/aranea-project-launch"
+ {cwd:.cwd,argv:($base+["claude","--resume",.providerSessionId])}' <<<"$request" | /bin/bash "$script_dir/aranea-project-launch"

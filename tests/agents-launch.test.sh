@@ -19,6 +19,23 @@ cp "$ARANEA_TEST_SANDBOX/bin/kitty" "$checkout/claude"
 cp "$ARANEA_TEST_SANDBOX/bin/kitty" "$ARANEA_TEST_SANDBOX/bin/claude"
 chmod +x "$ARANEA_TEST_SANDBOX/bin/kitty" "$ARANEA_TEST_SANDBOX/bin/claude" "$checkout/claude"
 export PATH="$checkout:$ARANEA_TEST_SANDBOX/bin:$PATH"
+cat >"$checkout/dirname" <<'SHADOW'
+#!/bin/bash
+printf invoked > "$ARANEA_TEST_SANDBOX/bootstrap-shadowed"
+exec /usr/bin/dirname "$@"
+SHADOW
+cat >"$checkout/bash" <<'SHADOW'
+#!/bin/bash
+printf invoked > "$ARANEA_TEST_SANDBOX/interpreter-shadowed"
+exec /bin/bash "$@"
+SHADOW
+chmod +x "$checkout/bash"
+chmod +x "$checkout/dirname"
+if "$launcher" <<<'{}' >/dev/null; then exit 1; fi
+[[ ! -f "$ARANEA_TEST_SANDBOX/bootstrap-shadowed" ]] || {
+  echo 'FAIL checkout dirname executed before request validation'
+  exit 1
+}
 request=$(jq -cn --arg cwd "$checkout" '{cwd:$cwd,provider:"claude",providerSessionId:"12345678-1234-1234-1234-123456789abc",terminalId:"kitty",token:"dev.aranea.activity.fixture"}')
 result=$("$launcher" <<<"$request")
 pid=$(jq -r .identity.pid <<<"$result")
@@ -39,4 +56,12 @@ rm "$ARANEA_TEST_SANDBOX/bin/claude"
 ln -s "$checkout/claude" "$ARANEA_TEST_SANDBOX/bin/claude"
 if result=$("$launcher" <<<"$request"); then exit 1; fi
 jq -e '.code=="TOOL_MISSING"' <<<"$result" >/dev/null
+[[ ! -f "$ARANEA_TEST_SANDBOX/bootstrap-shadowed" ]] || {
+  echo 'FAIL checkout dirname executed for valid resume'
+  exit 1
+}
+[[ ! -f "$ARANEA_TEST_SANDBOX/interpreter-shadowed" ]] || {
+  echo 'FAIL checkout bash executed by shared helper bootstrap'
+  exit 1
+}
 echo 'PASS fixed resume argv, option rejection, detached acceptance and checkout executable exclusion'
