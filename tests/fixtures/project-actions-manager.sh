@@ -66,8 +66,10 @@ PROPS
       *' stop '*)
         echo "${!#}" >>"$root/stops"
         [[ ! -e "$root/stop-fails" ]] || exit 1
+        [[ ! -e "$root/stop-no-change" ]] || exit 0
+        [[ ! -e "$root/stop-delays" ]] || sleep 10
         if [[ -e "$root/check-release" ]]; then
-          jq -e --arg u "${!#}" 'any(.runs[];.unitName==$u and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped") and (.submissionUnconfirmed|not))' "$ARANEA_STATE_ROOT/project-actions.json" >/dev/null
+          jq -e --arg u "${!#}" 'any(.runs[];.unitName==$u and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped") and .submissionUnconfirmed)' "$ARANEA_STATE_ROOT/project-actions.json" >/dev/null
         fi
         if [[ -e $root/gc-on-release ]]; then
           rm -f "$root/${!#}"
@@ -80,7 +82,11 @@ PROPS
     esac
     ;;
   journalctl)
-    jq -c --arg b "$(tr -d '-' </proc/sys/kernel/random/boot_id)" '. + (if has("_BOOT_ID") then {} else {_BOOT_ID:$b} end)' "$root/journal"
+    full=false
+    for arg in "$@"; do [[ $arg != --all ]] || full=true; done
+    jq -c --argjson full "$full" --arg b "$(tr -d '-' </proc/sys/kernel/random/boot_id)" '. + (if has("_BOOT_ID") then {} else {_BOOT_ID:$b} end) | if ($full|not) and (.MESSAGE|type)=="string" and (.MESSAGE|utf8bytelength)>4096 then .MESSAGE=null else . end' "$root/journal"
+    [[ ! -e $root/journal-malformed ]] || printf '{malformed\n'
+    [[ ! -e $root/journal-fails ]] || exit 1
     ;;
   curl) [[ ! -e "$root/unreachable" ]] ;;
   xdg-open) echo opened >>"$root/opened" ;;

@@ -208,20 +208,60 @@ runtime_read_proof() {
   [[ $(jq .definitionSnapshot "$scratch/run" | project_actions_definition_hash) == "$(jq -r .definitionHash "$scratch/run")" ]]
 }
 
-# Release retained terminal units only after the terminal receipt was persisted.
+# Distinguish persisted main-process exit evidence from completed cgroup cleanup.
+runtime_terminal_evidence() {
+  jq -e '.state=="completed" and .invocationId!=null and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped")' "$scratch/run" >/dev/null
+}
+
+# Keep the recorded exit result protected when unit/cgroup cleanup cannot be proved.
+runtime_cleanup_uncertain() {
+  local code=$1
+  jq --arg c "$code" '{submissionUnconfirmed:true,outcome:"partial",readiness:"unknown",error:(if .error.code=="TIMEOUT" then .error else {code:$c,message:"Main-process exit is recorded, but unit cleanup is unconfirmed.",recovery:"Refresh or Stop this retained run before starting another or removing actions."} end)}' "$scratch/run" >"$scratch/patch"
+  runtime_observe
+  runtime_error "$code" 'Main-process exit is recorded, but exact unit cleanup remains unconfirmed.'
+}
+
+# Clear protection only after a terminal receipt plus exact inactive/absent evidence.
+runtime_cleanup_complete() {
+  jq '{submissionUnconfirmed:false,outcome:(if .processState=="failed" then "failed" else "observed" end),error:(if .error.code=="TIMEOUT" then .error else null end)}' "$scratch/run" >"$scratch/patch"
+  runtime_observe
+}
+
+# Main exit is durable before release; stop failure cannot discard cgroup authority.
 runtime_release() {
+  runtime_terminal_evidence || runtime_error STOP_UNCONFIRMED 'No persisted main-process terminal evidence is available.'
+  if ! runtime_proof; then
+    if [[ $proof_missing == true ]]; then
+      runtime_cleanup_complete
+      return
+    fi
+    runtime_cleanup_uncertain "$proof_error"
+  fi
+  if [[ ${unit_props[ActiveState]} != inactive ]]; then
+    runtime_transport 5s "$ctl" --user --no-ask-password stop -- "$(jq -r .unitName "$scratch/run")" >/dev/null 2>&1 || true
+    if ! runtime_proof; then
+      if [[ $proof_missing == true ]]; then
+        runtime_cleanup_complete
+        return
+      fi
+      runtime_cleanup_uncertain "$proof_error"
+    fi
+    [[ ${unit_props[ActiveState]} == inactive ]] || runtime_cleanup_uncertain STOP_UNCONFIRMED
+  fi
+  runtime_cleanup_complete
+  # Inactive is durable; recheck identity before best-effort metadata reset.
   runtime_proof || return 0
-  [[ ${unit_props[ActiveState]} == inactive || ${unit_props[ActiveState]} == failed || (${unit_props[ActiveState]} == active && ${unit_props[SubState]} == exited) ]] || return 0
-  runtime_transport 5s "$ctl" --user --no-ask-password stop -- "$(jq -r .unitName "$scratch/run")" >/dev/null 2>&1 || return 0
-  # Recheck identity before reset; an unloaded unit needs no further release.
-  runtime_proof || return 0
+  [[ ${unit_props[ActiveState]} == inactive ]] || return 0
   runtime_transport 2s "$ctl" --user --no-ask-password reset-failed -- "$(jq -r .unitName "$scratch/run")" >/dev/null 2>&1 || true
 }
 
 # Interpret actual service state; active/exited is terminal, never a running process.
 runtime_refresh() {
   local process outcome code=null signal=null error=null terminal=false
-  if jq -e '(.submissionUnconfirmed|not) and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped")' "$scratch/run" >/dev/null; then return; fi
+  if runtime_terminal_evidence; then
+    if jq -e '.submissionUnconfirmed' "$scratch/run" >/dev/null; then runtime_release; fi
+    return 0
+  fi
   if ! runtime_proof; then
     local failure=$proof_error
     runtime_uncertain "$failure"
@@ -245,7 +285,7 @@ runtime_refresh() {
       return
       ;;
   esac
-  jq -cn --arg p "$process" --arg o "$outcome" --arg i "${unit_props[InvocationID]}" --argjson c "$code" --argjson s "$signal" --argjson e "$error" '{invocationId:$i,state:"completed",outcome:$o,processState:$p,readiness:"unknown",exitCode:$c,exitSignal:$s,error:$e,submissionUnconfirmed:false}' >"$scratch/patch"
+  jq -cn --arg p "$process" --arg o "$outcome" --arg i "${unit_props[InvocationID]}" --argjson c "$code" --argjson s "$signal" --argjson e "$error" --argjson terminal "$terminal" '{invocationId:$i,state:"completed",outcome:(if $terminal then "partial" else $o end),processState:$p,readiness:"unknown",exitCode:$c,exitSignal:$s,error:$e,submissionUnconfirmed:$terminal}' >"$scratch/patch"
   runtime_observe
   if [[ $terminal == true ]]; then runtime_release; else runtime_probe; fi
 }
@@ -269,6 +309,10 @@ runtime_stop() {
   if jq -e '(.submissionUnconfirmed|not) and (.processState=="succeeded" or .processState=="failed" or .processState=="stopped")' "$scratch/run" >/dev/null; then return; fi
   jq -n --slurpfile r "$scratch/run" '{action:"request-stop",args:{runId:$r[0].id}}' | runtime_store mutate
   jq '.run' "$scratch/result" >"$scratch/run"
+  if runtime_terminal_evidence; then
+    runtime_release
+    return 0
+  fi
   if ! runtime_proof; then
     local failure=$proof_error
     runtime_uncertain "$failure"
@@ -352,20 +396,42 @@ runtime_start() {
 # Read bounded JSON journal records, independently filtering the pinned invocation.
 runtime_logs() {
   [[ -n $journal ]] || runtime_error JOURNAL_UNAVAILABLE 'Install journalctl to read the local journal.'
-  local invocation unit boot
+  local invocation unit boot transport_lost=false
   boot=$(jq -r ' .bootId|gsub("-";"")' "$scratch/run")
   invocation=$(jq -r .invocationId "$scratch/run") unit=$(jq -r .unitName "$scratch/run")
   [[ $invocation != null ]] || runtime_error RUN_IDENTITY_LOST 'Refresh to persist the invocation before reading logs.'
-  if ! runtime_transport 2s "$journal" --user --no-pager --quiet --output=json --lines=200 "--unit=$unit" "_SYSTEMD_INVOCATION_ID=$invocation" "_BOOT_ID=$boot" 2>/dev/null | head -c 1048577 >"$scratch/journal"; then
+  if ! runtime_transport 2s "$journal" --user --no-pager --quiet --all --output=json --output-fields=MESSAGE,_SYSTEMD_INVOCATION_ID,_SYSTEMD_USER_UNIT,_SYSTEMD_UNIT,_BOOT_ID --lines=200 "--unit=$unit" "_SYSTEMD_INVOCATION_ID=$invocation" "_BOOT_ID=$boot" 2>/dev/null | head -c 1048577 >"$scratch/journal"; then
+    transport_lost=true
     [[ -s $scratch/journal ]] || runtime_error JOURNAL_UNAVAILABLE 'The local journal could not be read.'
   fi
   jq -Rn --arg i "$invocation" --arg u "$unit" --arg b "$boot" '
-    [inputs|fromjson? | select(._SYSTEMD_INVOCATION_ID==$i and ._BOOT_ID==$b and (._SYSTEMD_USER_UNIT==$u or ._SYSTEMD_UNIT==$u)) | .MESSAGE | select(type=="string")][:200]
-    | (length>=200) as $full | join("\n") | gsub("\u001b\\[[0-?]*[ -/]*[@-~]";"") | gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f]";"")
-    | {output:.,truncated:($full or utf8bytelength>262144)}' <"$scratch/journal" >"$scratch/output"
+    # Decode real journal byte arrays, rejecting overlong/surrogate/out-of-range UTF-8.
+    def utf8_bytes:
+      . as $bytes | reduce range(0;length) as $n ({points:[],skip:0,lost:false};
+        if .skip>0 then .skip-=1 else $bytes[$n] as $lead
+          | (if $lead<128 then 1 elif $lead>=194 and $lead<=223 then 2 elif $lead>=224 and $lead<=239 then 3 elif $lead>=240 and $lead<=244 then 4 else 0 end) as $width
+          | $bytes[$n:$n+$width] as $chunk
+          | (if $width>0 and ($chunk|length)==$width and all($chunk[1:][];.>=128 and .<=191)
+             then reduce $chunk[1:][] as $c ((if $width==1 then $lead elif $width==2 then $lead-192 elif $width==3 then $lead-224 else $lead-240 end); .*64+$c-128) else -1 end) as $cp
+          | if $cp>=([0,0,128,2048,65536][$width]) and $cp<=1114111 and ($cp<55296 or $cp>57343)
+            then .points+=[$cp] | .skip=($width-1)
+            else .points+=[65533] | .lost=true end
+        end) | {text:(.points|implode),lost};
+    def message:
+      if type=="string" then {text:.,lost:false}
+      elif type=="array" and all(.[];type=="number" and .==floor and .>=0 and .<=255) then utf8_bytes
+      else {text:"[Journal message unavailable]",lost:true} end;
+    [inputs | (try {record:fromjson} catch {lost:true})
+      | if .lost or (.record|type)!="object" then {lost:true}
+        elif .record._SYSTEMD_INVOCATION_ID==$i and .record._BOOT_ID==$b and (.record._SYSTEMD_USER_UNIT==$u or .record._SYSTEMD_UNIT==$u)
+        then (try (.record.MESSAGE|message) catch {text:"[Journal message unavailable]",lost:true})
+        else empty end]
+    | (length>=200) as $full | .[:200] as $records
+    | [$records[]|.text//empty] | join("\n") | gsub("\u001b\\[[0-?]*[ -/]*[@-~]";"") | gsub("[\u0000-\u0008\u000b-\u001f\u007f-\u009f]";"")
+    | {output:.,truncated:($full or any($records[];.lost) or utf8bytelength>262144)}' <"$scratch/journal" >"$scratch/output"
   # Byte limit is applied before JSON encoding; incomplete UTF-8 is decoded safely.
   jq -j .output "$scratch/output" | head -c 262144 >"$scratch/text" || true
-  jq --rawfile t "$scratch/text" --slurpfile o "$scratch/output" --argjson clipped "$([[ $(stat -c %s "$scratch/journal") -gt 1048576 ]] && echo true || echo false)" '.output=$t | until((.output|utf8bytelength)<=262144; .output|=.[0:-1]) | .truncated=($o[0].truncated or $clipped) | .availability={journal:true}' "$scratch/result" >"$scratch/next"
+  jq --rawfile t "$scratch/text" --slurpfile o "$scratch/output" --argjson lost "$transport_lost" --argjson clipped "$([[ $(stat -c %s "$scratch/journal") -gt 1048576 ]] && echo true || echo false)" '.output=$t | until((.output|utf8bytelength)<=262144; .output|=.[0:-1]) | .truncated=($o[0].truncated or $clipped or $lost) | .availability={journal:true}' "$scratch/result" >"$scratch/next"
   mv "$scratch/next" "$scratch/result"
 }
 
