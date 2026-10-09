@@ -52,6 +52,7 @@ PROPS
     case " $* " in
       *' --property=Version '*) echo Version=261 ;;
       *' show '*)
+        [[ ! -e $root/show-delay ]] || sleep "$(cat "$root/show-delay")"
         if [[ -e $root/show-hold ]]; then
           touch "$root/show-entered"
           while [[ -e $root/show-hold ]]; do sleep .01; done

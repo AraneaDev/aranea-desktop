@@ -171,7 +171,7 @@ projects_cli_observe() {
 # Capabilities are self-describing and expose absent dependencies without failing.
 projects_cli_capabilities() {
   local dependencies='{}' dependency available tools='null' owner='null'
-  for dependency in git flock jq realpath setsid timeout omarchy-shell; do
+  for dependency in git flock jq realpath setsid timeout omarchy-shell systemd-run systemctl journalctl curl xdg-open; do
     available=false
     command -v "$dependency" >/dev/null 2>&1 && available=true
     dependencies=$(jq -c --arg name "$dependency" --argjson available "$available" '.+{($name):$available}' <<<"$dependencies")
@@ -205,9 +205,10 @@ projects_cli_capabilities() {
 ]
 JSON
   )
-  local activity
+  local activity action_capabilities
   activity=$(agents_cli_capabilities)
-  projects_cli_finish observed '' 'Aranea capabilities.' "$(jq -cn --argjson activity "$activity" --argjson operations "$schemas" --argjson dependencies "$dependencies" --argjson tools "$tools" --argjson owner "$owner" '{operations:($operations+$activity.operations),activity:$activity.activity,availability:{dependencies:$dependencies,tools:$tools,owner:$owner}}')"
+  action_capabilities=$(project_actions_cli_capabilities)
+  projects_cli_finish observed '' 'Aranea capabilities.' "$(printf '%s\n' "$activity" "$schemas" "$dependencies" "$tools" "$owner" "$action_capabilities" | jq -cs '{operations:(.[1]+.[0].operations+.[5].operations),activity:.[0].activity,projectActions:.[5].projectActions,availability:{dependencies:.[2],tools:.[3],owner:.[4],projectActions:.[5].availability}}')"
 }
 
 # Parse all public syntax before crossing registry or desktop boundaries.
