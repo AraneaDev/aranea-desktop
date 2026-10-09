@@ -4,6 +4,8 @@
 # Usage: tools/render-settings-preview --output FILE [--fixture wide|narrow|dirty|unavailable|integration-failed|notifications|scaling]
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=tools/lib/render-capture.sh
+source "$repo_root/tools/lib/render-capture.sh"
 output=""
 fixture=wide
 while (($#)); do
@@ -65,20 +67,7 @@ ln -s "$repo_root" "$work/state/omarchy/current/theme"
 mkdir -p "$work/home/.local/state/omarchy/current"
 ln -s "$repo_root" "$work/home/.local/state/omarchy/current/theme"
 # Fixed process traps are installed before Quickshell loads any component.
-mkdir -p "$work/traps"
-for program in omarchy-shell aranea aranea-project-store aranea-project-discover aranea-project-tools code nvim alacritty kitty foot ghostty hyprctl; do
-  cat >"$work/traps/$program" <<'CAPTURE_TRAP'
-#!/usr/bin/env bash
-# Shared Style geometry probes receive fixed offscreen values, never live IPC.
-if [[ "${0##*/}" == hyprctl && "$*" == '-j getoption general:gaps_out' || "${0##*/}" == hyprctl && "$*" == '-j getoption decoration:rounding' ]]; then
-  printf '{"int":0}\n'
-  exit 0
-fi
-printf '%s %s\n' "${0##*/}" "$*" >>"$ARANEA_CAPTURE_EXECUTION_LOG"
-exit 99
-CAPTURE_TRAP
-  chmod +x "$work/traps/$program"
-done
+render_capture_install_traps "$work"
 chmod 700 "$work/run"
 ln -s "$shell_dir/Commons" "$work/cfg/Commons"
 ln -s "$shell_dir/Ui" "$work/cfg/Ui"
