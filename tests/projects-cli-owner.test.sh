@@ -34,6 +34,12 @@ cleanup_owner() {
     kill -- "-$owner_pid" 2>/dev/null || true
     wait "$owner_pid" 2>/dev/null || true
   }
+  if ((status != 0)); then
+    local diagnostic
+    diagnostic=$(mktemp -d /tmp/aranea-cli-failure.XXXXXX)
+    cp -r "$work" "$diagnostic/owner"
+    printf 'Owner failure diagnostics: %s\n' "$diagnostic"
+  fi
   rm -rf "$work"
 }
 sandbox_on_exit cleanup_owner
@@ -48,11 +54,18 @@ cat >"$ARANEA_TEST_SANDBOX/bin/omarchy-shell" <<'BRIDGE'
 #!/usr/bin/env bash
 set -euo pipefail
 jq -cn --args '$ARGS.positional' -- "$@" >> "$CLI_OWNER_CALLS"
+cold_first=false
 if [[ "${CLI_FORCE_COLD:-false}" == true && "$2" == request && ! -e "$CLI_OWNER_CALLS.cold" ]]; then
+  cold_first=true
   touch "$CLI_OWNER_CALLS.cold"
-  env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$CLI_OWNER_RUNTIME" "$CLI_OWNER_BIN" ipc -p "$CLI_OWNER_CONFIG" call fixture mode readiness >/dev/null
+  env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$CLI_OWNER_RUNTIME" "$CLI_OWNER_BIN" ipc -p "$CLI_OWNER_CONFIG" call fixture mode "${CLI_COLD_MODE:-readiness}" >/dev/null
 fi
-exec env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$CLI_OWNER_RUNTIME" "$CLI_OWNER_BIN" ipc -p "$CLI_OWNER_CONFIG" call "$@"
+response=$(env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$CLI_OWNER_RUNTIME" "$CLI_OWNER_BIN" ipc -p "$CLI_OWNER_CONFIG" call "$@")
+if [[ "$2" == request ]]; then printf '%s\n' "$response" >> "$CLI_OWNER_CALLS.responses"; fi
+if [[ "$cold_first" == true ]]; then
+  env -u QT_QPA_PLATFORMTHEME QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR="$CLI_OWNER_RUNTIME" "$CLI_OWNER_BIN" ipc -p "$CLI_OWNER_CONFIG" call fixture releaseRefresh >/dev/null
+fi
+printf '%s\n' "$response"
 BRIDGE
 chmod +x "$ARANEA_TEST_SANDBOX/bin/omarchy-shell"
 export PATH="$ARANEA_TEST_SANDBOX/bin:$PATH"
@@ -76,10 +89,12 @@ open_project() {
 # A real readiness refusal may retry each Open form, but acceptance submits only once.
 cold_open() {
   local before
-  before=$(jq -s 'map(select(.[1]=="request"))|length' "$work/calls")
+  before=$(wc -l <"$work/calls.responses")
   rm -f "$work/calls.cold"
   CLI_FORCE_COLD=true open_project "$@"
-  [[ $(jq -s 'map(select(.[1]=="request"))|length' "$work/calls") == $((before + 2)) ]]
+  # All retries precede the sole acceptance; a slow refresh can reject repeatedly.
+  jq -se --argjson before "$before" '.[ $before: ] | length >= 2 and all(.[:-1][];.ok == false and .operationId == null and .error.code == "OWNER_NOT_READY") and (.[-1]|.ok == true and (.operationId|type == "string" and length > 0))' "$work/calls.responses" >/dev/null
+  jq -se --slurpfile responses "$work/calls.responses" 'last.operationId == $responses[-1].operationId and last.status == "observed"' "$work/events" >/dev/null
 }
 for invalid in '{"newWindowRole":null}' '{"retryRole":null}' '{"reobserveRole":null}' '{"reobserveRole":"unknown"}' '{"reobserveRole":"editor","newWindowRole":"terminal"}' '{"reobserveRole":"terminal","retryRole":"editor"}'; do
   payload=$(jq -cn --arg project "$project" --argjson invalid "$invalid" '{projectId:$project}+$invalid')
@@ -97,7 +112,10 @@ omarchy-shell fixture mode normal | jq -e '.launches==["editor","terminal","term
 omarchy-shell fixture mode uncertain >/dev/null
 open_project 1 --new-window terminal
 omarchy-shell fixture mode normal >/dev/null
-cold_open 0 --reobserve-role terminal
+delayed_before=$(wc -l <"$work/calls.responses")
+CLI_COLD_MODE=readiness-delayed cold_open 0 --reobserve-role terminal
+# The delayed snapshot specifically exercises more than one readiness refusal.
+jq -se --argjson before "$delayed_before" '.[$before:] | length > 2' "$work/calls.responses" >/dev/null
 omarchy-shell fixture mode normal | jq -e '.launches==["editor","terminal","terminal","editor","terminal"]' >/dev/null
 jq -se 'last.data.outcome=="observed" and any(last.data.operation.steps[];.role=="terminal" and .status=="observed")' "$work/events" >/dev/null
 if grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop|Failed to load configuration' "$work/log"; then

@@ -11,6 +11,21 @@ ShellRoot {
     id: helpers
     captureActive: true
   }
+  // Delay only the next snapshot response to exercise readiness retries.
+  property bool delayRefresh: false
+  // Hold readiness until the first production request has actually been refused.
+  property bool holdRefresh: false
+  // Retained completion callback for that delayed snapshot.
+  property var delayedSnapshot: null
+  Timer {
+    id: snapshotDelay
+    interval: 1000
+    onTriggered: {
+      var done = root.delayedSnapshot
+      root.delayedSnapshot = null
+      done()
+    }
+  }
   // Observable launch count and deterministic role failure for targeted retry.
   property var launches: []
   // Current bindings are fixture process proof, never inferred by the owner.
@@ -26,7 +41,19 @@ ShellRoot {
   // Fake desktop replaces every launcher/compositor call before owner activation.
   property var desktop: ({
       sessionId: 'cli-owner',
-      processRunner: helpers.processRunner,
+      processRunner: function (argv, input, done) {
+        helpers.processRunner(argv, input, function (code, output, diagnostics) {
+          if ((root.delayRefresh || root.holdRefresh) && argv[1] === 'snapshot') {
+            root.delayRefresh = false
+            root.delayedSnapshot = function () {
+              done(code, output, diagnostics)
+            }
+            if (!root.holdRefresh)
+              snapshotDelay.start()
+          } else
+            done(code, output, diagnostics)
+        })
+      },
       snapshot: function () {
         return {
           available: true,
@@ -113,11 +140,21 @@ ShellRoot {
     })
   IpcHandler {
     target: 'fixture'
+    function releaseRefresh(): bool {
+      root.holdRefresh = false
+      if (root.delayedSnapshot)
+        snapshotDelay.start()
+      return true
+    }
     function mode(value: string): string {
       root.failTerminal = value === 'failure'
       root.uncertain = value === 'uncertain'
-      if (value === 'readiness')
+      if (value === 'readiness' || value === 'readiness-delayed') {
+        root.holdRefresh = true
+        root.delayRefresh = true
+        snapshotDelay.interval = value === 'readiness-delayed' ? 1000 : 0
         endpoint.owner.registryReady = false
+      }
       return JSON.stringify({
         launches: root.launches,
         ready: endpoint.owner.registryReady
