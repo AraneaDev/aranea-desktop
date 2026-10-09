@@ -167,8 +167,10 @@ resubmitted automatically. Timeout (`OBSERVATION_TIMEOUT`), disconnection
 CLI observer; owner work continues. Preserve the returned operation ID and
 reconnect with `projects operation OPERATION_ID --json`. A session/generation
 change or evicted result returns `OPERATION_LOST`; inspect state before deciding
-to create a new operation. A submission whose reply is lost may already have
-been accepted: inspect owner state before submitting again.
+to create a new operation. A submission whose reply is lost, empty, malformed, or nonconforming may already
+have been accepted. These indeterminate replies return `OWNER_UNAVAILABLE` and
+instruct inspection of owner state before any new submission. Only a conforming
+explicit refusal is trusted as a rejection.
 
 `details` sends a Settings summon payload `{section:"projects",projectId:ID}`.
 It reports observed only after the read-only
@@ -184,5 +186,6 @@ and `4` missing dependency. Stable failure codes include `CHECKOUT_MISSING`,
 `REGISTRY_CONFLICT`, `TOOL_MISSING`, `COMPOSITOR_UNAVAILABLE`,
 `OWNER_UNAVAILABLE`, `OBSERVATION_TIMEOUT`, and `OPERATION_LOST`. Missing Git or
 flock is actionable only for commands that need them. Missing jq still emits a
-fixed valid dependency-failure JSONL envelope and exits `4`; its unavailable
-clock placeholder is `1970-01-01T00:00:00Z`.
+valid dependency-failure JSONL envelope and exits `4`. Its UTC timestamp comes
+from validated clock output without jq; only a failed/unusable clock returns
+`timestamp: null` with `data.timestampAvailable: false`.

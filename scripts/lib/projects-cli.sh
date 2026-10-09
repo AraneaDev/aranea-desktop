@@ -58,9 +58,10 @@ projects_cli_store() {
 # Convert a helper or owner refusal without replacing stable domain errors.
 projects_cli_internal_error() {
   local response=$1 code message recovery exit_code=1
-  code=$(jq -r '.error.code // "OWNER_UNAVAILABLE"' <<<"$response" 2>/dev/null) || code=OWNER_UNAVAILABLE
-  message=$(jq -r '.error.message // "The response was unavailable."' <<<"$response" 2>/dev/null) || message='The response was unavailable.'
-  recovery=$(jq -r '.error.recovery // "Refresh and retry."' <<<"$response" 2>/dev/null) || recovery='Refresh and retry.'
+  if ! jq -e -s 'length==1 and (.[0]|type=="object")' <<<"$response" >/dev/null 2>&1; then response='{}'; fi
+  code=$(jq -r '(.error.code | select(type=="string" and length>0)) // "OWNER_UNAVAILABLE"' <<<"$response" 2>/dev/null) || code=OWNER_UNAVAILABLE
+  message=$(jq -r '(.error.message | select(type=="string" and length>0)) // "The response was unavailable."' <<<"$response" 2>/dev/null) || message='The response was unavailable.'
+  recovery=$(jq -r '(.error.recovery | select(type=="string" and length>0)) // "Inspect current state before retrying."' <<<"$response" 2>/dev/null) || recovery='Inspect current state before retrying.'
   case "$code" in
     DEPENDENCY_MISSING) exit_code=4 ;;
     TOOL_CHOICE_REQUIRED) exit_code=3 ;;
@@ -220,7 +221,13 @@ projects_cli_main() {
   if ! command -v jq >/dev/null 2>&1; then
     echo 'Install jq to use the public project protocol.' >&2
     if [[ "$cli_json" == true ]]; then
-      printf '%s\n' '{"schema":1,"event":"completed","operation":"aranea","timestamp":"1970-01-01T00:00:00Z","status":"failed","code":"DEPENDENCY_MISSING","data":{"outcome":"failed","dependency":"jq","recovery":"Install jq and retry."}}'
+      local timestamp timestamp_json=null timestamp_available=false
+      if timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null) && [[ "$timestamp" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+        # Only validated digits/punctuation enter this encoder-free envelope.
+        timestamp_json="\"$timestamp\""
+        timestamp_available=true
+      fi
+      printf '{"schema":1,"event":"completed","operation":"aranea","timestamp":%s,"status":"failed","code":"DEPENDENCY_MISSING","data":{"outcome":"failed","dependency":"jq","timestampAvailable":%s,"recovery":"Install jq and retry."}}\n' "$timestamp_json" "$timestamp_available"
     fi
     exit 4
   fi
@@ -389,9 +396,15 @@ projects_cli_main() {
       while true; do
         if [[ "$preparing" == true ]] && ((SECONDS >= ready_deadline)); then projects_cli_internal_error "$response"; fi
         if ! response=$(projects_cli_ipc aranea.projects request "$payload"); then projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'; fi
-        if jq -e '.ok==true and (.operationId|type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
+        if ! jq -e -s 'length==1 and (.[0]|type=="object")' <<<"$response" >/dev/null 2>&1; then
+          projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'
+        fi
+        if jq -e '.ok==true and has("error") and .error==null and (.operationId|type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
           cli_operation_id=$(jq -r .operationId <<<"$response")
           break
+        fi
+        if ! jq -e '.ok==false and has("operationId") and .operationId==null and (.error|type=="object") and all(.error.code,.error.message,.error.recovery; type=="string" and length>0)' <<<"$response" >/dev/null 2>&1; then
+          projects_cli_fail OWNER_UNAVAILABLE 'Submission could not be confirmed; it may have been accepted.' 'Inspect owner state before any new submission.'
         fi
         if jq -e '.ok==false and has("operationId") and .operationId==null and .error.code=="OWNER_NOT_READY"' <<<"$response" >/dev/null 2>&1 && ((SECONDS < ready_deadline)); then
           preparing=true

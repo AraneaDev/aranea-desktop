@@ -20,6 +20,13 @@ case "$1 $2" in
     jq -cn --argjson compositor "$compositor" --arg session "$session" '{sessionId:$session,observedAt:123,availability:{ready:true,registry:true,compositor:$compositor},projects:[],bindings:[],operations:[]}' ;;
   'aranea.projects request')
     printf '%s\n' "$3" > "$CLI_PAYLOAD"
+    case "$CLI_MODE" in
+      empty) exit 0 ;;
+      malformed) printf '{broken\n'; exit 0 ;;
+      nonobject) echo '[]'; exit 0 ;;
+      nonconforming) echo '{"ok":true,"operationId":null,"error":{"code":"OWNER_NOT_READY","message":"Wait","recovery":"Retry"}}'; exit 0 ;;
+      badrefusal) echo '{"ok":false,"operationId":null,"error":{"code":"","message":"","recovery":""}}'; exit 0 ;;
+    esac
     if [[ "$CLI_MODE" == choice ]]; then
       echo '{"ok":false,"operationId":null,"error":{"code":"TOOL_CHOICE_REQUIRED","message":"Choose tools","recovery":"Configure tools"}}'
     elif [[ "$CLI_MODE" == ready && ! -f "$CLI_COUNT" ]]; then
@@ -73,9 +80,25 @@ run_cli 1 projects register --path "$ARANEA_TEST_SANDBOX/vanished-candidate"
 run_cli 0 projects list
 jq -se 'last.data.projects|length==1' "$events" >/dev/null
 run_cli 0 projects inspect "$project"
+for reply in empty malformed nonobject nonconforming badrefusal; do
+  before=$(jq -s 'map(select(.[1]=="request"))|length' "$CLI_CALLS" 2>/dev/null || echo 0)
+  CLI_MODE="$reply" run_cli 1 projects open "$project"
+  jq -se 'last.code=="OWNER_UNAVAILABLE" and (last.message|contains("may have been accepted")) and (last.data.recovery|contains("Inspect owner state before any new submission")) and any(.[];.event=="recovery" and .code=="OWNER_UNAVAILABLE" and (.message|length>0))' "$events" >/dev/null || {
+    echo "Indeterminate $reply reply lost safe recovery"
+    exit 1
+  }
+  [[ $(jq -s 'map(select(.[1]=="request"))|length' "$CLI_CALLS") == $((before + 1)) ]]
+done
+# Empty/nonobject error translation must preserve nonempty fallback fields.
+for response in '' null '[]' '{"error":{"code":"","message":"","recovery":""}}'; do
+  actual=0
+  bash -c 'set -euo pipefail; source "$1/scripts/lib/json-events.sh"; source "$1/scripts/lib/projects-cli.sh"; cli_json=true; cli_operation=fixture; cli_operation_id=""; projects_cli_internal_error "$2"' bash "$repo_root" "$response" >"$events" 2>"$ARANEA_TEST_SANDBOX/diagnostics" || actual=$?
+  [[ "$actual" == 1 ]]
+  jq -se 'last.code=="OWNER_UNAVAILABLE" and (last.message|length>0) and (last.data.recovery|length>0)' "$events" >/dev/null
+done
 run_cli 1 projects open "$project"
 jq -se 'last.data.outcome=="partial" and last.operationId=="op-123-1"' "$events" >/dev/null
-jq -se --arg p "$project" --arg c "$checkout_id" 'map(select(.[1]=="request")) | length==1 and (.[0][2]|fromjson)=={projectId:$p,checkoutId:$c,separate:false,useCurrentWorkspace:false,newWindowRole:null,retryRole:null}' "$CLI_CALLS" >/dev/null
+jq -se --arg p "$project" --arg c "$checkout_id" 'map(select(.[1]=="request")) | (last[2]|fromjson)=={projectId:$p,checkoutId:$c,separate:false,useCurrentWorkspace:false,newWindowRole:null,retryRole:null}' "$CLI_CALLS" >/dev/null
 for args in 'open missing' "open $project --checkout missing" "open $project --separate --use-current-workspace" "open $project --retry-role editor --new-window terminal" "configure $project --workspace weird" "configure $project --editor bash" "relocate $project --checkout missing --path /tmp" 'roots remove missing' 'discover --root missing' 'operation invalid' 'open'; do
   before=$(wc -l <"$CLI_CALLS")
   read -r -a words <<<"$args"
@@ -170,6 +193,25 @@ actual=0
 PATH="$ARANEA_TEST_SANDBOX/deps" "$cli" capabilities --json >"$events" 2>"$ARANEA_TEST_SANDBOX/diagnostics" || actual=$?
 [[ "$actual" == 4 ]]
 jq -se 'last.schema==1 and last.code=="DEPENDENCY_MISSING" and last.data.dependency=="jq"' "$events" >/dev/null
+jq -se 'last.timestamp|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") and .!="1970-01-01T00:00:00Z"' "$events" >/dev/null || {
+  echo 'Missing jq discarded a functioning UTC clock'
+  exit 1
+}
+rm "$ARANEA_TEST_SANDBOX/deps/date"
+cat >"$ARANEA_TEST_SANDBOX/deps/date" <<'DATE'
+#!/usr/bin/env bash
+printf 'invalid " timestamp\n'
+DATE
+chmod +x "$ARANEA_TEST_SANDBOX/deps/date"
+actual=0
+PATH="$ARANEA_TEST_SANDBOX/deps" "$cli" capabilities --json >"$events" 2>"$ARANEA_TEST_SANDBOX/diagnostics" || actual=$?
+[[ "$actual" == 4 ]]
+jq -se 'last.timestamp==null and last.data.timestampAvailable==false and last.code=="DEPENDENCY_MISSING"' "$events" >/dev/null
+rm "$ARANEA_TEST_SANDBOX/deps/date"
+actual=0
+PATH="$ARANEA_TEST_SANDBOX/deps" "$cli" capabilities --json >"$events" 2>"$ARANEA_TEST_SANDBOX/diagnostics" || actual=$?
+[[ "$actual" == 4 ]]
+jq -se 'last.timestamp==null and last.data.timestampAvailable==false' "$events" >/dev/null
 export PATH="$full_path"
 # A pending accepted operation times out locally, without another submission.
 before=$(jq -s 'map(select(.[1]=="request"))|length' "$CLI_CALLS")
