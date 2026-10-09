@@ -70,7 +70,7 @@ echo 'PASS Codex turns, child isolation, replay ownership, permission uncertaint
 # hooks.json is independent of inline configuration, trust and permission policy.
 export CODEX_HOME="$HOME/custom codex"
 mkdir -p "$CODEX_HOME"
-printf '%s\n' 'allow_only_managed_hooks = true' '[[hooks.Stop]]' 'matcher = ""' >"$CODEX_HOME/config.toml"
+printf '%s\n' 'allow_managed_hooks_only = true' '[[hooks.Stop]]' 'matcher = ""' >"$CODEX_HOME/config.toml"
 cp "$CODEX_HOME/config.toml" "$TMPDIR/toml"
 config="$CODEX_HOME/hooks.json"
 printf '%s\n' '{"description":"Keep","hooks":{"Stop":[{"matcher":"keep","custom":true,"hooks":[{"type":"command","command":"unrelated","timeout":7}]}],"Custom":[]}}' >"$config"

@@ -47,10 +47,14 @@ ShellRoot {
       association: {
         status: 'registered',
         projectId: 'preview-project',
-        checkoutId: 'preview-checkout',
-        cwd: '/home/dev/work/customer-dashboard/accessibility/improve-keyboard-navigation'
+        checkoutId: 'preview-checkout' + (fixture === 'long' ? index : ''),
+        cwd: host.checkoutPath(index)
       }
     }
+  }
+  // Duplicate checkout basenames and branch labels expose exact full paths.
+  function checkoutPath(index) {
+    return fixture === 'long' ? '/home/dev/work/customer-dashboard/accessibility/' + (index ? 'review-copies/deeply-nested/customer-dashboard' : 'development-copies/deeply-nested/customer-dashboard') : '/home/dev/work/customer-dashboard/accessibility/improve-keyboard-navigation'
   }
   FloatingWindow {
     implicitWidth: Number(Quickshell.env('ARANEA_AGENTS_RENDER_WIDTH'))
@@ -91,13 +95,13 @@ ShellRoot {
                 {
                   id: 'preview-project',
                   name: 'Customer dashboard',
-                  checkouts: [
-                    {
-                      id: 'preview-checkout',
+                  checkouts: (host.fixture === 'long' ? [0, 1] : [0]).map(function (index) {
+                    return {
+                      id: 'preview-checkout' + (host.fixture === 'long' ? index : ''),
                       branch: 'accessibility/navigation',
-                      path: '/home/dev/work/customer-dashboard/accessibility/improve-keyboard-navigation'
+                      path: host.checkoutPath(index)
                     }
-                  ]
+                  })
                 }
               ]
             })
@@ -123,7 +127,7 @@ ShellRoot {
       partial: 'connection-lost',
       pending: 'connection-lost'
     }
-    var list = fixture === 'empty' ? [] : fixture === 'mixed' ? ['working', 'needs-input', 'ready-for-review', 'failed', 'connection-lost', 'finished'] : [states[fixture]]
+    var list = fixture === 'empty' ? [] : fixture === 'mixed' ? ['working', 'needs-input', 'ready-for-review', 'failed', 'connection-lost', 'finished'] : fixture === 'long' ? ['needs-input', 'needs-input'] : [states[fixture]]
     tasks.snapshot = {
       tasks: list.map(function (state, index) {
         return host.task(state, index)
@@ -145,7 +149,7 @@ ShellRoot {
             status: 'observed'
           },
           {
-            role: 'native-session',
+            role: 'session',
             status: 'unconfirmed'
           }
         ]

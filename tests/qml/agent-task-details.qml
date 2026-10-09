@@ -1,5 +1,6 @@
 // Inert details/actions tests for exact task identities and retained outcomes.
 import QtQuick
+import QtTest
 import Quickshell
 import "lib"
 import "plugins/araneadev.agents" as Agents
@@ -9,6 +10,11 @@ ShellRoot {
   id: host
   // View actions are recorded without invoking clients.
   property var actions: []
+  TestCase {
+    id: pointer
+    name: "detailsPointer"
+    when: false
+  }
   QmlTest {
     id: t
   }
@@ -206,6 +212,47 @@ ShellRoot {
       freshnessLabel: 'Connection lost'
     })
     t.check(view.actionKinds.indexOf('dismiss') >= 0, 'owner-stale failure makes dismissal reachable')
-    t.done()
+    pointerIdentityChecks()
   })
+
+  // Real press/release must never transfer an action to a new task or operation.
+  function pointerIdentityChecks() {
+    view.scroll.contentY = Math.max(0, view.scroll.contentHeight - view.scroll.height)
+    t.step(400, function () {
+      var control = t.findChildren(view, "taskAction").filter(function (c) {
+        return c.modelData === "back"
+      })[0]
+      actions = []
+      pointer.mousePress(control)
+      t.check(control.pressedIdentity.length > 0, "real pointer press captures details identity")
+      view.row = Object.assign({}, view.row, {
+        key: "replacement-task"
+      })
+      t.step(400, function () {
+        var current = t.findChildren(view, "taskAction").filter(function (c) {
+          return c.modelData === "back"
+        })[0]
+        pointer.mouseRelease(current)
+        t.equal(actions.length, 0, "press on old task cannot activate replacement after layout settles")
+        pointer.mousePress(current)
+        view.operation = {
+          id: "replacement-operation",
+          ownerId: "owner",
+          taskId: "replacement-task",
+          state: "completed",
+          outcome: "observed"
+        }
+        t.step(400, function () {
+          var next = t.findChildren(view, "taskAction").filter(function (c) {
+            return c.modelData === "back"
+          })[0]
+          pointer.mouseRelease(next)
+          t.equal(actions.length, 0, "press on old operation cannot activate new operation after layout settles")
+          pointer.mouseClick(next)
+          t.equal(actions.pop(), ["back", "replacement-task"], "settled fresh pointer action targets current task")
+          t.done()
+        })
+      })
+    })
+  }
 }
