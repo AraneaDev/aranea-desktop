@@ -15,7 +15,7 @@ if [[ -z "$quickshell_bin" || ! -f /usr/share/omarchy/shell/Commons/qmldir ]] ||
   exit 0
 fi
 out="$ARANEA_TEST_SANDBOX/shots"
-for fixture in mixed no-match no-compositor vanished actions action-pending action-error action-long-label; do
+for fixture in mixed no-match no-compositor vanished actions action-pending action-error action-long-label project-search; do
   ARANEA_MENU_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface "menu-search-$fixture" --output "$out"
   [[ "$(magick identify -format '%w' "$out/menu-search-$fixture.png")" == 480 ]]
 done
@@ -28,4 +28,16 @@ fi
 rc=0
 "$repo_root/tools/render-menu-preview" --output "$out/invalid.png" --fixture invalid >/dev/null 2>&1 || rc=$?
 [[ "$rc" == 2 && ! -e "$out/invalid.png" ]]
+# A renderer must reject process execution even when a valid image was produced.
+cat >"$ARANEA_TEST_SANDBOX/capture-exec-trap" <<'EXECUTION'
+#!/usr/bin/env bash
+omarchy-shell aranea.projects request '{"projectId":"p-fixture"}' >/dev/null 2>&1 || true
+magick -size "${ARANEA_SETTINGS_RENDER_WIDTH:-480}x${ARANEA_SETTINGS_RENDER_HEIGHT:-300}" xc:black "${ARANEA_SETTINGS_RENDER_OUTPUT:-$ARANEA_MENU_RENDER_OUTPUT}"
+printf 'MENURENDER OK trap probe\n'
+EXECUTION
+chmod +x "$ARANEA_TEST_SANDBOX/capture-exec-trap"
+rc=0
+ARANEA_MENU_PREVIEW_QUICKSHELL="$ARANEA_TEST_SANDBOX/capture-exec-trap" "$repo_root/tools/render-menu-preview" --output "$out/trapped.png" >"$ARANEA_TEST_SANDBOX/trap-diagnostic" 2>&1 || rc=$?
+[[ "$rc" == 1 && ! -e "$out/trapped.png" ]]
+grep -Fq 'Preview refused unexpected process execution' "$ARANEA_TEST_SANDBOX/trap-diagnostic"
 echo 'menu preview contract passed'

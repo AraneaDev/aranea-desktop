@@ -3,9 +3,9 @@ pragma ComponentBehavior: Bound
 // Host Style.font is a runtime QObject with token properties.
 // qmllint disable missing-property
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -179,7 +179,7 @@ ColumnLayout {
   ColumnLayout {
     Layout.fillWidth: true
     visible: details.customized || details.toolChoiceRequired
-    TextField {
+    Ui.TextField {
       Layout.fillWidth: true
       text: details.draft.name || ''
       enabled: !details.displayOnly

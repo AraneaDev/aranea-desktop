@@ -178,6 +178,20 @@ ShellRoot {
     details.applyDraft()
     t.equal(opens.length, 3, 'capture cannot submit Open')
     t.equal(configurations.length, 1, 'capture cannot configure')
+    var fields = []
+    function collectFields(item) {
+      if (item.placeholderText !== undefined && item.background)
+        fields.push(item)
+      var kids = item.children || []
+      for (var i = 0; i < kids.length; i++)
+        collectFields(kids[i])
+    }
+    collectFields(details)
+    t.check(fields.length >= 1, 'project details exposes editable fields')
+    fields.forEach(function (field) {
+      var fill = field.background.color
+      t.check(!!fill && fill.a < 0.5, 'project fields retain readable dark surfaces during inert capture')
+    })
     t.done()
   })
 }

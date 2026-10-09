@@ -204,3 +204,50 @@ Useful overrides include:
 
 Most scripts also expose `--dry-run`, `--json`, or `--help`. Prefer those
 interfaces over relying on internal paths.
+
+## Projects
+
+Open **Setup → Projects**. Choose a folder through the desktop folder picker or
+enter its absolute path; **Use folder** confirms the path before scanning.
+Nothing is registered until you select discovered checkouts and press **Add
+selected**. Git worktrees are grouped by their common Git directory. Registering
+one checkout does not register its siblings. Explicit Refresh discovers newly
+added checkouts, and partial results remain available for review. Scans avoid
+symlinks and `.git` internals, stop at eight directory levels and 20,000 visited
+directories, and can be cancelled. Ignoring a group persists until you restore it
+in **Review ignored repositories**. Removing a scan folder keeps registrations.
+
+Details select the preferred checkout and offer **Customize**. Supported editors
+are VS Code (`code`) and Neovim (`nvim`); supported terminals are Alacritty,
+Kitty, Foot and Ghostty. Neovim uses the selected terminal. Installed supported
+defaults are offered; otherwise choose both applications and Apply. Unsupported
+applications remain unavailable. Editing the project name, tools or workspace
+mode changes a local draft until Apply. Open always uses saved preferences.
+
+Dedicated workspace is the default. Current workspace is an explicit saved
+preference or the CLI's `--use-current-workspace` option. `--separate` opens a
+checkout with a separate association. Fresh window evidence controls Resume;
+no title matching or workspace membership guessing is used. Pending work is
+shared by all clients. A failed role can be retried with `--retry-role`; an
+unconfirmed role requires an explicit `--new-window` choice. These options target
+one role, and unavailable compositor/owner state is reported truthfully.
+
+If a checkout moved, **Locate folder** validates its Git identity while preserving
+project and checkout IDs. **Remove registration** removes saved project metadata,
+never the repository or its running applications. Registry corruption is an
+error with recovery guidance, never an empty replacement registry.
+
+```bash
+aranea projects configure PROJECT_ID --editor code --terminal kitty --workspace dedicated
+aranea projects open PROJECT_ID --checkout CHECKOUT_ID --separate --json
+aranea projects open PROJECT_ID --retry-role terminal --json
+aranea projects relocate PROJECT_ID --checkout CHECKOUT_ID --path '/home/me/Work/Moved Project'
+```
+
+The atomic schema-1 registry lives at
+`${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}/projects.json`.
+Git, jq and flock are required for registry operations. The command is installed
+in `${XDG_BIN_HOME:-$HOME/.local/bin}/aranea` for every profile; live opening also
+requires the loaded project owner and Hyprland. The installed command follows the
+stable installed theme rather than whichever theme is currently active. Profile
+installation does not install unsupported editors or terminals.

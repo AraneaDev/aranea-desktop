@@ -2,10 +2,10 @@
 // Host Style.font is a runtime QObject with token properties.
 // qmllint disable missing-property
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import qs.Commons
+import qs.Ui as Ui
 import "SettingsLogic.js" as Logic
 
 ColumnLayout {
@@ -74,7 +74,7 @@ ColumnLayout {
     text: picker.error || 'Or enter an absolute folder path'
     opacity: 0.7
   }
-  TextField {
+  Ui.TextField {
     Layout.fillWidth: true
     text: picker.pathDraft
     placeholderText: '/home/you/Projects'

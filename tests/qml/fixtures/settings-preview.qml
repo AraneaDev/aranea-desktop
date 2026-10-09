@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "plugins/araneadev.settings" as Settings
+import "ProjectPreview.js" as ProjectPreview
 
 ShellRoot {
   id: harness
@@ -12,6 +13,10 @@ ShellRoot {
   readonly property string artwork: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/backgrounds/'
   // Wait for images and fonts before grabbing.
   property int polls: 0
+  // Font overrides apply after the theme singleton finishes loading.
+  property bool fontPrepared: false
+  // Scroll detail/recovery captures after the actual production layout settles.
+  property bool positioned: false
   // Report the offscreen render outcome to the parent process.
   function finish(ok, message) {
     console.log((ok ? 'SETTINGSRENDER OK ' : 'SETTINGSRENDER FAIL ') + message)
@@ -49,6 +54,16 @@ ShellRoot {
   Component.onCompleted: {
     Style.spacingScale = 1
     Style.spacingScaleWithFont = false
+    entry.view = surface
+    entry.projectController.runner = function (argv, done) {
+      harness.finish(false, 'unexpected registry process')
+    }
+    entry.projectClient.runner = function (argv, done) {
+      harness.finish(false, 'unexpected project owner process')
+    }
+    entry.discoveryClient.runner = function (argv) {
+      harness.finish(false, 'unexpected scan process')
+    }
     var state = {
       display: {
         monitor: 'eDP-1',
@@ -146,6 +161,21 @@ ShellRoot {
       sample.state = {}
       sample.error = 'Desktop settings are unavailable. Check that the settings helper is installed, then Retry.'
     }
+    if (fixture.indexOf('projects-') === 0 || fixture.indexOf('project-') === 0) {
+      var projects = ProjectPreview.sample(fixture, Quickshell.env('ARANEA_PROJECT_RENDER_STATE'))
+      Object.keys(projects).forEach(function (key) {
+        sample[key] = projects[key]
+      })
+      var detailsId = fixture === 'project-details' || fixture === 'project-launch-partial' ? projects.projectId : ''
+      if (entry.captureBegin(JSON.stringify({
+        snapshot: entry.captureSnapshot(),
+        section: 'projects',
+        projectId: detailsId,
+        fixture: sample
+      })) !== 'ok')
+        finish(false, 'project fixture refused')
+      return
+    }
     if (entry.showcase(JSON.stringify(sample)) !== 'ok') {
       finish(false, 'fixture refused')
       return
@@ -169,6 +199,32 @@ ShellRoot {
     onTriggered: {
       harness.polls++
       var objects = harness.collect(surface, [])
+      if (!harness.fontPrepared && harness.polls >= 3) {
+        harness.fontPrepared = true
+        var fontScale = Number(Quickshell.env('ARANEA_SETTINGS_RENDER_FONT_SCALE') || 1)
+        Style.fontBaseSize = Math.round(Style.fontBaseSize * fontScale)
+        var fonts = Object.assign({}, Style.fontOverrides)
+        Object.keys(fonts).forEach(function (key) {
+          fonts[key] = Math.round(Number(fonts[key]) * fontScale)
+        })
+        Style.fontOverrides = fonts
+      }
+      if (!harness.positioned && harness.polls >= 6) {
+        harness.positioned = true
+        if (harness.fixture === 'project-details' || harness.fixture === 'project-launch-partial') {
+          for (var j = 0; j < objects.length; j++) {
+            var scroll = objects[j]
+            if (scroll.contentY === undefined || !scroll.contentItem || scroll.height < 100)
+              continue
+            var target = 0
+            for (var k = 0; k < objects.length; k++) {
+              if (objects[k].text === 'Customer dashboard and developer accessibility improvements' && objects[k].visible && objects[k].font && objects[k].font.bold)
+                target = Math.max(target, objects[k].mapToItem(scroll.contentItem, 0, 0).y)
+            }
+            scroll.contentY = Quickshell.env('ARANEA_SETTINGS_RENDER_SCROLL') === 'bottom' ? Math.max(0, scroll.contentHeight - scroll.height) : Math.min(target, Math.max(0, scroll.contentHeight - scroll.height))
+          }
+        }
+      }
       var loading = false
       for (var i = 0; i < objects.length; i++) {
         var item = objects[i]

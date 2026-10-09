@@ -189,3 +189,49 @@ flock is actionable only for commands that need them. Missing jq still emits a
 valid dependency-failure JSONL envelope and exits `4`. Its UTC timestamp comes
 from validated clock output without jq; only a failed/unusable clock returns
 `timestamp: null` with `data.timestampAvailable: false`.
+
+### Project outcomes and safe recovery
+
+A completed public event retains the operation identity and exact owner result.
+For example (IDs and timestamp are illustrative):
+
+```json
+{
+  "schema": 1,
+  "timestamp": "2026-01-01T00:00:00Z",
+  "operation": "projects.open",
+  "operationId": "op-example",
+  "event": "completed",
+  "status": "partial",
+  "data": {
+    "outcome": "partial",
+    "operation": {
+      "id": "op-example",
+      "projectId": "p-example",
+      "checkoutId": "c-example",
+      "sessionId": "session-example",
+      "generation": 1,
+      "state": "completed",
+      "outcome": "partial",
+      "steps": [
+        { "role": "editor", "status": "observed" },
+        { "role": "terminal", "status": "failed", "code": "TOOL_MISSING" }
+      ]
+    }
+  }
+}
+```
+
+Partial results exit `1`. Read `projects operation OPERATION_ID --json` to reconnect
+without resubmitting. Retry only the reported failed role when appropriate:
+`projects open PROJECT_ID --checkout CHECKOUT_ID --retry-role terminal --json`.
+An accepted but unconfirmed launch can already have created a window; never
+infer failure or automatically retry it. `--new-window terminal` explicitly
+permits an additional window. Existing owned copies can still make recovery
+conservative. Desktop status and project search expose current owner evidence,
+not proof that every intended application window exists.
+
+Search, details and JSON all resolve the registered checkout ID to the same
+canonical path. Register every desired worktree explicitly. `--separate` preserves
+a separate association; `--use-current-workspace` explicitly overrides dedicated
+allocation. These flags do not confer ownership on unrelated windows.

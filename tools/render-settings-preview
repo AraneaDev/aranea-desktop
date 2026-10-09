@@ -24,7 +24,7 @@ while (($#)); do
 done
 [[ -n "$output" ]] || exit 2
 case "$fixture" in
-  wide | scaling | dirty | integration-failed | notifications)
+  wide | scaling | dirty | integration-failed | notifications | projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial | workspaces)
     width=840
     height=620
     ;;
@@ -37,6 +37,8 @@ case "$fixture" in
     exit 2
     ;;
 esac
+width="${ARANEA_SETTINGS_RENDER_WIDTH:-$width}"
+height="${ARANEA_SETTINGS_RENDER_HEIGHT:-$height}"
 shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
 quickshell_bin="${ARANEA_SETTINGS_PREVIEW_QUICKSHELL:-quickshell}"
 [[ -f "$shell_dir/Commons/qmldir" && -f "$shell_dir/Ui/qmldir" ]] || {
@@ -58,8 +60,25 @@ cleanup() {
   [[ -z "$staged" ]] || rm -f -- "$staged"
 }
 trap cleanup EXIT
-mkdir -p "$work/cfg/plugins" "$work/run" "$work/state/omarchy/current"
+mkdir -p "$work/cfg/plugins" "$work/run" "$work/home" "$work/state/omarchy/current"
 ln -s "$repo_root" "$work/state/omarchy/current/theme"
+mkdir -p "$work/home/.local/state/omarchy/current"
+ln -s "$repo_root" "$work/home/.local/state/omarchy/current/theme"
+# Fixed process traps are installed before Quickshell loads any component.
+mkdir -p "$work/traps"
+for program in omarchy-shell aranea aranea-project-store aranea-project-discover aranea-project-tools code nvim alacritty kitty foot ghostty hyprctl; do
+  cat >"$work/traps/$program" <<'CAPTURE_TRAP'
+#!/usr/bin/env bash
+# Shared Style geometry probes receive fixed offscreen values, never live IPC.
+if [[ "${0##*/}" == hyprctl && "$*" == '-j getoption general:gaps_out' || "${0##*/}" == hyprctl && "$*" == '-j getoption decoration:rounding' ]]; then
+  printf '{"int":0}\n'
+  exit 0
+fi
+printf '%s %s\n' "${0##*/}" "$*" >>"$ARANEA_CAPTURE_EXECUTION_LOG"
+exit 99
+CAPTURE_TRAP
+  chmod +x "$work/traps/$program"
+done
 chmod 700 "$work/run"
 ln -s "$shell_dir/Commons" "$work/cfg/Commons"
 ln -s "$shell_dir/Ui" "$work/cfg/Ui"
@@ -67,10 +86,14 @@ for plugin in "$repo_root"/plugins/araneadev.*; do
   [[ -d "$plugin" ]] && ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"
 done
 cp "$repo_root/tests/qml/fixtures/settings-preview.qml" "$work/cfg/shell.qml"
+cp "$repo_root/tests/qml/fixtures/ProjectPreview.js" "$work/cfg/ProjectPreview.js"
+[[ "${ARANEA_SETTINGS_RENDER_CONTROLS:-0}" != 1 ]] || cp "$repo_root/tests/qml/fixtures/projects-controls.qml" "$work/cfg/shell.qml"
+[[ "$fixture" != workspaces ]] || cp "$repo_root/tests/qml/fixtures/workspaces-preview.qml" "$work/cfg/shell.qml"
 (cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
   -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
+  PATH="$work/traps:$PATH" ARANEA_CAPTURE_EXECUTION_LOG="$work/execution.log" \
   QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=1 ARANEA_REDUCED_MOTION=1 \
-  XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
+  HOME="$work/home" XDG_CONFIG_HOME="$work/home/.config" XDG_DATA_HOME="$work/home/.local/share" XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
   ARANEA_SETTINGS_RENDER_ROOT="$repo_root" ARANEA_SETTINGS_RENDER_FIXTURE="$fixture" \
   ARANEA_SETTINGS_RENDER_WIDTH="$width" ARANEA_SETTINGS_RENDER_HEIGHT="$height" \
   ARANEA_SETTINGS_RENDER_OUTPUT="$work/grab.png" \
@@ -83,11 +106,17 @@ while ((waited < 200)); do
   sleep 0.2
   waited=$((waited + 1))
 done
+if [[ -s "$work/execution.log" ]]; then
+  echo "Preview refused unexpected process execution:" >&2
+  cat "$work/execution.log" >&2
+  exit 1
+fi
 if ! grep -q 'SETTINGSRENDER OK' "$work/log" || grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop detected' "$work/log"; then
   echo 'Settings preview failed:' >&2
   tail -20 "$work/log" >&2
   exit 1
 fi
+[[ "${ARANEA_SETTINGS_RENDER_CONTROLS:-0}" != 1 ]] || grep 'PROJECTCONTROLS' "$work/log"
 [[ "$(magick identify -format '%wx%h' "$work/grab.png")" == "${width}x${height}" ]] || exit 1
 mkdir -p -- "$(dirname -- "$output")"
 staged="$(mktemp "$(dirname -- "$output")/.render-settings.XXXXXX")"

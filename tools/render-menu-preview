@@ -24,7 +24,7 @@ while (($#)); do
 done
 [[ -n "$output" ]] || exit 2
 case "$fixture" in
-  mixed | no-match | no-compositor | vanished | actions | action-pending | action-error | action-long-label) ;;
+  mixed | no-match | no-compositor | vanished | actions | action-pending | action-error | action-long-label | project-search) ;;
   *)
     echo "Unknown menu fixture: $fixture" >&2
     exit 2
@@ -55,6 +55,21 @@ mkdir -p "$work/cfg/plugins" "$work/run" "$work/home" "$work/state/omarchy/curre
 ln -s "$repo_root" "$work/state/omarchy/current/theme"
 mkdir -p "$work/home/.local/state/omarchy/current"
 ln -s "$repo_root" "$work/home/.local/state/omarchy/current/theme"
+# Fixed process traps are installed before Quickshell loads any component.
+mkdir -p "$work/traps"
+for program in omarchy-shell aranea aranea-project-store aranea-project-discover aranea-project-tools code nvim alacritty kitty foot ghostty hyprctl; do
+  cat >"$work/traps/$program" <<'CAPTURE_TRAP'
+#!/usr/bin/env bash
+# Shared Style geometry probes receive fixed offscreen values, never live IPC.
+if [[ "${0##*/}" == hyprctl && "$*" == '-j getoption general:gaps_out' || "${0##*/}" == hyprctl && "$*" == '-j getoption decoration:rounding' ]]; then
+  printf '{"int":0}\n'
+  exit 0
+fi
+printf '%s %s\n' "${0##*/}" "$*" >>"$ARANEA_CAPTURE_EXECUTION_LOG"
+exit 99
+CAPTURE_TRAP
+  chmod +x "$work/traps/$program"
+done
 chmod 700 "$work/run"
 ln -s "$shell_dir/Commons" "$work/cfg/Commons"
 ln -s "$shell_dir/Ui" "$work/cfg/Ui"
@@ -62,10 +77,12 @@ for plugin in "$repo_root"/plugins/araneadev.*; do
   [[ -d "$plugin" ]] && ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"
 done
 cp "$repo_root/tests/qml/fixtures/menu-preview.qml" "$work/cfg/shell.qml"
+cp "$repo_root/tests/qml/fixtures/ProjectPreview.js" "$work/cfg/ProjectPreview.js"
 (cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
   -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
+  PATH="$work/traps:$PATH" ARANEA_CAPTURE_EXECUTION_LOG="$work/execution.log" \
   QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR="${ARANEA_MENU_RENDER_SCALE:-1}" ARANEA_REDUCED_MOTION="${ARANEA_MENU_RENDER_REDUCED_MOTION:-1}" \
-  HOME="$work/home" XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
+  HOME="$work/home" XDG_CONFIG_HOME="$work/home/.config" XDG_DATA_HOME="$work/home/.local/share" XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" XDG_STATE_HOME="$work/state" \
   ARANEA_MENU_RENDER_ROOT="$repo_root" ARANEA_MENU_RENDER_FIXTURE="$fixture" \
   ARANEA_MENU_RENDER_OUTPUT="$work/grab.png" \
   "$quickshell_path" -p "$work/cfg") >"$work/log" 2>&1 &
@@ -77,6 +94,11 @@ while ((waited < 200)); do
   sleep 0.2
   waited=$((waited + 1))
 done
+if [[ -s "$work/execution.log" ]]; then
+  echo "Preview refused unexpected process execution:" >&2
+  cat "$work/execution.log" >&2
+  exit 1
+fi
 if ! grep -q 'MENURENDER OK' "$work/log" || grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop detected' "$work/log"; then
   echo 'Menu preview failed:' >&2
   tail -20 "$work/log" >&2

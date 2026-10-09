@@ -69,10 +69,27 @@ the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
 
 - **Command center:** Files, Terminal, Setup, Favorites, Recent, and searchable apps.
 - **Settings:** wallpaper, fonts, motion, display scale, schedule, integrations, and DND.
+- **Project workspaces:** confirmed Git discovery, grouped worktrees, project search, and Open/Resume with saved tools.
 - **System controls:** network, VPN, audio, Bluetooth, displays, power, tray, calendar, and weather.
 - **Health and notifications:** resource graphs, processes, services, reboot and container status, plus a quiet notification center.
 - **Pickers and prompts:** clipboard with secret masking, emoji, wallpapers, and consistent polkit authentication.
 - **Application integrations:** cursor, icons, terminals, editors, browser, media, Qt, and session styling.
+
+### Project workspaces
+
+Open **Setup → Projects**, confirm a development folder, review repositories and
+worktrees, then **Add selected**. Search with `project:` to Open or Resume saved
+tools. Dedicated workspace is the default; Customize makes current workspace an
+explicit preference. Partial launches report each role and offer targeted recovery.
+Repository scripts are never run by discovery or ordinary Open. Removing a
+registration preserves folders and applications.
+
+See [Project configuration](docs/configuration.md) for supported tools,
+folder relocation and workspace choices, and [the JSON interface](docs/agent-interface.md)
+for automation. Inert showcase IDs are `projects-empty`, `projects-discovery`,
+`projects-grouped`, `projects-partial`, `project-details`, `project-search` and
+`project-launch-partial`; [development instructions](docs/development.md)
+render them without user repositories or desktop operations.
 
 ### Typography and settings
 

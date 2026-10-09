@@ -243,3 +243,14 @@ test -f "$hero_dir/hero-showcase.gif"
 rm -rf "$hero_dir"
 
 echo "screenshot coverage contract passed (${#surfaces[@]} surfaces)"
+
+# Showcase lookup exposes project fixture IDs without contacting a desktop.
+for fixture in projects-empty projects-discovery projects-grouped projects-partial project-details project-search project-launch-partial; do
+  "$repo_root/scripts/aranea-showcase" surface "$fixture" >"$ARANEA_TEST_SANDBOX/showcase"
+  grep -Fq "surface: $fixture" "$ARANEA_TEST_SANDBOX/showcase"
+done
+# Invalid capture input must be rejected before any live owner/compositor call.
+rc=0
+"$capture_script" --surface project-not-a-fixture --output "$ARANEA_TEST_SANDBOX/refused" >/dev/null 2>&1 || rc=$?
+[[ "$rc" == 1 && ! -e "$ARANEA_TEST_SANDBOX/refused/project-not-a-fixture.png" ]]
+[[ ! -s "$ARANEA_TEST_SANDBOX/guard.log" ]]
