@@ -28,6 +28,7 @@ config_root="$(xdg_config_home)"
 omarchy_config="$HOME/.config/omarchy"
 data_root="$(xdg_data_home)"
 state_root="$(aranea_ownership_root)"
+project_state_root="$(aranea_state_root)"
 hook_files=("$omarchy_config/hooks/theme-set.d/theme-set" "$omarchy_config/hooks/post-boot.d/post-boot")
 # The desktop settings Aranea changes (install-integration save_gsetting).
 gsetting_keys=("org.gnome.desktop.interface cursor-theme" "org.gnome.desktop.interface icon-theme")
@@ -184,6 +185,9 @@ restore_gsettings() {
 # their backups (restore_managed_files keeps them), so those are kept.
 remove_state() {
   local entry
+  # Registry state does not follow an independently overridden ownership root.
+  # Remove only its owned artifacts: that root can contain kept backups.
+  rm -f -- "$project_state_root/projects.json" "$project_state_root/projects.json.lock"
   if [[ -s "$(ownership_record)" ]]; then
     for entry in "$state_root"/* "$state_root"/.[!.]*; do
       [[ -e "$entry" ]] || continue
@@ -213,6 +217,7 @@ describe() {
     sed 's/^/    /' "$(ownership_record)"
   fi
   printf '  restore saved desktop settings and remove %s\n' "$state_root"
+  printf '  remove project registrations %s/projects.json and its lock\n' "$project_state_root"
   return 0
 }
 

@@ -129,4 +129,37 @@ for removal_scope in integration complete; do
   [[ "$(ps -o stat= -p "$app_pid")" != Z* ]]
 done
 
+# Ownership backups and registry state may live at independently configured
+# roots. Both scopes must remove registrations without discarding kept files.
+distinct_root_failures=0
+for ownership_layout in separate nested; do
+  for removal_scope in integration complete; do
+    export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/$ownership_layout $removal_scope project state"
+    if [[ "$ownership_layout" == nested ]]; then
+      export ARANEA_OWNERSHIP_ROOT="$ARANEA_STATE_ROOT/ownership state"
+    else
+      export ARANEA_OWNERSHIP_ROOT="$ARANEA_TEST_SANDBOX/$removal_scope ownership state"
+    fi
+    "$repo_root/scripts/aranea" projects register --path "$project_dir" --json >/dev/null
+    custom_command="$HOME/.local/bin/independent-command"
+    printf 'customised command\n' >"$custom_command"
+    record_managed_file "$custom_command"
+    mkdir -p "$(dirname "$(backup_path "$custom_command")")"
+    printf 'original command\n' >"$(backup_path "$custom_command")"
+    dry_run_output="$("$repo_root/scripts/uninstall.sh" --dry-run --scope "$removal_scope")"
+    grep -Fq "$ARANEA_STATE_ROOT/projects.json" <<<"$dry_run_output"
+    [[ -e "$ARANEA_STATE_ROOT/projects.json" && -e "$ARANEA_STATE_ROOT/projects.json.lock" ]]
+    "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
+    if [[ -e "$ARANEA_STATE_ROOT/projects.json" || -e "$ARANEA_STATE_ROOT/projects.json.lock" ]]; then
+      echo "$ownership_layout $removal_scope removal retained project state with an independent ownership root" >&2
+      distinct_root_failures=$((distinct_root_failures + 1))
+    fi
+    [[ "$(cat "$custom_command")" == 'customised command' ]]
+    [[ "$(cat "$(backup_path "$custom_command")")" == 'original command' ]]
+    grep -Fqx "$custom_command" "$(ownership_record)"
+    [[ "$(cat "$project_dir/content")" == 'keep repository content' && -d "$project_dir/.git" ]]
+  done
+done
+[[ "$distinct_root_failures" == 0 ]]
+
 echo "uninstall contract passed"
