@@ -40,6 +40,12 @@ ShellRoot {
               path: "/tmp/dev/aranea",
               branch: "main",
               primary: true
+            },
+            {
+              id: "c-feature",
+              path: "/tmp/dev/aranea-feature",
+              branch: "feature",
+              primary: false
             }
           ]
         }
@@ -121,6 +127,21 @@ ShellRoot {
       } : null
     }), "")
   }
+  // Change the actual projected checkout without submitting or cancelling work.
+  function chooseCheckout(id) {
+    host.snapshot = JSON.parse(JSON.stringify(host.snapshot))
+    host.snapshot.projects[0].lastCheckoutId = id
+    menu.projectClient.snapshot = host.snapshot
+    menu.desktopSearch.refreshNow()
+  }
+  // A different checkout must never borrow status, message, or visible outcome.
+  function checkFeatureFeedbackAbsent(context) {
+    t.check(row().detail.indexOf("/tmp/dev/aranea-feature") >= 0, context + " shows the feature checkout path")
+    t.equal(row().actionStatus, "", context + " does not inherit main status")
+    t.equal(row().actionMessage, "", context + " does not inherit main message")
+    t.check(row().detail.indexOf("Project ready") < 0 && row().detail.indexOf("Terminal was not observed") < 0 && row().detail.indexOf("Checkout no longer exists") < 0, context + " does not inherit visible main outcome")
+  }
+
   // Count submissions independently of snapshot and observer reads.
   function requests() {
     return host.calls.filter(function (argv) {
@@ -174,8 +195,22 @@ ShellRoot {
         checkoutId: "c-main"
       }, "submission retains exact checkout identity")
       t.check(menu.opened, "project request keeps menu open")
+      chooseCheckout("c-feature")
+      checkFeatureFeedbackAbsent("synthetic pending main")
+      chooseCheckout("c-main")
+      t.equal(row().actionStatus, "pending", "synthetic pending remains attached to main")
       host.operation("observing", null)
       t.equal(row().actionStatus, "pending", "owner progress appears on row")
+      chooseCheckout("c-feature")
+      checkFeatureFeedbackAbsent("owner pending main")
+      menu.cancel()
+      menu.openRoute("root")
+      menu.setFilter("project: aranea")
+      menu.desktopSearch.refreshNow()
+      checkFeatureFeedbackAbsent("reopened feature during main launch")
+      t.equal(requests(), 1, "changing checkout and reopening never resubmit main launch")
+      chooseCheckout("c-main")
+      t.equal(row().actionStatus, "pending", "matching main restores pending after reopen")
       menu.setFilter("app: absent")
       menu.cancel()
       menu.openRoute("root")
@@ -193,6 +228,16 @@ ShellRoot {
       t.check(row().actionMessage.indexOf("Terminal was not observed") >= 0, "partial shows owner feedback")
       t.check(row().detail.indexOf("Terminal was not observed") >= 0 && row().detail.indexOf("/tmp/dev/aranea") >= 0, "visible partial detail retains feedback and canonical path")
       t.check(menu.opened, "partial feedback keeps menu open")
+      chooseCheckout("c-feature")
+      checkFeatureFeedbackAbsent("completed partial main")
+      menu.cancel()
+      menu.openRoute("root")
+      menu.setFilter("project: aranea")
+      menu.desktopSearch.refreshNow()
+      checkFeatureFeedbackAbsent("reopened feature after completed main")
+      chooseCheckout("c-main")
+      t.equal(row().actionStatus, "partial", "matching main restores partial feedback after reopen")
+      t.check(row().detail.indexOf("Terminal was not observed") >= 0, "matching main retains visible partial outcome")
       // Re-resolve selected checkout before dispatch, without waiting for publication.
       var original = JSON.parse(JSON.stringify(host.snapshot))
       client.snapshot.projects[0].checkouts = []
@@ -217,12 +262,20 @@ ShellRoot {
       t.equal(requests(), 2, "fresh user action may submit after completed work")
       t.equal(row().actionStatus, "failed", "rejected request clears pending presentation")
       t.check(row().actionMessage.indexOf("Checkout no longer exists") >= 0, "owner refusal remains actionable on row")
+      chooseCheckout("c-feature")
+      checkFeatureFeedbackAbsent("refused main request")
+      chooseCheckout("c-main")
+      t.equal(row().actionStatus, "failed", "matching main restores refusal feedback")
       host.refuse = false
       menu.handleKey(key(Qt.Key_Return))
       t.equal(requests(), 3, "retry is explicit after refusal")
       host.operation("completed", "observed")
       t.equal(row().actionStatus, "observed", "confirmed owner result remains visible")
       t.check(row().detail.indexOf("Project ready") >= 0, "visible observed detail confirms readiness")
+      chooseCheckout("c-feature")
+      checkFeatureFeedbackAbsent("completed observed main")
+      chooseCheckout("c-main")
+      t.equal(row().actionStatus, "observed", "matching main restores observed feedback")
       host.snapshot = JSON.parse(JSON.stringify(original))
       host.snapshot.bindings = [
         {
@@ -247,9 +300,13 @@ ShellRoot {
       client.pollInterval = 10
       menu.handleKey(key(Qt.Key_Return))
       t.equal(row().actionStatus, "pending", "rejected readiness alone keeps preparation pending")
+      chooseCheckout("c-feature")
+      checkFeatureFeedbackAbsent("main readiness preparation")
       t.waitFor(function () {
         return !client.pending
       }, 1000, "readiness preparation has bounded deadline", function () {
+        checkFeatureFeedbackAbsent("main readiness deadline after checkout change")
+        chooseCheckout("c-main")
         t.equal(row().actionStatus, "failed", "readiness deadline clears pending feedback")
         t.check(row().actionMessage.indexOf("Owner is preparing") >= 0, "readiness refusal exposes recovery message")
         var beforeCapture = requests()

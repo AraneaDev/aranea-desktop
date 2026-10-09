@@ -33,6 +33,8 @@ Item {
   property var projectFeedback: ({})
   // Current submission identity for asynchronous owner refusals.
   property string projectRequestKey: ""
+  // Exact submitted checkout retained across projection changes and refusals.
+  property string projectRequestCheckoutId: ""
   // Replaceable compositor and raw fixtures for offscreen integration tests.
   property var compositor: Hyprland
   // Optional raw window collection replacing the compositor model.
@@ -132,6 +134,7 @@ Item {
       return
     var feedback = Object.assign({}, sources.projectFeedback)
     feedback["project:" + operation.projectId] = {
+      checkoutId: operation.checkoutId || "",
       status: operation.state !== "completed" ? "pending" : operation.outcome || "failed",
       message: operation.error && operation.error.message ? operation.error.message : operation.state !== "completed" ? "Opening project…" : operation.outcome === "observed" ? "Project ready" : "Project launch " + (operation.outcome || "failed")
     }
@@ -254,15 +257,18 @@ Item {
         return false
       }
       sources.projectRequestKey = key
+      sources.projectRequestCheckoutId = projectRequest.payload.checkoutId
       sources.projectOperationChanged({
         id: "pending",
         projectId: projectRequest.payload.projectId,
+        checkoutId: projectRequest.payload.checkoutId,
         state: "accepted"
       })
       if (!sources.projectClient.request(projectRequest.payload)) {
         sources.projectOperationChanged({
           id: "refused",
           projectId: projectRequest.payload.projectId,
+          checkoutId: projectRequest.payload.checkoutId,
           state: "completed",
           outcome: "failed",
           error: {
@@ -312,6 +318,7 @@ Item {
       sources.projectOperationChanged({
         id: "refused",
         projectId: sources.projectRequestKey.slice("project:".length),
+        checkoutId: sources.projectRequestCheckoutId,
         state: "completed",
         outcome: "failed",
         error: {
