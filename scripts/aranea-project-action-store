@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Private durable action definitions and immutable launch-intent transactions.
-# Usage: aranea-project-action-store snapshot | mutate | activate | deactivate
+# Usage: aranea-project-action-store snapshot | mutate | activate | retire | deactivate
 # mutate reads one {action,args,expectedRevision?} JSON object on stdin.
 set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,7 +23,7 @@ respond_error() {
 for dependency in jq flock realpath stat head sha256sum; do
   command -v "$dependency" >/dev/null || respond_error DEPENDENCY_MISSING "Install $dependency."
 done
-[[ $# == 1 && ("$1" == snapshot || "$1" == mutate || "$1" == activate || "$1" == deactivate) ]] || respond_error INVALID_REQUEST 'Use snapshot, mutate, activate or deactivate.'
+[[ $# == 1 && ("$1" == snapshot || "$1" == mutate || "$1" == activate || "$1" == deactivate || "$1" == retire) ]] || respond_error INVALID_REQUEST 'Use snapshot, mutate, activate, retire or deactivate.'
 umask 077
 registry="$(aranea_state_root)/project-actions.json"
 filter="$script_dir/lib/project-actions.jq"
@@ -43,7 +43,10 @@ if [[ "$1" == mutate ]]; then
   run_filter -e --arg operation request <"$scratch/request" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Invalid action request fields or values.'
 fi
 lifecycle=false
-[[ "$1" != activate && "$1" != deactivate ]] || lifecycle=true
+[[ "$1" != activate && "$1" != deactivate && "$1" != retire ]] || lifecycle=true
+if [[ $lifecycle == true ]]; then
+  project_actions_dispatch_lock || respond_error "$action_lock_error" 'Dispatch authority is busy or unsafe.'
+fi
 project_actions_lock 2 "$lifecycle" || respond_error "$action_lock_error" 'Action store is busy, unsafe or belongs to a retired ingress.'
 project_actions_safe_path "$registry" || respond_error UNSAFE_STATE_PATH 'Action state must not traverse symlinks.'
 if [[ -e "$registry" ]]; then
@@ -56,11 +59,16 @@ else
   state=$(run_filter -cn --arg operation initial)
 fi
 if [[ "$lifecycle" == true ]]; then
-  if [[ "$1" == deactivate ]]; then
+  if [[ "$1" == retire ]]; then
+    if [[ $(project_actions_generation) != draining:* ]]; then
+      printf 'draining:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
+    fi
+  elif [[ "$1" == deactivate ]]; then
     run_filter -e --arg operation protected <<<"$state" >/dev/null && respond_error RUN_PROTECTED 'Accepted or unconfirmed runs must be resolved before removal.'
     printf 'removed:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
     rm -f -- "$registry" || respond_error ACTION_WRITE_FAILED 'Cannot remove action state.'
-  elif [[ $(project_actions_generation) == removed:* ]]; then
+  elif [[ $(project_actions_generation) == removed:* || $(project_actions_generation) == draining:* ]]; then
+    run_filter -e --arg operation protected <<<"$state" >/dev/null && respond_error RUN_PROTECTED 'Resolve retired protected runs before reactivation.'
     printf 'active:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
   fi
   printf '{"ok":true,"state":null,"error":null}\n'

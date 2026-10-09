@@ -42,7 +42,7 @@ project_actions_lock() {
   flock -w "$wait" -x "$action_lock_fd" || return 1
   current=$(project_actions_generation) || return 1
   action_lock_error=ACTION_REMOVED
-  [[ "$lifecycle" == true || ("$current" != removed:* && "$current" == "$action_generation") ]]
+  [[ "$lifecycle" == true || ("$current" != removed:* && "$current" == "$action_generation" && ("$current" != draining:* || ${ARANEA_ACTION_DRAIN:-} == 1)) ]]
 }
 
 # Hash exactly the immutable definition content, excluding wall-clock metadata.
@@ -66,4 +66,27 @@ project_actions_checkout() {
   cwd=$(projects_registry_path "$path/$relative") || return 1
   [[ "$cwd" == "$path" || "$cwd" == "$path/"* ]] || return 1
   [[ "$cwd" == "$(jq -r .args.cwd "$request")" ]]
+}
+
+# Dispatch always precedes the transaction lock. Lifecycle store subprocesses reuse
+# a validated inherited open-file description instead of recursively locking it.
+# shellcheck disable=SC2034
+project_actions_dispatch_lock() {
+  local lock inherited=${ARANEA_ACTION_DISPATCH_FD:-}
+  lock="$(aranea_state_root)/project-actions.json.dispatch.lock"
+  action_lock_error=UNSAFE_STATE_PATH
+  project_actions_safe_path "$lock" && [[ ! -e $lock || -f $lock ]] || return 1
+  action_lock_error=ACTION_WRITE_FAILED
+  mkdir -p -- "$(dirname "$lock")" || return 1
+  if [[ -n $inherited ]]; then
+    action_lock_error=UNSAFE_STATE_PATH
+    [[ $inherited =~ ^[0-9]+$ && -f /proc/$$/fd/$inherited && -f $lock ]] || return 1
+    [[ $(stat -Lc '%d:%i' "/proc/$$/fd/$inherited") == "$(stat -Lc '%d:%i' "$lock")" ]] || return 1
+    dispatch_fd=$inherited
+  else
+    exec {dispatch_fd}<>"$lock" || return 1
+  fi
+  chmod 600 "$lock" || return 1
+  action_lock_error=ACTION_LOCK_FAILED
+  flock -x -w 2 "$dispatch_fd"
 }
