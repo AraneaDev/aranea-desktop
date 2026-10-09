@@ -27,6 +27,7 @@ import "WorkspaceModel.js" as WorkspaceModel
 
 Item {
   id: panel
+  objectName: "workspacePanel"
 
   // Owning bar widget.
   property var owner: null
@@ -34,6 +35,10 @@ Item {
   property var bar: null
   // Normalized workspace rows rendered by the panel.
   property var workspaceStates: []
+  // Read-only owner projection; null keeps ordinary workspace labels.
+  property var projectSnapshot: null
+  // Shared secondary-line size, including exact checkout paths.
+  readonly property real captionFontSize: Style.font.caption
   // Row index of the keyboard cursor, -1 for none (the host passes -1
   // while the pointer drives, so the outline is keyboard only).
   property int cursorIndex: -1
@@ -213,10 +218,13 @@ Item {
             // The row's secondary text: its open windows' titles, joined,
             // "" when there are none to show.
             readonly property string titles: WorkspaceModel.workspaceTitles(rowWrap.workspace)
+            // Context decorates this workspace without becoming an action identity.
+            readonly property var projectContext: WorkspaceModel.projectContext(rowWrap.workspace.id, panel.projectSnapshot)
 
             objectName: "workspaceRow"
             Layout.fillWidth: true
-            implicitHeight: node.height + (titlesText.visible ? Style.space(2) + titlesText.height : 0)
+            implicitHeight: node.height + (projectPath.visible ? Style.space(2) + projectPath.height : 0) + (titlesText.visible ? Style.space(2) + titlesText.height : 0)
+            onImplicitHeightChanged: panel.noteLayoutChange()
 
             Aranea.NodeDeviceRow {
               id: node
@@ -226,7 +234,7 @@ Item {
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.top: parent.top
-              label: WorkspaceModel.workspaceLabel(rowWrap.workspace)
+              label: rowWrap.projectContext ? rowWrap.projectContext.label : WorkspaceModel.workspaceLabel(rowWrap.workspace)
               detail: WorkspaceModel.workspaceDetail(rowWrap.workspace)
               detailColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
               nodeColor: rowWrap.workspace.urgent ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.accent
@@ -243,10 +251,25 @@ Item {
             }
 
             Text {
+              id: projectPath
+              objectName: "workspaceProjectPath"
+              visible: !!rowWrap.projectContext && rowWrap.projectContext.detail !== ""
+              anchors.top: node.bottom
+              anchors.topMargin: Style.space(2)
+              x: Style.space(54)
+              width: Math.max(0, rowWrap.width - x)
+              text: rowWrap.projectContext ? rowWrap.projectContext.detail : ""
+              elide: Text.ElideLeft
+              color: Util.alpha(Aranea.DesignTokens.foreground, 0.5)
+              font.family: Aranea.Typography.technicalFamily
+              font.pixelSize: panel.captionFontSize
+            }
+
+            Text {
               id: titlesText
               objectName: "workspaceTitles"
               visible: rowWrap.titles !== ""
-              anchors.top: node.bottom
+              anchors.top: projectPath.visible ? projectPath.bottom : node.bottom
               anchors.topMargin: Style.space(2)
               // Indents roughly under node's label text (past its marker
               // and glyph slot); a secondary line, so pixel-exact alignment
@@ -257,7 +280,7 @@ Item {
               elide: Text.ElideRight
               color: Util.alpha(Aranea.DesignTokens.foreground, 0.5)
               font.family: Aranea.Typography.uiFamily
-              font.pixelSize: Style.font.caption
+              font.pixelSize: panel.captionFontSize
             }
           }
         }

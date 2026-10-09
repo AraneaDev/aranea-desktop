@@ -276,3 +276,142 @@ test("workspaceLayoutSignature pairs each row's id with whether it shows titles"
     model.workspaceLayoutSignature(titlesGone)
   )
 })
+
+/**
+ * Complete owner projection with distinct dedicated worktrees.
+ * @returns {*} Timestamped owner snapshot.
+ */
+function projectSnapshot() {
+  return {
+    sessionId: "session-new",
+    availability: { compositor: true },
+    projects: [
+      {
+        id: "p-app",
+        name: "App",
+        lastCheckoutId: "c-main",
+        workspaceMode: "dedicated",
+        checkouts: [
+          { id: "c-main", path: "/projects/app", branch: "main", primary: true },
+          { id: "c-fix", path: "/projects/app-fix", branch: "fix", primary: false }
+        ],
+        associations: [
+          { checkoutId: "c-main", mode: "dedicated", workspaceId: 2, separate: false },
+          { checkoutId: "c-fix", mode: "dedicated", workspaceId: 7, separate: true }
+        ]
+      }
+    ],
+    bindings: [],
+    operations: [],
+    observedAt: 123
+  }
+}
+
+/**
+ * Owner-proven current-session binding, with explicit invalid evidence variants.
+ * @param {*} overrides - Boundary fields to replace for rejection tests.
+ * @returns {*} Binding fixture.
+ */
+function verifiedBinding(overrides = {}) {
+  return Object.assign(
+    {
+      projectId: "p-app",
+      checkoutId: "c-fix",
+      role: "editor",
+      workspaceId: 4,
+      address: "0xabc",
+      appId: "code",
+      pid: 123,
+      evidence: { processVerified: true, mode: "process-app-id" },
+      sessionId: "session-new"
+    },
+    overrides
+  )
+}
+
+test("project context uses the exact dedicated association checkout including separate worktrees", () => {
+  const snapshot = projectSnapshot()
+  assert.deepEqual(model.projectContext(2, snapshot), {
+    projectId: "p-app",
+    checkoutId: "c-main",
+    label: "App · main",
+    detail: "/projects/app"
+  })
+  assert.deepEqual(model.projectContext(7, snapshot), {
+    projectId: "p-app",
+    checkoutId: "c-fix",
+    label: "App · fix",
+    detail: "/projects/app-fix"
+  })
+  assert.equal(model.projectContext(1, snapshot), null)
+})
+
+test("missing projects and missing associated checkouts fall back without substituting the last checkout", () => {
+  const snapshot = projectSnapshot()
+  snapshot.projects[0].checkouts.pop()
+  assert.equal(model.projectContext(7, snapshot), null)
+  snapshot.projects = []
+  assert.equal(model.projectContext(2, snapshot), null)
+  assert.equal(model.projectContext(2, null), null)
+})
+
+test("current workspace context requires matching current-session verified evidence", () => {
+  const snapshot = projectSnapshot()
+  snapshot.projects[0].associations = [
+    { checkoutId: "c-fix", mode: "current", workspaceId: 4, separate: false }
+  ]
+  assert.equal(model.projectContext(4, snapshot), null)
+  snapshot.bindings = [verifiedBinding()]
+  assert.deepEqual(model.projectContext(4, snapshot), {
+    projectId: "p-app",
+    checkoutId: "c-fix",
+    label: "App · fix",
+    detail: "/projects/app-fix"
+  })
+  for (const overrides of [
+    { sessionId: "session-old" },
+    { projectId: "p-other" },
+    { checkoutId: "c-main" },
+    { workspaceId: 9 },
+    { pid: 0 },
+    { address: "0x0" },
+    { address: "abc" },
+    { evidence: { processVerified: false, mode: "process-app-id" } },
+    { evidence: { processVerified: true, mode: "title" } }
+  ]) {
+    snapshot.bindings = [verifiedBinding(overrides)]
+    assert.equal(model.projectContext(4, snapshot), null, JSON.stringify(overrides))
+  }
+  snapshot.bindings = [verifiedBinding()]
+  snapshot.sessionId = ""
+  assert.equal(model.projectContext(4, snapshot), null)
+})
+
+test("null current association workspace resolves only through its matching verified binding", () => {
+  const snapshot = projectSnapshot()
+  snapshot.projects[0].associations = [
+    { checkoutId: "c-fix", mode: "current", workspaceId: null, separate: true }
+  ]
+  snapshot.bindings = [verifiedBinding()]
+  assert.equal(model.projectContext(4, snapshot).checkoutId, "c-fix")
+  assert.equal(model.projectContext(2, snapshot), null)
+  snapshot.bindings = [verifiedBinding({ sessionId: "session-old" })]
+  assert.equal(model.projectContext(4, snapshot), null)
+})
+
+test("changing project labels never changes workspace cursor identity or focus target", () => {
+  const rows = [
+    { id: 2, name: "2" },
+    { id: 7, name: "7" }
+  ]
+  const snapshot = projectSnapshot()
+  model.projectContext(7, snapshot)
+  snapshot.projects[0].name = "Renamed"
+  assert.equal(model.projectContext(7, snapshot).label, "Renamed · fix")
+  assert.equal(model.workspaceKeys(rows), "2\n7")
+  assert.deepEqual(model.cursorPress(rows, "7", true), { key: "7", keyboard: true, row: rows[1] })
+  assert.deepEqual(rows, [
+    { id: 2, name: "2" },
+    { id: 7, name: "7" }
+  ])
+})

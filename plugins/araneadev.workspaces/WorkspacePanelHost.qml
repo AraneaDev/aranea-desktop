@@ -11,6 +11,8 @@ Aranea.KeyboardPanelFrame {
   refined: true
   // Normalized workspace rows supplied by the bar widget.
   property var workspaceStates: []
+  // Informational owner snapshot supplied only while the overview is visible.
+  property var projectSnapshot: null
   // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
   // none); rows re-sort as workspaces come and go, so the cursor follows
   // the workspace, not a position. Only the keyboard places it; hover never
@@ -78,6 +80,7 @@ Aranea.KeyboardPanelFrame {
       id: panel
       Layout.fillWidth: true
       workspaceStates: host.workspaceStates
+      projectSnapshot: host.projectSnapshot
       cursorIndex: host.cursorIndex
       // The one true cap: the card's own maximum (Style.space(520) or a
       // smaller screen, whichever binds) minus the padding and border the

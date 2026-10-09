@@ -70,6 +70,9 @@ ShellRoot {
   }
 
   Component.onCompleted: {
+    // Install inert IPC before exercising focus against the fake bar transport.
+    widget.projectClient.runner = function () {}
+    widget.captureActive = false
     t.check(widget.activeWorkspaceId === 1, "active workspace is exposed")
     t.equal(widget.indicatorDots.length, 3, "all normal workspaces are dotted")
     t.check(widget.indicatorDots[2].urgent, "urgent workspace is marked")

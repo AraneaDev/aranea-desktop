@@ -6,6 +6,7 @@ import qs.Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
 import "../araneadev.shared" as Aranea
+import "../araneadev.projects" as Projects
 
 Item {
   id: root
@@ -19,10 +20,34 @@ Item {
   property var testWorkspaces: null
   // Test-only focused workspace override.
   property var testFocusedWorkspace: null
+  // Preview/capture disables owner reads and compositor dispatch before opening.
+  property bool captureActive: testWorkspaces !== null
   // Whether the overview panel is open.
   property bool panelOpen: false
   // Open state exposed to the panel host.
   readonly property bool opened: panelOpen
+  // Only a visible overview consumes project state; unavailable owners fall back.
+  readonly property var projectSnapshot: panelOpen && !captureActive && projectClient.available ? projectClient.snapshot : null
+  // Read-only boundary exposed to inert fixtures for transport replacement.
+  readonly property alias projectClient: projectClient
+
+  Projects.ProjectClient {
+    id: projectClient
+    captureActive: root.captureActive || !root.panelOpen
+    onCaptureActiveChanged: if (!captureActive)
+      root.refreshProjects()
+  }
+  // Read the owner projection while visible; closing invalidates pending reads.
+  function refreshProjects() {
+    if (root.panelOpen && !root.captureActive)
+      projectClient.refresh()
+  }
+  Timer {
+    interval: 2000
+    repeat: true
+    running: root.panelOpen && !root.captureActive
+    onTriggered: root.refreshProjects()
+  }
   // Read live workspace rows without indexing unstable toplevel objects.
   function liveWorkspaceRows() {
     var values = Hyprland.workspaces ? Hyprland.workspaces.values : []
@@ -106,7 +131,7 @@ Item {
   // Focus a workspace through Hyprland.
   function focusWorkspace(id) {
     var target = Number(id)
-    if (!Number.isFinite(target) || !bar)
+    if (root.captureActive || !Number.isFinite(target) || !bar)
       return
     bar.run("hyprctl dispatch " + Util.shellQuote("hl.dsp.focus({ workspace = \"" + target + "\" })"))
   }
@@ -215,6 +240,8 @@ Item {
   component PanelContent: Item {
     // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
+    // Informational context from the current read-only owner projection.
+    property var projectSnapshot: null
     // Row index of the keyboard cursor, -1 for none.
     property int cursorIndex: -1
     // Emitted to focus a workspace.
@@ -232,6 +259,7 @@ Item {
       id: content
       anchors.fill: parent
       workspaceStates: parent.workspaceStates
+      projectSnapshot: parent.projectSnapshot
       cursorIndex: parent.cursorIndex
       onFocusWorkspace: function (id) {
         parent.focusWorkspace(id)
@@ -246,6 +274,8 @@ Item {
     id: testHost
     // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
+    // Current owner snapshot, separate from the workspace identities.
+    property var projectSnapshot: null
     // Key of the cursor's workspace (WorkspaceModel.workspaceKey, "" for
     // none); only the keyboard places it, hover never does.
     property string cursorKey: ""
@@ -309,6 +339,7 @@ Item {
         id: content
         anchors.fill: parent
         workspaceStates: testHost.workspaceStates
+        projectSnapshot: testHost.projectSnapshot
         cursorIndex: testHost.cursorIndex
         onFocusWorkspace: function (id) {
           testHost.focusWorkspace(id)
@@ -329,6 +360,9 @@ Item {
     onLoaded: {
       item.workspaceStates = Qt.binding(function () {
         return root.visibleStates
+      })
+      item.projectSnapshot = Qt.binding(function () {
+        return root.projectSnapshot
       })
       item.open = Qt.binding(function () {
         return root.panelOpen
