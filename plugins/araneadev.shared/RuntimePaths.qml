@@ -23,7 +23,10 @@ QtObject {
   readonly property string vpnAppsPath: araneaConfigRoot + "/vpn-apps.json"
 
   // Aranea's persistent state directory.
-  readonly property string araneaStateRoot: xdgStateHome + "/aranea"
+  readonly property string araneaStateRoot: Quickshell.env("ARANEA_STATE_ROOT") || (xdgStateHome + "/aranea")
+
+  // Versioned development-project registry shared with the CLI.
+  readonly property string projectsRegistryPath: araneaStateRoot + "/projects.json"
 
   // Omarchy's persistent state directory.
   readonly property string omarchyStateRoot: xdgStateHome + "/omarchy"
