@@ -92,6 +92,10 @@ else
   stop_scan() {
     trap '' TERM INT
     kill -TERM -- "-$scan_pid" 2>/dev/null || true
+    # Bound cancellation even when a Git descendant ignores TERM. The group
+    # was created by this wrapper, so escalation never reaches the caller.
+    sleep 0.2
+    kill -KILL -- "-$scan_pid" 2>/dev/null || true
     wait "$scan_pid" || true
     exit 1
   }

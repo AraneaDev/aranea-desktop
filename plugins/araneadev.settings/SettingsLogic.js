@@ -13,9 +13,39 @@
  * @returns {string} Supported section.
  */
 function normalizeSection(value) {
-  return ["appearance", "display", "schedule", "integrations", "notifications"].indexOf(value) >= 0
+  return ["appearance", "display", "schedule", "integrations", "notifications", "projects"].indexOf(
+    value
+  ) >= 0
     ? value
     : "appearance"
+}
+/** Validate an optional opaque project details destination.
+ * @param {unknown} value Requested identity.
+ * @returns {string} Safe identity or the empty overview destination.
+ */
+function normalizeProjectId(value) {
+  return typeof value === "string" && /^p-[A-Za-z0-9-]+$/.test(value) ? value : ""
+}
+/** Normalize a local file URL or an absolute editable folder path.
+ * @param {string} value User-selected folder.
+ * @returns {string} Absolute path or an empty invalid result.
+ */
+function normalizeFolder(value) {
+  if (typeof value !== "string") return ""
+  if (value.indexOf("file://") === 0) {
+    if (!/^file:\/\/(localhost)?\//.test(value)) return ""
+    try {
+      value = decodeURIComponent(value.replace(/^file:\/\/(localhost)?/, ""))
+    } catch (e) {
+      return ""
+    }
+  }
+  if (value.charAt(0) !== "/") return ""
+  for (var i = 0; i < value.length; i++) {
+    var code = value.charCodeAt(i)
+    if (code <= 31 || code === 127) return ""
+  }
+  return value
 }
 /** Validate four strictly ascending phase times without evaluating user text.
  * @param {Array<string>} times Phase times.
@@ -280,6 +310,8 @@ function geometry(screenWidth, screenHeight, scale) {
 if (typeof module !== "undefined")
   module.exports = {
     normalizeSection: normalizeSection,
+    normalizeProjectId: normalizeProjectId,
+    normalizeFolder: normalizeFolder,
     validateSchedule: validateSchedule,
     validateScale: validateScale,
     acceptRead: acceptRead,
