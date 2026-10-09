@@ -352,8 +352,15 @@ Item {
     if (!client || !client.error || client.pending && client.requestError && client.requestError.code === "OWNER_NOT_READY")
       return
     var local = sources.projectSubmission
-    if (!local || local.clientGeneration !== client.generation)
+    if (!local || local.clientGeneration !== client.generation) {
+      // Current observer transport failures need a notice even after acceptance clears local feedback.
+      if (!client.available && !client.requestError && client.operationId && Object.keys(sources.projectFeedback).some(function (key) {
+        var feedback = sources.projectFeedback[key]
+        return feedback.sessionId === sources.projectSessionId && feedback.operationId === client.operationId
+      }))
+        sources.failed(client.error)
       return
+    }
     sources.projectSubmission = Object.assign({}, local, {
       status: "failed",
       message: client.error
