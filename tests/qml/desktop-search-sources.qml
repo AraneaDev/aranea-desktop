@@ -129,6 +129,8 @@ ShellRoot {
           t.equal(shell.successes, 0, "app and command requests preserve host close policy without argv success signal")
           sources.activate("setting:display")
           t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"display"}'], "Display search opens stable destination without applying")
+          sources.activate("setting:projects")
+          t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"projects"}'], "Projects search opens existing settings destination")
           sources.activate("setting:appearance")
           t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"appearance"}'], "settings only opens destination")
           sources.fixtureWindows = [
@@ -222,7 +224,7 @@ ShellRoot {
             t.check(!sources.available, "missing compositor reports unavailable")
             t.equal(sources.records.map(function (r) {
               return r.type
-            }), ["app", "command", "setting", "setting", "setting", "setting", "setting"], "missing compositor retains app, command and settings")
+            }), ["app", "command", "setting", "setting", "setting", "setting", "setting", "setting"], "missing compositor retains app, command and settings")
             sources.menuItems = ({
                 vpn: {
                   id: "vpn",

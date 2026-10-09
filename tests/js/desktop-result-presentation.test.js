@@ -3,7 +3,7 @@ const { test } = require("node:test")
 const view = require("../../plugins/araneadev.menu/DesktopResultPresentation.js")
 
 test("typed results keep a visible identity without an application icon", () => {
-  for (const type of ["app", "command", "window", "workspace", "setting", "action"]) {
+  for (const type of ["app", "command", "window", "workspace", "setting", "action", "project"]) {
     assert.ok(view.typeLabel(type))
     assert.ok(view.fallbackIcon(type))
   }

@@ -151,7 +151,7 @@ ShellRoot {
       t.equal(menu.displayModel.get(0).resultType, "command", "global result has controlled type badge")
       source.refreshNow()
       menu.setFilter("Project")
-      t.equal(menu.displayModel.count, 4, "mixed app window workspace results share existing model")
+      t.equal(menu.displayModel.count, 5, "mixed app window workspace and project settings results share existing model")
       menu.selectedIndex = find("window:0xabc")
       menu.cursorActive = true
       var selected = menu.selectedIndex

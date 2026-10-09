@@ -1,8 +1,8 @@
 // Pure desktop record normalization and ranking. Matching is injected by the
 // generated DesktopSearchLogic facade from the canonical MenuSearch module.
 
-/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"} DesktopType */
-/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string}} DesktopTarget */
+/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"|"project"} DesktopType */
+/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string, projectId?:string, checkoutId?:string}} DesktopTarget */
 /** @typedef {{key: string, type: DesktopType, label: string, detail: string, aliases: Array<string>, target: DesktopTarget, available: boolean, pinned: boolean, recentRank: ?number, activeWorkspace: boolean}} DesktopRecord */
 /** @typedef {{id: string, label: string, aliases: Array<string>, description: string}} DesktopMatchEntry */
 /**
@@ -21,7 +21,7 @@
  */
 function parseQuery(text) {
   var raw = String(text || "").trim()
-  var prefix = /^(app|command|window|workspace|setting|action):\s*/i.exec(raw)
+  var prefix = /^(app|command|window|workspace|setting|action|project):\s*/i.exec(raw)
   return {
     type: prefix ? /** @type {DesktopType} */ (prefix[1].toLowerCase()) : null,
     text: prefix ? raw.slice(prefix[0].length).trim() : raw
@@ -45,7 +45,8 @@ function normalizeRecord(record) {
     window: "address",
     workspace: "workspaceId",
     setting: "section",
-    action: "actionId"
+    action: "actionId",
+    project: "projectId"
   }
   if (!Object.prototype.hasOwnProperty.call(fields, type)) return null
   var label = typeof record.label === "string" ? record.label.trim() : ""
@@ -60,12 +61,18 @@ function normalizeRecord(record) {
   }
   if (
     type === "setting" &&
-    ["appearance", "display", "schedule", "integrations", "notifications"].indexOf(identity) < 0
+    ["appearance", "display", "schedule", "integrations", "notifications", "projects"].indexOf(
+      identity
+    ) < 0
   )
     return null
   /** @type {DesktopTarget & {[key: string]: *}} */
   var target = {}
   target[fields[type]] = identity
+  if (type === "project") {
+    if (typeof sourceTarget.checkoutId !== "string" || !sourceTarget.checkoutId.trim()) return null
+    target.checkoutId = sourceTarget.checkoutId
+  }
   if (
     type === "workspace" &&
     typeof sourceTarget.selector === "string" &&

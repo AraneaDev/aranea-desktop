@@ -1,5 +1,6 @@
 // Local runtime source/activation controller. The owning menu supplies existing
 // app/menu watchers and handles their activation; this owns only live refresh.
+import "../araneadev.projects/ProjectRecords.js" as Projects
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -26,6 +27,12 @@ Item {
   property bool settingsAvailable: false
   // Persistent quick-action owner; null when that capability is unavailable.
   property var actionController: null
+  // Read-only client for the single persistent project operation owner.
+  property var projectClient: null
+  // Owner feedback survives query edits and menu closing.
+  property var projectFeedback: ({})
+  // Current submission identity for asynchronous owner refusals.
+  property string projectRequestKey: ""
   // Replaceable compositor and raw fixtures for offscreen integration tests.
   property var compositor: Hyprland
   // Optional raw window collection replacing the compositor model.
@@ -89,8 +96,47 @@ Item {
       favoriteAppIds: sources.favoriteAppIds,
       recentAppIds: sources.recentAppIds,
       settingsAvailable: sources.settingsAvailable,
-      actionRecords: sources.actionController ? sources.actionController.records : []
+      actionRecords: sources.actionController ? sources.actionController.records : [],
+      projectRecords: sources.currentProjectRecords()
     }
+  }
+
+  // Rebuild canonical project/checkout records from the latest owner projection.
+  function currentProjectRecords(): var {
+    if (!sources.active || !sources.projectClient)
+      return []
+    var snapshot = sources.projectClient.snapshot || ({})
+    return Projects.records({
+      projects: snapshot.projects || []
+    }, snapshot).map(function (record) {
+      record.aliases = [record.label].concat(record.aliases)
+      record.label = (record.action === "resume" ? "Resume " : "Open ") + record.label
+      var project = (snapshot.projects || []).find(function (candidate) {
+        return candidate.id === record.target.projectId
+      })
+      var binding = (snapshot.bindings || []).find(function (candidate) {
+        return candidate.projectId === record.target.projectId && candidate.checkoutId === record.target.checkoutId && candidate.sessionId === snapshot.sessionId
+      })
+      var association = project && (project.associations || []).find(function (candidate) {
+        return candidate.checkoutId === record.target.checkoutId && !candidate.separate
+      })
+      var workspace = binding && binding.workspaceId || association && association.workspaceId
+      record.detail += workspace ? " · Workspace " + workspace : project && project.workspaceMode === "current" ? " · Current workspace" : " · Dedicated workspace"
+      return record
+    })
+  }
+
+  // Preserve authoritative outcomes without transferring launch ownership to UI.
+  function projectOperationChanged(operation: var): void {
+    if (!operation || !operation.id || !operation.projectId)
+      return
+    var feedback = Object.assign({}, sources.projectFeedback)
+    feedback["project:" + operation.projectId] = {
+      status: operation.state !== "completed" ? "pending" : operation.outcome || "failed",
+      message: operation.error && operation.error.message ? operation.error.message : operation.state !== "completed" ? "Opening project…" : operation.outcome === "observed" ? "Project ready" : "Project launch " + (operation.outcome || "failed")
+    }
+    sources.projectFeedback = feedback
+    sources.publish()
   }
 
   // Iterates live QObject models only on an explicit active refresh/activation.
@@ -137,6 +183,7 @@ Item {
     sources.generation += 1
     refreshTimer.stop()
     if (sources.active) {
+      sources.publish()
       sources.requestRefresh()
     } else {
       sources.liveRecords = []
@@ -159,6 +206,8 @@ Item {
     if (!sources.active)
       return
     refreshTimer.stop()
+    if (sources.projectClient)
+      sources.projectClient.refresh()
     var token = ++sources.generation
     try {
       if (sources.refreshReader) {
@@ -196,7 +245,35 @@ Item {
     }
     if (sources.actionController)
       data.actionRecords = sources.actionController.currentRecords()
+    var selected = Search.resolveTarget(sources.records, key)
     var record = Search.resolveTarget(Targets.sourceRecords(data), key)
+    if (key.indexOf("project:") === 0) {
+      var projectRequest = Targets.dispatchTarget(selected, data)
+      if (!projectRequest || !sources.projectClient || sources.projectClient.captureActive || sources.projectClient.pending) {
+        sources.failed("Project is busy or selected checkout is no longer available")
+        return false
+      }
+      sources.projectRequestKey = key
+      sources.projectOperationChanged({
+        id: "pending",
+        projectId: projectRequest.payload.projectId,
+        state: "accepted"
+      })
+      if (!sources.projectClient.request(projectRequest.payload)) {
+        sources.projectOperationChanged({
+          id: "refused",
+          projectId: projectRequest.payload.projectId,
+          state: "completed",
+          outcome: "failed",
+          error: {
+            message: "Project request refused"
+          }
+        })
+        sources.failed("Project request refused")
+        return false
+      }
+      return true
+    }
     if (record && record.type === "action") {
       if (sources.actionController.activate(record.key))
         return true
@@ -226,6 +303,47 @@ Item {
     return true
   }
 
+  // Readiness refusals remain pending only until the client's bounded deadline.
+  function projectClientError(): void {
+    var client = sources.projectClient
+    if (!client || !client.error || client.pending && client.requestError && client.requestError.code === "OWNER_NOT_READY")
+      return
+    if (sources.projectRequestKey)
+      sources.projectOperationChanged({
+        id: "refused",
+        projectId: sources.projectRequestKey.slice("project:".length),
+        state: "completed",
+        outcome: "failed",
+        error: {
+          message: client.error
+        }
+      })
+    sources.failed(client.error)
+  }
+
+  // Secondary details uses the public navigation boundary and never submits Open.
+  function openProjectDetails(key: string): bool {
+    if (!sources.active || !sources.projectClient || sources.projectClient.captureActive)
+      return false
+    var record = Search.resolveTarget(sources.currentProjectRecords(), key)
+    if (!record) {
+      sources.failed("Project is no longer available")
+      return false
+    }
+    try {
+      if (sources.runner(["aranea", "projects", "details", record.target.projectId]) === false) {
+        sources.failed("Could not open project details")
+        return false
+      }
+    } catch (error) {
+      sources.failed("Could not open project details")
+      return false
+    }
+    sources.activated()
+    return true
+  }
+
+  onProjectClientChanged: publish()
   onAppRowsChanged: publish()
   onMenuItemsChanged: publish()
   onItemOrderChanged: publish()
@@ -245,6 +363,25 @@ Item {
     interval: 100
     repeat: false
     onTriggered: sources.refreshNow()
+  }
+  Connections {
+    target: sources.projectClient
+    function onSnapshotChanged() {
+      var operations = sources.projectClient.snapshot.operations || []
+      operations.forEach(function (operation) {
+        sources.projectOperationChanged(operation)
+      })
+      sources.publish()
+    }
+    function onOperationChanged(operation) {
+      sources.projectOperationChanged(operation)
+    }
+    function onErrorChanged() {
+      sources.projectClientError()
+    }
+    function onPendingChanged() {
+      sources.projectClientError()
+    }
   }
   Connections {
     target: sources.actionController
