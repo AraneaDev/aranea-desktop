@@ -98,8 +98,8 @@ for response in '' null '[]' '{"error":{"code":"","message":"","recovery":""}}';
 done
 run_cli 1 projects open "$project"
 jq -se 'last.data.outcome=="partial" and last.operationId=="op-123-1"' "$events" >/dev/null
-jq -se --arg p "$project" --arg c "$checkout_id" 'map(select(.[1]=="request")) | (last[2]|fromjson)=={projectId:$p,checkoutId:$c,separate:false,useCurrentWorkspace:false,newWindowRole:null,retryRole:null}' "$CLI_CALLS" >/dev/null
-for args in 'open missing' "open $project --checkout missing" "open $project --separate --use-current-workspace" "open $project --retry-role editor --new-window terminal" "configure $project --workspace weird" "configure $project --editor bash" "relocate $project --checkout missing --path /tmp" 'roots remove missing' 'discover --root missing' 'operation invalid' 'open'; do
+jq -se --arg p "$project" --arg c "$checkout_id" 'map(select(.[1]=="request")) | (last[2]|fromjson)=={projectId:$p,checkoutId:$c,separate:false,useCurrentWorkspace:false}' "$CLI_CALLS" >/dev/null
+for args in 'open missing' "open $project --checkout missing" "open $project --separate --use-current-workspace" "open $project --retry-role editor --new-window terminal" "open $project --retry-role editor --reobserve-role terminal" "open $project --new-window editor --reobserve-role terminal" "open $project --reobserve-role invalid" "configure $project --workspace weird" "configure $project --editor bash" "relocate $project --checkout missing --path /tmp" 'roots remove missing' 'discover --root missing' 'operation invalid' 'open'; do
   before=$(wc -l <"$CLI_CALLS")
   read -r -a words <<<"$args"
   run_cli 2 projects "${words[@]}"

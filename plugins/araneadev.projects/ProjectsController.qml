@@ -30,6 +30,8 @@ Item {
   property var roleHistory: ({})
   // Unresolved submitted/accepted identities survive every later role outcome and eviction.
   property var launchAttempts: []
+  // Occupied saved associations with lost evidence keep per-role uncertainty in memory.
+  property var ownershipHolds: ({})
   // Public submissions require the initial authoritative registry snapshot.
   property bool registryReady: false
   // Omitted checkout IDs consume fresh one-use revision/session-bound selection leases.
@@ -191,6 +193,7 @@ Item {
     freshBindings = []
     roleHistory = ({})
     launchAttempts = []
+    ownershipHolds = ({})
     invalidateSelections()
     snapshotChanged()
   }
@@ -322,7 +325,7 @@ Item {
   function validPayload(payload: var): bool {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload))
       return false
-    var fields = ['projectId', 'checkoutId', 'separate', 'useCurrentWorkspace', 'newWindowRole', 'retryRole']
+    var fields = ['projectId', 'checkoutId', 'separate', 'useCurrentWorkspace', 'newWindowRole', 'retryRole', 'reobserveRole']
     if (Object.keys(payload).some(function (key) {
       return fields.indexOf(key) < 0
     }))
@@ -339,7 +342,11 @@ Item {
       return false
     if (payload.retryRole !== undefined && ['editor', 'terminal'].indexOf(payload.retryRole) < 0)
       return false
-    return !(payload.retryRole && payload.newWindowRole)
+    if (payload.reobserveRole !== undefined && ['editor', 'terminal'].indexOf(payload.reobserveRole) < 0)
+      return false
+    return [payload.retryRole, payload.newWindowRole, payload.reobserveRole].filter(function (role) {
+      return !!role
+    }).length <= 1
   }
   // A refresh or known mutation invalidates both leases and in-flight preparations.
   function invalidateSelections(): void {
@@ -574,6 +581,14 @@ Item {
           failOperation(id, 'CHECKOUT_INVALID', 'The registered checkout moved or its Git identity changed. Locate its folder in project details.')
           return
         }
+        if (op.reobserveRole) {
+          publish(Object.assign({}, operation(id), {
+            rolesPending: [op.reobserveRole]
+          }))
+          reobserveRole(id, op.reobserveRole)
+          releaseQueue(id)
+          return
+        }
         invoke(toolsRunner, [toolsPath, '--json'], function (tools) {
           if (!current(id, revision, session))
             return
@@ -656,6 +671,18 @@ Item {
       var existing = project.associations.some(function (row) {
         return row.workspaceId === association.workspaceId && row.checkoutId === association.checkoutId
       })
+      if (existing && data.workspaces.some(function (row) {
+        return row.id === association.workspaceId && (Array.isArray(row.windows) ? row.windows.length > 0 : row.windows > 0)
+      })) {
+        var holds = Object.assign({}, ownershipHolds);
+        ['editor', 'terminal'].forEach(function (role) {
+          if (!roleHistory[roleKey(op, role)] && !bindings.some(function (binding) {
+            return binding.projectId === op.projectId && binding.checkoutId === op.checkoutId && binding.role === role && binding.sessionId === session
+          }))
+            holds[roleKey(op, role)] = true
+        })
+        ownershipHolds = holds
+      }
       persistAndFocus(id, project, checkout, selected, available, proof, association, !existing, 0)
     })
   }
@@ -783,9 +810,9 @@ Item {
             processVerified: false
           })
         }) : null), prior, baseline.windows, session, disposition)
-      if (decision.action === 'launch' && op.newWindowRole !== role && launchAttempts.some(function (attempt) {
-        return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && attempt.role === role && attempt.sessionId === session && (attempt.state === 'submitted' || attempt.state === 'accepted')
-      }))
+      if (decision.action === 'launch' && op.newWindowRole !== role && (ownershipHolds[roleKey(op, role)] || launchAttempts.some(function (attempt) {
+          return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && attempt.role === role && attempt.sessionId === session && (attempt.state === 'submitted' || attempt.state === 'accepted')
+        })))
         decision = {
           action: 'hold',
           code: 'OWNERSHIP_UNCONFIRMED'
@@ -864,7 +891,9 @@ Item {
           role: role,
           sessionId: session,
           generation: revision,
-          state: 'submitted'
+          state: 'submitted',
+          spec: Object.assign({}, spec),
+          baseline: baseline
         }
       ])
       var responded = false
@@ -889,7 +918,8 @@ Item {
         spec.launchIdentity = response.identity
         updateAttempt(attemptId, {
           state: 'accepted',
-          launchIdentity: response.identity
+          launchIdentity: response.identity,
+          spec: Object.assign({}, spec)
         })
         var history = Object.assign({}, roleHistory)
         history[roleKey(op, role)] = {
@@ -919,6 +949,54 @@ Item {
     }
     submit(0)
   }
+  // Select a retained accepted identity; another unresolved copy remains independently guarded.
+  function acceptedAttempt(op: var, role: string): var {
+    var attempts = launchAttempts.filter(function (attempt) {
+      return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && attempt.role === role && attempt.sessionId === sessionId && attempt.state === 'accepted' && attempt.launchIdentity && attempt.spec && attempt.baseline
+    })
+    return attempts.length ? attempts[attempts.length - 1] : null
+  }
+  // A new bounded observation reuses original launch proof/baseline and never invokes launch.
+  function reobserveRole(id: string, role: string): void {
+    var op = operation(id), revision = op.generation, session = op.sessionId
+    var attempt = acceptedAttempt(op, role)
+    if (!attempt) {
+      finishRole(id, role, {
+        status: 'unconfirmed',
+        code: 'OWNERSHIP_UNCONFIRMED',
+        message: 'No accepted launch identity remains in this session. Use Open new window explicitly.'
+      })
+      return
+    }
+    var timer = deadlineComponent.createObject(controller, {
+      operationId: id,
+      role: role,
+      revision: revision,
+      session: session
+    })
+    var nextDeadlines = Object.assign({}, deadlines)
+    nextDeadlines[id + ':' + role] = timer
+    deadlines = nextDeadlines
+    publish(Object.assign({}, operation(id), {
+      state: 'observing',
+      workspaceId: attempt.spec.workspaceId
+    }))
+    runtime.observe(Object.assign({}, attempt.spec, {
+      generation: revision
+    }), attempt.baseline, function (observed) {
+      if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
+        return
+      if (observed && observed.status === 'observed' && observed.binding)
+        updateAttempt(attempt.id, {
+          state: 'observed',
+          binding: observed.binding
+        })
+      finishRole(id, role, observed || {
+        status: 'unconfirmed',
+        code: 'OBSERVATION_TIMEOUT'
+      })
+    })
+  }
   // Update one attempt without letting a later outcome discard another identity.
   function updateAttempt(id: string, changes: var): void {
     launchAttempts = launchAttempts.map(function (attempt) {
@@ -946,7 +1024,8 @@ Item {
       role: role,
       status: response.status,
       code: response.code || null,
-      message: response.message || null
+      message: response.message || null,
+      reobserveAvailable: response.status === 'unconfirmed' && !!acceptedAttempt(op, role)
     }
     if (response.binding) {
       step.binding = response.binding
@@ -993,7 +1072,7 @@ Item {
         controller.finishRole(timer.operationId, timer.role, {
           status: 'unconfirmed',
           code: 'OBSERVATION_TIMEOUT',
-          message: 'Launch could not be confirmed. Use Open new window explicitly.'
+          message: 'Window could not be confirmed. Check again or use Open new window explicitly.'
         })
         if (typeof timer.submissionDone === 'function')
           timer.submissionDone()

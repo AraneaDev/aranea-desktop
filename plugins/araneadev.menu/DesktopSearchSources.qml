@@ -31,10 +31,10 @@ Item {
   property var projectClient: null
   // Owner feedback survives query edits and menu closing.
   property var projectFeedback: ({})
-  // Current submission identity for asynchronous owner refusals.
-  property string projectRequestKey: ""
-  // Exact submitted checkout retained across projection changes and refusals.
-  property string projectRequestCheckoutId: ""
+  // Owner session scopes authoritative feedback; empty transient snapshots do not reset it.
+  property string projectSessionId: ""
+  // Local preparation/refusal has its own identity, separate from owner generations.
+  property var projectSubmission: null
   // Replaceable compositor and raw fixtures for offscreen integration tests.
   property var compositor: Hyprland
   // Optional raw window collection replacing the compositor model.
@@ -128,17 +128,54 @@ Item {
     })
   }
 
-  // Preserve authoritative outcomes without transferring launch ownership to UI.
+  // A real session replacement invalidates prior feedback and local preparation identity.
+  function syncProjectSession(): void {
+    var next = sources.projectClient && sources.projectClient.snapshot.sessionId
+    if (!next || next === sources.projectSessionId)
+      return
+    sources.projectSessionId = next
+    sources.projectFeedback = ({})
+    sources.projectSubmission = null
+  }
+
+  // Exact checkout keys keep independent operation generations from overwriting each other.
+  function projectFeedbackKey(projectId: string, checkoutId: string): string {
+    return projectId + "\n" + checkoutId
+  }
+
+  // Local progress is visible only until a newer accepted operation supersedes it.
+  function feedbackForProject(projectId: string, checkoutId: string): var {
+    var key = projectFeedbackKey(projectId, checkoutId)
+    var authoritative = sources.projectFeedback[key]
+    var local = sources.projectSubmission
+    if (local && local.key === key && local.sessionId === sources.projectSessionId && (!authoritative || authoritative.generation <= local.baselineGeneration))
+      return local
+    return authoritative || null
+  }
+
+  // Preserve current-session highest-generation outcomes without taking launch ownership.
   function projectOperationChanged(operation: var): void {
-    if (!operation || !operation.id || !operation.projectId)
+    syncProjectSession()
+    if (!operation || !operation.id || !operation.projectId || !operation.checkoutId || !sources.projectSessionId || operation.sessionId !== sources.projectSessionId || !Number.isInteger(operation.generation))
+      return
+    var key = projectFeedbackKey(operation.projectId, operation.checkoutId)
+    var previous = sources.projectFeedback[key]
+    if (previous && (previous.generation > operation.generation || previous.generation === operation.generation && (previous.operationId !== operation.id || previous.completed && operation.state !== "completed")))
       return
     var feedback = Object.assign({}, sources.projectFeedback)
-    feedback["project:" + operation.projectId] = {
-      checkoutId: operation.checkoutId || "",
+    feedback[key] = {
+      checkoutId: operation.checkoutId,
+      sessionId: operation.sessionId,
+      generation: operation.generation,
+      operationId: operation.id,
+      completed: operation.state === "completed",
       status: operation.state !== "completed" ? "pending" : operation.outcome || "failed",
       message: operation.error && operation.error.message ? operation.error.message : operation.state !== "completed" ? "Opening project…" : operation.outcome === "observed" ? "Project ready" : "Project launch " + (operation.outcome || "failed")
     }
     sources.projectFeedback = feedback
+    var local = sources.projectSubmission
+    if (local && local.key === key && (operation.generation > local.baselineGeneration || operation.id === sources.projectClient.operationId))
+      sources.projectSubmission = null
     sources.publish()
   }
 
@@ -256,25 +293,25 @@ Item {
         sources.failed("Project is busy or selected checkout is no longer available")
         return false
       }
-      sources.projectRequestKey = key
-      sources.projectRequestCheckoutId = projectRequest.payload.checkoutId
-      sources.projectOperationChanged({
-        id: "pending",
-        projectId: projectRequest.payload.projectId,
+      syncProjectSession()
+      var feedbackKey = projectFeedbackKey(projectRequest.payload.projectId, projectRequest.payload.checkoutId)
+      var previous = sources.projectFeedback[feedbackKey]
+      sources.projectSubmission = {
+        key: feedbackKey,
         checkoutId: projectRequest.payload.checkoutId,
-        state: "accepted"
-      })
+        sessionId: sources.projectSessionId,
+        clientGeneration: sources.projectClient.generation + 1,
+        baselineGeneration: previous ? previous.generation : -1,
+        status: "pending",
+        message: "Opening project…"
+      }
+      sources.publish()
       if (!sources.projectClient.request(projectRequest.payload)) {
-        sources.projectOperationChanged({
-          id: "refused",
-          projectId: projectRequest.payload.projectId,
-          checkoutId: projectRequest.payload.checkoutId,
-          state: "completed",
-          outcome: "failed",
-          error: {
-            message: "Project request refused"
-          }
+        sources.projectSubmission = Object.assign({}, sources.projectSubmission, {
+          status: "failed",
+          message: "Project request refused"
         })
+        sources.publish()
         sources.failed("Project request refused")
         return false
       }
@@ -314,17 +351,14 @@ Item {
     var client = sources.projectClient
     if (!client || !client.error || client.pending && client.requestError && client.requestError.code === "OWNER_NOT_READY")
       return
-    if (sources.projectRequestKey)
-      sources.projectOperationChanged({
-        id: "refused",
-        projectId: sources.projectRequestKey.slice("project:".length),
-        checkoutId: sources.projectRequestCheckoutId,
-        state: "completed",
-        outcome: "failed",
-        error: {
-          message: client.error
-        }
-      })
+    var local = sources.projectSubmission
+    if (!local || local.clientGeneration !== client.generation)
+      return
+    sources.projectSubmission = Object.assign({}, local, {
+      status: "failed",
+      message: client.error
+    })
+    sources.publish()
     sources.failed(client.error)
   }
 
@@ -350,7 +384,10 @@ Item {
     return true
   }
 
-  onProjectClientChanged: publish()
+  onProjectClientChanged: {
+    syncProjectSession()
+    publish()
+  }
   onAppRowsChanged: publish()
   onMenuItemsChanged: publish()
   onItemOrderChanged: publish()
@@ -374,6 +411,7 @@ Item {
   Connections {
     target: sources.projectClient
     function onSnapshotChanged() {
+      sources.syncProjectSession()
       var operations = sources.projectClient.snapshot.operations || []
       operations.forEach(function (operation) {
         sources.projectOperationChanged(operation)

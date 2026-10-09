@@ -55,6 +55,8 @@ ShellRoot {
   property var calls: []
   // Held operation callback for lifecycle races.
   property var observation: null
+  // Monotonic owner generation supplied independently of UI submissions.
+  property int ownerGeneration: 1
   // Captured public details navigation requests.
   property var details: []
   // Generic owner refusal selected by the fixture.
@@ -117,6 +119,8 @@ ShellRoot {
   function operation(state, outcome) {
     host.observation(0, JSON.stringify({
       id: "op-one",
+      sessionId: host.snapshot.sessionId,
+      generation: host.ownerGeneration,
       projectId: "p-aranea",
       checkoutId: "c-main",
       state: state,
@@ -269,6 +273,7 @@ ShellRoot {
       host.refuse = false
       menu.handleKey(key(Qt.Key_Return))
       t.equal(requests(), 3, "retry is explicit after refusal")
+      host.ownerGeneration = 2
       host.operation("completed", "observed")
       t.equal(row().actionStatus, "observed", "confirmed owner result remains visible")
       t.check(row().detail.indexOf("Project ready") >= 0, "visible observed detail confirms readiness")
@@ -295,6 +300,40 @@ ShellRoot {
       ]
       client.snapshot = host.snapshot
       t.equal(row().label, "Resume Aranea", "proven current-session project offers Resume")
+      var newer = {
+        id: "newer",
+        projectId: "p-aranea",
+        checkoutId: "c-main",
+        sessionId: "test-session",
+        generation: 4,
+        state: "completed",
+        outcome: "observed",
+        steps: []
+      }
+      menu.desktopSearch.projectOperationChanged(newer)
+      menu.desktopSearch.projectOperationChanged(Object.assign({}, newer, {
+        id: "older",
+        generation: 3,
+        outcome: "partial"
+      }))
+      t.equal(row().actionStatus, "observed", "older same-checkout generation cannot overwrite newer result")
+      menu.desktopSearch.projectOperationChanged(Object.assign({}, newer, {
+        state: "observing",
+        outcome: null
+      }))
+      t.equal(row().actionStatus, "observed", "delayed progress cannot overwrite terminal outcome of same generation")
+      client.error = "Late submission refusal"
+      t.equal(row().actionStatus, "observed", "late local refusal cannot overwrite newer accepted result")
+      client.error = ""
+      host.snapshot = Object.assign({}, host.snapshot, {
+        sessionId: "next-session",
+        operations: [],
+        bindings: []
+      })
+      client.snapshot = host.snapshot
+      t.equal(row().actionStatus, "", "empty new owner session clears historical project readiness")
+      menu.desktopSearch.projectOperationChanged(newer)
+      t.equal(row().actionStatus, "", "old-session callback cannot restore historical feedback")
       host.readiness = true
       client.readyTimeout = 40
       client.pollInterval = 10

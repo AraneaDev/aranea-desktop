@@ -99,7 +99,8 @@ ShellRoot {
         },
         {
           role: 'terminal',
-          status: 'unconfirmed'
+          status: 'unconfirmed',
+          reobserveAvailable: true
         }
       ]
     }
@@ -119,6 +120,15 @@ ShellRoot {
     ], 'only explicit role recovery is sent')
     details.recover('editor', 'new')
     t.equal(opens.length, 3, 'unsupported recovery cannot silently duplicate a role')
+    var checkAgain = t.findChild(details, 'reobserveRole:terminal')
+    t.check(!!checkAgain && checkAgain.visible, 'accepted uncertainty exposes Check terminal again control')
+    checkAgain.clicked()
+    t.equal(opens[3], {
+      projectId: 'p-one',
+      checkoutId: 'c-main',
+      reobserveRole: 'terminal'
+    }, 'check again targets accepted exact role without requesting a launch')
+    t.check(!details.recoveryAllowed('editor', 'reobserve'), 'failed launch has no accepted identity to re-observe')
     details.operation = {
       projectId: 'p-other',
       checkoutId: 'c-main',
@@ -176,7 +186,7 @@ ShellRoot {
     details.displayOnly = true
     details.openProject()
     details.applyDraft()
-    t.equal(opens.length, 3, 'capture cannot submit Open')
+    t.equal(opens.length, 4, 'capture cannot submit Open')
     t.equal(configurations.length, 1, 'capture cannot configure')
     var fields = []
     function collectFields(item) {

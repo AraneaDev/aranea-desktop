@@ -715,7 +715,7 @@ Item {
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
-        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : record.type === "project" ? desktopSources.projectFeedback[record.key] : null
+        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : record.type === "project" ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
         if (record.type === "project" && feedback && feedback.checkoutId !== record.target.checkoutId)
           feedback = null
         if (record.type === "project" && feedback && feedback.status !== "pending" && feedback.status !== "failed")

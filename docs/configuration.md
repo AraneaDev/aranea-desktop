@@ -229,8 +229,12 @@ preference or the CLI's `--use-current-workspace` option. `--separate` opens a
 checkout with a separate association. Fresh window evidence controls Resume;
 no title matching or workspace membership guessing is used. Pending work is
 shared by all clients. A failed role can be retried with `--retry-role`; an
-unconfirmed role requires an explicit `--new-window` choice. These options target
-one role, and unavailable compositor/owner state is reported truthfully.
+unconfirmed accepted role offers **Check editor again** or **Check terminal
+again** (`--reobserve-role`) without launching. An additional window requires
+an explicit `--new-window` choice. These options target one role, and unavailable
+compositor/owner state is reported truthfully. After a shell reload, occupied
+saved associations with lost ownership evidence also require per-role New window
+choices; workspace membership cannot restore ownership.
 
 If a checkout moved, **Locate folder** validates its Git identity while preserving
 project and checkout IDs. **Remove registration** removes saved project metadata,
@@ -241,6 +245,7 @@ error with recovery guidance, never an empty replacement registry.
 aranea projects configure PROJECT_ID --editor code --terminal kitty --workspace dedicated
 aranea projects open PROJECT_ID --checkout CHECKOUT_ID --separate --json
 aranea projects open PROJECT_ID --retry-role terminal --json
+aranea projects open PROJECT_ID --reobserve-role terminal --json
 aranea projects relocate PROJECT_ID --checkout CHECKOUT_ID --path '/home/me/Work/Moved Project'
 ```
 

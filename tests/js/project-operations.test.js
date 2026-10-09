@@ -128,12 +128,12 @@ test("normal and separate associations isolate occupied alternate checkouts", ()
   assert.equal(choose({ ...request, useCurrentWorkspace: true }).workspaceId, 1)
   assert.deepEqual(project.associations, [normal])
 })
-test("old-session evidence cannot block a fresh session or pass a missing guard", () => {
+test("old-session ownership remains uncertain and cannot pass a missing guard", () => {
   assert.equal(ops.acceptsGeneration({ state: "accepted" }, undefined, undefined), false)
   assert.equal(
     ops.roleDecision("editor", request, { ...binding, sessionId: "old" }, null, windows, "s-1")
       .action,
-    "launch"
+    "hold"
   )
   assert.equal(
     ops.begin([ops.begin([], request, "old").operation], { ...request, sessionId: "new" }, "new")

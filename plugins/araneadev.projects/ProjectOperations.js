@@ -157,12 +157,12 @@ function bindingMatches(binding, windows, sessionId) {
 function roleDecision(role, request, binding, lastStep, windows, sessionId, disposition) {
   if (request.retryRole && request.retryRole !== role) return { action: "skip", code: null }
   if (request.newWindowRole === role) return { action: "launch", code: null }
-  var own =
+  var related =
     binding &&
     binding.projectId === request.projectId &&
     binding.checkoutId === request.checkoutId &&
-    binding.role === role &&
-    binding.sessionId === sessionId
+    binding.role === role
+  var own = related && binding.sessionId === sessionId
   if (own && bindingMatches(binding, windows, sessionId)) return { action: "focus", code: null }
   var prior = lastStep && lastStep.status === "observed" && (own ? binding : lastStep.binding)
   var identity = disposition && disposition.identity
@@ -197,7 +197,10 @@ function roleDecision(role, request, binding, lastStep, windows, sessionId, disp
     identity.address === prior.address
   )
     return { action: "launch", code: null }
-  if (own || (lastStep && (lastStep.status === "unconfirmed" || lastStep.status === "observed")))
+  if (
+    related ||
+    (lastStep && (lastStep.status === "unconfirmed" || lastStep.status === "observed"))
+  )
     return { action: "hold", code: "OWNERSHIP_UNCONFIRMED" }
   if (request.retryRole === role && (!lastStep || lastStep.status !== "failed"))
     return { action: "hold", code: "RETRY_NOT_FAILED" }

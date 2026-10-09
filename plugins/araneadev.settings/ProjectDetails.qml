@@ -116,6 +116,8 @@ ColumnLayout {
       return s.role === role
     })
     var step = steps.length ? steps[steps.length - 1] : null
+    if (kind === 'reobserve')
+      return !!step && step.status === 'unconfirmed' && step.reobserveAvailable === true
     return !!step && (kind === 'retry' ? ['failed', 'missing'].indexOf(step.status) >= 0 : ['unconfirmed', 'uncertain'].indexOf(step.status) >= 0)
   }
   // Explicit recovery requests do not retry ordinary Open automatically.
@@ -130,7 +132,7 @@ ColumnLayout {
       request.separate = true
     if (operation.useCurrentWorkspace === true)
       request.useCurrentWorkspace = true
-    request[kind === 'retry' ? 'retryRole' : 'newWindowRole'] = role
+    request[kind === 'retry' ? 'retryRole' : kind === 'reobserve' ? 'reobserveRole' : 'newWindowRole'] = role
     openRequested(request)
   }
   onProjectChanged: if (!dirty || !project || draftProjectId !== project.id) {
@@ -310,6 +312,14 @@ ColumnLayout {
         enabled: !details.displayOnly && !details.pending
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'retry')
+      }
+      SettingsButton {
+        objectName: 'reobserveRole:' + role.modelData
+        text: 'Check ' + role.modelData + ' again'
+        visible: details.recoveryAllowed(role.modelData, 'reobserve')
+        enabled: !details.displayOnly && !details.pending
+        pointerGate: details.pointerGate
+        onClicked: details.recover(role.modelData, 'reobserve')
       }
       SettingsButton {
         text: 'Open new ' + role.modelData + ' window'

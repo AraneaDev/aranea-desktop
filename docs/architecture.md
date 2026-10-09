@@ -227,7 +227,13 @@ owns compositor snapshots, tracked process identity and exact focus readback.
 Generation/session guards reject stale responses; matching pending checkout
 requests coalesce. Accepted identities remain conservative after observation
 loss, preventing duplicate ordinary launches. Explicit failed-role retry and
-new-window actions use the same owner.
+new-window actions use the same owner. Explicit re-observation reuses a retained
+accepted identity and its original baseline without invoking the launcher; it
+creates a new bounded operation and leaves the original outcome immutable.
+Occupied saved associations with lost session evidence retain per-role uncertainty
+until an explicit New window choice. Search retains authoritative feedback by
+current owner session, exact checkout and highest operation generation; local
+submission feedback cannot overwrite newer accepted outcomes.
 
 Settings uses registry/discovery clients for registration and typed project
 configuration requests. Search uses `ProjectClient.qml` and `ProjectRecords.js`

@@ -117,7 +117,7 @@ aranea projects relocate PROJECT_ID --checkout CHECKOUT_ID --path PATH
 aranea projects remove PROJECT_ID
 aranea projects open PROJECT_ID [--checkout CHECKOUT_ID] [--separate]
     [--use-current-workspace] [--new-window editor|terminal]
-    [--retry-role editor|terminal]
+    [--retry-role editor|terminal] [--reobserve-role editor|terminal]
 aranea projects operation OPERATION_ID
 aranea projects details PROJECT_ID
 aranea desktop status
@@ -148,7 +148,7 @@ not register anything; register and relocate revalidate under the store lock.
 Mutations carry the snapshot revision and return `REGISTRY_CONFLICT` if another
 writer changes it. Invalid IDs and contradictory options are rejected before
 IPC. `--separate` and `--use-current-workspace` are mutually exclusive;
-`--new-window` and `--retry-role` are mutually exclusive. Tool arguments are
+`--new-window`, `--retry-role` and `--reobserve-role` are mutually exclusive. Tool arguments are
 fixed supported adapter IDs; custom shell commands are unsupported.
 
 New CLI envelopes use the existing schema 1 lifecycle and add `operationId`
@@ -226,10 +226,20 @@ Partial results exit `1`. Read `projects operation OPERATION_ID --json` to recon
 without resubmitting. Retry only the reported failed role when appropriate:
 `projects open PROJECT_ID --checkout CHECKOUT_ID --retry-role terminal --json`.
 An accepted but unconfirmed launch can already have created a window; never
-infer failure or automatically retry it. `--new-window terminal` explicitly
-permits an additional window. Existing owned copies can still make recovery
+infer failure or automatically retry it. Use
+`projects open PROJECT_ID --checkout CHECKOUT_ID --reobserve-role terminal --json`
+to check a retained accepted identity again without launching. Each explicit
+check has a bounded observation period and a new operation ID; the original
+launch deadline and completed result remain unchanged. The original pre-launch
+window baseline and process identity still apply. Missing or old-session evidence
+stays unconfirmed. Role steps expose `reobserveAvailable` when this recovery is
+available in project details. `--new-window terminal` explicitly permits an
+additional window. Existing owned copies can still make recovery
 conservative. Desktop status and project search expose current owner evidence,
-not proof that every intended application window exists.
+not proof that every intended application window exists. After an owner reload,
+an occupied saved association with lost ownership evidence holds unknown roles
+unconfirmed until an explicit per-role New window choice. Runtime bindings are
+never restored from workspace membership or persisted to the registry.
 
 Search, details and JSON all resolve the registered checkout ID to the same
 canonical path. Register every desired worktree explicitly. `--separate` preserves

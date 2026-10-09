@@ -198,7 +198,7 @@ projects_cli_capabilities() {
 {"name":"projects.configure","arguments":{"projectId":{"type":"string","required":true},"name":{"type":"string"},"editor":{"type":"string","enum":["code","nvim"]},"terminal":{"type":"string","enum":["alacritty","kitty","foot","ghostty"]},"workspace":{"type":"string","enum":["dedicated","current"]}}},
 {"name":"projects.relocate","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string","required":true},"path":{"type":"string","required":true}}},
 {"name":"projects.remove","arguments":{"projectId":{"type":"string","required":true}}},
-{"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"new-window":{"type":"string","enum":["editor","terminal"]},"retry-role":{"type":"string","enum":["editor","terminal"]}}},
+{"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"new-window":{"type":"string","enum":["editor","terminal"]},"retry-role":{"type":"string","enum":["editor","terminal"]},"reobserve-role":{"type":"string","enum":["editor","terminal"]}}},
 {"name":"projects.operation","arguments":{"operationId":{"type":"string","required":true}}},
 {"name":"projects.details","arguments":{"projectId":{"type":"string","required":true}}},
 {"name":"desktop.status","arguments":{}}
@@ -212,7 +212,7 @@ JSON
 projects_cli_main() {
   cli_json=false cli_operation=aranea cli_operation_id='' cli_checkout_id='' cli_project_id='' cli_state='' cli_snapshot=''
   local -a words=() paths=() discovery_args=()
-  local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null
+  local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null reobserve_role=null
   local -A supplied=()
   for arg in "$@"; do
     if [[ "$arg" == --json ]]; then cli_json=true; else words+=("$arg"); fi
@@ -303,7 +303,7 @@ projects_cli_main() {
         shift
         continue
         ;;
-      configure:--name | configure:--editor | configure:--terminal | configure:--workspace | open:--checkout | open:--new-window | open:--retry-role | relocate:--checkout | relocate:--path | discover:--root | register:--path | ignore:--path | unignore:--path) ;;
+      configure:--name | configure:--editor | configure:--terminal | configure:--workspace | open:--checkout | open:--new-window | open:--retry-role | open:--reobserve-role | relocate:--checkout | relocate:--path | discover:--root | register:--path | ignore:--path | unignore:--path) ;;
       *) projects_cli_usage ;;
     esac
     [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || projects_cli_usage
@@ -332,14 +332,19 @@ projects_cli_main() {
         [[ "$value" == dedicated || "$value" == current ]] || projects_cli_usage
         args=$(jq -c --arg mode "$value" '.+{workspaceMode:$mode}' <<<"$args")
         ;;
-      --new-window | --retry-role)
+      --new-window | --retry-role | --reobserve-role)
         [[ "$value" == editor || "$value" == terminal ]] || projects_cli_usage
-        if [[ "$option" == --new-window ]]; then new_role=$value; else retry_role=$value; fi
+        case "$option" in
+          --new-window) new_role=$value ;;
+          --retry-role) retry_role=$value ;;
+          --reobserve-role) reobserve_role=$value ;;
+        esac
         ;;
     esac
   done
   [[ "$separate" != true || "$current" != true ]] || projects_cli_usage
   [[ "$new_role" == null || "$retry_role" == null ]] || projects_cli_usage
+  [[ "$reobserve_role" == null || ("$new_role" == null && "$retry_role" == null) ]] || projects_cli_usage
   case "$command" in
     register | ignore | unignore) [[ ${#paths[@]} -gt 0 ]] || projects_cli_usage ;;
     relocate) [[ -n "$path" && -n "$cli_checkout_id" ]] || projects_cli_usage ;;
@@ -396,7 +401,7 @@ projects_cli_main() {
       projects_cli_snapshot
       jq -e '.availability.compositor==true' <<<"$cli_snapshot" >/dev/null || projects_cli_fail COMPOSITOR_UNAVAILABLE 'Workspace opening requires a live compositor.' 'Start a supported desktop session and retry.'
       local payload response ready_deadline=$((SECONDS + 5))
-      payload=$(jq -cn --arg projectId "$cli_project_id" --arg checkoutId "$cli_checkout_id" --argjson separate "$separate" --argjson current "$current" --arg new "$new_role" --arg retry "$retry_role" '{projectId:$projectId,checkoutId:$checkoutId,separate:$separate,useCurrentWorkspace:$current,newWindowRole:(if $new=="null" then null else $new end),retryRole:(if $retry=="null" then null else $retry end)}')
+      payload=$(jq -cn --arg projectId "$cli_project_id" --arg checkoutId "$cli_checkout_id" --argjson separate "$separate" --argjson current "$current" --arg new "$new_role" --arg retry "$retry_role" --arg reobserve "$reobserve_role" '{projectId:$projectId,checkoutId:$checkoutId,separate:$separate,useCurrentWorkspace:$current} + (if $new=="null" then {} else {newWindowRole:$new} end) + (if $retry=="null" then {} else {retryRole:$retry} end) + (if $reobserve=="null" then {} else {reobserveRole:$reobserve} end)')
       local preparing=false
       while true; do
         if [[ "$preparing" == true ]] && ((SECONDS >= ready_deadline)); then projects_cli_internal_error "$response"; fi
