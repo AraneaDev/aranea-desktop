@@ -55,6 +55,7 @@ Panel {
     if (!op && actionTaskId && actionKind === 'reopen')
       op = {
         id: activity.operationId,
+        ownerId: activity.ownerId,
         taskId: actionTaskId,
         action: actionKind,
         state: 'completed',
@@ -90,6 +91,7 @@ Panel {
   // Current or uncertain operation stays visible across client disconnect.
   readonly property var taskOperation: activity.currentOperation || (actionTaskId && actionKind === 'reopen' && activity.error ? ({
         id: activity.operationId,
+        ownerId: activity.ownerId,
         taskId: actionTaskId,
         action: actionKind,
         state: 'completed',

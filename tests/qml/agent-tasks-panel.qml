@@ -3,11 +3,50 @@ import QtQuick
 import Quickshell
 import "lib"
 import "plugins/araneadev.agents" as Agents
+import "plugins/araneadev.activity" as Activity
 
 ShellRoot {
   id: host
   // Typed calls expose the sole client boundary without commands.
   property var calls: []
+  // The first operation read can fail after both acceptance IDs are known.
+  property bool failAcceptedRead: true
+  // Fixture-controlled transport results never invoke a process.
+  property string acceptanceOwner: 'accepted-owner'
+  // A different owner cannot establish recovery of the original acceptance.
+  property string observationOwner: 'different-owner'
+  // Exact accepted ID is retained before currentOperation has been populated.
+  property string acceptanceId: 'accepted-before-first-read'
+  Activity.ActivityClient {
+    id: acceptedClient
+    captureActive: true
+    runner: function (argv, done) {
+      if (argv[2] === 'request')
+        done(0, JSON.stringify({
+          ok: true,
+          operationId: host.acceptanceId,
+          ownerId: host.acceptanceOwner
+        }), '')
+      else if (argv[2] === 'operation') {
+        if (host.failAcceptedRead)
+          done(1, '', 'First accepted operation read failed')
+        else
+          done(0, JSON.stringify({
+            id: host.acceptanceId,
+            ownerId: host.observationOwner,
+            taskId: 'before-first-read',
+            action: 'reopen',
+            state: 'completed',
+            outcome: 'observed'
+          }), '')
+      } else if (argv[2] === 'snapshot')
+        done(0, JSON.stringify({
+          tasks: []
+        }), '')
+      else
+        done(1, '', 'Unexpected test transport method')
+    }
+  }
   QmlTest {
     id: t
   }
@@ -299,6 +338,52 @@ ShellRoot {
     t.equal(panel.ringFraction, 0.2, 'task attention preserves the existing Usage ring')
     tabs.choose('tasks')
     t.equal(panel.selectedProviderId, 'claude', 'task selection leaves Usage provider identity unchanged')
+    panel.captureActive = false
+    acceptedClient.captureActive = false
+    acceptedClient.snapshot = {
+      tasks: [
+        {
+          taskId: 'before-first-read',
+          provider: 'claude',
+          source: 'native',
+          reportedState: 'working',
+          displayState: 'connection-lost',
+          freshness: 'connection-lost',
+          resumeCommand: 'fixed display text',
+          association: {
+            status: 'registered',
+            projectId: 'p',
+            checkoutId: 'c',
+            cwd: '/repo'
+          }
+        }
+      ]
+    }
+    panel.activityClient = acceptedClient
+    tasks.selectedId = 'before-first-read'
+    panel.handleTaskAction('reopen', 'before-first-read')
+    t.equal(acceptedClient.currentOperation, null, 'failed first read leaves accepted client operation unobserved')
+    t.equal(acceptedClient.operationId, 'accepted-before-first-read', 'real client retains accepted operation ID before observation')
+    t.equal(acceptedClient.ownerId, 'accepted-owner', 'real client retains accepted owner ID before observation')
+    t.equal(tasks.selectedOperation && tasks.selectedOperation.ownerId, 'accepted-owner', 'sticky first-read failure preserves known accepted owner identity')
+    t.check(tasks.selectedOperation && tasks.selectedOperation.ownerUnconfirmed, 'failed first observation is protected')
+    failAcceptedRead = false
+    acceptedClient.reconnect()
+    t.check(tasks.selectedOperation.ownerUnconfirmed, 'different owner response cannot clear first-read uncertainty')
+    observationOwner = 'accepted-owner'
+    acceptedClient.reconnect()
+    t.check(!tasks.selectedOperation.ownerUnconfirmed, 'successful same-owner first observation clears sticky protection')
+    t.equal(tasks.selectedOperation.id, 'accepted-before-first-read', 'successful recovery preserves the accepted ID')
+    acceptanceId = 'acceptance-without-owner'
+    acceptanceOwner = ''
+    failAcceptedRead = true
+    panel.handleTaskAction('reopen', 'before-first-read')
+    t.equal(tasks.selectedOperation.ownerId, '', 'missing accepted owner identity remains explicitly absent')
+    failAcceptedRead = false
+    acceptedClient.reconnect()
+    t.check(tasks.selectedOperation.ownerUnconfirmed, 'later owner identity is never guessed into the absent acceptance')
+    acceptedClient.captureActive = true
+    panel.captureActive = true
     t.done()
   })
 }
