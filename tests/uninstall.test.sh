@@ -91,4 +91,42 @@ if grep -Fq "icon-theme 'Aranea-icons'" "$ARANEA_TEST_SANDBOX/guard.log"; then
   exit 1
 fi
 
+# Both scopes discard project registrations, never their repository folders.
+# An owned command is removed; a user-replaced command and its backup stay.
+source "$repo_root/scripts/lib/ownership.sh"
+project_dir="$ARANEA_TEST_SANDBOX/project with spaces"
+git init -q "$project_dir"
+printf 'keep repository content\n' >"$project_dir/content"
+mkdir -p "$ARANEA_TEST_SANDBOX/app-bin"
+printf '#!/usr/bin/env bash\nexec /usr/bin/sleep 60\n' >"$ARANEA_TEST_SANDBOX/app-bin/code"
+chmod +x "$ARANEA_TEST_SANDBOX/app-bin/code"
+launch=$(jq -cn --arg cwd "$project_dir" '{cwd:$cwd,argv:["code","--new-window",$cwd]}' |
+  PATH="$ARANEA_TEST_SANDBOX/app-bin:$PATH" "$repo_root/scripts/aranea-project-launch")
+app_pid=$(jq -er 'select(.ok).identity.pid' <<<"$launch")
+sandbox_on_exit "kill -- -$app_pid 2>/dev/null || true"
+for removal_scope in integration complete; do
+  export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/$removal_scope state"
+  "$repo_root/scripts/aranea" projects register --path "$project_dir" --json >/dev/null
+  mkdir -p "$HOME/.local/bin" "$plugins/araneadev.projects"
+  ln -s "$HOME/.config/omarchy/themes/aranea/scripts/aranea" "$HOME/.local/bin/aranea"
+  record_managed_file "$HOME/.local/bin/aranea"
+  ln -sf "$project_dir/user-command" "$HOME/.local/bin/custom-command"
+  record_managed_file "$HOME/.local/bin/custom-command"
+  mkdir -p "$(dirname "$(backup_path "$HOME/.local/bin/custom-command")")"
+  printf 'original command\n' >"$(backup_path "$HOME/.local/bin/custom-command")"
+  printf '{"plugins":[{"id":"araneadev.projects"},{"id":"user.widget","option":7}]}\n' >"$HOME/.config/omarchy/shell.json"
+  "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
+  [[ ! -L "$HOME/.local/bin/aranea" ]] || {
+    echo "$removal_scope removal kept the owned project command" >&2
+    exit 1
+  }
+  [[ ! -e "$ARANEA_STATE_ROOT/projects.json" && ! -e "$plugins/araneadev.projects" ]]
+  jq -e '.plugins == [{id:"user.widget",option:7}]' "$HOME/.config/omarchy/shell.json" >/dev/null
+  [[ "$(cat "$project_dir/content")" == 'keep repository content' && -d "$project_dir/.git" ]]
+  [[ "$(readlink "$HOME/.local/bin/custom-command")" == "$project_dir/user-command" ]]
+  [[ "$(cat "$(backup_path "$HOME/.local/bin/custom-command")")" == 'original command' ]]
+  kill -0 "$app_pid" # uninstall removes state, never detached applications
+  [[ "$(ps -o stat= -p "$app_pid")" != Z* ]]
+done
+
 echo "uninstall contract passed"

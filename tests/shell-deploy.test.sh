@@ -75,6 +75,40 @@ echo "shell deployment lifecycle contract passed"
 test -f "$plugins_dir/araneadev.projects/Projects.qml"
 jq -e '.kinds == ["menu"] and .keepLoaded and .entryPoints.menu == "Projects.qml"' "$plugins_dir/araneadev.projects/manifest.json" >/dev/null
 jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1' "$config_dir/shell.json" >/dev/null
+
+# A real theme switch releases the owner but keeps registrations and detached
+# sandbox applications; full/no_apps return through the existing plugin loop.
+project_dir="$work_dir/project with spaces"
+git init -q "$project_dir"
+"$repo_root/scripts/aranea" projects register --path "$project_dir" --json >/dev/null
+cp "$ARANEA_STATE_ROOT/projects.json" "$work_dir/registry-before"
+printf '#!/usr/bin/env bash\nexec /usr/bin/sleep 60\n' >"$work_dir/bin/code"
+chmod +x "$work_dir/bin/code"
+launch=$(jq -cn --arg cwd "$project_dir" '{cwd:$cwd,argv:["code","--new-window",$cwd]}' |
+  "$repo_root/scripts/aranea-project-launch")
+app_pid=$(jq -er 'select(.ok).identity.pid' <<<"$launch")
+sandbox_on_exit "kill -- -$app_pid 2>/dev/null || true"
+mkdir -p "$HOME/.config/omarchy/themes/aranea"
+cp -a "$repo_root/scripts" "$HOME/.config/omarchy/themes/aranea/scripts"
+cp "$config_dir/shell.json" "$HOME/.config/omarchy/shell.json"
+"$repo_root/hooks/theme-set" tokyo-night
+jq -e '([.plugins[].id]|index("araneadev.projects"))==null
+  and (.plugins|map(select(.id=="user.widget")))==[{id:"user.widget",option:7}]' "$HOME/.config/omarchy/shell.json" >/dev/null
+cmp "$work_dir/registry-before" "$ARANEA_STATE_ROOT/projects.json"
+kill -0 "$app_pid"
+[[ "$(ps -o stat= -p "$app_pid")" != Z* ]]
+cp "$HOME/.config/omarchy/shell.json" "$config_dir/shell.json"
+for install_profile in full no_apps; do
+  printf '%s\n' "$install_profile" >"$ARANEA_STATE_ROOT/profile"
+  "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
+  jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1
+    and ([.bar | .. | objects | select(.id?=="araneadev.projects")]|length)==0' "$config_dir/shell.json" >/dev/null
+  cmp "$work_dir/registry-before" "$ARANEA_STATE_ROOT/projects.json"
+  kill -0 "$app_pid"
+  [[ "$(ps -o stat= -p "$app_pid")" != Z* ]]
+  "$repo_root/scripts/release-shell-config" "$config_dir/shell.json"
+  jq -e '([.plugins[].id]|index("araneadev.projects"))==null' "$config_dir/shell.json" >/dev/null
+done
 "$repo_root/scripts/release-shell-config" "$config_dir/shell.json"
 jq -e '([.plugins[].id]|index("araneadev.projects"))==null' "$config_dir/shell.json" >/dev/null
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"

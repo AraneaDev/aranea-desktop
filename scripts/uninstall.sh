@@ -42,6 +42,8 @@ Usage: scripts/uninstall.sh [--dry-run] [--yes] [--json]
 Removes Aranea's hooks, shell plugins, wallpaper timer, managed files
 (restoring what they replaced), saved desktop settings and state. The theme
 folder stays by default; use --scope complete to also remove it.
+Both scopes remove project registrations, preserving repository folders
+and applications opened from them.
 USAGE
 }
 

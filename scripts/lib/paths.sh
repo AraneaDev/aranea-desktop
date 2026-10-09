@@ -18,6 +18,11 @@ xdg_data_home() {
   printf '%s\n' "${XDG_DATA_HOME:-$HOME/.local/share}"
 }
 
+# Prints the user executable directory (XDG_BIN_HOME, else ~/.local/bin).
+xdg_bin_home() {
+  printf '%s\n' "${XDG_BIN_HOME:-$HOME/.local/bin}"
+}
+
 # Prints Aranea's state directory ($ARANEA_STATE_ROOT, else <state>/aranea).
 aranea_state_root() {
   printf '%s\n' "${ARANEA_STATE_ROOT:-$(xdg_state_home)/aranea}"

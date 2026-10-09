@@ -2,7 +2,13 @@
 # Public project commands: validate, submit once, and observe the live owner.
 # Usage: aranea capabilities | projects COMMAND [OPTIONS] | desktop status [--json]
 set -euo pipefail
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The installed user-bin symlink points to the stable theme executable.
+# Resolve it before loading siblings, independently of the active theme.
+script_path="${BASH_SOURCE[0]}"
+if [[ -L "$script_path" ]]; then
+  script_path="$(readlink -f -- "$script_path")"
+fi
+script_dir="$(cd "$(dirname "$script_path")" && pwd)"
 # shellcheck source=scripts/lib/json-events.sh
 source "$script_dir/lib/json-events.sh"
 # shellcheck source=scripts/lib/projects-cli.sh

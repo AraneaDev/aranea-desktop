@@ -12,6 +12,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/paths.sh"
 # shellcheck disable=SC1091
+source "$repo_root/scripts/lib/ownership.sh"
+# shellcheck disable=SC1091
 source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/json-events.sh"
@@ -190,12 +192,14 @@ if ((dry_run)); then
   if ((json_mode)); then
     json_step install ok persist-profile 'would persist installation profile'
     json_step install ok install-theme "would install theme from: $theme_source"
+    json_step install ok install-command 'would install the owned project command'
     json_step install ok install-fonts 'would install bundled interface fonts'
     json_step install ok install-hooks 'would install theme hooks'
     json_step install ok activate-theme 'would set theme to aranea'
   else
     say "would persist profile: $profile"
     say "would install theme from: $theme_source"
+    say "would install project command: $(xdg_bin_home)/aranea"
     say "would install theme hooks"
     say "would install bundled interface fonts"
     say "would set theme to aranea"
@@ -252,6 +256,11 @@ else
   run omarchy theme install "$theme_source"
   adopt_installed_theme "$theme_source"
   ((json_mode)) && json_step install ok install-theme 'theme installed as aranea'
+  ((json_mode)) && json_step install running install-command 'install the owned project command'
+  theme_root="$HOME/.config/omarchy/themes/aranea"
+  [[ -x "$theme_root/scripts/aranea" ]] || fail_install 1 'Installed project command is missing.' missing_command
+  link_managed_file "$(xdg_bin_home)/aranea" "$theme_root/scripts/aranea"
+  ((json_mode)) && json_step install ok install-command 'project command ownership reconciled'
   ((json_mode)) && json_step install running install-fonts 'install bundled interface fonts'
   run "$repo_root/scripts/install-fonts"
   ((json_mode)) && json_step install ok install-fonts 'bundled interface fonts installed'

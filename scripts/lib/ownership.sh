@@ -44,6 +44,9 @@ is_aranea_target() {
   local target="$1" destination root
   if [[ -L "$target" ]]; then
     destination="$(readlink -- "$target")"
+    # Only this exact command target is managed; scripts directories contain
+    # unrelated helpers and must never become general ownership roots.
+    [[ "$destination" == "$HOME/.config/omarchy/themes/aranea/scripts/aranea" ]] && return 0
     while IFS= read -r root; do
       [[ "$destination" == "$root"/* ]] && return 0
     done < <(aranea_link_roots)
