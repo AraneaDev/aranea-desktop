@@ -30,10 +30,12 @@ Item {
   // Fixed current action IDs in visual order.
   readonly property var actionKinds: {
     var kinds = ['back']
-    if (row && row.primary.kind && !pending && !outcome.protected && !(error && ['OPERATION_LOST', 'OWNER_UNAVAILABLE'].indexOf(error.code) >= 0 && operation))
+    if (row && row.primary.kind && (row.primary.local || !pending && !outcome.protected))
       kinds.unshift(row.primary.kind)
-    if (row && row.assigned && !pending && !outcome.protected)
+    if (row && row.assigned && !pending && !outcome.protected && kinds.indexOf('open-checkout') < 0)
       kinds.push('open-checkout')
+    if (row && row.secondary && row.secondary.kind && !pending && !outcome.protected)
+      kinds.push(row.secondary.kind)
     if (outcome.canReobserve)
       kinds.push('reobserve')
     if (outcome.canReconnect)
@@ -58,8 +60,10 @@ Item {
   }
   // Human labels for the fixed action enum.
   function label(kind) {
-    if (kind === 'focus' || kind === 'reopen')
+    if (row && kind === row.primary.kind)
       return row.primary.label
+    if (row && row.secondary && kind === row.secondary.kind)
+      return row.secondary.label
     return {
       'back': 'Back to tasks',
       'open-checkout': 'Open checkout',
@@ -75,8 +79,15 @@ Item {
       return false
     if (pointer)
       keyboardCursor = false
+    if (kind === 'inspect-result' || kind === 'inspect-failure')
+      inspectReport(kind)
     action(kind, row.key)
     return true
+  }
+  // Fixed local report inspection scrolls bounded plaintext without owner I/O.
+  function inspectReport(kind) {
+    var target = kind === 'inspect-failure' ? diagnosticsSection : resultSection
+    scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height, target.y))
   }
   // Tab switches and panel reopen require a fresh keyboard reveal.
   function disarmCursor() {
@@ -87,8 +98,11 @@ Item {
     var next = Logic.step(actionKinds, cursorKind, keyboardCursor, direction)
     cursorKind = next.key
     keyboardCursor = true
-    if (next.activate)
+    if (next.activate) {
       activateKind(cursorKind, false)
+      if (cursorKind === 'inspect-result' || cursorKind === 'inspect-failure')
+        return
+    }
     scroller.contentY = Math.max(0, scroller.contentHeight - scroller.height)
   }
   implicitHeight: Math.min(maxHeight, body.implicitHeight)
@@ -125,6 +139,15 @@ Item {
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
+      Text {
+        objectName: 'lastReportTime'
+        width: parent.width
+        text: details.row ? [details.row.lastReportTime, details.row.lastReportLabel].filter(Boolean).join('\n') : ''
+        textFormat: Text.PlainText
+        wrapMode: Text.Wrap
+        color: Aranea.DesignTokens.foreground
+        font.pixelSize: Style.font.body
+      }
       TextEdit {
         width: parent.width
         text: details.row ? details.row.context : ''
@@ -143,6 +166,7 @@ Item {
         font.bold: true
       }
       Text {
+        id: resultSection
         objectName: 'reportedResult'
         width: parent.width
         text: details.row ? details.row.result || 'No result reported' : ''
@@ -182,6 +206,7 @@ Item {
         font.bold: true
       }
       Text {
+        id: diagnosticsSection
         objectName: 'reportedDiagnostics'
         width: parent.width
         text: details.row ? details.row.diagnostics || 'No diagnostics reported' : ''

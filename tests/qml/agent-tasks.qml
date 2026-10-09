@@ -70,6 +70,13 @@ ShellRoot {
     tabs.choose('tasks')
     t.equal(tabs.destination, 'tasks', 'empty Tasks remains accessible and remembered')
     t.check(t.findChild(view, 'tasksEmpty').visible, 'empty task setup is visible')
+    view.navigate(1)
+    view.navigate(1)
+    view.navigate(-1)
+    t.check(actions.every(function (a) {
+      return a[0] !== 'setup'
+    }), 'empty arrow and j/k direction changes never activate setup')
+    view.disarmCursor()
     view.navigate(0)
     t.check(actions.every(function (a) {
       return a[0] !== 'setup'
@@ -147,7 +154,31 @@ ShellRoot {
       t.step(350, function () {
         pointer.mouseClick(t.findChild(view, 'taskDetailsControl'))
         t.equal(view.selectedId, 'replacement', 'settled pointer opens exact task')
-        t.done()
+        view.back()
+        view.nowMs = 172805000
+        view.snapshot = {
+          tasks: [Object.assign(task('recent', 'finished'), {
+              freshness: 'connection-lost',
+              lastReceivedAt: 172800
+            }), Object.assign(task('older', 'finished'), {
+              freshness: 'connection-lost',
+              lastReceivedAt: 5
+            })]
+        }
+        t.step(50, function () {
+          var labels = t.findChildren(view, 'taskLastReport').map(function (label) {
+            return label.text
+          })
+          t.check(labels.indexOf('Last report 5s ago') >= 0 && labels.indexOf('Last report 2d ago') >= 0, 'real rows distinguish report ages with equal connection freshness')
+          view.selectedId = 'recent'
+          t.check(t.findChild(view, 'lastReportTime').text.indexOf('Received 1970-01-03 00:00:00 UTC') >= 0, 'real details display exact receipt time separately')
+          t.equal(t.findChild(view, 'lastReportTime').textFormat, Text.PlainText, 'receipt time remains plaintext')
+          actions = []
+          view.navigate(0)
+          view.navigate(0)
+          t.equal(actions.length, 0, 'local result inspection never emits an owner action from the Tasks composition')
+          t.done()
+        })
       })
     })
   })

@@ -44,6 +44,49 @@ Panel {
   property string actionTaskId: ''
   // Fixed enum only; provider text can never become action input.
   property string actionKind: ''
+  // Accepted owner-loss records outlive transient client transport errors.
+  property var uncertainOperations: []
+  // Persist exact accepted identity when an owner/lifetime read becomes uncertain.
+  function retainOperationError() {
+    var error = activity.error
+    if (!error || ['OWNER_UNAVAILABLE', 'OPERATION_LOST'].indexOf(error.code) < 0)
+      return
+    var op = activity.currentOperation
+    if (!op && actionTaskId && actionKind === 'reopen')
+      op = {
+        id: activity.operationId,
+        taskId: actionTaskId,
+        action: actionKind,
+        state: 'completed',
+        outcome: 'partial'
+      }
+    if (!op || op.action !== 'reopen')
+      return
+    var copy = Object.assign({}, op, {
+      ownerUnconfirmed: true,
+      ownerLossError: Object.assign({}, error)
+    })
+    uncertainOperations = uncertainOperations.filter(function (record) {
+      return record.id !== copy.id || record.ownerId !== copy.ownerId || record.taskId !== copy.taskId
+    }).concat([copy])
+  }
+  // Only successful observation of this exact owner/operation clears its uncertainty.
+  function operationObserved(op) {
+    uncertainOperations = uncertainOperations.filter(function (record) {
+      return record.id !== op.id || record.ownerId !== op.ownerId || record.taskId !== op.taskId
+    })
+  }
+  onActivityChanged: retainOperationError()
+  Connections {
+    target: root.activity
+    ignoreUnknownSignals: true
+    function onErrorChanged() {
+      root.retainOperationError()
+    }
+    function onOperationChanged(operation) {
+      root.operationObserved(operation)
+    }
+  }
   // Current or uncertain operation stays visible across client disconnect.
   readonly property var taskOperation: activity.currentOperation || (actionTaskId && actionKind === 'reopen' && activity.error ? ({
         id: activity.operationId,
@@ -94,11 +137,18 @@ Panel {
     actionKind = kind
     if (kind === 'dismiss' && row.canDismiss)
       activity.dismiss(taskId)
-    else if (kind === 'open-checkout' && row.assigned || kind === row.primary.kind && kind)
+    else if (['focus', 'reopen', 'open-checkout'].indexOf(kind) >= 0 && (kind === 'open-checkout' && row.assigned || kind === row.primary.kind || row.secondary && kind === row.secondary.kind))
       activity.request({
         action: kind,
         taskId: taskId
       })
+  }
+
+  // Tasks keyboard and future refresh controls share the capture-safe boundary.
+  function requestTaskRefresh() {
+    if (captureActive || agentsShowcase)
+      return
+    activity.refresh()
   }
 
   // The popup's background colour, for picking a light or dark mark.
@@ -990,6 +1040,7 @@ Panel {
   // 640 cap, or less on a short screen), so the frame only sizes to it.
   Aranea.KeyboardPanelFrame {
     id: panel
+    objectName: "agentKeyboardFrame"
     refined: true
     anchorItem: button
     owner: root
@@ -1039,7 +1090,7 @@ Panel {
         if (t === "j" || t === "k")
           tasksView.navigate(t === "j" ? 1 : -1)
         else if (t === "r" || t === "R")
-          root.activity.refresh()
+          root.requestTaskRefresh()
         return
       }
       if (t === "r" || t === "R") {
@@ -1074,11 +1125,13 @@ Panel {
           width: parent.width
           visible: root.tasksShown
           captureActive: root.captureActive
+          nowMs: root.nowMs
           snapshot: root.activity.snapshot
           projectSnapshot: root.projects.snapshot
           error: root.activity.error || root.activity.snapshot.error
           pending: root.activity.pending
           operation: root.taskOperation
+          uncertainOperations: root.uncertainOperations
           maxHeight: panel.availableCardHeight > 0 ? Math.max(Style.space(80), Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) - navigation.height - content.spacing) : Style.space(580)
           onAction: function (kind, taskId) {
             root.handleTaskAction(kind, taskId)

@@ -130,3 +130,153 @@ test("retained operation outcomes never advertise a repeated uncertain launch", 
   )
   assert.equal(logic.operationView({ ...op, outcome: "observed" }, null, false).label, "Observed")
 })
+test("approved lifecycle actions vary by exact checkout, native capability and resume availability", () => {
+  const expected = {
+    "ready-for-review": "open-checkout",
+    failed: "inspect-failure",
+    finished: "inspect-result",
+    working: "focus",
+    "needs-input": "focus",
+    "connection-lost": "reopen"
+  }
+  for (const state of Object.keys(expected)) {
+    const row = logic.rows(
+      {
+        tasks: [
+          task("matrix", state, {
+            freshness: state === "connection-lost" ? "connection-lost" : "connected",
+            resumeCommand: "claude --resume 'fixed'",
+            result: "Reported result"
+          })
+        ]
+      },
+      registry
+    )[0]
+    assert.equal(row.primary.kind, expected[state], state)
+    assert.equal(
+      row.secondary && row.secondary.kind,
+      state === "failed" ? "reopen" : "",
+      state + " secondary"
+    )
+    assert.equal(
+      row.primary.local,
+      state === "failed" || state === "finished",
+      state + " local inspection"
+    )
+  }
+  for (const state of ["working", "needs-input", "connection-lost"]) {
+    for (const variant of [
+      { association: { status: "unassigned", cwd: "/repo" } },
+      { source: "report" },
+      { source: "native", freshness: "unconfirmed", resumeCommand: null }
+    ]) {
+      const row = logic.rows(
+        {
+          tasks: [
+            task("no-capability", state, {
+              freshness: "connection-lost",
+              resumeCommand: "claude --resume 'fixed'",
+              ...variant
+            })
+          ]
+        },
+        registry
+      )[0]
+      assert.equal(row.primary.kind, "", state + " unavailable capability")
+    }
+  }
+  for (const state of ["working", "needs-input"]) {
+    const row = logic.rows(
+      {
+        tasks: [
+          task("stale", state, {
+            freshness: "unconfirmed",
+            resumeCommand: "claude --resume 'fixed'"
+          })
+        ]
+      },
+      registry
+    )[0]
+    assert.equal(row.primary.kind, "reopen", state + " explicit resume fallback")
+  }
+  for (const state of ["failed", "finished"]) {
+    const row = logic.rows(
+      {
+        tasks: [
+          task("local", state, {
+            source: "report",
+            association: { status: "unassigned", cwd: "/manual" },
+            resumeCommand: null
+          })
+        ]
+      },
+      registry
+    )[0]
+    assert.equal(row.primary.kind, state === "failed" ? "inspect-failure" : "inspect-result")
+    assert.equal(row.secondary && row.secondary.kind, "")
+  }
+})
+test("only store-inactive finished or owner-stale records advertise dismissal", () => {
+  for (const reportedState of [
+    "working",
+    "needs-input",
+    "ready-for-review",
+    "failed",
+    "finished"
+  ]) {
+    for (const freshness of ["connected", "unconfirmed", "connection-lost"]) {
+      const row = logic.rows(
+        { tasks: [task("dismiss", reportedState, { freshness })] },
+        registry
+      )[0]
+      assert.equal(
+        row.canDismiss,
+        reportedState === "finished" || freshness === "connection-lost",
+        reportedState + " " + freshness
+      )
+    }
+  }
+})
+test("last report age and received time stay independent from freshness, lifecycle and verification", () => {
+  const same = {
+    freshness: "connection-lost",
+    verification: { status: "reported-pass" },
+    reportedState: "finished",
+    displayState: "finished"
+  }
+  const rows = logic.rows(
+    {
+      tasks: [
+        task("recent", "finished", { ...same, lastReceivedAt: 172800 }),
+        task("older", "finished", { ...same, lastReceivedAt: 5 })
+      ]
+    },
+    registry,
+    172805000
+  )
+  const recent = rows.find((r) => r.key === "recent")
+  const older = rows.find((r) => r.key === "older")
+  assert.equal(recent.lastReportLabel, "Last report 5s ago")
+  assert.equal(older.lastReportLabel, "Last report 2d ago")
+  assert.equal(recent.lastReportTime, "Received 1970-01-03 00:00:00 UTC")
+  assert.equal(recent.lastReceivedAt, 172800)
+  assert.equal(recent.freshnessLabel, older.freshnessLabel)
+  assert.equal(recent.stateLabel, older.stateLabel)
+  assert.equal(recent.verificationLabel, older.verificationLabel)
+  for (const lastReceivedAt of [undefined, -1, Infinity, "untrusted"]) {
+    const row = logic.rows(
+      { tasks: [task("unknown", "working", { lastReceivedAt })] },
+      registry,
+      172805000
+    )[0]
+    assert.equal(row.lastReportLabel, "Last report time not available")
+  }
+  assert.match(
+    logic.rows(
+      { tasks: [task("future", "working", { lastReceivedAt: 172900 })] },
+      registry,
+      172805000
+    )[0].lastReportLabel,
+    /clock ahead/
+  )
+})

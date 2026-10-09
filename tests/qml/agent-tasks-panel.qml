@@ -20,11 +20,24 @@ ShellRoot {
     property var error: null
     property var currentOperation: null
     property string operationId: ''
+    property bool acceptReopen: false
+    signal operationChanged(var operation)
     function refresh() {
       calls.push(['refresh'])
     }
     function request(payload) {
       calls.push(['request', payload])
+      if (acceptReopen && payload.action === 'reopen') {
+        operationId = 'accepted-lost'
+        currentOperation = {
+          id: operationId,
+          ownerId: 'old-owner',
+          taskId: payload.taskId,
+          action: 'reopen',
+          state: 'observing',
+          outcome: null
+        }
+      }
     }
     function dismiss(id) {
       calls.push(['dismiss', id])
@@ -109,6 +122,10 @@ ShellRoot {
     }
     t.check(panel.visible, 'task-only panel is visible')
     t.equal(tabs.destination, 'tasks', 'attention opens Tasks by default')
+    var frame = t.findChild(panel, 'agentKeyboardFrame')
+    frame.textKey('r')
+    frame.textKey('R')
+    t.equal(calls.length, 0, 'both Tasks r/R keyboard routes refuse injected refresh during capture')
     panel.handleTaskAction('focus', 'stable')
     panel.handleTaskAction('setup', '')
     t.equal(calls.length, 0, 'capture blocks mutation and setup actions')
@@ -117,6 +134,10 @@ ShellRoot {
     tabs.choose('tasks')
     tasks.selectedId = 'stable'
     panel.captureActive = false
+    frame.textKey('r')
+    frame.textKey('R')
+    t.equal(calls, [['refresh'], ['refresh']], 'both live Tasks r/R routes use the injected activity refresh boundary')
+    calls = []
     panel.handleTaskAction('focus', 'gone')
     t.equal(calls.length, 0, 'removed task action is refused')
     panel.handleTaskAction('focus', 'stable')
@@ -163,6 +184,94 @@ ShellRoot {
     t.equal(calls.pop(), ['reconnect', 'protected-original'], 'reconnect uses selected retained operation identity')
     panel.handleTaskAction('open-checkout', 'stable')
     t.equal(calls.length, 0, 'protected task cannot replace retained operation with another mutation')
+    activity.snapshot = {
+      tasks: [Object.assign({}, activity.snapshot.tasks[0], {
+          displayState: 'connection-lost',
+          freshness: 'connection-lost',
+          resumeCommand: 'fixed display command'
+        })],
+      operations: []
+    }
+    activity.currentOperation = null
+    activity.operationId = ''
+    activity.acceptReopen = true
+    panel.handleTaskAction('reopen', 'stable')
+    t.equal(calls.pop(), ['request',
+      {
+        action: 'reopen',
+        taskId: 'stable'
+      }
+    ], 'one reopen is explicitly accepted before owner loss')
+    activity.error = {
+      code: 'OPERATION_LOST',
+      message: 'Owner restarted',
+      recovery: 'Reconnect and check existing terminal'
+    }
+    t.check(tasks.selectedOperation && tasks.selectedOperation.ownerUnconfirmed, 'accepted owner loss marks exact operation unconfirmed')
+    panel.handleTaskAction('open-checkout', 'stable')
+    panel.handleTaskAction('dismiss', 'stable')
+    t.equal(calls.length, 0, 'lost accepted operation blocks same-task overwrite')
+    activity.snapshot = Object.assign({}, activity.snapshot, {
+      revision: 99,
+      ownerId: 'new-owner'
+    })
+    activity.error = null
+    activity.currentOperation = {
+      id: 'another-new-action',
+      ownerId: 'new-owner',
+      taskId: 'other-task',
+      action: 'focus',
+      state: 'completed',
+      outcome: 'observed'
+    }
+    activity.operationId = 'another-new-action'
+    t.equal(tasks.selectedOperation && tasks.selectedOperation.id, 'accepted-lost', 'successful new snapshot and other mutation retain original lost operation')
+    t.check(tasks.selectedOperation && tasks.selectedOperation.ownerLossError && tasks.selectedOperation.ownerLossError.code === 'OPERATION_LOST', 'loss diagnostic survives global error clearing')
+    panel.handleTaskAction('reopen', 'stable')
+    panel.handleTaskAction('open-checkout', 'stable')
+    t.equal(calls.length, 0, 'cleared transport error never restores same-task launch/checkout')
+    panel.handleTaskAction('reconnect', 'stable')
+    t.equal(calls.pop(), ['reconnect', 'accepted-lost'], 'lost owner recovery reconnects exact accepted ID')
+    t.check(t.findChild(tasks, 'operationStatus').text.indexOf('unconfirmed') >= 0, 'loss remains visible in actual details after global error clearing')
+    t.check(t.findChild(tasks, 'operationError').text.indexOf('Owner restarted') >= 0, 'exact retained loss diagnostic remains visible')
+    activity.operationChanged({
+      id: 'accepted-lost',
+      ownerId: 'new-owner',
+      taskId: 'stable'
+    })
+    t.check(tasks.selectedOperation.ownerUnconfirmed, 'different owner observation cannot clear retained loss')
+    var recovered = {
+      id: 'accepted-lost',
+      ownerId: 'old-owner',
+      taskId: 'stable',
+      action: 'reopen',
+      state: 'completed',
+      outcome: 'observed'
+    }
+    activity.currentOperation = recovered
+    activity.operationId = recovered.id
+    activity.operationChanged(recovered)
+    t.check(!tasks.selectedOperation.ownerUnconfirmed, 'explicit successful exact owner observation clears retained loss')
+    activity.currentOperation = null
+    activity.snapshot = {
+      tasks: [Object.assign({}, activity.snapshot.tasks[0], {
+          taskId: 'fresh-review',
+          reportedState: 'ready-for-review',
+          displayState: 'ready-for-review',
+          freshness: 'connected'
+        })],
+      operations: []
+    }
+    panel.handleTaskAction('dismiss', 'fresh-review')
+    t.equal(calls.length, 0, 'fresh live review never submits dismissal')
+    activity.snapshot = {
+      tasks: [Object.assign({}, activity.snapshot.tasks[0], {
+          freshness: 'connection-lost'
+        })],
+      operations: []
+    }
+    panel.handleTaskAction('dismiss', 'fresh-review')
+    t.equal(calls.pop(), ['dismiss', 'fresh-review'], 'owner-stale review submits narrow exact-ID dismissal')
     panel.captureActive = true
     panel.selectedProviderId = 'claude'
     panel.usageClient = {

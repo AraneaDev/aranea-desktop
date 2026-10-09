@@ -25,6 +25,7 @@ ShellRoot {
           {
             taskId: 'stable',
             provider: 'claude',
+            source: 'native',
             description: '<b>Fix</b>',
             result: 'result',
             question: 'question',
@@ -135,6 +136,76 @@ ShellRoot {
     view.disarmCursor()
     view.navigate(0)
     t.equal(actions.length, 0, 'disarming details cursor requires another reveal')
+    view.operation = null
+    view.error = null
+    view.row = Logic.rows({
+      tasks: [
+        {
+          taskId: 'finished-local',
+          provider: 'claude',
+          reportedState: 'finished',
+          displayState: 'finished',
+          freshness: 'connected',
+          source: 'report',
+          result: 'Final plaintext result',
+          association: {
+            status: 'unassigned',
+            cwd: '/manual'
+          }
+        }
+      ]
+    })[0]
+    t.equal(view.actionKinds[0], 'inspect-result', 'finished task leads with local result inspection')
+    actions = []
+    view.navigate(0)
+    view.navigate(0)
+    t.equal(actions.pop(), ['inspect-result', 'finished-local'], 'result control has a fixed local action and exact task ID')
+    t.check(view.scroll.contentY < view.scroll.contentHeight - view.scroll.height, 'confirmed result inspection scrolls to result rather than actions')
+    view.row = Logic.rows({
+      tasks: [
+        {
+          taskId: 'failed-local',
+          provider: 'claude',
+          reportedState: 'failed',
+          displayState: 'failed',
+          freshness: 'connected',
+          source: 'native',
+          resumeCommand: 'fixed display-only command',
+          diagnostics: [
+            {
+              summary: 'Failure details'
+            }
+          ],
+          association: {
+            status: 'registered',
+            projectId: 'p',
+            checkoutId: 'c',
+            cwd: '/repo'
+          }
+        }
+      ]
+    }, {
+      projects: [
+        {
+          id: 'p',
+          name: 'Project',
+          checkouts: [
+            {
+              id: 'c',
+              path: '/repo'
+            }
+          ]
+        }
+      ]
+    })[0]
+    t.equal(view.actionKinds[0], 'inspect-failure', 'failed task leads with local failure inspection')
+    t.check(view.actionKinds.indexOf('reopen') >= 0 && view.actionKinds.indexOf('focus') < 0, 'failure offers explicit resume without working-session focus')
+    t.check(view.actionKinds.indexOf('dismiss') < 0, 'fresh failed record has no dismissal control')
+    view.row = Object.assign({}, view.row, {
+      canDismiss: true,
+      freshnessLabel: 'Connection lost'
+    })
+    t.check(view.actionKinds.indexOf('dismiss') >= 0, 'owner-stale failure makes dismissal reachable')
     t.done()
   })
 }

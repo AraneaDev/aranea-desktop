@@ -11,12 +11,52 @@ function text(value, limit) {
   return s.length > n ? s.slice(0, n) + "…" : s
 }
 
+/** Format owner receipt time independently from lifecycle or connection freshness.
+ * @param {any} receivedAt - task's last report receipt in seconds
+ * @param {number} [now] - injected wall clock in milliseconds
+ * @returns {TaskData} bounded absolute and relative report labels
+ */
+function reportTime(receivedAt, now) {
+  /** @type {{lastReceivedAt:number|null,lastReportTime:string,lastReportLabel:string}} */
+  var missing = {
+    lastReceivedAt: null,
+    lastReportTime: "Last report time not available",
+    lastReportLabel: "Last report time not available"
+  }
+  if (typeof receivedAt !== "number" || !isFinite(receivedAt) || receivedAt < 0) return missing
+  var date = new Date(receivedAt * 1000)
+  if (!isFinite(date.getTime())) return missing
+  var stamp = date.toISOString().slice(0, 19).replace("T", " ") + " UTC"
+  var caption = "Last report " + stamp
+  if (typeof now === "number" && isFinite(now)) {
+    var age = Math.floor((now - receivedAt * 1000) / 1000)
+    if (age < 0) caption += " (clock ahead)"
+    else {
+      var unit =
+        age >= 86400
+          ? Math.floor(age / 86400) + "d"
+          : age >= 3600
+            ? Math.floor(age / 3600) + "h"
+            : age >= 60
+              ? Math.floor(age / 60) + "m"
+              : age + "s"
+      caption = "Last report " + unit + " ago"
+    }
+  }
+  return {
+    lastReceivedAt: receivedAt,
+    lastReportTime: "Received " + stamp,
+    lastReportLabel: caption
+  }
+}
+
 /** Build attention-first rows using exact registered checkout identities.
  * @param {TaskData} snapshot - projected owner state
  * @param {TaskData} [registry] - read-only project snapshot
+ * @param {number} [now] - injected wall clock for receipt ages
  * @returns {Array<TaskData>} immutable task rows
  */
-function rows(snapshot, registry) {
+function rows(snapshot, registry, now) {
   /** @type {{[key:string]:string}} */
   var labels = {
     working: "Working",
@@ -57,10 +97,29 @@ function rows(snapshot, registry) {
         ["needs-input", "ready-for-review", "failed"].indexOf(state) >= 0 &&
         freshness !== "connection-lost"
       var verification = task.verification || {}
-      var primary = { kind: "", label: "Session unavailable" }
-      if (assigned && task.source === "native" && freshness === "connected")
-        primary = { kind: "focus", label: "Go to session" }
-      else if (assigned && task.resumeCommand) primary = { kind: "reopen", label: "Reopen session" }
+      var report = reportTime(task.lastReceivedAt, now)
+      var canFocus = assigned && task.source === "native" && freshness === "connected"
+      var canReopen = assigned && task.source === "native" && !!task.resumeCommand
+      var primary = { kind: "", label: "Session unavailable", local: false }
+      var secondary = { kind: "", label: "" }
+      if (state === "finished")
+        primary = { kind: "inspect-result", label: "View reported result", local: true }
+      else if (state === "failed") {
+        primary = { kind: "inspect-failure", label: "Inspect failure", local: true }
+        if (canReopen) secondary = { kind: "reopen", label: "Reopen session" }
+      } else if (state === "ready-for-review") {
+        if (assigned) primary = { kind: "open-checkout", label: "Open checkout", local: false }
+      } else if (state === "connection-lost") {
+        if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
+      } else if (state === "working" || state === "needs-input") {
+        if (canFocus)
+          primary = {
+            kind: "focus",
+            label: state === "needs-input" ? "Open session" : "Go to session",
+            local: false
+          }
+        else if (canReopen) primary = { kind: "reopen", label: "Reopen session", local: false }
+      }
       var context = [
         assigned
           ? text(p.name, 256)
@@ -83,6 +142,9 @@ function rows(snapshot, registry) {
         summary: text(task.description, 512) || "Agent task",
         stateLabel: labels[state] || "Status not reported",
         reportedLabel: labels[task.reportedState] || "Status not reported",
+        lastReceivedAt: report.lastReceivedAt,
+        lastReportTime: report.lastReportTime,
+        lastReportLabel: report.lastReportLabel,
         priority: priorities[state] === undefined ? 6 : priorities[state],
         attention: attention,
         freshnessLabel:
@@ -129,9 +191,8 @@ function rows(snapshot, registry) {
           })
           .join("\n"),
         primary: primary,
-        canDismiss:
-          freshness === "connection-lost" ||
-          ["finished", "failed", "ready-for-review"].indexOf(state) >= 0,
+        secondary: secondary,
+        canDismiss: freshness === "connection-lost" || task.reportedState === "finished",
         resumeCommand: text(task.resumeCommand, 512),
         nativeId: text(task.providerSessionId, 256),
         epoch: text(task.producerEpoch, 256)
@@ -206,18 +267,24 @@ function visible(usageCount, list) {
  */
 function operationView(operation, error, pending) {
   var op = operation || {}
-  var protectedSubmission = !!(op.submissionPending || op.submissionUnconfirmed)
-  var label = protectedSubmission
-    ? "Launch acceptance unconfirmed"
-    : pending || op.state === "accepted" || op.state === "observing"
-      ? "Observing accepted operation"
-      : op.outcome === "observed"
-        ? "Observed"
-        : op.outcome === "partial"
-          ? "Partially observed"
-          : op.outcome === "failed"
-            ? "Action failed"
-            : ""
+  var protectedSubmission = !!(
+    op.submissionPending ||
+    op.submissionUnconfirmed ||
+    op.ownerUnconfirmed
+  )
+  var label = op.ownerUnconfirmed
+    ? "Accepted operation owner unconfirmed"
+    : protectedSubmission
+      ? "Launch acceptance unconfirmed"
+      : pending || op.state === "accepted" || op.state === "observing"
+        ? "Observing accepted operation"
+        : op.outcome === "observed"
+          ? "Observed"
+          : op.outcome === "partial"
+            ? "Partially observed"
+            : op.outcome === "failed"
+              ? "Action failed"
+              : ""
   return {
     label: label,
     protected: protectedSubmission,
@@ -249,9 +316,18 @@ function operationView(operation, error, pending) {
       !op.reconnectRequired &&
       !(error && error.code === "OPERATION_LOST"),
     canReconnect: !!op.id && !pending,
-    message: text(error ? error.message : (op.error || {}).message),
-    recovery: text(error ? error.recovery : (op.error || {}).recovery)
+    message: text((op.ownerLossError || error || op.error || {}).message),
+    recovery: text((op.ownerLossError || error || op.error || {}).recovery)
   }
 }
 if (typeof module !== "undefined")
-  module.exports = { text, rows, reconcileSelection, step, destination, visible, operationView }
+  module.exports = {
+    text,
+    reportTime,
+    rows,
+    reconcileSelection,
+    step,
+    destination,
+    visible,
+    operationView
+  }

@@ -25,8 +25,12 @@ Item {
   property bool pending: false
   // Retained client operation, independent of current selection.
   property var operation: null
+  // Exact accepted owner-loss records retained by the presentation host.
+  property var uncertainOperations: []
   // Available list/details height.
   property real maxHeight: Style.space(640)
+  // Injectable wall clock only formats report receipt ages.
+  property double nowMs: Date.now()
   // Stable selected detail task, never a row position.
   property string selectedId: ''
   // Stable keyboard row identity.
@@ -34,7 +38,7 @@ Item {
   // First Enter reveals the cursor.
   property bool keyboardCursor: false
   // Rows are attention-first immutable task projections.
-  readonly property var taskRows: Logic.rows(snapshot, projectSnapshot)
+  readonly property var taskRows: Logic.rows(snapshot, projectSnapshot, nowMs)
   // Selection is resolved by identity after every sort/refresh.
   readonly property var selectedRow: taskRows.filter(function (r) {
     return r.key === selectedId
@@ -65,10 +69,13 @@ Item {
     var retained = (snapshot.operations || []).filter(function (op) {
       return op.taskId === id
     }).slice().reverse()
+    var lost = uncertainOperations.filter(function (op) {
+      return op.taskId === id
+    }).slice().reverse()[0]
     var protectedOperation = retained.filter(function (op) {
       return op.submissionPending || op.submissionUnconfirmed
     })[0]
-    var result = protectedOperation || (operation && operation.taskId === id ? operation : retained[0])
+    var result = lost || protectedOperation || (operation && operation.taskId === id ? operation : retained[0])
     if (!result)
       return null
     return result === operation ? result : Object.assign({}, result, {
@@ -101,7 +108,7 @@ Item {
       return
     }
     if (taskRows.length === 0) {
-      if (keyboardCursor)
+      if (keyboardCursor && direction === 0)
         action('setup', '')
       keyboardCursor = true
       return
@@ -136,7 +143,7 @@ Item {
       tasks.keyboardCursor = false
       if (kind === 'back')
         tasks.back()
-      else
+      else if (kind !== 'inspect-result' && kind !== 'inspect-failure')
         tasks.action(kind, id)
     }
   }
@@ -215,6 +222,16 @@ Item {
             text: taskRow.modelData.context
             textFormat: Text.PlainText
             wrapMode: Text.WrapAnywhere
+            color: Aranea.DesignTokens.foreground
+            opacity: 0.65
+            font.pixelSize: Style.font.body
+          }
+          Text {
+            objectName: 'taskLastReport'
+            width: parent.width
+            text: taskRow.modelData.lastReportLabel
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
             color: Aranea.DesignTokens.foreground
             opacity: 0.65
             font.pixelSize: Style.font.body
