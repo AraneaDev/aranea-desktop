@@ -302,9 +302,22 @@ A genuinely new main turn preserves the earlier turn's state, question and
 blockers as inactive history. Fresh session heartbeats cannot revive it; late
 callbacks cannot select it as the current turn. Independent child tasks remain
 active. The private session metadata contains `currentTaskId`, native `turns`,
-optional `inactiveTaskIds` and optional `observedHooks`. Only the native mapper
+optional `inactiveTaskIds`, optional `observedHooks` and optional `callbackOwners`. Only the native mapper
 can change these fields; ordinary register/report requests cannot manufacture
-hook-observation evidence.
+hook-observation or callback-ownership evidence. `callbackOwners` retains at most
+512 unique records with hashed callback identity, original task/event IDs and
+optional bounded native tool ID. Records are pruned with their retained tasks and
+receipts; public event labels cannot manufacture ownership.
+
+Legacy epochs without callback ownership remain readable. Explicit mapped native
+turn identities remain usable, but uncorrelated callbacks are refused for that
+epoch. Start a new Claude provider/session epoch to establish ownership; duplicate
+SessionStart or another prompt within the legacy epoch does not enable it.
+Status `capabilities.callbackOwnership` reports legacy session count,
+`restartRequired` for fresh legacy activity, and recovery text. The count includes
+retained legacy history; that history does not block a modern active session.
+Historical optional-hook observations alone
+do not establish that a legacy epoch has callback coverage.
 
 The private heartbeat runs once per proven process epoch, updates connection
 receipts every 15 seconds, and exits on provider identity, session or epoch loss.

@@ -51,7 +51,7 @@ cp "$ARANEA_STATE_ROOT/agent-activity.json" "$TMPDIR/before"
 deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"p-one","prompt":"  Fix parser\nPRIVATE SECOND LINE"}'
 cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
 # A retained old native turn must not reset history after its replay receipt expires.
-jq '.sessions[0].receipts=[]' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/no-receipts"
+jq '.sessions[0].receipts=[] | .sessions[0].nativeMetadata.callbackOwners=[]' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/no-receipts"
 mv "$TMPDIR/no-receipts" "$ARANEA_STATE_ROOT/agent-activity.json"
 cp "$ARANEA_STATE_ROOT/agent-activity.json" "$TMPDIR/before"
 deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"p-one","prompt":"  Fix parser\nPRIVATE SECOND LINE"}'
@@ -273,7 +273,7 @@ rm -rf "$ARANEA_STATE_ROOT"
 deliver '{"hook_event_name":"SessionStart"}'
 deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"first","prompt":"First turn"}'
 # Valid retained task IDs may contain separators; correlation must preserve them.
-jq '.tasks[0].taskId="fixture:main:with:colons" | .sessions[0].nativeMetadata.currentTaskId="fixture:main:with:colons" | .sessions[0].nativeMetadata.turns[0].taskId="fixture:main:with:colons"' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/colon-task"
+jq '.tasks[0].taskId="fixture:main:with:colons" | .sessions[0].nativeMetadata.currentTaskId="fixture:main:with:colons" | .sessions[0].nativeMetadata.turns[0].taskId="fixture:main:with:colons" | if (.sessions[0].nativeMetadata|has("callbackOwners")) then .sessions[0].nativeMetadata.callbackOwners |= map(.taskId="fixture:main:with:colons") else . end' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/colon-task"
 mv "$TMPDIR/colon-task" "$ARANEA_STATE_ROOT/agent-activity.json"
 deliver '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"unique-old-tool","tool_input":{"questions":[{"question":"Old question?"}]}}'
 deliver '{"hook_event_name":"PreToolUse","tool_name":"ExitPlanMode","tool_use_id":"old-plan","tool_input":{}}'
@@ -302,3 +302,48 @@ deliver '{"hook_event_name":"PostToolUseFailure","tool_name":"ExitPlanMode","too
 cmp "$TMPDIR/turn-before" "$ARANEA_STATE_ROOT/agent-activity.json"
 snap | jq -e '[.state.sessions[0].receipts[]|select(.eventId|startswith("PreToolUse:"))]|length == 2' >/dev/null
 echo 'PASS retained native tool/lifecycle replay and first late results preserve original turn'
+
+# Private ownership cannot confuse delimiter IDs or borrow explicit event labels.
+rm -rf "$ARANEA_STATE_ROOT"
+deliver '{"hook_event_name":"SessionStart"}'
+deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"one","prompt":"First"}'
+jq '.tasks[0].taskId="A" | .sessions[0].nativeMetadata.currentTaskId="A" | .sessions[0].nativeMetadata.turns[0].taskId="A" | if (.sessions[0].nativeMetadata|has("callbackOwners")) then .sessions[0].nativeMetadata.callbackOwners |= map(.taskId="A") else . end' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/rename"
+mv "$TMPDIR/rename" "$ARANEA_STATE_ROOT/agent-activity.json"
+deliver '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"B:C","tool_input":{"questions":[{"question":"First tool"}]}}'
+deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"two","prompt":"Second"}'
+jq '(.sessions[0].nativeMetadata.currentTaskId) as $id | .tasks |= map(if .taskId == $id then .taskId="A:B" else . end) | .sessions[0].nativeMetadata.currentTaskId="A:B" | .sessions[0].nativeMetadata.turns |= map(if .taskId == $id then .taskId="A:B" else . end) | if (.sessions[0].nativeMetadata|has("callbackOwners")) then .sessions[0].nativeMetadata.callbackOwners |= map(if .taskId == $id then .taskId="A:B" else . end) else . end' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/rename"
+mv "$TMPDIR/rename" "$ARANEA_STATE_ROOT/agent-activity.json"
+# Public report can choose any label, but cannot establish native tool ownership.
+snapshot=$(snap)
+jq -c '.state.sessions[0] | {action:"report",args:{schemaVersion:1,eventId:"PreToolUse:A:B:forged-tool",provider:"claude",providerSessionId:.providerSessionId,producerEpoch:.producerEpoch,sequence:(.highWaterSequence+1),taskId:"A:B",kind:"needs-input",payload:{blockerId:"tool:forged-tool",question:"Explicit report question"}}}' <<<"$snapshot" | "$store" mutate >/dev/null
+deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"three","prompt":"Third"}'
+deliver '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"C","tool_input":{"questions":[{"question":"Third tool"}]}}'
+snap | jq -e 'any(.state.tasks[];.description == "Third" and .question == "Third tool" and .reportedState == "needs-input")' >/dev/null
+deliver '{"hook_event_name":"PostToolUseFailure","tool_name":"AskUserQuestion","tool_use_id":"C","error":"Third tool failed"}'
+deliver '{"hook_event_name":"PostToolUseFailure","tool_name":"AskUserQuestion","tool_use_id":"forged-tool","error":"Uncorrelated failure"}'
+snap | jq -e 'any(.state.tasks[];.taskId == "A:B" and .reportedState == "needs-input" and .question == "Explicit report question" and (.diagnostics|length == 0)) and any(.state.tasks[];.description == "Third" and .reportedState == "working" and (.diagnostics|map(.summary)) == ["Third tool failed","Uncorrelated failure"])' >/dev/null
+# Shared parent context is not child identity or a permission-decision identity.
+deliver '{"hook_event_name":"SubagentStart","agent_id":"child-one","prompt_id":"three","agent_type":"Explore"}'
+deliver '{"hook_event_name":"SubagentStart","agent_id":"child-two","prompt_id":"three","agent_type":"Explore"}'
+deliver '{"hook_event_name":"SubagentStop","agent_id":"child-one","prompt_id":"three","last_assistant_message":"One result"}'
+deliver '{"hook_event_name":"SubagentStop","agent_id":"child-two","prompt_id":"three","last_assistant_message":"Two result"}'
+deliver '{"hook_event_name":"TaskCompleted","task_id":"task-one","agent_id":"child-one","prompt_id":"three","task_subject":"One task"}'
+deliver '{"hook_event_name":"TaskCompleted","task_id":"task-two","agent_id":"child-one","prompt_id":"three","task_subject":"Two task"}'
+deliver '{"hook_event_name":"PermissionRequest","prompt_id":"three","tool_name":"Read","tool_input":{"file_path":"one"}}'
+deliver '{"hook_event_name":"PermissionRequest","prompt_id":"three","tool_name":"Read","tool_input":{"file_path":"two"}}'
+snap | jq -e 'any(.state.tasks[];.result == "One result" and .reportedState == "ready-for-review") and any(.state.tasks[];.result == "Two result" and .reportedState == "ready-for-review") and ([.state.tasks[]|select(.reportedState == "finished")]|length == 2) and any(.state.tasks[];.description == "Third" and (.blockers|length == 2))' >/dev/null
+# Legacy epochs remain readable, but no uncorrelated callback gains new ownership.
+jq 'del(.sessions[0].nativeMetadata.callbackOwners)' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/legacy"
+mv "$TMPDIR/legacy" "$ARANEA_STATE_ROOT/agent-activity.json"
+cp "$ARANEA_STATE_ROOT/agent-activity.json" "$TMPDIR/before"
+deliver '{"hook_event_name":"SessionStart"}'
+cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
+"$repo_root/scripts/aranea-agent-adapter" status claude | jq -e '.state.capabilities.callbackOwnership.restartRequired and .state.capabilities.callbackOwnership.legacySessions == 1' >/dev/null
+deliver '{"hook_event_name":"Stop","last_assistant_message":"Uncorrelated legacy result"}'
+cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
+deliver '{"hook_event_name":"Stop","prompt_id":"three","last_assistant_message":"Explicit legacy turn result"}'
+snap | jq -e 'any(.state.tasks[];.description == "Third" and .result == "Explicit legacy turn result") and (.state.sessions[0].nativeMetadata|has("callbackOwners")|not)' >/dev/null
+deliver '{"hook_event_name":"SessionStart","source":"new-epoch"}'
+snap | jq -e '.state.sessions[0].nativeMetadata.callbackOwners == []' >/dev/null
+"$repo_root/scripts/aranea-agent-adapter" status claude | jq -e '(.state.capabilities.callbackOwnership.restartRequired|not) and .state.capabilities.callbackOwnership.legacySessions == 0' >/dev/null
+echo 'PASS delimiter-safe private ownership, forged labels and conservative legacy recovery'

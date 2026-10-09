@@ -9,7 +9,7 @@ if ($p.session_id|id|not) then error("native session identity") else . end |
 if $s.provenance != null and $proof == null then error("unproven caller")
 elif $name == "SessionStart" then
   (if $proof == null then "unconfirmed:"+$fingerprint else "process:"+([$proof.bootId,($proof.pid|tostring),$proof.startTime,$proof.commandHash]|join(":")) end) as $epoch |
-  {action:"register",args:{provider:"claude",providerSessionId:$p.session_id,producerEpoch:$epoch,tasks:[],provenance:(if $s.producerEpoch == $epoch then $s.provenance else (if $proof == null then null else $proof + {observedAt:$clock.receivedAt} end) end)},nativeMetadata:{currentTaskId:null,turns:[],observedHooks:(if $proof == null then [] else ["SessionStart"] end)}}
+  {action:"register",args:{provider:"claude",providerSessionId:$p.session_id,producerEpoch:$epoch,tasks:[],provenance:(if $s.producerEpoch == $epoch then $s.provenance else (if $proof == null then null else $proof + {observedAt:$clock.receivedAt} end) end)},nativeMetadata:{currentTaskId:null,turns:[],callbackOwners:[],observedHooks:(if $proof == null then [] else ["SessionStart"] end)}}
 elif $s == null then error("unregistered session")
 elif $s.provenance != null and ($proof == null or $proof.pid != $s.provenance.pid or $proof.startTime != $s.provenance.startTime or $proof.bootId != $s.provenance.bootId or $proof.commandHash != $s.provenance.commandHash) then error("unproven caller")
 else
@@ -21,22 +21,20 @@ else
    elif ($p.prompt_id|id) then "prompt:"+$p.prompt_id
    else null end) as $native |
   (if ($p.tool_use_id|id) then $p.tool_use_id elif ($p.prompt_id|id) then $p.prompt_id elif ($p.agent_id|id) then $p.agent_id elif ($p.task_id|id) then $p.task_id else $fingerprint end) as $identity |
-  # Resolve retained delivery/tool ownership before falling back to current turn.
-  # Strip complete fixed prefix/suffix, never split a task ID on ':' separators.
-  (if ($p.tool_use_id|id) then ["PreToolUse","PostToolUse","PostToolUseFailure"] else [$name] end) as $family |
-  ([$s.receipts[] | .eventId as $eventId | ($eventId|split(":")[0]) as $eventName |
-    select(($family|index($eventName)) != null and ($eventId|endswith(":"+$identity))) |
-    ($eventId|ltrimstr($eventName+":")|rtrimstr(":"+$identity))] +
-    (if ($p.tool_use_id|id) then [$state.tasks[] | select(.provider == "claude" and .providerSessionId == $s.providerSessionId and .producerEpoch == $s.producerEpoch and any(.blockers[];.blockerId == "tool:"+$identity)) | .taskId] else [] end) | unique) as $owners |
+  ($m|has("callbackOwners")) as $modern |
+  ([$m.callbackOwners[]? | select(.key == $callbackKey)][0] // null) as $callback |
+  ([ $callback.taskId | select(. != null) ] +
+    (if ($p.tool_use_id|id) then [$m.callbackOwners[]? | select(.toolUseId == $p.tool_use_id) | .taskId] else [] end) | unique) as $owners |
   ([$m.turns[]|select(.nativeId == $native)][0].taskId // null) as $mapped |
   if ($owners|length)>1 or ($mapped != null and ($owners|length)==1 and $mapped != $owners[0]) then error("conflicting native ownership")
+  elif ($modern|not) and $native == null and $name != "AraneaHeartbeat" then error("uncorrelated legacy callback")
   elif $mapped == null and $native != null and ($name|IN("UserPromptSubmit","SubagentStart","TaskCompleted")|not) then error("unknown native identity") else . end |
   ($owners[0] // $mapped //
     (if $name|IN("UserPromptSubmit","SubagentStart","TaskCompleted") then "claude:"+$clock.generatedId else $m.currentTaskId end) // "session") as $task |
   ([$state.tasks[]|select(.taskId == $task)][0] // null) as $old |
   $fingerprint as $fp |
-  ($name+":"+$task+":"+$identity) as $eventId |
-  ([$s.receipts[]|select(.eventId == $eventId)][0] // null) as $receipt |
+  (if $modern then $callback.eventId // ("pending:"+$callbackKey) else $name+":"+$task+":"+$identity end) as $eventId |
+  (if $modern and $callback == null then null else ([$s.receipts[]|select(.eventId == $eventId)][0] // null) end) as $receipt |
   if $old != null and ($name|IN("UserPromptSubmit","SubagentStart","TaskCompleted")) and $receipt == null then error("retained native identity outside replay window") else . end |
   ($receipt.sequence // ($s.highWaterSequence+1)) as $sequence |
   (if $name == "UserPromptSubmit" then
@@ -64,5 +62,6 @@ else
         if $old == null and .currentTaskId != null then .inactiveTaskIds = (((.inactiveTaskIds//[])+[.currentTaskId])|unique) else . end |
         if $old == null then .currentTaskId=$task else . end
       else . end else . end |
-      if $proof != null and $s.provenance != null and $name != "AraneaHeartbeat" then .observedHooks=(((.observedHooks//[])+[$name])|unique) else . end)}
+      if $proof != null and $s.provenance != null and $name != "AraneaHeartbeat" then .observedHooks=(((.observedHooks//[])+[$name])|unique) else . end |
+      if $modern and $name != "AraneaHeartbeat" then .callbackOwners = ([.callbackOwners[]|select(.key != $callbackKey)] + [{key:$callbackKey,eventId:$eventId,taskId:$task} + (if ($p.tool_use_id|id) then {toolUseId:$p.tool_use_id} else {} end)] | .[-512:]) else . end)}
 end

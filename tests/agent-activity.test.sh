@@ -364,5 +364,34 @@ native_inactivity_and_resolution_summary() {
   done
   mutate dismiss '{"taskId":"turn"}' | jq -e '.state.sessions[0].nativeMetadata.inactiveTaskIds == [] and (.state.tasks|length == 1)' >/dev/null
 }
-for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary; do run_case "$name"; done
+# Private native callback ownership validates shape/references and follows retention.
+native_callback_ownership_schema_and_pruning() {
+  register >/dev/null
+  begin >/dev/null
+  mutate register "$(jq -cn --arg cwd "$checkout" '{provider:"codex",providerSessionId:"other",producerEpoch:"other",tasks:[{taskId:"foreign",cwd:$cwd,reportedState:"working"}]}')" >/dev/null
+  jq '.sessions[0].nativeMetadata.callbackOwners=[{key:("a"*64),eventId:.sessions[0].receipts[0].eventId,taskId:"turn",toolUseId:"tool:with:colon"}]' "$registry" >"$TMPDIR/fixture"
+  mv "$TMPDIR/fixture" "$registry"
+  "$store" snapshot | jq -e '.ok' >/dev/null
+  for update in '.sessions[0].nativeMetadata.callbackOwners=null' '.sessions[0].nativeMetadata.callbackOwners=false' '.sessions[0].nativeMetadata.callbackOwners += .sessions[0].nativeMetadata.callbackOwners' '.sessions[0].nativeMetadata.callbackOwners += [.sessions[0].nativeMetadata.callbackOwners[0]+{key:("b"*64)}]' '.sessions[0].nativeMetadata.callbackOwners[0].key="bad"' '.sessions[0].nativeMetadata.callbackOwners[0].eventId="missing"' '.sessions[0].nativeMetadata.callbackOwners[0].taskId="missing"' '.sessions[0].nativeMetadata.callbackOwners[0].taskId="foreign"' '.sessions[0].nativeMetadata.callbackOwners[0].toolUseId=null' '.sessions[0].nativeMetadata.callbackOwners[0].toolUseId=("x"*181)' '.sessions[0].nativeMetadata.callbackOwners[0].extra=true' '.sessions[0].nativeMetadata.callbackOwners += [range(513)|{key:(("0"*64)+tostring|.[-64:]),eventId:("receipt"+tostring),taskId:"turn"}]'; do
+    cp "$registry" "$TMPDIR/valid"
+    jq "$update" "$registry" >"$TMPDIR/fixture"
+    mv "$TMPDIR/fixture" "$registry"
+    cp "$registry" "$TMPDIR/before"
+    if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
+    jq -e '.error.code == "ACTIVITY_INVALID"' "$TMPDIR/error" >/dev/null
+    cmp "$registry" "$TMPDIR/before"
+    mv "$TMPDIR/valid" "$registry"
+  done
+  local args
+  args=$(event current 2 snapshot "$(jq -cn --arg cwd "$checkout" '{cwd:$cwd,reportedState:"working"}')" | jq '.taskId="current"')
+  mutate report "$args" >/dev/null
+  report gone 3 disconnected >/dev/null
+  mutate dismiss '{"taskId":"turn"}' | jq -e '.state.sessions[0].nativeMetadata.callbackOwners == []' >/dev/null
+  # Actual receipt-window truncation must prune ownership referencing the evicted receipt.
+  jq '.sessions[0].nativeMetadata.callbackOwners=[{key:("b"*64),eventId:"current",taskId:"current"}] | (.sessions[0].receipts[]|select(.eventId=="current")) as $current | .sessions[0].receipts=([$current]+[range(511)|{eventId:("fixture"+tostring),sequence:3,hash:("0"*64)}])' "$registry" >"$TMPDIR/fixture"
+  mv "$TMPDIR/fixture" "$registry"
+  "$store" snapshot | jq -e '.ok' >/dev/null
+  report evict 4 heartbeat | jq -e '.state.sessions[0].nativeMetadata.callbackOwners == [] and (.state.sessions[0].receipts|length == 512)' >/dev/null
+}
+for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
 ((failures == 0))

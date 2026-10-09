@@ -124,7 +124,7 @@ agent_hooks_helper_proof() {
 
 # Allocate epoch, turn and sequence from the current locked state, including replay.
 agent_hooks_prepare_request() {
-  local request="$1" state="$2" context="$3" proof session epoch evidence fingerprint normalized candidate hash
+  local request="$1" state="$2" context="$3" proof session epoch evidence fingerprint normalized candidate hash callback_key event_digest
   [[ $(jq -r .args.provider <<<"$request") == claude ]] || return 1
   if [[ $(jq -r .args.payload.hook_event_name <<<"$request") == AraneaHeartbeat ]]; then
     session=$(jq -r .args.payload.session_id <<<"$request")
@@ -138,7 +138,21 @@ agent_hooks_prepare_request() {
     if [[ "$proof" != null ]]; then agent_hooks_validate_provenance "$proof" || return 1; fi
   fi
   fingerprint=$(jq -Sc .args.payload <<<"$request" | sha256sum | cut -d' ' -f1)
-  normalized=$(printf '%s\n%s\n%s\n%s\n' "$request" "$state" "$context" "$proof" | jq -c -s --arg fingerprint "$fingerprint" -f "$script_dir/lib/agent-hooks.jq") || return 1
+  callback_key=$(jq -Sc --arg fingerprint "$fingerprint" '
+    def native_id: type == "string" and length>0 and length<=180 and (test("[\\x00-\\x1f\\x7f]")|not);
+    .args.payload | [.hook_event_name,
+      (if .hook_event_name == "PermissionRequest" or .hook_event_name == "Notification" then "fingerprint:"+$fingerprint
+       elif (.hook_event_name|IN("PreToolUse","PostToolUse","PostToolUseFailure")) then
+         if (.tool_use_id|native_id) then "tool:"+.tool_use_id else "fingerprint:"+$fingerprint end
+       elif .hook_event_name == "TaskCompleted" and (.task_id|native_id) then "task:"+.task_id
+       elif (.agent_id|native_id) then "agent:"+.agent_id
+       elif (.prompt_id|native_id) then "prompt:"+.prompt_id
+       else "fingerprint:"+$fingerprint end)]' <<<"$request" | sha256sum | cut -d' ' -f1)
+  normalized=$(printf '%s\n%s\n%s\n%s\n' "$request" "$state" "$context" "$proof" | jq -c -s --arg fingerprint "$fingerprint" --arg callbackKey "$callback_key" -f "$script_dir/lib/agent-hooks.jq") || return 1
+  if [[ $(jq -r .args.eventId <<<"$normalized") == "pending:$callback_key" ]]; then
+    event_digest=$(jq -Sc --arg key "$callback_key" '[$key,.args.taskId]' <<<"$normalized" | sha256sum | cut -d' ' -f1)
+    normalized=$(jq -c --arg key "$callback_key" --arg eventId "$(jq -r .args.payload.hook_event_name <<<"$request"):$event_digest" '.args.eventId=$eventId | .nativeMetadata.callbackOwners |= map(if .key == $key then .eventId=$eventId else . end)' <<<"$normalized")
+  fi
   # A resolved failure replay has no remaining blocker. Only its exact retained
   # canonical receipt authorizes replay of that resolution; otherwise diagnostic.
   if [[ $(jq -r .args.payload.hook_event_name <<<"$request") == PostToolUseFailure && $(jq -r .args.kind <<<"$normalized") == diagnostic ]] && jq -e '.args.payload | (.tool_name == "AskUserQuestion" or .tool_name == "ExitPlanMode") and (.tool_use_id|type == "string" and length > 0 and length <= 180 and (test("[\\x00-\\x1f\\x7f]")|not))' <<<"$request" >/dev/null; then
