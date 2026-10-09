@@ -241,3 +241,49 @@ cp "$HOME/.claude/settings.json" "$TMPDIR/unsafe-provider"
 cmp "$HOME/.claude/settings.json" "$TMPDIR/unsafe-provider"
 grep -Fq 'scripts/aranea-agent-adapter remove claude' "$TMPDIR/uninstall-guidance"
 echo 'PASS exact native helper cleanup, provider survival and refused-cleanup guidance'
+
+# The preceding malformed-settings fixture has completed its separate assertion.
+rm -f "$HOME/.claude/settings.json"
+
+# A symlinked ownership root must never enumerate and delete its target's data.
+# Refusal also preserves any canonical activity-lock route through that link.
+for removal_scope in integration complete; do
+  base="$ARANEA_TEST_SANDBOX/symlink-$removal_scope"
+  export ARANEA_STATE_ROOT="$base/activity" ARANEA_OWNERSHIP_ROOT="$base/ownership"
+  mkdir -p "$base/target/backups"
+  printf 'unrelated user data\n' >"$base/target/keep.txt"
+  printf 'customized original\n' >"$base/target/backups/original"
+  ln -s "$base/target" "$ARANEA_OWNERSHIP_ROOT"
+  status=0
+  "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
+  [[ $(cat "$base/target/keep.txt" 2>/dev/null || true) == 'unrelated user data' ]] || {
+    echo "FAIL $removal_scope cleanup traversed symlink ownership root"
+    exit 1
+  }
+  [[ "$status" == 1 && -L "$ARANEA_OWNERSHIP_ROOT" ]]
+  [[ $(cat "$base/target/backups/original") == 'customized original' ]]
+  jq -es 'last.event=="completed" and last.status=="failed" and last.code=="ownership_state_symlink" and all(.[]; .event!="completed" or .status!="ok")' "$TMPDIR/symlink-events" >/dev/null
+  # Trailing slashes cannot turn the symlink into an accepted directory root.
+  status=0
+  ARANEA_OWNERSHIP_ROOT="$ARANEA_OWNERSHIP_ROOT///" "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
+  [[ "$status" == 1 && $(cat "$base/target/keep.txt") == 'unrelated user data' ]]
+  jq -es 'last.status=="failed" and last.code=="ownership_state_symlink"' "$TMPDIR/symlink-events" >/dev/null
+  # Ordinary symlink entries are unlinked, never recursively followed.
+  rm "$ARANEA_OWNERSHIP_ROOT"
+  mkdir -p "$ARANEA_OWNERSHIP_ROOT"
+  ln -s "$base/target" "$ARANEA_OWNERSHIP_ROOT/unrelated-link"
+  "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events"
+  [[ $(cat "$base/target/keep.txt") == 'unrelated user data' && ! -L "$ARANEA_OWNERSHIP_ROOT/unrelated-link" ]]
+  jq -es 'last.event=="completed" and last.status=="ok"' "$TMPDIR/symlink-events" >/dev/null
+  # An entry that routes activity state must remain so queued writers keep the inode.
+  mkdir -p "$ARANEA_OWNERSHIP_ROOT" "$base/routed-activity"
+  ln -s "$base/routed-activity" "$ARANEA_OWNERSHIP_ROOT/activity-route"
+  export ARANEA_STATE_ROOT="$ARANEA_OWNERSHIP_ROOT/activity-route"
+  "$repo_root/scripts/aranea-agent-store" activate >/dev/null
+  inode=$(stat -c %i "$ARANEA_STATE_ROOT/agent-activity.json.lock")
+  status=0
+  "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
+  [[ "$status" == 1 && -L "$ARANEA_STATE_ROOT" && $(stat -c %i "$ARANEA_STATE_ROOT/agent-activity.json.lock") == "$inode" ]]
+  jq -es 'last.status=="failed" and last.code=="ownership_state_symlink"' "$TMPDIR/symlink-events" >/dev/null
+  echo "PASS $removal_scope refuses symlink ownership root and unlinks only symlink entries"
+done

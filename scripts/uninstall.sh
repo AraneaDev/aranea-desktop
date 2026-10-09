@@ -222,13 +222,20 @@ remove_agent_helpers() {
 # Delete owned state while preserving the stable activity coordination inode and
 # only its ancestor directories. Existing customised-file backups retain scope.
 remove_owned_state_dir() {
-  local directory=$1 entry canonical
+  local directory=$1 entry canonical link_check=$1
+  # Test the directory entry itself, including roots supplied with trailing slashes.
+  while [[ "$link_check" == */ && "$link_check" != / ]]; do link_check=${link_check%/}; done
+  [[ ! -L "$link_check" ]] || fail_uninstall 1 ownership_state_symlink 'Refusing to traverse a symlink ownership state root during cleanup.'
   [[ -d "$directory" ]] || return 0
   for entry in "$directory"/* "$directory"/.[!.]* "$directory"/..?*; do
     [[ -e "$entry" || -L "$entry" ]] || continue
     [[ "$keep_backups" != true || ("$entry" != "$(ownership_record)" && "$entry" != "$state_root/backups") ]] || continue
     canonical=$(realpath -m -- "$entry")
-    if [[ "$canonical" == "$activity_coordination" ]]; then
+    if [[ -L "$entry" ]]; then
+      # Removing an activity-root alias would sever the stable lock's lookup path.
+      [[ "$activity_coordination" != "$canonical/"* ]] || fail_uninstall 1 ownership_state_symlink 'Refusing to remove a symlink on the activity coordination path.'
+      rm -f -- "$entry"
+    elif [[ "$canonical" == "$activity_coordination" ]]; then
       continue
     elif [[ "$activity_coordination" == "$canonical/"* && -d "$entry" && ! -L "$entry" ]]; then
       remove_owned_state_dir "$entry"
