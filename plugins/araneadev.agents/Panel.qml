@@ -1,20 +1,17 @@
-// Aranea Agents (araneadev.agents, cloned from omarchy.agents): the bar
-// button and dropdown for Claude Code, Codex and Fireworks usage. Stock's
-// root logic stays (Main's discovery and watching, the 30 s clock, the IPC
-// target, the provider selection that follows the provider id, h/l, r,
-// Enter and the up/down scrolling, self-hiding with no usage, sync and the
-// bar entry's settings handed to Main). The pure view, AgentsDropdown,
-// draws it in the shared keyboard frame from agentsView; AgentsRing on the
-// bar button shows the current agent's fullest limit window. Added: the
-// keyboard cursor (shown only while the keyboard drives it; the first key
-// only reveals it), the Refresh pill's pending state (AgentsLogic), which
-// r, Enter, the pill and IPC refresh share, and the mark probe that walks
-// the light-twin fallback for the header.
+// Agents bar and shared keyboard panel: local Tasks alongside existing Usage.
+// Usage discovery, provider selection, collectors, refresh, rings and sync stay
+// owned by Main/AgentsLogic. Tasks use read-only client snapshots and fixed owner
+// action endpoints. Injected clients and captureActive unload collectors and
+// block I/O without changing real Usage selection or remembered destinations.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "AgentsLogic.js" as AgentsLogic
+import "AgentTasksLogic.js" as TasksLogic
+import "../araneadev.activity" as Activity
+import "../araneadev.projects" as Projects
 import "../araneadev.shared" as Aranea
 
 Panel {
@@ -22,6 +19,87 @@ Panel {
   moduleName: "omarchy.agents"
   ipcTarget: "omarchy.agents"
   manageIpc: false
+
+  // Inert capture clients replace the normal observation/usage boundaries.
+  property bool captureActive: false
+  // Optional usage stand-in; collectors remain unloaded in captures.
+  property var usageClient: null
+  // Activity observer injection for offscreen fixtures.
+  property var activityClient: null
+  // Read-only project label observer injection.
+  property var projectClient: null
+  // Existing usage API, preserving discovery and selection.
+  readonly property var usage: usageClient || usageLoader.item || ({
+      enabledProviders: [],
+      agents: [],
+      dataRevision: 0,
+      pendingUpdateKind: '',
+      syncStatusText: ''
+    })
+  // Activity submissions remain owned by the persistent activity service.
+  readonly property var activity: activityClient || activityObserver
+  // Labels join exact project/checkout identities without mutating the registry.
+  readonly property var projects: projectClient || projectObserver
+  // Stable task/action context remains available after transport uncertainty.
+  property string actionTaskId: ''
+  // Fixed enum only; provider text can never become action input.
+  property string actionKind: ''
+  // Current or uncertain operation stays visible across client disconnect.
+  readonly property var taskOperation: activity.currentOperation || (actionTaskId && actionKind === 'reopen' && activity.error ? ({
+        id: activity.operationId,
+        taskId: actionTaskId,
+        action: actionKind,
+        state: 'completed',
+        outcome: 'partial',
+        submissionUnconfirmed: true,
+        error: activity.error
+      }) : null)
+  // Initial destination is Usage unless tasks require attention or have no Usage.
+  readonly property bool tasksShown: navigation.destination === 'tasks' && !agentsShowcase
+  // Attention count does not replace the existing usage ring.
+  readonly property int taskAttentionCount: tasksView.taskRows.filter(function (r) {
+    return r.attention
+  }).length
+  // Route fixed view actions through existing narrow clients only.
+  function handleTaskAction(kind, taskId) {
+    if (captureActive || agentsShowcase)
+      return
+    if (kind === 'setup') {
+      // qmllint disable missing-property
+      if (root.bar)
+        root.bar.run('omarchy-shell shell summon araneadev.settings \'{"section":"projects"}\'')
+      // qmllint enable missing-property
+      root.close()
+      return
+    }
+    var row = tasksView.taskRows.filter(function (r) {
+      return r.key === taskId
+    })[0]
+    if (!row || activity.pending)
+      return
+    var retained = tasksView.operationFor(taskId)
+    var outcome = TasksLogic.operationView(retained, activity.error, activity.pending)
+    if (kind === 'reconnect' || kind === 'reobserve') {
+      if (!retained || !retained.id)
+        return
+      if (kind === 'reconnect' && outcome.canReconnect)
+        activity.reconnect(retained.id)
+      else if (kind === 'reobserve' && outcome.canReobserve && activity.operationId === retained.id)
+        activity.reobserve()
+      return
+    }
+    if (outcome.protected)
+      return
+    actionTaskId = taskId
+    actionKind = kind
+    if (kind === 'dismiss' && row.canDismiss)
+      activity.dismiss(taskId)
+    else if (kind === 'open-checkout' && row.assigned || kind === row.primary.kind && kind)
+      activity.request({
+        action: kind,
+        taskId: taskId
+      })
+  }
 
   // The popup's background colour, for picking a light or dark mark.
   readonly property color surface: Color.popups.background
@@ -164,6 +242,8 @@ Panel {
 
   // Forces every collector to re-run now, ignoring refreshIntervalSec.
   function refreshNow() {
+    if (root.captureActive)
+      return
     usage.refreshAll(true)
   }
 
@@ -200,7 +280,7 @@ Panel {
   // already pending. Refused while showcasing: the stand-ins are display
   // only.
   function requestRefresh() {
-    if (root.agentsShowcase)
+    if (root.captureActive || root.agentsShowcase)
       return
     var r = AgentsLogic.refreshClick(root.refreshPending, Date.now())
     root.refreshPending = r.state
@@ -210,7 +290,7 @@ Panel {
 
   // Runs the agent picker and closes the panel; refused while showcasing.
   function launchAgent() {
-    if (root.agentsShowcase)
+    if (root.captureActive || root.agentsShowcase)
       return
     // The bar is a plain QtObject to qmllint; run() is the bar's own.
     // qmllint disable missing-property
@@ -721,7 +801,7 @@ Panel {
   // Nothing to report, nothing in the bar: Bar.qml collapses a slot whose item
   // is invisible, so the icon appears the moment the first scan finds usage and
   // stays away entirely on a machine that has never run either CLI.
-  visible: providers.length > 0
+  visible: TasksLogic.visible(providers.length, tasksView.taskRows)
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -736,24 +816,53 @@ Panel {
     }).showcase
     details = AgentsLogic.detailsForProvider(details, detailsProviderId, displayedProviderId, false)
     cursorKey = "refresh"
+    tasksView.disarmCursor()
     if (!opened)
       return
     cursorActive = false
     keyboardCursor = false
     nowMs = Date.now()
     dropdown.scrollToTop()
-    usage.refreshLimits()
+    if (!captureActive) {
+      usage.refreshLimits()
+      activity.refresh()
+      projects.refresh()
+    }
   }
 
   // The refresh landing baseline is taken here, before any click, so the
   // first refresh waits for a real change rather than the first revision.
   Component.onCompleted: root.noteRecords()
 
-  Main {
-    id: usage
-    settings: root.settings
-    onDataRevisionChanged: root.noteRecords()
-    onPendingUpdateKindChanged: root.notePendingKind()
+  Loader {
+    id: usageLoader
+    objectName: "agentUsageLoader"
+    active: !root.captureActive && !root.usageClient
+    sourceComponent: Component {
+      Main {
+        settings: root.settings
+        onDataRevisionChanged: root.noteRecords()
+        onPendingUpdateKindChanged: root.notePendingKind()
+      }
+    }
+  }
+  Activity.ActivityClient {
+    id: activityObserver
+    captureActive: root.captureActive || !!root.activityClient || !!root.agentsShowcase
+  }
+  Projects.ProjectClient {
+    id: projectObserver
+    captureActive: root.captureActive || !!root.projectClient || !!root.agentsShowcase
+  }
+  Timer {
+    interval: 5000
+    running: !root.captureActive && !root.agentsShowcase
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: {
+      root.activity.refresh()
+      root.projects.refresh()
+    }
   }
 
   // Cheap enough to keep running: it only re-evaluates text bindings, and a
@@ -841,7 +950,7 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: String.fromCodePoint(0xF16A3)
-    active: root.alarming
+    active: root.alarming || root.taskAttentionCount > 0
     onPressed: function (buttonCode) {
       root.keyboardCursor = false
       if (buttonCode === Qt.RightButton)
@@ -850,6 +959,19 @@ Panel {
         root.selectProvider(root.providerIndex + 1)
       else
         root.toggle()
+    }
+
+    Text {
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      text: tasksView.taskRows.length ? String(tasksView.taskRows.length) : ''
+      textFormat: Text.PlainText
+      // Host caption token is a dynamic QObject property.
+      // qmllint disable missing-property
+      font.pixelSize: Style.font.caption
+      // qmllint enable missing-property
+      color: root.taskAttentionCount ? Aranea.DesignTokens.attention : Aranea.DesignTokens.foreground
+      opacity: root.taskAttentionCount ? 1 : 0.6
     }
 
     // Display only, drawn over the glyph slot: no layout change and no
@@ -874,14 +996,25 @@ Panel {
     bar: root.bar
     open: root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
-    onCloseRequested: root.close()
+    contentHeight: panel.fittedContentHeight(content.implicitHeight)
+    onCloseRequested: {
+      if (root.tasksShown && tasksView.selectedId)
+        tasksView.back()
+      else
+        root.close()
+    }
     onTabRequested: function (direction) {
       dropdown.disarmPointer()
-      root.switchPanel(direction)
+      navigation.cycle()
+      tasksView.disarmCursor()
+      root.keyboardCursor = false
     }
     onMoveRequested: function (dx, dy) {
       dropdown.disarmPointer()
+      if (root.tasksShown) {
+        tasksView.navigate(dy || dx)
+        return
+      }
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
       if (!root.cursorActive || !root.keyboardCursor) {
@@ -895,10 +1028,20 @@ Panel {
     }
     onActivateRequested: {
       dropdown.disarmPointer()
-      root.moveCursor(0)
+      if (root.tasksShown)
+        tasksView.navigate(0)
+      else
+        root.moveCursor(0)
     }
     onTextKey: function (t) {
       dropdown.disarmPointer()
+      if (root.tasksShown) {
+        if (t === "j" || t === "k")
+          tasksView.navigate(t === "j" ? 1 : -1)
+        else if (t === "r" || t === "R")
+          root.activity.refresh()
+        return
+      }
       if (t === "r" || t === "R") {
         root.keyboardCursor = true
         root.requestRefresh()
@@ -909,13 +1052,47 @@ Panel {
       anchors.fill: parent
       clip: true
 
-      AgentsDropdown {
-        id: dropdown
+      Column {
+        id: content
         width: parent.width
-        maxHeight: panel.availableCardHeight > 0 ? Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) : Style.space(640)
-        view: root.agentsView
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        spacing: Style.space(12)
+        AgentTaskNavigation {
+          id: navigation
+          objectName: "agentNavigation"
+          width: parent.width
+          visible: !root.agentsShowcase
+          taskRows: tasksView.taskRows
+          usageCount: root.providers.length
+          onAction: function (kind, taskId) {
+            tasksView.disarmCursor()
+            root.keyboardCursor = false
+          }
+        }
+        AgentTasks {
+          id: tasksView
+          objectName: "agentTasks"
+          width: parent.width
+          visible: root.tasksShown
+          captureActive: root.captureActive
+          snapshot: root.activity.snapshot
+          projectSnapshot: root.projects.snapshot
+          error: root.activity.error || root.activity.snapshot.error
+          pending: root.activity.pending
+          operation: root.taskOperation
+          maxHeight: panel.availableCardHeight > 0 ? Math.max(Style.space(80), Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) - navigation.height - content.spacing) : Style.space(580)
+          onAction: function (kind, taskId) {
+            root.handleTaskAction(kind, taskId)
+          }
+        }
+        AgentsDropdown {
+          id: dropdown
+          visible: !root.tasksShown
+          width: parent.width
+          maxHeight: panel.availableCardHeight > 0 ? Math.max(Style.space(80), Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) - (navigation.visible ? navigation.height + content.spacing : 0)) : Style.space(580)
+          view: root.agentsView
+          onAction: function (name, arg) {
+            root.handleAction(name, arg)
+          }
         }
       }
     }

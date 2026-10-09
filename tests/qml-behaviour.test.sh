@@ -58,7 +58,17 @@ run_test() {
   mkdir -p "$run_dir/cfg/plugins" "$run_dir/run"
   chmod 700 "$run_dir/run"
   ln -s "$shell_dir/Commons" "$run_dir/cfg/Commons"
-  ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
+  if [[ "$name" == agent-tasks-panel ]]; then
+    # Replace only the native PanelWindow boundary; production content stays real.
+    mkdir -p "$run_dir/cfg/Ui"
+    for plugin in "$shell_dir"/Ui/*; do
+      [[ "${plugin##*/}" == KeyboardPanel.qml ]] && continue
+      ln -s "$plugin" "$run_dir/cfg/Ui/${plugin##*/}"
+    done
+    cp "$repo_root/tests/qml/fixtures/agent-panel-host/KeyboardPanel.qml" "$run_dir/cfg/Ui/KeyboardPanel.qml"
+  else
+    ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
+  fi
   ln -s "$repo_root/tests/qml/lib" "$run_dir/cfg/lib"
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
