@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Read-only /proc proof for a detached project's process identities and descendants.
+# Usage: aranea-project-identity (reads {launch:{pid,startTime},pid,startTime?,known?} JSON stdin)
+set -euo pipefail
+command -v jq >/dev/null || {
+  echo '{"ok":false,"verified":false,"closed":false}'
+  exit 4
+}
+request=$(jq -cs 'if length==1 then .[0] else error("one request required") end' 2>/dev/null) || exit 2
+jq -e '.launch.pid | type=="number" and floor==. and .>0' <<<"$request" >/dev/null || exit 2
+jq -e '.launch.startTime | type=="string" and test("^[0-9]+$")' <<<"$request" >/dev/null || exit 2
+jq -e '.pid | type=="number" and floor==. and .>0' <<<"$request" >/dev/null || exit 2
+launch_pid=$(jq -r .launch.pid <<<"$request")
+launch_start=$(jq -r .launch.startTime <<<"$request")
+target_pid=$(jq -r .pid <<<"$request")
+target_start=$(jq -r '.startTime // ""' <<<"$request")
+# Read stat fields after the final closing parenthesis; command names may contain spaces.
+read_identity() {
+  local proc_pid=$1 proc_line proc_tail
+  [[ "$proc_pid" =~ ^[1-9][0-9]*$ && -r "/proc/$proc_pid/stat" ]] || return 1
+  { IFS= read -r proc_line <"/proc/$proc_pid/stat"; } 2>/dev/null || return 1
+  proc_tail=${proc_line##*) }
+  read -r -a fields <<<"$proc_tail"
+  [[ ${fields[0]:-Z} != Z && ${fields[19]:-} =~ ^[0-9]+$ ]] || return 1
+  proc_start=${fields[19]}
+  proc_parent=${fields[1]}
+  proc_session=${fields[3]}
+}
+root_alive=false
+if read_identity "$launch_pid" && [[ "$proc_start" == "$launch_start" ]]; then root_alive=true; fi
+verified=false
+observed_start=''
+if read_identity "$target_pid"; then
+  observed_start=$proc_start
+  if [[ -n "$target_start" && "$target_start" == "$observed_start" ]]; then
+    # A supplied target start-time belongs to a previously proven session binding.
+    verified=true
+  elif [[ "$root_alive" == true ]]; then
+    cursor=$target_pid
+    for ((depth = 0; depth < 128; depth++)); do
+      if [[ "$cursor" == "$launch_pid" ]]; then
+        verified=true
+        break
+      fi
+      read_identity "$cursor" || break
+      cursor=$proc_parent
+      [[ "$cursor" -gt 1 ]] || break
+    done
+  fi
+fi
+# Every remaining member of the detached session prevents confirmed closure,
+# including descendants that have been reparented after the launcher exited.
+processes='[]'
+declare -A process_parents=() process_starts=() process_sessions=()
+for proc_dir in /proc/[0-9]*; do
+  candidate=${proc_dir##*/}
+  if read_identity "$candidate"; then
+    process_parents[$candidate]=$proc_parent
+    process_starts[$candidate]=$proc_start
+    process_sessions[$candidate]=$proc_session
+  fi
+done
+for candidate in "${!process_starts[@]}"; do
+  owned=false
+  if [[ ${process_sessions[$candidate]} == "$launch_pid" ]] && ((${process_starts[$candidate]} >= launch_start)); then
+    owned=true
+  elif [[ "$root_alive" == true ]]; then
+    cursor=$candidate
+    for ((depth = 0; depth < 128; depth++)); do
+      if [[ "$cursor" == "$launch_pid" ]]; then
+        owned=true
+        break
+      fi
+      cursor=${process_parents[$cursor]:-0}
+      [[ "$cursor" -gt 1 ]] || break
+    done
+  fi
+  if [[ "$owned" == true ]]; then
+    processes=$(jq -cn --argjson list "$processes" --argjson pid "$candidate" --arg start "${process_starts[$candidate]}" '$list+[{pid:$pid,startTime:$start}]')
+  fi
+done
+# Retain previously observed descendants even if they created another session.
+while IFS=$'\t' read -r known_pid known_start; do
+  [[ -n "$known_pid" ]] || continue
+  if read_identity "$known_pid" && [[ "$proc_start" == "$known_start" ]]; then
+    processes=$(jq -cn --argjson list "$processes" --argjson pid "$known_pid" --arg start "$known_start" '$list+[{pid:$pid,startTime:$start}] | unique_by(.pid)')
+  fi
+done < <(jq -r '.known[]? | [.pid,.startTime] | @tsv' <<<"$request")
+closed=false
+if [[ "$root_alive" == false && "$verified" == false ]] && jq -e 'length==0' <<<"$processes" >/dev/null; then closed=true; fi
+jq -cn --argjson verified "$verified" --arg start "$observed_start" --argjson root "$root_alive" --argjson processes "$processes" --argjson closed "$closed" '{ok:true,verified:$verified,startTime:$start,rootAlive:$root,processes:$processes,closed:$closed}'

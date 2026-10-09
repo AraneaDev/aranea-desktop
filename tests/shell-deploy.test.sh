@@ -42,7 +42,7 @@ done
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
 
 jq -e '.bar.id == "araneadev.bar"' "$config_dir/shell.json" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.settings", "araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.projects", "araneadev.settings", "araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
 
 # A settings plugin missing from the target is deployed and registered; the
 # unrelated plugin and its inline settings survive deployment/release/return.
@@ -70,3 +70,12 @@ out="$("$repo_root/scripts/deploy-plugin" 2>&1)" || rc=$?
 grep -Fq 'Usage: scripts/deploy-plugin <source-dir> <target-dir>' <<<"$out"
 
 echo "shell deployment lifecycle contract passed"
+
+# The owner deploys with its supported keep-loaded menu manifest and survives return.
+test -f "$plugins_dir/araneadev.projects/Projects.qml"
+jq -e '.kinds == ["menu"] and .keepLoaded and .entryPoints.menu == "Projects.qml"' "$plugins_dir/araneadev.projects/manifest.json" >/dev/null
+jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1' "$config_dir/shell.json" >/dev/null
+"$repo_root/scripts/release-shell-config" "$config_dir/shell.json"
+jq -e '([.plugins[].id]|index("araneadev.projects"))==null' "$config_dir/shell.json" >/dev/null
+"$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
+jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1' "$config_dir/shell.json" >/dev/null

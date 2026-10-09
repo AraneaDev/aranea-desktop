@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "araneadev.projects",
+  "name": "Aranea projects",
+  "version": "1.0.0",
+  "author": "AraneaDev",
+  "description": "Persistent development project workspace operations",
+  "kinds": ["menu"],
+  "keepLoaded": true,
+  "entryPoints": { "menu": "Projects.qml" }
+}
