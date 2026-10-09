@@ -54,7 +54,7 @@ agent_adapters_main() {
     return 1
   }
   local action="$1" config="$HOME/.claude/settings.json" command content='{}' observed='[]' state='null' executable='' tmp='' mode=600
-  [[ "$HOME" == /* && ! "$HOME" =~ [[:cntrl:]] && ! -L "$HOME/.claude" && ! -L "$config" && ! -L "$config.aranea.lock" ]] || {
+  [[ "$HOME" == /* && ! "$HOME" =~ [[:cntrl:]] && ! -L "$HOME/.claude" && ! -L "$config" && ! -L "$config.aranea.lock" && (! -e "$config.aranea.lock" || -f "$config.aranea.lock") ]] || {
     agent_adapters_error UNSAFE_CONFIG_PATH 'Claude settings directory, file and lock must be safe regular paths.'
     return 1
   }
@@ -68,7 +68,14 @@ agent_adapters_main() {
       agent_adapters_error ADAPTER_WRITE_FAILED 'Cannot create Claude settings directory.'
       return 1
     }
-    exec {adapter_lock_fd}>"$config.aranea.lock"
+    [[ ! -L "$config.aranea.lock" && (! -e "$config.aranea.lock" || -f "$config.aranea.lock") ]] || {
+      agent_adapters_error UNSAFE_CONFIG_PATH 'Claude settings lock must be a regular file.'
+      return 1
+    }
+    if ! { exec {adapter_lock_fd}>"$config.aranea.lock"; } 2>/dev/null; then
+      agent_adapters_error ADAPTER_LOCK_FAILED 'Cannot open Claude settings lock.'
+      return 1
+    fi
     flock -w 1 -x "$adapter_lock_fd" || {
       agent_adapters_error ADAPTER_LOCK_FAILED 'Claude settings are busy.'
       return 1

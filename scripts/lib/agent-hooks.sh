@@ -112,8 +112,9 @@ agent_hooks_helper_proof() {
       ${argv[2]} == "$provider" && ${argv[3]} == "$session" && ${argv[4]} == "$epoch" &&
       ${argv[5]} == "$(jq -r .pid <<<"$evidence")" && ${argv[6]} == "$provider_start" && ${argv[7]} == "$(jq -r .bootId <<<"$evidence")" ]]; then
       [[ $(readlink -f -- "/proc/$pid/exe") == "$(readlink -f /bin/bash)" ]] || return 1
-      jq -e --argjson pid "$pid" --arg start "$start" --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" --argjson evidence "$evidence" '.pid == $pid and .startTime == $start and .provider == $provider and .providerSessionId == $session and .producerEpoch == $epoch and .providerProcess.pid == $evidence.pid and .providerProcess.startTime == $evidence.startTime and .bootId == $evidence.bootId' "$identity" >/dev/null || return 1
-      return 0
+      # Command substitutions can retain helper argv in an intermediate shell.
+      # Only the PID/start-time owner record identifies the actual helper.
+      if jq -e --argjson pid "$pid" --arg start "$start" --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" --argjson evidence "$evidence" '.pid == $pid and .startTime == $start and .provider == $provider and .providerSessionId == $session and .producerEpoch == $epoch and .providerProcess.pid == $evidence.pid and .providerProcess.startTime == $evidence.startTime and .bootId == $evidence.bootId' "$identity" >/dev/null; then return 0; fi
     fi
     pid=$parent
     count=$((count + 1))

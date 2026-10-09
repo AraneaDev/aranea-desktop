@@ -135,6 +135,18 @@ snap | jq -e 'any(.state.sessions[0].receipts[];.eventId|startswith("AraneaHeart
 if rg -q 'PRIVATE PROVIDER ARGV' "$ARANEA_STATE_ROOT/agent-activity.json" "$ARANEA_STATE_ROOT/agent-heartbeats"; then exit 1; fi
 "$repo_root/scripts/aranea-agent-adapter" status claude | jq -e '.state.connectionProven and .state.enabled == "unconfirmed"' >/dev/null
 epoch=$(snap | jq -r .state.sessions[0].producerEpoch)
+# A single missed tick due to contention must keep ownership and recover receipts.
+heartbeat_before=$(snap | jq '[.state.sessions[0].receipts[]|select(.eventId|startswith("AraneaHeartbeat:"))]|length')
+flock "$ARANEA_STATE_ROOT/agent-activity.json.lock" -c 'sleep 18'
+kill -0 "$provider_pid"
+[[ $(jq -r .pid "$ARANEA_STATE_ROOT"/agent-heartbeats/*.json) == "$helper_pid" ]]
+for _ in {1..170}; do
+  if snap | jq -e --argjson before "$heartbeat_before" '[.state.sessions[0].receipts[]|select(.eventId|startswith("AraneaHeartbeat:"))]|length > $before' >/dev/null; then break; fi
+  sleep .1
+done
+snap | jq -e --argjson before "$heartbeat_before" '[.state.sessions[0].receipts[]|select(.eventId|startswith("AraneaHeartbeat:"))]|length > $before' >/dev/null
+[[ $(jq -r .pid "$ARANEA_STATE_ROOT"/agent-heartbeats/*.json) == "$helper_pid" ]]
+echo 'PASS transient lock contention retains singleton and accepted heartbeat recovers'
 # A direct fabricated native heartbeat cannot borrow the real provider's proof.
 cp "$ARANEA_STATE_ROOT/agent-activity.json" "$TMPDIR/before"
 if jq -cn --arg epoch "$epoch" '{action:"native",args:{provider:"claude",caller:null,payload:{hook_event_name:"AraneaHeartbeat",session_id:"owned",producer_epoch:$epoch}}}' | "$store" mutate >"$TMPDIR/error"; then exit 1; fi
@@ -255,3 +267,38 @@ deliver '{"prompt":"No native turn ID","hook_event_name":"UserPromptSubmit"}'
 cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
 "$repo_root/scripts/aranea-agent-adapter" status claude | jq -e '.state.capabilities.duplicateDelivery|contains("unavailable-without-prompt_id")' >/dev/null
 echo 'PASS canonical no-ID replay and explicit duplicate-certainty limitation'
+
+# Retained callbacks keep their original native turn even after currentTaskId changes.
+rm -rf "$ARANEA_STATE_ROOT"
+deliver '{"hook_event_name":"SessionStart"}'
+deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"first","prompt":"First turn"}'
+# Valid retained task IDs may contain separators; correlation must preserve them.
+jq '.tasks[0].taskId="fixture:main:with:colons" | .sessions[0].nativeMetadata.currentTaskId="fixture:main:with:colons" | .sessions[0].nativeMetadata.turns[0].taskId="fixture:main:with:colons"' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/colon-task"
+mv "$TMPDIR/colon-task" "$ARANEA_STATE_ROOT/agent-activity.json"
+deliver '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"unique-old-tool","tool_input":{"questions":[{"question":"Old question?"}]}}'
+deliver '{"hook_event_name":"PreToolUse","tool_name":"ExitPlanMode","tool_use_id":"old-plan","tool_input":{}}'
+deliver '{"hook_event_name":"Stop","last_assistant_message":"First turn result"}'
+deliver '{"hook_event_name":"UserPromptSubmit","prompt_id":"second","prompt":"Second turn"}'
+cp "$ARANEA_STATE_ROOT/agent-activity.json" "$TMPDIR/turn-before"
+deliver '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"unique-old-tool","tool_input":{"questions":[{"question":"Old question?"}]}}'
+cmp "$TMPDIR/turn-before" "$ARANEA_STATE_ROOT/agent-activity.json"
+deliver '{"hook_event_name":"Stop","last_assistant_message":"First turn result"}'
+cmp "$TMPDIR/turn-before" "$ARANEA_STATE_ROOT/agent-activity.json"
+# Exact retained replay succeeds at the store transport, not only silent wrapper.
+jq -cn --arg cwd "$checkout" '{action:"native",args:{provider:"claude",caller:null,payload:{session_id:"fixture",cwd:$cwd,hook_event_name:"Stop",last_assistant_message:"First turn result"}}}' | "$store" mutate | jq -e '.ok' >/dev/null
+cmp "$TMPDIR/turn-before" "$ARANEA_STATE_ROOT/agent-activity.json"
+# Changed reuse and a contradictory explicit turn cannot rewrite either task.
+for payload in '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","tool_use_id":"unique-old-tool","tool_input":{"questions":[{"question":"Changed question"}]}}' '{"hook_event_name":"PostToolUse","prompt_id":"second","tool_name":"AskUserQuestion","tool_use_id":"unique-old-tool"}'; do
+  jq -cn --arg cwd "$checkout" --argjson p "$payload" '{action:"native",args:{provider:"claude",caller:null,payload:($p+{session_id:"fixture",cwd:$cwd})}}' | "$store" mutate >"$TMPDIR/error" 2>"$TMPDIR/err" && exit 1
+  jq -e '.ok == false and (.error.code == "ADAPTER_UNSUPPORTED" or .error.code == "EVENT_ID_CONFLICT")' "$TMPDIR/error" >/dev/null
+  cmp "$TMPDIR/turn-before" "$ARANEA_STATE_ROOT/agent-activity.json"
+done
+# First late results use the tool identity established by earlier PreToolUse.
+deliver '{"hook_event_name":"PostToolUse","tool_name":"AskUserQuestion","tool_use_id":"unique-old-tool"}'
+deliver '{"hook_event_name":"PostToolUseFailure","tool_name":"ExitPlanMode","tool_use_id":"old-plan","error":"Old tool cancelled"}'
+snap | jq -e '.state.tasks | any(.[];.description == "Second turn" and .reportedState == "working" and .result == "" and .question == "" and (.diagnostics|length == 0)) and any(.[];.description == "First turn" and .freshness == "connection-lost" and (.blockers|length == 0) and .diagnostics[-1].summary == "Old tool cancelled")' >/dev/null
+cp "$ARANEA_STATE_ROOT/agent-activity.json" "$TMPDIR/turn-before"
+deliver '{"hook_event_name":"PostToolUseFailure","tool_name":"ExitPlanMode","tool_use_id":"old-plan","error":"Old tool cancelled"}'
+cmp "$TMPDIR/turn-before" "$ARANEA_STATE_ROOT/agent-activity.json"
+snap | jq -e '[.state.sessions[0].receipts[]|select(.eventId|startswith("PreToolUse:"))]|length == 2' >/dev/null
+echo 'PASS retained native tool/lifecycle replay and first late results preserve original turn'

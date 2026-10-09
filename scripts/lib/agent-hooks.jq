@@ -20,11 +20,22 @@ else
    elif $name == "UserPromptSubmit" then "prompt:"+(if ($p.prompt_id|id) then $p.prompt_id else "unconfirmed:"+$fingerprint end)
    elif ($p.prompt_id|id) then "prompt:"+$p.prompt_id
    else null end) as $native |
-  ([$m.turns[]|select(.nativeId == $native)][0].taskId //
-    (if $name|IN("UserPromptSubmit","SubagentStart","TaskCompleted") then "claude:"+$clock.generatedId elif $native != null then error("unknown native identity") else $m.currentTaskId end) // "session") as $task |
+  (if ($p.tool_use_id|id) then $p.tool_use_id elif ($p.prompt_id|id) then $p.prompt_id elif ($p.agent_id|id) then $p.agent_id elif ($p.task_id|id) then $p.task_id else $fingerprint end) as $identity |
+  # Resolve retained delivery/tool ownership before falling back to current turn.
+  # Strip complete fixed prefix/suffix, never split a task ID on ':' separators.
+  (if ($p.tool_use_id|id) then ["PreToolUse","PostToolUse","PostToolUseFailure"] else [$name] end) as $family |
+  ([$s.receipts[] | .eventId as $eventId | ($eventId|split(":")[0]) as $eventName |
+    select(($family|index($eventName)) != null and ($eventId|endswith(":"+$identity))) |
+    ($eventId|ltrimstr($eventName+":")|rtrimstr(":"+$identity))] +
+    (if ($p.tool_use_id|id) then [$state.tasks[] | select(.provider == "claude" and .providerSessionId == $s.providerSessionId and .producerEpoch == $s.producerEpoch and any(.blockers[];.blockerId == "tool:"+$identity)) | .taskId] else [] end) | unique) as $owners |
+  ([$m.turns[]|select(.nativeId == $native)][0].taskId // null) as $mapped |
+  if ($owners|length)>1 or ($mapped != null and ($owners|length)==1 and $mapped != $owners[0]) then error("conflicting native ownership")
+  elif $mapped == null and $native != null and ($name|IN("UserPromptSubmit","SubagentStart","TaskCompleted")|not) then error("unknown native identity") else . end |
+  ($owners[0] // $mapped //
+    (if $name|IN("UserPromptSubmit","SubagentStart","TaskCompleted") then "claude:"+$clock.generatedId else $m.currentTaskId end) // "session") as $task |
   ([$state.tasks[]|select(.taskId == $task)][0] // null) as $old |
   $fingerprint as $fp |
-  ($name+":"+$task+":"+(if ($p.tool_use_id|id) then $p.tool_use_id elif ($p.prompt_id|id) then $p.prompt_id elif ($p.agent_id|id) then $p.agent_id elif ($p.task_id|id) then $p.task_id else $fp end)) as $eventId |
+  ($name+":"+$task+":"+$identity) as $eventId |
   ([$s.receipts[]|select(.eventId == $eventId)][0] // null) as $receipt |
   if $old != null and ($name|IN("UserPromptSubmit","SubagentStart","TaskCompleted")) and $receipt == null then error("retained native identity outside replay window") else . end |
   ($receipt.sequence // ($s.highWaterSequence+1)) as $sequence |

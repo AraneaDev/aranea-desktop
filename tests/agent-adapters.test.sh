@@ -34,6 +34,31 @@ rm "$config"
 ln -s "$TMPDIR/original" "$config"
 if "$adapter" install claude >"$TMPDIR/error"; then exit 1; fi
 jq -e '.error.code == "UNSAFE_CONFIG_PATH"' "$TMPDIR/error" >/dev/null
+# Lock acquisition failures retain the public JSON envelope and settings bytes.
+rm "$config"
+cp "$TMPDIR/original" "$config"
+lock="$config.aranea.lock"
+rm -f "$lock"
+mkdir "$lock"
+if "$adapter" install claude >"$TMPDIR/error" 2>"$TMPDIR/err"; then exit 1; fi
+jq -e '.ok == false and .state == null and .error.code == "UNSAFE_CONFIG_PATH"' "$TMPDIR/error" >/dev/null
+[[ ! -s "$TMPDIR/err" ]]
+cmp "$config" "$TMPDIR/original"
+rmdir "$lock"
+mkfifo "$lock"
+if /usr/bin/timeout 2 "$adapter" install claude >"$TMPDIR/error" 2>"$TMPDIR/err"; then exit 1; fi
+jq -e '.ok == false and .error.code == "UNSAFE_CONFIG_PATH"' "$TMPDIR/error" >/dev/null
+[[ ! -s "$TMPDIR/err" ]]
+rm "$lock"
+touch "$lock"
+chmod 400 "$lock"
+if [[ ! -w "$lock" ]]; then
+  if "$adapter" install claude >"$TMPDIR/error" 2>"$TMPDIR/err"; then exit 1; fi
+  jq -e '.ok == false and .state == null and .error.code == "ADAPTER_LOCK_FAILED"' "$TMPDIR/error" >/dev/null
+  [[ ! -s "$TMPDIR/err" ]]
+  cmp "$config" "$TMPDIR/original"
+fi
+chmod 600 "$lock"
 echo 'PASS owned merge, idempotence, permissions, mode, malformed and symlink protection'
 # Removal preserves siblings in the same owned matcher group and unrelated empties.
 rm "$config"
@@ -56,9 +81,15 @@ cp /bin/bash "$ARANEA_TEST_SANDBOX/provider/claude"
 jq -cn '{session_id:"optional-owned",hook_event_name:"SessionStart",cwd:"/tmp"}, {session_id:"optional-owned",hook_event_name:"UserPromptSubmit",prompt_id:"one",prompt:"Owned optional",cwd:"/tmp"}' >"$TMPDIR/native-events"
 cat >"$TMPDIR/provider.sh" <<'PROVIDER'
 #!/bin/bash
+set -euo pipefail
 while IFS= read -r event; do printf '%s\n' "$event" | /bin/bash "$1" claude; done <"$2"
 # Public report IDs cannot manufacture a native optional observation.
-/bin/bash "${1%/*}/aranea-agent-store" snapshot | jq -c '.state.sessions[] | select(.providerSessionId == "optional-owned") | {action:"report",args:{schemaVersion:1,eventId:"SubagentStop:forged:receipt",provider:"claude",providerSessionId:.providerSessionId,producerEpoch:.producerEpoch,sequence:(.highWaterSequence+1),taskId:.nativeMetadata.currentTaskId,kind:"diagnostic",payload:{summary:"Explicit report"}}}' | /bin/bash "${1%/*}/aranea-agent-store" mutate | jq -e '.ok' >/dev/null
+for _ in {1..10}; do
+  if snapshot=$(/bin/bash "${1%/*}/aranea-agent-store" snapshot); then break; fi
+  sleep .1
+done
+jq -e '.ok and any(.state.sessions[];.providerSessionId == "optional-owned" and .nativeMetadata.currentTaskId != null)' <<<"$snapshot" >/dev/null
+jq -c '.state.sessions[] | select(.providerSessionId == "optional-owned") | {action:"report",args:{schemaVersion:1,eventId:"SubagentStop:forged:receipt",provider:"claude",providerSessionId:.providerSessionId,producerEpoch:.producerEpoch,sequence:(.highWaterSequence+1),taskId:.nativeMetadata.currentTaskId,kind:"diagnostic",payload:{summary:"Explicit report"}}}' <<<"$snapshot" | /bin/bash "${1%/*}/aranea-agent-store" mutate | jq -e '.ok' >/dev/null
 /bin/bash "$3" status claude | jq -e 'all(.state.capabilities.optionalHooks[];.runtimeObserved == false and .available == false)' >/dev/null
 touch "$4.ready"
 while [[ ! -e "$4.go" ]]; do sleep .05; done

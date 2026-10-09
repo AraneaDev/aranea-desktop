@@ -287,7 +287,10 @@ structured activity reports remain the fallback.
 A prompt's first nonblank line supplies its label, limited to 160 characters;
 full prompts, tool arguments and provider argv are not persisted. Native prompt,
 tool, agent and task identities provide correlation. Canonical no-ID deliveries
-provide exact replay within the retained 512 receipts, but native turn identity
+provide exact replay within the retained 512 receipts. Retained callbacks use their
+original task and sequence, including no-ID lifecycle replay across main turns.
+Tool results follow the task established by their native tool ID; contradictory
+turn identities or changed reuse of an event ID are refused. Native turn identity
 and duplicate-delivery certainty are unavailable without `prompt_id`.
 PermissionRequest has no native tool ID, so permission resolution stays
 unconfirmed. Matching AskUserQuestion/ExitPlanMode results resolve only their
@@ -305,6 +308,9 @@ hook-observation evidence.
 
 The private heartbeat runs once per proven process epoch, updates connection
 receipts every 15 seconds, and exits on provider identity, session or epoch loss.
+Transient store or lock failures retain the same helper and retry at the bounded
+15-second cadence, with current process identity revalidated on every attempt.
+Only definitive process, session, epoch or ownership loss ends the helper.
 It never terminates the provider. Helper ownership lives in private
 `$(aranea_state_root)/agent-heartbeats/` identity files; there is no sequence
 sidecar. Provenance stores an absolute executable identity and a SHA256 command
