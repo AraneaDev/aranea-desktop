@@ -205,7 +205,9 @@ projects_cli_capabilities() {
 ]
 JSON
   )
-  projects_cli_finish observed '' 'Project capabilities.' "$(jq -cn --argjson operations "$schemas" --argjson dependencies "$dependencies" --argjson tools "$tools" --argjson owner "$owner" '{operations:$operations,availability:{dependencies:$dependencies,tools:$tools,owner:$owner}}')"
+  local activity
+  activity=$(agents_cli_capabilities)
+  projects_cli_finish observed '' 'Aranea capabilities.' "$(jq -cn --argjson activity "$activity" --argjson operations "$schemas" --argjson dependencies "$dependencies" --argjson tools "$tools" --argjson owner "$owner" '{operations:($operations+$activity.operations),activity:$activity.activity,availability:{dependencies:$dependencies,tools:$tools,owner:$owner}}')"
 }
 
 # Parse all public syntax before crossing registry or desktop boundaries.

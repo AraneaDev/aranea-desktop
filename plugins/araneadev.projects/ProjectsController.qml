@@ -412,6 +412,22 @@ Item {
   }
   // Normalize a stable checkout key before accepting or coalescing public work.
   function request(payload: var): var {
+    return acceptRequest(payload, false)
+  }
+  // Activity prepares only the registered workspace, without application choices or launches.
+  function prepareWorkspaceRequest(payload: var): var {
+    if (!payload || Object.keys(payload).some(function (key) {
+      return ['projectId', 'checkoutId'].indexOf(key) < 0
+    }) || !payload.checkoutId)
+      return {
+        ok: false,
+        operationId: null,
+        error: failure('INVALID_REQUEST', 'Choose exact registered project and checkout IDs.')
+      }
+    return acceptRequest(payload, true)
+  }
+  // Both public entry points share the sole allocation and focus transaction queue.
+  function acceptRequest(payload: var, workspaceOnly: bool): var {
     if (captureActive)
       return {
         ok: false,
@@ -459,7 +475,7 @@ Item {
     }
     var checkoutId = payload.checkoutId || lease.checkoutId
     var pending = operations.filter(function (op) {
-      return op.state !== 'completed' && op.sessionId === sessionId && op.projectId === payload.projectId && op.checkoutId === checkoutId
+      return op.state !== 'completed' && op.sessionId === sessionId && op.projectId === payload.projectId && op.checkoutId === checkoutId && (op.workspaceOnly === true) === workspaceOnly
     })[0]
     if (pending)
       return {
@@ -469,6 +485,7 @@ Item {
       }
     var request = Object.assign({}, payload, {
       checkoutId: checkoutId,
+      workspaceOnly: workspaceOnly,
       selectionRevision: lease ? lease.revision : null,
       generation: ++generation,
       sessionId: sessionId
@@ -587,6 +604,13 @@ Item {
           }))
           reobserveRole(id, op.reobserveRole)
           releaseQueue(id)
+          return
+        }
+        if (op.workspaceOnly) {
+          validate(function (proof) {
+            if (current(id, revision, session))
+              prepareWorkspace(id, project, checkout, {}, {}, proof)
+          })
           return
         }
         invoke(toolsRunner, [toolsPath, '--json'], function (tools) {
@@ -739,7 +763,14 @@ Item {
                 }
               ])
             }))
-            submitRoles(id, checkout, selected, available, proof, association, data)
+            if (op.workspaceOnly) {
+              publish(Object.assign(Operations.complete(operation(id), operation(id).steps), {
+                completedAt: Date.now()
+              }))
+              retainCompleted()
+              releaseQueue(id)
+            } else
+              submitRoles(id, checkout, selected, available, proof, association, data)
           })
         })
       }

@@ -37,7 +37,8 @@ function begin(operations, request, id) {
       operation.state !== "completed" &&
       operation.projectId === request.projectId &&
       operation.checkoutId === request.checkoutId &&
-      operation.sessionId === request.sessionId
+      operation.sessionId === request.sessionId &&
+      (operation.workspaceOnly === true) === (request.workspaceOnly === true)
     )
   })[0]
   if (existing) return { operation: existing, reused: true }

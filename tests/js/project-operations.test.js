@@ -235,3 +235,13 @@ test("resume relaunches confirmed closed editor and focuses surviving terminal",
     "launch"
   )
 })
+test("workspace preparation and ordinary open never coalesce in either order", () => {
+  for (const first of [true, false]) {
+    const accepted = ops.begin([], { ...request, workspaceOnly: first }, "first").operation
+    assert.equal(
+      ops.begin([accepted], { ...request, workspaceOnly: !first }, "second").reused,
+      false
+    )
+    assert.equal(ops.begin([accepted], { ...request, workspaceOnly: first }, "third").reused, true)
+  }
+})
