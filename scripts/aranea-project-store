@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Internal project registry: one snapshot or one serialized mutation per call.
+# Usage: aranea-project-store snapshot | mutate
+# mutate reads one {action,args,expectedRevision?} JSON object from stdin.
 set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/paths.sh
@@ -10,6 +12,7 @@ source "$script_dir/lib/projects-registry.sh"
 project_tmp=''
 trap '[[ -z "$project_tmp" ]] || rm -f -- "$project_tmp" "${project_tmp}.error"' EXIT
 state='null'
+# Emit the current valid state and an actionable error, then fail the call.
 respond_error() {
   jq -cn --argjson state "$state" --arg code "$1" --arg message "$2" --arg recovery "$3" \
     '{ok:false,state:$state,error:{code:$code,message:$message,recovery:$recovery}}'
@@ -43,6 +46,9 @@ if [[ "$1" == mutate ]]; then
   if ! request=$(jq -cs 'if length == 1 then .[0] else error("Expected one request object") end' 2>/dev/null); then
     respond_error INVALID_REQUEST 'Provide one JSON request.' 'Submit one action, args object, and optional expectedRevision.'
   fi
+  if ! jq -e '([.args? | objects | .path? | strings] + [.args? | objects | .paths? | arrays | .[] | strings]) | all(.[]; test("[\\x00-\\x1f\\x7f]") | not)' <<<"$request" >/dev/null; then
+    respond_error INVALID_PATH 'Project paths cannot contain ASCII control characters.' 'Choose a folder path without NUL, tabs, newlines, or other ASCII controls.'
+  fi
   if ! jq -e --arg operation request --argjson request null -f "$filter" <<<"$request" >/dev/null 2>&1; then
     respond_error INVALID_REQUEST 'Invalid project mutation arguments.' 'Check action, IDs, tool IDs, and workspace values.'
   fi
@@ -54,7 +60,12 @@ if [[ "$1" == mutate ]]; then
       command -v git >/dev/null || respond_error DEPENDENCY_MISSING 'Install Git to validate project checkouts.' 'Install Git and retry.'
       ;;
   esac
-  if ! prepared=$(projects_registry_prepare_request "$request"); then
+  if prepared=$(projects_registry_prepare_request "$request" "$state"); then
+    :
+  else
+    prepare_status=$?
+    [[ "$prepare_status" != 2 ]] || respond_error INVALID_PATH 'The resolved project path contains ASCII control characters.' 'Choose a folder whose canonical path contains no ASCII controls.'
+    [[ "$prepare_status" != 3 ]] || respond_error CHECKOUT_CONFLICT 'Relocation would combine unrelated repository groups.' 'Choose a replacement checkout from the same group, or locate all moved checkouts.'
     respond_error CHECKOUT_INVALID 'The selected path is not an existing directory or checkout root.' 'Choose the exact existing project folder and retry.'
   fi
   project_tmp=$(mktemp "${registry}.XXXXXX") || respond_error REGISTRY_WRITE_FAILED 'Cannot create an atomic registry write.' 'Check state-directory permissions and retry.'

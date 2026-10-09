@@ -11,8 +11,10 @@ mkdir -p "$ARANEA_TEST_SANDBOX/dev" "$ARANEA_TEST_SANDBOX/other"
 for path in "$ARANEA_TEST_SANDBOX/dev" "$ARANEA_TEST_SANDBOX/other"; do
   git init -q "$path"
 done
+# Submit one JSON mutation to the actual sandboxed store.
 mutate() { jq -cn --arg action "$1" --argjson args "$2" '{action:$action,args:$args}' | "$store" mutate; }
 failures=0
+# Reset registry state and run a case with effective errexit isolation.
 run_case() {
   rm -rf "$ARANEA_STATE_ROOT"
   set +e
@@ -27,6 +29,7 @@ run_case() {
     failures=$((failures + 1))
   fi
 }
+# Catch missing initialization or a changed initial snapshot contract.
 snapshot_initializes_only_absent() {
   [[ -x "$store" ]] || {
     echo 'Registry store is not implemented'
@@ -35,6 +38,7 @@ snapshot_initializes_only_absent() {
   "$store" snapshot | jq -e '.ok and .error == null and .state == {schemaVersion:1,revision:0,roots:[],ignored:[],projects:[]}'
   [[ -f "$registry" ]]
 }
+# Catch lost root mutations, missing revision guards, and canonical duplicates.
 roots_conflicts_and_concurrency() {
   jq -cn --arg path "$ARANEA_TEST_SANDBOX/dev" '{action:"root-add",args:{path:$path},expectedRevision:0}' | "$store" mutate | jq -e '.ok and .state.revision == 1'
   if jq -cn --arg path "$ARANEA_TEST_SANDBOX/other" '{action:"root-add",args:{path:$path},expectedRevision:0}' | "$store" mutate >"$TMPDIR/conflict"; then return 1; fi
@@ -51,6 +55,7 @@ roots_conflicts_and_concurrency() {
   id=$(jq -r '.roots[0].id' "$registry")
   mutate root-remove "$(jq -cn --arg id "$id" '{rootId:$id}')" | jq -e '.state.roots|length == 1'
 }
+# Catch any mutation or initialization that overwrites invalid existing bytes.
 corrupt_state_is_preserved() {
   mkdir -p "$ARANEA_STATE_ROOT"
   for text in '{broken' '{"schemaVersion":2,"revision":0,"roots":[],"ignored":[],"projects":[]}' '{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[{}]}'; do
@@ -63,6 +68,7 @@ corrupt_state_is_preserved() {
     [[ $(find "$ARANEA_STATE_ROOT" -name 'projects.json.*' ! -name '*.lock' | wc -l) == 0 ]]
   done
 }
+# Catch unstable IDs, unsupported preferences, or deletion of repository files.
 registration_configuration_and_removal() {
   mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >"$TMPDIR/registered"
   jq -e '.ok and (.state.projects|length == 1) and (.state.projects[0]|.id|test("^p-[0-9a-f-]{36}$")) and (.state.projects[0]| .workspaceMode == "dedicated" and .tools == {editorId:null,terminalId:null} and .lastCheckoutId == .checkouts[0].id)' "$TMPDIR/registered"
@@ -82,6 +88,7 @@ registration_configuration_and_removal() {
   mutate remove "$(jq -cn --arg id "$id" '{projectId:$id}')" | jq -e '.state.projects|length == 0'
   [[ -d "$ARANEA_TEST_SANDBOX/dev/.git" && ! -e NEVER ]]
 }
+# Catch incorrect ignores or shell interpretation of literal folder/name bytes.
 ignore_unignore_and_safe_paths() {
   path="$ARANEA_TEST_SANDBOX/space \$(touch NEVER) ; ' repo"
   mkdir -p "$path"
@@ -92,6 +99,7 @@ ignore_unignore_and_safe_paths() {
   mutate register "$(jq -cn --arg p "$path" '{paths:[$p]}')" | jq -e --arg p "$path" '.state.projects[0].checkouts[0].path == $p'
   [[ ! -e NEVER ]]
 }
+# Catch changed relocation IDs and interference between association modes.
 relocate_and_association_isolation() {
   mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >"$TMPDIR/registered"
   id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
@@ -105,6 +113,7 @@ relocate_and_association_isolation() {
   mutate select-checkout "$(jq -cn --arg id "$id" --arg c "$checkout" '{projectId:$id,checkoutId:$c}')" | jq -e --arg c "$checkout" '.state.projects[0].lastCheckoutId == $c'
   mv "$moved" "$ARANEA_TEST_SANDBOX/dev"
 }
+# Catch accepted malformed requests or side effects from rejected actions.
 invalid_requests_preserve_state() {
   "$store" snapshot >/dev/null
   cp "$registry" "$TMPDIR/original"
@@ -116,6 +125,7 @@ invalid_requests_preserve_state() {
   if printf '{}\n{}\n' | "$store" mutate >"$TMPDIR/error"; then return 1; fi
   jq -e '.ok == false' "$TMPDIR/error"
 }
+# Catch wrong worktree grouping, initial selection, or association ownership.
 grouped_checkouts_preserve_normal_and_separate_associations() {
   git -C "$ARANEA_TEST_SANDBOX/dev" -c user.name=Tests -c user.email=tests@example.invalid commit -q --allow-empty -m initial
   linked="$ARANEA_TEST_SANDBOX/a-linked"
@@ -132,6 +142,7 @@ grouped_checkouts_preserve_normal_and_separate_associations() {
   mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/other" '{paths:[$p]}')" | jq -e '.state.projects|length == 2 and (.[0].associations|length == 2) and .[1].associations == []'
   git -C "$ARANEA_TEST_SANDBOX/dev" worktree remove "$linked"
 }
+# Catch write success claims, damaged prior bytes, or leftover temporary files.
 atomic_write_failure_preserves_previous_state() {
   "$store" snapshot >/dev/null
   cp "$registry" "$TMPDIR/original"
@@ -143,6 +154,7 @@ atomic_write_failure_preserves_previous_state() {
   cmp "$registry" "$TMPDIR/original"
   [[ $(find "$ARANEA_STATE_ROOT" -name 'projects.json.*' ! -name '*.lock' | wc -l) == 0 ]]
 }
+# Catch misleading missing-Git errors or unnecessary root/snapshot dependencies.
 missing_git_keeps_registration_unavailable_without_affecting_roots() {
   "$store" snapshot >/dev/null
   cp "$registry" "$TMPDIR/original"
@@ -155,6 +167,7 @@ missing_git_keeps_registration_unavailable_without_affecting_roots() {
   cmp "$registry" "$TMPDIR/original"
   PATH="$TMPDIR/without-git" mutate root-add "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{path:$p}')" | jq -e '.ok and (.state.roots|length == 1)'
 }
+# Catch serialized-registration failures and duplicate generated checkout IDs.
 competing_registrations_are_both_retained() {
   mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >"$TMPDIR/register-one" &
   pid_one=$!
@@ -164,5 +177,76 @@ competing_registrations_are_both_retained() {
   wait "$pid_two"
   "$store" snapshot | jq -e '.state.revision == 2 and (.state.projects|length == 2) and ([.state.projects[].checkouts[].id]|unique|length == 2)'
 }
-for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained; do run_case "$case_name"; done
+# Catch inherited repository/config environment manufacturing checkout identity.
+inherited_git_context_cannot_register_an_ordinary_directory() {
+  ordinary="$ARANEA_TEST_SANDBOX/not-a-repository"
+  mkdir -p "$ordinary"
+  "$store" snapshot >/dev/null
+  cp "$registry" "$TMPDIR/original"
+  if GIT_DIR="$ARANEA_TEST_SANDBOX/dev/.git" GIT_WORK_TREE="$ordinary" mutate register "$(jq -cn --arg p "$ordinary" '{paths:[$p]}')" >"$TMPDIR/error"; then return 1; fi
+  jq -e '.ok == false and .error.code == "CHECKOUT_INVALID"' "$TMPDIR/error"
+  cmp "$registry" "$TMPDIR/original"
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.bare GIT_CONFIG_VALUE_0=true mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" | jq -e '.ok and .state.projects[0].checkouts[0].primary'
+}
+# Catch relocation silently combining distinct repositories into one project.
+relocation_rejects_an_unrelated_group_without_changing_bytes() {
+  linked="$ARANEA_TEST_SANDBOX/relocation-linked"
+  git -C "$ARANEA_TEST_SANDBOX/dev" worktree add -q "$linked" -b relocation-linked
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" --arg linked "$linked" '{paths:[$p,$linked]}')" >"$TMPDIR/registered"
+  project_id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  checkout_id=$(jq -r '.state.projects[0].checkouts[]|select(.primary|not)|.id' "$TMPDIR/registered")
+  cp "$registry" "$TMPDIR/original"
+  if mutate relocate "$(jq -cn --arg p "$project_id" --arg c "$checkout_id" --arg path "$ARANEA_TEST_SANDBOX/other" '{projectId:$p,checkoutId:$c,path:$path}')" >"$TMPDIR/error"; then return 1; fi
+  jq -e '.ok == false and .error.code == "CHECKOUT_CONFLICT"' "$TMPDIR/error"
+  cmp "$registry" "$TMPDIR/original"
+  git -C "$ARANEA_TEST_SANDBOX/dev" worktree remove "$linked"
+}
+# Catch over-restrictive relocation preventing an explicitly located group move.
+relocation_allows_a_whole_group_move_when_old_paths_are_absent() {
+  group="$ARANEA_TEST_SANDBOX/old-group"
+  mkdir -p "$group"
+  git init -q "$group/main"
+  git -C "$group/main" -c user.name=Tests -c user.email=tests@example.invalid commit -q --allow-empty -m initial
+  git -C "$group/main" worktree add -q "$group/linked" -b linked
+  mutate register "$(jq -cn --arg main "$group/main" --arg linked "$group/linked" '{paths:[$main,$linked]}')" >"$TMPDIR/registered"
+  project_id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  main_id=$(jq -r '.state.projects[0].checkouts[]|select(.primary)|.id' "$TMPDIR/registered")
+  linked_id=$(jq -r '.state.projects[0].checkouts[]|select(.primary|not)|.id' "$TMPDIR/registered")
+  mv "$group" "$ARANEA_TEST_SANDBOX/new-group"
+  group="$ARANEA_TEST_SANDBOX/new-group"
+  git -C "$group/main" worktree repair "$group/linked" 2>/dev/null
+  mutate relocate "$(jq -cn --arg p "$project_id" --arg c "$main_id" --arg path "$group/main" '{projectId:$p,checkoutId:$c,path:$path}')" | jq -e --arg p "$project_id" --arg common "$group/main/.git" '.state.projects[0] | .id == $p and .commonDir == $common'
+  mutate relocate "$(jq -cn --arg p "$project_id" --arg c "$linked_id" --arg path "$group/linked" '{projectId:$p,checkoutId:$c,path:$path}')" | jq -e --arg p "$project_id" --arg main "$main_id" --arg linked "$linked_id" '.state.projects[0] | .id == $p and ([.checkouts[].id]|sort) == ([$main,$linked]|sort)'
+}
+# Catch lossy decoding/canonicalization selecting a different existing sibling.
+control_paths_never_silently_select_a_sibling() {
+  sibling="$ARANEA_TEST_SANDBOX/control-path"
+  raw="$sibling"$'\n'
+  mkdir -p "$sibling" "$raw"
+  git init -q "$sibling"
+  git init -q "$raw"
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >"$TMPDIR/registered"
+  project_id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  checkout_id=$(jq -r '.state.projects[0].checkouts[0].id' "$TMPDIR/registered")
+  cp "$registry" "$TMPDIR/original"
+  for action in root-add ignore unignore register relocate; do
+    args=$(jq -cn --arg p "$raw" --arg project "$project_id" --arg checkout "$checkout_id" --arg action "$action" 'if $action == "register" then {paths:[$p]} elif $action == "relocate" then {projectId:$project,checkoutId:$checkout,path:$p} else {path:$p} end')
+    if mutate "$action" "$args" >"$TMPDIR/error"; then return 1; fi
+    jq -e '.ok == false and .error.code == "INVALID_PATH"' "$TMPDIR/error"
+    cmp "$registry" "$TMPDIR/original"
+  done
+  for control in $'\t' $'\r' $'\x1f' $'\x7f'; do
+    if mutate root-add "$(jq -cn --arg p "$sibling$control" '{path:$p}')" >"$TMPDIR/error"; then return 1; fi
+    jq -e '.ok == false and .error.code == "INVALID_PATH"' "$TMPDIR/error"
+    cmp "$registry" "$TMPDIR/original"
+  done
+  if mutate root-add '{"path":"/tmp/nul\u0000path"}' >"$TMPDIR/error"; then return 1; fi
+  jq -e '.ok == false and .error.code == "INVALID_PATH"' "$TMPDIR/error"
+  cmp "$registry" "$TMPDIR/original"
+  ln -s "$raw" "$ARANEA_TEST_SANDBOX/control-alias"
+  if mutate root-add "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/control-alias" '{path:$p}')" >"$TMPDIR/error"; then return 1; fi
+  jq -e '.ok == false and .error.code == "INVALID_PATH"' "$TMPDIR/error"
+  cmp "$registry" "$TMPDIR/original"
+}
+for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling; do run_case "$case_name"; done
 ((failures == 0))

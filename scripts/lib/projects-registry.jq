@@ -1,7 +1,7 @@
 # Registry schema, request validation, and pure mutations. Filesystem/Git reads
 # and opaque ID generation belong to the shell boundary, never this filter.
 def text: type == "string" and length > 0 and (contains("\u0000")|not);
-def path: text and startswith("/");
+def path: text and startswith("/") and (test("[\\x00-\\x1f\\x7f]")|not);
 def integer: type == "number" and . == floor;
 def opaque($prefix): text and test("^" + $prefix + "-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 def mode: . == "dedicated" or . == "current";

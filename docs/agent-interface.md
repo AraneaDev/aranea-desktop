@@ -68,3 +68,27 @@ rm -f "$events_file"
 Do not invoke complete removal without making the replacement-theme decision
 explicit. Prefer `--dry-run` before a destructive action and preserve recovery
 events in logs.
+
+## Internal project registry
+
+`scripts/aranea-project-store snapshot` reads the versioned registry at
+`$(aranea_state_root)/projects.json`. `mutate` accepts one JSON object on stdin
+with `action`, `args`, and optional `expectedRevision`. It returns a single
+`{ok,state,error}` object and exits `0` on success or `1` on failure. This
+internal helper has its own response contract rather than the JSONL event
+protocol above.
+
+Project paths may contain Unicode, spaces, quotes, and shell metacharacters.
+Raw paths and their canonical targets must contain no ASCII control characters
+(`U+0000` through `U+001F`, or `U+007F`), including tabs and newlines. Such paths
+return `INVALID_PATH` before mutation; choose or rename a folder whose canonical
+path contains no ASCII controls. The helper never silently trims a selected
+path to a different sibling.
+
+`CHECKOUT_INVALID` means the selected folder is missing or is not an exact Git
+checkout root. `CHECKOUT_CONFLICT` means an existing checkout already owns the
+path or relocation would mix unrelated repository groups. Locate a checkout
+from the same group; when moving a whole repository, locate its moved checkouts
+explicitly. `REGISTRY_CONFLICT` requires refreshing the snapshot and retrying
+with its current revision. Invalid or unsupported registry data returns
+`REGISTRY_INVALID` and leaves the original file intact for backup and repair.
