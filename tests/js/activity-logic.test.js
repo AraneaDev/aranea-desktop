@@ -63,7 +63,19 @@ test("missing association and native proof never become focus or arbitrary resum
     "-1234567-1234-1234-1234-123456789abc"
   ])
     assert.equal(logic.resumeCommand({ ...task, providerSessionId }), null)
-  assert.equal(logic.resumeCommand({ ...task, provider: "codex" }), null)
+  assert.equal(
+    logic.resumeCommand({ ...task, provider: "codex" }),
+    "codex resume '12345678-1234-1234-1234-123456789abc' --cd '/repo'"
+  )
+  assert.equal(
+    logic.resumeCommand({ ...task, provider: "codex", providerSessionId: "thr_app" }),
+    null
+  )
+  assert.equal(logic.resumeCommand({ ...task, provider: "codex", association: {} }), null)
+  assert.equal(
+    logic.resumeCommand({ ...task, provider: "codex", association: { cwd: "/repo's path" } }),
+    "codex resume '12345678-1234-1234-1234-123456789abc' --cd '/repo'\\''s path'"
+  )
   assert.equal(
     logic.project({ tasks: [task], sessions: [session] }, 2000, { projects: [] }).tasks[0]
       .association.status,

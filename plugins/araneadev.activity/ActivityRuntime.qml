@@ -94,11 +94,12 @@ Item {
   }
   // The native validator independently rechecks boot, executable, hash and parent chain.
   function proveNative(session: var, terminalPid: var, done: var): void {
-    if (!session || session.provider !== 'claude' || !session.provenance || !(session.nativeMetadata && (session.nativeMetadata.observedHooks || []).indexOf('SessionStart') >= 0)) {
+    if (!session || ['claude', 'codex'].indexOf(session.provider) < 0 || !session.provenance || !(session.nativeMetadata && (session.nativeMetadata.observedHooks || []).indexOf('SessionStart') >= 0)) {
       done(false)
       return
     }
     var input = {
+      provider: session.provider,
       provenance: session.provenance
     }
     if (terminalPid !== null)

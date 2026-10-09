@@ -85,9 +85,10 @@ agents_cli_submit() {
 
 # Capability fragment extends rather than replaces Phase 1 operation schemas.
 agents_cli_capabilities() {
-  local adapter=null
+  local adapter codex_adapter=null
   adapter=$("$script_dir/aranea-agent-adapter" status claude 2>/dev/null | jq -c '.state // null') || adapter=null
-  jq -cn --argjson adapter "$adapter" '{activity:{schemaVersion:1,providers:["claude"],unsupportedProviders:["codex"],adapter:$adapter,heartbeatSeconds:15,connectionLostSeconds:60,maxLiveTasks:200,maxInactiveTasks:500,inactiveRetentionDays:14,focusScope:"hosting-terminal",resumeIdentity:"native-uuid",actions:["focus","reopen","open-checkout"],reobserve:"same-operation-read-only",desktopDismiss:"owner-serialized-store-mutation"},operations:[
+  codex_adapter=$("$script_dir/aranea-agent-adapter" status codex 2>/dev/null | jq -c '.state // null') || codex_adapter=null
+  jq -cn --argjson codexAdapter "$codex_adapter" --argjson adapter "$adapter" '{activity:{schemaVersion:1,providers:["claude","codex"],unsupportedProviders:[],adapter:$adapter,adapters:{claude:$adapter,codex:$codexAdapter},heartbeatSeconds:15,connectionLostSeconds:60,maxLiveTasks:200,maxInactiveTasks:500,inactiveRetentionDays:14,focusScope:"hosting-terminal",resumeIdentity:"native-uuid",actions:["focus","reopen","open-checkout"],reobserve:"same-operation-read-only",desktopDismiss:"owner-serialized-store-mutation"},operations:[
     {name:"agents.status",arguments:{}},{name:"agents.list",arguments:{}},
     {name:"agents.inspect",arguments:{taskId:{type:"string",required:true}}},
     {name:"agents.register",arguments:{"json-input":{type:"boolean",required:true}}},
@@ -97,7 +98,7 @@ agents_cli_capabilities() {
     {name:"agents.open-checkout",arguments:{taskId:{type:"string",required:true}}},
     {name:"agents.dismiss",arguments:{taskId:{type:"string",required:true}}},
     {name:"agents.operation",arguments:{operationId:{type:"string",required:true},reobserve:{type:"boolean"}}},
-    {name:"agents.adapter",arguments:{action:{enum:["status","install","remove"],required:true},provider:{enum:["claude"],required:true}}}]}'
+    {name:"agents.adapter",arguments:{action:{enum:["status","install","remove"],required:true},provider:{enum:["claude","codex"],required:true}}}]}'
 }
 
 # Validate complete syntax before store mutations, IPC or adapter configuration.
@@ -136,7 +137,7 @@ agents_cli_main() {
       ((${#words[@]} == 2)) && [[ ${words[1]} == --json-input ]] || projects_cli_usage
       json_input=true
       ;;
-    adapter) ((${#words[@]} == 3)) && [[ ${words[1]} == status || ${words[1]} == install || ${words[1]} == remove ]] && [[ ${words[2]} == claude ]] || projects_cli_usage ;;
+    adapter) ((${#words[@]} == 3)) && [[ ${words[1]} == status || ${words[1]} == install || ${words[1]} == remove ]] && [[ ${words[2]} == claude || ${words[2]} == codex ]] || projects_cli_usage ;;
     *) projects_cli_usage ;;
   esac
   case "$command" in

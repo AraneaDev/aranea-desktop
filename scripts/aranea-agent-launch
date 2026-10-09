@@ -8,12 +8,12 @@ script_dir="$(cd -- "$(/usr/bin/dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   exit 4
 }
 request=$(/usr/bin/head -c 65537 | /usr/bin/jq -Rcse 'if utf8bytelength<=65536 then fromjson else error("too large") end' 2>/dev/null) || request=null
-if ! /usr/bin/jq -e 'type=="object" and keys==["cwd","provider","providerSessionId","terminalId","token"] and .provider=="claude" and (.providerSessionId|type=="string" and test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and (.terminalId|IN("kitty","foot","alacritty","ghostty"))' <<<"$request" >/dev/null 2>&1; then
-  echo '{"ok":false,"status":"failed","code":"RESUME_UNAVAILABLE","message":"Choose a supported terminal and native Claude UUID session."}'
+if ! /usr/bin/jq -e 'type=="object" and keys==["cwd","provider","providerSessionId","terminalId","token"] and (.provider|IN("claude","codex")) and (.providerSessionId|type=="string" and test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and (.terminalId|IN("kitty","foot","alacritty","ghostty"))' <<<"$request" >/dev/null 2>&1; then
+  echo '{"ok":false,"status":"failed","code":"RESUME_UNAVAILABLE","message":"Choose a supported terminal and native CLI UUID session."}'
   exit 1
 fi
 /usr/bin/jq -c '. as $s | (if .terminalId=="kitty" then ["kitty","--class",.token,"--directory",.cwd]
  elif .terminalId=="foot" then ["foot","--app-id",.token,"--working-directory",.cwd]
  elif .terminalId=="alacritty" then ["alacritty","--class",.token,"--working-directory",.cwd,"--command"]
  else ["ghostty","--class="+.token,"--gtk-single-instance=false","--working-directory="+.cwd,"-e"] end) as $base |
- {cwd:.cwd,argv:($base+["claude","--resume",.providerSessionId])}' <<<"$request" | /bin/bash "$script_dir/aranea-project-launch"
+ {cwd:.cwd,argv:($base+(if .provider=="codex" then ["codex","resume",.providerSessionId,"--cd",.cwd] else ["claude","--resume",.providerSessionId] end))}' <<<"$request" | /bin/bash "$script_dir/aranea-project-launch"

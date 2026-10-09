@@ -1,18 +1,18 @@
 #!/bin/bash
-# Usage: aranea-agent-hook-worker claude < native-hook.json (private)
+# Usage: aranea-agent-hook-worker claude|codex < native-hook.json (private)
 # Bounded native ingress. Payload identity never supplies process evidence.
 set -euo pipefail
 export PATH=/usr/bin:/bin
 unset BASH_ENV ENV CDPATH
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-[[ $# == 1 && "$1" == claude ]]
+[[ $# == 1 && ("$1" == claude || "$1" == codex) ]]
 payload=$(head -c 1048577 | jq -Rces 'if utf8bytelength > 1048576 then error("size") else fromjson | select(type == "object") end')
 response=$(jq -c --arg provider "$1" '{action:"native",args:{provider:$provider,payload:.,caller:null}}' <<<"$payload" | /bin/bash "$script_dir/aranea-agent-store" mutate)
 # Exactly one helper wins its own epoch lock; ordinary tools never launch helpers.
 if [[ $(jq -r '.hook_event_name' <<<"$payload") == SessionStart ]]; then
   session=$(jq -r '.session_id' <<<"$payload")
-  record=$(jq -c --arg id "$session" '.state.sessions[] | select(.provider == "claude" and .providerSessionId == $id and .provenance != null and .connection.connected)' <<<"$response")
+  record=$(jq -c --arg provider "$1" --arg id "$session" '.state.sessions[] | select(.provider == $provider and .providerSessionId == $id and .provenance != null and .connection.connected)' <<<"$response")
   if [[ -n "$record" ]]; then
-    /usr/bin/setsid /bin/bash "$script_dir/aranea-agent-heartbeat" claude "$session" "$(jq -r .producerEpoch <<<"$record")" "$(jq -r .provenance.pid <<<"$record")" "$(jq -r .provenance.startTime <<<"$record")" "$(jq -r .provenance.bootId <<<"$record")" </dev/null >/dev/null 2>&1 &
+    /usr/bin/setsid /bin/bash "$script_dir/aranea-agent-heartbeat" "$1" "$session" "$(jq -r .producerEpoch <<<"$record")" "$(jq -r .provenance.pid <<<"$record")" "$(jq -r .provenance.startTime <<<"$record")" "$(jq -r .provenance.bootId <<<"$record")" </dev/null >/dev/null 2>&1 &
   fi
 fi

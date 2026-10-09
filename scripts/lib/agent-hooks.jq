@@ -1,15 +1,17 @@
-# Claude-native to strict event contract. Input is in-memory only.
+# Provider-native to strict event contract. Input is in-memory only.
 .[0].args as $a | .[1] as $state | .[2] as $clock | .[3] as $proof |
-$a.payload as $p |
+$a.provider as $provider |
+($a.payload | if $provider == "codex" then del(.prompt_id,.task_id) + {prompt_id:.turn_id} else . end) as $p |
 def text($n): if type == "string" then gsub("[\\x00-\\x1f\\x7f]";" ") | .[:$n] else "" end;
 def id: type == "string" and length > 0 and length <= 180 and (test("[\\x00-\\x1f\\x7f]")|not);
+if $provider == "codex" and (($p.hook_event_name|IN("SessionStart","UserPromptSubmit","PreToolUse","PermissionRequest","PostToolUse","Stop","SessionEnd","SubagentStart","SubagentStop","Interrupt","AraneaHeartbeat")|not) or (($p.hook_event_name|IN("SessionStart","SessionEnd","AraneaHeartbeat")|not) and ($p.turn_id|id|not))) then error("unsupported Codex hook or turn identity") else . end |
 if ($p.session_id|id|not) then error("native session identity") else . end |
-([$state.sessions[] | select(.provider == "claude" and .providerSessionId == $p.session_id)][0] // null) as $s |
+([$state.sessions[] | select(.provider == $provider and .providerSessionId == $p.session_id)][0] // null) as $s |
 ($p.hook_event_name // "") as $name |
 if $s.provenance != null and $proof == null then error("unproven caller")
 elif $name == "SessionStart" then
   (if $proof == null then "unconfirmed:"+$fingerprint else "process:"+([$proof.bootId,($proof.pid|tostring),$proof.startTime,$proof.commandHash]|join(":")) end) as $epoch |
-  {action:"register",args:{provider:"claude",providerSessionId:$p.session_id,producerEpoch:$epoch,tasks:[],provenance:(if $s.producerEpoch == $epoch then $s.provenance else (if $proof == null then null else $proof + {observedAt:$clock.receivedAt} end) end)},nativeMetadata:{currentTaskId:null,turns:[],callbackOwners:[],observedHooks:(if $proof == null then [] else ["SessionStart"] end)}}
+  {action:"register",args:{provider:$provider,providerSessionId:$p.session_id,producerEpoch:$epoch,tasks:[],provenance:(if $s.producerEpoch == $epoch then $s.provenance else (if $proof == null then null else $proof + {observedAt:$clock.receivedAt} end) end)},nativeMetadata:{currentTaskId:null,turns:[],callbackOwners:[],observedHooks:(if $proof == null then [] else ["SessionStart"] end)}}
 elif $s == null then error("unregistered session")
 elif $s.provenance != null and ($proof == null or $proof.pid != $s.provenance.pid or $proof.startTime != $s.provenance.startTime or $proof.bootId != $s.provenance.bootId or $proof.commandHash != $s.provenance.commandHash) then error("unproven caller")
 else
@@ -30,7 +32,7 @@ else
   elif ($modern|not) and $native == null and $name != "AraneaHeartbeat" then error("uncorrelated legacy callback")
   elif $mapped == null and $native != null and ($name|IN("UserPromptSubmit","SubagentStart","TaskCompleted")|not) then error("unknown native identity") else . end |
   ($owners[0] // $mapped //
-    (if $name|IN("UserPromptSubmit","SubagentStart","TaskCompleted") then "claude:"+$clock.generatedId else $m.currentTaskId end) // "session") as $task |
+    (if $name|IN("UserPromptSubmit","SubagentStart","TaskCompleted") then $provider+":"+$clock.generatedId else $m.currentTaskId end) // "session") as $task |
   ([$state.tasks[]|select(.taskId == $task)][0] // null) as $old |
   $fingerprint as $fp |
   (if $modern then $callback.eventId // ("pending:"+$callbackKey) else $name+":"+$task+":"+$identity end) as $eventId |
@@ -41,6 +43,8 @@ else
     {kind:"snapshot",payload:{cwd:$p.cwd,reportedState:"working",description:(($p.prompt // "")|split("\n")|map(gsub("^[[:space:]]+|[[:space:]]+$";""))|map(text(160))|map(select(length>0))|.[0]//""|.[:160])}}
    elif $name == "SubagentStart" then {kind:"snapshot",payload:{cwd:$p.cwd,reportedState:"working",description:("Subagent "+($p.agent_type|text(160)))}}
    elif $name == "TaskCompleted" then {kind:"snapshot",payload:{cwd:$p.cwd,reportedState:"finished",description:($p.task_subject|text(160)),result:"Native task reported completed"}}
+   elif $provider == "codex" and $name == "Interrupt" then {kind:"diagnostic",payload:{summary:"Turn interrupted; unfinished work and permission resolution remain unconfirmed"}}
+   elif $provider == "codex" and ($name|IN("PreToolUse","PostToolUse")) then {kind:"diagnostic",payload:{summary:($name+": "+($p.tool_name|text(160)))}}
    elif $name == "PreToolUse" and ($p.tool_name|IN("AskUserQuestion","ExitPlanMode")) then
     {kind:"needs-input",payload:{blockerId:(if ($p.tool_use_id|id) then "tool:"+$p.tool_use_id else "unconfirmed:"+$fp end),question:(if $p.tool_name == "AskUserQuestion" then ($p.tool_input.questions[0].question|text(4096)) else "Review the proposed plan" end)}}
    elif $name == "PermissionRequest" then {kind:"needs-input",payload:{blockerId:"permission-unconfirmed:"+$fp,question:("Permission requested for "+($p.tool_name|text(160))+"; resolution unconfirmed (no native correlation ID)")}}
@@ -55,7 +59,7 @@ else
    elif $name == "SessionEnd" then {kind:"disconnected",payload:{}}
    elif $name == "AraneaHeartbeat" then {kind:"heartbeat",payload:{}}
    else error("unsupported hook") end) as $event |
-  {action:"report",args:({schemaVersion:1,eventId:$eventId,provider:"claude",providerSessionId:$p.session_id,producerEpoch:$s.producerEpoch,sequence:$sequence,taskId:$task}+$event),
+  {action:"report",args:({schemaVersion:1,eventId:$eventId,provider:$provider,providerSessionId:$p.session_id,producerEpoch:$s.producerEpoch,sequence:$sequence,taskId:$task}+$event),
     nativeMetadata:($m | if $name|IN("UserPromptSubmit","SubagentStart","TaskCompleted") then
       .turns = ([.turns[]|select(.nativeId != $native)]+[{nativeId:$native,taskId:$task}]) |
       if $name == "UserPromptSubmit" and ($p.agent_id|id|not) then

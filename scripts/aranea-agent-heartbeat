@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: aranea-agent-heartbeat claude SESSION EPOCH PID START_TIME BOOT_ID (private)
+# Usage: aranea-agent-heartbeat claude|codex SESSION EPOCH PID START_TIME BOOT_ID (private)
 # Private per-epoch owner. Exits on exact provider/epoch loss; never kills agents.
 set -euo pipefail
 export PATH=/usr/bin:/bin
@@ -9,7 +9,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$script_dir/lib/paths.sh"
 # shellcheck source=scripts/lib/agent-hooks.sh
 source "$script_dir/lib/agent-hooks.sh"
-[[ $# == 6 && "$1" == claude && "$4" =~ ^[1-9][0-9]*$ && "$5" =~ ^[0-9]+$ ]]
+[[ $# == 6 && ("$1" == claude || "$1" == codex) && "$4" =~ ^[1-9][0-9]*$ && "$5" =~ ^[0-9]+$ ]]
 provider=$1 session=$2 epoch=$3 provider_pid=$4 provider_start=$5 boot=$6
 [[ "$boot" == "$(cat /proc/sys/kernel/random/boot_id)" ]]
 root="$(aranea_state_root)/agent-heartbeats"
@@ -37,15 +37,15 @@ while true; do
   read -r _ current_start < <(agent_hooks_process "$provider_pid") || exit 0
   [[ "$current_start" == "$provider_start" && "$boot" == "$(cat /proc/sys/kernel/random/boot_id)" ]] || exit 0
   # Revalidate identity even when transport/lock failure prevents store access.
-  agent_hooks_provider_process "$provider_pid" || exit 0
+  agent_hooks_provider_process "$provider_pid" "$provider" || exit 0
   [[ "$(agent_hooks_command_hash "$provider_pid")" == "$expected_hash" ]] || exit 0
-  if [[ "$evidence" != null ]]; then agent_hooks_validate_provenance "$evidence" || exit 0; fi
+  if [[ "$evidence" != null ]]; then agent_hooks_validate_provenance "$evidence" "$provider" || exit 0; fi
   # Store revalidates actual helper ancestry and saved provenance under its lock.
   request=$(jq -cn --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" --arg tick "$(cat /proc/sys/kernel/random/uuid)" '{action:"native",args:{provider:$provider,caller:null,payload:{hook_event_name:"AraneaHeartbeat",session_id:$session,producer_epoch:$epoch,tick:$tick}}}')
   if response=$(printf '%s\n' "$request" | /usr/bin/timeout 2 /bin/bash "$script_dir/aranea-agent-store" mutate 2>/dev/null); then
     evidence=$(jq -c --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" '.state.sessions[] | select(.provider == $provider and .providerSessionId == $session and .producerEpoch == $epoch and .connection.connected) | .provenance' <<<"$response") || exit 0
     [[ -n "$evidence" && "$evidence" != null ]] || exit 0
-    agent_hooks_validate_provenance "$evidence" || exit 0
+    agent_hooks_validate_provenance "$evidence" "$provider" || exit 0
   else
     code=$(jq -r '.error.code // ""' <<<"$response" 2>/dev/null) || code=''
     case "$code" in

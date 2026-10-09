@@ -30,7 +30,7 @@ request=$(/usr/bin/jq -cs 'if length==1 then .[0] else error("one request requir
        elif $a[0]=="foot" then ["foot","--app-id",$token,"--working-directory",$cwd]
        elif $a[0]=="ghostty" then ["ghostty","--class="+$token,"--gtk-single-instance=false","--working-directory="+$cwd]
        else [] end) as $base |
-      ($token|test("^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$")) and (($base|length)>0) and ($a==$base or $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["nvim","--",$cwd]) or (($a[-1]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["claude","--resume",$a[-1]])))
+      ($token|test("^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$")) and (($base|length)>0) and ($a==$base or $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["nvim","--",$cwd]) or (($a[-1]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["claude","--resume",$a[-1]])) or (($a[-3]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["codex","resume",$a[-3],"--cd",$cwd])))
     end)
 ' <<<"$request" >/dev/null || fail INVALID_LAUNCH 'Only fixed supported project adapter arguments are allowed.'
 mapfile -t argv < <(/usr/bin/jq -r '.argv[]' <<<"$request")
@@ -64,6 +64,10 @@ fi
 if [[ ${argv[-3]} == claude && ${argv[-2]} == --resume ]]; then
   project_claude=$(resolve_tool claude) || fail TOOL_MISSING 'Install Claude outside the checkout.'
   argv[-3]=$project_claude
+fi
+if [[ ${#argv[@]} -ge 5 && ${argv[-5]} == codex && ${argv[-4]} == resume ]]; then
+  project_codex=$(resolve_tool codex) || fail TOOL_MISSING 'Install Codex outside the checkout.'
+  argv[-5]=$project_codex
 fi
 # The child is never tracked by Quickshell. Parent helpers never enter the checkout.
 (cd -- "$cwd" && PATH="$project_safe_path" exec "$project_setsid" -- "${argv[@]}") </dev/null >/dev/null 2>&1 &

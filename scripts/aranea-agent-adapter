@@ -1,6 +1,6 @@
 #!/bin/bash
-# Usage: aranea-agent-adapter status|install|remove claude
-# Explicit opt-in Claude settings transport. No provider executable is invoked.
+# Usage: aranea-agent-adapter status|install|remove claude|codex
+# Explicit opt-in provider hook configuration transport. No provider executable is invoked.
 set -euo pipefail
 adapter_search_path=${PATH:-}
 export PATH=/usr/bin:/bin

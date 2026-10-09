@@ -67,3 +67,11 @@ run_cli 0 agents register --json-input --json <<<"$(jq '.args | .producerEpoch="
 run_cli 0 agents list --json
 jq -es '.[-1].data.tasks|length==0' "$ARANEA_TEST_SANDBOX/events" >/dev/null
 echo 'PASS real report/store, schema1, strict syntax, operation reconnection, adapter sandbox and retained capabilities'
+
+unset CODEX_HOME
+run_cli 0 agents adapter install codex --json
+[[ -f "$HOME/.codex/hooks.json" ]]
+run_cli 0 capabilities --json
+jq -es '.[-1].data.activity.providers|index("codex")!=null' "$ARANEA_TEST_SANDBOX/events" >/dev/null
+run_cli 0 agents adapter remove codex --json
+echo 'PASS public Codex adapter and capabilities'

@@ -16,16 +16,25 @@ function validId(value) {
   )
 }
 
-/** Fixed Claude CLI resume identity; named sessions are deliberately unsupported.
+/** Fixed provider CLI resume identity; named sessions are deliberately unsupported.
  * @param {ActivityData} task - retained task
  * @returns {?string} display-only shell-quoted command
  */
 function resumeCommand(task) {
-  return task &&
-    task.provider === "claude" &&
-    /^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(task.providerSessionId)
-    ? "claude --resume '" + task.providerSessionId + "'"
-    : null
+  if (!task || !/^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(task.providerSessionId))
+    return null
+  if (task.provider === "claude") return "claude --resume '" + task.providerSessionId + "'"
+  var cwd = task.association && task.association.cwd
+  if (
+    task.provider !== "codex" ||
+    typeof cwd !== "string" ||
+    cwd[0] !== "/" ||
+    cwd.split("").some(function (character) {
+      return character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
+    })
+  )
+    return null
+  return "codex resume '" + task.providerSessionId + "' --cd '" + cwd.replace(/'/g, "'\\''") + "'"
 }
 
 /** Locate the exact native epoch, never another session sharing a checkout.

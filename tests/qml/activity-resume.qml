@@ -10,6 +10,8 @@ ShellRoot {
   property var windows: []
   // Native epoch changes are supplied by the store, never terminal appearance.
   property string epoch: 'old'
+  // Native provider is independent from the requested resume identity.
+  property string nativeProvider: 'claude'
   // Kernel proof can disappear while the same title/class remains visible.
   property bool nativeValid: true
   // Transport faults cannot establish that no detached provider was launched.
@@ -121,7 +123,7 @@ ShellRoot {
           state: {
             sessions: [
               {
-                provider: 'claude',
+                provider: root.nativeProvider,
                 providerSessionId: '12345678-1234-1234-1234-123456789abc',
                 producerEpoch: root.epoch,
                 connection: {
@@ -147,6 +149,7 @@ ShellRoot {
           }
         }
       else if (name === 'aranea-agent-identity') {
+        t.equal(JSON.parse(input).provider, root.nativeProvider, 'resume proof binds native provider')
         t.equal(JSON.parse(input).terminalPid, 50, 'native resume proof descends from observed hosting terminal')
         response = {
           ok: true,
@@ -259,6 +262,18 @@ ShellRoot {
         }, function (reply) {
           t.equal(reply.submissionUnconfirmed, false, 'structured prelaunch refusal is authoritative: ' + mode)
         })
+      })
+      op.sessionKey = 'codex:' + task.providerSessionId
+      runtime.observeResume(op, function (observed) {
+        t.equal(observed.native, null, 'Claude evidence cannot prove Codex resume')
+      })
+      root.nativeProvider = 'codex'
+      runtime.observeResume(op, function (observed) {
+        t.check(observed.native && observed.native.nativeVerified, 'Codex native epoch and process proof confirm resume')
+      })
+      root.nativeValid = false
+      runtime.observeResume(op, function (observed) {
+        t.equal(observed.native, null, 'Codex app or unproved process stays unconfirmed')
       })
       runtime.engine.sessionId = 'new-desktop'
       runtime.validateReobserve(op, function (valid) {

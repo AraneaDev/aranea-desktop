@@ -35,12 +35,15 @@ detached agent.
 
 Focus proves the actual native process, its executable/hash and ancestor chain,
 then the exact hosting terminal PID/address and current compositor instance.
-It makes no multiplexer pane claim. Resume supports native Claude UUID session
-identities with private native SessionStart evidence. The fixed command is
-`claude --resume SESSION_UUID`, launched through a supported saved terminal.
+It makes no multiplexer pane claim. Resume supports native Claude and Codex CLI
+UUID session identities with private native SessionStart evidence. Fixed commands
+are `claude --resume SESSION_UUID` and `codex resume SESSION_UUID --cd CHECKOUT`,
+launched through a supported saved terminal. Codex uses the exact registered
+checkout, overriding any saved resume directory preference.
 An observed terminal alone never proves a resumed native session. The owner
 waits for fresh, proven same-session evidence in a new process epoch, otherwise
-returns partial. Codex resume and native mapping remain unavailable here.
+returns partial. Codex app/server processes and unsupported session IDs cannot
+establish CLI ownership or enable reopening.
 
 Workspace preparation delegates to `aranea.projects prepareWorkspace(json)`.
 That narrow endpoint uses the existing allocation, association and focus queue
@@ -57,7 +60,7 @@ aranea agents report --json-input [--json]
 aranea agents focus|reopen|open-checkout TASK_ID [--json]
 aranea agents dismiss TASK_ID [--json]
 aranea agents operation OPERATION_ID [--reobserve] [--json]
-aranea agents adapter status|install|remove claude [--json]
+aranea agents adapter status|install|remove claude|codex [--json]
 ```
 
 Read/report/register/dismiss work without a desktop. Public JSON uses schema-1
@@ -65,6 +68,24 @@ JSONL envelopes. Exit zero means observed; partial and ordinary errors use 1,
 usage errors 2, missing tool selection 3 and missing dependencies 4.
 `aranea capabilities --json` retains project schemas and adds activity schemas,
 limits and adapter readiness. Adapter installation is explicit and opt-in.
+
+Codex installation merges only this adapter's owned command into
+`$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`). Removal preserves unrelated
+handlers and matcher fields. Inline `config.toml` hooks, permissions and trust
+settings remain untouched. Review and trust the current hook definition in Codex;
+disabled hooks or managed-only policy can prevent execution. `configured` describes
+the file, while `enabled` and `trusted` remain unconfirmed. Runtime observations
+and current process proof are reported separately.
+
+The Codex mapper uses `session_id` and stable `turn_id`; `agent_id` keeps children
+separate from their parent. Stop means Ready for review, never verified success.
+Interrupt adds a diagnostic and preserves unfinished state. Permission requests
+lack a guaranteed correlation ID, so unrelated tool completion cannot clear them.
+Native user-question coverage is unconfirmed; explicit structured reports cover
+that gap, task completion, API failures and verification. The adapter does not
+invent Claude-only Codex hooks and emits no decisions, text or added context.
+See the official [Codex hooks](https://learn.chatgpt.com/docs/hooks) and
+[CLI reference](https://learn.chatgpt.com/docs/cli/reference).
 
 Manual reporting starts by explicitly registering a session epoch. This does
 not register a project or checkout. Supply one bounded JSON object on stdin:

@@ -16,7 +16,7 @@ agent_hooks_process() {
 
 # Match the actual executable and command line, never a claimed payload name.
 agent_hooks_provider_process() {
-  local pid="$1" exe cwd entry
+  local pid="$1" provider="${2:-}" exe cwd entry arg
   local -a argv
   agent_hooks_process "$pid" >/dev/null || return 1
   exe=$(readlink -f -- "/proc/$pid/exe") || return 1
@@ -24,13 +24,20 @@ agent_hooks_provider_process() {
   argv=()
   mapfile -d '' -t argv <"/proc/$pid/cmdline" || return 1
   [[ ${#argv[@]} -gt 0 && "$exe" != "$cwd/"* ]] || return 1
-  if [[ ${argv[0]##*/} == claude ]]; then
+  if [[ "$provider" != claude && ${argv[0]##*/} == codex ]]; then
+    # The app server multiplexes sessions; its ancestry does not own a CLI turn.
+    for arg in "${argv[@]:1}"; do [[ "$arg" != app-server ]] || return 1; done
+    if [[ ${exe##*/} == codex ]]; then return 0; fi
+    [[ ${argv[0]} == /* ]] || return 1
+    entry=$(realpath -e -- "${argv[0]}") || return 1
+    [[ "$entry" == "$exe" ]]
+  elif [[ "$provider" != codex && ${argv[0]##*/} == claude ]]; then
     if [[ ${exe##*/} == claude ]]; then return 0; fi
     # Native installers may use an absolute claude symlink to a versioned binary.
     [[ ${argv[0]} == /* ]] || return 1
     entry=$(realpath -e -- "${argv[0]}") || return 1
     [[ "$entry" == "$exe" ]]
-  elif [[ ${exe##*/} == node && ${argv[1]:-} == /*/node_modules/@anthropic-ai/claude-code/cli.js ]]; then
+  elif [[ "$provider" != codex && ${exe##*/} == node && ${argv[1]:-} == /*/node_modules/@anthropic-ai/claude-code/cli.js ]]; then
     entry=$(realpath -e -- "${argv[1]}") || return 1
     [[ -f "$entry" && "$entry" != "$cwd/"* ]]
   else return 1; fi
@@ -52,11 +59,11 @@ agent_hooks_command_hash() {
 
 # Only an actual ancestor with an approved executable/entrypoint is a provider.
 agent_hooks_provenance() {
-  local pid=$$ parent start count=0 ancestors='[]' boot
+  local provider="${1:-}" pid=$$ parent start count=0 ancestors='[]' boot
   boot=$(cat /proc/sys/kernel/random/boot_id)
   while ((pid > 1 && count < 32)); do
     read -r parent start < <(agent_hooks_process "$pid") || break
-    if agent_hooks_provider_process "$pid"; then
+    if agent_hooks_provider_process "$pid" "$provider"; then
       # Keep the provider and its bounded host ancestry, never environment data.
       local provider_pid=$pid provider_start=$start executable command_hash
       executable=$(readlink -f -- "/proc/$pid/exe") || return 1
@@ -79,12 +86,12 @@ agent_hooks_provenance() {
 # Public read-only proof for later navigation: current provider and host identities.
 # A compositor window must still be independently proved by the desktop owner.
 agent_hooks_validate_provenance() {
-  local evidence="$1" pid expected parent start item
+  local evidence="$1" provider="${2:-}" pid expected parent start item
   [[ "$evidence" != null && $(jq -r .bootId <<<"$evidence") == "$(cat /proc/sys/kernel/random/boot_id)" ]] || return 1
   pid=$(jq -r .pid <<<"$evidence")
   expected=$(jq -r .startTime <<<"$evidence")
   read -r parent start < <(agent_hooks_process "$pid") || return 1
-  [[ "$start" == "$expected" ]] && agent_hooks_provider_process "$pid" || return 1
+  [[ "$start" == "$expected" ]] && agent_hooks_provider_process "$pid" "$provider" || return 1
   [[ "$(jq -r .executable <<<"$evidence")" == "$(readlink -f -- "/proc/$pid/exe")" && "$(jq -r .commandHash <<<"$evidence")" == "$(agent_hooks_command_hash "$pid")" ]] || return 1
   while IFS= read -r item; do
     [[ "$(jq -r .pid <<<"$item")" == "$parent" ]] || return 1
@@ -97,7 +104,7 @@ agent_hooks_validate_provenance() {
 agent_hooks_helper_proof() {
   local provider="$1" session="$2" epoch="$3" evidence="$4" pid=$$ parent start provider_start count=0
   local -a argv
-  agent_hooks_validate_provenance "$evidence" || return 1
+  agent_hooks_validate_provenance "$evidence" "$provider" || return 1
   provider_start=$(jq -r .startTime <<<"$evidence")
   local root key identity
   root="$(aranea_state_root)/agent-heartbeats"
@@ -124,29 +131,31 @@ agent_hooks_helper_proof() {
 
 # Allocate epoch, turn and sequence from the current locked state, including replay.
 agent_hooks_prepare_request() {
-  local request="$1" state="$2" context="$3" proof session epoch evidence fingerprint normalized candidate hash callback_key event_digest
-  [[ $(jq -r .args.provider <<<"$request") == claude ]] || return 1
+  local request="$1" state="$2" context="$3" provider proof session epoch evidence fingerprint normalized candidate hash callback_key event_digest
+  provider=$(jq -r .args.provider <<<"$request")
+  [[ "$provider" == claude || "$provider" == codex ]] || return 1
   if [[ $(jq -r .args.payload.hook_event_name <<<"$request") == AraneaHeartbeat ]]; then
     session=$(jq -r .args.payload.session_id <<<"$request")
     epoch=$(jq -r .args.payload.producer_epoch <<<"$request")
-    evidence=$(jq -c --arg session "$session" --arg epoch "$epoch" '.sessions[] | select(.provider == "claude" and .providerSessionId == $session and .producerEpoch == $epoch and .connection.connected) | .provenance' <<<"$state")
+    evidence=$(jq -c --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" '.sessions[] | select(.provider == $provider and .providerSessionId == $session and .producerEpoch == $epoch and .connection.connected) | .provenance' <<<"$state")
     [[ -n "$evidence" && "$evidence" != null ]] || return 1
-    agent_hooks_helper_proof claude "$session" "$epoch" "$evidence" || return 1
+    agent_hooks_helper_proof "$provider" "$session" "$epoch" "$evidence" || return 1
     proof=$evidence
   else
-    proof=$(agent_hooks_provenance) || return 1
-    if [[ "$proof" != null ]]; then agent_hooks_validate_provenance "$proof" || return 1; fi
+    proof=$(agent_hooks_provenance "$provider") || return 1
+    if [[ "$proof" != null ]]; then agent_hooks_validate_provenance "$proof" "$provider" || return 1; fi
   fi
   fingerprint=$(jq -Sc .args.payload <<<"$request" | sha256sum | cut -d' ' -f1)
   callback_key=$(jq -Sc --arg fingerprint "$fingerprint" '
     def native_id: type == "string" and length>0 and length<=180 and (test("[\\x00-\\x1f\\x7f]")|not);
-    .args.payload | [.hook_event_name,
+    .args.provider as $provider | .args.payload | [.hook_event_name,
       (if .hook_event_name == "PermissionRequest" or .hook_event_name == "Notification" then "fingerprint:"+$fingerprint
        elif (.hook_event_name|IN("PreToolUse","PostToolUse","PostToolUseFailure")) then
          if (.tool_use_id|native_id) then "tool:"+.tool_use_id else "fingerprint:"+$fingerprint end
        elif .hook_event_name == "TaskCompleted" and (.task_id|native_id) then "task:"+.task_id
        elif (.agent_id|native_id) then "agent:"+.agent_id
-       elif (.prompt_id|native_id) then "prompt:"+.prompt_id
+       elif $provider == "codex" and (.turn_id|native_id) then "turn:"+.turn_id
+       elif $provider == "claude" and (.prompt_id|native_id) then "prompt:"+.prompt_id
        else "fingerprint:"+$fingerprint end)]' <<<"$request" | sha256sum | cut -d' ' -f1)
   normalized=$(printf '%s\n%s\n%s\n%s\n' "$request" "$state" "$context" "$proof" | jq -c -s --arg fingerprint "$fingerprint" --arg callbackKey "$callback_key" -f "$script_dir/lib/agent-hooks.jq") || return 1
   if [[ $(jq -r .args.eventId <<<"$normalized") == "pending:$callback_key" ]]; then

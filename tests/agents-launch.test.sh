@@ -51,7 +51,22 @@ for id in --help 'x;touch nope' named-session; do
   if result=$(jq --arg id "$id" '.providerSessionId=$id' <<<"$request" | "$launcher"); then exit 1; fi
   jq -e '.code=="RESUME_UNAVAILABLE"' <<<"$result" >/dev/null
 done
-if jq '.provider="codex"' <<<"$request" | "$launcher" >/dev/null; then exit 1; fi
+cp "$ARANEA_TEST_SANDBOX/bin/kitty" "$ARANEA_TEST_SANDBOX/bin/codex"
+rm "$ARANEA_TEST_SANDBOX/argv"
+result=$(jq '.provider="codex"' <<<"$request" | "$launcher")
+pid=$(jq -r .identity.pid <<<"$result")
+sandbox_on_exit "kill -- -$pid 2>/dev/null || true"
+jq -e '.ok and .status=="accepted"' <<<"$result" >/dev/null
+for _ in {1..50}; do
+  [[ ! -f "$ARANEA_TEST_SANDBOX/argv" ]] || break
+  sleep .02
+done
+[[ $(sed -n '5p' "$ARANEA_TEST_SANDBOX/argv") == "$ARANEA_TEST_SANDBOX/bin/codex" ]]
+[[ $(sed -n '6p' "$ARANEA_TEST_SANDBOX/argv") == resume ]]
+[[ $(sed -n '7p' "$ARANEA_TEST_SANDBOX/argv") == 12345678-1234-1234-1234-123456789abc ]]
+[[ $(sed -n '8p' "$ARANEA_TEST_SANDBOX/argv") == --cd ]]
+[[ $(sed -n '9p' "$ARANEA_TEST_SANDBOX/argv") == "$checkout" ]]
+if jq '.provider="codex" | .providerSessionId="thr_app"' <<<"$request" | "$launcher" >/dev/null; then exit 1; fi
 rm "$ARANEA_TEST_SANDBOX/bin/claude"
 ln -s "$checkout/claude" "$ARANEA_TEST_SANDBOX/bin/claude"
 if result=$("$launcher" <<<"$request"); then exit 1; fi

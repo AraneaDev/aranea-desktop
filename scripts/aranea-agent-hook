@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: aranea-agent-hook claude < native-hook.json
+# Usage: aranea-agent-hook claude|codex < native-hook.json
 # Advisory reporter: fixed bootstrap tools, no provider decisions or context.
 export PATH=/usr/bin:/bin
 unset BASH_ENV ENV CDPATH

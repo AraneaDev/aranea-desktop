@@ -62,6 +62,7 @@ ShellRoot {
       if (argv[0].endsWith('aranea-agent-identity')) {
         root.proofs++
         var query = JSON.parse(input)
+        t.equal(query.provider, root.session.provider, 'proof includes the claimed provider')
         t.equal(query.terminalPid, 10, 'provider must descend from compositor terminal PID')
         if (root.replaceWindow)
           root.windows = [
@@ -106,6 +107,11 @@ ShellRoot {
       t.equal(proofs, 2, 'native process proof revalidated immediately before dispatch')
       t.equal(dispatches.length, 1, 'one exact focus')
     })
+    session.provider = 'codex'
+    runtime.focusSession({}, session, function (result) {
+      t.equal(result.status, 'observed', 'Codex hosting terminal requires the same native proofs')
+      t.equal(dispatches.length, 2, 'Codex uses the existing focus path')
+    })
     valid = false
     runtime.focusSession({}, session, function (result) {
       t.equal(result.status, 'unconfirmed', 'invalid native process refuses focus')
@@ -148,7 +154,7 @@ ShellRoot {
     runtime.focusSession({}, session, function (result) {
       t.equal(result.status, 'unconfirmed', 'provider PID is not hosting ancestor PID')
     })
-    t.equal(dispatches.length, 1, 'all uncertain cases never dispatch')
+    t.equal(dispatches.length, 2, 'all uncertain cases never dispatch')
     runtime.captureActive = true
     var before = proofs
     runtime.focusSession({}, session, function (result) {
@@ -218,7 +224,7 @@ ShellRoot {
       t.equal(result.terminalId, 'kitty', 'saved terminal preference comes from project authority')
       t.equal(requests, 2, 'retry only explicit preaccept readiness refusal')
       t.equal(queries, 2, 'accepted project ID queried without resubmission')
-      t.equal(dispatches.length, 1, 'preparation has no duplicate activity workspace dispatch')
+      t.equal(dispatches.length, 2, 'preparation has no duplicate activity workspace dispatch')
       t.done()
     })
   }

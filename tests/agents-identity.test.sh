@@ -27,3 +27,32 @@ for mutation in '.provenance.startTime="0"' '.provenance.bootId="wrong"' '.prove
   jq -e '.ok and (.verified|not)' <<<"$result" >/dev/null
 done
 echo 'PASS native boot/PID/start/executable/hash/ancestry and terminal-parent direction'
+
+# A Codex claim must never borrow a Claude executable's proof.
+jq '.provider="codex"' <<<"$query" | "$helper" | jq -e '.verified==false' >/dev/null
+cp /usr/bin/sleep "$ARANEA_TEST_SANDBOX/bin/codex"
+"$ARANEA_TEST_SANDBOX/bin/codex" 30 &
+codex_pid=$!
+sandbox_on_exit "kill $codex_pid 2>/dev/null || true"
+agent_hooks_provider_process "$codex_pid" codex || {
+  echo 'FAIL Codex CLI process proof unavailable'
+  exit 1
+}
+if agent_hooks_provider_process "$codex_pid" claude; then exit 1; fi
+read -r parent start < <(agent_hooks_process "$codex_pid")
+evidence=$(jq --argjson pid "$codex_pid" --arg start "$start" --arg exe "$(readlink -f "/proc/$codex_pid/exe")" --arg hash "$(agent_hooks_command_hash "$codex_pid")" '.pid=$pid|.startTime=$start|.executable=$exe|.commandHash=$hash' <<<"$evidence")
+jq -cn --argjson evidence "$evidence" '{provider:"codex",provenance:$evidence}' | "$helper" | jq -e '.verified' >/dev/null
+jq -cn --argjson evidence "$evidence" '{provenance:$evidence}' | "$helper" | jq -e '.verified' >/dev/null
+cp /bin/bash "$ARANEA_TEST_SANDBOX/bin/codex-app"
+# The absolute codex symlink models a versioned native install with app-server argv.
+rm "$ARANEA_TEST_SANDBOX/bin/codex"
+ln -s "$ARANEA_TEST_SANDBOX/bin/codex-app" "$ARANEA_TEST_SANDBOX/bin/codex"
+"$ARANEA_TEST_SANDBOX/bin/codex" -c 'sleep 30 & wait' app-server &
+app_pid=$!
+sandbox_on_exit "kill $app_pid 2>/dev/null || true"
+sleep .05
+if agent_hooks_provider_process "$app_pid" codex; then
+  echo 'FAIL app-server accepted as CLI'
+  exit 1
+fi
+echo 'PASS provider-specific Codex CLI proof and app-server refusal'

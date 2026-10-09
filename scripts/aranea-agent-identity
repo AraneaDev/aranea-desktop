@@ -1,5 +1,5 @@
 #!/bin/bash
-# Usage: aranea-agent-identity (reads {provenance,terminalPid?}; read-only proof)
+# Usage: aranea-agent-identity (reads {provenance,terminalPid?,provider?}; read-only proof)
 # Native process validation is shared with the hook adapter; terminal is an ancestor.
 set -euo pipefail
 export PATH=/usr/bin:/bin
@@ -13,9 +13,9 @@ source "$script_dir/lib/agent-hooks.sh"
 }
 request=$(head -c 65537 | jq -Rcse 'if utf8bytelength<=65536 then fromjson else error("too large") end' 2>/dev/null) || request=null
 verified=false terminal=null
-if jq -e 'type=="object" and (keys-["provenance","terminalPid"]|length)==0 and (.provenance|type=="object")' <<<"$request" >/dev/null 2>&1; then
+if jq -e 'type=="object" and (keys-["provenance","terminalPid","provider"]|length)==0 and (.provenance|type=="object") and ((has("provider")|not) or (.provider|IN("claude","codex")))' <<<"$request" >/dev/null 2>&1; then
   evidence=$(jq -c .provenance <<<"$request")
-  if agent_hooks_validate_provenance "$evidence" 2>/dev/null; then
+  if agent_hooks_validate_provenance "$evidence" "$(jq -r '.provider // ""' <<<"$request")" 2>/dev/null; then
     if jq -e 'has("terminalPid")' <<<"$request" >/dev/null; then
       terminal=$(jq -c --argjson pid "$(jq .terminalPid <<<"$request")" '[.ancestors[]|select(.pid==$pid)][0] // null' <<<"$evidence")
       [[ "$terminal" == null ]] || verified=true
