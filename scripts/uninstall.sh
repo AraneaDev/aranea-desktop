@@ -181,10 +181,51 @@ restore_gsettings() {
   done
 }
 
+# Remove only exact commands owned by this installation; unsafe settings remain untouched.
+remove_agent_adapters() {
+  local provider config
+  for provider in claude codex; do
+    if [[ "$provider" == claude ]]; then config="$HOME/.claude/settings.json"; else config="${CODEX_HOME:-$HOME/.codex}/hooks.json"; fi
+    [[ -e "$config" || -L "$config" ]] || continue
+    if ! "$repo_root/scripts/aranea-agent-adapter" remove "$provider" >/dev/null; then
+      printf 'Agent adapter cleanup refused for %s (%s). Restore this theme at %s, then run its scripts/aranea-agent-adapter remove %s; review only the exact aranea-agent-hook command in this file. Provider settings were preserved.\n' "$provider" "$config" "$repo_root" "$provider" >&2
+    fi
+  done
+}
+
+# A receipt is not kill authority without exact live PID/start/boot/executable/argv proof.
+remove_agent_helpers() {
+  local root="$project_state_root/agent-heartbeats" record pid start stat boot key
+  local -a argv
+  [[ -d "$root" && ! -L "$root" ]] || return 0
+  boot=$(cat /proc/sys/kernel/random/boot_id)
+  for record in "$root"/*.json; do
+    [[ -f "$record" && ! -L "$record" ]] || continue
+    pid=$(jq -er '.pid | select(type=="number" and .>1 and floor==.)' "$record" 2>/dev/null) || continue
+    [[ -r "/proc/$pid/stat" && -r "/proc/$pid/cmdline" ]] || continue
+    stat=$(cat "/proc/$pid/stat" 2>/dev/null) || continue
+    start=$(awk '{print $20}' <<<"${stat##*) }")
+    jq -e --arg start "$start" --arg boot "$boot" '.startTime==$start and .bootId==$boot' "$record" >/dev/null 2>&1 || continue
+    [[ $(readlink -f -- "/proc/$pid/exe") == "$(readlink -f /bin/bash)" ]] || continue
+    argv=()
+    mapfile -d '' -t argv <"/proc/$pid/cmdline" || continue
+    [[ ${#argv[@]} == 8 && ${argv[0]} == /bin/bash && ${argv[1]} == "$repo_root/scripts/aranea-agent-heartbeat" ]] || continue
+    jq -e --arg provider "${argv[2]}" --arg session "${argv[3]}" --arg epoch "${argv[4]}" --arg providerPid "${argv[5]}" --arg providerStart "${argv[6]}" --arg boot "${argv[7]}" '.provider==$provider and .providerSessionId==$session and .producerEpoch==$epoch and (.providerProcess.pid|tostring)==$providerPid and .providerProcess.startTime==$providerStart and .bootId==$boot' "$record" >/dev/null 2>&1 || continue
+    key=$(printf '%s\n' "${argv[2]}" "${argv[3]}" "${argv[4]}" | sha256sum | cut -d' ' -f1)
+    [[ "$record" == "$root/$key.json" ]] || continue
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  # Deleting the receipt also prevents a sleeping helper from reporting again.
+  rm -rf -- "$root"
+}
+
 # Removes Aranea's state. Files the user customised stay in the ledger with
 # their backups (restore_managed_files keeps them), so those are kept.
 remove_state() {
   local entry
+  remove_agent_adapters
+  remove_agent_helpers
+  rm -f -- "$project_state_root/agent-activity.json" "$project_state_root/agent-activity.json.lock"
   # Registry state does not follow an independently overridden ownership root.
   # Remove only its owned artifacts: that root can contain kept backups.
   rm -f -- "$project_state_root/projects.json" "$project_state_root/projects.json.lock"
@@ -217,6 +258,7 @@ describe() {
     sed 's/^/    /' "$(ownership_record)"
   fi
   printf '  restore saved desktop settings and remove %s\n' "$state_root"
+  printf '  remove exact owned Claude/Codex adapter hooks, heartbeat helpers and activity state\n'
   printf '  remove project registrations %s/projects.json and its lock\n' "$project_state_root"
   return 0
 }

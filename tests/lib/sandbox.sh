@@ -29,6 +29,8 @@ ARANEA_TEST_SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/aranea-test.XXXXXX")"
 export ARANEA_TEST_SANDBOX
 
 export HOME="$ARANEA_TEST_SANDBOX/home"
+# Provider adapters must never follow an inherited host configuration root.
+export CODEX_HOME="$HOME/.codex"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_STATE_HOME="$HOME/.local/state"
 export XDG_DATA_HOME="$HOME/.local/share"

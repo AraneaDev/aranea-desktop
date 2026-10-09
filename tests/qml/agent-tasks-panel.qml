@@ -331,7 +331,10 @@ ShellRoot {
       agents: [],
       dataRevision: 0,
       pendingUpdateKind: '',
-      syncStatusText: ''
+      syncStatusText: '',
+      refreshLimits: function () {
+        calls.push(['limits-refresh'])
+      }
     }
     tabs.choose('usage')
     t.check(t.findChild(panel, 'agentsHeader').visible, 'Usage tab renders the actual existing dropdown')
@@ -382,6 +385,42 @@ ShellRoot {
     failAcceptedRead = false
     acceptedClient.reconnect()
     t.check(tasks.selectedOperation.ownerUnconfirmed, 'later owner identity is never guessed into the absent acceptance')
+    panel.activityClient = activity
+    t.check(typeof panel.showTask === 'function', 'notification detail endpoint exists')
+    if (typeof panel.showTask === 'function') {
+      var beforeSelection = tasks.selectedId
+      var requested = panel.showTask('notify-task')
+      t.check(requested.ok && requested.status === 'pending', 'deep link awaits a fresh snapshot')
+      t.equal(tasks.selectedId, beforeSelection, 'cached task cannot satisfy notification deep link')
+      activity.snapshot = {
+        tasks: [
+          {
+            taskId: 'notify-task',
+            provider: 'claude',
+            reportedState: 'failed',
+            association: {}
+          }
+        ]
+      }
+      t.equal(tasks.selectedId, 'notify-task', 'fresh exact task opens its real details')
+      panel.showTask('removed-task')
+      activity.snapshot = {
+        tasks: [
+          {
+            taskId: 'different-task',
+            provider: 'claude',
+            reportedState: 'failed',
+            association: {}
+          }
+        ]
+      }
+      t.check(tasks.selectedId !== 'different-task', 'removed target never selects its replacement')
+      t.equal(panel.taskInspection.status, 'unavailable', 'removed deep link reports unavailable')
+      panel.captureActive = true
+      var beforeCalls = calls.length
+      t.check(!panel.showTask('different-task').ok, 'capture refuses deep link')
+      t.equal(calls.length, beforeCalls, 'capture deep link does not refresh')
+    }
     acceptedClient.captureActive = true
     panel.captureActive = true
     t.done()

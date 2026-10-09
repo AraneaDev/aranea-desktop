@@ -10,6 +10,7 @@ import qs.Commons
 import qs.Ui
 import "AgentsLogic.js" as AgentsLogic
 import "AgentTasksLogic.js" as TasksLogic
+import "../araneadev.activity/ActivityLogic.js" as ActivityLogic
 import "../araneadev.activity" as Activity
 import "../araneadev.projects" as Projects
 import "../araneadev.shared" as Aranea
@@ -40,6 +41,67 @@ Panel {
   readonly property var activity: activityClient || activityObserver
   // Labels join exact project/checkout identities without mutating the registry.
   readonly property var projects: projectClient || projectObserver
+  // A notification deep link waits for this client's next successful owner snapshot.
+  property string inspectionTaskId: ''
+  // IPC reports request/lookup status without asserting native popup visibility.
+  property var taskInspection: ({
+      ok: false,
+      status: 'unavailable',
+      taskId: ''
+    })
+  // Stable task IDs are the only accepted notification input.
+  function showTask(taskId: string): var {
+    if (captureActive || agentsShowcase || !ActivityLogic.validId(taskId))
+      return {
+        ok: false,
+        status: 'unavailable',
+        taskId: taskId
+      }
+    inspectionTaskId = taskId
+    taskInspection = {
+      ok: true,
+      status: 'pending',
+      taskId: taskId
+    }
+    inspectionTimeout.restart()
+    if (activity.refresh() === false)
+      finishTaskInspection(false)
+    return taskInspection
+  }
+  // Failed reads/removed targets do not substitute another row or action.
+  function finishTaskInspection(found: bool): void {
+    var id = inspectionTaskId
+    inspectionTaskId = ''
+    inspectionTimeout.stop()
+    taskInspection = {
+      ok: found,
+      status: found ? 'selected' : 'unavailable',
+      taskId: id
+    }
+    if (!found || captureActive || agentsShowcase)
+      return
+    root.open()
+    navigation.choose('tasks')
+    tasksView.openDetails(id)
+  }
+  // The snapshot signal follows only a successful read in ActivityClient.
+  function inspectFreshTask(): void {
+    if (!inspectionTaskId || captureActive || agentsShowcase)
+      return
+    var state = activity.snapshot
+    finishTaskInspection(!state.error && (!state.availability || state.availability.ready) && (state.tasks || []).some(function (task) {
+      return task.taskId === inspectionTaskId
+    }))
+  }
+  onCaptureActiveChanged: {
+    if (captureActive && inspectionTaskId)
+      finishTaskInspection(false)
+  }
+  Timer {
+    id: inspectionTimeout
+    interval: 3000
+    onTriggered: root.finishTaskInspection(false)
+  }
   // Stable task/action context remains available after transport uncertainty.
   property string actionTaskId: ''
   // Fixed enum only; provider text can never become action input.
@@ -81,7 +143,12 @@ Panel {
   Connections {
     target: root.activity
     ignoreUnknownSignals: true
+    function onSnapshotChanged() {
+      root.inspectFreshTask()
+    }
     function onErrorChanged() {
+      if (root.activity.error && root.inspectionTaskId)
+        root.finishTaskInspection(false)
       root.retainOperationError()
     }
     function onOperationChanged(operation) {
@@ -953,6 +1020,12 @@ Panel {
 
   IpcHandler {
     target: root.ipcTarget
+    function showTask(taskId: string): string {
+      return JSON.stringify(root.showTask(taskId))
+    }
+    function taskInspection(): string {
+      return JSON.stringify(root.taskInspection)
+    }
     function open(): void {
       root.open()
     }

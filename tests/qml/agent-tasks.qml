@@ -177,6 +177,11 @@ ShellRoot {
           view.navigate(0)
           view.navigate(0)
           t.equal(actions.length, 0, 'local result inspection never emits an owner action from the Tasks composition')
+          view.snapshot = {
+            tasks: []
+          }
+          t.check(t.findChild(view, 'taskSetupCommands').text.indexOf('aranea agents adapter install codex') >= 0, 'setup includes explicit Codex opt-in command')
+          t.check(t.findChild(view, 'taskSetupCommands').text.indexOf('trust') >= 0, 'setup explains configuration is not trust or observation')
           t.done()
         })
       })

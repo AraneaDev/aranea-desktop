@@ -114,3 +114,104 @@ Reported state and verification remain separate from connection freshness.
 Heartbeat loss after 60 seconds never invents completion. Reported review,
 failure and finished results remain historical. Store read errors retain the
 last valid snapshot. `captureActive` refuses all external I/O.
+
+## Setup and attention
+
+Open Agents → Tasks; Usage stays available as the neighboring tab. Reporting is
+local to this machine and opt-in. Register the exact checkout in Project settings
+first. An event never registers a project automatically.
+
+```sh
+aranea agents adapter status claude
+aranea agents adapter install claude
+aranea agents adapter status codex
+aranea agents adapter install codex
+aranea agents status --json
+```
+
+Install only the provider you want. Review the provider's hook/trust settings,
+then start a new native CLI session. `configured` only confirms owned hook entries;
+`enabled` and `trusted` remain unconfirmed. `runtimeObserved` records actual hook
+receipts; `connectionProven` additionally needs fresh native process evidence.
+Missing providers and disabled/untrusted hooks can still use explicit reports.
+Codex question-event coverage is unconfirmed; explicit reporting is the fallback.
+No setup action changes provider approvals, permissions, TOML or trust policy.
+
+Only Needs input, Ready for review and Failed transitions notify. The persistent
+owner coalesces each task's burst for two seconds and deduplicates unchanged
+state/blocker identities. DND, active quiet hours and unavailable policy consume
+attention without replay when suppression ends. The first snapshot after an
+owner restart is historical and silent. Normal-urgency notifications never
+bypass DND. Native notification observers expire after at most 15 seconds.
+`notifications.status` distinguishes suppressed, unavailable, accepted and
+requested; native popup visibility is never claimed observed. Headless reports
+update state without claiming notification delivery.
+
+Clicking **Open task** rereads the exact task ID, then calls the existing Agents
+panel's `showTask(taskId)` IPC endpoint. The panel waits for a fresh owner snapshot
+before selecting that task's details. Missing tasks cannot select another row.
+This performs inspection only; use the explicit task buttons to navigate or
+reopen. Missing Agents widget/IPC leaves inspection unavailable: add Agents to
+the bar, or use `aranea agents list` and `aranea agents inspect TASK_ID`.
+`omarchy.agents taskInspection` returns the most recent lookup status; `selected`
+means content selection, not observed native popup placement.
+
+Verification is independently unknown, reported-pass or reported-fail. Stop or
+ready-for-review does not imply tests passed. Focus needs fresh native identity,
+process ancestry and a unique current terminal window; workspace, title and class
+are insufficient. Focus reaches the hosting terminal, with no tmux/pane claim.
+A partial accepted resume is never retried automatically, including owner loss.
+
+## Explicit report example
+
+Register a manual session once, then send ordered schema-1 events. Replace the
+example directory with an existing checkout; project association requires prior
+explicit project registration. Native process proof cannot be supplied manually.
+
+```sh
+printf '%s\n' '{"provider":"claude","providerSessionId":"manual-demo","producerEpoch":"demo-1","tasks":[]}' |
+  aranea agents register --json-input
+printf '%s\n' '{"schemaVersion":1,"eventId":"demo-1","provider":"claude","providerSessionId":"manual-demo","producerEpoch":"demo-1","sequence":1,"taskId":"demo-task","kind":"snapshot","payload":{"cwd":"/path/to/checkout","reportedState":"working","description":"Review navigation"}}' |
+  aranea agents report --json-input
+printf '%s\n' '{"schemaVersion":1,"eventId":"demo-2","provider":"claude","providerSessionId":"manual-demo","producerEpoch":"demo-1","sequence":2,"taskId":"demo-task","kind":"needs-input","payload":{"blockerId":"choice","question":"Which checkout should receive the change?"}}' |
+  aranea agents report --json-input
+```
+
+Events require stable IDs and increasing sequence numbers within an epoch.
+Duplicate exact events are idempotent; mismatched replay or malformed fields are
+rejected. Reports are bounded display data, never executable commands. Heartbeats
+run every 15 seconds; connection loss is projected after 60 seconds. Retention
+keeps at most 500 inactive tasks for 14 days, with at most 200 live tasks and an
+explicit capacity error rather than silent live eviction.
+
+## Deployment and removal
+
+The `keepLoaded` activity owner deploys with the theme independently of the Agents
+bar entry. Theme release/return preserves activity state and running applications.
+Both uninstall scopes remove owned activity state and exact proven heartbeat
+helpers; provider processes, repositories and transcripts survive. Uninstall
+removes only this installation's exact adapter commands using the same safe
+removal transport. Unrelated hooks, permissions and Codex TOML remain intact.
+Unsafe/malformed settings are preserved with explicit repair/removal guidance.
+To opt out without uninstalling the theme:
+
+```sh
+aranea agents adapter remove claude
+aranea agents adapter remove codex
+```
+
+## Inert production preview
+
+`tools/render-agents-preview --fixture mixed --output /tmp/agents.png` renders the
+actual production Tasks/navigation/details components in an offscreen host.
+Fixtures: `empty`, `working`, `needs-input`, `review`, `failed`, `lost`, `finished`,
+`long`, `mixed`, `partial`, `pending`. Set `ARANEA_AGENTS_RENDER_DETAILS=1` for
+first-task details, `ARANEA_AGENTS_RENDER_WIDTH=420` for narrow content, and
+`ARANEA_AGENTS_RENDER_FONT_SCALE=1.5` for large fonts. Height is configurable with
+`ARANEA_AGENTS_RENDER_HEIGHT`; partial/pending show details by default.
+
+The renderer isolates HOME/XDG/state/theme paths, replaces absolute theme helper
+paths and PATH commands with execution traps, and checks for state/settings
+writes. It constructs no activity runtime, clients, collectors or provider.
+Captures cannot validate native popup placement, actual desktop notifications,
+provider trust or multiplexer focus; those remain separate host checks.

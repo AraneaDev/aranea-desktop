@@ -5,7 +5,7 @@
 render_capture_install_traps() {
   local work="$1" program
   mkdir -p "$work/traps"
-  for program in omarchy-shell aranea aranea-project-store aranea-project-discover aranea-project-tools code nvim alacritty kitty foot ghostty hyprctl; do
+  for program in claude codex notify-send aranea-agent-store aranea-agent-hook aranea-agent-hook-worker aranea-agent-heartbeat aranea-agent-adapter aranea-agent-identity aranea-agent-launch aranea-project-launch aranea-project-identity omarchy-shell aranea aranea-project-store aranea-project-discover aranea-project-tools code nvim alacritty kitty foot ghostty hyprctl; do
     cat >"$work/traps/$program" <<'CAPTURE_TRAP'
 #!/usr/bin/env bash
 # Shared Style geometry probes receive fixed offscreen values, never live IPC.

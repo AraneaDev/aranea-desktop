@@ -91,6 +91,20 @@ for automation. Inert showcase IDs are `projects-empty`, `projects-discovery`,
 `project-launch-partial`; [development instructions](docs/development.md)
 render them without user repositories or desktop operations.
 
+### Local agent activity
+
+Open **Agents → Tasks** for Claude Code and Codex task activity alongside Usage.
+Reporting is opt-in: run `aranea agents adapter status claude` or
+`aranea agents adapter status codex`, then copy the matching install command from
+Tasks setup. Review provider hook trust and start a new native CLI session;
+configured hooks alone do not prove observed activity. Register projects explicitly.
+
+Needs input, Ready for review and Failed transitions receive quiet, coalesced
+notifications respecting DND and quiet hours. Open task inspects current details;
+resume remains an explicit action. Verification is independently reported, and
+session focus reaches only a proven hosting terminal. Activity is local to this
+machine. See [setup, CLI examples and limitations](plugins/araneadev.activity/README.md).
+
 ### Typography and settings
 
 Open **Setup → Aranea settings**, or search for “settings”. Aranea uses

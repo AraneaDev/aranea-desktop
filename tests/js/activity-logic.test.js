@@ -82,3 +82,44 @@ test("missing association and native proof never become focus or arbitrary resum
     "unavailable"
   )
 })
+test("attention transitions use state and blocker identity, consume suppression and bound plain text", () => {
+  assert.equal(typeof logic.notificationTransitions, "function")
+  const previous = { tasks: [task] }
+  const attention = {
+    ...task,
+    reportedState: "needs-input",
+    description: "<b>" + "x".repeat(900),
+    blockers: [{ id: "b", summary: "question" }]
+  }
+  const current = { tasks: [attention] }
+  assert.equal(logic.notificationTransitions(previous, current, true).length, 0)
+  assert.equal(logic.notificationTransitions(current, current, false).length, 0)
+  assert.equal(logic.notificationTransitions(null, current, false).length, 0)
+  const result = logic.notificationTransitions(previous, current, false)
+  assert.equal(result.length, 1)
+  assert.equal(result[0].taskId, "t")
+  assert.ok(result[0].body.length <= 512)
+  assert.ok(!result[0].body.includes("<"))
+  assert.equal(
+    logic.notificationTransitions(
+      current,
+      { tasks: [{ ...attention, description: "changed" }] },
+      false
+    ).length,
+    0
+  )
+  assert.equal(
+    logic.notificationTransitions(
+      current,
+      { tasks: [{ ...attention, blockers: [{ id: "c" }] }] },
+      false
+    ).length,
+    1
+  )
+  for (const reportedState of ["working", "finished", "connection-lost"])
+    assert.equal(
+      logic.notificationTransitions(previous, { tasks: [{ ...task, reportedState }] }, false)
+        .length,
+      0
+    )
+})

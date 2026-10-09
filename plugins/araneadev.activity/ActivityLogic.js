@@ -117,4 +117,81 @@ function project(state, now, registry) {
     })
   })
 }
-if (typeof module !== "undefined") module.exports = { validId, resumeCommand, sessionFor, project }
+/** Stable attention identity excludes diagnostic/heartbeat/text updates.
+ * @param {ActivityData} task - current task
+ * @returns {string} identity
+ */
+function notificationKey(task) {
+  return JSON.stringify([
+    task.taskId,
+    task.producerEpoch,
+    task.reportedState,
+    (task.blockers || [])
+      .map(function (/** @type {ActivityData} */ b) {
+        return b.id || b.blockerId || ""
+      })
+      .sort()
+  ])
+}
+
+/** Bounded native notification text, without markup or control characters.
+ * @param {any} value - display data
+ * @param {number} limit - maximum length
+ * @returns {string} plain text
+ */
+function notificationText(value, limit) {
+  return String(value || "")
+    .replace(/[<>]/g, "")
+    .split("")
+    .filter(function (c) {
+      return c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127
+    })
+    .join("")
+    .slice(0, limit)
+}
+
+/** Initial snapshots are historical; suppressed transitions are consumed by the owner.
+ * @param {?ActivityData} previous - last successfully read snapshot
+ * @param {ActivityData} current - new successfully read snapshot
+ * @param {boolean} suppressed - policy blocks emission
+ * @returns {Array<ActivityData>} attention transitions only
+ */
+function notificationTransitions(previous, current, suppressed) {
+  if (!previous || suppressed) return []
+  return (current.tasks || [])
+    .filter(function (/** @type {ActivityData} */ task) {
+      if (["needs-input", "ready-for-review", "failed"].indexOf(task.reportedState) < 0)
+        return false
+      var before = (previous.tasks || []).filter(function (/** @type {ActivityData} */ old) {
+        return old.taskId === task.taskId
+      })[0]
+      return !before || notificationKey(before) !== notificationKey(task)
+    })
+    .map(function (/** @type {ActivityData} */ task) {
+      /** @type {{[key:string]:string}} */
+      var labels = {
+        "needs-input": "Needs input",
+        "ready-for-review": "Ready for review",
+        failed: "Failed"
+      }
+      return {
+        taskId: task.taskId,
+        key: notificationKey(task),
+        title: "Aranea · " + labels[task.reportedState],
+        body: notificationText(
+          task.description || task.summary || "Agent task needs attention",
+          512
+        )
+      }
+    })
+}
+if (typeof module !== "undefined")
+  module.exports = {
+    validId,
+    resumeCommand,
+    sessionFor,
+    project,
+    notificationKey,
+    notificationTransitions,
+    notificationText
+  }

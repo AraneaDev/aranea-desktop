@@ -78,6 +78,7 @@ if [[ "$1 $2" == "theme install" ]]; then
   rm -rf "$HOME/.config/omarchy/themes/$name"
   mkdir -p "$HOME/.config/omarchy/themes/$name"
   printf 'fresh\n' > "$HOME/.config/omarchy/themes/$name/VERSION"
+  cp -a "$TEST_THEME_SOURCE/plugins" "$HOME/.config/omarchy/themes/$name/plugins"
   cp -a "$TEST_THEME_SOURCE/scripts" "$HOME/.config/omarchy/themes/$name/scripts"
   cp -a "$TEST_THEME_SOURCE/integrations" "$TEST_THEME_SOURCE/branding" \
     "$TEST_THEME_SOURCE/theme-manifest.toml" "$HOME/.config/omarchy/themes/$name/"
@@ -153,3 +154,10 @@ PATH="$name_root/bin:$PATH" "$repo_root/scripts/install.sh" --yes --profile mini
 [[ "$(readlink "$HOME/.local/bin/aranea")" == "$HOME/custom/scripts/aranea" ]]
 
 echo "installer dry-run contract passed"
+
+# The stable installed CLI includes activity without silently opting providers in.
+installed_theme="$HOME/.config/omarchy/themes/aranea"
+jq -e '.id=="araneadev.activity" and .keepLoaded==true' "$installed_theme/plugins/araneadev.activity/manifest.json" >/dev/null
+"$installed_theme/scripts/aranea" agents list --json | jq -se 'last | .data.tasks==[]' >/dev/null
+[[ ! -e "$HOME/.claude/settings.json" && ! -e "$HOME/.codex/hooks.json" ]]
+echo 'PASS installed persistent activity plugin and opt-in provider configuration'

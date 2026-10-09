@@ -295,5 +295,6 @@ else
     json_completed_sent=1
   else
     say "$BRAND_NAME installed."
+    say "Agent activity is opt-in: aranea agents adapter status claude (or codex). See Agents → Tasks for setup."
   fi
 fi

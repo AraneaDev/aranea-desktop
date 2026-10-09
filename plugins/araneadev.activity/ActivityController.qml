@@ -47,6 +47,13 @@ Item {
   property double elapsedSinceRead: 0
   // Snapshot receipt wall clock anchors monotonically increasing cache age.
   property double readAt: 0
+  // Pending attention is owner-local and never restored or replayed after restart.
+  property var notificationQueue: []
+  // Delivery acceptance is separate from an unobservable desktop popup.
+  property var notificationStatus: ({
+      status: 'unavailable',
+      message: 'No notification delivery observed.'
+    })
   // Public projection changed without transferring operation ownership.
   signal snapshotChanged
   // Accepted operation progress for read-only consumers.
@@ -54,6 +61,8 @@ Item {
   onCaptureActiveChanged: {
     readGeneration++
     if (captureActive) {
+      notificationQueue = []
+      notificationTimer.stop()
       queue = []
       busy = false
       observing = false
@@ -77,6 +86,7 @@ Item {
         owner: !captureActive
       },
       error: error,
+      notifications: notificationStatus,
       operations: operations
     })
   }
@@ -91,7 +101,9 @@ Item {
       if (!response || !response.ok || !response.state) {
         error = response && response.error || failure('STORE_UNAVAILABLE', 'Activity store unavailable.')
       } else {
+        var previous = ready ? storeState : null
         storeState = response.state
+        consumeNotifications(previous, storeState, revision)
         ready = true
         error = null
         readAt = clock()
@@ -100,6 +112,121 @@ Item {
       snapshotChanged()
     })
     return true
+  }
+  // Successful snapshots consume transitions even when policy is unavailable or suppressed.
+  function consumeNotifications(previous: var, current: var, revision: int): void {
+    notificationQueue = notificationQueue.filter(function (notice) {
+      return current.tasks.some(function (task) {
+        return Logic.notificationKey(task) === notice.key
+      })
+    })
+    notificationQueue = notificationQueue.map(function (notice) {
+      var task = current.tasks.filter(function (row) {
+        return row.taskId === notice.taskId
+      })[0]
+      return Object.assign({}, notice, {
+        body: Logic.notificationText(task.description || task.summary || 'Agent task needs attention', 512)
+      })
+    })
+    var transitions = Logic.notificationTransitions(previous, current, false)
+    if (!transitions.length || !runtime || typeof runtime.readNotificationPolicy !== 'function')
+      return
+    runtime.readNotificationPolicy(function (policy) {
+      if (captureActive || revision !== readGeneration)
+        return
+      if (!policy || !policy.available || policy.suppressed) {
+        notificationQueue = []
+        notificationStatus = {
+          status: policy && policy.available ? 'suppressed' : 'unavailable',
+          message: 'Attention consumed; no backlog will be replayed.'
+        }
+        return
+      }
+      transitions.forEach(function (notice) {
+        notificationQueue = notificationQueue.filter(function (old) {
+          return old.taskId !== notice.taskId
+        }).concat([notice])
+      })
+      if (!notificationTimer.running)
+        notificationTimer.start()
+    })
+  }
+  // Recheck policy at emission; DND changes during coalescing also consume the burst.
+  function flushNotifications(): void {
+    notificationTimer.stop()
+    if (captureActive || !runtime || !notificationQueue.length)
+      return
+    var pending = notificationQueue
+    notificationQueue = []
+    runtime.readNotificationPolicy(function (policy) {
+      if (captureActive)
+        return
+      if (!policy || !policy.available || policy.suppressed) {
+        notificationStatus = {
+          status: policy && policy.available ? 'suppressed' : 'unavailable',
+          message: 'Attention consumed; no backlog will be replayed.'
+        }
+        return
+      }
+      pending.filter(function (notice) {
+        return storeState.tasks.some(function (task) {
+          return Logic.notificationKey(task) === notice.key
+        })
+      }).forEach(function (notice) {
+        runtime.notifyAttention(notice, function (result) {
+          if (captureActive)
+            return
+          notificationStatus = {
+            status: result && result.accepted ? 'accepted' : 'unavailable',
+            message: 'Desktop display is not observed. Open Agents Tasks to inspect activity.'
+          }
+          if (result && result.activated)
+            activateNotification(notice.taskId)
+        })
+      })
+    })
+  }
+  // Notification activation is inspection only; fresh lookup never resumes or answers.
+  function activateNotification(taskId: string): void {
+    if (captureActive || !runtime || !Logic.validId(taskId))
+      return
+    var revision = ++readGeneration
+    runtime.readStore(function (response) {
+      if (captureActive || revision !== readGeneration)
+        return
+      if (!response || !response.ok || !response.state || !response.state.tasks.some(function (task) {
+        return task.taskId === taskId
+      })) {
+        notificationStatus = {
+          status: 'unavailable',
+          message: 'Task is no longer available. Open Agents Tasks to inspect current activity.'
+        }
+        return
+      }
+      var previous = ready ? storeState : null
+      storeState = response.state
+      ready = true
+      error = null
+      readAt = clock()
+      elapsedSinceRead = 0
+      consumeNotifications(previous, storeState, revision)
+      snapshotChanged()
+      runtime.showTask(taskId, function (result) {
+        if (!captureActive)
+          notificationStatus = result && result.ok ? {
+            status: 'requested',
+            message: 'Task inspection requested; desktop opening is unconfirmed.'
+          } : {
+            status: 'unavailable',
+            message: 'Agents widget is unavailable. Add Agents to the bar or run aranea agents list.'
+          }
+      })
+    })
+  }
+  Timer {
+    id: notificationTimer
+    interval: 2000
+    onTriggered: controller.flushNotifications()
   }
   // Parse a single strict request; strings never become executable input.
   function requestJSON(json: string): var {

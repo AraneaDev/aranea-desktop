@@ -1,6 +1,7 @@
 // Compose Phase 1 process/compositor adapters; project IPC alone allocates workspaces.
 pragma ComponentBehavior: Bound
 import QtQuick
+import "ActivityLogic.js" as Logic
 import "../araneadev.projects" as Projects
 import "../araneadev.shared" as Aranea
 
@@ -72,6 +73,53 @@ Item {
         }
       })
     }
+  }
+  // Unknown policy is not equivalent to DND off; inactive scheduled quiet hours is known.
+  function readNotificationPolicy(done: var): void {
+    if (captureActive)
+      return
+    processRunner(['timeout', '2s', ipcPath, 'notifications', 'dndState'], '', function (code, output) {
+      if (runtime.captureActive)
+        return
+      var dnd = String(output).trim()
+      if (code !== 0 || ['on', 'off'].indexOf(dnd) < 0) {
+        done({
+          available: false,
+          suppressed: true
+        })
+        return
+      }
+      processRunner(['timeout', '2s', ipcPath, 'notifications', 'quietState'], '', function (quietCode, quietOutput) {
+        if (runtime.captureActive)
+          return
+        var quiet = String(quietOutput).trim()
+        var available = quietCode === 0 && ['on', 'off', 'scheduled'].indexOf(quiet) >= 0
+        done({
+          available: available,
+          suppressed: !available || dnd === 'on' || quiet === 'on'
+        })
+      })
+    })
+  }
+  // libnotify's default action produces a fixed stdout token, never command text.
+  function notifyAttention(notice: var, done: var): void {
+    if (captureActive)
+      return
+    processRunner(['timeout', '15s', 'notify-send', '--urgency=normal', '--expire-time=8000', '--app-name=Aranea agents', '--action=default=Open task', '--wait', '--print-id', '--', Logic.notificationText(notice.title, 96), Logic.notificationText(notice.body, 512)], '', function (code, output) {
+      if (runtime.captureActive)
+        return
+      var lines = String(output).trim().split('\n')
+      done({
+        accepted: /^[1-9][0-9]*$/.test(lines[0]),
+        activated: code === 0 && lines[1] === 'default'
+      })
+    })
+  }
+  // Exact stable IDs reach only the existing panel's inspection endpoint.
+  function showTask(taskId: string, done: var): void {
+    if (captureActive || !Logic.validId(taskId))
+      return
+    json(['timeout', '2s', ipcPath, 'omarchy.agents', 'showTask', taskId], '', done)
   }
   // Store reads carry boot and monotonic receipt projection from the shared store.
   function readStore(done: var): void {

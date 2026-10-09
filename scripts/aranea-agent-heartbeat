@@ -34,6 +34,8 @@ evidence=null
 expected_hash=${epoch##*:}
 [[ "$expected_hash" =~ ^[a-f0-9]{64}$ ]] || exit 0
 while true; do
+  [[ -f "$identity" && ! -L "$identity" ]] || exit 0
+  jq -e --argjson pid "$$" --arg start "$helper_start" '.pid == $pid and .startTime == $start' "$identity" >/dev/null 2>&1 || exit 0
   read -r _ current_start < <(agent_hooks_process "$provider_pid") || exit 0
   [[ "$current_start" == "$provider_start" && "$boot" == "$(cat /proc/sys/kernel/random/boot_id)" ]] || exit 0
   # Revalidate identity even when transport/lock failure prevents store access.

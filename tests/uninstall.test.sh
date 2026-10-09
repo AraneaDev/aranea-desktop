@@ -162,4 +162,82 @@ for ownership_layout in separate nested; do
 done
 [[ "$distinct_root_failures" == 0 ]]
 
+# Both scopes remove only current-install adapter commands and owned activity state.
+for removal_scope in integration complete; do
+  export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/activity-$removal_scope"
+  export ARANEA_OWNERSHIP_ROOT="$ARANEA_TEST_SANDBOX/ownership-$removal_scope"
+  mkdir -p "$HOME/.claude" "$HOME/.codex" "$ARANEA_STATE_ROOT/agent-heartbeats" "$plugins/araneadev.activity"
+  printf '%s\n' '{"permissions":{"allow":["Read"]},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"unrelated"}]}]}}' >"$HOME/.claude/settings.json"
+  printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"unrelated-codex"}]}]}}' >"$HOME/.codex/hooks.json"
+  printf 'keep config\n' >"$HOME/.codex/config.toml"
+  printf 'keep transcript\n' >"$HOME/.claude/transcript"
+  "$repo_root/scripts/aranea-agent-adapter" install claude >/dev/null
+  "$repo_root/scripts/aranea-agent-adapter" install codex >/dev/null
+  printf '{}' >"$ARANEA_STATE_ROOT/agent-activity.json"
+  touch "$ARANEA_STATE_ROOT/agent-activity.json.lock"
+  # A malicious receipt naming an unrelated application's PID is never kill authority.
+  jq -cn --argjson pid "$app_pid" '{pid:$pid,startTime:"forged",bootId:"forged"}' >"$ARANEA_STATE_ROOT/agent-heartbeats/forged.json"
+  "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
+  [[ ! -e "$ARANEA_STATE_ROOT/agent-activity.json" && ! -e "$ARANEA_STATE_ROOT/agent-activity.json.lock" && ! -e "$ARANEA_STATE_ROOT/agent-heartbeats" && ! -e "$plugins/araneadev.activity" ]] || {
+    echo 'FAIL activity artifacts retained'
+    exit 1
+  }
+  jq -e '.permissions.allow==["Read"] and .hooks.Stop[0].hooks==[{type:"command",command:"unrelated"}] and ([.hooks[][].hooks[] | select(.command|contains("aranea-agent-hook"))]|length)==0' "$HOME/.claude/settings.json" >/dev/null || {
+    echo 'FAIL owned Claude hooks retained or unrelated settings removed'
+    exit 1
+  }
+  jq -e '.hooks.Stop[0].hooks==[{type:"command",command:"unrelated-codex"}] and ([.hooks[][].hooks[] | select(.command|contains("aranea-agent-hook"))]|length)==0' "$HOME/.codex/hooks.json" >/dev/null
+  [[ "$(cat "$HOME/.codex/config.toml")" == 'keep config' && "$(cat "$HOME/.claude/transcript")" == 'keep transcript' ]]
+  kill -0 "$app_pid"
+done
+
 echo "uninstall contract passed"
+
+# Native fixture starts the actual heartbeat helper; removal stops only that helper.
+export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/native-removal"
+export ARANEA_OWNERSHIP_ROOT="$ARANEA_TEST_SANDBOX/native-ownership"
+mkdir -p "$ARANEA_TEST_SANDBOX/native-bin"
+cp /bin/bash "$ARANEA_TEST_SANDBOX/native-bin/claude"
+cat >"$TMPDIR/native-provider.sh" <<'PROVIDER'
+#!/bin/bash
+printf '%s\n' '{"session_id":"uninstall-native","hook_event_name":"SessionStart","cwd":"/tmp"}' | /bin/bash "$1" claude
+sleep 60
+PROVIDER
+"$ARANEA_TEST_SANDBOX/native-bin/claude" "$TMPDIR/native-provider.sh" "$repo_root/scripts/aranea-agent-hook" &
+provider_pid=$!
+sandbox_on_exit "kill $provider_pid 2>/dev/null || true"
+helper_record=''
+for _ in {1..40}; do
+  for candidate in "$ARANEA_STATE_ROOT/agent-heartbeats"/*.json; do
+    if [[ -s "$candidate" ]]; then
+      helper_record="$candidate"
+      break
+    fi
+  done
+  [[ -z "$helper_record" ]] || break
+  sleep .1
+done
+[[ -n "$helper_record" ]] || {
+  echo 'FAIL native helper fixture did not start'
+  exit 1
+}
+helper_pid=$(jq -r .pid "$helper_record")
+"$repo_root/scripts/uninstall.sh" --yes >/dev/null
+for _ in {1..40}; do
+  helper_stat=$(ps -o stat= -p "$helper_pid" 2>/dev/null || true)
+  [[ -n "$helper_stat" && "$helper_stat" != Z* ]] || break
+  sleep .1
+done
+[[ -z "$helper_stat" || "$helper_stat" == Z* ]] || {
+  echo 'FAIL exact owned helper kept running'
+  exit 1
+}
+kill -0 "$provider_pid"
+[[ ! -e "$ARANEA_STATE_ROOT/agent-activity.json" && ! -e "$ARANEA_STATE_ROOT/agent-heartbeats" ]]
+# Unsafe provider config remains byte-for-byte intact, with useful removal guidance.
+printf '{malformed' >"$HOME/.claude/settings.json"
+cp "$HOME/.claude/settings.json" "$TMPDIR/unsafe-provider"
+"$repo_root/scripts/uninstall.sh" --yes --scope complete >"$TMPDIR/uninstall-output" 2>"$TMPDIR/uninstall-guidance"
+cmp "$HOME/.claude/settings.json" "$TMPDIR/unsafe-provider"
+grep -Fq 'scripts/aranea-agent-adapter remove claude' "$TMPDIR/uninstall-guidance"
+echo 'PASS exact native helper cleanup, provider survival and refused-cleanup guidance'

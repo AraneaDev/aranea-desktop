@@ -28,7 +28,8 @@ work_dir="$(mktemp -d)"
 export ARANEA_STATE_ROOT="$work_dir/state"
 config_dir="$work_dir/config"
 plugins_dir="$config_dir/plugins"
-mkdir -p "$plugins_dir" "$work_dir/bin"
+mkdir -p "$plugins_dir" "$work_dir/bin" "$HOME/.local/state/omarchy/current/theme"
+cp -a "$repo_root/branding" "$HOME/.local/state/omarchy/current/theme/branding"
 printf '#!/usr/bin/env bash\nexit 1\n' >"$work_dir/bin/omarchy-hyprland-session-locked"
 chmod +x "$work_dir/bin/omarchy-hyprland-session-locked"
 export PATH="$work_dir/bin:$PATH"
@@ -42,7 +43,7 @@ done
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
 
 jq -e '.bar.id == "araneadev.bar"' "$config_dir/shell.json" >/dev/null
-jq -e '([.plugins[].id] | sort) == (["araneadev.projects", "araneadev.settings", "araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
+jq -e '([.plugins[].id] | sort) == (["araneadev.activity", "araneadev.projects", "araneadev.settings", "araneadev.clipboard", "araneadev.emojis", "araneadev.health", "araneadev.lock", "araneadev.notifications", "araneadev.osd", "araneadev.polkit", "araneadev.updates", "araneadev.workspaces"] | sort)' "$config_dir/shell.json" >/dev/null
 
 # A settings plugin missing from the target is deployed and registered; the
 # unrelated plugin and its inline settings survive deployment/release/return.
@@ -113,3 +114,12 @@ done
 jq -e '([.plugins[].id]|index("araneadev.projects"))==null' "$config_dir/shell.json" >/dev/null
 "$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir"
 jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1' "$config_dir/shell.json" >/dev/null
+
+# Activity deploys and repairs independently of bar layout; release retains its state.
+test -f "$plugins_dir/araneadev.activity/Activity.qml"
+jq -e '.keepLoaded and .entryPoints.menu=="Activity.qml"' "$plugins_dir/araneadev.activity/manifest.json" >/dev/null
+printf '{}' >"$ARANEA_STATE_ROOT/agent-activity.json"
+"$repo_root/scripts/release-shell-config" "$config_dir/shell.json" >/dev/null
+[[ -f "$ARANEA_STATE_ROOT/agent-activity.json" ]]
+"$repo_root/scripts/deploy-plugins-safely" "$repo_root" "$plugins_dir" >/dev/null
+jq -e '([.plugins[].id|select(.=="araneadev.activity")]|length)==1' "$config_dir/shell.json" >/dev/null

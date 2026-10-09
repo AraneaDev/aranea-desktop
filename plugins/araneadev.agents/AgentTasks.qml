@@ -277,7 +277,7 @@ Item {
         objectName: 'taskSetupCommands'
         width: parent.width
         visible: tasks.taskRows.length === 0
-        text: 'aranea agents adapter status claude\naranea agents adapter install claude\naranea agents register --json-input\naranea agents report --json-input'
+        text: 'Activity is opt-in. Check provider availability, then copy an install command to enable reporting.\naranea agents adapter status claude\naranea agents adapter install claude\naranea agents adapter status codex\naranea agents adapter install codex\n\nConfigured hooks do not prove enabled/trusted hooks or observed activity. Review provider trust, then start a new native CLI session. Missing question hooks can use explicit reports.\naranea agents register --json-input\naranea agents report --json-input\n\nVerification stays not reported until explicitly reported. Session focus needs native process proof and reaches only the hosting terminal, not a tmux pane. Remove only the owned adapter hooks with:\naranea agents adapter remove claude\naranea agents adapter remove codex'
         readOnly: true
         selectByMouse: true
         textFormat: TextEdit.PlainText
