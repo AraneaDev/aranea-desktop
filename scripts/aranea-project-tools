@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Read installed fixed adapters and Omarchy defaults, never evaluate configuration.
+# Adapter argv support was verified against installed help; this probe only checks
+# availability, and never launches installed applications or runs their help.
+# Usage: aranea-project-tools [--json]
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# Print command usage.
+usage() { printf 'Usage: aranea-project-tools [--json]\n'; }
+[[ $# == 0 || ($# == 1 && "$1" == --json) ]] || {
+  if [[ $# == 1 && ("$1" == --help || "$1" == -h) ]]; then
+    usage
+    exit 0
+  fi
+  usage >&2
+  exit 2
+}
+command -v jq >/dev/null || {
+  echo 'jq is required to probe project tools.' >&2
+  exit 4
+}
+terminals='[]'
+editors='[]'
+# Produce separate display metadata for an executable with a verified adapter.
+entry() {
+  jq -cn --arg id "$1" --arg label "$2" --arg executable "$3" \
+    '{id:$id,label:$label,executable:$executable,available:true,supported:true}'
+}
+for id in alacritty kitty foot ghostty code nvim; do
+  executable=$(command -v "$id" || true)
+  [[ -n "$executable" && -x "$executable" ]] || continue
+  case "$id" in
+    alacritty) label=Alacritty ;;
+    kitty) label=Kitty ;;
+    foot) label=Foot ;;
+    ghostty) label=Ghostty ;;
+    code) label='Visual Studio Code' ;;
+    nvim) label=Neovim ;;
+  esac
+  record=$(entry "$id" "$label" "$executable")
+  if [[ "$id" == code || "$id" == nvim ]]; then
+    editors=$(jq -cn --argjson entries "$editors" --argjson entry "$record" '$entries+[$entry]')
+  else
+    terminals=$(jq -cn --argjson entries "$terminals" --argjson entry "$record" '$entries+[$entry]')
+  fi
+done
+editor_id=null
+terminal_id=null
+editor_file="$(xdg_state_home)/omarchy/defaults/editor"
+if [[ -e "$editor_file" ]]; then
+  # Read the whole file as inert text; embedded newlines/fragments are unsupported.
+  configured=$(<"$editor_file")
+else
+  configured=nvim # Omarchy's documented missing-default fallback.
+fi
+editor_id=$(jq -cn --arg configured "$configured" --argjson entries "$editors" \
+  '$entries | map(select(.id == $configured or .executable == $configured)) | .[0].id // null')
+terminal_file="$(xdg_config_home)/xdg-terminals.list"
+if [[ -r "$terminal_file" ]]; then
+  while IFS= read -r desktop_id || [[ -n "$desktop_id" ]]; do
+    [[ -n "$desktop_id" && "$desktop_id" != \#* ]] || continue
+    candidate=${desktop_id%.desktop}
+    terminal_id=$(jq -cn --arg candidate "$candidate" --argjson entries "$terminals" \
+      '$entries | map(select(.id == $candidate)) | .[0].id // null')
+    [[ "$terminal_id" == null ]] || break
+  done <"$terminal_file"
+fi
+jq -cn --argjson editor "$editor_id" --argjson terminal "$terminal_id" \
+  --argjson editors "$editors" --argjson terminals "$terminals" \
+  '{defaults:{editorId:$editor,terminalId:$terminal},editors:$editors,terminals:$terminals}'
