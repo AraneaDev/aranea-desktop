@@ -76,7 +76,7 @@ projects_discovery_cancel() {
 # Traverse canonical explicit roots using arrays/globs (no per-directory Git,
 # realpath or jq). Directory names remain individual array elements throughout.
 projects_discovery_scan() {
-  local root canonical path child name depth index=0 metadata status common registry loaded bare discovery_count_limited=false
+  local root canonical path child name depth index=0 metadata status common registry loaded bare metadata_git_dir discovery_count_limited=false
   local -a queue=() depths=() children=() group_keys=()
   local -A scheduled=() groups=() ignored_paths=() ignored_groups=()
   discovery_visited=0
@@ -125,9 +125,12 @@ projects_discovery_scan() {
       projects_discovery_error DIRECTORY_UNREADABLE "$path" 'Folder could not be read; check its permissions.'
       continue
     fi
-    # Git metadata is a traversal boundary even when it is not named .git,
-    # core.bare is false, or checkout-root validation would fail.
-    if [[ -f "$path/HEAD" && -d "$path/objects" && -d "$path/refs" ]]; then
+    # Names only trigger a probe: project data can have the same shape. Stop
+    # only when Git identifies this exact directory as its metadata root,
+    # independently of bare status or checkout-root validation.
+    if [[ -f "$path/HEAD" && -d "$path/objects" && -d "$path/refs" ]] &&
+      projects_registry_git_value metadata_git_dir -C "$path" rev-parse --absolute-git-dir 2>/dev/null &&
+      [[ -d "$metadata_git_dir" && "$metadata_git_dir" -ef "$path" ]]; then
       if projects_registry_git_value bare -C "$path" rev-parse --is-bare-repository 2>/dev/null && [[ "$bare" == true ]]; then
         projects_discovery_error BARE_UNSUPPORTED "$path" 'Bare repositories are unsupported; choose a checkout.'
       else

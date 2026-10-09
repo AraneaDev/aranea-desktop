@@ -230,6 +230,21 @@ separate_git_metadata_internals_are_not_traversed() {
   if "$discover" --metadata "$metadata" --json >"$TMPDIR/metadata-root"; then return 1; fi
   jq -e '.ok == false and .error.code == "CHECKOUT_INVALID"' "$TMPDIR/metadata-root"
 }
+# Project files named like Git internals cannot hide valid or nested checkouts.
+project_names_do_not_spoof_metadata_identity() {
+  local root="$ARANEA_TEST_SANDBOX/name-collision" nested="$ARANEA_TEST_SANDBOX/name-collision/objects/nested"
+  make_repo "$root"
+  printf 'ordinary project data\n' >"$root/HEAD"
+  mkdir "$root/objects" "$root/refs"
+  make_repo "$nested"
+  "$discover" --metadata "$root" --json | jq -e --arg p "$root" '.ok and .metadata.path == $p and .metadata.metadataErrors == [] and any(.metadata.checkouts[]; .path == $p and .primary)'
+  "$discover" --root "$root" --json >"$TMPDIR/name-collision"
+  jq -se --arg p "$root" --arg nested "$nested" '
+    map(select(.event == "candidate")) as $c | ($c|length) == 2 and
+    any($c[]; .candidate.path == $p) and any($c[]; .candidate.path == $nested) and
+    (.[-1] | .outcome == "observed" and .errors == [] and .visited == 4)' "$TMPDIR/name-collision"
+  jq -cn --arg p "$root" '{action:"register",args:{paths:[$p]}}' | "$store" mutate | jq -e --arg p "$root" 'any(.state.projects[]; .commonDir == ($p+"/.git") and (.checkouts|length == 1) and .checkouts[0].path == $p)'
+}
 # Depth clipping preserves depth-eight results while excluding depth-nine repos.
 depth_limit_keeps_partial_candidates() {
   local root="$ARANEA_TEST_SANDBOX/depth" current="$ARANEA_TEST_SANDBOX/depth" i
@@ -293,5 +308,5 @@ SLOW
     if kill -0 "$child" 2>/dev/null; then [[ "$(ps -o stat= -p "$child")" == Z* ]]; fi
   done
 }
-for case_name in related_worktrees_and_explicit_registration ignored_groups_and_corrupt_state multiple_registry_objects_are_rejected missing_related_checkout_retains_valid_candidates replaced_related_checkout_cannot_join_a_group separate_git_dir_and_read_only_context linked_separate_git_dir_reports_unavailable_primary metadata_adapter_validates_exact_root_read_only unsupported_and_inaccessible_paths selected_git_internals_are_not_traversed invalid_unselected_relatives_preserve_selected_identity separate_primary_evidence_is_independent_of_scan_order separate_git_metadata_internals_are_not_traversed depth_limit_keeps_partial_candidates count_limit_is_bounded cancellation_stops_git_children; do run_case "$case_name"; done
+for case_name in related_worktrees_and_explicit_registration ignored_groups_and_corrupt_state multiple_registry_objects_are_rejected missing_related_checkout_retains_valid_candidates replaced_related_checkout_cannot_join_a_group separate_git_dir_and_read_only_context linked_separate_git_dir_reports_unavailable_primary metadata_adapter_validates_exact_root_read_only unsupported_and_inaccessible_paths selected_git_internals_are_not_traversed invalid_unselected_relatives_preserve_selected_identity separate_primary_evidence_is_independent_of_scan_order separate_git_metadata_internals_are_not_traversed project_names_do_not_spoof_metadata_identity depth_limit_keeps_partial_candidates count_limit_is_bounded cancellation_stops_git_children; do run_case "$case_name"; done
 ((failures == 0))
