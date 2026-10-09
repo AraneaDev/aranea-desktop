@@ -11,9 +11,45 @@ projects_discovery_error() {
   discovery_error_messages+=("$3")
 }
 
+# Merge group observations before emitting candidates so later exact primary
+# evidence resolves separate-Git-dir ambiguity independently of traversal order.
+projects_discovery_group() {
+  local common=$1 metadata=$2
+  if [[ -z "${groups[$common]:-}" ]]; then
+    group_keys+=("$common")
+    groups["$common"]=$metadata
+  else
+    groups["$common"]=$(jq -cn --argjson previous "${groups[$common]}" --argjson observed "$metadata" '
+      ($previous.checkouts + $observed.checkouts | unique_by(.path) | sort_by(.primary|not)) as $checkouts |
+      ($previous.metadataErrors + $observed.metadataErrors | unique_by([.code,.path]) |
+        map(select(.code != "PRIMARY_UNAVAILABLE" or ($checkouts | any(.[]; .primary) | not)))) as $errors |
+      (if any($observed.checkouts[]; .path == $observed.path and .primary) then $observed else $previous end) |
+      .checkouts=$checkouts | .metadataErrors=$errors')
+  fi
+}
+
+# Emit each merged group once and carry its remaining availability errors into
+# the terminal result. Candidate output waits for all selected-root evidence.
+projects_discovery_flush_candidates() {
+  local common metadata error_code error_path error_message
+  for common in "${group_keys[@]}"; do
+    metadata=${groups[$common]}
+    while IFS= read -r -d '' error_code && IFS= read -r -d '' error_path && IFS= read -r -d '' error_message; do
+      projects_discovery_error "$error_code" "$error_path" "$error_message"
+    done < <(jq -j '.metadataErrors[] | .code,"\u0000",.path,"\u0000",.message,"\u0000"' <<<"$metadata")
+    metadata=$(jq -c 'del(.metadataErrors)' <<<"$metadata")
+    if [[ "$discovery_json" == true ]]; then
+      jq -cn --argjson candidate "$metadata" '{event:"candidate",candidate:$candidate}'
+    else
+      jq -r '"\(.name): \(.path)", (.checkouts[] | "  \(.path) [\(.branch // "detached")]" )' <<<"$metadata"
+    fi
+  done
+}
+
 # Emit a terminal result with authoritative partial status after limits/errors.
 projects_discovery_complete() {
   local outcome=observed i discovery_errors
+  projects_discovery_flush_candidates
   discovery_errors=$(
     for ((i = 0; i < ${#discovery_error_codes[@]}; i++)); do
       printf '%s\0%s\0%s\0' "${discovery_error_codes[i]}" "${discovery_error_paths[i]}" "${discovery_error_messages[i]}"
@@ -40,8 +76,8 @@ projects_discovery_cancel() {
 # Traverse canonical explicit roots using arrays/globs (no per-directory Git,
 # realpath or jq). Directory names remain individual array elements throughout.
 projects_discovery_scan() {
-  local root canonical path child name depth index=0 metadata status common registry loaded error_code error_path error_message discovery_count_limited=false
-  local -a queue=() depths=() children=()
+  local root canonical path child name depth index=0 metadata status common registry loaded bare discovery_count_limited=false
+  local -a queue=() depths=() children=() group_keys=()
   local -A scheduled=() groups=() ignored_paths=() ignored_groups=()
   discovery_visited=0
   discovery_error_codes=() discovery_error_paths=() discovery_error_messages=()
@@ -89,18 +125,21 @@ projects_discovery_scan() {
       projects_discovery_error DIRECTORY_UNREADABLE "$path" 'Folder could not be read; check its permissions.'
       continue
     fi
-    if [[ -e "$path/.git" || (-f "$path/HEAD" && -d "$path/objects" && -d "$path/refs") ]]; then
+    # Git metadata is a traversal boundary even when it is not named .git,
+    # core.bare is false, or checkout-root validation would fail.
+    if [[ -f "$path/HEAD" && -d "$path/objects" && -d "$path/refs" ]]; then
+      if projects_registry_git_value bare -C "$path" rev-parse --is-bare-repository 2>/dev/null && [[ "$bare" == true ]]; then
+        projects_discovery_error BARE_UNSUPPORTED "$path" 'Bare repositories are unsupported; choose a checkout.'
+      else
+        projects_discovery_error GIT_METADATA_UNSUPPORTED "$path" 'Git metadata directories cannot be scanned; choose a checkout folder.'
+      fi
+      continue
+    fi
+    if [[ -e "$path/.git" ]]; then
       if metadata=$(project_git_metadata "$path"); then
         common=$(jq -r '.commonDir' <<<"$metadata")
-        if [[ -z "${groups[$common]:-}" ]]; then
-          groups["$common"]=1
-          if [[ -z "${ignored_paths[$path]:-}" && -z "${ignored_groups[$common]:-}" ]]; then
-            while IFS= read -r -d '' error_code && IFS= read -r -d '' error_path && IFS= read -r -d '' error_message; do
-              projects_discovery_error "$error_code" "$error_path" "$error_message"
-            done < <(jq -j '.metadataErrors[] | .code,"\u0000",.path,"\u0000",.message,"\u0000"' <<<"$metadata")
-            metadata=$(jq -c 'del(.metadataErrors)' <<<"$metadata")
-            if [[ "$discovery_json" == true ]]; then jq -cn --argjson candidate "$metadata" '{event:"candidate",candidate:$candidate}'; else jq -r '"\(.name): \(.path)", (.checkouts[] | "  \(.path) [\(.branch // "detached")]" )' <<<"$metadata"; fi
-          fi
+        if [[ -z "${ignored_paths[$path]:-}" && -z "${ignored_groups[$common]:-}" ]]; then
+          projects_discovery_group "$common" "$metadata"
         fi
       else
         status=$?

@@ -45,7 +45,7 @@ projects_registry_git_value() {
 # with --separate-git-dir replaces Git's misleading metadata-directory record.
 # Return 1 for invalid checkout, 2 for unsafe path, 4 for an unsupported bare repo.
 project_git_metadata() (
-  local canonical top common git_dir bare token record_path='' branch='' primary=false
+  local canonical top common git_dir bare token record_path='' branch='' primary=false related_status error_code
   local metadata_file checkout_path checkout_git_dir checkout_top checkout_common checkout_primary checkouts='[]' metadata_errors='[]'
   canonical=$(projects_registry_path "$1") || return $?
   projects_registry_git_value bare -C "$canonical" rev-parse --is-bare-repository 2>/dev/null || return 1
@@ -80,24 +80,28 @@ project_git_metadata() (
           fi
           record_path=$canonical
         fi
-        if [[ ! -d "$record_path" ]]; then
-          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg path "$record_path" '$errors + [{code:"CHECKOUT_UNAVAILABLE",path:$path,message:"A related checkout is unavailable; locate it or remove its stale Git worktree record."}]')
-          record_path=''
-          continue
+        # Only the selected identity is fatal. Invalid unselected worktree
+        # records are availability errors and cannot erase a validated selection.
+        if checkout_path=$(projects_registry_path "$record_path") &&
+          projects_registry_git_value checkout_git_dir -C "$checkout_path" rev-parse --absolute-git-dir 2>/dev/null &&
+          projects_registry_git_value checkout_top -C "$checkout_path" rev-parse --show-toplevel 2>/dev/null &&
+          projects_registry_git_value checkout_common -C "$checkout_path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null &&
+          checkout_git_dir=$(projects_registry_path "$checkout_git_dir") &&
+          checkout_top=$(projects_registry_path "$checkout_top") &&
+          checkout_common=$(projects_registry_path "$checkout_common"); then
+          if [[ "$checkout_top" == "$checkout_path" && "$checkout_common" == "$common" ]]; then
+            related_status=0
+          else
+            related_status=1
+          fi
+        else
+          related_status=$?
         fi
-        checkout_path=$(projects_registry_path "$record_path") || return $?
-        if ! projects_registry_git_value checkout_git_dir -C "$checkout_path" rev-parse --absolute-git-dir 2>/dev/null ||
-          ! projects_registry_git_value checkout_top -C "$checkout_path" rev-parse --show-toplevel 2>/dev/null ||
-          ! projects_registry_git_value checkout_common -C "$checkout_path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; then
-          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg path "$record_path" '$errors + [{code:"CHECKOUT_UNAVAILABLE",path:$path,message:"A related checkout could not be validated; locate it or repair its Git worktree record."}]')
-          record_path=''
-          continue
-        fi
-        checkout_git_dir=$(projects_registry_path "$checkout_git_dir") || return $?
-        checkout_top=$(projects_registry_path "$checkout_top") || return $?
-        checkout_common=$(projects_registry_path "$checkout_common") || return $?
-        if [[ "$checkout_top" != "$checkout_path" || "$checkout_common" != "$common" ]]; then
-          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg path "$record_path" '$errors + [{code:"CHECKOUT_UNAVAILABLE",path:$path,message:"A related path no longer belongs to this repository; repair its Git worktree record."}]')
+        if ((related_status != 0)); then
+          [[ "$record_path" != "$canonical" ]] || return "$related_status"
+          error_code=CHECKOUT_UNAVAILABLE
+          ((related_status != 2)) || error_code=INVALID_PATH
+          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg code "$error_code" --arg path "$record_path" '$errors + [{code:$code,path:$path,message:"A related checkout could not be validated; choose a valid folder or repair its Git worktree record."}]')
           record_path=''
           continue
         fi

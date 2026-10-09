@@ -155,6 +155,81 @@ selected_git_internals_are_not_traversed() {
   if "$discover" --root "$root/.git" --json >"$TMPDIR/internals"; then return 1; fi
   jq -se 'all(.[]; .event != "candidate") and (.[-1] | .visited == 0 and .outcome == "partial" and any(.errors[]; .code == "ROOT_INVALID"))' "$TMPDIR/internals"
 }
+# Unsafe/unresolvable unrelated metadata cannot discard a valid explicit choice.
+invalid_unselected_relatives_preserve_selected_identity() {
+  local root="$ARANEA_TEST_SANDBOX/relative-errors/main" raw="$ARANEA_TEST_SANDBOX/relative-errors/raw"$'\n' broken="$ARANEA_TEST_SANDBOX/relative-errors/broken"
+  make_repo "$root"
+  git -C "$root" worktree add -q "$raw" -b unsafe
+  git -C "$root" worktree add -q "$broken" -b broken
+  git -C "$root" config extensions.worktreeConfig true
+  git -C "$broken" config --worktree core.worktree "$ARANEA_TEST_SANDBOX/absent-related-top"
+  if "$discover" --root "$root" --json >"$TMPDIR/relative-errors"; then return 1; fi
+  jq -se --arg p "$root" --arg raw "$raw" --arg broken "$broken" '
+    any(.[]; .candidate.path? == $p and (.candidate.checkouts|length == 1)) and
+    (.[-1] | .outcome == "partial" and any(.errors[]; .code == "INVALID_PATH" and .path == $raw) and any(.errors[]; .code == "CHECKOUT_UNAVAILABLE" and .path == $broken))' "$TMPDIR/relative-errors"
+  "$discover" --metadata "$root" --json >"$TMPDIR/relative-metadata"
+  jq -e --arg p "$root" '.ok and .metadata.path == $p and (.metadata.checkouts|length == 1) and (.metadata.metadataErrors|length == 2)' "$TMPDIR/relative-metadata"
+  jq -cn --arg p "$root" '{action:"register",args:{paths:[$p]}}' | "$store" mutate >"$TMPDIR/relative-registered"
+  jq -e --arg p "$root" '.ok and any(.state.projects[]; .commonDir == ($p+"/.git") and (.checkouts|length == 1) and .checkouts[0].path == $p)' "$TMPDIR/relative-registered"
+  cp "$ARANEA_STATE_ROOT/projects.json" "$TMPDIR/relative-original"
+  for selected in "$raw" "$broken"; do
+    if "$discover" --metadata "$selected" --json >"$TMPDIR/invalid-selected"; then return 1; fi
+    jq -e '.ok == false and .metadata == null' "$TMPDIR/invalid-selected"
+    if jq -cn --arg p "$selected" '{action:"register",args:{paths:[$p]}}' | "$store" mutate >"$TMPDIR/invalid-selected-registry"; then return 1; fi
+    jq -e '.ok == false' "$TMPDIR/invalid-selected-registry"
+    cmp "$ARANEA_STATE_ROOT/projects.json" "$TMPDIR/relative-original"
+  done
+}
+# Both explicit roots and discovered roots merge proven primary evidence.
+separate_primary_evidence_is_independent_of_scan_order() {
+  local parent="$ARANEA_TEST_SANDBOX/order" primary linked common order
+  primary="$parent/z-primary"
+  linked="$parent/a-linked"
+  common="$ARANEA_TEST_SANDBOX/order-metadata"
+  git init -q --separate-git-dir "$common" "$primary"
+  git -C "$primary" -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m initial
+  git -C "$primary" worktree add -q "$linked" -b ordered
+  for order in linked-first primary-first parent; do
+    case "$order" in
+      linked-first) "$discover" --root "$linked" --root "$primary" --json >"$TMPDIR/$order" ;;
+      primary-first) "$discover" --root "$primary" --root "$linked" --json >"$TMPDIR/$order" ;;
+      parent) "$discover" --root "$parent" --json >"$TMPDIR/$order" ;;
+    esac
+    jq -se --arg p "$primary" --arg linked "$linked" '
+      map(select(.event == "candidate")) as $c | ($c|length) == 1 and
+      $c[0].candidate.path == $p and ($c[0].candidate.checkouts|length == 2) and
+      any($c[0].candidate.checkouts[]; .path == $p and .primary) and
+      any($c[0].candidate.checkouts[]; .path == $linked and (.primary|not)) and
+      (.[-1] | .outcome == "observed" and .errors == [])' "$TMPDIR/$order"
+  done
+  "$discover" --metadata "$primary" --json | jq -e '.ok and any(.metadata.checkouts[]; .primary)'
+  "$discover" --metadata "$linked" --json | jq -e '.ok and any(.metadata.metadataErrors[]; .code == "PRIMARY_UNAVAILABLE")'
+  local raw="$ARANEA_TEST_SANDBOX/order-invalid"$'\n'
+  git -C "$primary" worktree add -q "$raw" -b order-invalid
+  if "$discover" --root "$linked" --root "$primary" --json >"$TMPDIR/resolved-primary-partial"; then return 1; fi
+  jq -se --arg p "$primary" --arg raw "$raw" '
+    any(.[]; .candidate.path? == $p and (.candidate.checkouts|length == 2)) and
+    (.[-1] | .outcome == "partial" and (.errors|length == 1) and .errors[0].code == "INVALID_PATH" and .errors[0].path == $raw)' "$TMPDIR/resolved-primary-partial"
+  jq -cn --arg p "$linked" '{action:"register",args:{paths:[$p]}}' | "$store" mutate | jq -e --arg p "$linked" 'any(.state.projects[]; .commonDir == $common and (.checkouts|length == 1) and .checkouts[0].path == $p)' --arg common "$common"
+}
+# A separate metadata root is never traversed, even though core.bare is false.
+separate_git_metadata_internals_are_not_traversed() {
+  local parent="$ARANEA_TEST_SANDBOX/metadata-traversal" metadata primary location mode
+  metadata="$parent/metadata"
+  primary="$parent/main"
+  git init -q --separate-git-dir "$metadata" "$primary"
+  git -C "$primary" -c user.name=Test -c user.email=test@example.invalid commit -q --allow-empty -m initial
+  for location in objects/embedded refs/embedded worktrees/embedded; do make_repo "$metadata/$location"; done
+  for mode in direct parent; do
+    if [[ "$mode" == direct ]]; then location=$metadata; else location=$parent; fi
+    if "$discover" --root "$location" --json >"$TMPDIR/metadata-$mode"; then return 1; fi
+    jq -se --arg metadata "$metadata" 'all(.[]; ((.candidate.path? // "") | startswith($metadata+"/")) | not) and any(.[-1].errors[]; .code == "GIT_METADATA_UNSUPPORTED" and .path == $metadata)' "$TMPDIR/metadata-$mode"
+  done
+  jq -se '.[-1].visited == 1 and all(.[]; .event != "candidate")' "$TMPDIR/metadata-direct"
+  jq -se --arg p "$primary" 'any(.[]; .candidate.path? == $p) and .[-1].visited == 3' "$TMPDIR/metadata-parent"
+  if "$discover" --metadata "$metadata" --json >"$TMPDIR/metadata-root"; then return 1; fi
+  jq -e '.ok == false and .error.code == "CHECKOUT_INVALID"' "$TMPDIR/metadata-root"
+}
 # Depth clipping preserves depth-eight results while excluding depth-nine repos.
 depth_limit_keeps_partial_candidates() {
   local root="$ARANEA_TEST_SANDBOX/depth" current="$ARANEA_TEST_SANDBOX/depth" i
@@ -218,5 +293,5 @@ SLOW
     if kill -0 "$child" 2>/dev/null; then [[ "$(ps -o stat= -p "$child")" == Z* ]]; fi
   done
 }
-for case_name in related_worktrees_and_explicit_registration ignored_groups_and_corrupt_state multiple_registry_objects_are_rejected missing_related_checkout_retains_valid_candidates replaced_related_checkout_cannot_join_a_group separate_git_dir_and_read_only_context linked_separate_git_dir_reports_unavailable_primary metadata_adapter_validates_exact_root_read_only unsupported_and_inaccessible_paths selected_git_internals_are_not_traversed depth_limit_keeps_partial_candidates count_limit_is_bounded cancellation_stops_git_children; do run_case "$case_name"; done
+for case_name in related_worktrees_and_explicit_registration ignored_groups_and_corrupt_state multiple_registry_objects_are_rejected missing_related_checkout_retains_valid_candidates replaced_related_checkout_cannot_join_a_group separate_git_dir_and_read_only_context linked_separate_git_dir_reports_unavailable_primary metadata_adapter_validates_exact_root_read_only unsupported_and_inaccessible_paths selected_git_internals_are_not_traversed invalid_unselected_relatives_preserve_selected_identity separate_primary_evidence_is_independent_of_scan_order separate_git_metadata_internals_are_not_traversed depth_limit_keeps_partial_candidates count_limit_is_bounded cancellation_stops_git_children; do run_case "$case_name"; done
 ((failures == 0))
