@@ -153,3 +153,85 @@ test("association allocation reserves other projects and validates current works
     null
   )
 })
+test("resume relaunches confirmed closed editor and focuses surviving terminal", () => {
+  const closed = { ...binding, evidence: { ...binding.evidence, startTime: "100" } }
+  const terminal = { ...binding, role: "terminal", address: "0xb", pid: 43 }
+  const live = [{ address: "0xb", pid: 43, appId: "token" }]
+  const last = { status: "observed", binding: closed }
+  const disposition = {
+    state: "confirmed-missing",
+    verified: true,
+    projectId: "p-1",
+    checkoutId: "c-1",
+    role: "editor",
+    sessionId: "s-1",
+    generation: 2,
+    identity: { pid: 42, startTime: "100", address: "0xa" }
+  }
+  assert.equal(
+    ops.roleDecision("editor", request, closed, last, live, "s-1", disposition).action,
+    "launch"
+  )
+  assert.equal(
+    ops.roleDecision("editor", request, null, last, live, "s-1", disposition).action,
+    "launch"
+  )
+  assert.equal(
+    ops.roleDecision("terminal", request, terminal, { status: "observed" }, live, "s-1").action,
+    "focus"
+  )
+  assert.equal(ops.roleDecision("editor", request, closed, last, live, "s-1").action, "hold")
+  assert.equal(
+    ops.roleDecision("editor", request, null, { status: "observed" }, live, "s-1", disposition)
+      .action,
+    "hold"
+  )
+  assert.equal(
+    ops.roleDecision("editor", request, { ...closed, pid: 99 }, last, live, "s-1", disposition)
+      .action,
+    "hold"
+  )
+  assert.equal(
+    ops.roleDecision("editor", request, closed, last, windows, "s-1", disposition).action,
+    "focus"
+  )
+  for (const changed of [
+    { verified: false },
+    { sessionId: "old" },
+    { generation: 1 },
+    { projectId: "other" },
+    { checkoutId: "other" },
+    { role: "terminal" },
+    { state: "absent" },
+    { identity: { pid: 42, startTime: "101", address: "0xa" } },
+    { identity: { pid: 43, startTime: "100", address: "0xa" } },
+    { identity: { pid: 42, startTime: "100", address: "0xb" } }
+  ])
+    assert.equal(
+      ops.roleDecision("editor", request, closed, last, live, "s-1", { ...disposition, ...changed })
+        .action,
+      "hold"
+    )
+  assert.equal(
+    ops.roleDecision("editor", request, closed, { status: "unconfirmed" }, live, "s-1", disposition)
+      .action,
+    "hold"
+  )
+  assert.equal(
+    ops.roleDecision(
+      "editor",
+      { ...request, retryRole: "editor" },
+      closed,
+      last,
+      live,
+      "s-1",
+      disposition
+    ).action,
+    "hold"
+  )
+  assert.equal(
+    ops.roleDecision("editor", { ...request, newWindowRole: "editor" }, closed, last, live, "s-1")
+      .action,
+    "launch"
+  )
+})
