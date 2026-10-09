@@ -73,6 +73,189 @@ ShellRoot {
   property string closureAddress: ''
   // Resume window evidence is supplied only through the independent runtime validator.
   property var proven: []
+  // Review regressions run a separate asynchronous owner against isolated state.
+  property var caseRegistry: ({})
+  // Accepted applications are counted independently of outcome history.
+  property int caseLaunches: 0
+  // Each case uses a new session without touching another owner or desktop.
+  property string caseSession: 'review-cold'
+  // Deferred role observations preserve pending coalescing and uncertainty.
+  property var caseObservations: []
+  // Observed ownership is supplied only by the independent fake validator.
+  property var caseProven: []
+  // Positive exact closure proof may cover just the latest observed copy.
+  property bool caseClosed: false
+  // One selected adapter can fail after older uncertain launches.
+  property string caseFailRole: ''
+  // A silent helper exercises sequential submission watchdog advancement.
+  property bool caseStallLaunch: false
+  // Mutations can be held while mixed default/explicit submissions coalesce.
+  property bool casePauseMutations: false
+  // Callback releases retain the real revision-sensitive owner transaction.
+  property var caseMutations: []
+  // Active focus and overlap counts expose simultaneous readback races.
+  property string caseActiveAddress: ''
+  // Number of exact focuses currently awaiting independent readback.
+  property int caseFocusPending: 0
+  // Maximum simultaneous focus transaction count.
+  property int caseFocusMax: 0
+  Projects.ProjectsController {
+    id: caseOwner
+    captureActive: true
+    runtime: ({
+        sessionId: root.caseSession,
+        snapshot: function () {
+          return {
+            available: true,
+            observedAt: Date.now(),
+            currentWorkspaceId: 1,
+            workspaces: [],
+            windows: root.caseProven.map(function (binding) {
+              return {
+                address: binding.address,
+                pid: binding.pid,
+                appId: binding.appId,
+                workspaceId: binding.workspaceId
+              }
+            })
+          }
+        },
+        validateBindings: function (bindings, done) {
+          Qt.callLater(function () {
+            done({
+              bindings: root.caseProven,
+              missing: root.caseClosed ? bindings.map(function (binding) {
+                return {
+                  binding: binding,
+                  identity: {
+                    pid: binding.pid,
+                    startTime: binding.evidence.startTime,
+                    address: binding.address
+                  }
+                }
+              }) : []
+            })
+          })
+        },
+        focusWorkspace: function (id, done) {
+          t.equal(caseFocusPending, 0, 'global workspace focus waits for exact-window readback')
+          Qt.callLater(function () {
+            done({
+              ok: true,
+              status: 'observed'
+            })
+          })
+        },
+        focusBinding: function (binding, done) {
+          root.caseActiveAddress = binding.address
+          root.caseFocusPending++
+          root.caseFocusMax = Math.max(root.caseFocusMax, root.caseFocusPending)
+          t.step(40, function () {
+            root.caseFocusPending--
+            done({
+              ok: root.caseActiveAddress === binding.address,
+              status: root.caseActiveAddress === binding.address ? 'observed' : 'unconfirmed',
+              code: root.caseActiveAddress === binding.address ? null : 'FOCUS_UNCONFIRMED',
+              binding: root.caseActiveAddress === binding.address ? binding : null
+            })
+          })
+        },
+        launch: function (spec, done) {
+          root.caseLaunches++
+          if (root.caseStallLaunch)
+            return
+          var pid = 200 + root.caseLaunches
+          Qt.callLater(function () {
+            done(root.caseFailRole === spec.role ? {
+              ok: false,
+              status: 'failed',
+              code: 'LAUNCH_FAILED'
+            } : {
+              ok: true,
+              status: 'accepted',
+              identity: {
+                pid: pid,
+                startTime: String(pid),
+                sessionId: root.caseSession,
+                token: spec.token
+              }
+            })
+          })
+        },
+        observe: function (spec, baseline, done) {
+          root.caseObservations.push({
+            spec: spec,
+            done: done
+          })
+        }
+      })
+    storeRunner: function (argv, done, input) {
+      var respond = function () {
+        if (argv[1] === 'mutate') {
+          var request = JSON.parse(input), next = JSON.parse(JSON.stringify(root.caseRegistry))
+          t.equal(request.expectedRevision, next.revision, 'review fixture mutation uses exact revision')
+          next.revision++
+          if (request.action === 'associate') {
+            var a = request.args
+            next.projects[0].associations = next.projects[0].associations.filter(function (row) {
+              return a.separate ? !row.separate || row.checkoutId !== a.checkoutId : row.separate
+            }).concat([
+              {
+                checkoutId: a.checkoutId,
+                mode: a.mode,
+                workspaceId: a.workspaceId,
+                separate: a.separate
+              }
+            ])
+          }
+          if (request.action === 'select-checkout')
+            next.projects[0].lastCheckoutId = request.args.checkoutId
+          root.caseRegistry = next
+        }
+        done({
+          ok: true,
+          state: root.caseRegistry,
+          error: null
+        })
+      }
+      if (argv[1] === 'mutate' && root.casePauseMutations)
+        root.caseMutations.push(respond)
+      else
+        Qt.callLater(respond)
+    }
+    metadataRunner: function (argv, done) {
+      Qt.callLater(function () {
+        done({
+          ok: true,
+          metadata: {
+            path: argv[2],
+            commonDir: '/fixture/.git'
+          },
+          error: null
+        })
+      })
+    }
+    toolsRunner: function (argv, done) {
+      Qt.callLater(function () {
+        done({
+          defaults: {
+            editorId: 'code',
+            terminalId: 'kitty'
+          },
+          editors: [
+            {
+              id: 'code'
+            }
+          ],
+          terminals: [
+            {
+              id: 'kitty'
+            }
+          ]
+        })
+      })
+    }
+  }
   QmlTest {
     id: t
   }
@@ -82,6 +265,7 @@ ShellRoot {
   }
   Projects.ProjectsController {
     id: controller
+    captureActive: true
     runtime: ({
         sessionId: root.session,
         snapshot: function () {
@@ -524,7 +708,7 @@ ShellRoot {
                   return controller.operation(failed.operationId).state === 'completed'
                 }, 2000, 'late terminal failure retained', function () {
                   t.equal(launches, 11, 'explicit failing terminal invoked once')
-                  // Ordinary open may retry known failed roles; keep it unconfirmed before retention.
+                  // A newer failure cannot authorize duplication of an older uncertain attempt.
                   failTerminal = false
                   var retry = controller.request({
                     projectId: 'p-fixture',
@@ -532,14 +716,24 @@ ShellRoot {
                     retryRole: 'terminal'
                   })
                   t.waitFor(function () {
-                    return observations.length === 1
-                  }, 2000, 'retention seed retry accepted', function () {
-                    settleUnconfirmed()
-                    firstRetained = first.operationId
-                    retentionCount = 1
+                    return controller.operation(retry.operationId).state === 'completed'
+                  }, 2000, 'retention seed targeted retry held', function () {
+                    t.equal(launches, 11, 'older uncertain terminal blocks targeted retry')
                     controller.request({
                       projectId: 'p-fixture',
-                      checkoutId: 'c-main'
+                      checkoutId: 'c-main',
+                      newWindowRole: 'terminal'
+                    })
+                    t.waitFor(function () {
+                      return observations.length === 1
+                    }, 2000, 'explicit retention seed accepted', function () {
+                      settleUnconfirmed()
+                      firstRetained = first.operationId
+                      retentionCount = 1
+                      controller.request({
+                        projectId: 'p-fixture',
+                        checkoutId: 'c-main'
+                      })
                     })
                   })
                 })
@@ -550,7 +744,339 @@ ShellRoot {
       })
     })
   }
-  Component.onCompleted: {
+  // Reset only fake environment data; a session change invalidates prior owner evidence.
+  function newReviewCase(name: string, done: var): void {
+    caseSession = name
+    caseLaunches = 0
+    caseObservations = []
+    caseProven = []
+    caseClosed = false
+    caseFailRole = ''
+    caseStallLaunch = false
+    caseOwner.roleTimeout = 10000
+    casePauseMutations = false
+    caseMutations = []
+    caseFocusPending = 0
+    caseFocusMax = 0
+    caseRegistry = JSON.parse(JSON.stringify(registry))
+    caseRegistry.revision = 0
+    caseRegistry.projects[0].lastCheckoutId = 'c-main'
+    caseRegistry.projects[0].associations = []
+    caseRegistry.projects[0].tools = {
+      editorId: 'code',
+      terminalId: 'kitty'
+    }
+    caseOwner.captureActive = false
+    caseOwner.refresh()
+    t.waitFor(function () {
+      return !caseOwner.refreshing && caseOwner.registry.projects.length === 1
+    }, 2000, 'review owner ready ' + name, done)
+  }
+  // Settle actual deferred observation callbacks, optionally proving the newly launched role.
+  function settleReview(observedRoles: var): void {
+    var entries = caseObservations.slice()
+    caseObservations = []
+    entries.forEach(function (entry) {
+      if (observedRoles.indexOf(entry.spec.role) < 0) {
+        entry.done({
+          ok: false,
+          status: 'unconfirmed',
+          code: 'OBSERVATION_TIMEOUT'
+        })
+        return
+      }
+      var spec = entry.spec, identity = spec.launchIdentity
+      var binding = {
+        projectId: spec.projectId,
+        checkoutId: spec.checkoutId,
+        role: spec.role,
+        workspaceId: spec.workspaceId,
+        address: '0x' + identity.pid.toString(16),
+        appId: spec.expectedAppId || 'code',
+        pid: identity.pid,
+        sessionId: caseSession,
+        launchIdentity: identity,
+        evidence: {
+          mode: spec.evidenceMode,
+          processVerified: true,
+          startTime: identity.startTime,
+          verifiedAt: Date.now()
+        }
+      }
+      caseProven.push(binding)
+      entry.done({
+        ok: true,
+        status: 'observed',
+        binding: binding
+      })
+    })
+  }
+  // Release held store transactions after coalescing assertions, preserving asynchronous transport.
+  function releaseReviewMutations(): void {
+    casePauseMutations = false
+    var pending = caseMutations.slice()
+    caseMutations = []
+    pending.forEach(function (respond) {
+      Qt.callLater(respond)
+    })
+  }
+  // Cold readiness never exposes provisional operation IDs for mixed omitted/explicit targets.
+  function verifyColdCoalescing(): void {
+    caseRegistry = JSON.parse(JSON.stringify(registry))
+    casePauseMutations = true
+    caseOwner.captureActive = false
+    var coldDefault = caseOwner.request({
+      projectId: 'p-fixture'
+    })
+    var coldExplicit = caseOwner.request({
+      projectId: 'p-fixture',
+      checkoutId: 'c-main'
+    })
+    t.equal(coldDefault.error && coldDefault.error.code, 'OWNER_NOT_READY', 'cold omitted request refused before target resolution')
+    t.equal(coldExplicit.error && coldExplicit.error.code, 'OWNER_NOT_READY', 'cold explicit request refused before initial snapshot')
+    t.check(!coldDefault.operationId && !coldExplicit.operationId, 'cold owner never publishes provisional IDs')
+    caseOwner.captureActive = true
+    newReviewCase('review-ready', function () {
+      casePauseMutations = true
+      var prepared = caseOwner.request({
+        projectId: 'p-fixture'
+      })
+      t.equal(prepared.error && prepared.error.code, 'OWNER_NOT_READY', 'omitted target requests fresh one-use selection')
+      var explicit = caseOwner.request({
+        projectId: 'p-fixture',
+        checkoutId: 'c-main'
+      })
+      t.step(60, function () {
+        var resolved = caseOwner.request({
+          projectId: 'p-fixture'
+        })
+        t.check(resolved.ok && explicit.ok, 'ready mixed requests accepted with resolved target')
+        t.equal(resolved.operationId, explicit.operationId, 'ready omitted and explicit checkout coalesce')
+        releaseReviewMutations()
+        t.waitFor(function () {
+          return caseObservations.length === 2
+        }, 2000, 'mixed pending request launches one pair', function () {
+          t.equal(caseLaunches, 2, 'mixed ready request invokes one editor and terminal')
+          settleReview([])
+          verifyLeaseConflict()
+        })
+      })
+    })
+  }
+  // An external mutation after selection acceptance fails the same ID before dispatch.
+  function verifyLeaseConflict(): void {
+    var prepared = caseOwner.request({
+      projectId: 'p-fixture'
+    })
+    t.equal(prepared.error && prepared.error.code, 'OWNER_NOT_READY', 'consumed selection lease requires another fresh read')
+    t.waitFor(function () {
+      return !!caseOwner.defaultSelections['p-fixture']
+    }, 2000, 'fresh lease prepared for concurrency check', function () {
+      var accepted = caseOwner.request({
+        projectId: 'p-fixture'
+      })
+      t.check(accepted.ok && !!accepted.operationId, 'fresh default lease accepts stable operation')
+      var changed = JSON.parse(JSON.stringify(caseRegistry))
+      changed.revision++
+      changed.projects[0].lastCheckoutId = 'c-other'
+      caseRegistry = changed
+      var focuses = caseFocusMax
+      t.waitFor(function () {
+        return caseOwner.operation(accepted.operationId).state === 'completed'
+      }, 2000, 'accepted selection conflicts with later external revision', function () {
+        t.equal(caseOwner.operation(accepted.operationId).error.code, 'REGISTRY_CONFLICT', 'fresh read rejects stale accepted selection revision')
+        t.equal(caseLaunches, 2, 'selection conflict never launches either checkout')
+        t.equal(caseFocusMax, focuses, 'selection conflict never dispatches exact focus')
+        verifyChangedSelection()
+      })
+    })
+  }
+  // External selected-checkout changes cannot make two accepted IDs converge later.
+  function verifyChangedSelection(): void {
+    var changed = JSON.parse(JSON.stringify(caseRegistry))
+    changed.revision++
+    changed.projects[0].lastCheckoutId = 'c-other'
+    caseRegistry = changed
+    casePauseMutations = true
+    var omitted = caseOwner.request({
+      projectId: 'p-fixture'
+    })
+    t.equal(omitted.error && omitted.error.code, 'OWNER_NOT_READY', 'changed selected checkout re-resolves before acceptance')
+    var explicit = caseOwner.request({
+      projectId: 'p-fixture',
+      checkoutId: 'c-other'
+    })
+    t.step(60, function () {
+      var resolved = caseOwner.request({
+        projectId: 'p-fixture'
+      })
+      t.equal(resolved.operationId, explicit.operationId, 'fresh changed selection coalesces exact pending checkout')
+      releaseReviewMutations()
+      t.waitFor(function () {
+        return caseObservations.length === 2
+      }, 2000, 'changed checkout one pair pending', function () {
+        t.equal(caseObservations.map(function (entry) {
+          return entry.spec.cwd
+        }), ['/other', '/other'], 'changed default never launches cached checkout')
+        settleReview([])
+        verifyUncertainFailure()
+      })
+    })
+  }
+  // Uncertain accepted attempts survive a later explicit failed attempt and targeted retry.
+  function verifyUncertainFailure(): void {
+    newReviewCase('review-uncertain-failure', function () {
+      var first = caseOwner.request({
+        projectId: 'p-fixture',
+        checkoutId: 'c-main'
+      })
+      t.waitFor(function () {
+        return caseObservations.length === 2
+      }, 2000, 'older uncertain pair accepted', function () {
+        settleReview([])
+        t.equal(caseOwner.launchAttempts.map(function (attempt) {
+          return attempt.launchIdentity.pid
+        }), [201, 202], 'uncertain attempts retain both accepted process identities')
+        caseFailRole = 'terminal'
+        var explicit = caseOwner.request({
+          projectId: 'p-fixture',
+          checkoutId: 'c-main',
+          newWindowRole: 'terminal'
+        })
+        t.waitFor(function () {
+          return caseOwner.operation(explicit.operationId).state === 'completed'
+        }, 2000, 'explicit later failure completes', function () {
+          caseFailRole = ''
+          t.equal(caseOwner.launchAttempts.map(function (attempt) {
+            return attempt.launchIdentity.pid
+          }), [201, 202], 'new failure cannot erase earlier accepted identities')
+          var ordinary = caseOwner.request({
+            projectId: 'p-fixture',
+            checkoutId: 'c-main'
+          })
+          t.step(80, function () {
+            settleReview([])
+            t.equal(caseLaunches, 3, 'uncertain then explicit failure blocks ordinary duplication')
+            var retry = caseOwner.request({
+              projectId: 'p-fixture',
+              checkoutId: 'c-main',
+              retryRole: 'terminal'
+            })
+            t.step(80, function () {
+              settleReview([])
+              t.equal(caseLaunches, 3, 'older uncertain attempt blocks targeted retry after newer failure')
+              verifyUncertainObservedClosure()
+            })
+          })
+        })
+      })
+    })
+  }
+  // Closing a later observed copy never erases an older accepted-unconfirmed process guard.
+  function verifyUncertainObservedClosure(): void {
+    newReviewCase('review-uncertain-copy', function () {
+      caseOwner.request({
+        projectId: 'p-fixture',
+        checkoutId: 'c-main'
+      })
+      t.waitFor(function () {
+        return caseObservations.length === 2
+      }, 2000, 'older unconfirmed copies retained', function () {
+        settleReview([])
+        caseOwner.request({
+          projectId: 'p-fixture',
+          checkoutId: 'c-main',
+          newWindowRole: 'terminal'
+        })
+        t.waitFor(function () {
+          return caseObservations.length === 1
+        }, 2000, 'explicit later terminal accepted', function () {
+          settleReview(['terminal'])
+          var resume = caseOwner.request({
+            projectId: 'p-fixture',
+            checkoutId: 'c-main'
+          })
+          t.waitFor(function () {
+            return caseOwner.operation(resume.operationId).state === 'completed'
+          }, 2000, 'later observed terminal can focus', function () {
+            caseProven = []
+            caseClosed = true
+            caseOwner.request({
+              projectId: 'p-fixture',
+              checkoutId: 'c-main'
+            })
+            t.step(100, function () {
+              settleReview([])
+              t.equal(caseLaunches, 3, 'older uncertainty survives later success focus and observed-copy closure')
+              verifySerialResume()
+            })
+          })
+        })
+      })
+    })
+  }
+  // Both exact roles resume only after each focus and delayed readback finishes.
+  function verifySerialResume(): void {
+    newReviewCase('review-two-role-resume', function () {
+      caseOwner.request({
+        projectId: 'p-fixture',
+        checkoutId: 'c-main'
+      })
+      t.waitFor(function () {
+        return caseObservations.length === 2
+      }, 2000, 'two roles initially observed', function () {
+        settleReview(['editor', 'terminal'])
+        var resume = caseOwner.request({
+          projectId: 'p-fixture',
+          checkoutId: 'c-main'
+        })
+        var next = caseOwner.request({
+          projectId: 'p-fixture',
+          checkoutId: 'c-other',
+          retryRole: 'terminal'
+        })
+        t.waitFor(function () {
+          return caseOwner.operation(resume.operationId).state === 'completed' && caseOwner.operation(next.operationId).state === 'completed'
+        }, 2000, 'both delayed exact readbacks precede next global transaction', function () {
+          t.equal(caseOwner.operation(resume.operationId).outcome, 'observed', 'two healthy roles resume without spurious partial')
+          t.equal(caseFocusMax, 1, 'exact focus and readback serialized within global transaction')
+          t.equal(caseLaunches, 2, 'observed two-role resume never relaunches applications')
+          verifyStalledSubmission()
+        })
+      })
+    })
+  }
+  // Serial submission still advances when a launch helper never returns acceptance.
+  function verifyStalledSubmission(): void {
+    newReviewCase('review-submission-deadline', function () {
+      caseStallLaunch = true
+      caseOwner.roleTimeout = 50
+      var first = caseOwner.request({
+        projectId: 'p-fixture',
+        checkoutId: 'c-main'
+      })
+      t.waitFor(function () {
+        return caseOwner.operation(first.operationId).state === 'completed' && !caseOwner.queueActive
+      }, 2000, 'both stalled submissions settle and release global queue', function () {
+        t.equal(caseLaunches, 2, 'each stalled helper is submitted once despite serial advancement')
+        t.equal(caseOwner.operation(first.operationId).outcome, 'partial', 'unknown submission remains unconfirmed')
+        caseStallLaunch = false
+        var held = caseOwner.request({
+          projectId: 'p-fixture',
+          checkoutId: 'c-main'
+        })
+        t.waitFor(function () {
+          return caseOwner.operation(held.operationId).state === 'completed'
+        }, 2000, 'unknown submissions hold ordinary reopen', function () {
+          t.equal(caseLaunches, 2, 'unknown helper acceptance never authorizes duplicate launch')
+          caseOwner.captureActive = true
+          startExisting()
+        })
+      })
+    })
+  }
+  // Run the established controller coverage after the isolated asynchronous regressions.
+  function startExisting(): void {
     unavailable.captureActive = false
     var refused = unavailable.request({
       projectId: 'p-fixture'
@@ -564,66 +1090,82 @@ ShellRoot {
     controller.refresh()
     t.equal(storeCalls, 0, 'capture never reads registry or processes')
     controller.captureActive = false
-    var first = controller.request({
-      projectId: 'p-fixture',
-      checkoutId: 'c-main'
-    })
-    var second = controller.request({
-      projectId: 'p-fixture',
-      checkoutId: 'c-main'
-    })
-    t.check(first.ok && second.ok, 'same checkout requests accepted')
-    t.equal(second.operationId, first.operationId, 'pending operation coalesced before async registry read')
+    controller.refresh()
     t.waitFor(function () {
-      return observations.length === 2
-    }, 2000, 'both roles observe independently', function () {
-      t.equal(launches, 2, 'one editor and one terminal launch')
-      t.equal(focused, [1], 'global allocation chooses unused workspace')
-      settleUnconfirmed()
-      t.equal(controller.operation(first.operationId).outcome, 'partial', 'accepted unconfirmed is partial')
-      var held = controller.request({
+      return !controller.refreshing && controller.registry.projects.length === 1
+    }, 2000, 'existing owner startup snapshot ready', function () {
+      var first = controller.request({
         projectId: 'p-fixture',
         checkoutId: 'c-main'
       })
+      var second = controller.request({
+        projectId: 'p-fixture',
+        checkoutId: 'c-main'
+      })
+      t.check(first.ok && second.ok, 'same checkout requests accepted')
+      t.equal(second.operationId, first.operationId, 'pending operation coalesced before async registry read')
       t.waitFor(function () {
-        return controller.operation(held.operationId).state === 'completed'
-      }, 2000, 'ordinary reopen holds uncertain roles', function () {
-        t.equal(launches, 2, 'ordinary open never duplicates unconfirmed launch')
-        failTerminal = true
-        var fresh = controller.request({
+        return observations.length === 2
+      }, 2000, 'both roles observe independently', function () {
+        t.equal(launches, 2, 'one editor and one terminal launch')
+        t.equal(focused, [1], 'global allocation chooses unused workspace')
+        settleUnconfirmed()
+        t.equal(controller.operation(first.operationId).outcome, 'partial', 'accepted unconfirmed is partial')
+        var held = controller.request({
           projectId: 'p-fixture',
-          checkoutId: 'c-main',
-          newWindowRole: 'terminal'
+          checkoutId: 'c-main'
         })
         t.waitFor(function () {
-          return controller.operation(fresh.operationId).state === 'completed'
-        }, 2000, 'explicit terminal failure settles independently', function () {
-          t.equal(launches, 3, 'explicit new window launches only selected uncertain role')
-          failTerminal = false
-          var retry = controller.request({
+          return controller.operation(held.operationId).state === 'completed'
+        }, 2000, 'ordinary reopen holds uncertain roles', function () {
+          t.equal(launches, 2, 'ordinary open never duplicates unconfirmed launch')
+          failTerminal = true
+          var fresh = controller.request({
             projectId: 'p-fixture',
             checkoutId: 'c-main',
-            retryRole: 'terminal'
+            newWindowRole: 'terminal'
           })
           t.waitFor(function () {
-            return observations.length === 1
-          }, 2000, 'failed role retries', function () {
-            t.equal(observations[0].spec.role, 'terminal', 'retry observes selected role only')
-            t.equal(launches, 4, 'retry does not relaunch editor')
-            session = 'next-session'
-            controller.snapshot()
-            settleUnconfirmed()
-            t.equal(controller.operation(retry.operationId).error.code, 'SESSION_CHANGED', 'session change invalidates pending work')
-            t.equal(controller.snapshot().bindings, [], 'new session clears runtime bindings')
-            t.equal(controller.request({
+            return controller.operation(fresh.operationId).state === 'completed'
+          }, 2000, 'explicit terminal failure settles independently', function () {
+            t.equal(launches, 3, 'explicit new window launches only selected uncertain role')
+            failTerminal = false
+            var retry = controller.request({
               projectId: 'p-fixture',
-              retryRole: 'terminal',
-              newWindowRole: 'editor'
-            }).error.code, 'INVALID_REQUEST', 'contradictory action flags rejected')
-            verifyQueue()
+              checkoutId: 'c-main',
+              retryRole: 'terminal'
+            })
+            t.waitFor(function () {
+              return controller.operation(retry.operationId).state === 'completed'
+            }, 2000, 'failed role retry holds older uncertainty', function () {
+              t.equal(launches, 3, 'targeted retry never duplicates earlier uncertain terminal')
+              var authorized = controller.request({
+                projectId: 'p-fixture',
+                checkoutId: 'c-main',
+                newWindowRole: 'terminal'
+              })
+              t.waitFor(function () {
+                return observations.length === 1
+              }, 2000, 'explicit role authorization accepted', function () {
+                t.equal(observations[0].spec.role, 'terminal', 'explicit new window observes selected role only')
+                t.equal(launches, 4, 'explicit authorization does not relaunch editor')
+                session = 'next-session'
+                controller.snapshot()
+                settleUnconfirmed()
+                t.equal(controller.operation(authorized.operationId).error.code, 'SESSION_CHANGED', 'session change invalidates pending work')
+                t.equal(controller.snapshot().bindings, [], 'new session clears runtime bindings')
+                t.equal(controller.request({
+                  projectId: 'p-fixture',
+                  retryRole: 'terminal',
+                  newWindowRole: 'editor'
+                }).error.code, 'INVALID_REQUEST', 'contradictory action flags rejected')
+                verifyQueue()
+              })
+            })
           })
         })
       })
     })
   }
+  Component.onCompleted: verifyColdCoalescing()
 }

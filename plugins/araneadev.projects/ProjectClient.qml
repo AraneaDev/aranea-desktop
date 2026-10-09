@@ -14,6 +14,16 @@ Item {
   property bool pending: false
   // Latest actionable IPC or owner request error.
   property string error: ''
+  // Structured refusal remains available to consumers while the owner prepares.
+  property var requestError: null
+  // Preparation retries apply only before any operation has been accepted.
+  property bool preparing: false
+  // Bound readiness retries; reaching this deadline leaves the request rejected.
+  property int readyTimeout: 5000
+  // Original serialized request is immutable throughout rejected-only retries.
+  property string submissionJson: ''
+  // Absolute preparation deadline does not extend on each readiness refusal.
+  property real submissionDeadline: 0
   // Operation being observed, without owning launch lifetime.
   property string operationId: ''
   // Fresh reads reject responses from earlier requests or closed captures.
@@ -68,6 +78,9 @@ Item {
   onCaptureActiveChanged: {
     generation++
     poll.stop()
+    readyRetry.stop()
+    submissionJson = ''
+    preparing = false
     pending = false
   }
   // Decode one structured IPC response and surface missing owner errors.
@@ -87,6 +100,9 @@ Item {
           pending = false
           error = diagnostics || 'Project owner unavailable. Activate Aranea and retry.'
           poll.stop()
+          readyRetry.stop()
+          submissionJson = ''
+          preparing = false
           return
         }
         available = true
@@ -98,6 +114,9 @@ Item {
       pending = false
       error = String(e)
       poll.stop()
+      readyRetry.stop()
+      submissionJson = ''
+      preparing = false
     }
   }
   // Refresh owner observations without creating or cancelling operations.
@@ -110,26 +129,59 @@ Item {
     })
     return true
   }
-  // Submit once, then observe the returned operation ID.
+  // Retry only rejected readiness responses, then observe one accepted ID forever.
   function request(payload: var): bool {
     if (captureActive || pending)
       return false
+    poll.stop()
+    operationId = ''
+    requestError = null
     pending = true
-    var revision = ++generation
-    invoke('request', [JSON.stringify(payload)], revision, function (response) {
+    preparing = false
+    generation++
+    submissionJson = JSON.stringify(payload)
+    submissionDeadline = Date.now() + readyTimeout
+    submitRequest()
+    return true
+  }
+  // Reusing a rejected payload is safe; an accepted submission is never repeated.
+  function submitRequest(): void {
+    if (captureActive || !pending || !submissionJson)
+      return
+    if (preparing && Date.now() >= submissionDeadline) {
+      pending = false
+      preparing = false
+      submissionJson = ''
+      return
+    }
+    invoke('request', [submissionJson], generation, function (response) {
       if (!response.ok || !response.operationId) {
-        pending = false
+        requestError = response.error || null
         error = response.error ? response.error.message : 'Project request refused.'
+        if (!response.operationId && response.error && response.error.code === 'OWNER_NOT_READY' && Date.now() < submissionDeadline) {
+          preparing = true
+          readyRetry.restart()
+          return
+        }
+        pending = false
+        preparing = false
+        submissionJson = ''
         return
       }
+      readyRetry.stop()
+      submissionJson = ''
+      preparing = false
+      requestError = null
       observeOperation(response.operationId)
     })
-    return true
   }
   // Reconnect to a known operation; disconnecting this item never cancels the owner.
   function observeOperation(id: string): bool {
     if (captureActive || !id)
       return false
+    readyRetry.stop()
+    submissionJson = ''
+    preparing = false
     operationId = id
     pending = true
     readOperation()
@@ -155,6 +207,11 @@ Item {
       else
         refresh()
     })
+  }
+  Timer {
+    id: readyRetry
+    interval: client.pollInterval
+    onTriggered: client.submitRequest()
   }
   Timer {
     id: poll

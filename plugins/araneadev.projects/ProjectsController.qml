@@ -28,6 +28,18 @@ Item {
   property var freshBindings: []
   // Latest role history survives completed-operation eviction to prevent duplicates.
   property var roleHistory: ({})
+  // Unresolved submitted/accepted identities survive every later role outcome and eviction.
+  property var launchAttempts: []
+  // Public submissions require the initial authoritative registry snapshot.
+  property bool registryReady: false
+  // Omitted checkout IDs consume fresh one-use revision/session-bound selection leases.
+  property var defaultSelections: ({})
+  // Read-only selection preparations publish no operation IDs.
+  property var selectionPending: ({})
+  // Preparation failures are returned on the next rejected submission.
+  property var selectionErrors: ({})
+  // Invalidates in-flight selection reads on known refreshes and mutations.
+  property int selectionGeneration: 0
   // Global allocation/focus/launch submission queue, independent of role observation.
   property var queue: []
   // One global submission transaction runs at a time.
@@ -68,8 +80,10 @@ Item {
   signal snapshotChanged
   // Consumers observe progress and terminal outcomes by stable operation ID.
   signal operationChanged(var operation)
-  onCaptureActiveChanged: if (captureActive)
+  onCaptureActiveChanged: if (captureActive) {
+    invalidateSelections()
     abortPending('INERT_MODE', 'Inert project fixture.')
+  }
   // Decode JSON through the runtime's safe argv/stdin/collector transport.
   function runJson(argv: var, input: string, done: var): void {
     if (captureActive) {
@@ -176,6 +190,8 @@ Item {
     bindings = []
     freshBindings = []
     roleHistory = ({})
+    launchAttempts = []
+    invalidateSelections()
     snapshotChanged()
   }
   // Snapshot registry objects plus explicitly timestamped fresh runtime observations.
@@ -194,7 +210,8 @@ Item {
       availability: {
         compositor: live.available === true,
         owner: !captureActive,
-        registry: !error,
+        registry: registryReady && !error,
+        ready: registryReady,
         error: error
       },
       projects: registry.projects,
@@ -263,6 +280,7 @@ Item {
     if (captureActive || refreshing || queueActive)
       return false
     syncSession()
+    invalidateSelections()
     refreshing = true
     var session = sessionId
     invoke(storeRunner, [storePath, 'snapshot'], function (response) {
@@ -272,6 +290,7 @@ Item {
       }
       if (response && response.ok && response.state) {
         registry = response.state
+        registryReady = true
         error = null
       } else
         error = response && response.error || failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
@@ -322,7 +341,69 @@ Item {
       return false
     return !(payload.retryRole && payload.newWindowRole)
   }
-  // Accept/coalesce immediately, before any asynchronous registry or desktop work.
+  // A refresh or known mutation invalidates both leases and in-flight preparations.
+  function invalidateSelections(): void {
+    selectionGeneration++
+    defaultSelections = ({})
+    selectionPending = ({})
+    selectionErrors = ({})
+  }
+  // Reject readiness without accepting work; clients may retry only this refusal.
+  function notReady(): var {
+    return {
+      ok: false,
+      operationId: null,
+      error: {
+        code: 'OWNER_NOT_READY',
+        message: 'Project owner is preparing a fresh checkout selection. Retry this rejected request shortly.',
+        recovery: 'Retry only this rejected request; never resubmit an accepted operation.'
+      }
+    }
+  }
+  // Read the selected checkout afresh without creating a provisional operation.
+  function prepareSelection(projectId: string): void {
+    if (captureActive || selectionPending[projectId])
+      return
+    var revision = selectionGeneration, session = sessionId
+    var pending = Object.assign({}, selectionPending)
+    pending[projectId] = true
+    selectionPending = pending
+    invoke(storeRunner, [storePath, 'snapshot'], function (response) {
+      if (captureActive || session !== sessionId || revision !== selectionGeneration)
+        return
+      var nextPending = Object.assign({}, selectionPending)
+      delete nextPending[projectId]
+      selectionPending = nextPending
+      var state = response && response.ok && response.state
+      var project = state && state.projects.filter(function (row) {
+        return row.id === projectId
+      })[0]
+      var checkout = project && project.checkouts.filter(function (row) {
+        return row.id === project.lastCheckoutId
+      })[0]
+      if (!state || !project || !checkout) {
+        var errors = Object.assign({}, selectionErrors)
+        errors[projectId] = response && response.error || failure(!state ? 'REGISTRY_UNAVAILABLE' : !project ? 'PROJECT_NOT_FOUND' : 'CHECKOUT_NOT_FOUND', 'The selected project or checkout is unavailable. Locate its folder in project details.')
+        selectionErrors = errors
+        return
+      }
+      if (!queueActive) {
+        registry = state
+        registryReady = true
+        error = null
+      }
+      var leases = Object.assign({}, defaultSelections)
+      leases[projectId] = {
+        projectId: projectId,
+        checkoutId: checkout.id,
+        sessionId: session,
+        revision: state.revision
+      }
+      defaultSelections = leases
+      snapshotChanged()
+    }, '')
+  }
+  // Normalize a stable checkout key before accepting or coalescing public work.
   function request(payload: var): var {
     if (captureActive)
       return {
@@ -343,12 +424,35 @@ Item {
         error: failure('DEPENDENCY_MISSING', 'The project runtime is unavailable. Reinstall the project plugin and retry.')
       }
     syncSession()
-    var project = registry.projects.filter(function (row) {
-      return row.id === payload.projectId
-    })[0]
-    var checkoutId = payload.checkoutId || (project && project.lastCheckoutId) || null
+    if (!registryReady) {
+      refresh()
+      return notReady()
+    }
+    var lease = null
+    if (!payload.checkoutId) {
+      if (selectionErrors[payload.projectId]) {
+        var problem = selectionErrors[payload.projectId]
+        var errors = Object.assign({}, selectionErrors)
+        delete errors[payload.projectId]
+        selectionErrors = errors
+        return {
+          ok: false,
+          operationId: null,
+          error: problem
+        }
+      }
+      lease = defaultSelections[payload.projectId]
+      if (!lease || lease.sessionId !== sessionId || lease.revision !== registry.revision) {
+        prepareSelection(payload.projectId)
+        return notReady()
+      }
+      var leases = Object.assign({}, defaultSelections)
+      delete leases[payload.projectId]
+      defaultSelections = leases
+    }
+    var checkoutId = payload.checkoutId || lease.checkoutId
     var pending = operations.filter(function (op) {
-      return op.state !== 'completed' && op.sessionId === sessionId && op.projectId === payload.projectId && (op.checkoutId === checkoutId || (!payload.checkoutId && !op.requestedCheckoutId))
+      return op.state !== 'completed' && op.sessionId === sessionId && op.projectId === payload.projectId && op.checkoutId === checkoutId
     })[0]
     if (pending)
       return {
@@ -358,7 +462,7 @@ Item {
       }
     var request = Object.assign({}, payload, {
       checkoutId: checkoutId,
-      requestedCheckoutId: payload.checkoutId || null,
+      selectionRevision: lease ? lease.revision : null,
       generation: ++generation,
       sessionId: sessionId
     })
@@ -441,12 +545,17 @@ Item {
         failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry unavailable.')
         return
       }
+      if (op.selectionRevision !== null && op.selectionRevision !== undefined && op.selectionRevision !== response.state.revision) {
+        invalidateSelections()
+        failOperation(id, 'REGISTRY_CONFLICT', 'Project selection changed after acceptance. Review the checkout and submit a new request.')
+        return
+      }
       registry = response.state
       error = null
       var project = registry.projects.filter(function (row) {
         return row.id === op.projectId
       })[0]
-      var checkoutId = op.requestedCheckoutId || project && project.lastCheckoutId
+      var checkoutId = op.checkoutId
       var checkout = project && project.checkouts.filter(function (row) {
         return row.id === checkoutId
       })[0]
@@ -517,6 +626,7 @@ Item {
         return
       }
       registry = response.state
+      invalidateSelections()
       done()
     }, JSON.stringify({
       action: action,
@@ -622,14 +732,22 @@ Item {
       state: 'launching',
       rolesPending: ['editor', 'terminal']
     }))
-    var acceptedPending = 2
-    var accepted = function () {
-      acceptedPending--
-      if (!acceptedPending)
-        releaseQueue(id)
-    }
     var roles = ['editor', 'terminal']
-    roles.forEach(function (role) {
+    var submit = function (index) {
+      if (index >= roles.length) {
+        releaseQueue(id)
+        return
+      }
+      var role = roles[index]
+      var advanced = false
+      var accepted = function () {
+        if (advanced)
+          return
+        advanced = true
+        Qt.callLater(function () {
+          submit(index + 1)
+        })
+      }
       if (!current(id, revision, session))
         return
       var prior = roleHistory[roleKey(op, role)] || null
@@ -665,9 +783,15 @@ Item {
             processVerified: false
           })
         }) : null), prior, baseline.windows, session, disposition)
+      if (decision.action === 'launch' && op.newWindowRole !== role && launchAttempts.some(function (attempt) {
+        return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && attempt.role === role && attempt.sessionId === session && (attempt.state === 'submitted' || attempt.state === 'accepted')
+      }))
+        decision = {
+          action: 'hold',
+          code: 'OWNERSHIP_UNCONFIRMED'
+        }
       if (decision.action === 'focus' && typeof runtime.focusBinding === 'function') {
         runtime.focusBinding(fresh, function (focused) {
-          accepted()
           if (!current(id, revision, session))
             return
           finishRole(id, role, {
@@ -677,6 +801,7 @@ Item {
             binding: focused && focused.status === 'observed' ? focused.binding || fresh : null,
             preserveHistory: !focused || focused.status !== 'observed'
           })
+          accepted()
         })
         return
       }
@@ -724,11 +849,24 @@ Item {
         operationId: id,
         role: role,
         revision: revision,
-        session: session
+        session: session,
+        submissionDone: accepted
       })
       var nextDeadlines = Object.assign({}, deadlines)
       nextDeadlines[id + ':' + role] = timer
       deadlines = nextDeadlines
+      var attemptId = id + ':' + role
+      launchAttempts = launchAttempts.concat([
+        {
+          id: attemptId,
+          projectId: op.projectId,
+          checkoutId: op.checkoutId,
+          role: role,
+          sessionId: session,
+          generation: revision,
+          state: 'submitted'
+        }
+      ])
       var responded = false
       runtime.launch(spec, function (response) {
         if (responded)
@@ -738,6 +876,9 @@ Item {
         if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
           return
         if (!response || !response.ok || response.status !== 'accepted') {
+          updateAttempt(attemptId, {
+            state: 'failed'
+          })
           finishRole(id, role, {
             status: 'failed',
             code: response && response.code || 'LAUNCH_FAILED',
@@ -746,6 +887,10 @@ Item {
           return
         }
         spec.launchIdentity = response.identity
+        updateAttempt(attemptId, {
+          state: 'accepted',
+          launchIdentity: response.identity
+        })
         var history = Object.assign({}, roleHistory)
         history[roleKey(op, role)] = {
           role: role,
@@ -760,12 +905,26 @@ Item {
         runtime.observe(spec, baseline, function (observed) {
           if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
             return
+          if (observed && observed.status === 'observed' && observed.binding)
+            updateAttempt(attemptId, {
+              state: 'observed',
+              binding: observed.binding
+            })
           finishRole(id, role, observed || {
             status: 'unconfirmed',
             code: 'OBSERVATION_TIMEOUT'
           })
         })
       })
+    }
+    submit(0)
+  }
+  // Update one attempt without letting a later outcome discard another identity.
+  function updateAttempt(id: string, changes: var): void {
+    launchAttempts = launchAttempts.map(function (attempt) {
+      return attempt.id === id ? Object.assign({}, attempt, changes) : attempt
+    }).filter(function (attempt) {
+      return attempt.state === 'submitted' || attempt.state === 'accepted'
     })
   }
   // Pure fixed adapter import is exposed only to this live owner.
@@ -827,6 +986,7 @@ Item {
       property string role
       property int revision
       property string session
+      property var submissionDone
       interval: controller.roleTimeout
       running: true
       onTriggered: if (controller.current(timer.operationId, timer.revision, timer.session)) {
@@ -835,7 +995,8 @@ Item {
           code: 'OBSERVATION_TIMEOUT',
           message: 'Launch could not be confirmed. Use Open new window explicitly.'
         })
-        controller.releaseQueue(timer.operationId)
+        if (typeof timer.submissionDone === 'function')
+          timer.submissionDone()
       }
     }
   }
