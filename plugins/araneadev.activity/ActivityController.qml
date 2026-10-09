@@ -49,6 +49,10 @@ Item {
   property double readAt: 0
   // Pending attention is owner-local and never restored or replayed after restart.
   property var notificationQueue: []
+  // Policy ownership is independent of successful store-read generations.
+  property int notificationGeneration: 0
+  // Each occurrence has a unique token even if a state/blocker key recurs later.
+  property int nextNotificationId: 0
   // Delivery acceptance is separate from an unobservable desktop popup.
   property var notificationStatus: ({
       status: 'unavailable',
@@ -60,6 +64,7 @@ Item {
   signal operationChanged(var operation)
   onCaptureActiveChanged: {
     readGeneration++
+    notificationGeneration++
     if (captureActive) {
       notificationQueue = []
       notificationTimer.stop()
@@ -103,7 +108,7 @@ Item {
       } else {
         var previous = ready ? storeState : null
         storeState = response.state
-        consumeNotifications(previous, storeState, revision)
+        consumeNotifications(previous, storeState)
         ready = true
         error = null
         readAt = clock()
@@ -113,14 +118,13 @@ Item {
     })
     return true
   }
-  // Successful snapshots consume transitions even when policy is unavailable or suppressed.
-  function consumeNotifications(previous: var, current: var, revision: int): void {
+  // Successful snapshots preserve outstanding decisions only for the current identity.
+  function consumeNotifications(previous: var, current: var): void {
     notificationQueue = notificationQueue.filter(function (notice) {
       return current.tasks.some(function (task) {
         return Logic.notificationKey(task) === notice.key
       })
-    })
-    notificationQueue = notificationQueue.map(function (notice) {
+    }).map(function (notice) {
       var task = current.tasks.filter(function (row) {
         return row.taskId === notice.taskId
       })[0]
@@ -131,35 +135,74 @@ Item {
     var transitions = Logic.notificationTransitions(previous, current, false)
     if (!transitions.length || !runtime || typeof runtime.readNotificationPolicy !== 'function')
       return
+    var tokens = [], lifetime = notificationGeneration
+    transitions.forEach(function (notice) {
+      var token = ++nextNotificationId
+      tokens.push(token)
+      notificationQueue = notificationQueue.filter(function (old) {
+        return old.taskId !== notice.taskId
+      }).concat([Object.assign({}, notice, {
+          token: token,
+          phase: 'policy'
+        })])
+    })
     runtime.readNotificationPolicy(function (policy) {
-      if (captureActive || revision !== readGeneration)
+      if (captureActive || lifetime !== notificationGeneration)
         return
-      if (!policy || !policy.available || policy.suppressed) {
-        notificationQueue = []
+      var pending = notificationQueue.filter(function (notice) {
+        return tokens.indexOf(notice.token) >= 0 && notice.phase === 'policy'
+      })
+      if (!pending.length)
+        return
+      var allowed = policy && policy.available && !policy.suppressed
+      notificationQueue = notificationQueue.filter(function (notice) {
+        return allowed || tokens.indexOf(notice.token) < 0 || notice.phase !== 'policy'
+      }).map(function (notice) {
+        return tokens.indexOf(notice.token) >= 0 && notice.phase === 'policy' ? Object.assign({}, notice, {
+          phase: 'queued'
+        }) : notice
+      })
+      if (!allowed) {
         notificationStatus = {
           status: policy && policy.available ? 'suppressed' : 'unavailable',
           message: 'Attention consumed; no backlog will be replayed.'
         }
         return
       }
-      transitions.forEach(function (notice) {
-        notificationQueue = notificationQueue.filter(function (old) {
-          return old.taskId !== notice.taskId
-        }).concat([notice])
-      })
       if (!notificationTimer.running)
         notificationTimer.start()
     })
   }
-  // Recheck policy at emission; DND changes during coalescing also consume the burst.
+  // Final policy checks retain their tokens until consumed, preventing late duplicate replies.
   function flushNotifications(): void {
     notificationTimer.stop()
-    if (captureActive || !runtime || !notificationQueue.length)
+    if (captureActive || !runtime)
       return
-    var pending = notificationQueue
-    notificationQueue = []
+    var tokens = notificationQueue.filter(function (notice) {
+      return notice.phase === 'queued'
+    }).map(function (notice) {
+      return notice.token
+    })
+    if (!tokens.length)
+      return
+    var lifetime = notificationGeneration
+    notificationQueue = notificationQueue.map(function (notice) {
+      return tokens.indexOf(notice.token) >= 0 ? Object.assign({}, notice, {
+        phase: 'delivery'
+      }) : notice
+    })
     runtime.readNotificationPolicy(function (policy) {
-      if (captureActive)
+      if (captureActive || lifetime !== notificationGeneration)
+        return
+      var pending = notificationQueue.filter(function (notice) {
+        return tokens.indexOf(notice.token) >= 0 && notice.phase === 'delivery' && storeState.tasks.some(function (task) {
+          return Logic.notificationKey(task) === notice.key
+        })
+      })
+      notificationQueue = notificationQueue.filter(function (notice) {
+        return tokens.indexOf(notice.token) < 0
+      })
+      if (!pending.length)
         return
       if (!policy || !policy.available || policy.suppressed) {
         notificationStatus = {
@@ -168,13 +211,9 @@ Item {
         }
         return
       }
-      pending.filter(function (notice) {
-        return storeState.tasks.some(function (task) {
-          return Logic.notificationKey(task) === notice.key
-        })
-      }).forEach(function (notice) {
+      pending.forEach(function (notice) {
         runtime.notifyAttention(notice, function (result) {
-          if (captureActive)
+          if (captureActive || lifetime !== notificationGeneration)
             return
           notificationStatus = {
             status: result && result.accepted ? 'accepted' : 'unavailable',
@@ -209,7 +248,7 @@ Item {
       error = null
       readAt = clock()
       elapsedSinceRead = 0
-      consumeNotifications(previous, storeState, revision)
+      consumeNotifications(previous, storeState)
       snapshotChanged()
       runtime.showTask(taskId, function (result) {
         if (!captureActive)
