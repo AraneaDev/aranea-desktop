@@ -28,6 +28,8 @@ Item {
   property string operationId: ''
   // Fresh reads reject responses from earlier requests or closed captures.
   property int generation: 0
+  // Snapshot reads have independent freshness so Refresh cannot invalidate accepted work.
+  property int snapshotReadRevision: 0
   // Poll only while observing a pending owner operation.
   property int pollInterval: 150
   // Same fixed IPC wrapper used by public CLI clients.
@@ -77,6 +79,7 @@ Item {
   }
   onCaptureActiveChanged: {
     generation++
+    snapshotReadRevision++
     poll.stop()
     readyRetry.stop()
     submissionJson = ''
@@ -87,9 +90,10 @@ Item {
   function invoke(method: string, args: var, revision: int, done: var): void {
     if (captureActive)
       return
+    var readRevision = snapshotReadRevision
     try {
       runner([ipcPath, 'aranea.projects', method].concat(args || []), function (code, output, diagnostics) {
-        if (captureActive || revision !== generation)
+        if (captureActive || revision !== generation || method === 'snapshot' && readRevision !== snapshotReadRevision)
           return
         var response = null
         try {
@@ -110,6 +114,8 @@ Item {
         done(response)
       })
     } catch (e) {
+      if (captureActive || revision !== generation || method === 'snapshot' && readRevision !== snapshotReadRevision)
+        return
       available = false
       pending = false
       error = String(e)
@@ -124,6 +130,7 @@ Item {
     if (captureActive)
       return false
     var revision = generation
+    snapshotReadRevision++
     invoke('snapshot', [], revision, function (response) {
       snapshot = response
     })

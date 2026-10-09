@@ -69,7 +69,83 @@ ShellRoot {
       root.result = operation
     }
   }
+  // Held IPC callbacks prove read freshness without cancelling accepted observations.
+  property var heldReads: []
+  Projects.ProjectClient {
+    id: ordered
+    pollInterval: 60000
+    runner: function (argv, done) {
+      root.heldReads.push({
+        argv: argv,
+        done: done
+      })
+    }
+  }
+  // Provide current owner state through the real client's replaceable IPC boundary.
+  function ownerSnapshot(session, generation, status) {
+    return JSON.stringify({
+      sessionId: session,
+      availability: {
+        compositor: true
+      },
+      projects: [],
+      bindings: [],
+      operations: [
+        {
+          id: 'op-read-' + generation,
+          sessionId: session,
+          projectId: 'p-order',
+          checkoutId: 'c-order',
+          generation: generation,
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: status
+            }
+          ]
+        }
+      ]
+    })
+  }
   Component.onCompleted: {
+    ordered.refresh()
+    ordered.refresh()
+    heldReads[1].done(0, ownerSnapshot('session-one', 2, 'observed'), '')
+    heldReads[0].done(0, ownerSnapshot('session-one', 1, 'unconfirmed'), '')
+    t.equal(ordered.snapshot.operations[0].generation, 2, 'inverted snapshot callbacks cannot roll back operation generation')
+    ordered.refresh()
+    ordered.refresh()
+    heldReads[3].done(0, ownerSnapshot('session-two', 1, 'observed'), '')
+    heldReads[2].done(0, ownerSnapshot('session-one', 3, 'unconfirmed'), '')
+    t.equal(ordered.snapshot.sessionId, 'session-two', 'older response cannot resurrect previous owner session')
+    ordered.request({
+      projectId: 'p-order',
+      checkoutId: 'c-order'
+    })
+    ordered.refresh()
+    ordered.refresh()
+    heldReads[6].done(0, ownerSnapshot('session-two', 2, 'observed'), '')
+    heldReads[4].done(0, JSON.stringify({
+      ok: true,
+      operationId: 'op-accepted',
+      error: null
+    }), '')
+    heldReads[5].done(1, '', 'superseded snapshot transport failed')
+    t.check(ordered.available && ordered.pending && !ordered.error, 'stale snapshot error cannot stop accepted operation observation')
+    t.equal(ordered.operationId, 'op-accepted', 'overlapping refresh preserves accepted operation identity')
+    heldReads[7].done(0, JSON.stringify({
+      id: 'op-accepted',
+      state: 'completed',
+      outcome: 'observed',
+      steps: [],
+      error: null
+    }), '')
+    t.check(!ordered.pending, 'accepted callback completes despite overlapping snapshot reads')
+    t.equal(heldReads.filter(function (read) {
+      return read.argv[2] === 'request'
+    }).length, 1, 'snapshot refresh never resubmits accepted operation')
+    ordered.captureActive = true
     client.captureActive = true
     client.refresh()
     client.request({

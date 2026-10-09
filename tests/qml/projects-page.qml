@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import "lib"
 import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as Projects
 
 ShellRoot {
   id: host
@@ -89,6 +90,14 @@ ShellRoot {
     property string error: ''
     // Inert owner operation observations never submit or launch desktop work.
     signal operationChanged(var operation)
+  }
+  // Held real-client refresh callbacks exercise the complete view recovery boundary.
+  property var refreshCallbacks: []
+  Projects.ProjectClient {
+    id: refreshOwner
+    runner: function (argv, done) {
+      host.refreshCallbacks.push(done)
+    }
   }
   Settings.ProjectFolderPicker {
     id: picker
@@ -302,6 +311,88 @@ ShellRoot {
       ]
     })
     t.equal(page.details.operation, null, 'old-session event cannot resurrect recovery')
+    page.projectClient = refreshOwner
+    refreshOwner.refresh()
+    refreshOwner.refresh()
+    refreshCallbacks[1](0, JSON.stringify({
+      sessionId: 'fresh-owner',
+      availability: {
+        compositor: true
+      },
+      operations: [
+        {
+          id: 'op-fresh',
+          generation: 2,
+          sessionId: 'fresh-owner',
+          projectId: 'p-review',
+          checkoutId: 'c-anchor',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'observed'
+            }
+          ]
+        }
+      ]
+    }), '')
+    refreshCallbacks[0](0, JSON.stringify({
+      sessionId: 'fresh-owner',
+      availability: {
+        compositor: true
+      },
+      operations: [
+        {
+          id: 'op-stale',
+          generation: 1,
+          sessionId: 'fresh-owner',
+          projectId: 'p-review',
+          checkoutId: 'c-anchor',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'unconfirmed'
+            }
+          ]
+        }
+      ]
+    }), '')
+    t.equal(page.details.operation.id, 'op-fresh', 'real client inverted Refresh cannot restore stale recovery outcome')
+    t.check(!page.details.recoveryAllowed('terminal', 'new'), 'older in-flight Refresh cannot enable another new window')
+    refreshOwner.refresh()
+    refreshCallbacks[2](0, JSON.stringify({
+      sessionId: 'fresh-owner',
+      availability: {
+        compositor: true
+      },
+      operations: []
+    }), '')
+    t.equal(page.details.operation, null, 'genuinely current absent owner result clears recovery')
+    refreshOwner.refresh()
+    refreshCallbacks[3](0, JSON.stringify({
+      sessionId: 'restarted-owner',
+      availability: {
+        compositor: true
+      },
+      operations: [
+        {
+          id: 'op-old-session',
+          generation: 99,
+          sessionId: 'fresh-owner',
+          projectId: 'p-review',
+          checkoutId: 'c-anchor',
+          state: 'completed',
+          steps: [
+            {
+              role: 'terminal',
+              status: 'unconfirmed'
+            }
+          ]
+        }
+      ]
+    }), '')
+    t.equal(page.details.operation, null, 'current owner session change clears session-invalid recovery')
     page.displayOnly = true
     page.addSelected()
     t.equal(sent.length, 2, 'inert capture refuses registration')
