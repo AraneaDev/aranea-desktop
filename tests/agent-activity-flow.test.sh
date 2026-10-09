@@ -148,15 +148,45 @@ owner_before=$(omarchy-shell aranea.activity snapshot | jq -r .ownerId)
 kill -- "-$owner_pid"
 wait "$owner_pid" || true
 owner_pid=""
-"$cli" agents register --json-input --json <<<'{"provider":"claude","providerSessionId":"manual","producerEpoch":"manual-epoch","tasks":[]}' >/dev/null
+"$cli" agents register --json-input --json <<<'{"provider":"claude","providerSessionId":"99999999-1234-1234-1234-123456789abc","producerEpoch":"manual-epoch","tasks":[]}' >/dev/null
 "$cli" agents report --json-input --json <<EOF_REPORT >/dev/null
-{"schemaVersion":1,"eventId":"manual-result","provider":"claude","providerSessionId":"manual","producerEpoch":"manual-epoch","sequence":1,"taskId":"headless","kind":"snapshot","payload":{"cwd":"$checkout","reportedState":"finished","description":"Headless retained result","result":"Saved while owner stopped"}}
+{"schemaVersion":1,"eventId":"manual-result","provider":"claude","providerSessionId":"99999999-1234-1234-1234-123456789abc","producerEpoch":"manual-epoch","sequence":1,"taskId":"headless","kind":"snapshot","payload":{"cwd":"$checkout","reportedState":"finished","description":"Headless retained result","result":"Saved while owner stopped"}}
 EOF_REPORT
 start_owner
 [[ "$(omarchy-shell aranea.activity snapshot | jq -r .ownerId)" != "$owner_before" ]]
 assert_views
 omarchy-shell fixture inspect headless | jq -e '.selected.key=="headless" and .resultText=="Saved while owner stopped"' >/dev/null
 claude_task=$(jq -r '.owner.tasks[]|select(.provider=="claude" and .source=="native")|.taskId' "$TMPDIR/view")
+# Public reports retain private exact-session capability in actual owner/client/Tasks.
+for kind in verification needs-input failed; do
+  "$store" snapshot >"$TMPDIR/state"
+  jq -cn --slurpfile state "$TMPDIR/state" --arg id "$claude_task" --arg kind "$kind" '$state[0].state as $s | ($s.tasks[]|select(.taskId==$id)) as $t | ($s.sessions[]|select(.provider==$t.provider and .providerSessionId==$t.providerSessionId)) as $session | {schemaVersion:1,eventId:("public-"+$kind),provider:$t.provider,providerSessionId:$t.providerSessionId,producerEpoch:$t.producerEpoch,sequence:($session.highWaterSequence+1),taskId:$t.taskId,kind:$kind,payload:(if $kind=="verification" then {status:"reported-pass",summary:"Passed",commands:[]} elif $kind=="needs-input" then {blockerId:"public-question",question:"Which option?"} else {result:"Explicit failure"} end)}' >"$TMPDIR/report"
+  "$cli" agents report --json-input --json <"$TMPDIR/report" >"$TMPDIR/reported"
+  revision=$(jq -r 'select(.event=="completed")|.data.state.revision' "$TMPDIR/reported")
+  omarchy-shell fixture refresh >/dev/null
+  for _ in {1..100}; do
+    omarchy-shell fixture snapshot >"$TMPDIR/view"
+    if jq -e --argjson revision "$revision" '.client.revision==$revision' "$TMPDIR/view" >/dev/null; then break; fi
+    sleep .05
+  done
+  jq -e --arg id "$claude_task" --arg kind "$kind" '.owner.tasks[] | select(.taskId==$id) | .source=="report"' "$TMPDIR/view" >/dev/null
+  jq -e --arg id "$claude_task" --arg kind "$kind" '.rows[] | select(.key==$id) | if $kind=="failed" then .primary.kind=="inspect-failure" and .secondary.kind=="reopen" else .primary.kind=="focus" end' "$TMPDIR/view" >/dev/null || {
+    echo "FAIL public $kind report removed native Tasks action"
+    exit 1
+  }
+  # A UUID-shaped manually registered session still has no native action.
+  "$store" snapshot >"$TMPDIR/state"
+  jq -cn --slurpfile state "$TMPDIR/state" --slurpfile report "$TMPDIR/report" '$state[0].state as $s | ($s.tasks[]|select(.taskId=="headless")) as $t | ($s.sessions[]|select(.providerSessionId==$t.providerSessionId)) as $session | $report[0] + {eventId:("manual-"+$report[0].kind),providerSessionId:$t.providerSessionId,producerEpoch:$t.producerEpoch,sequence:($session.highWaterSequence+1),taskId:$t.taskId}' >"$TMPDIR/manual-report"
+  "$cli" agents report --json-input --json <"$TMPDIR/manual-report" >"$TMPDIR/manual-reported"
+  revision=$(jq -r 'select(.event=="completed")|.data.state.revision' "$TMPDIR/manual-reported")
+  omarchy-shell fixture refresh >/dev/null
+  for _ in {1..100}; do
+    omarchy-shell fixture snapshot >"$TMPDIR/view"
+    if jq -e --argjson revision "$revision" '.client.revision==$revision' "$TMPDIR/view" >/dev/null; then break; fi
+    sleep .05
+  done
+  jq -e '.rows[]|select(.key=="headless")|.primary.kind!="focus" and .primary.kind!="reopen" and .secondary.kind==""' "$TMPDIR/view" >/dev/null
+done
 # A disconnected observer keeps the accepted ID; reconnect/reobserve must never launch again.
 rc=0
 FLOW_DISCONNECT=1 "$cli" agents reopen "$claude_task" --json >"$TMPDIR/events" 2>"$TMPDIR/disconnected" || rc=$?

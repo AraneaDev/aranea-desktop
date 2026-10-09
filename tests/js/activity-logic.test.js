@@ -123,3 +123,21 @@ test("attention transitions use state and blocker identity, consume suppression 
       0
     )
 })
+
+test("native capability uses exact private session evidence independent of latest report source", () => {
+  for (const source of ["native", "report"]) {
+    for (const replacement of [
+      session,
+      { ...session, producerEpoch: "other" },
+      { ...session, provenance: null },
+      { ...session, nativeMetadata: { observedHooks: [] } }
+    ]) {
+      const projected = logic.project(
+        { tasks: [{ ...task, source, nativeSessionEligible: true }], sessions: [replacement] },
+        2000,
+        registry
+      ).tasks[0]
+      assert.equal(projected.nativeSessionEligible, replacement === session)
+    }
+  }
+})

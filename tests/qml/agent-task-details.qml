@@ -32,6 +32,7 @@ ShellRoot {
             taskId: 'stable',
             provider: 'claude',
             source: 'native',
+            nativeSessionEligible: true,
             description: '<b>Fix</b>',
             result: 'result',
             question: 'question',
@@ -176,6 +177,7 @@ ShellRoot {
           displayState: 'failed',
           freshness: 'connected',
           source: 'native',
+          nativeSessionEligible: true,
           resumeCommand: 'fixed display-only command',
           diagnostics: [
             {

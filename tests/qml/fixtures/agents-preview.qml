@@ -18,6 +18,7 @@ ShellRoot {
       taskId: 'preview-' + index,
       provider: index % 2 ? 'codex' : 'claude',
       source: 'native',
+      nativeSessionEligible: true,
       providerSessionId: '12345678-1234-1234-1234-123456789abc',
       producerEpoch: 'preview',
       reportedState: state === 'connection-lost' ? 'working' : state,

@@ -36,3 +36,39 @@ agent_activity_is_replay() {
     any(.sessions[]; .provider == $r.args.provider and .providerSessionId == $r.args.providerSessionId and .producerEpoch == $r.args.producerEpoch
       and (if $r.action == "register" then .registrationHash == $hash else any(.receipts[];.eventId == $r.args.eventId and .hash == $hash) end))' <<<"$state" >/dev/null
 }
+
+# Capture ingress lifetime before waiting or reading hook input. The coordination
+# inode survives uninstall; its content changes only under its transaction lock.
+agent_activity_generation() {
+  local lock generation=''
+  lock="$(aranea_state_root)/agent-activity.json.lock"
+  if [[ -L "$lock" || (-e "$lock" && ! -f "$lock") ]]; then
+    printf 'unsafe\n'
+    return 0
+  fi
+  [[ ! -e "$lock" ]] || generation=$(head -c 128 -- "$lock") || return 1
+  printf '%s\n' "${generation:-initial}"
+}
+
+# Join the same authority for stores and helper startup. A retired ingress cannot
+# cross teardown or reinstall, even if it had not reached the store yet.
+# Caller supplies activity_generation and consumes activity_lock_error/fd.
+# shellcheck disable=SC2034,SC2154
+agent_activity_lock() {
+  local wait=$1 lifecycle=${2:-false} current
+  local lock
+  lock="$(aranea_state_root)/agent-activity.json.lock"
+  activity_lock_error=ACTIVITY_WRITE_FAILED
+  mkdir -p -- "$(dirname "$lock")" || return 1
+  activity_lock_error=UNSAFE_STATE_PATH
+  [[ ! -L "$lock" && (! -e "$lock" || -f "$lock") ]] || return 1
+  activity_lock_error=ACTIVITY_WRITE_FAILED
+  exec {activity_lock_fd}<>"$lock" || return 1
+  activity_lock_error=ACTIVITY_LOCK_FAILED
+  flock -w "$wait" -x "$activity_lock_fd" || return 1
+  current=$(agent_activity_generation) || return 1
+  activity_lock_error=ACTIVITY_REMOVED
+  if [[ "$lifecycle" != true ]]; then
+    [[ "$current" != removed:* && "$current" == "$activity_generation" ]] || return 1
+  fi
+}

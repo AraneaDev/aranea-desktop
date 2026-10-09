@@ -11,6 +11,7 @@ const task = (id, state, extra = {}) => ({
   displayState: state,
   freshness: "connected",
   source: "native",
+  nativeSessionEligible: true,
   association: { status: "registered", projectId: "p", checkoutId: "c", cwd: "/repo" },
   ...extra
 })
@@ -167,8 +168,13 @@ test("approved lifecycle actions vary by exact checkout, native capability and r
   for (const state of ["working", "needs-input", "connection-lost"]) {
     for (const variant of [
       { association: { status: "unassigned", cwd: "/repo" } },
-      { source: "report" },
-      { source: "native", freshness: "unconfirmed", resumeCommand: null }
+      { source: "report", nativeSessionEligible: false },
+      {
+        source: "native",
+        nativeSessionEligible: true,
+        freshness: "unconfirmed",
+        resumeCommand: null
+      }
     ]) {
       const row = logic.rows(
         {

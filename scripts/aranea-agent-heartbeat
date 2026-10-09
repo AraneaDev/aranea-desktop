@@ -7,6 +7,10 @@ unset BASH_ENV ENV CDPATH
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/paths.sh
 source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/agent-activity.sh
+source "$script_dir/lib/agent-activity.sh"
+activity_generation=${ARANEA_ACTIVITY_GENERATION:-$(agent_activity_generation)}
+export ARANEA_ACTIVITY_GENERATION="$activity_generation"
 # shellcheck source=scripts/lib/agent-hooks.sh
 source "$script_dir/lib/agent-hooks.sh"
 [[ $# == 6 && ("$1" == claude || "$1" == codex) && "$4" =~ ^[1-9][0-9]*$ && "$5" =~ ^[0-9]+$ ]]
@@ -15,6 +19,8 @@ provider=$1 session=$2 epoch=$3 provider_pid=$4 provider_start=$5 boot=$6
 root="$(aranea_state_root)/agent-heartbeats"
 [[ ! -L "$root" ]]
 umask 077
+# Serialize record creation against teardown as well as the later store writes.
+agent_activity_lock 1 || exit 0
 mkdir -p -- "$root"
 key=$(printf '%s\n' "$provider" "$session" "$epoch" | sha256sum | cut -d' ' -f1)
 identity="$root/$key.json"
@@ -30,6 +36,7 @@ cleanup() {
   if [[ ! -L "$identity" ]] && jq -e --argjson pid "$$" --arg start "$helper_start" '.pid == $pid and .startTime == $start' "$identity" >/dev/null 2>&1; then rm -f -- "$identity"; fi
 }
 trap cleanup EXIT
+exec {activity_lock_fd}>&-
 evidence=null
 expected_hash=${epoch##*:}
 [[ "$expected_hash" =~ ^[a-f0-9]{64}$ ]] || exit 0
@@ -51,7 +58,7 @@ while true; do
   else
     code=$(jq -r '.error.code // ""' <<<"$response" 2>/dev/null) || code=''
     case "$code" in
-      ADAPTER_UNSUPPORTED | EPOCH_MISMATCH | SESSION_NOT_FOUND) exit 0 ;;
+      ADAPTER_UNSUPPORTED | EPOCH_MISMATCH | SESSION_NOT_FOUND | ACTIVITY_REMOVED) exit 0 ;;
       # Transient store/transport failure: retain the singleton, bounded cadence.
       *) ;;
     esac

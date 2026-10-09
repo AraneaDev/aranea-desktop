@@ -146,8 +146,8 @@ agents_cli_main() {
       if [[ "$command" == inspect ]]; then
         response=$(jq -c --arg id "$id" '[.tasks[]|select(.taskId==$id)][0] // null' <<<"$cli_state")
         [[ "$response" != null ]] || agents_cli_fail TASK_NOT_FOUND 'Task not found.' 'List current activity and select a retained task.'
-        body=$(jq -cn --argjson task "$response" '{task:$task}')
-      else body=$(jq -cn --argjson state "$cli_state" '{state:$state,tasks:$state.tasks}'); fi
+        body=$(jq -c '{task:.}' <<<"$response")
+      else body=$(jq -c '{state:.,tasks:.tasks}' <<<"$cli_state"); fi
       projects_cli_finish observed '' 'Activity snapshot.' "$body"
       ;;
     report | register)
@@ -158,7 +158,7 @@ agents_cli_main() {
       if [[ "$command" == register ]] && ! jq -e '.provenance==null' <<<"$event" >/dev/null; then
         agents_cli_fail INVALID_REQUEST 'Explicit registration cannot claim native process provenance.' 'Omit provenance or set it to null; native hooks own native evidence.'
       fi
-      response=$(jq -cn --arg action "$command" --argjson event "$event" '{action:$action,args:$event}' | "$script_dir/aranea-agent-store" mutate) || {
+      response=$(jq -c --arg action "$command" '{action:$action,args:.}' <<<"$event" | "$script_dir/aranea-agent-store" mutate) || {
         if [[ $(jq -r '.error.code // ""' <<<"$response") == SESSION_NOT_FOUND ]]; then
           agents_cli_fail SESSION_NOT_FOUND 'Register this explicit session before reporting.' 'Use aranea agents register --json-input with a complete session snapshot, then report events.'
         fi

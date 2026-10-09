@@ -219,26 +219,45 @@ remove_agent_helpers() {
   rm -rf -- "$root"
 }
 
+# Delete owned state while preserving the stable activity coordination inode and
+# only its ancestor directories. Existing customised-file backups retain scope.
+remove_owned_state_dir() {
+  local directory=$1 entry canonical
+  [[ -d "$directory" ]] || return 0
+  for entry in "$directory"/* "$directory"/.[!.]* "$directory"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    [[ "$keep_backups" != true || ("$entry" != "$(ownership_record)" && "$entry" != "$state_root/backups") ]] || continue
+    canonical=$(realpath -m -- "$entry")
+    if [[ "$canonical" == "$activity_coordination" ]]; then
+      continue
+    elif [[ "$activity_coordination" == "$canonical/"* && -d "$entry" && ! -L "$entry" ]]; then
+      remove_owned_state_dir "$entry"
+    else
+      rm -rf -- "$entry"
+    fi
+  done
+  rmdir -- "$directory" 2>/dev/null || true
+}
+
 # Removes Aranea's state. Files the user customised stay in the ledger with
 # their backups (restore_managed_files keeps them), so those are kept.
 remove_state() {
-  local entry
+  local response keep_backups=false activity_coordination
   remove_agent_adapters
+  # This drains publication before state/helper deletion. Never unlink the lock:
+  # pending store/worker/helper ingress must observe the tombstone on that inode.
+  if ! response=$("$repo_root/scripts/aranea-agent-store" deactivate); then
+    fail_uninstall 1 activity_teardown_failed "Activity teardown could not coordinate; state removal is incomplete. $response"
+  fi
   remove_agent_helpers
-  rm -f -- "$project_state_root/agent-activity.json" "$project_state_root/agent-activity.json.lock"
+  activity_coordination=$(realpath -m -- "$project_state_root/agent-activity.json.lock")
   # Registry state does not follow an independently overridden ownership root.
-  # Remove only its owned artifacts: that root can contain kept backups.
   rm -f -- "$project_state_root/projects.json" "$project_state_root/projects.json.lock"
   if [[ -s "$(ownership_record)" ]]; then
-    for entry in "$state_root"/* "$state_root"/.[!.]*; do
-      [[ -e "$entry" ]] || continue
-      [[ "$entry" == "$(ownership_record)" || "$entry" == "$state_root/backups" ]] && continue
-      rm -rf -- "$entry"
-    done
+    keep_backups=true
     printf 'kept the originals of files you changed in %s\n' "$state_root/backups"
-  else
-    rm -rf -- "$state_root"
   fi
+  remove_owned_state_dir "$state_root"
 }
 
 # Prints what a real run would do.

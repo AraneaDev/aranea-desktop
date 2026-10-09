@@ -259,6 +259,7 @@ else
   ((json_mode)) && json_step install running install-command 'install the owned project command'
   theme_root="$HOME/.config/omarchy/themes/aranea"
   [[ -x "$theme_root/scripts/aranea" ]] || fail_install 1 'Installed project command is missing.' missing_command
+  run "$theme_root/scripts/aranea-agent-store" activate >/dev/null
   link_managed_file "$(xdg_bin_home)/aranea" "$theme_root/scripts/aranea"
   ((json_mode)) && json_step install ok install-command 'project command ownership reconciled'
   ((json_mode)) && json_step install running install-fonts 'install bundled interface fonts'

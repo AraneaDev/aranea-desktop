@@ -106,6 +106,15 @@ function project(state, now, registry) {
         association.status = "unavailable"
       var historical = ["finished", "failed", "ready-for-review"].indexOf(task.reportedState) >= 0
       return Object.assign({}, task, {
+        // Presentation eligibility follows private exact-epoch evidence, not the
+        // latest producer label. Runtime still independently proves every action.
+        nativeSessionEligible: !!(
+          s &&
+          s.provenance &&
+          s.provenance.commandHash &&
+          s.nativeMetadata &&
+          (s.nativeMetadata.observedHooks || []).indexOf("SessionStart") >= 0
+        ),
         association: association,
         freshness: freshness,
         displayState: !historical && lost ? "connection-lost" : task.reportedState,

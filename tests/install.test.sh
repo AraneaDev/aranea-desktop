@@ -144,6 +144,7 @@ for install_profile in full no_apps; do
   PATH="$name_root/bin:$PATH" "$repo_root/scripts/install.sh" --yes --profile "$install_profile" \
     --source https://example.invalid/AraneaDev/aranea-desktop.git >/dev/null
   [[ "$(readlink "$HOME/.local/bin/aranea")" == "$HOME/.config/omarchy/themes/aranea/scripts/aranea" ]]
+  "$HOME/.local/bin/aranea" agents list --json | jq -se 'last | .data.tasks == [] and .data.outcome == "observed"' >/dev/null
   "$HOME/.local/bin/aranea" projects list --json | jq -se 'last | .data.projects == []' >/dev/null
 done
 ln -sf "$HOME/custom/scripts/aranea" "$HOME/.local/bin/aranea"
@@ -158,6 +159,10 @@ echo "installer dry-run contract passed"
 # The stable installed CLI includes activity without silently opting providers in.
 installed_theme="$HOME/.config/omarchy/themes/aranea"
 jq -e '.id=="araneadev.activity" and .keepLoaded==true' "$installed_theme/plugins/araneadev.activity/manifest.json" >/dev/null
-"$installed_theme/scripts/aranea" agents list --json | jq -se 'last | .data.tasks==[]' >/dev/null
+if "$installed_theme/scripts/aranea" agents list --json >"$TMPDIR/removed-activity" 2>/dev/null; then
+  echo 'uninstalled activity unexpectedly reactivated'
+  exit 1
+fi
+jq -se 'last | .code=="ACTIVITY_REMOVED"' "$TMPDIR/removed-activity" >/dev/null
 [[ ! -e "$HOME/.claude/settings.json" && ! -e "$HOME/.codex/hooks.json" ]]
 echo 'PASS installed persistent activity plugin and opt-in provider configuration'

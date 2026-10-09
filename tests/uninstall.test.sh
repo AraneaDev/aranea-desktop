@@ -30,7 +30,7 @@ printf 'dawn=06:00\n' >"$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
 [[ ! -e "$plugins/araneadev.bar" && ! -e "$plugins/araneadev.settings" && -e "$plugins/other.plugin" ]]
 jq -e ' .plugins == [{id:"user.widget",option:7}] and .userSettings.keep' "$HOME/.config/omarchy/shell.json" >/dev/null
 [[ ! -e "$units/aranea-wallpaper-day-night.timer" && ! -e "$units/aranea-wallpaper-day-night.service" ]]
-[[ ! -e "$XDG_STATE_HOME/aranea" ]]
+[[ $(find "$XDG_STATE_HOME/aranea" -type f | wc -l) == 1 && -f "$XDG_STATE_HOME/aranea/agent-activity.json.lock" ]]
 [[ ! -e "$XDG_CONFIG_HOME/aranea" ]]
 [[ ! -e "$XDG_DATA_HOME/icons/Aranea" ]]
 jq -e '.bar.id != "araneadev.bar"' "$HOME/.config/omarchy/shell.json" >/dev/null
@@ -178,7 +178,7 @@ for removal_scope in integration complete; do
   # A malicious receipt naming an unrelated application's PID is never kill authority.
   jq -cn --argjson pid "$app_pid" '{pid:$pid,startTime:"forged",bootId:"forged"}' >"$ARANEA_STATE_ROOT/agent-heartbeats/forged.json"
   "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
-  [[ ! -e "$ARANEA_STATE_ROOT/agent-activity.json" && ! -e "$ARANEA_STATE_ROOT/agent-activity.json.lock" && ! -e "$ARANEA_STATE_ROOT/agent-heartbeats" && ! -e "$plugins/araneadev.activity" ]] || {
+  [[ ! -e "$ARANEA_STATE_ROOT/agent-activity.json" && -f "$ARANEA_STATE_ROOT/agent-activity.json.lock" && ! -e "$ARANEA_STATE_ROOT/agent-heartbeats" && ! -e "$plugins/araneadev.activity" ]] || {
     echo 'FAIL activity artifacts retained'
     exit 1
   }

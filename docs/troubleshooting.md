@@ -78,7 +78,13 @@ scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
 ```
 
 The uninstall process restores files recorded by the ownership ledger and
-preserves files that were customized after installation.
+preserves files that were customized after installation. Both scopes drain activity
+writes and remove task/session state and owned heartbeat helpers. The inert
+`agent-activity.json.lock` coordination file and its required parent directories
+remain so delayed callbacks cannot recreate removed state. Normal installation
+reactivates activity under that same lock; public reports cannot reactivate it.
+If activity teardown cannot acquire its lock, uninstall reports failure instead
+of claiming state removal succeeded.
 
 ## Collect useful information
 

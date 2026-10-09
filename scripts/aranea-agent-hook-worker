@@ -5,6 +5,11 @@ set -euo pipefail
 export PATH=/usr/bin:/bin
 unset BASH_ENV ENV CDPATH
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/agent-activity.sh
+source "$script_dir/lib/agent-activity.sh"
+export ARANEA_ACTIVITY_GENERATION="${ARANEA_ACTIVITY_GENERATION:-$(agent_activity_generation)}"
 [[ $# == 1 && ("$1" == claude || "$1" == codex) ]]
 payload=$(head -c 1048577 | jq -Rces 'if utf8bytelength > 1048576 then error("size") else fromjson | select(type == "object") end')
 response=$(jq -c --arg provider "$1" '{action:"native",args:{provider:$provider,payload:.,caller:null}}' <<<"$payload" | /bin/bash "$script_dir/aranea-agent-store" mutate)

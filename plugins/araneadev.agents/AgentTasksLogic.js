@@ -98,8 +98,8 @@ function rows(snapshot, registry, now) {
         freshness !== "connection-lost"
       var verification = task.verification || {}
       var report = reportTime(task.lastReceivedAt, now)
-      var canFocus = assigned && task.source === "native" && freshness === "connected"
-      var canReopen = assigned && task.source === "native" && !!task.resumeCommand
+      var canFocus = assigned && task.nativeSessionEligible === true && freshness === "connected"
+      var canReopen = assigned && task.nativeSessionEligible === true && !!task.resumeCommand
       var primary = { kind: "", label: "Session unavailable", local: false }
       var secondary = { kind: "", label: "" }
       if (state === "finished")
