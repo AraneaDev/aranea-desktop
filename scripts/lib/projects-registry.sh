@@ -41,21 +41,85 @@ projects_registry_git_value() {
   printf -v "$destination" '%s' "$git_value"
 }
 
-# Only explicit checkout roots are accepted; no repository scripts run.
-# Discovery extends this boundary with full related-worktree metadata.
-projects_registry_checkout() {
-  local canonical top common branch primary=false
+# Read a complete group from NUL-framed Git worktree records. A selected primary
+# with --separate-git-dir replaces Git's misleading metadata-directory record.
+# Return 1 for invalid checkout, 2 for unsafe path, 4 for an unsupported bare repo.
+project_git_metadata() (
+  local canonical top common git_dir bare token record_path='' branch='' primary=false
+  local metadata_file checkout_path checkout_git_dir checkout_top checkout_common checkout_primary checkouts='[]' metadata_errors='[]'
   canonical=$(projects_registry_path "$1") || return $?
+  projects_registry_git_value bare -C "$canonical" rev-parse --is-bare-repository 2>/dev/null || return 1
+  [[ "$bare" != true ]] || return 4
   projects_registry_git_value top -C "$canonical" rev-parse --show-toplevel 2>/dev/null || return 1
   top=$(projects_registry_path "$top") || return $?
   [[ "$canonical" == "$top" ]] || return 1
   projects_registry_git_value common -C "$canonical" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || return 1
   common=$(projects_registry_path "$common") || return $?
-  [[ "$common" != "$canonical/.git" ]] || primary=true
+  projects_registry_git_value git_dir -C "$canonical" rev-parse --absolute-git-dir 2>/dev/null || return 1
+  git_dir=$(projects_registry_path "$git_dir") || return $?
+  [[ "$git_dir" != "$common" ]] || primary=true
+  metadata_file=$(mktemp) || return 1
+  trap 'rm -f -- "$metadata_file"' EXIT
+  projects_registry_git -C "$canonical" worktree list --porcelain -z >"$metadata_file" 2>/dev/null || return 1
+  while IFS= read -r -d '' token; do
+    case "$token" in
+      'worktree '*)
+        record_path=${token#worktree }
+        branch=''
+        ;;
+      'branch '*) branch=${token#branch refs/heads/} ;;
+      '')
+        [[ -n "$record_path" ]] || continue
+        # Git lacks a backlink to the root for separate git dirs. The selected
+        # primary is reliable, whereas its metadata directory is not a checkout.
+        if [[ "$record_path" == "$common" ]]; then
+          if [[ "$primary" != true ]]; then
+            metadata_errors=$(jq -cn --arg path "$record_path" '{code:"PRIMARY_UNAVAILABLE",path:$path,message:"Git does not record the primary checkout folder for this separate Git directory; choose the primary folder to discover it."} | [.]')
+            record_path=''
+            continue
+          fi
+          record_path=$canonical
+        fi
+        if [[ ! -d "$record_path" ]]; then
+          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg path "$record_path" '$errors + [{code:"CHECKOUT_UNAVAILABLE",path:$path,message:"A related checkout is unavailable; locate it or remove its stale Git worktree record."}]')
+          record_path=''
+          continue
+        fi
+        checkout_path=$(projects_registry_path "$record_path") || return $?
+        if ! projects_registry_git_value checkout_git_dir -C "$checkout_path" rev-parse --absolute-git-dir 2>/dev/null ||
+          ! projects_registry_git_value checkout_top -C "$checkout_path" rev-parse --show-toplevel 2>/dev/null ||
+          ! projects_registry_git_value checkout_common -C "$checkout_path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; then
+          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg path "$record_path" '$errors + [{code:"CHECKOUT_UNAVAILABLE",path:$path,message:"A related checkout could not be validated; locate it or repair its Git worktree record."}]')
+          record_path=''
+          continue
+        fi
+        checkout_git_dir=$(projects_registry_path "$checkout_git_dir") || return $?
+        checkout_top=$(projects_registry_path "$checkout_top") || return $?
+        checkout_common=$(projects_registry_path "$checkout_common") || return $?
+        if [[ "$checkout_top" != "$checkout_path" || "$checkout_common" != "$common" ]]; then
+          metadata_errors=$(jq -cn --argjson errors "$metadata_errors" --arg path "$record_path" '$errors + [{code:"CHECKOUT_UNAVAILABLE",path:$path,message:"A related path no longer belongs to this repository; repair its Git worktree record."}]')
+          record_path=''
+          continue
+        fi
+        checkout_primary=false
+        [[ "$checkout_git_dir" != "$common" ]] || checkout_primary=true
+        checkouts=$(jq -cn --argjson current "$checkouts" --arg path "$checkout_path" --arg branch "$branch" --argjson primary "$checkout_primary" \
+          '$current + [{path:$path,branch:(if $branch == "" then null else $branch end),primary:$primary}]') || return 1
+        record_path=''
+        ;;
+    esac
+  done <"$metadata_file"
   projects_registry_git_value branch -C "$canonical" symbolic-ref --quiet --short HEAD 2>/dev/null || branch=''
-  jq -cn --arg path "$canonical" --arg common "$common" --arg branch "$branch" --argjson primary "$primary" \
-    --arg name "${canonical##*/}" --arg id "$(projects_registry_id c)" --arg projectId "$(projects_registry_id p)" \
-    '{path:$path,commonDir:$common,branch:(if $branch == "" then null else $branch end),primary:$primary,name:$name,id:$id,projectId:$projectId}'
+  jq -cn --arg path "$canonical" --arg common "$common" --arg name "${canonical##*/}" --arg branch "$branch" --argjson primary "$primary" --argjson checkouts "$checkouts" --argjson metadataErrors "$metadata_errors" \
+    '{metadataErrors:$metadataErrors,path:$path,name:$name,commonDir:$common,checkouts:($checkouts + [{path:$path,branch:(if $branch == "" then null else $branch end),primary:$primary}] | unique_by(.path) | sort_by(.primary|not))}'
+)
+
+# Revalidate a single explicit checkout, never register unselected relatives.
+projects_registry_checkout() {
+  local metadata
+  metadata=$(project_git_metadata "$1") || return $?
+  jq -cn --argjson metadata "$metadata" --arg id "$(projects_registry_id c)" --arg projectId "$(projects_registry_id p)" \
+    '$metadata as $group | ($group.checkouts[] | select(.path == $group.path)) + ($group|{name,commonDir}) + {id:$id,projectId:$projectId}'
 }
 
 # Reject regrouping while any surviving sibling has a different Git identity.
