@@ -200,7 +200,7 @@ capacity_retention_and_receipt_bounds() {
 nested_records_and_history_bounds() {
   register >/dev/null
   begin >/dev/null
-  for update in '.sessions[0].provenance={pid:1}' '.tasks[0].verification.commands=[42]' '.tasks[0].blockers=[{blockerId:"a",question:"a"},{blockerId:"a",question:"b"}]' '.tasks[0].providerSessionId="missing"' '.sessions[0].nativeMetadata={currentTaskId:"missing",turns:[]}' '.tasks[0].association.cwd="/tmp/\u0000"'; do
+  for update in '.sessions[0].provenance={pid:1}' '.sessions[0].provenance={pid:1,startTime:"1",bootId:"boot",ancestors:[],windowAddress:null,observedAt:0,executable:"/bin/false"}' '.sessions[0].provenance={pid:1,startTime:"1",bootId:"boot",ancestors:[],windowAddress:null,observedAt:0,executable:"/bin/false",commandHash:"invalid"}' '.tasks[0].verification.commands=[42]' '.tasks[0].blockers=[{blockerId:"a",question:"a"},{blockerId:"a",question:"b"}]' '.tasks[0].providerSessionId="missing"' '.sessions[0].nativeMetadata={currentTaskId:"missing",turns:[]}' '.tasks[0].association.cwd="/tmp/\u0000"'; do
     cp "$registry" "$TMPDIR/valid"
     jq "$update" "$registry" >"$TMPDIR/fixture"
     mv "$TMPDIR/fixture" "$registry"
@@ -338,5 +338,31 @@ epoch_history_never_revives_a_retained_producer() {
   mutate prune '{}' | jq -e '.state.sessions == []' >/dev/null
   register | jq -e '.state.sessions[0].retiredEpochs == []' >/dev/null
 }
-for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer; do run_case "$name"; done
+# Catch unbounded resolution diagnostics, invalid inactive references and heartbeat revival.
+native_inactivity_and_resolution_summary() {
+  register >/dev/null
+  begin >/dev/null
+  report input 2 needs-input '{"blockerId":"question","question":"Keep question"}' >/dev/null
+  reject report "$(event bad-summary 3 blocker-resolved "$(jq -cn '{blockerId:"question",summary:("x"*4097)}')")" INVALID_REQUEST
+  reject report "$(event bad-summary 3 blocker-resolved '{"blockerId":"question","summary":42}')" INVALID_REQUEST
+  report unmatched 3 blocker-resolved '{"blockerId":"other","summary":"Unrelated failure"}' | jq -e '.state.tasks[0] | .reportedState == "needs-input" and .diagnostics == []' >/dev/null
+  local args
+  args=$(event current 4 snapshot "$(jq -cn --arg cwd "$checkout" '{cwd:$cwd,reportedState:"working"}')" | jq '.taskId="current"')
+  mutate report "$args" >/dev/null
+  jq '.sessions[0].nativeMetadata={currentTaskId:"current",turns:[{nativeId:"old",taskId:"turn"},{nativeId:"new",taskId:"current"}],inactiveTaskIds:["turn"]}' "$registry" >"$TMPDIR/fixture"
+  mv "$TMPDIR/fixture" "$registry"
+  report heartbeat 5 heartbeat | jq -e 'any(.state.tasks[];.taskId == "turn" and .freshness == "connection-lost" and .reportedState == "needs-input" and .question == "Keep question") and any(.state.tasks[];.taskId == "current" and .freshness == "unconfirmed")' >/dev/null
+  for update in '.sessions[0].nativeMetadata.observedHooks=null' '.sessions[0].nativeMetadata.observedHooks=false' '.sessions[0].nativeMetadata.observedHooks=["StopFailure","StopFailure"]' '.sessions[0].nativeMetadata.observedHooks=["bad-name"]' '.sessions[0].nativeMetadata.observedHooks=[("x"*65)]' '.sessions[0].nativeMetadata.observedHooks=[range(33)|tostring|"Hook"+.]' '.sessions[0].nativeMetadata.inactiveTaskIds=null' '.sessions[0].nativeMetadata.inactiveTaskIds=false' '.sessions[0].nativeMetadata.inactiveTaskIds=["current"]' '.sessions[0].nativeMetadata.inactiveTaskIds=["missing"]' '.sessions[0].nativeMetadata.inactiveTaskIds=["turn","turn"]'; do
+    cp "$registry" "$TMPDIR/valid"
+    jq "$update" "$registry" >"$TMPDIR/fixture"
+    mv "$TMPDIR/fixture" "$registry"
+    cp "$registry" "$TMPDIR/before"
+    if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
+    jq -e '.error.code == "ACTIVITY_INVALID"' "$TMPDIR/error" >/dev/null
+    cmp "$registry" "$TMPDIR/before"
+    mv "$TMPDIR/valid" "$registry"
+  done
+  mutate dismiss '{"taskId":"turn"}' | jq -e '.state.sessions[0].nativeMetadata.inactiveTaskIds == [] and (.state.tasks|length == 1)' >/dev/null
+}
+for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary; do run_case "$name"; done
 ((failures == 0))

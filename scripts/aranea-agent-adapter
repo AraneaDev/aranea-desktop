@@ -1,0 +1,15 @@
+#!/bin/bash
+# Usage: aranea-agent-adapter status|install|remove claude
+# Explicit opt-in Claude settings transport. No provider executable is invoked.
+set -euo pipefail
+adapter_search_path=${PATH:-}
+export PATH=/usr/bin:/bin
+unset BASH_ENV ENV CDPATH
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/agent-hooks.sh
+source "$script_dir/lib/agent-hooks.sh"
+# shellcheck source=scripts/lib/agent-adapters.sh
+source "$script_dir/lib/agent-adapters.sh"
+agent_adapters_main "$@"

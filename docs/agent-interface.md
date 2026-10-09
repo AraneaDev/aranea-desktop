@@ -245,3 +245,68 @@ Search, details and JSON all resolve the registered checkout ID to the same
 canonical path. Register every desired worktree explicitly. `--separate` preserves
 a separate association; `--use-current-workspace` explicitly overrides dedicated
 allocation. These flags do not confer ownership on unrelated windows.
+
+## Claude activity adapter
+
+The activity adapter is opt-in and has a single-object `{ok,state,error}` response:
+
+```bash
+scripts/aranea-agent-adapter status claude
+scripts/aranea-agent-adapter install claude
+scripts/aranea-agent-adapter remove claude
+scripts/aranea-agent-store snapshot
+```
+
+Installation atomically merges this installation's exact command into
+`~/.claude/settings.json`. Removal deletes only that command handler, preserving
+siblings, unrelated groups, permissions and file mode. Malformed settings and
+symlinks are refused without replacing the file. Commands use a quoted absolute
+reporter path, fixed `/bin/bash` and `/usr/bin/timeout`, and `/usr/bin:/bin` PATH.
+The reporter reads native JSON stdin, stays silent and exits successfully even
+when reporting fails; it never supplies an approval decision.
+
+Status distinguishes `commandAvailable`, `configured`, `runtimeObserved`, and
+`connectionProven`. Configuration entries do not prove hooks enabled or the
+project trusted: `enabled` and `trusted` remain `"unconfirmed"`.
+`runtimeObserved` requires a hook observed through proven native process ancestry;
+`connectionProven` also requires fresh receipt time and current executable,
+PID/start time, boot and ancestor proof. Neither establishes desktop window
+ownership.
+
+Baseline installation includes SessionStart, UserPromptSubmit, PreToolUse,
+PermissionRequest, PostToolUse, Stop, SessionEnd and Notification. The mapper
+also supports PostToolUseFailure, StopFailure, SubagentStart, SubagentStop and
+TaskCompleted. These optional handlers are installed only after that particular
+native event has been observed through proven provider ancestry. Status reports
+mapper support, observation, availability and owned installation separately.
+Existing owned optional handlers remain until explicit removal, even if retained
+evidence is lost. No version string proves capability. API-error, subagent,
+tool-failure and task-completion coverage can therefore be unavailable; explicit
+structured activity reports remain the fallback.
+
+A prompt's first nonblank line supplies its label, limited to 160 characters;
+full prompts, tool arguments and provider argv are not persisted. Native prompt,
+tool, agent and task identities provide correlation. Canonical no-ID deliveries
+provide exact replay within the retained 512 receipts, but native turn identity
+and duplicate-delivery certainty are unavailable without `prompt_id`.
+PermissionRequest has no native tool ID, so permission resolution stays
+unconfirmed. Matching AskUserQuestion/ExitPlanMode results resolve only their
+own blockers; unmatched failures append diagnostics. Stop means review handoff,
+StopFailure means reported failure, and TaskCompleted finishes only that native
+task. None supplies verification evidence.
+
+A genuinely new main turn preserves the earlier turn's state, question and
+blockers as inactive history. Fresh session heartbeats cannot revive it; late
+callbacks cannot select it as the current turn. Independent child tasks remain
+active. The private session metadata contains `currentTaskId`, native `turns`,
+optional `inactiveTaskIds` and optional `observedHooks`. Only the native mapper
+can change these fields; ordinary register/report requests cannot manufacture
+hook-observation evidence.
+
+The private heartbeat runs once per proven process epoch, updates connection
+receipts every 15 seconds, and exits on provider identity, session or epoch loss.
+It never terminates the provider. Helper ownership lives in private
+`$(aranea_state_root)/agent-heartbeats/` identity files; there is no sequence
+sidecar. Provenance stores an absolute executable identity and a SHA256 command
+fingerprint, never raw argv. Navigation consumers must revalidate process and
+window proof immediately before focus.

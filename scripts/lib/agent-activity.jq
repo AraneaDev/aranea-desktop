@@ -12,8 +12,8 @@ def verification: fields(["status","summary","commands"];[]) and (.status|IN("un
 def blocker: fields(["blockerId","question"];[]) and (.blockerId|id) and (.question|text(4096));
 def blockers: type == "array" and length <= 32 and all(.[];blocker) and (map(.blockerId)|unique_values);
 def process_identity: fields(["pid","startTime"];[]) and (.pid|uint and . > 0) and (.startTime|id);
-def provenance: . == null or (fields(["pid","startTime","bootId","ancestors","windowAddress","observedAt"];[]) and (.pid|uint and . > 0) and (.startTime|id) and (.bootId|id) and (.observedAt|uint) and (.windowAddress == null or (.windowAddress|id)) and (.ancestors|type == "array" and length <= 32 and all(.[];process_identity) and (map(.pid)|unique_values)));
-def metadata: fields(["currentTaskId","turns"];[]) and (.currentTaskId == null or (.currentTaskId|id)) and (.turns|type == "array" and length <= 512 and all(.[];fields(["nativeId","taskId"];[]) and (.nativeId|id) and (.taskId|id)) and (map(.nativeId)|unique_values));
+def provenance: . == null or (fields(["pid","startTime","bootId","ancestors","windowAddress","observedAt"];["executable","commandHash"]) and (.pid|uint and . > 0) and (.startTime|id) and (.bootId|id) and (.observedAt|uint) and (.windowAddress == null or (.windowAddress|id)) and (.ancestors|type == "array" and length <= 32 and all(.[];process_identity) and (map(.pid)|unique_values)) and (has("executable") == has("commandHash")) and ((has("executable")|not) or ((.executable|path) and (.commandHash|type == "string" and test("^[a-f0-9]{64}$")))));
+def metadata: fields(["currentTaskId","turns"];["inactiveTaskIds","observedHooks"]) and (.currentTaskId == null or (.currentTaskId|id)) and (.turns|type == "array" and length <= 512 and all(.[];fields(["nativeId","taskId"];[]) and (.nativeId|id) and (.taskId|id)) and (map(.nativeId)|unique_values)) and ((has("inactiveTaskIds")|not) or (.inactiveTaskIds|type == "array" and length <= 512 and all(.[];id) and unique_values)) and (. as $m | all((.inactiveTaskIds//[])[];. != $m.currentTaskId)) and ((has("observedHooks")|not) or (.observedHooks|type == "array" and length <= 32 and all(.[];type == "string" and length <= 64 and test("^[A-Za-z][A-Za-z0-9]*$")) and unique_values));
 def task_snapshot: fields(["cwd","reportedState"];["taskId","projectId","checkoutId","description","result","question","blockers","verification"])
   and (.cwd|path) and (.reportedState|lifecycle)
   and ((has("taskId")|not) or (.taskId|id))
@@ -27,7 +27,7 @@ def event: fields(["schemaVersion","eventId","provider","providerSessionId","pro
     if $kind == "snapshot" then task_snapshot and (has("taskId")|not)
     elif $kind == "working" then fields([];["description"]) and ((has("description")|not) or (.description|text(4096)))
     elif $kind == "needs-input" then blocker
-    elif $kind == "blocker-resolved" then fields(["blockerId"];[]) and (.blockerId|id)
+    elif $kind == "blocker-resolved" then fields(["blockerId"];["summary"]) and (.blockerId|id) and ((has("summary")|not) or (.summary|text(4096)))
     elif $kind|IN("ready-for-review","failed","finished") then fields([];["result"]) and ((has("result")|not) or (.result|text(4096)))
     elif $kind == "diagnostic" then fields(["summary"];[]) and (.summary|text(4096))
     elif $kind == "verification" then verification
@@ -65,9 +65,9 @@ def state_valid: fields(["schemaVersion","revision","sessions","tasks"];[]) and 
   and (.sessions|type == "array" and length <= 1200 and all(.[];session) and (map([.provider,.providerSessionId])|unique_values))
   and (.tasks|type == "array" and length <= 700 and all(.[];task) and (map(.taskId)|unique_values))
   and (.sessions as $s | all(.tasks[]; . as $t | any($s[];same_session($t) and .producerEpoch == $t.producerEpoch)))
-  and (.tasks as $ts | all(.sessions[]; . as $s | (.nativeMetadata.currentTaskId == null or any($ts[];same_session($s) and .taskId == $s.nativeMetadata.currentTaskId)) and all(.nativeMetadata.turns[]; .taskId as $tid | any($ts[];same_session($s) and .taskId == $tid))));
+  and (.tasks as $ts | all(.sessions[]; . as $s | (.nativeMetadata.currentTaskId == null or any($ts[];same_session($s) and .taskId == $s.nativeMetadata.currentTaskId)) and all(.nativeMetadata.turns[]; .taskId as $tid | any($ts[];same_session($s) and .taskId == $tid)) and all((.nativeMetadata.inactiveTaskIds//[])[];. as $tid | any($ts[];same_session($s) and .taskId == $tid))));
 def fresh($s): $s.connection.connected and $s.connection.bootId == $context.bootId and $context.monotonic >= $s.connection.monotonic and ($context.monotonic - $s.connection.monotonic) < 60 and $context.receivedAt >= $s.connection.receivedAt and ($context.receivedAt - $s.connection.receivedAt) < 60;
-def live($sessions): . as $t | .reportedState != "finished" and any($sessions[];same_session($t) and fresh(.));
+def live($sessions): . as $t | .reportedState != "finished" and any($sessions[];same_session($t) and fresh(.) and ((.nativeMetadata.inactiveTaskIds//[])|index($t.taskId)|not));
 def clock($connected): {receivedAt:$context.receivedAt,monotonic:$context.monotonic,bootId:$context.bootId,connected:$connected};
 def associate($a): [$projects.projects[] as $p | $p.checkouts[] | select(.path == $a.cwd) | {status:"registered",projectId:$p.id,checkoutId:.id,cwd:$a.cwd}] as $found
   | if ($a|has("projectId")) and (all($found[]; .projectId != $a.projectId or .checkoutId != $a.checkoutId) or ($found|length == 0)) then error("ASSOCIATION_MISMATCH")
@@ -80,6 +80,7 @@ def retain:
   | .tasks as $tasks
   | .sessions |= map(select(. as $s | any($tasks[];same_session($s)) or fresh($s))
       | .nativeMetadata.turns |= map(select(.taskId as $tid | any($tasks[];.taskId == $tid)))
+      | if (.nativeMetadata|has("inactiveTaskIds")) then .nativeMetadata.inactiveTaskIds |= map(select(. as $tid | any($tasks[];.taskId == $tid))) else . end
       | if (.nativeMetadata.currentTaskId as $tid | any($tasks[];.taskId == $tid)) then . else .nativeMetadata.currentTaskId = null end)
   | if ([.tasks[]|select(live($sessions))]|length) > 200 or (.sessions|length) > 1200 then error("CAPACITY_EXCEEDED") else . end;
 def register($a;$source):
@@ -100,6 +101,7 @@ def update_task($e): .lastReceivedAt = $context.receivedAt
     elif $e.kind == "blocker-resolved" then any(.blockers[];.blockerId == $e.payload.blockerId) as $resolved
       | .blockers |= map(select(.blockerId != $e.payload.blockerId))
       | if $resolved and .reportedState == "needs-input" and (.blockers|length == 0) then .reportedState = "working" | .question = "" elif (.blockers|length > 0) then .question = .blockers[-1].question else . end
+      | if $resolved and ($e.payload|has("summary")) then .diagnostics = ((.diagnostics + [{summary:$e.payload.summary,receivedAt:$context.receivedAt}])|.[-20:]) else . end
     elif $e.kind == "working" then (if (.blockers|length == 0) then .reportedState = "working" else . end) | .description = ($e.payload.description//.description)
     elif $e.kind|IN("ready-for-review","failed","finished") then .reportedState = $e.kind | .result = ($e.payload.result//.result)
     elif $e.kind == "diagnostic" then .diagnostics = ((.diagnostics + [{summary:$e.payload.summary,receivedAt:$context.receivedAt}])|.[-20:])
@@ -140,7 +142,7 @@ def mutation($r;$source):
   else error("INVALID_REQUEST") end;
 def project_state:
   . as $state | .tasks |= map(. as $task | [$state.sessions[]|select(same_session($task))][0] as $s
-    | .freshness = (if fresh($s) then if $s.provenance == null then "unconfirmed" else "connected" end else "connection-lost" end)
+    | .freshness = (if (($s.nativeMetadata.inactiveTaskIds//[])|index($task.taskId)) then "connection-lost" elif fresh($s) then if $s.provenance == null or ($s.provenance|has("commandHash")|not) then "unconfirmed" else "connected" end else "connection-lost" end)
     | if .association.status == "registered" and (any($projects.projects[];.id == $task.association.projectId and any(.checkouts[];.id == $task.association.checkoutId and .path == $task.association.cwd))|not) then .association.status = "unavailable" else . end)
   | .capabilities = {heartbeatSeconds:15,connectionLostSeconds:60,maxLiveTasks:200,maxInactiveTasks:500,inactiveRetentionDays:14,duplicateReceiptWindow:512,maxRetiredEpochs:512,epochHistoryLifetime:"retained-session"};
 if $operation == "validate" then try state_valid catch false
