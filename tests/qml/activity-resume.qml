@@ -14,6 +14,36 @@ ShellRoot {
   property bool nativeValid: true
   // Transport faults cannot establish that no detached provider was launched.
   property string launchMode: 'accepted'
+  // Parseable failures still need an explicit negative helper envelope.
+  property var malformedFailures: [
+    {},
+    [],
+    {
+      message: 'unexpected failure'
+    },
+    {
+      ok: false
+    },
+    {
+      ok: false,
+      error: {}
+    },
+    {
+      code: 'DEPENDENCY_MISSING',
+      message: 'missing ok'
+    },
+    {
+      ok: false,
+      error: {
+        code: 'TOOL_MISSING'
+      }
+    },
+    {
+      ok: false,
+      code: 'TOOL_MISSING',
+      message: 42
+    }
+  ]
   // Retained resume arguments remain data passed to the fixed launcher.
   property var launchRequest: null
   // No observer is allowed to dispatch a focus or move.
@@ -59,6 +89,18 @@ ShellRoot {
         }
         if (root.launchMode === 'invalid-identity') {
           done(0, '{"ok":true,"identity":{"pid":0,"startTime":"x"}}', '')
+          return
+        }
+        if (root.launchMode.indexOf('failure-') === 0) {
+          done(1, JSON.stringify(root.malformedFailures[Number(root.launchMode.slice(8))]), '')
+          return
+        }
+        if (root.launchMode === 'zero-failure') {
+          done(0, '{"ok":false,"error":{"code":"TOOL_MISSING"}}', '')
+          return
+        }
+        if (root.launchMode === 'refused-nested') {
+          done(1, '{"ok":false,"error":{"code":"DEPENDENCY_MISSING","message":"Install jq."}}', '')
           return
         }
         if (root.launchMode === 'refused') {
@@ -189,7 +231,9 @@ ShellRoot {
       runtime.validateReobserve(op, function (valid) {
         t.check(valid, 'retained launch can be explicitly reobserved')
       });
-      ['timeout', 'malformed', 'missing-identity', 'invalid-identity'].forEach(function (mode) {
+      ['timeout', 'malformed', 'missing-identity', 'invalid-identity', 'zero-failure'].concat(root.malformedFailures.map(function (reply, index) {
+        return 'failure-' + index
+      })).forEach(function (mode) {
         root.launchMode = mode
         runtime.launch(task, {
           cwd: '/repo',
@@ -202,17 +246,19 @@ ShellRoot {
           t.equal(reply.ok, false, 'uncertain transport does not claim launch acceptance: ' + mode)
           t.equal(reply.submissionUnconfirmed, true, 'uncertain transport preserves no-repeat authority: ' + mode)
         })
-      })
-      root.launchMode = 'refused'
-      runtime.launch(task, {
-        cwd: '/repo',
-        commonDir: '/repo/.git',
-        terminalId: 'kitty',
-        workspaceId: 2,
-        projectId: 'p',
-        checkoutId: 'c'
-      }, function (reply) {
-        t.equal(reply.submissionUnconfirmed, false, 'structured prelaunch refusal is authoritative')
+      });
+      ['refused', 'refused-nested'].forEach(function (mode) {
+        root.launchMode = mode
+        runtime.launch(task, {
+          cwd: '/repo',
+          commonDir: '/repo/.git',
+          terminalId: 'kitty',
+          workspaceId: 2,
+          projectId: 'p',
+          checkoutId: 'c'
+        }, function (reply) {
+          t.equal(reply.submissionUnconfirmed, false, 'structured prelaunch refusal is authoritative: ' + mode)
+        })
       })
       runtime.engine.sessionId = 'new-desktop'
       runtime.validateReobserve(op, function (valid) {

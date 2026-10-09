@@ -23,6 +23,22 @@ ShellRoot {
   QmlTest {
     id: t
   }
+  Activity.ActivityRuntime {
+    id: decoder
+    processRunner: function (argv, input, done) {
+      var name = (argv[0] === '/usr/bin/timeout' ? argv[2] : argv[0]).split('/').pop()
+      if (name === 'aranea-project-discover')
+        done(0, '{"ok":true,"metadata":{"path":"/repo","commonDir":"/repo/.git"}}', '')
+      else if (name === 'aranea-project-tools')
+        done(0, '{"terminals":[{"id":"kitty","available":true}]}', '')
+      else if (name === 'aranea-agent-launch')
+        done(1, '{}', 'unexpected failure')
+      else {
+        t.check(false, 'unexpected decoder process')
+        done(1, '', '')
+      }
+    }
+  }
   Activity.ActivityController {
     id: owner
     pollInterval: 60000
@@ -130,6 +146,16 @@ ShellRoot {
     })
   }
   Component.onCompleted: {
+    decoder.engine.compositor = {
+      snapshot: function () {
+        return {
+          available: true,
+          windows: [],
+          workspaces: [],
+          observedAt: Date.now()
+        }
+      }
+    }
     observer = clientComponent.createObject(root)
     observer.request({
       action: 'reopen',
@@ -185,14 +211,20 @@ ShellRoot {
           t.waitFor(function () {
             return owner.operation(uncertain.operationId).state === 'completed'
           }, 1000, 'second submission observation deadline', function () {
-            launchCallback({
-              ok: false,
-              submissionUnconfirmed: true,
-              code: 'LAUNCH_UNCONFIRMED',
-              message: 'transport deadline'
-            })
+            decoder.launch({
+              provider: 'claude',
+              providerSessionId: '12345678-1234-1234-1234-123456789abc'
+            }, {
+              cwd: '/repo',
+              commonDir: '/repo/.git',
+              terminalId: 'kitty',
+              workspaceId: 2,
+              projectId: 'p',
+              checkoutId: 'c'
+            }, root.launchCallback)
             var unresolved = owner.operation(uncertain.operationId)
-            t.equal(unresolved.submissionUnconfirmed, true, 'transport timeout remains uncertainty rather than failed launch')
+            t.equal(unresolved.submissionUnconfirmed, true, 'malformed nonzero helper reply retains submission uncertainty')
+            t.equal(unresolved.submissionPending, true, 'malformed helper reply keeps operation protected from retention eviction')
             t.equal(owner.request({
               action: 'reopen',
               taskId: 't'
@@ -205,6 +237,19 @@ ShellRoot {
             t.step(20, function () {
               t.equal(owner.operation(afterTimeout.operationId).outcome, 'observed', 'unrelated action progresses after transport timeout')
               t.equal(launches, 2, 'uncertain submission is never repeated')
+              for (var i = 0; i < 101; i++) {
+                owner.request({
+                  action: 'focus',
+                  taskId: 't'
+                })
+                owner.drain()
+              }
+              t.equal(owner.operation(uncertain.operationId).submissionPending, true, 'retention pressure preserves malformed-reply operation')
+              t.equal(owner.request({
+                action: 'reopen',
+                taskId: 't'
+              }).operationId, uncertain.operationId, 'retained malformed-reply operation still dedupes after eviction')
+              t.equal(launches, 2, 'retention pressure cannot authorize another launcher')
               root.desktopId = 'new-desktop'
               acceptLaunch()
               t.check(!owner.operation(uncertain.operationId).launchIdentity, 'late response from old desktop cannot authorize new lifetime')

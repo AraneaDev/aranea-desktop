@@ -24,6 +24,15 @@ Item {
     id: desktop
     captureActive: runtime.captureActive
   }
+  // Only an explicit negative envelope supplies an authoritative helper error.
+  function negativeHelperError(data: var): var {
+    if (!data || typeof data !== 'object' || Array.isArray(data) || data.ok !== false)
+      return null
+    var error = data.error === undefined ? data : data.error
+    if (!error || typeof error !== 'object' || Array.isArray(error) || typeof error.code !== 'string' || !error.code.length || typeof error.message !== 'string' || !error.message.length)
+      return null
+    return error
+  }
   // Decode helper envelopes, retaining explicit errors rather than invented data.
   function json(argv: var, input: string, done: var): void {
     if (captureActive) {
@@ -46,7 +55,7 @@ Item {
         } catch (e) {}
         done(code === 0 && data ? data : {
           ok: false,
-          transportUnconfirmed: !data || code === 124 || code === 137 || data.ok === true,
+          transportUnconfirmed: !runtime.negativeHelperError(data) || code === 124 || code === 137,
           error: data && data.error || {
             code: data && data.code || 'DEPENDENCY_MISSING',
             message: data && data.message || diagnostics || 'Activity dependency unavailable.'
@@ -230,7 +239,8 @@ Item {
           json(['/usr/bin/timeout', '2s', scriptsPath + '/aranea-agent-launch'], JSON.stringify(spec), function (response) {
             var accepted = response.ok === true && response.identity && Number.isInteger(response.identity.pid) && response.identity.pid > 0 && typeof response.identity.startTime === 'string' && /^[0-9]+$/.test(response.identity.startTime)
             if (!accepted || lifetime !== runtime.sessionId) {
-              var refusal = response.ok === false && response.error && ['RESUME_UNAVAILABLE', 'INVALID_LAUNCH', 'CHECKOUT_INVALID', 'TOOL_MISSING', 'DEPENDENCY_MISSING'].indexOf(response.error.code) >= 0
+              var helperError = negativeHelperError(response)
+              var refusal = helperError && ['RESUME_UNAVAILABLE', 'INVALID_LAUNCH', 'CHECKOUT_INVALID', 'TOOL_MISSING', 'DEPENDENCY_MISSING'].indexOf(helperError.code) >= 0
               done({
                 ok: false,
                 submissionUnconfirmed: response.transportUnconfirmed === true || lifetime !== runtime.sessionId || !refusal,
