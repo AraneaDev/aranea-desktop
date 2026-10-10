@@ -42,6 +42,33 @@ ShellRoot {
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5
   }
   Component.onCompleted: t.step(50, function () {
+    t.check(typeof editor.useExample === 'function', 'action editor offers worked example drafts')
+    if (typeof editor.useExample === 'function') {
+      editor.begin(null, 4)
+      editor.useExample('test')
+      t.equal(editor.definition().argv, ['npm', 'test'], 'test example keeps individual literal arguments')
+      t.equal(saved, null, 'choosing an example never saves or runs it')
+      editor.useExample('dev')
+      t.equal(editor.definition().argv, ['npm', 'test'], 'examples never overwrite an edited draft')
+      editor.begin(null, 4)
+      editor.useExample('dev')
+      t.equal(editor.definition().kind, 'service', 'dev example uses a retained service')
+      t.equal(editor.definition().argv, ['npm', 'run', 'dev'], 'dev example separates its arguments')
+      var customFields = [['cwdRelative', 'apps/web'], ['timeoutSeconds', '90'], ['kind', 'service'], ['previewUrl', 'http://127.0.0.1:5173']]
+      customFields.forEach(function (field) {
+        editor.begin(null, 4)
+        editor.setField(field[0], field[1])
+        var before = editor.definition()
+        editor.useExample('test')
+        t.equal(editor.definition(), before, 'example preserves customized ' + field[0])
+        t.equal(editor.draft[field[0]], field[1], 'example keeps exact draft value for ' + field[0])
+      })
+      editor.displayOnly = true
+      editor.begin(null, 4)
+      editor.useExample('test')
+      t.equal(editor.draft.executable, '', 'capture refuses example draft mutation')
+      editor.displayOnly = false
+    }
     editor.begin(null, 4)
     editor.save()
     t.check(!saved && !!editor.fieldError, 'empty executable and name refuse locally')

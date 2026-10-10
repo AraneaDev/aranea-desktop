@@ -19,6 +19,8 @@ Item {
     })
   // Capture state is exposed to hosts; this view has no I/O.
   property bool captureActive: false
+  // Help is a read-only destination alongside Tasks and Usage.
+  property bool helpActive: false
   // Client structured error; the previous snapshot remains displayed.
   property var error: null
   // One client cannot submit another action while observing.
@@ -37,6 +39,8 @@ Item {
   property string cursorId: ''
   // First Enter reveals the cursor.
   property bool keyboardCursor: false
+  // Advanced setup text is a local disclosure, never an owner action.
+  property bool setupGuideExpanded: false
   // Rows are attention-first immutable task projections.
   readonly property var taskRows: Logic.rows(snapshot, projectSnapshot, nowMs)
   // Selection is resolved by identity after every sort/refresh.
@@ -103,14 +107,26 @@ Item {
   }
   // Keyboard navigation delegates to the same stable detail action model.
   function navigate(direction) {
+    if (helpActive) {
+      helpScroll.contentY = Math.max(0, Math.min(helpScroll.contentHeight - helpScroll.height, helpScroll.contentY + direction * Style.space(48)))
+      return
+    }
     if (selectedRow) {
       detailView.navigate(direction)
       return
     }
     if (taskRows.length === 0) {
-      if (keyboardCursor && direction === 0)
-        action('setup', '')
+      var emptyNext = Logic.step(['setup', 'guide'], cursorId, keyboardCursor, direction)
+      cursorId = emptyNext.key
       keyboardCursor = true
+      if (emptyNext.activate) {
+        if (cursorId === 'guide')
+          setupGuideExpanded = !setupGuideExpanded
+        else
+          action('setup', '')
+      }
+      var target = cursorId === 'guide' ? setupGuide : setupButton
+      listScroll.contentY = Math.max(0, Math.min(listScroll.contentHeight - listScroll.height, target.y))
       return
     }
     var next = Logic.step(taskRows.map(function (r) {
@@ -127,13 +143,27 @@ Item {
     if (item)
       listScroll.contentY = Math.max(0, Math.min(listScroll.contentHeight - listScroll.height, item.y))
   }
-  implicitHeight: selectedRow ? detailView.implicitHeight : Math.min(maxHeight, listBody.implicitHeight)
+  implicitHeight: helpActive ? Math.min(maxHeight, helpBody.implicitHeight) : selectedRow ? detailView.implicitHeight : Math.min(maxHeight, listBody.implicitHeight)
   height: implicitHeight
   clip: true
+  Flickable {
+    id: helpScroll
+    anchors.fill: parent
+    visible: tasks.helpActive
+    contentWidth: width
+    contentHeight: helpBody.implicitHeight
+    boundsBehavior: Flickable.StopAtBounds
+    Aranea.WorkflowHelp {
+      id: helpBody
+      objectName: 'agentWorkflowHelp'
+      width: helpScroll.width
+      topic: 'agents'
+    }
+  }
   AgentTaskDetails {
     id: detailView
     width: parent.width
-    visible: !!tasks.selectedRow
+    visible: !tasks.helpActive && !!tasks.selectedRow
     maxHeight: tasks.maxHeight
     row: tasks.selectedRow
     operation: tasks.selectedOperation
@@ -150,7 +180,7 @@ Item {
   Flickable {
     id: listScroll
     anchors.fill: parent
-    visible: !tasks.selectedRow
+    visible: !tasks.helpActive && !tasks.selectedRow
     contentWidth: width
     contentHeight: listBody.implicitHeight
     boundsBehavior: Flickable.StopAtBounds
@@ -161,7 +191,9 @@ Item {
       spacing: Style.space(12)
       Text {
         width: parent.width
-        text: 'Agent tasks'
+        text: tasks.taskRows.length ? tasks.taskRows.length + ' tasks · ' + tasks.taskRows.filter(function (r) {
+          return r.attention
+        }).length + ' need attention' : 'Agent tasks'
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
@@ -181,7 +213,7 @@ Item {
         objectName: 'tasksEmpty'
         width: parent.width
         visible: tasks.taskRows.length === 0
-        text: 'No tasks reported yet. Enable the provider adapter explicitly, or register a session and report activity. Usage remains available in the Usage tab.'
+        text: 'No tasks yet. Enable reporting below, then start a new agent session.'
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
@@ -190,67 +222,104 @@ Item {
       Repeater {
         id: rowRepeater
         model: tasks.taskRows
-        Column {
+        Rectangle {
           id: taskRow
           required property var modelData
           property string pressedKey: ''
           property string pressedLayout: ''
           objectName: 'taskRow'
           width: listBody.width
-          spacing: Style.space(4)
-          Text {
-            objectName: 'taskSummary'
-            width: parent.width
-            text: taskRow.modelData.summary
-            textFormat: Text.PlainText
-            wrapMode: Text.Wrap
-            color: Aranea.DesignTokens.foreground
-            font.family: Aranea.Typography.uiFamily
-            font.pixelSize: Style.font.body
-            font.bold: true
-          }
-          Text {
-            width: parent.width
-            text: taskRow.modelData.providerLabel + ' · ' + taskRow.modelData.stateLabel + ' · ' + taskRow.modelData.freshnessLabel
-            textFormat: Text.PlainText
-            wrapMode: Text.Wrap
-            color: taskRow.modelData.attention ? Aranea.DesignTokens.attention : Aranea.DesignTokens.foreground
-            font.pixelSize: Style.font.body
-          }
-          Text {
-            width: parent.width
-            text: taskRow.modelData.context
-            textFormat: Text.PlainText
-            wrapMode: Text.WrapAnywhere
-            color: Aranea.DesignTokens.foreground
-            opacity: 0.65
-            font.pixelSize: Style.font.body
-          }
-          Text {
-            objectName: 'taskLastReport'
-            width: parent.width
-            text: taskRow.modelData.lastReportLabel
-            textFormat: Text.PlainText
-            wrapMode: Text.Wrap
-            color: Aranea.DesignTokens.foreground
-            opacity: 0.65
-            font.pixelSize: Style.font.body
-          }
-          Aranea.FilamentPill {
-            objectName: 'taskDetailsControl'
-            refined: true
-            text: 'Details'
-            hasCursor: tasks.keyboardCursor && tasks.cursorId === taskRow.modelData.key
-            onPressed: {
-              taskRow.pressedKey = taskRow.modelData.key
-              taskRow.pressedLayout = tasks.layoutSignature
+          height: cardBody.implicitHeight + Style.space(24)
+          radius: Aranea.DesignTokens.cornerRadius
+          color: tasks.keyboardCursor && tasks.cursorId === modelData.key ? Aranea.DesignTokens.selectedFill : Qt.alpha(Aranea.DesignTokens.foreground, 0.035)
+          border.width: 1
+          border.color: Qt.alpha(modelData.attention ? Aranea.DesignTokens.attention : Aranea.DesignTokens.foreground, 0.22)
+          Column {
+            id: cardBody
+            x: Style.space(12)
+            y: Style.space(12)
+            width: parent.width - Style.space(24)
+            spacing: Style.space(6)
+            Flow {
+              width: parent.width
+              spacing: Style.space(8)
+              Rectangle {
+                width: stateLabel.implicitWidth + Style.space(12)
+                height: stateLabel.implicitHeight + Style.space(6)
+                radius: height / 2
+                color: Qt.alpha(taskRow.modelData.attention ? Aranea.DesignTokens.attention : Aranea.DesignTokens.accent, 0.12)
+                Text {
+                  id: stateLabel
+                  anchors.centerIn: parent
+                  text: taskRow.modelData.stateLabel
+                  textFormat: Text.PlainText
+                  color: taskRow.modelData.attention ? Aranea.DesignTokens.attention : Aranea.DesignTokens.accent
+                  font.family: Aranea.Typography.uiFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                }
+              }
+              Text {
+                width: Math.min(implicitWidth, parent.width)
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
+                text: taskRow.modelData.providerLabel
+                color: Aranea.DesignTokens.foreground
+                opacity: 0.65
+                font.family: Aranea.Typography.uiFamily
+                font.pixelSize: Style.font.caption
+              }
             }
-            onPressCanceled: taskRow.pressedKey = ''
-            onClicked: {
-              if (taskRow.pressedKey && (taskRow.pressedKey !== taskRow.modelData.key || taskRow.pressedLayout !== tasks.layoutSignature))
-                return
-              tasks.openDetails(taskRow.modelData.key, !!taskRow.pressedKey)
-              taskRow.pressedKey = ''
+            Text {
+              objectName: 'taskSummary'
+              width: parent.width
+              text: taskRow.modelData.summary
+              textFormat: Text.PlainText
+              wrapMode: Text.Wrap
+              maximumLineCount: 2
+              elide: Text.ElideRight
+              color: Aranea.DesignTokens.foreground
+              font.family: Aranea.Typography.uiFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+            Text {
+              width: parent.width
+              text: taskRow.modelData.assigned ? [taskRow.modelData.projectLabel, taskRow.modelData.branch].filter(Boolean).join(' · ') : taskRow.modelData.associationLabel
+              textFormat: Text.PlainText
+              elide: Text.ElideRight
+              color: Aranea.DesignTokens.foreground
+              opacity: 0.65
+              font.family: Aranea.Typography.uiFamily
+              font.pixelSize: Style.font.caption
+            }
+            Text {
+              objectName: 'taskLastReport'
+              width: parent.width
+              text: taskRow.modelData.lastReportLabel + (taskRow.modelData.freshnessLabel !== 'Connected' ? ' · ' + taskRow.modelData.freshnessLabel : '')
+              textFormat: Text.PlainText
+              wrapMode: Text.Wrap
+              color: Aranea.DesignTokens.foreground
+              opacity: 0.65
+              font.family: Aranea.Typography.uiFamily
+              font.pixelSize: Style.font.caption
+            }
+            Aranea.FilamentPill {
+              objectName: 'taskDetailsControl'
+              refined: true
+              text: 'Details'
+              hasCursor: tasks.keyboardCursor && tasks.cursorId === taskRow.modelData.key
+              onPressed: {
+                taskRow.pressedKey = taskRow.modelData.key
+                taskRow.pressedLayout = tasks.layoutSignature
+              }
+              onPressCanceled: taskRow.pressedKey = ''
+              onClicked: {
+                if (taskRow.pressedKey && (taskRow.pressedKey !== taskRow.modelData.key || taskRow.pressedLayout !== tasks.layoutSignature))
+                  return
+                tasks.openDetails(taskRow.modelData.key, !!taskRow.pressedKey)
+                taskRow.pressedKey = ''
+              }
             }
           }
         }
@@ -260,35 +329,61 @@ Item {
         visible: tasks.taskRows.length === 0 || tasks.taskRows.some(function (r) {
           return !r.assigned
         })
-        text: 'Unassigned tasks need an explicitly registered project and checkout. Open Project settings to add one; reporting activity never registers projects.'
+        text: 'Register a project and checkout to enable session actions.'
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
       Aranea.FilamentPill {
+        id: setupButton
         objectName: 'taskSetup'
+        visible: tasks.taskRows.length === 0 || tasks.taskRows.some(function (r) {
+          return !r.assigned
+        })
         refined: true
         text: 'Project settings'
-        hasCursor: tasks.taskRows.length === 0 && tasks.keyboardCursor
+        hasCursor: tasks.taskRows.length === 0 && tasks.keyboardCursor && tasks.cursorId === 'setup'
         onClicked: tasks.action('setup', '')
+      }
+      TextEdit {
+        width: parent.width
+        visible: tasks.taskRows.length === 0
+        text: 'Enable reporting (opt-in)\naranea agents adapter install claude\naranea agents adapter install codex\n\nReview provider trust, then start a new CLI session.'
+        readOnly: true
+        selectByMouse: true
+        textFormat: TextEdit.PlainText
+        wrapMode: TextEdit.Wrap
+        color: Aranea.DesignTokens.foreground
+        font.family: Aranea.Typography.uiFamily
+        font.pixelSize: Style.font.body
+      }
+      Aranea.FilamentPill {
+        id: setupGuide
+        objectName: 'taskSetupGuide'
+        visible: tasks.taskRows.length === 0
+        refined: true
+        text: tasks.setupGuideExpanded ? 'Hide setup details' : 'Setup details'
+        hasCursor: tasks.keyboardCursor && tasks.cursorId === 'guide'
+        cursorOutlineMargin: 0
+        onClicked: tasks.setupGuideExpanded = !tasks.setupGuideExpanded
       }
       TextEdit {
         objectName: 'taskSetupCommands'
         width: parent.width
-        visible: tasks.taskRows.length === 0
-        text: 'Activity is opt-in. Check provider availability, then copy an install command to enable reporting.\naranea agents adapter status claude\naranea agents adapter install claude\naranea agents adapter status codex\naranea agents adapter install codex\n\nConfigured hooks do not prove enabled/trusted hooks or observed activity. Review provider trust, then start a new native CLI session. Missing question hooks can use explicit reports.\naranea agents register --json-input\naranea agents report --json-input\n\nVerification stays not reported until explicitly reported. Session focus needs native process proof and reaches only the hosting terminal, not a tmux pane. Remove only the owned adapter hooks with:\naranea agents adapter remove claude\naranea agents adapter remove codex'
+        visible: tasks.taskRows.length === 0 && tasks.setupGuideExpanded
+        text: 'Enable reporting (opt-in)\naranea agents adapter install claude\naranea agents adapter install codex\n\nReview provider trust, then start a new CLI session. Configured hooks do not prove trust or observed activity.\n\nCheck availability\naranea agents adapter status claude\naranea agents adapter status codex\n\nRemove owned hooks\naranea agents adapter remove claude\naranea agents adapter remove codex'
         readOnly: true
         selectByMouse: true
         textFormat: TextEdit.PlainText
-        wrapMode: TextEdit.WrapAnywhere
+        wrapMode: TextEdit.Wrap
         color: Aranea.DesignTokens.foreground
-        font.family: Aranea.Typography.technicalFamily
+        font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
       }
       Text {
         width: parent.width
-        text: '↑↓ / j k tasks · enter details · tab Tasks / Usage'
+        text: '↑↓ / j k tasks · enter details · tab Tasks / Usage / Help'
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground

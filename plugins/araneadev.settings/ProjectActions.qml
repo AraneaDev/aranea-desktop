@@ -18,6 +18,8 @@ ColumnLayout {
   property var projectClient: null
   // Capture is bound before selection reads, polling and all client effects.
   property bool displayOnly: false
+  // Offline action help never reads or changes the action store.
+  property bool helpExpanded: false
   // Shared pointer settling boundary.
   property var pointerGate: null
   // Existing selected project page controls the observation lifetime.
@@ -217,6 +219,7 @@ ColumnLayout {
   function captureSnapshot(): var {
     return {
       selectedActionId: selectedActionId,
+      helpExpanded: helpExpanded,
       selectedIdentity: selectedIdentity,
       editing: editing,
       editConflict: editConflict,
@@ -241,6 +244,7 @@ ColumnLayout {
   function captureRestore(saved: var): void {
     if (!saved)
       return
+    helpExpanded = saved.helpExpanded === true
     selectedActionId = saved.selectedActionId || ''
     selectedIdentity = saved.selectedIdentity || ''
     editing = saved.editing === true
@@ -296,8 +300,23 @@ ColumnLayout {
   onCheckoutChanged: scheduleRefresh()
   spacing: Style.space(8)
   SettingsLabel {
-    text: 'Actions'
+    text: 'Workflow actions'
     font.bold: true
+  }
+  SettingsLabel {
+    Layout.fillWidth: true
+    text: 'Save reusable tests, builds, and dev servers here. Opening a project does not run them.'
+  }
+  SettingsButton {
+    objectName: 'actionHelpToggle'
+    text: actions.helpExpanded ? 'Hide actions help' : 'How to use actions'
+    pointerGate: actions.pointerGate
+    onClicked: actions.helpExpanded = !actions.helpExpanded
+  }
+  Aranea.WorkflowHelp {
+    Layout.fillWidth: true
+    visible: actions.helpExpanded
+    topic: 'actions'
   }
   SettingsLabel {
     Layout.fillWidth: true
@@ -344,7 +363,7 @@ ColumnLayout {
   SettingsLabel {
     Layout.fillWidth: true
     visible: !actions.definitions.length
-    text: 'No configured actions. Add a named command or local service.'
+    text: 'No actions yet. Add action to define a test, build, or dev server. Examples are available in the editor.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
   Repeater {

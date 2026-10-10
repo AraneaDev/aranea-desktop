@@ -26,7 +26,7 @@ while (($#)); do
 done
 [[ -n "$output" ]] || exit 2
 case "$fixture" in
-  wide | scaling | dirty | integration-failed | notifications | projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial | workspaces)
+  wide | scaling | dirty | integration-failed | notifications | projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial | project-setup-folder | project-setup-review | project-setup-configure | project-setup-bulk | project-setup-agents | workspaces)
     width=840
     height=620
     ;;

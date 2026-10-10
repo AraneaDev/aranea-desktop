@@ -167,7 +167,7 @@ Panel {
         error: activity.error
       }) : null)
   // Initial destination is Usage unless tasks require attention or have no Usage.
-  readonly property bool tasksShown: navigation.destination === 'tasks' && !agentsShowcase
+  readonly property bool tasksShown: navigation.destination !== 'usage' && !agentsShowcase
   // Attention count does not replace the existing usage ring.
   readonly property int taskAttentionCount: tasksView.taskRows.filter(function (r) {
     return r.attention
@@ -1124,7 +1124,7 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
     onCloseRequested: {
-      if (root.tasksShown && tasksView.selectedId)
+      if (root.tasksShown && !tasksView.helpActive && tasksView.selectedId)
         tasksView.back()
       else
         root.close()
@@ -1164,7 +1164,7 @@ Panel {
       if (root.tasksShown) {
         if (t === "j" || t === "k")
           tasksView.navigate(t === "j" ? 1 : -1)
-        else if (t === "r" || t === "R")
+        else if (!tasksView.helpActive && (t === "r" || t === "R"))
           root.requestTaskRefresh()
         return
       }
@@ -1196,6 +1196,7 @@ Panel {
         }
         AgentTasks {
           id: tasksView
+          helpActive: navigation.destination === 'help'
           objectName: "agentTasks"
           width: parent.width
           visible: root.tasksShown

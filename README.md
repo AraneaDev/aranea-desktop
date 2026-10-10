@@ -77,9 +77,14 @@ the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
 
 ### Project workspaces
 
+New to projects and agent tasks? Start with **Setup → Projects → Set up a project**.
+The wizard guides you through registration, tools, workflow actions, and optional
+agent reporting. **Projects help**, **How to use actions**, and **Agents → Help**
+are available offline. See the [step-by-step user guide](docs/workflows.md).
+
 Open **Setup → Projects**, confirm a development folder, review repositories and
 worktrees, then **Add selected**. Search with `project:` to Open or Resume saved
-tools. Dedicated workspace is the default; Customize makes current workspace an
+tools. Dedicated workspace is the default; Project preferences makes current workspace an
 explicit preference. Partial launches report each role and offer targeted recovery.
 Repository scripts are never run by discovery or ordinary Open. Removing a
 registration preserves folders and applications.

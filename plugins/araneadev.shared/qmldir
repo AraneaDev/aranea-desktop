@@ -28,3 +28,5 @@ LinkGraph 1.0 LinkGraph.qml
 CredentialPrompt 1.0 CredentialPrompt.qml
 HoverTint 1.0 HoverTint.qml
 DesktopFontSync 1.0 DesktopFontSync.qml
+
+WorkflowHelp 1.0 WorkflowHelp.qml
