@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.24.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.23.0...v2.24.0) (2026-10-10)
+
+
+### Features
+
+* guide project workflows and clarify agent activity ([#143](https://github.com/AraneaDev/aranea-desktop/issues/143)) ([71fd747](https://github.com/AraneaDev/aranea-desktop/commit/71fd7479ba88e7198a47761324304bfb8a6d4df5))
+
+
+### Fixes
+
+* keep folder selection and desktop typography consistent ([#142](https://github.com/AraneaDev/aranea-desktop/issues/142)) ([755c946](https://github.com/AraneaDev/aranea-desktop/commit/755c946896868ef8b5fb998217712437d3d13a82))
+
 ## [2.23.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.3...v2.23.0) (2026-10-10)
 
 
