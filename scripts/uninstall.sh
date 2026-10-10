@@ -178,12 +178,12 @@ restore_gsettings() {
     read -r schema key <<<"$entry"
     saved="$state_root/gsettings/$schema.$key"
     if [[ -f "$saved" && "$(<"$saved")" != "'Aranea'" && "$(<"$saved")" != "'Aranea-icons'" ]]; then
-      gsettings set "$schema" "$key" "$(<"$saved")" >/dev/null 2>&1 || true
+      lifecycle_effect gsettings set "$schema" "$key" "$(<"$saved")" >/dev/null 2>&1 || true
       continue
     fi
-    current="$(gsettings get "$schema" "$key" 2>/dev/null || true)"
+    current="$(lifecycle_effect gsettings get "$schema" "$key" 2>/dev/null || true)"
     if [[ -f "$saved" || "$current" == "'Aranea'" || "$current" == "'Aranea-icons'" ]]; then
-      gsettings reset "$schema" "$key" >/dev/null 2>&1 || true
+      lifecycle_effect gsettings reset "$schema" "$key" >/dev/null 2>&1 || true
     fi
   done
 }
