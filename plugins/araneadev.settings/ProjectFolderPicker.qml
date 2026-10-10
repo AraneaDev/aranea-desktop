@@ -12,7 +12,7 @@ ColumnLayout {
   id: picker
   // Explicitly disables chooser interaction for unavailable desktops and captures.
   property bool chooserAvailable: true
-  // Inert captures do not open native dialogs or emit mutation requests.
+  // Inert captures do not open dialogs or emit mutation requests.
   property bool displayOnly: false
   // Draft is presentation only; backend remains the canonical path validator.
   property string pathDraft: ''
@@ -24,7 +24,7 @@ ColumnLayout {
   property string error: ''
   // Context-specific chooser label, including explicit checkout relocation.
   property string buttonText: 'Choose folder'
-  // The manual path alternative stays available even when a portal fails silently.
+  // The manual path alternative stays available independently of the dialog.
   readonly property bool fallbackVisible: true
   // Local absolute-path validation does not replace backend existence validation.
   readonly property bool validPath: Logic.normalizeFolder(pathDraft) !== ''
@@ -48,7 +48,7 @@ ColumnLayout {
     if (!displayOnly && validPath)
       folderRequested(Logic.normalizeFolder(pathDraft))
   }
-  // Invoke the native desktop chooser; the path field remains available on failure.
+  // Invoke the Qt Quick chooser; the path field remains available on failure.
   function choose(): void {
     if (displayOnly)
       return
@@ -93,6 +93,8 @@ ColumnLayout {
   FolderDialog {
     id: dialog
     title: 'Choose a development folder'
+    // GTK/GVFS native dialogs can segfault the shared Quickshell process.
+    options: FolderDialog.DontUseNativeDialog
     onAccepted: {
       picker.setPath(selectedFolder.toString())
       picker.confirm()
