@@ -2,6 +2,7 @@
 // Host Style.font is a runtime QObject with token properties.
 // qmllint disable missing-property
 import QtQuick
+import QtQuick.Controls as Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import qs.Commons
@@ -95,6 +96,8 @@ ColumnLayout {
     title: 'Choose a development folder'
     // GTK/GVFS native dialogs can segfault the shared Quickshell process.
     options: FolderDialog.DontUseNativeDialog
+    // Settings is a layer-shell overlay; a separate window would tile beneath it.
+    popupType: Controls.Popup.Item
     onAccepted: {
       picker.setPath(selectedFolder.toString())
       picker.confirm()

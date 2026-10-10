@@ -1,5 +1,6 @@
 // Folder selection stays inside Qt Quick and emits only on explicit acceptance.
 import QtQuick
+import QtQuick.Controls as Controls
 import QtQuick.Dialogs
 import Quickshell
 import "lib"
@@ -39,6 +40,11 @@ ShellRoot {
     t.check(safe, 'folder chooser bypasses in-process native GTK/GVFS')
     // Refuse to open the crashing native path when the regression is present.
     if (!safe) {
+      t.done()
+      return
+    }
+    t.equal(dialog.popupType, Controls.Popup.Item, 'chooser stays inside Settings instead of creating a tiled window')
+    if (dialog.popupType !== Controls.Popup.Item) {
       t.done()
       return
     }
