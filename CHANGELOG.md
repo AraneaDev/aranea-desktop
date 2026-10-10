@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.23.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.3...v2.23.0) (2026-10-10)
+
+
+### Features
+
+* add project workspaces, agent activity and configured actions ([#140](https://github.com/AraneaDev/aranea-desktop/issues/140)) ([b93dc1d](https://github.com/AraneaDev/aranea-desktop/commit/b93dc1d5168e996bcf40e550679eec1b55d75e83))
+
 ## [2.22.3](https://github.com/AraneaDev/aranea-desktop/compare/v2.22.2...v2.22.3) (2026-10-08)
 
 
