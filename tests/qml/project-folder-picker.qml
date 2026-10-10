@@ -3,8 +3,10 @@ import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Dialogs
 import Quickshell
+import qs.Commons
 import "lib"
 import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.shared" as Shared
 
 ShellRoot {
   id: host
@@ -43,6 +45,23 @@ ShellRoot {
     t.waitFor(function () {
       return dialog.visible
     }, 3000, 'Qt Quick folder chooser opens', function () {
+      var popup = picker.Controls.Overlay.overlay.children.filter(function (child) {
+        return child.visible && child.font !== undefined
+      })[0]
+      t.check(!!popup, 'chooser exposes its visual font context inside the overlay')
+      if (popup) {
+        t.equal(popup.font.pixelSize, Style.font.body, 'chooser uses shared logical body size rather than a cached Qt font')
+        t.equal(popup.font.family, Shared.Typography.uiFamily, 'chooser uses shared interface family')
+        Style.fontBaseSize = 16
+        Shared.Typography.preferences = ({
+            uiFamily: 'Source Sans 3',
+            technicalFamily: ''
+          })
+        t.equal(popup.font.pixelSize, Style.font.body, 'open chooser follows a live shared size change')
+        t.equal(popup.font.family, 'Source Sans 3', 'open chooser follows a live interface family change')
+        Style.fontBaseSize = 12
+        Shared.Typography.preferences = ({})
+      }
       t.equal(host.requests, [], 'opening chooser does not submit a folder')
       dialog.reject()
       t.equal(host.requests, [], 'cancelling chooser does not submit a folder')

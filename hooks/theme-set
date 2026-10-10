@@ -22,6 +22,9 @@ if [[ $1 != aranea && $1 != aranea-* ]]; then
   systemctl --user daemon-reload >/dev/null 2>&1 || true
   rm -f "$HOME/.config/systemd/user/aranea-wallpaper-day-night.timer" \
     "$HOME/.config/systemd/user/aranea-wallpaper-day-night.service"
+  if [[ -x "$installed_theme/scripts/aranea-sync-desktop-font" ]]; then
+    "$installed_theme/scripts/aranea-sync-desktop-font" --restore || true
+  fi
   # Hand notifications, lock, OSD and polkit back to Omarchy and take the
   # Aranea entries out of the bar; repair-shell-config restores them on return.
   # current/theme already holds the new theme here; use the installed copy.

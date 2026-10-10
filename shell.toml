@@ -46,13 +46,6 @@ label-gap = 6
 
 [font]
 base-size = 12
-caption = 10
-body-small = 11
-body = 12
-subtitle = 13
-title = 14
-icon = 14
-icon-large = 18
 
 [popups]
 background = "#0b1016"

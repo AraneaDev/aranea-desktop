@@ -122,8 +122,14 @@ Appearance offers searchable font choices and preview samples, including
 **IBM Plex Sans**, **Source Sans 3**, **Inter Display**, **Inter Variable**, and
 **JetBrains Mono NL**. Apply saves a draft; resetting defaults also requires
 Apply. Saved font choices are preserved, and icons keep their dedicated font.
-These choices affect Aranea panels and controls; application and terminal fonts
-keep their own settings. See [Bundled fonts](fonts/README.md).
+The interface choice also follows through to GTK applications and Qt applications
+using the GTK platform theme, including Files and the project folder chooser.
+`omarchy display text size SIZE` controls the shared logical text size. Aranea
+projects that size into desktop fonts without applying GTK's text multiplier
+again; monitor scaling remains handled by the toolkits. Terminal font families
+keep their own settings. Running Qt applications may need reopening to refresh
+their cached desktop font; Aranea’s chooser follows changes live.
+See [Bundled fonts](fonts/README.md).
 
 Wallpaper selection requires Apply, and schedule drafts require Save. Custom
 display scales from 1 to 4 apply to the focused display and show the observed

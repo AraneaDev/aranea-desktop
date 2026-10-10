@@ -19,6 +19,23 @@ printf '#!/bin/bash\n# my own hook\n' >"$hooks/theme-set.d/mine"
 : >"$units/aranea-wallpaper-day-night.timer"
 : >"$units/aranea-wallpaper-day-night.service"
 printf "'Adwaita'\n" >"$XDG_STATE_HOME/aranea/gsettings/org.gnome.desktop.interface.icon-theme"
+printf "'Old Sans 11'\n" >"$XDG_STATE_HOME/aranea/gsettings/org.gnome.desktop.interface.font-name"
+printf "'Inter 9'\n" >"$XDG_STATE_HOME/aranea/gsettings/org.gnome.desktop.interface.font-name.applied"
+printf "1.25\n" >"$XDG_STATE_HOME/aranea/gsettings/org.gnome.desktop.interface.text-scaling-factor"
+printf "1.0\n" >"$XDG_STATE_HOME/aranea/gsettings/org.gnome.desktop.interface.text-scaling-factor.applied"
+# Report a later independent font edit but the still-owned scaling projection.
+cat >"$ARANEA_TEST_SANDBOX/gsettings" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "gsettings $*" >>"$ARANEA_TEST_SANDBOX/guard.log"
+if [[ $1 == get ]]; then
+  case "$3" in
+    font-name) printf "'User Sans 18'\n" ;;
+    text-scaling-factor) printf '1.0\n' ;;
+  esac
+fi
+STUB
+chmod +x "$ARANEA_TEST_SANDBOX/gsettings"
+export PATH="$ARANEA_TEST_SANDBOX:$PATH"
 printf '{"bar":{"id":"araneadev.bar"},"plugins":[{"id":"araneadev.settings"},{"id":"user.widget","option":7}],"userSettings":{"keep":true}}\n' >"$HOME/.config/omarchy/shell.json"
 mkdir -p "$XDG_CONFIG_HOME/aranea"
 printf 'dawn=06:00\n' >"$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
@@ -35,6 +52,8 @@ jq -e ' .plugins == [{id:"user.widget",option:7}] and .userSettings.keep' "$HOME
 [[ ! -e "$XDG_DATA_HOME/icons/Aranea" ]]
 jq -e '.bar.id != "araneadev.bar"' "$HOME/.config/omarchy/shell.json" >/dev/null
 grep -Fq "gsettings set org.gnome.desktop.interface icon-theme 'Adwaita'" "$ARANEA_TEST_SANDBOX/guard.log"
+if grep -Fq "gsettings set org.gnome.desktop.interface font-name 'Old Sans 11'" "$ARANEA_TEST_SANDBOX/guard.log"; then exit 1; fi
+grep -Fq 'gsettings set org.gnome.desktop.interface text-scaling-factor 1.25' "$ARANEA_TEST_SANDBOX/guard.log"
 grep -Fq 'systemctl --user disable --now aranea-wallpaper-day-night.timer' "$ARANEA_TEST_SANDBOX/guard.log"
 
 json_output="$("$repo_root/scripts/uninstall.sh" --json --dry-run --yes --scope integration)"

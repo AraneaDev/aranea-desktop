@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Project Aranea's effective interface font into GTK and GTK-backed Qt applications.
+# Usage: scripts/aranea-sync-desktop-font FAMILY BODY_PIXELS | --restore
+set -euo pipefail
+
+# shellcheck source=scripts/lib/ownership.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/ownership.sh"
+state="$(aranea_ownership_root)/gsettings"
+schema=org.gnome.desktop.interface
+command -v gsettings >/dev/null || exit 0
+if [[ $# == 1 && $1 == --restore ]]; then
+  for key in font-name text-scaling-factor; do
+    saved="$state/$schema.$key"
+    applied="$saved.applied"
+    [[ -f "$saved" && -f "$applied" ]] || continue
+    current=$(gsettings get "$schema" "$key")
+    if [[ "$current" == "$(cat "$applied")" ]]; then
+      gsettings set "$schema" "$key" "$(cat "$saved")"
+    fi
+  done
+  exit 0
+fi
+[[ $# == 2 && -n $1 && $1 != *[$'\n\r\t']* && $2 =~ ^[1-9][0-9]*$ ]] || {
+  echo 'Expected an interface family and a positive integer logical pixel size' >&2
+  exit 2
+}
+# Inert captures and other themes never gain desktop mutation authority.
+theme_file="$(xdg_state_home)/omarchy/current/theme.name"
+[[ -f "$theme_file" ]] || exit 0
+theme=$(cat "$theme_file")
+[[ "$theme" == aranea || "$theme" == aranea-* ]] || exit 0
+# Both toolkits handle monitor scale; logical pixels convert to points at 96 DPI.
+points=$(awk -v pixels="$2" 'BEGIN { printf "%g", pixels * 72 / 96 }')
+font="$1 $points"
+font=${font//\\/\\\\}
+font=${font//\'/\\\'}
+font="'$font'"
+mkdir -p "$state"
+for key in font-name text-scaling-factor; do
+  value="$font"
+  # The shared pixel size already incorporates the user's text-size preference.
+  [[ "$key" != text-scaling-factor ]] || value=1.0
+  current=$(gsettings get "$schema" "$key")
+  [[ "$current" != "$value" ]] || continue
+  saved="$state/$schema.$key"
+  [[ -e "$saved" ]] || printf '%s\n' "$current" >"$saved"
+  gsettings set "$schema" "$key" "$value"
+  # Store canonical readback so deactivation preserves subsequent user changes.
+  gsettings get "$schema" "$key" >"$saved.applied"
+done

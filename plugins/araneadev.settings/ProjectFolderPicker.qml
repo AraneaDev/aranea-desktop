@@ -9,6 +9,7 @@ import QtQuick.Layouts
 import qs.Commons
 import qs.Ui as Ui
 import "SettingsLogic.js" as Logic
+import "../araneadev.shared" as Aranea
 
 ColumnLayout {
   id: picker
@@ -71,8 +72,29 @@ ColumnLayout {
     try {
       if (activeDialog)
         return
+      var overlay = picker.Controls.Overlay.overlay
+      var previousItems = []
+      if (overlay) {
+        for (var i = 0; i < overlay.children.length; i++)
+          previousItems.push(overlay.children[i])
+      }
       activeDialog = folderDialogComponent.createObject(picker)
       activeDialog.open()
+      // The public overlay contains the newly opened popup's Control font context.
+      // Bind only that new item; Qt's GTK font cache can retain an older system size.
+      if (overlay) {
+        for (var j = 0; j < overlay.children.length; j++) {
+          var item = overlay.children[j]
+          if (previousItems.indexOf(item) < 0 && item.font !== undefined) {
+            item.font = Qt.binding(function () {
+              return Qt.font({
+                family: Aranea.Typography.uiFamily,
+                pixelSize: Style.font.body
+              })
+            })
+          }
+        }
+      }
     } catch (e) {
       releaseDialog()
       error = 'Folder chooser unavailable. Enter an absolute folder path below.'
