@@ -33,7 +33,7 @@ should not be parsed as a contract.
 
 Install step IDs include `validate`, `persist-profile`, `install-theme`,
 `install-hooks`, `activate-theme`, `install-cursor`, `install-icons`, and
-`install-terminal`. Uninstall IDs include `remove-hooks`, `remove-plugins`,
+`install-terminal`. Uninstall IDs include `stop-actions`, `remove-hooks`, `remove-plugins`,
 `remove-timer`, `restore-managed-files`, `restore-settings`, `remove-state`,
 and `remove-theme`. Doctor step IDs are its check IDs, such as `theme`,
 `hooks`, `branding`, `icons`, `plugins`, `runtime`, and `health`.
@@ -95,7 +95,7 @@ with its current revision. Invalid or unsupported registry data returns
 
 ## Public project commands
 
-Use `scripts/aranea` for the public Phase 1 interface. Every command accepts
+Use `scripts/aranea` for the public project interface. Every command accepts
 `--json`; without it, output is human readable. `capabilities --json` describes
 all argument schemas, installed supported tools, dependency availability, and
 owner availability. Capabilities does not initialize or mutate the registry.
@@ -329,3 +329,122 @@ It never terminates the provider. Helper ownership lives in private
 sidecar. Provenance stores an absolute executable identity and a SHA256 command
 fingerprint, never raw argv. Navigation consumers must revalidate process and
 window proof immediately before focus.
+
+## Configured project actions and retained runs
+
+These commands work through the shared headless backend, independently of the
+project workspace owner. Every command accepts `--json` and preserves the
+schema 1 JSONL protocol. IDs below are opaque IDs returned by list/configure/run.
+
+```text
+aranea projects actions list PROJECT_ID
+aranea projects actions configure PROJECT_ID --json-input
+aranea projects actions remove PROJECT_ID ACTION_ID
+aranea projects actions run PROJECT_ID ACTION_ID [--checkout CHECKOUT_ID]
+    [--request-id REQ_ID] [--definition-revision INTEGER]
+aranea projects runs list [--project PROJECT_ID]
+aranea projects runs inspect RUN_ID
+aranea projects runs refresh RUN_ID
+aranea projects runs stop RUN_ID
+aranea projects runs restart RUN_ID [--request-id REQ_ID]
+aranea projects runs logs RUN_ID
+aranea projects runs open-preview RUN_ID
+```
+
+Configure reads one definition draft from stdin. Save is inert; it does not
+require an installed executable or a reachable user manager. For example,
+after assigning a registered project ID to `project_id`:
+
+```bash
+aranea projects actions configure "$project_id" --json-input --json <<'JSON'
+{"name":"Run checks","kind":"command","argv":["npm","test"],"cwdRelative":".","timeoutSeconds":300,"previewUrl":null}
+JSON
+aranea projects actions configure "$project_id" --json-input --json <<'JSON'
+{"name":"Start preview","kind":"service","argv":["npm","run","dev","--","--host","127.0.0.1","--port","5173"],"cwdRelative":".","timeoutSeconds":null,"previewUrl":"http://127.0.0.1:5173/"}
+JSON
+```
+
+Each `argv` element is one literal argument, including spaces or an empty later
+argument. No shell splitting, expansion or evaluation occurs. An explicit shell
+must itself be saved as the executable with its arguments. There are no runtime
+command overrides, environment-value fields, repository manifests, automatic
+dependency installation, privilege prompts, automatic execution or automatic
+restart. Configuration is local to Aranea, outside the repository.
+
+To edit, include the saved action `id`. For revision-checked edits, stdin may
+instead be exactly `{"definition":{...},"expectedRevision":42}`, where 42 is the
+latest action-state revision. A conflict preserves the saved definition; refresh
+and review before explicitly retrying. Editing preserves existing runs' immutable
+command snapshots. Removing an action refuses while any run remains protected.
+
+A fresh run uses the selected exact registered checkout, or resolves that
+project's current default once when `--checkout` is omitted. It revalidates Git
+identity and the working folder; a missing/changed checkout never falls back.
+`--definition-revision` optionally guards the reviewed command revision. Omission
+uses the current saved definition. CLI Restart explicitly stops the original
+exact run and uses the current saved definition; it has no revision option.
+The UI instead guards Start and Restart with its displayed revision, and asks
+for command review when a run's saved revision differs from today's action.
+
+Start/restart generates a `req-UUID` unless supplied. Keep the request and run IDs.
+An accepted event identifies a durably recorded intent, not successful execution.
+Exact request replay returns its original run; conflicting reuse refuses.
+A fresh Start coalesces with a protected run for the same project, checkout and
+action, even after an edit. No postacceptance retry occurs automatically.
+
+The CLI observes for up to ten seconds; transport/final reporting can add time.
+Running services or commands return observed running without waiting for exit.
+Closing the observer or its deadline yields a partial result and does not cancel
+accepted work. Reconnect with inspect (retained metadata), refresh (fresh manager
+evidence), or logs. Use stop for explicit cancellation; Restart never launches a
+replacement until exact cleanup is confirmed. Exit 0 means successful observation,
+1 means partial/domain failure, 2 invalid usage and 4 missing required dependency.
+The completed event retains backend errors/recovery and available run/request IDs.
+
+Operation `state`/`outcome`, `processState`, and preview `readiness` are independent.
+Exit 0 proves only that command succeeded, not project or agent-task verification.
+Pending/running/unconfirmed processes **or** `submissionUnconfirmed:true` remain
+protected. Even a succeeded main process may have unconfirmed child cleanup.
+Missing manager, changed invocation or uncertain submission cannot establish Stop,
+permit duplicate execution, or discard ownership evidence. Boot, transient unit,
+immutable command marker and pinned invocation must match before control.
+
+`aranea capabilities --json` includes action operation schemas, `projectActions`
+lifetime/bounds contracts and `availability.projectActions` execution, userManager,
+journal, previewProbe and opener flags. Execution requires a responsive systemd
+user manager and systemd-run 254+; the shell panel may be closed. Execution uses
+transient user services, noninteractive stdin, no automatic restart, and whole
+control-group stopping. Services are not enabled at login and do not promise to
+survive logout, user-manager shutdown or reboot. Definition/status metadata remains
+local across shell restarts. Project removal retains accepted runs addressable by
+run ID; new starts require a registered project.
+
+Service preview reachability is a separate optional one-second numeric-loopback
+HTTP(S) probe; it proves neither port ownership nor application correctness.
+`open-preview` requires current exact owned running-service proof and a saved URL;
+it requests the external opener without claiming the browser displayed anything.
+No preview opens automatically. Missing curl/opener affects those capabilities.
+
+Logs are explicit bounded plaintext reads from the local system journal, filtered
+by exact unit, invocation and boot. They contain at most 200 entries / 256 KiB,
+with sanitization and explicit truncation. Aranea stores no extra output archive;
+journal retention follows system policy and is not erased by metadata cleanup.
+State is limited to 16 MiB; requests to 1 MiB; definitions to 200 total / 50 per
+project; protected runs to 50; terminal history to 100 / seven days; request
+receipts to 512. Protected evidence does not silently expire. Command timeout is
+1–3600 seconds (default 300); service timeout is null. argv permits 1–64 entries,
+1024 characters each / 16 KiB total. Working folders stay inside the exact checkout;
+preview URLs use HTTP(S), numeric 127.0.0.1 or [::1] and an explicit port.
+
+Install/deployment and uninstall hold the existing dispatch mutex through their
+full lifecycle operation; a busy/unsafe lock reports `action_lifecycle_busy` before
+destructive work. Both uninstall scopes fence action ingress, drain dispatch and stop only proven
+owned runs before removing definitions/history or installed recovery tools. A
+failed drain reports `action_teardown_failed`, keeps protected payload/tools and
+blocks reinstall activation until recovery. Inspect/refresh/stop the retained run
+ID, restore manager access as needed, then retry uninstall. Successful removal
+retains only the inert action coordination files `project-actions.json.lock` and
+`project-actions.json.dispatch.lock`, alongside `agent-activity.json.lock` and
+necessary ancestors; reinstall preserves their inodes while activating a fresh
+generation. Journal data, repositories, unrelated services and editor/provider
+processes are not removed by action cleanup.

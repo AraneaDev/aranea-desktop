@@ -43,7 +43,15 @@ chmod 700 "$XDG_RUNTIME_DIR"
 unset HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY DISPLAY DBUS_SESSION_BUS_ADDRESS
 
 sandbox_guard_bin="$(cd "$sandbox_lib_dir/../guard-bin" && pwd)"
-export PATH="$sandbox_guard_bin:$PATH"
+# Action helpers deliberately exclude the repository from executable lookup.
+# Keep effect guards outside it too, so sanitized PATH cannot reach host tools.
+sandbox_action_guards="$ARANEA_TEST_SANDBOX/action-guards"
+mkdir -p "$sandbox_action_guards"
+for sandbox_tool in systemd-run systemctl journalctl curl xdg-open; do
+  cp -L "$sandbox_guard_bin/systemctl" "$sandbox_action_guards/$sandbox_tool"
+done
+unset sandbox_tool
+export PATH="$sandbox_guard_bin:$sandbox_action_guards:$PATH"
 
 sandbox_exit_commands=()
 

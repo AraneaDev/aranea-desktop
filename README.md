@@ -84,6 +84,15 @@ explicit preference. Partial launches report each role and offer targeted recove
 Repository scripts are never run by discovery or ordinary Open. Removing a
 registration preserves folders and applications.
 
+Project details also offer named **Actions**: configure an executable and individual
+arguments, then explicitly Run a command or Start a service for the selected
+checkout. Track exit status, Stop/Restart, view bounded local-journal output and
+open an optional loopback preview. Saving, opening a project and reloading the
+shell never run actions. Runs belong to the systemd user manager independently
+of the panel; uncertainty remains visible and protected. See the
+[action guide](docs/features.md#project-commands-and-previews) and
+[CLI examples](docs/agent-interface.md#configured-project-actions-and-retained-runs).
+
 See [Project configuration](docs/configuration.md) for supported tools,
 folder relocation and workspace choices, and [the JSON interface](docs/agent-interface.md)
 for automation. Inert showcase IDs are `projects-empty`, `projects-discovery`,

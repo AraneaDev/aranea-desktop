@@ -111,9 +111,18 @@ export TEST_THEME_SOURCE="$repo_root"
 mkdir -p "$XDG_BIN_HOME"
 printf '#!/usr/bin/env bash\nprintf "user wrapper\\n"\n' >"$XDG_BIN_HOME/aranea"
 chmod +x "$XDG_BIN_HOME/aranea"
+"$repo_root/scripts/aranea-project-actions" deactivate </dev/null >/dev/null
+action_lock="$XDG_STATE_HOME/aranea/project-actions.json.lock"
+action_inode=$(stat -c %i "$action_lock")
 for attempt in first repeat; do
   PATH="$name_root/bin:$PATH" "$repo_root/scripts/install.sh" --yes --profile minimal \
     --source https://example.invalid/AraneaDev/aranea-desktop.git >/dev/null
+  [[ $(cat "$action_lock") == active:* ]] || {
+    echo 'FAIL installer left actions retired'
+    exit 1
+  }
+  [[ $(stat -c %i "$action_lock") == "$action_inode" ]]
+  [[ ! -e "$XDG_STATE_HOME/aranea/project-actions.json" ]]
   [[ "$(readlink "$XDG_BIN_HOME/aranea")" == "$HOME/.config/omarchy/themes/aranea/scripts/aranea" ]] || {
     echo "$attempt install did not link the stable installed project command" >&2
     exit 1
@@ -166,3 +175,31 @@ fi
 jq -se 'last | .code=="ACTIVITY_REMOVED"' "$TMPDIR/removed-activity" >/dev/null
 [[ ! -e "$HOME/.claude/settings.json" && ! -e "$HOME/.codex/hooks.json" ]]
 echo 'PASS installed persistent activity plugin and opt-in provider configuration'
+
+# Reinstall must fail honestly when a draining intent has no cleanup proof.
+export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/protected-reinstall"
+"$repo_root/scripts/aranea-project-actions" activate </dev/null >/dev/null
+project_path="$ARANEA_TEST_SANDBOX/reinstall-repo"
+git init -q "$project_path"
+jq -cn --arg p "$project_path" '{action:"register",args:{paths:[$p]}}' | "$repo_root/scripts/aranea-project-store" mutate >"$TMPDIR/reinstall-project"
+project=$(jq -r '.state.projects[0].id' "$TMPDIR/reinstall-project")
+checkout=$(jq -r '.state.projects[0].checkouts[0].id' "$TMPDIR/reinstall-project")
+jq -cn --arg p "$project" '{projectId:$p,definition:{name:"Saved only",kind:"command",argv:["printf","inert"],cwdRelative:".",previewUrl:null}}' | "$repo_root/scripts/aranea-project-actions" configure >"$TMPDIR/reinstall-action"
+action=$(jq -r '.state.definitions[0].id' "$TMPDIR/reinstall-action")
+hash=$(jq -Sc '.state.definitions[0] | del(.createdAt,.updatedAt)' "$TMPDIR/reinstall-action" | sha256sum | cut -d' ' -f1)
+jq -cn --arg p "$project" --arg c "$checkout" --arg a "$action" --arg cwd "$project_path" --arg hash "$hash" --arg boot "$(cat /proc/sys/kernel/random/boot_id)" '{action:"reserve",args:{projectId:$p,checkoutId:$c,actionId:$a,requestId:"req-00000000-0000-4000-8000-000000000001",cwd:$cwd,definitionRevision:1,definitionHash:$hash,bootId:$boot}}' | "$repo_root/scripts/aranea-project-action-store" mutate >/dev/null
+"$repo_root/scripts/aranea-project-action-store" retire >/dev/null
+cp "$ARANEA_STATE_ROOT/project-actions.json" "$TMPDIR/protected-payload"
+if PATH="$name_root/bin:$PATH" "$repo_root/scripts/install.sh" --yes --json --profile minimal --source https://example.invalid/AraneaDev/aranea-desktop.git >"$TMPDIR/protected-install"; then
+  echo 'FAIL reinstall silently activated protected draining intent'
+  exit 1
+fi
+jq -es 'any(.[];.event=="completed" and .status=="failed" and .code=="action_activation_failed") and all(.[];.event!="completed" or .status!="ok")' "$TMPDIR/protected-install" >/dev/null
+cmp "$ARANEA_STATE_ROOT/project-actions.json" "$TMPDIR/protected-payload"
+[[ $(cat "$ARANEA_STATE_ROOT/project-actions.json.lock") == draining:* ]]
+[[ -x "$HOME/.config/omarchy/themes/aranea/scripts/aranea-project-actions" ]]
+if grep -Eq '^systemd-run .*--unit=' "$ARANEA_TEST_SANDBOX/guard.log"; then
+  echo 'FAIL installer executed a configured action'
+  exit 1
+fi
+echo 'PASS installer preserves protected draining intent and recovery code without execution'

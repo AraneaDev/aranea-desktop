@@ -30,7 +30,7 @@ printf 'dawn=06:00\n' >"$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
 [[ ! -e "$plugins/araneadev.bar" && ! -e "$plugins/araneadev.settings" && -e "$plugins/other.plugin" ]]
 jq -e ' .plugins == [{id:"user.widget",option:7}] and .userSettings.keep' "$HOME/.config/omarchy/shell.json" >/dev/null
 [[ ! -e "$units/aranea-wallpaper-day-night.timer" && ! -e "$units/aranea-wallpaper-day-night.service" ]]
-[[ $(find "$XDG_STATE_HOME/aranea" -type f | wc -l) == 1 && -f "$XDG_STATE_HOME/aranea/agent-activity.json.lock" ]]
+[[ $(find "$XDG_STATE_HOME/aranea" -type f | wc -l) == 3 && -f "$XDG_STATE_HOME/aranea/agent-activity.json.lock" && -f "$XDG_STATE_HOME/aranea/project-actions.json.lock" && -f "$XDG_STATE_HOME/aranea/project-actions.json.dispatch.lock" ]]
 [[ ! -e "$XDG_CONFIG_HOME/aranea" ]]
 [[ ! -e "$XDG_DATA_HOME/icons/Aranea" ]]
 jq -e '.bar.id != "araneadev.bar"' "$HOME/.config/omarchy/shell.json" >/dev/null
@@ -284,6 +284,6 @@ for removal_scope in integration complete; do
   status=0
   "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
   [[ "$status" == 1 && -L "$ARANEA_STATE_ROOT" && $(stat -c %i "$ARANEA_STATE_ROOT/agent-activity.json.lock") == "$inode" ]]
-  jq -es 'last.status=="failed" and last.code=="ownership_state_symlink"' "$TMPDIR/symlink-events" >/dev/null
+  jq -es 'last.status=="failed" and last.code=="action_lifecycle_busy"' "$TMPDIR/symlink-events" >/dev/null
   echo "PASS $removal_scope refuses symlink ownership root and unlinks only symlink entries"
 done

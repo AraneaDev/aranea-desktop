@@ -16,6 +16,7 @@ source "$repo_root/scripts/lib/paths.sh"
 source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/ownership.sh"
 source "$repo_root/scripts/lib/json-events.sh"
+source "$repo_root/scripts/lib/project-actions.sh"
 
 dry_run=0
 assume_yes=0
@@ -117,6 +118,12 @@ if ((json_mode)); then
   json_started_sent=1
 fi
 
+# Native effects cannot retain the install/removal mutex after this script exits.
+lifecycle_effect() (
+  [[ -z ${dispatch_fd:-} ]] || exec {dispatch_fd}>&-
+  "$@"
+)
+
 # Whether HOOK is Aranea's copy (it carries the Aranea header); a user's own
 # hook with the same name is left alone.
 is_aranea_hook() {
@@ -144,7 +151,7 @@ remove_plugins() {
     rm -rf -- "$plugin"
     found=1
   done
-  ((found)) && { omarchy restart shell >/dev/null 2>&1 || true; }
+  ((found)) && { lifecycle_effect omarchy restart shell >/dev/null 2>&1 || true; }
   return 0
 }
 
@@ -156,9 +163,9 @@ remove_timer() {
     [[ -e "$unit" ]] && found=1
   done
   ((found)) || return 0
-  systemctl --user disable --now aranea-wallpaper-day-night.timer >/dev/null 2>&1 || true
+  lifecycle_effect systemctl --user disable --now aranea-wallpaper-day-night.timer >/dev/null 2>&1 || true
   rm -f -- "${unit_files[@]}"
-  systemctl --user daemon-reload >/dev/null 2>&1 || true
+  lifecycle_effect systemctl --user daemon-reload >/dev/null 2>&1 || true
 }
 
 # Writes back the desktop settings saved before Aranea first changed them;
@@ -219,10 +226,10 @@ remove_agent_helpers() {
   rm -rf -- "$root"
 }
 
-# Delete owned state while preserving the stable activity coordination inode and
+# Delete owned state while preserving the three exact stable coordination inodes and
 # only its ancestor directories. Existing customised-file backups retain scope.
 remove_owned_state_dir() {
-  local directory=$1 entry canonical link_check=$1
+  local directory=$1 entry canonical coordination preserve ancestor link_check=$1
   # Test the directory entry itself, including roots supplied with trailing slashes.
   while [[ "$link_check" == */ && "$link_check" != / ]]; do link_check=${link_check%/}; done
   [[ ! -L "$link_check" ]] || fail_uninstall 1 ownership_state_symlink 'Refusing to traverse a symlink ownership state root during cleanup.'
@@ -231,13 +238,18 @@ remove_owned_state_dir() {
     [[ -e "$entry" || -L "$entry" ]] || continue
     [[ "$keep_backups" != true || ("$entry" != "$(ownership_record)" && "$entry" != "$state_root/backups") ]] || continue
     canonical=$(realpath -m -- "$entry")
+    preserve=false ancestor=false
+    for coordination in "${coordination_files[@]}"; do
+      [[ "$canonical" != "$coordination" ]] || preserve=true
+      [[ "$coordination" != "$canonical/"* ]] || ancestor=true
+    done
     if [[ -L "$entry" ]]; then
-      # Removing an activity-root alias would sever the stable lock's lookup path.
-      [[ "$activity_coordination" != "$canonical/"* ]] || fail_uninstall 1 ownership_state_symlink 'Refusing to remove a symlink on the activity coordination path.'
+      # Never sever a retained lock's lookup path or follow an unrelated alias.
+      [[ "$preserve" == false && "$ancestor" == false ]] || fail_uninstall 1 ownership_state_symlink 'Refusing to remove a symlink on a coordination path.'
       rm -f -- "$entry"
-    elif [[ "$canonical" == "$activity_coordination" ]]; then
+    elif [[ "$preserve" == true ]]; then
       continue
-    elif [[ "$activity_coordination" == "$canonical/"* && -d "$entry" && ! -L "$entry" ]]; then
+    elif [[ "$ancestor" == true && -d "$entry" ]]; then
       remove_owned_state_dir "$entry"
     else
       rm -rf -- "$entry"
@@ -249,7 +261,8 @@ remove_owned_state_dir() {
 # Removes Aranea's state. Files the user customised stay in the ledger with
 # their backups (restore_managed_files keeps them), so those are kept.
 remove_state() {
-  local response keep_backups=false activity_coordination
+  local response keep_backups=false
+  local -a coordination_files
   remove_agent_adapters
   # This drains publication before state/helper deletion. Never unlink the lock:
   # pending store/worker/helper ingress must observe the tombstone on that inode.
@@ -257,7 +270,11 @@ remove_state() {
     fail_uninstall 1 activity_teardown_failed "Activity teardown could not coordinate; state removal is incomplete. $response"
   fi
   remove_agent_helpers
-  activity_coordination=$(realpath -m -- "$project_state_root/agent-activity.json.lock")
+  coordination_files=(
+    "$(realpath -m -- "$project_state_root/agent-activity.json.lock")"
+    "$(realpath -m -- "$project_state_root/project-actions.json.lock")"
+    "$(realpath -m -- "$project_state_root/project-actions.json.dispatch.lock")"
+  )
   # Registry state does not follow an independently overridden ownership root.
   rm -f -- "$project_state_root/projects.json" "$project_state_root/projects.json.lock"
   if [[ -s "$(ownership_record)" ]]; then
@@ -284,6 +301,8 @@ describe() {
     sed 's/^/    /' "$(ownership_record)"
   fi
   printf '  restore saved desktop settings and remove %s\n' "$state_root"
+  printf '  fence project action starts, stop proven owned runs, then remove action definitions/history\n'
+  printf '  retain inert activity/action coordination files and necessary ancestors\n'
   printf '  remove exact owned Claude/Codex adapter hooks, heartbeat helpers and activity state\n'
   printf '  remove project registrations %s/projects.json and its lock\n' "$project_state_root"
   return 0
@@ -291,6 +310,7 @@ describe() {
 
 if ((dry_run)); then
   if ((json_mode)); then
+    json_step uninstall ok stop-actions 'would fence project actions and drain only proven owned runs'
     json_step uninstall ok remove-hooks 'would remove Aranea hooks'
     json_step uninstall ok remove-plugins 'would remove Aranea plugins'
     json_step uninstall ok remove-timer 'would stop and remove the wallpaper timer'
@@ -314,6 +334,23 @@ if ((! assume_yes)) && [[ -t 0 ]]; then
     exit 0
   }
 fi
+
+# Retain the installed command, theme scripts, registry and authority on failure.
+# Backend retirement fences ingress and drains dispatch before deleting payload.
+ownership_path=$state_root
+while [[ "$ownership_path" == */ && "$ownership_path" != / ]]; do ownership_path=${ownership_path%/}; done
+[[ ! -L "$ownership_path" ]] || fail_uninstall 1 ownership_state_symlink 'Refusing to traverse a symlink ownership state root during cleanup.'
+unset ARANEA_ACTION_DISPATCH_FD
+lifecycle_umask=$(umask)
+umask 077
+project_actions_dispatch_lock || fail_uninstall 1 action_lifecycle_busy "Project action lifecycle is busy or unsafe ($action_lock_error); removal has not begun. Retry after the other operation finishes."
+umask "$lifecycle_umask"
+if ((json_mode)); then json_step uninstall running stop-actions 'drain owned project actions'; fi
+if ! action_response=$(ARANEA_ACTION_DISPATCH_FD=$dispatch_fd "$repo_root/scripts/aranea-project-actions" deactivate </dev/null); then
+  action_error=$(printf '%s\n' "$action_response" | jq -r '[.error.message, .error.recovery, (if .run.id then "Retained run: " + .run.id + ". Use aranea projects runs inspect|refresh|stop with this run ID." else empty end)] | join(" ")')
+  fail_uninstall 1 action_teardown_failed "Project action removal is incomplete; installed recovery tools and action state were retained. $action_error Restore manager access, resolve the retained run, then retry this uninstall."
+fi
+if ((json_mode)); then json_step uninstall ok stop-actions 'owned project actions drained'; fi
 
 if ((json_mode)); then json_step uninstall running remove-hooks 'remove Aranea hooks'; fi
 remove_hooks
@@ -339,10 +376,10 @@ remove_state
 if ((json_mode)); then json_step uninstall ok remove-state 'Aranea state removed'; fi
 
 if [[ "$scope" == complete ]]; then
-  current_theme="$(omarchy theme current 2>/dev/null || true)"
+  current_theme="$(lifecycle_effect omarchy theme current 2>/dev/null || true)"
   if [[ "$current_theme" == Aranea || "$current_theme" == aranea ]]; then
     if [[ -n "$replacement_theme" ]]; then
-      omarchy theme set "$replacement_theme"
+      lifecycle_effect omarchy theme set "$replacement_theme"
     elif ((json_mode)); then
       if ((! assume_yes)); then
         json_prompt uninstall replacement-theme 'choose a replacement theme before complete removal'
@@ -355,14 +392,14 @@ if [[ "$scope" == complete ]]; then
         printf '%s\n' 'Cancelled.'
         exit 3
       }
-      omarchy theme set "$replacement_theme"
+      lifecycle_effect omarchy theme set "$replacement_theme"
     else
       printf '%s\n' 'Complete removal requires --replacement-theme when Aranea is active.' >&2
       exit 3
     fi
   fi
   if ((json_mode)); then json_step uninstall running remove-theme 'remove aranea theme directory'; fi
-  omarchy theme remove aranea
+  lifecycle_effect omarchy theme remove aranea
   if ((json_mode)); then json_step uninstall ok remove-theme 'aranea theme directory removed'; fi
 fi
 

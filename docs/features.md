@@ -124,3 +124,39 @@ started. Workspace titles, application classes and workspace membership alone
 never establish ownership. The workspace overview shows project context only
 when the current owner can justify it. A shell restart loses live bindings;
 applications and repository files remain intact.
+
+## Project commands and previews
+
+Select a registered project and exact checkout in **Setup → Projects**, then use
+**Actions** to add a named command or service. The form has a name, executable,
+individual argument rows with Add/Remove controls, working folder (default `.`),
+a command timeout and an optional service preview URL. Save and Cancel never run
+the command. Definitions stay in local Aranea state; repository files are not
+imported as executable configuration. Review the displayed command and folder,
+then explicitly Run or Start. Opening/discovering a project, theme reload and
+shell startup never execute saved actions.
+
+Runs retain their accepted command and exact checkout. Refresh reads current
+status; View logs loads selectable plaintext from the local journal. Stop cancels
+only the proven owned run and its process group. Restart waits for confirmed
+cleanup. If the command changed since that run, review the current action and use
+Run/Start; the UI refuses an outdated restart. Conflicting edits keep the draft:
+Refresh, review the latest saved definition, then explicitly Save draft over latest.
+
+A command's exit status, service process state and preview reachability are shown
+separately. Command success does not verify an agent task or the whole project.
+A reachable URL does not prove which service owns its port. Open preview is an
+explicit browser request for a currently owned running service. Focus project
+reuses the existing workspace controls without launching an action.
+
+The systemd user manager owns runs independently of the panel. Closing Settings,
+reloading the shell, changing themes or closing the CLI observer does not cancel
+them; reopen and Refresh the retained run. Services have no automatic restart or
+login startup and do not promise to survive logout or reboot. A missing manager
+makes execution unavailable while definitions remain editable. Uncertain starts
+or cleanup stay protected until exact evidence is recovered. Logs follow system
+journal retention, with at most 200 entries / 256 KiB displayed per read.
+
+The same actions are available through the [public CLI](agent-interface.md#configured-project-actions-and-retained-runs).
+Native manager/browser execution is separate from the sandboxed automated tests;
+those tests do not run configured repository commands on the live desktop.

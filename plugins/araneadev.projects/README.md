@@ -100,3 +100,42 @@ repository and running applications intact.
 Run `tests/run install uninstall shell-config shell-deploy application-integrations`.
 These tests use sandbox HOME/XDG directories, temporary repositories and fake
 applications; they do not install into the active desktop.
+
+## Named actions and tracked runs
+
+Settings project details include Actions for the selected exact checkout. Save a
+name, executable, separate argument fields, working folder, Command/Service kind,
+command timeout and optional loopback preview URL. Save is inert; Run/Start is
+explicit. Configuration lives in local `project-actions.json`, without repository
+manifests, shell text splitting or runtime command overrides.
+
+The action backend is headless and independent of this persistent workspace
+owner. `ProjectActionsClient.qml` observes it only while the view is visible;
+closing the view does not Stop a run. Systemd transient user services own the
+process lifetime. They have no automatic restart or login startup; user-manager
+shutdown/logout/reboot may end them. No additional persistent plugin is installed.
+
+```text
+aranea projects actions list PROJECT_ID --json
+aranea projects actions run PROJECT_ID ACTION_ID --checkout CHECKOUT_ID --json
+aranea projects runs list --project PROJECT_ID --json
+aranea projects runs refresh RUN_ID --json
+aranea projects runs stop RUN_ID --json
+aranea projects runs logs RUN_ID --json
+aranea projects runs open-preview RUN_ID --json
+```
+
+See the [full CLI/configuration contract](../../docs/agent-interface.md#configured-project-actions-and-retained-runs)
+for configure examples, revision guards, Restart, capabilities and bounds.
+UI Start/Restart guards the displayed revision; CLI Restart explicitly uses the
+current saved action after confirmed exact Stop. Exit status, cleanup uncertainty
+and preview reachability remain independent. Logs are bounded local-journal
+plaintext; retention belongs to system policy.
+
+Both uninstall scopes stop only proven owned action units before removing their
+payload. A refused drain leaves recovery code and protected metadata intact and
+reports failure. Successful removal preserves three stable coordination files
+and required ancestor directories; reinstall fences older requests. Repository
+folders, providers, editors and unrelated services remain untouched. Sandboxed
+backend/CLI/UI tests use fake manager/browser boundaries; they do not validate
+live native unit/browser behavior.
