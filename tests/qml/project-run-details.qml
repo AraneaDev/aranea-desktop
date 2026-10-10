@@ -37,8 +37,8 @@ ShellRoot {
   }
   Projects.ProjectActionsClient {
     id: client
-    projectId: 'p-one'
-    checkoutId: 'c-one'
+    projectId: 'p-00000000-0000-4000-8000-000000000001'
+    checkoutId: 'c-00000000-0000-4000-8000-000000000001'
     runner: function (argv, input, done) {
       root.calls.push([argv[argv.length - 1], JSON.parse(input || '{}')])
       root.completions.push(done)
@@ -50,14 +50,16 @@ ShellRoot {
     client: client
     projectClient: projectClient
     checkout: ({
-        id: 'c-one',
+        id: 'c-00000000-0000-4000-8000-000000000001',
         path: '/repo path'
       })
     run: ({
-        id: 'r-one',
-        projectId: 'p-one',
-        checkoutId: 'c-one',
-        actionId: 'a-one',
+        id: 'r-00000000-0000-4000-8000-000000000001',
+        requestId: 'req-00000000-0000-4000-8000-000000000001',
+        definitionHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        projectId: 'p-00000000-0000-4000-8000-000000000001',
+        checkoutId: 'c-00000000-0000-4000-8000-000000000001',
+        actionId: 'a-00000000-0000-4000-8000-000000000001',
         definitionSnapshot: {
           name: 'Old command',
           kind: 'command',
@@ -78,27 +80,27 @@ ShellRoot {
     t.check(details.statusText.indexOf('Cleanup unconfirmed') >= 0, 'terminal main result honestly retains cleanup uncertainty')
     t.check(details.statusText.indexOf('Previous preview reachability') >= 0, 'preview evidence separate from process result')
     t.check(!details.restartAllowed, 'unconfirmed cleanup refuses restart')
-    details.perform('restart', 'r-one')
+    details.perform('restart', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls.length, 0, 'restart uncertainty never submits')
-    details.rememberRun('r-one')
+    details.rememberRun('r-00000000-0000-4000-8000-000000000001')
     details.run = Object.assign({}, details.run, {
       id: 'r-two'
     })
     details.releaseRun('stop', 'r-two')
     t.equal(calls.length, 0, 'changed run pointer release cannot transfer Stop')
     details.run = Object.assign({}, details.run, {
-      id: 'r-one'
+      id: 'r-00000000-0000-4000-8000-000000000001'
     })
     client.currentRun = details.run
-    details.perform('logs', 'r-one')
+    details.perform('logs', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls[0], ['logs',
       {
-        runId: 'r-one'
+        runId: 'r-00000000-0000-4000-8000-000000000001'
       }
     ], 'View logs targets exact retained ID')
     client.pending = false
     client.output = '<b>literal</b>\n' + 'x'.repeat(300000)
-    client.runId = 'r-one'
+    client.runId = 'r-00000000-0000-4000-8000-000000000001'
     client.truncated = true
     t.check(details.outputText.length <= 262144, 'output render bounded')
     var output = t.findChild(details, 'actionRunOutput')
@@ -155,8 +157,8 @@ ShellRoot {
       revision: 2,
       definitions: [
         {
-          id: 'a-one',
-          projectId: 'p-one',
+          id: 'a-00000000-0000-4000-8000-000000000001',
+          projectId: 'p-00000000-0000-4000-8000-000000000001',
           revision: 2
         }
       ],
@@ -165,14 +167,14 @@ ShellRoot {
     }
     client.pending = false
     t.check(!details.restartAllowed, 'changed current action cannot restart historical command')
-    details.perform('restart', 'r-one')
+    details.perform('restart', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls.length, 1, 'stale definition restart performs no UUID or backend IO')
     client.snapshot = {
       revision: 3,
       definitions: [
         {
-          id: 'a-one',
-          projectId: 'p-one',
+          id: 'a-00000000-0000-4000-8000-000000000001',
+          projectId: 'p-00000000-0000-4000-8000-000000000001',
           revision: 1
         }
       ],
@@ -181,41 +183,41 @@ ShellRoot {
     }
     t.check(details.restartAllowed, 'unchanged exact definition permits explicit restart')
     details.keyboardIdentity = 'old focused run'
-    details.activateRun('stop', 'r-one')
+    details.activateRun('stop', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls.length, 1, 'first keyboard activation on changed run reveals without Stop')
-    details.activateRun('stop', 'r-one')
+    details.activateRun('stop', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls[1], ['stop',
       {
-        runId: 'r-one'
+        runId: 'r-00000000-0000-4000-8000-000000000001'
       }
     ], 'explicit second keyboard activation stops exact run')
     client.pending = false
-    details.perform('preview', 'r-one')
+    details.perform('preview', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls[2], ['open-preview',
       {
-        runId: 'r-one'
+        runId: 'r-00000000-0000-4000-8000-000000000001'
       }
     ], 'preview targets eligible exact owned service')
     client.pending = false
-    details.perform('refresh', 'r-one')
+    details.perform('refresh', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(calls[3], ['refresh',
       {
-        runId: 'r-one'
+        runId: 'r-00000000-0000-4000-8000-000000000001'
       }
     ], 'Refresh observes exact retained run')
     client.pending = false
-    details.perform('focus', 'r-one')
+    details.perform('focus', 'r-00000000-0000-4000-8000-000000000001')
     t.equal(focusCalls[0], {
-      projectId: 'p-one',
-      checkoutId: 'c-one'
+      projectId: 'p-00000000-0000-4000-8000-000000000001',
+      checkoutId: 'c-00000000-0000-4000-8000-000000000001'
     }, 'Focus uses existing project client for exact checkout')
     client.pending = false
-    details.perform('restart', 'r-one')
+    details.perform('restart', 'r-00000000-0000-4000-8000-000000000001')
     completions[4](0, '00000000-0000-4000-8000-000000000099', '')
     t.equal(calls[5][1].expectedDefinitionRevision, 1, 'Restart submits immutable displayed definition revision')
-    t.equal(calls[5][1].runId, 'r-one', 'Restart retains exact original run identity')
+    t.equal(calls[5][1].runId, 'r-00000000-0000-4000-8000-000000000001', 'Restart retains exact original run identity')
     var restarted = Object.assign({}, details.run, {
-      id: 'r-restarted',
+      id: 'r-00000000-0000-4000-8000-000000000099',
       requestId: 'req-00000000-0000-4000-8000-000000000099'
     })
     completions[5](0, JSON.stringify({
@@ -232,13 +234,13 @@ ShellRoot {
         ]
       })
     }), '')
-    t.equal(client.runId, 'r-restarted', 'actual client retains newly accepted restart run ID')
+    t.equal(client.runId, 'r-00000000-0000-4000-8000-000000000099', 'actual client retains newly accepted restart run ID')
     details.run = client.currentRun
     details.displayOnly = true
-    details.perform('refresh', 'r-restarted')
-    details.perform('stop', 'r-restarted')
+    details.perform('refresh', 'r-00000000-0000-4000-8000-000000000099')
+    details.perform('stop', 'r-00000000-0000-4000-8000-000000000099')
     t.equal(calls.length, 6, 'capture exact-run controls refuse transport')
-    details.perform('focus', 'r-restarted')
+    details.perform('focus', 'r-00000000-0000-4000-8000-000000000099')
     t.equal(focusCalls.length, 1, 'capture prevents existing owner Focus request')
     t.done()
   })

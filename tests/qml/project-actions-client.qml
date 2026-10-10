@@ -15,8 +15,8 @@ ShellRoot {
   }
   Projects.ProjectActionsClient {
     id: client
-    projectId: 'p-one'
-    checkoutId: 'c-one'
+    projectId: 'p-00000000-0000-4000-8000-000000000001'
+    checkoutId: 'c-00000000-0000-4000-8000-000000000001'
     observationActive: false
     runner: function (argv, input, done) {
       root.calls.push({
@@ -32,8 +32,8 @@ ShellRoot {
   property int restartAcceptances: 0
   Projects.ProjectActionsClient {
     id: restartClient
-    projectId: 'p-one'
-    checkoutId: 'c-one'
+    projectId: 'p-00000000-0000-4000-8000-000000000001'
+    checkoutId: 'c-00000000-0000-4000-8000-000000000001'
     observationActive: false
     runner: function (argv, input, done) {
       root.restartCalls.push({
@@ -48,11 +48,74 @@ ShellRoot {
   property var conflictingCalls: []
   Projects.ProjectActionsClient {
     id: conflictingClient
-    projectId: 'p-one'
-    checkoutId: 'c-one'
+    projectId: 'p-00000000-0000-4000-8000-000000000001'
+    checkoutId: 'c-00000000-0000-4000-8000-000000000001'
     runner: function (argv, input, done) {
       root.conflictingCalls.push(done)
     }
+  }
+  // Every probe uses a fresh actual client; only the held native transport is injected.
+  property var probeCalls: []
+  Component {
+    id: probeFactory
+    Projects.ProjectActionsClient {
+      property int acceptanceCount: 0
+      projectId: 'p-00000000-0000-4000-8000-000000000001'
+      checkoutId: 'c-00000000-0000-4000-8000-000000000001'
+      onRunAccepted: acceptanceCount++
+      runner: function (argv, input, done) {
+        root.probeCalls.push(done)
+      }
+    }
+  }
+  // Missing or malformed immutable evidence must never authorize another submission.
+  function rejectEnvelope(label, fields, retainedFields, receiptFields, refusal, recover) {
+    var subject = probeFactory.createObject(root)
+    var original = root.run()
+    if (refusal)
+      subject.currentRun = original
+    probeCalls = []
+    if (refusal)
+      subject.restart(original.id)
+    else
+      subject.start(original.actionId, 3)
+    probeCalls[0](0, '00000000-0000-4000-8000-000000000011', '')
+    var damaged = Object.assign({}, original, fields)
+    var response = root.envelope(damaged, 1)
+    response.state.runs = [Object.assign({}, damaged, retainedFields)]
+    response.state.requests = [Object.assign({
+        requestId: 'req-00000000-0000-4000-8000-000000000011',
+        runId: damaged.id
+      }, receiptFields)]
+    if (refusal) {
+      response.ok = false
+      response.error = {
+        code: 'STOP_UNCONFIRMED',
+        message: 'Protected original',
+        recovery: 'Refresh or Stop'
+      }
+      response.state.requests = []
+    }
+    var callbackError = ''
+    try {
+      probeCalls[1](response.ok ? 0 : 1, JSON.stringify(response), '')
+    } catch (e) {
+      callbackError = String(e)
+    }
+    t.equal(callbackError, '', label + ' callback safely rejects malformed evidence')
+    t.check(subject.submissionUncertain && subject.acceptanceCount === 0, label + ' remains uncertain without fresh acceptance')
+    t.equal(subject.runId, '', label + ' never publishes an unusable or wrong run')
+    if (recover) {
+      subject.refresh()
+      try {
+        probeCalls[2](0, JSON.stringify(response), '')
+      } catch (e) {
+        t.check(false, 'malformed snapshot callback throws: ' + e)
+      }
+      t.check(subject.submissionUncertain && subject.acceptanceCount === 0 && !subject.runId, 'malformed snapshot cannot bypass exact receipt recovery')
+    }
+    t.check(!subject.start(original.actionId, 3), label + ' blocks duplicate submission')
+    subject.destroy()
   }
   Projects.ProjectActionsClient {
     id: nativeClient
@@ -65,8 +128,8 @@ ShellRoot {
   property var captureStdinResult: null
   Projects.ProjectActionsClient {
     id: captureRace
-    projectId: 'p-one'
-    checkoutId: 'c-one'
+    projectId: 'p-00000000-0000-4000-8000-000000000001'
+    checkoutId: 'c-00000000-0000-4000-8000-000000000001'
     backendPath: '/usr/bin/tee'
     runner: function (argv, input, done) {
       var process = captureRace.processComponent.createObject(captureRace, {
@@ -90,8 +153,8 @@ ShellRoot {
     implicitHeight: 100
     Projects.ProjectActionsClient {
       id: pollClient
-      projectId: 'p-one'
-      checkoutId: 'c-one'
+      projectId: 'p-00000000-0000-4000-8000-000000000001'
+      checkoutId: 'c-00000000-0000-4000-8000-000000000001'
       observationActive: true
       visible: false
       pollInterval: 30
@@ -162,16 +225,84 @@ ShellRoot {
     return {
       id: accepted,
       requestId: 'req-00000000-0000-4000-8000-000000000001',
-      projectId: 'p-one',
-      checkoutId: 'c-one',
-      actionId: 'a-one',
+      projectId: 'p-00000000-0000-4000-8000-000000000001',
+      checkoutId: 'c-00000000-0000-4000-8000-000000000001',
+      actionId: 'a-00000000-0000-4000-8000-000000000001',
       definitionRevision: 3,
+      definitionHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
       processState: 'running',
       submissionUnconfirmed: false,
       readiness: 'unknown'
     }
   }
-  Component.onCompleted: {
+  Component.onCompleted: t.step(0, function () {
+    root.rejectEnvelope('absent run identity', {
+      id: undefined,
+      definitionRevision: undefined,
+      definitionHash: undefined
+    }, {}, {
+      runId: undefined
+    }, false, true)
+    root.rejectEnvelope('empty run ID', {
+      id: ''
+    }, {}, {}, false, false)
+    root.rejectEnvelope('wrongly typed run ID', {
+      id: 17
+    }, {}, {}, false, false)
+    root.rejectEnvelope('malformed run ID', {
+      id: 'r-invalid'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('run ID with trailing newline', {
+      id: accepted + '\n'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('hash with trailing newline', {
+      definitionHash: root.run().definitionHash + '\n'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('absent primary request ID', {
+      requestId: undefined
+    }, {}, {}, false, false)
+    root.rejectEnvelope('malformed primary request ID', {
+      requestId: 'req-invalid'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('absent definition revision', {
+      definitionRevision: undefined
+    }, {}, {}, false, false)
+    root.rejectEnvelope('string definition revision', {
+      definitionRevision: '3'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('fractional definition revision', {
+      definitionRevision: 1.5
+    }, {}, {}, false, false)
+    root.rejectEnvelope('zero definition revision', {
+      definitionRevision: 0
+    }, {}, {}, false, false)
+    root.rejectEnvelope('absent definition hash', {
+      definitionHash: undefined
+    }, {}, {}, false, false)
+    root.rejectEnvelope('malformed definition hash', {
+      definitionHash: 'short'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('missing retained hash', {}, {
+      definitionHash: undefined
+    }, {}, false, false)
+    root.rejectEnvelope('missing receipt run ID', {}, {}, {
+      runId: undefined
+    }, false, false)
+    root.rejectEnvelope('wrong project', {
+      projectId: 'p-00000000-0000-4000-8000-000000000002'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('wrong checkout', {
+      checkoutId: 'c-00000000-0000-4000-8000-000000000002'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('wrong action', {
+      actionId: 'a-00000000-0000-4000-8000-000000000002'
+    }, {}, {}, false, false)
+    root.rejectEnvelope('original refusal missing hash', {
+      definitionHash: undefined
+    }, {}, {}, true, false)
+    root.rejectEnvelope('original refusal missing revision', {
+      definitionRevision: undefined
+    }, {}, {}, true, false)
     var original = root.run()
     restartClient.currentRun = original
     restartClient.snapshot = envelope(original, 1).state
@@ -225,7 +356,7 @@ ShellRoot {
     inconsistent.ok = false
     inconsistent.error = refused.error
     var other = Object.assign({}, original, {
-      id: 'r-other'
+      id: 'r-00000000-0000-4000-8000-000000000002'
     })
     inconsistent.state.runs.push(other)
     inconsistent.state.requests = [
@@ -239,9 +370,9 @@ ShellRoot {
 
     client.captureActive = true
     client.refresh()
-    client.start('a-one', 3)
+    client.start('a-00000000-0000-4000-8000-000000000001', 3)
     client.configure({}, 0)
-    client.remove('a-one', 0)
+    client.remove('a-00000000-0000-4000-8000-000000000001', 0)
     client.observeRun(accepted)
     client.refreshRun(accepted)
     client.stop(accepted)
@@ -256,14 +387,14 @@ ShellRoot {
     reply(1, envelope(null, 2))
     reply(0, envelope(null, 1))
     t.equal(client.snapshot.revision, 2, 'stale snapshot cannot roll state back')
-    t.check(client.start('a-one', 3), 'explicit start allowed')
-    t.check(!client.start('a-one', 3), 'pending UUID prevents double submission')
+    t.check(client.start('a-00000000-0000-4000-8000-000000000001', 3), 'explicit start allowed')
+    t.check(!client.start('a-00000000-0000-4000-8000-000000000001', 3), 'pending UUID prevents double submission')
     t.equal(calls[2].argv, ['/usr/bin/cat', '/proc/sys/kernel/random/uuid'], 'request ID comes from native UUID helper')
     calls[2].done(0, '00000000-0000-4000-8000-000000000001\n', '')
     t.equal(calls[3].argv.slice(-1), ['start'], 'fixed command map invokes backend')
     var payload = JSON.parse(calls[3].input)
     t.equal(payload.expectedDefinitionRevision, 3, 'displayed revision is submitted on stdin')
-    t.equal(payload.checkoutId, 'c-one', 'exact selected checkout retained')
+    t.equal(payload.checkoutId, 'c-00000000-0000-4000-8000-000000000001', 'exact selected checkout retained')
     client.refresh()
     client.refresh()
     reply(5, envelope(null, 5))
@@ -278,21 +409,34 @@ ShellRoot {
     }))
     t.equal(client.output, '<b>literal</b>', 'log bytes stay plaintext data')
     t.check(client.truncated, 'truncation retained')
-    client.projectId = 'p-other'
+    var wrongRun = Object.assign({}, run(), {
+      id: 'r-00000000-0000-4000-8000-000000000002'
+    })
+    var wrongRead = calls.length
+    client.logs(accepted)
+    reply(wrongRead, Object.assign(envelope(wrongRun, 8), {
+      output: 'wrong run output',
+      truncated: false
+    }))
+    t.check(client.currentRun.id === accepted && client.runId === accepted, 'wrong exact-run-ID callback cannot replace retained run')
+    t.check(client.output === '<b>literal</b>' && client.truncated && client.snapshot.revision === 7, 'wrong exact-run-ID callback cannot replace logs or snapshot')
+    t.equal(client.error.code, 'SUBMISSION_UNCONFIRMED', 'wrong exact-run-ID callback reports recovery error')
+    calls.splice(wrongRead, 1)
+    client.projectId = 'p-00000000-0000-4000-8000-000000000002'
     t.check(!client.currentRun, 'selection change never attaches old receipt to new project')
     t.equal(client.runId, accepted, 'accepted receipt retained for recovery')
-    client.projectId = 'p-one'
-    client.checkoutId = 'c-one'
+    client.projectId = 'p-00000000-0000-4000-8000-000000000001'
+    client.checkoutId = 'c-00000000-0000-4000-8000-000000000001'
     client.disconnect()
-    client.start('a-two', 1)
+    client.start('a-00000000-0000-4000-8000-000000000002', 1)
     calls[7].done(0, '00000000-0000-4000-8000-000000000002', '')
     calls[8].done(1, '', 'transport lost')
     t.check(client.submissionUncertain, 'lost response stays uncertain')
-    t.check(!client.start('a-two', 1), 'uncertain submission cannot automatically or explicitly duplicate')
+    t.check(!client.start('a-00000000-0000-4000-8000-000000000002', 1), 'uncertain submission cannot automatically or explicitly duplicate')
     client.refresh()
     var late = run()
     late.requestId = 'req-00000000-0000-4000-8000-000000000002'
-    late.actionId = 'a-two'
+    late.actionId = 'a-00000000-0000-4000-8000-000000000002'
     var recovered = envelope(late, 9)
     recovered.state.requests = [
       {
@@ -312,7 +456,7 @@ ShellRoot {
     t.equal(calls.length, count, 'poll capture guard is before I/O')
     client.captureActive = false
     client.disconnect()
-    client.start('a-three', 1)
+    client.start('a-00000000-0000-4000-8000-000000000003', 1)
     calls[10].done(0, '00000000-0000-4000-8000-000000000003', '')
     reply(11, {
       ok: true,
@@ -373,5 +517,5 @@ ShellRoot {
         finishPolling.start()
       })
     })
-  }
+  })
 }

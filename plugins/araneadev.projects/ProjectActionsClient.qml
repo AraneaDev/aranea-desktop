@@ -160,6 +160,14 @@ Item {
   function matchesSelection(run: var): bool {
     return !!run && run.projectId === projectId && run.checkoutId === checkoutId
   }
+  // Check only immutable receipt identity here; the backend remains full-schema authority.
+  function validRecordId(value: var, prefix: string): bool {
+    return typeof value === 'string' && value.indexOf(prefix + '-') === 0 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value.slice(prefix.length + 1))
+  }
+  // Missing fields must never establish equality with other missing evidence.
+  function validRunIdentity(run: var): bool {
+    return !!run && validRecordId(run.id, 'r') && validRecordId(run.requestId, 'req') && validRecordId(run.projectId, 'p') && validRecordId(run.checkoutId, 'c') && validRecordId(run.actionId, 'a') && typeof run.definitionRevision === 'number' && isFinite(run.definitionRevision) && run.definitionRevision > 0 && Math.floor(run.definitionRevision) === run.definitionRevision && typeof run.definitionHash === 'string' && /^[0-9a-f]{64}$/.test(run.definitionHash)
+  }
   // Transport uncertainty directs exact-receipt recovery without retry.
   function transportError(text: string): var {
     return {
@@ -216,11 +224,11 @@ Item {
   function recoverReceipt(state: var): void {
     if (!submissionUncertain || !requestId || !submissionTarget)
       return
-    var receipt = (state.requests || []).filter(function (row) {
-      return row.requestId === client.requestId
+    var receipt = (Array.isArray(state.requests) ? state.requests : []).filter(function (row) {
+      return !!row && row.requestId === client.requestId && validRecordId(row.runId, 'r')
     })[0]
-    var run = (state.runs || []).filter(function (row) {
-      return receipt && row.id === receipt.runId && row.projectId === client.submissionTarget.projectId && row.checkoutId === client.submissionTarget.checkoutId && row.actionId === client.submissionTarget.actionId
+    var run = (Array.isArray(state.runs) ? state.runs : []).filter(function (row) {
+      return receipt && validRunIdentity(row) && row.id === receipt.runId && row.projectId === client.submissionTarget.projectId && row.checkoutId === client.submissionTarget.checkoutId && row.actionId === client.submissionTarget.actionId
     })[0]
     if (run) {
       submissionUncertain = false
@@ -352,15 +360,15 @@ Item {
           var run = response.run
           var requests = response.state && Array.isArray(response.state.requests) ? response.state.requests : []
           var runs = response.state && Array.isArray(response.state.runs) ? response.state.runs : []
-          var matches = run.projectId === target.projectId && run.checkoutId === target.checkoutId && run.actionId === target.actionId
+          var matches = validRunIdentity(run) && run.projectId === target.projectId && run.checkoutId === target.checkoutId && run.actionId === target.actionId
           var hasRequest = requests.some(function (row) {
             return !!row && row.requestId === client.requestId
           })
           var receipt = requests.some(function (row) {
-            return !!row && row.requestId === client.requestId && row.runId === run.id
+            return !!row && row.requestId === client.requestId && validRecordId(row.runId, 'r') && row.runId === run.id
           })
           var retained = runs.some(function (row) {
-            return !!row && row.id === run.id && row.projectId === target.projectId && row.checkoutId === target.checkoutId && row.actionId === target.actionId && row.definitionRevision === run.definitionRevision && row.definitionHash === run.definitionHash
+            return validRunIdentity(row) && row.id === run.id && row.projectId === target.projectId && row.checkoutId === target.checkoutId && row.actionId === target.actionId && row.definitionRevision === run.definitionRevision && row.definitionHash === run.definitionHash
           })
           // An authoritative refused restart returns recovery evidence for its original run,
           // not acceptance of the newly generated request. A coalesced acceptance has a receipt.
