@@ -117,6 +117,7 @@ ColumnLayout {
       selectedPaths: candidates.selectedPaths.slice(),
       ignoredExpanded: ignoredExpanded,
       detailsDraft: Object.assign({}, details.draft),
+      actions: details.actions.captureSnapshot(),
       relocationDrafts: Object.assign({}, details.relocationDrafts),
       detailsOperation: details.operation,
       recoveryCheckoutId: recoveryCheckoutId,
@@ -138,6 +139,7 @@ ColumnLayout {
     recoveryProjectId = saved.recoveryProjectId || (selectedProject ? selectedProject.id : '')
     recoverySelectedCheckoutId = saved.recoverySelectedCheckoutId || (selectedProject ? selectedProject.lastCheckoutId || '' : '')
     details.relocationDrafts = saved.relocationDrafts || {}
+    details.actions.captureRestore(saved.actions)
     details.draft = saved.detailsDraft
     details.dirty = saved.detailsDirty
     details.customized = saved.customized
@@ -148,6 +150,7 @@ ColumnLayout {
     candidates.selectedPaths = []
     ignoredExpanded = false
     details.discardDraft()
+    details.actions.captureReset(fixture)
     details.relocationDrafts = {}
     details.operation = null
     details.customized = false
@@ -326,6 +329,8 @@ ColumnLayout {
     id: details
     Layout.fillWidth: true
     project: page.selectedProject
+    projectClient: page.projectClient
+    actionsActive: page.visible && !page.displayOnly
     tools: page.tools
     displayOnly: page.displayOnly
     pending: page.pending || !!page.projectClient && page.projectClient.pending

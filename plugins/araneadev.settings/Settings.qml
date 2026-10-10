@@ -117,7 +117,7 @@ Item {
   }
   // Atomically accept an inert fixture before changing visibility or presentation.
   function captureBegin(payloadJson) {
-    if (controller.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved)
+    if (controller.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && typeof view.captureBusy === 'function' && view.captureBusy()))
       return 'busy'
     var payload
     try {

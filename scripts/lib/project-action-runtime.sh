@@ -14,7 +14,7 @@ runtime_validate() {
     def id($p): type=="string" and test("\\A"+$p+"-[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\\z");
     def keys_only($k): (keys_unsorted-$k|length)==0;
     if $op=="start" then keys_only(["projectId","checkoutId","actionId","requestId","expectedDefinitionRevision"]) and (.projectId|id("p")) and (.actionId|id("a")) and (.requestId|id("req")) and ((has("checkoutId")|not) or (.checkoutId|id("c"))) and ((has("expectedDefinitionRevision")|not) or (.expectedDefinitionRevision|type=="number" and .==floor and .>=1))
-    elif $op=="restart" then keys_only(["runId","requestId"]) and (.runId|id("r")) and (.requestId|id("req"))
+    elif $op=="restart" then keys_only(["runId","requestId","expectedDefinitionRevision"]) and (.runId|id("r")) and (.requestId|id("req")) and ((has("expectedDefinitionRevision")|not) or (.expectedDefinitionRevision|type=="number" and .==floor and .>=1))
     elif (["inspect","refresh","stop","logs","open-preview"]|index($op))!=null then keys_only(["runId"]) and (.runId|id("r"))
     elif $op=="snapshot" then keys_only(["projectId"]) and ((has("projectId")|not) or (.projectId|id("p")))
     elif $op=="configure" then keys_only(["projectId","definition","expectedRevision"]) and (.projectId|id("p")) and (.definition|type)=="object"

@@ -24,6 +24,10 @@ Item {
   // Section whose scroll offset is currently shown.
   property string scrollSection: 'appearance'
   Component.onCompleted: scrollSection = root.section
+  // Capture cannot replace an in-flight action operation or its acceptance callback.
+  function captureBusy() {
+    return projectsPage.details.actions.pending
+  }
   // Hidden layers and offscreen content may have no backing keyboard Window.
   function captureFocus() {
     var window = panel.Window.window
@@ -428,7 +432,7 @@ Item {
                   discoveryClient: panel.root.discoveryClient
                   projectClient: panel.root.projectClient
                   projectId: panel.root.projectId
-                  displayOnly: panel.controller.showcaseActive
+                  displayOnly: panel.controller.showcaseActive || !!panel.root.captureSaved
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
                   error: panel.root.projectController.error || panel.root.projectClient.error
                   pointerGate: pointerGate

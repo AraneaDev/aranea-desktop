@@ -11,7 +11,7 @@ ShellRoot {
   property int failures: 0
   // Discover production targets through public control text and viewport properties.
   function collect(item, out) {
-    if (item.contentY !== undefined || item.text !== undefined || item.objectName === 'settingsScrollBar')
+    if (item.contentY !== undefined || item.text !== undefined || item.objectName === 'settingsScrollBar' || item.objectName === 'projectActions')
       out.push(item)
     var children = item.children || []
     for (var i = 0; i < children.length; i++)
@@ -42,6 +42,15 @@ ShellRoot {
     }
   }
   Component.onCompleted: {
+    var actionView = harness.collect(surface, []).filter(function (item) {
+      return item.objectName === 'projectActions'
+    })[0]
+    if (actionView) {
+      actionView.displayOnly = true
+      actionView.client.runner = function (argv, input, done) {
+        harness.check(false, 'unexpected action backend process')
+      }
+    }
     entry.projectController.captureActive = true
     entry.projectClient.captureActive = true
     entry.discoveryClient.captureActive = true

@@ -70,6 +70,13 @@ ShellRoot {
     }
   }
   Component.onCompleted: t.step(50, function () {
+    t.check(!!details.actions, 'actual project details composes configured actions')
+    if (!details.actions) {
+      t.done()
+      return
+    }
+    details.actions.client.runner = function (argv, input, done) {}
+
     details.setDraft('name', 'Changed')
     details.setDraft('workspaceMode', 'current')
     t.equal(configurations.length, 0, 'editing does not persist')

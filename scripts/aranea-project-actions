@@ -71,11 +71,17 @@ case "$operation" in
   restart)
     runtime_load
     cp "$scratch/run" "$scratch/old-run"
-    runtime_tools
-    runtime_stop
-    jq -e '.processState=="stopped" or .processState=="succeeded" or .processState=="failed"' "$scratch/run" >/dev/null || runtime_error STOP_UNCONFIRMED 'Refresh and stop the original run before restarting.'
-    jq --slurpfile old "$scratch/old-run" '. as $q | $old[0]|{projectId,checkoutId,actionId} + {requestId:$q.requestId}' "$scratch/request" >"$scratch/restart"
+    jq --slurpfile old "$scratch/old-run" '. as $q | $old[0]|{projectId,checkoutId,actionId} + {requestId:$q.requestId} + (if $q|has("expectedDefinitionRevision") then {expectedDefinitionRevision:$q.expectedDefinitionRevision} else {} end)' "$scratch/request" >"$scratch/restart"
+    # Replaying an accepted receipt never stops again or checks a newer definition.
+    if ! jq -e --slurpfile q "$scratch/restart" 'any(.state.requests[];.requestId==$q[0].requestId)' "$scratch/result" >/dev/null; then
+      # Refuse a stale reviewed command before changing the original exact run.
+      jq -e --slurpfile q "$scratch/restart" '($q[0]|has("expectedDefinitionRevision")|not) or any(.state.definitions[];.projectId==$q[0].projectId and .id==$q[0].actionId and .revision==$q[0].expectedDefinitionRevision)' "$scratch/result" >/dev/null || runtime_error ACTION_CONFLICT 'The displayed action definition changed; review it before restarting.'
+      runtime_tools
+      runtime_stop
+      jq -e '.processState=="stopped" or .processState=="succeeded" or .processState=="failed"' "$scratch/run" >/dev/null || runtime_error STOP_UNCONFIRMED 'Refresh and stop the original run before restarting.'
+    fi
     mv "$scratch/restart" "$scratch/request"
+    # Fresh Start rechecks the same reviewed revision after stop observation.
     runtime_start
     cat "$scratch/result"
     ;;

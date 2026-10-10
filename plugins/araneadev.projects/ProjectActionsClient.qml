@@ -123,7 +123,11 @@ Item {
       // qmllint enable signal-handler-parameters
     }
   }
-  onCaptureActiveChanged: disconnect()
+  onCaptureActiveChanged: {
+    disconnect()
+    if (!captureActive)
+      schedulePoll()
+  }
   onProjectIdChanged: selectionChanged()
   onCheckoutIdChanged: selectionChanged()
   onObservationActiveChanged: schedulePoll()
@@ -346,16 +350,29 @@ Item {
           client.submissionUncertain = true
         } else if (response.run) {
           var run = response.run
-          var receipt = (response.state && response.state.requests || []).some(function (row) {
-            return row.requestId === client.requestId && row.runId === run.id
+          var requests = response.state && Array.isArray(response.state.requests) ? response.state.requests : []
+          var runs = response.state && Array.isArray(response.state.runs) ? response.state.runs : []
+          var matches = run.projectId === target.projectId && run.checkoutId === target.checkoutId && run.actionId === target.actionId
+          var hasRequest = requests.some(function (row) {
+            return !!row && row.requestId === client.requestId
           })
-          if (run.projectId !== target.projectId || run.checkoutId !== target.checkoutId || run.actionId !== target.actionId || (!receipt && run.requestId !== client.requestId)) {
+          var receipt = requests.some(function (row) {
+            return !!row && row.requestId === client.requestId && row.runId === run.id
+          })
+          var retained = runs.some(function (row) {
+            return !!row && row.id === run.id && row.projectId === target.projectId && row.checkoutId === target.checkoutId && row.actionId === target.actionId && row.definitionRevision === run.definitionRevision && row.definitionHash === run.definitionHash
+          })
+          // An authoritative refused restart returns recovery evidence for its original run,
+          // not acceptance of the newly generated request. A coalesced acceptance has a receipt.
+          var originalRefusal = method === 'restart' && !response.ok && matches && retained && !hasRequest && run.id === payload.runId && response.error && typeof response.error.code === 'string' && typeof response.error.message === 'string' && typeof response.error.recovery === 'string'
+          if (!matches || !retained || (!receipt && !originalRefusal)) {
             client.submissionUncertain = true
             client.error = client.transportError('The returned run does not match the submitted identity.')
           } else {
             client.submissionUncertain = false
             client.publishRun(run)
-            client.runAccepted(run)
+            if (!originalRefusal)
+              client.runAccepted(run)
             if (response.state && client.projectId === target.projectId) {
               client.snapshotGeneration++
               client.snapshot = response.state
@@ -397,10 +414,11 @@ Item {
   }
   // Explicit restart refuses unresolved cleanup or mismatched selection.
   function restart(id: string): bool {
-    if (captureActive || !currentRun || currentRun.id !== id || !matchesSelection(currentRun) || currentRun.submissionUnconfirmed || currentRun.processState === 'unconfirmed')
+    if (captureActive || !currentRun || currentRun.id !== id || !matchesSelection(currentRun) || currentRun.submissionUnconfirmed || currentRun.processState === 'unconfirmed' || !currentRun.definitionRevision || currentRun.definitionRevision < 1)
       return false
     return submit('restart', {
-      runId: id
+      runId: id,
+      expectedDefinitionRevision: currentRun.definitionRevision
     }, {
       projectId: currentRun.projectId,
       checkoutId: currentRun.checkoutId,

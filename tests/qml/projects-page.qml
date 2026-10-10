@@ -1,6 +1,7 @@
 // Explicit review stays local until the real page emits Add selected.
 import QtQuick
 import Quickshell
+import qs.Commons
 import "lib"
 import "plugins/araneadev.settings" as Settings
 import "plugins/araneadev.projects" as Projects
@@ -109,6 +110,7 @@ ShellRoot {
     runner: function (argv, done) {}
   }
   FloatingWindow {
+    id: window
     visible: true
     implicitWidth: 420
     implicitHeight: 260
@@ -119,7 +121,34 @@ ShellRoot {
       height: 260
     }
   }
+  // Independent geometry checks use the existing production focus-reveal behavior.
+  function checkActionLayout(surface, label) {
+    var scroll = t.findChild(surface, 'settingsScrollBar').parent
+    while (scroll && scroll.contentY === undefined)
+      scroll = scroll.parent
+    t.check(!!scroll && scroll.contentHeight > scroll.height, label + ' has scrollable action content')
+    var names = ['actionExecutable', 'actionSave', 'actionCancel', 'actionStart:a-layout', 'actionRun:refresh', 'actionRun:logs', 'actionRun:stop', 'actionRun:restart']
+    names.forEach(function (name) {
+      var control = t.findChild(surface, name)
+      t.check(!!control && control.visible && control.enabled, label + ' exposes ' + name)
+      if (!control || !scroll)
+        return
+      control.forceActiveFocus(Qt.TabFocusReason)
+      surface.revealFocus(control)
+      var point = control.mapToItem(scroll.contentItem, 0, 0)
+      t.check(control.activeFocus && point.y - scroll.contentY >= -1 && point.y - scroll.contentY + control.height <= scroll.height + 1 && point.x >= -1 && point.x + control.width <= scroll.width + 1, label + ' reveals complete ' + name + ' ' + JSON.stringify([point.x, point.y - scroll.contentY, control.width, control.height, scroll.width, scroll.height, control.activeFocus, surface.height, window.height, Style.fontBaseSize]))
+    })
+  }
   Component.onCompleted: t.step(50, function () {
+    t.check(!!page.details.actions, 'actual Projects page includes action view')
+    if (!page.details.actions) {
+      t.done()
+      return
+    }
+    page.details.actions.client.runner = function (argv, input, done) {}
+    var fixturePage = t.findChild(surface, 'projectsPage')
+    fixturePage.details.actions.client.runner = function (argv, input, done) {}
+
     page.candidateList.select('/tmp/fixture/repo', true)
     t.equal(sent.length, 0, 'selection alone never registers')
     page.addSelected()
@@ -506,6 +535,11 @@ ShellRoot {
     if (locate)
       locate.setPath('/replacement draft')
     realPage.candidateList.select('/review', true)
+    realPage.details.actions.addAction()
+    realPage.details.actions.editor.setField('name', 'Unsaved action')
+    realPage.details.actions.client.pending = true
+    t.equal(entry.captureBegin('{}'), 'busy', 'capture cannot interrupt action acceptance or mutation')
+    realPage.details.actions.client.pending = false
     var snapshot = entry.captureSnapshot()
     var before = sent.length
     t.equal(entry.captureBegin(JSON.stringify({
@@ -545,7 +579,9 @@ ShellRoot {
       projectId: 'p-fixture'
     }), 'capture refuses owner submission before runner')
     t.equal(sent.length, before, 'capture invokes no project backend process or owner')
+    t.check(realPage.details.actions.client.captureActive, 'Settings capture gates action client before IO')
     entry.close()
+    t.check(realPage.details.actions.client.captureActive, 'capture stays inert after Settings close')
     t.check(!entry.projectController.request('remove', {
       projectId: 'p-fixture'
     }), 'closing capture surface retains inert project boundary until restoration')
@@ -554,6 +590,8 @@ ShellRoot {
     }), 'closed capture cannot submit live owner requests')
     t.equal(entry.captureRestore(snapshot), 'ok', 'capture restores prior Settings state')
     t.equal(entry.projectId, 'p-one', 'capture restores Details destination')
+    t.equal(realPage.details.actions.editor.draft.name, 'Unsaved action', 'capture restores action draft')
+    t.check(realPage.details.actions.editing, 'capture restores action editor visibility')
     t.equal(realPage.details.draft.name, 'Unsaved', 'capture restores unsaved project details draft')
     t.check(realPage.details.dirty && realPage.details.customized, 'capture restores draft status and customization disclosure')
     t.equal(realPage.candidateList.selectedPaths, ['/review'], 'capture restores explicit candidate selection')
@@ -624,6 +662,67 @@ ShellRoot {
       error: null
     }), '')
     t.equal(entry.discoveryClient.rootId, 'r-new', 'choosing folder scans its backend canonical root ID')
-    t.done()
+    // Real settings scrolling must reveal every action input/control at all widths.
+    var view = realPage.details.actions
+    view.client.pollInterval = 60000
+    view.client.pending = false
+    view.client.availability = {
+      execution: true
+    }
+    var action = {
+      id: 'a-layout',
+      projectId: 'p-review',
+      revision: 1,
+      name: 'Layout action',
+      kind: 'command',
+      argv: ['printf', '<b>literal</b>'],
+      cwdRelative: '.',
+      timeoutSeconds: 300,
+      previewUrl: null
+    }
+    var run = {
+      id: 'r-layout',
+      projectId: 'p-review',
+      checkoutId: 'c-anchor',
+      actionId: 'a-old',
+      definitionRevision: 1,
+      definitionHash: 'old',
+      definitionSnapshot: action,
+      processState: 'running',
+      submissionUnconfirmed: false,
+      readiness: 'unknown',
+      cwd: '/tmp/fixture/repo',
+      createdAt: 1
+    }
+    view.client.snapshot = {
+      revision: 1,
+      definitions: [action, Object.assign({}, action, {
+          id: 'a-old'
+        })],
+      runs: [run],
+      requests: []
+    }
+    view.client.currentRun = run
+    view.client.runId = run.id
+    view.addAction()
+    surface.width = 840
+    surface.height = 680
+    t.step(100, function () {
+      host.checkActionLayout(surface, 'wide')
+      surface.width = 420
+      t.step(100, function () {
+        host.checkActionLayout(surface, 'narrow')
+        Style.fontBaseSize = Math.round(Style.fontBaseSize * 1.5)
+        var fonts = Object.assign({}, Style.fontOverrides)
+        Object.keys(fonts).forEach(function (k) {
+          fonts[k] = Math.round(Number(fonts[k]) * 1.5)
+        })
+        Style.fontOverrides = fonts
+        t.step(100, function () {
+          host.checkActionLayout(surface, 'narrow font 1.5')
+          t.done()
+        })
+      })
+    })
   })
 }

@@ -26,6 +26,34 @@ ShellRoot {
       })
     }
   }
+  // Separate real-client transport exercises authoritative restart refusal and receipt aliases.
+  property var restartCalls: []
+  // Original-run refusals never emit a new acceptance event.
+  property int restartAcceptances: 0
+  Projects.ProjectActionsClient {
+    id: restartClient
+    projectId: 'p-one'
+    checkoutId: 'c-one'
+    observationActive: false
+    runner: function (argv, input, done) {
+      root.restartCalls.push({
+        argv: argv,
+        input: input,
+        done: done
+      })
+    }
+    onRunAccepted: root.restartAcceptances++
+  }
+  // A separate damaged-envelope transport cannot hide a new request receipt.
+  property var conflictingCalls: []
+  Projects.ProjectActionsClient {
+    id: conflictingClient
+    projectId: 'p-one'
+    checkoutId: 'c-one'
+    runner: function (argv, input, done) {
+      root.conflictingCalls.push(done)
+    }
+  }
   Projects.ProjectActionsClient {
     id: nativeClient
     projectId: 'p-native'
@@ -88,14 +116,21 @@ ShellRoot {
       pollClient.captureActive = true
       pollClient.readRun()
       t.equal(root.pollReads, 3, 'capture stops native polling before process creation')
-      captureRace.configure({
-        name: 'Must remain inert'
-      }, 0)
+      pollClient.currentRun = root.run()
+      pollClient.captureActive = false
       t.waitFor(function () {
-        return root.captureStdinResult !== null
-      }, 2000, 'queued native transport closes capture stdin', function () {
-        t.equal(root.captureStdinResult, '', 'capture blocks stdin after queued process creation')
-        t.done()
+        return root.pollReads === 4
+      }, 2000, 'restored visible protected run resumes observation', function () {
+        pollClient.captureActive = true
+        captureRace.configure({
+          name: 'Must remain inert'
+        }, 0)
+        t.waitFor(function () {
+          return root.captureStdinResult !== null
+        }, 2000, 'queued native transport closes capture stdin', function () {
+          t.equal(root.captureStdinResult, '', 'capture blocks stdin after queued process creation')
+          t.done()
+        })
       })
     }
   }
@@ -112,7 +147,12 @@ ShellRoot {
         revision: revision,
         definitions: [],
         runs: run ? [run] : [],
-        requests: []
+        requests: run ? [
+          {
+            requestId: run.requestId,
+            runId: run.id
+          }
+        ] : []
       },
       run: run
     }
@@ -132,6 +172,71 @@ ShellRoot {
     }
   }
   Component.onCompleted: {
+    var original = root.run()
+    restartClient.currentRun = original
+    restartClient.snapshot = envelope(original, 1).state
+    restartClient.restart(original.id)
+    restartCalls[0].done(0, '00000000-0000-4000-8000-000000000007', '')
+    var refused = envelope(original, 2)
+    refused.ok = false
+    refused.error = {
+      code: 'STOP_UNCONFIRMED',
+      message: 'Original run remains protected',
+      recovery: 'Refresh or Stop original run'
+    }
+    restartCalls[1].done(1, JSON.stringify(refused), '')
+    t.check(!restartClient.submissionUncertain && restartClient.currentRun.id === original.id, 'authoritative failed restart retains original without wedged new receipt')
+    t.equal(restartClient.error.code, 'STOP_UNCONFIRMED', 'failed restart retains backend recovery error')
+    t.equal(restartAcceptances, 0, 'original refusal never emits fresh acceptance')
+    if (restartClient.submissionUncertain) {
+      t.done()
+      return
+    }
+    t.check(restartClient.refreshRun(original.id), 'failed restart permits exact original Refresh')
+    restartCalls[2].done(0, JSON.stringify(envelope(original, 3)), '')
+    t.check(restartClient.stop(original.id), 'failed restart permits exact original Stop')
+    restartCalls[3].done(1, JSON.stringify(refused), '')
+    restartClient.restart(original.id)
+    restartCalls[4].done(0, '00000000-0000-4000-8000-000000000008', '')
+    var coalesced = envelope(original, 4)
+    coalesced.state.requests = [
+      {
+        requestId: 'req-00000000-0000-4000-8000-000000000008',
+        runId: original.id
+      }
+    ]
+    restartCalls[5].done(0, JSON.stringify(coalesced), '')
+    t.check(!restartClient.submissionUncertain && restartClient.runId === original.id, 'exact aliased request receipt accepts coalesced original run')
+    t.equal(restartAcceptances, 1, 'coalesced acceptance emits one accepted identity')
+    restartClient.restart(original.id)
+    restartCalls[6].done(0, '00000000-0000-4000-8000-000000000009', '')
+    var orphan = Object.assign({}, original, {
+      requestId: 'req-00000000-0000-4000-8000-000000000009'
+    })
+    var orphanResponse = envelope(orphan, 5)
+    orphanResponse.state.requests = []
+    restartCalls[7].done(0, JSON.stringify(orphanResponse), '')
+    t.check(restartClient.submissionUncertain, 'success orphan without exact durable receipt remains uncertain')
+    conflictingClient.currentRun = original
+    conflictingClient.snapshot = envelope(original, 1).state
+    conflictingClient.restart(original.id)
+    conflictingCalls[0](0, '00000000-0000-4000-8000-000000000010', '')
+    var inconsistent = envelope(original, 6)
+    inconsistent.ok = false
+    inconsistent.error = refused.error
+    var other = Object.assign({}, original, {
+      id: 'r-other'
+    })
+    inconsistent.state.runs.push(other)
+    inconsistent.state.requests = [
+      {
+        requestId: 'req-00000000-0000-4000-8000-000000000010',
+        runId: other.id
+      }
+    ]
+    conflictingCalls[1](1, JSON.stringify(inconsistent), '')
+    t.check(conflictingClient.submissionUncertain, 'original-run refusal cannot hide a mismatched new request receipt')
+
     client.captureActive = true
     client.refresh()
     client.start('a-one', 3)

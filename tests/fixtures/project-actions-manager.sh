@@ -78,7 +78,13 @@ PROPS
         fi
         sed -i -e 's/^ActiveState=.*/ActiveState=inactive/' -e 's/^SubState=.*/SubState=dead/' "$root/${!#}"
         ;;
-      *' reset-failed '*) echo "${!#}" >>"$root/resets" ;;
+      *' reset-failed '*)
+        echo "${!#}" >>"$root/resets"
+        if [[ -e $root/reset-hold ]]; then
+          touch "$root/reset-entered"
+          while [[ -e $root/reset-hold ]]; do sleep .01; done
+        fi
+        ;;
       *) exit 91 ;;
     esac
     ;;

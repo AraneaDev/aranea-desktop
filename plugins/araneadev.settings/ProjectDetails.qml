@@ -24,6 +24,12 @@ ColumnLayout {
   property bool pending: false
   // Shared pointer/layout settling gate.
   property var pointerGate: null
+  // Existing project focus authority, shared with exact-run controls.
+  property var projectClient: null
+  // The surrounding selected page enables visible-only observation.
+  property bool actionsActive: false
+  // Public presentation/client boundary for capture and isolated fixtures.
+  property alias actions: actions
   // Optional preferences stay collapsed after installed defaults resolve.
   property bool customized: false
   // Draft values never become saved configuration until explicit Apply.
@@ -329,5 +335,14 @@ ColumnLayout {
         onClicked: details.recover(role.modelData, 'new')
       }
     }
+  }
+  ProjectActions {
+    id: actions
+    Layout.fillWidth: true
+    project: details.project
+    projectClient: details.projectClient
+    active: details.actionsActive
+    displayOnly: details.displayOnly
+    pointerGate: details.pointerGate
   }
 }
