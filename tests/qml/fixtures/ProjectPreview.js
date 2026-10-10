@@ -44,14 +44,24 @@ function sample(id, mode) {
     operation.outcome = null
     operation.steps[1].status = "pending"
   }
-  var empty = id === "projects-empty"
-  var discovery = id === "projects-discovery" || id === "projects-partial"
+  var empty = id === "projects-empty" || id === "project-setup-folder"
+  var discovery =
+    id === "projects-discovery" || id === "projects-partial" || id === "project-setup-review"
+  var bulk = id === "project-setup-bulk"
+  var secondProject = Object.assign({}, project, {
+    id: "p-second",
+    name: "Backend API",
+    checkouts: [
+      { id: "c-second", path: "/fixture/development/backend-api", branch: "main", primary: true }
+    ],
+    lastCheckoutId: "c-second"
+  })
   var state = {
     schemaVersion: 1,
     revision: 1,
     roots: empty ? [] : [{ id: "r-preview", path: "/fixture/development" }],
     ignored: [],
-    projects: empty || discovery ? [] : [project]
+    projects: empty || discovery ? [] : bulk ? [project, secondProject] : [project]
   }
   var snapshot = {
     sessionId: "preview-session",
@@ -87,6 +97,22 @@ function sample(id, mode) {
           : [{ id: "kitty", label: "Kitty", available: true, supported: true }]
     },
     projectsDraft: {
+      setupActive: id.indexOf("project-setup-") === 0,
+      setupStep:
+        id === "project-setup-folder"
+          ? 0
+          : id === "project-setup-review"
+            ? 1
+            : id === "project-setup-configure" || bulk
+              ? 2
+              : 3,
+      setupProjectId:
+        id === "project-setup-configure" || id === "project-setup-agents" || bulk ? project.id : "",
+      setupProjectIds: bulk
+        ? [project.id, secondProject.id]
+        : id === "project-setup-configure" || id === "project-setup-agents"
+          ? [project.id]
+          : [],
       selectedPaths: [],
       ignoredExpanded: false,
       detailsDraft: {

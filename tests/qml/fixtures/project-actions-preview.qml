@@ -280,9 +280,11 @@ ShellRoot {
         harness.check(before === JSON.stringify(harness.actionView.captureSnapshot()), 'all capture I/O controls leave presentation unchanged')
         var objects = harness.collect(surface, [])
         var scroll = objects.filter(function (o) {
-          return o.contentY !== undefined && o.contentHeight > o.height && o.height > 100
+          return o.contentY !== undefined && o.contentItem && o.height > 100
         })[0]
-        harness.check(!!scroll, 'production settings viewport scrolls')
+        harness.check(!!scroll, 'production settings viewport exists even when compact content fits')
+        if (!scroll)
+          return
         // Capture guards disable mutation buttons. Temporarily enable focus only;
         // no handler is activated, and runner still rejects every transport.
         var controls = objects.filter(function (o) {

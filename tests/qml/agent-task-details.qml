@@ -162,6 +162,7 @@ ShellRoot {
         }
       ]
     })[0]
+    t.check(!t.findChild(view, 'reportedQuestion').visible && !t.findChild(view, 'reportedDiagnostics').visible, 'empty report sections do not crowd finished task details')
     t.equal(view.actionKinds[0], 'inspect-result', 'finished task leads with local result inspection')
     actions = []
     view.navigate(0)

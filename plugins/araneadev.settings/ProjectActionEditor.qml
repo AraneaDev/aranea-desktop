@@ -26,6 +26,8 @@ ColumnLayout {
       previewUrl: '',
       id: ''
     })
+  // Presets are available only before any field in a new draft has been edited.
+  readonly property bool exampleAvailable: !draft.id && !draft.name && !draft.executable && argumentsModel.count === 0 && draft.cwdRelative === '.' && draft.kind === 'command' && draft.timeoutSeconds === '300' && !draft.previewUrl
   // Store revision captured when editing began, never silently rebased.
   property int expectedRevision: 0
   // Local validation feedback remains plain text.
@@ -78,6 +80,18 @@ ColumnLayout {
       [key]: value
     })
     fieldError = ''
+  }
+  // Examples fill only an empty draft and never submit or execute it.
+  function useExample(example: string): void {
+    if (displayOnly || pending || !exampleAvailable || ['test', 'dev'].indexOf(example) < 0)
+      return
+    begin({
+      name: example === 'test' ? 'Run tests' : 'Dev server',
+      kind: example === 'test' ? 'command' : 'service',
+      argv: example === 'test' ? ['npm', 'test'] : ['npm', 'run', 'dev'],
+      cwdRelative: '.',
+      timeoutSeconds: 300
+    }, expectedRevision)
   }
   // Add one literal argument; an empty value is valid.
   function addArgument(): void {
@@ -189,8 +203,25 @@ ColumnLayout {
   }
   SettingsLabel {
     Layout.fillWidth: true
-    text: 'Saving approves this command for explicit Run or Start. Arguments are passed literally, one field per argument.'
+    text: 'Save defines the action; Run or Start executes it later. Put the program in Executable and each following word in its own argument field.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+  }
+  Flow {
+    Layout.fillWidth: true
+    spacing: Style.space(8)
+    visible: editor.exampleAvailable
+    SettingsButton {
+      text: 'Example: npm test'
+      enabled: !editor.displayOnly && !editor.pending
+      pointerGate: editor.pointerGate
+      onClicked: editor.useExample('test')
+    }
+    SettingsButton {
+      text: 'Example: npm run dev'
+      enabled: !editor.displayOnly && !editor.pending
+      pointerGate: editor.pointerGate
+      onClicked: editor.useExample('dev')
+    }
   }
   Repeater {
     model: [
@@ -200,11 +231,11 @@ ColumnLayout {
       },
       {
         key: 'executable',
-        label: 'Command executable'
+        label: 'Executable (for example, npm)'
       },
       {
         key: 'cwdRelative',
-        label: 'Working folder (relative to checkout)'
+        label: 'Working folder (. = checkout root)'
       }
     ]
     ColumnLayout {
@@ -270,7 +301,7 @@ ColumnLayout {
       SettingsButton {
         id: kind
         required property string modelData
-        text: modelData === 'command' ? 'Command' : 'Service'
+        text: modelData === 'command' ? 'Command (runs to completion)' : 'Service (keeps running)'
         selected: editor.draft.kind === modelData
         enabled: !editor.displayOnly && !editor.pending
         pointerGate: editor.pointerGate
@@ -298,7 +329,7 @@ ColumnLayout {
     visible: editor.draft.kind === 'service'
     SettingsLabel {
       Layout.fillWidth: true
-      text: 'Preview URL (optional loopback URL with port)'
+      text: 'Preview URL (optional, e.g. http://127.0.0.1:5173)'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
     InputField {

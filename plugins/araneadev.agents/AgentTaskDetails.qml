@@ -128,12 +128,12 @@ Item {
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.uiFamily
-        font.pixelSize: Style.font.body
+        font.pixelSize: Style.font.title
         font.bold: true
       }
       Text {
         width: parent.width
-        text: details.row ? details.row.providerLabel + ' · ' + details.row.stateLabel + '\nReported: ' + details.row.reportedLabel + ' · ' + details.row.freshnessLabel : ''
+        text: details.row ? details.row.stateLabel + ' · ' + details.row.providerLabel + '\n' + details.row.freshnessLabel + (details.row.reportedLabel !== details.row.stateLabel ? ' · Last state: ' + details.row.reportedLabel : '') : ''
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
@@ -142,7 +142,7 @@ Item {
       Text {
         objectName: 'lastReportTime'
         width: parent.width
-        text: details.row ? [details.row.lastReportTime, details.row.lastReportLabel].filter(Boolean).join('\n') : ''
+        text: details.row ? details.row.lastReportLabel + ' · ' + details.row.lastReportTime : ''
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
@@ -159,15 +159,24 @@ Item {
         font.family: Aranea.Typography.technicalFamily
         font.pixelSize: Style.font.body
       }
+      Rectangle {
+        width: parent.width
+        height: 1
+        color: Qt.alpha(Aranea.DesignTokens.foreground, 0.15)
+        visible: !!(details.row && (details.row.result || details.row.primary.kind === 'inspect-result' || details.row.primary.kind === 'inspect-failure'))
+      }
       Text {
+        visible: !!(details.row && (details.row.result || details.row.primary.kind === 'inspect-result' || details.row.primary.kind === 'inspect-failure'))
         text: 'Reported result'
         color: Aranea.DesignTokens.foreground
-        font.pixelSize: Style.font.body
+        font.family: Aranea.Typography.uiFamily
+        font.pixelSize: Style.font.caption
         font.bold: true
       }
       Text {
         id: resultSection
         objectName: 'reportedResult'
+        visible: !!(details.row && (details.row.result || details.row.primary.kind === 'inspect-result' || details.row.primary.kind === 'inspect-failure'))
         width: parent.width
         text: details.row ? details.row.result || 'No result reported' : ''
         textFormat: Text.PlainText
@@ -175,14 +184,23 @@ Item {
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
+      Rectangle {
+        width: parent.width
+        height: 1
+        color: Qt.alpha(Aranea.DesignTokens.foreground, 0.15)
+        visible: !!(details.row && (details.row.question || details.row.blockers))
+      }
       Text {
-        text: 'Question / blockers'
+        visible: !!(details.row && (details.row.question || details.row.blockers))
+        text: 'Needs your input'
         color: Aranea.DesignTokens.foreground
-        font.pixelSize: Style.font.body
+        font.family: Aranea.Typography.uiFamily
+        font.pixelSize: Style.font.caption
         font.bold: true
       }
       Text {
         objectName: 'reportedQuestion'
+        visible: !!(details.row && details.row.question)
         width: parent.width
         text: details.row ? details.row.question || 'No question reported' : ''
         textFormat: Text.PlainText
@@ -199,15 +217,24 @@ Item {
         color: Aranea.DesignTokens.foreground
         font.pixelSize: Style.font.body
       }
+      Rectangle {
+        width: parent.width
+        height: 1
+        color: Qt.alpha(Aranea.DesignTokens.foreground, 0.15)
+        visible: !!(details.row && details.row.diagnostics)
+      }
       Text {
+        visible: !!(details.row && details.row.diagnostics)
         text: 'Diagnostics'
         color: Aranea.DesignTokens.foreground
-        font.pixelSize: Style.font.body
+        font.family: Aranea.Typography.uiFamily
+        font.pixelSize: Style.font.caption
         font.bold: true
       }
       Text {
         id: diagnosticsSection
         objectName: 'reportedDiagnostics'
+        visible: !!(details.row && details.row.diagnostics)
         width: parent.width
         text: details.row ? details.row.diagnostics || 'No diagnostics reported' : ''
         textFormat: Text.PlainText
@@ -222,7 +249,8 @@ Item {
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
-        font.pixelSize: Style.font.body
+        font.family: Aranea.Typography.uiFamily
+        font.pixelSize: Style.font.caption
         font.bold: true
       }
       Text {
@@ -247,7 +275,7 @@ Item {
       Text {
         objectName: 'hostingTerminalNote'
         width: parent.width
-        text: 'Go to session focuses the hosting terminal. It cannot select a terminal pane or tmux window. Reported results and verification come from the agent.'
+        text: 'Session actions open the hosting terminal, not a specific pane. Results and verification are agent reports.'
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
@@ -296,7 +324,7 @@ Item {
       TextEdit {
         objectName: 'resumeCommand'
         width: parent.width
-        visible: text !== ''
+        visible: text !== '' && details.actionKinds.indexOf('reopen') >= 0
         text: details.row ? details.row.resumeCommand : ''
         readOnly: true
         selectByMouse: true

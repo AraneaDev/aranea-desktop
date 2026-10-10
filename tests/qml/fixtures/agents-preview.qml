@@ -90,6 +90,7 @@ ShellRoot {
           width: parent.width
           maxHeight: surface.height - 120
           captureActive: true
+          helpActive: navigation.destination === 'help'
           nowMs: host.now
           projectSnapshot: ({
               projects: [
@@ -115,6 +116,8 @@ ShellRoot {
     }
   }
   Component.onCompleted: {
+    if (Quickshell.env('ARANEA_AGENTS_RENDER_HELP') === '1')
+      navigation.choose('help')
     Style.spacingScale = 1
     Style.spacingScaleWithFont = false
     var states = {
