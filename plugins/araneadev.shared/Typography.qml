@@ -2,6 +2,7 @@
 // qmllint disable missing-property
 pragma Singleton
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import qs.Commons
 
@@ -31,6 +32,20 @@ Item {
   // Explicit owner readback also covers creation of a previously absent file.
   function refresh() {
     fontFile.reload()
+  }
+  DesktopFontSync {
+    id: desktopFonts
+    // Separate preview/test shells must never mutate the real desktop.
+    enabled: Quickshell.shellDir === (RuntimePaths.omarchyPath || '/usr/share/omarchy') + '/shell'
+    family: typography.uiFamily
+    bodyPixels: Style.font.body
+  }
+  Process {
+    running: desktopFonts.enabled
+    command: ['gsettings', 'monitor', 'org.gnome.desktop.interface', 'text-scaling-factor']
+    stdout: SplitParser {
+      onRead: desktopFonts.invalidate()
+    }
   }
   FileView {
     id: fontFile

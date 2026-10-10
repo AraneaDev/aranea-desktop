@@ -32,7 +32,7 @@ state_root="$(aranea_ownership_root)"
 project_state_root="$(aranea_state_root)"
 hook_files=("$omarchy_config/hooks/theme-set.d/theme-set" "$omarchy_config/hooks/post-boot.d/post-boot")
 # The desktop settings Aranea changes (install-integration save_gsetting).
-gsetting_keys=("org.gnome.desktop.interface cursor-theme" "org.gnome.desktop.interface icon-theme")
+gsetting_keys=("org.gnome.desktop.interface cursor-theme" "org.gnome.desktop.interface icon-theme" "org.gnome.desktop.interface font-name" "org.gnome.desktop.interface text-scaling-factor")
 unit_files=("$config_root/systemd/user/aranea-wallpaper-day-night.timer" "$config_root/systemd/user/aranea-wallpaper-day-night.service")
 
 # Prints the usage text.
@@ -177,6 +177,11 @@ restore_gsettings() {
   for entry in "${gsetting_keys[@]}"; do
     read -r schema key <<<"$entry"
     saved="$state_root/gsettings/$schema.$key"
+    if [[ "$key" == font-name || "$key" == text-scaling-factor ]]; then
+      [[ -f "$saved.applied" ]] || continue
+      current="$(lifecycle_effect gsettings get "$schema" "$key" 2>/dev/null || true)"
+      [[ "$current" == "$(cat "$saved.applied")" ]] || continue
+    fi
     if [[ -f "$saved" && "$(<"$saved")" != "'Aranea'" && "$(<"$saved")" != "'Aranea-icons'" ]]; then
       lifecycle_effect gsettings set "$schema" "$key" "$(<"$saved")" >/dev/null 2>&1 || true
       continue

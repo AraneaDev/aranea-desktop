@@ -85,6 +85,8 @@ ShellRoot {
     t.check(t.findChild(shared, 'pillUnderline').visible, 'shared pill keeps selected underline')
     button.forceActiveFocus()
     t.check(t.findChild(button, 'cursorOutline').border.width > 0, 'keyboard focus remains visible')
+    var outline = t.findChild(button, 'cursorOutline')
+    t.check(outline.x >= 0 && outline.y >= 0 && outline.x + outline.width <= button.width && outline.y + outline.height <= button.height, 'Settings focus outline stays inside clipped content')
     keyboard.keyClick(Qt.Key_Space)
     t.equal(actions, 1, 'keyboard activates compact action')
     button.enabled = false

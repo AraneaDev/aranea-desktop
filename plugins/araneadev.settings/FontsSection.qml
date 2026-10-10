@@ -62,7 +62,7 @@ SettingsSection {
   title: 'Fonts'
   SettingsLabel {
     Layout.fillWidth: true
-    text: 'Used across Aranea panels and controls.'
+    text: 'Used across Aranea panels, Files and desktop controls.'
     opacity: 0.65
   }
   GridLayout {

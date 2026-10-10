@@ -18,6 +18,7 @@ Aranea.FilamentPill {
   }
   activeFocusOnTab: enabled && visible
   hasCursor: activeFocus
+  cursorOutlineMargin: 0
   implicitHeight: Style.space(28)
   implicitWidth: labelMeasure.implicitWidth + Style.space(16)
   selected: variant === 'primary'

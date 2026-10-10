@@ -74,6 +74,7 @@ run_test() {
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] && ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
   done
+  ln -s "$repo_root/shell.toml" "$run_dir/cfg/theme-shell.toml"
   cp "$test_file" "$run_dir/cfg/shell.qml"
   # No display, compositor, session bus or desktop platform theme (the gtk3
   # theme aborts without a display).

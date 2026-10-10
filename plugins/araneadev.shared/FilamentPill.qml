@@ -31,6 +31,8 @@ Item {
   property color selectedColor: DesignTokens.accent
   // Whether the keyboard cursor is on this pill.
   property bool hasCursor: false
+  // Keep focus inside clipped hosts when requested.
+  property real cursorOutlineMargin: -Style.space(3)
   // Draw the persistent outline; Settings quiet rows opt out.
   property bool borderVisible: true
   // Draw the selected underline; Settings navigation uses a side marker.
@@ -133,7 +135,7 @@ Item {
     // The keyboard cursor outline.
     objectName: "cursorOutline"
     anchors.fill: parent
-    anchors.margins: -Style.space(3)
+    anchors.margins: pill.cursorOutlineMargin
     color: pill.hasCursor ? Util.alpha(DesignTokens.accent, 0.08) : "transparent"
     border.width: pill.hasCursor ? 1 : 0
     border.color: DesignTokens.accent
