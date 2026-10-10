@@ -1,6 +1,7 @@
 // Desktop folder chooser with an always editable absolute-path alternative.
 // Host Style.font is a runtime QObject with token properties.
 // qmllint disable missing-property
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Dialogs
@@ -23,6 +24,16 @@ ColumnLayout {
   property var pointerGate: null
   // Explain chooser errors while keeping the manual alternative accessible.
   property string error: ''
+  // A fresh dialog avoids Qt retaining a popup deleted with a hidden shell window.
+  property var activeDialog: null
+  // Release only the dialog that closed; queued cleanup cannot affect a newer one.
+  function releaseDialog(expected = activeDialog): void {
+    if (!expected || expected !== activeDialog)
+      return
+    activeDialog = null
+    expected.close()
+    expected.destroy()
+  }
   // Context-specific chooser label, including explicit checkout relocation.
   property string buttonText: 'Choose folder'
   // The manual path alternative stays available independently of the dialog.
@@ -58,9 +69,21 @@ ColumnLayout {
       return
     }
     try {
-      dialog.open()
+      if (activeDialog)
+        return
+      activeDialog = folderDialogComponent.createObject(picker)
+      activeDialog.open()
     } catch (e) {
+      releaseDialog()
       error = 'Folder chooser unavailable. Enter an absolute folder path below.'
+    }
+  }
+  // Shell windows are destroyed when hidden; close their chooser first.
+  Connections {
+    target: picker.Window.window
+    function onVisibleChanged() {
+      if (target && !target.visible)
+        picker.releaseDialog()
     }
   }
   spacing: Style.space(8)
@@ -91,16 +114,23 @@ ColumnLayout {
     pointerGate: picker.pointerGate
     onClicked: picker.confirm()
   }
-  FolderDialog {
-    id: dialog
-    title: 'Choose a development folder'
-    // GTK/GVFS native dialogs can segfault the shared Quickshell process.
-    options: FolderDialog.DontUseNativeDialog
-    // Settings is a layer-shell overlay; a separate window would tile beneath it.
-    popupType: Controls.Popup.Item
-    onAccepted: {
-      picker.setPath(selectedFolder.toString())
-      picker.confirm()
+  Component {
+    id: folderDialogComponent
+    FolderDialog {
+      id: dialog
+      title: 'Choose a development folder'
+      // GTK/GVFS native dialogs can segfault the shared Quickshell process.
+      options: FolderDialog.DontUseNativeDialog
+      // Settings is a layer-shell overlay; a separate window would tile beneath it.
+      popupType: Controls.Popup.Item
+      onVisibleChanged: if (!visible)
+        Qt.callLater(function () {
+          picker.releaseDialog(dialog)
+        })
+      onAccepted: {
+        picker.setPath(selectedFolder.toString())
+        picker.confirm()
+      }
     }
   }
 }

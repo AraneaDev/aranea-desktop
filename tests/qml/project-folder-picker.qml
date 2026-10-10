@@ -14,6 +14,7 @@ ShellRoot {
     id: t
   }
   FloatingWindow {
+    id: window
     visible: true
     implicitWidth: 500
     implicitHeight: 300
@@ -26,49 +27,64 @@ ShellRoot {
     }
   }
   Component.onCompleted: t.step(100, function () {
-    var dialog = null
-    for (var i = 0; i < picker.data.length; i++) {
-      if (picker.data[i].selectedFolder !== undefined)
-        dialog = picker.data[i]
-    }
-    t.check(dialog !== null, 'production picker owns its folder dialog')
+    picker.displayOnly = true
+    picker.choose()
+    t.check(picker.activeDialog === null, 'inert picker cannot create a folder dialog')
+    picker.displayOnly = false
+    picker.choose()
+    var dialog = picker.activeDialog
+    t.check(dialog !== null, 'production picker creates its folder dialog')
     if (!dialog) {
       t.done()
       return
     }
-    var safe = !!(dialog.options & FolderDialog.DontUseNativeDialog)
-    t.check(safe, 'folder chooser bypasses in-process native GTK/GVFS')
-    // Refuse to open the crashing native path when the regression is present.
-    if (!safe) {
-      t.done()
-      return
-    }
+    t.check(!!(dialog.options & FolderDialog.DontUseNativeDialog), 'folder chooser bypasses in-process native GTK/GVFS')
     t.equal(dialog.popupType, Controls.Popup.Item, 'chooser stays inside Settings instead of creating a tiled window')
-    if (dialog.popupType !== Controls.Popup.Item) {
-      t.done()
-      return
-    }
-    picker.displayOnly = true
-    picker.choose()
-    t.check(!dialog.visible, 'inert picker cannot open a folder dialog')
-    picker.displayOnly = false
-    dialog.currentFolder = 'file:///tmp'
-    picker.choose()
     t.waitFor(function () {
       return dialog.visible
     }, 3000, 'Qt Quick folder chooser opens', function () {
       t.equal(host.requests, [], 'opening chooser does not submit a folder')
       dialog.reject()
       t.equal(host.requests, [], 'cancelling chooser does not submit a folder')
-      picker.choose()
-      t.waitFor(function () {
-        return dialog.visible
-      }, 3000, 'folder chooser reopens after cancellation', function () {
-        dialog.selectedFolder = 'file:///tmp'
-        dialog.accept()
-        t.equal(picker.pathDraft, '/tmp', 'accepted folder updates the editable absolute path')
-        t.equal(host.requests, ['/tmp'], 'acceptance submits exactly one normalized folder')
-        t.done()
+      window.visible = false
+      t.step(100, function () {
+        window.visible = true
+        t.step(100, function () {
+          t.check(picker.activeDialog === null, 'closed dialog is released before shell window recreation')
+          picker.choose()
+          dialog = picker.activeDialog
+          t.waitFor(function () {
+            return dialog.visible
+          }, 3000, 'folder chooser reopens after cancellation', function () {
+            dialog.selectedFolder = 'file:///tmp'
+            dialog.accept()
+            t.equal(picker.pathDraft, '/tmp', 'accepted folder updates the editable absolute path')
+            t.equal(host.requests, ['/tmp'], 'acceptance submits exactly one normalized folder')
+            t.step(50, function () {
+              t.check(picker.activeDialog === null, 'accepted dialog releases its popup')
+              picker.choose()
+              t.waitFor(function () {
+                return picker.activeDialog && picker.activeDialog.visible
+              }, 3000, 'chooser opens before hiding Settings', function () {
+                window.visible = false
+                t.step(100, function () {
+                  t.check(picker.activeDialog === null, 'hiding Settings releases an open chooser')
+                  window.visible = true
+                  t.step(100, function () {
+                    picker.choose()
+                    t.waitFor(function () {
+                      return picker.activeDialog && picker.activeDialog.visible
+                    }, 3000, 'chooser reopens after its window was hidden', function () {
+                      picker.activeDialog.reject()
+                      t.equal(host.requests, ['/tmp'], 'window lifecycle and cancellation do not resubmit a folder')
+                      t.done()
+                    })
+                  })
+                })
+              })
+            })
+          })
+        })
       })
     })
   })
