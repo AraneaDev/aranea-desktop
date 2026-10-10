@@ -81,7 +81,7 @@ jobs:
           echo 'Server = https://archive.archlinux.org/repos/2026/10/06/$repo/os/$arch' > /etc/pacman.d/mirrorlist
 
       - name: Install packages
-        run: pacman -Syyuu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap
+        run: pacman -Syyuu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils
 
       # Arch's sway carries cap_sys_nice as a file capability, and a container
       # that may not grant it cannot exec sway at all ("Operation not
