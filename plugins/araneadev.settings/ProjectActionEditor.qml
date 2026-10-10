@@ -39,6 +39,7 @@ ColumnLayout {
   // Uniform theme surface for friendly input fields; plain text stays selectable.
   component InputField: TextField {
     color: Color.foreground
+    placeholderTextColor: Util.alpha(Color.foreground, 0.65)
     padding: Style.space(8)
     background: Rectangle {
       radius: Style.space(3)

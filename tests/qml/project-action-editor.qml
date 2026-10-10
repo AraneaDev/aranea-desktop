@@ -1,6 +1,7 @@
 // Actual editor validates fields, preserves literal argument rows and never launches.
 import QtQuick
 import Quickshell
+import qs.Commons
 import "lib"
 import "plugins/araneadev.settings" as Settings
 
@@ -21,6 +22,25 @@ ShellRoot {
     }
     onCancelRequested: root.cancellations++
   }
+  // Compare composited real text/background colors, rather than a theme token spelling.
+  function luminance(color) {
+    var linear = function (c) {
+      return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
+  }
+  // Resolve alpha layers over the same dark surface as the real editor.
+  function composite(foreground, background) {
+    return Qt.rgba(foreground.r * foreground.a + background.r * (1 - foreground.a), foreground.g * foreground.a + background.g * (1 - foreground.a), foreground.b * foreground.a + background.b * (1 - foreground.a), 1)
+  }
+  // Require readable placeholder contrast for enabled and readonly argument fields.
+  function placeholderReadable(field) {
+    var background = composite(field.background.color, Color.background)
+    var foreground = composite(field.placeholderTextColor, background)
+    var a = luminance(foreground), b = luminance(background)
+    console.log('EDITORPLACEHOLDER color=' + field.placeholderTextColor + ' contrast=' + ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)))
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5
+  }
   Component.onCompleted: t.step(50, function () {
     editor.begin(null, 4)
     editor.save()
@@ -28,6 +48,7 @@ ShellRoot {
     editor.setField('name', 'Run checks')
     editor.setField('executable', 'printf')
     editor.addArgument()
+    t.check(placeholderReadable(t.findChild(editor, 'actionArgument:0')), 'enabled empty argument placeholder meets readable contrast; color=' + t.findChild(editor, 'actionArgument:0').placeholderTextColor)
     editor.setArgument(0, 'a $HOME ; <b>literal</b>')
     editor.addArgument()
     t.equal(editor.definition().argv, ['printf', 'a $HOME ; <b>literal</b>', ''], 'literal and later empty argument are retained')
@@ -53,6 +74,7 @@ ShellRoot {
     editor.cancel()
     t.equal(cancellations, 1, 'Cancel only emits cancellation')
     editor.displayOnly = true
+    t.check(placeholderReadable(t.findChild(editor, 'actionArgument:0')), 'readonly capture argument placeholder stays readable; color=' + t.findChild(editor, 'actionArgument:0').placeholderTextColor)
     saved = null
     editor.save()
     t.check(!saved, 'capture editor refuses save')

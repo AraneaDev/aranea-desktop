@@ -4,6 +4,30 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=tests/lib/sandbox.sh
 source "$repo_root/tests/lib/sandbox.sh"
+# Retain isolated child envelopes and state before sandbox cleanup on failure.
+adapter_failure_diagnostics() {
+  if ((status != 0)); then
+    local diagnostic child_status='child not started or exit status unavailable'
+    diagnostic=$(mktemp -d /tmp/aranea-adapter-failure.XXXXXX)
+    if [[ -f "$TMPDIR/owned-install.exit" ]]; then
+      child_status=$(cat "$TMPDIR/owned-install.exit")
+    elif [[ -n ${provider_pid:-} ]]; then
+      if kill -0 "$provider_pid" 2>/dev/null; then
+        child_status='child still running at assertion failure'
+      else
+        child_status=0
+        wait "$provider_pid" || child_status=$?
+        printf '%s\n' "$child_status" >"$TMPDIR/owned-install.exit"
+      fi
+    fi
+    printf '%s\n' "$child_status" >"$diagnostic/child-status"
+    cp -r "$TMPDIR" "$diagnostic/fixture"
+    [[ ! -d "$XDG_STATE_HOME/aranea" ]] || cp -r "$XDG_STATE_HOME/aranea" "$diagnostic/state"
+    [[ ! -f "$ARANEA_TEST_SANDBOX/guard.log" ]] || cp "$ARANEA_TEST_SANDBOX/guard.log" "$diagnostic/guard.log"
+    printf 'Adapter failure diagnostics: %s\n' "$diagnostic"
+  fi
+}
+sandbox_on_exit adapter_failure_diagnostics
 adapter="$repo_root/scripts/aranea-agent-adapter"
 [[ -x "$adapter" ]] || {
   echo 'Claude adapter configuration not implemented'
@@ -89,7 +113,7 @@ for _ in {1..10}; do
   sleep .1
 done
 jq -e '.ok and any(.state.sessions[];.providerSessionId == "optional-owned" and .nativeMetadata.currentTaskId != null)' <<<"$snapshot" >/dev/null
-jq -c '.state.sessions[] | select(.providerSessionId == "optional-owned") | {action:"report",args:{schemaVersion:1,eventId:"SubagentStop:forged:receipt",provider:"claude",providerSessionId:.providerSessionId,producerEpoch:.producerEpoch,sequence:(.highWaterSequence+1),taskId:.nativeMetadata.currentTaskId,kind:"diagnostic",payload:{summary:"Explicit report"}}}' <<<"$snapshot" | /bin/bash "${1%/*}/aranea-agent-store" mutate | jq -e '.ok' >/dev/null
+jq -c '.state.sessions[] | select(.providerSessionId == "optional-owned") | {action:"report",args:{schemaVersion:1,eventId:"SubagentStop:forged:receipt",provider:"claude",providerSessionId:.providerSessionId,producerEpoch:.producerEpoch,sequence:(.highWaterSequence+1),taskId:.nativeMetadata.currentTaskId,kind:"diagnostic",payload:{summary:"Explicit report"}}}' <<<"$snapshot" | /bin/bash "$5" "${1%/*}/aranea-agent-store" "$4.report-attempts" >"$4.report-result"
 /bin/bash "$3" status claude | jq -e 'all(.state.capabilities.optionalHooks[];.runtimeObserved == false and .available == false)' >/dev/null
 touch "$4.ready"
 while [[ ! -e "$4.go" ]]; do sleep .05; done
@@ -97,7 +121,7 @@ printf '%s\n' '{"session_id":"optional-owned","hook_event_name":"StopFailure","p
 /bin/bash "$3" install claude >"$4"
 printf '%s\n' '{"session_id":"optional-owned","hook_event_name":"SessionEnd","cwd":"/tmp"}' | /bin/bash "$1" claude
 PROVIDER
-"$ARANEA_TEST_SANDBOX/provider/claude" "$TMPDIR/provider.sh" "$repo_root/scripts/aranea-agent-hook" "$TMPDIR/native-events" "$adapter" "$TMPDIR/owned-install" &
+"$ARANEA_TEST_SANDBOX/provider/claude" "$TMPDIR/provider.sh" "$repo_root/scripts/aranea-agent-hook" "$TMPDIR/native-events" "$adapter" "$TMPDIR/owned-install" "$repo_root/tests/lib/agent-adapter-fixture-report.sh" >"$TMPDIR/provider.stdout" 2>"$TMPDIR/provider.stderr" &
 provider_pid=$!
 # shellcheck disable=SC2016
 sandbox_on_exit 'kill "$provider_pid" 2>/dev/null || true; wait "$provider_pid" 2>/dev/null || true'
@@ -112,7 +136,11 @@ printf '%s\n' '{"session_id":"optional-owned","hook_event_name":"StopFailure","p
 cmp "$TMPDIR/proven-before" "$XDG_STATE_HOME/aranea/agent-activity.json"
 "$adapter" status claude | jq -e 'all(.state.capabilities.optionalHooks[];.runtimeObserved == false and .available == false)' >/dev/null
 touch "$TMPDIR/owned-install.go"
-wait "$provider_pid"
+# Capture actual wait status before asserting, without replacing sandbox cleanup.
+provider_exit=0
+wait "$provider_pid" || provider_exit=$?
+printf '%s\n' "$provider_exit" >"$TMPDIR/owned-install.exit"
+[[ "$provider_exit" == 0 ]]
 jq -e 'any(.state.capabilities.optionalHooks[];.event == "StopFailure" and .runtimeObserved and .installed and .available) and .state.enabled == "unconfirmed"' "$TMPDIR/owned-install" >/dev/null
 for _ in {1..170}; do
   if ! compgen -G "$XDG_STATE_HOME/aranea/agent-heartbeats/*.json" >/dev/null; then break; fi

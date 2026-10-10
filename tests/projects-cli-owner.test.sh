@@ -26,6 +26,17 @@ exit 99
 TRAP
   chmod +x "$ARANEA_TEST_SANDBOX/bin/$tool"
 done
+# Capabilities may probe the manager version; every effectful manager call fails.
+cat >"$ARANEA_TEST_SANDBOX/bin/systemctl" <<'MANAGER'
+#!/usr/bin/env bash
+if [[ $# -eq 4 && $1 == --user && $2 == --no-ask-password && $3 == show && $4 == --property=Version ]]; then
+  printf '%s\n' "$*" >> "$ARANEA_TEST_SANDBOX/manager-probes"
+  exit 0
+fi
+printf 'unexpected systemctl %s\n' "$*" >> "$ARANEA_TEST_SANDBOX/guard.log"
+exit 99
+MANAGER
+chmod +x "$ARANEA_TEST_SANDBOX/bin/systemctl"
 work=$(mktemp -d /tmp/aranea-cli.XXXXXX)
 owner_pid=""
 # Stop only the isolated endpoint process group and remove its socket directory.
@@ -123,4 +134,5 @@ if grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop|Failed to lo
   exit 1
 fi
 [[ ! -e "$ARANEA_TEST_SANDBOX/execution-trap" && ! -s "$ARANEA_TEST_SANDBOX/guard.log" ]]
+[[ $(cat "$ARANEA_TEST_SANDBOX/manager-probes") == '--user --no-ask-password show --property=Version' ]]
 echo 'projects CLI/owner: Open, new-window, retry, rejected readiness and re-observation passed'
