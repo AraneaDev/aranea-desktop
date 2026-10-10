@@ -72,10 +72,10 @@ ShellRoot {
       t.check(t.findChild(button, 'selectedFill').visible, 'primary action retains accent emphasis')
     }
     var categories = t.findChildren(navigation, 'pill')
-    t.equal(categories.length, 6, 'Projects and existing destinations remain available')
+    t.equal(categories.length, 5, 'Settings contains desktop preference destinations')
     t.equal(navigation.categories.map(function (category) {
       return category.id
-    }).sort(), ['appearance', 'display', 'integrations', 'notifications', 'projects', 'schedule'], 'all settings destinations retain stable identities')
+    }).sort(), ['appearance', 'display', 'integrations', 'notifications', 'schedule'], 'all settings destinations retain stable identities')
     for (var i = 0; i < categories.length; i++) {
       t.check(!t.findChild(categories[i], 'pillBorder').visible, 'navigation has no persistent full border ' + i)
       t.check(!!t.findChild(categories[i], 'navigationIcon'), 'navigation has an icon ' + i)

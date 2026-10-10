@@ -430,12 +430,12 @@ projects_cli_main() {
     details)
       projects_cli_require omarchy-shell timeout
       local payload readback
-      payload=$(jq -cn --arg projectId "$cli_project_id" '{section:"projects",projectId:$projectId}')
-      projects_cli_ipc shell summon araneadev.settings "$payload" >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'Settings could not be summoned.' 'Activate Aranea and retry.'
-      if readback=$(projects_cli_ipc aranea.settings.capture captureSnapshot) && jq -e --arg id "$cli_project_id" '.opened==true and .section=="projects" and .projectId==$id' <<<"$readback" >/dev/null 2>&1; then
+      payload=$(jq -cn --arg projectId "$cli_project_id" '{projectId:$projectId}')
+      projects_cli_ipc shell summon araneadev.projects "$payload" >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'Projects could not be summoned.' 'Activate Aranea and retry.'
+      if readback=$(projects_cli_ipc aranea.projects.capture captureSnapshot) && jq -e --arg id "$cli_project_id" '.opened==true and .projectId==$id' <<<"$readback" >/dev/null 2>&1; then
         projects_cli_finish observed '' 'Project details observed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true}')"
       fi
-      projects_cli_finish partial DETAILS_UNCONFIRMED 'Settings accepted the summon; the exact destination is unconfirmed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true,recovery:"Install/activate the Settings Projects destination and retry."}')" 1
+      projects_cli_finish partial DETAILS_UNCONFIRMED 'Projects accepted the summon; the exact destination is unconfirmed.' "$(jq -cn --arg id "$cli_project_id" '{projectId:$id,accepted:true,recovery:"Install/activate the Projects component and retry."}')" 1
       ;;
     register)
       action=register

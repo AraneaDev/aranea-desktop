@@ -299,15 +299,15 @@ ColumnLayout {
   }
   onCheckoutChanged: scheduleRefresh()
   spacing: Style.space(8)
-  SettingsLabel {
+  Aranea.UiLabel {
     text: 'Workflow actions'
     font.bold: true
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Save reusable tests, builds, and dev servers here. Opening a project does not run them.'
   }
-  SettingsButton {
+  Aranea.ActionButton {
     objectName: 'actionHelpToggle'
     text: actions.helpExpanded ? 'Hide actions help' : 'How to use actions'
     pointerGate: actions.pointerGate
@@ -318,26 +318,26 @@ ColumnLayout {
     visible: actions.helpExpanded
     topic: 'actions'
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Checkout: ' + (actions.checkout ? actions.checkout.path + ' · ' + actions.checkout.id : 'Selected checkout unavailable. Locate it before running.')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !actions.executionAvailable
     text: 'Execution unavailable. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: client.submissionUncertain
     text: 'Submission unconfirmed. Refresh to recover the exact receipt. Do not submit another run.'
     color: Aranea.DesignTokens.attention
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!client.error
     text: client.error ? (client.error.message || client.error.code) + (client.error.recovery ? ' ' + client.error.recovery : '') : ''
@@ -347,20 +347,20 @@ ColumnLayout {
   Flow {
     Layout.fillWidth: true
     spacing: Style.space(8)
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Refresh actions'
       enabled: !actions.displayOnly && !client.pending
       pointerGate: actions.pointerGate
       onClicked: actions.refresh()
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Add action'
       enabled: !actions.displayOnly && !client.pending
       pointerGate: actions.pointerGate
       onClicked: actions.addAction()
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !actions.definitions.length
     text: 'No actions yet. Add action to define a test, build, or dev server. Examples are available in the editor.'
@@ -372,13 +372,13 @@ ColumnLayout {
       id: action
       required property var modelData
       Layout.fillWidth: true
-      SettingsLabel {
+      Aranea.UiLabel {
         Layout.fillWidth: true
         text: action.modelData.name + ' · ' + (action.modelData.kind === 'service' ? 'Service' : 'Command')
         font.bold: true
         wrapMode: Text.WrapAtWordBoundaryOrAnywhere
       }
-      SettingsLabel {
+      Aranea.UiLabel {
         Layout.fillWidth: true
         text: action.modelData.argv.map(function (arg) {
           return JSON.stringify(arg)
@@ -386,7 +386,7 @@ ColumnLayout {
         technical: true
         wrapMode: Text.WrapAnywhere
       }
-      SettingsLabel {
+      Aranea.UiLabel {
         Layout.fillWidth: true
         text: 'Working folder: ' + action.modelData.cwdRelative
         technical: true
@@ -395,13 +395,13 @@ ColumnLayout {
       Flow {
         Layout.fillWidth: true
         spacing: Style.space(8)
-        SettingsButton {
+        Aranea.ActionButton {
           text: 'Details'
           selected: actions.selectedActionId === action.modelData.id
           pointerGate: actions.pointerGate
           onClicked: actions.selectAction(action.modelData.id, action.modelData.revision)
         }
-        SettingsButton {
+        Aranea.ActionButton {
           objectName: 'actionStart:' + action.modelData.id
           text: action.modelData.kind === 'service' ? 'Start' : 'Run'
           enabled: !actions.displayOnly && actions.executionAvailable && !!actions.checkout && !client.pending && !client.submissionUncertain && !Records.activeRun(client.snapshot, actions.project.id, actions.checkout.id, action.modelData.id)
@@ -415,7 +415,7 @@ ColumnLayout {
               actions.activateAction(action.modelData.id, action.modelData.revision)
           }
         }
-        SettingsButton {
+        Aranea.ActionButton {
           objectName: 'actionEdit:' + action.modelData.id
           text: 'Edit'
           enabled: !actions.displayOnly && !client.pending
@@ -429,7 +429,7 @@ ColumnLayout {
               actions.activateControl('edit', action.modelData.id, action.modelData.revision)
           }
         }
-        SettingsButton {
+        Aranea.ActionButton {
           objectName: 'actionRemove:' + action.modelData.id
           text: 'Remove action'
           enabled: !actions.displayOnly && !client.pending && !Records.runs(client.snapshot, actions.project.id, '').some(function (r) {
@@ -467,12 +467,12 @@ ColumnLayout {
   ColumnLayout {
     Layout.fillWidth: true
     visible: actions.editing && actions.editConflict
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       text: 'Draft retained. Refresh actions to review the latest saved definition before saving over it.'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       visible: actions.conflictRefreshed
       text: !editor.draft.id ? 'State refreshed. Review your new action draft before retrying.' : actions.conflictDefinition ? 'Latest saved: ' + actions.conflictDefinition.name + ' · revision ' + actions.conflictDefinition.revision + ' · ' + actions.conflictDefinition.argv.map(function (arg) {
@@ -480,21 +480,21 @@ ColumnLayout {
       }).join(' ') + ' · folder ' + actions.conflictDefinition.cwdRelative : 'This action was removed. Cancel and add a new action to configure it again.'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Save draft over latest'
       enabled: !actions.displayOnly && !client.pending && actions.conflictRefreshed && (!editor.draft.id || !!actions.conflictDefinition)
       pointerGate: actions.pointerGate
       onClicked: actions.saveOverLatest()
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     text: 'Runs in this checkout'
     font.bold: true
     visible: actions.runs.length > 0
   }
   Repeater {
     model: actions.runs
-    SettingsButton {
+    Aranea.ActionButton {
       id: retained
       required property var modelData
       text: (modelData.definitionSnapshot ? modelData.definitionSnapshot.name : modelData.id) + ' · ' + Records.runLabel(modelData)

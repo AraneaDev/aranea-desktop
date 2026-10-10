@@ -10,7 +10,7 @@ function sections(topic) {
     return [
       {
         title: "1. Add a project",
-        body: "Choose Set up a project. Pick a repository folder or the development folder containing your repositories. Aranea scans for Git checkouts; review the results, select the checkouts you want, and choose Add selected. Select several repositories to configure them together in the wizard. Related worktrees share one project. Scanning alone adds nothing."
+        body: "Choose Add project. Pick a repository folder or the development folder containing your repositories. Aranea scans for Git checkouts; review the results, select the checkouts you want, and choose Add selected. Select several repositories to configure them together in the wizard. Related worktrees share one project. Scanning alone adds nothing."
       },
       {
         title: "2. Choose how it opens",
@@ -63,7 +63,7 @@ function sections(topic) {
     },
     {
       title: "1. Register the project",
-      body: "Open Setup → Projects → Set up a project. Add the exact Git checkout you will use. Start your agent in that folder so session actions can resolve the correct project and checkout."
+      body: "Open Launcher → Projects → Add project. Add the exact Git checkout you will use. Start your agent in that folder so session actions can resolve the correct project and checkout."
     },
     {
       title: "2. Enable your provider",

@@ -34,6 +34,10 @@ ColumnLayout {
   property bool customized: false
   // Guided setup exposes preferences while deferring maintenance controls.
   property bool guidedSetup: false
+  // Standalone navigation chooses one focused section; direct consumers retain all.
+  property string viewSection: 'all'
+  // Standalone window supplies identity and its single primary Open action.
+  property bool headerProvided: false
   // Draft values never become saved configuration until explicit Apply.
   property var draft: ({})
   // Dirty drafts survive asynchronous observation refreshes.
@@ -154,43 +158,140 @@ ColumnLayout {
   Component.onCompleted: discardDraft()
   spacing: Style.space(8)
   visible: !!project
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
+    visible: !details.headerProvided || details.guidedSetup
     text: details.project ? details.project.name : ''
     font.bold: true
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
+    visible: !details.headerProvided || !!details.operation || !details.openAvailable
     text: !details.openAvailable ? 'Workspace opening unavailable. Restore the project owner and compositor, then retry.' : details.operation ? 'Open · ' + (details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
   }
-  SettingsLabel {
+  Aranea.UiLabel {
+    Layout.fillWidth: true
+    visible: details.viewSection === 'overview' && !details.headerProvided
+    text: {
+      var p = details.project || {}, co = (p.checkouts || []).filter(function (c) {
+        return c.id === p.lastCheckoutId
+      })[0] || (p.checkouts || [])[0]
+      return co ? co.path + '\nBranch: ' + (co.branch || 'detached') + ' · ' + (p.workspaceMode === 'current' ? 'Current workspace' : 'Dedicated workspace') : 'No registered checkout.'
+    }
+    technical: true
+  }
+  Flow {
+    Layout.fillWidth: true
+    spacing: Style.space(8)
+    visible: details.viewSection === 'overview' && !details.headerProvided
+    Repeater {
+      model: ['editor', 'terminal']
+      Aranea.ActionButton {
+        required property string modelData
+        text: 'New ' + modelData + ' window'
+        enabled: !details.displayOnly && !details.pending && details.openAvailable
+        pointerGate: details.pointerGate
+        onClicked: details.openRequested({
+          projectId: details.project.id,
+          newWindowRole: modelData
+        })
+      }
+    }
+  }
+  ProjectSectionCard {
+    Layout.fillWidth: true
+    visible: details.headerProvided && !details.guidedSetup && details.viewSection === 'overview'
+    Aranea.UiLabel {
+      text: 'Workspace'
+      font.pixelSize: Style.font.body
+      font.bold: true
+    }
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Open your editor and terminal together. Existing project windows are reused when available.'
+      opacity: 0.75
+    }
+    GridLayout {
+      Layout.fillWidth: true
+      columns: width < Style.space(360) ? 1 : 2
+      columnSpacing: Style.space(24)
+      rowSpacing: Style.space(12)
+      Repeater {
+        model: ['editors', 'terminals']
+        ColumnLayout {
+          required property string modelData
+          Layout.fillWidth: true
+          Aranea.UiLabel {
+            text: parent.modelData === 'editors' ? 'EDITOR' : 'TERMINAL'
+            opacity: 0.55
+          }
+          Aranea.UiLabel {
+            Layout.fillWidth: true
+            text: {
+              var role = parent.modelData, id = details.project && details.project.tools ? details.project.tools[role === 'editors' ? 'editorId' : 'terminalId'] : ''
+              id = id || (details.tools.defaults || {})[role === 'editors' ? 'editorId' : 'terminalId']
+              var tool = (details.tools[role] || []).filter(function (t) {
+                return t.id === id
+              })[0]
+              return tool ? tool.label : id || 'Choose in Preferences'
+            }
+            font.pixelSize: Style.font.body
+          }
+        }
+      }
+    }
+    Flow {
+      Layout.fillWidth: true
+      spacing: Style.space(8)
+      Repeater {
+        model: ['editor', 'terminal']
+        Aranea.ActionButton {
+          required property string modelData
+          text: 'New ' + modelData + ' window'
+          enabled: !details.displayOnly && !details.pending && details.openAvailable
+          pointerGate: details.pointerGate
+          onClicked: details.openRequested({
+            projectId: details.project.id,
+            newWindowRole: modelData
+          })
+        }
+      }
+    }
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Change tools, checkouts, and workspace behavior in Preferences.'
+      opacity: 0.55
+    }
+  }
+  Aranea.UiLabel {
     objectName: 'projectOperationError'
     Layout.fillWidth: true
     visible: !!details.operation && !!details.operation.error
     text: details.operation && details.operation.error ? details.operation.error.message + (details.operation.error.recovery ? ' ' + details.operation.error.recovery : '') : ''
     color: Aranea.DesignTokens.attention
   }
-  SettingsButton {
+  Aranea.ActionButton {
+    visible: !details.headerProvided || details.guidedSetup
     text: details.pending ? 'Preparing…' : 'Open project'
     enabled: !details.displayOnly && !details.pending && details.openAvailable
     pointerGate: details.pointerGate
     onClicked: details.openProject()
   }
-  SettingsButton {
-    visible: !details.guidedSetup
+  Aranea.ActionButton {
+    visible: !details.guidedSetup && details.viewSection === 'all'
     text: details.customized ? 'Hide preferences' : 'Project preferences'
     pointerGate: details.pointerGate
     onClicked: details.customized = !details.customized
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: details.toolChoiceRequired
     text: 'Choose an installed supported editor and terminal, then Save preferences.'
   }
-  ColumnLayout {
+  ProjectSectionCard {
     Layout.fillWidth: true
-    visible: details.guidedSetup || details.customized || details.toolChoiceRequired
-    SettingsLabel {
+    visible: details.guidedSetup || details.viewSection === 'preferences' || details.viewSection === 'all' && (details.customized || details.toolChoiceRequired)
+    Aranea.UiLabel {
       text: 'Project name'
     }
     Ui.TextField {
@@ -202,12 +303,12 @@ ColumnLayout {
       font.pixelSize: Style.font.body
       onTextEdited: details.setDraft('name', text)
     }
-    SettingsLabel {
+    Aranea.UiLabel {
       text: 'Editor'
     }
     Repeater {
       model: details.choices('editors')
-      SettingsButton {
+      Aranea.ActionButton {
         id: editor
         required property var modelData
         text: modelData.label
@@ -217,12 +318,12 @@ ColumnLayout {
         onClicked: details.setDraft('editorId', editor.modelData.id)
       }
     }
-    SettingsLabel {
+    Aranea.UiLabel {
       text: 'Terminal'
     }
     Repeater {
       model: details.choices('terminals')
-      SettingsButton {
+      Aranea.ActionButton {
         id: terminal
         required property var modelData
         text: modelData.label
@@ -232,14 +333,14 @@ ColumnLayout {
         onClicked: details.setDraft('terminalId', terminal.modelData.id)
       }
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Dedicated workspace'
       selected: details.draft.workspaceMode === 'dedicated'
       enabled: !details.displayOnly
       pointerGate: details.pointerGate
       onClicked: details.setDraft('workspaceMode', 'dedicated')
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Use current workspace'
       selected: details.draft.workspaceMode === 'current'
       enabled: !details.displayOnly
@@ -247,13 +348,13 @@ ColumnLayout {
       onClicked: details.setDraft('workspaceMode', 'current')
     }
     RowLayout {
-      SettingsButton {
+      Aranea.ActionButton {
         text: 'Save preferences'
         enabled: !details.displayOnly && !details.pending && details.supported('editors', details.draft.editorId) && details.supported('terminals', details.draft.terminalId)
         pointerGate: details.pointerGate
         onClicked: details.applyDraft()
       }
-      SettingsButton {
+      Aranea.ActionButton {
         text: 'Discard'
         pointerGate: details.pointerGate
         onClicked: details.discardDraft()
@@ -265,18 +366,18 @@ ColumnLayout {
         id: checkout
         required property var modelData
         Layout.fillWidth: true
-        SettingsLabel {
+        Aranea.UiLabel {
           Layout.fillWidth: true
           text: checkout.modelData.path + ' · ' + checkout.modelData.branch
         }
-        SettingsButton {
+        Aranea.ActionButton {
           text: 'Use checkout'
           enabled: !details.displayOnly && !details.pending
           selected: details.project && details.project.lastCheckoutId === checkout.modelData.id
           pointerGate: details.pointerGate
           onClicked: details.checkoutRequested(details.project.id, checkout.modelData.id)
         }
-        SettingsButton {
+        Aranea.ActionButton {
           text: 'Open separately'
           enabled: !details.displayOnly && !details.pending && details.openAvailable
           pointerGate: details.pointerGate
@@ -304,12 +405,12 @@ ColumnLayout {
         }
       }
     }
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       visible: !details.guidedSetup
       text: 'Remove registration keeps repository files and existing windows.'
     }
-    SettingsButton {
+    Aranea.ActionButton {
       visible: !details.guidedSetup
       text: 'Remove registration'
       enabled: !details.displayOnly && !details.pending
@@ -323,14 +424,14 @@ ColumnLayout {
       id: role
       required property string modelData
       visible: details.recoveryAllowed(modelData, 'retry') || details.recoveryAllowed(modelData, 'new')
-      SettingsButton {
+      Aranea.ActionButton {
         text: 'Retry ' + role.modelData
         visible: details.recoveryAllowed(role.modelData, 'retry')
         enabled: !details.displayOnly && !details.pending
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'retry')
       }
-      SettingsButton {
+      Aranea.ActionButton {
         objectName: 'reobserveRole:' + role.modelData
         text: 'Check ' + role.modelData + ' again'
         visible: details.recoveryAllowed(role.modelData, 'reobserve')
@@ -338,7 +439,7 @@ ColumnLayout {
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'reobserve')
       }
-      SettingsButton {
+      Aranea.ActionButton {
         text: 'Open new ' + role.modelData + ' window'
         visible: details.recoveryAllowed(role.modelData, 'new')
         enabled: !details.displayOnly && !details.pending
@@ -352,7 +453,8 @@ ColumnLayout {
     Layout.fillWidth: true
     project: details.project
     projectClient: details.projectClient
-    active: details.actionsActive
+    visible: details.guidedSetup || details.viewSection === 'all' || details.viewSection === 'actions'
+    active: details.actionsActive && visible
     displayOnly: details.displayOnly
     pointerGate: details.pointerGate
   }

@@ -320,6 +320,7 @@ Item {
     favoriteAppIds: history.favoriteAppIds
     recentAppIds: history.recentAppIds
     settingsAvailable: sources.settingsAvailable
+    projectsAvailable: sources.projectsAvailable
     actionController: desktopActions
     projectClient: root.projectClient
     onRevisionChanged: if (root.desktopSearchActive)

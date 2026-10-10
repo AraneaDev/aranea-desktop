@@ -3,12 +3,19 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as Projects
 import "ProjectPreview.js" as ProjectPreview
 
 ShellRoot {
   id: harness
   // Capture variant supplied by the renderer.
   readonly property string fixture: Quickshell.env('ARANEA_SETTINGS_RENDER_FIXTURE')
+  // Legacy project fixture names render the independent Projects component.
+  readonly property bool isProject: fixture.indexOf('projects-') === 0 || fixture.indexOf('project-') === 0
+  // Select the real presentation entry belonging to the requested fixture.
+  readonly property var entry: isProject ? projectEntry : settingsEntry
+  // Select the real production surface belonging to the requested fixture.
+  readonly property var surface: isProject ? projectSurface : settingsSurface
   // Repository artwork, independent of live preferences.
   readonly property string artwork: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/backgrounds/'
   // Wait for images and fonts before grabbing.
@@ -34,11 +41,15 @@ ShellRoot {
     return out
   }
   Settings.Settings {
-    id: entry
+    id: settingsEntry
     windowEnabled: false
     runner: function (argv, done) {
       harness.finish(false, 'unexpected process request: ' + argv[0])
     }
+  }
+  Projects.ProjectsPresentation {
+    id: projectEntry
+    windowEnabled: false
   }
   FloatingWindow {
     implicitWidth: Number(Quickshell.env('ARANEA_SETTINGS_RENDER_WIDTH'))
@@ -46,23 +57,32 @@ ShellRoot {
     color: 'transparent'
     visible: true
     Settings.SettingsSurface {
-      id: surface
+      id: settingsSurface
+      visible: !harness.isProject
       anchors.fill: parent
-      root: entry
+      root: settingsEntry
+    }
+    Projects.ProjectsSurface {
+      id: projectSurface
+      visible: harness.isProject
+      anchors.fill: parent
+      root: projectEntry
     }
   }
   Component.onCompleted: {
     Style.spacingScale = 1
     Style.spacingScaleWithFont = false
     entry.view = surface
-    entry.projectController.runner = function (argv, done) {
-      harness.finish(false, 'unexpected registry process')
-    }
-    entry.projectClient.runner = function (argv, done) {
-      harness.finish(false, 'unexpected project owner process')
-    }
-    entry.discoveryClient.runner = function (argv) {
-      harness.finish(false, 'unexpected scan process')
+    if (isProject) {
+      entry.projectController.runner = function (argv, done) {
+        harness.finish(false, 'unexpected registry process')
+      }
+      entry.projectClient.runner = function (argv, done) {
+        harness.finish(false, 'unexpected project owner process')
+      }
+      entry.discoveryClient.runner = function (argv) {
+        harness.finish(false, 'unexpected scan process')
+      }
     }
     var state = {
       display: {

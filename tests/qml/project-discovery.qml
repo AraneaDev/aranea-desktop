@@ -3,7 +3,7 @@ import QtQuick
 import Quickshell
 import "lib"
 import "plugins/araneadev.projects" as Projects
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 
 ShellRoot {
   id: host
@@ -31,7 +31,7 @@ ShellRoot {
   property var backendCalls: []
   // Retained private helper callbacks for exact request/readback assertions.
   property var backendDone: []
-  Settings.ProjectSettingsController {
+  ProjectUi.ProjectRegistryClient {
     id: backend
     storePath: '/fixture/store'
     toolsPath: '/fixture/tools'

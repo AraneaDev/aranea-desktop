@@ -108,55 +108,55 @@ ColumnLayout {
   }
   spacing: Style.space(8)
   visible: !!run
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: details.run && details.run.definitionSnapshot ? details.run.definitionSnapshot.name : 'Retained run'
     font.bold: true
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     objectName: 'actionRunStatus'
     Layout.fillWidth: true
     text: details.statusText
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Checkout: ' + (details.checkout ? details.checkout.path : 'Unavailable') + ' · ' + (details.run ? details.run.checkoutId : '')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Command: ' + details.commandText
     technical: true
     wrapMode: Text.WrapAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Working folder: ' + (details.run ? details.run.cwd || 'Not resolved' : '')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: details.run ? 'Run: ' + details.run.id + ' · Receipt: ' + (details.run.createdAt ? new Date(details.run.createdAt * 1000).toLocaleString() : 'Unavailable') + ' · Outcome: ' + (details.run.outcome || 'Awaiting observation') : ''
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!details.run && (details.run.exitCode !== null && details.run.exitCode !== undefined || !!details.run.exitSignal)
     text: details.run ? 'Process result: exit ' + (details.run.exitCode === null || details.run.exitCode === undefined ? 'unknown' : details.run.exitCode) + (details.run.exitSignal ? ' · signal ' + details.run.exitSignal : '') : ''
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!details.run && !!details.run.error
     text: details.run && details.run.error ? (details.run.error.message || details.run.error.code) + (details.run.error.recovery ? ' ' + details.run.error.recovery : '') : ''
     color: Aranea.DesignTokens.attention
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!details.run && (!details.currentDefinition || details.currentDefinition.revision !== details.run.definitionRevision)
     text: 'Action changed. Review its current command, then Run or Start it.'
@@ -192,7 +192,7 @@ ColumnLayout {
           label: 'Focus project'
         }
       ]
-      SettingsButton {
+      Aranea.ActionButton {
         id: control
         required property var modelData
         objectName: 'actionRun:' + modelData.method
@@ -212,12 +212,12 @@ ColumnLayout {
       }
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Output comes from the local user journal. Retention follows the system journal policy.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     objectName: 'actionOutputTruncated'
     Layout.fillWidth: true
     visible: !!details.client && (details.client.truncated || details.client.output.length > details.outputText.length)

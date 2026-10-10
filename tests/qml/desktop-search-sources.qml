@@ -54,6 +54,7 @@ ShellRoot {
     ]
     fixtureFocusedWorkspaceId: 2
     settingsAvailable: true
+    projectsAvailable: true
     appRows: [
       {
         id: "apps.browser",
@@ -130,7 +131,7 @@ ShellRoot {
           sources.activate("setting:display")
           t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"display"}'], "Display search opens stable destination without applying")
           sources.activate("setting:projects")
-          t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"projects"}'], "Projects search opens existing settings destination")
+          t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.projects", '{}'], "Projects search opens standalone Projects destination")
           sources.activate("setting:appearance")
           t.equal(shell.ran[shell.ran.length - 1], ["omarchy-shell", "shell", "summon", "araneadev.settings", '{"section":"appearance"}'], "settings only opens destination")
           sources.fixtureWindows = [

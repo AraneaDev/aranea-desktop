@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Render the independent Projects component using inert production fixtures.
+# Usage: tools/render-projects-preview --output PNG [--fixture project-details]
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$repo_root/tools/render-settings-preview" --fixture projects-empty "$@"

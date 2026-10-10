@@ -3,7 +3,7 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 
 ShellRoot {
   // Explicit registry requests captured without native side effects.
@@ -27,7 +27,7 @@ ShellRoot {
       }
     ]
   }
-  Settings.ProjectsPage {
+  ProjectUi.ProjectsPage {
     id: page
     width: 420
     discoveryClient: discovery
@@ -62,16 +62,15 @@ ShellRoot {
       requests.push(paths)
     }
   }
-  Settings.Settings {
+  ProjectUi.ProjectsPresentation {
     id: entry
     windowEnabled: false
-    runner: function () {}
   }
   FloatingWindow {
     visible: true
     width: 420
     height: 620
-    Settings.SettingsSurface {
+    ProjectUi.ProjectsSurface {
       id: surface
       root: entry
       width: 420
@@ -424,6 +423,7 @@ ShellRoot {
     realPage.advanceSetup()
     t.equal(realPage.setupStep, 2, 'real batch stays in configuration for the second project')
     t.equal(realPage.selectedProject.id, 'p-beta', 'real batch selects the exact second identity')
+    t.equal(t.findChild(surface, 'projectsSidebar').selectedId, 'p-beta', 'sidebar follows the current project in the bulk setup queue')
     realPage.advanceSetup()
     t.equal(realPage.setupStep, 3, 'real setup reaches optional agent instructions after all projects')
     realPage.finishSetup()
