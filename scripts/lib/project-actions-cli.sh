@@ -22,6 +22,29 @@ project_actions_cli_capabilities() {
   ]}' <<<"$availability"
 }
 
+# Action-specific human evidence is independent of the process outcome being inspected.
+# JSONL stays delegated unchanged; other public command groups use their own formatter.
+project_actions_cli_event() {
+  if [[ $cli_json == true ]]; then
+    projects_cli_event "$@"
+    return
+  fi
+  local event=$1 status=$2 message=$4 code=$5 data=${6:-\{\}}
+  printf '%s: %s%s\n' "$event" "${message:-$status}" "${code:+ ($code)}"
+  if [[ $event == completed || $status == accepted ]]; then
+    jq -r '
+      (if (.runId // .run.id)!=null then "Run: " + (.runId // .run.id) else empty end),
+      (if (.requestId // .run.requestId)!=null then "Request: " + (.requestId // .run.requestId) else empty end),
+      (if .run.processState!=null then "Process: " + .run.processState else empty end),
+      (if .run.exitCode!=null then "Exit code: " + (.run.exitCode|tostring) else empty end),
+      (if .run.exitSignal!=null then "Exit signal: " + (.run.exitSignal|tostring) else empty end),
+      (if has("output") then .output else empty end),
+      (if .truncated==true then "[Output truncated]" else empty end)' <<<"$data"
+    # Successful inspection/list responses retain the existing complete metadata display.
+    if [[ $event == completed && $status == observed ]] && jq -e 'has("output")|not' <<<"$data" >/dev/null; then jq . <<<"$data"; fi
+  fi
+}
+
 # Detached helper owns copied stdin/results until backend completion and reader release.
 # Only the shared backend mutates or dispatches; the lease owns scratch lifetime only.
 project_actions_cli_worker() {
@@ -96,7 +119,7 @@ project_actions_cli_observe() {
     if [[ $accepted == false ]] && /usr/bin/timeout -k .2s "${remaining}s" "$script_dir/aranea-project-action-store" snapshot >"$action_cli_scratch/acceptance-state" 2>/dev/null && project_actions_cli_receipt "$action_cli_scratch/acceptance-state"; then
       local event_data
       event_data=$(jq -c --arg request "$action_cli_request_id" '{runId:.run.id,run,requestId:$request}' "$action_cli_scratch/receipt")
-      projects_cli_event step accepted request 'Run accepted; its lifetime is independent of this observer.' '' "$event_data"
+      project_actions_cli_event step accepted request 'Run accepted; its lifetime is independent of this observer.' '' "$event_data"
       accepted=true
     fi
     if [[ -e $worker/done ]]; then
@@ -104,7 +127,7 @@ project_actions_cli_observe() {
       if [[ $accepted == false ]] && project_actions_cli_receipt "$action_cli_scratch/result"; then
         local event_data
         event_data=$(jq -c --arg request "$action_cli_request_id" '{runId:.run.id,run,requestId:$request,reused:(.reused//false)}' "$action_cli_scratch/receipt")
-        projects_cli_event step accepted request 'Run accepted; its lifetime is independent of this observer.' '' "$event_data"
+        project_actions_cli_event step accepted request 'Run accepted; its lifetime is independent of this observer.' '' "$event_data"
       fi
       exec {action_cli_lease_fd}>&-
       trap - INT TERM
@@ -145,9 +168,9 @@ project_actions_cli_finish() {
     local recovery
     recovery=$(jq -r '.error.recovery // .run.error.recovery // "Refresh the retained run or view its logs."' "$action_cli_scratch/result")
     printf '%s: %s\n' "${code:-ACTION_FAILED}" "$message" >&2
-    projects_cli_event recovery action_required '' "$recovery" "$code" "$data"
+    project_actions_cli_event recovery action_required '' "$recovery" "$code" "$data"
   fi
-  projects_cli_event completed "$outcome" '' "$message" "$code" "$data"
+  project_actions_cli_event completed "$outcome" '' "$message" "$code" "$data"
   exit "$exit_code"
 }
 

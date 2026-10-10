@@ -59,7 +59,15 @@ runtime_transport() (
 # Call the independently locked store, retaining its exact success/failure envelope.
 runtime_store() {
   if ! ARANEA_ACTION_DISPATCH_FD=${dispatch_fd:-} "$script_dir/aranea-project-action-store" "$@" >"$scratch/next"; then
-    cat "$scratch/next"
+    # A later observation can conflict after acceptance (readiness releases the gate).
+    # Project only the exact immutable run from the store's current state; keep its error.
+    if [[ -s $scratch/run ]]; then
+      jq -c --slurpfile known "$scratch/run" '
+        ([.state.runs[]? | select(.id==$known[0].id and .projectId==$known[0].projectId and
+          .checkoutId==$known[0].checkoutId and .actionId==$known[0].actionId and
+          .definitionRevision==$known[0].definitionRevision and .definitionHash==$known[0].definitionHash)][0] // null) as $run |
+        if $run!=null then .run=$run else . end' "$scratch/next"
+    else cat "$scratch/next"; fi
     exit 1
   fi
   mv "$scratch/next" "$scratch/result"

@@ -354,16 +354,24 @@ Item {
         client.submitting = false
         client.available = !!response
         client.error = failure || response.error
+        var requests = response && response.state && Array.isArray(response.state.requests) ? response.state.requests : []
+        var runs = response && response.state && Array.isArray(response.state.runs) ? response.state.runs : []
+        var request = requests.filter(function (row) {
+          return !!row && row.requestId === client.requestId
+        })[0]
+        var hasRequest = !!request
+        var run = response && response.run
+        // Store conflicts can carry acceptance only in state. Resolve the exact receipt,
+        // then use the same immutable checks as the top-level run envelope below.
+        if (!run) {
+          run = runs.filter(function (row) {
+            return !!row && (hasRequest ? validRecordId(request.runId, 'r') && row.id === request.runId : (row.requestId === client.requestId || Records.protectedRun(row)) && row.projectId === target.projectId && row.checkoutId === target.checkoutId && row.actionId === target.actionId)
+          })[0]
+        }
         if (!response) {
           client.submissionUncertain = true
-        } else if (response.run) {
-          var run = response.run
-          var requests = response.state && Array.isArray(response.state.requests) ? response.state.requests : []
-          var runs = response.state && Array.isArray(response.state.runs) ? response.state.runs : []
+        } else if (run) {
           var matches = validRunIdentity(run) && run.projectId === target.projectId && run.checkoutId === target.checkoutId && run.actionId === target.actionId
-          var hasRequest = requests.some(function (row) {
-            return !!row && row.requestId === client.requestId
-          })
           var receipt = requests.some(function (row) {
             return !!row && row.requestId === client.requestId && validRecordId(row.runId, 'r') && row.runId === run.id
           })
@@ -372,7 +380,7 @@ Item {
           })
           // An authoritative refused restart returns recovery evidence for its original run,
           // not acceptance of the newly generated request. A coalesced acceptance has a receipt.
-          var originalRefusal = method === 'restart' && !response.ok && matches && retained && !hasRequest && run.id === payload.runId && response.error && typeof response.error.code === 'string' && typeof response.error.message === 'string' && typeof response.error.recovery === 'string'
+          var originalRefusal = !!response.run && method === 'restart' && !response.ok && matches && retained && !hasRequest && run.id === payload.runId && response.error && typeof response.error.code === 'string' && typeof response.error.message === 'string' && typeof response.error.recovery === 'string'
           if (!matches || !retained || (!receipt && !originalRefusal)) {
             client.submissionUncertain = true
             client.error = client.transportError('The returned run does not match the submitted identity.')
@@ -388,7 +396,7 @@ Item {
             }
           }
         }
-        if (response && response.ok && !response.run) {
+        if (response && !run && (response.ok || hasRequest)) {
           client.submissionUncertain = true
           client.error = client.transportError('Acceptance response omitted its retained run identity.')
         }

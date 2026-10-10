@@ -45,13 +45,8 @@ jq -c '.state.sessions[] | select(.providerSessionId=="fixture-report") | {actio
 jq -se '.[0].error.code=="STALE_SEQUENCE" and .[-1].ok and ([.[] | select(.ok)] | length)==1' "$TMPDIR/attempts" >/dev/null
 jq -e '.state.sessions[] | select(.providerSessionId=="fixture-report") | ([.receipts[] | select(.eventId=="SubagentStop:forged:receipt")] | length)==1 and (.nativeMetadata.observedHooks | index("SubagentStop")==null)' "$TMPDIR/accepted" >/dev/null
 "$repo_root/scripts/aranea-agent-adapter" status claude | jq -e 'all(.state.capabilities.optionalHooks[];.runtimeObserved==false and .available==false)' >/dev/null
-# A different error remains fatal on its first attempt, with state unchanged.
-"$store" snapshot >"$TMPDIR/error-before"
-cp "$XDG_STATE_HOME/aranea/agent-activity.json" "$TMPDIR/error-state-before"
-jq '.args.eventId="invalid-task-report" | .args.taskId="fixture-task-missing" | .args.sequence=100000' "$TMPDIR/request" >"$TMPDIR/bad-request"
-if /bin/bash "$report" "$store" "$TMPDIR/errors" <"$TMPDIR/bad-request" >"$TMPDIR/error-result" 2>"$TMPDIR/error-stderr"; then exit 1; fi
-jq -se 'length==1 and .[0].error.code=="TASK_NOT_FOUND"' "$TMPDIR/errors" >/dev/null
-cmp "$XDG_STATE_HOME/aranea/agent-activity.json" "$TMPDIR/error-state-before"
+# Finish the authentic provider and wait for its heartbeat writer to exit before
+# asserting immutable state. A scheduling pause cannot race a legitimate next tick.
 touch "$TMPDIR/provider.go"
 wait "$provider_pid"
 for _ in {1..170}; do
@@ -59,5 +54,12 @@ for _ in {1..170}; do
   sleep .1
 done
 if compgen -G "$XDG_STATE_HOME/aranea/agent-heartbeats/*.json" >/dev/null; then exit 1; fi
+# A different error remains fatal on its first attempt, with state unchanged.
+"$store" snapshot >"$TMPDIR/error-before"
+cp "$XDG_STATE_HOME/aranea/agent-activity.json" "$TMPDIR/error-state-before"
+jq '.args.eventId="invalid-task-report" | .args.taskId="fixture-task-missing" | .args.sequence=100000' "$TMPDIR/request" >"$TMPDIR/bad-request"
+if /bin/bash "$report" "$store" "$TMPDIR/errors" <"$TMPDIR/bad-request" >"$TMPDIR/error-result" 2>"$TMPDIR/error-stderr"; then exit 1; fi
+jq -se 'length==1 and .[0].error.code=="TASK_NOT_FOUND"' "$TMPDIR/errors" >/dev/null
+cmp "$XDG_STATE_HOME/aranea/agent-activity.json" "$TMPDIR/error-state-before"
 [[ ! -s "$ARANEA_TEST_SANDBOX/guard.log" ]]
 echo 'adapter fixture report: authentic heartbeat refusal, single acceptance and other-error rejection passed'

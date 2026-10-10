@@ -117,6 +117,62 @@ ShellRoot {
     t.check(!subject.start(original.actionId, 3), label + ' blocks duplicate submission')
     subject.destroy()
   }
+  // State-only store refusals must retain exact acceptance and the observation error.
+  function stateOnlyConflict(label, fields, receiptFields, missingReceipt, acceptedResponse) {
+    var subject = probeFactory.createObject(root)
+    probeCalls = []
+    var original = root.run()
+    subject.start(original.actionId, 3)
+    probeCalls[0](0, '00000000-0000-4000-8000-000000000011', '')
+    var retained = Object.assign({}, original, fields)
+    var response = root.envelope(retained, 8)
+    delete response.run
+    response.ok = false
+    response.error = {
+      code: 'ACTION_CONFLICT',
+      message: 'The action state revision changed.',
+      recovery: 'Refresh action state.'
+    }
+    response.state.requests = missingReceipt ? [] : [Object.assign({
+        requestId: 'req-00000000-0000-4000-8000-000000000011',
+        runId: retained.id
+      }, receiptFields)]
+    probeCalls[1](1, JSON.stringify(response), '')
+    if (acceptedResponse) {
+      t.equal(subject.runId, original.id, label + ' retains accepted identity')
+      t.equal(subject.currentRun, retained, label + ' attaches accepted state')
+      t.equal(subject.snapshot.revision, 8, label + ' publishes the returned snapshot')
+      t.equal(subject.error.code, 'ACTION_CONFLICT', label + ' preserves observation error')
+      t.check(!subject.submissionUncertain && subject.acceptanceCount === 1, label + ' recognizes exact durable acceptance')
+    } else {
+      t.check(subject.submissionUncertain && !subject.runId && subject.acceptanceCount === 0, label + ' rejects incomplete acceptance evidence')
+    }
+    t.check(!subject.start(original.actionId, 3), label + ' blocks another Start')
+    subject.destroy()
+  }
+  // Existing terminal history does not turn a fresh preacceptance refusal into uncertainty.
+  function stateOnlyPreacceptanceRefusal() {
+    var subject = probeFactory.createObject(root)
+    probeCalls = []
+    var original = root.run()
+    subject.start(original.actionId, 3)
+    probeCalls[0](0, '00000000-0000-4000-8000-000000000011', '')
+    var response = root.envelope(Object.assign({}, original, {
+      processState: 'succeeded'
+    }), 8)
+    delete response.run
+    response.ok = false
+    response.error = {
+      code: 'ACTION_CONFLICT',
+      message: 'Definition changed.',
+      recovery: 'Review the saved command.'
+    }
+    probeCalls[1](1, JSON.stringify(response), '')
+    t.check(!subject.submissionUncertain && !subject.runId && subject.acceptanceCount === 0, 'old terminal history is not new acceptance')
+    t.equal(subject.error.code, 'ACTION_CONFLICT', 'preacceptance refusal preserves its actionable error')
+    t.check(subject.start(original.actionId, 4), 'reviewed fresh definition can be explicitly submitted after refusal')
+    subject.destroy()
+  }
   Projects.ProjectActionsClient {
     id: nativeClient
     projectId: 'p-native'
@@ -236,6 +292,33 @@ ShellRoot {
     }
   }
   Component.onCompleted: t.step(0, function () {
+    root.stateOnlyPreacceptanceRefusal()
+    root.stateOnlyConflict('state-only accepted alias', {}, {}, false, true)
+    root.stateOnlyConflict('state-only exact primary request', {
+      requestId: 'req-00000000-0000-4000-8000-000000000011'
+    }, {}, false, true)
+    root.stateOnlyConflict('state-only missing receipt', {}, {}, true, false)
+    root.stateOnlyConflict('state-only orphan receipt', {}, {
+      runId: 'r-00000000-0000-4000-8000-000000000099'
+    }, false, false)
+    root.stateOnlyConflict('state-only wrong project', {
+      projectId: 'p-00000000-0000-4000-8000-000000000099'
+    }, {}, false, false)
+    root.stateOnlyConflict('state-only wrong checkout', {
+      checkoutId: 'c-00000000-0000-4000-8000-000000000099'
+    }, {}, false, false)
+    root.stateOnlyConflict('state-only wrong action', {
+      actionId: 'a-00000000-0000-4000-8000-000000000099'
+    }, {}, false, false)
+    root.stateOnlyConflict('state-only missing revision', {
+      definitionRevision: undefined
+    }, {}, false, false)
+    root.stateOnlyConflict('state-only missing hash', {
+      definitionHash: undefined
+    }, {}, false, false)
+    root.stateOnlyConflict('state-only missing run ID', {
+      id: undefined
+    }, {}, false, false)
     root.rejectEnvelope('absent run identity', {
       id: undefined,
       definitionRevision: undefined,
