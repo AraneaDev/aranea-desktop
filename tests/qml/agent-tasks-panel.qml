@@ -140,6 +140,10 @@ ShellRoot {
     panel.requestRefresh()
     t.equal(calls.length, 0, 'capture does not refresh any injected client')
     t.equal(tabs.destination, 'usage', 'empty panel starts with Usage')
+    tabs.choose('help')
+    t.equal(tabs.destination, 'help', 'agent help is always available')
+    t.equal(calls.length, 0, 'opening agent help never invokes a backend')
+    tabs.remembered = ''
     activity.snapshot = {
       tasks: [
         {
@@ -162,6 +166,16 @@ ShellRoot {
     }
     t.check(panel.visible, 'task-only panel is visible')
     t.equal(tabs.destination, 'tasks', 'attention opens Tasks by default')
+    tabs.choose('help')
+    t.check(t.findChild(panel, 'agentWorkflowHelp').visible, 'Help tab shows the actual user guide')
+    var helpScroll = t.findChild(panel, 'agentWorkflowHelp').parent
+    while (helpScroll && helpScroll.contentY === undefined)
+      helpScroll = helpScroll.parent
+    tasks.navigate(1)
+    t.check(helpScroll && helpScroll.contentY > 0, 'Help scrolls using the panel keyboard route')
+    t.equal(calls.length, 0, 'Help scrolling never invokes a client')
+
+    tabs.choose('tasks')
     var frame = t.findChild(panel, 'agentKeyboardFrame')
     frame.textKey('r')
     frame.textKey('R')

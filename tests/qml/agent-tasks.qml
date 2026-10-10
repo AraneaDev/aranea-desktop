@@ -70,6 +70,7 @@ ShellRoot {
     tabs.choose('tasks')
     t.equal(tabs.destination, 'tasks', 'empty Tasks remains accessible and remembered')
     t.check(t.findChild(view, 'tasksEmpty').visible, 'empty task setup is visible')
+    t.check(!t.findChild(view, 'taskSetupCommands').visible, 'advanced setup instructions are hidden initially')
     view.navigate(1)
     view.navigate(1)
     view.navigate(-1)
@@ -83,6 +84,13 @@ ShellRoot {
     }), 'first empty Enter reveals setup')
     view.navigate(0)
     t.equal(actions.pop(), ['setup', ''], 'setup emits a fixed action')
+    var actionsBeforeGuide = actions.length
+    view.navigate(1)
+    view.navigate(0)
+    t.check(t.findChild(view, 'taskSetupCommands').visible, 'keyboard opens setup details without an owner action')
+    view.navigate(0)
+    t.check(!t.findChild(view, 'taskSetupCommands').visible, 'keyboard closes setup details')
+    t.equal(actions.length, actionsBeforeGuide, 'setup disclosure never emits an owner action')
     view.snapshot = {
       tasks: [task('one', 'working'), task('two', 'needs-input')]
     }
@@ -134,6 +142,9 @@ ShellRoot {
       return r.stateLabel
     }), ['Needs input', 'Ready for review', 'Failed', 'Working', 'Connection lost', 'Finished'], 'all six states render in attention order')
     t.equal(t.findChildren(view, 'taskRow').length, 6, 'actual delegates display all states')
+    t.check(t.findChildren(view, 'taskRow').every(function (card) {
+      return card.height < 180
+    }), 'compact task cards avoid repeating full checkout paths')
     t.check(view.taskRows.some(function (r) {
       return r.providerLabel === 'Codex'
     }), 'multiple providers remain visible')
@@ -169,7 +180,11 @@ ShellRoot {
           var labels = t.findChildren(view, 'taskLastReport').map(function (label) {
             return label.text
           })
-          t.check(labels.indexOf('Last report 5s ago') >= 0 && labels.indexOf('Last report 2d ago') >= 0, 'real rows distinguish report ages with equal connection freshness')
+          t.check(labels.some(function (label) {
+            return label.indexOf('Last report 5s ago') === 0
+          }) && labels.some(function (label) {
+            return label.indexOf('Last report 2d ago') === 0
+          }), 'real rows distinguish report ages with equal connection freshness')
           view.selectedId = 'recent'
           t.check(t.findChild(view, 'lastReportTime').text.indexOf('Received 1970-01-03 00:00:00 UTC') >= 0, 'real details display exact receipt time separately')
           t.equal(t.findChild(view, 'lastReportTime').textFormat, Text.PlainText, 'receipt time remains plaintext')

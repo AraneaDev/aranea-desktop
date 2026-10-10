@@ -211,7 +211,7 @@ ShellRoot {
       }
       if (!harness.positioned && harness.polls >= 6) {
         harness.positioned = true
-        if (harness.fixture === 'project-details' || harness.fixture === 'project-launch-partial') {
+        if (harness.fixture === 'project-details' || harness.fixture === 'project-launch-partial' || harness.fixture === 'project-setup-bulk') {
           for (var j = 0; j < objects.length; j++) {
             var scroll = objects[j]
             if (scroll.contentY === undefined || !scroll.contentItem || scroll.height < 100)

@@ -198,8 +198,7 @@ Item {
       panel.stampLayout()
     }
     function onMutationCompleted(action, args, state) {
-      if (action === 'configure' && args.projectId === panel.root.projectId)
-        projectsPage.details.discardDraft()
+      projectsPage.registryMutationCompleted(action, args, state)
     }
   }
   Connections {

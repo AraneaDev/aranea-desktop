@@ -32,6 +32,8 @@ ColumnLayout {
   property alias actions: actions
   // Optional preferences stay collapsed after installed defaults resolve.
   property bool customized: false
+  // Guided setup exposes preferences while deferring maintenance controls.
+  property bool guidedSetup: false
   // Draft values never become saved configuration until explicit Apply.
   property var draft: ({})
   // Dirty drafts survive asynchronous observation refreshes.
@@ -169,29 +171,35 @@ ColumnLayout {
     color: Aranea.DesignTokens.attention
   }
   SettingsButton {
-    text: details.pending ? 'Preparing…' : 'Open'
+    text: details.pending ? 'Preparing…' : 'Open project'
     enabled: !details.displayOnly && !details.pending && details.openAvailable
     pointerGate: details.pointerGate
     onClicked: details.openProject()
   }
   SettingsButton {
-    text: details.customized ? 'Hide customization' : 'Customize'
+    visible: !details.guidedSetup
+    text: details.customized ? 'Hide preferences' : 'Project preferences'
     pointerGate: details.pointerGate
     onClicked: details.customized = !details.customized
   }
   SettingsLabel {
     Layout.fillWidth: true
     visible: details.toolChoiceRequired
-    text: 'Choose an installed supported editor and terminal, then Apply.'
+    text: 'Choose an installed supported editor and terminal, then Save preferences.'
   }
   ColumnLayout {
     Layout.fillWidth: true
-    visible: details.customized || details.toolChoiceRequired
+    visible: details.guidedSetup || details.customized || details.toolChoiceRequired
+    SettingsLabel {
+      text: 'Project name'
+    }
     Ui.TextField {
       Layout.fillWidth: true
       text: details.draft.name || ''
       enabled: !details.displayOnly
       Accessible.name: 'Project name'
+      font.family: Aranea.Typography.uiFamily
+      font.pixelSize: Style.font.body
       onTextEdited: details.setDraft('name', text)
     }
     SettingsLabel {
@@ -240,7 +248,7 @@ ColumnLayout {
     }
     RowLayout {
       SettingsButton {
-        text: 'Apply'
+        text: 'Save preferences'
         enabled: !details.displayOnly && !details.pending && details.supported('editors', details.draft.editorId) && details.supported('terminals', details.draft.terminalId)
         pointerGate: details.pointerGate
         onClicked: details.applyDraft()
@@ -279,6 +287,7 @@ ColumnLayout {
           })
         }
         ProjectFolderPicker {
+          visible: !details.guidedSetup
           objectName: 'locateFolder:' + details.project.id + ':' + checkout.modelData.id
           buttonText: 'Locate folder'
           externalDraft: true
@@ -297,9 +306,11 @@ ColumnLayout {
     }
     SettingsLabel {
       Layout.fillWidth: true
+      visible: !details.guidedSetup
       text: 'Remove registration keeps repository files and existing windows.'
     }
     SettingsButton {
+      visible: !details.guidedSetup
       text: 'Remove registration'
       enabled: !details.displayOnly && !details.pending
       pointerGate: details.pointerGate

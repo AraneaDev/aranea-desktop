@@ -60,7 +60,7 @@ ShellRoot {
     })
     t.step(50, function () {
       labels.forEach(function (label) {
-        t.equal(label.lineCount, 3, 'narrow large-font prose keeps each terminal word intact: ' + label.objectName)
+        t.equal(label.lineCount, label.objectName === 'taskSummary' ? 2 : 3, 'list previews are bounded while details preserve complete words: ' + label.objectName)
         label.text = new Array(80).fill('x').join('')
       })
       t.step(50, function () {
