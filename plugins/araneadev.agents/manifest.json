@@ -4,14 +4,14 @@
   "name": "Aranea Agents",
   "version": "1.0.0",
   "author": "AraneaDev",
-  "description": "Claude Code, Codex, and Fireworks usage, limits, and pace in a bar panel.",
+  "description": "Local agent Tasks alongside Claude Code, Codex, and Fireworks Usage, limits, and pace.",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
     "displayName": "Aranea Agents",
-    "description": "One bar icon and one panel: rate-limit meters with pace, today, the last week, and the all-time model breakdown for every subscription.",
+    "description": "Tasks and Usage in one panel: local task activity, exact checkouts, session actions, and subscription rate-limit meters.",
     "category": "AI",
     "aliases": ["agents", "model-usage"],
     "allowMultiple": false,

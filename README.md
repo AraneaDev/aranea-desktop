@@ -69,10 +69,50 @@ the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
 
 - **Command center:** Files, Terminal, Setup, Favorites, Recent, and searchable apps.
 - **Settings:** wallpaper, fonts, motion, display scale, schedule, integrations, and DND.
+- **Project workspaces:** confirmed Git discovery, grouped worktrees, project search, and Open/Resume with saved tools.
 - **System controls:** network, VPN, audio, Bluetooth, displays, power, tray, calendar, and weather.
 - **Health and notifications:** resource graphs, processes, services, reboot and container status, plus a quiet notification center.
 - **Pickers and prompts:** clipboard with secret masking, emoji, wallpapers, and consistent polkit authentication.
 - **Application integrations:** cursor, icons, terminals, editors, browser, media, Qt, and session styling.
+
+### Project workspaces
+
+Open **Setup → Projects**, confirm a development folder, review repositories and
+worktrees, then **Add selected**. Search with `project:` to Open or Resume saved
+tools. Dedicated workspace is the default; Customize makes current workspace an
+explicit preference. Partial launches report each role and offer targeted recovery.
+Repository scripts are never run by discovery or ordinary Open. Removing a
+registration preserves folders and applications.
+
+Project details also offer named **Actions**: configure an executable and individual
+arguments, then explicitly Run a command or Start a service for the selected
+checkout. Track exit status, Stop/Restart, view bounded local-journal output and
+open an optional loopback preview. Saving, opening a project and reloading the
+shell never run actions. Runs belong to the systemd user manager independently
+of the panel; uncertainty remains visible and protected. See the
+[action guide](docs/features.md#project-commands-and-previews) and
+[CLI examples](docs/agent-interface.md#configured-project-actions-and-retained-runs).
+
+See [Project configuration](docs/configuration.md) for supported tools,
+folder relocation and workspace choices, and [the JSON interface](docs/agent-interface.md)
+for automation. Inert showcase IDs are `projects-empty`, `projects-discovery`,
+`projects-grouped`, `projects-partial`, `project-details`, `project-search` and
+`project-launch-partial`; [development instructions](docs/development.md)
+render them without user repositories or desktop operations.
+
+### Local agent activity
+
+Open **Agents → Tasks** for Claude Code and Codex task activity alongside Usage.
+Reporting is opt-in: run `aranea agents adapter status claude` or
+`aranea agents adapter status codex`, then copy the matching install command from
+Tasks setup. Review provider hook trust and start a new native CLI session;
+configured hooks alone do not prove observed activity. Register projects explicitly.
+
+Needs input, Ready for review and Failed transitions receive quiet, coalesced
+notifications respecting DND and quiet hours. Open task inspects current details;
+resume remains an explicit action. Verification is independently reported, and
+session focus reaches only a proven hosting terminal. Activity is local to this
+machine. See [setup, CLI examples and limitations](plugins/araneadev.activity/README.md).
 
 ### Typography and settings
 

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Launch one fixed project adapter in a detached session; acceptance is not observation.
+# Usage: aranea-project-launch (reads one {argv,cwd} JSON object on stdin)
+set -euo pipefail
+# Bootstrap parsers/session tools come from system paths, before checkout data is trusted.
+project_realpath=/usr/bin/realpath
+project_setsid=/usr/bin/setsid
+[[ -x /usr/bin/jq ]] || {
+  echo '{"ok":false,"status":"failed","code":"DEPENDENCY_MISSING","message":"Install jq."}'
+  exit 4
+}
+# Fail without executing any requested application.
+fail() {
+  /usr/bin/jq -cn --arg code "$1" --arg message "$2" '{ok:false,status:"failed",code:$code,message:$message,binding:null}'
+  exit 1
+}
+[[ -x "$project_setsid" && -x "$project_realpath" ]] || fail DEPENDENCY_MISSING 'Install util-linux and coreutils for detached project launches.'
+request=$(/usr/bin/jq -cs 'if length==1 then .[0] else error("one request required") end' 2>/dev/null) || fail INVALID_LAUNCH 'Provide one launch specification.'
+/usr/bin/jq -e '
+  type=="object" and ((keys)==["argv","cwd"]) and ((.cwd|type)=="string") and (.cwd|startswith("/")) and (.cwd|test("[\\x00-\\x1f\\x7f]")|not) and
+  ((.argv|type)=="array") and ((.argv|length)>=3) and (.argv|all(.[]; type=="string" and (test("[\\x00-\\x1f\\x7f]")|not))) and
+  (. as $s | .argv as $a | .cwd as $cwd |
+    if $a[0]=="code" then $a==["code","--new-window",$cwd]
+    else
+      (if $a[0]=="kitty" then $a[2]
+       elif $a[0]=="alacritty" or $a[0]=="foot" then $a[2]
+       elif $a[0]=="ghostty" then ($a[1]|ltrimstr("--class=")) else "" end) as $token |
+      (if $a[0]=="kitty" then ["kitty","--class",$token,"--directory",$cwd]
+       elif $a[0]=="alacritty" then ["alacritty","--class",$token,"--working-directory",$cwd]
+       elif $a[0]=="foot" then ["foot","--app-id",$token,"--working-directory",$cwd]
+       elif $a[0]=="ghostty" then ["ghostty","--class="+$token,"--gtk-single-instance=false","--working-directory="+$cwd]
+       else [] end) as $base |
+      ($token|test("^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$")) and (($base|length)>0) and ($a==$base or $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["nvim","--",$cwd]) or (($a[-1]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["claude","--resume",$a[-1]])) or (($a[-3]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["codex","resume",$a[-3],"--cd",$cwd])))
+    end)
+' <<<"$request" >/dev/null || fail INVALID_LAUNCH 'Only fixed supported project adapter arguments are allowed.'
+mapfile -t argv < <(/usr/bin/jq -r '.argv[]' <<<"$request")
+cwd=$(/usr/bin/jq -r .cwd <<<"$request")
+[[ -d "$cwd" ]] || fail CHECKOUT_INVALID 'The checkout folder is unavailable.'
+canonical_cwd=$("$project_realpath" -e -- "$cwd") || fail CHECKOUT_INVALID 'The checkout folder cannot be resolved.'
+# Relative entries and checkout directories never participate in executable lookup.
+project_safe_path=''
+IFS=: read -r -a project_path_entries <<<"$PATH"
+for project_dir in "${project_path_entries[@]}"; do
+  [[ "$project_dir" == /* && -d "$project_dir" ]] || continue
+  project_dir=$("$project_realpath" -e -- "$project_dir") || continue
+  [[ "$project_dir" != "$canonical_cwd" && "$project_dir" != "$canonical_cwd/"* ]] || continue
+  project_safe_path+="${project_safe_path:+:}$project_dir"
+done
+# Resolve only supported names to absolute canonical files outside the checkout.
+resolve_tool() {
+  local executable
+  executable=$(PATH="$project_safe_path" command -v "$1" || true)
+  [[ "$executable" == /* && -x "$executable" ]] || return 1
+  executable=$("$project_realpath" -e -- "$executable") || return 1
+  [[ "$executable" != "$canonical_cwd" && "$executable" != "$canonical_cwd/"* ]] || return 1
+  printf '%s\n' "$executable"
+}
+project_executable=$(resolve_tool "${argv[0]}") || fail TOOL_MISSING 'Choose an installed application outside the checkout.'
+argv[0]=$project_executable
+if [[ ${argv[-3]} == nvim && ${argv[-2]} == -- ]]; then
+  project_nvim=$(resolve_tool nvim) || fail TOOL_MISSING 'Choose installed Neovim outside the checkout.'
+  argv[-3]=$project_nvim
+fi
+if [[ ${argv[-3]} == claude && ${argv[-2]} == --resume ]]; then
+  project_claude=$(resolve_tool claude) || fail TOOL_MISSING 'Install Claude outside the checkout.'
+  argv[-3]=$project_claude
+fi
+if [[ ${#argv[@]} -ge 5 && ${argv[-5]} == codex && ${argv[-4]} == resume ]]; then
+  project_codex=$(resolve_tool codex) || fail TOOL_MISSING 'Install Codex outside the checkout.'
+  argv[-5]=$project_codex
+fi
+# The child is never tracked by Quickshell. Parent helpers never enter the checkout.
+(cd -- "$cwd" && PATH="$project_safe_path" exec "$project_setsid" -- "${argv[@]}") </dev/null >/dev/null 2>&1 &
+project_pid=$!
+project_start=''
+for ((attempt = 0; attempt < 20; attempt++)); do
+  if [[ -r "/proc/$project_pid/stat" ]]; then
+    stat_line=$(<"/proc/$project_pid/stat")
+    stat_tail=${stat_line##*) }
+    read -r -a stat_fields <<<"$stat_tail"
+    if [[ ${stat_fields[0]:-Z} != Z ]]; then
+      project_start=${stat_fields[19]:-}
+      break
+    fi
+  fi
+  /usr/bin/sleep 0.005
+done
+[[ "$project_start" =~ ^[0-9]+$ ]] || fail LAUNCH_FAILED 'The application exited before its launch identity was accepted.'
+/usr/bin/jq -cn --argjson pid "$project_pid" --arg start "$project_start" '{ok:true,status:"accepted",code:null,message:null,binding:null,identity:{pid:$pid,startTime:$start}}'

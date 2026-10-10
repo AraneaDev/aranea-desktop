@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "plugins/araneadev.menu" as Menu
+import "ProjectPreview.js" as ProjectPreview
 
 ShellRoot {
   id: harness
@@ -105,6 +106,9 @@ ShellRoot {
     entry.desktopActions.wallpaper.runner = function (argv, done) {
       harness.finish(false, "unexpected wallpaper owner call")
     }
+    entry.projectClient.runner = function (argv, done) {
+      harness.finish(false, "unexpected project owner process")
+    }
     entry.desktopSearch.compositor = null
     entry.desktopSearch.runner = function (argv) {
       return false
@@ -166,7 +170,15 @@ ShellRoot {
         entry.items = items
         entry.itemOrder = entry.itemOrder.concat(["setup.project"])
         source.refreshNow()
-        if (harness.fixture === "actions" || harness.fixture.indexOf("action-") === 0) {
+        if (harness.fixture === "project-search") {
+          var projects = ProjectPreview.sample("project-search")
+          entry.projectClient.snapshot = projects.projectSnapshot
+          entry.projectClient.available = true
+          source.refreshNow()
+          entry.setFilter("project:")
+          entry.selectedIndex = 0
+          entry.cursorActive = true
+        } else if (harness.fixture === "actions" || harness.fixture.indexOf("action-") === 0) {
           var key = "action:audio:7:speaker"
           var snapshot = {
             dnd: {

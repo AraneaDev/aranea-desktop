@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# Internal activity transaction boundary. Native mapping runs under this lock.
+# Usage: aranea-agent-store snapshot | mutate (JSON stdin) | deactivate | activate
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/agent-activity.sh
+source "$script_dir/lib/agent-activity.sh"
+activity_generation=${ARANEA_ACTIVITY_GENERATION:-$(agent_activity_generation)}
+state=null
+activity_tmp=''
+activity_scratch=''
+trap '[[ -z "$activity_tmp" ]] || rm -f -- "$activity_tmp" "${activity_tmp}.error"; [[ -z "$activity_scratch" ]] || rm -rf -- "$activity_scratch"' EXIT
+# Emit one structured failure without changing durable state.
+respond_error() {
+  jq -c --arg code "$1" --arg message "$2" \
+    '{ok:false,state:.,error:{code:$code,message:$message,recovery:"Refresh activity and check the supplied request or state-file permissions."}}' <<<"$state"
+  exit 1
+}
+for dependency in jq flock realpath stat head sha256sum; do
+  command -v "$dependency" >/dev/null || {
+    printf '{"ok":false,"state":null,"error":{"code":"DEPENDENCY_MISSING","message":"Install %s.","recovery":"Install the dependency and retry."}}\n' "$dependency"
+    exit 1
+  }
+done
+[[ $# == 1 && ("$1" == snapshot || "$1" == mutate || "$1" == deactivate || "$1" == activate) ]] || respond_error INVALID_REQUEST 'Use snapshot, mutate, deactivate or activate.'
+registry="$(aranea_state_root)/agent-activity.json"
+filter="$script_dir/lib/agent-activity.jq"
+umask 077
+if [[ "$1" == deactivate || "$1" == activate ]]; then
+  # Installation lifecycle shares the publication lock, including malformed state.
+  agent_activity_lock 5 true || respond_error "$activity_lock_error" 'Cannot coordinate activity installation lifecycle.'
+  if [[ "$1" == deactivate ]]; then
+    printf 'removed:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
+    rm -f -- "$registry" || respond_error ACTIVITY_WRITE_FAILED 'Cannot remove activity state.'
+  elif [[ $(agent_activity_generation) == removed:* ]]; then
+    printf 'active:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
+  fi
+  printf '{"ok":true,"state":null,"error":null}\n'
+  exit 0
+fi
+agent_activity_lock 1 || respond_error "$activity_lock_error" 'Activity store is busy, removed or belongs to a retired ingress lifetime.'
+[[ ! -L "$registry" ]] || respond_error UNSAFE_STATE_PATH 'Activity state must not be a symlink.'
+context=$(jq -cn --argjson receivedAt "$(date +%s)" --argjson monotonic "$(cut -d. -f1 /proc/uptime)" --arg bootId "$(cat /proc/sys/kernel/random/boot_id)" --arg generatedId "$(cat /proc/sys/kernel/random/uuid)" '{receivedAt:$receivedAt,monotonic:$monotonic,bootId:$bootId,generatedId:$generatedId}')
+projects='{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[]}'
+project_path="$(aranea_state_root)/projects.json"
+if [[ -e "$project_path" || -L "$project_path" ]]; then
+  [[ ! -L "$project_path" && -f "$project_path" ]] || respond_error REGISTRY_INVALID 'Project registry is not a regular file.'
+  projects=$(head -c 16777217 -- "$project_path" | jq -Rce 'if utf8bytelength > 16777216 then error("size") else fromjson end' -s 2>/dev/null) || respond_error REGISTRY_INVALID 'Project registry is malformed or exceeds the read limit.'
+  jq -e --arg operation validate --argjson request null -f "$script_dir/lib/projects-registry.jq" <<<"$projects" >/dev/null 2>&1 || respond_error REGISTRY_INVALID 'Project registry schema is invalid.'
+fi
+activity_scratch=$(mktemp -d "$(dirname "$registry")/.activity.XXXXXX") || respond_error ACTIVITY_WRITE_FAILED 'Cannot create private activity scratch files.'
+printf '%s\n' "$projects" >"$activity_scratch/projects"
+printf '%s\n' "$context" >"$activity_scratch/context"
+# Run the pure reducer using private files to avoid operating-system argv limits.
+run_filter() {
+  # Validation uses stdin; never write raw native prompts into scratch storage.
+  if [[ " $* " == *" operation request "* || " $* " == *" operation normalized "* ]]; then
+    printf 'null\n' >"$activity_scratch/request"
+  else
+    printf '%s\n' "${request:-null}" >"$activity_scratch/request"
+  fi
+  jq "$@" --slurpfile activity_context "$activity_scratch/context" --slurpfile activity_projects "$activity_scratch/projects" --slurpfile activity_request "$activity_scratch/request" --arg hash "${hash:-}" -f "$filter"
+}
+if [[ -e "$registry" ]]; then
+  [[ -f "$registry" ]] || respond_error ACTIVITY_INVALID 'Activity state is not a regular file.'
+  loaded=$(head -c 33554433 -- "$registry" | jq -Rces 'if utf8bytelength > 33554432 then error("size") else fromjson end' 2>/dev/null) || respond_error ACTIVITY_INVALID 'Activity state is malformed or exceeds the read limit.'
+  run_filter -e --arg operation validate <<<"$loaded" >/dev/null 2>&1 || respond_error ACTIVITY_INVALID 'Activity schema is invalid or unsupported.'
+  state=$loaded
+else
+  state='{"schemaVersion":1,"revision":0,"sessions":[],"tasks":[]}'
+fi
+if [[ "$1" == mutate ]]; then
+  input=$(head -c 1048577 | jq -Rcs 'if utf8bytelength > 1048576 then {tooLarge:true} else {request:fromjson} end' 2>/dev/null) || respond_error INVALID_REQUEST 'Provide one JSON request.'
+  [[ $(jq -r '.tooLarge // false' <<<"$input") != true ]] || respond_error INPUT_TOO_LARGE 'Request exceeds 1 MiB.'
+  request=$(jq -c .request <<<"$input")
+  run_filter -e --arg operation request <<<"$request" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Unsupported or invalid activity request.'
+  jq -e --argjson revision "$(jq .revision <<<"$state")" 'has("expectedRevision")|not' <<<"$request" >/dev/null ||
+    jq -e --argjson revision "$(jq .revision <<<"$state")" '.expectedRevision == $revision' <<<"$request" >/dev/null || respond_error ACTIVITY_CONFLICT 'Activity revision changed.'
+  if [[ $(jq -r .action <<<"$request") == native ]]; then
+    [[ -f "$script_dir/lib/agent-hooks.sh" ]] || respond_error ADAPTER_UNSUPPORTED 'Native provider mapping is unavailable.'
+    # shellcheck source=/dev/null
+    source "$script_dir/lib/agent-hooks.sh"
+    declare -F agent_hooks_prepare_request >/dev/null || respond_error ADAPTER_UNSUPPORTED 'Native provider mapping is unavailable.'
+    normalized=$(agent_hooks_prepare_request "$request" "$state" "$context") || respond_error ADAPTER_UNSUPPORTED 'Native provider request is unsupported.'
+    run_filter -e --arg operation normalized <<<"$normalized" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Native mapping returned an invalid request.'
+    [[ $(jq -r .args.provider <<<"$normalized") == "$(jq -r .args.provider <<<"$request")" ]] || respond_error INVALID_REQUEST 'Native mapping changed the provider.'
+    hash=$(jq -Sc 'del(.nativeMetadata)' <<<"$normalized" | sha256sum | cut -d' ' -f1)
+    if ! agent_activity_is_replay "$normalized" "$state" "$hash"; then
+      normalized=$(agent_activity_prepare "$normalized") || respond_error ASSOCIATION_MISMATCH 'Native checkout path is invalid.'
+    fi
+    request=$(jq -c '{action:"native",args:{normalized:.}}' <<<"$normalized")
+  else
+    # Fingerprint the original validated request: canonical path preparation must
+    # not change duplicate identity when the original path later disappears.
+    hash=$(jq -Sc 'del(.expectedRevision)' <<<"$request" | sha256sum | cut -d' ' -f1)
+    if ! agent_activity_is_replay "$request" "$state" "$hash"; then
+      request=$(agent_activity_prepare "$request") || respond_error ASSOCIATION_MISMATCH 'Checkout path must be an existing canonical directory.'
+    fi
+  fi
+  activity_tmp=$(mktemp "${registry}.XXXXXX") || respond_error ACTIVITY_WRITE_FAILED 'Cannot create atomic activity write.'
+  if ! run_filter --arg operation mutate <<<"$state" >"$activity_tmp" 2>"${activity_tmp}.error"; then
+    code=$(sed -nE 's/.*: ([A-Z_]+)$/\1/p' "${activity_tmp}.error" | tail -1)
+    respond_error "${code:-INVALID_REQUEST}" 'Activity mutation was rejected.'
+  fi
+  [[ $(stat -c %s -- "$activity_tmp") -le 33554432 ]] || respond_error CAPACITY_EXCEEDED 'Activity storage limit reached.'
+  run_filter -e --arg operation validate <"$activity_tmp" >/dev/null 2>&1 || respond_error ACTIVITY_INVALID 'Mutation would produce invalid activity state.'
+  [[ ! -L "$registry" ]] || respond_error UNSAFE_STATE_PATH 'Activity destination changed to a symlink.'
+  if [[ $(jq -c . <"$activity_tmp") != "$state" ]]; then
+    mv -T -- "$activity_tmp" "$registry" || respond_error ACTIVITY_WRITE_FAILED 'Cannot replace activity state atomically.'
+  fi
+  rm -f -- "$activity_tmp" "${activity_tmp}.error"
+  activity_tmp=''
+  state=$(cat "$registry")
+fi
+projection=$(run_filter -c --arg operation project <<<"$state") || respond_error ACTIVITY_INVALID 'Cannot project activity state.'
+jq -c '{ok:true,state:.,error:null}' <<<"$projection"

@@ -50,6 +50,7 @@ test("missing compositor removes only live records and app identities survive du
       "setting:display",
       "setting:schedule",
       "setting:integrations",
+      "setting:projects",
       "setting:notifications"
     ]
   )
@@ -207,4 +208,41 @@ test("obsolete guard results do not hide a command whose current item has no gua
     whenResults: { vpn: false }
   })
   assert.ok(records(data).some((r) => r.key === "command:vpn"))
+})
+
+test("project search forwards typed identities and details without display-derived commands", () => {
+  const row = {
+    key: "project:p-aranea",
+    type: "project",
+    label: 'Open Hostile ";bad',
+    detail: "/tmp/dev/aranea",
+    target: { projectId: "p-aranea", checkoutId: "c-main" },
+    available: true
+  }
+  const data = snapshot({ projectRecords: [row] })
+  assert.deepEqual(dispatch("project:p-aranea", data), {
+    kind: "project",
+    payload: { projectId: "p-aranea", checkoutId: "c-main" }
+  })
+  assert.equal(targets.dispatchTarget(row, snapshot({ projectRecords: [] })), null)
+  assert.equal(
+    targets.dispatchTarget(
+      row,
+      snapshot({
+        projectRecords: [{ ...row, target: { projectId: "p-aranea", checkoutId: "c-other" } }]
+      })
+    ),
+    null
+  )
+  assert.equal(
+    targets.dispatchTarget(row, snapshot({ projectRecords: [{ ...row, available: false }] })),
+    null
+  )
+  assert.deepEqual(dispatch("setting:projects", data).argv, [
+    "omarchy-shell",
+    "shell",
+    "summon",
+    "araneadev.settings",
+    '{"section":"projects"}'
+  ])
 })

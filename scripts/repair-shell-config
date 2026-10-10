@@ -71,8 +71,12 @@ weather_installed=false
 tray_installed=false
 agents_installed=false
 settings_installed=false
+activity_installed=false
+projects_installed=false
 vpn_installed=false
 for dir in "$given_config_dir" "$config_dir"; do
+  [[ -f "$dir/plugins/araneadev.activity/manifest.json" ]] && activity_installed=true
+  [[ -f "$dir/plugins/araneadev.projects/manifest.json" ]] && projects_installed=true
   [[ -f "$dir/plugins/araneadev.settings/manifest.json" ]] && settings_installed=true
   [[ -f "$dir/plugins/araneadev.audio/manifest.json" ]] && audio_installed=true
   [[ -f "$dir/plugins/araneadev.bluetooth/manifest.json" ]] && bluetooth_installed=true
@@ -106,7 +110,7 @@ note_polkit_handover() {
   fi
 }
 
-jq --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
+jq --argjson activity "$activity_installed" --argjson projects "$projects_installed" --argjson settings "$settings_installed" --argjson place "$place_bell" --argjson placeHealth "$place_health" --argjson audio "$audio_installed" --argjson bluetooth "$bluetooth_installed" --argjson clock "$clock_installed" --argjson monitor "$monitor_installed" --argjson network "$network_installed" --argjson power "$power_installed" --argjson weather "$weather_installed" --argjson tray "$tray_installed" --argjson agents "$agents_installed" --argjson vpn "$vpn_installed" --argjson placeVpn "$place_vpn" '
   def entry_id: if type == "string" then . else .id? end;
   # Drops later duplicates by id (string or {id} entries), keeping order.
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
@@ -196,7 +200,7 @@ jq --argjson settings "$settings_installed" --argjson place "$place_bell" --argj
       {id: "araneadev.polkit"},
       {id: "araneadev.workspaces"},
       {id: "araneadev.updates"}
-    ] + (if $settings then [{id: "araneadev.settings"}] else [] end) | dedupe_by_id)
+    ] + (if $activity then [{id: "araneadev.activity"}] else [] end) + (if $projects then [{id: "araneadev.projects"}] else [] end) + (if $settings then [{id: "araneadev.settings"}] else [] end) | dedupe_by_id)
   | .disabledPlugins = (((.disabledPlugins // []) + [
       "omarchy.bar",
       "omarchy.clipboard",

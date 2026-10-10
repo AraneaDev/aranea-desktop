@@ -1,0 +1,8 @@
+#!/bin/bash
+# Usage: aranea-agent-hook claude|codex < native-hook.json
+# Advisory reporter: fixed bootstrap tools, no provider decisions or context.
+export PATH=/usr/bin:/bin
+unset BASH_ENV ENV CDPATH
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+/usr/bin/timeout 2 /bin/bash "$script_dir/aranea-agent-hook-worker" "${1:-}" >/dev/null 2>&1 || true
+exit 0

@@ -97,3 +97,28 @@ the bar ring: a canvas arc taking `fraction` and `tone` from `AgentsLogic.js`, h
 Run `tests/shell-config.test.sh`, `tests/shell-deploy.test.sh` and `tools/check-docs --root .
 plugins/araneadev.agents/Panel.qml plugins/araneadev.agents/Main.qml
 plugins/araneadev.agents/Agent.qml`.
+
+## Local Tasks
+
+Tasks sits alongside Usage and stays visible for task-only activity. Attention
+selects Tasks initially; your deliberate tab choice is retained. Arrow/j/k moves
+the task cursor, Enter opens details, Tab changes Tasks/Usage, and Escape returns
+from details before closing. Task selection follows stable IDs across sorting.
+
+Empty Tasks provides copyable Claude/Codex opt-in commands and Project settings.
+Configured hooks are separate from provider trust and observed runtime activity.
+Verification is a separate reported fact; Ready for review does not mean tests
+passed. Native focus targets a proven hosting terminal, without a tmux pane claim.
+See [Activity setup and contract](../araneadev.activity/README.md).
+
+The activity owner survives bar/panel closure. Notification activation calls
+`omarchy.agents showTask TASK_ID`: inspection waits for a fresh owner snapshot,
+selects only the exact retained task, and never automatically resumes or answers.
+`taskInspection` exposes pending/selected/unavailable lookup status. Capture and
+Usage showcase modes refuse this route. A missing bar widget leaves the panel
+unavailable while CLI activity reporting and the persistent owner continue.
+
+Use `tools/render-agents-preview` for isolated screenshots of the actual Tasks
+components. This offscreen route includes empty, attention, result, lost and
+partial-operation fixtures, with narrow/large-font variants. The existing Usage
+showcase remains separate; no mock Tasks design or live activity is introduced.

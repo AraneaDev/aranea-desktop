@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Render actual inert SettingsSurface actions; matrix evidence stays outside Git.
+# Usage: tools/render-project-actions-preview --output PNG [--scene NAME] [--size wide|narrow|large-font] [--scroll target|bottom] | --matrix DIR
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tools/lib/render-capture.sh"
+scenes=(empty configured-command configured-service editor-command editor-service invalid-editor running passed failed stopped unconfirmed unavailable-manager reachable unreachable long-output)
+output='' scene=configured-command size=wide matrix='' scroll=target
+while (($#)); do
+  case "$1" in
+    --output | --scene | --size | --matrix | --scroll)
+      (($# >= 2)) || exit 2
+      case "$1" in --output) output=$2 ;; --scene) scene=$2 ;; --size) size=$2 ;; --matrix) matrix=$2 ;;
+      --scroll) scroll=$2 ;; esac
+      shift 2
+      ;;
+    *)
+      echo 'Usage: render-project-actions-preview --output PNG [--scene NAME] [--size wide|narrow|large-font] [--scroll target|bottom] | --matrix DIR' >&2
+      exit 2
+      ;;
+  esac
+done
+if [[ -n $matrix ]]; then
+  mkdir -p "$matrix"
+  : >"$matrix/manifest.sha256"
+  for scene in "${scenes[@]}"; do
+    for size in wide narrow large-font; do
+      output="$matrix/$scene-$size.png"
+      "$0" --output "$output" --scene "$scene" --size "$size" >"$matrix/$scene-$size.log" 2>&1
+      sha256sum "$output" >>"$matrix/manifest.sha256"
+      cat "$matrix/$scene-$size.log"
+    done
+  done
+  for scene in editor-command editor-service invalid-editor running passed failed stopped unconfirmed reachable unreachable long-output; do
+    output="$matrix/$scene-large-font-bottom.png"
+    "$0" --output "$output" --scene "$scene" --size large-font --scroll bottom >"$matrix/$scene-large-font-bottom.log" 2>&1
+    sha256sum "$output" >>"$matrix/manifest.sha256"
+    cat "$matrix/$scene-large-font-bottom.log"
+  done
+  exit
+fi
+[[ $scroll == target || $scroll == bottom ]] || exit 2
+[[ -n $output && " ${scenes[*]} " == *" $scene "* ]] || exit 2
+case "$size" in wide) width=840 font_scale=1 ;; narrow) width=420 font_scale=1 ;; large-font) width=420 font_scale=1.5 ;; *) exit 2 ;; esac
+shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
+[[ -f $shell_dir/Commons/qmldir && -f $shell_dir/Ui/qmldir ]]
+qs=$(command -v "${ARANEA_ACTION_PREVIEW_QUICKSHELL:-quickshell}")
+command -v magick >/dev/null
+work=$(mktemp -d /tmp/aranea-actions-render.XXXXXX)
+qs_pid='' staged=''
+# Terminate only this isolated capture group and remove partial output.
+cleanup() {
+  if [[ -n $qs_pid ]]; then
+    kill -- "-$qs_pid" 2>/dev/null || true
+    wait "$qs_pid" 2>/dev/null || true
+  fi
+  rm -rf "$work"
+  [[ -z $staged ]] || rm -f "$staged"
+}
+trap cleanup EXIT
+mkdir -p "$work/home/.config" "$work/home/.local/share" "$work/cfg/plugins" "$work/run" "$work/home/.local/state/omarchy/current" "$work/state/omarchy/current" "$work/codex"
+chmod 700 "$work/run"
+ln -s "$repo_root" "$work/state/omarchy/current/theme"
+ln -s "$repo_root" "$work/home/.local/state/omarchy/current/theme"
+render_capture_install_traps "$work"
+# Extend existing capture policy for every new action/native boundary before load.
+for program in aranea-project-actions aranea-project-action-store systemd-run systemctl journalctl curl xdg-open; do cp "$work/traps/aranea-project-store" "$work/traps/$program"; done
+ln -s "$shell_dir/Commons" "$work/cfg/Commons"
+ln -s "$shell_dir/Ui" "$work/cfg/Ui"
+for plugin in "$repo_root"/plugins/araneadev.*; do ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
+cp "$repo_root/tests/qml/fixtures/project-actions-preview.qml" "$work/cfg/shell.qml"
+# Hash all isolated state/config payload bytes and link targets before/after capture.
+state_hash() {
+  python3 - "$work" <<'PY'
+import hashlib, os, sys
+root=sys.argv[1]; h=hashlib.sha256()
+for top in ('home','state','codex'):
+ for base, dirs, files in os.walk(os.path.join(root,top),followlinks=False):
+  for name in sorted(dirs+files):
+   path=os.path.join(base,name); h.update(os.path.relpath(path,root).encode())
+   if os.path.islink(path): h.update(os.readlink(path).encode())
+   elif os.path.isfile(path): h.update(open(path,'rb').read())
+print(h.hexdigest())
+PY
+}
+before=$(state_hash)
+(cd "$work" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
+  -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
+  PATH="$work/traps:$PATH" ARANEA_CAPTURE_EXECUTION_LOG="$work/execution.log" QT_QPA_PLATFORM=offscreen QT_IM_MODULE=compose QT_SCALE_FACTOR=1 ARANEA_REDUCED_MOTION=1 \
+  HOME="$work/home" CODEX_HOME="$work/codex" XDG_CONFIG_HOME="$work/home/.config" XDG_DATA_HOME="$work/home/.local/share" XDG_STATE_HOME="$work/state" \
+  XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" ARANEA_ACTION_RENDER_SCENE="$scene" ARANEA_ACTION_RENDER_WIDTH="$width" \
+  ARANEA_ACTION_RENDER_SCROLL="$scroll" ARANEA_ACTION_RENDER_FONT_SCALE="$font_scale" ARANEA_ACTION_RENDER_OUTPUT="$work/grab.png" "$qs" -p "$work/cfg") >"$work/log" 2>&1 &
+qs_pid=$!
+for _ in {1..150}; do
+  grep -q 'ACTIONRENDER OK\|ACTIONRENDER FAILED\|Failed to load configuration' "$work/log" && break
+  kill -0 "$qs_pid" 2>/dev/null || break
+  sleep .2
+done
+after=$(state_hash)
+if [[ $before != "$after" || -s $work/execution.log ]] || ! grep -q 'ACTIONRENDER OK' "$work/log" || grep -Eq 'ACTIONRENDER FAIL|TypeError|ReferenceError|Cannot assign|Unable to assign|Binding loop detected' "$work/log"; then
+  cat "$work/log" >&2
+  [[ ! -f $work/execution.log ]] || cat "$work/execution.log" >&2
+  echo "state before=$before after=$after" >&2
+  exit 1
+fi
+[[ $(magick identify -format '%wx%h' "$work/grab.png") == "${width}x680" ]]
+mkdir -p "$(dirname "$output")"
+staged=$(mktemp "$(dirname "$output")/.render-actions.XXXXXX")
+magick "$work/grab.png" -strip "PNG32:$staged"
+mv -f "$staged" "$output"
+staged=''
+grep 'ACTIONRENDER PASS' "$work/log"
+printf 'rendered: %s (%sx680 font=%s) state-before=%s state-after=%s effects=0\n' "$output" "$width" "$font_scale" "$before" "$after"

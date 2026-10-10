@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Internal project registry: one snapshot or one serialized mutation per call.
+# Usage: aranea-project-store snapshot | mutate
+# mutate reads one {action,args,expectedRevision?} JSON object from stdin.
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/projects-registry.sh
+source "$script_dir/lib/projects-registry.sh"
+
+project_tmp=''
+trap '[[ -z "$project_tmp" ]] || rm -f -- "$project_tmp" "${project_tmp}.error"' EXIT
+state='null'
+# Emit the current valid state and an actionable error, then fail the call.
+respond_error() {
+  jq -cn --argjson state "$state" --arg code "$1" --arg message "$2" --arg recovery "$3" \
+    '{ok:false,state:$state,error:{code:$code,message:$message,recovery:$recovery}}'
+  exit 1
+}
+for dependency in jq flock realpath; do
+  if ! command -v "$dependency" >/dev/null; then
+    printf '{"ok":false,"state":null,"error":{"code":"DEPENDENCY_MISSING","message":"Install %s to use the project registry.","recovery":"Install the missing dependency and retry."}}\n' "$dependency"
+    exit 1
+  fi
+done
+[[ $# == 1 && ("$1" == snapshot || "$1" == mutate) ]] || respond_error INVALID_REQUEST 'Use snapshot or mutate.' 'Submit one supported store action.'
+registry="$(aranea_state_root)/projects.json"
+filter="$script_dir/lib/projects-registry.jq"
+umask 077
+mkdir -p -- "$(dirname "$registry")" || respond_error REGISTRY_WRITE_FAILED 'Cannot create the registry directory.' 'Check state-directory permissions and retry.'
+exec {project_lock_fd}>"$registry.lock" || respond_error REGISTRY_WRITE_FAILED 'Cannot open the registry lock.' 'Check state-directory permissions and retry.'
+flock -x "$project_lock_fd" || respond_error REGISTRY_LOCK_FAILED 'Cannot lock the registry.' 'Retry when registry storage is available.'
+if [[ -e "$registry" || -L "$registry" ]]; then
+  if ! loaded=$(jq -cs 'if length == 1 then .[0] else error("Expected one registry object") end' "$registry" 2>/dev/null); then
+    respond_error REGISTRY_INVALID 'The project registry contains malformed JSON.' 'Back up projects.json and repair it before retrying.'
+  fi
+  if ! jq -e --arg operation validate --argjson request null -f "$filter" <<<"$loaded" >/dev/null 2>&1; then
+    respond_error REGISTRY_INVALID 'The project registry schema is invalid or unsupported.' 'Back up projects.json and repair its schema before retrying.'
+  fi
+  state=$loaded
+else
+  state='{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[]}'
+fi
+if [[ "$1" == mutate ]]; then
+  if ! request=$(jq -cs 'if length == 1 then .[0] else error("Expected one request object") end' 2>/dev/null); then
+    respond_error INVALID_REQUEST 'Provide one JSON request.' 'Submit one action, args object, and optional expectedRevision.'
+  fi
+  if ! jq -e '([.args? | objects | .path? | strings] + [.args? | objects | .paths? | arrays | .[] | strings]) | all(.[]; test("[\\x00-\\x1f\\x7f]") | not)' <<<"$request" >/dev/null; then
+    respond_error INVALID_PATH 'Project paths cannot contain ASCII control characters.' 'Choose a folder path without NUL, tabs, newlines, or other ASCII controls.'
+  fi
+  if ! jq -e --arg operation request --argjson request null -f "$filter" <<<"$request" >/dev/null 2>&1; then
+    respond_error INVALID_REQUEST 'Invalid project mutation arguments.' 'Check action, IDs, tool IDs, and workspace values.'
+  fi
+  if ! jq -e --argjson state "$state" 'if has("expectedRevision") then .expectedRevision == $state.revision else true end' <<<"$request" >/dev/null; then
+    respond_error REGISTRY_CONFLICT 'The registry changed since the supplied revision.' 'Refresh the registry and retry with the current revision.'
+  fi
+  case "$(jq -r .action <<<"$request")" in
+    register | ignore | relocate)
+      command -v git >/dev/null || respond_error DEPENDENCY_MISSING 'Install Git to validate project checkouts.' 'Install Git and retry.'
+      ;;
+  esac
+  if prepared=$(projects_registry_prepare_request "$request" "$state"); then
+    :
+  else
+    prepare_status=$?
+    [[ "$prepare_status" != 2 ]] || respond_error INVALID_PATH 'The resolved project path contains ASCII control characters.' 'Choose a folder whose canonical path contains no ASCII controls.'
+    [[ "$prepare_status" != 3 ]] || respond_error CHECKOUT_CONFLICT 'Relocation would combine unrelated repository groups.' 'Choose a replacement checkout from the same group, or locate all moved checkouts.'
+    respond_error CHECKOUT_INVALID 'The selected path is not an existing directory or checkout root.' 'Choose the exact existing project folder and retry.'
+  fi
+  project_tmp=$(mktemp "${registry}.XXXXXX") || respond_error REGISTRY_WRITE_FAILED 'Cannot create an atomic registry write.' 'Check state-directory permissions and retry.'
+  if ! jq --arg operation mutate --argjson request "$prepared" -f "$filter" <<<"$state" >"$project_tmp" 2>"${project_tmp}.error"; then
+    code=$(sed -nE 's/.*: (PROJECT_NOT_FOUND|CHECKOUT_NOT_FOUND|ROOT_NOT_FOUND|CHECKOUT_CONFLICT)$/\1/p' "${project_tmp}.error")
+    rm -f -- "${project_tmp}.error"
+    respond_error "${code:-INVALID_REQUEST}" 'The project mutation could not be applied.' 'Refresh the registry and check the selected project and checkout.'
+  fi
+  rm -f -- "${project_tmp}.error"
+  if ! jq -e --arg operation validate --argjson request null -f "$filter" "$project_tmp" >/dev/null 2>&1; then
+    respond_error REGISTRY_INVALID 'The mutation would produce an invalid registry.' 'Check project identity and retry after refreshing.'
+  fi
+elif [[ -e "$registry" ]]; then
+  jq -cn --argjson state "$state" '{ok:true,state:$state,error:null}'
+  exit 0
+else
+  project_tmp=$(mktemp "${registry}.XXXXXX") || respond_error REGISTRY_WRITE_FAILED 'Cannot initialize the registry.' 'Check state-directory permissions and retry.'
+  printf '%s\n' "$state" >"$project_tmp" || respond_error REGISTRY_WRITE_FAILED 'Cannot initialize the registry.' 'Check available space and retry.'
+fi
+if ! mv -- "$project_tmp" "$registry"; then
+  respond_error REGISTRY_WRITE_FAILED 'Cannot replace the registry atomically.' 'Check state-directory permissions and available space, then retry.'
+fi
+project_tmp=''
+state=$(cat "$registry")
+jq -cn --argjson state "$state" '{ok:true,state:$state,error:null}'

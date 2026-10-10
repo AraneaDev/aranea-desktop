@@ -1,0 +1,106 @@
+#!/usr/bin/bash
+# Headless action execution, exact-run observation and fenced lifecycle authority.
+# Usage: aranea-project-actions COMMAND; reads one JSON request on stdin.
+set -euo pipefail
+# Bootstrap helpers never resolve through a caller's repository or relative PATH.
+action_search_path=${PATH:-/usr/local/bin:/usr/bin}
+export PATH=/usr/local/bin:/usr/bin
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/projects-registry.sh
+source "$script_dir/lib/projects-registry.sh"
+# shellcheck source=scripts/lib/project-actions.sh
+source "$script_dir/lib/project-actions.sh"
+# shellcheck source=scripts/lib/project-action-runtime.sh
+source "$script_dir/lib/project-action-runtime.sh"
+action_generation=${ARANEA_ACTION_GENERATION:-$(project_actions_generation)}
+export ARANEA_ACTION_GENERATION=$action_generation
+unset ARANEA_ACTION_DRAIN
+umask 077
+scratch=$(mktemp -d)
+trap 'rm -rf -- "$scratch"' EXIT
+printf '{"ok":true,"state":null,"error":null}\n' >"$scratch/result"
+[[ $# == 1 ]] || runtime_error INVALID_REQUEST 'Choose one backend command.'
+operation=$1
+head -c 1048577 >"$scratch/input"
+[[ $(stat -c %s "$scratch/input") -le 1048576 ]] || runtime_error INPUT_TOO_LARGE 'Request exceeds 1 MiB.'
+[[ -s "$scratch/input" ]] || printf '{}\n' >"$scratch/input"
+jq -ecs 'if length==1 and (.[0]|type)=="object" then .[0] else error("one object") end' "$scratch/input" >"$scratch/request" 2>/dev/null || runtime_error INVALID_REQUEST 'Provide one JSON object.'
+runtime_validate || runtime_error INVALID_REQUEST 'Invalid command request fields or identity.'
+runtime_gate
+case "$operation" in
+  activate)
+    runtime_store activate
+    cat "$scratch/result"
+    ;;
+  deactivate) runtime_deactivate ;;
+  availability)
+    runtime_tools
+    runtime_availability
+    cat "$scratch/result"
+    ;;
+  configure | remove)
+    jq --arg op "$operation" '{action:$op,args:del(.expectedRevision)} + (if has("expectedRevision") then {expectedRevision} else {} end)' "$scratch/request" | runtime_store mutate
+    cat "$scratch/result"
+    ;;
+  snapshot)
+    runtime_store snapshot
+    jq --slurpfile r "$scratch/request" 'if $r[0].projectId then .state.definitions|=map(select(.projectId==$r[0].projectId)) | .state.runs|=map(select(.projectId==$r[0].projectId)) | .state.runs as $runs | .state.requests|=map(select(.runId as $id | any($runs[];.id==$id))) else . end' "$scratch/result"
+    ;;
+  start)
+    runtime_start
+    cat "$scratch/result"
+    ;;
+  inspect)
+    runtime_load
+    cat "$scratch/result"
+    ;;
+  refresh)
+    runtime_load
+    runtime_tools
+    runtime_refresh
+    cat "$scratch/result"
+    ;;
+  stop)
+    runtime_load
+    runtime_tools
+    runtime_stop
+    cat "$scratch/result"
+    ;;
+  restart)
+    runtime_load
+    cp "$scratch/run" "$scratch/old-run"
+    jq --slurpfile old "$scratch/old-run" '. as $q | $old[0]|{projectId,checkoutId,actionId} + {requestId:$q.requestId} + (if $q|has("expectedDefinitionRevision") then {expectedDefinitionRevision:$q.expectedDefinitionRevision} else {} end)' "$scratch/request" >"$scratch/restart"
+    # Replaying an accepted receipt never stops again or checks a newer definition.
+    if ! jq -e --slurpfile q "$scratch/restart" 'any(.state.requests[];.requestId==$q[0].requestId)' "$scratch/result" >/dev/null; then
+      # Refuse a stale reviewed command before changing the original exact run.
+      jq -e --slurpfile q "$scratch/restart" '($q[0]|has("expectedDefinitionRevision")|not) or any(.state.definitions[];.projectId==$q[0].projectId and .id==$q[0].actionId and .revision==$q[0].expectedDefinitionRevision)' "$scratch/result" >/dev/null || runtime_error ACTION_CONFLICT 'The displayed action definition changed; review it before restarting.'
+      runtime_tools
+      runtime_stop
+      jq -e '.processState=="stopped" or .processState=="succeeded" or .processState=="failed"' "$scratch/run" >/dev/null || runtime_error STOP_UNCONFIRMED 'Refresh and stop the original run before restarting.'
+    fi
+    mv "$scratch/restart" "$scratch/request"
+    # Fresh Start rechecks the same reviewed revision after stop observation.
+    runtime_start
+    cat "$scratch/result"
+    ;;
+  logs | open-preview)
+    runtime_load
+    runtime_tools
+    if [[ $operation == logs ]]; then
+      runtime_read_proof || runtime_error "$proof_error" 'The current invocation or retained terminal history cannot be verified.'
+    else
+      runtime_proof || runtime_error "$proof_error" 'The exact owned invocation cannot be verified; refresh this run.'
+    fi
+    if [[ $(jq -r .invocationId "$scratch/run") == null ]]; then
+      jq -cn --arg i "${unit_props[InvocationID]}" '{invocationId:$i}' >"$scratch/patch"
+      runtime_observe
+      runtime_proof || runtime_error "$proof_error" 'The adopted invocation changed before the requested read.'
+    fi
+    # Do not hold state/dispatch authority across journal, HTTP or browser I/O.
+    runtime_ungate
+    if [[ $operation == logs ]]; then runtime_logs; else runtime_preview; fi
+    cat "$scratch/result"
+    ;;
+esac

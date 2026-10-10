@@ -81,7 +81,7 @@ jobs:
           echo 'Server = https://archive.archlinux.org/repos/2026/10/06/$repo/os/$arch' > /etc/pacman.d/mirrorlist
 
       - name: Install packages
-        run: pacman -Syyuu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap
+        run: pacman -Syyuu --noconfirm --needed git curl jq ripgrep python nodejs npm quickshell qt6-declarative imagemagick librsvg libxml2 lua sway dbus libcap diffutils
 
       # Arch's sway carries cap_sys_nice as a file capability, and a container
       # that may not grant it cannot exec sway at all ("Operation not
@@ -116,3 +116,10 @@ jobs:
         env:
           ARANEA_CHECK_REQUIRE_ALL: "1"
         run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tools/check --only format,qml,qmltest,smoke
+
+      # Native flows require the same pinned Quickshell/Omarchy host as QML.
+      # The Ubuntu job retains their headless checks and reports native skips.
+      - name: Native project and agent acceptance
+        env:
+          ARANEA_CHECK_REQUIRE_ALL: "1"
+        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tests/run agent-activity-flow project-actions-flow projects-cli-owner projects-flow showcase

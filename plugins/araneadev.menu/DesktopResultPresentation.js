@@ -13,7 +13,8 @@ function typeLabel(type) {
       window: "Window",
       workspace: "Workspace",
       setting: "Setting",
-      action: "Action"
+      action: "Action",
+      project: "Project"
     }[type] || ""
   )
 }
@@ -31,7 +32,8 @@ function fallbackIcon(type) {
     window: 0xf02d1,
     workspace: 0xf0099,
     setting: 0xf0493,
-    action: 0xf0e7
+    action: 0xf0e7,
+    project: 0xf024b
   }
   return codes[type] ? String.fromCodePoint(codes[type]) : ""
 }

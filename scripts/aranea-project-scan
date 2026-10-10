@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Private settings scan transport; only its own child group can be cancelled.
+# Usage: aranea-project-scan ROOT_ID (stdin: cancel)
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ $# == 1 && "$1" =~ ^r-[A-Za-z0-9-]+$ ]] || exit 2
+command -v setsid >/dev/null || {
+  echo 'Install setsid to discover projects.' >&2
+  exit 4
+}
+setsid bash "$script_dir/aranea" projects discover --root "$1" --json &
+scan_pid=$!
+scan_started=''
+# Read the exact child identity and private process-group ID from procfs.
+scan_identity() {
+  [[ -r /proc/$scan_pid/stat ]] || return 1
+  local stat
+  stat=$(<"/proc/$scan_pid/stat")
+  stat=${stat##*) }
+  read -r -a fields <<<"$stat"
+  [[ "${fields[2]}" == "$scan_pid" ]] || return 1
+  printf '%s' "${fields[19]}"
+}
+# Record start-time once setsid has established the child-owned private group.
+for ((attempt = 0; attempt < 100; attempt++)); do
+  scan_started=$(scan_identity) && break
+  kill -0 "$scan_pid" 2>/dev/null || break
+  sleep 0.01
+done
+# Forward TERM to all outer descendants, allowing nested discovery to stop its group.
+stop_scan() {
+  trap '' TERM INT
+  if [[ -n "$scan_started" && $(scan_identity || true) == "$scan_started" ]]; then
+    kill -TERM -- "-$scan_pid" 2>/dev/null || true
+    # Nested discovery escalates its own group before the outer CLI is reaped.
+    sleep 0.5
+    if [[ $(scan_identity || true) == "$scan_started" ]]; then kill -KILL -- "-$scan_pid" 2>/dev/null || true; fi
+  fi
+  wait "$scan_pid" 2>/dev/null || true
+  exit 1
+}
+trap stop_scan TERM INT
+while kill -0 "$scan_pid" 2>/dev/null; do
+  input=''
+  if IFS= read -r -t 0.1 input; then
+    [[ "$input" != cancel ]] || stop_scan
+  else
+    read_status=$?
+    # A closed client cancels discovery; timeout keeps waiting asynchronously.
+    [[ "$read_status" != 1 ]] || stop_scan
+  fi
+done
+wait "$scan_pid"

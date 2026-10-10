@@ -5,6 +5,7 @@ import Quickshell
 import QtQuick
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "../araneadev.projects" as Projects
 import "MenuModel.js" as MenuModel
 import "MenuLayout.js" as MenuLayout
 import "DesktopSearchLogic.js" as DesktopSearch
@@ -300,6 +301,14 @@ Item {
   // Persistent action owner, also used by inert render and integration fixtures.
   readonly property alias desktopActions: desktopActions
 
+  // Only capture/preview makes the client inert; hiding never cancels observation.
+  Projects.ProjectClient {
+    id: projectClient
+    captureActive: !root.windowEnabled || desktopActions.showcaseActive
+  }
+  // Project boundary exposed to inert previews and sandbox integration tests.
+  readonly property alias projectClient: projectClient
+
   // Existing watchers supply static inputs; only the local controller owns live reads.
   DesktopSearchSources {
     id: desktopSources
@@ -312,6 +321,7 @@ Item {
     recentAppIds: history.recentAppIds
     settingsAvailable: sources.settingsAvailable
     actionController: desktopActions
+    projectClient: root.projectClient
     onRevisionChanged: if (root.desktopSearchActive)
       root.rebuildDisplay()
     onAppRequested: function (appId, label) {
@@ -336,10 +346,10 @@ Item {
     if (serial < 0 || !root.desktopSearchActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
       return null
     var row = displayModel.get(root.selectedIndex)
-    return row.actionStatus === "failed" ? row : null
+    return row.actionStatus === "failed" || row.resultType === "project" && root.cursorActive ? row : null
   }
   // Available recovery destination for the selected failed action.
-  readonly property string recoveryLabel: !recoveryRow ? "" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
+  readonly property string recoveryLabel: !recoveryRow ? "" : recoveryRow.resultType === "project" ? "Project details" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
   // Space reserved beneath results so recovery never clips outside the card.
   readonly property int recoveryHeight: recoveryLabel ? Style.space(28) + root.style.sectionSpacing : 0
   onRecoveryLabelChanged: if (!recoveryLabel)
@@ -348,6 +358,10 @@ Item {
   function recoverSelected(): void {
     if (!root.recoveryLabel || desktopActions.showcaseActive)
       return
+    if (root.recoveryRow.resultType === "project") {
+      desktopSources.openProjectDetails(root.recoveryRow.desktopKey)
+      return
+    }
     var argv = root.recoveryLabel === "Open audio controls" ? ["omarchy-shell", "omarchy.audio", "open"] : ["omarchy-shell", "shell", "summon", "araneadev.settings", JSON.stringify({
         section: "appearance"
       })]
@@ -701,7 +715,11 @@ Item {
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
-        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : null
+        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : record.type === "project" ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
+        if (record.type === "project" && feedback && feedback.checkoutId !== record.target.checkoutId)
+          feedback = null
+        if (record.type === "project" && feedback && feedback.status !== "pending" && feedback.status !== "failed")
+          desktopRow.detail += " · " + feedback.message
         desktopRow.actionStatus = feedback ? feedback.status : ""
         desktopRow.actionMessage = feedback ? feedback.message : ""
         rows.push(desktopRow)

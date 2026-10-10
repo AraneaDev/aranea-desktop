@@ -125,6 +125,14 @@ function settingRecords(available) {
     ),
     sourceRecord(
       "setting",
+      "projects",
+      "Projects",
+      { section: "projects" },
+      "Development projects and workspaces",
+      ["project", "checkout", "worktree"]
+    ),
+    sourceRecord(
+      "setting",
       "notifications",
       "Notifications",
       { section: "notifications" },
@@ -211,6 +219,12 @@ function sourceRecords(snapshot) {
         return row && row.type === "action"
       })
     )
+  if (Array.isArray(data.projectRecords))
+    rows = rows.concat(
+      data.projectRecords.filter(function (row) {
+        return row && row.type === "project"
+      })
+    )
   if (data.compositorAvailable !== true) return rows
   collectionValues(data.windows).forEach(function (window) {
     if (!window) return
@@ -269,6 +283,19 @@ function dispatchTarget(record, snapshot) {
     return row.key === record.key
   })[0]
   if (!current) return null
+  if (current.type === "project") {
+    if (
+      current.available === false ||
+      !record.target ||
+      record.target.projectId !== current.target.projectId ||
+      record.target.checkoutId !== current.target.checkoutId
+    )
+      return null
+    return {
+      kind: "project",
+      payload: { projectId: current.target.projectId, checkoutId: current.target.checkoutId }
+    }
+  }
   // Actions belong to the persistent action controller, never the argv fallback.
   if (current.type === "action") return null
   if (current.type === "app")

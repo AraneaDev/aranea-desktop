@@ -1007,3 +1007,36 @@ jq -e '.plugins[0] == {"id":"araneadev.settings","preferred":"notifications"} an
 jq -e '.plugins == ["user.widget"]' "$settings_cfg" >/dev/null
 
 echo "shell config contract passed"
+
+# Persistent projects owner is registered only after deployment, without a bar entry.
+project_config="$test_root/project-config/shell.json"
+mkdir -p "$(dirname "$project_config")" "$ARANEA_STATE_ROOT"
+printf '%s\n' '{"plugins":[{"id":"user.widget","keep":7}],"bar":{"layout":{"right":[]}}}' >"$project_config"
+printf '%s\n' '{"schemaVersion":1,"revision":7,"roots":[],"ignored":[],"projects":[]}' >"$ARANEA_STATE_ROOT/projects.json"
+cp "$ARANEA_STATE_ROOT/projects.json" "$test_root/projects-before.json"
+"$repo_root/scripts/repair-shell-config" "$project_config"
+jq -e '([.plugins[].id]|index("araneadev.projects")) == null' "$project_config" >/dev/null
+mkdir -p "$(dirname "$project_config")/plugins/araneadev.projects"
+cp "$repo_root/plugins/araneadev.projects/manifest.json" "$(dirname "$project_config")/plugins/araneadev.projects/manifest.json"
+"$repo_root/scripts/repair-shell-config" "$project_config"
+"$repo_root/scripts/repair-shell-config" "$project_config"
+jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1 and ([.bar.layout[]? | .[]? | if type=="string" then . else .id end] | index("araneadev.projects")) == null' "$project_config" >/dev/null
+"$repo_root/scripts/release-shell-config" "$project_config"
+"$repo_root/scripts/release-shell-config" "$project_config"
+jq -e '([.plugins[].id]|index("araneadev.projects"))==null and (.plugins|map(select(.id=="user.widget")))==[{id:"user.widget",keep:7}]' "$project_config" >/dev/null
+cmp "$ARANEA_STATE_ROOT/projects.json" "$test_root/projects-before.json"
+"$repo_root/scripts/repair-shell-config" "$project_config"
+jq -e '([.plugins[].id|select(.=="araneadev.projects")]|length)==1' "$project_config" >/dev/null
+
+# Activity ownership is independent of an Agents widget and never changes providers.
+activity_config="$test_root/activity-config/shell.json"
+mkdir -p "$(dirname "$activity_config")/plugins/araneadev.activity"
+cp "$repo_root/plugins/araneadev.activity/manifest.json" "$(dirname "$activity_config")/plugins/araneadev.activity/manifest.json"
+printf '%s\n' '{"plugins":["user.widget"],"bar":{"layout":{"right":[]}},"providers":{"codex":{"enabled":false}}}' >"$activity_config"
+"$repo_root/scripts/repair-shell-config" "$activity_config" >/dev/null
+"$repo_root/scripts/repair-shell-config" "$activity_config" >/dev/null
+jq -e '([.plugins[] | if type=="string" then . else .id end | select(.=="araneadev.activity")]|length)==1 and .bar.layout.right==[] and .providers.codex.enabled==false' "$activity_config" >/dev/null
+"$repo_root/scripts/release-shell-config" "$activity_config" >/dev/null
+jq -e '.plugins==["user.widget"] and .providers.codex.enabled==false' "$activity_config" >/dev/null
+"$repo_root/scripts/repair-shell-config" "$activity_config" >/dev/null
+jq -e 'any(.plugins[]; .id?=="araneadev.activity")' "$activity_config" >/dev/null

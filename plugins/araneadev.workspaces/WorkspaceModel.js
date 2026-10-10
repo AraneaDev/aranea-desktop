@@ -625,6 +625,67 @@ function openCaption(count) {
 }
 
 /**
+ * Informational context for an exact associated checkout. Dedicated associations
+ * describe persistent intent; current associations require the owner's verified
+ * current-session binding. Neither labels nor associations prove window ownership.
+ * @param {*} workspaceId - Positive compositor workspace id.
+ * @param {*} projectSnapshot - Current owner projection, or null when unavailable.
+ * @returns {{projectId:string, checkoutId:string, label:string, detail:string}|null} Context, or ordinary workspace fallback.
+ */
+function projectContext(workspaceId, projectSnapshot) {
+  var id = Number(workspaceId)
+  if (!Number.isInteger(id) || id <= 0 || !projectSnapshot) return null
+  var projects = Array.isArray(projectSnapshot.projects) ? projectSnapshot.projects : []
+  var bindings = Array.isArray(projectSnapshot.bindings) ? projectSnapshot.bindings : []
+  for (var i = 0; i < projects.length; i++) {
+    var project = projects[i]
+    if (!project || !project.id) continue
+    var associations = Array.isArray(project.associations) ? project.associations : []
+    var checkouts = Array.isArray(project.checkouts) ? project.checkouts : []
+    for (var j = 0; j < associations.length; j++) {
+      var association = associations[j]
+      if (!association || !association.checkoutId) continue
+      var matches = association.mode === "dedicated" && association.workspaceId === id
+      if (
+        association.mode === "current" &&
+        (association.workspaceId === null || association.workspaceId === id)
+      ) {
+        matches = bindings.some(function (/** @type {*} */ binding) {
+          return (
+            binding &&
+            binding.projectId === project.id &&
+            binding.checkoutId === association.checkoutId &&
+            binding.workspaceId === id &&
+            !!projectSnapshot.sessionId &&
+            binding.sessionId === projectSnapshot.sessionId &&
+            binding.evidence &&
+            binding.evidence.processVerified === true &&
+            ["process-only", "process-app-id"].indexOf(binding.evidence.mode) >= 0 &&
+            binding.pid > 0 &&
+            typeof binding.address === "string" &&
+            /^0x[0-9a-fA-F]+$/.test(binding.address) &&
+            !/^0x0+$/.test(binding.address)
+          )
+        })
+      }
+      if (!matches) continue
+      var checkout = checkouts.filter(function (/** @type {*} */ candidate) {
+        return candidate && candidate.id === association.checkoutId
+      })[0]
+      if (!checkout) continue
+      return {
+        projectId: project.id,
+        checkoutId: checkout.id,
+        label:
+          String(project.name || project.id) + (checkout.branch ? " · " + checkout.branch : ""),
+        detail: String(checkout.path || "")
+      }
+    }
+  }
+  return null
+}
+
+/**
  * A row's label: "Workspace" plus its display name.
  * @param {*} row - Workspace row.
  * @returns {string} The row's label.
@@ -697,6 +758,7 @@ if (typeof module !== "undefined") {
     cursorPress,
     outlineIndex,
     openCaption,
+    projectContext,
     workspaceLabel,
     workspaceDetail,
     workspaceTitles,

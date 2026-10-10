@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Private durable action definitions and immutable launch-intent transactions.
+# Usage: aranea-project-action-store snapshot | mutate | activate | retire | deactivate
+# mutate reads one {action,args,expectedRevision?} JSON object on stdin.
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/projects-registry.sh
+source "$script_dir/lib/projects-registry.sh"
+# shellcheck source=scripts/lib/project-actions.sh
+source "$script_dir/lib/project-actions.sh"
+action_generation=${ARANEA_ACTION_GENERATION:-$(project_actions_generation)}
+state=null
+scratch=''
+atomic=''
+trap '[[ -z "$scratch" ]] || rm -rf -- "$scratch"; [[ -z "$atomic" ]] || rm -f -- "$atomic"' EXIT
+# Return the valid pre-transaction state, without exposing scratch or corrupt bytes.
+respond_error() {
+  jq -c --arg code "$1" --arg message "$2" '{ok:false,state:.,error:{code:$code,message:$message,recovery:"Refresh action state and check the request, checkout and state-file permissions."}}' <<<"$state"
+  exit 1
+}
+for dependency in jq flock realpath stat head sha256sum; do
+  command -v "$dependency" >/dev/null || respond_error DEPENDENCY_MISSING "Install $dependency."
+done
+[[ $# == 1 && ("$1" == snapshot || "$1" == mutate || "$1" == activate || "$1" == deactivate || "$1" == retire) ]] || respond_error INVALID_REQUEST 'Use snapshot, mutate, activate, retire or deactivate.'
+umask 077
+registry="$(aranea_state_root)/project-actions.json"
+filter="$script_dir/lib/project-actions.jq"
+scratch=$(mktemp -d) || respond_error ACTION_WRITE_FAILED 'Cannot create private request scratch.'
+printf 'null\n' >"$scratch/request"
+printf '{}\n' >"$scratch/context"
+# All variable JSON crosses jq through stdin/files, including the returned state.
+run_filter() {
+  jq "$@" --slurpfile action_request "$scratch/request" --slurpfile action_context "$scratch/context" -f "$filter"
+}
+# Read bounded ingress before taking the transaction lock: a stalled producer
+# cannot hold authority indefinitely; its captured generation still fences it.
+if [[ "$1" == mutate ]]; then
+  head -c 1048577 >"$scratch/input"
+  [[ $(stat -c %s "$scratch/input") -le 1048576 ]] || respond_error INPUT_TOO_LARGE 'Request exceeds 1 MiB.'
+  jq -ecs 'if length==1 then .[0] else error("one request") end' "$scratch/input" >"$scratch/request" 2>/dev/null || respond_error INVALID_REQUEST 'Provide one JSON request.'
+  run_filter -e --arg operation request <"$scratch/request" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Invalid action request fields or values.'
+fi
+lifecycle=false
+[[ "$1" != activate && "$1" != deactivate && "$1" != retire ]] || lifecycle=true
+if [[ $lifecycle == true ]]; then
+  project_actions_dispatch_lock || respond_error "$action_lock_error" 'Dispatch authority is busy or unsafe.'
+fi
+project_actions_lock 2 "$lifecycle" || respond_error "$action_lock_error" 'Action store is busy, unsafe or belongs to a retired ingress.'
+project_actions_safe_path "$registry" || respond_error UNSAFE_STATE_PATH 'Action state must not traverse symlinks.'
+if [[ -e "$registry" ]]; then
+  [[ -f "$registry" ]] || respond_error ACTION_STATE_INVALID 'Action state is not a regular file.'
+  [[ $(stat -c %s "$registry") -le 16777216 ]] || respond_error ACTION_STATE_INVALID 'Action state exceeds 16 MiB.'
+  loaded=$(head -c 16777217 "$registry" | jq -Rces 'if utf8bytelength<=16777216 then fromjson else error("size") end' 2>/dev/null) || respond_error ACTION_STATE_INVALID 'Action state contains malformed JSON.'
+  run_filter -e --arg operation validate <<<"$loaded" >/dev/null 2>&1 || respond_error ACTION_STATE_INVALID 'Action state has invalid schema.'
+  state=$loaded
+else
+  state=$(run_filter -cn --arg operation initial)
+fi
+if [[ "$lifecycle" == true ]]; then
+  if [[ "$1" == retire ]]; then
+    if [[ $(project_actions_generation) != draining:* ]]; then
+      printf 'draining:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
+    fi
+  elif [[ "$1" == deactivate ]]; then
+    run_filter -e --arg operation protected <<<"$state" >/dev/null && respond_error RUN_PROTECTED 'Accepted or unconfirmed runs must be resolved before removal.'
+    printf 'removed:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
+    rm -f -- "$registry" || respond_error ACTION_WRITE_FAILED 'Cannot remove action state.'
+  elif [[ $(project_actions_generation) == removed:* || $(project_actions_generation) == draining:* ]]; then
+    run_filter -e --arg operation protected <<<"$state" >/dev/null && respond_error RUN_PROTECTED 'Resolve retired protected runs before reactivation.'
+    printf 'active:%s\n' "$(cat /proc/sys/kernel/random/uuid)" >"$registry.lock"
+  fi
+  printf '{"ok":true,"state":null,"error":null}\n'
+  exit 0
+fi
+if [[ "$1" == snapshot ]]; then
+  jq -c '{ok:true,state:.,error:null}' <<<"$state"
+  exit 0
+fi
+printf '%s\n' "$state" >"$scratch/state"
+jq -e --slurpfile s "$scratch/state" 'has("expectedRevision")|not' "$scratch/request" >/dev/null ||
+  jq -e --slurpfile s "$scratch/state" '.expectedRevision==$s[0].revision' "$scratch/request" >/dev/null || respond_error ACTION_CONFLICT 'The action state revision changed.'
+action=$(jq -r .action "$scratch/request")
+request_hash=''
+replay=false
+if [[ "$action" == reserve ]]; then
+  request_hash=$(jq -Sc '.args|{projectId,checkoutId,actionId}' "$scratch/request" | sha256sum | cut -d' ' -f1)
+  if jq -e --slurpfile r "$scratch/request" 'any(.requests[];.requestId==$r[0].args.requestId)' "$scratch/state" >/dev/null; then
+    replay=true
+  fi
+fi
+if [[ "$action" == configure || ("$action" == reserve && "$replay" == false) ]]; then
+  projects="$(aranea_state_root)/projects.json"
+  project_actions_safe_path "$projects" && [[ -f "$projects" && $(stat -c %s "$projects") -le 16777216 ]] || respond_error REGISTRY_INVALID 'Project registry is absent, unsafe or oversized.'
+  head -c 16777217 "$projects" >"$scratch/projects"
+  if ! jq -es 'length==1' "$scratch/projects" >/dev/null 2>&1 ||
+    ! jq -e --arg operation validate --argjson request null -f "$script_dir/lib/projects-registry.jq" "$scratch/projects" >/dev/null 2>&1; then
+    respond_error REGISTRY_INVALID 'Project registry schema is invalid.'
+  fi
+  jq -e --slurpfile r "$scratch/request" 'any(.projects[];.id==$r[0].args.projectId)' "$scratch/projects" >/dev/null || respond_error PROJECT_NOT_FOUND 'The registered project no longer exists.'
+  if [[ "$action" == reserve ]]; then
+    jq -ce --slurpfile r "$scratch/request" '.definitions[]|select(.id==$r[0].args.actionId and .projectId==$r[0].args.projectId)' "$scratch/state" >"$scratch/definition" || respond_error ACTION_NOT_FOUND 'The selected definition no longer exists.'
+    definition_hash=$(project_actions_definition_hash <"$scratch/definition")
+    jq -e --arg h "$definition_hash" --slurpfile d "$scratch/definition" '.args.definitionHash==$h and .args.definitionRevision==$d[0].revision' "$scratch/request" >/dev/null || respond_error ACTION_CONFLICT 'The definition changed before reservation.'
+    project_actions_checkout "$scratch/request" "$scratch/projects" "$scratch/definition" || respond_error CHECKOUT_INVALID 'The exact registered checkout or configured working directory changed.'
+  fi
+fi
+jq -cn --arg uuid "$(cat /proc/sys/kernel/random/uuid)" --argjson now "$(date +%s)" --arg requestHash "$request_hash" '{uuid:$uuid,now:$now,requestHash:$requestHash}' >"$scratch/context"
+atomic=$(mktemp "${registry}.XXXXXX") || respond_error ACTION_WRITE_FAILED 'Cannot create atomic action write.'
+if ! run_filter -c --arg operation mutate <"$scratch/state" >"$atomic" 2>"$scratch/error"; then
+  code=$(sed -nE 's/.*: ([A-Z_]+)$/\1/p' "$scratch/error" | tail -1)
+  respond_error "${code:-INVALID_REQUEST}" 'The action mutation was rejected.'
+fi
+[[ $(stat -c %s "$atomic") -le 16777216 ]] || respond_error CAPACITY_EXCEEDED 'Action state exceeds 16 MiB.'
+run_filter -e --arg operation validate <"$atomic" >/dev/null 2>&1 || respond_error ACTION_STATE_INVALID 'Mutation would produce invalid action state.'
+project_actions_safe_path "$registry" || respond_error UNSAFE_STATE_PATH 'Action destination changed to a symlink.'
+mv -T -- "$atomic" "$registry" || respond_error ACTION_WRITE_FAILED 'Cannot atomically replace action state.'
+atomic=''
+jq -c --arg action "$action" --slurpfile r "$scratch/request" --slurpfile before "$scratch/state" '
+  . as $state | {ok:true,state:.,error:null}
+  | if $action=="reserve" then ($state.requests[]|select(.requestId==$r[0].args.requestId)|.runId) as $id
+    | .run=($state.runs[]|select(.id==$id)) | .reused=any($before[0].runs[];.id==$id)
+    elif $action=="observe" or $action=="request-stop" then .run=([$state.runs[]|select(.id==$r[0].args.runId)][0]//null) else . end' "$registry"

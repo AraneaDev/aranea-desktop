@@ -231,3 +231,43 @@ test("Display survives settings normalization and typed scale searches", () => {
   const ranking = loadPragma("plugins/araneadev.menu/DesktopSearchRanking.js")
   assert.equal(ranking.normalizeRecord(row)?.key, "setting:display")
 })
+
+test("project prefix selects projects while preserving canonical keys", () => {
+  const project = {
+    type: "project",
+    label: "Open Aranea",
+    detail: "/tmp/dev/aranea",
+    target: { projectId: "p-aranea", checkoutId: "c-main" }
+  }
+  assert.deepEqual(plain(search.parseQuery("project: aranea")), { type: "project", text: "aranea" })
+  assert.deepEqual(keys([project], "project: aranea"), ["project:p-aranea"])
+  assert.deepEqual(plain(search.normalizeRecord(project)).target, {
+    projectId: "p-aranea",
+    checkoutId: "c-main"
+  })
+  assert.equal(search.normalizeRecord({ ...project, target: { projectId: "p-aranea" } }), null)
+})
+
+test("projects use matching tiers without a blanket project preference", () => {
+  const project = {
+    type: "project",
+    label: "Open Aranea",
+    detail: "/tmp/dev/aranea",
+    aliases: ["aranea"],
+    target: { projectId: "p-aranea", checkoutId: "c-main" },
+    pinned: true,
+    recentRank: 0,
+    activeWorkspace: true
+  }
+  assert.deepEqual(keys([project, record("app", "aranea", "Aranea")], "aranea"), [
+    "app:aranea",
+    "project:p-aranea"
+  ])
+  assert.deepEqual(keys([project, record("command", "aranea", "Open Aranea")], "open aranea"), [
+    "command:aranea",
+    "project:p-aranea"
+  ])
+  assert.deepEqual(keys([record("setting", "projects", "Projects")], "setting: projects"), [
+    "setting:projects"
+  ])
+})

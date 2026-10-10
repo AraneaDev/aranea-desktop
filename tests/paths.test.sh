@@ -33,3 +33,24 @@ if grep -rnE '\$\{XDG_(STATE|CONFIG|DATA)_HOME:-' "$repo_root/scripts" "$repo_ro
 fi
 
 echo "paths contract passed"
+
+# Execute the JavaScript path bindings consumed by QML with controlled env.
+# Removing the state-root override or using another registry root breaks this.
+node - "$repo_root/plugins/araneadev.shared/RuntimePaths.qml" <<'JS'
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const source = fs.readFileSync(process.argv[2], 'utf8');
+function paths(env) {
+  const context = vm.createContext({Quickshell:{env:key => env[key] || ''}});
+  for (const name of ['home','xdgStateHome','araneaStateRoot','projectsRegistryPath']) {
+    const binding = source.match(new RegExp('readonly property string ' + name + ': ([^\\n]+)'));
+    assert.ok(binding, 'missing runtime path ' + name);
+    context[name] = vm.runInContext(binding[1], context);
+  }
+  return context;
+}
+assert.equal(paths({HOME:'/home/example'}).projectsRegistryPath, '/home/example/.local/state/aranea/projects.json');
+assert.equal(paths({HOME:'/home/example',XDG_STATE_HOME:'/xdg',ARANEA_STATE_ROOT:'/custom'}).projectsRegistryPath, '/custom/projects.json');
+assert.equal(paths({HOME:'/home/example',XDG_STATE_HOME:'/xdg',ARANEA_STATE_ROOT:''}).projectsRegistryPath, '/xdg/aranea/projects.json');
+JS

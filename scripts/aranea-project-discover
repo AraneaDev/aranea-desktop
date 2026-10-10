@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# Scan explicitly selected folders for repositories and related worktrees.
+# Usage: aranea-project-discover --root PATH [--root PATH ...] [--json]
+# Internal identity adapter: --metadata PATH --json returns {ok,metadata,error}.
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/projects-registry.sh
+source "$script_dir/lib/projects-registry.sh"
+# shellcheck source=scripts/lib/projects-discovery.sh
+source "$script_dir/lib/projects-discovery.sh"
+worker=false discovery_json=false
+if [[ "${1:-}" == --worker ]]; then
+  worker=true
+  shift
+fi
+scan_args=("$@")
+roots=() metadata_path=''
+while (($#)); do
+  case "$1" in
+    --root)
+      [[ $# -ge 2 && -n "$2" ]] || {
+        echo 'Provide a folder after --root.' >&2
+        exit 2
+      }
+      roots+=("$2")
+      shift 2
+      ;;
+    --metadata)
+      [[ $# -ge 2 && -n "$2" && -z "$metadata_path" ]] || {
+        echo 'Provide one checkout after --metadata.' >&2
+        exit 2
+      }
+      metadata_path=$2
+      shift 2
+      ;;
+    --json)
+      discovery_json=true
+      shift
+      ;;
+    *)
+      echo 'Use --root PATH [--root PATH ...] [--json].' >&2
+      exit 2
+      ;;
+  esac
+done
+[[ -n "$metadata_path" || ${#roots[@]} -gt 0 ]] || {
+  echo 'Choose at least one folder with --root PATH.' >&2
+  exit 2
+}
+[[ -z "$metadata_path" || ${#roots[@]} -eq 0 ]] || {
+  echo 'Use --metadata or --root independently.' >&2
+  exit 2
+}
+for dependency in git jq realpath setsid; do
+  command -v "$dependency" >/dev/null || {
+    echo "Install $dependency to discover projects." >&2
+    exit 4
+  }
+done
+if [[ "$worker" == true ]]; then
+  if [[ -n "$metadata_path" ]]; then
+    if metadata=$(project_git_metadata "$metadata_path"); then
+      jq -cn --argjson metadata "$metadata" '{ok:true,metadata:$metadata,error:null}'
+    else
+      metadata_status=$?
+      code=CHECKOUT_INVALID
+      message='Choose the exact existing checkout root.'
+      case "$metadata_status" in
+        2)
+          code=INVALID_PATH
+          message='Choose a folder without ASCII control characters.'
+          ;;
+        4)
+          code=BARE_UNSUPPORTED
+          message='Bare repositories are unsupported; choose a checkout.'
+          ;;
+      esac
+      jq -cn --arg code "$code" --arg message "$message" '{ok:false,metadata:null,error:{code:$code,message:$message,recovery:$message}}'
+      exit 1
+    fi
+  else
+    projects_discovery_scan "${roots[@]}"
+  fi
+else
+  # A private session gives cancellation a safe process-group target, including
+  # Git subprocesses, without signalling the calling UI, CLI, or test harness.
+  setsid bash "$0" --worker "${scan_args[@]}" &
+  scan_pid=$!
+  # Stop the private scan group and wait for its terminal cancellation event.
+  stop_scan() {
+    trap '' TERM INT
+    kill -TERM -- "-$scan_pid" 2>/dev/null || true
+    # Bound cancellation even when a Git descendant ignores TERM. The group
+    # was created by this wrapper, so escalation never reaches the caller.
+    sleep 0.2
+    kill -KILL -- "-$scan_pid" 2>/dev/null || true
+    wait "$scan_pid" || true
+    exit 1
+  }
+  trap stop_scan TERM INT
+  wait "$scan_pid"
+fi

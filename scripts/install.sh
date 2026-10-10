@@ -12,9 +12,12 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/scripts/lib/paths.sh"
 # shellcheck disable=SC1091
+source "$repo_root/scripts/lib/ownership.sh"
+# shellcheck disable=SC1091
 source "$repo_root/branding/brand.env"
 source "$repo_root/scripts/lib/manifest.sh"
 source "$repo_root/scripts/lib/json-events.sh"
+source "$repo_root/scripts/lib/project-actions.sh"
 theme_repo_url="${ARANEA_THEME_REPO_URL:-https://github.com/AraneaDev/aranea-desktop.git}"
 theme_source="${ARANEA_THEME_SOURCE:-$theme_repo_url}"
 dry_run=0
@@ -57,7 +60,11 @@ run() {
   if ((dry_run)); then
     say "would run: $*"
   else
-    "$@"
+    # Native effects must not inherit the lifecycle mutex (shells may outlive us).
+    (
+      [[ -z ${dispatch_fd:-} ]] || exec {dispatch_fd}>&-
+      "$@"
+    )
   fi
 }
 
@@ -190,12 +197,14 @@ if ((dry_run)); then
   if ((json_mode)); then
     json_step install ok persist-profile 'would persist installation profile'
     json_step install ok install-theme "would install theme from: $theme_source"
+    json_step install ok install-command 'would install the owned project command'
     json_step install ok install-fonts 'would install bundled interface fonts'
     json_step install ok install-hooks 'would install theme hooks'
     json_step install ok activate-theme 'would set theme to aranea'
   else
     say "would persist profile: $profile"
     say "would install theme from: $theme_source"
+    say "would install project command: $(xdg_bin_home)/aranea"
     say "would install theme hooks"
     say "would install bundled interface fonts"
     say "would set theme to aranea"
@@ -243,6 +252,12 @@ else
     return "$status"
   }
   trap install_failure_handler EXIT
+  # Serialize deployment and activation with removal using the existing mutex.
+  unset ARANEA_ACTION_DISPATCH_FD
+  lifecycle_umask=$(umask)
+  umask 077
+  project_actions_dispatch_lock || fail_install 1 "Project action lifecycle is busy or unsafe ($action_lock_error); retry installation after the other operation finishes." action_lifecycle_busy
+  umask "$lifecycle_umask"
   ((json_mode)) && json_step install running persist-profile 'persist installation profile'
   profile_state="$(aranea_state_root)/profile"
   install -Dm644 /dev/null "$profile_state"
@@ -252,6 +267,17 @@ else
   run omarchy theme install "$theme_source"
   adopt_installed_theme "$theme_source"
   ((json_mode)) && json_step install ok install-theme 'theme installed as aranea'
+  ((json_mode)) && json_step install running install-command 'install the owned project command'
+  theme_root="$HOME/.config/omarchy/themes/aranea"
+  [[ -x "$theme_root/scripts/aranea" ]] || fail_install 1 'Installed project command is missing.' missing_command
+  # Lifecycle input is empty; activation never submits a configured command.
+  if ! action_response=$(ARANEA_ACTION_DISPATCH_FD=$dispatch_fd "$theme_root/scripts/aranea-project-actions" activate </dev/null); then
+    action_error=$(printf '%s\n' "$action_response" | jq -r '.error.message + " " + .error.recovery')
+    fail_install 1 "Project actions could not activate. $action_error" action_activation_failed
+  fi
+  run "$theme_root/scripts/aranea-agent-store" activate >/dev/null
+  link_managed_file "$(xdg_bin_home)/aranea" "$theme_root/scripts/aranea"
+  ((json_mode)) && json_step install ok install-command 'project command ownership reconciled'
   ((json_mode)) && json_step install running install-fonts 'install bundled interface fonts'
   run "$repo_root/scripts/install-fonts"
   ((json_mode)) && json_step install ok install-fonts 'bundled interface fonts installed'
@@ -286,5 +312,6 @@ else
     json_completed_sent=1
   else
     say "$BRAND_NAME installed."
+    say "Agent activity is opt-in: aranea agents adapter status claude (or codex). See Agents → Tasks for setup."
   fi
 fi

@@ -30,7 +30,7 @@ printf 'dawn=06:00\n' >"$XDG_CONFIG_HOME/aranea/wallpaper-schedule.conf"
 [[ ! -e "$plugins/araneadev.bar" && ! -e "$plugins/araneadev.settings" && -e "$plugins/other.plugin" ]]
 jq -e ' .plugins == [{id:"user.widget",option:7}] and .userSettings.keep' "$HOME/.config/omarchy/shell.json" >/dev/null
 [[ ! -e "$units/aranea-wallpaper-day-night.timer" && ! -e "$units/aranea-wallpaper-day-night.service" ]]
-[[ ! -e "$XDG_STATE_HOME/aranea" ]]
+[[ $(find "$XDG_STATE_HOME/aranea" -type f | wc -l) == 3 && -f "$XDG_STATE_HOME/aranea/agent-activity.json.lock" && -f "$XDG_STATE_HOME/aranea/project-actions.json.lock" && -f "$XDG_STATE_HOME/aranea/project-actions.json.dispatch.lock" ]]
 [[ ! -e "$XDG_CONFIG_HOME/aranea" ]]
 [[ ! -e "$XDG_DATA_HOME/icons/Aranea" ]]
 jq -e '.bar.id != "araneadev.bar"' "$HOME/.config/omarchy/shell.json" >/dev/null
@@ -91,4 +91,199 @@ if grep -Fq "icon-theme 'Aranea-icons'" "$ARANEA_TEST_SANDBOX/guard.log"; then
   exit 1
 fi
 
+# Both scopes discard project registrations, never their repository folders.
+# An owned command is removed; a user-replaced command and its backup stay.
+source "$repo_root/scripts/lib/ownership.sh"
+project_dir="$ARANEA_TEST_SANDBOX/project with spaces"
+git init -q "$project_dir"
+printf 'keep repository content\n' >"$project_dir/content"
+mkdir -p "$ARANEA_TEST_SANDBOX/app-bin"
+printf '#!/usr/bin/env bash\nexec /usr/bin/sleep 60\n' >"$ARANEA_TEST_SANDBOX/app-bin/code"
+chmod +x "$ARANEA_TEST_SANDBOX/app-bin/code"
+launch=$(jq -cn --arg cwd "$project_dir" '{cwd:$cwd,argv:["code","--new-window",$cwd]}' |
+  PATH="$ARANEA_TEST_SANDBOX/app-bin:$PATH" "$repo_root/scripts/aranea-project-launch")
+app_pid=$(jq -er 'select(.ok).identity.pid' <<<"$launch")
+sandbox_on_exit "kill -- -$app_pid 2>/dev/null || true"
+for removal_scope in integration complete; do
+  export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/$removal_scope state"
+  "$repo_root/scripts/aranea" projects register --path "$project_dir" --json >/dev/null
+  mkdir -p "$HOME/.local/bin" "$plugins/araneadev.projects"
+  ln -s "$HOME/.config/omarchy/themes/aranea/scripts/aranea" "$HOME/.local/bin/aranea"
+  record_managed_file "$HOME/.local/bin/aranea"
+  ln -sf "$project_dir/user-command" "$HOME/.local/bin/custom-command"
+  record_managed_file "$HOME/.local/bin/custom-command"
+  mkdir -p "$(dirname "$(backup_path "$HOME/.local/bin/custom-command")")"
+  printf 'original command\n' >"$(backup_path "$HOME/.local/bin/custom-command")"
+  printf '{"plugins":[{"id":"araneadev.projects"},{"id":"user.widget","option":7}]}\n' >"$HOME/.config/omarchy/shell.json"
+  "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
+  [[ ! -L "$HOME/.local/bin/aranea" ]] || {
+    echo "$removal_scope removal kept the owned project command" >&2
+    exit 1
+  }
+  [[ ! -e "$ARANEA_STATE_ROOT/projects.json" && ! -e "$plugins/araneadev.projects" ]]
+  jq -e '.plugins == [{id:"user.widget",option:7}]' "$HOME/.config/omarchy/shell.json" >/dev/null
+  [[ "$(cat "$project_dir/content")" == 'keep repository content' && -d "$project_dir/.git" ]]
+  [[ "$(readlink "$HOME/.local/bin/custom-command")" == "$project_dir/user-command" ]]
+  [[ "$(cat "$(backup_path "$HOME/.local/bin/custom-command")")" == 'original command' ]]
+  kill -0 "$app_pid" # uninstall removes state, never detached applications
+  [[ "$(ps -o stat= -p "$app_pid")" != Z* ]]
+done
+
+# Ownership backups and registry state may live at independently configured
+# roots. Both scopes must remove registrations without discarding kept files.
+distinct_root_failures=0
+for ownership_layout in separate nested; do
+  for removal_scope in integration complete; do
+    export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/$ownership_layout $removal_scope project state"
+    if [[ "$ownership_layout" == nested ]]; then
+      export ARANEA_OWNERSHIP_ROOT="$ARANEA_STATE_ROOT/ownership state"
+    else
+      export ARANEA_OWNERSHIP_ROOT="$ARANEA_TEST_SANDBOX/$removal_scope ownership state"
+    fi
+    "$repo_root/scripts/aranea" projects register --path "$project_dir" --json >/dev/null
+    custom_command="$HOME/.local/bin/independent-command"
+    printf 'customised command\n' >"$custom_command"
+    record_managed_file "$custom_command"
+    mkdir -p "$(dirname "$(backup_path "$custom_command")")"
+    printf 'original command\n' >"$(backup_path "$custom_command")"
+    dry_run_output="$("$repo_root/scripts/uninstall.sh" --dry-run --scope "$removal_scope")"
+    grep -Fq "$ARANEA_STATE_ROOT/projects.json" <<<"$dry_run_output"
+    [[ -e "$ARANEA_STATE_ROOT/projects.json" && -e "$ARANEA_STATE_ROOT/projects.json.lock" ]]
+    "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
+    if [[ -e "$ARANEA_STATE_ROOT/projects.json" || -e "$ARANEA_STATE_ROOT/projects.json.lock" ]]; then
+      echo "$ownership_layout $removal_scope removal retained project state with an independent ownership root" >&2
+      distinct_root_failures=$((distinct_root_failures + 1))
+    fi
+    [[ "$(cat "$custom_command")" == 'customised command' ]]
+    [[ "$(cat "$(backup_path "$custom_command")")" == 'original command' ]]
+    grep -Fqx "$custom_command" "$(ownership_record)"
+    [[ "$(cat "$project_dir/content")" == 'keep repository content' && -d "$project_dir/.git" ]]
+  done
+done
+[[ "$distinct_root_failures" == 0 ]]
+
+# Both scopes remove only current-install adapter commands and owned activity state.
+for removal_scope in integration complete; do
+  export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/activity-$removal_scope"
+  export ARANEA_OWNERSHIP_ROOT="$ARANEA_TEST_SANDBOX/ownership-$removal_scope"
+  mkdir -p "$HOME/.claude" "$HOME/.codex" "$ARANEA_STATE_ROOT/agent-heartbeats" "$plugins/araneadev.activity"
+  printf '%s\n' '{"permissions":{"allow":["Read"]},"hooks":{"Stop":[{"hooks":[{"type":"command","command":"unrelated"}]}]}}' >"$HOME/.claude/settings.json"
+  printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"unrelated-codex"}]}]}}' >"$HOME/.codex/hooks.json"
+  printf 'keep config\n' >"$HOME/.codex/config.toml"
+  printf 'keep transcript\n' >"$HOME/.claude/transcript"
+  "$repo_root/scripts/aranea-agent-adapter" install claude >/dev/null
+  "$repo_root/scripts/aranea-agent-adapter" install codex >/dev/null
+  printf '{}' >"$ARANEA_STATE_ROOT/agent-activity.json"
+  touch "$ARANEA_STATE_ROOT/agent-activity.json.lock"
+  # A malicious receipt naming an unrelated application's PID is never kill authority.
+  jq -cn --argjson pid "$app_pid" '{pid:$pid,startTime:"forged",bootId:"forged"}' >"$ARANEA_STATE_ROOT/agent-heartbeats/forged.json"
+  "$repo_root/scripts/uninstall.sh" --yes --scope "$removal_scope" >/dev/null
+  [[ ! -e "$ARANEA_STATE_ROOT/agent-activity.json" && -f "$ARANEA_STATE_ROOT/agent-activity.json.lock" && ! -e "$ARANEA_STATE_ROOT/agent-heartbeats" && ! -e "$plugins/araneadev.activity" ]] || {
+    echo 'FAIL activity artifacts retained'
+    exit 1
+  }
+  jq -e '.permissions.allow==["Read"] and .hooks.Stop[0].hooks==[{type:"command",command:"unrelated"}] and ([.hooks[][].hooks[] | select(.command|contains("aranea-agent-hook"))]|length)==0' "$HOME/.claude/settings.json" >/dev/null || {
+    echo 'FAIL owned Claude hooks retained or unrelated settings removed'
+    exit 1
+  }
+  jq -e '.hooks.Stop[0].hooks==[{type:"command",command:"unrelated-codex"}] and ([.hooks[][].hooks[] | select(.command|contains("aranea-agent-hook"))]|length)==0' "$HOME/.codex/hooks.json" >/dev/null
+  [[ "$(cat "$HOME/.codex/config.toml")" == 'keep config' && "$(cat "$HOME/.claude/transcript")" == 'keep transcript' ]]
+  kill -0 "$app_pid"
+done
+
 echo "uninstall contract passed"
+
+# Native fixture starts the actual heartbeat helper; removal stops only that helper.
+export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/native-removal"
+export ARANEA_OWNERSHIP_ROOT="$ARANEA_TEST_SANDBOX/native-ownership"
+mkdir -p "$ARANEA_TEST_SANDBOX/native-bin"
+cp /bin/bash "$ARANEA_TEST_SANDBOX/native-bin/claude"
+cat >"$TMPDIR/native-provider.sh" <<'PROVIDER'
+#!/bin/bash
+printf '%s\n' '{"session_id":"uninstall-native","hook_event_name":"SessionStart","cwd":"/tmp"}' | /bin/bash "$1" claude
+sleep 60
+PROVIDER
+"$ARANEA_TEST_SANDBOX/native-bin/claude" "$TMPDIR/native-provider.sh" "$repo_root/scripts/aranea-agent-hook" &
+provider_pid=$!
+sandbox_on_exit "kill $provider_pid 2>/dev/null || true"
+helper_record=''
+for _ in {1..40}; do
+  for candidate in "$ARANEA_STATE_ROOT/agent-heartbeats"/*.json; do
+    if [[ -s "$candidate" ]]; then
+      helper_record="$candidate"
+      break
+    fi
+  done
+  [[ -z "$helper_record" ]] || break
+  sleep .1
+done
+[[ -n "$helper_record" ]] || {
+  echo 'FAIL native helper fixture did not start'
+  exit 1
+}
+helper_pid=$(jq -r .pid "$helper_record")
+"$repo_root/scripts/uninstall.sh" --yes >/dev/null
+for _ in {1..40}; do
+  helper_stat=$(ps -o stat= -p "$helper_pid" 2>/dev/null || true)
+  [[ -n "$helper_stat" && "$helper_stat" != Z* ]] || break
+  sleep .1
+done
+[[ -z "$helper_stat" || "$helper_stat" == Z* ]] || {
+  echo 'FAIL exact owned helper kept running'
+  exit 1
+}
+kill -0 "$provider_pid"
+[[ ! -e "$ARANEA_STATE_ROOT/agent-activity.json" && ! -e "$ARANEA_STATE_ROOT/agent-heartbeats" ]]
+# Unsafe provider config remains byte-for-byte intact, with useful removal guidance.
+printf '{malformed' >"$HOME/.claude/settings.json"
+cp "$HOME/.claude/settings.json" "$TMPDIR/unsafe-provider"
+"$repo_root/scripts/uninstall.sh" --yes --scope complete >"$TMPDIR/uninstall-output" 2>"$TMPDIR/uninstall-guidance"
+cmp "$HOME/.claude/settings.json" "$TMPDIR/unsafe-provider"
+grep -Fq 'scripts/aranea-agent-adapter remove claude' "$TMPDIR/uninstall-guidance"
+echo 'PASS exact native helper cleanup, provider survival and refused-cleanup guidance'
+
+# The preceding malformed-settings fixture has completed its separate assertion.
+rm -f "$HOME/.claude/settings.json"
+
+# A symlinked ownership root must never enumerate and delete its target's data.
+# Refusal also preserves any canonical activity-lock route through that link.
+for removal_scope in integration complete; do
+  base="$ARANEA_TEST_SANDBOX/symlink-$removal_scope"
+  export ARANEA_STATE_ROOT="$base/activity" ARANEA_OWNERSHIP_ROOT="$base/ownership"
+  mkdir -p "$base/target/backups"
+  printf 'unrelated user data\n' >"$base/target/keep.txt"
+  printf 'customized original\n' >"$base/target/backups/original"
+  ln -s "$base/target" "$ARANEA_OWNERSHIP_ROOT"
+  status=0
+  "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
+  [[ $(cat "$base/target/keep.txt" 2>/dev/null || true) == 'unrelated user data' ]] || {
+    echo "FAIL $removal_scope cleanup traversed symlink ownership root"
+    exit 1
+  }
+  [[ "$status" == 1 && -L "$ARANEA_OWNERSHIP_ROOT" ]]
+  [[ $(cat "$base/target/backups/original") == 'customized original' ]]
+  jq -es 'last.event=="completed" and last.status=="failed" and last.code=="ownership_state_symlink" and all(.[]; .event!="completed" or .status!="ok")' "$TMPDIR/symlink-events" >/dev/null
+  # Trailing slashes cannot turn the symlink into an accepted directory root.
+  status=0
+  ARANEA_OWNERSHIP_ROOT="$ARANEA_OWNERSHIP_ROOT///" "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
+  [[ "$status" == 1 && $(cat "$base/target/keep.txt") == 'unrelated user data' ]]
+  jq -es 'last.status=="failed" and last.code=="ownership_state_symlink"' "$TMPDIR/symlink-events" >/dev/null
+  # Ordinary symlink entries are unlinked, never recursively followed.
+  rm "$ARANEA_OWNERSHIP_ROOT"
+  mkdir -p "$ARANEA_OWNERSHIP_ROOT"
+  ln -s "$base/target" "$ARANEA_OWNERSHIP_ROOT/unrelated-link"
+  "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events"
+  [[ $(cat "$base/target/keep.txt") == 'unrelated user data' && ! -L "$ARANEA_OWNERSHIP_ROOT/unrelated-link" ]]
+  jq -es 'last.event=="completed" and last.status=="ok"' "$TMPDIR/symlink-events" >/dev/null
+  # An entry that routes activity state must remain so queued writers keep the inode.
+  mkdir -p "$ARANEA_OWNERSHIP_ROOT" "$base/routed-activity"
+  ln -s "$base/routed-activity" "$ARANEA_OWNERSHIP_ROOT/activity-route"
+  export ARANEA_STATE_ROOT="$ARANEA_OWNERSHIP_ROOT/activity-route"
+  "$repo_root/scripts/aranea-agent-store" activate >/dev/null
+  inode=$(stat -c %i "$ARANEA_STATE_ROOT/agent-activity.json.lock")
+  status=0
+  "$repo_root/scripts/uninstall.sh" --yes --json --scope "$removal_scope" >"$TMPDIR/symlink-events" || status=$?
+  [[ "$status" == 1 && -L "$ARANEA_STATE_ROOT" && $(stat -c %i "$ARANEA_STATE_ROOT/agent-activity.json.lock") == "$inode" ]]
+  jq -es 'last.status=="failed" and last.code=="action_lifecycle_busy"' "$TMPDIR/symlink-events" >/dev/null
+  echo "PASS $removal_scope refuses symlink ownership root and unlinks only symlink entries"
+done

@@ -82,4 +82,27 @@ for script in aranea-motion aranea-doctor aranea-integrations aranea-wallpaper a
 done
 grep -Fq '.config/omarchy/themes/aranea/scripts/<name>' "$repo_root/README.md"
 
+# Scripts links are not general integration ownership: only the stable
+# installed project's exact executable may be removed/restored as managed.
+source "$repo_root/scripts/lib/ownership.sh"
+mkdir -p "$HOME/.local/bin" "$HOME/.config/omarchy/themes/aranea"
+cp -a "$repo_root/scripts" "$HOME/.config/omarchy/themes/aranea/scripts"
+ln -s "$HOME/.config/omarchy/themes/aranea/scripts/aranea" "$HOME/.local/bin/aranea"
+"$HOME/.local/bin/aranea" projects list --json | jq -se 'last | .data.projects == []' >/dev/null
+is_aranea_target "$HOME/.local/bin/aranea" || {
+  echo 'stable installed project command was not recognized as owned' >&2
+  exit 1
+}
+for destination in \
+  "$HOME/.config/omarchy/themes/aranea/scripts/aranea-doctor" \
+  "$HOME/.local/state/omarchy/current/theme/scripts/aranea" \
+  "$repo_root/scripts/aranea" \
+  "$HOME/other-theme/scripts/aranea"; do
+  ln -sf "$destination" "$HOME/.local/bin/foreign"
+  if is_aranea_target "$HOME/.local/bin/foreign"; then
+    echo "arbitrary scripts symlink was counted as managed: $destination" >&2
+    exit 1
+  fi
+done
+
 echo "application integration contract passed"

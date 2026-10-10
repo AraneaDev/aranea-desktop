@@ -407,7 +407,7 @@ fi
 showcase_surface="$surface"
 case "$surface" in
   settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
-  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label) showcase_surface=menu ;;
+  menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label | menu-search-project-search) showcase_surface=menu ;;
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
   neovim) showcase_surface=editor ;;
@@ -415,6 +415,18 @@ case "$surface" in
 esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
 mkdir -p "$output"
+
+# Project and workspace captures are isolated before any desktop reads or dispatch.
+case "$surface" in
+  projects-empty | projects-discovery | projects-grouped | projects-partial | project-details | project-launch-partial | workspaces)
+    "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$surface"
+    exit 0
+    ;;
+  project-search | menu-search-project-search)
+    "$repo_root/tools/render-menu-preview" --output "$output/$surface.png" --fixture project-search
+    exit 0
+    ;;
+esac
 
 # Settings and search captures use production content with inert owner fixtures.
 case "$surface" in
@@ -1338,10 +1350,6 @@ case "$surface" in
   tray | tray-manage)
     # Fixture tray items only (tools/fixture-tray-item): never a real app.
     capture_tray_surface
-    exit 0
-    ;;
-  workspaces)
-    capture_bar_widget_surface araneadev.workspaces
     exit 0
     ;;
   updates)

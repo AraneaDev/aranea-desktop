@@ -1,0 +1,67 @@
+#!/bin/bash
+# Usage: aranea-agent-heartbeat claude|codex SESSION EPOCH PID START_TIME BOOT_ID (private)
+# Private per-epoch owner. Exits on exact provider/epoch loss; never kills agents.
+set -euo pipefail
+export PATH=/usr/bin:/bin
+unset BASH_ENV ENV CDPATH
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/agent-activity.sh
+source "$script_dir/lib/agent-activity.sh"
+activity_generation=${ARANEA_ACTIVITY_GENERATION:-$(agent_activity_generation)}
+export ARANEA_ACTIVITY_GENERATION="$activity_generation"
+# shellcheck source=scripts/lib/agent-hooks.sh
+source "$script_dir/lib/agent-hooks.sh"
+[[ $# == 6 && ("$1" == claude || "$1" == codex) && "$4" =~ ^[1-9][0-9]*$ && "$5" =~ ^[0-9]+$ ]]
+provider=$1 session=$2 epoch=$3 provider_pid=$4 provider_start=$5 boot=$6
+[[ "$boot" == "$(cat /proc/sys/kernel/random/boot_id)" ]]
+root="$(aranea_state_root)/agent-heartbeats"
+[[ ! -L "$root" ]]
+umask 077
+# Serialize record creation against teardown as well as the later store writes.
+agent_activity_lock 1 || exit 0
+mkdir -p -- "$root"
+key=$(printf '%s\n' "$provider" "$session" "$epoch" | sha256sum | cut -d' ' -f1)
+identity="$root/$key.json"
+[[ ! -L "$root/$key.lock" && ! -L "$identity" ]]
+exec {heartbeat_fd}>"$root/$key.lock"
+flock -n -x "$heartbeat_fd" || exit 0
+read -r helper_parent helper_start < <(agent_hooks_process "$$")
+read -r _ parent_start < <(agent_hooks_process "$helper_parent")
+# The helper record contains ownership only, never sequence or turn allocation.
+jq -cn --argjson pid "$$" --arg start "$helper_start" --argjson parent "$helper_parent" --arg parentStart "$parent_start" --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" --argjson providerPid "$provider_pid" --arg providerStart "$provider_start" --arg boot "$boot" '{pid:$pid,startTime:$start,parent:{pid:$parent,startTime:$parentStart},provider:$provider,providerSessionId:$session,producerEpoch:$epoch,providerProcess:{pid:$providerPid,startTime:$providerStart},bootId:$boot}' >"$identity"
+# Remove only this exact helper ownership record; never terminate the provider.
+cleanup() {
+  if [[ ! -L "$identity" ]] && jq -e --argjson pid "$$" --arg start "$helper_start" '.pid == $pid and .startTime == $start' "$identity" >/dev/null 2>&1; then rm -f -- "$identity"; fi
+}
+trap cleanup EXIT
+exec {activity_lock_fd}>&-
+evidence=null
+expected_hash=${epoch##*:}
+[[ "$expected_hash" =~ ^[a-f0-9]{64}$ ]] || exit 0
+while true; do
+  [[ -f "$identity" && ! -L "$identity" ]] || exit 0
+  jq -e --argjson pid "$$" --arg start "$helper_start" '.pid == $pid and .startTime == $start' "$identity" >/dev/null 2>&1 || exit 0
+  read -r _ current_start < <(agent_hooks_process "$provider_pid") || exit 0
+  [[ "$current_start" == "$provider_start" && "$boot" == "$(cat /proc/sys/kernel/random/boot_id)" ]] || exit 0
+  # Revalidate identity even when transport/lock failure prevents store access.
+  agent_hooks_provider_process "$provider_pid" "$provider" || exit 0
+  [[ "$(agent_hooks_command_hash "$provider_pid")" == "$expected_hash" ]] || exit 0
+  if [[ "$evidence" != null ]]; then agent_hooks_validate_provenance "$evidence" "$provider" || exit 0; fi
+  # Store revalidates actual helper ancestry and saved provenance under its lock.
+  request=$(jq -cn --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" --arg tick "$(cat /proc/sys/kernel/random/uuid)" '{action:"native",args:{provider:$provider,caller:null,payload:{hook_event_name:"AraneaHeartbeat",session_id:$session,producer_epoch:$epoch,tick:$tick}}}')
+  if response=$(printf '%s\n' "$request" | /usr/bin/timeout 2 /bin/bash "$script_dir/aranea-agent-store" mutate 2>/dev/null); then
+    evidence=$(jq -c --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" '.state.sessions[] | select(.provider == $provider and .providerSessionId == $session and .producerEpoch == $epoch and .connection.connected) | .provenance' <<<"$response") || exit 0
+    [[ -n "$evidence" && "$evidence" != null ]] || exit 0
+    agent_hooks_validate_provenance "$evidence" "$provider" || exit 0
+  else
+    code=$(jq -r '.error.code // ""' <<<"$response" 2>/dev/null) || code=''
+    case "$code" in
+      ADAPTER_UNSUPPORTED | EPOCH_MISMATCH | SESSION_NOT_FOUND | ACTIVITY_REMOVED) exit 0 ;;
+      # Transient store/transport failure: retain the singleton, bounded cadence.
+      *) ;;
+    esac
+  fi
+  sleep 15
+done

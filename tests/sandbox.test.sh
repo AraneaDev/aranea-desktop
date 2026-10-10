@@ -8,6 +8,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 real_home="$HOME"
 real_tmp="${TMPDIR:-/tmp}"
+export CODEX_HOME=/tmp/aranea-forbidden-inherited-codex
 source "$repo_root/tests/lib/sandbox.sh"
 
 # --- every test sources the sandbox before doing anything else
@@ -30,6 +31,10 @@ for test_file in "$repo_root"/tests/*.test.sh; do
 done
 
 # --- inside the sandbox
+[[ "$CODEX_HOME" == "$HOME/.codex" ]] || {
+  echo 'FAIL inherited CODEX_HOME escaped sandbox'
+  exit 1
+}
 [[ -d "$ARANEA_TEST_SANDBOX" && "$ARANEA_TEST_SANDBOX" == "$real_tmp"/aranea-test.* ]]
 [[ "$HOME" == "$ARANEA_TEST_SANDBOX"/* ]]
 for var in XDG_CONFIG_HOME XDG_STATE_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_RUNTIME_DIR TMPDIR; do

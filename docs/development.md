@@ -200,3 +200,40 @@ for new operations.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for hooks, commit conventions, and
 release workflow.
+
+## Project acceptance and inert previews
+
+`tests/run projects-flow` creates real temporary Git repositories/worktrees,
+registers only explicit paths through JSON, then exercises the production owner
+with fake desktop evidence and real sandbox helper processes. It checks exact
+store/owner/search identities, Open/Resume without duplicate launches, and a
+partial sibling launch followed by failed-terminal-only retry. HOME/XDG/session
+isolation and application execution traps prevent live desktop or repository use.
+
+Render the production project surfaces without loading a live owner:
+
+```bash
+scripts/capture-screenshots --surface projects-empty --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface projects-discovery --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface projects-grouped --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface projects-partial --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface project-details --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface project-search --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface project-launch-partial --output /tmp/aranea-project-previews
+scripts/capture-screenshots --surface workspaces --output /tmp/aranea-project-previews
+```
+
+Settings rendering supports `ARANEA_SETTINGS_RENDER_WIDTH`,
+`ARANEA_SETTINGS_RENDER_HEIGHT`, `ARANEA_SETTINGS_RENDER_FONT_SCALE`, and
+`ARANEA_SETTINGS_RENDER_SCROLL=bottom` for detail/recovery views. Use
+`ARANEA_PROJECT_RENDER_STATE=pending` with `project-launch-partial` for a pending
+operation. Menu rendering supports the existing logical size and font-scale
+overrides. Fixtures use invented `/fixture/` paths and refuse mutation, owner
+reads, chooser activation and tool execution. Workspace capture renders only the
+production panel offscreen; it no longer focuses or reads the live desktop.
+
+Run registry/discovery/tool/CLI/flow suites, `node --test tests/js/project-*.test.js`,
+and project QML behavior fixtures before the full `tools/check` gate. Offscreen
+verification does not verify the native folder portal, live compositor focus,
+real editor/terminal window observation or actual application reuse. Record those
+host checks separately; unavailable checks are limitations, never passed tests.

@@ -7,6 +7,19 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
 
+# Local URL fragments select content inside the linked file, not another file.
+local_asset_exists() {
+  local path="${1%%#*}"
+  [[ -n "$path" && -f "$repo_root/$path" ]]
+}
+
+# Preserve file validation for anchored links, including missing-file rejection.
+local_asset_exists 'docs/features.md#project-commands-and-previews'
+if local_asset_exists 'README.md/missing#fragment' || local_asset_exists '#fragment'; then
+  echo 'local asset validation accepted a missing file' >&2
+  exit 1
+fi
+
 while IFS= read -r path; do
   test -n "$path"
   test -f "$repo_root/$path"
@@ -22,8 +35,7 @@ hero_frames="$(identify "$repo_root/screenshots/hero-showcase.gif" | wc -l)"
 }
 
 while IFS= read -r path; do
-  test -n "$path"
-  test -f "$repo_root/$path"
+  local_asset_exists "$path"
 done < <(rg -o '\]\([^)]*\)' "$repo_root/README.md" | sed 's/^](//; s/)$//' | rg -v '^(https?://|#)')
 
 find "$repo_root/integrations" -type f -name '*.svg' -print0 |

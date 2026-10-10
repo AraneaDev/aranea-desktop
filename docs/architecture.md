@@ -210,3 +210,42 @@ when the host provides the required Omarchy and Quickshell dependencies.
 - [Agent interface](agent-interface.md) for the installer and repair JSONL
   protocol.
 - [Visual language](visual-language.md) for user-facing design principles.
+
+## Project ownership
+
+`scripts/aranea-project-store` owns the locked, revision-aware atomic registry;
+`scripts/aranea-project-discover` performs bounded read-only Git discovery and
+fresh activation validation. `aranea-project-tools` probes fixed supported
+adapters. No repository scripts are executed by discovery or ordinary Open.
+Public `aranea projects` commands translate these helper contracts to schema-1
+JSONL and authoritative exit codes.
+
+The keep-loaded `araneadev.projects` plugin is the only live operation owner.
+`ProjectsController.qml` serializes workspace allocation, selection persistence
+and tool submission while observing roles independently. `ProjectRuntime.qml`
+owns compositor snapshots, tracked process identity and exact focus readback.
+Generation/session guards reject stale responses; matching pending checkout
+requests coalesce. Accepted identities remain conservative after observation
+loss, preventing duplicate ordinary launches. Explicit failed-role retry and
+new-window actions use the same owner. Explicit re-observation reuses a retained
+accepted identity and its original baseline without invoking the launcher; it
+creates a new bounded operation and leaves the original outcome immutable.
+Occupied saved associations with lost session evidence retain per-role uncertainty
+until an explicit New window choice. Search retains authoritative feedback by
+current owner session, exact checkout and highest operation generation; local
+submission feedback cannot overwrite newer accepted outcomes.
+
+Settings uses registry/discovery clients for registration and typed project
+configuration requests. Search uses `ProjectClient.qml` and `ProjectRecords.js`
+for matching and owner outcomes. Its observer survives menu closure. The
+workspace overview reads owner context only while visible; it owns no launch
+queue. Durable IDs and canonical paths are shared across every projection.
+Runtime bindings stay in memory and expire with the owner session. Only verified
+process/window evidence establishes ownership, with a ten-second observation
+deadline; accepted process submission alone cannot produce an observed outcome.
+
+Project previews render production SettingsSurface, MenuSurface and
+WorkspacePanel in isolated offscreen hosts. Capture guards refuse registry,
+chooser, owner and launch requests. Workspace capture routes to the offscreen
+panel before any compositor read or focus dispatch, so its image is a panel
+illustration rather than a full live-desktop frame.

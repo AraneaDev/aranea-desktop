@@ -40,6 +40,11 @@ Item {
       icon: String.fromCodePoint(0xf0c56)
     },
     {
+      id: 'projects',
+      label: 'Projects',
+      icon: String.fromCodePoint(0xf024b)
+    },
+    {
       id: 'notifications',
       label: 'Notifications',
       icon: String.fromCodePoint(0xf009a)
