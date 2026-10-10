@@ -207,7 +207,7 @@ interfaces over relying on internal paths.
 
 ## Projects
 
-Open **Setup → Projects**. Choose a folder through the desktop folder picker or
+Open **Launcher → Projects**. Choose a folder through the desktop folder picker or
 enter its absolute path; **Use folder** confirms the path before scanning.
 Nothing is registered until you select discovered checkouts and press **Add
 selected**. Git worktrees are grouped by their common Git directory. Registering

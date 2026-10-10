@@ -2,9 +2,14 @@
 
 `araneadev.projects` is the persistent owner of project workspace operations.
 Its menu entry point, `Projects.qml`, stays loaded while registered in the
-Omarchy shell. Settings, desktop search, the workspace overview and the CLI
+Omarchy shell. The Projects window, desktop search, the workspace overview and the CLI
 consume its snapshots and results; they do not launch tools independently.
-The plugin adds no bar widget.
+The plugin adds no bar widget. Open **Projects** directly from the launcher.
+Its own window contains a searchable project sidebar and Overview, Actions,
+Agents, Preferences, and Help destinations. A narrow window uses a compact
+project selector. The window keeps the selected project when reopened. With no selection,
+a welcome card explains the next steps. Add project starts setup; development
+folder management lives under Preferences, and Help covers projects, actions, and agents. Closing the window retains drafts and accepted operations.
 
 ## Commands and installation
 
@@ -103,7 +108,7 @@ applications; they do not install into the active desktop.
 
 ## Named actions and tracked runs
 
-Settings project details include Actions for the selected exact checkout. Save a
+The standalone Projects window includes Actions for the selected exact checkout. Save a
 name, executable, separate argument fields, working folder, Command/Service kind,
 command timeout and optional loopback preview URL. Save is inert; Run/Start is
 explicit. Configuration lives in local `project-actions.json`, without repository

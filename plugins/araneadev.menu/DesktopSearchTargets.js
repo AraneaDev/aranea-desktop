@@ -125,14 +125,6 @@ function settingRecords(available) {
     ),
     sourceRecord(
       "setting",
-      "projects",
-      "Projects",
-      { section: "projects" },
-      "Development projects and workspaces",
-      ["project", "checkout", "worktree"]
-    ),
-    sourceRecord(
-      "setting",
       "notifications",
       "Notifications",
       { section: "notifications" },
@@ -213,6 +205,19 @@ function sourceRecords(snapshot) {
     )
   })
   rows = rows.concat(settingRecords(data.settingsAvailable === true))
+  // The standalone menu command owns discovery once the menu sources load.
+  // Retain the direct destination only while that command is unavailable.
+  if (data.projectsAvailable === true && !seen["command:aranea.projects"])
+    rows.push(
+      sourceRecord(
+        "setting",
+        "projects",
+        "Projects",
+        { section: "projects" },
+        "Project workspaces, workflows and agents",
+        ["project", "checkout", "worktree", "workflows"]
+      )
+    )
   if (Array.isArray(data.actionRecords))
     rows = rows.concat(
       data.actionRecords.filter(function (row) {
@@ -308,8 +313,10 @@ function dispatchTarget(record, snapshot) {
         "omarchy-shell",
         "shell",
         "summon",
-        "araneadev.settings",
-        JSON.stringify({ section: current.target.section })
+        current.target.section === "projects" ? "araneadev.projects" : "araneadev.settings",
+        JSON.stringify(
+          current.target.section === "projects" ? {} : { section: current.target.section }
+        )
       ]
     }
   var field = current.type === "window" ? "window" : "workspace"

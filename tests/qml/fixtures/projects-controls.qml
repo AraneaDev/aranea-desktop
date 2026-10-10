@@ -1,17 +1,23 @@
 // Production settings controls with every external client inert before activation.
 import QtQuick
+import QtTest
 import Quickshell
 import qs.Commons
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as Settings
 import "ProjectPreview.js" as Fixtures
 
 ShellRoot {
   id: harness
+  TestCase {
+    id: input
+    name: "projectControlsInput"
+    when: false
+  }
   // Assertions fail the renderer without allowing backend execution.
   property int failures: 0
   // Discover production targets through public control text and viewport properties.
   function collect(item, out) {
-    if (item.contentY !== undefined || item.text !== undefined || item.objectName === 'settingsScrollBar' || item.objectName === 'projectActions')
+    if (item.contentY !== undefined || item.text !== undefined || item.objectName === 'settingsScrollBar' || item.objectName === 'projectsContentViewport' || item.objectName === 'projectActions')
       out.push(item)
     var children = item.children || []
     for (var i = 0; i < children.length; i++)
@@ -24,18 +30,15 @@ ShellRoot {
     if (!value)
       failures++
   }
-  Settings.Settings {
+  Settings.ProjectsPresentation {
     id: entry
     windowEnabled: false
-    runner: function (argv, done) {
-      harness.check(false, 'unexpected settings process')
-    }
   }
   FloatingWindow {
     implicitWidth: 652
     implicitHeight: 452
     visible: true
-    Settings.SettingsSurface {
+    Settings.ProjectsSurface {
       id: surface
       anchors.fill: parent
       root: entry
@@ -71,6 +74,7 @@ ShellRoot {
     entry.section = 'projects'
     entry.projectId = 'p-preview'
     entry.opened = true
+    surface.chooseSection('preferences')
   }
   Timer {
     interval: 400
@@ -93,7 +97,7 @@ ShellRoot {
       var objects = harness.collect(surface, []), scroll = null, bar = null, retry = null, field = null
       for (var i = 0; i < objects.length; i++) {
         var item = objects[i]
-        if (item.contentY !== undefined && item.contentHeight > item.height && item.height > 100)
+        if (item.objectName === 'projectsContentViewport')
           scroll = item
         if (item.objectName === 'settingsScrollBar')
           bar = item
@@ -105,12 +109,10 @@ ShellRoot {
       harness.check(!!scroll && !!bar && !!retry && !!field, 'large-font production viewport and exact recovery targets exist')
       if (scroll && bar && retry && field) {
         surface.scrollTo(0)
-        var event = {
-          key: Qt.Key_PageDown,
-          accepted: false
-        }
-        surface.handleKey(event)
-        harness.check(event.accepted && scroll.contentY > 0, 'actual PageDown handler scrolls Projects')
+        field.forceActiveFocus(Qt.TabFocusReason)
+        surface.scrollTo(0)
+        input.keyClick(Qt.Key_PageDown)
+        harness.check(scroll.contentY > 0, 'actual PageDown input scrolls Projects')
         surface.scrollTo(0)
         bar.position = 1 - bar.size
         harness.check(scroll.contentY > 0, 'actual pointer scrollbar moves production viewport')

@@ -45,9 +45,9 @@ case "$1 $2" in
     [[ "$CLI_MODE" != wrongtarget ]] || checkout=another-checkout
     jq -cn --arg project "$project" --arg checkout "$checkout" --arg state "$state" --arg outcome "$outcome" '{id:"op-123-1",projectId:$project,checkoutId:$checkout,sessionId:"s1",generation:1,state:$state,outcome:(if $outcome=="null" then null else $outcome end),steps:[{id:"editor",status:"observed"},(if $outcome=="observed" then {id:"terminal",status:"observed"} else {id:"terminal",status:"failed",code:"TOOL_MISSING"} end)],error:null}' ;;
   'shell summon') echo ok ;;
-  'aranea.settings.capture captureSnapshot')
+  'aranea.projects.capture captureSnapshot')
     if [[ "$CLI_MODE" == details ]]; then
-      jq -cn --arg id "$CLI_PROJECT" '{opened:true,section:"projects",projectId:$id,ui:null}'
+      jq -cn --arg id "$CLI_PROJECT" '{opened:true,projectId:$id,ui:null}'
     else echo '{"opened":true,"section":"appearance","ui":null}'; fi ;;
   *) echo 'unexpected IPC' >&2; exit 1 ;;
 esac
@@ -115,6 +115,7 @@ run_cli 0 desktop status
 run_cli 1 projects details "$project"
 jq -se 'last.code=="DETAILS_UNCONFIRMED" and last.data.accepted' "$events" >/dev/null
 CLI_MODE=details run_cli 0 projects details "$project"
+jq -se --arg id "$project" 'any(.[]; .[0:3]==["shell","summon","araneadev.projects"] and (.[3]|fromjson).projectId==$id)' "$CLI_CALLS" >/dev/null
 CLI_MODE=compositor run_cli 1 projects open "$project"
 jq -se 'last.code=="COMPOSITOR_UNAVAILABLE"' "$events" >/dev/null
 CLI_MODE=choice run_cli 3 projects open "$project"

@@ -5,7 +5,7 @@ import QtQuick.Dialogs
 import Quickshell
 import qs.Commons
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 import "plugins/araneadev.shared" as Shared
 
 ShellRoot {
@@ -20,7 +20,7 @@ ShellRoot {
     visible: true
     implicitWidth: 500
     implicitHeight: 300
-    Settings.ProjectFolderPicker {
+    ProjectUi.ProjectFolderPicker {
       id: picker
       width: 480
       onFolderRequested: function (path) {

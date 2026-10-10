@@ -64,7 +64,8 @@ returns host requests or argument arrays. On `activate(key)`, the controller
 reads a fresh synchronous snapshot and re-resolves the key through
 `DesktopSearchLogic.resolveTarget`, independently of cached refresh records.
 `appRequested(appId, label)` and `commandRequested(itemId)` preserve the existing
-launch and menu handlers. Settings results summon one of four static sections;
+launch and menu handlers. Settings results summon a desktop preferences section; the Projects destination
+summons the independent project manager;
 window/workspace targets use validated exact identities in the installed Lua
 focus dispatcher. Titles, descriptions and queries stay display data. Missing
 compositor data affects only live results. Failed or vanished activation emits
@@ -235,8 +236,11 @@ until an explicit New window choice. Search retains authoritative feedback by
 current owner session, exact checkout and highest operation generation; local
 submission feedback cannot overwrite newer accepted outcomes.
 
-Settings uses registry/discovery clients for registration and typed project
-configuration requests. Search uses `ProjectClient.qml` and `ProjectRecords.js`
+The standalone Projects presentation owns registry/discovery clients for
+registration and typed project configuration requests. `ProjectsPresentation.qml`
+retains drafts and observation clients independently of the window.
+`ProjectsSurface.qml` owns the searchable sidebar and focused Overview, Actions,
+Agents, Preferences, and Help destinations. Settings contains desktop preferences. Search uses `ProjectClient.qml` and `ProjectRecords.js`
 for matching and owner outcomes. Its observer survives menu closure. The
 workspace overview reads owner context only while visible; it owns no launch
 queue. Durable IDs and canonical paths are shared across every projection.
@@ -244,7 +248,7 @@ Runtime bindings stay in memory and expire with the owner session. Only verified
 process/window evidence establishes ownership, with a ten-second observation
 deadline; accepted process submission alone cannot produce an observed outcome.
 
-Project previews render production SettingsSurface, MenuSurface and
+Project previews render production ProjectsSurface, MenuSurface and
 WorkspacePanel in isolated offscreen hosts. Capture guards refuse registry,
 chooser, owner and launch requests. Workspace capture routes to the offscreen
 panel before any compositor read or focus dispatch, so its image is a panel

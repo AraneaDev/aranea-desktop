@@ -3,7 +3,7 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 import "plugins/araneadev.projects" as Projects
 
 ShellRoot {
@@ -54,7 +54,7 @@ ShellRoot {
       pending = false
     }
   }
-  Settings.ProjectsPage {
+  ProjectUi.ProjectsPage {
     id: page
     width: 420
     discoveryClient: discovery
@@ -100,21 +100,20 @@ ShellRoot {
       host.refreshCallbacks.push(done)
     }
   }
-  Settings.ProjectFolderPicker {
+  ProjectUi.ProjectFolderPicker {
     id: picker
     chooserAvailable: false
   }
-  Settings.Settings {
+  ProjectUi.ProjectsPresentation {
     id: entry
     windowEnabled: false
-    runner: function (argv, done) {}
   }
   FloatingWindow {
     id: window
     visible: true
     implicitWidth: 420
     implicitHeight: 260
-    Settings.SettingsSurface {
+    ProjectUi.ProjectsSurface {
       id: surface
       root: entry
       width: 420
@@ -598,12 +597,10 @@ ShellRoot {
     var restoredLocate = t.findChild(realPage, 'locateFolder:p-one:c-real')
     t.check(!!restoredLocate && restoredLocate.pathDraft === '/replacement draft', 'capture with different project restores Locate folder draft by stable IDs')
     t.check(surface.compact, 'Projects uses compact navigation on small screens')
-    entry.section = 'appearance'
     var beforeNavigation = sent.length
-    var navigation = t.findChild(surface, 'settingsNavigation')
-    navigation.choose('projects')
-    t.equal(entry.section, 'projects', 'keyboard category action reaches Projects')
-    t.equal(sent.length, beforeNavigation + 3, 'Projects navigation refreshes private registry tools and live observations')
+    entry.projectController.refresh()
+    entry.projectClient.refresh()
+    t.equal(sent.length, beforeNavigation + 3, 'Projects refreshes registry tools and owner observations')
     entryResponses[entryResponses.length - 2](0, JSON.stringify({
       ok: true,
       state: entry.projectController.state,
@@ -663,6 +660,7 @@ ShellRoot {
     }), '')
     t.equal(entry.discoveryClient.rootId, 'r-new', 'choosing folder scans its backend canonical root ID')
     // Real settings scrolling must reveal every action input/control at all widths.
+    surface.section = 'actions'
     var view = realPage.details.actions
     view.client.pollInterval = 60000
     view.client.pending = false

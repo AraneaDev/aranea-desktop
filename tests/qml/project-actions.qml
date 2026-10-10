@@ -2,7 +2,7 @@
 import QtQuick
 import Quickshell
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 
 ShellRoot {
   id: root
@@ -11,7 +11,7 @@ ShellRoot {
   QmlTest {
     id: t
   }
-  Settings.ProjectActions {
+  ProjectUi.ProjectActions {
     id: actions
     width: 380
     displayOnly: true

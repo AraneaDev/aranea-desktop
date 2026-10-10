@@ -2,7 +2,7 @@
 import QtQuick
 import Quickshell
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 
 ShellRoot {
   id: host
@@ -13,7 +13,7 @@ ShellRoot {
   QmlTest {
     id: t
   }
-  Settings.ProjectDetails {
+  ProjectUi.ProjectDetails {
     id: details
     width: 400
     project: ({

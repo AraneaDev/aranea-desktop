@@ -1,9 +1,18 @@
 # Projects, workflow actions, and agents
 
-Start in **Setup → Projects → Set up a project**. The wizard guides you through
+Open **Projects** from the launcher (**Super + Space**, then type `Projects`).
+Projects opens its own window. Choose **Add project**. The wizard guides you through
 adding a Git checkout, choosing your tools, defining optional workflow actions,
-and connecting agent reporting. **Projects help**, **How to use actions**, and
-**Agents → Help** provide offline help inside the desktop.
+and connecting agent reporting. The **Help** destination explains projects, actions,
+and agent reporting without leaving the window.
+
+Use the sidebar to search and select a saved project. Narrow windows use a compact
+project selector. **Overview** shows the selected checkout, branch, and workspace;
+**Actions** contains reusable workflows and their results; **Agents** shows tasks
+reported from that project's exact registered checkouts; **Preferences** contains
+editor, terminal, checkout, workspace choices, and development folders; **Help** explains the workflow.
+Save or discard drafts before switching projects or destinations. Closing the
+window retains your selected project and drafts and does not cancel accepted operations.
 
 ## What belongs where?
 
@@ -19,7 +28,7 @@ You can use projects and actions without enabling agent reporting.
 
 ## Set up your first project
 
-1. Open **Setup → Projects** and choose **Set up a project**.
+1. Open **Launcher → Projects** and choose **Add project**.
 2. **Choose folder:** pick the exact Git repository folder or a development folder
    containing repositories. You can also enter an absolute path and choose
    **Use folder**. The saved folder is scanned for Git checkouts.
@@ -38,7 +47,7 @@ You can use projects and actions without enabling agent reporting.
    Keep the current preferences and continue if you do not need customization;
    continuing does not save or run anything.
 5. Optionally add test, build, or dev-server actions. Save or cancel any action
-   draft before continuing. You can add actions later in **Preferences & actions**.
+   draft before continuing. You can add actions later in **Actions**.
 6. **Connect agents:** follow the reporting instructions for the provider you use,
    or skip this optional setup by choosing **Finish setup**. This stage appears
    after the last project. Install reporting once per provider, then start agent
@@ -48,7 +57,7 @@ You can use projects and actions without enabling agent reporting.
 registered. An existing unsaved project or action draft must be saved or discarded
 before starting another setup.
 
-To add more repositories later, use the wizard again. **Manage development folders**
+To add more repositories later, choose **Add project** again. **Preferences → Manage development folders**
 opens the folder and discovery controls directly. **Scan again** refreshes the
 results for a saved folder. A partial scan can still contain usable candidates;
 choose a narrower folder if it reaches a limit.
@@ -59,7 +68,7 @@ Choose **Open project** in Projects, or search for `project:` in the launcher.
 Aranea uses the saved preferences and selected checkout, opening or focusing its
 editor and terminal. Opening a project does not run workflow actions.
 
-Use **Preferences & actions** to change the default checkout, tools, or workspace.
+Use **Preferences** to change the default checkout, tools, or workspace.
 **Open separately** opens another registered checkout separately. **Locate folder**
 updates a checkout's saved location after it has moved. Removing a development
 folder does not remove its project registrations. **Remove registration** removes
@@ -72,7 +81,7 @@ prove that a tool failed to launch.
 
 ## Example: run tests
 
-Open the project's **Preferences & actions**, then **Add action**. On an empty
+Open the project's **Actions** destination, then **Add action**. On an empty
 new draft, **Example: npm test** fills the fields for you. Adapt it to the command
 your repository actually uses:
 

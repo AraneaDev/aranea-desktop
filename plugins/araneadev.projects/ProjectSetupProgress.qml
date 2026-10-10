@@ -49,7 +49,7 @@ ColumnLayout {
     spacing: Style.space(8)
     Repeater {
       model: progress.steps
-      SettingsLabel {
+      Aranea.UiLabel {
         required property int index
         required property string modelData
         text: (index + 1) + '. ' + modelData
@@ -59,12 +59,12 @@ ColumnLayout {
       }
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: progress.showSteps
     text: progress.descriptions[progress.step]
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: progress.showSteps && progress.step === 2 && progress.projectCount > 0
     text: 'Project ' + (progress.projectIndex + 1) + ' of ' + progress.projectCount + ' · ' + progress.projectName
@@ -75,7 +75,7 @@ ColumnLayout {
     Layout.fillWidth: true
     visible: progress.showControls
     spacing: Style.space(8)
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'setupBack'
       text: progress.step === 2 && progress.projectIndex > 0 ? 'Previous project' : 'Back'
       visible: progress.step > 0
@@ -83,7 +83,7 @@ ColumnLayout {
       pointerGate: progress.pointerGate
       onClicked: progress.backRequested()
     }
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'setupNext'
       text: progress.step === 0 ? 'Review repositories' : progress.step === 2 ? (progress.projectIndex + 1 < progress.projectCount ? 'Next project' : 'Continue to agents') : 'Next'
       visible: progress.step < 3
@@ -91,7 +91,7 @@ ColumnLayout {
       pointerGate: progress.pointerGate
       onClicked: progress.nextRequested()
     }
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'setupFinish'
       text: 'Finish setup'
       visible: progress.step === 3
@@ -99,14 +99,14 @@ ColumnLayout {
       pointerGate: progress.pointerGate
       onClicked: progress.finishRequested()
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Exit setup'
       enabled: !progress.displayOnly && !progress.pending
       pointerGate: progress.pointerGate
       onClicked: progress.cancelRequested()
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: progress.showControls
     text: progress.step === 1 ? 'Select one or several repositories and Add selected to configure them together.' : progress.step === 2 ? 'Keep the current preferences and continue, or customize this project. Workflow actions are optional; you can add them later.' : progress.step === 3 && progress.projectCount > 1 ? 'All ' + progress.projectCount + ' projects are registered. Reporting is installed once per provider; start agents from the checkout you want to work in.' : 'Existing saved projects are kept when you exit setup.'

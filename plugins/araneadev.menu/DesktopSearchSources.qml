@@ -25,6 +25,8 @@ Item {
   property var recentAppIds: []
   // Availability from the existing settings manifest watcher.
   property bool settingsAvailable: false
+  // Availability of the independently installed Projects destination.
+  property bool projectsAvailable: false
   // Persistent quick-action owner; null when that capability is unavailable.
   property var actionController: null
   // Read-only client for the single persistent project operation owner.
@@ -98,6 +100,7 @@ Item {
       favoriteAppIds: sources.favoriteAppIds,
       recentAppIds: sources.recentAppIds,
       settingsAvailable: sources.settingsAvailable,
+      projectsAvailable: sources.projectsAvailable,
       actionRecords: sources.actionController ? sources.actionController.records : [],
       projectRecords: sources.currentProjectRecords()
     }
@@ -402,6 +405,7 @@ Item {
   onFavoriteAppIdsChanged: publish()
   onRecentAppIdsChanged: publish()
   onSettingsAvailableChanged: publish()
+  onProjectsAvailableChanged: publish()
   onActionControllerChanged: publish()
   onFixtureWindowsChanged: requestRefresh()
   onFixtureWorkspacesChanged: requestRefresh()
