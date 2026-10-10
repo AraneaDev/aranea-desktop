@@ -45,12 +45,8 @@ echo "showcase contract passed"
   echo 'FAIL missing inert Tasks renderer'
   exit 1
 }
-preview_quickshell=""
-while IFS= read -r candidate; do
-  [[ "$candidate" == */tests/guard-bin/* ]] && continue
-  preview_quickshell="$candidate"
-  break
-done < <(type -ap quickshell)
-ARANEA_AGENTS_PREVIEW_QUICKSHELL="$preview_quickshell" "$repo_root/tools/render-agents-preview" --fixture empty --output "$ARANEA_TEST_SANDBOX/agents.png"
+source "$repo_root/tests/lib/qml-host.sh"
+require_qml_host
+ARANEA_QML_SHELL_DIR="$qml_shell_dir" ARANEA_AGENTS_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/tools/render-agents-preview" --fixture empty --output "$ARANEA_TEST_SANDBOX/agents.png"
 [[ -s "$ARANEA_TEST_SANDBOX/agents.png" ]]
 echo 'PASS inert production Tasks preview, execution traps and unchanged state/settings'

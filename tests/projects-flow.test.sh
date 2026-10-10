@@ -3,16 +3,8 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
-quickshell_bin=""
-while IFS= read -r candidate; do
-  [[ "$candidate" == */tests/guard-bin/* ]] && continue
-  quickshell_bin="$candidate"
-  break
-done < <(type -ap quickshell 2>/dev/null || true)
-[[ -n "$quickshell_bin" && -f /usr/share/omarchy/shell/Commons/qmldir ]] || {
-  echo 'Project flow needs Quickshell and Omarchy'
-  exit 1
-}
+source "$repo_root/tests/lib/qml-host.sh"
+require_qml_host
 checkout="$ARANEA_TEST_SANDBOX/development/project with spaces"
 mkdir -p "$checkout" "$ARANEA_TEST_SANDBOX/bin" "$XDG_STATE_HOME/omarchy/current"
 git init -q "$checkout"
@@ -50,8 +42,8 @@ cleanup_flow() {
 sandbox_on_exit cleanup_flow
 mkdir -p "$work/cfg/plugins" "$work/run"
 chmod 700 "$work/run"
-ln -s /usr/share/omarchy/shell/Commons "$work/cfg/Commons"
-ln -s /usr/share/omarchy/shell/Ui "$work/cfg/Ui"
+ln -s "$qml_shell_dir/Commons" "$work/cfg/Commons"
+ln -s "$qml_shell_dir/Ui" "$work/cfg/Ui"
 ln -s "$repo_root/tests/qml/lib" "$work/cfg/lib"
 for plugin in "$repo_root"/plugins/araneadev.*; do ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
 cp "$repo_root/tests/qml/fixtures/projects-flow.qml" "$work/cfg/shell.qml"

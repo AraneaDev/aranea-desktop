@@ -91,16 +91,12 @@ jq -cn --slurpfile state "$TMPDIR/state" '$state[0].state as $s | ($s.tasks[]|se
 deliver codex '{"hook_event_name":"SessionEnd","reason":"exit"}'
 "$cli" agents list --json >"$TMPDIR/list"
 jq -se 'last.data.tasks | any(.[];.provider=="codex" and .reportedState=="ready-for-review" and .result=="Codex result" and .verification.status=="reported-pass" and .freshness=="connection-lost")' "$TMPDIR/list" >/dev/null
-quickshell_bin=""
-while IFS= read -r candidate; do [[ "$candidate" == */tests/guard-bin/* ]] || {
-  quickshell_bin="$candidate"
-  break
-}; done < <(type -ap quickshell)
-[[ -n "$quickshell_bin" && -f /usr/share/omarchy/shell/Commons/qmldir ]]
+source "$repo_root/tests/lib/qml-host.sh"
+require_qml_host
 mkdir -p "$work/cfg/plugins" "$work/run"
 chmod 700 "$work/run"
-ln -s /usr/share/omarchy/shell/Commons "$work/cfg/Commons"
-ln -s /usr/share/omarchy/shell/Ui "$work/cfg/Ui"
+ln -s "$qml_shell_dir/Commons" "$work/cfg/Commons"
+ln -s "$qml_shell_dir/Ui" "$work/cfg/Ui"
 ln -s "$repo_root/tests/qml/lib" "$work/cfg/lib"
 for plugin in "$repo_root"/plugins/araneadev.*; do ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
 cp "$repo_root/tests/qml/fixtures/agent-activity-flow.qml" "$work/cfg/shell.qml"
@@ -229,4 +225,4 @@ if rg -q 'QMLTEST FAIL|TypeError|ReferenceError|Unable to assign|Binding loop|Fa
 fi
 echo 'PASS native Claude/Codex → exact Git checkout/store/CLI → IPC owner/client/Tasks, headless restart, verification/result/disconnect, stale refusal and reconnect no relaunch'
 # Preserve the existing real owner/client identity/late acceptance regressions in this boundary run.
-ARANEA_CHECK_REQUIRE_ALL=1 bash "$repo_root/tests/qml-behaviour.test.sh" activity-controller activity-client activity-resume activity-late-launch activity-stale-callback
+ARANEA_QML_SHELL_DIR="$qml_shell_dir" ARANEA_CHECK_REQUIRE_ALL=1 bash "$repo_root/tests/qml-behaviour.test.sh" activity-controller activity-client activity-resume activity-late-launch activity-stale-callback

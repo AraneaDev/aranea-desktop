@@ -116,3 +116,10 @@ jobs:
         env:
           ARANEA_CHECK_REQUIRE_ALL: "1"
         run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tools/check --only format,qml,qmltest,smoke
+
+      # Native flows require the same pinned Quickshell/Omarchy host as QML.
+      # The Ubuntu job retains their headless checks and reports native skips.
+      - name: Native project and agent acceptance
+        env:
+          ARANEA_CHECK_REQUIRE_ALL: "1"
+        run: ARANEA_QML_SHELL_DIR="$RUNNER_TEMP/omarchy/shell" tests/run agent-activity-flow project-actions-flow projects-cli-owner projects-flow showcase

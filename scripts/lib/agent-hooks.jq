@@ -47,7 +47,7 @@ else
    elif $provider == "codex" and ($name|IN("PreToolUse","PostToolUse")) then {kind:"diagnostic",payload:{summary:($name+": "+($p.tool_name|text(160)))}}
    elif $name == "PreToolUse" and ($p.tool_name|IN("AskUserQuestion","ExitPlanMode")) then
     {kind:"needs-input",payload:{blockerId:(if ($p.tool_use_id|id) then "tool:"+$p.tool_use_id else "unconfirmed:"+$fp end),question:(if $p.tool_name == "AskUserQuestion" then ($p.tool_input.questions[0].question|text(4096)) else "Review the proposed plan" end)}}
-   elif $name == "PermissionRequest" then {kind:"needs-input",payload:{blockerId:"permission-unconfirmed:"+$fp,question:("Permission requested for "+($p.tool_name|text(160))+"; resolution unconfirmed (no native correlation ID)")}}
+   elif $name == "PermissionRequest" then {kind:"needs-input",payload:{blockerId:("permission-unconfirmed:"+$fp),question:("Permission requested for "+($p.tool_name|text(160))+"; resolution unconfirmed (no native correlation ID)")}}
    elif $name|IN("PostToolUse","PostToolUseFailure") then
     (if ($p.tool_use_id|id) then "tool:"+$p.tool_use_id else "unconfirmed-no-match" end) as $blocker |
     if ($p.tool_name|IN("AskUserQuestion","ExitPlanMode")) and ($p.tool_use_id|id) and ($name == "PostToolUse" or any($old.blockers[]?;.blockerId == $blocker)) then {kind:"blocker-resolved",payload:({blockerId:$blocker}+(if $name == "PostToolUseFailure" then {summary:($p.error|text(4096))} else {} end))}

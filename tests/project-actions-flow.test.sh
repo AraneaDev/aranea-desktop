@@ -6,15 +6,10 @@ source "$repo_root/tests/lib/sandbox.sh"
 export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/state"
 backend="$repo_root/scripts/aranea-project-actions"
 cli="$repo_root/scripts/aranea"
-shell_dir="$(sandbox_inherited_value ARANEA_QML_SHELL_DIR)"
-shell_dir="${shell_dir:-/usr/share/omarchy/shell}"
-qs=""
-while IFS= read -r candidate; do
-  [[ $candidate == */tests/guard-bin/* ]] && continue
-  qs=$candidate
-  break
-done < <(type -ap quickshell)
-[[ -n $qs && -f $shell_dir/Commons/qmldir ]]
+source "$repo_root/tests/lib/qml-host.sh"
+require_qml_host
+shell_dir="$qml_shell_dir"
+qs="$quickshell_bin"
 mkdir -p "$ARANEA_TEST_SANDBOX/bin" "$ARANEA_TEST_SANDBOX/repo" "$ARANEA_TEST_SANDBOX/manager"
 for tool in systemd-run systemctl journalctl curl xdg-open; do ln -s "$repo_root/tests/fixtures/project-actions-manager.sh" "$ARANEA_TEST_SANDBOX/bin/$tool"; done
 export PATH="$ARANEA_TEST_SANDBOX/bin:$PATH"

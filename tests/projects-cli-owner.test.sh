@@ -3,13 +3,8 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
-quickshell_bin=""
-while IFS= read -r candidate; do
-  [[ "$candidate" == */tests/guard-bin/* ]] && continue
-  quickshell_bin="$candidate"
-  break
-done < <(type -ap quickshell 2>/dev/null || true)
-[[ -n "$quickshell_bin" && -f /usr/share/omarchy/shell/Commons/qmldir ]]
+source "$repo_root/tests/lib/qml-host.sh"
+require_qml_host
 checkout="$ARANEA_TEST_SANDBOX/repo with spaces"
 mkdir -p "$checkout" "$ARANEA_TEST_SANDBOX/bin" "$XDG_STATE_HOME/omarchy/current"
 git init -q "$checkout"
@@ -56,8 +51,8 @@ cleanup_owner() {
 sandbox_on_exit cleanup_owner
 mkdir -p "$work/cfg/plugins" "$work/run"
 chmod 700 "$work/run"
-ln -s /usr/share/omarchy/shell/Commons "$work/cfg/Commons"
-ln -s /usr/share/omarchy/shell/Ui "$work/cfg/Ui"
+ln -s "$qml_shell_dir/Commons" "$work/cfg/Commons"
+ln -s "$qml_shell_dir/Ui" "$work/cfg/Ui"
 for plugin in "$repo_root"/plugins/araneadev.*; do ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
 cp "$repo_root/tests/qml/fixtures/projects-cli-owner.qml" "$work/cfg/shell.qml"
 export CLI_OWNER_BIN="$quickshell_bin" CLI_OWNER_CONFIG="$work/cfg" CLI_OWNER_RUNTIME="$work/run" CLI_OWNER_CALLS="$work/calls"
