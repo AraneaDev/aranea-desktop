@@ -117,6 +117,7 @@ ShellRoot {
         }
       ]
       source.settingsAvailable = true
+      source.projectsAvailable = true
       source.fixtureFocusedWorkspaceId = 2
       source.runner = function (argv) {
         host.ran = host.ran.concat([argv])

@@ -179,7 +179,7 @@ Panel {
     if (kind === 'setup') {
       // qmllint disable missing-property
       if (root.bar)
-        root.bar.run('omarchy-shell shell summon araneadev.settings \'{"section":"projects"}\'')
+        root.bar.run('omarchy-shell shell summon araneadev.projects')
       // qmllint enable missing-property
       root.close()
       return

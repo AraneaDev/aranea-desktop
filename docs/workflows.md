@@ -1,9 +1,18 @@
 # Projects, workflow actions, and agents
 
-Start in **Setup → Projects → Set up a project**. The wizard guides you through
+Open **Projects** from the launcher (**Super + Space**, then type `Projects`).
+Projects opens its own window. Choose **Add project**. The wizard guides you through
 adding a Git checkout, choosing your tools, defining optional workflow actions,
-and connecting agent reporting. **Projects help**, **How to use actions**, and
-**Agents → Help** provide offline help inside the desktop.
+and connecting agent reporting. The **Help** destination explains projects, actions,
+and agent reporting without leaving the window.
+
+Use the sidebar to search and select a saved project. Narrow windows use a compact
+project selector. **Overview** shows the selected checkout, branch, and workspace;
+**Actions** contains reusable workflows and their results; **Agents** shows tasks
+reported from that project's exact registered checkouts; **Preferences** contains
+editor, terminal, checkout, workspace choices, and development folders; **Help** explains the workflow.
+Save or discard drafts before switching projects or destinations. Closing the
+window retains your selected project and drafts and does not cancel accepted operations.
 
 ## What belongs where?
 
@@ -19,7 +28,7 @@ You can use projects and actions without enabling agent reporting.
 
 ## Set up your first project
 
-1. Open **Setup → Projects** and choose **Set up a project**.
+1. Open **Launcher → Projects** and choose **Add project**.
 2. **Choose folder:** pick the exact Git repository folder or a development folder
    containing repositories. You can also enter an absolute path and choose
    **Use folder**. The saved folder is scanned for Git checkouts.
@@ -38,7 +47,7 @@ You can use projects and actions without enabling agent reporting.
    Keep the current preferences and continue if you do not need customization;
    continuing does not save or run anything.
 5. Optionally add test, build, or dev-server actions. Save or cancel any action
-   draft before continuing. You can add actions later in **Preferences & actions**.
+   draft before continuing. You can add actions later in **Actions**.
 6. **Connect agents:** follow the reporting instructions for the provider you use,
    or skip this optional setup by choosing **Finish setup**. This stage appears
    after the last project. Install reporting once per provider, then start agent
@@ -48,31 +57,56 @@ You can use projects and actions without enabling agent reporting.
 registered. An existing unsaved project or action draft must be saved or discarded
 before starting another setup.
 
-To add more repositories later, use the wizard again. **Manage development folders**
+To add more repositories later, choose **Add project** again. **Preferences → Manage development folders**
 opens the folder and discovery controls directly. **Scan again** refreshes the
 results for a saved folder. A partial scan can still contain usable candidates;
 choose a narrower folder if it reaches a limit.
 
 ## Open and resume a project
 
-Choose **Open project** in Projects, or search for `project:` in the launcher.
-Aranea uses the saved preferences and selected checkout, opening or focusing its
-editor and terminal. Opening a project does not run workflow actions.
+Choose **Open workspace** in Projects, or search for `project:` in the launcher.
+Open launches or focuses the tools ticked under **▾ → Opens by default** (Editor
+and Terminal for new projects); toggles save immediately. **▾ → Just open one**
+starts a single tool once: an agent, the terminal, or the editor. Opening a project
+does not run workflow actions.
 
-Use **Preferences & actions** to change the default checkout, tools, or workspace.
+Use **Preferences** to change the default checkout, tools, or workspace.
 **Open separately** opens another registered checkout separately. **Locate folder**
 updates a checkout's saved location after it has moved. Removing a development
 folder does not remove its project registrations. **Remove registration** removes
 only the saved project record; repository files and existing windows remain.
 
-If only one tool opens, inspect the individual editor and terminal outcomes.
+If only one tool opens, inspect the individual role outcomes.
 Use the offered **Retry**, **Check … again**, or **Open new … window** control for
 that role. An unconfirmed result means observation is incomplete; it does not
 prove that a tool failed to launch.
 
+## Start an agent in a project
+
+Choose **Start Codex/Claude** from **▾ → Just open one**, **New agent session** on
+Overview, or **Start … here** on an empty Agents tab. In the launcher, type
+`claude <project>`, `codex <project>`, or `agent <project>`. Each installed provider
+has its own result; the generic `agent` query puts the suggestion first within
+equally matched results. The reason appears beside the suggestion, and the other
+provider is available when installed. Agents run in the terminal selected in
+Preferences.
+
+Suggestions use local usage records. Aranea prefers a provider with known usage
+below 90% when it is the only such choice; otherwise, a difference of at least
+15 percentage points picks the provider with more headroom. Smaller differences
+or unknown usage fall back to the provider last started here, then Claude when
+both are installed. Expired usage is unknown. Starting an agent does not refresh
+provider usage. Provider history is saved immediately before a launch attempt;
+an unsuccessful attempt can therefore become the last choice. Focusing an
+existing agent keeps its provider history.
+
+If a proven agent window from the project is already open, **Open workspace**
+with Agent ticked focuses it. **Start** always opens a new session. An unconfirmed
+window is not automatically started again; use the offered recovery controls.
+
 ## Example: run tests
 
-Open the project's **Preferences & actions**, then **Add action**. On an empty
+Open the project's **Actions** destination, then **Add action**. On an empty
 new draft, **Example: npm test** fills the fields for you. Adapt it to the command
 your repository actually uses:
 
@@ -139,8 +173,8 @@ aranea agents adapter install codex
 Review your provider's hook trust settings, then start a **new native CLI session
 from that registered checkout** and perform some work. Installing hooks alone
 does not prove that they are trusted or that activity has been reported. Existing
-sessions may not load newly installed hooks. Aranea does not start an agent when
-you finish project setup.
+sessions may not load newly installed hooks. Aranea starts agents only when you
+choose to; finishing setup starts nothing.
 
 Check **Agents → Tasks** for activity. **Agents → Help** explains setup, status,
 session controls, and troubleshooting. **Usage** remains separate from reporting.

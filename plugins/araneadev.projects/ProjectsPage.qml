@@ -15,12 +15,18 @@ ColumnLayout {
   property var discoveryClient: null
   // Shared live-owner client supplies Open availability and progress.
   property var projectClient: null
-  // Current details destination, supplied by Settings IPC or explicit selection.
+  // Current details destination, supplied by Projects IPC or explicit selection.
   property string projectId: ''
+  // Dedicated window supplies project selection outside the content.
+  property bool sidebarNavigation: false
+  // Focused project destination supplied by standalone navigation.
+  property string viewSection: 'all'
   // Inert captures refuse all backend, chooser and owner actions.
   property bool displayOnly: false
   // Registry mutations are serialized by the focused operation client.
   property bool pending: false
+  // Shared suggestion propagated to the selected project Details.
+  property var agentChoice: null
   // Actionable backend error retained independently of discovery outcomes.
   property string error: ''
   // Shared pointer/layout settling gate.
@@ -39,6 +45,8 @@ ColumnLayout {
   readonly property int setupProjectIndex: setupProjectIds.indexOf(setupProjectId)
   // Any active mutation or scan pauses switching projects and wizard stages.
   readonly property bool setupNavigationPending: pending || !!discoveryClient && discoveryClient.pending || details.pending || details.actions.pending
+  // Exiting setup must retain every unsaved preference or action draft.
+  readonly property bool setupCanExit: !setupNavigationPending && !details.dirty && !details.actions.editing
   // Explicit submitted selection matched against successful readback.
   property var setupRegistrationPaths: []
   // A folder confirmation is awaiting canonical registry approval.
@@ -85,10 +93,11 @@ ColumnLayout {
   }
   // Exit preserves saved registration and the exact configured project destination.
   function finishSetup(): void {
-    if (!displayOnly && !setupNavigationPending) {
-      if (setupActive && selectedProject)
-        detailsRequested(selectedProject.id)
+    if (!displayOnly && setupCanExit) {
+      var completedId = setupActive && selectedProject ? selectedProject.id : ''
       setupActive = false
+      if (completedId)
+        detailsRequested(completedId)
       setupRegistrationPaths = []
       setupAwaitingFolder = false
     }
@@ -98,7 +107,9 @@ ColumnLayout {
     if (displayOnly)
       return
     if (action === 'configure' && selectedProject && args.projectId === selectedProject.id)
-      details.discardDraft()
+      details.acknowledgeDraft((state.projects || []).filter(function (project) {
+        return project.id === args.projectId
+      })[0])
     if (!setupActive)
       return
     if (action === 'root-add' && setupAwaitingFolder) {
@@ -173,7 +184,7 @@ ColumnLayout {
   signal removeRequested(string projectId)
   // The sole owner handles Open and explicit role recovery.
   signal openRequested(var payload)
-  // Route typed details destination through the Settings composition root.
+  // Route typed details destination through the Projects composition root.
   signal detailsRequested(string projectId)
   // Read current registry/tool/owner state after an actionable error.
   signal refreshRequested
@@ -292,19 +303,20 @@ ColumnLayout {
       captureRestore(fixture.projectsDraft)
   }
   spacing: Style.space(12)
-  SettingsPageHeader {
+  Aranea.PageHeader {
+    visible: !page.sidebarNavigation
     title: 'Projects'
     description: 'Keep your editor, terminal, and workflow actions together for each project.'
   }
   RowLayout {
     Layout.fillWidth: true
     visible: !!page.error
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       text: page.error
       color: Aranea.DesignTokens.attention
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Retry'
       enabled: !page.displayOnly && !page.pending
       pointerGate: page.pointerGate
@@ -314,22 +326,25 @@ ColumnLayout {
   Flow {
     Layout.fillWidth: true
     spacing: Style.space(8)
-    SettingsButton {
+    visible: !page.sidebarNavigation || !page.setupActive && page.viewSection === 'preferences'
+    Aranea.ActionButton {
       objectName: 'projectSetupStart'
       text: 'Set up a project'
-      visible: !page.setupActive
+      visible: !page.setupActive && !page.sidebarNavigation
       enabled: !page.displayOnly && !page.setupNavigationPending && !details.dirty && !details.actions.editing
       pointerGate: page.pointerGate
       onClicked: page.startSetup()
     }
-    SettingsButton {
+    Aranea.ActionButton {
+      objectName: 'projectFoldersToggle'
       text: page.foldersExpanded ? 'Hide folder management' : 'Manage development folders'
       visible: !page.setupActive
       pointerGate: page.pointerGate
       onClicked: page.foldersExpanded = !page.foldersExpanded
     }
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'projectHelpToggle'
+      visible: !page.sidebarNavigation
       text: page.helpExpanded && page.helpTopic === 'projects' ? 'Hide projects help' : 'Projects help'
       pointerGate: page.pointerGate
       onClicked: {
@@ -337,8 +352,9 @@ ColumnLayout {
         page.helpTopic = 'projects'
       }
     }
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'agentHelpToggle'
+      visible: !page.sidebarNavigation
       text: page.helpExpanded && page.helpTopic === 'agents' ? 'Hide agent help' : 'Agent reporting help'
       pointerGate: page.pointerGate
       onClicked: {
@@ -347,7 +363,7 @@ ColumnLayout {
       }
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.setupActive && (details.dirty || details.actions.editing)
     text: 'Save or discard your current draft before starting a new project setup.'
@@ -369,6 +385,7 @@ ColumnLayout {
     projectCount: page.setupProjectIds.length
     projectName: page.selectedProject ? page.selectedProject.name : ''
     canContinue: page.setupCanContinue
+    canExit: page.setupCanExit
     canBack: page.setupStep !== 2 || !details.dirty && !details.actions.editing
     pending: page.setupNavigationPending
     pointerGate: page.pointerGate
@@ -377,13 +394,13 @@ ColumnLayout {
     onFinishRequested: page.finishSetup()
     onCancelRequested: page.finishSetup()
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: page.setupActive && page.setupStep >= 2 && !page.selectedProject
     text: 'This project is no longer registered. Go Back to add it again, or Exit setup.'
     color: Aranea.DesignTokens.attention
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: page.setupActive && page.setupStep === 2 && (page.details.dirty || page.details.actions.editing)
     text: page.details.actions.editing ? 'Save or cancel the action draft before changing steps.' : 'Save preferences before changing steps, or Discard to keep the saved values.'
@@ -391,8 +408,8 @@ ColumnLayout {
   }
   ColumnLayout {
     Layout.fillWidth: true
-    visible: page.setupActive ? page.setupStep < 2 : page.foldersExpanded || candidates.candidates.length > 0
-    SettingsLabel {
+    visible: page.setupActive ? page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidates.candidates.length > 0)
+    Aranea.UiLabel {
       Layout.fillWidth: true
       visible: !!page.discoveryClient && page.discoveryClient.pending
       text: 'Scanning for Git repositories… Review the results when the scan finishes.'
@@ -416,18 +433,18 @@ ColumnLayout {
         id: rootFolder
         required property var modelData
         Layout.fillWidth: true
-        SettingsLabel {
+        Aranea.UiLabel {
           Layout.fillWidth: true
           text: rootFolder.modelData.path
         }
         RowLayout {
-          SettingsButton {
+          Aranea.ActionButton {
             text: 'Scan again'
             enabled: !page.displayOnly && !page.pending && !(page.discoveryClient && page.discoveryClient.pending)
             pointerGate: page.pointerGate
             onClicked: page.discoverRequested(rootFolder.modelData.id)
           }
-          SettingsButton {
+          Aranea.ActionButton {
             text: 'Remove folder'
             visible: !page.setupActive
             enabled: !page.displayOnly && !page.pending
@@ -437,27 +454,27 @@ ColumnLayout {
         }
       }
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Cancel scan'
       visible: !!page.discoveryClient && page.discoveryClient.pending
       enabled: !page.displayOnly
       pointerGate: page.pointerGate
       onClicked: page.cancelRequested()
     }
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       visible: page.partial
       text: 'Partial scan. Review the results or choose a narrower folder.'
     }
     Repeater {
       model: page.discoveryClient ? page.discoveryClient.errors : []
-      SettingsLabel {
+      Aranea.UiLabel {
         required property var modelData
         Layout.fillWidth: true
         text: typeof modelData === 'string' ? modelData : (modelData.message || modelData.code || 'Scan error') + (modelData.path ? ' · ' + modelData.path : '')
       }
     }
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       visible: (!page.setupActive || page.setupStep === 1) && !!page.discoveryClient && !page.discoveryClient.pending && !candidates.candidates.length
       text: 'No repositories to review. Choose another folder or refresh an approved folder.'
@@ -482,7 +499,7 @@ ColumnLayout {
         page.ignoreRequested(path)
       }
     }
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'setupRegister'
       text: 'Add selected' + (candidates.selectedPaths.length ? ' (' + candidates.selectedPaths.length + ')' : '')
       visible: !page.setupActive || page.setupStep === 1
@@ -490,7 +507,7 @@ ColumnLayout {
       pointerGate: page.pointerGate
       onClicked: page.addSelected()
     }
-    SettingsButton {
+    Aranea.ActionButton {
       visible: !page.setupActive
       text: page.ignoredExpanded ? 'Hide ignored repositories' : 'Review ignored repositories'
       pointerGate: page.pointerGate
@@ -505,11 +522,11 @@ ColumnLayout {
           id: ignoredRepo
           required property var modelData
           Layout.fillWidth: true
-          SettingsLabel {
+          Aranea.UiLabel {
             Layout.fillWidth: true
             text: ignoredRepo.modelData.path
           }
-          SettingsButton {
+          Aranea.ActionButton {
             text: 'Unignore'
             enabled: !page.displayOnly && !page.pending
             pointerGate: page.pointerGate
@@ -521,8 +538,8 @@ ColumnLayout {
   }
   ColumnLayout {
     Layout.fillWidth: true
-    visible: !page.setupActive
-    SettingsLabel {
+    visible: !page.setupActive && !page.sidebarNavigation
+    Aranea.UiLabel {
       visible: (page.registryState.projects || []).length > 0
       text: 'Registered projects'
       font.bold: true
@@ -533,17 +550,17 @@ ColumnLayout {
         id: project
         required property var modelData
         Layout.fillWidth: true
-        SettingsLabel {
+        Aranea.UiLabel {
           Layout.fillWidth: true
           text: project.modelData.name + ' · ' + (project.modelData.checkouts.length ? project.modelData.checkouts[0].path : '')
         }
-        SettingsButton {
+        Aranea.ActionButton {
           text: 'Preferences & actions'
           selected: page.projectId === project.modelData.id
           pointerGate: page.pointerGate
           onClicked: page.detailsRequested(project.modelData.id)
         }
-        SettingsButton {
+        Aranea.ActionButton {
           text: 'Open project'
           enabled: !page.displayOnly && !page.pending && !!page.projectClient && page.projectClient.available && !page.projectClient.pending && !!page.projectClient.snapshot.availability && page.projectClient.snapshot.availability.compositor === true
           pointerGate: page.pointerGate
@@ -554,7 +571,7 @@ ColumnLayout {
       }
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.setupActive && !!page.projectId && !page.selectedProject
     text: 'Project unavailable. Refresh or choose a registered project.'
@@ -562,12 +579,15 @@ ColumnLayout {
   ProjectDetails {
     id: details
     Layout.fillWidth: true
-    visible: !!page.selectedProject && (!page.setupActive || page.setupStep === 2)
+    visible: !!page.selectedProject && (page.setupActive ? page.setupStep === 2 : ['all', 'overview', 'actions', 'preferences'].indexOf(page.viewSection) >= 0)
     project: page.selectedProject
+    headerProvided: page.sidebarNavigation
     guidedSetup: page.setupActive
+    viewSection: page.viewSection
     projectClient: page.projectClient
     actionsActive: page.visible && details.visible && !page.displayOnly
     tools: page.tools
+    agentChoice: page.agentChoice
     displayOnly: page.displayOnly
     pending: page.pending || !!page.projectClient && page.projectClient.pending
     openAvailable: !!page.projectClient && page.projectClient.available && !!page.projectClient.snapshot.availability && page.projectClient.snapshot.availability.compositor === true
@@ -604,6 +624,7 @@ ColumnLayout {
     projectCount: page.setupProjectIds.length
     projectName: page.selectedProject ? page.selectedProject.name : ''
     canContinue: page.setupCanContinue
+    canExit: page.setupCanExit
     canBack: page.setupStep !== 2 || !details.dirty && !details.actions.editing
     pending: page.setupNavigationPending
     pointerGate: page.pointerGate
@@ -612,9 +633,9 @@ ColumnLayout {
     onFinishRequested: page.finishSetup()
     onCancelRequested: page.finishSetup()
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
-    visible: !page.setupActive && !(page.registryState.projects || []).length && !candidates.candidates.length
+    visible: !page.sidebarNavigation && !page.setupActive && !(page.registryState.projects || []).length && !candidates.candidates.length
     text: 'No projects yet. Set up a project to choose a Git checkout, your tools, and optional workflow actions.'
   }
   Connections {

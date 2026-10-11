@@ -8,6 +8,8 @@ import "HealthLogic.js" as HealthLogic
 
 Item {
   id: root
+  // Spatial motion policy, overridable by static previews and input fixtures.
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
   // Whether a health service with metrics is published.
   property bool available: false
   // Existing health severity from the service.
@@ -64,10 +66,7 @@ Item {
   }
   // The height of a disclosure heading, excluding its expanded content.
   function headingHeight(section) {
-    for (var i = 0; i < section.children.length; i++)
-      if (section.children[i].objectName === "disclosureHeading")
-        return section.children[i].height
-    return 0
+    return section.headingHeight
   }
   // Keep keyed targets reachable when problem lists or details overflow.
   function ensureCursorVisible(): void {
@@ -174,6 +173,7 @@ Item {
           id: resourcesDetails
           Layout.fillWidth: true
           title: "Resource details"
+          motionEnabled: root.motionEnabled
           expanded: root.resourcesExpanded
           keyboardFocused: root.keyboardCursor && root.cursorKey === "details:resources"
           pointerGate: problemsSection.pointerGate
@@ -191,6 +191,7 @@ Item {
           id: processesDetails
           Layout.fillWidth: true
           title: "Processes"
+          motionEnabled: root.motionEnabled
           expanded: root.processesExpanded
           keyboardFocused: root.keyboardCursor && root.cursorKey === "details:processes"
           pointerGate: problemsSection.pointerGate

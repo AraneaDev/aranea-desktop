@@ -13,9 +13,7 @@
  * @returns {string} Supported section.
  */
 function normalizeSection(value) {
-  return ["appearance", "display", "schedule", "integrations", "notifications", "projects"].indexOf(
-    value
-  ) >= 0
+  return ["appearance", "display", "schedule", "integrations", "notifications"].indexOf(value) >= 0
     ? value
     : "appearance"
 }

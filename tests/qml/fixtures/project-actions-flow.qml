@@ -2,7 +2,7 @@
 import QtQuick
 import Quickshell
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as Settings
 
 ShellRoot {
   id: root

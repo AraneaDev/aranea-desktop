@@ -196,12 +196,12 @@ ColumnLayout {
     })
   }
   spacing: Style.space(8)
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Configure action'
     font.bold: true
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: 'Save defines the action; Run or Start executes it later. Put the program in Executable and each following word in its own argument field.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
@@ -210,13 +210,13 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: Style.space(8)
     visible: editor.exampleAvailable
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Example: npm test'
       enabled: !editor.displayOnly && !editor.pending
       pointerGate: editor.pointerGate
       onClicked: editor.useExample('test')
     }
-    SettingsButton {
+    Aranea.ActionButton {
       text: 'Example: npm run dev'
       enabled: !editor.displayOnly && !editor.pending
       pointerGate: editor.pointerGate
@@ -242,7 +242,7 @@ ColumnLayout {
       id: field
       required property var modelData
       Layout.fillWidth: true
-      SettingsLabel {
+      Aranea.UiLabel {
         text: field.modelData.label
       }
       InputField {
@@ -257,7 +257,7 @@ ColumnLayout {
       }
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     text: 'Arguments'
     visible: argumentsModel.count > 0
   }
@@ -279,7 +279,7 @@ ColumnLayout {
         font.pixelSize: Style.font.caption
         onTextEdited: editor.setArgument(argument.index, text)
       }
-      SettingsButton {
+      Aranea.ActionButton {
         text: 'Remove argument ' + (argument.index + 1)
         enabled: !editor.displayOnly && !editor.pending
         pointerGate: editor.pointerGate
@@ -287,7 +287,7 @@ ColumnLayout {
       }
     }
   }
-  SettingsButton {
+  Aranea.ActionButton {
     text: 'Add argument'
     enabled: !editor.displayOnly && !editor.pending && argumentsModel.count < 63
     pointerGate: editor.pointerGate
@@ -298,7 +298,7 @@ ColumnLayout {
     spacing: Style.space(8)
     Repeater {
       model: ['command', 'service']
-      SettingsButton {
+      Aranea.ActionButton {
         id: kind
         required property string modelData
         text: modelData === 'command' ? 'Command (runs to completion)' : 'Service (keeps running)'
@@ -312,7 +312,7 @@ ColumnLayout {
   ColumnLayout {
     Layout.fillWidth: true
     visible: editor.draft.kind === 'command'
-    SettingsLabel {
+    Aranea.UiLabel {
       text: 'Timeout (seconds)'
     }
     InputField {
@@ -327,7 +327,7 @@ ColumnLayout {
   ColumnLayout {
     Layout.fillWidth: true
     visible: editor.draft.kind === 'service'
-    SettingsLabel {
+    Aranea.UiLabel {
       Layout.fillWidth: true
       text: 'Preview URL (optional, e.g. http://127.0.0.1:5173)'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
@@ -342,7 +342,7 @@ ColumnLayout {
       onTextEdited: editor.setField('previewUrl', text)
     }
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!editor.fieldError
     text: editor.fieldError
@@ -352,14 +352,14 @@ ColumnLayout {
   Flow {
     Layout.fillWidth: true
     spacing: Style.space(8)
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'actionSave'
       text: 'Save'
       enabled: !editor.displayOnly && !editor.pending
       pointerGate: editor.pointerGate
       onClicked: editor.save()
     }
-    SettingsButton {
+    Aranea.ActionButton {
       objectName: 'actionCancel'
       text: 'Cancel'
       enabled: !editor.pending

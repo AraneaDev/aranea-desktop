@@ -41,41 +41,18 @@ PanelWindow {
     clearConfirm.selectedIndex = 1
   }
 
-  // Plays the entrance animation when the picker opens (unless motion is off).
-  Connections {
-    target: panel.root
-    function onOpenedChanged() {
-      if (panel.root.opened && panel.root.motionEnabled)
-        openAnimation.restart()
-    }
-  }
-
   PointerMoveGate {
     id: pointerGate
     referenceItem: card
   }
 
-  ParallelAnimation {
-    id: openAnimation
-    NumberAnimation {
-      target: card
-      property: "opacity"
-      from: 0
-      to: 1
-      duration: Aranea.DesignTokens.settleDuration
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: card
-      property: "scale"
-      from: 0.97
-      to: 1
-      duration: Aranea.DesignTokens.settleDuration
-      easing.type: Easing.OutCubic
-    }
+  Aranea.SurfaceMotion {
+    id: surfaceMotion
+    opened: panel.root.opened
+    motionEnabled: panel.root.motionEnabled
   }
 
-  visible: panel.root.opened
+  visible: surfaceMotion.present
   anchors {
     top: true
     bottom: true
@@ -85,21 +62,31 @@ PanelWindow {
   color: "transparent"
   WlrLayershell.namespace: "omarchy-clipboard"
   WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+  WlrLayershell.keyboardFocus: surfaceMotion.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+  // Closing frames never intercept pointer input.
+  mask: Region {
+    width: surfaceMotion.opened ? panel.width : 0
+    height: surfaceMotion.opened ? panel.height : 0
+  }
   exclusionMode: ExclusionMode.Ignore
 
   Rectangle {
     anchors.fill: parent
     color: panel.root.scrim
+    opacity: surfaceMotion.opacity
   }
 
   MouseArea {
     anchors.fill: parent
+    enabled: surfaceMotion.opened
     onClicked: panel.root.close()
   }
 
   Aranea.SurfaceCard {
     id: card
+    scale: surfaceMotion.scale
+    opacity: surfaceMotion.opacity
+    enabled: surfaceMotion.opened
     width: panel.cardWidth
     height: panel.cardHeight
     cornerRadius: panel.root.cornerRadius
@@ -131,11 +118,12 @@ PanelWindow {
           event.accepted = true
       }
 
-      ConfirmDialog {
+      Aranea.SpringConfirmDialog {
         id: clearConfirm
 
         anchors.fill: parent
         opened: panel.root.clearConfirmOpen
+        motionEnabled: panel.root.motionEnabled
         z: 10
         message: "Delete all unpinned clipboard items?"
         confirmText: "Delete"

@@ -18,7 +18,7 @@ pointer gates and keyboard signals keep their existing contracts. Label fonts
 remain overridable. Refined captions use the shared 64% foreground role; related
 header labels use the four-pixel spacing step. Long device details elide in a
 bounded column so labels and trailing actions keep their space. Existing
-feedback uses 120 ms and panel settling 160 ms, with immediate final states
+feedback uses 120 ms and opening opacity settles in 160 ms, with immediate final states
 under reduced motion. These values come from `design/tokens.toml`.
 
 `StatusTextPair.valueFontFamily` independently controls technical subtitles. `PanelChrome.popupBorder(refined)` keeps the host's resolved
@@ -192,3 +192,21 @@ Register new QML types in `qmldir`, add direct behavior coverage under
 
 Run `tests/qml-behaviour.test.sh shared overlay-components polkit-components`
 and `tests/qml/shared.qml` through the normal QML behavior suite.
+
+## Spring motion
+
+`SurfaceMotion` owns card scale and opacity presentation. Bind `opened` to the
+logical host state, window visibility to `present`, and card scale/opacity to its
+outputs. Release keyboard focus and use an empty input mask immediately when
+`opened` becomes false. Capture readiness waits for `running` to become false.
+`SpringValue` provides interruptible spatial values for disclosures and drawers;
+its `targetValue` remains host-owned. Both controllers stop and snap when the
+shared motion preference is disabled. `SurfaceSpring` reads canonical strength
+and damping from `DesignTokens`; edit `design/tokens.toml` and regenerate.
+
+`SpringPanel` and `SpringConfirmDialog` are owned adaptations of the Omarchy
+shell components. The panel preserves native placement, focus priming, popout
+coordination and dismissal on other outputs while giving the whole card one
+shared transition. `KeyboardPanelFrame` adds the existing keyboard protocol.
+Offscreen panel tests substitute only native windows and attached Wayland state,
+retaining production placement, input masks, focus timers and motion logic.

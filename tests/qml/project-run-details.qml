@@ -2,7 +2,7 @@
 import QtQuick
 import Quickshell
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 import "plugins/araneadev.projects" as Projects
 
 ShellRoot {
@@ -44,7 +44,7 @@ ShellRoot {
       root.completions.push(done)
     }
   }
-  Settings.ProjectRunDetails {
+  ProjectUi.ProjectRunDetails {
     id: details
     width: 320
     client: client

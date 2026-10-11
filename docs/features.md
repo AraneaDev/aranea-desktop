@@ -7,7 +7,7 @@ wallpapers, cursors, icons, and application integrations.
 ## Command center
 
 The bar opens an Omarchy command menu with Aranea identity, Files, Terminal,
-and Setup tiles. Apps keeps Favorites and Recent state in
+and Projects tiles, with Setup in the menu below. Apps keeps Favorites and Recent state in
 `~/.local/state/aranea/menu.json`. The menu uses a compact network-and-node
 motif and supports keyboard navigation and pinned applications. Typing at the
 root searches apps, menu commands, windows, workspaces, projects, settings and quick actions.
@@ -102,7 +102,7 @@ immediate behavior.
 
 ## Project workspaces
 
-**Setup → Projects** starts with **Choose folder**, or an absolute folder path.
+**Launcher → Projects** starts with **Choose folder**, or an absolute folder path.
 Confirm the folder, review the discovered Git repositories and worktrees, select
 checkouts, then **Add selected**. Discovery alone registers nothing. Related
 worktrees share a project; each checkout retains its exact path and branch.
@@ -127,7 +127,7 @@ applications and repository files remain intact.
 
 ## Project commands and previews
 
-Select a registered project and exact checkout in **Setup → Projects**, then use
+Select a registered project and exact checkout in **Launcher → Projects**, then use
 **Actions** to add a named command or service. The form has a name, executable,
 individual argument rows with Add/Remove controls, working folder (default `.`),
 a command timeout and an optional service preview URL. Save and Cancel never run

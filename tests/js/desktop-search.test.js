@@ -271,3 +271,23 @@ test("projects use matching tiers without a blanket project preference", () => {
     "setting:projects"
   ])
 })
+
+test("agent normalization rejects unknown or padded provider IDs and retains the provider in canonical keys", () => {
+  const row = {
+    type: "project-agent",
+    label: "Start Codex",
+    target: { projectId: "p-1", checkoutId: "c-1", agentId: "codex" }
+  }
+  assert.equal(search.normalizeRecord(row)?.key, "project-agent:p-1:codex")
+  assert.deepEqual(plain(search.normalizeRecord(row)?.target), {
+    projectId: "p-1",
+    checkoutId: "c-1",
+    agentId: "codex"
+  })
+  for (const agentId of [undefined, null, "", "other", "Codex", "codex ", 1])
+    assert.equal(search.normalizeRecord({ ...row, target: { ...row.target, agentId } }), null)
+  assert.equal(
+    search.normalizeRecord({ ...row, target: { projectId: "p-1", agentId: "codex" } }),
+    null
+  )
+})

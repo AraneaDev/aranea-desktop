@@ -22,6 +22,11 @@ Item {
   // Whether the optional settings destination is installed.
   property bool settingsAvailable: false
   onSettingsAvailableChanged: updated()
+  // Watched installed manifest for the standalone Projects component.
+  property string projectsManifestPath: Quickshell.env("HOME") + "/.config/omarchy/plugins/araneadev.projects/manifest.json"
+  // Availability of the independently installed Projects destination.
+  property bool projectsAvailable: false
+  onProjectsAvailableChanged: updated()
   // Items parsed from the default file.
   property var defaultMenuItems: []
   // Items parsed from the user file ([] when it is missing).
@@ -38,12 +43,13 @@ Item {
 
   // Merges the user file over the defaults ({items, itemOrder}); later keys win per item.
   function merge(): var {
-    return MenuModel.mergeMenuSources(sources.defaultMenuItems, sources.userMenuItems, sources.settingsAvailable)
+    return MenuModel.mergeMenuSources(sources.defaultMenuItems, sources.userMenuItems, sources.settingsAvailable, sources.projectsAvailable)
   }
 
   // Reads all menu sources and optional plugin availability again.
   function reload(): void {
     settingsManifestFile.reload()
+    projectsManifestFile.reload()
     defaultMenuFile.reload()
     userMenuFile.reload()
   }
@@ -51,6 +57,26 @@ Item {
   // The JSONC sources are watched so live edits to the default file (or the
   // user extension at ~/.config/omarchy/extensions/omarchy-menu.jsonc) take
   // effect without restarting the shell.
+  FileView {
+    id: projectsManifestFile
+    path: sources.projectsManifestPath
+    watchChanges: true
+    printErrors: false
+    onLoaded: {
+      try {
+        sources.projectsAvailable = JSON.parse(text()).id === "araneadev.projects"
+      } catch (e) {
+        sources.projectsAvailable = false
+      }
+      sources.updated()
+    }
+    onLoadFailed: {
+      sources.projectsAvailable = false
+      sources.updated()
+    }
+    onFileChanged: reload()
+  }
+
   FileView {
     id: settingsManifestFile
     path: sources.settingsManifestPath

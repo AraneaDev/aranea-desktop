@@ -8,7 +8,7 @@ import QtQuick.Dialogs
 import QtQuick.Layouts
 import qs.Commons
 import qs.Ui as Ui
-import "SettingsLogic.js" as Logic
+import "ProjectsLogic.js" as Logic
 import "../araneadev.shared" as Aranea
 
 ColumnLayout {
@@ -109,13 +109,13 @@ ColumnLayout {
     }
   }
   spacing: Style.space(8)
-  SettingsButton {
+  Aranea.ActionButton {
     text: picker.buttonText
     enabled: !picker.displayOnly
     pointerGate: picker.pointerGate
     onClicked: picker.choose()
   }
-  SettingsLabel {
+  Aranea.UiLabel {
     Layout.fillWidth: true
     text: picker.error || 'Or enter an absolute folder path'
     opacity: 0.7
@@ -130,7 +130,7 @@ ColumnLayout {
     onAccepted: picker.confirm()
     Accessible.name: 'Absolute project folder path'
   }
-  SettingsButton {
+  Aranea.ActionButton {
     text: 'Use folder'
     enabled: !picker.displayOnly && picker.validPath
     pointerGate: picker.pointerGate
@@ -143,7 +143,7 @@ ColumnLayout {
       title: 'Choose a development folder'
       // GTK/GVFS native dialogs can segfault the shared Quickshell process.
       options: FolderDialog.DontUseNativeDialog
-      // Settings is a layer-shell overlay; a separate window would tile beneath it.
+      // Projects is a layer-shell overlay; a separate window would tile beneath it.
       popupType: Controls.Popup.Item
       onVisibleChanged: if (!visible)
         Qt.callLater(function () {

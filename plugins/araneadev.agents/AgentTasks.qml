@@ -105,6 +105,35 @@ Item {
     selectedId = ''
     keyboardCursor = false
   }
+  // Snapshot both list and nested detail navigation without reading any owner.
+  function captureSnapshot() {
+    return {
+      selectedId: selectedId,
+      cursorId: cursorId,
+      keyboardCursor: keyboardCursor,
+      setupGuideExpanded: setupGuideExpanded,
+      contentY: listScroll.contentY,
+      detail: {
+        cursorKind: detailView.cursorKind,
+        keyboardCursor: detailView.keyboardCursor,
+        contentY: detailView.scroll.contentY
+      }
+    }
+  }
+  // Restore nested presentation after the selected-row binding settles.
+  function captureRestore(saved) {
+    selectedId = saved.selectedId || ''
+    cursorId = saved.cursorId || ''
+    keyboardCursor = saved.keyboardCursor === true
+    setupGuideExpanded = saved.setupGuideExpanded === true
+    Qt.callLater(function () {
+      listScroll.contentY = saved.contentY || 0
+      var detail = saved.detail || {}
+      detailView.cursorKind = detail.cursorKind || ''
+      detailView.keyboardCursor = detail.keyboardCursor === true
+      detailView.scroll.contentY = detail.contentY || 0
+    })
+  }
   // Keyboard navigation delegates to the same stable detail action model.
   function navigate(direction) {
     if (helpActive) {

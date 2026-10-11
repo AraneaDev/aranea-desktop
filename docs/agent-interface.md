@@ -113,11 +113,13 @@ aranea projects ignored
 aranea projects unignore --path PATH
 aranea projects configure PROJECT_ID [--name NAME] [--editor code|nvim]
     [--terminal alacritty|kitty|foot|ghostty] [--workspace dedicated|current]
+    [--open-roles editor,terminal,agent]
 aranea projects relocate PROJECT_ID --checkout CHECKOUT_ID --path PATH
 aranea projects remove PROJECT_ID
 aranea projects open PROJECT_ID [--checkout CHECKOUT_ID] [--separate]
-    [--use-current-workspace] [--new-window editor|terminal]
-    [--retry-role editor|terminal] [--reobserve-role editor|terminal]
+    [--use-current-workspace] [--roles editor,terminal,agent] [--agent claude|codex]
+    [--new-window editor|terminal|agent] [--retry-role editor|terminal|agent]
+    [--reobserve-role editor|terminal|agent]
 aranea projects operation OPERATION_ID
 aranea projects details PROJECT_ID
 aranea desktop status
@@ -140,6 +142,26 @@ owner snapshot, including raw registered projects, current session, availability
 operations, and independently validated bindings. An unavailable owner prevents
 live observations while registration and inspection remain usable. Removing a
 root or registration never deletes repository files or closes applications.
+
+`--open-roles` saves the ordinary Open defaults; `--roles` selects roles for one
+request. Each CSV is a nonempty distinct subset of `editor`, `terminal`, `agent`,
+normalized by the CLI to that canonical order. Missing saved `openRoles` means
+`["editor","terminal"]`. Empty lists, duplicates and unknown roles are invalid.
+The owner Open payload accepts `roles` (an optional role array) and `agentId`
+(optional `"claude"` or `"codex"`). `--agent` sets `agentId` and requires agent to
+be requested, either explicitly, through saved defaults, or as the recovery
+target. `--new-window agent` defaults to agent-only when `--roles` is omitted;
+with an explicit list, the owner includes the new-window target. Retry and
+reobserve target only their named role. Omitted `--agent` uses the owner's
+suggestion; reobserve retains the original launch provider.
+
+The owner snapshot adds `agents: {tools, usage}`: `tools` contains the supported
+provider probe records, and `usage` maps `claude` and `codex` to local usage
+records or null. These are observations, not proof of reporting-hook trust or
+window ownership. Suggestions use known headroom and project provider history;
+see [the selection rules](workflows.md#start-an-agent-in-a-project). History is
+saved before an actual launch attempt, including a failed attempt, and does not
+change for focus-only Open or reobserve.
 
 The selected checkout is resolved from a fresh registry snapshot and validated
 against its exact canonical Git path and common-directory identity before Open.
@@ -183,12 +205,17 @@ mutation methods or claims that summon acceptance proves the destination.
 For this public CLI, exit codes are `0` observed, `1` partial/failed,
 `2` invalid usage, `3` missing required choice (including `TOOL_CHOICE_REQUIRED`),
 and `4` missing dependency. Stable failure codes include `CHECKOUT_MISSING`,
-`REGISTRY_CONFLICT`, `TOOL_MISSING`, `COMPOSITOR_UNAVAILABLE`,
+`REGISTRY_CONFLICT`, `TOOL_MISSING`, `AGENT_MISSING`, `COMPOSITOR_UNAVAILABLE`,
 `OWNER_UNAVAILABLE`, `OBSERVATION_TIMEOUT`, and `OPERATION_LOST`. Missing Git or
 flock is actionable only for commands that need them. Missing jq still emits a
 valid dependency-failure JSONL envelope and exits `4`. Its UTC timestamp comes
 from validated clock output without jq; only a failed/unusable clock returns
 `timestamp: null` with `data.timestampAvailable: false`.
+
+`AGENT_MISSING` means no requested or suggested provider CLI is available. Choose
+an installed alternative or install Claude Code or Codex; agents also require a
+supported terminal. A missing terminal remains a tool-choice/tool failure rather
+than proof that an agent window opened.
 
 ### Project outcomes and safe recovery
 

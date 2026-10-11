@@ -46,6 +46,21 @@ QtObject {
     process.running = true
   }
   onCaptureActiveChanged: generation++
+  // Startup exceptions and duplicate completions obey the same one-result contract.
+  function runHelper(argv: var, input: string, done: var): void {
+    var completed = false
+    function complete(code, output, diagnostics) {
+      if (completed)
+        return
+      completed = true
+      done(code, output, diagnostics)
+    }
+    try {
+      runner(argv, input, complete)
+    } catch (e) {
+      complete(-1, '', 'Project backend executable unavailable. Activate Aranea and retry.')
+    }
+  }
   // Parse one private store response without silently resetting malformed data.
   function parseStore(output: string, code: int): var {
     try {
@@ -69,26 +84,37 @@ QtObject {
     var revision = generation
     reading = true
     var remaining = 2
+    var failures = ['', '']
     // Complete the grouped read only after both independent helpers return.
-    function finished() {
+    function finished(index, message) {
+      failures[index] = message
       remaining--
+      var combined = failures.filter(function (failure) {
+        return !!failure
+      }).join(' ')
+      // Retain an earlier error until the entire retry succeeds. Independent
+      // failures are reported in registry/tool order regardless of callback timing.
+      if (combined || !remaining)
+        error = combined
       if (!remaining)
         reading = false
     }
-    runner([storePath, 'snapshot'], '', function (code, output, diagnostics) {
+    runHelper([storePath, 'snapshot'], '', function (code, output, diagnostics) {
       if (captureActive || revision !== generation)
         return
       var value = parseStore(output, code)
       if (code === 0 && value.ok) {
         state = value.state
-        error = ''
-      } else
-        error = value.error ? value.error.message : diagnostics
-      finished()
+        finished(0, '')
+      } else {
+        var message = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
+        finished(0, message || 'Project registry unavailable. Check registry storage and retry.')
+      }
     })
-    runner([toolsPath, '--json'], '', function (code, output, diagnostics) {
+    runHelper([toolsPath, '--json'], '', function (code, output, diagnostics) {
       if (captureActive || revision !== generation)
         return
+      var message = ''
       try {
         var value = JSON.parse(output)
         if (code !== 0 || !Array.isArray(value.editors) || !Array.isArray(value.terminals))
@@ -100,9 +126,9 @@ QtObject {
           editors: [],
           terminals: []
         }
-        error = error || diagnostics || 'Tool choices unavailable. Install supported tools and retry.'
+        message = diagnostics || 'Tool choices unavailable. Install supported tools and retry.'
       }
-      finished()
+      finished(1, message)
     })
     return true
   }
@@ -122,7 +148,7 @@ QtObject {
     }
     if (typeof state.revision === 'number')
       payload.expectedRevision = state.revision
-    runner([storePath, 'mutate'], JSON.stringify(payload), function (code, output, diagnostics) {
+    runHelper([storePath, 'mutate'], JSON.stringify(payload), function (code, output, diagnostics) {
       if (captureActive || revision !== generation)
         return
       var value = parseStore(output, code)
@@ -151,7 +177,7 @@ QtObject {
           return
         }
         // An already registered root may be entered through a symlink or dot segments.
-        runner(['realpath', '--', args.path], '', function (code, output, diagnostics) {
+        runHelper(['realpath', '--', args.path], '', function (code, output, diagnostics) {
           if (captureActive || revision !== generation)
             return
           var path = output.replace(/\n$/, '')

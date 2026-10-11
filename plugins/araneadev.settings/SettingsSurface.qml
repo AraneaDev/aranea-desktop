@@ -26,7 +26,7 @@ Item {
   Component.onCompleted: scrollSection = root.section
   // Capture cannot replace an in-flight action operation or its acceptance callback.
   function captureBusy() {
-    return projectsPage.details.actions.pending
+    return false
   }
   // Hidden layers and offscreen content may have no backing keyboard Window.
   function captureFocus() {
@@ -51,8 +51,7 @@ Item {
       scaleDirty: displayPage.scaleDirty,
       detailsExpanded: displayPage.detailsExpanded,
       scheduleDraft: schedulePage.draft,
-      scheduleDirty: schedulePage.dirty,
-      projects: projectsPage.captureSnapshot()
+      scheduleDirty: schedulePage.dirty
     }
   }
   // Restore local capture state after restoring owner observations and section.
@@ -70,7 +69,6 @@ Item {
     displayPage.detailsExpanded = saved.detailsExpanded
     schedulePage.draft = saved.scheduleDraft
     schedulePage.dirty = saved.scheduleDirty
-    projectsPage.captureRestore(saved.projects)
     pageOffsets = saved.pageOffsets
     scrollSection = saved.scrollSection
     scrollTo(saved.contentY)
@@ -91,7 +89,6 @@ Item {
     displayPage.detailsExpanded = false
     schedulePage.dirty = false
     schedulePage.syncDraft()
-    projectsPage.captureReset(fixture)
     pageOffsets = ({})
     scrollTo(0)
   }
@@ -189,36 +186,6 @@ Item {
       panel.stampLayout()
     }
   }
-  Connections {
-    target: panel.root.projectController
-    function onStateChanged() {
-      panel.stampLayout()
-    }
-    function onToolsChanged() {
-      panel.stampLayout()
-    }
-    function onMutationCompleted(action, args, state) {
-      projectsPage.registryMutationCompleted(action, args, state)
-    }
-  }
-  Connections {
-    target: panel.root.discoveryClient
-    function onCandidatesChanged() {
-      panel.stampLayout()
-    }
-    function onPendingChanged() {
-      panel.stampLayout()
-    }
-  }
-  Connections {
-    target: panel.root.projectClient
-    function onSnapshotChanged() {
-      panel.stampLayout()
-    }
-    function onOperationChanged(operation) {
-      panel.stampLayout()
-    }
-  }
   PointerMoveGate {
     id: pointerGate
     referenceItem: card
@@ -292,10 +259,6 @@ Item {
             pointerGate: pointerGate
             onSectionRequested: function (section) {
               panel.root.section = section
-              if (section === 'projects' && !panel.controller.showcaseActive) {
-                panel.root.projectController.refresh()
-                panel.root.projectClient.refresh()
-              }
             }
           }
           Flickable {
@@ -346,7 +309,7 @@ Item {
                 id: pages
                 width: Math.min(scroller.contentWidth, Style.space(560))
                 height: pages.children[pages.currentIndex] ? pages.children[pages.currentIndex].implicitHeight : 0
-                currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications', 'projects'].indexOf(panel.root.section)
+                currentIndex: ['appearance', 'display', 'schedule', 'integrations', 'notifications'].indexOf(panel.root.section)
                 AppearancePage {
                   id: appearancePage
                   Layout.fillHeight: false
@@ -421,83 +384,6 @@ Item {
                     panel.controller.request(operation, args)
                   }
                   onRetryRequested: panel.controller.refreshNotifications()
-                }
-                ProjectsPage {
-                  id: projectsPage
-                  objectName: 'projectsPage'
-                  Layout.fillHeight: false
-                  registryState: panel.root.projectController.state
-                  tools: panel.root.projectController.tools
-                  discoveryClient: panel.root.discoveryClient
-                  projectClient: panel.root.projectClient
-                  projectId: panel.root.projectId
-                  displayOnly: panel.controller.showcaseActive || !!panel.root.captureSaved
-                  pending: panel.root.projectController.pending || panel.root.projectController.reading
-                  error: panel.root.projectController.error || panel.root.projectClient.error
-                  pointerGate: pointerGate
-                  onRegisterRequested: function (paths) {
-                    panel.root.projectController.request('register', {
-                      paths: paths
-                    })
-                  }
-                  onRootAddRequested: function (path) {
-                    panel.root.projectController.request('root-add', {
-                      path: path
-                    })
-                  }
-                  onRootRemoveRequested: function (id) {
-                    panel.root.projectController.request('root-remove', {
-                      rootId: id
-                    })
-                  }
-                  onDiscoverRequested: function (id) {
-                    panel.root.discoveryClient.start(id)
-                  }
-                  onCancelRequested: panel.root.discoveryClient.cancel()
-                  onIgnoreRequested: function (path) {
-                    panel.root.projectController.request('ignore', {
-                      path: path
-                    })
-                  }
-                  onUnignoreRequested: function (path) {
-                    panel.root.projectController.request('unignore', {
-                      path: path
-                    })
-                  }
-                  onConfigureRequested: function (id, draft) {
-                    panel.root.projectController.request('configure', Object.assign({
-                      projectId: id
-                    }, draft))
-                  }
-                  onCheckoutRequested: function (id, checkout) {
-                    panel.root.projectController.request('select-checkout', {
-                      projectId: id,
-                      checkoutId: checkout
-                    })
-                  }
-                  onLocateRequested: function (id, checkout, path) {
-                    panel.root.projectController.request('relocate', {
-                      projectId: id,
-                      checkoutId: checkout,
-                      path: path
-                    })
-                  }
-                  onRemoveRequested: function (id) {
-                    panel.root.projectController.request('remove', {
-                      projectId: id
-                    })
-                  }
-                  onOpenRequested: function (payload) {
-                    panel.root.projectClient.request(payload)
-                  }
-                  onDetailsRequested: function (id) {
-                    panel.root.projectId = id
-                    panel.stampLayout()
-                  }
-                  onRefreshRequested: {
-                    panel.root.projectController.refresh()
-                    panel.root.projectClient.refresh()
-                  }
                 }
               }
             }

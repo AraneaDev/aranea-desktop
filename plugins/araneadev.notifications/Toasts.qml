@@ -127,8 +127,16 @@ Scope {
               }
             }
 
+            Aranea.SurfaceMotion {
+              id: entrance
+              opened: true
+              motionEnabled: cardSlot.svc.motionEnabled
+            }
+
             NotificationCard {
               id: card
+              scale: entrance.scale
+              opacity: entrance.opacity
               anchors.right: parent.right
               app: cardSlot.app
               appIcon: cardSlot.appIcon

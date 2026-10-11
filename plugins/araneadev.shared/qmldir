@@ -30,3 +30,14 @@ HoverTint 1.0 HoverTint.qml
 DesktopFontSync 1.0 DesktopFontSync.qml
 
 WorkflowHelp 1.0 WorkflowHelp.qml
+ActionButton 1.0 ActionButton.qml
+UiLabel 1.0 UiLabel.qml
+ActionToggle 1.0 ActionToggle.qml
+PageHeader 1.0 PageHeader.qml
+SurfaceMotion 1.0 SurfaceMotion.qml
+SurfaceSpring 1.0 SurfaceSpring.qml
+SpringConfirmDialog 1.0 SpringConfirmDialog.qml
+SpringValue 1.0 SpringValue.qml
+SpringPanel 1.0 SpringPanel.qml
+MenuPopup 1.0 MenuPopup.qml
+SplitButton 1.0 SplitButton.qml

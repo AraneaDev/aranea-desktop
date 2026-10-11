@@ -3,7 +3,7 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import "lib"
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as ProjectUi
 
 ShellRoot {
   id: root
@@ -14,7 +14,7 @@ ShellRoot {
   QmlTest {
     id: t
   }
-  Settings.ProjectActionEditor {
+  ProjectUi.ProjectActionEditor {
     id: editor
     width: 360
     onSaveRequested: function (definition, revision) {

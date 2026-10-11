@@ -2,9 +2,14 @@
 
 `araneadev.projects` is the persistent owner of project workspace operations.
 Its menu entry point, `Projects.qml`, stays loaded while registered in the
-Omarchy shell. Settings, desktop search, the workspace overview and the CLI
+Omarchy shell. The Projects window, desktop search, the workspace overview and the CLI
 consume its snapshots and results; they do not launch tools independently.
-The plugin adds no bar widget.
+The plugin adds no bar widget. Open **Projects** directly from the launcher.
+Its own window contains a searchable project sidebar and Overview, Actions,
+Agents, Preferences, and Help destinations. A narrow window uses a compact
+project selector. The window keeps the selected project when reopened. With no selection,
+a welcome card explains the next steps. Add project starts setup; development
+folder management lives under Preferences, and Help covers projects, actions, and agents. Closing the window retains drafts and accepted operations.
 
 ## Commands and installation
 
@@ -59,6 +64,28 @@ terminal. A missing tool or an unsupported configured default requires an
 explicit choice; configuration is read as inert text and is never evaluated
 as a shell command.
 
+Claude Code (`claude`) and Codex (`codex`) are agent adapters inside the selected
+terminal, with fixed provider argv: `claude` or `codex --cd <checkout>`.
+Executables resolve on the safe PATH outside the checkout. Agents require an
+installed supported terminal; they do not run checkout scripts. The provider
+suggestion reads local usage and project history, with reasons and installed
+alternatives shown in Projects and provider-specific launcher results. See
+[starting agents](../../docs/workflows.md#start-an-agent-in-a-project) for the
+usage and history tie rules.
+
+```bash
+aranea projects configure PROJECT_ID --open-roles editor,agent --json
+aranea projects open PROJECT_ID --new-window agent --agent codex --json
+aranea projects open PROJECT_ID --roles terminal --json
+```
+
+Saved `openRoles` selects the tools for ordinary Open; absent roles default to
+editor and terminal. `--roles` overrides that selection once. Explicit new agent
+sessions use agent-only roles unless `--roles` is supplied. Ordinary Open focuses
+a proven existing agent; Start explicitly creates another session. The last
+provider is recorded immediately before an attempted launch, even if that launch
+fails; focus and reobserve do not change it.
+
 Dedicated workspaces are the default. Use `--use-current-workspace` explicitly
 to choose the current workspace. Related worktrees are grouped; `--separate`
 opens a checkout with a separate association. Open focuses bindings supported
@@ -103,7 +130,7 @@ applications; they do not install into the active desktop.
 
 ## Named actions and tracked runs
 
-Settings project details include Actions for the selected exact checkout. Save a
+The standalone Projects window includes Actions for the selected exact checkout. Save a
 name, executable, separate argument fields, working folder, Command/Service kind,
 command timeout and optional loopback preview URL. Save is inert; Run/Start is
 explicit. Configuration lives in local `project-actions.json`, without repository

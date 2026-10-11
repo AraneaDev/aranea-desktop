@@ -1,7 +1,6 @@
 // Production menu card shared by the layer window and inert preview host.
 import QtQuick
 import qs.Commons
-import qs.Ui
 import "../araneadev.shared" as Aranea
 
 Aranea.SurfaceCard {
@@ -45,11 +44,12 @@ Aranea.SurfaceCard {
       card.root.handleKey(event)
     }
 
-    ConfirmDialog {
+    Aranea.SpringConfirmDialog {
       id: deleteConfirm
 
       anchors.fill: parent
       opened: card.root.appHistory.deleteConfirmOpen
+      motionEnabled: card.root.style.motionEnabled
       z: 10
       message: "Do you want to uninstall " + ((card.root.appHistory.deleteTarget && card.root.appHistory.deleteTarget.label) || "") + "?"
       confirmText: "Uninstall"

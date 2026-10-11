@@ -25,6 +25,7 @@ const snapshot = (extra = {}) => ({
   favoriteAppIds: ["browser"],
   recentAppIds: ["other", "browser"],
   settingsAvailable: true,
+  projectsAvailable: true,
   compositorAvailable: true,
   focusedWorkspaceId: 2,
   windows: [{ address: "0xabc", title: 'Hostile "); os.execute("bad") --', workspace: { id: 2 } }],
@@ -50,8 +51,8 @@ test("missing compositor removes only live records and app identities survive du
       "setting:display",
       "setting:schedule",
       "setting:integrations",
-      "setting:projects",
-      "setting:notifications"
+      "setting:notifications",
+      "setting:projects"
     ]
   )
   assert.equal(rows[0].pinned, true)
@@ -71,7 +72,9 @@ test("settings aliases discover scaling but dispatch only static section destina
     })
   }
   assert.equal(
-    records(snapshot({ settingsAvailable: false })).filter((r) => r.type === "setting").length,
+    records(snapshot({ settingsAvailable: false, projectsAvailable: false })).filter(
+      (r) => r.type === "setting"
+    ).length,
     0
   )
 })
@@ -242,7 +245,31 @@ test("project search forwards typed identities and details without display-deriv
     "omarchy-shell",
     "shell",
     "summon",
-    "araneadev.settings",
-    '{"section":"projects"}'
+    "araneadev.projects",
+    "{}"
   ])
+})
+
+test("Projects opens its independent component without desktop Settings installed", () => {
+  const data = snapshot({ settingsAvailable: false, projectsAvailable: true })
+  const result = dispatch("setting:projects", data)
+  assert.deepEqual(result.argv, ["omarchy-shell", "shell", "summon", "araneadev.projects", "{}"])
+})
+
+test("standalone Projects menu entry replaces the old Settings search destination", () => {
+  const data = snapshot({
+    settingsAvailable: false,
+    menuItems: {
+      "aranea.projects": {
+        id: "aranea.projects",
+        kind: "action",
+        label: "Projects",
+        action: "omarchy-shell shell summon araneadev.projects"
+      }
+    }
+  })
+  const matches = records(data).filter((row) => row.label === "Projects")
+  assert.equal(matches.length, 1)
+  assert.equal(matches[0].type, "command")
+  assert.deepEqual(dispatch(matches[0].key, data), { kind: "command", itemId: "aranea.projects" })
 })

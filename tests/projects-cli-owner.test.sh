@@ -13,7 +13,7 @@ cli="$repo_root/scripts/aranea"
 "$cli" projects register --path "$checkout" --json >"$ARANEA_TEST_SANDBOX/register"
 project=$(jq -r 'select(.event=="completed")|.data.state.projects[0].id' "$ARANEA_TEST_SANDBOX/register")
 "$cli" projects configure "$project" --editor code --terminal kitty --json >/dev/null
-for tool in code kitty; do
+for tool in code kitty claude codex; do
   cat >"$ARANEA_TEST_SANDBOX/bin/$tool" <<'TRAP'
 #!/usr/bin/env bash
 echo unexpected >> "$ARANEA_TEST_SANDBOX/execution-trap"
@@ -106,7 +106,7 @@ for invalid in '{"newWindowRole":null}' '{"retryRole":null}' '{"reobserveRole":n
   payload=$(jq -cn --arg project "$project" --argjson invalid "$invalid" '{projectId:$project}+$invalid')
   omarchy-shell aranea.projects request "$payload" | jq -e '.ok==false and .operationId==null and .error.code=="INVALID_REQUEST"' >/dev/null
 done
-"$cli" capabilities --json | jq -se 'last.data.operations | any(.name=="projects.open" and .arguments["reobserve-role"].enum==["editor","terminal"])' >/dev/null
+"$cli" capabilities --json | jq -se 'last.data.operations | any(.name=="projects.open" and .arguments["reobserve-role"].enum==["editor","terminal","agent"])' >/dev/null
 omarchy-shell fixture mode failure >/dev/null
 open_project 1
 jq -se 'last.data.outcome=="partial" and any(last.data.operation.steps[];.role=="terminal" and .status=="failed")' "$work/events" >/dev/null
@@ -124,6 +124,11 @@ CLI_COLD_MODE=readiness-delayed cold_open 0 --reobserve-role terminal
 jq -se --argjson before "$delayed_before" '.[$before:] | length > 2' "$work/calls.responses" >/dev/null
 omarchy-shell fixture mode normal | jq -e '.launches==["editor","terminal","terminal","editor","terminal"]' >/dev/null
 jq -se 'last.data.outcome=="observed" and any(last.data.operation.steps[];.role=="terminal" and .status=="observed")' "$work/events" >/dev/null
+# CLI omission delegates suggestion to the real owner; explicit roles survive Start.
+open_project 0 --roles agent
+jq -se 'last.data.operation.roles == ["agent"] and last.data.operation.agentId == "claude" and any(last.data.operation.steps[];.role=="agent" and .status=="observed")' "$work/events" >/dev/null
+open_project 0 --roles terminal --new-window agent --agent codex
+jq -se 'last.data.operation.roles == ["terminal","agent"] and last.data.operation.agentId == "codex" and any(last.data.operation.steps[];.role=="agent" and .status=="observed")' "$work/events" >/dev/null
 if grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop|Failed to load configuration' "$work/log"; then
   cat "$work/log"
   exit 1

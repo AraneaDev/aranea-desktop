@@ -864,9 +864,10 @@ function parseMenuJsonc(raw) {
  * @param {Array<MenuItem>} defaultItems - items from the shipped menu
  * @param {Array<MenuItem>} userItems - items from the user extension file
  * @param {boolean} [settingsAvailable] - whether the settings plugin manifest is installed
+ * @param {boolean} [projectsAvailable] - whether standalone Projects is installed
  * @returns {{items: ItemMap, itemOrder: Array<string>}} items by id and their order
  */
-function mergeMenuSources(defaultItems, userItems, settingsAvailable) {
+function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAvailable) {
   /** @type {{[key: string]: *}} */
   var nextItems = {}
   var nextOrder = []
@@ -905,6 +906,19 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable) {
   if (settings.length && !nextItems["aranea.settings"]) {
     nextItems["aranea.settings"] = settings[0]
     nextOrder.push("aranea.settings")
+  }
+
+  if (projectsAvailable && !nextItems["aranea.projects"]) {
+    nextItems["aranea.projects"] = normalizeItem("aranea.projects", {
+      parent: "root",
+      label: "Projects",
+      icon: String.fromCodePoint(0xf024b),
+      description: "Project workspaces, workflows and agents",
+      aliases: ["projects", "project-manager", "workflows"],
+      action: "omarchy-shell shell summon araneadev.projects",
+      when: 'test -f "$HOME/.config/omarchy/plugins/araneadev.projects/manifest.json"'
+    })
+    nextOrder.push("aranea.projects")
   }
 
   if (!nextItems.root) {

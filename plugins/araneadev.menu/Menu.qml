@@ -320,6 +320,7 @@ Item {
     favoriteAppIds: history.favoriteAppIds
     recentAppIds: history.recentAppIds
     settingsAvailable: sources.settingsAvailable
+    projectsAvailable: sources.projectsAvailable
     actionController: desktopActions
     projectClient: root.projectClient
     onRevisionChanged: if (root.desktopSearchActive)
@@ -346,10 +347,10 @@ Item {
     if (serial < 0 || !root.desktopSearchActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
       return null
     var row = displayModel.get(root.selectedIndex)
-    return row.actionStatus === "failed" || row.resultType === "project" && root.cursorActive ? row : null
+    return row.actionStatus === "failed" || (row.resultType === "project" || row.resultType === "project-agent") && root.cursorActive ? row : null
   }
   // Available recovery destination for the selected failed action.
-  readonly property string recoveryLabel: !recoveryRow ? "" : recoveryRow.resultType === "project" ? "Project details" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
+  readonly property string recoveryLabel: !recoveryRow ? "" : (recoveryRow.resultType === "project" || recoveryRow.resultType === "project-agent") ? "Project details" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
   // Space reserved beneath results so recovery never clips outside the card.
   readonly property int recoveryHeight: recoveryLabel ? Style.space(28) + root.style.sectionSpacing : 0
   onRecoveryLabelChanged: if (!recoveryLabel)
@@ -358,7 +359,7 @@ Item {
   function recoverSelected(): void {
     if (!root.recoveryLabel || desktopActions.showcaseActive)
       return
-    if (root.recoveryRow.resultType === "project") {
+    if (root.recoveryRow.resultType === "project" || root.recoveryRow.resultType === "project-agent") {
       desktopSources.openProjectDetails(root.recoveryRow.desktopKey)
       return
     }
@@ -515,7 +516,7 @@ Item {
     root.run(action)
   }
 
-  // Handles a root tile click or Ctrl+1..3: open Files, a terminal or Setup.
+  // Handles a root tile click or Ctrl+1..3: open Files, a terminal or Projects.
   function activateTile(tile): void {
     if (!tile)
       return
@@ -529,8 +530,10 @@ Item {
       root.cancel()
       return
     }
-    if (tile.id === "tile.setup") {
-      root.openRoute("setup")
+    if (tile.id === "tile.projects") {
+      var projects = root.item("aranea.projects")
+      if (projects && MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, projects))
+        root.activateMenuItem(projects)
       return
     }
   }
@@ -715,10 +718,10 @@ Item {
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
-        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : record.type === "project" ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
-        if (record.type === "project" && feedback && feedback.checkoutId !== record.target.checkoutId)
+        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : (record.type === "project" || record.type === "project-agent") ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
+        if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.checkoutId !== record.target.checkoutId)
           feedback = null
-        if (record.type === "project" && feedback && feedback.status !== "pending" && feedback.status !== "failed")
+        if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.status !== "pending" && feedback.status !== "failed")
           desktopRow.detail += " · " + feedback.message
         desktopRow.actionStatus = feedback ? feedback.status : ""
         desktopRow.actionMessage = feedback ? feedback.message : ""
@@ -773,6 +776,9 @@ Item {
       for (var j = 0; j < root.itemOrder.length; j++) {
         var child = root.item(root.itemOrder[j])
         if (!child || child.parent !== active)
+          continue
+        // Projects is already a root tile; retain its command for search.
+        if (active === "root" && child.id === "aranea.projects")
           continue
         if (!MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, child))
           continue

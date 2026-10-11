@@ -261,6 +261,81 @@ function chooseAssociation(
   }
 }
 
+/**
+ * Canonical roles for one request, including explicit recovery targets.
+ * Retries open only their target. A new agent window without a one-off role set
+ * opens only the agent; other requests retain saved or legacy defaults.
+ * @param {OperationData} project - registry project with optional openRoles
+ * @param {OperationData} request - one-off roles and optional targeted role
+ * @returns {Array<string>} distinct supported roles in canonical order
+ */
+function requestedRoles(project, request) {
+  if (["editor", "terminal", "agent"].indexOf(request.retryRole) >= 0) return [request.retryRole]
+  var source = Array.isArray(request.roles)
+    ? request.roles
+    : request.newWindowRole === "agent"
+      ? ["agent"]
+      : project && Array.isArray(project.openRoles)
+        ? project.openRoles
+        : ["editor", "terminal"]
+  var wanted = source.concat([request.retryRole, request.newWindowRole, request.reobserveRole])
+  return ["editor", "terminal", "agent"].filter(function (role) {
+    return wanted.indexOf(role) >= 0
+  })
+}
+
+/**
+ * First missing tool for the requested roles. Agents and Neovim require a
+ * selected supported terminal that the installed-tool probe confirms available.
+ * @param {Array<string>} roles - requested roles
+ * @param {OperationData} selected - resolved editor, terminal and agent IDs
+ * @param {OperationData} tools - installed-tool probe with terminals and agents
+ * @returns {?{code:string,message:string}} problem or null when launchable
+ */
+function toolProblem(roles, selected, tools) {
+  /**
+   * Checks whether this request includes the role.
+   * @param {string} role - role to check
+   * @returns {boolean} whether the role is requested
+   */
+  var has = function (role) {
+    return roles.indexOf(role) >= 0
+  }
+  if (has("editor") && !selected.editor)
+    return { code: "TOOL_CHOICE_REQUIRED", message: "Choose an editor in Preferences." }
+  var hostRequired = has("agent") || (has("editor") && selected.editor === "nvim")
+  /** @type {Array<OperationData>} */
+  var terminals = (tools && tools.terminals) || []
+  var hostAvailable =
+    ["alacritty", "kitty", "foot", "ghostty"].indexOf(selected.terminal) >= 0 &&
+    terminals.some(function (row) {
+      return row.id === selected.terminal && row.available === true && row.supported === true
+    })
+  if (((has("terminal") || hostRequired) && !selected.terminal) || (hostRequired && !hostAvailable))
+    return {
+      code: "TOOL_CHOICE_REQUIRED",
+      message: has("agent")
+        ? "Agents run in a terminal. Choose one in Preferences."
+        : "Choose a terminal in Preferences."
+    }
+  if (!has("agent")) return null
+  if (!selected.agent)
+    return { code: "AGENT_MISSING", message: "Install Claude Code or Codex to start agents here." }
+  /** @type {Array<OperationData>} */
+  var agents = (tools && tools.agents) || []
+  var installed =
+    ["claude", "codex"].indexOf(selected.agent) >= 0 &&
+    agents.some(function (row) {
+      return row.id === selected.agent && row.available === true && row.supported !== false
+    })
+  return installed
+    ? null
+    : {
+        code: "AGENT_MISSING",
+        message: (selected.agent === "codex" ? "Codex" : "Claude Code") + " isn't installed."
+      }
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     allocateWorkspace,
@@ -269,5 +344,7 @@ if (typeof module !== "undefined")
     complete,
     bindingMatches,
     roleDecision,
-    chooseAssociation
+    chooseAssociation,
+    requestedRoles,
+    toolProblem
   }

@@ -67,7 +67,7 @@ the shell, applications, lock screen, and boot: obsidian surfaces, mint activity
 violet focus, and a transparent interactive bar. Wallpapers stay mark-free;
 the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
 
-- **Command center:** Files, Terminal, Setup, Favorites, Recent, and searchable apps.
+- **Command center:** Files, Terminal, Projects, Favorites, Recent, and searchable apps.
 - **Settings:** wallpaper, fonts, motion, display scale, schedule, integrations, and DND.
 - **Project workspaces:** confirmed Git discovery, grouped worktrees, project search, and Open/Resume with saved tools.
 - **System controls:** network, VPN, audio, Bluetooth, displays, power, tray, calendar, and weather.
@@ -77,12 +77,12 @@ the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
 
 ### Project workspaces
 
-New to projects and agent tasks? Start with **Setup → Projects → Set up a project**.
+New to projects and agent tasks? Start with **Launcher → Projects → Add project**.
 The wizard guides you through registration, tools, workflow actions, and optional
-agent reporting. **Projects help**, **How to use actions**, and **Agents → Help**
+agent reporting. The Projects **Help** destination and **How to use actions**
 are available offline. See the [step-by-step user guide](docs/workflows.md).
 
-Open **Setup → Projects**, confirm a development folder, review repositories and
+Open **Launcher → Projects**, confirm a development folder, review repositories and
 worktrees, then **Add selected**. Search with `project:` to Open or Resume saved
 tools. Dedicated workspace is the default; Project preferences makes current workspace an
 explicit preference. Partial launches report each role and offer targeted recovery.

@@ -2,7 +2,6 @@
 import QtQuick
 import Quickshell.Io
 import "SettingsLogic.js" as Logic
-import "../araneadev.projects" as Projects
 
 Item {
   id: root
@@ -16,62 +15,6 @@ Item {
   property bool opened: false
   // Current supported settings destination.
   property string section: 'appearance'
-  // Optional opaque details destination, empty for the Projects overview.
-  property string projectId: ''
-  // Registry/tool operation client works independently of the live owner.
-  property alias projectController: projectController
-  // Sole-owner submission/observation client, without launch authority.
-  property alias projectClient: projectClient
-  // Keep-loaded cancellable scan observer survives window visibility changes.
-  property alias discoveryClient: discoveryClient
-  ProjectSettingsController {
-    id: projectController
-    captureActive: controller.showcaseActive || !!root.captureSaved
-  }
-  Projects.ProjectClient {
-    id: projectClient
-    captureActive: controller.showcaseActive || !!root.captureSaved
-  }
-  Projects.ProjectDiscoveryController {
-    id: discoveryClient
-    captureActive: controller.showcaseActive || !!root.captureSaved
-  }
-  Connections {
-    target: projectController
-    function onRootReady(rootId) {
-      discoveryClient.start(rootId)
-    }
-    function onMutationCompleted(action, args, state) {
-      if (action === 'register') {
-        var added = state.projects.filter(function (p) {
-          return p.checkouts.some(function (c) {
-            return args.paths.indexOf(c.path) >= 0
-          })
-        })[0]
-        if (added)
-          root.projectId = added.id
-        discoveryClient.candidates = discoveryClient.candidates.filter(function (c) {
-          return [c.path].concat((c.checkouts || []).map(function (checkout) {
-            return checkout.path
-          })).some(function (path) {
-            return !state.projects.some(function (p) {
-              return p.checkouts.some(function (checkout) {
-                return checkout.path === path
-              })
-            })
-          })
-        })
-      }
-      if (action === 'remove' && root.projectId === args.projectId)
-        root.projectId = ''
-      if (action === 'ignore')
-        discoveryClient.candidates = discoveryClient.candidates.filter(function (c) {
-          return !state.ignored.some(function (i) {
-            return i.commonDir === c.commonDir
-          })
-        })
-    }
-  }
   // Summoned window instance, independent of the persistent controller.
   property var view: null
   // Persistent settings process and state owner.
@@ -90,19 +33,6 @@ Item {
     return JSON.stringify({
       opened: opened,
       section: section,
-      projectId: projectId,
-      projects: {
-        state: projectController.state,
-        tools: projectController.tools,
-        error: projectController.error,
-        candidates: discoveryClient.candidates,
-        partial: discoveryClient.partial,
-        errors: discoveryClient.errors,
-        snapshot: projectClient.snapshot,
-        available: projectClient.available,
-        clientError: projectClient.error,
-        requestError: projectClient.requestError
-      },
       ui: view ? view.captureSnapshot() : null,
       showcase: controller.showcaseActive,
       fixture: {
@@ -117,7 +47,7 @@ Item {
   }
   // Atomically accept an inert fixture before changing visibility or presentation.
   function captureBegin(payloadJson) {
-    if (controller.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && typeof view.captureBusy === 'function' && view.captureBusy()))
+    if (controller.pending || captureSaved || (view && typeof view.captureBusy === 'function' && view.captureBusy()))
       return 'busy'
     var payload
     try {
@@ -125,15 +55,9 @@ Item {
     } catch (e) {
       return 'invalid'
     }
-    if (!payload || ['appearance', 'display', 'projects'].indexOf(payload.section) < 0)
+    if (!payload || ['appearance', 'display'].indexOf(payload.section) < 0)
       return 'invalid'
     if (payload.fixture && payload.fixture.displayDraft && (typeof payload.fixture.displayDraft !== 'string' || !Logic.validateScale(payload.fixture.displayDraft).ok))
-      return 'invalid'
-    if (payload.projectId !== undefined && payload.projectId !== '' && Logic.normalizeProjectId(payload.projectId) !== payload.projectId)
-      return 'invalid'
-    if (payload.section === 'projects' && (!payload.fixture || !payload.fixture.projectsState || !Array.isArray(payload.fixture.projectsState.roots) || !Array.isArray(payload.fixture.projectsState.ignored) || !Array.isArray(payload.fixture.projectsState.projects)))
-      return 'invalid'
-    if (payload.fixture && payload.fixture.projectCandidates !== undefined && !Array.isArray(payload.fixture.projectCandidates))
       return 'invalid'
     var saved = captureSnapshot()
     if (payload.snapshot !== saved)
@@ -148,23 +72,6 @@ Item {
       focus: focus
     }
     section = payload.section
-    projectId = payload.section === 'projects' ? Logic.normalizeProjectId(payload.projectId) : ''
-    if (payload.section === 'projects') {
-      projectController.state = payload.fixture.projectsState
-      projectController.tools = payload.fixture.projectTools || {
-        defaults: {},
-        editors: [],
-        terminals: []
-      }
-      projectController.error = payload.fixture.projectError || ''
-      discoveryClient.candidates = payload.fixture.projectCandidates || []
-      discoveryClient.partial = payload.fixture.projectPartial === true
-      discoveryClient.errors = payload.fixture.projectErrors || []
-      projectClient.snapshot = payload.fixture.projectSnapshot || {}
-      projectClient.available = payload.fixture.projectAvailable === true
-      projectClient.error = ''
-      projectClient.requestError = null
-    }
     if (view)
       view.captureReset(payload.fixture)
     opened = true
@@ -188,21 +95,7 @@ Item {
       controller.beginShowcase(saved.fixture)
       controller.showcaseSaved = captureSaved.ownerSaved
     }
-    var projects = saved.projects
-    if (projects) {
-      projectController.state = projects.state
-      projectController.tools = projects.tools
-      projectController.error = projects.error
-      discoveryClient.candidates = projects.candidates
-      discoveryClient.partial = projects.partial
-      discoveryClient.errors = projects.errors
-      projectClient.snapshot = projects.snapshot
-      projectClient.available = projects.available
-      projectClient.error = projects.clientError
-      projectClient.requestError = projects.requestError
-    }
     section = saved.section
-    projectId = saved.projectId || ''
     opened = saved.opened
     if (view && saved.ui)
       view.captureRestore(saved.ui)
@@ -247,13 +140,8 @@ Item {
       payload = JSON.parse(payloadJson || '{}')
     } catch (e) {}
     section = Logic.normalizeSection(payload && payload.section)
-    projectId = section === 'projects' ? Logic.normalizeProjectId(payload && payload.projectId) : ''
     opened = true
     controller.reopened()
-    if (section === 'projects' && !controller.showcaseActive) {
-      projectController.refresh()
-      projectClient.refresh()
-    }
     if (view)
       view.focusKeys()
   }

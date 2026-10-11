@@ -125,14 +125,6 @@ function settingRecords(available) {
     ),
     sourceRecord(
       "setting",
-      "projects",
-      "Projects",
-      { section: "projects" },
-      "Development projects and workspaces",
-      ["project", "checkout", "worktree"]
-    ),
-    sourceRecord(
-      "setting",
       "notifications",
       "Notifications",
       { section: "notifications" },
@@ -213,6 +205,19 @@ function sourceRecords(snapshot) {
     )
   })
   rows = rows.concat(settingRecords(data.settingsAvailable === true))
+  // The standalone menu command owns discovery once the menu sources load.
+  // Retain the direct destination only while that command is unavailable.
+  if (data.projectsAvailable === true && !seen["command:aranea.projects"])
+    rows.push(
+      sourceRecord(
+        "setting",
+        "projects",
+        "Projects",
+        { section: "projects" },
+        "Project workspaces, workflows and agents",
+        ["project", "checkout", "worktree", "workflows"]
+      )
+    )
   if (Array.isArray(data.actionRecords))
     rows = rows.concat(
       data.actionRecords.filter(function (row) {
@@ -222,7 +227,7 @@ function sourceRecords(snapshot) {
   if (Array.isArray(data.projectRecords))
     rows = rows.concat(
       data.projectRecords.filter(function (row) {
-        return row && row.type === "project"
+        return row && (row.type === "project" || row.type === "project-agent")
       })
     )
   if (data.compositorAvailable !== true) return rows
@@ -296,6 +301,28 @@ function dispatchTarget(record, snapshot) {
       payload: { projectId: current.target.projectId, checkoutId: current.target.checkoutId }
     }
   }
+  if (current.type === "project-agent") {
+    if (
+      current.available === false ||
+      !record.target ||
+      !current.target ||
+      record.target.projectId !== current.target.projectId ||
+      record.target.checkoutId !== current.target.checkoutId ||
+      record.target.agentId !== current.target.agentId ||
+      ["claude", "codex"].indexOf(current.target.agentId) < 0
+    )
+      return null
+    return {
+      kind: "project",
+      payload: {
+        projectId: current.target.projectId,
+        checkoutId: current.target.checkoutId,
+        roles: ["agent"],
+        newWindowRole: "agent",
+        agentId: current.target.agentId
+      }
+    }
+  }
   // Actions belong to the persistent action controller, never the argv fallback.
   if (current.type === "action") return null
   if (current.type === "app")
@@ -308,8 +335,10 @@ function dispatchTarget(record, snapshot) {
         "omarchy-shell",
         "shell",
         "summon",
-        "araneadev.settings",
-        JSON.stringify({ section: current.target.section })
+        current.target.section === "projects" ? "araneadev.projects" : "araneadev.settings",
+        JSON.stringify(
+          current.target.section === "projects" ? {} : { section: current.target.section }
+        )
       ]
     }
   var field = current.type === "window" ? "window" : "workspace"

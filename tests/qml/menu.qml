@@ -144,13 +144,21 @@ ShellRoot {
       menu.handleKey(key(Qt.Key_P, Qt.ControlModifier))
       t.check(menu.favoriteAppIds.indexOf("app1") < 0, "Ctrl+P unpins the cursor app")
 
-      // Ctrl+2 opens a terminal; Ctrl+3 opens Setup.
+      // Projects occupies the third tile while Setup remains in the menu.
+      menu.openRoute("root")
+      var rootIds = []
+      for (var i = 0; i < menu.displayModel.count; i++)
+        rootIds.push(menu.displayModel.get(i).itemId)
+      t.check(rootIds.indexOf("setup") >= 0, "Setup remains in the root menu")
+      t.check(rootIds.indexOf("aranea.projects") < 0, "Projects is not duplicated in the root menu")
+
+      // Ctrl+2 opens a terminal; Ctrl+3 opens Projects.
       menu.openRoute("root")
       menu.handleKey(key(Qt.Key_2, Qt.ControlModifier))
       t.check(shell.ran.indexOf("xdg-terminal-exec") >= 0, "Ctrl+2 opens a terminal")
       menu.openRoute("root")
       menu.handleKey(key(Qt.Key_3, Qt.ControlModifier))
-      t.equal(menu.activeMenu, "setup", "Ctrl+3 opens Setup")
+      t.check(shell.ran.indexOf("omarchy-shell shell summon araneadev.projects") >= 0, "Ctrl+3 opens Projects")
 
       // cardHeight budgets exactly what MenuWindow lays out: the border, the
       // padding, the chrome, one section gap and the rows (or the input line).

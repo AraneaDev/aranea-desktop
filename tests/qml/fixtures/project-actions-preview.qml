@@ -1,8 +1,8 @@
-// Actual Settings capture protocol and production actions/editor/run details.
+// Actual Projects capture protocol and production actions/editor/run details.
 import QtQuick
 import Quickshell
 import qs.Commons
-import "plugins/araneadev.settings" as Settings
+import "plugins/araneadev.projects" as Projects
 
 ShellRoot {
   id: harness
@@ -12,7 +12,7 @@ ShellRoot {
   property int polls: 0
   // A visual guard or layout failure prevents publishing the artifact.
   property int failures: 0
-  // Actual composed view discovered inside SettingsSurface, never stub content.
+  // Actual composed view discovered inside ProjectsSurface, never stub content.
   property var actionView: null
   // Report independent capture/geometry assertions to the renderer.
   function check(value, label) {
@@ -39,16 +39,15 @@ ShellRoot {
     }
     return out
   }
-  Settings.Settings {
+  Projects.ProjectsPresentation {
     id: entry
     windowEnabled: false
-    runner: harness.reject
   }
   FloatingWindow {
     implicitWidth: Number(Quickshell.env('ARANEA_ACTION_RENDER_WIDTH'))
     implicitHeight: 680
     visible: true
-    Settings.SettingsSurface {
+    Projects.ProjectsSurface {
       id: surface
       anchors.fill: parent
       root: entry
@@ -235,10 +234,11 @@ ShellRoot {
     actionView = collect(surface, []).filter(function (o) {
       return o.objectName === 'projectActions'
     })[0]
-    check(!!actionView, 'actual action view composed in SettingsSurface')
+    check(!!actionView, 'actual action view composed in ProjectsSurface')
     actionView.displayOnly = true
     actionView.client.runner = harness.reject
     var fixture = sample()
+    fixture.projectSection = 'actions'
     check(entry.captureBegin(JSON.stringify({
       snapshot: entry.captureSnapshot(),
       section: 'projects',

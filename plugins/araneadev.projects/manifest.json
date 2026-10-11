@@ -4,7 +4,7 @@
   "name": "Aranea projects",
   "version": "1.0.0",
   "author": "AraneaDev",
-  "description": "Persistent development project workspace operations",
+  "description": "Independent project manager with workspaces, workflows, setup and agent activity",
   "kinds": ["menu"],
   "keepLoaded": true,
   "entryPoints": { "menu": "Projects.qml" }

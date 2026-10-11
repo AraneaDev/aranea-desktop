@@ -1,6 +1,7 @@
 // Local runtime source/activation controller. The owning menu supplies existing
 // app/menu watchers and handles their activation; this owns only live refresh.
 import "../araneadev.projects/ProjectRecords.js" as Projects
+import "../araneadev.projects/AgentSuggestion.js" as Suggestion
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -25,6 +26,8 @@ Item {
   property var recentAppIds: []
   // Availability from the existing settings manifest watcher.
   property bool settingsAvailable: false
+  // Availability of the independently installed Projects destination.
+  property bool projectsAvailable: false
   // Persistent quick-action owner; null when that capability is unavailable.
   property var actionController: null
   // Read-only client for the single persistent project operation owner.
@@ -98,6 +101,7 @@ Item {
       favoriteAppIds: sources.favoriteAppIds,
       recentAppIds: sources.recentAppIds,
       settingsAvailable: sources.settingsAvailable,
+      projectsAvailable: sources.projectsAvailable,
       actionRecords: sources.actionController ? sources.actionController.records : [],
       projectRecords: sources.currentProjectRecords()
     }
@@ -108,7 +112,7 @@ Item {
     if (!sources.active || !sources.projectClient)
       return []
     var snapshot = sources.projectClient.snapshot || ({})
-    return Projects.records({
+    var mapped = Projects.records({
       projects: snapshot.projects || []
     }, snapshot).map(function (record) {
       record.aliases = [record.label].concat(record.aliases)
@@ -126,6 +130,13 @@ Item {
       record.detail += workspace ? " · Workspace " + workspace : project && project.workspaceMode === "current" ? " · Current workspace" : " · Dedicated workspace"
       return record
     })
+    var agents = snapshot.agents || ({})
+    var now = Date.now()
+    return mapped.concat(Projects.agentRecords({
+      projects: snapshot.projects || []
+    }, snapshot, function (project) {
+      return Suggestion.suggest(agents.tools || [], agents.usage || ({}), project.tools ? project.tools.agentId || null : null, now)
+    }))
   }
 
   // A real session replacement invalidates prior feedback and local preparation identity.
@@ -287,7 +298,7 @@ Item {
       data.actionRecords = sources.actionController.currentRecords()
     var selected = Search.resolveTarget(sources.records, key)
     var record = Search.resolveTarget(Targets.sourceRecords(data), key)
-    if (key.indexOf("project:") === 0) {
+    if (key.indexOf("project:") === 0 || key.indexOf("project-agent:") === 0) {
       var projectRequest = Targets.dispatchTarget(selected, data)
       if (!projectRequest || !sources.projectClient || sources.projectClient.captureActive || sources.projectClient.pending) {
         sources.failed("Project is busy or selected checkout is no longer available")
@@ -303,7 +314,7 @@ Item {
         clientGeneration: sources.projectClient.generation + 1,
         baselineGeneration: previous ? previous.generation : -1,
         status: "pending",
-        message: "Opening project…"
+        message: key.indexOf("project-agent:") === 0 ? "Starting agent…" : "Opening project…"
       }
       sources.publish()
       if (!sources.projectClient.request(projectRequest.payload)) {
@@ -402,6 +413,7 @@ Item {
   onFavoriteAppIdsChanged: publish()
   onRecentAppIdsChanged: publish()
   onSettingsAvailableChanged: publish()
+  onProjectsAvailableChanged: publish()
   onActionControllerChanged: publish()
   onFixtureWindowsChanged: requestRefresh()
   onFixtureWorkspacesChanged: requestRefresh()

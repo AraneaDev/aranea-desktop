@@ -5,6 +5,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import "../araneadev.shared" as Aranea
 import qs.Commons
 import qs.Ui
 import "MenuLayout.js" as MenuLayout
@@ -65,7 +66,13 @@ PanelWindow {
     referenceItem: card
   }
 
-  visible: panel.root.opened && panel.root.rowsLoaded
+  Aranea.SurfaceMotion {
+    id: surfaceMotion
+    opened: panel.root.opened && panel.root.rowsLoaded
+    motionEnabled: panel.root.style.motionEnabled
+  }
+
+  visible: surfaceMotion.present
   anchors {
     top: true
     bottom: true
@@ -75,7 +82,12 @@ PanelWindow {
   color: "transparent"
   WlrLayershell.namespace: "omarchy-menu"
   WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+  WlrLayershell.keyboardFocus: surfaceMotion.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+  // Closing frames never intercept pointer input.
+  mask: Region {
+    width: surfaceMotion.opened ? panel.width : 0
+    height: surfaceMotion.opened ? panel.height : 0
+  }
   exclusionMode: ExclusionMode.Ignore
 
   // The card opens centered exactly as always. The first search keystroke
@@ -99,7 +111,7 @@ PanelWindow {
   readonly property int effectiveCardTop: cardTop >= 0 ? cardTop : centeredTop
   // Freezes the card top and rows height at their current values.
   function freezeCardTop() {
-    if (visible && cardTop < 0) {
+    if (surfaceMotion.opened && cardTop < 0) {
       cardTop = effectiveCardTop
       maxRowsHeight = panel.root.visibleRowsHeight
     }
@@ -112,15 +124,20 @@ PanelWindow {
   Rectangle {
     anchors.fill: parent
     color: panel.root.style.scrim
+    opacity: surfaceMotion.opacity
   }
 
   MouseArea {
     anchors.fill: parent
+    enabled: surfaceMotion.opened
     onClicked: panel.root.cancel()
   }
 
   MenuSurface {
     id: card
+    scale: surfaceMotion.scale
+    opacity: surfaceMotion.opacity
+    enabled: surfaceMotion.opened
     root: panel.root
     pointerGate: pointerGate
     width: panel.root.cardWidth

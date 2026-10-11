@@ -59,13 +59,24 @@ and elide long details before they can crowd labels or trailing controls.
 
 ## Motion
 
-Feedback should feel immediate, panels should settle gently, and ceremonial
-transitions should have room to breathe. Reduced motion is a first-class
-behavior, not an afterthought. A static state must remain understandable when
-animations are disabled. Existing hover and selection feedback uses 120 ms;
-panels and disclosures settle in 160 ms. Reduced motion displays the final state
-immediately, including picker hover, tray disclosure and bar move feedback.
-Busy pulses retain their established ceremonial rhythm and static fallback.
+Feedback stays immediate. Dropdowns, modal cards, pickers, Projects and Settings
+use a restrained spring scale from 97% to full size; disclosures and the tray
+drawer use the same spatial spring. Notification entrances and OSD cards follow
+that policy. Opacity fades without overshoot: 160 ms on opening and 120 ms on
+closing. Hover and selection feedback remains 120 ms. Busy pulses retain their
+established ceremonial rhythm and static fallback.
+
+Spring strength, damping and card scale come from `design/tokens.toml`.
+`SurfaceMotion` and `SpringValue` preserve the current presentation when a
+transition reverses. Turning motion off stops active animations and assigns the
+exact final state immediately. Logical close releases input at once; retained
+closing frames are decorative. The lock screen and permanent bar do not spring.
+
+Desktop windows use the matching `araneaSpring` Hyprland overshoot curve for
+opening and movement, with a quick monotonic close. The compositor curve
+approximates the QML spring. `scripts/aranea-motion` supports both legacy
+keywords and Lua-configured Hyprland; shell cards own their animations so
+full-screen transparent layers do not receive a second scale transition.
 
 ## Identity system
 

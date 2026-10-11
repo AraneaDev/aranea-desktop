@@ -1,6 +1,7 @@
 // Explicit candidate and related-worktree selection, separate from registration.
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../araneadev.shared" as Aranea
 import QtQuick.Layouts
 import qs.Commons
 
@@ -80,7 +81,7 @@ ColumnLayout {
       required property var modelData
       Layout.fillWidth: true
       spacing: Style.space(4)
-      SettingsLabel {
+      Aranea.UiLabel {
         Layout.fillWidth: true
         text: group.modelData.name
         font.bold: true
@@ -91,20 +92,20 @@ ColumnLayout {
           id: checkout
           required property var modelData
           Layout.fillWidth: true
-          SettingsToggle {
+          Aranea.ActionToggle {
             checked: list.selectedPaths.indexOf(checkout.modelData.path) >= 0
             enabled: !list.displayOnly
             pointerGate: list.pointerGate
             Accessible.name: 'Select ' + checkout.modelData.path
             onToggled: list.select(checkout.modelData.path, !checked)
           }
-          SettingsLabel {
+          Aranea.UiLabel {
             Layout.fillWidth: true
             text: checkout.modelData.path + (checkout.modelData.branch ? ' · ' + checkout.modelData.branch : '')
           }
         }
       }
-      SettingsButton {
+      Aranea.ActionButton {
         text: 'Ignore'
         enabled: !list.displayOnly
         pointerGate: list.pointerGate

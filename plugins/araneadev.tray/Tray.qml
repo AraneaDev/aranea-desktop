@@ -86,9 +86,8 @@ BarWidget {
   // The drawer's full extent (icon count times their slot, plus gaps).
   readonly property int drawerExtent: drawerCount > 0 ? drawerCount * trayItemExtent + (drawerCount - 1) * trayItemGap : 0
   // Drawer disclosure uses the same settling rhythm as other panels.
-  readonly property int animationDuration: Aranea.DesignTokens.settleDuration
   // 0 when the drawer is collapsed, 1 when fully revealed.
-  property real revealProgress: expanded ? 1 : 0
+  readonly property real revealProgress: Math.max(0, Math.min(1.03, drawerSpring.value))
   // The drawer's currently revealed extent (drawerExtent times revealProgress).
   readonly property real revealExtent: drawerExtent * revealProgress
   // The drawer arrow (the bar's chevron) of the loaded orientation, or null.
@@ -856,12 +855,11 @@ BarWidget {
       manageViewItem.noteLayoutChange()
   }
 
-  Behavior on revealProgress {
-    enabled: Aranea.DesignTokens.motionEnabled
-    NumberAnimation {
-      duration: root.animationDuration
-      easing.type: Easing.OutCubic
-    }
+  Aranea.SpringValue {
+    id: drawerSpring
+    targetValue: root.expanded ? 1 : 0
+    motionEnabled: Aranea.DesignTokens.motionEnabled
+    epsilon: 0.0001
   }
 
   Loader {
@@ -915,6 +913,7 @@ BarWidget {
 
         Item {
           id: trayClip
+          enabled: root.expanded
           x: expandIcon.width
           anchors.verticalCenter: parent.verticalCenter
           width: Math.round(root.revealExtent)
@@ -996,6 +995,7 @@ BarWidget {
 
         Item {
           id: trayClip
+          enabled: root.expanded
           y: expandIcon.height
           anchors.horizontalCenter: parent.horizontalCenter
           width: root.barSize

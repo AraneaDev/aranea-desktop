@@ -58,21 +58,32 @@ run_test() {
   mkdir -p "$run_dir/cfg/plugins" "$run_dir/run"
   chmod 700 "$run_dir/run"
   ln -s "$shell_dir/Commons" "$run_dir/cfg/Commons"
-  if [[ "$name" == agent-tasks-panel ]]; then
-    # Replace only the native PanelWindow boundary; production content stays real.
-    mkdir -p "$run_dir/cfg/Ui"
-    for plugin in "$shell_dir"/Ui/*; do
-      [[ "${plugin##*/}" == KeyboardPanel.qml ]] && continue
-      ln -s "$plugin" "$run_dir/cfg/Ui/${plugin##*/}"
-    done
-    cp "$repo_root/tests/qml/fixtures/agent-panel-host/KeyboardPanel.qml" "$run_dir/cfg/Ui/KeyboardPanel.qml"
-  else
-    ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
-  fi
+  ln -s "$shell_dir/Ui" "$run_dir/cfg/Ui"
   ln -s "$repo_root/tests/qml/lib" "$run_dir/cfg/lib"
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
-    [[ -d "$plugin" ]] && ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
+    [[ -d "$plugin" ]] || continue
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == spring-panel) ]]; then
+      # Adapt only native windows/attached layer-shell state. Placement, mask,
+      # motion, coordinator, focus timer and production panel content stay real.
+      mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
+      for shared in "$plugin"/*; do
+        [[ "${shared##*/}" == SpringPanel.qml ]] && continue
+        ln -s "$shared" "$run_dir/cfg/plugins/araneadev.shared/${shared##*/}"
+      done
+      python - "$plugin/SpringPanel.qml" "$run_dir/cfg/plugins/araneadev.shared/SpringPanel.qml" <<'PYBOUNDARY'
+import pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+source = source.replace('import QtQuick', 'import QtQuick\nimport "../../fixtures/agent-panel-host"')
+source = re.sub(r'\bPanelWindow\s*\{', 'NativePanelWindow {', source)
+source = source.replace('WlrLayershell.', 'nativeLayer.')
+# These are native window anchors, never Item anchors in content.
+source = re.sub(r'(?m)^(  |        )anchors \{', r'\1nativeAnchors {', source)
+pathlib.Path(sys.argv[2]).write_text(source)
+PYBOUNDARY
+    else
+      ln -s "$plugin" "$run_dir/cfg/plugins/${plugin##*/}"
+    fi
   done
   ln -s "$repo_root/shell.toml" "$run_dir/cfg/theme-shell.toml"
   cp "$test_file" "$run_dir/cfg/shell.qml"

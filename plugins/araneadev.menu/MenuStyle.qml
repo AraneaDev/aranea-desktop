@@ -109,7 +109,7 @@ QtObject {
   // HH:mm time shown in the root context band; ticks every minute.
   readonly property string clockContext: Qt.formatDateTime(menuClock.date, "HH:mm")
 
-  // Fixed tiles (Files, Terminal, Setup) shown on the root menu.
+  // Fixed tiles (Files, Terminal, Projects) shown on the root menu.
   readonly property var rootTiles: [({
         id: "tile.files",
         label: "Files",
@@ -123,10 +123,10 @@ QtObject {
         icon: String.fromCodePoint(0xf489),
         source: "fixed"
       }), ({
-        id: "tile.setup",
-        label: "Setup",
-        detail: "CONFIGURE  ·  ^3",
-        icon: String.fromCodePoint(0xe615),
+        id: "tile.projects",
+        label: "Projects",
+        detail: "WORKSPACES  ·  ^3",
+        icon: String.fromCodePoint(0xf024b),
         source: "fixed"
       })]
 

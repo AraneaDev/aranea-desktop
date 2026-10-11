@@ -232,8 +232,28 @@ overrides. Fixtures use invented `/fixture/` paths and refuse mutation, owner
 reads, chooser activation and tool execution. Workspace capture renders only the
 production panel offscreen; it no longer focuses or reads the live desktop.
 
-Run registry/discovery/tool/CLI/flow suites, `node --test tests/js/project-*.test.js`,
-and project QML behavior fixtures before the full `tools/check` gate. Offscreen
+Run registry/discovery/tool/CLI/flow suites,
+`node --test --experimental-test-coverage tests/js/project-*.test.js tests/js/projects-logic.test.js`,
+and project QML behavior fixtures before the full `tools/check` gate. Projects JavaScript
+modules have enforced function coverage floors in `tools/baselines/coverage.txt`.
+The registry-client and client-refresh fixtures exercise both callback orders,
+failed reads, startup exceptions, and continued observation without resubmission.
+The setup fixture checks edits made during Save and unsaved batch-project exit.
+Offscreen
 verification does not verify the native folder portal, live compositor focus,
 real editor/terminal window observation or actual application reuse. Record those
 host checks separately; unavailable checks are limitations, never passed tests.
+
+### Projects presentation
+
+Project views, registry/discovery clients, and their capture transaction live in
+`plugins/araneadev.projects`. The persistent operation owner stays separate from
+window visibility. Shared buttons, labels, toggles, and page headers live in
+`araneadev.shared`; desktop Settings uses compatibility wrappers for these controls.
+
+Render the real standalone content without desktop mutations:
+
+```bash
+tools/render-projects-preview --output /tmp/projects.png --fixture project-details
+tools/render-project-actions-preview --output /tmp/actions.png --scene editor-service --size large-font
+```

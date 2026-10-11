@@ -30,7 +30,14 @@ request=$(/usr/bin/jq -cs 'if length==1 then .[0] else error("one request requir
        elif $a[0]=="foot" then ["foot","--app-id",$token,"--working-directory",$cwd]
        elif $a[0]=="ghostty" then ["ghostty","--class="+$token,"--gtk-single-instance=false","--working-directory="+$cwd]
        else [] end) as $base |
-      ($token|test("^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$")) and (($base|length)>0) and ($a==$base or $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["nvim","--",$cwd]) or (($a[-1]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["claude","--resume",$a[-1]])) or (($a[-3]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) + ["codex","resume",$a[-3],"--cd",$cwd])))
+      (if $a[0]=="alacritty" then ["--command"] elif $a[0]=="ghostty" then ["-e"] else [] end) as $sep |
+      ($token|test("^[A-Za-z_][A-Za-z0-9_-]*(\\.[A-Za-z_][A-Za-z0-9_-]*)+$")) and (($base|length)>0) and (
+        $a==$base
+        or $a==($base + $sep + ["nvim","--",$cwd])
+        or $a==($base + $sep + ["claude"])
+        or $a==($base + $sep + ["codex","--cd",$cwd])
+        or (($a[-1]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + $sep + ["claude","--resume",$a[-1]]))
+        or (($a[-3]|test("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")) and $a==($base + $sep + ["codex","resume",$a[-3],"--cd",$cwd])))
     end)
 ' <<<"$request" >/dev/null || fail INVALID_LAUNCH 'Only fixed supported project adapter arguments are allowed.'
 mapfile -t argv < <(/usr/bin/jq -r '.argv[]' <<<"$request")
@@ -46,13 +53,15 @@ for project_dir in "${project_path_entries[@]}"; do
   [[ "$project_dir" != "$canonical_cwd" && "$project_dir" != "$canonical_cwd/"* ]] || continue
   project_safe_path+="${project_safe_path:+:}$project_dir"
 done
-# Resolve only supported names to absolute canonical files outside the checkout.
+# Validate both lookup path and canonical target outside the checkout, then invoke
+# the named path: shims such as mise select their program from that basename.
 resolve_tool() {
-  local executable
+  local executable canonical_executable
   executable=$(PATH="$project_safe_path" command -v "$1" || true)
   [[ "$executable" == /* && -x "$executable" ]] || return 1
-  executable=$("$project_realpath" -e -- "$executable") || return 1
   [[ "$executable" != "$canonical_cwd" && "$executable" != "$canonical_cwd/"* ]] || return 1
+  canonical_executable=$("$project_realpath" -e -- "$executable") || return 1
+  [[ "$canonical_executable" != "$canonical_cwd" && "$canonical_executable" != "$canonical_cwd/"* ]] || return 1
   printf '%s\n' "$executable"
 }
 project_executable=$(resolve_tool "${argv[0]}") || fail TOOL_MISSING 'Choose an installed application outside the checkout.'
@@ -68,6 +77,14 @@ fi
 if [[ ${#argv[@]} -ge 5 && ${argv[-5]} == codex && ${argv[-4]} == resume ]]; then
   project_codex=$(resolve_tool codex) || fail TOOL_MISSING 'Install Codex outside the checkout.'
   argv[-5]=$project_codex
+fi
+if [[ ${argv[-1]} == claude ]]; then
+  project_claude=$(resolve_tool claude) || fail TOOL_MISSING 'Install Claude Code outside the checkout.'
+  argv[-1]=$project_claude
+fi
+if [[ ${#argv[@]} -ge 3 && ${argv[-3]} == codex && ${argv[-2]} == --cd ]]; then
+  project_codex=$(resolve_tool codex) || fail TOOL_MISSING 'Install Codex outside the checkout.'
+  argv[-3]=$project_codex
 fi
 # The child is never tracked by Quickshell. Parent helpers never enter the checkout.
 (cd -- "$cwd" && PATH="$project_safe_path" exec "$project_setsid" -- "${argv[@]}") </dev/null >/dev/null 2>&1 &
