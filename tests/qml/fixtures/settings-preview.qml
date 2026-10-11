@@ -24,6 +24,8 @@ ShellRoot {
   property bool fontPrepared: false
   // Scroll detail/recovery captures after the actual production layout settles.
   property bool positioned: false
+  // Menu captures change only inert presentation state, never activate a row.
+  property bool menuPrepared: false
   // Report the offscreen render outcome to the parent process.
   function finish(ok, message) {
     console.log((ok ? 'SETTINGSRENDER OK ' : 'SETTINGSRENDER FAIL ') + message)
@@ -257,6 +259,26 @@ ShellRoot {
         }
         if (item.status !== Image.Ready)
           loading = true
+      }
+      var agentMode = Quickshell.env('ARANEA_PROJECT_RENDER_STATE')
+      if (!harness.menuPrepared && harness.polls >= 8 && agentMode.indexOf('agents') === 0 && agentMode.indexOf('menu') >= 0) {
+        if (!entry.inert) {
+          stop()
+          harness.finish(false, 'agent menu capture requires inert state')
+          return
+        }
+        for (var m = 0; m < objects.length; m++) {
+          var menu = objects[m]
+          if (menu.objectName === 'splitMenu') {
+            menu.opened = true
+            harness.menuPrepared = true
+          }
+        }
+        if (!harness.menuPrepared) {
+          stop()
+          harness.finish(false, 'project menu not found')
+          return
+        }
       }
       if (!loading && harness.polls >= 10) {
         stop()

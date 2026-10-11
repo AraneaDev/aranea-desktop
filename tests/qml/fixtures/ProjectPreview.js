@@ -1,7 +1,7 @@
 /**
  * Supplies fixed display data without a user directory or owner read.
  * @param {string} id - approved project fixture identifier
- * @param {string} [mode] - optional pending launch display
+ * @param {string} [mode] - pending launch or installed agent display variant
  * @returns {Object<string, *>} inert settings and owner observations
  */
 function sample(id, mode) {
@@ -70,6 +70,31 @@ function sample(id, mode) {
     projects: state.projects,
     bindings: [],
     operations: id === "project-launch-partial" ? [operation] : []
+  }
+  if (mode && mode.indexOf("agents") === 0) {
+    var history = mode === "agents-history-menu"
+    project.openRoles = ["editor", "terminal", "agent"]
+    project.tools.agentId = history ? "claude" : "codex"
+    snapshot.agents = {
+      tools: [
+        { id: "claude", label: "Claude Code", available: true, supported: true },
+        { id: "codex", label: "Codex", available: true, supported: true }
+      ],
+      usage: {
+        claude: {
+          limits: [
+            {
+              label: "weekly limit",
+              percent: history ? 0.55 : 0.94,
+              resetsAt: "2099-01-01T12:00:00Z"
+            }
+          ]
+        },
+        codex: {
+          limits: [{ label: "weekly limit", percent: 0.5, resetsAt: "2099-01-01T12:00:00Z" }]
+        }
+      }
+    }
   }
   if (id === "project-search") {
     snapshot.bindings = [

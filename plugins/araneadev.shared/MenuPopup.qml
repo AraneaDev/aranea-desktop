@@ -107,6 +107,8 @@ Aranea.SurfaceCard {
   }
 
   objectName: 'splitMenu'
+  // In-window overlays cannot blur underlying content; keep the theme RGB opaque.
+  fillColor: Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1)
   visible: opened
   focus: opened
   z: 100

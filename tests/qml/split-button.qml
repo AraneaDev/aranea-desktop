@@ -2,6 +2,7 @@
 import QtQuick
 import QtTest
 import Quickshell
+import qs.Commons
 import "lib"
 import "plugins/araneadev.shared" as Aranea
 
@@ -68,11 +69,13 @@ ShellRoot {
     var primary = t.findChild(split, 'splitPrimary')
     var toggle = t.findChild(split, 'splitToggle')
     var menu = t.findChild(split, 'splitMenu')
+    Color.popups.background = Qt.rgba(0.1, 0.2, 0.3, 0.4)
     input.mouseClick(primary)
     t.equal(root.events, ['primary'], 'primary pointer click emits the default action')
     toggle.forceActiveFocus()
     input.keyClick(Qt.Key_Down)
     t.check(menu.opened && split.menuOpen && menu.activeFocus, 'Down opens the menu and focuses keyboard input')
+    t.equal(menu.fillColor.a, 1, 'in-window menu fill hides competing content underneath')
     t.equal(menu.cursor, 1, 'open selects the first enabled row')
     var rows = t.findChildren(menu, 'menuRow')
     var outline = t.findChild(rows[1], 'cursorOutline')
