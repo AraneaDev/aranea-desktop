@@ -20,6 +20,8 @@ ColumnLayout {
   property bool canContinue: false
   // The parent blocks Back while a configuration draft is unsaved.
   property bool canBack: true
+  // Unsaved preferences or actions block Exit as well as stage navigation.
+  property bool canExit: true
   // Registry and scan activity pauses wizard navigation.
   property bool pending: false
   // Inert captures cannot navigate or finish a live setup.
@@ -95,13 +97,13 @@ ColumnLayout {
       objectName: 'setupFinish'
       text: 'Finish setup'
       visible: progress.step === 3
-      enabled: !progress.displayOnly && !progress.pending
+      enabled: !progress.displayOnly && !progress.pending && progress.canExit
       pointerGate: progress.pointerGate
       onClicked: progress.finishRequested()
     }
     Aranea.ActionButton {
       text: 'Exit setup'
-      enabled: !progress.displayOnly && !progress.pending
+      enabled: !progress.displayOnly && !progress.pending && progress.canExit
       pointerGate: progress.pointerGate
       onClicked: progress.cancelRequested()
     }

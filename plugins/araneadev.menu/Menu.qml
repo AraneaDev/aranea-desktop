@@ -516,7 +516,7 @@ Item {
     root.run(action)
   }
 
-  // Handles a root tile click or Ctrl+1..3: open Files, a terminal or Setup.
+  // Handles a root tile click or Ctrl+1..3: open Files, a terminal or Projects.
   function activateTile(tile): void {
     if (!tile)
       return
@@ -530,8 +530,10 @@ Item {
       root.cancel()
       return
     }
-    if (tile.id === "tile.setup") {
-      root.openRoute("setup")
+    if (tile.id === "tile.projects") {
+      var projects = root.item("aranea.projects")
+      if (projects && MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, projects))
+        root.activateMenuItem(projects)
       return
     }
   }
@@ -774,6 +776,9 @@ Item {
       for (var j = 0; j < root.itemOrder.length; j++) {
         var child = root.item(root.itemOrder[j])
         if (!child || child.parent !== active)
+          continue
+        // Projects is already a root tile; retain its command for search.
+        if (active === "root" && child.id === "aranea.projects")
           continue
         if (!MenuModel.isVisible(root.items, root.itemOrder, guards.whenResults, child))
           continue

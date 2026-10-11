@@ -134,6 +134,7 @@ ShellRoot {
     }
   }
   Component.onCompleted: t.step(80, function () {
+    panel.open()
     var tabs = t.findChild(panel, 'agentNavigation')
     var tasks = t.findChild(panel, 'agentTasks')
     t.check(!t.findChild(panel, 'agentUsageLoader').active, 'capture never creates Usage collectors')

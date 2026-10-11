@@ -192,7 +192,12 @@ Item {
 
   PanelWindow {
     id: panel
-    visible: root.opened || card.opacity > 0
+    visible: surfaceMotion.present
+    Aranea.SurfaceMotion {
+      id: surfaceMotion
+      opened: root.opened
+      motionEnabled: root.motionEnabled
+    }
     anchors {
       top: true
       bottom: true
@@ -208,7 +213,7 @@ Item {
 
     Aranea.SurfaceCard {
       id: card
-      property real revealOffset: root.opened ? 0 : Style.space(8)
+      scale: surfaceMotion.scale
       width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
       height: card.borderTop + root.pad + Style.font.body + root.pad + card.borderBottom
       anchors.horizontalCenter: parent.horizontalCenter
@@ -218,25 +223,7 @@ Item {
       surface: "popups"
       borderColor: Color.popups.border
       borderSpecOverride: Aranea.PanelChrome.popupBorder(true)
-      opacity: root.opened ? 1 : 0
-      transform: Translate {
-        y: card.revealOffset
-      }
-
-      Behavior on opacity {
-        enabled: root.motionEnabled
-        NumberAnimation {
-          duration: Aranea.DesignTokens.settleDuration
-          easing.type: Easing.OutCubic
-        }
-      }
-      Behavior on revealOffset {
-        enabled: root.motionEnabled
-        NumberAnimation {
-          duration: Aranea.DesignTokens.settleDuration
-          easing.type: Easing.OutCubic
-        }
-      }
+      opacity: surfaceMotion.opacity
 
       Row {
         anchors.fill: parent

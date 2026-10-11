@@ -34,3 +34,8 @@ ActionButton 1.0 ActionButton.qml
 UiLabel 1.0 UiLabel.qml
 ActionToggle 1.0 ActionToggle.qml
 PageHeader 1.0 PageHeader.qml
+SurfaceMotion 1.0 SurfaceMotion.qml
+SurfaceSpring 1.0 SurfaceSpring.qml
+SpringConfirmDialog 1.0 SpringConfirmDialog.qml
+SpringValue 1.0 SpringValue.qml
+SpringPanel 1.0 SpringPanel.qml

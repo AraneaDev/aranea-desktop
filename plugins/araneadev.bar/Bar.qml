@@ -1624,10 +1624,30 @@ Item {
     PopupWindow {
       id: tooltipWindow
 
-      visible: root.tooltipShown && root.tooltipTarget !== null && root.tooltipText !== "" && root.targetBelongsToWindow(root.tooltipTarget, barWindow)
+      // The bar host intentionally comes from the enclosing BarPanel context.
+      // qmllint disable unqualified
+      readonly property var tooltipOwner: root
+      // qmllint enable unqualified
+      // Keep the last label while the passive bubble fades out.
+      property string retainedText: ""
+      Component.onCompleted: tooltipWindow.retainedText = tooltipWindow.tooltipOwner.tooltipText
+      Aranea.SurfaceMotion {
+        id: tooltipMotion
+        opened: tooltipWindow.tooltipOwner.tooltipShown && tooltipWindow.tooltipOwner.tooltipTarget !== null && tooltipWindow.tooltipOwner.tooltipText !== "" && tooltipWindow.tooltipOwner.targetBelongsToWindow(tooltipWindow.tooltipOwner.tooltipTarget, barWindow)
+        motionEnabled: tooltipWindow.tooltipOwner.motionEnabled
+      }
+      Connections {
+        target: tooltipWindow.tooltipOwner
+        function onTooltipTextChanged() {
+          if (tooltipWindow.tooltipOwner.tooltipText !== "")
+            tooltipWindow.retainedText = tooltipWindow.tooltipOwner.tooltipText
+        }
+      }
+      visible: tooltipMotion.present
+      mask: Region {}
       color: "transparent"
-      implicitWidth: Math.ceil(tooltipBubble.implicitWidth)
-      implicitHeight: Math.ceil(tooltipBubble.implicitHeight)
+      implicitWidth: Math.ceil(tooltipBubble.implicitWidth) + Style.space(8)
+      implicitHeight: Math.ceil(tooltipBubble.implicitHeight) + Style.space(8)
 
       // No id inside the grouped property (qmllint rejects it); the anchor is
       // reached through its window instead.
@@ -1666,7 +1686,11 @@ Item {
 
       TooltipBubble {
         id: tooltipBubble
-        text: root.tooltipText
+        x: Style.space(4)
+        y: Style.space(4)
+        scale: tooltipMotion.scale
+        opacity: tooltipMotion.opacity
+        text: root.tooltipText || tooltipWindow.retainedText
         fontFamily: Aranea.Typography.uiFamily
       }
     }

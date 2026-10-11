@@ -5,5 +5,6 @@
   "setup": {"icon":"S","label":"Setup","aliases":["settings"]},
   "setup.power": {"icon":"P","label":"Power Profile","action":"omarchy-launch-power"},
   "system": {"icon":"Y","label":"System","aliases":["power-menu"]},
-  "system.lock": {"icon":"L","label":"Lock","action":"omarchy-lock-screen"}
+  "system.lock": {"icon":"L","label":"Lock","action":"omarchy-lock-screen"},
+  "aranea.projects": {"parent":"root","label":"Projects","action":"omarchy-shell shell summon araneadev.projects"}
 }

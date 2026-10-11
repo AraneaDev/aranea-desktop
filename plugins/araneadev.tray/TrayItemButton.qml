@@ -20,6 +20,9 @@ Item {
 
   // Dispatch a completed native click or a click forwarded by the bar.
   function triggerPress(mouseButton, mouse) {
+    // Forwarded bar clicks must obey inherited drawer input ownership too.
+    if (!button.enabled)
+      return
     if (button.bar)
       button.bar.hideTooltip(button)
     if (mouseButton === Qt.RightButton || (mouseButton === Qt.LeftButton && button.modelData.onlyMenu))

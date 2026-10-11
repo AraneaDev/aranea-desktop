@@ -15,6 +15,8 @@ ShellRoot {
   property var submission: null
   // Menu-facing notices stay separate from the authoritative operation outcome.
   property var notices: []
+  // Snapshot failures and operation failures remain separate recovery events.
+  property bool snapshotFailure: false
   // Current snapshot can recover a completed operation without another request.
   property var state: ({
       sessionId: 'observer-session',
@@ -49,9 +51,12 @@ ShellRoot {
     captureActive: true
     pollInterval: 10
     runner: function (argv, done) {
-      if (argv[2] === 'snapshot')
-        done(0, JSON.stringify(root.state), '')
-      else if (argv[2] === 'request') {
+      if (argv[2] === 'snapshot') {
+        if (root.snapshotFailure)
+          done(1, '', 'Snapshot unavailable; retry Refresh.')
+        else
+          done(0, JSON.stringify(root.state), '')
+      } else if (argv[2] === 'request') {
         root.requests.push(JSON.parse(argv[3]))
         if (root.requests.length === 1)
           done(0, JSON.stringify({
@@ -107,9 +112,14 @@ ShellRoot {
   // Accepted observer failure is visible while the last authoritative owner result is retained.
   function disconnect() {
     var previous = JSON.stringify(sources.feedbackForProject('p-observer', 'c-observer'))
+    snapshotFailure = true
+    client.refresh()
+    t.check(client.pending && !client.available, 'snapshot failure keeps accepted observer pending')
+    t.equal(notices, ['Snapshot unavailable; retry Refresh.'], 'snapshot failure emits one separate recovery notice')
+    snapshotFailure = false
     observation(1, '', 'Connection lost; refresh to observe the accepted operation.')
     t.check(!client.available && !client.pending && !!client.error, 'transport failure stops only the local observer')
-    t.equal(notices, ['Connection lost; refresh to observe the accepted operation.'], 'accepted observer disconnect emits a separate recovery notice')
+    t.equal(notices, ['Snapshot unavailable; retry Refresh.', 'Connection lost; refresh to observe the accepted operation.'], 'accepted observer disconnect emits one new recovery notice without repeating snapshot failure')
     t.equal(JSON.stringify(sources.feedbackForProject('p-observer', 'c-observer')), previous, 'disconnect preserves authoritative pending outcome')
     t.equal(client.operationId, 'op-observed', 'disconnect retains accepted operation identity for recovery')
     t.step(60, function () {
@@ -142,7 +152,7 @@ ShellRoot {
         recovery: 'Review project details'
       }
     }), '')
-    t.equal(notices, ['Connection lost; refresh to observe the accepted operation.'], 'stale local refusal cannot emit a new error notice')
+    t.equal(notices, ['Snapshot unavailable; retry Refresh.', 'Connection lost; refresh to observe the accepted operation.'], 'stale local refusal cannot emit a new error notice')
     t.equal(sources.feedbackForProject('p-observer', 'c-observer').operationId, 'op-newer', 'stale refusal leaves newer accepted outcome intact')
     t.step(60, function () {
       t.equal(requests.length, 2, 'only the two explicit user actions submit requests')

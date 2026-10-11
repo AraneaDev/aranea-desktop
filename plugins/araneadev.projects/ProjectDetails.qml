@@ -111,6 +111,24 @@ ColumnLayout {
       return
     configureRequested(project.id, Object.assign({}, draft))
   }
+  // A save acknowledges only values still represented by its authoritative readback.
+  function acknowledgeDraft(savedProject: var): void {
+    if (!project || !savedProject || project.id !== savedProject.id)
+      return
+    var saved = savedProject.tools || {}, defaults = tools.defaults || {}
+    var confirmed = {
+      name: savedProject.name || '',
+      editorId: saved.editorId || defaults.editorId || '',
+      terminalId: saved.terminalId || defaults.terminalId || '',
+      workspaceMode: savedProject.workspaceMode || 'dedicated'
+    }
+    if (Object.keys(confirmed).every(function (key) {
+      return draft[key] === confirmed[key]
+    })) {
+      draft = confirmed
+      dirty = false
+    }
+  }
   // Ordinary Open deliberately omits all unsaved presentation draft values.
   function openProject(): void {
     if (!displayOnly && !pending && project && openAvailable)

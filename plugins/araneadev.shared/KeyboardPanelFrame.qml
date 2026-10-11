@@ -1,9 +1,8 @@
 // Shared KeyboardPanel and key-catcher plumbing. Plugin hosts retain their
 // own cursor and activation policy through the forwarded signals.
 import QtQuick
-import qs.Ui
 
-KeyboardPanel {
+SpringPanel {
   id: frame
   // Opt into neutral panel chrome while keeping the configured width and radius.
   property bool refined: false

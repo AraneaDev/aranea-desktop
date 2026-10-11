@@ -156,8 +156,14 @@ ShellRoot {
       projectId: 'unrelated'
     }, page.registryState)
     t.check(page.details.dirty, 'another project save cannot discard this draft')
+    page.registryState = Object.assign({}, page.registryState, {
+      projects: [Object.assign({}, project, {
+          name: 'Renamed'
+        })]
+    })
     page.registryMutationCompleted('configure', {
-      projectId: 'p-demo'
+      projectId: 'p-demo',
+      name: 'Renamed'
     }, page.registryState)
     t.check(!page.details.dirty, 'successful preference save clears draft')
     page.details.actions.editing = true
@@ -409,6 +415,7 @@ ShellRoot {
     realPage.details.setDraft('name', 'Saved name')
     realPage.details.applyDraft()
     t.check(entry.projectController.pending, 'wizard preferences use existing typed save boundary')
+    realPage.details.setDraft('name', 'Edited during save')
     state = Object.assign({}, state, {
       revision: 3,
       projects: [Object.assign({}, project, {
@@ -419,11 +426,49 @@ ShellRoot {
       ok: true,
       state: state
     }), '')
-    t.check(!realPage.details.dirty, 'real successful save releases wizard draft guard')
+    t.equal(realPage.details.draft.name, 'Edited during save', 'save acknowledgement preserves a newer preference draft')
+    t.check(realPage.details.dirty, 'newer preference edits remain unsaved after earlier acknowledgement')
+    t.check(!realPage.setupCanContinue, 'earlier save does not release the newer draft navigation guard')
+    realPage.details.applyDraft()
+    state = Object.assign({}, state, {
+      revision: 4,
+      projects: [Object.assign({}, project, {
+          name: 'Edited during save'
+        }), second]
+    })
+    responses.pop()(0, JSON.stringify({
+      ok: true,
+      state: state
+    }), '')
+    t.check(!realPage.details.dirty, 'matching successful readback releases the preference draft guard')
     realPage.advanceSetup()
     t.equal(realPage.setupStep, 2, 'real batch stays in configuration for the second project')
     t.equal(realPage.selectedProject.id, 'p-beta', 'real batch selects the exact second identity')
     t.equal(t.findChild(surface, 'projectsSidebar').selectedId, 'p-beta', 'sidebar follows the current project in the bulk setup queue')
+    realPage.details.setDraft('name', 'Unsaved second project')
+    var exits = t.findChildren(surface, 'pill').filter(function (item) {
+      return item.text === 'Exit setup' && item.visible
+    })
+    t.check(exits.length > 0 && exits.every(function (item) {
+      return !item.enabled
+    }), 'Exit setup controls refuse unsaved preferences')
+    realPage.finishSetup()
+    t.check(realPage.setupActive, 'Exit setup handler refuses unsaved preferences')
+    t.equal(realPage.selectedProject.id, 'p-beta', 'refused Exit keeps the second project identity')
+    t.equal(realPage.details.draft.name, 'Unsaved second project', 'refused Exit keeps the second project draft')
+    realPage.details.discardDraft()
+    realPage.details.actions.addAction()
+    realPage.details.actions.editor.setField('name', 'Unsaved second action')
+    exits = t.findChildren(surface, 'pill').filter(function (item) {
+      return item.text === 'Exit setup' && item.visible
+    })
+    t.check(exits.length > 0 && exits.every(function (item) {
+      return !item.enabled
+    }), 'Exit setup controls refuse an action draft')
+    realPage.finishSetup()
+    t.check(realPage.setupActive && realPage.details.actions.editing, 'Exit setup handler preserves an action draft')
+    t.equal(realPage.details.actions.editor.draft.name, 'Unsaved second action', 'refused Exit keeps action draft values')
+    realPage.details.actions.editing = false
     realPage.advanceSetup()
     t.equal(realPage.setupStep, 3, 'real setup reaches optional agent instructions after all projects')
     realPage.finishSetup()

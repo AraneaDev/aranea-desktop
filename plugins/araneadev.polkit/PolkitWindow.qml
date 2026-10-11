@@ -54,7 +54,7 @@ PanelWindow {
 
   // Entrance animation for a new request.
   function playOpen(): void {
-    openAnimation.restart()
+    // Visibility owns entrance motion; repeated requests do not reset position.
   }
 
   SequentialAnimation {
@@ -106,35 +106,13 @@ PanelWindow {
       easing.type: Easing.OutQuad
     }
   }
-  ParallelAnimation {
-    id: openAnimation
-    NumberAnimation {
-      target: scrimRect
-      property: "opacity"
-      from: 0
-      to: 1
-      duration: Aranea.DesignTokens.settleDuration
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: card
-      property: "opacity"
-      from: 0
-      to: 1
-      duration: Aranea.DesignTokens.settleDuration
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: card
-      property: "scale"
-      from: 0.97
-      to: 1
-      duration: Aranea.DesignTokens.settleDuration
-      easing.type: Easing.OutCubic
-    }
+  Aranea.SurfaceMotion {
+    id: surfaceMotion
+    opened: panel.root.dialogVisible && !panel.root.closing
+    motionEnabled: panel.root.motionEnabled
   }
 
-  visible: panel.root.dialogVisible
+  visible: surfaceMotion.present
   anchors {
     top: true
     bottom: true
@@ -144,11 +122,17 @@ PanelWindow {
   color: "transparent"
   WlrLayershell.namespace: "omarchy-polkit"
   WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+  WlrLayershell.keyboardFocus: surfaceMotion.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+  // Closing frames never intercept pointer input.
+  mask: Region {
+    width: surfaceMotion.opened ? panel.width : 0
+    height: surfaceMotion.opened ? panel.height : 0
+  }
   exclusionMode: ExclusionMode.Ignore
 
   Rectangle {
     id: scrimRect
+    opacity: surfaceMotion.opacity
     anchors.fill: parent
     color: panel.root.scrim
   }
@@ -160,6 +144,9 @@ PanelWindow {
 
   Aranea.SurfaceCard {
     id: card
+    scale: surfaceMotion.scale
+    opacity: surfaceMotion.opacity
+    enabled: surfaceMotion.opened
     width: panel.cardWidth
     height: Math.min(content.implicitHeight + card.contentTopInset + card.contentBottomInset, panel.height - Style.gapsOut * 2)
     cornerRadius: panel.root.cornerRadius

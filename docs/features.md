@@ -7,7 +7,7 @@ wallpapers, cursors, icons, and application integrations.
 ## Command center
 
 The bar opens an Omarchy command menu with Aranea identity, Files, Terminal,
-and Setup tiles. Apps keeps Favorites and Recent state in
+and Projects tiles, with Setup in the menu below. Apps keeps Favorites and Recent state in
 `~/.local/state/aranea/menu.json`. The menu uses a compact network-and-node
 motif and supports keyboard navigation and pinned applications. Typing at the
 root searches apps, menu commands, windows, workspaces, projects, settings and quick actions.

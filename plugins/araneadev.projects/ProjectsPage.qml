@@ -43,6 +43,8 @@ ColumnLayout {
   readonly property int setupProjectIndex: setupProjectIds.indexOf(setupProjectId)
   // Any active mutation or scan pauses switching projects and wizard stages.
   readonly property bool setupNavigationPending: pending || !!discoveryClient && discoveryClient.pending || details.pending || details.actions.pending
+  // Exiting setup must retain every unsaved preference or action draft.
+  readonly property bool setupCanExit: !setupNavigationPending && !details.dirty && !details.actions.editing
   // Explicit submitted selection matched against successful readback.
   property var setupRegistrationPaths: []
   // A folder confirmation is awaiting canonical registry approval.
@@ -89,7 +91,7 @@ ColumnLayout {
   }
   // Exit preserves saved registration and the exact configured project destination.
   function finishSetup(): void {
-    if (!displayOnly && !setupNavigationPending) {
+    if (!displayOnly && setupCanExit) {
       var completedId = setupActive && selectedProject ? selectedProject.id : ''
       setupActive = false
       if (completedId)
@@ -103,7 +105,9 @@ ColumnLayout {
     if (displayOnly)
       return
     if (action === 'configure' && selectedProject && args.projectId === selectedProject.id)
-      details.discardDraft()
+      details.acknowledgeDraft((state.projects || []).filter(function (project) {
+        return project.id === args.projectId
+      })[0])
     if (!setupActive)
       return
     if (action === 'root-add' && setupAwaitingFolder) {
@@ -379,6 +383,7 @@ ColumnLayout {
     projectCount: page.setupProjectIds.length
     projectName: page.selectedProject ? page.selectedProject.name : ''
     canContinue: page.setupCanContinue
+    canExit: page.setupCanExit
     canBack: page.setupStep !== 2 || !details.dirty && !details.actions.editing
     pending: page.setupNavigationPending
     pointerGate: page.pointerGate
@@ -616,6 +621,7 @@ ColumnLayout {
     projectCount: page.setupProjectIds.length
     projectName: page.selectedProject ? page.selectedProject.name : ''
     canContinue: page.setupCanContinue
+    canExit: page.setupCanExit
     canBack: page.setupStep !== 2 || !details.dirty && !details.actions.editing
     pending: page.setupNavigationPending
     pointerGate: page.pointerGate

@@ -105,6 +105,14 @@ ShellRoot {
       t.equal(testRoot.menus, 2, "right press waits for completed click")
       pointer.mouseRelease(icon, 10, 10, Qt.RightButton)
       t.equal(testRoot.menus, 3, "right release opens menu once")
+      icon.parent.enabled = false
+      icon.triggerPress(Qt.LeftButton)
+      icon.triggerPress(Qt.MiddleButton)
+      icon.triggerPress(Qt.RightButton)
+      t.equal(testRoot.menus, 3, "closing drawer rejects routed menu activation")
+      t.equal(testRoot.secondaryActivations, 1, "closing drawer rejects routed middle activation")
+      t.equal(testRoot.activations, 1, "closing drawer rejects routed app activation")
+      icon.parent.enabled = true
       widget.bar = null
       t.check(testRoot.targets.indexOf(icon) < 0, "detached tray icon unregisters")
     }

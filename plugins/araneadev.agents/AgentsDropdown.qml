@@ -23,6 +23,8 @@ import "../araneadev.shared" as Aranea
 
 Column {
   id: dropdown
+  // Spatial motion policy, overridable by static previews and input fixtures.
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
 
   // View state built by the panel:
   //   hero {mark, glyph, title, caption, problem}; refresh {busy};
@@ -129,7 +131,7 @@ Column {
   // Shared budget after identity, provider selection and the fixed hint.
   readonly property real bodyBudget: Math.max(0, maxHeight - (header.visible ? header.height + spacing : 0) - (agentSwitch.visible ? agentSwitch.height + spacing : 0) - (keyHint.visible ? keyHint.implicitHeight + spacing : 0))
   // Reserve collapsed heading space, so expansion never crowds out decisions.
-  readonly property real detailReserve: Math.min(scrollColumn.implicitHeight, (historyDisclosure.visible ? historyDisclosure.children[0].height : 0) + (modelsDisclosure.visible ? modelsDisclosure.children[0].height : 0) + (footerText.visible ? footerText.implicitHeight : 0) + Math.max(0, Number(historyDisclosure.visible) + Number(modelsDisclosure.visible) + Number(footerText.visible) - 1) * spacing)
+  readonly property real detailReserve: Math.min(scrollColumn.implicitHeight, (historyDisclosure.visible ? historyDisclosure.headingHeight : 0) + (modelsDisclosure.visible ? modelsDisclosure.headingHeight : 0) + (footerText.visible ? footerText.implicitHeight : 0) + Math.max(0, Number(historyDisclosure.visible) + Number(modelsDisclosure.visible) + Number(footerText.visible) - 1) * spacing)
 
   // Keep focused headings visible after expansion or a smaller height budget.
   function ensureCursorVisible() {
@@ -138,9 +140,8 @@ Column {
     var section = dropdown.cursor.index === 0 ? historyDisclosure : modelsDisclosure
     if (!section.visible)
       return
-    var heading = section.children[0]
-    var top = heading.mapToItem(scrollColumn, 0, 0).y
-    var bottom = top + heading.height
+    var top = section.mapToItem(scrollColumn, 0, 0).y
+    var bottom = top + section.headingHeight
     var limit = Math.max(0, agentsScroll.contentHeight - agentsScroll.height)
     if (top < agentsScroll.contentY)
       agentsScroll.contentY = Math.max(0, top)
@@ -314,6 +315,7 @@ Column {
         width: parent.width
         visible: (dropdown.view.days || []).length > 0
         title: "Usage history"
+        motionEnabled: dropdown.motionEnabled
         expanded: !!(dropdown.view.details && dropdown.view.details.historyExpanded)
         keyboardFocused: dropdown.cursorIn("details") === 0
         pointerGate: dropdown.pointerGate
@@ -340,6 +342,7 @@ Column {
         width: parent.width
         visible: (dropdown.view.models || []).length > 0
         title: "Models"
+        motionEnabled: dropdown.motionEnabled
         expanded: !!(dropdown.view.details && dropdown.view.details.modelsExpanded)
         keyboardFocused: dropdown.cursorIn("details") === 1
         pointerGate: dropdown.pointerGate

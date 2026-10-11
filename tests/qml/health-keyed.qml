@@ -206,6 +206,8 @@ ShellRoot {
     visible: true
     Health.HealthDropdown {
       id: dropdown
+      // Pointer/keyboard contracts use settled geometry; spring timing has its own fixture.
+      motionEnabled: false
       x: 20
       y: 20
       width: 360

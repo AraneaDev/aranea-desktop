@@ -40,6 +40,7 @@ ShellRoot {
 
       Shared.DisclosureSection {
         id: section
+        motionEnabled: false
         width: 360
         title: "Resource details"
         pointerGate: gate
@@ -68,6 +69,7 @@ ShellRoot {
   Component.onCompleted: t.step(400, function () {
     var heading = t.findChild(section, "disclosureHeading")
     collapsedHeight = section.height
+    t.equal(section.headingHeight, collapsedHeight, "heading extent is independent of internal child order")
     t.check(collapsedHeight > 0 && collapsedHeight < 100, "collapsed section retains only its heading")
     t.check(!details.visible, "collapsed content is hidden")
     pointer.mouseClick(heading, 40, heading.height / 2)

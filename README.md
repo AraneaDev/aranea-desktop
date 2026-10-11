@@ -67,7 +67,7 @@ the shell, applications, lock screen, and boot: obsidian surfaces, mint activity
 violet focus, and a transparent interactive bar. Wallpapers stay mark-free;
 the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
 
-- **Command center:** Files, Terminal, Setup, Favorites, Recent, and searchable apps.
+- **Command center:** Files, Terminal, Projects, Favorites, Recent, and searchable apps.
 - **Settings:** wallpaper, fonts, motion, display scale, schedule, integrations, and DND.
 - **Project workspaces:** confirmed Git discovery, grouped worktrees, project search, and Open/Resume with saved tools.
 - **System controls:** network, VPN, audio, Bluetooth, displays, power, tray, calendar, and weather.

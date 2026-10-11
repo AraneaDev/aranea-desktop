@@ -12,6 +12,15 @@ Item {
   property string title: ""
   // Expansion state controlled by the host.
   property bool expanded: false
+  // Stable heading extent for hosts reserving keyboard navigation space.
+  readonly property real headingHeight: heading.height
+  // Shared reduced-motion policy, injectable in static hosts.
+  property bool motionEnabled: MotionState.motionEnabled
+  SpringValue {
+    id: reveal
+    targetValue: section.expanded && contentSlot.implicitHeight > 0 ? Style.space(16) + contentSlot.implicitHeight : 0
+    motionEnabled: section.motionEnabled
+  }
   // Whether the host's keyboard cursor targets this heading.
   property bool keyboardFocused: false
   // Host PointerMoveGate with its layoutChangedAt settling stamp.
@@ -27,7 +36,7 @@ Item {
   }
 
   implicitWidth: Math.max(heading.implicitWidth, contentSlot.implicitWidth)
-  implicitHeight: heading.height + (expanded && contentSlot.implicitHeight > 0 ? Style.space(16) + contentSlot.implicitHeight : 0)
+  implicitHeight: heading.height + Math.max(0, reveal.value)
 
   Item {
     id: heading
@@ -130,13 +139,19 @@ Item {
     }
   }
 
-  Column {
-    id: contentSlot
-    objectName: "disclosureContent"
-    y: heading.height + Style.space(16)
+  Item {
+    y: heading.height
     width: parent.width
-    height: section.expanded ? implicitHeight : 0
-    visible: section.expanded
-    spacing: Style.space(8)
+    height: Math.max(0, reveal.value)
+    clip: true
+    Column {
+      id: contentSlot
+      objectName: "disclosureContent"
+      y: Style.space(16)
+      width: parent.width
+      visible: section.expanded || reveal.value > 0
+      enabled: section.expanded
+      spacing: Style.space(8)
+    }
   }
 }

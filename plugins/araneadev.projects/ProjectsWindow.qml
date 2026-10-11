@@ -6,6 +6,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import "../araneadev.shared" as Aranea
 import qs.Commons
 import "ProjectsLogic.js" as Logic
 
@@ -47,23 +48,39 @@ PanelWindow {
   }
   // Confirm visible artwork and layout have settled.
   function captureReady() {
-    return visible && surface.captureReady()
+    return surfaceMotion.opened && !surfaceMotion.running && surface.captureReady()
   }
   // Remember the keyboard target for an already open Projects window.
   function captureFocus() {
     return surface.captureFocus()
   }
-  visible: root.opened
-  implicitWidth: geometry.width
-  implicitHeight: geometry.height
+  Aranea.SurfaceMotion {
+    id: surfaceMotion
+    opened: panel.root.opened
+    motionEnabled: Aranea.MotionState.motionEnabled
+  }
+
+  visible: surfaceMotion.present
+  implicitWidth: geometry.width + Style.space(8)
+  implicitHeight: geometry.height + Style.space(8)
   color: 'transparent'
   exclusionMode: ExclusionMode.Ignore
   WlrLayershell.namespace: 'aranea-projects'
   WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+  WlrLayershell.keyboardFocus: surfaceMotion.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+  // Closing frames never intercept pointer input.
+  mask: Region {
+    width: surfaceMotion.opened ? panel.width : 0
+    height: surfaceMotion.opened ? panel.height : 0
+  }
   ProjectsSurface {
     id: surface
+    scale: surfaceMotion.scale
+    opacity: surfaceMotion.opacity
+    enabled: surfaceMotion.opened
     anchors.fill: parent
+    // Reserve a small transparent gutter for spring overshoot.
+    anchors.margins: Style.space(4)
     root: panel.root
   }
 }

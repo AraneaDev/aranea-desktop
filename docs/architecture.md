@@ -239,6 +239,9 @@ submission feedback cannot overwrite newer accepted outcomes.
 The standalone Projects presentation owns registry/discovery clients for
 registration and typed project configuration requests. `ProjectsPresentation.qml`
 retains drafts and observation clients independently of the window.
+Registry and tool refresh failures remain independent of callback completion order;
+snapshot read failures do not interrupt accepted launch observation. Preference save
+readback acknowledges only matching draft values, and setup exit retains unsaved drafts.
 `ProjectsSurface.qml` owns the searchable sidebar and focused Overview, Actions,
 Agents, Preferences, and Help destinations. Settings contains desktop preferences. Search uses `ProjectClient.qml` and `ProjectRecords.js`
 for matching and owner outcomes. Its observer survives menu closure. The

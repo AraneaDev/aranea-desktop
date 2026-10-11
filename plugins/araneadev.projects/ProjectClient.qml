@@ -86,6 +86,22 @@ Item {
     preparing = false
     pending = false
   }
+  // Snapshot reads cannot cancel independently submitted or observed work.
+  function transportFailed(method: string, message: string): void {
+    available = false
+    if (method === 'snapshot') {
+      error = message
+      return
+    }
+    // Pending observers react to both properties; never replay an earlier read error.
+    error = ''
+    pending = false
+    error = message
+    poll.stop()
+    readyRetry.stop()
+    submissionJson = ''
+    preparing = false
+  }
   // Decode one structured IPC response and surface missing owner errors.
   function invoke(method: string, args: var, revision: int, done: var): void {
     if (captureActive)
@@ -100,13 +116,7 @@ Item {
           response = JSON.parse(output)
         } catch (e) {}
         if (code !== 0 || !response || typeof response !== 'object') {
-          available = false
-          pending = false
-          error = diagnostics || 'Project owner unavailable. Activate Aranea and retry.'
-          poll.stop()
-          readyRetry.stop()
-          submissionJson = ''
-          preparing = false
+          transportFailed(method, diagnostics || 'Project owner unavailable. Activate Aranea and retry.')
           return
         }
         available = true
@@ -116,13 +126,7 @@ Item {
     } catch (e) {
       if (captureActive || revision !== generation || method === 'snapshot' && readRevision !== snapshotReadRevision)
         return
-      available = false
-      pending = false
-      error = String(e)
-      poll.stop()
-      readyRetry.stop()
-      submissionJson = ''
-      preparing = false
+      transportFailed(method, String(e))
     }
   }
   // Refresh owner observations without creating or cancelling operations.

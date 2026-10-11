@@ -169,8 +169,14 @@ QtObject {
   readonly property real secondaryOpacity: ${tokens.typography?.secondary_opacity ?? 0.64}
   // Duration of existing hover and selection feedback.
   readonly property int feedbackDuration: ${tokens.motion.feedback_ms ?? 120}
-  // Duration of existing panel and disclosure settling.
+  // Duration of panel opacity settling.
   readonly property int settleDuration: ${tokens.motion.settle_ms ?? 160}
+  // Shared spring strength and damping for spatial transitions.
+  readonly property real springStrength: ${tokens.motion.spring_strength ?? 4.0}
+  // Shared damping controls the small overshoot and settling.
+  readonly property real springDamping: ${tokens.motion.spring_damping ?? 0.3}
+  // Small entrance/exit scale offset for readable cards.
+  readonly property real surfaceClosedScale: ${tokens.motion.surface_closed_scale ?? 0.97}
   // Whether motion effects are enabled.
   readonly property bool motionEnabled: MotionState.motionEnabled
   // Fill of a clickable element under the pointer, shown only after a real

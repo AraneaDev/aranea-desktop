@@ -274,8 +274,52 @@ ShellRoot {
         var caption = t.findChild(view, "footerText")
         t.check(Qt.colorEqual(hint.color, caption.color) && hint.color.a > 0.3, "keyboard hint is as readable as existing muted captions")
         view.maxHeight = 2000
-        t.done()
+        // Exercise the real scrolling composition while a sibling springs open.
+        view.maxHeight = 300
+        var collapsed = viewOf(agentRows, false, {
+          active: true,
+          section: "details",
+          index: 1
+        })
+        collapsed.details = {
+          historyExpanded: false,
+          modelsExpanded: false
+        }
+        view.view = collapsed
+        t.step(50, function () {
+          var history = t.findChild(view, "historyDisclosure")
+          var collapsedHeight = history.height
+          view.motionEnabled = true
+          var opening = viewOf(agentRows, false, {
+            active: true,
+            section: "details",
+            index: 1
+          })
+          opening.details = {
+            historyExpanded: true,
+            modelsExpanded: false
+          }
+          view.view = opening
+          t.step(60, function () {
+            t.check(history.height > collapsedHeight, "animated history disclosure progresses in production layout")
+            sampleAnimatedHeading(12)
+          })
+        })
       })
+    })
+  }
+
+  // Sample keyboard visibility through the production spring and layout callbacks.
+  function sampleAnimatedHeading(remaining) {
+    var section = t.findChild(view, "modelsDisclosure")
+    var top = section.mapToItem(view.scroll.contentItem, 0, 0).y
+    t.check(top >= view.scroll.contentY - 1 && top + section.headingHeight <= view.scroll.contentY + view.scroll.height + 1, "animated disclosure keeps focused models heading visible " + remaining)
+    if (remaining === 0) {
+      t.done()
+      return
+    }
+    t.step(50, function () {
+      sampleAnimatedHeading(remaining - 1)
     })
   }
 
@@ -297,6 +341,8 @@ ShellRoot {
 
     Agents.AgentsDropdown {
       id: view
+      // Pointer/keyboard contracts use settled geometry; spring timing has its own fixture.
+      motionEnabled: false
       width: 380
       maxHeight: 2000
       view: viewOf(agentRows, false)

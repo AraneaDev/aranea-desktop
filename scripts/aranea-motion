@@ -53,7 +53,7 @@ motion_status_json() {
 # Applies the stored mode to Hyprland (animations off, or on with Aranea's
 # curves) and prints it; only prints it when hyprctl is missing.
 apply_motion() {
-  local mode hyprctl_bin
+  local mode hyprctl_bin reply lua_code apply_status=0
   mode="$(motion_status)"
   hyprctl_bin="${ARANEA_HYPRCTL:-hyprctl}"
   if ! command -v "$hyprctl_bin" >/dev/null 2>&1; then
@@ -62,9 +62,29 @@ apply_motion() {
   fi
 
   if [[ "$mode" == off ]]; then
-    "$hyprctl_bin" keyword animations:enabled false >/dev/null
+    reply="$("$hyprctl_bin" keyword animations:enabled false)" || apply_status=$?
+    lua_code='hl.config({ animations = { enabled = false } })'
   else
-    "$hyprctl_bin" --batch 'keyword animations:enabled true; keyword animation windowsIn, 1, 2.2, easeOutQuint, popin 94%; keyword animation windowsOut, 1, 1.4, linear, popin 96%; keyword animation workspaces, 1, 2.4, easeInOutCubic, slidefade 12%; keyword animation specialWorkspace, 1, 2.6, easeInOutCubic, slidefadevert 10%' >/dev/null
+    # A modest spatial overshoot approximates the shell card springs. Define
+    # it before either use; closing stays monotonic and layer surfaces retain
+    # their QML motion so transparent shell windows never get a second scale.
+    reply="$("$hyprctl_bin" --batch 'keyword animations:enabled true; keyword bezier araneaSpring, 0.22, 1, 0.36, 1.14; keyword animation windowsIn, 1, 2.8, araneaSpring, popin 94%; keyword animation windowsMove, 1, 2.8, araneaSpring; keyword animation windowsOut, 1, 1.4, linear, popin 96%; keyword animation workspaces, 1, 2.4, easeInOutCubic, slidefade 12%; keyword animation specialWorkspace, 1, 2.6, easeInOutCubic, slidefadevert 10%')" || apply_status=$?
+    lua_code='hl.config({ animations = { enabled = true } }); hl.curve("araneaSpring", { type = "bezier", points = { { 0.22, 1 }, { 0.36, 1.14 } } }); hl.animation({ leaf = "windowsIn", enabled = true, speed = 2.8, bezier = "araneaSpring", style = "popin 94%" }); hl.animation({ leaf = "windowsMove", enabled = true, speed = 2.8, bezier = "araneaSpring" }); hl.animation({ leaf = "windowsOut", enabled = true, speed = 1.4, bezier = "linear", style = "popin 96%" }); hl.animation({ leaf = "workspaces", enabled = true, speed = 2.4, bezier = "easeInOutCubic", style = "slidefade 12%" }); hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 2.6, bezier = "easeInOutCubic", style = "slidefadevert 10%" })'
+  fi
+
+  # Lua-configured Hyprland refuses legacy keywords before changing anything.
+  # Its CLI can exit 0 for that rejection, so inspect the compositor reply.
+  if [[ "$reply" == *"keyword can't work with non-legacy parsers. Use eval."* ]]; then
+    apply_status=0
+    reply="$("$hyprctl_bin" eval "$lua_code")" || apply_status=$?
+  fi
+  if ((apply_status != 0)); then
+    [[ -z "$reply" ]] || printf '%s\n' "$reply" >&2
+    return "$apply_status"
+  fi
+  if [[ -n "$reply" ]] && grep -qvE '^(ok|[[:space:]]*)$' <<<"$reply"; then
+    printf 'motion: Hyprland rejected apply: %s\n' "$reply" >&2
+    return 1
   fi
   printf 'motion: %s\n' "$mode"
 }

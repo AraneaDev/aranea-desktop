@@ -182,3 +182,19 @@ test("brand projections use the configured identity and tokenized mark colors", 
   assert.match(renderBrandQml(brand), /shortName: "EXAMPLE"/)
   assert.match(renderBrandQml(brand), /lockSubtitle: "PRIVATE SESSION"/)
 })
+
+test("renderQmlTokens projects spring tuning from canonical motion tokens", async () => {
+  const { renderQmlTokens } = await generatorPromise
+  const output = renderQmlTokens({
+    ...fixture,
+    motion: {
+      ...fixture.motion,
+      spring_strength: 3,
+      spring_damping: 0.25,
+      surface_closed_scale: 0.96
+    }
+  })
+  assert.match(output, /readonly property real springStrength: 3/)
+  assert.match(output, /readonly property real springDamping: 0.25/)
+  assert.match(output, /readonly property real surfaceClosedScale: 0.96/)
+})

@@ -28,13 +28,38 @@ test("terminal adapters preserve exact path and distinct application token", () 
   }
 })
 test("nvim uses selected terminal execute argv with exact directory", () => {
-  for (const id of ["alacritty", "kitty", "foot", "ghostty"]) {
-    const base = plain(tools.launchSpec("terminal", id, path, token))
-    const extra = id === "alacritty" ? ["--command"] : id === "ghostty" ? ["-e"] : []
-    assert.deepEqual(
-      plain(tools.launchSpec("editor", "nvim", path, token, id)).argv,
-      base.argv.concat(extra, ["nvim", "--", path])
-    )
+  const expected = {
+    alacritty: [
+      "alacritty",
+      "--class",
+      token,
+      "--working-directory",
+      path,
+      "--command",
+      "nvim",
+      "--",
+      path
+    ],
+    kitty: ["kitty", "--class", token, "--directory", path, "nvim", "--", path],
+    foot: ["foot", "--app-id", token, "--working-directory", path, "nvim", "--", path],
+    ghostty: [
+      "ghostty",
+      "--class=" + token,
+      "--gtk-single-instance=false",
+      "--working-directory=" + path,
+      "-e",
+      "nvim",
+      "--",
+      path
+    ]
+  }
+  for (const id of Object.keys(expected)) {
+    assert.deepEqual(plain(tools.launchSpec("editor", "nvim", path, token, id)), {
+      argv: expected[id],
+      cwd: path,
+      expectedAppId: token,
+      evidenceMode: "process-app-id"
+    })
   }
   assert.equal(tools.launchSpec("editor", "nvim", path, token), null)
   assert.equal(tools.launchSpec("editor", "nvim", path, token, "unsupported"), null)
