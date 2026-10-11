@@ -64,6 +64,68 @@ test("nvim uses selected terminal execute argv with exact directory", () => {
   assert.equal(tools.launchSpec("editor", "nvim", path, token), null)
   assert.equal(tools.launchSpec("editor", "nvim", path, token, "unsupported"), null)
 })
+test("agent role runs fixed provider argv inside the selected terminal", () => {
+  const expected = {
+    alacritty: {
+      claude: ["alacritty", "--class", token, "--working-directory", path, "--command", "claude"],
+      codex: [
+        "alacritty",
+        "--class",
+        token,
+        "--working-directory",
+        path,
+        "--command",
+        "codex",
+        "--cd",
+        path
+      ]
+    },
+    ghostty: {
+      claude: [
+        "ghostty",
+        "--class=" + token,
+        "--gtk-single-instance=false",
+        "--working-directory=" + path,
+        "-e",
+        "claude"
+      ],
+      codex: [
+        "ghostty",
+        "--class=" + token,
+        "--gtk-single-instance=false",
+        "--working-directory=" + path,
+        "-e",
+        "codex",
+        "--cd",
+        path
+      ]
+    },
+    kitty: {
+      claude: ["kitty", "--class", token, "--directory", path, "claude"],
+      codex: ["kitty", "--class", token, "--directory", path, "codex", "--cd", path]
+    },
+    foot: {
+      claude: ["foot", "--app-id", token, "--working-directory", path, "claude"],
+      codex: ["foot", "--app-id", token, "--working-directory", path, "codex", "--cd", path]
+    }
+  }
+  for (const terminalId of Object.keys(expected)) {
+    for (const providerId of ["claude", "codex"]) {
+      assert.deepEqual(plain(tools.launchSpec("agent", providerId, path, token, terminalId)), {
+        argv: expected[terminalId][providerId],
+        cwd: path,
+        expectedAppId: token,
+        evidenceMode: "process-app-id"
+      })
+    }
+  }
+})
+test("agent role refuses unknown providers and missing terminals", () => {
+  assert.equal(tools.launchSpec("agent", "gemini", path, token, "kitty"), null)
+  assert.equal(tools.launchSpec("agent", "claude", path, token, undefined), null)
+  assert.equal(tools.launchSpec("agent", "claude", path, "bad token", "kitty"), null)
+  assert.equal(tools.launchSpec("agent", "claude", "relative", token, "kitty"), null)
+})
 test("code launches new window with process-only evidence", () => {
   assert.deepEqual(plain(tools.launchSpec("editor", "code", path, token)), {
     argv: ["code", "--new-window", path],
