@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.25.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.24.0...v2.25.0) (2026-10-11)
+
+
+### Features
+
+* manage project workspaces and start coding agents ([#145](https://github.com/AraneaDev/aranea-desktop/issues/145)) ([2fce66f](https://github.com/AraneaDev/aranea-desktop/commit/2fce66f0207d470464ec99f23e5138a4b3b0218c))
+
 ## [2.24.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.23.0...v2.24.0) (2026-10-10)
 
 
