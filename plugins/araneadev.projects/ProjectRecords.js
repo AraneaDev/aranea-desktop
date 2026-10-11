@@ -62,4 +62,66 @@ function records(registry, runtime) {
   return result
 }
 
-if (typeof module !== "undefined") module.exports = { records }
+/**
+ * Project-specific provider suggestion callback.
+ * @callback ProjectChoiceFor
+ * @param {ProjectData} project - project identity and saved tools
+ * @returns {ProjectData} installed options and suggested provider
+ */
+
+/**
+ * One explicit launcher action per installed provider and project.
+ * Suggestion is presentation metadata; the target always names the provider.
+ * @param {ProjectData} registry - validated persistent registry snapshot
+ * @param {ProjectData} runtime - fresh owner availability
+ * @param {ProjectChoiceFor} choiceFor - suggestion per project
+ * @returns {Array<ProjectData>} agent start records
+ */
+function agentRecords(registry, runtime, choiceFor) {
+  var live = runtime || {}
+  /** @type {Array<ProjectData>} */
+  var result = []
+  /** @type {{[key:string]:boolean}} */
+  var seen = {}
+  /** @type {Array<ProjectData>} */
+  var projects = (registry || {}).projects || []
+  projects.forEach(function (project) {
+    if (!project || !project.id) return
+    /** @type {Array<ProjectData>} */
+    var checkouts = project.checkouts || []
+    var checkout = checkouts.filter(function (candidate) {
+      return candidate.id === project.lastCheckoutId
+    })[0]
+    var choice = choiceFor(project) || { options: [] }
+    /** @type {Array<ProjectData>} */
+    var options = (choice.options || []).filter(function (/** @type {ProjectData} */ option) {
+      return option && option.available === true && ["claude", "codex"].indexOf(option.id) >= 0
+    })
+    options.sort(function (/** @type {ProjectData} */ a, /** @type {ProjectData} */ b) {
+      return Number(b.id === choice.suggestedId) - Number(a.id === choice.suggestedId)
+    })
+    options.forEach(function (option) {
+      var key = "project-agent:" + project.id + ":" + option.id
+      if (seen[key]) return
+      seen[key] = true
+      var suggested = option.id === choice.suggestedId
+      result.push({
+        key: key,
+        type: "project-agent",
+        label: "Start " + (option.id === "claude" ? "Claude" : "Codex") + " in " + project.name,
+        target: { projectId: project.id, checkoutId: project.lastCheckoutId, agentId: option.id },
+        detail: (suggested ? "Suggested · " : "") + (option.reason || "Usage unknown"),
+        aliases: ["agent", option.id, project.name],
+        available: !!checkout && !!live.availability && live.availability.compositor === true,
+        action: "agent",
+        suggested: suggested,
+        pinned: false,
+        recentRank: null,
+        activeWorkspace: false
+      })
+    })
+  })
+  return result
+}
+
+if (typeof module !== "undefined") module.exports = { records, agentRecords }

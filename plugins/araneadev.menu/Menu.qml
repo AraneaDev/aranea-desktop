@@ -347,10 +347,10 @@ Item {
     if (serial < 0 || !root.desktopSearchActive || root.selectedIndex < 0 || root.selectedIndex >= displayModel.count)
       return null
     var row = displayModel.get(root.selectedIndex)
-    return row.actionStatus === "failed" || row.resultType === "project" && root.cursorActive ? row : null
+    return row.actionStatus === "failed" || (row.resultType === "project" || row.resultType === "project-agent") && root.cursorActive ? row : null
   }
   // Available recovery destination for the selected failed action.
-  readonly property string recoveryLabel: !recoveryRow ? "" : recoveryRow.resultType === "project" ? "Project details" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
+  readonly property string recoveryLabel: !recoveryRow ? "" : (recoveryRow.resultType === "project" || recoveryRow.resultType === "project-agent") ? "Project details" : recoveryRow.desktopKey.indexOf("action:audio:") === 0 ? "Open audio controls" : recoveryRow.desktopKey.indexOf("action:wallpaper:") === 0 ? "Open Appearance" : ""
   // Space reserved beneath results so recovery never clips outside the card.
   readonly property int recoveryHeight: recoveryLabel ? Style.space(28) + root.style.sectionSpacing : 0
   onRecoveryLabelChanged: if (!recoveryLabel)
@@ -359,7 +359,7 @@ Item {
   function recoverSelected(): void {
     if (!root.recoveryLabel || desktopActions.showcaseActive)
       return
-    if (root.recoveryRow.resultType === "project") {
+    if (root.recoveryRow.resultType === "project" || root.recoveryRow.resultType === "project-agent") {
       desktopSources.openProjectDetails(root.recoveryRow.desktopKey)
       return
     }
@@ -718,10 +718,10 @@ Item {
         if (!base)
           desktopRow.label = record.label
         desktopRow.detail = record.detail
-        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : record.type === "project" ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
-        if (record.type === "project" && feedback && feedback.checkoutId !== record.target.checkoutId)
+        var feedback = record.type === "action" ? desktopActions.feedback[record.key] : (record.type === "project" || record.type === "project-agent") ? desktopSources.feedbackForProject(record.target.projectId, record.target.checkoutId) : null
+        if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.checkoutId !== record.target.checkoutId)
           feedback = null
-        if (record.type === "project" && feedback && feedback.status !== "pending" && feedback.status !== "failed")
+        if ((record.type === "project" || record.type === "project-agent") && feedback && feedback.status !== "pending" && feedback.status !== "failed")
           desktopRow.detail += " · " + feedback.message
         desktopRow.actionStatus = feedback ? feedback.status : ""
         desktopRow.actionMessage = feedback ? feedback.message : ""

@@ -227,7 +227,7 @@ function sourceRecords(snapshot) {
   if (Array.isArray(data.projectRecords))
     rows = rows.concat(
       data.projectRecords.filter(function (row) {
-        return row && row.type === "project"
+        return row && (row.type === "project" || row.type === "project-agent")
       })
     )
   if (data.compositorAvailable !== true) return rows
@@ -299,6 +299,28 @@ function dispatchTarget(record, snapshot) {
     return {
       kind: "project",
       payload: { projectId: current.target.projectId, checkoutId: current.target.checkoutId }
+    }
+  }
+  if (current.type === "project-agent") {
+    if (
+      current.available === false ||
+      !record.target ||
+      !current.target ||
+      record.target.projectId !== current.target.projectId ||
+      record.target.checkoutId !== current.target.checkoutId ||
+      record.target.agentId !== current.target.agentId ||
+      ["claude", "codex"].indexOf(current.target.agentId) < 0
+    )
+      return null
+    return {
+      kind: "project",
+      payload: {
+        projectId: current.target.projectId,
+        checkoutId: current.target.checkoutId,
+        roles: ["agent"],
+        newWindowRole: "agent",
+        agentId: current.target.agentId
+      }
     }
   }
   // Actions belong to the persistent action controller, never the argv fallback.

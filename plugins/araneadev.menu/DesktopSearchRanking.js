@@ -1,9 +1,9 @@
 // Pure desktop record normalization and ranking. Matching is injected by the
 // generated DesktopSearchLogic facade from the canonical MenuSearch module.
 
-/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"|"project"} DesktopType */
-/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string, projectId?:string, checkoutId?:string}} DesktopTarget */
-/** @typedef {{key: string, type: DesktopType, label: string, detail: string, aliases: Array<string>, target: DesktopTarget, available: boolean, pinned: boolean, recentRank: ?number, activeWorkspace: boolean}} DesktopRecord */
+/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"|"project"|"project-agent"} DesktopType */
+/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string, projectId?:string, checkoutId?:string, agentId?:string}} DesktopTarget */
+/** @typedef {{key: string, type: DesktopType, label: string, detail: string, aliases: Array<string>, target: DesktopTarget, available: boolean, pinned: boolean, recentRank: ?number, activeWorkspace: boolean, suggested?: boolean}} DesktopRecord */
 /** @typedef {{id: string, label: string, aliases: Array<string>, description: string}} DesktopMatchEntry */
 /**
  * Canonical menu matching callback.
@@ -21,7 +21,7 @@
  */
 function parseQuery(text) {
   var raw = String(text || "").trim()
-  var prefix = /^(app|command|window|workspace|setting|action|project):\s*/i.exec(raw)
+  var prefix = /^(app|command|window|workspace|setting|action|project|project-agent):\s*/i.exec(raw)
   return {
     type: prefix ? /** @type {DesktopType} */ (prefix[1].toLowerCase()) : null,
     text: prefix ? raw.slice(prefix[0].length).trim() : raw
@@ -46,7 +46,8 @@ function normalizeRecord(record) {
     workspace: "workspaceId",
     setting: "section",
     action: "actionId",
-    project: "projectId"
+    project: "projectId",
+    "project-agent": "projectId"
   }
   if (!Object.prototype.hasOwnProperty.call(fields, type)) return null
   var label = typeof record.label === "string" ? record.label.trim() : ""
@@ -69,9 +70,13 @@ function normalizeRecord(record) {
   /** @type {DesktopTarget & {[key: string]: *}} */
   var target = {}
   target[fields[type]] = identity
-  if (type === "project") {
+  if (type === "project" || type === "project-agent") {
     if (typeof sourceTarget.checkoutId !== "string" || !sourceTarget.checkoutId.trim()) return null
     target.checkoutId = sourceTarget.checkoutId
+  }
+  if (type === "project-agent") {
+    if (["claude", "codex"].indexOf(sourceTarget.agentId) < 0) return null
+    target.agentId = sourceTarget.agentId
   }
   if (
     type === "workspace" &&
@@ -82,8 +87,9 @@ function normalizeRecord(record) {
   var recentRank = record.recentRank
   /** @type {Array<*>} */
   var aliases = Array.isArray(record.aliases) ? record.aliases : []
-  return {
-    key: type + ":" + identity,
+  /** @type {DesktopRecord} */
+  var normalized = {
+    key: type + ":" + identity + (type === "project-agent" ? ":" + target.agentId : ""),
     type: type,
     label: label,
     detail: typeof record.detail === "string" ? record.detail : "",
@@ -99,6 +105,8 @@ function normalizeRecord(record) {
         : null,
     activeWorkspace: type === "window" && record.activeWorkspace === true
   }
+  if (type === "project-agent") normalized.suggested = record.suggested === true
+  return normalized
 }
 
 /**
@@ -170,6 +178,28 @@ function rankDesktopResults(records, query, matcher) {
     }
     return 0
   })
+  // Reorder only agent slots within an already eligible match tier. Ordinary
+  // results keep their exact ranks, and explicit provider queries keep theirs.
+  var terms = parsed.text.toLowerCase().split(/\s+/)
+  if (terms.indexOf("agent") >= 0 && terms.indexOf("claude") < 0 && terms.indexOf("codex") < 0) {
+    for (var matchTier = 0; matchTier <= 4; matchTier++) {
+      var positions = []
+      var agents = []
+      for (var position = 0; position < ranked.length; position++) {
+        if (
+          ranked[position].tuple[0] === matchTier &&
+          ranked[position].record.type === "project-agent"
+        ) {
+          positions.push(position)
+          agents.push(ranked[position])
+        }
+      }
+      agents.sort(function (a, b) {
+        return Number(b.record.suggested) - Number(a.record.suggested)
+      })
+      for (var slot = 0; slot < positions.length; slot++) ranked[positions[slot]] = agents[slot]
+    }
+  }
   /** @type {{[key: string]: boolean}} */
   var seen = {}
   var out = []
