@@ -248,5 +248,57 @@ control_paths_never_silently_select_a_sibling() {
   jq -e '.ok == false and .error.code == "INVALID_PATH"' "$TMPDIR/error"
   cmp "$registry" "$TMPDIR/original"
 }
-for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling; do run_case "$case_name"; done
+# Catch eager migration, missing persistence, or rejection of a valid role subset.
+open_roles_and_agent_configure() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >/dev/null
+  id=$("$store" snapshot | jq -r '.state.projects[0].id')
+  cp "$registry" "$TMPDIR/original"
+  "$store" snapshot | jq -e '.state.projects[0] | (has("openRoles")|not) and (.tools|has("agentId")|not)'
+  cmp "$registry" "$TMPDIR/original"
+  mutate configure "$(jq -cn --arg id "$id" '{projectId:$id,openRoles:["editor","agent"],agentId:"codex"}')" |
+    jq -e '.ok and .error == null and (.state.projects[0] | .openRoles == ["editor","agent"] and .tools.agentId == "codex")'
+  "$store" snapshot | jq -e '.state.projects[0] | .openRoles == ["editor","agent"] and .tools.agentId == "codex"'
+  for roles in '["editor"]' '["terminal"]' '["agent"]' '["editor","terminal"]' '["editor","agent"]' '["terminal","agent"]' '["editor","terminal","agent"]'; do
+    mutate configure "$(jq -cn --arg id "$id" --argjson roles "$roles" '{projectId:$id,openRoles:$roles}')" |
+      jq -e --argjson roles "$roles" '.state.projects[0] | .openRoles == $roles and .tools.agentId == "codex"'
+  done
+  mutate configure "$(jq -cn --arg id "$id" '{projectId:$id,agentId:"claude"}')" | jq -e '.state.projects[0].tools.agentId == "claude"'
+  mutate configure "$(jq -cn --arg id "$id" '{projectId:$id,agentId:null}')" | jq -e '.state.projects[0].tools | has("agentId") and .agentId == null'
+  mutate configure "$(jq -cn --arg id "$id" '{projectId:$id,name:"Still configured"}')" |
+    jq -e '.state.projects[0] | .openRoles == ["editor","terminal","agent"] and (.tools | has("agentId") and .agentId == null)'
+}
+# Catch permissive request validation, misleading refusal results, or partial writes.
+invalid_roles_and_agents_preserve_state() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >/dev/null
+  id=$("$store" snapshot | jq -r '.state.projects[0].id')
+  cp "$registry" "$TMPDIR/original"
+  for field in openRoles agentId; do
+    if [[ "$field" == openRoles ]]; then
+      values=('[]' '["agent","editor"]' '["editor","editor"]' '["browser"]' '"editor"' 'null' '{}' '["editor",null]' '["editor","agent","terminal"]')
+    else
+      values=('"gemini"' '""' 'false' '1' '[]' '{}')
+    fi
+    for value in "${values[@]}"; do
+      if mutate configure "$(jq -cn --arg id "$id" --arg field "$field" --argjson value "$value" '{projectId:$id,name:"Must not persist",($field):$value}')" >"$TMPDIR/error"; then
+        echo "accepted $field $value"
+        return 1
+      fi
+      jq -e --slurpfile original "$TMPDIR/original" '.ok == false and .state == $original[0] and .error.code == "INVALID_REQUEST" and (.error.message|length > 0) and (.error.recovery|length > 0)' "$TMPDIR/error"
+      cmp "$registry" "$TMPDIR/original"
+    done
+  done
+}
+# Catch schema validation accepting malformed saved roles or unsupported agents.
+invalid_saved_roles_and_agents_are_preserved() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >/dev/null
+  cp "$registry" "$TMPDIR/original"
+  for patch in '{"openRoles":[]}' '{"openRoles":["agent","editor"]}' '{"openRoles":["editor","editor"]}' '{"openRoles":["browser"]}' '{"openRoles":null}' '{"tools":{"editorId":null,"terminalId":null,"agentId":"gemini"}}'; do
+    jq --argjson patch "$patch" '.projects[0] += $patch' "$TMPDIR/original" >"$registry"
+    cp "$registry" "$TMPDIR/invalid-registry"
+    if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
+    jq -e '.ok == false and .state == null and .error.code == "REGISTRY_INVALID" and (.error.recovery|length > 0)' "$TMPDIR/error"
+    cmp "$registry" "$TMPDIR/invalid-registry"
+  done
+}
+for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling open_roles_and_agent_configure invalid_roles_and_agents_preserve_state invalid_saved_roles_and_agents_are_preserved; do run_case "$case_name"; done
 ((failures == 0))

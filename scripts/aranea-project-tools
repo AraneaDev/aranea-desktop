@@ -21,16 +21,38 @@ command -v jq >/dev/null || {
   echo 'jq is required to probe project tools.' >&2
   exit 4
 }
+project_realpath=/usr/bin/realpath
+[[ -x "$project_realpath" ]] || {
+  echo 'realpath is required to probe project tools.' >&2
+  exit 4
+}
+# Match launch lookup's absolute, canonical PATH semantics. This global probe
+# has no checkout context; the launch guard additionally excludes that checkout.
+project_safe_path=''
+IFS=: read -r -a project_path_entries <<<"$PATH"
+for project_dir in "${project_path_entries[@]}"; do
+  [[ "$project_dir" == /* && -d "$project_dir" ]] || continue
+  project_dir=$("$project_realpath" -e -- "$project_dir") || continue
+  project_safe_path+="${project_safe_path:+:}$project_dir"
+done
+# Resolve metadata only; supported applications are never executed by the probe.
+resolve_tool() {
+  local executable
+  executable=$(PATH="$project_safe_path" command -v "$1" || true)
+  [[ "$executable" == /* && -x "$executable" ]] || return 1
+  executable=$("$project_realpath" -e -- "$executable") || return 1
+  printf '%s\n' "$executable"
+}
 terminals='[]'
 editors='[]'
+agents='[]'
 # Produce separate display metadata for an executable with a verified adapter.
 entry() {
   jq -cn --arg id "$1" --arg label "$2" --arg executable "$3" \
     '{id:$id,label:$label,executable:$executable,available:true,supported:true}'
 }
-for id in alacritty kitty foot ghostty code nvim; do
-  executable=$(command -v "$id" || true)
-  [[ -n "$executable" && -x "$executable" ]] || continue
+for id in alacritty kitty foot ghostty code nvim claude codex; do
+  executable=$(resolve_tool "$id") || continue
   case "$id" in
     alacritty) label=Alacritty ;;
     kitty) label=Kitty ;;
@@ -38,10 +60,14 @@ for id in alacritty kitty foot ghostty code nvim; do
     ghostty) label=Ghostty ;;
     code) label='Visual Studio Code' ;;
     nvim) label=Neovim ;;
+    claude) label='Claude Code' ;;
+    codex) label=Codex ;;
   esac
   record=$(entry "$id" "$label" "$executable")
   if [[ "$id" == code || "$id" == nvim ]]; then
     editors=$(jq -cn --argjson entries "$editors" --argjson entry "$record" '$entries+[$entry]')
+  elif [[ "$id" == claude || "$id" == codex ]]; then
+    agents=$(jq -cn --argjson entries "$agents" --argjson entry "$record" '$entries+[$entry]')
   else
     terminals=$(jq -cn --argjson entries "$terminals" --argjson entry "$record" '$entries+[$entry]')
   fi
@@ -68,5 +94,5 @@ if [[ -r "$terminal_file" ]]; then
   done <"$terminal_file"
 fi
 jq -cn --argjson editor "$editor_id" --argjson terminal "$terminal_id" \
-  --argjson editors "$editors" --argjson terminals "$terminals" \
-  '{defaults:{editorId:$editor,terminalId:$terminal},editors:$editors,terminals:$terminals}'
+  --argjson editors "$editors" --argjson terminals "$terminals" --argjson agents "$agents" \
+  '{defaults:{editorId:$editor,terminalId:$terminal},editors:$editors,terminals:$terminals,agents:$agents}'

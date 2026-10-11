@@ -7,15 +7,19 @@ def opaque($prefix): text and test("^" + $prefix + "-[0-9a-f]{8}-[0-9a-f]{4}-[0-
 def mode: . == "dedicated" or . == "current";
 def editor: . == null or . == "code" or . == "nvim";
 def terminal: . == null or . == "alacritty" or . == "kitty" or . == "foot" or . == "ghostty";
+def agent: . == null or . == "claude" or . == "codex";
+def roles: type == "array" and length > 0 and all(.[]; . == "editor" or . == "terminal" or . == "agent")
+  and (. as $r | ["editor","terminal","agent"] | map(select(. as $x | $r | index($x))) == $r);
 def distinct: length == (unique|length);
 def fields($required; $optional): type == "object" and ((keys - ($required + $optional))|length == 0) and ($required - keys|length == 0);
 def checkout:
   fields(["id","path","branch","primary"];[]) and (.id|opaque("c")) and (.path|path)
   and (.branch == null or (.branch|text)) and (.primary|type == "boolean");
 def project:
-  fields(["id","name","commonDir","lastCheckoutId","workspaceMode","tools","checkouts","associations"];[])
+  fields(["id","name","commonDir","lastCheckoutId","workspaceMode","tools","checkouts","associations"];["openRoles"])
   and (.id|opaque("p")) and (.name|text) and (.commonDir|path) and (.workspaceMode|mode)
-  and (.tools|fields(["editorId","terminalId"];[]) and (.editorId|editor) and (.terminalId|terminal))
+  and ((has("openRoles")|not) or (.openRoles|roles))
+  and (.tools|fields(["editorId","terminalId"];["agentId"]) and (.editorId|editor) and (.terminalId|terminal) and ((has("agentId")|not) or (.agentId|agent)))
   and (.checkouts|type == "array" and length > 0 and all(.[];checkout) and (map(.id)|distinct) and (map(.path)|distinct))
   and (.lastCheckoutId as $last | any(.checkouts[];.id == $last))
   and (.checkouts as $checkouts | .associations|type == "array" and all(.[];
@@ -36,9 +40,10 @@ def request_valid:
     elif $action == "root-remove" then fields(["rootId"];[]) and (.rootId|text)
     elif $action == "register" then fields(["paths"];[]) and (.paths|type == "array" and length > 0 and all(.[];text))
     elif $action == "remove" then fields(["projectId"];[]) and (.projectId|text)
-    elif $action == "configure" then fields(["projectId"];["name","editorId","terminalId","workspaceMode"]) and (.projectId|text)
+    elif $action == "configure" then fields(["projectId"];["name","editorId","terminalId","workspaceMode","openRoles","agentId"]) and (.projectId|text)
       and ((has("name")|not) or (.name|text)) and ((has("editorId")|not) or (.editorId|editor))
       and ((has("terminalId")|not) or (.terminalId|terminal)) and ((has("workspaceMode")|not) or (.workspaceMode|mode))
+      and ((has("openRoles")|not) or (.openRoles|roles)) and ((has("agentId")|not) or (.agentId|agent))
     elif $action == "relocate" then fields(["projectId","checkoutId","path"];[]) and (.projectId|text) and (.checkoutId|text) and (.path|text)
     elif $action == "select-checkout" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
     elif $action == "associate" then fields(["projectId","checkoutId","mode","workspaceId","separate"];[]) and (.projectId|text) and (.checkoutId|text)
@@ -67,7 +72,9 @@ def mutate($r):
     (if $a|has("name") then .name = $a.name else . end)
     | (if $a|has("workspaceMode") then .workspaceMode = $a.workspaceMode else . end)
     | (if $a|has("editorId") then .tools.editorId = $a.editorId else . end)
-    | (if $a|has("terminalId") then .tools.terminalId = $a.terminalId else . end) else . end)
+    | (if $a|has("terminalId") then .tools.terminalId = $a.terminalId else . end)
+    | (if $a|has("openRoles") then .openRoles = $a.openRoles else . end)
+    | (if $a|has("agentId") then .tools.agentId = $a.agentId else . end) else . end)
   elif $r.action == "relocate" then require_checkout($a.projectId;$a.checkoutId)
     | if any(.projects[].checkouts[];.path == $a.path and .id != $a.checkoutId) then error("CHECKOUT_CONFLICT") else . end
     | .projects |= map(if .id == $a.projectId then .commonDir = $a.commonDir | .checkouts |= map(if .id == $a.checkoutId then .path = $a.path | .branch = $a.branch | .primary = $a.primary else . end) else . end)
