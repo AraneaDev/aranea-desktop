@@ -1,7 +1,8 @@
 // ESLint for the plugin logic modules. They are plain scripts (QML imports
 // them; tests load them through a module.exports guard), so sourceType is
 // "script". Two bridges start with QML's `.pragma library`, which is not
-// JavaScript: the processor comments it out, keeping line numbers.
+// JavaScript: the processor comments it out, keeping line numbers. QML
+// `.import` aliases become declarations so their consumers remain linted.
 const js = require("@eslint/js")
 const globals = require("globals")
 const jsdoc = require("eslint-plugin-jsdoc")
@@ -12,7 +13,11 @@ const docs = process.env.ARANEA_ESLINT_DOCS === "1"
 
 const qmlPragma = {
   preprocess(text) {
-    return [text.replace(/^\.pragma library$/m, "// .pragma library")]
+    return [
+      text
+        .replace(/^\.pragma library$/m, "// .pragma library")
+        .replace(/^\.import\s+"[^"]+"\s+as\s+(\w+)$/gm, "var $1 = {}")
+    ]
   },
   postprocess(messages) {
     return messages.flat()
