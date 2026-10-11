@@ -25,6 +25,8 @@ ColumnLayout {
   property bool displayOnly: false
   // Registry mutations are serialized by the focused operation client.
   property bool pending: false
+  // Shared suggestion propagated to the selected project Details.
+  property var agentChoice: null
   // Actionable backend error retained independently of discovery outcomes.
   property string error: ''
   // Shared pointer/layout settling gate.
@@ -585,6 +587,7 @@ ColumnLayout {
     projectClient: page.projectClient
     actionsActive: page.visible && details.visible && !page.displayOnly
     tools: page.tools
+    agentChoice: page.agentChoice
     displayOnly: page.displayOnly
     pending: page.pending || !!page.projectClient && page.projectClient.pending
     openAvailable: !!page.projectClient && page.projectClient.available && !!page.projectClient.snapshot.availability && page.projectClient.snapshot.availability.compositor === true

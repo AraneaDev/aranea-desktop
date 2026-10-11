@@ -142,6 +142,67 @@ ShellRoot {
       var restored = view.captureSnapshot()
       t.equal(restored.tasks.detail, saved.tasks.detail, 'capture restores nested detail cursor and scroll exactly')
       t.equal(restored.tasks.selectedId, saved.tasks.selectedId, 'capture restores exact task selection')
+      observer.snapshot = {
+        tasks: [],
+        operations: []
+      }
+      t.equal(view.agentChoice, null, 'empty Agents defaults to safe null provider choice')
+      view.agentChoice = {
+        suggestedId: 'codex',
+        options: [
+          {
+            id: 'claude',
+            label: 'Claude Code',
+            available: true,
+            reason: '40% used'
+          },
+          {
+            id: 'codex',
+            label: 'Codex',
+            available: true,
+            reason: '10% used'
+          }
+        ]
+      }
+      var start = t.findChild(view, 'startAgentHere'), other = t.findChild(view, 'startOtherAgent'), started = []
+      view.startRequested.connect(function (id) {
+        started.push(id)
+      })
+      t.check(!!start && start.visible && start.text === 'Start Codex here', 'empty Agents offers suggested provider')
+      start.activate()
+      other.activate()
+      t.equal(started, ['codex', 'claude'], 'both installed providers reachable from empty state')
+      view.pending = true
+      t.check(!start.enabled && !other.enabled, 'pending project opening disables empty state starts')
+      start.activate()
+      view.pending = false
+      view.openAvailable = false
+      t.check(!start.enabled && !other.enabled, 'unavailable owner disables empty state starts')
+      other.activate()
+      view.openAvailable = true
+      view.displayOnly = true
+      t.check(!start.enabled && !other.enabled, 'capture disables empty state starts')
+      view.displayOnly = false
+      t.equal(started.length, 2, 'disabled starts emit no provider request')
+      view.agentChoice = null
+      t.check(!start.visible && !other.visible, 'null suggestion hides empty state starts without errors')
+      view.agentChoice = {
+        suggestedId: 'codex',
+        options: [
+          {
+            id: 'codex',
+            label: 'Codex',
+            available: true,
+            reason: 'Usage unknown'
+          }
+        ]
+      }
+      t.check(start.visible && !other.visible, 'single installed provider has no alternative')
+      observer.snapshot = {
+        tasks: [task],
+        operations: []
+      }
+      t.check(!start.visible, 'existing project activity hides empty state starts')
       t.done()
     })
   })

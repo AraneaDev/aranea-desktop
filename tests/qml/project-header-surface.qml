@@ -11,6 +11,41 @@ ShellRoot {
   property var calls: []
   // Real one-off owner transport requests intercepted at the IPC boundary.
   property var ipcCalls: []
+  // Real owner requests exercise omitted-checkout leases at the IPC boundary.
+  property var agentRequests: []
+  // Count owner transport responses before and after readiness acceptance.
+  property var agentResponses: []
+  Projects.ProjectsController {
+    id: routeOwner
+    captureActive: true
+    runtime: ({
+        sessionId: 'agent-route-session',
+        snapshot: function () {
+          return {
+            available: true,
+            currentWorkspaceId: 1,
+            workspaces: [],
+            windows: []
+          }
+        }
+      })
+    storeRunner: function (argv, done, input) {
+      Qt.callLater(function () {
+        done({
+          ok: true,
+          state: entry.projectController.state
+        })
+      })
+    }
+    // Stop after acceptance so this routing fixture never reaches any launcher.
+    metadataRunner: function (argv, done) {
+      Qt.callLater(function () {
+        done({
+          ok: false
+        })
+      })
+    }
+  }
   QmlTest {
     id: t
   }
@@ -108,6 +143,9 @@ ShellRoot {
     t.step(80, function () {
       var header = t.findChild(surface, 'projectHeader')
       t.check(header.agentChoice === surface.agentChoice, 'surface supplies its shared suggestion to header')
+      var page = t.findChild(surface, 'projectsPage'), agents = t.findChild(surface, 'projectAgents')
+      t.check(page.agentChoice === surface.agentChoice && page.details.agentChoice === surface.agentChoice, 'surface and page pass one shared choice to Details')
+      t.check(!!agents && agents.agentChoice === surface.agentChoice, 'surface passes same choice to Agents')
       header.choose('role:terminal')
       t.equal(host.calls.length, 1, 'default toggle dispatches exactly one configure helper')
       t.equal(JSON.parse(host.calls[0].payload), {
@@ -183,7 +221,57 @@ ShellRoot {
         input.keyClick(Qt.Key_Down)
         header.visible = false
         t.check(!menu.opened, 'hiding the header closes its reparented overlay menu')
-        t.done()
+        header.visible = true
+        entry.projectClient.captureActive = true
+        entry.projectClient.runner = function (argv, done) {
+          var method = argv[2], response
+          if (method === 'request') {
+            var payload = JSON.parse(argv[3])
+            host.agentRequests.push(payload)
+            response = routeOwner.request(payload)
+            host.agentResponses.push(response)
+          } else if (method === 'operation')
+            response = routeOwner.operation(argv[3])
+          else if (method === 'snapshot')
+            response = entry.projectClient.snapshot
+          done(0, JSON.stringify(response), '')
+        }
+        routeOwner.registry = entry.projectController.state
+        routeOwner.registryReady = true
+        routeOwner.captureActive = false
+        entry.projectClient.captureActive = false
+        entry.projectClient.available = true
+        surface.chooseSection('agents')
+        var startHere = t.findChild(agents, 'startAgentHere')
+        t.check(!!startHere && startHere.visible && startHere.enabled, 'actual empty Agents surface exposes available Start control')
+        startHere.activate()
+        t.check(entry.projectClient.preparing && agents.pending && !startHere.enabled, 'ordinary route disables Start during rejected owner readiness')
+        t.equal(host.agentResponses[0].error.code, 'OWNER_NOT_READY', 'omitted-checkout Start acquires real owner selection lease')
+        t.waitFor(function () {
+          return host.agentResponses.length === 2 && !entry.projectClient.pending
+        }, 2000, 'agent start retries readiness and observes one accepted operation', function () {
+          t.equal(host.agentRequests, [
+            {
+              projectId: 'p-one',
+              roles: ['agent'],
+              newWindowRole: 'agent',
+              agentId: 'codex'
+            },
+            {
+              projectId: 'p-one',
+              roles: ['agent'],
+              newWindowRole: 'agent',
+              agentId: 'codex'
+            }
+          ], 'retry preserves exact provider-only payload without selecting checkout in UI')
+          t.check(host.agentResponses[1].ok && routeOwner.operations.length === 1, 'readiness retry creates exactly one owner operation')
+          var op = routeOwner.operations[0]
+          t.equal([op.checkoutId, op.selectionRevision, op.agentId, op.roles, op.newWindowRole], ['c-main', 5, 'codex', ['agent'], 'agent'], 'owner resolves saved checkout through revision-bound lease and preserves agent request')
+          t.check(!routeOwner.defaultSelections['p-one'], 'accepted Start consumes selection lease')
+          routeOwner.captureActive = true
+          entry.projectClient.captureActive = true
+          t.done()
+        })
       })
     })
   })

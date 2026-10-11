@@ -69,6 +69,10 @@ ShellRoot {
       host.opens.push(payload)
     }
   }
+  // Smoke creates the view before any selected project or installed-tool observation.
+  ProjectUi.ProjectDetails {
+    id: emptyDetails
+  }
   Component.onCompleted: t.step(50, function () {
     t.check(!!details.actions, 'actual project details composes configured actions')
     if (!details.actions) {
@@ -209,6 +213,156 @@ ShellRoot {
       var fill = field.background.color
       t.check(!!fill && fill.a < 0.5, 'project fields retain readable dark surfaces during inert capture')
     })
+    t.check(!t.findChild(emptyDetails, 'projectSavePreferences').enabled, 'Save preferences cannot validate absent project during initial tool binding')
+    t.check(!emptyDetails.project && emptyDetails.toolChoiceRequired, 'default Details with no observations stays safely inert')
+    details.displayOnly = false
+    details.headerProvided = true
+    details.viewSection = 'overview'
+    details.agentChoice = {
+      suggestedId: 'codex',
+      options: [
+        {
+          id: 'claude',
+          label: 'Claude Code',
+          available: true,
+          reason: '40% used'
+        },
+        {
+          id: 'codex',
+          label: 'Codex',
+          available: true,
+          reason: '10% used'
+        }
+      ]
+    }
+    var column = t.findChild(details, 'projectAgentColumn'), start = t.findChild(details, 'newAgentSession')
+    t.check(!!column && column.visible, 'Overview renders the actual AGENT column')
+    t.equal(t.findChild(details, 'projectAgentLabel').text, 'Codex', 'AGENT column shows shared suggested provider')
+    t.equal(t.findChild(details, 'projectAgentReason').text, 'Suggested · 10% used', 'AGENT column explains shared suggestion')
+    t.check(!!start && start.visible && start.enabled, 'Overview renders enabled New agent session button')
+    var before = opens.length
+    start.activate()
+    t.equal(opens[before], {
+      projectId: 'p-one',
+      roles: ['agent'],
+      newWindowRole: 'agent',
+      agentId: 'codex'
+    }, 'New agent session button starts suggested provider only')
+    details.pending = true
+    t.check(!start.enabled, 'pending disables agent button')
+    details.startAgent('claude')
+    details.pending = false
+    details.openAvailable = false
+    t.check(!start.enabled, 'unavailable owner disables agent button')
+    details.startAgent('claude')
+    details.openAvailable = true
+    details.displayOnly = true
+    details.startAgent('claude')
+    details.displayOnly = false
+    details.agentChoice = null
+    t.check(!start.enabled, 'null choice disables agent button without runtime errors')
+    t.equal(t.findChild(details, 'projectAgentLabel').text, 'Not installed', 'null choice renders installation state')
+    details.startAgent('')
+    t.equal(opens.length, before + 1, 'blocked starts submit nothing')
+    details.agentChoice = {
+      suggestedId: 'codex',
+      options: [
+        {
+          id: 'claude',
+          label: 'Claude Code',
+          available: true,
+          reason: '40% used'
+        },
+        {
+          id: 'codex',
+          label: 'Codex',
+          available: true,
+          reason: '10% used'
+        }
+      ]
+    }
+    details.operation = {
+      projectId: 'p-one',
+      checkoutId: 'c-main',
+      state: 'completed',
+      agentId: 'claude',
+      separate: true,
+      useCurrentWorkspace: true,
+      steps: [
+        {
+          role: 'agent',
+          status: 'unconfirmed',
+          reobserveAvailable: true
+        }
+      ]
+    }
+    var plain = t.findChild(details, 'agentUnconfirmed'), reobserve = t.findChild(details, 'reobserveRole:agent')
+    t.check(!!plain && plain.visible && plain.text === "Couldn't confirm the agent window opened.", 'agent uncertainty uses required plain-language copy')
+    t.check(!!reobserve && reobserve.visible && reobserve.text === 'Check agent again', 'agent has real Check again recovery control')
+    reobserve.activate()
+    details.recover('agent', 'new')
+    t.equal(opens.slice(before + 1), [
+      {
+        projectId: 'p-one',
+        checkoutId: 'c-main',
+        separate: true,
+        useCurrentWorkspace: true,
+        reobserveRole: 'agent',
+        roles: ['agent'],
+        agentId: 'claude'
+      },
+      {
+        projectId: 'p-one',
+        checkoutId: 'c-main',
+        separate: true,
+        useCurrentWorkspace: true,
+        newWindowRole: 'agent',
+        roles: ['agent'],
+        agentId: 'claude'
+      }
+    ], 'agent recovery preserves actual operation provider and workspace context')
+    details.operation = {
+      projectId: 'p-one',
+      checkoutId: 'c-main',
+      state: 'completed',
+      agentId: 'claude',
+      steps: [
+        {
+          role: 'agent',
+          status: 'failed'
+        }
+      ],
+      error: {
+        code: 'AGENT_MISSING',
+        message: 'Agent missing'
+      }
+    }
+    var alternative = t.findChild(details, 'startAlternativeAgent')
+    t.check(!!alternative && alternative.visible && alternative.text === 'Start Codex', 'missing agent offers installed alternative provider')
+    alternative.activate()
+    t.equal(opens[opens.length - 1], {
+      projectId: 'p-one',
+      roles: ['agent'],
+      newWindowRole: 'agent',
+      agentId: 'codex'
+    }, 'error alternative starts its explicit provider')
+    details.operation = Object.assign({}, details.operation, {
+      steps: [
+        {
+          role: 'agent',
+          status: 'unconfirmed'
+        },
+        {
+          role: 'agent',
+          status: 'observed'
+        }
+      ],
+      error: {
+        code: 'OTHER',
+        message: 'Other failure'
+      }
+    })
+    t.check(!plain.visible && !alternative.visible, 'latest confirmed step and unrelated errors hide agent recovery copy')
     t.done()
   })
 }

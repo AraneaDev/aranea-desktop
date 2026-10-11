@@ -20,6 +20,16 @@ ColumnLayout {
   property var client: null
   // Inert captures refuse all activity reads and submissions.
   property bool displayOnly: false
+  // Shared provider suggestion belongs to the surface, not the activity observer.
+  property var agentChoice: null
+  // Project owner readiness and pending state also guard empty-state starts.
+  property bool pending: false
+  // Current owner/compositor availability for new agent sessions.
+  property bool openAvailable: true
+  // Shared pointer/layout settling gate for new session controls.
+  property var pointerGate: null
+  // Explicit installed provider start is routed through the selected Details.
+  signal startRequested(string agentId)
   // Available viewport height for the reused task list and details.
   property real maxHeight: Style.space(600)
   // Only exact registered checkout associations belong to this project.
@@ -202,6 +212,45 @@ ColumnLayout {
       }
       view.submit(kind, id)
     }
+  }
+  Flow {
+    id: starts
+    Layout.fillWidth: true
+    spacing: Style.space(8)
+    visible: view.projectTasks.length === 0 && !!suggested
+    readonly property var options: view.agentChoice ? (view.agentChoice.options || []).filter(function (o) {
+      return o.available === true
+    }) : []
+    readonly property var suggested: options.filter(function (o) {
+      return !!view.agentChoice && o.id === view.agentChoice.suggestedId
+    })[0] || null
+    readonly property var other: options.filter(function (o) {
+      return !!view.agentChoice && o.id !== view.agentChoice.suggestedId
+    })[0] || null
+    Aranea.ActionButton {
+      objectName: 'startAgentHere'
+      variant: 'primary'
+      text: starts.suggested ? 'Start ' + starts.suggested.label.replace(' Code', '') + ' here' : ''
+      enabled: !view.displayOnly && !view.pending && view.openAvailable && !!starts.suggested
+      pointerGate: view.pointerGate
+      onClicked: if (enabled && starts.suggested)
+        view.startRequested(starts.suggested.id)
+    }
+    Aranea.ActionButton {
+      objectName: 'startOtherAgent'
+      visible: !!starts.other
+      text: starts.other ? 'Start ' + starts.other.label.replace(' Code', '') : ''
+      enabled: !view.displayOnly && !view.pending && view.openAvailable && !!starts.other
+      pointerGate: view.pointerGate
+      onClicked: if (enabled && starts.other)
+        view.startRequested(starts.other.id)
+    }
+  }
+  Aranea.UiLabel {
+    Layout.fillWidth: true
+    visible: starts.visible
+    text: starts.suggested ? 'Suggested · ' + starts.suggested.reason : ''
+    opacity: 0.6
   }
   Aranea.WorkflowHelp {
     Layout.fillWidth: true

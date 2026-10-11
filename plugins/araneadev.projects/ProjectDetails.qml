@@ -14,6 +14,30 @@ ColumnLayout {
   property var project: null
   // Installed supported tool observations from the backend probe.
   property var tools: ({})
+  // Shared provider choice computed once by the selected-project surface.
+  property var agentChoice: null
+  // Only installed providers can be offered as starts or error alternatives.
+  readonly property var availableAgents: agentChoice ? (agentChoice.options || []).filter(function (o) {
+    return o.available === true
+  }) : []
+  // Keep label, reason and activation tied to the same shared suggestion.
+  readonly property var suggestedAgent: availableAgents.filter(function (o) {
+    return !!details.agentChoice && o.id === details.agentChoice.suggestedId
+  })[0] || null
+  // Missing-provider recovery offers a different installed provider explicitly.
+  readonly property var alternativeAgent: {
+    var failedId = operation && operation.agentId || project && project.tools && project.tools.agentId || agentChoice && agentChoice.suggestedId
+    return availableAgents.filter(function (o) {
+      return o.id !== failedId
+    })[0] || null
+  }
+  // The latest outcome for the agent controls confirmation copy.
+  readonly property var agentStep: {
+    var steps = operation ? (operation.steps || []).filter(function (s) {
+      return s.role === 'agent'
+    }) : []
+    return steps.length ? steps[steps.length - 1] : null
+  }
   // Latest observed live-owner operation, including individual role outcomes.
   property var operation: null
   // Whether the live compositor is available; registration remains usable otherwise.
@@ -136,6 +160,20 @@ ColumnLayout {
         projectId: project.id
       })
   }
+  // New sessions use the ordinary owner selection lease and readiness retries.
+  function startAgent(agentId: string): void {
+    var id = agentId || (agentChoice ? agentChoice.suggestedId : null)
+    if (displayOnly || pending || !project || !openAvailable || !availableAgents.some(function (o) {
+      return o.id === id
+    }))
+      return
+    openRequested({
+      projectId: project.id,
+      roles: ['agent'],
+      newWindowRole: 'agent',
+      agentId: id
+    })
+  }
   // Recovery is offered only for the corresponding reported owner role outcome.
   function recoveryAllowed(role: string, kind: string): bool {
     if (!project || !operation || operation.projectId !== project.id || operation.state !== 'completed' || !(project.checkouts || []).some(function (c) {
@@ -163,6 +201,11 @@ ColumnLayout {
     if (operation.useCurrentWorkspace === true)
       request.useCurrentWorkspace = true
     request[kind === 'retry' ? 'retryRole' : kind === 'reobserve' ? 'reobserveRole' : 'newWindowRole'] = role
+    if (role === 'agent') {
+      request.roles = ['agent']
+      if (operation.agentId)
+        request.agentId = operation.agentId
+    }
     openRequested(request)
   }
   onProjectChanged: if (!dirty || !project || draftProjectId !== project.id) {
@@ -226,12 +269,12 @@ ColumnLayout {
     }
     Aranea.UiLabel {
       Layout.fillWidth: true
-      text: 'Open your editor and terminal together. Existing project windows are reused when available.'
+      text: 'Open your tools together. Existing project windows are reused when available.'
       opacity: 0.75
     }
     GridLayout {
       Layout.fillWidth: true
-      columns: width < Style.space(360) ? 1 : 2
+      columns: width < Style.space(480) ? 1 : 3
       columnSpacing: Style.space(24)
       rowSpacing: Style.space(12)
       Repeater {
@@ -257,6 +300,26 @@ ColumnLayout {
           }
         }
       }
+      ColumnLayout {
+        objectName: 'projectAgentColumn'
+        Layout.fillWidth: true
+        Aranea.UiLabel {
+          text: 'AGENT'
+          opacity: 0.55
+        }
+        Aranea.UiLabel {
+          objectName: 'projectAgentLabel'
+          Layout.fillWidth: true
+          text: details.suggestedAgent ? details.suggestedAgent.label : 'Not installed'
+          font.pixelSize: Style.font.body
+        }
+        Aranea.UiLabel {
+          objectName: 'projectAgentReason'
+          Layout.fillWidth: true
+          text: details.suggestedAgent ? 'Suggested · ' + details.suggestedAgent.reason : 'Install Claude Code or Codex to start agents here.'
+          opacity: 0.6
+        }
+      }
     }
     Flow {
       Layout.fillWidth: true
@@ -274,6 +337,13 @@ ColumnLayout {
           })
         }
       }
+      Aranea.ActionButton {
+        objectName: 'newAgentSession'
+        text: 'New agent session'
+        enabled: !details.displayOnly && !details.pending && details.openAvailable && !!details.suggestedAgent
+        pointerGate: details.pointerGate
+        onClicked: details.startAgent('')
+      }
     }
     Aranea.UiLabel {
       Layout.fillWidth: true
@@ -287,6 +357,15 @@ ColumnLayout {
     visible: !!details.operation && !!details.operation.error
     text: details.operation && details.operation.error ? details.operation.error.message + (details.operation.error.recovery ? ' ' + details.operation.error.recovery : '') : ''
     color: Aranea.DesignTokens.attention
+  }
+  Aranea.ActionButton {
+    objectName: 'startAlternativeAgent'
+    visible: !!details.operation && !!details.operation.error && details.operation.error.code === 'AGENT_MISSING' && !!details.alternativeAgent
+    text: details.alternativeAgent ? 'Start ' + details.alternativeAgent.label.replace(' Code', '') : ''
+    enabled: !details.displayOnly && !details.pending && details.openAvailable
+    pointerGate: details.pointerGate
+    onClicked: if (details.alternativeAgent)
+      details.startAgent(details.alternativeAgent.id)
   }
   Aranea.ActionButton {
     visible: !details.headerProvided || details.guidedSetup
@@ -367,8 +446,9 @@ ColumnLayout {
     }
     RowLayout {
       Aranea.ActionButton {
+        objectName: 'projectSavePreferences'
         text: 'Save preferences'
-        enabled: !details.displayOnly && !details.pending && details.supported('editors', details.draft.editorId) && details.supported('terminals', details.draft.terminalId)
+        enabled: !details.displayOnly && !details.pending && !!details.project && details.supported('editors', details.draft.editorId) && details.supported('terminals', details.draft.terminalId)
         pointerGate: details.pointerGate
         onClicked: details.applyDraft()
       }
@@ -436,8 +516,14 @@ ColumnLayout {
       onClicked: details.removeRequested(details.project.id)
     }
   }
+  Aranea.UiLabel {
+    objectName: 'agentUnconfirmed'
+    Layout.fillWidth: true
+    visible: !!details.project && !!details.operation && details.operation.projectId === details.project.id && !!details.agentStep && details.agentStep.status === 'unconfirmed'
+    text: "Couldn't confirm the agent window opened."
+  }
   Repeater {
-    model: ['editor', 'terminal']
+    model: ['editor', 'terminal', 'agent']
     RowLayout {
       id: role
       required property string modelData
@@ -445,7 +531,7 @@ ColumnLayout {
       Aranea.ActionButton {
         text: 'Retry ' + role.modelData
         visible: details.recoveryAllowed(role.modelData, 'retry')
-        enabled: !details.displayOnly && !details.pending
+        enabled: !details.displayOnly && !details.pending && details.openAvailable
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'retry')
       }
@@ -453,14 +539,14 @@ ColumnLayout {
         objectName: 'reobserveRole:' + role.modelData
         text: 'Check ' + role.modelData + ' again'
         visible: details.recoveryAllowed(role.modelData, 'reobserve')
-        enabled: !details.displayOnly && !details.pending
+        enabled: !details.displayOnly && !details.pending && details.openAvailable
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'reobserve')
       }
       Aranea.ActionButton {
         text: 'Open new ' + role.modelData + ' window'
         visible: details.recoveryAllowed(role.modelData, 'new')
-        enabled: !details.displayOnly && !details.pending
+        enabled: !details.displayOnly && !details.pending && details.openAvailable
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'new')
       }

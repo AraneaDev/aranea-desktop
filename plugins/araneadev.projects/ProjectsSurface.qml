@@ -403,6 +403,7 @@ Item {
                   viewSection: panel.section
                   registryState: panel.root.projectController.state
                   tools: panel.root.projectController.tools
+                  agentChoice: panel.agentChoice
                   discoveryClient: panel.root.discoveryClient
                   projectClient: panel.root.projectClient
                   projectId: panel.root.projectId
@@ -475,11 +476,19 @@ Item {
                 }
                 ProjectAgents {
                   id: agentsView
+                  objectName: 'projectAgents'
                   width: scroller.contentWidth
                   visible: panel.section === 'agents' && !!projectsPage.selectedProject && !projectsPage.setupActive
                   project: projectsPage.selectedProject
                   registry: panel.root.projectController.state
                   client: panel.root.activityClient
+                  agentChoice: panel.agentChoice
+                  pending: projectsPage.details.pending
+                  openAvailable: projectsPage.details.openAvailable
+                  pointerGate: pointerGate
+                  onStartRequested: function (agentId) {
+                    projectsPage.details.startAgent(agentId)
+                  }
                   displayOnly: !!panel.root.inert
                   maxHeight: Math.max(Style.space(200), scroller.height)
                   onSetupRequested: projectsPage.startSetup()
