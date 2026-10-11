@@ -5,6 +5,7 @@ import QtQuick
 import "../araneadev.shared" as Aranea
 import "ProjectOperations.js" as Operations
 import "ProjectTools.js" as Tools
+import "AgentSuggestion.js" as Suggestion
 
 Item {
   id: controller
@@ -76,15 +77,26 @@ Item {
   }
   // Per-role launch/observation deadline also covers helpers that never complete.
   property int roleTimeout: 10000
+  // Latest read-only installed provider probe and watched usage records.
+  property var agentTools: []
+  // Shared provider usage records supplied by the read-only composition watchers.
+  property var agentUsage: ({})
+  // Invalidates probe callbacks across requests, captures and desktop sessions.
+  property int agentProbeGeneration: 0
+  onAgentToolsChanged: snapshotChanged()
+  onAgentUsageChanged: snapshotChanged()
   // Active role timers are parented to this persistent owner.
   property var deadlines: ({})
   // Consumers receive state publications without taking ownership of launch processes.
   signal snapshotChanged
   // Consumers observe progress and terminal outcomes by stable operation ID.
   signal operationChanged(var operation)
-  onCaptureActiveChanged: if (captureActive) {
-    invalidateSelections()
-    abortPending('INERT_MODE', 'Inert project fixture.')
+  onCaptureActiveChanged: {
+    agentProbeGeneration++
+    if (captureActive) {
+      invalidateSelections()
+      abortPending('INERT_MODE', 'Inert project fixture.')
+    }
   }
   // Decode JSON through the runtime's safe argv/stdin/collector transport.
   function runJson(argv: var, input: string, done: var): void {
@@ -188,6 +200,7 @@ Item {
       return
     if (sessionId)
       abortPending('SESSION_CHANGED', 'The desktop session changed. Open the project again.')
+    agentProbeGeneration++
     sessionId = next
     bindings = []
     freshBindings = []
@@ -219,7 +232,11 @@ Item {
       },
       projects: registry.projects,
       bindings: fresh,
-      operations: operations
+      operations: operations,
+      agents: {
+        tools: agentTools,
+        usage: agentUsage
+      }
     }
   }
   // Refresh the authoritative compositor or a synchronous isolated fixture.
@@ -306,7 +323,21 @@ Item {
         })
       })
     }, '')
+    probeAgents()
     return true
+  }
+  // Refresh provider availability without running providers or fetching usage.
+  function probeAgents(): void {
+    if (captureActive)
+      return
+    syncSession()
+    var revision = ++agentProbeGeneration, session = sessionId
+    invoke(toolsRunner, [toolsPath, '--json'], function (tools) {
+      syncSession()
+      if (captureActive || session !== sessionId || revision !== agentProbeGeneration)
+        return
+      agentTools = tools && tools.ok !== false && Array.isArray(tools.agents) ? tools.agents : []
+    }, '')
   }
   // Call an injected helper safely; capture guard precedes every store/process boundary.
   function invoke(runner: var, argv: var, done: var, input: string): void {
@@ -325,7 +356,7 @@ Item {
   function validPayload(payload: var): bool {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload))
       return false
-    var fields = ['projectId', 'checkoutId', 'separate', 'useCurrentWorkspace', 'newWindowRole', 'retryRole', 'reobserveRole']
+    var fields = ['projectId', 'checkoutId', 'separate', 'useCurrentWorkspace', 'newWindowRole', 'retryRole', 'reobserveRole', 'roles', 'agentId']
     if (Object.keys(payload).some(function (key) {
       return fields.indexOf(key) < 0
     }))
@@ -338,11 +369,17 @@ Item {
       return false
     if (payload.useCurrentWorkspace !== undefined && typeof payload.useCurrentWorkspace !== 'boolean')
       return false
-    if (payload.newWindowRole !== undefined && ['editor', 'terminal'].indexOf(payload.newWindowRole) < 0)
+    if (payload.newWindowRole !== undefined && ['editor', 'terminal', 'agent'].indexOf(payload.newWindowRole) < 0)
       return false
-    if (payload.retryRole !== undefined && ['editor', 'terminal'].indexOf(payload.retryRole) < 0)
+    if (payload.retryRole !== undefined && ['editor', 'terminal', 'agent'].indexOf(payload.retryRole) < 0)
       return false
-    if (payload.reobserveRole !== undefined && ['editor', 'terminal'].indexOf(payload.reobserveRole) < 0)
+    if (payload.reobserveRole !== undefined && ['editor', 'terminal', 'agent'].indexOf(payload.reobserveRole) < 0)
+      return false
+    if (payload.roles !== undefined && (!Array.isArray(payload.roles) || !payload.roles.length || payload.roles.some(function (role, index) {
+        return ['editor', 'terminal', 'agent'].indexOf(role) < 0 || payload.roles.indexOf(role) !== index
+      })))
+      return false
+    if (payload.agentId !== undefined && ['claude', 'codex'].indexOf(payload.agentId) < 0)
       return false
     return [payload.retryRole, payload.newWindowRole, payload.reobserveRole].filter(function (role) {
       return !!role
@@ -599,7 +636,10 @@ Item {
           return
         }
         if (op.reobserveRole) {
+          var attempt = acceptedAttempt(op, op.reobserveRole)
           publish(Object.assign({}, operation(id), {
+            roles: [op.reobserveRole],
+            agentId: op.reobserveRole === 'agent' && attempt ? attempt.spec.agentId : null,
             rolesPending: [op.reobserveRole]
           }))
           reobserveRole(id, op.reobserveRole)
@@ -620,21 +660,30 @@ Item {
             failOperation(id, 'DEPENDENCY_MISSING', tools && tools.error && tools.error.message || 'Project tool probe unavailable. Install required dependencies.')
             return
           }
+          agentProbeGeneration++
+          agentTools = Array.isArray(tools.agents) ? tools.agents : []
           var defaults = tools.defaults || ({})
-          var editorId = project.tools.editorId || defaults.editorId
-          var terminalId = project.tools.terminalId || defaults.terminalId
-          if (!editorId || !terminalId) {
-            failOperation(id, 'TOOL_CHOICE_REQUIRED', 'Choose installed supported editor and terminal applications in project details.')
-            return
-          }
+          var roles = Operations.requestedRoles(project, op)
+          var agentId = roles.indexOf('agent') < 0 ? null : op.agentId || Suggestion.suggest(agentTools, agentUsage, project.tools.agentId || null, Date.now()).suggestedId
           var selected = {
-            editor: editorId,
-            terminal: terminalId
+            editor: project.tools.editorId || defaults.editorId,
+            terminal: project.tools.terminalId || defaults.terminalId,
+            agent: agentId
+          }
+          var problem = Operations.toolProblem(roles, selected, tools)
+          if (problem) {
+            failOperation(id, problem.code, problem.message)
+            return
           }
           var available = {
             editor: tools.editors || [],
-            terminal: tools.terminals || []
+            terminal: tools.terminals || [],
+            agent: agentTools
           }
+          publish(Object.assign({}, operation(id), {
+            roles: roles,
+            agentId: agentId
+          }))
           readDesktop(function (data) {
             if (!current(id, revision, session))
               return
@@ -654,14 +703,18 @@ Item {
     }, '')
   }
   // Persist a revision-checked mutation; failures never claim an association was saved.
-  function mutate(id: string, action: string, args: var, done: var): void {
+  function mutate(id: string, action: string, args: var, done: var, failed: var): void {
     var op = operation(id), revision = op.generation, session = op.sessionId
     invoke(storeRunner, [storePath, 'mutate'], function (response) {
       if (!current(id, revision, session))
         return
       if (!response || !response.ok || !response.state) {
         var problem = response && response.error
-        failOperation(id, problem && problem.code || 'REGISTRY_WRITE_FAILED', problem && problem.message || 'Project registry write failed.')
+        var code = problem && problem.code || 'REGISTRY_WRITE_FAILED', message = problem && problem.message || 'Project registry write failed.'
+        if (typeof failed === 'function')
+          failed(failure(code, message))
+        else
+          failOperation(id, code, message)
         return
       }
       registry = response.state
@@ -699,7 +752,7 @@ Item {
         return row.id === association.workspaceId && (Array.isArray(row.windows) ? row.windows.length > 0 : row.windows > 0)
       })) {
         var holds = Object.assign({}, ownershipHolds);
-        ['editor', 'terminal'].forEach(function (role) {
+        (operation(id).roles || ['editor', 'terminal']).forEach(function (role) {
           if (!roleHistory[roleKey(op, role)] && !bindings.some(function (binding) {
             return binding.projectId === op.projectId && binding.checkoutId === op.checkoutId && binding.role === role && binding.sessionId === session
           }))
@@ -786,11 +839,11 @@ Item {
   // Start independent configured roles with exact safe adapter specs and guarded callbacks.
   function submitRoles(id: string, checkout: var, selected: var, available: var, proof: var, association: var, baseline: var): void {
     var op = operation(id), revision = op.generation, session = op.sessionId
+    var roles = (op.roles || ['editor', 'terminal']).slice()
     publish(Object.assign({}, op, {
       state: 'launching',
-      rolesPending: ['editor', 'terminal']
+      rolesPending: roles.slice()
     }))
-    var roles = ['editor', 'terminal']
     var submit = function (index) {
       if (index >= roles.length) {
         releaseQueue(id)
@@ -857,7 +910,7 @@ Item {
             code: focused && focused.code || null,
             message: focused && focused.message || null,
             binding: focused && focused.status === 'observed' ? focused.binding || fresh : null,
-            preserveHistory: !focused || focused.status !== 'observed'
+            preserveHistory: true
           })
           accepted()
         })
@@ -867,7 +920,8 @@ Item {
         finishRole(id, role, {
           status: decision.action === 'focus' ? 'observed' : decision.action === 'skip' ? 'skipped' : 'unconfirmed',
           code: decision.code,
-          binding: decision.action === 'focus' ? fresh : null
+          binding: decision.action === 'focus' ? fresh : null,
+          preserveHistory: decision.action === 'focus'
         })
         accepted()
         return
@@ -883,100 +937,121 @@ Item {
         accepted()
         return
       }
-      var token = 'dev.aranea.project_' + session.replace(/[^A-Za-z0-9_]/g, '_') + '_' + revision + '_' + role
-      var spec = toolContracts.launchSpec(role, selected[role], checkout.path, token, selected.terminal)
-      if (!spec) {
-        finishRole(id, role, {
-          status: 'failed',
-          code: 'UNSUPPORTED_TOOL',
-          message: 'Choose a supported application adapter.'
-        })
-        accepted()
-        return
-      }
-      spec = Object.assign({}, spec, {
-        projectId: op.projectId,
-        checkoutId: op.checkoutId,
-        role: role,
-        generation: revision,
-        sessionId: session,
-        workspaceId: association.workspaceId,
-        token: token
-      })
-      var timer = deadlineComponent.createObject(controller, {
-        operationId: id,
-        role: role,
-        revision: revision,
-        session: session,
-        submissionDone: accepted
-      })
-      var nextDeadlines = Object.assign({}, deadlines)
-      nextDeadlines[id + ':' + role] = timer
-      deadlines = nextDeadlines
-      var attemptId = id + ':' + role
-      launchAttempts = launchAttempts.concat([
-        {
-          id: attemptId,
+      // Record only an actual new agent start; focus/hold never rewrite history.
+      var launch = function () {
+        var token = 'dev.aranea.project_' + session.replace(/[^A-Za-z0-9_]/g, '_') + '_' + revision + '_' + role
+        var spec = toolContracts.launchSpec(role, selected[role], checkout.path, token, selected.terminal)
+        if (!spec) {
+          finishRole(id, role, {
+            status: 'failed',
+            code: 'UNSUPPORTED_TOOL',
+            message: 'Choose a supported application adapter.'
+          })
+          accepted()
+          return
+        }
+        spec = Object.assign({}, spec, {
           projectId: op.projectId,
           checkoutId: op.checkoutId,
           role: role,
-          sessionId: session,
+          agentId: role === 'agent' ? selected.agent : null,
           generation: revision,
-          state: 'submitted',
-          spec: Object.assign({}, spec),
-          baseline: baseline
-        }
-      ])
-      var responded = false
-      runtime.launch(spec, function (response) {
-        if (responded)
-          return
-        responded = true
-        accepted()
-        if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
-          return
-        if (!response || !response.ok || response.status !== 'accepted') {
-          updateAttempt(attemptId, {
-            state: 'failed'
-          })
-          finishRole(id, role, {
-            status: 'failed',
-            code: response && response.code || 'LAUNCH_FAILED',
-            message: response && response.message
-          })
-          return
-        }
-        spec.launchIdentity = response.identity
-        updateAttempt(attemptId, {
-          state: 'accepted',
-          launchIdentity: response.identity,
-          spec: Object.assign({}, spec)
+          sessionId: session,
+          workspaceId: association.workspaceId,
+          token: token
         })
-        var history = Object.assign({}, roleHistory)
-        history[roleKey(op, role)] = {
+        var timer = deadlineComponent.createObject(controller, {
+          operationId: id,
           role: role,
-          status: 'unconfirmed',
-          code: 'LAUNCH_ACCEPTED',
-          launchIdentity: response.identity
-        }
-        roleHistory = history
-        publish(Object.assign({}, operation(id), {
-          state: 'observing'
-        }))
-        runtime.observe(spec, baseline, function (observed) {
+          revision: revision,
+          session: session,
+          submissionDone: accepted
+        })
+        var nextDeadlines = Object.assign({}, deadlines)
+        nextDeadlines[id + ':' + role] = timer
+        deadlines = nextDeadlines
+        var attemptId = id + ':' + role
+        launchAttempts = launchAttempts.concat([
+          {
+            id: attemptId,
+            projectId: op.projectId,
+            checkoutId: op.checkoutId,
+            role: role,
+            sessionId: session,
+            generation: revision,
+            state: 'submitted',
+            spec: Object.assign({}, spec),
+            baseline: baseline
+          }
+        ])
+        var responded = false
+        runtime.launch(spec, function (response) {
+          if (responded)
+            return
+          responded = true
+          accepted()
           if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
             return
-          if (observed && observed.status === 'observed' && observed.binding)
+          if (!response || !response.ok || response.status !== 'accepted') {
             updateAttempt(attemptId, {
-              state: 'observed',
-              binding: observed.binding
+              state: 'failed'
             })
-          finishRole(id, role, observed || {
+            finishRole(id, role, {
+              status: 'failed',
+              code: response && response.code || 'LAUNCH_FAILED',
+              message: response && response.message
+            })
+            return
+          }
+          spec.launchIdentity = response.identity
+          updateAttempt(attemptId, {
+            state: 'accepted',
+            launchIdentity: response.identity,
+            spec: Object.assign({}, spec)
+          })
+          var history = Object.assign({}, roleHistory)
+          history[roleKey(op, role)] = {
+            role: role,
             status: 'unconfirmed',
-            code: 'OBSERVATION_TIMEOUT'
+            code: 'LAUNCH_ACCEPTED',
+            launchIdentity: response.identity
+          }
+          roleHistory = history
+          publish(Object.assign({}, operation(id), {
+            state: 'observing'
+          }))
+          runtime.observe(spec, baseline, function (observed) {
+            if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
+              return
+            if (observed && observed.status === 'observed' && observed.binding)
+              updateAttempt(attemptId, {
+                state: 'observed',
+                binding: observed.binding
+              })
+            finishRole(id, role, observed || {
+              status: 'unconfirmed',
+              code: 'OBSERVATION_TIMEOUT'
+            })
           })
         })
-      })
+      }
+      var project = registry.projects.filter(function (row) {
+        return row.id === op.projectId
+      })[0]
+      if (role === 'agent' && project.tools.agentId !== selected.agent)
+        mutate(id, 'configure', {
+          projectId: op.projectId,
+          agentId: selected.agent
+        }, launch, function (problem) {
+          finishRole(id, role, {
+            status: 'failed',
+            code: problem.code,
+            message: problem.message
+          })
+          accepted()
+        })
+      else
+        launch()
     }
     submit(0)
   }

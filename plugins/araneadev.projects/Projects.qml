@@ -1,5 +1,7 @@
 // Keep-loaded owner and independent Projects window composition root.
 import QtQuick
+import Quickshell
+import "../araneadev.agents" as Agents
 import Quickshell.Io
 
 Item {
@@ -16,6 +18,33 @@ Item {
   property alias captureActive: controller.captureActive
   // Public owner boundary available to narrow composition consumers.
   property alias owner: controller
+  // Shared Agents records are watched read-only; Projects never fetches usage.
+  readonly property string usageDir: (Quickshell.env('XDG_STATE_HOME') || Quickshell.env('HOME') + '/.local/state') + '/omarchy/agents/usage'
+  // Publish only fields used by provider suggestions.
+  function syncUsage(): void {
+    var trim = function (record) {
+      return record ? {
+        limits: Array.isArray(record.limits) ? record.limits : [],
+        updatedAt: record.updatedAt || null
+      } : null
+    }
+    controller.agentUsage = {
+      claude: trim(claudeUsage.record),
+      codex: trim(codexUsage.record)
+    }
+  }
+  Agents.Agent {
+    id: claudeUsage
+    agentId: 'claude'
+    path: root.usageDir + '/claude.json'
+    onRecordChanged: root.syncUsage()
+  }
+  Agents.Agent {
+    id: codexUsage
+    agentId: 'codex'
+    path: root.usageDir + '/codex.json'
+    onRecordChanged: root.syncUsage()
+  }
   ProjectRuntime {
     id: runtime
     captureActive: controller.captureActive
@@ -64,5 +93,8 @@ Item {
       return JSON.stringify(controller.operation(id))
     }
   }
-  Component.onCompleted: controller.refresh()
+  Component.onCompleted: {
+    syncUsage()
+    controller.refresh()
+  }
 }
