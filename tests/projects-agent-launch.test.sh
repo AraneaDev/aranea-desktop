@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fixed argv, canonical provider lookup and refusals exercise the real project guard.
+# Fixed argv, safe provider lookup and refusals exercise the real project guard.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
@@ -38,12 +38,20 @@ terminal_base() {
 
 # Assert detached acceptance and the complete argv delivered to the terminal.
 launch() {
-  local argv=$1 expected=$2 result pid actual
+  local argv=$1 expected=$2 invoked=${3:-} provider_args=${4:-} resume_request=${5:-} result pid actual
+  rm -f "$ARANEA_TEST_SANDBOX/invoked" "$ARANEA_TEST_SANDBOX/provider-argv"
   rm -f "$ARANEA_TEST_SANDBOX/argv" "$ARANEA_TEST_SANDBOX/cwd"
-  result=$(jq -cn --arg cwd "$checkout" --argjson argv "$argv" '{argv:$argv,cwd:$cwd}' | PATH="$launch_path" "$launcher") || {
-    echo "Expected acceptance for $argv, got: $result"
-    exit 1
-  }
+  if [[ -n "$resume_request" ]]; then
+    result=$(PATH="$launch_path" "$repo_root/scripts/aranea-agent-launch" <<<"$resume_request") || {
+      echo "Expected resume acceptance, got: $result"
+      exit 1
+    }
+  else
+    result=$(jq -cn --arg cwd "$checkout" --argjson argv "$argv" '{argv:$argv,cwd:$cwd}' | PATH="$launch_path" "$launcher") || {
+      echo "Expected acceptance for $argv, got: $result"
+      exit 1
+    }
+  fi
   jq -e '.ok and .status=="accepted" and (.identity.pid>0) and (.identity.startTime|test("^[0-9]+$"))' <<<"$result" >/dev/null
   pid=$(jq -r .identity.pid <<<"$result")
   sandbox_on_exit "kill -- -$pid 2>/dev/null || true"
@@ -51,6 +59,17 @@ launch() {
     [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
     sleep .02
   done
+  if [[ -n "$invoked" ]]; then
+    for ((i = 0; i < 50; i++)); do
+      [[ ! -f "$ARANEA_TEST_SANDBOX/invoked" ]] || break
+      sleep .02
+    done
+    actual=$(jq -Rsc 'split("\n")[:-1]' "$ARANEA_TEST_SANDBOX/provider-argv")
+    [[ -f "$ARANEA_TEST_SANDBOX/invoked" && $(<"$ARANEA_TEST_SANDBOX/invoked") == "$invoked" && "$actual" == "$provider_args" ]] || {
+      echo "Expected executed $invoked $provider_args, got $(cat "$ARANEA_TEST_SANDBOX/invoked" 2>/dev/null) $actual"
+      exit 1
+    }
+  fi
   actual=$(jq -Rsc 'split("\n")[:-1]' "$ARANEA_TEST_SANDBOX/argv")
   [[ "$actual" == "$expected" && $(<"$ARANEA_TEST_SANDBOX/cwd") == "$checkout" ]] || {
     echo "Expected terminal argv $expected, got: $actual"
@@ -95,21 +114,81 @@ for terminal in kitty alacritty foot ghostty; do
   launch "$(jq -c --arg id "$session_id" --arg cwd "$checkout" '.+["codex","resume",$id,"--cd",$cwd]' <<<"$base")" "$(jq -c --arg bin "$tool_bin/codex" --arg id "$session_id" --arg cwd "$checkout" '.[1:]+[$bin,"resume",$id,"--cd",$cwd]' <<<"$base")"
 done
 
-# Canonical resolution accepts an outside symlink, but excludes checkout PATH
+# A mise-style executable depends on the invoked symlink basename.
+# The terminal actually execs the resolved provider, rather than only recording argv.
+cp "$tool_bin/kitty" "$tool_bin/recording-kitty"
+cat >"$tool_bin/kitty" <<'TERMINAL'
+#!/bin/bash
+printf '%s\n' "$@" > "$ARANEA_TEST_SANDBOX/argv"
+printf '%s\n' "$PWD" > "$ARANEA_TEST_SANDBOX/cwd"
+shift 4
+exec "$@"
+TERMINAL
+cat >"$tool_bin/mise" <<'SHIM'
+#!/bin/bash
+: > "$ARANEA_TEST_SANDBOX/provider-argv"
+if (($#)); then printf '%s\n' "$@" > "$ARANEA_TEST_SANDBOX/provider-argv"; fi
+printf '%s\n' "${0##*/}" > "$ARANEA_TEST_SANDBOX/invoked"
+exec /usr/bin/sleep 10
+SHIM
+chmod +x "$tool_bin/mise"
+for tool in claude codex nvim; do
+  mv "$tool_bin/$tool" "$tool_bin/recording-$tool"
+  ln -s "$tool_bin/mise" "$tool_bin/$tool"
+done
+base=$(terminal_base kitty)
+for provider in claude codex; do
+  if [[ "$provider" == claude ]]; then
+    provider_args='[]'
+    argv=$(jq -c '.+["claude"]' <<<"$base")
+    expected=$(jq -c --arg bin "$tool_bin/claude" '.[1:]+[$bin]' <<<"$base")
+  else
+    provider_args=$(jq -cn --arg cwd "$checkout" '["--cd",$cwd]')
+    argv=$(jq -c --arg cwd "$checkout" '.+["codex","--cd",$cwd]' <<<"$base")
+    expected=$(jq -c --arg bin "$tool_bin/codex" --arg cwd "$checkout" '.[1:]+[$bin,"--cd",$cwd]' <<<"$base")
+  fi
+  launch "$argv" "$expected" "$provider" "$provider_args"
+  if [[ "$provider" == claude ]]; then
+    provider_args=$(jq -cn --arg id "$session_id" '["--resume",$id]')
+  else
+    provider_args=$(jq -cn --arg id "$session_id" --arg cwd "$checkout" '["resume",$id,"--cd",$cwd]')
+  fi
+  argv=$(jq -c --arg provider "$provider" --argjson args "$provider_args" '.+[$provider]+$args' <<<"$base")
+  expected=$(jq -c --arg bin "$tool_bin/$provider" --argjson args "$provider_args" '.[1:]+[$bin]+$args' <<<"$base")
+  launch "$argv" "$expected" "$provider" "$provider_args"
+  resume_request=$(jq -cn --arg cwd "$checkout" --arg provider "$provider" --arg id "$session_id" --arg token "$token" '{cwd:$cwd,provider:$provider,providerSessionId:$id,terminalId:"kitty",token:$token}')
+  launch "$argv" "$expected" "$provider" "$provider_args" "$resume_request"
+done
+provider_args=$(jq -cn --arg cwd "$checkout" '["--",$cwd]')
+launch "$(jq -c --arg cwd "$checkout" '.+["nvim","--",$cwd]' <<<"$base")" "$(jq -c --arg bin "$tool_bin/nvim" --arg cwd "$checkout" '.[1:]+[$bin,"--",$cwd]' <<<"$base")" nvim "$provider_args"
+for tool in claude codex nvim; do
+  rm "$tool_bin/$tool"
+  mv "$tool_bin/recording-$tool" "$tool_bin/$tool"
+done
+mv "$tool_bin/recording-kitty" "$tool_bin/kitty"
+
+# Validated invocation preserves an outside symlink, but excludes checkout PATH
 # entries (absolute, relative, nested, and aliases) and symlink targets.
 base=$(terminal_base kitty)
 for provider in claude codex; do
   if [[ "$provider" == claude ]]; then
     argv=$(jq -c '.+["claude"]' <<<"$base")
-    expected=$(jq -c --arg bin "$tool_bin/real-claude" '.[1:]+[$bin]' <<<"$base")
+    expected=$(jq -c --arg bin "$tool_bin/claude" '.[1:]+[$bin]' <<<"$base")
   else
     argv=$(jq -c --arg cwd "$checkout" '.+["codex","--cd",$cwd]' <<<"$base")
-    expected=$(jq -c --arg bin "$tool_bin/real-codex" --arg cwd "$checkout" '.[1:]+[$bin,"--cd",$cwd]' <<<"$base")
+    expected=$(jq -c --arg bin "$tool_bin/codex" --arg cwd "$checkout" '.[1:]+[$bin,"--cd",$cwd]' <<<"$base")
   fi
   mv "$tool_bin/$provider" "$tool_bin/real-$provider"
   ln -s "$tool_bin/real-$provider" "$tool_bin/$provider"
   launch "$argv" "$expected"
   rm "$tool_bin/$provider"
+  # Even an alias whose target is trusted is excluded when the alias is in checkout.
+  ln -s "$tool_bin/real-$provider" "$checkout/$provider"
+  ln -s "$checkout" "$ARANEA_TEST_SANDBOX/checkout-alias"
+  launch_path=".:$checkout:$checkout/nested:$ARANEA_TEST_SANDBOX/checkout-alias:$tool_bin"
+  cd "$checkout"
+  refuse "$argv" TOOL_MISSING
+  rm "$checkout/$provider" "$ARANEA_TEST_SANDBOX/checkout-alias"
   mv "$tool_bin/real-$provider" "$checkout/nested/$provider"
   cp "$checkout/nested/$provider" "$checkout/$provider"
   ln -s "$checkout" "$ARANEA_TEST_SANDBOX/checkout-alias"
@@ -122,4 +201,4 @@ for provider in claude codex; do
   mv "$checkout/nested/$provider" "$tool_bin/$provider"
   launch_path="$tool_bin"
 done
-echo "PASS $accepted accepted launches, $refused refusals: all terminal/provider shapes, existing editor/resume shapes and canonical safe PATH"
+echo "PASS $accepted accepted launches, $refused refusals: all terminal/provider shapes, basename-sensitive shims, editor/resume shapes and canonical safe PATH"

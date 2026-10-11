@@ -53,13 +53,15 @@ for project_dir in "${project_path_entries[@]}"; do
   [[ "$project_dir" != "$canonical_cwd" && "$project_dir" != "$canonical_cwd/"* ]] || continue
   project_safe_path+="${project_safe_path:+:}$project_dir"
 done
-# Resolve only supported names to absolute canonical files outside the checkout.
+# Validate both lookup path and canonical target outside the checkout, then invoke
+# the named path: shims such as mise select their program from that basename.
 resolve_tool() {
-  local executable
+  local executable canonical_executable
   executable=$(PATH="$project_safe_path" command -v "$1" || true)
   [[ "$executable" == /* && -x "$executable" ]] || return 1
-  executable=$("$project_realpath" -e -- "$executable") || return 1
   [[ "$executable" != "$canonical_cwd" && "$executable" != "$canonical_cwd/"* ]] || return 1
+  canonical_executable=$("$project_realpath" -e -- "$executable") || return 1
+  [[ "$canonical_executable" != "$canonical_cwd" && "$canonical_executable" != "$canonical_cwd/"* ]] || return 1
   printf '%s\n' "$executable"
 }
 project_executable=$(resolve_tool "${argv[0]}") || fail TOOL_MISSING 'Choose an installed application outside the checkout.'
