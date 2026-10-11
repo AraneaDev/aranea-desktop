@@ -17,6 +17,15 @@ FocusScope {
   readonly property bool menuOpen: menu.opened
   // Shared pointer settling gate for both buttons and menu feedback.
   property var pointerGate: null
+  // Optional window-level overlay escapes clipped host content.
+  property Item menuHost: null
+  // Host geometry epoch invalidates mapped anchor positions after scrolling.
+  property real menuRevision: 0
+  // Preserve the primary ActionButton activation route for existing consumers.
+  function activate(): void {
+    if (enabled)
+      clicked()
+  }
   // Default action request.
   signal clicked
   // Checkbox or action request identified by its stable key.
@@ -25,6 +34,8 @@ FocusScope {
   implicitWidth: primary.implicitWidth + toggle.implicitWidth + Style.space(2)
   implicitHeight: Math.max(Style.space(34), Style.font.body + Style.space(16))
   onEnabledChanged: if (!enabled)
+    menu.close()
+  onVisibleChanged: if (!visible)
     menu.close()
   Row {
     spacing: Style.space(2)
@@ -59,9 +70,16 @@ FocusScope {
   }
   Aranea.MenuPopup {
     id: menu
-    anchors.right: parent.right
-    anchors.top: parent.bottom
-    anchors.topMargin: Style.space(4)
+    parent: split.menuHost || split
+    // Reading the host epoch makes mapped scrolling anchors reactive.
+    readonly property point anchor: {
+      split.menuRevision
+      return split.mapToItem(parent, split.width, split.height)
+    }
+    x: split.menuHost ? Math.max(Style.space(8), Math.min(anchor.x - width, parent.width - width - Style.space(8))) : split.width - width
+    y: split.menuHost ? Math.max(Style.space(8), Math.min(anchor.y + Style.space(4), parent.height - height - Style.space(8))) : split.height + Style.space(4)
+    width: split.menuHost ? Math.max(1, Math.min(implicitWidth, parent.width - Style.space(16))) : implicitWidth
+    maximumHeight: split.menuHost ? Math.max(1, parent.height - Style.space(16)) : Infinity
     pointerGate: split.pointerGate
     onTriggered: function (key) {
       split.triggered(key)

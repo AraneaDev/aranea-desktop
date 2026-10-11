@@ -8,11 +8,25 @@ import QtQuick.Window
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
+import "AgentSuggestion.js" as Suggestion
 
 Item {
   id: panel
   // Persistent presentation entry owns clients and visibility.
   required property var root
+  // Minute clock updates reset and stale usage explanations while visible.
+  property real nowMs: Date.now()
+  // One suggestion shared by selected-project surface consumers.
+  readonly property var agentChoice: {
+    var agents = root.projectClient.snapshot.agents || {}, project = projectsPage.selectedProject
+    return Suggestion.suggest(agents.tools || [], agents.usage || {}, project && project.tools ? project.tools.agentId || null : null, nowMs)
+  }
+  Timer {
+    interval: 60000
+    repeat: true
+    running: panel.visible
+    onTriggered: panel.nowMs = Date.now()
+  }
   // Narrow widths use a compact selector instead of the tall sidebar.
   readonly property bool compact: width < Style.space(720)
   // Reduce window chrome on short logical screens.
@@ -289,6 +303,33 @@ Item {
                   pending: projectsPage.details.pending
                   displayOnly: !!panel.root.inert
                   pointerGate: pointerGate
+                  agentChoice: panel.agentChoice
+                  tools: panel.root.projectController.tools
+                  menuHost: panel
+                  menuRevision: panel.layoutChangedAt
+                  toolLabels: {
+                    var tools = panel.root.projectController.tools || {}, project = projectsPage.selectedProject || {}, saved = project.tools || {}, defaults = tools.defaults || {}
+                    var label = function (list, id) {
+                      var row = (list || []).filter(function (tool) {
+                        return tool.id === id
+                      })[0]
+                      return row ? row.label : id || ''
+                    }
+                    return {
+                      editor: label(tools.editors, saved.editorId || defaults.editorId),
+                      terminal: label(tools.terminals, saved.terminalId || defaults.terminalId)
+                    }
+                  }
+                  onOneOffRequested: function (payload) {
+                    if (['agents', 'help'].indexOf(panel.section) < 0 || panel.chooseSection('overview'))
+                      projectsPage.details.openRequested(payload)
+                  }
+                  onDefaultRolesRequested: function (roles) {
+                    panel.root.projectController.request('configure', {
+                      projectId: projectsPage.selectedProject.id,
+                      openRoles: roles
+                    })
+                  }
                   onOpenRequested: {
                     if (['agents', 'help'].indexOf(panel.section) < 0 || panel.chooseSection('overview'))
                       projectsPage.details.openProject()

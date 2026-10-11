@@ -11,6 +11,8 @@ Aranea.SurfaceCard {
   id: menu
   // Rows contain kind, key, label, detail, checked, enabled and tooltip.
   property var entries: []
+  // Optional finite host height; overflowing rows stay keyboard reachable.
+  property real maximumHeight: Infinity
   // Logical visibility and keyboard input ownership.
   property bool opened: false
   // Current enabled checkbox or action index, or minus one.
@@ -33,6 +35,7 @@ Aranea.SurfaceCard {
   function select(index: int): void {
     cursor = index
     cursorKey = interactive(index) ? String(entries[index].key || '') : ''
+    Qt.callLater(revealCursor)
   }
   // Preserve identity on refresh; otherwise choose the first enabled row.
   function repairCursor(): void {
@@ -65,6 +68,16 @@ Aranea.SurfaceCard {
         return
       }
     }
+  }
+  // Keep the keyboard row within a height-bounded host viewport.
+  function revealCursor(): void {
+    var row = repeater.itemAt(cursor)
+    if (!row)
+      return
+    if (row.y < viewport.contentY)
+      viewport.contentY = row.y
+    else if (row.y + row.height > viewport.contentY + viewport.height)
+      viewport.contentY = Math.min(Math.max(0, viewport.contentHeight - viewport.height), row.y + row.height - viewport.height)
   }
   // Open at the first enabled entry; focus never waits for presentation.
   function open(): void {
@@ -101,6 +114,7 @@ Aranea.SurfaceCard {
   // Width never depends on wrapped children; hosts may override width.
   implicitWidth: Math.max(1, Style.space(300))
   implicitHeight: rows.implicitHeight + contentTopInset + contentBottomInset
+  height: Math.min(implicitHeight, maximumHeight)
   scale: motion.scale
   onEntriesChanged: repairCursor()
   onOpenedChanged: {
@@ -134,74 +148,84 @@ Aranea.SurfaceCard {
       return
     event.accepted = true
   }
-  Column {
-    id: rows
+  Flickable {
+    id: viewport
     x: menu.contentLeftInset
     y: menu.contentTopInset
     width: Math.max(0, menu.width - menu.contentLeftInset - menu.contentRightInset)
-    spacing: Style.space(2)
-    Repeater {
-      model: menu.entries || []
-      Item {
-        id: row
-        required property var modelData
-        required property int index
-        objectName: 'menuRow'
-        width: rows.width
-        implicitHeight: modelData.kind === 'separator' ? Style.space(9) : label.implicitHeight + (detail.visible ? detail.implicitHeight : 0) + Style.space(10)
-        Aranea.HoverTint {
-          active: menu.interactive(row.index)
-          pointerGate: menu.pointerGate
-        }
-        Rectangle {
-          objectName: 'cursorOutline'
-          anchors.fill: parent
-          visible: menu.cursor === row.index && menu.interactive(row.index)
-          color: 'transparent'
-          border.width: Aranea.DesignTokens.borderWidth
-          border.color: Aranea.DesignTokens.accent
-          radius: Aranea.DesignTokens.cornerRadius
-        }
-        Rectangle {
-          visible: row.modelData.kind === 'separator'
-          anchors.verticalCenter: parent.verticalCenter
-          width: parent.width
-          height: 1
-          color: Aranea.DesignTokens.foreground
-          opacity: 0.15
-        }
-        Aranea.UiLabel {
-          id: label
-          visible: row.modelData.kind !== 'separator'
-          x: Style.space(8)
-          y: Style.space(5)
-          width: Math.max(0, row.width - Style.space(16))
-          text: (row.modelData.kind === 'check' ? (row.modelData.checked ? '✓  ' : '☐  ') : '') + (row.modelData.label || '')
-          opacity: row.modelData.kind === 'header' ? 0.55 : row.modelData.enabled === false ? 0.45 : 1
-          font.bold: row.modelData.kind === 'header'
-        }
-        Aranea.UiLabel {
-          id: detail
-          objectName: 'menuDetail'
-          visible: !!text && row.modelData.kind !== 'separator'
-          anchors.top: label.bottom
-          x: Style.space(8) + (row.modelData.kind === 'check' ? Style.space(18) : 0)
-          width: Math.max(0, row.width - x - Style.space(8))
-          text: row.modelData.detail || (row.modelData.enabled === false ? row.modelData.tooltip || '' : '')
-          opacity: Aranea.DesignTokens.secondaryOpacity
-        }
-        HoverHandler {
-          id: hover
-        }
-        TapHandler {
-          enabled: menu.opened && menu.interactive(row.index)
-          onTapped: {
-            menu.select(row.index)
-            menu.activateCursor(row.modelData.kind === 'check')
+    height: Math.max(0, menu.height - menu.contentTopInset - menu.contentBottomInset)
+    contentWidth: width
+    contentHeight: rows.implicitHeight
+    clip: true
+    boundsBehavior: Flickable.StopAtBounds
+    Column {
+      id: rows
+      width: viewport.width
+      spacing: Style.space(2)
+      Repeater {
+        id: repeater
+        model: menu.entries || []
+        Item {
+          id: row
+          required property var modelData
+          required property int index
+          objectName: 'menuRow'
+          width: rows.width
+          implicitHeight: modelData.kind === 'separator' ? Style.space(9) : label.implicitHeight + (detail.visible ? detail.implicitHeight : 0) + Style.space(10)
+          Aranea.HoverTint {
+            active: menu.interactive(row.index)
+            pointerGate: menu.pointerGate
           }
+          Rectangle {
+            objectName: 'cursorOutline'
+            anchors.fill: parent
+            visible: menu.cursor === row.index && menu.interactive(row.index)
+            color: 'transparent'
+            border.width: Aranea.DesignTokens.borderWidth
+            border.color: Aranea.DesignTokens.accent
+            radius: Aranea.DesignTokens.cornerRadius
+          }
+          Rectangle {
+            visible: row.modelData.kind === 'separator'
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            height: 1
+            color: Aranea.DesignTokens.foreground
+            opacity: 0.15
+          }
+          Aranea.UiLabel {
+            id: label
+            visible: row.modelData.kind !== 'separator'
+            x: Style.space(8)
+            y: Style.space(5)
+            width: Math.max(0, row.width - Style.space(16))
+            text: (row.modelData.kind === 'check' ? (row.modelData.checked ? '✓  ' : '☐  ') : '') + (row.modelData.label || '')
+            opacity: row.modelData.kind === 'header' ? 0.55 : row.modelData.enabled === false ? 0.45 : 1
+            font.bold: row.modelData.kind === 'header'
+          }
+          Aranea.UiLabel {
+            id: detail
+            objectName: 'menuDetail'
+            visible: !!text && row.modelData.kind !== 'separator'
+            anchors.top: label.bottom
+            x: Style.space(8) + (row.modelData.kind === 'check' ? Style.space(18) : 0)
+            width: Math.max(0, row.width - x - Style.space(8))
+            text: row.modelData.detail || (row.modelData.enabled === false ? row.modelData.tooltip || '' : '')
+            opacity: Aranea.DesignTokens.secondaryOpacity
+          }
+          HoverHandler {
+            id: hover
+          }
+          TapHandler {
+            enabled: menu.opened && menu.interactive(row.index)
+            onTapped: {
+              menu.select(row.index)
+              menu.activateCursor(row.modelData.kind === 'check')
+            }
+          }
+          ToolTip.visible: hover.hovered && !!row.modelData.tooltip
+          ToolTip.text: row.modelData.tooltip || ''
         }
-        ToolTip.visible: hover.hovered && !!row.modelData.tooltip
-        ToolTip.text: row.modelData.tooltip || ''
       }
     }
   }
