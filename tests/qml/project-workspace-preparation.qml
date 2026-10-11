@@ -38,6 +38,8 @@ ShellRoot {
   property int launches: 0
   // Workspace preparation must not require an editor or terminal probe.
   property int probes: 0
+  // Probe totals at preparation completion keep queued Open observations separate.
+  property var preparationProbes: []
   // Observed workspace IDs expose occupied allocation behavior.
   property var focused: []
   QmlTest {
@@ -45,6 +47,10 @@ ShellRoot {
   }
   Projects.ProjectsController {
     id: owner
+    onOperationChanged: function (operation) {
+      if (operation.workspaceOnly && operation.state === 'completed')
+        root.preparationProbes.push(root.probes)
+    }
     runtime: ({
         sessionId: 'desktop',
         snapshot: function () {
@@ -118,8 +124,9 @@ ShellRoot {
   Component.onCompleted: {
     owner.refresh()
     t.waitFor(function () {
-      return owner.registryReady
-    }, 1000, 'registry ready', function () {
+      return owner.registryReady && !owner.refreshing
+    }, 1000, 'registry and startup probe ready', function () {
+      var initialProbes = probes
       var prep = owner.prepareWorkspaceRequest({
         projectId: 'p',
         checkoutId: 'c'
@@ -135,7 +142,8 @@ ShellRoot {
         t.equal(owner.operation(prep.operationId).outcome, 'observed', 'preparation requires no editor or terminal selection')
         t.equal(owner.operation(normal.operationId).error.code, 'TOOL_CHOICE_REQUIRED', 'ordinary open still requires tools')
         t.equal(launches, 0, 'preparation launches no application')
-        t.equal(probes, 1, 'preparation does not even probe tools')
+        t.equal(preparationProbes[0], initialProbes, 'preparation adds no tool probe after startup')
+        t.equal(probes - initialProbes, 1, 'ordinary Open adds exactly one tool probe')
         t.equal(focused, [2], 'occupied workspace preserved by shared allocator')
         var n = owner.request({
           projectId: 'p',
@@ -150,6 +158,7 @@ ShellRoot {
           return owner.operation(p.operationId).state === 'completed'
         }, 1000, 'second preparation completes', function () {
           t.equal(owner.operation(p.operationId).outcome, 'observed', 'preparation observes existing association')
+          t.equal(preparationProbes[1], initialProbes + 2, 'queued preparation adds no probe after the second ordinary Open')
           t.equal(owner.request({
             projectId: 'p',
             checkoutId: 'c',
