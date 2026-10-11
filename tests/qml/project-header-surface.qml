@@ -15,6 +15,8 @@ ShellRoot {
   property var agentRequests: []
   // Count owner transport responses before and after readiness acceptance.
   property var agentResponses: []
+  // Accepted failures and uncertain observations cross the actual owner/client route.
+  property bool missingProvider: true
   Projects.ProjectsController {
     id: routeOwner
     captureActive: true
@@ -27,6 +29,42 @@ ShellRoot {
             workspaces: [],
             windows: []
           }
+        },
+        validateBindings: function (bindings, done) {
+          Qt.callLater(function () {
+            done({
+              bindings: [],
+              missing: []
+            })
+          })
+        },
+        focusWorkspace: function (id, done) {
+          Qt.callLater(function () {
+            done({
+              ok: true,
+              status: 'observed'
+            })
+          })
+        },
+        launch: function (spec, done) {
+          Qt.callLater(function () {
+            done({
+              ok: true,
+              status: 'accepted',
+              identity: {
+                pid: 321,
+                startTime: '1'
+              }
+            })
+          })
+        },
+        observe: function (spec, baseline, done) {
+          Qt.callLater(function () {
+            done({
+              status: 'unconfirmed',
+              code: 'OBSERVATION_TIMEOUT'
+            })
+          })
         }
       })
     storeRunner: function (argv, done, input) {
@@ -37,11 +75,42 @@ ShellRoot {
         })
       })
     }
-    // Stop after acceptance so this routing fixture never reaches any launcher.
     metadataRunner: function (argv, done) {
       Qt.callLater(function () {
         done({
-          ok: false
+          ok: true,
+          metadata: {
+            path: argv[2],
+            commonDir: '/repo/.git'
+          }
+        })
+      })
+    }
+    toolsRunner: function (argv, done) {
+      Qt.callLater(function () {
+        done({
+          defaults: {},
+          editors: [],
+          terminals: [
+            {
+              id: 'kitty',
+              available: true,
+              supported: true
+            }
+          ],
+          agents: host.missingProvider ? [
+            {
+              id: 'claude',
+              available: true,
+              supported: true
+            }
+          ] : [
+            {
+              id: 'codex',
+              available: true,
+              supported: true
+            }
+          ]
         })
       })
     }
@@ -86,9 +155,12 @@ ShellRoot {
         {
           id: 'p-one',
           name: 'Repo',
+          commonDir: '/repo/.git',
+          associations: [],
           tools: {
             editorId: 'code',
-            terminalId: 'kitty'
+            terminalId: 'kitty',
+            agentId: 'codex'
           },
           openRoles: ['editor', 'agent'],
           lastCheckoutId: 'c-main',
@@ -122,6 +194,7 @@ ShellRoot {
       ]
     }
     entry.projectClient.snapshot = {
+      sessionId: 'agent-route-session',
       availability: {
         compositor: true
       },
@@ -129,6 +202,11 @@ ShellRoot {
       operations: [],
       agents: {
         tools: [
+          {
+            id: 'claude',
+            label: 'Claude Code',
+            available: true
+          },
           {
             id: 'codex',
             label: 'Codex',
@@ -233,7 +311,9 @@ ShellRoot {
           } else if (method === 'operation')
             response = routeOwner.operation(argv[3])
           else if (method === 'snapshot')
-            response = entry.projectClient.snapshot
+            response = Object.assign({}, routeOwner.snapshot(), {
+              agents: entry.projectClient.snapshot.agents
+            })
           done(0, JSON.stringify(response), '')
         }
         routeOwner.registry = entry.projectController.state
@@ -245,7 +325,8 @@ ShellRoot {
         var startHere = t.findChild(agents, 'startAgentHere')
         t.check(!!startHere && startHere.visible && startHere.enabled, 'actual empty Agents surface exposes available Start control')
         startHere.activate()
-        t.check(entry.projectClient.preparing && agents.pending && !startHere.enabled, 'ordinary route disables Start during rejected owner readiness')
+        t.equal(surface.section, 'overview', 'empty Agents Start routes to Overview before submission')
+        t.check(entry.projectClient.preparing && page.details.pending && !startHere.enabled, 'ordinary route disables Start during rejected owner readiness')
         t.equal(host.agentResponses[0].error.code, 'OWNER_NOT_READY', 'omitted-checkout Start acquires real owner selection lease')
         t.waitFor(function () {
           return host.agentResponses.length === 2 && !entry.projectClient.pending
@@ -268,9 +349,26 @@ ShellRoot {
           var op = routeOwner.operations[0]
           t.equal([op.checkoutId, op.selectionRevision, op.agentId, op.roles, op.newWindowRole], ['c-main', 5, 'codex', ['agent'], 'agent'], 'owner resolves saved checkout through revision-bound lease and preserves agent request')
           t.check(!routeOwner.defaultSelections['p-one'], 'accepted Start consumes selection lease')
-          routeOwner.captureActive = true
-          entry.projectClient.captureActive = true
-          t.done()
+          t.equal(op.error.code, 'AGENT_MISSING', 'actual accepted start fails for missing selected provider')
+          var explanation = t.findChild(page.details, 'projectOperationError'), alternative = t.findChild(page.details, 'startAlternativeAgent')
+          t.check(page.details.visible && explanation.visible && explanation.text.indexOf('Codex') >= 0 && explanation.text.indexOf('installed') >= 0, 'accepted start failure explanation is visible in real surface')
+          t.check(alternative.visible && alternative.enabled && alternative.text === 'Start Claude', 'failed Start exposes installed alternative recovery')
+          host.missingProvider = false
+          surface.chooseSection('agents')
+          t.check(startHere.visible && startHere.enabled, 'empty Agents offers another explicit Start after settled failure')
+          startHere.activate()
+          t.waitFor(function () {
+            return host.agentResponses.length >= 3 && !entry.projectClient.pending
+          }, 2000, 'second surface start observes accepted unconfirmed outcome', function () {
+            t.equal(routeOwner.operations.length, 2, 'readiness retries accept exactly one operation per explicit Start')
+            var uncertain = routeOwner.operations[1], message = t.findChild(page.details, 'agentUnconfirmed'), checkAgain = t.findChild(page.details, 'reobserveRole:agent')
+            t.equal(uncertain.outcome, 'partial', 'real owner retains unconfirmed accepted launch')
+            t.check(surface.section === 'overview' && page.details.visible && message.visible && message.text === "Couldn't confirm the agent window opened.", 'unconfirmed Start explanation is visible in real surface')
+            t.check(checkAgain.visible && checkAgain.enabled, 'unconfirmed Start exposes applicable Check agent again recovery')
+            routeOwner.captureActive = true
+            entry.projectClient.captureActive = true
+            t.done()
+          })
         })
       })
     })

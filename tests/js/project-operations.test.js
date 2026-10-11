@@ -262,25 +262,19 @@ test("requested roles preserve defaults and canonicalize saved and explicit sets
   assert.deepEqual(plain(ops.requestedRoles({}, { roles: [] })), [])
   assert.deepEqual(plain(ops.requestedRoles({}, { roles: null })), ["editor", "terminal"])
 })
-test("requested roles include recovery targets without mutating either input", () => {
-  const project = { openRoles: ["editor"] }
-  const targeted = {
-    roles: ["terminal"],
-    retryRole: "agent",
-    reobserveRole: "editor",
-    newWindowRole: "bogus"
+test("retry preflight uses only its target despite saved or explicit unrelated roles", () => {
+  const project = { openRoles: ["editor", "agent"] }
+  for (const role of ["editor", "terminal", "agent"]) {
+    const targeted = { retryRole: role, roles: ["editor", "terminal", "agent"] }
+    assert.deepEqual(plain(ops.requestedRoles(project, targeted)), [role])
+    assert.deepEqual(targeted.roles, ["editor", "terminal", "agent"])
   }
-  assert.deepEqual(plain(ops.requestedRoles(project, targeted)), ["editor", "terminal", "agent"])
-  assert.deepEqual(plain(ops.requestedRoles(project, { retryRole: "terminal" })), [
-    "editor",
-    "terminal"
-  ])
+  assert.deepEqual(plain(ops.requestedRoles(project, { retryRole: "terminal" })), ["terminal"])
   assert.deepEqual(plain(ops.requestedRoles(project, { reobserveRole: "agent" })), [
     "editor",
     "agent"
   ])
-  assert.deepEqual(project, { openRoles: ["editor"] })
-  assert.deepEqual(targeted.roles, ["terminal"])
+  assert.deepEqual(project, { openRoles: ["editor", "agent"] })
 })
 test("new agent windows are agent-only unless roles are explicit; other new windows keep defaults", () => {
   for (const project of [{}, { openRoles: ["editor", "terminal"] }]) {

@@ -14,19 +14,19 @@ function sections(topic) {
       },
       {
         title: "2. Choose how it opens",
-        body: "A checkout is a folder containing one working copy of your repository. Related Git worktrees can belong to the same project. Choose the checkout, editor, terminal, and workspace you want to use. In bulk setup, Project 1 of N shows your progress; Next project and Previous project move between repositories. Keep the current preferences and continue, or save any edits first. Workflow actions can be added later."
+        body: "A checkout is a folder containing one working copy of your repository. Related Git worktrees can belong to the same project. Choose the checkout, editor, terminal, and workspace you want to use. The Open workspace menu saves which default tools to open: Editor, Terminal, and Agent. At least one tool must stay selected; changes save immediately. In bulk setup, Project 1 of N shows your progress; Next project and Previous project move between repositories. Keep the current preferences and continue, or save any edits first. Workflow actions can be added later."
       },
       {
         title: "3. Open or resume your work",
-        body: "Open project brings up the saved editor and terminal in the selected checkout. Use project: in the launcher to find registered projects. A dedicated workspace keeps project windows together; Current workspace uses the workspace you are on. Opening a project does not run tests or start a dev server."
+        body: "Open workspace brings up the saved default tools in the selected checkout, including an agent when selected. Proven existing windows are focused. Use the menu for a one-off tool or a new Claude Code or Codex session. Use project: in the launcher to find registered projects. A dedicated workspace keeps project windows together; Current workspace uses the workspace you are on. Opening a project does not run tests or start a dev server."
       },
       {
         title: "4. Add optional workflow actions",
         body: "In project details, add a named action for a test, build, or dev server. Run is for commands that finish; Start is for services that keep running. Saving an action does not execute it. Use Run or Start when you are ready."
       },
       {
-        title: "5. Connect an agent",
-        body: "Agents → Help explains opt-in reporting for Claude Code and Codex. Start the agent from an exact registered checkout so its task can be associated with the project. Usage is separate from task activity."
+        title: "5. Start an agent",
+        body: "Choose New agent session in Overview, Start agent here in an empty Agents tab, or a provider in the Open workspace menu. Claude Code or Codex starts in the selected checkout and terminal. The suggestion uses local usage and the provider last started here; you can choose another installed provider. Help explains opt-in task reporting. Starting an agent does not enable reporting hooks. Usage is separate from task activity."
       },
       {
         title: "If something is missing",

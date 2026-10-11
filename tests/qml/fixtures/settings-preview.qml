@@ -260,7 +260,7 @@ ShellRoot {
         if (item.status !== Image.Ready)
           loading = true
       }
-      var agentMode = Quickshell.env('ARANEA_PROJECT_RENDER_STATE')
+      var agentMode = Quickshell.env('ARANEA_PROJECT_RENDER_STATE') || ''
       if (!harness.menuPrepared && harness.polls >= 8 && agentMode.indexOf('agents') === 0 && agentMode.indexOf('menu') >= 0) {
         if (!entry.inert) {
           stop()

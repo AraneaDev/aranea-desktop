@@ -487,7 +487,8 @@ Item {
                   openAvailable: projectsPage.details.openAvailable
                   pointerGate: pointerGate
                   onStartRequested: function (agentId) {
-                    projectsPage.details.startAgent(agentId)
+                    if (panel.chooseSection('overview'))
+                      projectsPage.details.startAgent(agentId)
                   }
                   displayOnly: !!panel.root.inert
                   maxHeight: Math.max(Style.space(200), scroller.height)

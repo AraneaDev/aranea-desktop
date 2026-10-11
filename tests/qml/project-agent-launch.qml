@@ -565,6 +565,99 @@ ShellRoot {
           })
         }, function () {
           reset()
+          root.registry.projects[0].openRoles = ['editor', 'agent']
+          root.toolProbe.agents = []
+          var failed = {}
+          failed[owner.roleKey({
+              projectId: 'p-fixture',
+              checkoutId: 'c-main'
+            }, 'editor')] = {
+            status: 'failed',
+            code: 'LAUNCH_FAILED'
+          }
+          owner.roleHistory = failed
+          open({
+            retryRole: 'editor',
+            separate: true,
+            useCurrentWorkspace: true
+          }, function (op) {
+            t.equal(op.outcome, 'observed', 'editor retry ignores unavailable saved agent')
+            t.equal(op.roles, ['editor'], 'editor retry publishes only target role')
+            t.equal(root.launched.map(function (spec) {
+              return spec.role
+            }), ['editor'], 'editor retry launches no unrelated role')
+            t.equal(root.configures.length, 0, 'editor retry never writes agent history')
+            t.equal([op.separate, op.useCurrentWorkspace, op.checkoutId], [true, true, 'c-main'], 'editor retry preserves checkout and separate/current request')
+            t.equal(root.registry.projects[0].associations[0], {
+              checkoutId: 'c-main',
+              mode: 'current',
+              workspaceId: 1,
+              separate: true
+            }, 'retry association honors separate current workspace')
+          })
+        }, function () {
+          reset()
+          var failed = {}
+          failed[owner.roleKey({
+              projectId: 'p-fixture',
+              checkoutId: 'c-main'
+            }, 'terminal')] = {
+            status: 'failed',
+            code: 'LAUNCH_FAILED'
+          }
+          owner.roleHistory = failed
+          open({
+            retryRole: 'terminal'
+          }, function (op) {
+            t.equal(op.outcome, 'observed', 'terminal retry ignores unavailable saved agent')
+            t.equal(op.roles, ['terminal'], 'terminal retry publishes only target role')
+            t.equal(root.launched.map(function (spec) {
+              return spec.role
+            }), ['terminal'], 'terminal retry launches no unrelated role')
+            t.equal(root.configures.length, 0, 'terminal retry never writes agent history')
+          })
+        }, function () {
+          reset()
+          root.registry.projects[0].tools.editorId = null
+          root.toolProbe.defaults.editorId = null
+          root.toolProbe.editors = []
+          root.toolProbe.agents = [
+            {
+              id: 'codex',
+              available: true,
+              supported: true
+            }
+          ]
+          var failed = {}
+          failed[owner.roleKey({
+              projectId: 'p-fixture',
+              checkoutId: 'c-main'
+            }, 'agent')] = {
+            status: 'failed',
+            code: 'LAUNCH_FAILED'
+          }
+          owner.roleHistory = failed
+          open({
+            retryRole: 'agent',
+            agentId: 'codex'
+          }, function (op) {
+            t.equal(op.outcome, 'observed', 'agent retry ignores absent unrelated editor choice')
+            t.equal(op.roles, ['agent'], 'agent retry publishes only target role')
+            t.equal(root.launched.map(function (spec) {
+              return spec.role
+            }), ['agent'], 'agent retry launches no unrelated role')
+            root.registry.projects[0].tools.editorId = 'code'
+            root.toolProbe.defaults.editorId = 'code'
+            root.toolProbe.editors = [
+              {
+                id: 'code',
+                available: true,
+                supported: true
+              }
+            ]
+          })
+        }, function () {
+          reset()
           root.toolProbe.agents = []
           open({
             roles: ['agent']

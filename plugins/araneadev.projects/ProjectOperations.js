@@ -263,13 +263,14 @@ function chooseAssociation(
 
 /**
  * Canonical roles for one request, including explicit recovery targets.
- * A new agent window without a one-off role set opens only the agent; other
- * requests retain saved defaults or the legacy editor-and-terminal default.
+ * Retries open only their target. A new agent window without a one-off role set
+ * opens only the agent; other requests retain saved or legacy defaults.
  * @param {OperationData} project - registry project with optional openRoles
  * @param {OperationData} request - one-off roles and optional targeted role
  * @returns {Array<string>} distinct supported roles in canonical order
  */
 function requestedRoles(project, request) {
+  if (["editor", "terminal", "agent"].indexOf(request.retryRole) >= 0) return [request.retryRole]
   var source = Array.isArray(request.roles)
     ? request.roles
     : request.newWindowRole === "agent"
