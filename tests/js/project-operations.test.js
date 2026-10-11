@@ -245,3 +245,171 @@ test("workspace preparation and ordinary open never coalesce in either order", (
     assert.equal(ops.begin([accepted], { ...request, workspaceOnly: first }, "third").reused, true)
   }
 })
+
+test("requested roles preserve defaults and canonicalize saved and explicit sets", () => {
+  assert.deepEqual(plain(ops.requestedRoles({ id: "p" }, {})), ["editor", "terminal"])
+  assert.deepEqual(plain(ops.requestedRoles({ openRoles: ["agent", "editor"] }, {})), [
+    "editor",
+    "agent"
+  ])
+  assert.deepEqual(plain(ops.requestedRoles({ openRoles: ["editor"] }, { roles: ["agent"] })), [
+    "agent"
+  ])
+  assert.deepEqual(
+    plain(ops.requestedRoles({}, { roles: ["agent", "bogus", "terminal", "agent"] })),
+    ["terminal", "agent"]
+  )
+  assert.deepEqual(plain(ops.requestedRoles({}, { roles: [] })), [])
+  assert.deepEqual(plain(ops.requestedRoles({}, { roles: null })), ["editor", "terminal"])
+})
+test("requested roles include recovery targets without mutating either input", () => {
+  const project = { openRoles: ["editor"] }
+  const targeted = {
+    roles: ["terminal"],
+    retryRole: "agent",
+    reobserveRole: "editor",
+    newWindowRole: "bogus"
+  }
+  assert.deepEqual(plain(ops.requestedRoles(project, targeted)), ["editor", "terminal", "agent"])
+  assert.deepEqual(plain(ops.requestedRoles(project, { retryRole: "terminal" })), [
+    "editor",
+    "terminal"
+  ])
+  assert.deepEqual(plain(ops.requestedRoles(project, { reobserveRole: "agent" })), [
+    "editor",
+    "agent"
+  ])
+  assert.deepEqual(project, { openRoles: ["editor"] })
+  assert.deepEqual(targeted.roles, ["terminal"])
+})
+test("new agent windows are agent-only unless roles are explicit; other new windows keep defaults", () => {
+  for (const project of [{}, { openRoles: ["editor", "terminal"] }]) {
+    assert.deepEqual(plain(ops.requestedRoles(project, { newWindowRole: "agent" })), ["agent"])
+    assert.deepEqual(
+      plain(ops.requestedRoles(project, { newWindowRole: "agent", roles: ["terminal", "editor"] })),
+      ["editor", "terminal", "agent"]
+    )
+  }
+  assert.deepEqual(plain(ops.requestedRoles({}, { newWindowRole: "editor" })), [
+    "editor",
+    "terminal"
+  ])
+  assert.deepEqual(plain(ops.requestedRoles({}, { newWindowRole: "terminal" })), [
+    "editor",
+    "terminal"
+  ])
+  assert.deepEqual(
+    plain(ops.requestedRoles({ openRoles: ["editor"] }, { newWindowRole: "terminal" })),
+    ["editor", "terminal"]
+  )
+})
+const probedTools = {
+  terminals: [
+    { id: "kitty", label: "Kitty", executable: "/usr/bin/kitty", available: true, supported: true }
+  ],
+  agents: [
+    {
+      id: "claude",
+      label: "Claude Code",
+      executable: "/usr/bin/claude",
+      available: true,
+      supported: true
+    }
+  ]
+}
+test("tool problems preserve normal tool choices and explain missing selections", () => {
+  assert.equal(
+    ops.toolProblem(["editor", "terminal"], { editor: "code", terminal: "kitty" }, {}),
+    null
+  )
+  assert.equal(
+    ops.toolProblem(["agent"], { terminal: "kitty", agent: "claude" }, probedTools),
+    null
+  )
+  assert.deepEqual(plain(ops.toolProblem(["editor"], { editor: null }, {})), {
+    code: "TOOL_CHOICE_REQUIRED",
+    message: "Choose an editor in Preferences."
+  })
+  assert.deepEqual(plain(ops.toolProblem(["terminal"], { terminal: null }, {})), {
+    code: "TOOL_CHOICE_REQUIRED",
+    message: "Choose a terminal in Preferences."
+  })
+  assert.equal(ops.toolProblem([], {}, {}), null)
+})
+test("agents and Neovim require an installed supported host terminal", () => {
+  const agentProblem = {
+    code: "TOOL_CHOICE_REQUIRED",
+    message: "Agents run in a terminal. Choose one in Preferences."
+  }
+  const editorProblem = {
+    code: "TOOL_CHOICE_REQUIRED",
+    message: "Choose a terminal in Preferences."
+  }
+  for (const tools of [
+    {},
+    { ...probedTools, terminals: [] },
+    { ...probedTools, terminals: [{ ...probedTools.terminals[0], available: false }] },
+    { ...probedTools, terminals: [{ ...probedTools.terminals[0], supported: false }] },
+    { ...probedTools, terminals: [{ ...probedTools.terminals[0], id: "unknown" }] }
+  ]) {
+    assert.deepEqual(
+      plain(ops.toolProblem(["agent"], { terminal: "kitty", agent: "claude" }, tools)),
+      agentProblem
+    )
+    assert.deepEqual(
+      plain(ops.toolProblem(["editor"], { editor: "nvim", terminal: "kitty" }, tools)),
+      editorProblem
+    )
+  }
+  assert.deepEqual(
+    plain(ops.toolProblem(["agent"], { terminal: null, agent: "claude" }, probedTools)),
+    agentProblem
+  )
+  assert.deepEqual(
+    plain(ops.toolProblem(["editor"], { editor: "nvim", terminal: null }, probedTools)),
+    editorProblem
+  )
+  assert.equal(
+    ops.toolProblem(["editor"], { editor: "nvim", terminal: "kitty" }, probedTools),
+    null
+  )
+  for (const id of ["alacritty", "foot", "ghostty"]) {
+    const tools = { ...probedTools, terminals: [{ ...probedTools.terminals[0], id }] }
+    assert.equal(ops.toolProblem(["agent"], { terminal: id, agent: "claude" }, tools), null)
+  }
+  const unknown = { ...probedTools, terminals: [{ ...probedTools.terminals[0], id: "unknown" }] }
+  assert.deepEqual(
+    plain(ops.toolProblem(["agent"], { terminal: "unknown", agent: "claude" }, unknown)),
+    agentProblem
+  )
+})
+test("missing agent providers return installation guidance or the selected provider name", () => {
+  for (const agent of [null, undefined])
+    assert.deepEqual(
+      plain(
+        ops.toolProblem(["agent"], { terminal: "kitty", agent }, { ...probedTools, agents: [] })
+      ),
+      { code: "AGENT_MISSING", message: "Install Claude Code or Codex to start agents here." }
+    )
+  assert.deepEqual(
+    plain(ops.toolProblem(["agent"], { terminal: "kitty", agent: "codex" }, probedTools)),
+    { code: "AGENT_MISSING", message: "Codex isn't installed." }
+  )
+  assert.deepEqual(
+    plain(
+      ops.toolProblem(
+        ["agent"],
+        { terminal: "kitty", agent: "claude" },
+        { ...probedTools, agents: [{ ...probedTools.agents[0], available: false }] }
+      )
+    ),
+    { code: "AGENT_MISSING", message: "Claude Code isn't installed." }
+  )
+  const codexTools = {
+    ...probedTools,
+    agents: [
+      { ...probedTools.agents[0], id: "codex", label: "Codex", executable: "/usr/bin/codex" }
+    ]
+  }
+  assert.equal(ops.toolProblem(["agent"], { terminal: "kitty", agent: "codex" }, codexTools), null)
+})
