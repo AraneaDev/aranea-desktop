@@ -127,6 +127,63 @@ ready_before=$(jq -s 'map(select(.[1]=="request"))|length' "$CLI_CALLS")
 CLI_MODE=ready run_cli 0 projects open "$project" --checkout "$checkout_id" --new-window editor
 jq -se 'last.data.outcome=="observed"' "$events" >/dev/null
 [[ $(jq -s 'map(select(.[1]=="request"))|length' "$CLI_CALLS") == $((ready_before + 2)) ]]
+# Role CSV canonicalization and provider omission are public payload contracts.
+# Return the last payload submitted to the isolated IPC endpoint.
+last_request() { jq -s '[.[]|select(.[1]=="request")]|last|.[2]|fromjson' "$CLI_CALLS"; }
+CLI_MODE=observed run_cli 0 projects open "$project" --roles agent,editor
+last_request | jq -e '.roles == ["editor","agent"] and (has("agentId")|not)' >/dev/null
+CLI_MODE=observed run_cli 0 projects open "$project" --roles agent
+last_request | jq -e '.roles == ["agent"] and (has("agentId")|not)' >/dev/null
+CLI_MODE=observed run_cli 0 projects open "$project" --new-window agent --agent codex
+last_request | jq -e '.roles == ["agent"] and .newWindowRole == "agent" and .agentId == "codex"' >/dev/null
+CLI_MODE=observed run_cli 0 projects open "$project" --new-window agent
+last_request | jq -e '.roles == ["agent"] and (has("agentId")|not)' >/dev/null
+CLI_MODE=observed run_cli 0 projects open "$project" --roles terminal,editor --new-window agent --agent claude
+last_request | jq -e '.roles == ["editor","terminal"] and .newWindowRole == "agent" and .agentId == "claude"' >/dev/null
+CLI_MODE=observed run_cli 0 projects open "$project" --roles agent,terminal,editor --new-window agent
+last_request | jq -e '.roles == ["editor","terminal","agent"] and .newWindowRole == "agent"' >/dev/null
+for recovery in --retry-role --reobserve-role; do
+  CLI_MODE=observed run_cli 0 projects open "$project" "$recovery" agent --agent claude
+  last_request | jq -e --arg key "${recovery#--}" '.[($key|gsub("-r";"R"))] == "agent" and .agentId == "claude" and (has("roles")|not)' >/dev/null
+  CLI_MODE=observed run_cli 0 projects open "$project" "$recovery" agent
+  last_request | jq -e '(has("agentId")|not)' >/dev/null
+done
+# Malformed CSV and ignored provider overrides fail before IPC or mutation.
+registry_before=$("$repo_root/scripts/aranea-project-store" snapshot | jq -c .state)
+before=$(wc -l <"$CLI_CALLS")
+run_cli 2 projects open "$project" --roles
+run_cli 2 projects configure "$project" --open-roles
+for csv in '' 'editor,' ',agent' editor,,agent editor,editor agent,agent browser ' editor' agent,browser; do
+  run_cli 2 projects open "$project" --roles "$csv"
+  run_cli 2 projects configure "$project" --open-roles "$csv"
+done
+run_cli 2 projects open "$project" --agent
+run_cli 2 projects open "$project" --roles agent --agent gemini
+run_cli 2 projects open "$project" --agent codex
+run_cli 2 projects open "$project" --new-window editor --agent codex
+run_cli 2 projects open "$project" --roles terminal --agent claude
+run_cli 2 projects open "$project" --roles agent --roles terminal
+run_cli 2 projects open "$project" --new-window agent --retry-role agent
+run_cli 2 projects open "$project" --new-window agent --reobserve-role agent
+run_cli 2 projects open "$project" --retry-role agent --reobserve-role agent
+[[ $(wc -l <"$CLI_CALLS") == "$before" ]]
+[[ $("$repo_root/scripts/aranea-project-store" snapshot | jq -c .state) == "$registry_before" ]]
+run_cli 0 projects configure "$project" --open-roles agent,terminal
+jq -se 'last.data.state.projects[0].openRoles == ["terminal","agent"]' "$events" >/dev/null
+CLI_MODE=observed run_cli 0 projects open "$project" --agent codex
+last_request | jq -e '.agentId == "codex" and (has("roles")|not)' >/dev/null
+for recovery in --retry-role --reobserve-role; do
+  before=$(wc -l <"$CLI_CALLS")
+  run_cli 2 projects open "$project" "$recovery" editor --agent claude
+  run_cli 2 projects open "$project" "$recovery" terminal --roles agent --agent codex
+  [[ $(wc -l <"$CLI_CALLS") == "$before" ]]
+done
+run_cli 0 projects configure "$project" --open-roles editor,terminal
+run_cli 0 capabilities
+jq -se 'last.data.operations as $ops |
+  ($ops | any(.[]; .name=="projects.configure" and .arguments["open-roles"].type=="string")) and
+  ($ops | any(.[]; .name=="projects.open" and .arguments.roles.type=="string" and .arguments.agent.enum==["claude","codex"] and
+    all(.arguments["new-window"], .arguments["retry-role"], .arguments["reobserve-role"]; .enum==["editor","terminal","agent"])))' "$events" >/dev/null
 rm -f "$CLI_COUNT"
 CLI_MODE=lost run_cli 1 projects open "$project"
 jq -se 'last.code=="OPERATION_LOST"' "$events" >/dev/null

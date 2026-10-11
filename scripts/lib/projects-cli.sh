@@ -34,7 +34,7 @@ projects_cli_fail() {
 
 # Reject usage before IPC/mutation; missing fields and repeated options are errors.
 projects_cli_usage() {
-  projects_cli_fail INVALID_USAGE 'Invalid command arguments.' 'Run aranea capabilities --json for command argument schemas.' 2
+  projects_cli_fail INVALID_USAGE 'Invalid command arguments.' 'Open: aranea projects open ID [--roles editor,terminal,agent] [--new-window ROLE | --retry-role ROLE | --reobserve-role ROLE] [--agent claude|codex]. Configure: aranea projects configure ID --open-roles editor,terminal,agent. Role lists are nonempty distinct subsets, normalized to editor,terminal,agent. --new-window agent defaults to agent-only unless --roles is explicit; its target is included by the owner. Omitted --agent delegates provider choice to the owner; reobserve retains the prior launch provider. --agent requires a requested agent role; retry/reobserve must target agent. Ordinary Open may use saved open roles. Run aranea capabilities --json for all arguments.' 2
 }
 
 # Require only the dependencies used by this command.
@@ -195,10 +195,10 @@ projects_cli_capabilities() {
 {"name":"projects.ignore","arguments":{"path":{"type":"string","required":true}}},
 {"name":"projects.ignored","arguments":{}},
 {"name":"projects.unignore","arguments":{"path":{"type":"string","required":true}}},
-{"name":"projects.configure","arguments":{"projectId":{"type":"string","required":true},"name":{"type":"string"},"editor":{"type":"string","enum":["code","nvim"]},"terminal":{"type":"string","enum":["alacritty","kitty","foot","ghostty"]},"workspace":{"type":"string","enum":["dedicated","current"]}}},
+{"name":"projects.configure","arguments":{"projectId":{"type":"string","required":true},"name":{"type":"string"},"editor":{"type":"string","enum":["code","nvim"]},"terminal":{"type":"string","enum":["alacritty","kitty","foot","ghostty"]},"workspace":{"type":"string","enum":["dedicated","current"]},"open-roles":{"type":"string","description":"Nonempty distinct comma-separated subset of editor,terminal,agent; normalized to canonical order"}}},
 {"name":"projects.relocate","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string","required":true},"path":{"type":"string","required":true}}},
 {"name":"projects.remove","arguments":{"projectId":{"type":"string","required":true}}},
-{"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"new-window":{"type":"string","enum":["editor","terminal"]},"retry-role":{"type":"string","enum":["editor","terminal"]},"reobserve-role":{"type":"string","enum":["editor","terminal"]}}},
+{"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"roles":{"type":"string","description":"Nonempty distinct comma-separated subset of editor,terminal,agent; normalized to canonical order"},"agent":{"type":"string","enum":["claude","codex"],"description":"Choose a provider for agent launches; requires requested agent. Retry/reobserve must target agent; reobserve retains the prior launch provider"},"new-window":{"type":"string","enum":["editor","terminal","agent"],"description":"Includes the target role; agent defaults to agent-only unless roles is explicit"},"retry-role":{"type":"string","enum":["editor","terminal","agent"]},"reobserve-role":{"type":"string","enum":["editor","terminal","agent"]}}},
 {"name":"projects.operation","arguments":{"operationId":{"type":"string","required":true}}},
 {"name":"projects.details","arguments":{"projectId":{"type":"string","required":true}}},
 {"name":"desktop.status","arguments":{}}
@@ -215,7 +215,7 @@ JSON
 projects_cli_main() {
   cli_json=false cli_operation=aranea cli_operation_id='' cli_checkout_id='' cli_project_id='' cli_state='' cli_snapshot=''
   local -a words=() paths=() discovery_args=()
-  local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null reobserve_role=null
+  local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null reobserve_role=null roles=null agent=null
   local -A supplied=()
   for arg in "$@"; do
     if [[ "$arg" == --json ]]; then cli_json=true; else words+=("$arg"); fi
@@ -306,7 +306,7 @@ projects_cli_main() {
         shift
         continue
         ;;
-      configure:--name | configure:--editor | configure:--terminal | configure:--workspace | open:--checkout | open:--new-window | open:--retry-role | open:--reobserve-role | relocate:--checkout | relocate:--path | discover:--root | register:--path | ignore:--path | unignore:--path) ;;
+      configure:--name | configure:--editor | configure:--terminal | configure:--workspace | configure:--open-roles | open:--roles | open:--agent | open:--checkout | open:--new-window | open:--retry-role | open:--reobserve-role | relocate:--checkout | relocate:--path | discover:--root | register:--path | ignore:--path | unignore:--path) ;;
       *) projects_cli_usage ;;
     esac
     [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || projects_cli_usage
@@ -335,8 +335,17 @@ projects_cli_main() {
         [[ "$value" == dedicated || "$value" == current ]] || projects_cli_usage
         args=$(jq -c --arg mode "$value" '.+{workspaceMode:$mode}' <<<"$args")
         ;;
+      --roles | --open-roles)
+        value=$(jq -cn --arg v "$value" '$v | split(",") as $r | if ($r|length) > 0 and all($r[]; IN("editor","terminal","agent")) and ($r|length) == ($r|unique|length) then ["editor","terminal","agent"] | map(select(. as $x | $r | index($x))) else null end')
+        [[ "$value" != null ]] || projects_cli_usage
+        if [[ "$option" == --roles ]]; then roles=$value; else args=$(jq -c --argjson r "$value" '.+{openRoles:$r}' <<<"$args"); fi
+        ;;
+      --agent)
+        [[ "$value" == claude || "$value" == codex ]] || projects_cli_usage
+        agent=$value
+        ;;
       --new-window | --retry-role | --reobserve-role)
-        [[ "$value" == editor || "$value" == terminal ]] || projects_cli_usage
+        [[ "$value" == editor || "$value" == terminal || "$value" == agent ]] || projects_cli_usage
         case "$option" in
           --new-window) new_role=$value ;;
           --retry-role) retry_role=$value ;;
@@ -345,6 +354,15 @@ projects_cli_main() {
         ;;
     esac
   done
+  [[ "$new_role" != agent || "$roles" != null ]] || roles='["agent"]'
+  if [[ "$agent" != null ]]; then
+    # Recovery acts on its target only, irrespective of saved or explicit roles.
+    [[ "$retry_role" == null || "$retry_role" == agent ]] || projects_cli_usage
+    [[ "$reobserve_role" == null || "$reobserve_role" == agent ]] || projects_cli_usage
+    if [[ "$new_role" != agent && "$retry_role" != agent && "$reobserve_role" != agent && "$roles" != null ]]; then
+      jq -e 'index("agent")!=null' <<<"$roles" >/dev/null || projects_cli_usage
+    fi
+  fi
   [[ "$separate" != true || "$current" != true ]] || projects_cli_usage
   [[ "$new_role" == null || "$retry_role" == null ]] || projects_cli_usage
   [[ "$reobserve_role" == null || ("$new_role" == null && "$retry_role" == null) ]] || projects_cli_usage
@@ -367,6 +385,9 @@ projects_cli_main() {
   esac
   projects_cli_store snapshot
   [[ -z "$cli_project_id" ]] || projects_cli_select
+  if [[ "$agent" != null && "$roles" == null && "$new_role" != agent && "$retry_role" != agent && "$reobserve_role" != agent ]]; then
+    jq -e '(.openRoles // ["editor","terminal"]) | index("agent")!=null' <<<"$cli_project" >/dev/null || projects_cli_usage
+  fi
   if [[ -n "$root_id" ]]; then
     jq -e --arg id "$root_id" 'any(.roots[];.id==$id)' <<<"$cli_state" >/dev/null || projects_cli_usage
   fi
@@ -404,7 +425,7 @@ projects_cli_main() {
       projects_cli_snapshot
       jq -e '.availability.compositor==true' <<<"$cli_snapshot" >/dev/null || projects_cli_fail COMPOSITOR_UNAVAILABLE 'Workspace opening requires a live compositor.' 'Start a supported desktop session and retry.'
       local payload response ready_deadline=$((SECONDS + 5))
-      payload=$(jq -cn --arg projectId "$cli_project_id" --arg checkoutId "$cli_checkout_id" --argjson separate "$separate" --argjson current "$current" --arg new "$new_role" --arg retry "$retry_role" --arg reobserve "$reobserve_role" '{projectId:$projectId,checkoutId:$checkoutId,separate:$separate,useCurrentWorkspace:$current} + (if $new=="null" then {} else {newWindowRole:$new} end) + (if $retry=="null" then {} else {retryRole:$retry} end) + (if $reobserve=="null" then {} else {reobserveRole:$reobserve} end)')
+      payload=$(jq -cn --arg projectId "$cli_project_id" --arg checkoutId "$cli_checkout_id" --argjson separate "$separate" --argjson current "$current" --arg new "$new_role" --arg retry "$retry_role" --arg reobserve "$reobserve_role" --arg roles "$roles" --arg agent "$agent" '{projectId:$projectId,checkoutId:$checkoutId,separate:$separate,useCurrentWorkspace:$current} + (if $new=="null" then {} else {newWindowRole:$new} end) + (if $retry=="null" then {} else {retryRole:$retry} end) + (if $reobserve=="null" then {} else {reobserveRole:$reobserve} end) + (if $roles=="null" then {} else {roles:($roles|fromjson)} end) + (if $agent=="null" then {} else {agentId:$agent} end)')
       local preparing=false
       while true; do
         if [[ "$preparing" == true ]] && ((SECONDS >= ready_deadline)); then projects_cli_internal_error "$response"; fi
