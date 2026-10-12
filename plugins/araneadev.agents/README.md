@@ -104,6 +104,23 @@ Tasks sits alongside Usage and stays visible for task-only activity. Attention
 selects Tasks initially; your deliberate tab choice is retained. Arrow/j/k moves
 the task cursor, Enter opens details, Tab changes Tasks/Usage, and Escape returns
 from details before closing. Task selection follows stable IDs across sorting.
+The Tasks badge counts connected provider threads, deduplicating their prompt
+and subagent records. The list header shows that count separately from retained
+task history; saved tasks do not imply that many active conversations.
+Completed results are counted as ready for review separately from requests for
+input and failures needing attention.
+
+**Clear task history** removes completed (finished, ready for review, or failed)
+and disconnected entries from the Tasks list. Working tasks, unresolved input in
+a connected session, and entries with uncertain accepted actions remain.
+Dismissals run one at a time through the existing activity owner, which rechecks
+liveness before each removal. Explicit pre-mutation lock refusals retry up to
+three times; successful mutations retry only their readback. Other refusals or
+connection loss stop the batch and
+show an error; accepted work is never automatically resubmitted. Clearing does
+not stop providers or delete their session files. The control is also reachable
+with the task list's keyboard navigation and is disabled during capture or
+another task action.
 
 Empty Tasks provides copyable Claude/Codex opt-in commands and Project settings.
 Configured hooks are separate from provider trust and observed runtime activity.

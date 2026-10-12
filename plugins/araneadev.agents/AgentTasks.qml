@@ -25,6 +25,10 @@ Item {
   property var error: null
   // One client cannot submit another action while observing.
   property bool pending: false
+  // Hosts opt into bulk dismissal through their existing activity client.
+  property bool allowClear: false
+  // Distinguish a bulk clear from unrelated observed task actions.
+  property bool clearing: false
   // Retained client operation, independent of current selection.
   property var operation: null
   // Exact accepted owner-loss records retained by the presentation host.
@@ -43,6 +47,22 @@ Item {
   property bool setupGuideExpanded: false
   // Rows are attention-first immutable task projections.
   readonly property var taskRows: Logic.rows(snapshot, projectSnapshot, nowMs)
+  // Prompt/subagent history is not the number of connected provider threads.
+  readonly property var summary: Logic.summary(snapshot)
+  // Completed results are ready to read, distinct from unresolved attention.
+  readonly property int reviewCount: taskRows.filter(function (row) {
+    return row.attention && row.reportedState === 'ready-for-review' && !row.hasBlockers
+  }).length
+  // Pending input and failures retain their attention indication.
+  readonly property int attentionCount: taskRows.filter(function (row) {
+    return row.attention
+  }).length - reviewCount
+  // Live tasks and uncertain accepted actions remain available for recovery.
+  readonly property var dismissibleTaskIds: taskRows.filter(function (row) {
+    return row.canDismiss && !Logic.operationView(operationFor(row.key), error, pending).protected
+  }).map(function (row) {
+    return row.key
+  })
   // Selection is resolved by identity after every sort/refresh.
   readonly property var selectedRow: taskRows.filter(function (r) {
     return r.key === selectedId
@@ -158,11 +178,20 @@ Item {
       listScroll.contentY = Math.max(0, Math.min(listScroll.contentHeight - listScroll.height, target.y))
       return
     }
-    var next = Logic.step(taskRows.map(function (r) {
+    var keys = taskRows.map(function (r) {
       return r.key
-    }), cursorId, keyboardCursor, direction)
+    })
+    if (allowClear && dismissibleTaskIds.length && !pending && !captureActive)
+      keys.push('-clear-inactive')
+    var next = Logic.step(keys, cursorId, keyboardCursor, direction)
     cursorId = next.key
     keyboardCursor = true
+    if (cursorId === '-clear-inactive') {
+      if (next.activate)
+        requestClear(false)
+      listScroll.contentY = Math.max(0, Math.min(listScroll.contentHeight - listScroll.height, clearButton.y))
+      return
+    }
     if (next.activate)
       openDetails(cursorId, false)
     var index = taskRows.findIndex(function (r) {
@@ -171,6 +200,14 @@ Item {
     var item = rowRepeater.itemAt(index)
     if (item)
       listScroll.contentY = Math.max(0, Math.min(listScroll.contentHeight - listScroll.height, item.y))
+  }
+  // Both keyboard and pointer use the same explicit, capture-safe action.
+  function requestClear(pointer: bool): bool {
+    if (!allowClear || captureActive || pending || !dismissibleTaskIds.length || pointer && Date.now() - layoutChangedAt < 300)
+      return false
+    keyboardCursor = false
+    action('clear-inactive', '')
+    return true
   }
   implicitHeight: helpActive ? Math.min(maxHeight, helpBody.implicitHeight) : selectedRow ? detailView.implicitHeight : Math.min(maxHeight, listBody.implicitHeight)
   height: implicitHeight
@@ -220,9 +257,8 @@ Item {
       spacing: Style.space(12)
       Text {
         width: parent.width
-        text: tasks.taskRows.length ? tasks.taskRows.length + ' tasks · ' + tasks.taskRows.filter(function (r) {
-          return r.attention
-        }).length + ' need attention' : 'Agent tasks'
+        text: tasks.taskRows.length ? tasks.summary.threadCount + ' connected thread' + (tasks.summary.threadCount === 1 ? '' : 's') + ' · ' + tasks.taskRows.length + ' saved tasks' + (tasks.reviewCount ? ' · ' + tasks.reviewCount + ' ready for review' : '') + (tasks.attentionCount ? ' · ' + tasks.attentionCount + ' need attention' : '') : 'Agent tasks'
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body
@@ -237,6 +273,24 @@ Item {
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.attention
         font.pixelSize: Style.font.body
+      }
+      Aranea.ActionButton {
+        id: clearButton
+        objectName: 'clearInactiveTasks'
+        visible: tasks.allowClear && tasks.taskRows.length > 0
+        text: tasks.clearing ? 'Clearing tasks…' : 'Clear task history'
+        enabled: !tasks.captureActive && !tasks.pending && tasks.dismissibleTaskIds.length > 0
+        hasCursor: activeFocus || tasks.keyboardCursor && tasks.cursorId === '-clear-inactive'
+        onClicked: tasks.requestClear(true)
+      }
+      Text {
+        width: parent.width
+        visible: tasks.allowClear && tasks.taskRows.length > 0
+        text: 'Clears completed and disconnected entries. Working tasks and live requests for input stay.'
+        wrapMode: Text.Wrap
+        color: Aranea.DesignTokens.foreground
+        opacity: 0.65
+        font.pixelSize: Style.font.caption
       }
       Text {
         objectName: 'tasksEmpty'

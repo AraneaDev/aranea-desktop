@@ -17,6 +17,15 @@ deliver() {
 # Read durable state without changing it.
 snap() { "$store" snapshot; }
 deliver '{"hook_event_name":"SessionStart","source":"startup"}'
+# This fixture tests unconfirmed ingress. A real Codex caller can legitimately
+# supply provenance and start its fixture heartbeat; clear that evidence under
+# the store mutex so helper writes cannot race byte-for-byte replay assertions.
+(
+  exec {fixture_fd}<>"$ARANEA_STATE_ROOT/agent-activity.json.lock"
+  flock -x "$fixture_fd"
+  jq '.sessions[0].provenance=null | .sessions[0].nativeMetadata.observedHooks=[]' "$ARANEA_STATE_ROOT/agent-activity.json" >"$TMPDIR/unconfirmed"
+  mv "$TMPDIR/unconfirmed" "$ARANEA_STATE_ROOT/agent-activity.json"
+)
 deliver '{"hook_event_name":"UserPromptSubmit","turn_id":"one","prompt":"Fix parser\nPRIVATE"}'
 snap | jq -e '.state.tasks|length==1 and .[0].provider=="codex" and .[0].description=="Fix parser" and .[0].reportedState=="working" and .[0].freshness=="unconfirmed"' >/dev/null || {
   echo 'FAIL Codex native turn was not ingested'
@@ -144,12 +153,27 @@ cat >"$TMPDIR/unproven.sh" <<'PROVIDER'
 #!/bin/bash
 /bin/bash "$1" codex <"$2"
 PROVIDER
+# A valid outer Codex process must not lend its identity across an unsupported
+# app-server or different-provider boundary. Keep the mode out of outer argv.
+cat >"$TMPDIR/outer.sh" <<'PROVIDER'
+#!/bin/bash
+"$1" "$2" "$3" "$4" "$FIXTURE_MODE"
+PROVIDER
 for mode in app-server claude; do
   path="$ARANEA_TEST_SANDBOX/provider/codex"
   [[ "$mode" != claude ]] || path="$ARANEA_TEST_SANDBOX/provider/claude"
   printf '%s\n' '{"session_id":"unproven-'"$mode"'","hook_event_name":"SessionStart","cwd":"/tmp"}' >"$TMPDIR/event"
-  "$path" "$TMPDIR/unproven.sh" "$hook" "$TMPDIR/event" "$mode"
+  FIXTURE_MODE="$mode" "$ARANEA_TEST_SANDBOX/provider/codex" "$TMPDIR/outer.sh" "$path" "$TMPDIR/unproven.sh" "$hook" "$TMPDIR/event"
   snap | jq -e --arg id "unproven-$mode" 'any(.state.sessions[];.providerSessionId==$id and .provenance==null and .nativeMetadata.observedHooks==[])' >/dev/null
 done
+cp /bin/bash "$ARANEA_TEST_SANDBOX/provider/node"
+mkdir -p "$TMPDIR/relative/node_modules/@anthropic-ai/claude-code"
+cp "$TMPDIR/unproven.sh" "$TMPDIR/relative/node_modules/@anthropic-ai/claude-code/cli.js"
+printf '%s\n' '{"session_id":"unproven-relative-claude","hook_event_name":"SessionStart","cwd":"/tmp"}' >"$TMPDIR/event"
+(
+  cd "$TMPDIR/relative"
+  FIXTURE_MODE=relative "$ARANEA_TEST_SANDBOX/provider/codex" "$TMPDIR/outer.sh" "$ARANEA_TEST_SANDBOX/provider/node" node_modules/@anthropic-ai/claude-code/cli.js "$hook" "$TMPDIR/event"
+)
+snap | jq -e 'any(.state.sessions[];.providerSessionId=="unproven-relative-claude" and .provenance==null and .nativeMetadata.observedHooks==[])' >/dev/null
 "$adapter" status codex | jq -e '.state.connectionProven==false' >/dev/null
 echo 'PASS Codex native ownership, heartbeat receipts/cleanup, forged callback and app/Claude proof refusal'

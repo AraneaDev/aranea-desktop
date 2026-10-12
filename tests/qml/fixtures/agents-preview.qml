@@ -82,6 +82,7 @@ ShellRoot {
           id: navigation
           width: parent.width
           taskRows: tasks.taskRows
+          connectedThreadCount: tasks.summary.threadCount
           remembered: 'tasks'
           usageCount: 0
         }
@@ -90,6 +91,7 @@ ShellRoot {
           width: parent.width
           maxHeight: surface.height - 120
           captureActive: true
+          allowClear: true
           helpActive: navigation.destination === 'help'
           nowMs: host.now
           projectSnapshot: ({

@@ -9,6 +9,8 @@ Flow {
   id: tabs
   // Task rows determine the initial attention destination.
   property var taskRows: []
+  // Global panel badge reports connected threads instead of retained turns.
+  property int connectedThreadCount: -1
   // Usage discovery stays owned by the existing collector.
   property int usageCount: 0
   // Deliberate destination survives panel reopen.
@@ -32,7 +34,7 @@ Flow {
   Aranea.FilamentPill {
     objectName: 'tasksTab'
     refined: true
-    text: 'Tasks' + (tabs.taskRows.length ? ' · ' + tabs.taskRows.length : '')
+    text: 'Tasks' + (tabs.connectedThreadCount >= 0 ? ' · ' + tabs.connectedThreadCount + ' connected' : tabs.taskRows.length ? ' · ' + tabs.taskRows.length : '')
     selected: tabs.destination === 'tasks'
     onClicked: tabs.choose('tasks')
   }

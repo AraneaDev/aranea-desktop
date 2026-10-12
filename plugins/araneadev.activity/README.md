@@ -14,6 +14,11 @@ connection receipts, retention, association and dismissal.
 `observed`, `partial` or `failed`. An owner restart returns `OPERATION_LOST`;
 accepted work may still be running and must never be resubmitted automatically.
 
+IPC snapshots retain task history and projected eligibility but omit private
+replay receipts, registration hashes, retired epochs, and callback correlation
+records. Those remain in the authoritative store; sending them to the panel can
+exceed the IPC transport's payload limit and leave its displayed count stale.
+
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,
 `reconnect(id?)`, `reobserve()` and `dismiss(taskId)`. Snapshot read generations
@@ -21,6 +26,12 @@ are independent of operation observation. Only explicit `OWNER_NOT_READY`
 refusals retry the original submission. Reconnect reads the accepted ID.
 Reobserve explicitly checks a retained partial resume without launching,
 preparing, moving or focusing anything.
+
+Dismissal also accepts completed review/failure records in connected sessions
+when no unresolved blocker remains. Working tasks and live input requests stay
+protected. Explicit store-lock refusals retry up to three times before a
+mutation; once accepted, only the confirmation read may retry. Transport
+uncertainty never repeats a mutation.
 
 A launch submission outlives the observation deadline. `submissionPending`
 protects its operation from eviction and repeat submission; unrelated actions

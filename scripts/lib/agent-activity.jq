@@ -133,7 +133,8 @@ def mutation($r;$source):
   elif $r.action == "dismiss" then
     ([.tasks[]|select(.taskId == $r.args.taskId)][0]//null) as $task
     | if $task == null then error("TASK_NOT_FOUND")
-      elif (.sessions as $sessions | $task|live($sessions)) then error("TASK_LIVE")
+      elif (.sessions as $sessions | $task|live($sessions)) and
+        (($task | (.reportedState|IN("ready-for-review","failed")) and (.blockers|length)==0)|not) then error("TASK_LIVE")
       else .tasks |= map(select(.taskId != $r.args.taskId)) | .revision += 1 end
   elif $r.action == "prune" then .revision += 1
   elif $r.action == "native" then $r.args.normalized as $n

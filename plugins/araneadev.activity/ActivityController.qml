@@ -84,6 +84,19 @@ Item {
   // Public state exposes reported facts and owner uncertainty separately.
   function snapshot(): var {
     var view = Logic.project(storeState, Math.max(clock(), readAt + elapsedSinceRead), null)
+    // Replay/correlation bookkeeping stays private and can exceed IPC limits.
+    // Copy after projection so native eligibility still uses full owner evidence.
+    view.sessions = (view.sessions || []).map(function (session) {
+      var copy = Object.assign({}, session)
+      delete copy.receipts
+      delete copy.registrationHash
+      delete copy.retiredEpochs
+      if (session.nativeMetadata) {
+        copy.nativeMetadata = Object.assign({}, session.nativeMetadata)
+        delete copy.nativeMetadata.callbackOwners
+      }
+      return copy
+    })
     return Object.assign({}, view, {
       ownerId: ownerId,
       availability: {

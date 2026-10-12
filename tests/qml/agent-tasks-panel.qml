@@ -60,6 +60,9 @@ ShellRoot {
     property var currentOperation: null
     property string operationId: ''
     property bool acceptReopen: false
+    // Bulk integration observes the same accepted dismissal contract.
+    property bool bulkMode: false
+    property string ownerId: ''
     signal operationChanged(var operation)
     function refresh() {
       calls.push(['refresh'])
@@ -80,6 +83,12 @@ ShellRoot {
     }
     function dismiss(id) {
       calls.push(['dismiss', id])
+      if (bulkMode) {
+        ownerId = 'bulk-owner'
+        operationId = 'dismiss-' + id
+        pending = true
+      }
+      return true
     }
     function reconnect(id) {
       calls.push(['reconnect', id])
@@ -318,7 +327,22 @@ ShellRoot {
       operations: []
     }
     panel.handleTaskAction('dismiss', 'fresh-review')
-    t.equal(calls.length, 0, 'fresh live review never submits dismissal')
+    t.equal(calls.pop(), ['dismiss', 'fresh-review'], 'completed review can be dismissed while provider remains connected')
+    t.equal(tasks.reviewCount, 1, 'completed result counts as ready for review')
+    t.equal(tasks.attentionCount, 0, 'completed result does not advertise unresolved attention')
+    activity.snapshot = {
+      tasks: [Object.assign({}, activity.snapshot.tasks[0], {
+          blockers: [
+            {
+              blockerId: 'input',
+              question: 'Approve?'
+            }
+          ]
+        })],
+      operations: []
+    }
+    panel.handleTaskAction('dismiss', 'fresh-review')
+    t.equal(calls.length, 0, 'connected review with unresolved input cannot be dismissed')
     activity.snapshot = {
       tasks: [Object.assign({}, activity.snapshot.tasks[0], {
           freshness: 'connection-lost'
@@ -440,6 +464,77 @@ ShellRoot {
     }
     acceptedClient.captureActive = true
     panel.captureActive = true
-    t.done()
+    activity.snapshot = {
+      tasks: [
+        {
+          taskId: 'clear-done',
+          providerSessionId: 'shared-thread',
+          provider: 'claude',
+          reportedState: 'finished',
+          freshness: 'connected',
+          association: {}
+        },
+        {
+          taskId: 'keep-live',
+          providerSessionId: 'shared-thread',
+          provider: 'claude',
+          reportedState: 'working',
+          freshness: 'connected',
+          association: {}
+        }
+      ]
+    }
+    tasks.back()
+    tabs.choose('tasks')
+    t.check(tasks.allowClear, 'real agent panel enables bulk clear')
+    t.equal(tasks.summary.threadCount, 1, 'panel counts a connected thread once across saved task records')
+    t.equal(t.findChild(panel, 'tasksTab').text, 'Tasks · 1 connected', 'Tasks badge distinguishes connected thread from task history')
+    var beforeClear = calls.length
+    tasks.requestClear(false)
+    t.equal(calls.length, beforeClear, 'panel capture refuses clear')
+    activity.bulkMode = true
+    activity.pending = false
+    activity.error = null
+    activity.currentOperation = null
+    panel.captureActive = false
+    tasks.requestClear(false)
+    t.equal(calls[calls.length - 1], ['dismiss', 'clear-done'], 'panel clear routes exact inactive identity through its activity client')
+    t.check(tasks.pending && tasks.clearing, 'real panel exposes bulk progress and disables actions')
+    var beforeOther = calls.length
+    panel.handleTaskAction('focus', 'keep-live')
+    t.equal(calls.length, beforeOther, 'bulk clear prevents interleaved task actions')
+    activity.pending = false
+    activity.operationChanged({
+      id: 'dismiss-clear-done',
+      ownerId: 'bulk-owner',
+      taskId: 'clear-done',
+      action: 'dismiss',
+      state: 'completed',
+      outcome: 'observed'
+    })
+    t.waitFor(function () {
+      return !tasks.pending
+    }, 1500, 'panel bulk completion', function () {
+      t.check(calls.slice(beforeOther).some(function (call) {
+        return call[0] === 'refresh'
+      }), 'panel completion refreshes task state')
+      t.check(!tasks.error, 'successful panel clear has no retained failure')
+      activity.snapshot = {
+        tasks: [
+          {
+            taskId: 'keep-live',
+            provider: 'claude',
+            reportedState: 'working',
+            freshness: 'connected',
+            association: {}
+          }
+        ]
+      }
+      t.equal(tasks.taskRows.map(function (row) {
+        return row.key
+      }), ['keep-live'], 'fresh panel snapshot retains live task')
+      panel.captureActive = true
+      t.done()
+    })
   })
 }

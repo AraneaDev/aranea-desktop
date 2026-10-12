@@ -1,5 +1,27 @@
 /** @typedef {{[key:string]:any}} TaskData */
 
+/** Count connected threads separately from retained prompt/subagent task history.
+ * @param {?TaskData} snapshot - owner task projection
+ * @returns {{threadCount:number,taskCount:number}} connected identities and saved entries
+ */
+function summary(snapshot) {
+  var tasks = snapshot && Array.isArray(snapshot.tasks) ? snapshot.tasks : []
+  /** @type {Array<string>} */
+  var threads = []
+  tasks.forEach(function (task) {
+    if (
+      task.freshness !== "connected" ||
+      ["claude", "codex"].indexOf(task.provider) < 0 ||
+      typeof task.providerSessionId !== "string" ||
+      !task.providerSessionId
+    )
+      return
+    var key = JSON.stringify([task.provider, task.providerSessionId])
+    if (threads.indexOf(key) < 0) threads.push(key)
+  })
+  return { threadCount: threads.length, taskCount: tasks.length }
+}
+
 /** Bound display text; it never becomes executable input.
  * @param {any} value - provider text
  * @param {number} [limit] - maximum retained characters
@@ -133,6 +155,8 @@ function rows(snapshot, registry, now) {
         .join(" · ")
       return {
         key: task.taskId,
+        reportedState: task.reportedState,
+        hasBlockers: (task.blockers || []).length > 0,
         providerLabel:
           task.provider === "claude"
             ? "Claude Code"
@@ -192,7 +216,11 @@ function rows(snapshot, registry, now) {
           .join("\n"),
         primary: primary,
         secondary: secondary,
-        canDismiss: freshness === "connection-lost" || task.reportedState === "finished",
+        canDismiss:
+          freshness === "connection-lost" ||
+          task.reportedState === "finished" ||
+          (["ready-for-review", "failed"].indexOf(task.reportedState) >= 0 &&
+            (task.blockers || []).length === 0),
         resumeCommand: text(task.resumeCommand, 512),
         nativeId: text(task.providerSessionId, 256),
         epoch: text(task.producerEpoch, 256)
@@ -322,6 +350,7 @@ function operationView(operation, error, pending) {
 }
 if (typeof module !== "undefined")
   module.exports = {
+    summary,
     text,
     reportTime,
     rows,
