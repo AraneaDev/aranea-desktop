@@ -176,6 +176,13 @@ Panel {
   function handleTaskAction(kind, taskId) {
     if (captureActive || agentsShowcase)
       return
+    if (kind === 'clear-inactive') {
+      taskClear.start(tasksView.dismissibleTaskIds)
+      return
+    }
+    if (taskClear.pending)
+      return
+    taskClear.error = null
     if (kind === 'setup') {
       // qmllint disable missing-property
       if (root.bar)
@@ -969,6 +976,11 @@ Panel {
     id: activityObserver
     captureActive: root.captureActive || !!root.activityClient || !!root.agentsShowcase
   }
+  TaskClearQueue {
+    id: taskClear
+    client: root.activity
+    captureActive: root.captureActive || !!root.agentsShowcase
+  }
   Projects.ProjectClient {
     id: projectObserver
     captureActive: root.captureActive || !!root.projectClient || !!root.agentsShowcase
@@ -1204,8 +1216,10 @@ Panel {
           nowMs: root.nowMs
           snapshot: root.activity.snapshot
           projectSnapshot: root.projects.snapshot
-          error: root.activity.error || root.activity.snapshot.error
-          pending: root.activity.pending
+          error: taskClear.error || root.activity.error || root.activity.snapshot.error
+          pending: taskClear.pending || root.activity.pending
+          allowClear: true
+          clearing: taskClear.pending
           operation: root.taskOperation
           uncertainOperations: root.uncertainOperations
           maxHeight: panel.availableCardHeight > 0 ? Math.max(Style.space(80), Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) - navigation.height - content.spacing) : Style.space(580)

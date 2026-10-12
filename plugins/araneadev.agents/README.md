@@ -105,6 +105,15 @@ selects Tasks initially; your deliberate tab choice is retained. Arrow/j/k moves
 the task cursor, Enter opens details, Tab changes Tasks/Usage, and Escape returns
 from details before closing. Task selection follows stable IDs across sorting.
 
+**Clear all inactive tasks** removes finished and disconnected entries from the
+Tasks list. Live tasks and entries with uncertain accepted actions remain.
+Dismissals run one at a time through the existing activity owner, which rechecks
+liveness before each removal. A refusal or connection loss stops the batch and
+shows an error; accepted work is never automatically resubmitted. Clearing does
+not stop providers or delete their session files. The control is also reachable
+with the task list's keyboard navigation and is disabled during capture or
+another task action.
+
 Empty Tasks provides copyable Claude/Codex opt-in commands and Project settings.
 Configured hooks are separate from provider trust and observed runtime activity.
 Verification is a separate reported fact; Ready for review does not mean tests

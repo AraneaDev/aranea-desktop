@@ -90,6 +90,7 @@ ShellRoot {
           width: parent.width
           maxHeight: surface.height - 120
           captureActive: true
+          allowClear: true
           helpActive: navigation.destination === 'help'
           nowMs: host.now
           projectSnapshot: ({
