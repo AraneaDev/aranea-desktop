@@ -209,7 +209,27 @@ ShellRoot {
     })[0]
     t.equal(view.actionKinds[0], 'inspect-failure', 'failed task leads with local failure inspection')
     t.check(view.actionKinds.indexOf('reopen') >= 0 && view.actionKinds.indexOf('focus') < 0, 'failure offers explicit resume without working-session focus')
-    t.check(view.actionKinds.indexOf('dismiss') < 0, 'fresh failed record has no dismissal control')
+    t.check(view.actionKinds.indexOf('dismiss') >= 0, 'completed failure without blockers can be cleared while connected')
+    var completedFailure = view.row
+    view.row = Logic.rows({
+      tasks: [
+        {
+          taskId: 'blocked-failure',
+          provider: 'claude',
+          reportedState: 'failed',
+          displayState: 'failed',
+          freshness: 'connected',
+          blockers: [
+            {
+              blockerId: 'pending',
+              question: 'Unresolved input'
+            }
+          ]
+        }
+      ]
+    })[0]
+    t.check(view.actionKinds.indexOf('dismiss') < 0, 'connected failure with unresolved blockers stays protected')
+    view.row = completedFailure
     view.row = Object.assign({}, view.row, {
       result: 'Native or explicitly reported failure reason',
       question: new Array(30).fill('Earlier question details').join('\n'),
