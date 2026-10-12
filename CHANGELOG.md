@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.26.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.25.0...v2.26.0) (2026-10-12)
+
+
+### Features
+
+* **agents:** clear task history and show connected thread counts ([#147](https://github.com/AraneaDev/aranea-desktop/issues/147)) ([2ed132c](https://github.com/AraneaDev/aranea-desktop/commit/2ed132cd311e8f7769740bd0f45d7c6c3bb80ac4))
+
 ## [2.25.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.24.0...v2.25.0) (2026-10-11)
 
 
