@@ -47,6 +47,8 @@ Item {
   property bool setupGuideExpanded: false
   // Rows are attention-first immutable task projections.
   readonly property var taskRows: Logic.rows(snapshot, projectSnapshot, nowMs)
+  // Prompt/subagent history is not the number of connected provider threads.
+  readonly property var summary: Logic.summary(snapshot)
   // Live tasks and uncertain accepted actions remain available for recovery.
   readonly property var dismissibleTaskIds: taskRows.filter(function (row) {
     return row.canDismiss && !Logic.operationView(operationFor(row.key), error, pending).protected
@@ -247,9 +249,10 @@ Item {
       spacing: Style.space(12)
       Text {
         width: parent.width
-        text: tasks.taskRows.length ? tasks.taskRows.length + ' tasks · ' + tasks.taskRows.filter(function (r) {
+        text: tasks.taskRows.length ? tasks.summary.threadCount + ' connected thread' + (tasks.summary.threadCount === 1 ? '' : 's') + ' · ' + tasks.taskRows.length + ' saved tasks · ' + tasks.taskRows.filter(function (r) {
           return r.attention
         }).length + ' need attention' : 'Agent tasks'
+        wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.uiFamily
         font.pixelSize: Style.font.body

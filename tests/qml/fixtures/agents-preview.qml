@@ -82,6 +82,7 @@ ShellRoot {
           id: navigation
           width: parent.width
           taskRows: tasks.taskRows
+          connectedThreadCount: tasks.summary.threadCount
           remembered: 'tasks'
           usageCount: 0
         }

@@ -453,6 +453,7 @@ ShellRoot {
       tasks: [
         {
           taskId: 'clear-done',
+          providerSessionId: 'shared-thread',
           provider: 'claude',
           reportedState: 'finished',
           freshness: 'connected',
@@ -460,6 +461,7 @@ ShellRoot {
         },
         {
           taskId: 'keep-live',
+          providerSessionId: 'shared-thread',
           provider: 'claude',
           reportedState: 'working',
           freshness: 'connected',
@@ -470,6 +472,8 @@ ShellRoot {
     tasks.back()
     tabs.choose('tasks')
     t.check(tasks.allowClear, 'real agent panel enables bulk clear')
+    t.equal(tasks.summary.threadCount, 1, 'panel counts a connected thread once across saved task records')
+    t.equal(t.findChild(panel, 'tasksTab').text, 'Tasks · 1 connected', 'Tasks badge distinguishes connected thread from task history')
     var beforeClear = calls.length
     tasks.requestClear(false)
     t.equal(calls.length, beforeClear, 'panel capture refuses clear')

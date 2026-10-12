@@ -14,6 +14,11 @@ connection receipts, retention, association and dismissal.
 `observed`, `partial` or `failed`. An owner restart returns `OPERATION_LOST`;
 accepted work may still be running and must never be resubmitted automatically.
 
+IPC snapshots retain task history and projected eligibility but omit private
+replay receipts, registration hashes, retired epochs, and callback correlation
+records. Those remain in the authoritative store; sending them to the panel can
+exceed the IPC transport's payload limit and leave its displayed count stale.
+
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,
 `reconnect(id?)`, `reobserve()` and `dismiss(taskId)`. Snapshot read generations

@@ -104,6 +104,9 @@ Tasks sits alongside Usage and stays visible for task-only activity. Attention
 selects Tasks initially; your deliberate tab choice is retained. Arrow/j/k moves
 the task cursor, Enter opens details, Tab changes Tasks/Usage, and Escape returns
 from details before closing. Task selection follows stable IDs across sorting.
+The Tasks badge counts connected provider threads, deduplicating their prompt
+and subagent records. The list header shows that count separately from retained
+task history; saved tasks do not imply that many active conversations.
 
 **Clear all inactive tasks** removes finished and disconnected entries from the
 Tasks list. Live tasks and entries with uncertain accepted actions remain.

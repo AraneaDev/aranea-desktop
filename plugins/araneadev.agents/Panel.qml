@@ -1200,6 +1200,7 @@ Panel {
           width: parent.width
           visible: !root.agentsShowcase
           taskRows: tasksView.taskRows
+          connectedThreadCount: tasksView.summary.threadCount
           usageCount: root.providers.length
           onAction: function (kind, taskId) {
             tasksView.disarmCursor()

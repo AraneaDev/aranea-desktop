@@ -25,6 +25,27 @@ const registry = {
     { id: "other", name: "Duplicated project", checkouts: [{ id: "c2", path: "/else" }] }
   ]
 }
+test("task history counts connected provider threads once instead of counting prompts and subagents", () => {
+  assert.equal(typeof logic.summary, "function")
+  const entries = [
+    task("current", "working", { providerSessionId: "thread" }),
+    task("child", "working", { providerSessionId: "thread" }),
+    task("history", "ready-for-review", { providerSessionId: "old", freshness: "connection-lost" }),
+    task("other-provider", "working", { provider: "codex", providerSessionId: "thread" }),
+    task("unconfirmed", "working", { providerSessionId: "maybe", freshness: "unconfirmed" }),
+    task("missing-id", "working")
+  ]
+  assert.deepEqual(logic.summary({ tasks: entries }), { threadCount: 2, taskCount: 6 })
+  assert.deepEqual(logic.summary(null), { threadCount: 0, taskCount: 0 })
+  assert.deepEqual(
+    logic.summary({
+      tasks: [
+        task("old", "finished", { providerSessionId: "thread", freshness: "connection-lost" })
+      ]
+    }),
+    { threadCount: 0, taskCount: 1 }
+  )
+})
 test("all six states use human labels and attention comes first without verification inference", () => {
   assert.equal(typeof logic.rows, "function", "Tasks projection exists")
   const states = [
