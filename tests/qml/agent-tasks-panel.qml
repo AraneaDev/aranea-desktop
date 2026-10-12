@@ -327,7 +327,22 @@ ShellRoot {
       operations: []
     }
     panel.handleTaskAction('dismiss', 'fresh-review')
-    t.equal(calls.length, 0, 'fresh live review never submits dismissal')
+    t.equal(calls.pop(), ['dismiss', 'fresh-review'], 'completed review can be dismissed while provider remains connected')
+    t.equal(tasks.reviewCount, 1, 'completed result counts as ready for review')
+    t.equal(tasks.attentionCount, 0, 'completed result does not advertise unresolved attention')
+    activity.snapshot = {
+      tasks: [Object.assign({}, activity.snapshot.tasks[0], {
+          blockers: [
+            {
+              blockerId: 'input',
+              question: 'Approve?'
+            }
+          ]
+        })],
+      operations: []
+    }
+    panel.handleTaskAction('dismiss', 'fresh-review')
+    t.equal(calls.length, 0, 'connected review with unresolved input cannot be dismissed')
     activity.snapshot = {
       tasks: [Object.assign({}, activity.snapshot.tasks[0], {
           freshness: 'connection-lost'

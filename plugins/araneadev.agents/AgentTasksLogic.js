@@ -155,6 +155,8 @@ function rows(snapshot, registry, now) {
         .join(" · ")
       return {
         key: task.taskId,
+        reportedState: task.reportedState,
+        hasBlockers: (task.blockers || []).length > 0,
         providerLabel:
           task.provider === "claude"
             ? "Claude Code"
@@ -214,7 +216,11 @@ function rows(snapshot, registry, now) {
           .join("\n"),
         primary: primary,
         secondary: secondary,
-        canDismiss: freshness === "connection-lost" || task.reportedState === "finished",
+        canDismiss:
+          freshness === "connection-lost" ||
+          task.reportedState === "finished" ||
+          (["ready-for-review", "failed"].indexOf(task.reportedState) >= 0 &&
+            (task.blockers || []).length === 0),
         resumeCommand: text(task.resumeCommand, 512),
         nativeId: text(task.providerSessionId, 256),
         epoch: text(task.producerEpoch, 256)

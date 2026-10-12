@@ -59,7 +59,8 @@ agent_hooks_command_hash() {
 
 # Only an actual ancestor with an approved executable/entrypoint is a provider.
 agent_hooks_provenance() {
-  local provider="${1:-}" pid=$$ parent start count=0 ancestors='[]' boot
+  local provider="${1:-}" pid=$$ parent start count=0 ancestors='[]' boot boundary_exe
+  local -a boundary_argv
   boot=$(cat /proc/sys/kernel/random/boot_id)
   while ((pid > 1 && count < 32)); do
     read -r parent start < <(agent_hooks_process "$pid") || break
@@ -76,6 +77,19 @@ agent_hooks_provenance() {
       done
       jq -cn --argjson pid "$provider_pid" --arg start "$provider_start" --arg boot "$boot" --argjson ancestors "$ancestors" --arg executable "$executable" --arg hash "$command_hash" '{executable:$executable,commandHash:$hash,pid:$pid,startTime:$start,bootId:$boot,ancestors:$ancestors,windowAddress:null,observedAt:0}'
       return 0
+    fi
+    # A different provider or unsupported app-server boundary cannot borrow a
+    # valid outer provider's identity. A claimed boundary only removes trust.
+    boundary_exe=$(readlink -f -- "/proc/$pid/exe") || break
+    boundary_argv=()
+    mapfile -d '' -t boundary_argv <"/proc/$pid/cmdline" || break
+    ((${#boundary_argv[@]})) || break
+    if [[ ${boundary_exe##*/} == codex || ${boundary_exe##*/} == claude ||
+      ${boundary_argv[0]##*/} == codex || ${boundary_argv[0]##*/} == claude ||
+      (${boundary_exe##*/} == node &&
+      (${boundary_argv[1]:-} == */node_modules/@anthropic-ai/claude-code/cli.js ||
+      ${boundary_argv[1]:-} == node_modules/@anthropic-ai/claude-code/cli.js)) ]]; then
+      break
     fi
     pid=$parent
     count=$((count + 1))

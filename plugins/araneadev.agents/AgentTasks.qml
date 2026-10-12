@@ -49,6 +49,14 @@ Item {
   readonly property var taskRows: Logic.rows(snapshot, projectSnapshot, nowMs)
   // Prompt/subagent history is not the number of connected provider threads.
   readonly property var summary: Logic.summary(snapshot)
+  // Completed results are ready to read, distinct from unresolved attention.
+  readonly property int reviewCount: taskRows.filter(function (row) {
+    return row.attention && row.reportedState === 'ready-for-review' && !row.hasBlockers
+  }).length
+  // Pending input and failures retain their attention indication.
+  readonly property int attentionCount: taskRows.filter(function (row) {
+    return row.attention
+  }).length - reviewCount
   // Live tasks and uncertain accepted actions remain available for recovery.
   readonly property var dismissibleTaskIds: taskRows.filter(function (row) {
     return row.canDismiss && !Logic.operationView(operationFor(row.key), error, pending).protected
@@ -249,9 +257,7 @@ Item {
       spacing: Style.space(12)
       Text {
         width: parent.width
-        text: tasks.taskRows.length ? tasks.summary.threadCount + ' connected thread' + (tasks.summary.threadCount === 1 ? '' : 's') + ' · ' + tasks.taskRows.length + ' saved tasks · ' + tasks.taskRows.filter(function (r) {
-          return r.attention
-        }).length + ' need attention' : 'Agent tasks'
+        text: tasks.taskRows.length ? tasks.summary.threadCount + ' connected thread' + (tasks.summary.threadCount === 1 ? '' : 's') + ' · ' + tasks.taskRows.length + ' saved tasks' + (tasks.reviewCount ? ' · ' + tasks.reviewCount + ' ready for review' : '') + (tasks.attentionCount ? ' · ' + tasks.attentionCount + ' need attention' : '') : 'Agent tasks'
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         font.family: Aranea.Typography.uiFamily
@@ -272,7 +278,7 @@ Item {
         id: clearButton
         objectName: 'clearInactiveTasks'
         visible: tasks.allowClear && tasks.taskRows.length > 0
-        text: tasks.clearing ? 'Clearing tasks…' : 'Clear all inactive tasks'
+        text: tasks.clearing ? 'Clearing tasks…' : 'Clear task history'
         enabled: !tasks.captureActive && !tasks.pending && tasks.dismissibleTaskIds.length > 0
         hasCursor: activeFocus || tasks.keyboardCursor && tasks.cursorId === '-clear-inactive'
         onClicked: tasks.requestClear(true)
@@ -280,7 +286,7 @@ Item {
       Text {
         width: parent.width
         visible: tasks.allowClear && tasks.taskRows.length > 0
-        text: 'Clears finished and disconnected tasks. Live tasks stay.'
+        text: 'Clears completed and disconnected entries. Working tasks and live requests for input stay.'
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
         opacity: 0.65

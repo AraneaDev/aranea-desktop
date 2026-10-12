@@ -246,19 +246,30 @@ prompt_minimization_and_duplicate_replay() {
 attention_retention_respects_connection() {
   register >/dev/null
   begin >/dev/null
-  report review 2 ready-for-review >/dev/null
+  report blocked 2 needs-input '{"blockerId":"pending","question":"Still needs input"}' >/dev/null
+  report review 3 ready-for-review >/dev/null
   reject dismiss '{"taskId":"turn"}' TASK_LIVE
-  report failed 3 failed >/dev/null
+  report failed 4 failed >/dev/null
   reject dismiss '{"taskId":"turn"}' TASK_LIVE
   jq '.tasks[0] as $task | .tasks=[range(200) as $i|$task+{taskId:("attention-"+($i|tostring))}]' "$registry" >"$TMPDIR/fixture"
   mv "$TMPDIR/fixture" "$registry"
-  reject report "$(event extra 4 snapshot "$(jq -cn --arg cwd "$checkout" '{cwd:$cwd,reportedState:"ready-for-review"}')")" CAPACITY_EXCEEDED
+  reject report "$(event extra 5 snapshot "$(jq -cn --arg cwd "$checkout" '{cwd:$cwd,reportedState:"ready-for-review"}')")" CAPACITY_EXCEEDED
   jq '.sessions[0].connection.monotonic=0 | .sessions[0].connection.receivedAt=0' "$registry" >"$TMPDIR/fixture"
   mv "$TMPDIR/fixture" "$registry"
   mutate dismiss '{"taskId":"attention-0"}' | jq -e '(.state.tasks|length == 199) and all(.state.tasks[];.reportedState == "failed")' >/dev/null
   jq '.tasks |= map(.lastReceivedAt=0)' "$registry" >"$TMPDIR/fixture"
   mv "$TMPDIR/fixture" "$registry"
   mutate prune '{}' | jq -e '.state.tasks == [] and .state.sessions == []' >/dev/null
+}
+# Explicit clearing of completed records must not terminate the reporting session.
+completed_history_dismissal() {
+  register >/dev/null
+  begin >/dev/null
+  report review 2 ready-for-review >/dev/null
+  mutate dismiss '{"taskId":"turn"}' | jq -e '.state.tasks == [] and .state.sessions[0].connection.connected' >/dev/null
+  report again 3 snapshot "$(jq -cn --arg cwd "$checkout" '{cwd:$cwd,reportedState:"working"}')" >/dev/null
+  report failure 4 failed >/dev/null
+  mutate dismiss '{"taskId":"turn"}' | jq -e '.state.tasks == [] and .state.sessions[0].connection.connected' >/dev/null
 }
 # A sandbox provider mapper exercises the production serialization boundary.
 copy_store_without_mapper() {
@@ -393,5 +404,5 @@ native_callback_ownership_schema_and_pruning() {
   "$store" snapshot | jq -e '.ok' >/dev/null
   report evict 4 heartbeat | jq -e '.state.sessions[0].nativeMetadata.callbackOwners == [] and (.state.sessions[0].receipts|length == 512)' >/dev/null
 }
-for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
+for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection completed_history_dismissal native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
 ((failures == 0))

@@ -27,6 +27,12 @@ refusals retry the original submission. Reconnect reads the accepted ID.
 Reobserve explicitly checks a retained partial resume without launching,
 preparing, moving or focusing anything.
 
+Dismissal also accepts completed review/failure records in connected sessions
+when no unresolved blocker remains. Working tasks and live input requests stay
+protected. Explicit store-lock refusals retry up to three times before a
+mutation; once accepted, only the confirmation read may retry. Transport
+uncertainty never repeats a mutation.
+
 A launch submission outlives the observation deadline. `submissionPending`
 protects its operation from eviction and repeat submission; unrelated actions
 can continue. A late accepted identity remains on the original partial operation

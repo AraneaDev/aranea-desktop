@@ -46,6 +46,24 @@ test("task history counts connected provider threads once instead of counting pr
     { threadCount: 0, taskCount: 1 }
   )
 })
+test("completed reviews and failures are clearable without clearing live work or unresolved input", () => {
+  for (const state of ["ready-for-review", "failed"]) {
+    assert.equal(logic.rows({ tasks: [task("complete", state)] }, registry)[0].canDismiss, true)
+    assert.equal(
+      logic.rows(
+        {
+          tasks: [
+            task("blocked", state, { blockers: [{ blockerId: "pending", question: "Approve?" }] })
+          ]
+        },
+        registry
+      )[0].canDismiss,
+      false
+    )
+  }
+  for (const state of ["working", "needs-input"])
+    assert.equal(logic.rows({ tasks: [task("live", state)] }, registry)[0].canDismiss, false)
+})
 test("all six states use human labels and attention comes first without verification inference", () => {
   assert.equal(typeof logic.rows, "function", "Tasks projection exists")
   const states = [
@@ -243,7 +261,7 @@ test("approved lifecycle actions vary by exact checkout, native capability and r
     assert.equal(row.secondary && row.secondary.kind, "")
   }
 })
-test("only store-inactive finished or owner-stale records advertise dismissal", () => {
+test("completed or owner-stale records advertise dismissal while current work remains protected", () => {
   for (const reportedState of [
     "working",
     "needs-input",
@@ -258,7 +276,8 @@ test("only store-inactive finished or owner-stale records advertise dismissal", 
       )[0]
       assert.equal(
         row.canDismiss,
-        reportedState === "finished" || freshness === "connection-lost",
+        ["ready-for-review", "failed", "finished"].includes(reportedState) ||
+          freshness === "connection-lost",
         reportedState + " " + freshness
       )
     }

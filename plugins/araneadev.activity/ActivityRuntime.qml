@@ -127,18 +127,42 @@ Item {
   }
   // Confirm successful dismissal using a fresh store read; no provider process is signalled.
   function dismiss(taskId: string, done: var): void {
-    json([scriptsPath + '/aranea-agent-store', 'mutate'], JSON.stringify({
+    var request = JSON.stringify({
       action: 'dismiss',
       args: {
         taskId: taskId
       }
-    }), function (response) {
-      if (!response.ok) {
-        done(response)
-        return
-      }
-      readStore(done)
     })
+    // A structured lock refusal occurs before mutation. Transport ambiguity
+    // never retries; after success only readback may be repeated.
+    function busy(response) {
+      return response && !response.ok && response.transportUnconfirmed !== true && response.error && response.error.code === 'ACTIVITY_LOCK_FAILED'
+    }
+    // Read contention never replays the already acknowledged deletion.
+    function verify(attempt) {
+      readStore(function (response) {
+        if (busy(response) && attempt < 3)
+          Qt.callLater(function () {
+            verify(attempt + 1)
+          })
+        else
+          done(response)
+      })
+    }
+    // Repeat only a guaranteed pre-write refusal, with a fixed attempt limit.
+    function remove(attempt) {
+      json([scriptsPath + '/aranea-agent-store', 'mutate'], request, function (response) {
+        if (busy(response) && attempt < 3)
+          Qt.callLater(function () {
+            remove(attempt + 1)
+          })
+        else if (!response.ok)
+          done(response)
+        else
+          verify(0)
+      })
+    }
+    remove(0)
   }
   // The native validator independently rechecks boot, executable, hash and parent chain.
   function proveNative(session: var, terminalPid: var, done: var): void {
