@@ -52,7 +52,7 @@ ShellRoot {
   // How many pills draw the mint outline.
   function outlined() {
     return t.findChildren(panel, "cursorOutline").filter(function (o) {
-      return o.border.width > 0
+      return o.visible && o.focused
     }).length
   }
 
@@ -106,7 +106,7 @@ ShellRoot {
             error: "",
             groups: []
           })
-        t.equal(t.findChild(panel, "statusTitle").text, "Up to date", "updates waiting with no reboot still reads ok")
+        t.equal(t.findChild(panel, "statusTitle").text, "Updates available", "pending updates never claim the system is up to date")
         t.equal(t.findChild(panel, "statusSubtitle").text, "2 updates available", "the count line pluralizes")
         t.check(Qt.colorEqual(t.findChild(panel, "statusNode").color, Aranea.DesignTokens.ceremony), "the node is tinted mint/ceremony for ok")
 

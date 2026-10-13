@@ -76,8 +76,14 @@ animation or system activation step.
 
 Generated outputs include the files under `branding/`, `colors.toml`,
 `shell.toml`, integration stylesheets, platform configs, shared QML config,
-and raster artwork. They are checked into the repository for installation and
-must not be edited directly.
+and generated branding rasters such as `unlock.png`. They are checked into the
+repository for installation and must not be edited directly.
+
+Wallpaper PNGs are separate generated-image artwork, not token-generator
+outputs. Recoloring tokens or replacing the SVG mark does not regenerate their
+scenes or embedded emblems. See [Artwork](../backgrounds/ARTWORK.md) for prompts,
+original sources, and export instructions. Signal Shrine and Aranea Core use the
+spider in the artwork; update those explicitly when rebranding.
 
 If the shape or semantic role of a motif or status glyph needs to change, edit
 the corresponding template under `design/templates/assets/branding/` and run
@@ -89,5 +95,5 @@ and add a contract test before regenerating outputs.
 
 For the complete contributor verification workflow, including QML, JavaScript,
 ShellCheck, documentation, and screenshot checks, see
-[Development](development.md). The public README intentionally omits those
-development-only commands and capture details.
+[Development](development.md). The README links the contributor workflow and
+shows the current capture set.

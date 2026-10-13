@@ -64,6 +64,8 @@ Panel {
   readonly property var source: Pipewire.defaultAudioSource
   // All Pipewire nodes, or [] before the service is ready.
   readonly property var nodes: Pipewire.nodes ? Pipewire.nodes.values : []
+  // Recorder-stream activity, independent of the level meter and source mute.
+  readonly property bool captureActive: Model.captureActive(nodes)
   // All known MPRIS media players.
   readonly property var mprisPlayers: Mpris.players ? Mpris.players.values : []
   // Omarchy's media service, when the bar exposes one.
@@ -645,13 +647,6 @@ Panel {
     return String.fromCodePoint(0xEEE8)
   }
 
-  // The microphone glyph for the current input mute state.
-  function inputIcon() {
-    if (!source || !source.audio)
-      return String.fromCodePoint(0xF036D)
-    return inputMuted ? String.fromCodePoint(0xF036D) : String.fromCodePoint(0xF036C)
-  }
-
   // Playful mood-name for a given output volume. Mirrors the brightness
   // panel's brightnessName ladder; bands are wide enough that small
   // tweaks don't rename the room you're in.
@@ -879,7 +874,8 @@ Panel {
         present: hasInput,
         volume: inputVolume,
         muted: inputMuted,
-        level: inputSignal
+        level: inputSignal,
+        captureActive: captureActive
       },
       inputDevices: inputDeviceRows,
       inputDefault: inputShown,
@@ -996,6 +992,15 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: root.outputIcon()
+    tooltipText: root.captureActive ? (root.inputMuted ? "Audio · Recording requested, microphone muted" : "Audio · Microphone in use") : "Audio"
+    AudioCaptureIndicator {
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.rightMargin: Style.space(1)
+      anchors.bottomMargin: Style.space(3)
+      captureActive: root.captureActive
+      muted: root.inputMuted
+    }
     onPressed: function (b) {
       root.keyboardCursor = false
       if (b === Qt.RightButton)

@@ -3,6 +3,8 @@
 // metrics. State lives in the health service (Service.qml), read through
 // HealthBridge.js because the Aranea bar gives widgets a service-less facade.
 
+pragma ComponentBehavior: Bound
+import "."
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -15,6 +17,53 @@ Panel {
   id: root
   moduleName: "araneadev.health"
   manageIpc: false
+
+  // Consolidated bars show this shortcut only when an issue needs attention.
+  property bool alertOnly: setting("alertOnly", false) === true
+  // Keep the open panel anchor stable if its final issue is resolved.
+  readonly property bool showBarIcon: !alertOnly || opened || (available && problems.length > 0)
+
+  // Battery/System embeds the existing controller and resource view.
+  property bool embedded: false
+  // System owner while embedded; null for standalone use.
+  property var embeddingHost: null
+  // Health resource view rendered inside the System popup.
+  property var hostedDropdown: null
+  // Only the visible view receives cursor, scrolling and pointer resets.
+  readonly property var activeDropdown: embedded ? hostedDropdown : standaloneView.item
+  // Open the embedded System page or the standalone controller.
+  function open() {
+    if (embedded && embeddingHost)
+      embeddingHost.openSystemPage("health")
+    else
+      root.controller.show()
+  }
+  // Close the owning System window or the standalone controller.
+  function close() {
+    if (embedded && embeddingHost)
+      embeddingHost.close()
+    else
+      root.controller.hide()
+  }
+  // Toggle the current Health surface.
+  function toggle() {
+    root.opened ? root.close() : root.open()
+  }
+  // Clear stale pointer samples on the active resource view.
+  function disarmPointer() {
+    if (root.activeDropdown)
+      root.activeDropdown.disarmPointer()
+  }
+  // Forward hosted navigation through the existing keyed Health cursor.
+  function navigateKeyboard(dx, dy) {
+    root.disarmPointer()
+    root.moveCursor(dy)
+  }
+  // Apply the existing reveal-before-activation rule in either host.
+  function activateKeyboard() {
+    root.disarmPointer()
+    root.activateCursor()
+  }
 
   // The published health service, or null; re-polled every second so a
   // reloaded service is picked up.
@@ -51,7 +100,7 @@ Panel {
   // after pointer use only reveals it.
   property bool keyboardCursor: false
   // Disclosure headings are keyed stops after all actionable problems.
-  property bool resourcesExpanded: false
+  property bool resourcesExpanded: true
   // Host-owned Processes expansion state.
   property bool processesExpanded: false
   // Problem keys followed by the two disclosure heading keys.
@@ -63,8 +112,10 @@ Panel {
     if (root.resourcesExpanded && root.cursorKey.indexOf("details:resources:") === 0)
       root.cursorKey = "details:resources"
     root.resourcesExpanded = !root.resourcesExpanded
-    dropdown.noteLayoutChange()
-    Qt.callLater(dropdown.ensureCursorVisible)
+    if (root.activeDropdown) {
+      root.activeDropdown.noteLayoutChange()
+      Qt.callLater(root.activeDropdown.ensureCursorVisible)
+    }
   }
 
   // Toggles process details and restores internal focus on collapse.
@@ -72,8 +123,10 @@ Panel {
     if (root.processesExpanded && root.cursorKey.indexOf("details:processes:") === 0)
       root.cursorKey = "details:processes"
     root.processesExpanded = !root.processesExpanded
-    dropdown.noteLayoutChange()
-    Qt.callLater(dropdown.ensureCursorVisible)
+    if (root.activeDropdown) {
+      root.activeDropdown.noteLayoutChange()
+      Qt.callLater(root.activeDropdown.ensureCursorVisible)
+    }
   }
 
   // A problem that went away takes the cursor with it (after the change
@@ -125,8 +178,12 @@ Panel {
 
   // Runs a problem row's click command, if it has one.
   function runRow(row): void {
-    if (row && row.execArgv && row.execArgv.length)
-      Util.execArgv(row.execArgv)
+    var tools = root.service && root.service.monitor ? root.service.monitor.tools : null
+    var argv = HealthLogic.resolutionArgv(row, Aranea.RuntimePaths.themeRoot + "/scripts/aranea-health-resolve", tools ? tools.terminal !== false : true)
+    if (argv.length) {
+      root.close()
+      Util.execArgv(argv)
+    }
   }
 
   // Counted per panel, so switching the dropdown between monitors (the host
@@ -170,14 +227,16 @@ Panel {
     root.cursorKey = ""
     root.keyboardCursor = false
     if (!opened) {
-      root.resourcesExpanded = false
+      root.resourcesExpanded = true
       root.processesExpanded = false
-      dropdown.scrollViewport.contentY = 0
+      if (root.activeDropdown)
+        root.activeDropdown.scrollViewport.contentY = 0
     }
   }
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  visible: !embedded && showBarIcon
+  implicitWidth: !embedded && showBarIcon ? button.implicitWidth : 0
+  implicitHeight: !embedded && showBarIcon ? button.implicitHeight : 0
 
   BarIconButton {
     id: button
@@ -207,50 +266,56 @@ Panel {
     anchorItem: button
     owner: root
     bar: root.bar
-    open: root.opened
-    contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight, Style.space(720))
+    open: !root.embedded && root.opened
+    contentWidth: panel.fittedContentWidth(Style.space(540))
+    contentHeight: panel.fittedContentHeight(root.activeDropdown ? root.activeDropdown.implicitHeight : 0, Style.space(720))
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
-      dropdown.disarmPointer()
-      root.moveCursor(dy)
+      root.disarmPointer()
+      root.navigateKeyboard(dx, dy)
     }
     onActivateRequested: {
-      dropdown.disarmPointer()
-      root.activateCursor()
+      root.disarmPointer()
+      root.activateKeyboard()
     }
 
-    HealthDropdown {
-      id: dropdown
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      available: root.available
-      status: root.status
-      problems: root.problems
-      metrics: root.m
-      active: root.opened
-      cursorKey: root.cursorKey
-      keyboardCursor: root.keyboardCursor
-      resourcesExpanded: root.resourcesExpanded
-      processesExpanded: root.processesExpanded
-      maxContentHeight: Math.max(0, Math.min(Style.space(720), panel.availableCardHeight) - panel.verticalContentInset)
-      onProblemActivated: function (index, key) {
-        root.activateRow(index, key)
-      }
-      onResourcesToggleRequested: {
-        root.keyboardCursor = false
-        root.cursorKey = "details:resources"
-        root.toggleResources()
-      }
-      onProcessesToggleRequested: {
-        root.keyboardCursor = false
-        root.cursorKey = "details:processes"
-        root.toggleProcesses()
+    Loader {
+      id: standaloneView
+      width: parent.width
+      active: !root.embedded
+      sourceComponent: Component {
+        HealthDropdown {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          available: root.available
+          status: root.status
+          problems: root.problems
+          metrics: root.m
+          active: root.opened
+          cursorKey: root.cursorKey
+          keyboardCursor: root.keyboardCursor
+          resourcesExpanded: root.resourcesExpanded
+          processesExpanded: root.processesExpanded
+          maxContentHeight: Math.max(0, Math.min(Style.space(720), panel.availableCardHeight) - panel.verticalContentInset)
+          onProblemActivated: function (index, key) {
+            root.activateRow(index, key)
+          }
+          onResourcesToggleRequested: {
+            root.keyboardCursor = false
+            root.cursorKey = "details:resources"
+            root.toggleResources()
+          }
+          onProcessesToggleRequested: {
+            root.keyboardCursor = false
+            root.cursorKey = "details:processes"
+            root.toggleProcesses()
+          }
+        }
       }
     }
   }

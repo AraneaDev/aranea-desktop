@@ -39,13 +39,13 @@ QtObject {
   // Duration of existing hover and selection feedback.
   readonly property int feedbackDuration: 120
   // Duration of panel opacity settling.
-  readonly property int settleDuration: 160
+  readonly property int settleDuration: 220
   // Shared spring strength and damping for spatial transitions.
   readonly property real springStrength: 4
   // Shared damping controls the small overshoot and settling.
   readonly property real springDamping: 0.3
   // Small entrance/exit scale offset for readable cards.
-  readonly property real surfaceClosedScale: 0.97
+  readonly property real surfaceClosedScale: 0.94
   // Whether motion effects are enabled.
   readonly property bool motionEnabled: MotionState.motionEnabled
   // Fill of a clickable element under the pointer, shown only after a real

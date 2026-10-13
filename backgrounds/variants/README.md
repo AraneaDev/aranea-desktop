@@ -1,13 +1,20 @@
 # Aranea wallpaper variants
 
-The stable variant IDs are declared in `../manifest.toml`. Day/night remain the
-canonical desktop pair; dusk, monochrome, ultrawide, sparse, and dense are
-distinct silk-network compositions generated for their named contrast and
-aspect goals. Sparse is a low-noise mint network; dense has richer mint/violet
-topology and dimensional nodes. Dusk is softer violet, monochrome is silver,
-and ultrawide has a dedicated panoramic composition.
+Signal Shrine is the default background. The relative link
+`../00-default.png` puts it first in Omarchy's sorted background selection
+without duplicating the image or changing its catalog ID.
 
-The six 16:9 wallpapers are exported at 3840×2160; ultrawide is 3840×1280.
+The collection contains thirteen distinct cyberpunk scenes in obsidian, mint,
+and violet. Neural Deck is a physical hacker command room; Ghost in the Wire is
+the cybernetic portrait. Stable IDs such as `cockpit` and `monochrome` are kept
+for compatibility even though human titles describe the new artwork. The full
+[title/ID map](../../docs/configuration.md#wallpapers) lists every scene.
+
+Twelve 16:9 wallpapers are exported at 3840×2160; ultrawide is 3840×1280.
 These are resampled delivery sizes, not native generated resolution. Original
-generator outputs, full prompts, and export instructions are documented in
+outputs, full prompts and export instructions are documented in
 [../ARTWORK.md](../ARTWORK.md).
+
+Four additional scenes expand the collection: Aranea Core and Signal Shrine
+feature the Aranea spider; Violet Pursuit follows a futuristic motorcycle;
+Deep Current explores a submerged data facility.

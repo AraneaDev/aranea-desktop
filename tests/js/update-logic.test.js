@@ -4,6 +4,18 @@ const { test } = require("node:test")
 
 const logic = require(path.join(__dirname, "..", "..", "plugins/araneadev.updates/UpdateLogic.js"))
 
+test("collector decoding keeps process failures and malformed output out of package counts", () => {
+  assert.deepEqual(logic.statusFromOutput('{"updates":[{"source":"system","name":"curl"}]}', 0), {
+    updates: [{ source: "system", name: "curl" }]
+  })
+  assert.equal(
+    logic.statusFromOutput('{"error":"aur check unavailable"}', 1).error,
+    "aur check unavailable"
+  )
+  assert.equal(logic.statusFromOutput('{"updates":[]}', 1).error, "update check unavailable")
+  assert.equal(logic.statusFromOutput("cannot fetch updates", 0).error, "update check unavailable")
+})
+
 test("parses update rows into grouped source counts", () => {
   const status = logic.parseStatus({
     updates: [
@@ -92,7 +104,7 @@ test("the status row reads a failed check or a pending reboot as a warning", () 
   })
   assert.deepEqual(logic.statusRow({ count: 1 }), {
     tone: "ok",
-    title: "Up to date",
+    title: "Updates available",
     subtitle: "1 update available"
   })
   assert.deepEqual(logic.statusRow({ count: 3, rebootRequired: true }), {

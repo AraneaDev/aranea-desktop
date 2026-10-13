@@ -45,6 +45,14 @@ into view; a removed target cannot activate its replacement. Hover only draws a 
 hides the outline. Expansion, scrolling and real re-sorts stamp layout changes so stale pointer
 clicks settle for 300 ms. The font family and external mint/violet frame remain host-controlled.
 
+Real Usage provider selection is saved as `selectedProviderId` in the inline
+Agents bar settings, so a shell restart restores Codex when Codex was selected.
+Showcase and inert capture navigation never overwrite that preference.
+`omarchy-shell omarchy.agents selection` reports preferred/active IDs;
+`omarchy-shell omarchy.agents select codex` selects an available provider and
+saves it (`unavailable` if undiscovered, `refused` during captures/showcases).
+These controls do not enable task reporting.
+
 The pure rules live in `AgentsLogic.js` (ring fraction/tone, row keys, refresh-pending state and its landing gate, the
 "updated HH:MM" caption; tested under Node). `Panel.qml` builds `agentsView` from stock's own
 limit/balance/day/model functions and adds the limits' pace tick (the elapsed share of each
@@ -55,7 +63,7 @@ window's span) and the mark probe that walks stock's light-twin fallback for the
 todayPrompts, todaySessions, limits: [{label, percent, resetsInMinutes}], days: [...counts,
 oldest first, today last], models: [{id, input, output, cacheRead, cacheWrite}], balance?:
 {remaining, funded, spent, currency}}]}` (`AgentsLogic.parseShowcase`, which refuses anything
-  malformed). The first stand-in is selected. Display only: no collector runs, the sync footer
+  malformed). The first stand-in is selected (Codex in the shipped capture fixture). Display only: no collector runs, the sync footer
   hides, IPC `refresh` answers `refused` and the Refresh pill, `r`, Enter on Refresh and the right-click
   agent picker do nothing while it is shown, and it clears when the dropdown opens or closes.
   Closed, the call answers `closed`; a bad payload, `invalid`. The stand-in choice of agent is

@@ -80,7 +80,7 @@ ShellRoot {
   // How many rows draw the mint outline.
   function outlined() {
     return t.findChildren(section, "cursorOutline").filter(function (o) {
-      return o.border.width > 0
+      return o.visible && o.focused
     }).length
   }
 

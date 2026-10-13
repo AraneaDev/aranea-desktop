@@ -235,8 +235,8 @@ Item {
             Layout.fillHeight: !panel.compact
             implicitHeight: panel.compact ? sidebar.implicitHeight + Style.space(24) : 0
             radius: Style.space(6)
-            color: Util.alpha(Color.foreground, 0.025)
-            border.color: Util.alpha(Color.foreground, 0.08)
+            color: Util.alpha(Aranea.DesignTokens.accent, 0.04)
+            border.color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
             border.width: 1
             ProjectsSidebar {
               id: sidebar

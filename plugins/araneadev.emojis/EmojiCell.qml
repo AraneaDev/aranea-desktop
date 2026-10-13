@@ -67,15 +67,10 @@ Rectangle {
   radius: cornerRadius
   color: hovered ? selectedBackground : "transparent"
 
-  Rectangle {
-    // The keyboard cursor outline (mint): Enter's target.
+  Aranea.FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
-    radius: cell.cornerRadius
-    visible: cell.hasCursor
-    color: Util.alpha(Aranea.DesignTokens.accent, 0.08)
-    border.width: 1
-    border.color: Aranea.DesignTokens.accent
+    focused: cell.hasCursor
   }
 
   Text {

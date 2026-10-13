@@ -213,6 +213,24 @@ ShellRoot {
         availability: 'available',
         enabled: false,
         applied: false,
+        entries: [
+          {
+            time: '06:00',
+            wallpaper: 'wallpaper-0'
+          },
+          {
+            time: '08:00',
+            wallpaper: 'wallpaper-1'
+          },
+          {
+            time: '18:00',
+            wallpaper: 'wallpaper-2'
+          },
+          {
+            time: '20:00',
+            wallpaper: 'wallpaper-3'
+          }
+        ],
         dawn: '06:00',
         day: '08:00',
         dusk: '18:00',

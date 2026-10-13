@@ -11,6 +11,7 @@
 import QtQuick
 import QtTest
 import Quickshell
+import qs.Commons
 import "lib"
 import "plugins/araneadev.tray" as Tray
 import "plugins/araneadev.shared" as Aranea
@@ -125,7 +126,7 @@ ShellRoot {
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
     return t.findChildren(item, "cursorOutline").filter(function (o) {
-      return o.visible && (o.border.width > 0 || o.color.a > 0)
+      return o.visible && o.focused
     }).length
   }
 
@@ -181,7 +182,7 @@ ShellRoot {
         t.equal(hidden.text, "Hidden", "a hidden item's pill reads Hidden")
         t.check(hidden.selected, "and is lit")
         t.check(Qt.colorEqual(hidden.selectedColor, Aranea.DesignTokens.strandEnd), "in violet")
-        t.check(Qt.colorEqual(one(hidden, "pillBorder").border.color, Aranea.DesignTokens.strandEnd), "its border is violet")
+        t.check(Qt.colorEqual(one(hidden, "pillBorder").border.color, Util.alpha(Aranea.DesignTokens.foreground, 0.18)), "its bezel stays neutral while the choice is violet")
         t.check(one(rowAt(2), "rowName").color.a < 1 || one(rowAt(2), "rowName").opacity < 1, "a hidden item's name is muted")
 
         // ---------- Pending ----------

@@ -47,7 +47,7 @@ grep -Fq '06:00:00' "$unit_root/aranea-wallpaper-day-night.timer"
 grep -Fq '08:00:00' "$unit_root/aranea-wallpaper-day-night.timer"
 grep -Fq '18:00:00' "$unit_root/aranea-wallpaper-day-night.timer"
 grep -Fq '20:00:00' "$unit_root/aranea-wallpaper-day-night.timer"
-grep -Fq 'set-phase' "$unit_root/aranea-wallpaper-day-night.service"
+grep -Fq 'set-scheduled' "$unit_root/aranea-wallpaper-day-night.service"
 grep -Fq 'wallpaper schedule: on' <(XDG_CONFIG_HOME="$config_root" ARANEA_STATE_ROOT="$schedule_state" "$repo_root/scripts/aranea-wallpaper" schedule status)
 ARANEA_SYSTEMD_USER_DIR="$unit_root" ARANEA_STATE_ROOT="$schedule_state" XDG_CONFIG_HOME="$config_root" ARANEA_SYSTEMCTL=/bin/true \
   "$repo_root/scripts/aranea-wallpaper" schedule configure 05:30 08:00 18:30 21:00 >/dev/null
@@ -85,7 +85,26 @@ grep -Fq 'Unknown wallpaper: da\y' <<<"$bs_out"
 rm -f "$wp_manifest"
 
 # Optional catalog is machine-readable; the default text list stays intact.
-"$repo_root/scripts/aranea-wallpaper" list --json | jq -e 'length == 8 and all(.[]; (.path | startswith("/")) and .available)' >/dev/null
+"$repo_root/scripts/aranea-wallpaper" list --json | jq -e 'any(.[]; .id == "cockpit" and .available) and all(.[]; (.path | startswith("/")) and .available)' >/dev/null
+# Human-facing titles come from the manifest without renaming stable IDs.
+title_manifest="$(mktemp)"
+cat >"$title_manifest" <<'TOML'
+[[wallpapers]]
+id = "day"
+path = "backgrounds/background-day.png"
+label = "Rain City"
+
+[other]
+label = "Not a wallpaper title"
+
+[[wallpapers]]
+id = "night"
+path = "backgrounds/background-night.png"
+TOML
+ARANEA_WALLPAPER_MANIFEST="$title_manifest" "$repo_root/scripts/aranea-wallpaper" list --json |
+  jq -e '.[0].id == "day" and .[0].label == "Rain City" and .[1].label == "Night"' >/dev/null
+[[ "$(ARANEA_WALLPAPER_MANIFEST="$title_manifest" "$repo_root/scripts/aranea-wallpaper" list)" == $'day\tbackgrounds/background-day.png\nnight\tbackgrounds/background-night.png' ]]
+rm -f "$title_manifest"
 # Missing current-background owner reports unavailable, never last selection.
 "$repo_root/scripts/aranea-wallpaper" status --json | jq -e '.activeId == null and .availability == "unavailable"' >/dev/null
 

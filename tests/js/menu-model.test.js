@@ -188,7 +188,7 @@ test("menu model (4b)", () => {
     "system tagline"
   )
   eq(
-    menu.semanticDetail({ id: "install", parent: "root", label: "Install" }, "desc"),
+    menu.semanticDetail({ id: "custom", parent: "root", label: "Custom" }, "desc"),
     "desc",
     "other roots keep description"
   )

@@ -79,7 +79,7 @@ ShellRoot {
     t.equal(menu.cursor, 1, 'open selects the first enabled row')
     var rows = t.findChildren(menu, 'menuRow')
     var outline = t.findChild(rows[1], 'cursorOutline')
-    t.check(outline.visible && outline.border.width > 0 && rows[1].visible, 'first keyboard outline is visible immediately')
+    t.check(outline.visible && outline.focused && rows[1].visible, 'first keyboard outline is visible immediately')
     t.check(isFinite(menu.width) && menu.width > 0 && isFinite(menu.height) && menu.height > 0, 'popup has finite nonzero dimensions')
     var reason = t.findChild(rows[2], 'menuDetail')
     t.check(reason.visible && reason.height > reason.font.pixelSize * 2 && reason.width > 0 && reason.width < menu.width, 'long disabled reason wraps within fixed menu width')

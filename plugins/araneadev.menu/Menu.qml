@@ -419,6 +419,8 @@ Item {
     id: menuStyle
     opened: root.opened
     fullRootHeader: root.fullRootHeader
+    compactRoot: root.screenHeight < Style.space(620)
+    minimalRoot: root.screenHeight < Style.space(380)
   }
   // The menu's style (read by the window as root.style.x).
   readonly property alias style: menuStyle
@@ -435,7 +437,7 @@ Item {
   // refresh) does not stamp the layout.
   property string displayKeys: ""
   // Card width: depends on mode and menu, capped to the screen.
-  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : root.fullRootHeader ? Style.space(640) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(480)), root.screenWidth - Style.gapsOut * 2)
+  property int cardWidth: Math.min(root.dmenuActive ? Math.max(Style.space(dmenuRequest.requestedWidth), Style.space(420)) : ((root.activeMenu === "trigger.capture.screenrecord" || root.activeMenu === "style.font") ? Style.space(560) : Style.space(540)), root.screenWidth - Style.gapsOut * 2)
   // Height given to the row list for the current rows.
   property int visibleRowsHeight: root.dmenuActive ? dmenuRowListHeight(layoutSerial, displayModel.count, filterText) : rowListHeight(layoutSerial, displayModel.count, filterText, searchDivider)
   // Total card height: borders, padding, chrome, one section gap and the rows

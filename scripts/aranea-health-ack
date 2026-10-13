@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Persist acknowledgment of one stopped-container occurrence, not its name forever.
+# Usage: aranea-health-ack status | acknowledge container:NAME [EXPECTED_JSON] | forget container:NAME
+set -euo pipefail
+operation="${1:-}"
+state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+state_file="$state_root/health-acknowledgments.json"
+scratch="$(mktemp -d)"
+state_tmp=''
+# Remove temporary inspection output and any uncommitted state file.
+cleanup() {
+  rm -rf "$scratch"
+  [[ -z "$state_tmp" ]] || rm -f "$state_tmp"
+}
+trap cleanup EXIT
+umask 077
+case "$operation" in
+  status) [[ $# == 1 ]] || exit 2 ;;
+  acknowledge | forget)
+    [[ $# == 2 || ("$operation" == acknowledge && $# == 3) ]] || exit 2
+    key="$2"
+    [[ "$key" == container:* ]] || exit 2
+    name="${key#container:}"
+    [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || exit 2
+    mkdir -p "$state_root"
+    exec 9>"$state_root/health-acknowledgments.lock"
+    flock -x 9
+    ;;
+  *) exit 2 ;;
+esac
+if [[ -f "$state_file" ]]; then
+  cp "$state_file" "$scratch/state"
+else
+  echo '{"version":1,"containers":{}}' >"$scratch/state"
+fi
+jq -e '.version == 1 and (.containers | type == "object") and
+  all(.containers | to_entries[];
+    (.key | test("^[A-Za-z0-9][A-Za-z0-9_.-]*$")) and
+    (.value | type == "object" and (.id | type == "string" and length > 0) and
+      (.finishedAt | type == "string" and length > 0)))' "$scratch/state" >/dev/null || {
+  echo 'Health acknowledgments are unreadable.' >&2
+  exit 1
+}
+
+# Docker supplies a stable ID and precise stop timestamp; no environment/secrets.
+read_occurrence() {
+  timeout 10 docker inspect --format '{"id":{{json .Id}},"finishedAt":{{json .State.FinishedAt}},"running":{{json .State.Running}}}' -- "$1"
+}
+# Reject a running or never-started container; this feature acknowledges a stop.
+is_stopped() {
+  jq -e '.running == false and (.id | type == "string" and length > 0) and
+    (.finishedAt | type == "string" and length > 0 and (startswith("0001-") | not))' "$1" >/dev/null
+}
+
+if [[ "$operation" == status ]]; then
+  : >"$scratch/keys"
+  while IFS= read -r name; do
+    if read_occurrence "$name" >"$scratch/current" 2>/dev/null && is_stopped "$scratch/current"; then
+      if jq -e --arg name "$name" --slurpfile current "$scratch/current" \
+        '.containers[$name] | .id == $current[0].id and .finishedAt == $current[0].finishedAt' "$scratch/state" >/dev/null; then
+        jq -cn --arg key "container:$name" '$key' >>"$scratch/keys"
+      fi
+    fi
+  done < <(jq -r '.containers | keys[]' "$scratch/state")
+  jq -cn --slurpfile keys "$scratch/keys" '{acknowledged:$keys}'
+  exit 0
+fi
+
+if [[ "$operation" == acknowledge ]]; then
+  read_occurrence "$name" >"$scratch/current"
+  is_stopped "$scratch/current" || {
+    echo 'This container is running or has no recorded stop.' >&2
+    exit 1
+  }
+  if [[ $# == 3 ]]; then
+    printf '%s\n' "$3" >"$scratch/expected"
+    jq -e --slurpfile expected "$scratch/expected" \
+      '.id == $expected[0].id and .finishedAt == $expected[0].finishedAt' "$scratch/current" >/dev/null || {
+      echo 'The container state changed. Reopen the issue before acknowledging it.' >&2
+      exit 1
+    }
+  fi
+  jq --arg name "$name" --slurpfile current "$scratch/current" \
+    '.containers[$name] = ($current[0] | {id,finishedAt})' "$scratch/state" >"$scratch/next"
+else
+  jq --arg name "$name" 'del(.containers[$name])' "$scratch/state" >"$scratch/next"
+fi
+state_tmp="$(mktemp "$state_root/.health-ack.XXXXXX")"
+cat "$scratch/next" >"$state_tmp"
+mv -f "$state_tmp" "$state_file"
+state_tmp=''
+jq -cn --arg key "$key" --arg operation "$operation" '{key:$key,operation:$operation}'

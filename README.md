@@ -2,10 +2,11 @@
 
 # Aranea Desktop
 
-**A quiet, obsidian Omarchy desktop experience with a living network of light.**
+**A cyberpunk command center for Omarchy.**
 
-Deep black surfaces, mint activity, violet focus, atmospheric wallpapers, and
-the AraneaDev mark carried consistently from boot to desktop.
+Obsidian instruments, mint light, violet depth, animated controls, and
+thirteen distinct cyberpunk wallpapers. Signal Shrine brings the Aranea spider
+to the desktop; the same identity carries through the command center, lock, and boot.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/aranea-desktop/ci.yml?label=CI)](https://github.com/AraneaDev/aranea-desktop/actions/workflows/ci.yml)
@@ -34,7 +35,6 @@ Choose **Install/update** and a profile. The same operation is available directl
 
 ```bash
 scripts/install.sh --profile full --yes
-omarchy theme set aranea
 ```
 
 | Profile   | Includes                                                               |
@@ -53,7 +53,7 @@ Select a wallpaper and optionally apply the boot splash:
 
 ```bash
 scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set day
+scripts/aranea-wallpaper set signal-shrine
 omarchy plymouth set-by-theme aranea
 ```
 
@@ -64,25 +64,28 @@ activation, and update workflow.
 
 Aranea installs as the `aranea` theme and brings a consistent visual system to
 the shell, applications, lock screen, and boot: obsidian surfaces, mint activity,
-violet focus, and a transparent interactive bar. Wallpapers stay mark-free;
-the spider identity appears in menus, lock, boot, idle, and fastfetch surfaces.
+violet depth, and an interactive bar. The default Signal Shrine and Aranea Core
+wallpapers incorporate the spider into the scene; menus, lock, boot, idle, and
+fastfetch use the canonical mark.
 
 - **Command center:** Files, Terminal, Projects, Favorites, Recent, and searchable apps.
 - **Settings:** wallpaper, fonts, motion, display scale, schedule, integrations, and DND.
 - **Project workspaces:** confirmed Git discovery, grouped worktrees, project search, and Open/Resume with saved tools.
-- **System controls:** network, VPN, audio, Bluetooth, displays, power, tray, calendar, and weather.
-- **Health and notifications:** resource graphs, processes, services, reboot and container status, plus a quiet notification center.
+- **Network:** Network, VPN, and Bluetooth tabs behind one linked-node control.
+- **Audio:** output, microphone, devices, and app streams; a microphone badge appears during capture.
+- **System:** Power, Display, and Health tabs behind one adjustments control.
+- **Health and notifications:** expanded resource graphs, compact issue rows with guided recovery, processes, and a quiet notification center.
 - **Pickers and prompts:** clipboard with secret masking, emoji, wallpapers, and consistent polkit authentication.
 - **Application integrations:** cursor, icons, terminals, editors, browser, media, Qt, and session styling.
 
 ### Project workspaces
 
-New to projects and agent tasks? Start with **Launcher → Projects → Add project**.
+New to projects and agent tasks? Start with **Command center → Projects → Add project**.
 The wizard guides you through registration, tools, workflow actions, and optional
 agent reporting. The Projects **Help** destination and **How to use actions**
 are available offline. See the [step-by-step user guide](docs/workflows.md).
 
-Open **Launcher → Projects**, confirm a development folder, review repositories and
+Open **Command center → Projects**, confirm a development folder, review repositories and
 worktrees, then **Add selected**. Search with `project:` to Open or Resume saved
 tools. Dedicated workspace is the default; Project preferences makes current workspace an
 explicit preference. Partial launches report each role and offer targeted recovery.
@@ -121,7 +124,7 @@ machine. See [setup, CLI examples and limitations](plugins/araneadev.activity/RE
 
 ### Typography and settings
 
-Open **Setup → Aranea settings**, or search for “settings”. Aranea uses
+Open **Command center → Settings → Aranea**, or search for “settings”. Aranea uses
 **Inter** for the interface and **JetBrains Mono** for technical text.
 Appearance offers searchable font choices and preview samples, including
 **IBM Plex Sans**, **Source Sans 3**, **Inter Display**, **Inter Variable**, and
@@ -143,12 +146,37 @@ effective fraction. Quiet hours are read-only. See
 
 ### Everyday controls
 
-The wallpaper picker includes `day`, `night`, `dawn`, `sparse`, `dense`, `dusk`,
-`monochrome`, and `ultrawide`. Aranea Pulse adds an opt-in four-phase schedule
-and filament OSD:
+The command center has six sections: Apps, Actions, Software, Settings, Help,
+and System. Software groups Install, Remove, and Update. Settings contains the
+Aranea, Appearance, and Devices. Existing app, software, and device commands remain searchable.
+
+The right side of the bar keeps five everyday controls: Notifications, Agents,
+Network, Audio, and System. The app tray uses a disclosure, and a Health shortcut
+appears when an issue needs attention. Network groups Wi-Fi, VPN, and Bluetooth;
+System groups Power, Display, and Health. Standalone child controls remain
+available when their parent control is absent.
+
+| Control | Pages and shortcuts                                                           |
+| ------- | ----------------------------------------------------------------------------- |
+| Network | `N` Network, `V` VPN, `B` Bluetooth; `T` toggles Bluetooth on its hosted page |
+| System  | `P` Power, `D` Display, `S` Health                                            |
+| Audio   | Output and microphone volume, mute, devices, and app streams                  |
+
+Health opens with its CPU trace and memory/disk details expanded. Click an issue
+or press Enter to open its diagnostics and recovery options. An intentionally
+stopped container can be acknowledged for that specific stop; new failures still
+appear. See [Health recovery](docs/troubleshooting.md#resolve-a-health-issue).
+
+The wallpaper picker offers thirteen cyberpunk scenes. New additions are
+Aranea Core and Signal Shrine with the spider, Violet Pursuit, and Deep Current.
+[Preview the additions](screenshots/cyberpunk-additions.jpg). Existing wallpaper
+IDs and day/night schedules remain stable. Signal Shrine is the theme default.
+In **Settings → Aranea → Schedule**, add as many daily entries as you need,
+choose an image and local time for each, then Save. Existing schedules are
+preserved. The filament OSD follows the same palette:
 
 ```bash
-scripts/aranea-wallpaper schedule configure 06:00 08:00 18:00 20:00
+scripts/aranea-wallpaper schedule configure --entries '[{"time":"07:00","wallpaper":"day"},{"time":"21:00","wallpaper":"signal-shrine"}]'
 scripts/aranea-wallpaper schedule on
 scripts/aranea-integrations status --json
 ```
@@ -173,13 +201,17 @@ Omarchy's fallback prompt can take over.
 ## Gallery
 
 The hero shows a tour of the desktop. The captures below cover each showcase
-surface once, including compact Settings windows within the full desktop.
+surface once, including the current Network and System tabs and compact
+Settings windows. The agent preview selects Codex. Captures use Signal Shrine
+except for the separate wallpaper examples.
 
 ### Desktop and settings
 
 | Desktop                             | Appearance                                       | Display scaling                                               |
 | ----------------------------------- | ------------------------------------------------ | ------------------------------------------------------------- |
 | ![Desktop](screenshots/desktop.png) | ![Appearance settings](screenshots/settings.png) | ![Display scaling settings](screenshots/settings-scaling.png) |
+
+![Daily wallpaper schedule](screenshots/settings-schedule.png)
 
 ### Command center
 
@@ -197,7 +229,7 @@ surface once, including compact Settings windows within the full desktop.
 | ---------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
 | ![System health](screenshots/health.png) | ![Notifications](screenshots/notifications.png) | ![Empty notification center](screenshots/notifications-empty.png) |
 
-| Updates                                   | Workspaces                                        | Power                                    |
+| Updates                                   | Workspaces                                        | System: Power                            |
 | ----------------------------------------- | ------------------------------------------------- | ---------------------------------------- |
 | ![Update center](screenshots/updates.png) | ![Workspace overview](screenshots/workspaces.png) | ![Power controls](screenshots/power.png) |
 
@@ -207,11 +239,11 @@ surface once, including compact Settings windows within the full desktop.
 
 ### Bar controls
 
-| Network                                      | VPN                                  | Bluetooth                                        |
+| Network: Network                             | Network: VPN                         | Network: Bluetooth                               |
 | -------------------------------------------- | ------------------------------------ | ------------------------------------------------ |
 | ![Network controls](screenshots/network.png) | ![VPN controls](screenshots/vpn.png) | ![Bluetooth controls](screenshots/bluetooth.png) |
 
-| Audio                                    | Agents                                  | Displays                                     |
+| Audio                                    | Agents: Codex                           | System: Display                              |
 | ---------------------------------------- | --------------------------------------- | -------------------------------------------- |
 | ![Audio controls](screenshots/audio.png) | ![Agent status](screenshots/agents.png) | ![Display controls](screenshots/monitor.png) |
 
@@ -235,17 +267,31 @@ surface once, including compact Settings windows within the full desktop.
 
 ### Wallpapers
 
-| Day                                              | Night                                                | Dawn desktop                          |
-| ------------------------------------------------ | ---------------------------------------------------- | ------------------------------------- |
-| ![Day wallpaper](backgrounds/background-day.png) | ![Night wallpaper](backgrounds/background-night.png) | ![Dawn desktop](screenshots/dawn.png) |
+Thirteen different scenes share obsidian, mint, and violet: alleys, command rooms,
+rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, and orbit.
+Human titles appear in the picker; stable IDs preserve selections and schedules.
+See the [title/ID map](docs/configuration.md#wallpapers) and
+[artwork sources and prompts](backgrounds/ARTWORK.md).
 
-| Sparse                                               | Dense                                              | Dusk                                             |
-| ---------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
-| ![Sparse wallpaper](backgrounds/variants/sparse.png) | ![Dense wallpaper](backgrounds/variants/dense.png) | ![Dusk wallpaper](backgrounds/variants/dusk.png) |
+| Signal Shrine (default)                                  | Aranea Core                                          | Neural Deck                                      |
+| -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------ |
+| ![Signal Shrine](backgrounds/variants/signal-shrine.png) | ![Aranea Core](backgrounds/variants/aranea-core.png) | ![Neural Deck](backgrounds/variants/cockpit.png) |
 
-| Monochrome                                                   | Ultrawide                                                  |
-| ------------------------------------------------------------ | ---------------------------------------------------------- |
-| ![Monochrome wallpaper](backgrounds/variants/monochrome.png) | ![Ultrawide wallpaper](backgrounds/variants/ultrawide.png) |
+| Rain City                                    | Silent Vault                                      | First Departure                                   |
+| -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| ![Rain City](backgrounds/background-day.png) | ![Silent Vault](backgrounds/background-night.png) | ![First Departure](backgrounds/variants/dawn.png) |
+
+| Dead Frequency                                   | Black Signal                                     | Undercity                                    |
+| ------------------------------------------------ | ------------------------------------------------ | -------------------------------------------- |
+| ![Dead Frequency](backgrounds/variants/dusk.png) | ![Black Signal](backgrounds/variants/sparse.png) | ![Undercity](backgrounds/variants/dense.png) |
+
+| Ghost in the Wire                                         | Violet Pursuit                                             | Deep Current                                           |
+| --------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+| ![Ghost in the Wire](backgrounds/variants/monochrome.png) | ![Violet Pursuit](backgrounds/variants/violet-pursuit.png) | ![Deep Current](backgrounds/variants/deep-current.png) |
+
+| Orbital Relay                                        |     |     |
+| ---------------------------------------------------- | --- | --- |
+| ![Orbital Relay](backgrounds/variants/ultrawide.png) |     |     |
 
 See [Visual language](docs/visual-language.md) for the design system behind
 these surfaces.
@@ -275,18 +321,22 @@ restart changes the behavior in a [bug report](https://github.com/AraneaDev/aran
 Run helpers from `scripts/` in a checkout, or from
 `~/.config/omarchy/themes/aranea/scripts/<name>` after installation.
 
-| Helper                                               | Purpose                                                 |
-| ---------------------------------------------------- | ------------------------------------------------------- |
-| `scripts/install.sh` / `scripts/uninstall.sh`        | Install, update, or remove Aranea                       |
-| `scripts/aranea-doctor` / `scripts/aranea-about`     | Diagnose, repair, and summarize the installation        |
-| `scripts/aranea-integrations`                        | Inspect and toggle integrations                         |
-| `scripts/aranea-wallpaper` / `scripts/aranea-motion` | Select and schedule wallpapers; control animations      |
-| `scripts/aranea-settings`                            | Read versioned settings JSON or invoke existing helpers |
-| `scripts/install-fonts`                              | Install bundled fonts and refresh the font cache        |
-| `scripts/aranea-showcase`                            | List documented surfaces                                |
+| Helper                                                        | Purpose                                                       |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `scripts/install.sh` / `scripts/uninstall.sh`                 | Install, update, or remove Aranea                             |
+| `scripts/aranea-doctor` / `scripts/aranea-about`              | Diagnose, repair, and summarize the installation              |
+| `scripts/aranea-integrations`                                 | Inspect and toggle integrations                               |
+| `scripts/aranea-wallpaper` / `scripts/aranea-motion`          | Select and schedule wallpapers; control animations            |
+| `scripts/aranea-settings`                                     | Read versioned settings JSON or invoke existing helpers       |
+| `scripts/install-fonts`                                       | Install bundled fonts and refresh the font cache              |
+| `scripts/aranea-update-status`                                | Read repository/AUR update availability                       |
+| `scripts/aranea-health-resolve` / `scripts/aranea-health-ack` | Diagnose an issue or manage stopped-container acknowledgments |
+| `scripts/aranea-showcase`                                     | List documented surfaces                                      |
 
-The CLI is human-readable by default. Explicit `--json` emits versioned JSONL
-events with stable step IDs; the process exit code remains authoritative:
+The installer, uninstaller, and doctor are human-readable by default. Their
+explicit `--json` mode emits versioned JSONL events with stable step IDs; the
+process exit code remains authoritative. Other status helpers and the public
+project CLI return their documented JSON objects or arrays:
 
 ```bash
 scripts/install.sh --json --yes --profile minimal

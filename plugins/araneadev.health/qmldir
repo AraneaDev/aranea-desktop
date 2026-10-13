@@ -1,0 +1,9 @@
+HealthDropdown 1.0 HealthDropdown.qml
+HealthProblemsSection 1.0 HealthProblemsSection.qml
+HealthProcessSection 1.0 HealthProcessSection.qml
+HealthResourceSection 1.0 HealthResourceSection.qml
+HealthSummary 1.0 HealthSummary.qml
+Metrics 1.0 Metrics.qml
+Monitor 1.0 Monitor.qml
+HealthPanel 1.0 Panel.qml
+Service 1.0 Service.qml

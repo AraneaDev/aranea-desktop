@@ -13,12 +13,12 @@ bundled Inter. `defaultUiFamily` also drives the Settings default preview.
 `iconFamily` retains the dedicated desktop font so Nerd Font glyphs stay legible.
 `DropdownHeader`, `NodeDeviceRow`, `FilamentPill` and `KeyboardPanelFrame` expose
 `refined: false` for a deliberate host migration. Refined presentation uses
-proportional labels, untracked captions and neutral panel borders; selection,
+proportional labels, technical captions and neutral panel borders with mint/violet circuit accents; selection,
 pointer gates and keyboard signals keep their existing contracts. Label fonts
 remain overridable. Refined captions use the shared 64% foreground role; related
 header labels use the four-pixel spacing step. Long device details elide in a
 bounded column so labels and trailing actions keep their space. Existing
-feedback uses 120 ms and opening opacity settles in 160 ms, with immediate final states
+feedback uses 120 ms and opening opacity settles in 220 ms, with immediate final states
 under reduced motion. These values come from `design/tokens.toml`.
 
 `StatusTextPair.valueFontFamily` independently controls technical subtitles. `PanelChrome.popupBorder(refined)` keeps the host's resolved
@@ -29,9 +29,17 @@ refined hosts select a neutral color.
 
 - `DesignTokens`, `MotionState`, and `RuntimePaths` expose canonical runtime
   values and paths.
-- `SurfaceCard`, `PanelHeader`, `BrandHeader`, `StatusRail`,
+- `SurfaceCard`, `BrandHeader`, `StatusRail`,
   `StatusTextPair`, `StatusRow`, `EmptyState`, and `InkText` provide
   presentational contracts.
+- `CircuitFrame` supplies a shaded obsidian instrument material, mint/violet
+  bezel traces, and an edge rail shared by cards, dropdowns, and lock branding.
+  Lock branding disables the material layer. Traveling edge light runs only
+  in a visible native window with motion enabled. Surfaces with all border
+  widths set to zero omit the accents.
+- `DeckReveal` stages presentation without owning layout, visibility, or input.
+  Delays and active transitions cancel immediately under reduced motion;
+  close/reopen retargets from the current frame.
 - `FilamentSlider` is the Filament-style hairline slider/handle used by
   volume and level controls.
 - `FilamentBar` is the read-only strand bar for a level (`value`, 0..1,
@@ -68,8 +76,14 @@ refined hosts select a neutral color.
   current workspace) draws the selected highlight (`DesignTokens.selectedFill`
   and an accent left marker); a real pointer move draws the hover fill
   (`DesignTokens.hoverFill`, gated, cleared on leaving or a layout shift);
-  `hasCursor` draws the mint outline. `interactive: false` marks an
+  `hasCursor` draws the shared keyboard reticle. `interactive: false` marks an
   informational row (no hover fill, arrow cursor).
+- `FocusFrame` draws keyboard targets with corner brackets, a mint side tick
+  and a soft mint-to-violet tint. It owns no input or layout. The host sets
+  `focused`; fade and scale transitions stop and snap when motion is disabled.
+- `BarGroupIcon` draws scalable connections and system-control symbols without
+  depending on font glyphs. The owning bar button supplies its foreground color;
+  existing status badges and optional battery percentage stay separate.
 - `HoverTint` is the shared hover fill for any other clickable element: it
   fills its parent with `DesignTokens.hoverFill` once the pointer really
   moved over it (its own `PointerMoveGate`, in window coordinates), never
@@ -87,9 +101,9 @@ refined hosts select a neutral color.
   host hide its own row tooltip. `tooltipText` is the button's tooltip, and
   clicks settle like `NodeDeviceRow`'s.
 - `FilamentPill` is the Filament-style choice pill (the network dropdown's
-  band and DNS rows): a thin muted border, or an accent border with a 2 px
-  accent underline and the selected fill when `selected`; the keyboard
-  cursor (`hasCursor`) draws the same mint outline as `NodeDeviceRow`,
+  band and DNS rows): a quiet bezel, a tinted selected surface and a short
+  mint-to-violet inset underline when `selected`; the keyboard cursor
+  (`hasCursor`) draws the same corner reticle as `NodeDeviceRow`,
   pointer hover never does: it draws the hover fill after a real move. A
   `busy` pill breathes. It emits `clicked`, and `hoveredMoved` on entering,
   or only on a real pointer move when a `pointerGate` is set. A pill on a

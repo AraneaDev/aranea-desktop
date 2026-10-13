@@ -1,0 +1,6 @@
+DisplaysCaption 1.0 DisplaysCaption.qml
+DisplaysControlRow 1.0 DisplaysControlRow.qml
+DisplaysDropdown 1.0 DisplaysDropdown.qml
+DisplaysList 1.0 DisplaysList.qml
+DisplaysToggles 1.0 DisplaysToggles.qml
+DisplayPanel 1.0 Panel.qml

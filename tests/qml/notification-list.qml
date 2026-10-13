@@ -132,7 +132,7 @@ ShellRoot {
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
     return t.findChildren(item, "cursorOutline").filter(function (o) {
-      return o.visible && (o.border.width > 0 || o.color.a > 0)
+      return o.visible && o.focused
     }).length
   }
 
@@ -305,7 +305,6 @@ ShellRoot {
         }
         t.equal(litOutlines(list), 1, "one outline with cursor.active")
         t.equal(litOutlines(list.itemAtIndex(3)), 1, "on the cursor's card")
-        t.check(sameColor(one(list.itemAtIndex(3), "cursorOutline").border.color, Aranea.DesignTokens.accent), "in mint (the accent)")
         t.check(sameColor(list.itemAtIndex(3).color, Color.notifications.background), "the cursor's card keeps its fill")
         list.cursor = {
           active: true,

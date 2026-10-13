@@ -87,13 +87,10 @@ Column {
     Aranea.HoverTint {
       pointerGate: action.pointerGate
     }
-    Rectangle {
-      // The keyboard cursor outline.
+    Aranea.FocusFrame {
       objectName: "cursorOutline"
       anchors.fill: parent
-      color: action.hasCursor ? Util.alpha(Aranea.DesignTokens.accent, 0.08) : "transparent"
-      border.width: action.hasCursor ? 1 : 0
-      border.color: Aranea.DesignTokens.accent
+      focused: action.hasCursor
     }
     Text {
       id: glyphText

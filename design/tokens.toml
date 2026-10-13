@@ -48,10 +48,10 @@ secondary_opacity = 0.64
 
 [motion]
 feedback_ms = 120
-settle_ms = 160
+settle_ms = 220
 spring_strength = 4.0
 spring_damping = 0.3
-surface_closed_scale = 0.97
+surface_closed_scale = 0.94
 enabled = true
 reduced_motion_fallback = "static"
 

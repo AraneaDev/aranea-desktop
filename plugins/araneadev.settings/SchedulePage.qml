@@ -24,16 +24,18 @@ ColumnLayout {
   property string error: ''
   // Host pointer movement and layout settling gate.
   property var pointerGate: null
-  // Local editable phase times; retained while dirty.
-  property var draft: ['', '', '', '']
+  // Local editable daily entries; retained while dirty.
+  property var draft: []
   // Whether edits must survive unrelated refreshes and navigation.
   property bool dirty: false
   // Observed schedule configuration and live timer state.
   readonly property var schedule: page.backendState.schedule || ({})
-  // Validation result for all four local phase times.
-  readonly property var validation: Logic.validateSchedule(draft)
+  // Validation and actionable messages for daily entries.
+  readonly property var validation: Logic.validateScheduleEntries(draft, backendState.wallpapers || [])
   // Whether the configured section can be safely changed.
   readonly property bool available: schedule.availability === 'available'
+  // Catalog reads must be confirmed before committing wallpaper choices.
+  readonly property bool editable: available && !displayOnly && !pending
   // Ask the persistent controller to perform an explicit operation.
   signal request(string operation, var args)
   // Ask the controller to retry a read, never a mutation.
@@ -41,28 +43,77 @@ ColumnLayout {
   // Refresh clean draft values without discarding local edits.
   function syncDraft() {
     if (!dirty && available)
-      draft = [schedule.dawn || '', schedule.day || '', schedule.dusk || '', schedule.night || '']
+      draft = Logic.scheduleEntries(schedule)
   }
-  // Update one editable phase time and mark the draft dirty.
-  function setDraft(index, value) {
-    var next = draft.slice()
-    next[index] = value
+  // Update a single clock or wallpaper without changing owner state.
+  function setDraft(index, value, field) {
+    if (!editable || index < 0 || index >= draft.length)
+      return
+    field = field || 'time'
+    if (field !== 'time' && field !== 'wallpaper')
+      return
+    // Preserve visible draft order while editing; sorting belongs to Save.
+    var next = draft.map(function (entry) {
+      return {
+        time: entry.time,
+        wallpaper: entry.wallpaper
+      }
+    })
+    next[index][field] = value
     draft = next
     dirty = true
   }
-  // Emit explicit Save only when all phase times are valid.
+  // Append an editable row using an available image and unused clock time.
+  function addEntry() {
+    if (!editable)
+      return
+    var assets = (backendState.wallpapers || []).filter(function (asset) {
+      return asset.available === true
+    })
+    var time = ''
+    for (var minute = 0; minute < 1440; minute++) {
+      var clock = ('0' + Math.floor(minute / 60)).slice(-2) + ':' + ('0' + minute % 60).slice(-2)
+      if (!draft.some(function (entry) {
+        return entry.time === clock
+      })) {
+        time = clock
+        break
+      }
+    }
+    draft = draft.concat([
+      {
+        time: time,
+        wallpaper: assets.length ? assets[0].id : ''
+      }
+    ])
+    dirty = true
+  }
+  // Keep at least one entry; removing a row never applies changes.
+  function removeEntry(index) {
+    if (!editable || draft.length <= 1 || index < 0 || index >= draft.length)
+      return
+    var next = draft.slice()
+    next.splice(index, 1)
+    draft = next
+    dirty = true
+  }
+  // Submit the normalized daily list while preserving the enabled choice.
   function save() {
-    if (!displayOnly && !pending && available && validation.ok)
-      request('configure schedule', draft.slice())
+    if (editable && backendState.wallpapersAvailability === 'available' && validation.ok)
+      request('configure schedule', [JSON.stringify(Logic.normalizeScheduleEntries(draft))])
   }
-  // Mark an explicitly saved draft clean only when owner configuration matches.
+  // An earlier acknowledgement must not discard newer local edits.
   function acceptSaved(args) {
-    var current = [schedule.dawn, schedule.day, schedule.dusk, schedule.night]
-    if (JSON.stringify(current) === JSON.stringify(args) && JSON.stringify(draft) === JSON.stringify(args))
+    var submitted = Logic.submittedScheduleEntries(args)
+    if (submitted && validation.ok && JSON.stringify(Logic.scheduleEntries(schedule)) === JSON.stringify(submitted) && JSON.stringify(Logic.normalizeScheduleEntries(draft)) === JSON.stringify(submitted)) {
       dirty = false
+      syncDraft()
+    }
   }
-  // Discard local edits explicitly and adopt current owner configuration.
-  function useCurrentTimes() {
+  // Explicitly discard local edits and adopt current owner entries.
+  function discardDraft() {
+    if (!editable)
+      return
     dirty = false
     syncDraft()
   }
@@ -73,7 +124,7 @@ ColumnLayout {
   SettingsPageHeader {
     Layout.fillWidth: true
     title: 'Wallpaper schedule'
-    description: 'Move through dawn, day, dusk and night.'
+    description: 'Choose when each wallpaper appears, every day.'
   }
   SettingsSection {
     Layout.fillWidth: true
@@ -91,7 +142,8 @@ ColumnLayout {
         enabled: !page.displayOnly && !page.pending && page.available
         busy: page.pendingKey === 'schedule'
         pointerGate: page.pointerGate
-        onToggled: page.request('set schedule', [checked ? 'off' : 'on'])
+        onToggled: if (page.editable)
+          page.request('set schedule', [checked ? 'off' : 'on'])
       }
       Item {
         Layout.fillWidth: true
@@ -102,53 +154,40 @@ ColumnLayout {
       text: !page.available ? 'Unavailable' : page.pendingKey === 'schedule' ? 'Applying…' : page.result || (page.schedule.applied === null ? 'Timer state unavailable' : page.schedule.applied ? 'Timer active' : 'Timer inactive')
       opacity: 0.65
     }
-    GridLayout {
-      Layout.fillWidth: true
-      columns: width < Style.space(420) ? 1 : 2
-      columnSpacing: Style.space(12)
-      rowSpacing: Style.space(8)
-      Repeater {
-        model: ['Dawn', 'Day', 'Dusk', 'Night']
-        ColumnLayout {
-          id: phase
-          required property int index
-          required property string modelData
-          Layout.fillWidth: true
-          SettingsLabel {
-            text: phase.modelData
-          }
-          Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: Style.space(28)
-            color: Util.alpha(Color.foreground, 0.04)
-            radius: Style.space(3)
-            border.width: 1
-            border.color: field.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
-            TextInput {
-              id: field
-              objectName: 'phaseTime'
-              anchors.fill: parent
-              anchors.leftMargin: Style.space(8)
-              anchors.rightMargin: Style.space(8)
-              verticalAlignment: TextInput.AlignVCenter
-              text: page.draft[phase.index] || ''
-              color: Color.foreground
-              font.family: Aranea.Typography.technicalFamily
-              font.pixelSize: Style.font.body
-              enabled: page.available && !page.displayOnly && !page.pending
-              activeFocusOnTab: true
-              selectByMouse: true
-              maximumLength: 5
-              Accessible.name: phase.modelData + ' time'
-              onTextEdited: page.setDraft(phase.index, text)
-            }
-          }
+    Repeater {
+      model: page.draft.length
+      ScheduleEntryRow {
+        required property int index
+        Layout.fillWidth: true
+        entry: page.draft[index] || ({
+            time: '',
+            wallpaper: ''
+          })
+        rowNumber: index + 1
+        catalog: page.backendState.wallpapers || []
+        editable: page.editable
+        removable: page.draft.length > 1
+        error: page.validation.errors[index] || ''
+        pointerGate: page.pointerGate
+        onTimeEdited: function (value) {
+          page.setDraft(index, value)
         }
+        onWallpaperSelected: function (value) {
+          page.setDraft(index, value, 'wallpaper')
+        }
+        onRemoveRequested: page.removeEntry(index)
       }
+    }
+    SettingsButton {
+      objectName: 'scheduleAdd'
+      text: 'Add entry'
+      enabled: page.editable
+      pointerGate: page.pointerGate
+      onClicked: page.addEntry()
     }
     SettingsLabel {
       Layout.fillWidth: true
-      text: page.dirty && !page.validation.ok ? page.validation.message : 'Use 24-hour times. Saving times keeps the schedule enabled setting.'
+      text: page.dirty && !page.validation.ok ? page.validation.message : 'Use unique 24-hour times. Save sorts entries and keeps the schedule enabled setting.'
       color: page.dirty && !page.validation.ok ? Aranea.DesignTokens.attention : Color.foreground
       opacity: 0.75
     }
@@ -159,9 +198,9 @@ ColumnLayout {
       rowSpacing: Style.space(8)
       SettingsButton {
         objectName: 'scheduleSave'
-        text: 'Save times'
+        text: 'Save schedule'
         variant: 'primary'
-        enabled: page.available && !page.displayOnly && !page.pending && page.validation.ok
+        enabled: page.editable && page.backendState.wallpapersAvailability === 'available' && page.validation.ok
         pointerGate: page.pointerGate
         onClicked: page.save()
       }
@@ -169,7 +208,7 @@ ColumnLayout {
         text: 'Discard'
         enabled: page.available && !page.displayOnly && !page.pending
         pointerGate: page.pointerGate
-        onClicked: page.useCurrentTimes()
+        onClicked: page.discardDraft()
       }
     }
     SettingsLabel {
@@ -184,6 +223,7 @@ ColumnLayout {
     visible: !page.available
     enabled: !page.displayOnly && !page.pending
     pointerGate: page.pointerGate
-    onClicked: page.retryRequested()
+    onClicked: if (!page.displayOnly && !page.pending)
+      page.retryRequested()
   }
 }

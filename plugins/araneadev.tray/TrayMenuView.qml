@@ -321,13 +321,10 @@ Column {
             active: row.selectable
             pointerGate: gate
           }
-          Rectangle {
-            // The keyboard cursor outline.
+          Aranea.FocusFrame {
             objectName: "cursorOutline"
             anchors.fill: parent
-            color: row.hasCursor ? Util.alpha(Aranea.DesignTokens.accent, 0.08) : "transparent"
-            border.width: row.hasCursor ? 1 : 0
-            border.color: Aranea.DesignTokens.accent
+            focused: row.hasCursor
           }
           Rectangle {
             objectName: "separatorLine"

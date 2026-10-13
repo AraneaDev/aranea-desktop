@@ -35,13 +35,23 @@ Item {
   // Trailing content, anchored to the right edge.
   default property alias trailing: trailingSlot.data
 
-  implicitHeight: Math.max(glyphText.implicitHeight, labels.implicitHeight, trailingSlot.childrenRect.height)
+  implicitHeight: Math.max(header.refined ? Style.space(44) : 0, glyphText.implicitHeight, labels.implicitHeight, trailingSlot.childrenRect.height)
+
+  Rectangle {
+    visible: header.refined
+    width: glyphText.width
+    height: width
+    anchors.centerIn: glyphText
+    color: Util.alpha(DesignTokens.accent, 0.08)
+    radius: Style.space(6)
+    border.width: 0
+  }
 
   Text {
     id: glyphText
     textFormat: Text.PlainText
     objectName: "headerGlyph"
-    width: Style.space(28)
+    width: Style.space(header.refined ? 40 : 28)
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignHCenter
@@ -89,10 +99,10 @@ Item {
       opacity: header.captionOpacity
       elide: Text.ElideRight
       color: Util.alpha(DesignTokens.foreground, header.refined ? DesignTokens.secondaryOpacity : 0.55)
-      font.family: header.labelFontFamily
+      font.family: header.refined ? Typography.technicalFamily : header.labelFontFamily
       font.pixelSize: Style.font.caption
       font.bold: !header.refined
-      font.letterSpacing: header.refined ? 0 : 1.2
+      font.letterSpacing: header.refined ? 0.4 : 1.2
     }
   }
   Item {

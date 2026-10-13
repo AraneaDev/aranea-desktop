@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# Guided diagnostics and deliberate recovery for one health issue.
+# Usage: aranea-health-resolve ISSUE_KEY
+set -euo pipefail
+[[ $# == 1 ]] || {
+  echo 'Expected one health issue key' >&2
+  exit 2
+}
+key="$1"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+initial_container_state=''
+kind="${key%%:*}"
+target="${key#*:}"
+scope=system
+case "$kind" in
+  container) [[ "$target" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]] || exit 2 ;;
+  unit)
+    scope="${target%%:*}"
+    target="${target#*:}"
+    [[ "$scope" == system || "$scope" == user ]] || exit 2
+    [[ -n "$target" && "$target" != -* && "$target" != *$'\n'* && "$target" != *$'\r'* ]] || exit 2
+    ;;
+  disk) [[ "$target" == /* ]] || exit 2 ;;
+  reboot)
+    [[ "$key" == reboot ]] || exit 2
+    target='kernel update'
+    ;;
+  *)
+    echo 'Unsupported health issue' >&2
+    exit 2
+    ;;
+esac
+
+# Diagnostics do not change the affected service, container, or filesystem.
+diagnostic() {
+  local rc=0
+  timeout 15 "$@" || rc=$?
+  # Failed services normally make systemctl status return a nonzero code.
+  # The command already explains such results; only add a timeout message.
+  if ((rc == 124)); then echo 'Diagnostic timed out. Try again from the menu.'; fi
+}
+# A restart is offered separately and needs an explicit answer.
+confirm() {
+  local answer
+  printf '%s [y/N] ' "$1"
+  IFS= read -r answer || return 1
+  [[ "$answer" == y || "$answer" == Y ]]
+}
+# Keep the terminal open after success or failure, and refresh the live panel.
+run_action() {
+  if "$@"; then
+    echo 'Action completed. Health will check the result again.'
+    omarchy-shell -q health refresh >/dev/null 2>&1 || true
+  else
+    echo 'Action failed. Review the output above before trying again.'
+  fi
+}
+unit_command=(systemctl)
+journal_command=(journalctl)
+if [[ "$scope" == user ]]; then
+  unit_command+=(--user)
+  journal_command+=(--user)
+fi
+printf '\nARANEA // HEALTH\n%s: %s\n\n' "$kind" "$target"
+case "$kind" in
+  container)
+    initial_container_state=$(timeout 15 docker inspect --format '{"id":{{json .Id}},"finishedAt":{{json .State.FinishedAt}},"running":{{json .State.Running}}}' -- "$target" 2>/dev/null || true)
+    diagnostic docker inspect --format 'State: {{.State.Status}} · exit: {{.State.ExitCode}} · OOM: {{.State.OOMKilled}} · image: {{.Config.Image}}' -- "$target"
+    diagnostic docker logs --tail 40 -- "$target"
+    echo 'Check the error above and the container configuration. Restart if it should be running.'
+    echo 'If it was intentionally stopped, acknowledge this stop to clear its alert.'
+    ;;
+  unit)
+    diagnostic "${unit_command[@]}" status --no-pager -- "$target"
+    diagnostic "${journal_command[@]}" -u "$target" -n 40 --no-pager
+    echo 'Read the failure above, correct its configuration or dependency, then restart the service.'
+    ;;
+  disk)
+    diagnostic df -h -- "$target"
+    echo 'Find the largest folders and review their contents before removing anything.'
+    echo 'This tool does not delete files.'
+    ;;
+  reboot)
+    printf 'Running kernel: %s\n' "$(uname -r)"
+    echo 'The installed kernel has changed. Save your work, then reboot to load it.'
+    ;;
+esac
+
+while true; do
+  printf '\n'
+  case "$kind" in
+    container) echo '[l] logs  [i] inspect  [r] restart container  [a] acknowledge this stop  [q] close' ;;
+    unit) echo '[l] logs  [s] status  [r] restart service  [q] close' ;;
+    disk) echo '[o] open folder  [d] largest folders  [q] close' ;;
+    reboot) echo '[r] reboot  [q] close' ;;
+  esac
+  printf '> '
+  IFS= read -r choice || break
+  case "${choice,,}" in
+    q) break ;;
+    a)
+      if [[ "$kind" == container ]]; then
+        if jq -e 'type == "object" and .running == false' <<<"$initial_container_state" >/dev/null 2>&1; then
+          if "$script_dir/aranea-health-ack" acknowledge "$key" "$initial_container_state" >/dev/null; then
+            echo 'Alert acknowledged. A later failure of this container will be reported again.'
+            omarchy-shell -q health refresh >/dev/null 2>&1 || true
+          fi
+        else
+          echo 'This is not a verified stopped-container occurrence. Reopen the issue to check its state.'
+        fi
+      fi
+      ;;
+    l)
+      if [[ "$kind" == container ]]; then
+        diagnostic docker logs --tail 200 -- "$target"
+      elif [[ "$kind" == unit ]]; then
+        diagnostic "${journal_command[@]}" -u "$target" -n 200 --no-pager
+      fi
+      ;;
+    i) [[ "$kind" != container ]] || diagnostic docker inspect -- "$target" ;;
+    s) [[ "$kind" != unit ]] || diagnostic "${unit_command[@]}" status --no-pager -- "$target" ;;
+    o) [[ "$kind" != disk ]] || run_action xdg-open "$target" ;;
+    d)
+      if [[ "$kind" == disk ]]; then
+        echo 'Scanning this filesystem; this can take a while. Permission errors identify unreadable folders.'
+        du -x -h --max-depth=1 -- "$target" | sort -h || true
+      fi
+      ;;
+    r)
+      case "$kind" in
+        container) if confirm "Restart container $target?"; then run_action docker restart -- "$target"; fi ;;
+        unit)
+          if confirm "Restart $scope service $target?"; then
+            if [[ "$scope" == user ]]; then
+              run_action "${unit_command[@]}" restart -- "$target"
+            else
+              run_action sudo systemctl restart -- "$target"
+            fi
+          fi
+          ;;
+        reboot) if confirm 'Reboot now? Save your work first.'; then run_action omarchy-system-reboot; fi ;;
+      esac
+      ;;
+  esac
+done

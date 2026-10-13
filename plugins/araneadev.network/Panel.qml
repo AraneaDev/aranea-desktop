@@ -3,8 +3,8 @@
 // throughput/ping polling, Wi-Fi scanning and actions, DNS and band
 // selection, the cursor model and IPC), plus the extras (link history,
 // interfaces, saved profiles, a VPN status line); the Aranea view,
-// NetworkDropdown, replaces the stock one. VPN control itself lives in
-// araneadev.vpn, summoned from the status line's click.
+// NetworkDropdown replaces the stock view; the VPN page hosts araneadev.vpn's
+// existing controller and pure view inside this same popup.
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
@@ -27,6 +27,92 @@ Panel {
   // manageIpc: false so this panel can own the single IpcHandler the target
   // permits — needed for the toggleNetwork method below.
   manageIpc: false
+
+  // VPN shares this panel's window, while its existing controller owns tunnels.
+  property string activePage: "network"
+  // Existing VPN state and actions, dynamically loaded from its plugin.
+  readonly property var vpnController: vpnRuntime.item
+  // True only for a usable, selected VPN page.
+  readonly property bool vpnPageActive: activePage === "vpn" && vpnController !== null
+  // Bluetooth uses its original discovery and device-action controller.
+  readonly property var bluetoothController: bluetoothRuntime.item
+  // True only for a usable, selected Bluetooth page.
+  readonly property bool bluetoothPageActive: activePage === "bluetooth" && bluetoothController !== null
+  // Start discovery only on the selected Bluetooth page; close settles it.
+  function syncBluetoothPage() {
+    if (!root.bluetoothController)
+      return
+    if (root.opened && root.activePage === "bluetooth")
+      root.bluetoothController.controller.show()
+    else
+      root.bluetoothController.controller.hide()
+  }
+  // Keep VPN sampling and credential lifecycle aligned with the visible page.
+  function syncVpnPage() {
+    if (!root.vpnController)
+      return
+    if (root.opened && root.activePage === "vpn")
+      root.vpnController.controller.show()
+    else
+      root.vpnController.controller.hide()
+  }
+  // Select a page, discarding unsubmitted Wi-Fi input and stale pointer samples.
+  function selectPage(page) {
+    if (page === "vpn" && !root.vpnController)
+      return
+    if (page === "bluetooth" && !root.bluetoothController)
+      return
+    root.activePage = page === "vpn" || page === "bluetooth" ? page : "network"
+    root.keyboardCursor = false
+    root.cancelPasswordPrompt()
+    dropdown.disarmPointer()
+    if (root.vpnController)
+      root.vpnController.disarmPointer()
+    if (root.bluetoothController)
+      root.bluetoothController.disarmPointer()
+  }
+  onActivePageChanged: {
+    root.syncVpnPage()
+    root.syncBluetoothPage()
+  }
+
+  // Dynamic loading keeps Network usable when the optional VPN plugin is absent.
+  Loader {
+    id: vpnRuntime
+    visible: false
+    Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.vpn/Panel.qml"), {
+      embedded: true,
+      embeddingHost: root
+    })
+    onLoaded: {
+      item.bar = Qt.binding(function () {
+        return root.bar
+      })
+      item.hostedDropdown = Qt.binding(function () {
+        return vpnPage.item
+      })
+      root.syncVpnPage()
+    }
+  }
+
+  // Optional Bluetooth plugin follows the same controller/view split as VPN.
+  Loader {
+    id: bluetoothRuntime
+    visible: false
+    Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.bluetooth/Panel.qml"), {
+      embedded: true,
+      embeddingHost: root
+    })
+    onLoaded: {
+      item.bar = Qt.binding(function () {
+        return root.bar
+      })
+      item.hostedDropdown = Qt.binding(function () {
+        return bluetoothPage.item
+      })
+      root.syncBluetoothPage()
+    }
+  }
 
   // Centralized close so callers can't forget to drop the passphrase prompt.
   function close() {
@@ -455,6 +541,7 @@ Panel {
   // KeyboardPanel primes layer-shell focus whenever the panel opens. That's
   // what makes the SUPER+CTRL+W keybind land here with navigation ready.
   onOpenedChanged: {
+    root.syncBluetoothPage()
     if (opened) {
       refresh(true)
       selectedIndex = wifiNetworks.length > 0 ? 0 : -1
@@ -530,19 +617,6 @@ Panel {
   }
 
   onWifiNetworkObjectsChanged: syncWifiNetworks()
-
-  // Moves the Wi-Fi row selection by delta, clamped to wifiNetworks.
-  function selectByDelta(delta) {
-    if (wifiNetworks.length === 0) {
-      selectedIndex = -1
-      return
-    }
-    if (selectedIndex < 0)
-      selectedIndex = delta > 0 ? 0 : wifiNetworks.length - 1
-    else
-      selectedIndex = Math.max(0, Math.min(wifiNetworks.length - 1, selectedIndex + delta))
-    wifiActionFocused = false
-  }
 
   // Whether net can be forgotten, delegating to Model.js.
   function canForgetNetwork(net) {
@@ -864,17 +938,16 @@ Panel {
     // qmllint enable missing-property
   }
 
-  // The status line's click: VPN control is its own panel plugin
-  // (araneadev.vpn), summoned by id; this one closes first, as the other
-  // summon actions do.
+  // Both the status line and legacy VPN IPC enter the internal VPN page.
   function openVpnDropdown() {
-    if (!root.bar)
-      return
-    controller.hide()
-    cancelPasswordPrompt()
-    // qmllint disable missing-property
-    bar.shell.summon("araneadev.vpn")
-    // qmllint enable missing-property
+    root.selectPage("vpn")
+    root.open()
+  }
+
+  // Legacy Bluetooth IPC enters the internal Bluetooth page.
+  function openBluetoothDropdown() {
+    root.selectPage("bluetooth")
+    root.open()
   }
 
   // Shell command to query or set the DNS provider.
@@ -1271,6 +1344,24 @@ Panel {
     anchors.fill: parent
     bar: root.bar
     text: root.icon
+    dimmed: root.kind === "disconnected"
+    tooltipText: "Connections · Network / VPN / Bluetooth" + (root.kind === "wifi" ? " · Wi-Fi " + root.signalStrength + "%" : root.kind === "ethernet" ? " · Ethernet" : " · Offline")
+    iconComponent: Component {
+      Aranea.BarGroupIcon {
+        kind: "connections"
+        ink: button.foreground
+      }
+    }
+
+    Rectangle {
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      width: Style.space(4)
+      height: width
+      radius: width / 2
+      color: Aranea.DesignTokens.accent
+      visible: root.vpnController !== null && root.vpnController.connectedRows.length > 0
+    }
 
     onPressed: function (b) {
       if (root.opened)
@@ -1317,12 +1408,6 @@ Panel {
   // cursor) changes focusSection but not this, so keyboard actions there
   // refuse until the user picks a row.
   property string cursorChosenSection: ""
-
-  // The SSID of Wi-Fi row INDEX, or "" when there is none.
-  function wifiSsidAt(index) {
-    var net = wifiNetworks[index]
-    return net ? net.ssid : ""
-  }
 
   // Wi-Fi rows as {key} for the NetworkLogic cursor rules.
   function wifiKeyRows() {
@@ -2068,6 +2153,9 @@ Panel {
   Connections {
     target: root
     function onOpenedChanged() {
+      if (!root.opened)
+        root.activePage = "network"
+      root.syncVpnPage()
       root.keyboardCursor = false
       root.savedActionFocused = false
       // Stand-in names never carry over into an open or past a close.
@@ -2318,17 +2406,29 @@ Panel {
     bar: root.bar
     open: root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    contentHeight: panel.fittedContentHeight(panelContent.implicitHeight)
     // Freeze the cursor model while the inline passphrase prompt is open;
     // its fields own input until Esc or Enter.
-    blocked: root.passwordSsid !== ""
+    blocked: root.vpnPageActive ? root.vpnController.promptKey !== "" && !root.vpnController.promptBusy : !root.bluetoothPageActive && root.passwordSsid !== ""
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
+      if (root.bluetoothPageActive)
+        root.bluetoothController.disarmPointer()
+      if (root.vpnPageActive)
+        root.vpnController.disarmPointer()
       dropdown.disarmPointer()
       root.keyboardCursor = true
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
+      if (root.bluetoothPageActive) {
+        root.bluetoothController.navigateKeyboard(dx, dy)
+        return
+      }
+      if (root.vpnPageActive) {
+        root.vpnController.navigateKeyboard(dx, dy)
+        return
+      }
       dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
       // cursor where it is; stock lets an upward first press move as well.
@@ -2348,6 +2448,14 @@ Panel {
     // arrows do, and the revealed row is Enter's next target. A row that
     // changed under a shown outline is refused (NetworkLogic.pressOutcome).
     onActivateRequested: {
+      if (root.bluetoothPageActive) {
+        root.bluetoothController.activateKeyboard()
+        return
+      }
+      if (root.vpnPageActive) {
+        root.vpnController.activateKeyboard()
+        return
+      }
       dropdown.disarmPointer()
       var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
       if (outcome === "act")
@@ -2357,6 +2465,15 @@ Panel {
       Qt.callLater(root.ensureCursorVisible)
     }
     onDeleteRequested: {
+      if (root.bluetoothPageActive) {
+        root.bluetoothController.deleteKeyboard()
+        return
+      }
+      if (root.vpnPageActive) {
+        root.vpnController.disarmPointer()
+        root.vpnController.keyboardCursor = true
+        return
+      }
       dropdown.disarmPointer()
       var outcome = NetworkLogic.pressOutcome(root.cursorTarget(root.focusSection), root.cursorActive, root.keyboardCursor)
       if (outcome === "act")
@@ -2366,6 +2483,30 @@ Panel {
       Qt.callLater(root.ensureCursorVisible)
     }
     onTextKey: function (t) {
+      if (t === "b" || t === "B") {
+        root.selectPage("bluetooth")
+        return
+      }
+      if (t === "v" || t === "V") {
+        root.selectPage("vpn")
+        return
+      }
+      if (t === "n" || t === "N") {
+        root.selectPage("network")
+        return
+      }
+      if (root.vpnPageActive) {
+        root.vpnController.disarmPointer()
+        root.vpnController.keyboardCursor = true
+        return
+      }
+      if (root.bluetoothPageActive) {
+        root.bluetoothController.disarmPointer()
+        root.bluetoothController.keyboardCursor = true
+        if (t === "t" || t === "T")
+          root.bluetoothController.toggleBluetooth()
+        return
+      }
       dropdown.disarmPointer()
       if (t === "r" || t === "R") {
         root.keyboardCursor = true
@@ -2380,18 +2521,103 @@ Panel {
       anchors.fill: parent
       clip: true
 
-      NetworkDropdown {
-        id: dropdown
+      Column {
+        id: panelContent
         width: parent.width
-        captionOpacity: root.captionOpacity
-        view: root.networkView
-        stats: root.statsView
-        graph: root.linkHistory
-        wifiStatus: root.wifiStatusView
-        savedStatus: root.savedStatusView
-        prompt: root.promptView
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        spacing: Style.space(14)
+        NetworkTabs {
+          width: parent.width
+          page: root.activePage
+          vpnAvailable: root.vpnController !== null
+          bluetoothAvailable: root.bluetoothController !== null
+          connectedCount: root.vpnController ? root.vpnController.shownConnected.length : 0
+          onPageRequested: function (page) {
+            root.selectPage(page)
+          }
+        }
+        NetworkDropdown {
+          id: dropdown
+          visible: !root.vpnPageActive && !root.bluetoothPageActive
+          width: parent.width
+          captionOpacity: root.captionOpacity
+          view: root.networkView
+          stats: root.statsView
+          graph: root.linkHistory
+          wifiStatus: root.wifiStatusView
+          savedStatus: root.savedStatusView
+          prompt: root.promptView
+          onAction: function (name, arg) {
+            root.handleAction(name, arg)
+          }
+        }
+        Loader {
+          id: vpnPage
+          width: parent.width
+          active: root.vpnController !== null
+          visible: root.vpnPageActive
+          source: Qt.resolvedUrl("../araneadev.vpn/VpnDropdown.qml")
+          onLoaded: {
+            item.view = Qt.binding(function () {
+              return root.vpnController ? root.vpnController.vpnView : ({})
+            })
+            item.status = Qt.binding(function () {
+              return root.vpnController ? root.vpnController.statusView : ({})
+            })
+            item.sessions = Qt.binding(function () {
+              return root.vpnController ? root.vpnController.sessionsView : ({})
+            })
+            item.graphs = Qt.binding(function () {
+              return root.vpnController && !root.vpnController.fixture ? root.vpnController.graphs : ({})
+            })
+            item.prompt = Qt.binding(function () {
+              return root.vpnController ? root.vpnController.promptView : ({})
+            })
+            item.showcaseNames = Qt.binding(function () {
+              return root.vpnController ? root.vpnController.showcaseNames : []
+            })
+          }
+        }
+        Connections {
+          target: vpnPage.item
+          function onAction(name, arg) {
+            if (root.vpnController)
+              root.vpnController.handleAction(name, arg)
+          }
+        }
+        Loader {
+          id: bluetoothPage
+          width: parent.width
+          active: root.bluetoothController !== null
+          visible: root.bluetoothPageActive
+          source: Qt.resolvedUrl("../araneadev.bluetooth/BluetoothDropdown.qml")
+          onLoaded: {
+            item.view = Qt.binding(function () {
+              return root.bluetoothController ? root.bluetoothController.bluetoothView : ({})
+            })
+            item.captionOpacity = Qt.binding(function () {
+              return root.bluetoothController ? root.bluetoothController.captionOpacity : 1
+            })
+            item.maxScrollHeight = Style.space(400)
+            item.powerShortcut = "t"
+          }
+        }
+        Connections {
+          target: bluetoothPage.item
+          function onAction(name, arg) {
+            if (root.bluetoothController)
+              root.bluetoothController.handleAction(name, arg)
+          }
+        }
+        Text {
+          width: parent.width
+          visible: root.vpnController !== null || root.bluetoothController !== null
+          text: "n network" + (root.vpnController ? " · v VPN" : "") + (root.bluetoothController ? " · b Bluetooth" : "")
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
+          // Host font tokens are dynamic QObject properties.
+          // qmllint disable missing-property
+          font.family: Aranea.Typography.technicalFamily
+          font.pixelSize: Style.font.caption
+          // qmllint enable missing-property
         }
       }
     }

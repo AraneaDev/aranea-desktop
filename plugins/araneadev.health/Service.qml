@@ -72,6 +72,7 @@ Item {
       service.monitor.checkUnits()
       service.monitor.checkDisk()
       service.monitor.checkReboot()
+      service.monitor.refreshAcknowledgments()
       return "ok"
     }
     function metrics(): string {

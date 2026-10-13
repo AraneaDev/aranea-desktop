@@ -204,14 +204,10 @@ Item {
           Aranea.HoverTint {
             pointerGate: gate
           }
-          Rectangle {
-            // The keyboard cursor outline (mint, keyboard only).
+          Aranea.FocusFrame {
             objectName: "cursorOutline"
             anchors.fill: parent
-            color: "transparent"
-            border.width: rowLoader.hasCursor ? 1 : 0
-            border.color: Aranea.DesignTokens.accent
-            visible: rowLoader.hasCursor
+            focused: rowLoader.hasCursor
           }
           Text {
             id: moreText

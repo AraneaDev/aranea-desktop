@@ -26,6 +26,8 @@ Column {
 
   // View state built by Panel.bluetoothView.
   property var view: ({})
+  // Host chooses a power key that does not conflict with page selection.
+  property string powerShortcut: "b"
   // Cap on the Paired/Available scroll area's height, so a noisy
   // neighbourhood doesn't grow the popup past the screen.
   property real maxScrollHeight: Style.space(400)
@@ -333,7 +335,7 @@ Column {
   Text {
     objectName: "keyHint"
     width: parent.width
-    text: "↑↓ move · enter toggle · x forget · b power"
+    text: "↑↓ move · enter toggle · x forget · " + dropdown.powerShortcut + " power"
     color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption

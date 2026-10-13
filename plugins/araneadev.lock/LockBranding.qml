@@ -30,6 +30,14 @@ Item {
   implicitHeight: logo.height + logoGap + title.implicitHeight + subtitleGap + subtitle.implicitHeight
   height: implicitHeight
 
+  Aranea.CircuitFrame {
+    material: false
+    anchors.centerIn: logo
+    width: branding.logoSize + Style.space(48)
+    height: width
+    cornerRadius: 0
+  }
+
   Image {
     id: logo
     width: branding.logoSize
@@ -67,7 +75,7 @@ Item {
     anchors.horizontalCenterOffset: font.letterSpacing / 2
     text: Aranea.BrandConfig.lockSubtitle
     color: branding.placeholderColor
-    font.family: branding.fontFamily
+    font.family: Aranea.Typography.technicalFamily
     font.pixelSize: Math.round(Style.font.bodySmall * 0.82)
     font.letterSpacing: 3.4
   }

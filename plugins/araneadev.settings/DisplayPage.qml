@@ -118,7 +118,11 @@ ColumnLayout {
         radius: Style.space(3)
         color: Util.alpha(Color.foreground, 0.04)
         border.width: 1
-        border.color: scaleField.activeFocus ? Aranea.DesignTokens.accent : Util.alpha(Color.foreground, 0.15)
+        border.color: Util.alpha(Color.foreground, 0.15)
+        Aranea.FocusFrame {
+          anchors.fill: parent
+          focused: scaleField.activeFocus
+        }
         TextInput {
           id: scaleField
           objectName: 'displayScaleInput'

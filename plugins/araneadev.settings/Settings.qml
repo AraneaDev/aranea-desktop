@@ -55,7 +55,7 @@ Item {
     } catch (e) {
       return 'invalid'
     }
-    if (!payload || ['appearance', 'display'].indexOf(payload.section) < 0)
+    if (!payload || ['appearance', 'display', 'schedule'].indexOf(payload.section) < 0)
       return 'invalid'
     if (payload.fixture && payload.fixture.displayDraft && (typeof payload.fixture.displayDraft !== 'string' || !Logic.validateScale(payload.fixture.displayDraft).ok))
       return 'invalid'

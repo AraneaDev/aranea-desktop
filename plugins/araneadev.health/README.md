@@ -3,6 +3,11 @@
 `araneadev.health` provides a service and bar widget for system health. The
 manifest exposes `Service.qml` and `Panel.qml`, and keeps the service loaded.
 
+On the consolidated bar, `alertOnly: true` keeps the Health shortcut hidden until
+there is an open issue. Its anchor remains visible while the issue panel is open,
+even if the final issue clears. Regular resources remain available in the
+Battery/System Health tab; standalone layouts retain the permanent Health icon.
+
 ## Responsibilities
 
 - Track failed systemd units, disk pressure, reboot requirements, and Docker
@@ -19,12 +24,33 @@ resource groups.
 ## The dropdown
 
 `Panel.qml` draws the dropdown in the shared `KeyboardPanelFrame`, with a
-pure `HealthDropdown` view: hostname and uptime, a severity-aware decision summary,
-all actionable problems, compact CPU/memory/fullest-disk values, Resource details and
-Processes disclosure headings, and a fixed muted keyboard hint. The host owns expansion,
+pure `HealthDropdown` view: hostname and uptime, a compact availability/healthy caption,
+all actionable problems, expanded Resource details and an optional
+Processes section, and a fixed muted keyboard hint. The host owns expansion,
 lifecycle and keyed cursor state. Unknown metrics display an em dash; an unavailable service
-reads “Health data unavailable”. Details start collapsed and reset when the dropdown closes.
+reads “Health data unavailable”. Resources start expanded on every open; Processes
+starts collapsed. The wider panel puts memory and disk side by side, with a larger
+CPU trace spanning the width. Narrow screens return to one resource column.
+Collapsing resources reveals the compact CPU/memory/fullest-disk summary.
 Expanded content scrolls within the host's available-height budget.
+
+Issues use one compact heading and keyed row list, with no repeated issue-count
+and severity block. Clicking “Resolve” or activating a row closes the dropdown
+and opens `scripts/aranea-health-resolve` in a terminal. It shows diagnostics
+for that exact issue and offers a guided next step: service/container restart,
+disk folder inspection and usage analysis, or a kernel-update reboot. Opening
+the tool performs only diagnostics; restart/reboot requires selecting the action
+and confirming it. The tool never deletes files. Successful actions request a
+fresh health check. Systems without the terminal launcher retain their native
+disk and reboot actions.
+
+For an intentionally stopped container, the troubleshooting menu also offers
+`a` to acknowledge that stop. `scripts/aranea-health-ack` stores the container ID
+and precise Docker finish time in Aranea's user state. The monitor validates
+that occurrence before hiding its row, including after a shell restart. A
+new stop, a replacement container, or a running container never inherits the
+acknowledgment. Other health checks remain visible. `aranea-health-ack forget
+container:NAME` reverses an acknowledgment.
 
 - **Problems** (`HealthProblemsSection.qml`): one `NodeDeviceRow` per open
   problem, its node tinted urgent (critical) or amber (attention). Rows are

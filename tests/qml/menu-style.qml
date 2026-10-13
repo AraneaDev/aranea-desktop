@@ -26,7 +26,6 @@ ShellRoot {
   Component.onCompleted: {
     t.equal(rootStyle.rootExtrasHeight, rootStyle.rootContextHeight + rootStyle.rootTileHeight + rootStyle.footerHeight + rootStyle.rootChromeSpacing * 3, "the root header adds the band, tiles, footer and the chrome's own gaps")
     t.equal(rootStyle.chromeHeight, rootStyle.rootHeaderHeight + rootStyle.rootExtrasHeight, "the chrome slot holds everything the chrome lays out")
-    t.equal(rootStyle.rootHeaderHeight, Style.space(48), "the root header is the mark's height")
     t.equal(submenuStyle.sectionSpacing, submenuStyle.compactContentSpacing, "compact cards budget the gap they lay out")
     t.equal(submenuStyle.rootExtrasHeight, 0, "submenus add nothing")
     t.equal(rootStyle.menuFontSize(10), 11, "font sizes scale by 1.10")

@@ -1,7 +1,9 @@
 # Aranea VPN
 
-`araneadev.vpn` is a new (not cloned) bar-widget plugin: a VPN icon in the
-bar and its dropdown. It runs two kinds of VPN side by side:
+`araneadev.vpn` supplies the VPN page inside Aranea Network. Its existing
+controller owns tunnel polling, actions, credentials, and keyed navigation;
+Network hosts the view in its popup. With the standalone Network plugin
+absent, VPN retains its own bar widget and dropdown. It runs two kinds of VPN:
 
 - **NetworkManager VPNs** (OpenVPN, WatchGuard Firebox SSL imported from
   its `.ovpn`, OpenConnect / GlobalProtect, WireGuard): each row has a
@@ -165,8 +167,9 @@ doesn't (`scripts/capture-screenshots` does the same).
   (plain properties in, one `action(name, arg)` signal out). Status,
   sessions, graphs and the prompt are separate properties keyed by row key,
   so they never rebuild a row.
-- `scripts/repair-shell-config` inserts `araneadev.vpn` into the bar
-  layout right after the network entry, once: it leaves
+- `scripts/repair-shell-config` removes the redundant VPN bar entry when
+  Aranea Network hosts it. Otherwise it inserts `araneadev.vpn` after the
+  network entry once, leaving
   `$XDG_STATE_HOME/aranea/vpn-widget-placed`, so an icon you take out of
   the bar stays out. `scripts/release-shell-config` removes it and, when
   it was in the bar, parks it (`vpn-widget-parked`) so the next return to

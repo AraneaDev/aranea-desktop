@@ -28,7 +28,7 @@ You can use projects and actions without enabling agent reporting.
 
 ## Set up your first project
 
-1. Open **Launcher → Projects** and choose **Add project**.
+1. Open **Command center → Projects** and choose **Add project**.
 2. **Choose folder:** pick the exact Git repository folder or a development folder
    containing repositories. You can also enter an absolute path and choose
    **Use folder**. The saved folder is scanned for Git checkouts.
@@ -154,6 +154,11 @@ Runs continue when the panel closes. Saving an action, opening a project, and
 reloading the shell do not start it. Stop and Restart target the selected run.
 If submission is unconfirmed, refresh and inspect the retained run before
 starting another; the first request may already have been accepted.
+
+The Usage provider shown in the Agents panel is a separate preference from the
+provider started in a project. Selecting Codex in Usage saves the bar/panel
+choice across shell restarts; project launch suggestions still use the rules
+above and the explicit provider you choose in the project form.
 
 ## Connect Claude Code or Codex
 

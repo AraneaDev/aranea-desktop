@@ -22,9 +22,15 @@ only while the open panel is scanning and has devices under Available.
 
 `Panel.qml` keeps stock's `manageIpc: false` and owns the `omarchy.bluetooth`
 IpcHandler itself, so `omarchy-shell shell summon omarchy.bluetooth` still
-opens it.
+opens the Bluetooth page inside Network when embedded. The hosted controller
+creates no separate popup or bar entry. Network owns page selection (`n`, `v`,
+`b`) and forwards device navigation, Enter, and `x` to the existing Bluetooth
+cursor. Leaving the page closes its discovery lifecycle; moving the popup
+between monitors hands the discovery debt to the controller on the new monitor.
+The hosted page uses `t` for power while `b` selects the Bluetooth page.
+The standalone fallback keeps its original dropdown and `b` power shortcut.
 
 ## Validation
 
 Run `node --test tests/js/bluetooth-logic.test.js` and
-`tests/qml-behaviour.test.sh bluetooth-dropdown bluetooth-keyed`.
+`tests/qml-behaviour.test.sh bluetooth-dropdown bluetooth-keyed bluetooth-forget-hover bluetooth-embedded`.

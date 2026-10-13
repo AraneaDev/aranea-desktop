@@ -127,15 +127,16 @@ fi
 export check_root repo_root file_list
 
 # Prints the files to check, optionally filtered by extended regular
-# expressions matched against the whole path (e.g. '\.json$').
+# expressions matched against the whole path (e.g. '\.json$'). Deleted
+# working-tree files are skipped; staged mode tests existence in the index snapshot.
 check_files() {
-  if (($# == 0)); then
-    cat "$file_list"
-    return
-  fi
   local file regex
   while IFS= read -r file; do
-    [[ -n "$file" ]] || continue
+    [[ -n "$file" && (-e "$check_root/$file" || -L "$check_root/$file") ]] || continue
+    if (($# == 0)); then
+      printf '%s\n' "$file"
+      continue
+    fi
     for regex in "$@"; do
       if [[ "$file" =~ $regex ]]; then
         printf '%s\n' "$file"

@@ -217,7 +217,7 @@ ColumnLayout {
       objectName: 'wallpaperScheduleNote'
       Layout.fillWidth: true
       visible: !!page.backendState.schedule && page.backendState.schedule.enabled === true
-      text: 'Schedule enabled · your wallpaper may change at the next phase.'
+      text: 'Schedule enabled · your wallpaper may change at the next scheduled time.'
       opacity: 0.75
     }
     SettingsLabel {

@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Item {
   id: section
@@ -18,7 +19,14 @@ Item {
     radius: Style.space(4)
     color: Util.alpha(Color.foreground, 0.025)
     border.width: 1
-    border.color: Util.alpha(Color.foreground, 0.07)
+    border.color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
+    Rectangle {
+      x: Style.space(12)
+      width: Style.space(28)
+      height: 1
+      color: Aranea.DesignTokens.accent
+      opacity: 0.55
+    }
   }
   ColumnLayout {
     id: body

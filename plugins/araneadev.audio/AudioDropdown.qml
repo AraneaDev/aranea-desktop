@@ -170,7 +170,8 @@ Column {
     visible: !!dropdown.view.inputVisible
     // Showing or hiding moves everything below it.
     onVisibleChanged: dropdown.noteLayoutChange()
-    caption: "INPUT"
+    caption: dropdown.view.input && dropdown.view.input.captureActive ? (dropdown.view.input.muted ? "MICROPHONE · Recording, muted" : "MICROPHONE · Recording") : "MICROPHONE"
+    microphoneControl: true
     emptyText: "No input device"
     channel: dropdown.view.input || ({
         present: false,

@@ -10,6 +10,58 @@ test("health presentation owns byte formatting", () => {
   if (presentation.humanBytes(1536) !== "1.5 KB") throw new Error("byte formatting")
 })
 
+test("acknowledgments hide only named stopped-container alerts", () => {
+  const rows = [
+    { check: "container", key: "container:demo" },
+    { check: "unit", key: "unit:user:demo.service" }
+  ]
+  deepEq(
+    h.filterAcknowledged(rows, ["container:demo", "unit:user:demo.service"]),
+    [rows[1]],
+    "only container alert clears"
+  )
+  deepEq(h.filterAcknowledged(rows, []), rows, "new or unacknowledged occurrences stay visible")
+})
+
+test("health issue actions open the guided resolver with the exact key as one argument", () => {
+  deepEq(
+    presentation.resolutionArgv(
+      { check: "container", key: "container:app-test" },
+      "/theme/scripts/aranea-health-resolve"
+    ),
+    ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "container:app-test"],
+    "guided container resolution"
+  )
+  deepEq(
+    presentation.resolutionArgv(
+      { check: "disk", key: "disk:/path with spaces" },
+      "/theme/scripts/aranea-health-resolve"
+    ),
+    ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "disk:/path with spaces"],
+    "disk path remains one argument"
+  )
+  deepEq(
+    presentation.resolutionArgv({ check: "custom", execArgv: ["custom-helper"] }, "/resolver"),
+    ["custom-helper"],
+    "custom problem commands still work"
+  )
+})
+
+test("health resolution preserves disk and reboot actions without a terminal", () => {
+  for (const problem of [
+    { check: "disk", key: "disk:/", target: "/" },
+    { check: "reboot", key: "reboot" },
+    { check: "unit", key: "unit:user:demo.service", unit: "demo.service", scope: "user" }
+  ]) {
+    const row = Object.assign({}, problem, h.itemFor(problem, { terminal: false }))
+    deepEq(
+      presentation.resolutionArgv(row, "/resolver", false),
+      row.execArgv,
+      "native fallback for " + problem.check
+    )
+  }
+})
+
 const assert = (cond, msg) => {
   if (!cond) throw new Error(msg)
 }

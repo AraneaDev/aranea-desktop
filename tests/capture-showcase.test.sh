@@ -26,7 +26,7 @@ cat >"$bin/omarchy-shell" <<'SH'
 #!/usr/bin/env bash
 printf 'omarchy-shell'"$(printf ' [%%s]%.0s' "$@")"'\n' "$@" >>"$ARANEA_TEST_SANDBOX/calls.log"
 case "$2" in
-  summon)
+  summon | show)
     if [[ "${SUMMON_FAILS:-0}" == 1 ]]; then
       echo 'omarchy-shell is not running' >&2
       exit 1
@@ -60,7 +60,7 @@ bt_default='["WH-1000XM5","MX Master 3S","Pixel 9","Keychron K3","JBL Flip 6","X
 vpn_default='[{"name":"Office (Firebox)","label":"OpenVPN","kind":"nm","connected":true,"ip":"10.20.4.17","server":"vpn.example.com","upMinutes":72},{"name":"Azure (Contoso)","label":"Azure VPN Client","kind":"app","connected":true,"upMinutes":23},{"name":"Client A","label":"OpenVPN","kind":"nm","connected":false},{"name":"GlobalProtect (HQ)","label":"GlobalProtect","kind":"app","connected":false},{"name":"Azure (Fabrikam)","label":"Azure VPN Client","kind":"app","connected":false}]'
 clock_default='{"name":"Amsterdam","latitude":52.37,"longitude":4.90}'
 audio_default='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["Desk Mic","WH-1000XM5"],"apps":["Spotify","Firefox"],"track":{"title":"Midnight City","artist":"M83","player":"Spotify","progress":0.4}}'
-agents_default='{"agents":[{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
+agents_default='{"agents":[{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
 
 # Fails with MESSAGE unless the call log holds LINES in this order (other
 # calls may come between them).
@@ -108,12 +108,12 @@ fi
 "$capture" --surface bluetooth --output "$out" >/dev/null
 test -f "$out/bluetooth.png"
 assert_calls_in_order 'bluetooth: summon, showcase defaults, waits, grim, hide' \
-  'omarchy-shell [shell] [summon] [omarchy.bluetooth]' \
+  'omarchy-shell [omarchy.bluetooth] [show]' \
   "omarchy-shell [omarchy.bluetooth] [showcase] [ $bt_default]" \
   'sleep 1' \
   'sleep 3' \
   'grim' \
-  'omarchy-shell [shell] [hide] [omarchy.bluetooth]'
+  'omarchy-shell [omarchy.bluetooth] [hide]'
 : >"$log"
 ARANEA_CAPTURE_BT_NAMES='["Pod"]' "$capture" --surface bluetooth --output "$out" >/dev/null
 grep -Fxq 'omarchy-shell [omarchy.bluetooth] [showcase] [ ["Pod"]]' "$log"
@@ -124,10 +124,10 @@ grep -Fxq 'omarchy-shell [omarchy.bluetooth] [showcase] [ ["Pod"]]' "$log"
 "$capture" --surface vpn --output "$out" >/dev/null
 test -f "$out/vpn.png"
 assert_calls_in_order 'vpn: summon, showcaseFixture defaults, grim, hide' \
-  'omarchy-shell [shell] [summon] [araneadev.vpn]' \
+  'omarchy-shell [aranea.vpn] [show]' \
   "omarchy-shell [aranea.vpn] [showcaseFixture] [ $vpn_default]" \
   'grim' \
-  'omarchy-shell [shell] [hide] [araneadev.vpn]'
+  'omarchy-shell [aranea.vpn] [hide]'
 
 # --- VPN: the fixture rows are overridable.
 : >"$log"
@@ -200,6 +200,7 @@ node -e '
   const logic = require(process.argv[1])
   const s = logic.parseShowcase(process.argv[2], Date.now())
   if (!s || s.length !== 3) process.exit(1)
+  if (s[0].providerId !== "codex") process.exit(1)
   if (!s.some((p) => p.limits.length > 0) || !s.some((p) => p.balance)) process.exit(1)
 ' "$repo_root/plugins/araneadev.agents/AgentsLogic.js" "$agents_default" || {
   echo 'agents: the default stand-ins must parse, with limits and a balance' >&2
@@ -228,7 +229,9 @@ for surface in network bluetooth audio agents; do
       printf '%s: the failure must say why: %s\n' "$surface" "$errors" >&2
       exit 1
     }
-    grep -Fxq "omarchy-shell [shell] [hide] [omarchy.$surface]" "$log" || {
+    expected_hide="omarchy-shell [shell] [hide] [omarchy.$surface]"
+    [[ "$surface" != bluetooth ]] || expected_hide='omarchy-shell [omarchy.bluetooth] [hide]'
+    grep -Fxq "$expected_hide" "$log" || {
       printf '%s: a failed showcase must hide the dropdown\n' "$surface" >&2
       exit 1
     }
@@ -251,7 +254,7 @@ for answer in 'Function not found.' 'invalid' 'closed' ''; do
     printf 'vpn: the failure must say why: %s\n' "$errors" >&2
     exit 1
   }
-  grep -Fxq 'omarchy-shell [shell] [hide] [araneadev.vpn]' "$log" || {
+  grep -Fxq 'omarchy-shell [aranea.vpn] [hide]' "$log" || {
     echo 'vpn: a failed showcaseFixture must hide the dropdown' >&2
     exit 1
   }
@@ -303,6 +306,6 @@ if ((status != 3)) || [[ -e "$out/vpn.png" ]] || grep -Fq '[showcaseFixture]' "$
   printf 'vpn: a failed summon must exit 3 without a screenshot (status %s): %s\n' "$status" "$errors" >&2
   exit 1
 fi
-grep -Fq 'Unable to summon popup araneadev.vpn' <<<"$errors"
+grep -Fq 'Unable to summon popup aranea.vpn' <<<"$errors"
 
 echo "capture showcase behaviour passed"

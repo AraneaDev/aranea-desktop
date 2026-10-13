@@ -74,12 +74,10 @@ Item {
       color: DesignTokens.hoverFill
       visible: heading.pointerHovered && section.enabled
     }
-    Rectangle {
+    FocusFrame {
       objectName: "cursorOutline"
       anchors.fill: parent
-      color: section.keyboardFocused ? Util.alpha(DesignTokens.accent, 0.08) : "transparent"
-      border.width: section.keyboardFocused ? 1 : 0
-      border.color: DesignTokens.accent
+      focused: section.keyboardFocused
     }
     Rectangle {
       anchors.left: parent.left

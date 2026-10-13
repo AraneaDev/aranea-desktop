@@ -35,6 +35,27 @@ ShellRoot {
   QmlTest {
     id: t
   }
+  // This contract exercises the narrow single-column presentation.
+  QtObject {
+    id: narrowView
+    property int width: 520
+    property int height: 640
+    property int cardTop: -1
+    property int maxRowsHeight: -1
+    function freezeCardTop() {
+    }
+    function focusKeys() {
+    }
+    function revealCursor() {
+    }
+    function disarmPointer() {
+    }
+    function resetDeleteConfirm() {
+    }
+    function deleteConfirmHandleKey(event) {
+      return false
+    }
+  }
 
   // Synthesizes pointer events (TestCase's mouse helpers), never run as a
   // test.
@@ -97,6 +118,7 @@ ShellRoot {
 
   Menu.Menu {
     id: menu
+    view: narrowView
     windowEnabled: false
     shell: fakeShell
     // The test's own menu, never the installed Omarchy's.

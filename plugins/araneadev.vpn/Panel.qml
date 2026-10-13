@@ -27,9 +27,36 @@ Panel {
   // permits, for the showcase methods below.
   manageIpc: false
 
+  // Network may host this controller and its pure view in the same popup.
+  property bool embedded: false
+  // Owning Network panel while embedded; null for the standalone widget.
+  property var embeddingHost: null
+  // VPN view inside the owning Network popup.
+  property var hostedDropdown: null
+  // One visible view receives cursor scrolling and pointer resets.
+  readonly property var activeDropdown: embedded ? hostedDropdown : standaloneView.item
+
+  // Open the owning Network page or the standalone dropdown.
+  function open() {
+    if (embedded && embeddingHost)
+      embeddingHost.openVpnDropdown()
+    else
+      root.controller.show()
+  }
+  // Toggle the currently hosted VPN surface.
+  function toggle() {
+    if (root.opened)
+      root.close()
+    else
+      root.open()
+  }
+
   // Centralized close so callers can't forget to drop the prompt.
   function close() {
-    root.controller.hide()
+    if (embedded && embeddingHost)
+      embeddingHost.close()
+    else
+      root.controller.hide()
     cancelPrompt()
   }
 
@@ -555,7 +582,32 @@ Panel {
   function ensureCursorVisible() {
     if (!opened || !cursorActive || !keyboardCursor)
       return
-    dropdown.ensureVisible(cursorAt.section, cursorAt.index)
+    if (root.activeDropdown)
+      root.activeDropdown.ensureVisible(cursorAt.section, cursorAt.index)
+  }
+
+  // Shared keyboard policy for the standalone popup and Network's VPN page.
+  function disarmPointer() {
+    if (root.activeDropdown)
+      root.activeDropdown.disarmPointer()
+  }
+  // Reveal first, then move through stable keyed rows from either host.
+  function navigateKeyboard(dx, dy) {
+    root.disarmPointer()
+    if (!root.cursorActive || !root.keyboardCursor)
+      root.revealCursor()
+    else if (dy !== 0)
+      root.moveCursor(dy)
+    Qt.callLater(root.ensureCursorVisible)
+  }
+  // Act only on a visible, confirmed key; screenshot fixtures never act.
+  function activateKeyboard() {
+    root.disarmPointer()
+    if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) !== "act")
+      root.revealCursor()
+    else if (!root.fixture && CursorLogic.cursorConfirmed(root.flatRows, root.cursorKey, root.cursorFlat))
+      root.activateKey(root.cursorKey)
+    Qt.callLater(root.ensureCursorVisible)
   }
 
   // ---------- Lifecycle ----------
@@ -593,19 +645,20 @@ Panel {
 
   // Focus goes back to the key catcher when the prompt closes or starts
   // its connect (its fields hide), so arrows and Esc work without a click.
+  function restoreKeyboardFocus() {
+    if (!root.opened)
+      return
+    var target = root.embedded && root.embeddingHost ? root.embeddingHost.keyCatcher : panel.focusTarget
+    if (target)
+      target.forceActiveFocus()
+  }
   onPromptKeyChanged: {
     if (promptKey === "" && opened)
-      Qt.callLater(function () {
-        if (panel.focusTarget)
-          panel.focusTarget.forceActiveFocus()
-      })
+      Qt.callLater(root.restoreKeyboardFocus)
   }
   onPromptBusyChanged: {
     if (promptBusy && opened)
-      Qt.callLater(function () {
-        if (panel.focusTarget)
-          panel.focusTarget.forceActiveFocus()
-      })
+      Qt.callLater(root.restoreKeyboardFocus)
   }
 
   Component.onCompleted: runList()
@@ -970,8 +1023,8 @@ Panel {
 
   // Hidden (zero width) with no profiles and no apps; it stays laid out
   // while open so an IPC open still has an anchor.
-  visible: shown || opened
-  implicitWidth: shown ? button.implicitWidth : 0
+  visible: !embedded && (shown || opened)
+  implicitWidth: !embedded && shown ? button.implicitWidth : 0
   implicitHeight: button.implicitHeight
 
   BarIconButton {
@@ -992,46 +1045,34 @@ Panel {
     anchorItem: button
     owner: root
     bar: root.bar
-    open: root.opened
+    open: !root.embedded && root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    contentHeight: panel.fittedContentHeight(root.activeDropdown ? root.activeDropdown.implicitHeight : 0)
     // The prompt's fields own input until Esc or Enter; once its connect
     // runs they hide, and the frame takes the keys back.
     blocked: root.promptKey !== "" && !root.promptBusy
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.keyboardCursor = true
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
-      dropdown.disarmPointer()
-      // The first key after opening or after mouse use only reveals the
-      // cursor where it is.
-      if (!root.cursorActive || !root.keyboardCursor)
-        root.revealCursor()
-      else if (dy !== 0)
-        root.moveCursor(dy)
-      Qt.callLater(root.ensureCursorVisible)
+      root.navigateKeyboard(dx, dy)
     }
     // Enter, like any first key, only reveals a hidden cursor; it acts only
     // on a cursor the keyboard is showing, on the row the user chose and
     // still sees (CursorLogic.pressIntent, cursorConfirmed). Fixture rows
     // never act.
     onActivateRequested: {
-      dropdown.disarmPointer()
-      if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) !== "act")
-        root.revealCursor()
-      else if (!root.fixture && CursorLogic.cursorConfirmed(root.flatRows, root.cursorKey, root.cursorFlat))
-        root.activateKey(root.cursorKey)
-      Qt.callLater(root.ensureCursorVisible)
+      root.activateKeyboard()
     }
     onDeleteRequested: {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.keyboardCursor = true
     }
     onTextKey: function (t) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.keyboardCursor = true
     }
 
@@ -1039,17 +1080,22 @@ Panel {
       anchors.fill: parent
       clip: true
 
-      VpnDropdown {
-        id: dropdown
+      Loader {
+        id: standaloneView
         width: parent.width
-        view: root.vpnView
-        status: root.statusView
-        sessions: root.sessionsView
-        graphs: root.fixture ? ({}) : root.graphs
-        prompt: root.promptView
-        showcaseNames: root.showcaseNames
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        active: !root.embedded
+        sourceComponent: Component {
+          VpnDropdown {
+            view: root.vpnView
+            status: root.statusView
+            sessions: root.sessionsView
+            graphs: root.fixture ? ({}) : root.graphs
+            prompt: root.promptView
+            showcaseNames: root.showcaseNames
+            onAction: function (name, arg) {
+              root.handleAction(name, arg)
+            }
+          }
         }
       }
     }

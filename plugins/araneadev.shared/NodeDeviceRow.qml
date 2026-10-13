@@ -13,8 +13,8 @@
 // marker) on the current item (the default device, the connected network,
 // the current workspace); the hover fill, only after a real pointer move
 // (pointerGate, else the row's own gate), cleared when the row is left or
-// the dropdown's layout shifts; and the mint keyboard outline (hasCursor).
-// Hover never moves the outline.
+// the dropdown's layout shifts; and the mint-to-violet keyboard reticle (hasCursor).
+// Hover never moves the keyboard reticle.
 import QtQuick
 import QtQuick.Effects
 import qs.Commons
@@ -130,15 +130,26 @@ Item {
     // The selected highlight's fill.
     objectName: "selectedFill"
     anchors.fill: parent
-    color: DesignTokens.selectedFill
+    gradient: Gradient {
+      orientation: Gradient.Horizontal
+      GradientStop {
+        position: 0
+        color: DesignTokens.selectedFill
+      }
+      GradientStop {
+        position: 1
+        color: Util.alpha(DesignTokens.strandEnd, 0.035)
+      }
+    }
     visible: row.selected
   }
   Rectangle {
     // The selected highlight's left marker.
     objectName: "selectedMarker"
     anchors.left: parent.left
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
+    anchors.verticalCenter: parent.verticalCenter
+    height: parent.height * 0.5
+    radius: width / 2
     width: DesignTokens.selectedMarkerWidth
     color: DesignTokens.accent
     visible: row.selected
@@ -150,13 +161,10 @@ Item {
     color: DesignTokens.hoverFill
     visible: row.hoverLit
   }
-  Rectangle {
-    // The keyboard cursor outline.
+  FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
-    color: row.hasCursor ? Util.alpha(DesignTokens.accent, 0.08) : "transparent"
-    border.width: row.hasCursor ? 1 : 0
-    border.color: DesignTokens.accent
+    focused: row.hasCursor
   }
   // The active device's node glows.
   RectangularShadow {

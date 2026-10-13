@@ -27,6 +27,12 @@ Aranea.SurfaceCard {
   fillColor: card.root.style.background
   borderSpecOverride: card.root.style.borderSpec
   contentPadding: card.root.style.contentMargin
+  Aranea.DeckReveal {
+    id: resultsEntrance
+    opened: card.root.opened
+    delay: card.root.fullRootHeader ? 180 : 0
+    motionEnabled: card.root.style.motionEnabled
+  }
 
   MouseArea {
     anchors.fill: parent
@@ -78,6 +84,8 @@ Aranea.SurfaceCard {
       height: card.root.style.chromeHeight
       sectionSpacing: card.root.style.rootChromeSpacing
       fullRootHeader: card.root.fullRootHeader
+      compactDeck: card.root.style.compactRoot
+      presented: card.root.opened
       dmenuActive: card.root.dmenuActive
       matchedQuery: !card.root.dmenuActive && card.root.displayModel.count > 0 && card.root.filterText.trim() ? card.root.filterText : ""
       scopedSearch: card.root.scopedSearch
@@ -167,6 +175,7 @@ Aranea.SurfaceCard {
     Item {
       width: parent.width
       height: card.root.visibleRowsHeight
+      opacity: resultsEntrance.progress
       MenuResultList {
         id: resultListComponent
         objectName: "menuResults"
@@ -187,7 +196,6 @@ Aranea.SurfaceCard {
         foreground: card.root.style.foreground
         selectedBackground: card.root.style.selectedBackground
         selectedText: card.root.style.selectedText
-        border: card.root.style.border
         fontFamily: card.root.style.fontFamily
         menuFontScale: card.root.style.menuFontScale
         menuLetterSpacing: card.root.style.menuLetterSpacing

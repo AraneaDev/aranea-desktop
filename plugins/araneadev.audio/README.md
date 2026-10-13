@@ -14,6 +14,15 @@ the panel's cached display fallback cannot dispatch a removed device.
 
 ## Behaviour
 
+- Microphone volume and input device selection live in Audio's microphone
+  section. Its switch toggles microphone mute directly; Enter or `m` on
+  the input slider retains the same keyboard action. Recording status shares
+  the caption row, so it adds no popup height.
+- The Audio bar button carries a small microphone badge only while a recorder
+  stream is connected. Its muted glyph distinguishes a recording request with
+  a muted default input. Idle microphones have no badge. This follows native
+  PipeWire recorder-stream state, never the source's `running` flag (which can
+  reflect Audio's own level meter).
 - Choosing a device (a click or Enter) shows it as the default at once.
   Its row pulses until PipeWire reports it. Choices made meanwhile queue,
   and the last one wins. After 4 s the rows fall back to the real default.
@@ -39,5 +48,5 @@ the panel's cached display fallback cannot dispatch a removed device.
 
 ## Validation
 
-Run `node --test tests/js/audio-logic.test.js` and
-`tests/qml-behaviour.test.sh audio-dropdown audio-keyed filament-components`.
+Run `node --test tests/js/audio-logic.test.js tests/js/audio-capture.test.js` and
+`tests/qml-behaviour.test.sh audio-microphone audio-dropdown audio-keyed audio-defaults filament-components`.

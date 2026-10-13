@@ -1,0 +1,92 @@
+// Provider choice survives shell reconstruction; showcases never overwrite it.
+import QtQuick
+import Quickshell
+import "lib"
+import "plugins/araneadev.agents" as Agents
+
+ShellRoot {
+  id: host
+  // Instance reconstructed from the saved inline settings during this test.
+  property var panel: null
+  QtObject {
+    id: activity
+    property var snapshot: ({
+        tasks: []
+      })
+    property bool pending: false
+    property var error: null
+    property var currentOperation: null
+    property string operationId: ''
+    property string ownerId: ''
+    function refresh() {
+    }
+  }
+  QtObject {
+    id: projects
+    property var snapshot: ({
+        projects: []
+      })
+    function refresh() {
+    }
+  }
+  QmlTest {
+    id: t
+  }
+  Component {
+    id: panelFactory
+    Agents.Panel {
+      activityClient: activity
+      projectClient: projects
+      usageClient: ({
+          enabledProviders: [
+            {
+              providerId: "claude",
+              limits: []
+            },
+            {
+              providerId: "codex",
+              limits: []
+            }
+          ],
+          agents: [],
+          dataRevision: 0,
+          pendingUpdateKind: '',
+          syncStatusText: ''
+        })
+    }
+  }
+  Component.onCompleted: t.step(100, function () {
+    host.panel = panelFactory.createObject(host, {
+      settings: {
+        refreshIntervalSec: 60
+      }
+    })
+    host.panel.selectProvider(1)
+    t.equal(host.panel.settings.selectedProviderId, 'codex', 'real provider choice is saved in inline settings')
+    t.equal(host.panel.settings.refreshIntervalSec, 60, 'saving a provider retains other settings')
+    var saved = host.panel.settings
+    host.panel.destroy()
+    t.step(100, function () {
+      host.panel = panelFactory.createObject(host, {
+        settings: saved
+      })
+      t.equal(host.panel.provider.providerId, 'codex', 'a reconstructed shell restores Codex instead of the first provider')
+      host.panel.agentsShowcase = [
+        {
+          providerId: 'claude'
+        },
+        {
+          providerId: 'codex'
+        }
+      ]
+      host.panel.selectProvider(0)
+      t.equal(host.panel.settings.selectedProviderId, 'codex', 'showcase selection never saves over the real choice')
+      host.panel.agentsShowcase = null
+      t.equal(host.panel.provider.providerId, 'codex', 'closing showcase restores the saved provider')
+      host.panel.captureActive = true
+      host.panel.selectProvider(0)
+      t.equal(host.panel.settings.selectedProviderId, 'codex', 'inert capture navigation never writes preferences')
+      t.done()
+    })
+  })
+}

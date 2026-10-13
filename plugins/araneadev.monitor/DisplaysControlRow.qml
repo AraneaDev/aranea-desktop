@@ -43,14 +43,11 @@ Item {
 
   Component.onCompleted: row.createdAt = Date.now()
 
-  Rectangle {
-    // The keyboard cursor outline.
+  Aranea.FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
     anchors.margins: -Style.space(3)
-    color: row.hasCursor ? Util.alpha(Aranea.DesignTokens.accent, 0.08) : "transparent"
-    border.width: row.hasCursor ? 1 : 0
-    border.color: Aranea.DesignTokens.accent
+    focused: row.hasCursor
   }
   Item {
     id: body

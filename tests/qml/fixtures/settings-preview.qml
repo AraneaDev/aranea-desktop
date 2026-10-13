@@ -109,13 +109,13 @@ ShellRoot {
       wallpapers: [
         {
           id: 'day',
-          label: 'Day',
+          label: 'Rain City',
           path: artwork + 'background-day.png',
           available: true
         },
         {
           id: 'night',
-          label: 'Night',
+          label: 'Silent Vault',
           path: artwork + 'background-night.png',
           available: true
         }
@@ -129,13 +129,23 @@ ShellRoot {
         availability: 'available'
       },
       schedule: {
+        entries: [
+          {
+            time: '07:00',
+            wallpaper: 'day'
+          },
+          {
+            time: '21:00',
+            wallpaper: 'night'
+          }
+        ],
         enabled: true,
         applied: true,
         availability: 'available',
-        dawn: '06:00',
-        day: '08:00',
-        dusk: '18:00',
-        night: '20:00'
+        dawn: null,
+        day: '07:00',
+        dusk: null,
+        night: '21:00'
       },
       integrations: [
         {

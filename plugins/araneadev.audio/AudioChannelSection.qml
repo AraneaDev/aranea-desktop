@@ -8,6 +8,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
+import qs.Ui
 import "../araneadev.shared" as Aranea
 import "../araneadev.shared/ClickSettle.js" as ClickSettle
 
@@ -18,6 +19,9 @@ Column {
   property string caption: ""
   // Text shown instead of the slider when there is no device.
   property string emptyText: ""
+  // A direct input mute control shares the existing caption row, keeping
+  // microphone controls compact and the keyboard's slider stop unchanged.
+  property bool microphoneControl: false
   // Channel state: {present, volume, muted, level}.
   property var channel: ({
       present: false,
@@ -52,18 +56,59 @@ Column {
   spacing: Style.space(6)
 
   Item {
+    id: captionRow
+    property real pointerMovedAt: 0
+    function clickSettled() {
+      return ClickSettle.clickSettled({
+        now: Date.now(),
+        movedAt: captionRow.pointerMovedAt,
+        layoutChangedAt: section.pointerGate ? Number(section.pointerGate.layoutChangedAt) || 0 : 0
+      })
+    }
     width: parent.width
     implicitHeight: Math.max(captionText.implicitHeight, levelText.implicitHeight)
     Text {
       id: captionText
       anchors.left: parent.left
+      anchors.right: microphoneSwitch.visible ? microphoneSwitch.left : levelText.left
+      anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       text: section.caption
+      elide: Text.ElideRight
       color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
       font.family: Aranea.Typography.uiFamily
       font.pixelSize: Style.font.caption
       font.bold: true
       font.letterSpacing: 0
+    }
+    Aranea.FilamentSwitch {
+      id: microphoneSwitch
+      objectName: "microphoneMute"
+      anchors.right: levelText.left
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      visible: section.microphoneControl && section.channel.present
+      checked: !section.channel.muted
+      clickGate: captionRow
+      pointerGate: section.pointerGate
+      onToggled: section.muteToggled()
+      HoverHandler {
+        id: muteHover
+        onHoveredChanged: if (hovered && !section.pointerGate)
+          section.rowHovered(-1)
+        onPointChanged: if (section.pointerGate && muteHover.hovered && section.pointerGate.moved(muteHover.parent, {
+          x: muteHover.point.position.x,
+          y: muteHover.point.position.y
+        })) {
+          captionRow.pointerMovedAt = Date.now()
+          section.rowHovered(-1)
+        }
+      }
+      PanelToolTip {
+        visible: muteHover.hovered
+        text: section.channel.muted ? "Unmute microphone" : "Mute microphone"
+        fontFamily: Aranea.Typography.uiFamily
+      }
     }
     Text {
       id: levelText
@@ -104,13 +149,10 @@ Column {
     width: parent.width
     height: slider.implicitHeight + Style.space(6)
     visible: section.channel.present
-    Rectangle {
-      // The keyboard cursor outline.
+    Aranea.FocusFrame {
       objectName: "cursorOutline"
       anchors.fill: parent
-      color: "transparent"
-      border.width: section.cursor === -1 ? 1 : 0
-      border.color: Aranea.DesignTokens.accent
+      focused: section.cursor === -1
     }
     Aranea.FilamentSlider {
       id: slider

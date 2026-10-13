@@ -14,6 +14,30 @@ QtObject {
   property bool opened: false
   // True on the unfiltered root menu, which adds the context band, tiles and footer.
   property bool fullRootHeader: false
+  // Compact command deck keeps the result viewport usable on short screens.
+  property bool compactRoot: false
+  // At the smallest usable size the console leads straight into results.
+  property bool minimalRoot: false
+  // Measure the actual role fonts, independently of the user's spacing scale.
+  // The host's font token map is a runtime QObject.
+  // qmllint disable missing-property
+  property FontMetrics deckTitleMetrics: FontMetrics {
+    font.family: style.fontFamily
+    font.pixelSize: style.menuFontScale * (style.compactRoot ? Style.font.title : Style.font.displayLarge)
+    font.bold: true
+  }
+  // Technical caption metrics used to size the command deck.
+  property FontMetrics deckCaptionMetrics: FontMetrics {
+    font.family: Aranea.Typography.technicalFamily
+    font.pixelSize: style.menuFontScale * Style.font.caption
+  }
+  // Label metrics used to preserve tile height across font choices.
+  property FontMetrics tileLabelMetrics: FontMetrics {
+    font.family: style.fontFamily
+    font.pixelSize: style.menuFontScale * Style.font.subtitle
+    font.weight: Font.DemiBold
+  }
+  // qmllint enable missing-property
 
   // Font for all menu text; a payload's fontFamily overrides it.
   property string fontFamily: Quickshell.env("OMARCHY_MENU_FONT") || Aranea.Typography.uiFamily
@@ -72,20 +96,19 @@ QtObject {
   property int contentMargin: Style.spacing.panelPadding
   // Header height for submenus and dmenu requests.
   property int headerHeight: Math.max(Style.space(46), style.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
-  // Header height on the unfiltered root menu: the 48 px mark, so its top sits
-  // one panel padding below the border, like its left edge.
-  property int rootHeaderHeight: Math.max(Style.space(48), style.menuFontSize(Style.font.title) + Style.spacing.controlPaddingY * 2)
+  // Root command console compresses on short screens to preserve results.
+  property int rootHeaderHeight: Math.max(Style.space(style.compactRoot ? 72 : 108), Math.ceil(style.deckTitleMetrics.height + style.deckCaptionMetrics.height * (style.compactRoot ? 1 : 2) + Style.space(style.compactRoot ? 28 : 32)))
   // Height of the root tile row.
-  property int rootTileHeight: Style.space(64)
+  property int rootTileHeight: style.minimalRoot ? 0 : Math.max(Style.space(style.compactRoot ? 72 : 96), Math.ceil(Style.space(style.compactRoot ? 58 : 66) + style.tileLabelMetrics.height + (style.compactRoot ? 0 : style.deckCaptionMetrics.height)))
   // Height of the root context band (status, workspace, clock).
-  property int rootContextHeight: Style.space(20)
+  property int rootContextHeight: style.minimalRoot ? 0 : Style.space(24)
   // Height of the root footer.
-  property int footerHeight: Style.space(20)
+  property int footerHeight: style.minimalRoot ? 0 : Style.space(24)
   // Gap between the root chrome's header, context band, tiles and footer.
   property int rootChromeSpacing: Style.space(8)
   // Extra card height for the root context band, tiles and footer and the
   // three gaps between the chrome's four parts (0 elsewhere).
-  property int rootExtrasHeight: style.fullRootHeader ? style.rootContextHeight + style.rootTileHeight + style.footerHeight + style.rootChromeSpacing * 3 : 0
+  property int rootExtrasHeight: style.fullRootHeader && !style.minimalRoot ? style.rootContextHeight + style.rootTileHeight + style.footerHeight + style.rootChromeSpacing * 3 : 0
   // Height of the whole chrome (header, and on the root the band, tiles and footer).
   readonly property int chromeHeight: style.fullRootHeader ? style.rootHeaderHeight + style.rootExtrasHeight : style.headerHeight
   // Gap between the chrome and the rows (and the input line); the card height uses the same value.

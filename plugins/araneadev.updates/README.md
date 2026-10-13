@@ -11,6 +11,18 @@ manifest exposes `Service.qml` and `BarWidget.qml`.
 - Delegate installation to the host updater instead of installing packages in
   the bar.
 
+`scripts/aranea-update-status` collects repository updates with
+`checkupdates --nocolor` and AUR updates with `yay -Qua --color never`, when
+yay is available. It uses a private temporary database and never installs
+packages. The repository count includes Omarchy itself; an active Omarchy
+development checkout also retains its native availability check. AUR results
+honor the native updater's gcc14/gcc14-libs exclusions.
+
+Checks run on startup, hourly, and whenever the panel opens. No-update exit
+codes are successful empty results; unavailable sources fail the refresh and
+retain the previous valid status. The panel says “Updates available” whenever
+the count is positive, and “Check failed” when a source cannot be checked.
+
 `Service.qml` owns polling and service publication. `BarWidget.qml` is the bar
 entry point. `UpdatePanelHost.qml` owns panel hosting and `UpdatePanel.qml`
 owns the presentational update list.
@@ -23,4 +35,6 @@ owns the presentational update list.
 
 ## Validation
 
-Run `tests/qml-behaviour.test.sh updates-widget` and the update JS suite.
+Run `bash tests/update-status.test.sh`,
+`tests/qml-behaviour.test.sh updates-service updates-widget updates-dropdown`,
+and `node tests/js/update-logic.test.js`.

@@ -52,14 +52,11 @@ Item {
     active: sw.enabled && sw.ownHover
     pointerGate: sw.pointerGate
   }
-  Rectangle {
-    // The keyboard cursor outline.
+  FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
     anchors.margins: -Style.space(3)
-    color: "transparent"
-    border.width: sw.hasCursor ? 1 : 0
-    border.color: DesignTokens.accent
+    focused: sw.hasCursor
   }
   Rectangle {
     anchors.left: parent.left

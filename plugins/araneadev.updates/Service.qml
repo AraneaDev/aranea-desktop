@@ -1,4 +1,4 @@
-// Update status service and updater process coordination.
+// Read-only update status collection; installation stays with the host updater.
 import QtQuick
 import Quickshell.Io
 import "../araneadev.shared" as Aranea
@@ -11,84 +11,37 @@ Item {
   property var testStatus: null
   // Whether automatic refresh is enabled.
   property bool autoStart: true
+  // Collector path follows the active theme, like other Aranea adapters.
+  property string adapterPath: Aranea.RuntimePaths.themeRoot + "/scripts/aranea-update-status"
   // Parsed and merged update status.
   property var status: UpdateLogic.parseStatus({
     updates: []
   })
-  // State directory containing the reboot marker.
-  property string stateHome: Aranea.RuntimePaths.xdgStateHome
-  // Path to the reboot-required marker.
-  readonly property string rebootPath: Aranea.RuntimePaths.rebootRequiredPath
-  // Raw updater output.
-  property string updateOutput: ""
-  // Whether the update process has completed.
-  property bool updateFinished: false
-  // Whether the reboot marker check has completed.
-  property bool rebootFinished: false
-  // Whether the update process failed.
-  property bool updateFailed: false
-  // Whether an update or reboot-marker check is running right now; the
-  // dropdown's Refresh pill is busy and pulsing while this is true, and
-  // ignores clicks (refresh() below is already a no-op while it holds).
-  readonly property bool checking: updateProc.running || rebootProc.running
+  // Refresh activity drives the panel's busy state.
+  property bool checking: false
+  // Failed launches never emit exited; distinguish them from a normal exit.
+  property bool processStarted: false
 
   onTestStatusChanged: if (testStatus !== null)
     applyStatus(testStatus)
 
-  // Convert updater output into update rows.
-  function statusFromOutput(text) {
-    var lines = String(text || "").split(/\r?\n/).map(function (line) {
-      return line.trim()
-    }).filter(function (line) {
-      return line && line !== "Omarchy is up to date"
-    })
-    return {
-      updates: lines.map(function (line) {
-        return {
-          source: line.split(/\s+/)[0] || "system",
-          name: line
-        }
-      }),
-      rebootRequired: false
-    }
-  }
-
-  // Apply a raw or already-error status to the current state.
+  // Retain the last valid result when any source check is unavailable.
   function applyStatus(raw) {
     var next = raw && raw.error ? raw : UpdateLogic.parseStatus(raw)
     status = UpdateLogic.mergeRefresh(status, next, Date.now())
   }
 
-  // Merge process results after both checks finish.
-  function finishRefresh() {
-    if (!updateFinished || !rebootFinished)
-      return
-    var next = statusFromOutput(updateOutput)
-    next.rebootRequired = !updateFailed && rebootExitCode === 0
-    if (updateFailed)
-      next = {
-        error: "update check unavailable"
-      }
-    applyStatus(next)
-    updateFinished = false
-    rebootFinished = false
-    updateOutput = ""
-    updateFailed = false
-  }
-
-  // Start an update and reboot-marker refresh.
+  // Never overlap checks or run a live command with a test status override.
   function refresh() {
     if (testStatus !== null) {
       applyStatus(testStatus)
       return
     }
-    if (updateProc.running || rebootProc.running)
+    if (root.checking)
       return
-    updateFinished = false
-    rebootFinished = false
-    updateFailed = false
+    root.checking = true
+    root.processStarted = false
     updateProc.running = true
-    rebootProc.running = true
   }
 
   Component.onCompleted: {
@@ -100,38 +53,29 @@ Item {
 
   Process {
     id: updateProc
-    command: ["omarchy-update-available"]
+    command: [root.adapterPath]
     stdout: StdioCollector {
+      id: updateStdout
       waitForEnd: true
-      onStreamFinished: root.updateOutput = text
+    }
+    onStarted: root.processStarted = true
+    onRunningChanged: if (root.checking && !running && !root.processStarted) {
+      root.checking = false
+      root.applyStatus({
+        error: "update check could not start"
+      })
     }
     onExited: function (exitCode, exitStatus) {
       void exitStatus
-      root.updateFailed = exitCode !== 0 && root.updateOutput.trim() === ""
-      root.updateFinished = true
-      root.finishRefresh()
-    }
-  }
-
-  // Exit status from the reboot marker process.
-  property int rebootExitCode: 1
-
-  Process {
-    id: rebootProc
-    command: ["test", "-f", root.rebootPath]
-    onExited: function (exitCode, exitStatus) {
-      void exitStatus
-      root.rebootExitCode = exitCode
-      root.rebootFinished = true
-      root.finishRefresh()
+      root.checking = false
+      root.applyStatus(UpdateLogic.statusFromOutput(updateStdout.text, exitCode))
     }
   }
 
   Timer {
-    interval: 21600000
+    interval: 3600000
     repeat: true
     running: root.autoStart
-    triggeredOnStart: true
     onTriggered: root.refresh()
   }
 }

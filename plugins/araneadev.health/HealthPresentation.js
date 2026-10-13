@@ -77,6 +77,34 @@ function cpuSamples(history) {
   })
 }
 
+/**
+ * Open guided recovery for built-in issues, preserving custom click commands.
+ * @param {{[key: string]: *}|null} row - Current keyed problem row.
+ * @param {string} resolverPath - Installed health resolver executable.
+ * @param {boolean} [terminalAvailable] - False keeps the original native action.
+ * @returns {Array<string>} Literal argv, never shell interpolation.
+ */
+function resolutionArgv(row, resolverPath, terminalAvailable) {
+  if (!row) return []
+  if (terminalAvailable === false) return row.execArgv || []
+  if (["unit", "disk", "container", "reboot"].indexOf(row.check) >= 0 && row.key)
+    return ["xdg-terminal-exec", resolverPath, String(row.key)]
+  return row.execArgv || []
+}
+
+/**
+ * Apply occurrence-checked acknowledgments only to stopped-container alerts.
+ * @param {Array<{[key: string]: *}>} rows - Current annotated problems.
+ * @param {Array<string>} keys - Keys validated by the acknowledgment backend.
+ * @returns {Array<{[key: string]: *}>} Visible problems, with other checks untouched.
+ */
+function filterAcknowledged(rows, keys) {
+  var acknowledged = Array.isArray(keys) ? keys : []
+  return (rows || []).filter(function (row) {
+    return row.check !== "container" || acknowledged.indexOf(row.key) < 0
+  })
+}
+
 if (typeof module !== "undefined")
   module.exports = {
     humanBytes: humanBytes,
@@ -84,5 +112,7 @@ if (typeof module !== "undefined")
     problemKeys: problemKeys,
     keyedProblem: keyedProblem,
     barFraction: barFraction,
-    cpuSamples: cpuSamples
+    cpuSamples: cpuSamples,
+    resolutionArgv: resolutionArgv,
+    filterAcknowledged: filterAcknowledged
   }

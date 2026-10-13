@@ -99,6 +99,27 @@ if tools/check --staged --fix --only format >/dev/null 2>&1; then
   echo "--staged --fix accepted" >&2
   exit 1
 fi
+# Deleted working-tree files are omitted; staged checks still read their index versions.
+if command -v qmllint >/dev/null || [[ -x /usr/lib/qt6/bin/qmllint ]]; then
+  mkdir -p plugins/deleted
+  printf '// Deleted after staging.\nimport QtQuick\nItem {\n  width: 10 +\n}\n' >plugins/deleted/Removed.qml
+  git add plugins/deleted/Removed.qml
+  rm plugins/deleted/Removed.qml
+  run_check --only qml || {
+    echo "qml tried to check a deleted working-tree file" >&2
+    cat "$ARANEA_TEST_SANDBOX/out" >&2
+    exit 1
+  }
+  if run_check --staged --only qml; then
+    echo "staged checks skipped an indexed file deleted from the working tree" >&2
+    exit 1
+  fi
+  grep -Fq 'plugins/deleted/Removed.qml' "$ARANEA_TEST_SANDBOX/out" || {
+    cat "$ARANEA_TEST_SANDBOX/out" >&2
+    exit 1
+  }
+  git reset -q --hard
+fi
 # lint: an undefined JS name, a markdown heading jump and a workflow typo fail.
 mkdir -p plugins/x .github/workflows
 printf 'function f() {\n  return missingName\n}\n' >plugins/x/a.js

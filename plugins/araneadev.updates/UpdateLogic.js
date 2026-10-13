@@ -70,6 +70,24 @@ function parseStatus(raw) {
 }
 
 /**
+ * Decode the collector's JSON, keeping process errors out of package counts.
+ * @param {string} text - Collector output.
+ * @param {number} exitCode - Collector exit status.
+ * @returns {any} Raw status or a refresh error.
+ */
+function statusFromOutput(text, exitCode) {
+  var raw
+  try {
+    raw = JSON.parse(text)
+  } catch (_error) {
+    return { error: "update check unavailable" }
+  }
+  if (raw && raw.error) return { error: String(raw.error) }
+  if (exitCode !== 0) return { error: "update check unavailable" }
+  return raw
+}
+
+/**
  * Merge a refresh result with the previous valid status.
  * @param {*} previous - Previous status.
  * @param {*} next - New status.
@@ -131,9 +149,8 @@ function statusCaption(status, checking) {
 
 /**
  * The status row's content: a node tinted warn or ok, the headline and the
- * update count. Matches the old header/status wording: only a failed check
- * or a pending reboot reads as a warning; updates waiting with neither is
- * still "Up to date" (no feature change from the text-button version).
+ * update count. Failures and pending reboots read as warnings; a positive
+ * count always says that updates are available.
  * @param {any} status - update status (parseStatus / mergeRefresh)
  * @returns {{tone: string, title: string, subtitle: string}} "warn" or "ok" tone, the headline and the count line
  */
@@ -143,7 +160,13 @@ function statusRow(status) {
   var warn = !!s.error || !!s.rebootRequired
   return {
     tone: warn ? "warn" : "ok",
-    title: s.error ? "Check failed" : s.rebootRequired ? "Reboot required" : "Up to date",
+    title: s.error
+      ? "Check failed"
+      : s.rebootRequired
+        ? "Reboot required"
+        : count > 0
+          ? "Updates available"
+          : "Up to date",
     subtitle: count + (count === 1 ? " update available" : " updates available")
   }
 }
@@ -185,6 +208,7 @@ if (typeof module !== "undefined") {
     displayState,
     statusCaption,
     statusRow,
+    statusFromOutput,
     moveCursor
   }
 }

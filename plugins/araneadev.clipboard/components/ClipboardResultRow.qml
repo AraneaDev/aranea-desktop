@@ -93,15 +93,10 @@ Rectangle {
     }
   }
 
-  Rectangle {
-    // The keyboard cursor outline (mint): Enter's target.
+  Aranea.FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
-    radius: row.cornerRadius
-    visible: row.hasCursor
-    color: Util.alpha(Aranea.DesignTokens.accent, 0.08)
-    border.width: 1
-    border.color: Aranea.DesignTokens.accent
+    focused: row.hasCursor
   }
 
   Row {

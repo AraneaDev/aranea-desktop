@@ -50,8 +50,9 @@ if [[ "${FAIL_SYSTEMCTL_COMMAND:-}" == enable && "$*" == *' enable '* ]] ||
 fi
 case "$*" in
   *is-active*) if [[ "$(cat "$ARANEA_TEST_SANDBOX/live-timer" 2>/dev/null || echo inactive)" == active ]]; then echo active; else echo inactive; exit 3; fi ;;
-  *enable*) echo active >"$ARANEA_TEST_SANDBOX/live-timer" ;;
-  *disable*) echo inactive >"$ARANEA_TEST_SANDBOX/live-timer" ;;
+  *is-enabled*) if [[ "$(cat "$ARANEA_TEST_SANDBOX/live-timer" 2>/dev/null || echo inactive)" == active ]]; then echo enabled; else echo disabled; exit 1; fi ;;
+  *enable* | *restart* | *start*) echo active >"$ARANEA_TEST_SANDBOX/live-timer" ;;
+  *disable* | *stop*) echo inactive >"$ARANEA_TEST_SANDBOX/live-timer" ;;
   *daemon-reload*)
     if [[ "${EXPECT_REMOVED:-0}" == 1 ]]; then
       [[ ! -e "$ARANEA_SYSTEMD_USER_DIR/aranea-wallpaper-day-night.timer" ]] || exit 12
@@ -74,7 +75,7 @@ jq -e '.schemaVersion == 1 and .operation == "status" and .ok
   and .state.motion.configured == "on" and .state.motion.applied == "on"
   and .state.wallpaper.activeId == null and .state.wallpaper.availability == "unavailable"
   and .state.schedule.enabled == false and .state.schedule.dawn == "06:00"
-  and (.state.wallpapers | length == 8)
+  and (.state.wallpapers | length == 13)
   and (.state.wallpapers[] | (.path | startswith("/")) and (.available | type == "boolean"))' "$sandbox_root/status.json" >/dev/null
 [[ "$(jq -s length "$sandbox_root/status.json")" == 1 ]]
 test ! -e "$ARANEA_STATE_ROOT" # Reads do not create state.
@@ -176,19 +177,19 @@ done
 rc=0
 FAIL_SYSTEMCTL_COMMAND=enable "$ctl" configure schedule 04:00 07:00 17:00 22:00 --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
 [[ $rc == 11 ]]
-mapfile -t timer_calls < <(sed '/--user is-active/d' "$sandbox_root/systemctl.log")
+mapfile -t timer_calls < <(sed '/--user is-active/d; /--user is-enabled/d' "$sandbox_root/systemctl.log")
 [[ "${timer_calls[0]}" == '--user daemon-reload' && "${timer_calls[1]}" == '--user enable --now aranea-wallpaper-day-night.timer' ]]
 jq -e '.ok == false and .state.schedule.enabled == true and .state.schedule.applied == true' "$sandbox_root/result.json" >/dev/null
 diff -r "$sandbox_root/config-before" "$XDG_CONFIG_HOME/aranea"
 diff -r "$sandbox_root/units-before" "$ARANEA_SYSTEMD_USER_DIR"
-# Reload failure after disable/removal restores files but reports inactive live timer.
+# Reload failure after disable/removal restores files and the previous live timer.
 : >"$sandbox_root/systemctl.log"
 rc=0
 FAIL_RELOAD_AFTER_REMOVAL=1 "$ctl" set schedule off --json >"$sandbox_root/result.json" 2>"$sandbox_root/error" || rc=$?
 [[ $rc == 11 ]]
-mapfile -t timer_calls < <(sed '/--user is-active/d' "$sandbox_root/systemctl.log")
+mapfile -t timer_calls < <(sed '/--user is-active/d; /--user is-enabled/d' "$sandbox_root/systemctl.log")
 [[ "${timer_calls[0]}" == '--user disable --now aranea-wallpaper-day-night.timer' && "${timer_calls[1]}" == '--user daemon-reload' ]]
-jq -e '.ok == false and .state.schedule.enabled == true and .state.schedule.applied == false' "$sandbox_root/result.json" >/dev/null
+jq -e '.ok == false and .state.schedule.enabled == true and .state.schedule.applied == true' "$sandbox_root/result.json" >/dev/null
 diff -r "$sandbox_root/units-before" "$ARANEA_SYSTEMD_USER_DIR"
 [[ "$(cat "$ARANEA_STATE_ROOT/wallpaper-schedule")" == on ]]
 "$ctl" set schedule on --json >/dev/null
@@ -239,7 +240,8 @@ cat >"$sandbox_root/manifest.toml" <<'MANIFEST'
 id = "absent-image"
 path = "backgrounds/does-not-exist.png"
 MANIFEST
-ARANEA_WALLPAPER_MANIFEST="$sandbox_root/manifest.toml" "$ctl" status --json | jq -e '.state.wallpapers[0].id == "absent-image" and .state.wallpapers[0].label == "Absent image" and .state.wallpapers[0].available == false' >/dev/null
+ARANEA_WALLPAPER_MANIFEST="$sandbox_root/manifest.toml" "$ctl" status --json >"$sandbox_root/result.json" || true
+jq -e '.state.wallpapers[0].id == "absent-image" and .state.wallpapers[0].label == "Absent image" and .state.wallpapers[0].available == false' "$sandbox_root/result.json" >/dev/null
 cp "$sandbox_root/applier.log" "$sandbox_root/applier-before"
 ARANEA_WALLPAPER_MANIFEST="$sandbox_root/manifest.toml" reject ASSET_UNAVAILABLE set wallpaper absent-image --json
 cmp "$sandbox_root/applier-before" "$sandbox_root/applier.log"
