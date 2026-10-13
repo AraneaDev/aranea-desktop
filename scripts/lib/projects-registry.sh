@@ -145,6 +145,14 @@ projects_registry_prepare_request() {
   local request=$1 state=${2:-null} action path metadata checkouts='[]'
   action=$(jq -r '.action' <<<"$request")
   case "$action" in
+    navigation-set)
+      # The store owns visit time; callers cannot supply or backdate recency.
+      if [[ "$(jq -r '.args.visit // false' <<<"$request")" == true ]]; then
+        jq -c --argjson visitedAt "$(date +%s%3N)" '.args.visitedAt=$visitedAt' <<<"$request"
+      else
+        printf '%s\n' "$request"
+      fi
+      ;;
     root-add)
       path=$(projects_registry_path "$(jq -r '.args.path' <<<"$request")") || return $?
       jq -c --arg path "$path" --arg id "$(projects_registry_id r)" '.args.path=$path | .args.id=$id' <<<"$request"

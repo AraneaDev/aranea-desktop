@@ -56,6 +56,11 @@ if [[ "$1" == mutate ]]; then
     respond_error REGISTRY_CONFLICT 'The registry changed since the supplied revision.' 'Refresh the registry and retry with the current revision.'
   fi
   case "$(jq -r .action <<<"$request")" in
+    navigation-set)
+      if [[ "$(jq -r '.args.visit // false' <<<"$request")" == true ]]; then
+        command -v date >/dev/null || respond_error DEPENDENCY_MISSING 'Install date to record project visits.' 'Install the missing dependency and retry.'
+      fi
+      ;;
     register | ignore | relocate)
       command -v git >/dev/null || respond_error DEPENDENCY_MISSING 'Install Git to validate project checkouts.' 'Install Git and retry.'
       ;;

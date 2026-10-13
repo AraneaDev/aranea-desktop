@@ -134,7 +134,7 @@ QtObject {
   }
   // Submit only fixed registry actions with data encoded on stdin, never shell code.
   function request(action: string, args: var): bool {
-    if (captureActive || pending || reading || ['root-add', 'root-remove', 'register', 'ignore', 'unignore', 'configure', 'select-checkout', 'relocate', 'remove'].indexOf(action) < 0)
+    if (captureActive || pending || reading || ['root-add', 'root-remove', 'register', 'ignore', 'unignore', 'configure', 'select-checkout', 'relocate', 'remove', 'navigation-set'].indexOf(action) < 0)
       return false
     if (!args || typeof args !== 'object' || Array.isArray(args))
       return false

@@ -26,12 +26,18 @@ def project:
     fields(["checkoutId","mode","workspaceId","separate"];[]) and (.checkoutId as $id | any($checkouts[];.id == $id))
     and (.mode|mode) and (.workspaceId == null or (.workspaceId|integer and . > 0)) and (.separate|type == "boolean")))
   and ([.associations[]|if .separate then .checkoutId else "normal" end]|distinct);
+def navigation($ids):
+  fields(["lastProjectId","pinnedProjectIds","visitedAt"];[])
+  and (.lastProjectId == null or (.lastProjectId as $id | $ids | index($id) != null))
+  and (.pinnedProjectIds|type == "array" and distinct and all(.[]; . as $id | $ids | index($id) != null))
+  and (.visitedAt|type == "object" and all(to_entries[]; (.key as $id | $ids | index($id) != null) and (.value|integer and . >= 0)));
 def valid:
-  fields(["schemaVersion","revision","roots","ignored","projects"];[]) and .schemaVersion == 1 and (.revision|integer and . >= 0)
+  fields(["schemaVersion","revision","roots","ignored","projects"];["navigation"]) and .schemaVersion == 1 and (.revision|integer and . >= 0)
   and (.roots|type == "array" and all(.[]; fields(["id","path"];[]) and (.id|opaque("r")) and (.path|path)) and (map(.id)|distinct) and (map(.path)|distinct))
   and (.ignored|type == "array" and all(.[]; fields(["path","commonDir"];[]) and (.path|path) and (.commonDir|path)) and (map(.path)|distinct))
   and (.projects|type == "array" and all(.[];project) and (map(.id)|distinct) and (map(.commonDir)|distinct))
-  and ([.projects[].checkouts[].id]|distinct) and ([.projects[].checkouts[].path]|distinct);
+  and ([.projects[].checkouts[].id]|distinct) and ([.projects[].checkouts[].path]|distinct)
+  and ((has("navigation")|not) or ([.projects[].id] as $ids | .navigation | navigation($ids)));
 def request_valid:
   fields(["action","args"];["expectedRevision"]) and (.action|text) and (.args|type == "object")
   and ((has("expectedRevision")|not) or (.expectedRevision|integer and . >= 0))
@@ -40,6 +46,9 @@ def request_valid:
     elif $action == "root-remove" then fields(["rootId"];[]) and (.rootId|text)
     elif $action == "register" then fields(["paths"];[]) and (.paths|type == "array" and length > 0 and all(.[];text))
     elif $action == "remove" then fields(["projectId"];[]) and (.projectId|text)
+    elif $action == "navigation-set" then
+      (fields(["projectId","visit"];[]) and (.projectId|text) and .visit == true)
+      or (fields(["projectId","pinned"];[]) and (.projectId|text) and (.pinned|type == "boolean"))
     elif $action == "configure" then fields(["projectId"];["name","editorId","terminalId","workspaceMode","openRoles","agentId"]) and (.projectId|text)
       and ((has("name")|not) or (.name|text)) and ((has("editorId")|not) or (.editorId|editor))
       and ((has("terminalId")|not) or (.terminalId|terminal)) and ((has("workspaceMode")|not) or (.workspaceMode|mode))
@@ -78,7 +87,16 @@ def mutate($r):
   elif $r.action == "relocate" then require_checkout($a.projectId;$a.checkoutId)
     | if any(.projects[].checkouts[];.path == $a.path and .id != $a.checkoutId) then error("CHECKOUT_CONFLICT") else . end
     | .projects |= map(if .id == $a.projectId then .commonDir = $a.commonDir | .checkouts |= map(if .id == $a.checkoutId then .path = $a.path | .branch = $a.branch | .primary = $a.primary else . end) else . end)
+  elif $r.action == "navigation-set" then require_project($a.projectId)
+    | .navigation //= {lastProjectId:null,pinnedProjectIds:[],visitedAt:{}}
+    | if $a.visit == true then .navigation.lastProjectId = $a.projectId | .navigation.visitedAt[$a.projectId] = $a.visitedAt
+      elif $a.pinned then .navigation.pinnedProjectIds = (.navigation.pinnedProjectIds + [$a.projectId] | unique)
+      else .navigation.pinnedProjectIds |= map(select(. != $a.projectId)) end
   elif $r.action == "remove" then require_project($a.projectId) | .projects |= map(select(.id != $a.projectId))
+    | if has("navigation") then
+        .navigation |= (if .lastProjectId == $a.projectId then .lastProjectId = null else . end
+          | .pinnedProjectIds |= map(select(. != $a.projectId)) | del(.visitedAt[$a.projectId]))
+      else . end
   elif $r.action == "select-checkout" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then .lastCheckoutId = $a.checkoutId else . end)
   elif $r.action == "associate" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then
     .associations = ([.associations[]|select(if $a.separate then (.separate|not) or .checkoutId != $a.checkoutId else .separate end)]
