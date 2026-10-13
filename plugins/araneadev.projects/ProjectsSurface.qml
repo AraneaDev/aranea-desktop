@@ -9,6 +9,7 @@ import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "AgentSuggestion.js" as Suggestion
+import "ProjectsNavigation.js" as Navigation
 
 Item {
   id: panel
@@ -50,11 +51,46 @@ Item {
     if (navigationBlocked)
       return false
     root.projectId = id
+    root.flushNavigation()
     section = 'overview'
     scrollTo(0)
     stampLayout()
     return true
   }
+  // Ctrl+K is deliberate navigation and does not consume ordinary field text.
+  function focusProjectSearch() {
+    if (navigationBlocked || root.inert)
+      return
+    if (compact)
+      projectPicker.open()
+    else
+      sidebar.focusSearch()
+  }
+  Shortcut {
+    sequence: 'Ctrl+K'
+    enabled: panel.visible && !panel.root.inert && !panel.navigationBlocked
+    onActivated: panel.focusProjectSearch()
+  }
+  ProjectPicker {
+    id: projectPicker
+    objectName: 'projectPicker'
+    parent: panel
+    rows: Navigation.rows(panel.root.projectController.state.projects || [], panel.root.projectController.state.navigation || {}, query, frozenIds)
+    rowsFiltered: true
+    selectedId: panel.root.projectId
+    displayOnly: panel.root.inert || panel.navigationBlocked
+    pointerGate: pointerGate
+    pinningEnabled: true
+    onSelected: function (id) {
+      panel.navigate(id)
+    }
+    onPinRequested: function (id, pinned) {
+      panel.root.rememberNavigation(id, pinned)
+    }
+  }
+  onCompactChanged: projectPicker.close()
+  onVisibleChanged: if (!visible)
+    projectPicker.close()
   // Choose a supported destination after checking draft and pending guards.
   function chooseSection(next) {
     if (['overview', 'actions', 'agents', 'preferences', 'help'].indexOf(next) < 0)
@@ -208,6 +244,14 @@ Item {
         spacing: Style.space(16)
         RowLayout {
           Layout.fillWidth: true
+          Aranea.ActionButton {
+            objectName: 'chooseProject'
+            visible: panel.compact && !projectsPage.selectedProject && !projectsPage.setupActive
+            text: 'Choose project'
+            enabled: !panel.root.inert && !panel.navigationBlocked
+            pointerGate: pointerGate
+            onClicked: projectPicker.open()
+          }
           Aranea.UiLabel {
             Layout.fillWidth: true
             text: 'Projects'
@@ -229,7 +273,7 @@ Item {
           columnSpacing: Style.space(16)
           rowSpacing: Style.space(8)
           Rectangle {
-            visible: !projectsPage.setupActive
+            visible: !projectsPage.setupActive && !panel.compact
             Layout.fillWidth: panel.compact
             Layout.preferredWidth: panel.compact ? -1 : Style.space(260)
             Layout.fillHeight: !panel.compact
@@ -244,12 +288,16 @@ Item {
               anchors.margins: Style.space(12)
               compact: panel.compact
               projects: panel.root.projectController.state.projects || []
+              navigation: panel.root.projectController.state.navigation || {}
               bindings: panel.root.projectClient.snapshot.bindings || []
               selectedId: projectsPage.selectedProject ? projectsPage.selectedProject.id : panel.root.projectId
               navigationEnabled: !panel.navigationBlocked && !panel.root.inert
               pointerGate: pointerGate
               onProjectRequested: function (id) {
                 panel.navigate(id)
+              }
+              onPinRequested: function (id, pinned) {
+                panel.root.rememberNavigation(id, pinned)
               }
               onSetupRequested: projectsPage.startSetup()
               onViewportChanged: panel.stampLayout()
@@ -297,6 +345,15 @@ Item {
                 ProjectHeader {
                   width: content.width
                   visible: !!projectsPage.selectedProject && !projectsPage.setupActive
+                  compact: panel.compact
+                  navigationEnabled: !panel.navigationBlocked
+                  onProjectPickerRequested: projectPicker.open()
+                  onCheckoutRequested: function (id, checkoutId) {
+                    panel.root.projectController.request('select-checkout', {
+                      projectId: id,
+                      checkoutId: checkoutId
+                    })
+                  }
                   project: projectsPage.selectedProject
                   bindings: panel.root.projectClient.snapshot.bindings || []
                   openAvailable: projectsPage.details.openAvailable
@@ -408,6 +465,7 @@ Item {
                   projectClient: panel.root.projectClient
                   projectId: panel.root.projectId
                   displayOnly: !!panel.root.inert
+                  metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
                   error: panel.root.projectController.error || panel.root.projectClient.error
                   pointerGate: pointerGate

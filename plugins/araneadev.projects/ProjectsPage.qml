@@ -25,6 +25,8 @@ ColumnLayout {
   property bool displayOnly: false
   // Registry mutations are serialized by the focused operation client.
   property bool pending: false
+  // Best-effort visit/pin writes never block local wizard navigation.
+  property bool metadataPending: false
   // Shared suggestion propagated to the selected project Details.
   property var agentChoice: null
   // Actionable backend error retained independently of discovery outcomes.
@@ -43,8 +45,8 @@ ColumnLayout {
   property var setupProjectIds: []
   // Current position follows exact identity, independent of registry ordering.
   readonly property int setupProjectIndex: setupProjectIds.indexOf(setupProjectId)
-  // Any active mutation or scan pauses switching projects and wizard stages.
-  readonly property bool setupNavigationPending: pending || !!discoveryClient && discoveryClient.pending || details.pending || details.actions.pending
+  // Registration/action saves, owner work, and scans pause wizard navigation.
+  readonly property bool setupNavigationPending: pending && !metadataPending || !!discoveryClient && discoveryClient.pending || !!projectClient && projectClient.pending || details.actions.pending
   // Exiting setup must retain every unsaved preference or action draft.
   readonly property bool setupCanExit: !setupNavigationPending && !details.dirty && !details.actions.editing
   // Explicit submitted selection matched against successful readback.

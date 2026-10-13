@@ -10,6 +10,8 @@ ShellRoot {
   property var requests: []
   // Held callbacks exercise the real Settings composition wiring.
   property var responses: []
+  // Best-effort visit metadata is acknowledged separately from held mandatory saves.
+  property var navigationCalls: []
   QmlTest {
     id: t
   }
@@ -311,6 +313,25 @@ ShellRoot {
       return function () {}
     }
     entry.projectController.runner = function (argv, input, done) {
+      var request = JSON.parse(input)
+      if (request.action === 'navigation-set') {
+        navigationCalls.push(request)
+        var visits = {}
+        visits[request.args.projectId] = Date.now()
+        var state = Object.assign({}, entry.projectController.state, {
+          revision: entry.projectController.state.revision + 1,
+          navigation: {
+            lastProjectId: request.args.projectId,
+            pinnedProjectIds: [],
+            visitedAt: visits
+          }
+        })
+        done(0, JSON.stringify({
+          ok: true,
+          state: state
+        }), '')
+        return
+      }
       responses.push(done)
     }
     entry.projectController.tools = page.tools
@@ -431,7 +452,7 @@ ShellRoot {
     t.check(!realPage.setupCanContinue, 'earlier save does not release the newer draft navigation guard')
     realPage.details.applyDraft()
     state = Object.assign({}, state, {
-      revision: 4,
+      revision: 5,
       projects: [Object.assign({}, project, {
           name: 'Edited during save'
         }), second]
@@ -473,6 +494,25 @@ ShellRoot {
     t.equal(realPage.setupStep, 3, 'real setup reaches optional agent instructions after all projects')
     realPage.finishSetup()
     t.check(!realPage.setupActive && entry.projectId === 'p-beta', 'finish keeps the exact last configured project selected')
+    t.equal(navigationCalls, [
+      {
+        action: 'navigation-set',
+        args: {
+          projectId: 'p-real',
+          visit: true
+        },
+        expectedRevision: 3
+      },
+      {
+        action: 'navigation-set',
+        args: {
+          projectId: 'p-beta',
+          visit: true
+        },
+        expectedRevision: 5
+      }
+    ], 'registration and finished wizard record each selected project once separately from mandatory saves')
+    t.check(!entry.projectController.pending, 'acknowledged visit metadata leaves registry saves available')
     realPage.details.actions.client.captureActive = true
     realPage.setupActive = true
     realPage.setupProjectId = 'p-real'

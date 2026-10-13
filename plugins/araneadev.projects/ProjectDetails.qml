@@ -347,7 +347,7 @@ ColumnLayout {
     }
     Aranea.UiLabel {
       Layout.fillWidth: true
-      text: 'Change tools, checkouts, and workspace behavior in Preferences.'
+      text: 'Switch checkout above. Manage tools, registered checkouts, and workspace behavior in Preferences.'
       opacity: 0.55
     }
   }
@@ -392,6 +392,7 @@ ColumnLayout {
       text: 'Project name'
     }
     Ui.TextField {
+      objectName: 'projectNameDraft'
       Layout.fillWidth: true
       text: details.draft.name || ''
       enabled: !details.displayOnly

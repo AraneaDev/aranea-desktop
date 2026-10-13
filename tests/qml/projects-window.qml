@@ -1,5 +1,6 @@
 // Independent Projects navigation uses stable IDs and never hides an unsaved draft.
 import QtQuick
+import QtTest
 import Quickshell
 import qs.Commons
 import "lib"
@@ -7,6 +8,19 @@ import "plugins/araneadev.projects" as Projects
 
 ShellRoot {
   id: host
+  TestCase {
+    id: input
+    name: 'navigationInput'
+    when: false
+  }
+  // Serialized real client mutations captured without writing a registry.
+  property var registryCalls: []
+  // Held completion lets inspection race a pending metadata save.
+  property var metadataDone: null
+  // Owner transport calls must stay absent during inspection.
+  property int ownerCalls: 0
+  // Count actual Open signals even when the owner transport is inert.
+  property int inspectionLaunches: 0
   QmlTest {
     id: t
   }
@@ -75,9 +89,29 @@ ShellRoot {
         }
       ]
     }
+    entry.projectController.state = Object.assign({}, entry.projectController.state, {
+      navigation: {
+        lastProjectId: 'p-two',
+        pinnedProjectIds: [],
+        visitedAt: {}
+      }
+    })
+    entry.projectId = ''
+    entry.open('{}')
+    t.equal(entry.projectId, 'p-two', 'saved registered selection is restored without a launch')
+    var registered = entry.projectController.state
+    entry.projectController.state = Object.assign({}, registered, {
+      projects: [registered.projects[0]]
+    })
+    entry.open('{}')
+    t.equal(entry.projectId, '', 'a removed saved selection reopens the recent project list')
+    entry.projectController.state = registered
     t.check(surface.navigate('p-one'), 'standalone navigation selects the exact project')
     t.equal(entry.projectId, 'p-one', 'selection is independent of Settings')
     var page = t.findChild(surface, 'projectsPage')
+    page.details.openRequested.connect(function (payload) {
+      host.inspectionLaunches++
+    })
     page.details.actions.client.captureActive = true
     page.details.setDraft('name', 'Unsaved')
     t.check(!surface.navigate('p-two'), 'unsaved preferences prevent changing project')
@@ -150,7 +184,98 @@ ShellRoot {
       var header = t.findChild(surface, 'projectHeader'), branch = t.findChild(header, 'projectBranch')
       t.check(branch.width <= header.width && branch.height > 0, 'long branch metadata stays readable inside the compact viewport')
       t.check(narrowSurface.compact, 'standalone layout adapts to narrow widths')
-      t.done()
+      t.check(!t.findChild(narrowSurface, 'compactProjectSelector'), 'narrow navigation replaces the project dropdown')
+      t.check(!!t.findChild(narrowSurface, 'projectPicker'), 'narrow navigation exposes the full searchable picker')
+      host.inspectionLaunches = 0
+      var picker = t.findChild(surface, 'projectPicker')
+      t.findChild(header, 'headerChooseProject').activate()
+      t.step(80, function () {
+        t.check(picker.opened, 'selected narrow header opens full project search')
+        input.keyClick(Qt.Key_Escape)
+        t.check(!picker.opened && entry.opened, 'picker dismissal keeps Projects open')
+        var checkoutPicker = t.findChild(header, 'checkoutPicker')
+        entry.projectController.captureActive = false
+        entry.projectController.runner = function (argv, payload, done) {
+          host.registryCalls.push(JSON.parse(payload))
+          host.metadataDone = done
+        }
+        entry.projectClient.runner = function (argv, done) {
+          host.ownerCalls++
+        }
+        t.findChild(header, 'headerChooseCheckout').activate()
+        t.step(80, function () {
+          t.check(checkoutPicker.opened, 'header checkout selector is searchable')
+          checkoutPicker.select('c-main')
+          t.equal(host.registryCalls[0].action, 'select-checkout', 'checkout activation routes through the registry operation')
+          t.equal(host.registryCalls[0].args, {
+            projectId: 'p-one',
+            checkoutId: 'c-main'
+          }, 'checkout activation preserves exact project and checkout IDs')
+          host.metadataDone(1, JSON.stringify({
+            ok: false,
+            error: {
+              message: 'Metadata unavailable'
+            }
+          }), '')
+          t.equal(host.ownerCalls, 0, 'project and checkout inspection emit no Open request')
+          t.check(surface.navigate('p-two'), 'project inspection accepts navigation before saving metadata')
+          t.check(entry.projectController.pending, 'visit metadata may be pending independently of selection')
+          t.check(surface.navigate('p-one'), 'pending visit save cannot block inspecting another project')
+          t.equal(entry.projectId, 'p-one', 'pending metadata preserves the new exact selected ID')
+          t.findChild(surface, 'projectsSidebar').setupRequested()
+          t.check(page.setupActive, 'metadata-only pending permits entering mandatory project setup')
+          t.check(!page.setupNavigationPending, 'metadata-only pending cannot block wizard navigation')
+          t.check(!entry.projectController.request('root-add', {
+            path: '/work'
+          }), 'metadata pending preserves serialization for native registry saves')
+          page.finishSetup()
+          t.check(!page.setupActive, 'metadata-only pending permits exiting clean project setup')
+          host.metadataDone(1, JSON.stringify({
+            ok: false,
+            error: {
+              message: 'Metadata unavailable'
+            }
+          }), '')
+          t.equal(host.registryCalls[2] ? host.registryCalls[2].args : null, {
+            projectId: 'p-one',
+            visit: true
+          }, 'latest navigation metadata is saved after a pending request fails')
+          host.metadataDone(1, JSON.stringify({
+            ok: false,
+            error: {
+              message: 'Metadata unavailable'
+            }
+          }), '')
+          t.check(surface.navigate('p-two'), 'metadata save failure cannot block project inspection')
+          host.metadataDone(1, JSON.stringify({
+            ok: false,
+            error: {
+              message: 'Metadata unavailable'
+            }
+          }), '')
+          surface.width = 1080
+          var sidebar = t.findChild(surface, 'projectsSidebar')
+          input.keyClick(Qt.Key_K, Qt.ControlModifier)
+          t.check(t.findChild(sidebar, 'projectSearch').activeFocus, 'Ctrl+K focuses wide project search')
+          var focus = window.activeFocusItem
+          entry.projectController.state = Object.assign({}, entry.projectController.state)
+          t.step(80, function () {
+            t.equal(window.activeFocusItem === focus, true, 'registry refresh never steals the search field focus')
+            t.equal(host.ownerCalls, 0, 'navigation and metadata failure never submit application launches')
+            t.equal(host.inspectionLaunches, 0, 'project and checkout selection emit no Open signal')
+            surface.chooseSection('preferences')
+            var nameField = t.findChild(surface, 'projectNameDraft')
+            t.check(!!nameField, 'preferences retain a normal name draft field')
+            if (nameField) {
+              nameField.forceActiveFocus()
+              input.keyClick(Qt.Key_X)
+              t.check(nameField.activeFocus && nameField.text.indexOf('x') >= 0, 'ordinary typed field text is not intercepted by project navigation')
+              page.details.discardDraft()
+            }
+            t.done()
+          })
+        })
+      })
     })
   })
 }

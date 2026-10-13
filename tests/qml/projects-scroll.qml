@@ -68,7 +68,8 @@ ShellRoot {
       t.check(list.contentHeight > list.height, 'large registries create a scrollable sidebar')
       t.equal(row.width, list.contentWidth, 'project rows fill their complete click target after layout settles')
       var labels = t.findChildren(row, 'projectRowName')
-      t.check(labels.length === 1 && !labels[0].truncated, 'long repository names remain readable without truncation')
+      t.check(labels.length === 1 && labels[0].truncated && labels[0].wrapMode === Text.NoWrap, 'long repository names elide within compact navigation rows')
+      t.check(row.fullLabel.indexOf('Project 1 with a readable full repository name') >= 0 && row.fullLabel.indexOf('/work/development/project-1') >= 0, 'compact row hover and accessibility retain complete name and path')
       input.mouseWheel(list, list.width / 2, list.height / 2, 0, -120)
       t.step(100, function () {
         t.check(list.contentY > 0, 'mouse wheel scrolls the project list')

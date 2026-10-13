@@ -9,6 +9,8 @@ ShellRoot {
   id: host
   // Held helper callbacks expose serialization and authoritative publication.
   property var calls: []
+  // Visit writes have their own acknowledged transport, separate from held role saves.
+  property var navigationCalls: []
   // Real one-off owner transport requests intercepted at the IPC boundary.
   property var ipcCalls: []
   // Real owner requests exercise omitted-checkout leases at the IPC boundary.
@@ -141,6 +143,25 @@ ShellRoot {
     entry.discoveryClient.captureActive = true
     entry.projectClient.captureActive = true
     entry.projectController.runner = function (argv, payload, done) {
+      var request = JSON.parse(payload)
+      if (request.action === 'navigation-set') {
+        host.navigationCalls.push(request)
+        var state = Object.assign({}, entry.projectController.state, {
+          revision: entry.projectController.state.revision + 1,
+          navigation: {
+            lastProjectId: request.args.projectId,
+            pinnedProjectIds: [],
+            visitedAt: {
+              'p-one': Date.now()
+            }
+          }
+        })
+        done(0, JSON.stringify({
+          ok: true,
+          state: state
+        }), '')
+        return
+      }
       host.calls.push({
         argv: argv,
         payload: payload,
@@ -219,6 +240,16 @@ ShellRoot {
     entry.projectClient.available = true
     surface.navigate('p-one')
     t.step(80, function () {
+      t.equal(host.navigationCalls, [
+        {
+          action: 'navigation-set',
+          args: {
+            projectId: 'p-one',
+            visit: true
+          },
+          expectedRevision: 4
+        }
+      ], 'inspection saves exact visit metadata independently of configure')
       var header = t.findChild(surface, 'projectHeader')
       t.check(header.agentChoice === surface.agentChoice, 'surface supplies its shared suggestion to header')
       var page = t.findChild(surface, 'projectsPage'), agents = t.findChild(surface, 'projectAgents')
@@ -232,14 +263,14 @@ ShellRoot {
           projectId: 'p-one',
           openRoles: ['editor', 'terminal', 'agent']
         },
-        expectedRevision: 4
+        expectedRevision: 5
       }, 'autosave encodes canonical roles through real registry transport')
       t.check(entry.projectController.pending && header.pending, 'held configure disables header immediately')
       header.choose('role:editor')
       t.equal(host.calls.length, 1, 'rapid second toggle cannot overwrite pending selection')
       t.equal(header.openRoles, ['editor', 'agent'], 'pending save retains authoritative roles until readback')
       var saved = Object.assign({}, entry.projectController.state, {
-        revision: 5,
+        revision: 6,
         projects: [Object.assign({}, entry.projectController.state.projects[0], {
             openRoles: ['editor', 'terminal', 'agent']
           })]
@@ -347,7 +378,7 @@ ShellRoot {
           ], 'retry preserves exact provider-only payload without selecting checkout in UI')
           t.check(host.agentResponses[1].ok && routeOwner.operations.length === 1, 'readiness retry creates exactly one owner operation')
           var op = routeOwner.operations[0]
-          t.equal([op.checkoutId, op.selectionRevision, op.agentId, op.roles, op.newWindowRole], ['c-main', 5, 'codex', ['agent'], 'agent'], 'owner resolves saved checkout through revision-bound lease and preserves agent request')
+          t.equal([op.checkoutId, op.selectionRevision, op.agentId, op.roles, op.newWindowRole], ['c-main', 6, 'codex', ['agent'], 'agent'], 'owner resolves saved checkout through revision-bound lease and preserves agent request')
           t.check(!routeOwner.defaultSelections['p-one'], 'accepted Start consumes selection lease')
           t.equal(op.error.code, 'AGENT_MISSING', 'actual accepted start fails for missing selected provider')
           var explanation = t.findChild(page.details, 'projectOperationError'), alternative = t.findChild(page.details, 'startAlternativeAgent')

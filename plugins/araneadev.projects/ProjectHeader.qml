@@ -10,6 +10,14 @@ import "../araneadev.shared" as Aranea
 ColumnLayout {
   id: header
   objectName: 'projectHeader'
+  // Narrow hosts reach the full project picker from the selected header.
+  property bool compact: false
+  // Host draft guards prevent changing the checkout underneath an editor.
+  property bool navigationEnabled: true
+  // Project inspection and checkout switching never submit Open.
+  signal projectPickerRequested
+  // Select an exact registered checkout without launching tools.
+  signal checkoutRequested(string projectId, string checkoutId)
   // Current saved project identity; this view never changes registration.
   property var project: null
   // Observed workspace bindings supplied by the persistent owner.
@@ -156,6 +164,27 @@ ColumnLayout {
         roles: [parts[1]]
       }))
   }
+  ProjectPicker {
+    id: checkoutPicker
+    objectName: 'checkoutPicker'
+    parent: header.menuHost || header
+    rows: header.project ? (header.project.checkouts || []).map(function (checkout) {
+      return {
+        id: checkout.id,
+        name: checkout.branch || 'detached',
+        branch: checkout.branch || '',
+        path: checkout.path
+      }
+    }) : []
+    selectedId: header.checkout ? header.checkout.id : ''
+    displayOnly: header.displayOnly || header.pending || !header.navigationEnabled
+    pointerGate: header.pointerGate
+    onSelected: function (id) {
+      if (header.project)
+        header.checkoutRequested(header.project.id, id)
+    }
+  }
+  onProjectChanged: checkoutPicker.close()
   z: openSplit.menuOpen ? 10 : 0
   spacing: Style.space(8)
   GridLayout {
@@ -190,6 +219,25 @@ ColumnLayout {
       onTriggered: function (key) {
         header.choose(key)
       }
+    }
+  }
+  RowLayout {
+    Layout.fillWidth: true
+    Aranea.ActionButton {
+      objectName: 'headerChooseProject'
+      visible: header.compact
+      text: 'Choose project'
+      enabled: !header.displayOnly && header.navigationEnabled
+      pointerGate: header.pointerGate
+      onClicked: header.projectPickerRequested()
+    }
+    Aranea.ActionButton {
+      objectName: 'headerChooseCheckout'
+      Layout.fillWidth: true
+      text: 'Checkout · ' + (header.checkout ? header.checkout.branch || 'detached' : 'None')
+      enabled: !header.displayOnly && !header.pending && header.navigationEnabled && !!header.project && header.project.checkouts.length > 0
+      pointerGate: header.pointerGate
+      onClicked: checkoutPicker.open()
     }
   }
   Aranea.UiLabel {

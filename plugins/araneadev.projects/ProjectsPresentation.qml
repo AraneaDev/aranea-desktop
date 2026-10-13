@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell.Io
 import "../araneadev.activity" as Activity
 import "ProjectsLogic.js" as Logic
+import "ProjectsNavigation.js" as Navigation
 
 Item {
   id: root
@@ -22,6 +23,56 @@ Item {
   property string section: 'projects'
   // Optional opaque details destination, empty for the Projects overview.
   property string projectId: ''
+  // Every genuine selection source records once; fixture changes remain inert.
+  onProjectIdChanged: if (projectId && !inert)
+    rememberNavigation(projectId, undefined, true)
+  // Restore saved registration only after the initial registry observation.
+  property bool restoreNavigationPending: false
+  // Restoration is presentation-only and never asks the live owner to Open.
+  function restoreNavigation() {
+    if (!restoreNavigationPending || inert || projectController.reading)
+      return
+    var state = projectController.state
+    projectId = Navigation.restoreSelection(state.projects || [], projectId || null, (state.navigation || {}).lastProjectId || null)
+    restoreNavigationPending = false
+  }
+  // Metadata writes have no authority over project inspection or draft guards.
+  property bool navigationSaving: false
+  // Retain later visits and pin changes while the registry serializes mutations.
+  property var navigationQueue: []
+  // Queue exact-ID metadata without waiting for storage to accept inspection.
+  function rememberNavigation(id, pinned, deferred) {
+    if (inert || !id)
+      return
+    var args = pinned === undefined ? {
+      projectId: id,
+      visit: true
+    } : {
+      projectId: id,
+      pinned: pinned
+    }
+    navigationQueue = navigationQueue.concat([args])
+    if (deferred)
+      Qt.callLater(flushNavigation)
+    else
+      flushNavigation()
+  }
+  // Drain metadata only when existing registry work has completed; failures are final.
+  function flushNavigation() {
+    if (inert || projectController.pending || projectController.reading || !navigationQueue.length)
+      return
+    var args = navigationQueue[0]
+    navigationQueue = navigationQueue.slice(1)
+    if (!(projectController.state.projects || []).some(function (project) {
+      return project.id === args.projectId
+    })) {
+      Qt.callLater(flushNavigation)
+      return
+    }
+    navigationSaving = true
+    if (!projectController.request('navigation-set', args))
+      navigationSaving = false
+  }
   // Registry/tool operation client works independently of the live owner.
   property alias projectController: projectController
   // Sole-owner submission/observation client, without launch authority.
@@ -42,6 +93,21 @@ Item {
   }
   Connections {
     target: projectController
+    function onStateChanged() {
+      root.restoreNavigation()
+    }
+    function onReadingChanged() {
+      if (!projectController.reading) {
+        root.restoreNavigation()
+        root.flushNavigation()
+      }
+    }
+    function onPendingChanged() {
+      if (!projectController.pending) {
+        root.navigationSaving = false
+        root.flushNavigation()
+      }
+    }
     function onRootReady(rootId) {
       discoveryClient.start(rootId)
     }
@@ -228,9 +294,11 @@ Item {
     var nextId = payload && payload.projectId !== undefined ? Logic.normalizeProjectId(payload.projectId) : projectId
     if (view && nextId !== projectId && view.navigationBlocked)
       return 'busy'
+    restoreNavigationPending = !payload || payload.projectId === undefined
     projectId = nextId
     opened = true
     projectController.refresh()
+    restoreNavigation()
     projectClient.refresh()
     if (view)
       view.focusKeys()
