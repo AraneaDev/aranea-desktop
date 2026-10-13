@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.27.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.26.0...v2.27.0) (2026-10-13)
+
+
+### Features
+
+* refine cockpit controls and flexible wallpaper scheduling ([3a7d65f](https://github.com/AraneaDev/aranea-desktop/commit/3a7d65f80b18be278fff9eb5c1df2ea3b564cef5))
+
 ## [2.26.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.25.0...v2.26.0) (2026-10-12)
 
 
