@@ -29,10 +29,18 @@ full_theme
 rm "$theme/branding/brand.svg"
 [[ "$(missing_brand_assets "$plugins" "$theme")" == branding/brand.svg ]]
 
-# --- literal motif paths are checked too
+# --- a fixture consumer verifies literal paths independently of current UI artwork
+reference_plugins="$ARANEA_TEST_SANDBOX/reference-plugins"
+mkdir -p "$reference_plugins/araneadev.shared"
+cp "$plugins/araneadev.shared/BrandConfig.qml" "$reference_plugins/araneadev.shared/"
+cat >"$reference_plugins/araneadev.shared/Reference.qml" <<'QML'
+import QtQuick
+Image { source: BrandConfig.brandingMotifsPath + "menu-network.svg" }
+QML
 full_theme
+[[ -z "$(missing_brand_assets "$reference_plugins" "$theme")" ]]
 rm "$theme/branding/motifs/menu-network.svg"
-[[ "$(missing_brand_assets "$plugins" "$theme")" == branding/motifs/menu-network.svg ]]
+[[ "$(missing_brand_assets "$reference_plugins" "$theme")" == branding/motifs/menu-network.svg ]]
 
 # --- no deployed shared plugin: nothing to compare
 [[ -z "$(missing_brand_assets "$ARANEA_TEST_SANDBOX/no-plugins" "$theme")" ]]

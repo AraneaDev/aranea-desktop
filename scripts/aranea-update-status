@@ -2,6 +2,9 @@
 # Read-only package checks for the update center; installation stays native.
 # Usage: scripts/aranea-update-status
 set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
 export LC_ALL=C
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
@@ -73,7 +76,7 @@ if [[ -n ${OMARCHY_PATH:-} && "$OMARCHY_PATH" != /usr/share/omarchy ]]; then
 fi
 
 reboot=false
-[[ ! -f "${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/reboot-required" ]] || reboot=true
+[[ ! -f "$(xdg_state_home)/omarchy/reboot-required" ]] || reboot=true
 jq -cn --slurpfile updates "$scratch/updates" --rawfile errors "$scratch/errors" --argjson reboot "$reboot" \
   '{updates:$updates,rebootRequired:$reboot} + (if $errors == "" then {} else {error:($errors | rtrimstr("\n"))} end)'
 [[ ! -s "$scratch/errors" ]]

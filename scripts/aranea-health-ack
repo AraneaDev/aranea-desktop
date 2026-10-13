@@ -2,8 +2,11 @@
 # Persist acknowledgment of one stopped-container occurrence, not its name forever.
 # Usage: aranea-health-ack status | acknowledge container:NAME [EXPECTED_JSON] | forget container:NAME
 set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
 operation="${1:-}"
-state_root="${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}"
+state_root="$(aranea_state_root)"
 state_file="$state_root/health-acknowledgments.json"
 scratch="$(mktemp -d)"
 state_tmp=''

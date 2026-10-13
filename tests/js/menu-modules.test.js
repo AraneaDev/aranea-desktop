@@ -37,6 +37,22 @@ test("command center groups software and configuration without losing routes", (
   )
   defaults.push(parsing.normalizeItem("install.package", { action: "install-package" }))
   const merged = parsing.mergeMenuSources(defaults, [], true)
+  assert.deepEqual(
+    plain(facade.mergeMenuSources(defaults, [], true)),
+    plain(merged),
+    "public facade preserves grouped routes"
+  )
+  const withoutSettings = facade.mergeMenuSources(defaults, [], false)
+  assert.equal(
+    withoutSettings.items.about.parent,
+    "learn",
+    "Help retains About when Settings is unavailable"
+  )
+  assert.equal(
+    withoutSettings.items["aranea.settings"],
+    undefined,
+    "unavailable Settings is not injected"
+  )
   const roots = merged.itemOrder.filter((id) => merged.items[id].parent === "root")
   assert.deepEqual(plain(roots), ["apps", "trigger", "software", "settings", "learn", "system"])
   assert.equal(merged.items.trigger.label, "Actions")
@@ -56,6 +72,11 @@ test("command center groups software and configuration without losing routes", (
     '{"about":{"action":"custom-about"},"settings":{"action":"custom-settings"}}'
   )
   const overridden = parsing.mergeMenuSources(defaults, custom, true)
+  assert.deepEqual(
+    plain(facade.mergeMenuSources(defaults, custom, true)),
+    plain(overridden),
+    "public facade respects custom group destinations"
+  )
   assert.ok(overridden.items.about, "custom About action stays available")
   assert.equal(overridden.items.about.action, "custom-about")
   assert.equal(overridden.items.style.parent, "root", "action destinations cannot contain menus")

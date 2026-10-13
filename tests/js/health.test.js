@@ -15,36 +15,52 @@ test("acknowledgments hide only named stopped-container alerts", () => {
     { check: "container", key: "container:demo" },
     { check: "unit", key: "unit:user:demo.service" }
   ]
-  deepEq(
-    h.filterAcknowledged(rows, ["container:demo", "unit:user:demo.service"]),
-    [rows[1]],
-    "only container alert clears"
-  )
-  deepEq(h.filterAcknowledged(rows, []), rows, "new or unacknowledged occurrences stay visible")
+  for (const logic of [h, presentation]) {
+    deepEq(
+      logic.filterAcknowledged(rows, ["container:demo", "unit:user:demo.service"]),
+      [rows[1]],
+      "only container alert clears"
+    )
+    deepEq(
+      logic.filterAcknowledged(rows, []),
+      rows,
+      "new or unacknowledged occurrences stay visible"
+    )
+    deepEq(logic.filterAcknowledged(rows, null), rows, "unavailable acknowledgments keep alerts")
+    deepEq(logic.filterAcknowledged(null, []), [], "missing problems remain empty")
+  }
 })
 
 test("health issue actions open the guided resolver with the exact key as one argument", () => {
-  deepEq(
-    presentation.resolutionArgv(
-      { check: "container", key: "container:app-test" },
-      "/theme/scripts/aranea-health-resolve"
-    ),
-    ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "container:app-test"],
-    "guided container resolution"
-  )
-  deepEq(
-    presentation.resolutionArgv(
-      { check: "disk", key: "disk:/path with spaces" },
-      "/theme/scripts/aranea-health-resolve"
-    ),
-    ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "disk:/path with spaces"],
-    "disk path remains one argument"
-  )
-  deepEq(
-    presentation.resolutionArgv({ check: "custom", execArgv: ["custom-helper"] }, "/resolver"),
-    ["custom-helper"],
-    "custom problem commands still work"
-  )
+  for (const logic of [h, presentation]) {
+    deepEq(logic.resolutionArgv(null, "/resolver"), [], "missing issue cannot dispatch")
+    deepEq(
+      logic.resolutionArgv({ check: "custom" }, "/resolver"),
+      [],
+      "missing custom command cannot dispatch"
+    )
+    deepEq(
+      logic.resolutionArgv(
+        { check: "container", key: "container:app-test" },
+        "/theme/scripts/aranea-health-resolve"
+      ),
+      ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "container:app-test"],
+      "guided container resolution"
+    )
+    deepEq(
+      logic.resolutionArgv(
+        { check: "disk", key: "disk:/path with spaces" },
+        "/theme/scripts/aranea-health-resolve"
+      ),
+      ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "disk:/path with spaces"],
+      "disk path remains one argument"
+    )
+    deepEq(
+      logic.resolutionArgv({ check: "custom", execArgv: ["custom-helper"] }, "/resolver"),
+      ["custom-helper"],
+      "custom problem commands still work"
+    )
+  }
 })
 
 test("health resolution preserves disk and reboot actions without a terminal", () => {
