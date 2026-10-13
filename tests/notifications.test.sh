@@ -134,7 +134,7 @@ grep -Fq 'interval: 3600000' "$inbox_qml"
 grep -Fq 'InboxLogic.mergeLoaded(' "$inbox_qml"
 grep -Fq 'NotificationLogic.clampTimestamp(' "$inbox_qml"
 grep -Fq 'onPruned' "$svc"
-grep -Fq 'critical notifications stay until dismissed' "$repo_root/README.md"
+grep -Fq 'critical notifications stay until dismissed' "$repo_root/docs/features.md"
 
 # --- 4c: quiet hours follow a minute-aligned clock; a pending DND save is flushed
 grep -Fq 'precision: SystemClock.Minutes' "$svc"

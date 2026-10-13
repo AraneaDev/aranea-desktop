@@ -22,188 +22,129 @@ to the desktop; the same identity carries through the command center, lock, and 
 
 Static fallback: [desktop capture](screenshots/desktop.png) · [full showcase GIF](screenshots/hero-showcase.gif)
 
-## Quick start
+[Install](#install) · [Daily controls](#daily-controls) · [Projects and agents](#projects-and-agents) · [Gallery](#gallery) · [Documentation](#documentation)
 
-Aranea Desktop expects an [Omarchy](https://omarchy.org) installation with
-`omarchy` on `PATH`. From this checkout, open the guided installer:
+## Install
+
+Aranea runs on [Omarchy](https://omarchy.org). Clone the repository and open the
+guided installer:
 
 ```bash
+git clone https://github.com/AraneaDev/aranea-desktop.git
+cd aranea-desktop
 ./installer
 ```
 
-Choose **Install/update** and a profile. The same operation is available directly:
+Choose **Install/update**, then a profile. The installer also offers diagnosis,
+repair, and removal. It uses `gum` and `jq`, alongside Omarchy's own commands.
+
+| Profile   | What you get                                                                                  |
+| --------- | --------------------------------------------------------------------------------------------- |
+| `full`    | The desktop and all supported application integrations. This is the CLI default.              |
+| `minimal` | The core theme and GTK styling.                                                               |
+| `no_apps` | The theme and GTK styling, plus cursor and icons, without the extra application integrations. |
+
+For a direct installation or a preview:
 
 ```bash
 scripts/install.sh --profile full --yes
+scripts/install.sh --profile full --dry-run --yes
 ```
 
-| Profile   | Includes                                                               |
-| --------- | ---------------------------------------------------------------------- |
-| `minimal` | Core theme and GTK experience                                          |
-| `full`    | Every supported application integration                                |
-| `no_apps` | Theme, cursor, icons, wallpaper, and branding without app integrations |
+To update, run the installer again with your selected profile. See
+[Getting started](docs/getting-started.md) for activation, local development
+sources, the optional boot splash, and removal.
 
-The TUI also offers diagnosis/repair and removal. It requires
-[`gum`](https://github.com/charmbracelet/gum) and `jq`; JSON CLI output requires
-`jq`. Preview installation with `scripts/install.sh --dry-run --yes`.
-To update, rerun the installer or the CLI command with your selected profile.
-The saved profile lives in `~/.local/state/aranea/profile`.
+## Daily controls
 
-Select a wallpaper and optionally apply the boot splash:
+Open the command center from the spider on the bar. **Files**, **Terminal**, and
+**Projects** are the three top tiles. The list below groups applications,
+actions, software management, settings, help, and system commands in one column.
+Type to search; use a prefix such as `app:`, `window:`, or `project:` to narrow
+results.
 
-```bash
-scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set signal-shrine
-omarchy plymouth set-by-theme aranea
-```
+The right side of the bar groups related controls:
 
-See [Getting started](docs/getting-started.md) for the full installation,
-activation, and update workflow.
+| Control           | Inside                                                           | Page shortcuts                               |
+| ----------------- | ---------------------------------------------------------------- | -------------------------------------------- |
+| **Network**       | Wi-Fi and wired connections, VPN profiles, Bluetooth devices     | `N` Network · `V` VPN · `B` Bluetooth        |
+| **Audio**         | Output and microphone levels, devices, and application streams   | Keyboard controls follow the focused channel |
+| **System**        | Power, display controls, and resource details with health issues | `P` Power · `D` Display · `S` Health         |
+| **Notifications** | Notification history and Do Not Disturb                          | Controls shown in the panel                  |
+| **Agents**        | Provider usage and reported local tasks                          | Usage and Tasks views                        |
 
-## Desktop experience
+A microphone badge appears during capture. Health adds a shortcut when an issue
+needs attention; the app tray opens through its disclosure. Inside the command
+center and panels, use the displayed keyboard hints to navigate and activate
+controls.
 
-Aranea installs as the `aranea` theme and brings a consistent visual system to
-the shell, applications, lock screen, and boot: obsidian surfaces, mint activity,
-violet depth, and an interactive bar. The default Signal Shrine and Aranea Core
-wallpapers incorporate the spider into the scene; menus, lock, boot, idle, and
-fastfetch use the canonical mark.
+For a tour of every surface, see [Features](docs/features.md). For step-by-step
+use, start with [Workflows](docs/workflows.md).
 
-- **Command center:** Files, Terminal, Projects, Favorites, Recent, and searchable apps.
-- **Settings:** wallpaper, fonts, motion, display scale, schedule, integrations, and DND.
-- **Project workspaces:** confirmed Git discovery, grouped worktrees, project search, and Open/Resume with saved tools.
-- **Network:** Network, VPN, and Bluetooth tabs behind one linked-node control.
-- **Audio:** output, microphone, devices, and app streams; a microphone badge appears during capture.
-- **System:** Power, Display, and Health tabs behind one adjustments control.
-- **Health and notifications:** expanded resource graphs, compact issue rows with guided recovery, processes, and a quiet notification center.
-- **Pickers and prompts:** clipboard with secret masking, emoji, wallpapers, and consistent polkit authentication.
-- **Application integrations:** cursor, icons, terminals, editors, browser, media, Qt, and session styling.
+### Make it yours
 
-### Project workspaces
+Open **Command center → Settings → Aranea**:
 
-New to projects and agent tasks? Start with **Command center → Projects → Add project**.
-The wizard guides you through registration, tools, workflow actions, and optional
-agent reporting. The Projects **Help** destination and **How to use actions**
-are available offline. See the [step-by-step user guide](docs/workflows.md).
+| Page              | Change                                               |
+| ----------------- | ---------------------------------------------------- |
+| **Appearance**    | Wallpaper, interface and technical fonts, and motion |
+| **Display**       | The focused monitor's scale, including custom values |
+| **Schedule**      | A daily list of wallpaper images and times           |
+| **Integrations**  | Optional application styling                         |
+| **Notifications** | Do Not Disturb and current notification preferences  |
 
-Open **Command center → Projects**, confirm a development folder, review repositories and
-worktrees, then **Add selected**. Search with `project:` to Open or Resume saved
-tools. Dedicated workspace is the default; Project preferences makes current workspace an
-explicit preference. Partial launches report each role and offer targeted recovery.
-Repository scripts are never run by discovery or ordinary Open. Removing a
-registration preserves folders and applications.
+Choose a wallpaper or font, then **Apply**. For a wallpaper schedule, **Add
+entry**, choose its image and a unique 24-hour time, then **Save schedule**. Add or remove
+entries as needed; the most recent entry stays active across midnight. Existing
+schedules retain their choices.
 
-Project details also offer named **Actions**: configure an executable and individual
-arguments, then explicitly Run a command or Start a service for the selected
-checkout. Track exit status, Stop/Restart, view bounded local-journal output and
-open an optional loopback preview. Saving, opening a project and reloading the
-shell never run actions. Runs belong to the systemd user manager independently
-of the panel; uncertainty remains visible and protected. See the
-[action guide](docs/features.md#project-commands-and-previews) and
-[CLI examples](docs/agent-interface.md#configured-project-actions-and-retained-runs).
+The default fonts are **Inter** for the interface and **JetBrains Mono** for
+technical text. Motion can be turned off. The wallpaper collection contains
+thirteen distinct scenes in obsidian, mint, and violet, with **Signal Shrine** as
+the default. Signal Shrine and Aranea Core include the spider; Ghost in the Wire
+is the cybernetic portrait, and Neural Deck is the command room.
 
-See [Project configuration](docs/configuration.md) for supported tools,
-folder relocation and workspace choices, and [the JSON interface](docs/agent-interface.md)
-for automation. Inert showcase IDs are `projects-empty`, `projects-discovery`,
-`projects-grouped`, `projects-partial`, `project-details`, `project-search` and
-`project-launch-partial`; [development instructions](docs/development.md)
-render them without user repositories or desktop operations.
+See [Configuration](docs/configuration.md) for saved preferences, display
+behavior, and the wallpaper title/ID map.
 
-### Local agent activity
+### Health and updates
 
-Open **Agents → Tasks** for Claude Code and Codex task activity alongside Usage.
-Reporting is opt-in: run `aranea agents adapter status claude` or
-`aranea agents adapter status codex`, then copy the matching install command from
-Tasks setup. Review provider hook trust and start a new native CLI session;
-configured hooks alone do not prove observed activity. Register projects explicitly.
+System's Health page opens with CPU, memory, and disk details expanded. Select an
+issue to open its diagnostics and recovery options. A stopped container can be
+acknowledged for that particular stop; later failures still appear.
 
-Needs input, Ready for review and Failed transitions receive quiet, coalesced
-notifications respecting DND and quiet hours. Open task inspects current details;
-resume remains an explicit action. Verification is independently reported, and
-session focus reaches only a proven hosting terminal. Activity is local to this
-machine. See [setup, CLI examples and limitations](plugins/araneadev.activity/README.md).
+The update center checks repository and AUR packages, including the installed Omarchy package, and hands installation to the native update tools. See
+[Troubleshooting](docs/troubleshooting.md) when a check or recovery action needs
+attention.
 
-### Typography and settings
+## Projects and agents
 
-Open **Command center → Settings → Aranea**, or search for “settings”. Aranea uses
-**Inter** for the interface and **JetBrains Mono** for technical text.
-Appearance offers searchable font choices and preview samples, including
-**IBM Plex Sans**, **Source Sans 3**, **Inter Display**, **Inter Variable**, and
-**JetBrains Mono NL**. Apply saves a draft; resetting defaults also requires
-Apply. Saved font choices are preserved, and icons keep their dedicated font.
-The interface choice also follows through to GTK applications and Qt applications
-using the GTK platform theme, including Files and the project folder chooser.
-`omarchy display text size SIZE` controls the shared logical text size. Aranea
-projects that size into desktop fonts without applying GTK's text multiplier
-again; monitor scaling remains handled by the toolkits. Terminal font families
-keep their own settings. Running Qt applications may need reopening to refresh
-their cached desktop font; Aranea’s chooser follows changes live.
-See [Bundled fonts](fonts/README.md).
+Open **Command center → Projects → Add project** to register a development
+folder. Review discovered repositories and worktrees, choose your tools and
+workspace preference, then use **Open** or **Resume** to return to a checkout.
+Search with `project:` from the command center. The Projects help pages explain
+the workflow offline.
 
-Wallpaper selection requires Apply, and schedule drafts require Save. Custom
-display scales from 1 to 4 apply to the focused display and show the observed
-effective fraction. Quiet hours are read-only. See
-[Configuration](docs/configuration.md) for settings, state, and integrations.
+Project **Actions** are saved commands or services that you start explicitly.
+Their runs retain status and bounded local-journal output, with Stop/Restart and
+an optional local preview. Registering or opening a project does not run its
+repository scripts. Follow the [project workflow guide](docs/workflows.md) to
+set up a project, tools, and actions.
 
-### Everyday controls
-
-The command center has six sections: Apps, Actions, Software, Settings, Help,
-and System. Software groups Install, Remove, and Update. Settings contains the
-Aranea, Appearance, and Devices. Existing app, software, and device commands remain searchable.
-
-The right side of the bar keeps five everyday controls: Notifications, Agents,
-Network, Audio, and System. The app tray uses a disclosure, and a Health shortcut
-appears when an issue needs attention. Network groups Wi-Fi, VPN, and Bluetooth;
-System groups Power, Display, and Health. Standalone child controls remain
-available when their parent control is absent.
-
-| Control | Pages and shortcuts                                                           |
-| ------- | ----------------------------------------------------------------------------- |
-| Network | `N` Network, `V` VPN, `B` Bluetooth; `T` toggles Bluetooth on its hosted page |
-| System  | `P` Power, `D` Display, `S` Health                                            |
-| Audio   | Output and microphone volume, mute, devices, and app streams                  |
-
-Health opens with its CPU trace and memory/disk details expanded. Click an issue
-or press Enter to open its diagnostics and recovery options. An intentionally
-stopped container can be acknowledged for that specific stop; new failures still
-appear. See [Health recovery](docs/troubleshooting.md#resolve-a-health-issue).
-
-The wallpaper picker offers thirteen cyberpunk scenes. New additions are
-Aranea Core and Signal Shrine with the spider, Violet Pursuit, and Deep Current.
-[Preview the additions](screenshots/cyberpunk-additions.jpg). Existing wallpaper
-IDs and day/night schedules remain stable. Signal Shrine is the theme default.
-In **Settings → Aranea → Schedule**, add as many daily entries as you need,
-choose an image and local time for each, then Save. Existing schedules are
-preserved. The filament OSD follows the same palette:
-
-```bash
-scripts/aranea-wallpaper schedule configure --entries '[{"time":"07:00","wallpaper":"day"},{"time":"21:00","wallpaper":"signal-shrine"}]'
-scripts/aranea-wallpaper schedule on
-scripts/aranea-integrations status --json
-```
-
-Activate or roll back integrations individually with
-`scripts/aranea-integrations activate <id> --yes` and
-`scripts/aranea-integrations deactivate <id>`. Managed files are backed up in
-the Aranea state directory before changes. For NetworkManager and app-based
-VPN support, see the [VPN guide](plugins/araneadev.vpn/README.md).
-
-`Ctrl+P` pins the app under the cursor in the command menu. Favorites and Recent
-live in `~/.local/state/aranea/menu.json`. Notifications collect in the center
-(up to 100 items for 7 days); critical notifications stay until dismissed. Clipboard
-secrets are masked and expire according to `ARANEA_CLIPBOARD_SECRET_TTL_MS`.
-Health treats container exit codes 137 or 143 as a memory-kill signal only when
-the container was stopped for that reason.
-
-If you manually disable the polkit prompt with
-`omarchy plugin disable araneadev.polkit`, run `omarchy restart shell` so
-Omarchy's fallback prompt can take over.
+**Agents → Usage** shows provider usage. **Tasks** shows opt-in local Claude Code
+and Codex activity. Install an adapter only when you want local task reporting;
+the [agent activity workflow](docs/workflows.md#connect-claude-code-or-codex) explains the
+commands and controls. Live work and unanswered input remain distinct from
+completed history that can be cleared.
 
 ## Gallery
 
-The hero shows a tour of the desktop. The captures below cover each showcase
-surface once, including the current Network and System tabs and compact
-Settings windows. The agent preview selects Codex. Captures use Signal Shrine
-except for the separate wallpaper examples.
+The hero is a tour of the current desktop. Expand a collection below to inspect
+individual surfaces or choose a wallpaper. Agent usage captures show Codex with
+demonstration data; the desktop background is Signal Shrine.
+
+<details>
+<summary><strong>Desktop panels, settings, pickers, and applications</strong></summary>
 
 ### Desktop and settings
 
@@ -265,7 +206,10 @@ except for the separate wallpaper examples.
 | --------------------------------------------- | --------------------------------- | ----------------------------- |
 | ![File manager](screenshots/file-manager.png) | ![Neovim](screenshots/neovim.png) | ![Btop](screenshots/btop.png) |
 
-### Wallpapers
+</details>
+
+<details>
+<summary><strong>All thirteen cyberpunk wallpapers</strong></summary>
 
 Thirteen different scenes share obsidian, mint, and violet: alleys, command rooms,
 rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, and orbit.
@@ -296,88 +240,45 @@ See the [title/ID map](docs/configuration.md#wallpapers) and
 See [Visual language](docs/visual-language.md) for the design system behind
 these surfaces.
 
-## Documentation and support
+</details>
 
-Start at the [documentation hub](docs/README.md), or choose a guide:
+## Documentation
 
-| Task                                 | Guide                                                                     |
-| ------------------------------------ | ------------------------------------------------------------------------- |
-| Install, update, activate, or remove | [Getting started](docs/getting-started.md)                                |
-| Explore capabilities                 | [Features](docs/features.md)                                              |
-| Configure settings and integrations  | [Configuration](docs/configuration.md)                                    |
-| Diagnose and recover                 | [Troubleshooting](docs/troubleshooting.md)                                |
-| Automate installation                | [Agent interface](docs/agent-interface.md)                                |
-| Browse icons and typography          | [Icon gallery](docs/icons.md) · [Bundled fonts](fonts/README.md)          |
-| Understand or contribute to the code | [Architecture](docs/architecture.md) · [Development](docs/development.md) |
+Start with the [documentation hub](docs/README.md), or go directly to your task:
 
-For a problem, run `scripts/aranea-doctor`; `scripts/aranea-doctor --fix`
-repairs stale hooks and plugin deployment. Include `scripts/aranea-about`,
-`scripts/aranea-doctor --json`, your install profile, and whether a shell
-restart changes the behavior in a [bug report](https://github.com/AraneaDev/aranea-desktop/issues).
+| Task                                       | Guide                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| Install, update, activate, or remove       | [Getting started](docs/getting-started.md)                                |
+| Use the desktop and project workflows      | [Features](docs/features.md) · [Workflows](docs/workflows.md)             |
+| Set preferences and integrations           | [Configuration](docs/configuration.md)                                    |
+| Diagnose or recover                        | [Troubleshooting](docs/troubleshooting.md)                                |
+| Automate projects, agents, or installation | [Agent interface](docs/agent-interface.md)                                |
+| Browse fonts and icons                     | [Bundled fonts](fonts/README.md) · [Icon gallery](docs/icons.md)          |
+| Work on the code                           | [Development](docs/development.md) · [Architecture](docs/architecture.md) |
 
-## Helpers and automation
+Helpers can be run from this checkout's `scripts/` directory or from the installed
+`~/.config/omarchy/themes/aranea/scripts/` directory. The public `aranea` command
+manages projects, actions, and local agent activity. See the automation guide for
+JSON schemas and command examples.
 
-Run helpers from `scripts/` in a checkout, or from
-`~/.config/omarchy/themes/aranea/scripts/<name>` after installation.
+### Get help
 
-| Helper                                                        | Purpose                                                       |
-| ------------------------------------------------------------- | ------------------------------------------------------------- |
-| `scripts/install.sh` / `scripts/uninstall.sh`                 | Install, update, or remove Aranea                             |
-| `scripts/aranea-doctor` / `scripts/aranea-about`              | Diagnose, repair, and summarize the installation              |
-| `scripts/aranea-integrations`                                 | Inspect and toggle integrations                               |
-| `scripts/aranea-wallpaper` / `scripts/aranea-motion`          | Select and schedule wallpapers; control animations            |
-| `scripts/aranea-settings`                                     | Read versioned settings JSON or invoke existing helpers       |
-| `scripts/install-fonts`                                       | Install bundled fonts and refresh the font cache              |
-| `scripts/aranea-update-status`                                | Read repository/AUR update availability                       |
-| `scripts/aranea-health-resolve` / `scripts/aranea-health-ack` | Diagnose an issue or manage stopped-container acknowledgments |
-| `scripts/aranea-showcase`                                     | List documented surfaces                                      |
+Run `scripts/aranea-doctor` for installation diagnostics. Its `--fix` option
+repairs stale hooks and plugin deployment. For a
+[bug report](https://github.com/AraneaDev/aranea-desktop/issues), include your
+install profile, the affected surface, and the output of
+`scripts/aranea-about` and `scripts/aranea-doctor --json`.
 
-The installer, uninstaller, and doctor are human-readable by default. Their
-explicit `--json` mode emits versioned JSONL events with stable step IDs; the
-process exit code remains authoritative. Other status helpers and the public
-project CLI return their documented JSON objects or arrays:
+### Contribute
 
-```bash
-scripts/install.sh --json --yes --profile minimal
-scripts/uninstall.sh --json --yes --scope integration
-scripts/aranea-doctor --json
-```
+Read [Contributing](CONTRIBUTING.md) for checks, conventional commits, and
+releases. The [development guide](docs/development.md) covers token generation,
+focused tests, and screenshot capture. Aranea's identity and canonical spider
+mark are fixed; user preferences live in Settings.
 
-See [Agent interface](docs/agent-interface.md) for the complete contract.
-
-## Removal
-
-Keep the theme directory while removing Aranea's integration:
-
-```bash
-scripts/uninstall.sh --scope integration --yes
-```
-
-Remove the integration and installed theme directory:
-
-```bash
-scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
-```
-
-Use `--dry-run` to preview either operation. Bundled fonts remain installed
-for documents and applications that selected them.
-
-## Development
-
-Run the repository quality gates and refresh the complete showcase with:
-
-```bash
-tools/check
-scripts/capture-screenshots --all --output screenshots
-```
-
-See [Development](docs/development.md) for the repository map, focused tests,
-design token generation, capture fixtures, and upstream tracking, and
-[Contributing](CONTRIBUTING.md) for contribution and release conventions.
-
-## License
+### License
 
 Code is released under the [MIT License](LICENSE). Bundled fonts use the
 [SIL Open Font License 1.1](fonts/README.md), with license texts in each family
 directory. Check upstream project and asset licenses before redistributing
-modified branding or artwork.
+artwork.

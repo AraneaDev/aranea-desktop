@@ -120,6 +120,6 @@ fi
 
 # --- 4c final review: a cursor whose problem is gone is cleared
 grep -Fq 'onCursorChanged: if (root.cursor < 0 && root.cursorKey)' "$hpanel"
-grep -Fq '137 or 143' "$repo_root/README.md"
+grep -Fq '137 or 143' "$repo_root/docs/troubleshooting.md"
 
 echo "health contract passed"

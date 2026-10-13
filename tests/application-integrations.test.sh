@@ -73,14 +73,15 @@ printf '%s\n' "$media_output"
 grep -Fq 'media/pavucontrol.css' <<<"$media_output"
 grep -Fq 'integrations/aranea-colors.css' <<<"$media_output"
 
-# --- 4d: the README says how to run the helper scripts
-for script in aranea-motion aranea-doctor aranea-integrations aranea-wallpaper aranea-about uninstall.sh; do
-  grep -Fq "scripts/$script" "$repo_root/README.md" || {
-    echo "README misses scripts/$script" >&2
-    exit 1
-  }
+# --- 4d: helper commands are documented in their task-specific guides
+for script in aranea-motion aranea-integrations aranea-wallpaper; do
+  grep -Fq "scripts/$script" "$repo_root/docs/configuration.md"
 done
-grep -Fq '.config/omarchy/themes/aranea/scripts/<name>' "$repo_root/README.md"
+for script in aranea-doctor aranea-about; do
+  grep -Fq "scripts/$script" "$repo_root/docs/troubleshooting.md"
+done
+grep -Fq 'scripts/uninstall.sh' "$repo_root/docs/getting-started.md"
+grep -Fq '.config/omarchy/themes/aranea/scripts/' "$repo_root/README.md"
 
 # Scripts links are not general integration ownership: only the stable
 # installed project's exact executable may be removed/restored as managed.

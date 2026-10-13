@@ -1,92 +1,126 @@
 # Getting started
 
+Install Aranea on an existing Omarchy desktop, then choose your wallpaper and
+preferences. The installer activates the theme and sets up its shell controls;
+you do not need to copy plugin files by hand.
+
 ## Requirements
 
-Aranea is an Omarchy theme and expects an Omarchy installation with `omarchy`
-available on `PATH`. The guided installer also uses `gum` and `jq`.
+Use an Omarchy installation with `omarchy` available on `PATH`. The guided
+installer requires `gum` and `jq`. Git is needed to download the theme; optional
+application integrations apply to supported applications already installed.
+Aranea does not install your editor, terminal, browser, or agent CLI for you.
 
 ## Install from a checkout
 
+Download the repository and open it before running the installer:
+
 ```bash
+git clone https://github.com/AraneaDev/aranea-desktop.git
+cd aranea-desktop
 ./installer
 ```
 
-Choose a profile:
+Choose **Install/update**, then select a profile and review the confirmation.
 
-- `minimal`: core theme and GTK experience;
-- `full`: every supported application integration;
-- `no_apps`: theme, cursor, icons, wallpaper, and branding without app integrations.
+| Profile   | Choose it when…                                                                                     |
+| --------- | --------------------------------------------------------------------------------------------------- |
+| `full`    | You want all supported integrations, including terminals and developer tools.                       |
+| `minimal` | You want the core desktop and GTK styling.                                                          |
+| `no_apps` | You want the core desktop, GTK, cursor, icons, and artwork without the additional app integrations. |
 
-The direct CLI is useful for scripts and agents:
+For a noninteractive installation, use:
 
 ```bash
 scripts/install.sh --profile full --yes
-scripts/install.sh --source "$PWD" --profile minimal --yes
-scripts/install.sh --dry-run --yes
 ```
 
-The installer normally uses the public repository. Use `--source "$PWD"` to
-clone the local repository instead. Omarchy clones committed Git content, not
-uncommitted working files. The guided installer can use the same source with `ARANEA_THEME_SOURCE="$PWD" ./installer`.
+The direct installer defaults to `full` with `--yes` or without an interactive
+terminal. An explicit `--profile` makes your choice reproducible. The selected
+profile is saved in `~/.local/state/aranea/profile`.
 
-The selected profile is stored in `~/.local/state/aranea/profile`.
+The installer normally downloads the public repository again. To install the
+committed version in your local Git checkout instead, use:
+
+```bash
+scripts/install.sh --source "$PWD" --profile minimal --yes
+# Or use the guided installer with that source:
+ARANEA_THEME_SOURCE="$PWD" ./installer
+```
+
+Omarchy clones Git content: uncommitted working files are not included. You can
+review the planned steps first with `scripts/install.sh --dry-run --yes`.
 
 ## Activate the theme
 
+Installation already activates Aranea. When returning from another theme, run:
+
 ```bash
 omarchy theme set aranea
-scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set signal-shrine
 ```
 
-Signal Shrine is selected first when Aranea is applied with no matching current
-background. You can choose another scene in **Command center → Settings →
-Aranea → Appearance**. An enabled daily schedule continues to select its
-scheduled wallpapers. The installer already activates Aranea; setting the theme
-again is only necessary when switching back from another theme.
+**Signal Shrine** is the default when there is no matching current background.
+Choose another scene in **Command center → Settings → Aranea → Appearance**.
+An enabled wallpaper schedule continues to choose its scheduled images.
 
-Apply the optional boot splash separately:
+The boot splash is optional and applied separately:
 
 ```bash
 omarchy plymouth set-by-theme aranea
 ```
 
+## After installation
+
+Click the spider button to open the command center. Its top tiles open **Files**,
+**Terminal**, and **Projects**. Below them, **Apps**, **Actions**, **Software**,
+**Settings**, **Help**, and **System** form a single list. Start typing to search,
+or open **Settings → Aranea** for desktop preferences.
+
+The right side of the bar brings related controls together:
+
+| Control       | What you will find                                            |
+| ------------- | ------------------------------------------------------------- |
+| Network       | Network (`N`), VPN (`V`), and Bluetooth (`B`) tabs.           |
+| Audio         | Output devices, microphones, per-app audio, volume, and mute. |
+| System        | Power (`P`), Display (`D`), and Health (`S`) tabs.            |
+| Notifications | Waiting notifications and Do not disturb.                     |
+| Agents        | Local task reports and provider usage. Reporting is optional. |
+
+The letter shortcuts work inside their panels. In Bluetooth, `T` toggles power.
+A microphone badge appears during active capture; a separate Health shortcut
+appears when issues need attention.
+
+For a useful first check, run `scripts/aranea-doctor` from the checkout. Continue
+with [Configuration](configuration.md) for wallpapers, fonts, and scaling, or
+[Workflows](workflows.md) to register a project and run its tools.
+
 ## Update
 
-Run `./installer` and choose Install/update, or repeat the CLI install command.
-The installer adopts the installed theme as `aranea` and re-registers the
-hooks and selected integrations.
+From your checkout, run `./installer` and choose **Install/update**, or repeat
+your direct install command with the profile you want. The default source is
+the public repository; a local-source installation uses your local committed
+content. Updates reinstall the theme as `aranea` and reconcile its hooks and
+selected integrations.
+
+Updating Aranea is separate from updating system packages. Use **Command center
+→ Software → Update** for Omarchy's native updater.
 
 ## Remove
 
-Remove Aranea's integration while leaving the theme directory:
+Run removal from the checkout. Integration removal restores managed settings
+while keeping the installed theme directory:
 
 ```bash
 scripts/uninstall.sh --scope integration --yes
 ```
 
-Remove the integration and the installed theme directory:
+For complete removal, select an installed replacement theme:
 
 ```bash
 scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
 ```
 
-The TUI presents these as separate, clearly confirmed actions.
-
-## After installation
-
-Open the command center from the spider button. Files, Terminal, and Projects
-are the three top tiles; Apps, Actions, Software, Settings, Help, and System form
-the single-column command list. **Settings → Aranea** opens desktop
-preferences.
-
-The right bar groups connections in Network, output and microphone controls in
-Audio, and Power/Display/Health in System. Use `N`/`V`/`B` inside Network and
-`P`/`D`/`S` inside System. Health resource details open expanded; selecting an
-issue opens guided diagnostics and recovery. See [Features](features.md).
-
-Use `scripts/aranea-doctor` to inspect the installation. Use
-`scripts/aranea-doctor --fix` to repair stale hooks and plugin deployment.
-
-See [Configuration](configuration.md) for wallpapers, motion, integrations,
-and state; see [Troubleshooting](troubleshooting.md) when something is wrong.
+Replace `Omarchy` with your chosen installed theme if necessary. The guided
+installer also offers both removal scopes. Aranea preserves managed files that
+you changed after installation. See [Uninstall safely](troubleshooting.md#uninstall-safely)
+if removal reports a retained run or another error.

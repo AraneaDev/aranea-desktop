@@ -1,212 +1,185 @@
 # Features
 
-Aranea is designed as a system-wide visual language rather than a single bar
-theme. The same identity appears in the shell, notifications, secure prompts,
-wallpapers, cursors, icons, and application integrations.
+Aranea brings the command menu, desktop panels, notifications, authentication
+prompts, and application styling into one visual system. This guide explains
+where to find the controls; [Configuration](configuration.md) covers changing
+them, and [Workflows](workflows.md) covers project work.
 
 ## Command center
 
-The bar opens an Omarchy command menu with Aranea identity, Files, Terminal,
-and Projects tiles above a compact single-column list: Apps, Actions, Software,
-Settings, Help, and System. Software groups Install, Remove, and Update; Settings
-groups Aranea, Appearance, and Devices. The stock About slot is replaced by
-Aranea, while the other menu IDs and searchable commands remain available. Apps keeps Favorites and Recent state in
-`~/.local/state/aranea/menu.json`. The menu uses a compact network-and-node
-motif and supports keyboard navigation and pinned applications. Typing at the
-root searches apps, menu commands, windows, workspaces, projects, settings and quick actions.
-Use `app:`, `command:`, `window:`, `workspace:`, `setting:`, `project:` or `action:` to restrict results.
-Submenu searches stay scoped; Search everywhere or Ctrl+F keeps the query while
-returning to root. Enter uses the selected current target, and a disappearing
-window clears that selection. The list caps at 50 matches with a refinement hint.
-Dmenu choices and input answers keep their existing behavior.
+Click the spider button to open the command center. **Files**, **Terminal**, and
+**Projects** sit above a compact list of **Apps**, **Actions**, **Software**,
+**Settings**, **Help**, and **System**. Apps keeps favorites and recently used
+applications. Software groups installation, removal, and updates; desktop
+preferences live in **Settings → Aranea**. Select an application and press
+**Ctrl+P** to pin or unpin it; Apps keeps up to twelve favorites.
 
-Quick actions toggle manual Do not disturb, select an available audio output, or
-apply an installed wallpaper while keeping the menu open. Current choices, quiet
-hours and active schedules are labelled; those schedules remain in place. Pending
-changes wait for confirmation. Failed actions can be retried with Enter; Tab
-reaches the offered audio controls or Appearance recovery destination. Missing
-capabilities are omitted.
+Typing at the root searches applications, commands, open windows, workspaces,
+projects, settings, and quick actions. Use a prefix to narrow your search:
 
-![Aranea command menu](../screenshots/menu.png)
+| Prefix                   | Find                               |
+| ------------------------ | ---------------------------------- |
+| `app:`                   | Installed applications.            |
+| `command:`               | Menu commands.                     |
+| `window:` / `workspace:` | Existing windows or workspaces.    |
+| `project:`               | Registered projects and checkouts. |
+| `setting:`               | Settings destinations.             |
+| `action:`                | Desktop quick actions.             |
 
-![Unified desktop search with type labels](../screenshots/menu-search-mixed.png)
+A submenu searches its own entries. **Search everywhere** or **Ctrl+F** returns
+to the root with your query intact. Results stop at 50 matches; add more detail
+if the menu asks you to refine the search.
 
-![Desktop quick actions](../screenshots/menu-search-actions.png)
+Quick actions can change Do not disturb, select an available audio output, or
+apply an installed wallpaper without closing the menu. They show the current
+choice and any active schedule. Selecting a wallpaper leaves an enabled
+schedule in place, so its next transition can change the image again.
+
+![Aranea command center](../screenshots/menu.png)
+
+![Search across desktop destinations](../screenshots/menu-search-mixed.png)
 
 ## Network, Audio, and System
 
-Network uses a linked-node bar icon and contains **Network**, **VPN**, and
-**Bluetooth** tabs. `N`, `V`, and `B` switch pages; Bluetooth uses `T` for its
-power toggle while hosted, so switching to the tab never changes hardware state.
-VPN retains NetworkManager profiles, own-app profiles, connection controls,
-session details, and traffic graphs.
+Related controls share three panels:
 
-Audio keeps output/input devices, per-app streams, volume, and mute controls in
-one panel. Microphone mute is explicit in the input heading. A small microphone
-badge appears only during an active capture stream; its muted/live appearance
-reflects the source state. The hardware microphone mute key retains its normal
-behavior.
+| Panel   | Pages and controls                                              | Page shortcuts |
+| ------- | --------------------------------------------------------------- | -------------- |
+| Network | Connections, VPN profiles and sessions, Bluetooth devices.      | `N`, `V`, `B`  |
+| Audio   | Output and input devices, app streams, volume, microphone mute. | Panel hints    |
+| System  | Power, display controls, resources and Health issues.           | `P`, `D`, `S`  |
 
-System uses an adjustments icon with a small battery cue and optional percentage.
-Its **Power**, **Display**, and **Health** tabs use `P`, `D`, and `S`. Power opens
-by default, Display retains brightness, night light, keyboard light, scaling, and
-monitor controls, and Health shows resources and actionable issues. System stays
-reachable on machines without a battery. Child plugins retain their standalone
-controls when the corresponding host is absent.
+Network uses the linked-node icon. Bluetooth's power shortcut is `T` inside
+Network. VPN includes NetworkManager and supported own-app profiles, connection
+controls, session details, and traffic graphs.
 
-Notifications and Agents remain separate everyday bar controls. The tray stays
-behind its disclosure. Usage provider selection is saved across shell restarts;
-showcase choices do not overwrite it. Agents also offers local Tasks; reporting
-is opt-in as described in the [workflow guide](workflows.md).
+System uses the adjustments icon and opens Power by default. It remains
+available without a battery. Display contains brightness, night light, keyboard
+light, scaling, and monitor controls. Health includes CPU, memory, disk, and
+optional process details, with resource sections expanded initially.
+
+The microphone badge appears only during active capture and reflects the
+source's mute state. Notifications and Agents remain separate bar controls;
+the tray opens through its disclosure.
 
 ## Update center
 
-The update center reports repository packages and AUR updates separately, plus
-reboot-required state. Repository checks include Omarchy itself; the AUR check
-runs when yay is present. Checks run at startup, hourly, and when the panel opens.
-A source failure shows **Check failed** and retains the previous valid result.
-Installation stays with Omarchy's native updater; **Software → Update** remains
-available from the command center. See [update troubleshooting](troubleshooting.md#updates-appear-empty-or-stale).
+The update center shows repository packages and AUR packages separately, plus
+whether a reboot is required. It checks at startup, hourly, and when opened;
+AUR checks require `yay`. A failed check retains the last valid result and shows
+**Check failed**. Install updates with **Command center → Software → Update**,
+which uses Omarchy's updater.
+
+See [update troubleshooting](troubleshooting.md#updates-appear-empty-or-stale)
+when a source cannot be checked.
 
 ## Notifications and health
 
-Notifications go to the center instead of interrupting the desktop. Critical
-items remain visible through a red indicator, while ordinary waiting items use
-the mint badge. The health surface reports failed services, disk pressure,
-reboot state, containers, CPU, memory, network, and process activity. Health lives
-in **System → Health** (`S`), with an extra bar shortcut only while issues are
-open or its alert popup is still visible. CPU, memory, and disk details start
-expanded; Processes is optional. The issue list stays compact. Selecting an
-issue opens diagnostics and deliberate recovery choices; intentionally stopped
-containers can acknowledge that exact stop. See [Health recovery](troubleshooting.md#resolve-a-health-issue).
+Notifications collect in the notification center. Ordinary waiting items use a
+mint indicator; critical items use red. Do not disturb and configured quiet
+hours control notification behavior. In the notification center, critical notifications stay until dismissed;
+their toast disappears after one minute. History is capped at 100 items,
+pruning ordinary entries first.
+
+Health is always available in **System → Health**. An additional shortcut
+appears while issues or their alert popup are present. Select an issue to open
+diagnostics and recovery choices. Opening diagnostics alone does not restart
+services or containers. For an intentionally stopped container, you can
+acknowledge that particular stop without hiding future failures.
+
+See [Health recovery](troubleshooting.md#resolve-a-health-issue).
 
 ![Aranea notification center](../screenshots/notifications.png)
 
 ## Clipboard and emoji
 
-The clipboard picker labels links, paths, colors, code, images, and text. It
-keeps pinned entries above recent history and masks likely secrets. The emoji
-picker keeps recent emoji close and supports insert versus copy actions.
+The clipboard picker labels links, paths, colors, code, images, and text. Pinned
+entries stay above recent history, and likely secrets are masked. Unpinned
+secrets expire after ten minutes by default; the retention override is described
+in [Configuration](configuration.md#environment-variables). The emoji
+picker offers recent emoji and lets you insert or copy a selection.
 
 ![Aranea clipboard picker](../screenshots/clipboard.png)
 
 ## Secure prompts
 
-The Aranea polkit surface gives privileged actions a consistent card with the
-request, account, action details, and authentication state.
+Privileged actions use an Aranea authentication card showing the request,
+account, action details, and authentication state.
 
 ![Aranea authentication prompt](../screenshots/polkit.png)
 
 ## Wallpapers and motion
 
-The collection contains thirteen distinct scenes, with **Signal Shrine** as the
-default. **Aranea Core** also incorporates the spider; **Ghost in the Wire** is
-the cybernetic portrait, and **Neural Deck** is the new command room. Other scenes
-cover rain city, rail, rooftop, desert, market, motorcycle, ocean, and orbit.
-The [catalog](configuration.md#wallpapers) maps human titles to stable IDs.
-Twelve scenes have 3840×2160 exports; Orbital Relay has a 3840×1280 export. These
-are resampled delivery sizes; original sources and prompts are in
-[Artwork](../backgrounds/ARTWORK.md). The optional daily schedule lets you add, remove, and edit time/image entries
-in **Settings → Aranea → Schedule**.
-Motion can be enabled or disabled independently.
+Choose from thirteen scenes, with **Signal Shrine** as the default. The
+collection includes city, rail, rooftop, desert, ocean, orbital, and interior
+scenes. **Neural Deck** is the command room; **Ghost in the Wire** is the
+cybernetic portrait. [The catalog](configuration.md#wallpapers) lists their
+stable command-line IDs, which sometimes differ from the displayed titles.
 
-```bash
-scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set signal-shrine
-scripts/aranea-wallpaper schedule configure --entries '[{"time":"07:00","wallpaper":"day"},{"time":"21:00","wallpaper":"signal-shrine"}]'
-scripts/aranea-wallpaper schedule on
-scripts/aranea-motion status
-```
+Twelve scenes have 3840×2160 delivery images; **Orbital Relay** is 3840×1280.
+Sources, prompts, and export details are in [Artwork](../backgrounds/ARTWORK.md).
 
-## Integrations
-
-The theme includes cursor, icon, terminal, browser, media, Qt, session,
-developer, and application integrations. They are managed with backups and can
-be inspected or toggled individually:
-
-```bash
-scripts/aranea-integrations status --json
-scripts/aranea-integrations activate <id> --yes
-scripts/aranea-integrations deactivate <id> --yes
-```
-
-## More surfaces
-
-The repository also contains lock, Plymouth, Cava, cursor, icon, GTK, browser,
-terminal, and media styling. The README contains the visual showcase; this
-page explains what each surface is for.
+In **Settings → Aranea → Schedule**, create as many daily time/image entries as
+you need, keeping at least one. Entries use unique 24-hour times and take effect
+when saved. Motion has a separate on/off control in Appearance.
 
 ## Desktop settings
 
-**Command center → Settings → Aranea** opens a compact, centered Settings
-window with Appearance, Display, Schedule, Integrations, and Notifications
-destinations. Projects has its own top tile and independent manager. Appearance offers
-searchable interface/monospace font choices with samples and explicit Apply;
-icons keep their dedicated family. Appearance keeps its
-wallpaper chooser collapsed until requested. Wallpaper selection and Display
-presets edit local drafts, with explicit Apply and Discard. Display accepts
-exact decimal scales and reports effective scale and persistence separately.
-Drafts and scroll positions survive page navigation; long content scrolls
-inside the window. Motion, integration and Do not disturb toggles keep their
-immediate behavior.
+**Command center → Settings → Aranea** opens a centered window with Appearance,
+Display, Schedule, Integrations, and Notifications pages. Longer pages scroll
+inside the window, and navigation retains your drafts.
+
+Wallpaper and display scale use explicit **Apply** and **Discard** controls.
+Fonts also require **Apply**; resetting fonts changes the draft. Schedule entries
+use **Save schedule**. Motion, integration toggles,
+and Do not disturb apply immediately. The Appearance wallpaper chooser stays
+collapsed until you request it; font choices offer search and preview samples.
+Display accepts decimal scales and distinguishes effective scaling from whether
+it was saved for later sessions.
 
 ## Project workspaces
 
-**Command center → Projects** starts with **Choose folder**, or an absolute folder path.
-Confirm the folder, review the discovered Git repositories and worktrees, select
-checkouts, then **Add selected**. Discovery alone registers nothing. Related
-worktrees share a project; each checkout retains its exact path and branch.
-**Review ignored repositories** lets you restore a group for the next refresh.
-Scanning runs only after a confirmed folder or explicit Refresh. A partial scan
-keeps its results and explains how to choose a narrower folder.
+**Command center → Projects** opens a separate project manager. Its setup wizard
+helps you choose a development folder, review Git repositories and worktrees,
+save your preferred tools, and optionally connect agent reporting. A scan
+registers nothing until you choose **Add selected**.
 
-Search project names, paths and branches with `project:`. **Open** uses saved
-preferences and a dedicated workspace by default. **Resume** focuses freshly
-verified project windows and opens missing tools when safe. **Customize** offers
-an editor, terminal and an explicit current-workspace preference. Opening a
-worktree separately preserves its separate workspace association. Occupied
-workspaces and other checkouts' observed windows are preserved.
+Each project remembers its checkouts, editor, terminal, and workspace
+preferences. **Open workspace** opens or focuses the selected tools; another
+checkout can be opened separately. Overview, Actions, Agents, Preferences, and
+Help keep project context together. Removing a registration leaves the
+repository and existing windows in place.
 
-Project details show launch outcomes and role recovery. Retry targets a reported failed
-role; an unconfirmed launch offers an explicit new window instead of an automatic
-retry. A ten-second deadline can leave a partial result even when the application
-started. Workspace titles, application classes and workspace membership alone
-never establish ownership. The workspace overview shows project context only
-when the current owner can justify it. A shell restart loses live bindings;
-applications and repository files remain intact.
+Follow [Set up your first project](workflows.md#set-up-your-first-project).
 
 ## Project commands and previews
 
-Select a registered project and exact checkout in **Command center → Projects**, then use
-**Actions** to add a named command or service. The form has a name, executable,
-individual argument rows with Add/Remove controls, working folder (default `.`),
-a command timeout and an optional service preview URL. Save and Cancel never run
-the command. Definitions stay in local Aranea state; repository files are not
-imported as executable configuration. Review the displayed command and folder,
-then explicitly Run or Start. Opening/discovering a project, theme reload and
-shell startup never execute saved actions.
+Save test commands, builds, and development servers as named **Actions**. Each
+action uses an executable, separate argument fields, and a working folder inside
+the selected checkout. **Save** defines it; **Run** or **Start** executes it.
+Opening a project or reloading the shell never runs saved actions automatically.
 
-Runs retain their accepted command and exact checkout. Refresh reads current
-status; View logs loads selectable plaintext from the local journal. Stop cancels
-only the proven owned run and its process group. Restart waits for confirmed
-cleanup. If the command changed since that run, review the current action and use
-Run/Start; the UI refuses an outdated restart. Conflicting edits keep the draft:
-Refresh, review the latest saved definition, then explicitly Save draft over latest.
+Commands report completion and exit status. Services report their running state
+and can have a local preview URL. **View logs**, **Stop**, and **Restart** operate
+on the selected run. Runs continue when you close the panel; services do not
+have automatic startup or restart. A reachable preview does not establish which
+process owns the port, and a successful action does not verify an agent's task.
 
-A command's exit status, service process state and preview reachability are shown
-separately. Command success does not verify an agent task or the whole project.
-A reachable URL does not prove which service owns its port. Open preview is an
-explicit browser request for a currently owned running service. Focus project
-reuses the existing workspace controls without launching an action.
+The [workflow examples](workflows.md#example-run-tests) show how to configure
+both kinds. Automation uses the [public CLI](agent-interface.md#configured-project-actions-and-retained-runs).
 
-The systemd user manager owns runs independently of the panel. Closing Projects,
-reloading the shell, changing themes or closing the CLI observer does not cancel
-them; reopen and Refresh the retained run. Services have no automatic restart or
-login startup and do not promise to survive logout or reboot. A missing manager
-makes execution unavailable while definitions remain editable. Uncertain starts
-or cleanup stay protected until exact evidence is recovered. Logs follow system
-journal retention, with at most 200 entries / 256 KiB displayed per read.
+## Integrations
 
-The same actions are available through the [public CLI](agent-interface.md#configured-project-actions-and-retained-runs).
-Native manager/browser execution is separate from the sandboxed automated tests;
-those tests do not run configured repository commands on the live desktop.
+Profiles select supported application integrations, including terminal,
+developer, browser, media, and Qt styling. You can inspect their state and
+activate or deactivate them individually in **Settings → Aranea → Integrations**.
+Managed changes use backups; customized files are preserved during restoration.
+See [Profiles](configuration.md#profiles) and [Integrations](configuration.md#integrations).
+
+## More surfaces
+
+Aranea also includes lock screen, optional Plymouth splash, Cava, GTK, cursor,
+icon, browser, terminal, and media artwork or styling. Some integrations provide
+assets for manual use rather than rewriting an application profile. The
+[README showcase](../README.md) shows the desktop; integration-specific notes
+live under [integrations](../integrations/).

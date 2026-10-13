@@ -1,175 +1,243 @@
 # Troubleshooting
 
+Start with the doctor, then follow the section matching what you see. The
+`scripts/…` commands below run from your Aranea checkout; `aranea` is the
+installed command for projects and agents.
+
 ## Start with the doctor
 
 ```bash
 scripts/aranea-doctor
+```
+
+The doctor checks the active theme, hooks, assets, fonts, shell plugins, logs,
+integrations, and optional tooling. **repair** identifies something needing
+attention; **skipped** usually means an optional dependency is absent.
+
+For machine-readable output or repair:
+
+```bash
 scripts/aranea-doctor --json
 scripts/aranea-doctor --fix
 ```
 
-The doctor checks the active theme, hooks, manifest, icons, ownership, shell
-plugins, runtime logs, integrations, notifications, and optional tooling.
-`repair` means a check needs attention; `skipped` usually means an optional
-dependency is not installed.
+`--fix` repairs hooks and reconciles plugin deployment. It does not replace a
+missing theme update or install every optional application.
 
 ## Aranea is not active
+
+Check the current theme and switch back:
 
 ```bash
 omarchy theme current
 omarchy theme set aranea
-scripts/aranea-doctor --fix
 ```
 
-Switching themes intentionally hands host-owned surfaces back to Omarchy. Set
-Aranea active again if you want its shell plugins and integrations restored.
+Switching away from Aranea releases its theme-owned shell surfaces. If returning
+does not restore them, run `scripts/aranea-doctor --fix`.
 
 ## Hooks or plugins are stale
 
-Run:
+Repair deployment and restart the shell:
 
 ```bash
 scripts/aranea-doctor --fix
 omarchy restart shell
 ```
 
-The repair path reinstalls the theme-set and post-boot hooks and reconciles
-deployed plugins.
+If the doctor reports missing theme assets, update the theme before retrying.
+A shell restart also loses live project-window bindings; use the project's
+explicit recovery controls if an existing window cannot be verified afterward.
+
+## Use the native authentication prompt
+
+To use Omarchy’s native prompt instead of Aranea’s authentication card, disable
+the plugin and restart the shell so the native agent takes over:
+
+```bash
+omarchy plugin disable araneadev.polkit
+omarchy restart shell
+```
+
+Run `scripts/aranea-doctor` to inspect which authentication prompt is enabled.
 
 ## The spider mark is missing
 
-A blank bar icon, menu header or lock mark means the deployed plugins are
-newer than the installed theme: they reference a branding file (for example
-`branding/brand.svg`) the active theme does not have yet. The doctor's
-`branding` check names the missing files, and `deploy-plugins-safely` warns
-about them. Update the theme so both match:
-
-```bash
-scripts/install.sh --yes --profile "$(cat ~/.local/state/aranea/profile)"
-```
+A blank menu, bar, or lock mark can mean the deployed plugins expect artwork
+missing from the installed theme. The doctor's `branding` check identifies
+missing files. Update through `./installer` → **Install/update**, using your
+preferred profile, then run the doctor again. Repairing hooks alone cannot add
+artwork absent from an older installed theme.
 
 ## Installation failed
 
-The installer reports the exact command for restoring the previously active
-theme when it can detect one. Inspect a plan before retrying:
+Read the failed step and any command offered to restore your previously active
+theme. Inspect the plan before retrying:
 
 ```bash
 scripts/install.sh --dry-run --yes
 scripts/aranea-doctor --json
 ```
 
-If `jq` or `gum` is missing, install the missing Omarchy ecosystem dependency
-or use the plain CLI without the TUI. JSON mode requires `jq`; the TUI requires
-both `gum` and `jq`.
+The guided installer needs both `gum` and `jq`. The direct CLI avoids the TUI,
+but JSON mode and several supporting operations still need `jq`; a working
+Omarchy installation must satisfy its own installer dependencies.
+
+For a local-source installation, check that the source is a Git checkout with
+the intended committed content. Uncommitted files are not included in the clone.
+See [Getting started](getting-started.md#install-from-a-checkout) for the full
+clone, directory, and install sequence.
 
 ## Uninstall safely
 
-Use integration scope first:
+Preview integration removal, then run it:
 
 ```bash
 scripts/uninstall.sh --dry-run --scope integration --yes
 scripts/uninstall.sh --scope integration --yes
 ```
 
-Complete removal is explicit and also removes the installed theme directory:
+This keeps the installed theme directory. Complete removal also removes that
+directory and selects an installed replacement theme:
 
 ```bash
 scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
 ```
 
-The uninstall process restores files recorded by the ownership ledger and
-preserves files that were customized after installation. Both scopes drain activity
-writes and remove task/session state and owned heartbeat helpers. The inert
-`agent-activity.json.lock` coordination file and its required parent directories
-remain so delayed callbacks cannot recreate removed state. Normal installation
-reactivates activity under that same lock; public reports cannot reactivate it.
-If activity teardown cannot acquire its lock, uninstall reports failure instead
-of claiming state removal succeeded.
+Replace `Omarchy` with the theme you want to use. Restoration preserves managed
+files you changed after installation. Use the uninstall command rather than
+deleting its ownership records or theme directory manually.
+
+Uninstall also stops owned project-action runs and removes task/session state.
+If it reports `action_teardown_failed`, follow [project-action recovery](#project-actions-unavailable-or-unconfirmed)
+with the retained command before retrying removal. Small inert lock files can
+remain after successful removal; these prevent delayed requests from recreating
+state and are reused on reinstall.
 
 ## Find a control after bar consolidation
 
-VPN and Bluetooth are inside **Network** (`V` and `B`). Brightness, night light,
-keyboard light, and monitor controls are inside **System → Display** (`D`).
-Resources and issues are inside **System → Health** (`S`). Audio contains both
-output and microphone controls. A separate microphone indicator appears only
-while a capture stream is active; a separate Health shortcut appears only for
-issues or an open alert popup. Their absence is normal.
+| Looking for…                                      | Open                                   |
+| ------------------------------------------------- | -------------------------------------- |
+| VPN / Bluetooth                                   | Network → VPN (`V`) / Bluetooth (`B`). |
+| Brightness, night light, keyboard light, monitors | System → Display (`D`).                |
+| Resources or issues                               | System → Health (`S`).                 |
+| Output or microphone controls                     | Audio.                                 |
+| Wallpaper, fonts, scaling preferences             | Command center → Settings → Aranea.    |
 
-The linked-node icon opens Network; the adjustment-sliders icon opens System.
-System remains available on machines without a battery. Standalone child widgets
-are retained when their host is absent. If a tab is missing after an update,
-run `scripts/aranea-doctor --fix` and restart the shell to reconcile the installed
-plugins. Desktop preferences moved to **Command center → Settings → Aranea**;
-search `aranea-settings` to reach the same window.
+Network has the linked-node icon; System has the adjustment-sliders icon.
+System is available without a battery. The microphone badge only appears during
+active capture; the separate Health shortcut only appears for issues or an open
+alert popup. Their absence is normal. If a tab is missing after an update,
+repair plugins and restart the shell as described above.
 
 ## Resolve a Health issue
 
-Click the issue or select it with the keyboard and press Enter. The panel opens
-a terminal with diagnostics for the exact service, container, filesystem, or
-kernel update. Opening the resolver does not restart anything. Select the offered
-recovery action and confirm it; successful actions trigger another Health check.
-Disk actions inspect usage and open folders, without deleting files.
+1. Open **System → Health** and select the issue.
+2. Read the diagnostics in the terminal that opens. Opening it alone performs
+   no restart.
+3. Choose an offered recovery action and confirm it. Successful recovery starts
+   another Health check.
+4. If the issue remains, reopen it and inspect the fresh output.
 
-An intentionally stopped container may still be reported because it has a
-nonzero recorded exit. In its resolver, choose `a` to acknowledge that stop.
-Acknowledgment matches both the container ID and its stop timestamp. Restarting
-it, replacing it, or stopping it again creates a different occurrence, so a later
-failure remains visible. A changed container state refuses an old acknowledgment.
-Memory-kill wording requires Docker's OOM evidence; exit code 137 or 143 alone
-does not establish that cause.
+Disk actions inspect usage and open folders without deleting files. Active
+service, disk, and reboot issues need resolution at their source.
 
-Inspect or undo acknowledgments with the installed helper:
+An intentionally stopped container may still have a recorded nonzero exit. In
+its resolver, `a` acknowledges that exact stop. A later stop or replacement
+container is a new occurrence and can still appear. Exit code 137 or 143 alone
+does not prove an out-of-memory kill.
+
+Inspect or undo container acknowledgments:
 
 ```bash
 scripts/aranea-health-ack status
 scripts/aranea-health-ack forget container:NAME
 ```
 
-Active service, disk, and reboot issues must be resolved at their source. If an
-issue remains after recovery, reopen it and inspect the fresh diagnostic output.
 See the [Health plugin](../plugins/araneadev.health/README.md) for check details.
 
 ## Updates appear empty or stale
 
-The update center now checks repository packages with `checkupdates --nocolor`
-and AUR packages with `yay -Qua --color never` when yay is installed. Repository
-results include Omarchy itself; a development checkout adds its native check.
-It refreshes at shell startup, hourly, and when its panel opens. Update actions
-still use Omarchy's native updater.
+Open the update center to trigger a fresh check. It also checks at startup and
+hourly. Repository checks use `checkupdates`; AUR checks use `yay` when present.
+A successful check with no updates is empty. Missing tools, network failures,
+or invalid output show **Check failed** and retain the last valid result.
 
-Read the same source results without installing packages:
+Read source results without installing packages:
 
 ```bash
 scripts/aranea-update-status
 ```
 
-A no-update exit is an empty successful result. Missing tools, network failures,
-or malformed output are errors: the panel shows **Check failed** and keeps its
-last valid status rather than replacing it with a false zero. Check the returned
-`error` field and the named package tool. The native updater's gcc14/gcc14-libs AUR
-exclusions are also applied here. See [Updates](../plugins/araneadev.updates/README.md).
+Inspect the `error` field and named package tool. Installation still uses
+**Command center → Software → Update**, Omarchy's native updater. For source
+handling and exclusions, see [Updates](../plugins/araneadev.updates/README.md).
 
 ## Agents returns to the wrong provider
 
-Selecting a Usage provider saves its stable ID in the Agents inline bar entry.
-Codex stays selected across shell restarts; screenshot stand-ins never overwrite
-the real choice. Read or change that selection with:
+The Usage provider is saved independently of project launches and task hooks.
+Inspect it or select an available provider:
 
 ```bash
 omarchy-shell omarchy.agents selection
 omarchy-shell omarchy.agents select codex
 ```
 
-`select` returns `unavailable` when the provider has not been discovered and
-`refused` during an inert capture or active showcase. A preferred provider that
-is currently unavailable falls back to a discovered provider for display while
-retaining the preference. This choice controls Usage and its bar ring; it does
-not enable task-reporting hooks. If selection still resets, update the deployed
-Agents plugin and run the doctor before restarting.
+An unavailable preferred provider can temporarily fall back to one that is
+available while keeping the saved preference. `select` reports `unavailable`
+if the provider has not been discovered, or `refused` during an inert capture or
+showcase. If the preference keeps resetting, update Aranea, run the doctor, and
+restart the shell.
+
+For missing tasks rather than Usage, follow
+[If no tasks appear](workflows.md#if-no-tasks-appear).
+
+## Project actions unavailable or unconfirmed
+
+Use `aranea capabilities --json` to check execution, journal, preview, and opener
+availability. Running actions requires a responsive systemd user manager and
+`systemd-run` 254 or newer. Definitions remain editable when execution is
+unavailable. Saving an action does not install its executable or dependencies;
+select the exact checkout and review its working folder before starting it.
+
+Keep the reported run ID and inspect that same run:
+
+```bash
+aranea projects runs inspect RUN_ID --json
+aranea projects runs refresh RUN_ID --json
+aranea projects runs logs RUN_ID --json
+```
+
+Replace `RUN_ID` with the retained identifier. A timeout or closed panel does
+not cancel a command. Refresh before requesting another run: an unconfirmed
+submission may already have started. If you need to stop it:
+
+```bash
+aranea projects runs stop RUN_ID --json
+```
+
+If cleanup remains unconfirmed, restore user-manager access and retry
+**Refresh/Stop** for that exact run. Aranea refuses control when it cannot prove
+ownership; a unit name, PID, or reachable port is not enough. Keep retained
+`project-actions.json` state and its lock files intact during recovery.
+
+| Message or symptom                      | Next step                                                                                            |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `ACTION_CONFLICT` while saving          | Refresh, review the saved definition, then explicitly choose **Save draft over latest**.             |
+| Restart unavailable after an edit       | Review the current action and use **Run/Start**. The UI does not restart an older definition.        |
+| Preview unchecked or cannot open        | Check `curl` and `xdg-open` availability, plus the saved loopback URL and port.                      |
+| Logs truncated or unavailable           | Check local journal retention; the panel reads at most 200 entries / 256 KiB.                        |
+| `action_teardown_failed` during removal | Use the retained command to refresh/stop its run, then retry the same uninstall.                     |
+| `action_lifecycle_busy`                 | Wait for the concurrent install/removal to finish and retry; inspect any reported unsafe-path error. |
+
+CLI restart explicitly uses the current saved definition after confirmed Stop.
+A service's process state and its preview reachability are separate results.
+See the [action CLI reference](agent-interface.md#configured-project-actions-and-retained-runs)
+for detailed run states and recovery contracts.
 
 ## Collect useful information
 
-For a bug report, include:
+Include these outputs in a bug report:
 
 ```bash
 scripts/aranea-about
@@ -177,60 +245,7 @@ scripts/aranea-doctor --json
 omarchy theme current
 ```
 
-Also state the selected install profile, whether the problem survives a shell
-restart, and whether it affects the live session or only an integration.
-
-## Project actions unavailable or unconfirmed
-
-Use `aranea capabilities --json` to inspect action execution, user-manager,
-journal, preview-probe and opener availability. Execution needs a responsive
-systemd user manager and systemd-run 254+. Definitions can be configured without
-them. An absent executable or invalid checkout is a Start error; saving does not
-install dependencies. Select the exact registered checkout and review the working
-folder, which must resolve inside it.
-
-Keep the reported run ID, then use:
-
-```text
-aranea projects runs inspect RUN_ID --json
-aranea projects runs refresh RUN_ID --json
-aranea projects runs logs RUN_ID --json
-aranea projects runs stop RUN_ID --json
-```
-
-An observer timeout or closed panel does not cancel the command. Refresh the same
-run instead of inventing a new request to work around uncertainty. Main-process
-success with cleanup unconfirmed still protects the run: child processes may
-remain. Identity mismatch refuses control of a replacement unit; do not infer
-ownership from its name, PID or port. Restore manager access and retry exact-run
-Refresh/Stop. An unresolved submission whose unit is absent can remain protected;
-absence alone cannot prove it never launched.
-
-Preview reachable is only HTTP reachability. Missing curl means unchecked;
-missing xdg-open prevents opening. Logs are explicit local journal reads, capped
-at 200 entries / 256 KiB, and may be truncated or unavailable under system journal
-retention. Removing run metadata does not delete that journal.
-
-`ACTION_CONFLICT` preserves an unsaved UI draft. Refresh and review the current
-saved definition, then explicitly choose Save draft over latest. A run whose
-accepted definition changed cannot use UI Restart; review the new action and
-Run/Start it. CLI `projects runs restart` explicitly uses the current saved
-command after confirmed Stop. Neither interface overrides argv at runtime.
-
-If uninstall reports `action_teardown_failed`, it retains the installed command,
-script code, registry and protected action payload before removing integrations.
-Use the retained run ID with the commands above, then retry the same uninstall.
-A draining state blocks new starts/configuration; reinstall activation also
-refuses protected runs. Keep `project-actions.json` and both action lock files
-intact during recovery. Corrupt state is preserved for repair, never silently
-reset. Successful removal leaves `project-actions.json.lock`,
-`project-actions.json.dispatch.lock`, and `agent-activity.json.lock` with their
-necessary directories; these inert files fence delayed requests and are reused
-by reinstall. Existing customized-file backups retain their normal protection.
-
-Install and uninstall share the action dispatch mutex through deployment/removal.
-`action_lifecycle_busy` means that lock is busy or its path is unsafe; the message
-names the underlying code. A concurrent operation refuses before destructive
-work. Wait for it to finish and retry, or repair the reported unsafe path without
-deleting retained coordination files. Native desktop commands do not inherit the
-mutex.
+Describe the visible symptom, selected install profile, and steps to reproduce.
+State whether a shell restart changes the result. For project issues, include
+the exact checkout and retained run or request ID; review logs before sharing
+any private paths or command output.

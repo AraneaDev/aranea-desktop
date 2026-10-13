@@ -108,7 +108,7 @@ block_grep "$menu_style" 'id: menuClock' 'enabled: style.opened'
   echo "every other open/cancel path must drop a pending Favorites/Recent route" >&2
   exit 1
 }
-grep -Fq 'menu.json' "$repo_root/README.md"
-grep -Fq 'Ctrl+P' "$repo_root/README.md"
+grep -Fq 'menu.json' "$repo_root/docs/configuration.md"
+grep -Fq 'Ctrl+P' "$repo_root/docs/configuration.md"
 
 echo "menu contract passed"

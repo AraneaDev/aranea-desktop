@@ -1,174 +1,142 @@
 # Configuration
 
+Most everyday preferences are in **Command center → Settings → Aranea**. Use
+this guide to change the desktop, choose integrations, and understand which
+settings take effect immediately. Commands below run from a repository checkout;
+`aranea` is the installed command used for projects and agents.
+
 ## Aranea settings
 
-Open **Command center → Settings → Aranea**, or search for “settings” in the menu.
-The centered window uses a compact 840×460 logical size capped to the screen,
-with scrolling for longer pages. It covers wallpaper selection and explicit Apply, motion,
-custom display scaling, wallpaper schedule enablement and validated Save, integration activation, and
-Do not disturb. Navigation and thumbnail selection never change preferences.
-Appearance includes searchable **Interface font** and **Monospace font**
-choices for Aranea panels and controls. Samples preview each draft; **Apply**
-saves both choices and updates open surfaces. **Reset to defaults** edits the
-draft and also requires Apply. Icon glyphs retain their dedicated font.
-Preferences live in `~/.config/aranea/fonts.json`; changing these choices does
-replace terminal font settings. The interface family also updates GTK and
-GTK-backed Qt desktop fonts; running Qt applications may need reopening.
+The settings window has five destinations:
 
-The theme defaults to **Inter** for the interface and **JetBrains Mono** for
-technical text. It also bundles **IBM Plex Sans**, **Source Sans 3**,
-**Inter Display**, **Inter Variable** and **JetBrains Mono NL** (without ligatures).
-Plex and Source Sans include Regular, Medium, Semibold, Bold and Italic;
-Inter and JetBrains Mono include all weights with italics.
-Installation and Aranea activation install them under
-`~/.local/share/fonts/aranea/` (or `$XDG_DATA_HOME/fonts/aranea/`); no package
-manager or network access is needed. Existing saved choices are preserved.
-**Reset to defaults** uses Inter for the interface and JetBrains Mono for
-technical text; icons retain their dedicated Nerd Font. To install just the fonts, run
-`scripts/install-fonts`. The fonts stay installed after theme removal so
-documents and other applications that use them keep rendering correctly.
+| Destination   | Change                                          | When it takes effect                                                   |
+| ------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| Appearance    | Wallpaper.                                      | **Apply** commits the draft; **Discard** restores the observed choice. |
+| Appearance    | Interface and monospace fonts.                  | **Apply** commits the draft; reset also requires Apply.                |
+| Appearance    | Motion.                                         | Immediately.                                                           |
+| Display       | Desktop scale.                                  | **Apply** commits the draft.                                           |
+| Schedule      | Daily wallpaper entries.                        | **Save schedule** commits the draft.                                   |
+| Schedule      | Enable or disable the saved schedule.           | Immediately.                                                           |
+| Integrations  | Activate or deactivate a supported integration. | Immediately, after the operation completes.                            |
+| Notifications | Manual Do not disturb.                          | Immediately.                                                           |
 
-Appearance also shows the current wallpaper preview. **Choose wallpaper**
-expands an inline chooser; thumbnail and label are one selection target.
-**Apply** changes the desktop, while **Discard** restores the observed wallpaper.
-Collapsing the chooser and navigating retain drafts and page scroll positions.
+Navigating between pages keeps your drafts and scroll positions. Unavailable
+controls show an error and **Retry** without disabling unrelated preferences.
+Closing the window does not cancel an accepted integration installation.
 
-Reopening reads the existing CLI and service owners; closing leaves an active
-integration installation running until its result is confirmed.
+### Choose fonts
 
-**Display** accepts decimal values from 1 to 4, including
-`2.5` and `2.667`. Editing the field does nothing until **Apply**. Presets for 2x, 2.5x, 2.667x and 3x also edit only
-the local draft. **Discard** restores the current observed scale.
-The focused display and current effective scale are shown separately from your
-entry. Omarchy adjusts fractions to clean logical pixels for the display mode;
-for example, `2.667` on a 3840×2160 display can become about `2.666667`.
-The typed request stays visible after applying; the
-[scaling preview](../screenshots/settings-scaling.png) shows both values. See the
-[Hyprland monitor contract](https://wiki.hypr.land/configuring/core/monitors/).
+In Appearance, search **Interface font** and **Monospace font**, inspect the
+samples, then choose **Apply**. **Reset to defaults** changes the draft and also
+requires Apply. Defaults are **Inter** and **JetBrains Mono**. Icons keep their
+dedicated font.
 
-The existing `omarchy hyprland monitor scaling` helper owns display changes.
-Standard generic Omarchy monitor configuration supports saving the scale;
-custom monitor rules can leave a session-only change. Settings reports whether
-saving is supported and whether literal persistence was confirmed, without
-interpreting arbitrary Lua or creating a second display preference store.
-A changed focused display or unconfirmed effective scale shows an actionable
-error; review the current display before applying again. There are no automatic
-retries. This control offers scaling only; the installed owner retains its
-existing monitor-application behavior.
+Aranea bundles Inter, Inter Display, Inter Variable, IBM Plex Sans, Source Sans
+3, JetBrains Mono, and JetBrains Mono NL. The installer and theme activation
+install these locally under `~/.local/share/fonts/aranea/`; saved choices are
+preserved. You can also run `scripts/install-fonts` from the checkout. Bundled
+fonts remain installed after removal for other documents and applications.
+
+Preferences are stored in `~/.config/aranea/fonts.json`. They update Aranea's
+interface and technical text; the interface family also updates GTK and
+GTK-backed Qt desktop fonts. Reopen running Qt applications if needed. Terminal
+font preferences remain under the terminal's own configuration.
+
+### Change display scale
+
+Open Display, review the focused monitor, enter a decimal scale from `1` to `4`,
+and choose **Apply**. Presets such as `2.5` and `2.667` only fill the draft.
+**Discard** returns to the currently observed scale.
+
+The requested scale and effective scale can differ slightly: Omarchy adjusts
+fractions to fit clean logical pixels. Settings reports whether the result was
+saved or applies only to this session. Standard generic Omarchy monitor
+configuration supports saving; custom monitor rules may allow only a session
+change. If focus changes or the result cannot be confirmed, review the current
+monitor and error before applying again.
+
+For a direct request:
 
 ```bash
 scripts/aranea-settings set display-scale 2.667 --json
-# Optional stale-focus guard used by the UI:
-scripts/aranea-settings set display-scale 2.5 --monitor eDP-1 --json
 ```
 
-Schema version 1 retains its existing fields and adds optional `state.display`:
-`monitor` (focused connector or null), `scale` (observed number or null), `width`
-and `height` (observed mode or null), `availability` (`available` or
-`unavailable`), `persistenceSupport` (`supported`, `unsupported`, or `unknown`),
-and `configuredScale` (recognized literal number or null). An unavailable
-scaling owner does not make other sections unavailable.
+This uses Omarchy's existing scaling helper. Other monitor controls remain in
+**System → Display**. See the [settings CLI](agent-interface.md) for machine
+readback and automation details.
 
-A dispatched scale mutation adds `result.displayScale`: `requested` (exact
-string), `monitor` (original target), `width` and `height` (original mode),
-`expectedScale` (owner's clean fraction), `effectiveScale` (observed target
-scale or null), `confirmed` (boolean), and `persistence` (`persisted`,
-`session-only`, or `unconfirmed`). `state.display` always describes the current
-focused display, which can differ from that target on failure. Confirmation
-checks exit status, identity, mode and effective scale; changed monitor config
-is reloaded and checked with `hyprctl configerrors`. A successful-looking helper
-message alone never confirms application. A later independent controller read
-must still match the target before the UI reports Applied.
+### Notifications and quiet hours
 
-Quiet hours shows the effective state and configured window read-only. Set
-`ARANEA_QUIET_HOURS` through your notification service configuration to change it;
-settings does not write `notifications.json`. Bar layout and editable quiet hours are outside this release.
+Notifications offers manual Do not disturb and shows the configured quiet-hours
+window. Quiet hours is read-only here; `ARANEA_QUIET_HOURS` is supplied through
+the notification service's environment, using a window such as `22:00-07:00`.
 
-Direct destinations use the existing summon contract:
+For a combined settings readback, use:
 
 ```bash
-omarchy-shell shell summon araneadev.settings '{"section":"appearance"}'
-omarchy-shell shell summon araneadev.settings '{"section":"display"}'
-omarchy-shell shell summon araneadev.settings '{"section":"schedule"}'
-omarchy-shell shell summon araneadev.settings '{"section":"integrations"}'
-omarchy-shell shell summon araneadev.settings '{"section":"notifications"}'
 scripts/aranea-settings status --json
 ```
 
-Unknown sections open Appearance. Unavailable reads show Retry and disable
-only the affected changes. Saved, deferred, failed, and confirmed Applied
-outcomes remain distinct. Changes reuse the existing helper ownership and
-backup behavior.
-
-Installation and theme activation deploy and register `araneadev.settings`
-when its manifest is present; repair adds it once and preserves other plugin
-settings. Leaving Aranea releases the registration, and uninstall removes its
-owned folder. It has no stock plugin replacement or bar icon. User-defined
-`aranea.settings` menu entries take precedence over the generated route.
-
-For display-only full-desktop captures, run `scripts/capture-screenshots --surface
-settings --output screenshots` on one line. Use `settings-scaling` for Display.
-These show the normal centered compact window with the bar and wallpaper. Capture
-refuses an in-flight mutation, waits for an acknowledged inert fixture and ready
-artwork, and restores prior visibility, section, drafts, scroll positions, showcase
-state, workspace and focus. Preference mutations and owner refreshes are disabled.
-The `--all` batch and hero include both frames after menu navigation.
-
-Diagnostic variants `settings-narrow`, `settings-dirty`, `settings-unavailable`,
-`settings-integration-failed` and `settings-notifications` render production content
-offscreen with fixed fixtures and refuse reads and changes. The standalone
-`tools/render-settings-preview --fixture scaling --output FILE` retains the cropped
-Display diagnostic. Offscreen diagnostics do not summon the live desktop or change
-notifications.
-
 ## Bar and panel groups
 
-The default right bar has Notifications, Agents, Network, Audio, and System,
-with a tray disclosure and an issue-only Health shortcut. `scripts/repair-shell-config`
-folds redundant VPN/Bluetooth entries into Network, Display into System, and the
-separate microphone entry into Audio when those hosts are present. Removing a
-host retains the child plugin's standalone route; repair is idempotent and keeps
-inline user settings.
+The right bar groups controls into Notifications, Agents, Network, Audio, and
+System, with a tray disclosure and a conditional Health shortcut.
 
-Network tab shortcuts are `N` Network, `V` VPN, and `B` Bluetooth. System uses
-`P` Power, `D` Display, and `S` Health. Hosted Bluetooth uses `T` to toggle power;
-standalone Bluetooth retains its original `B` toggle. The conditional Health
-entry uses `alertOnly: true`; its popup stays reachable while its last issue is
-being resolved.
+| Panel   | Keyboard tabs                        | Other controls                                 |
+| ------- | ------------------------------------ | ---------------------------------------------- |
+| Network | `N` Network, `V` VPN, `B` Bluetooth. | `T` toggles Bluetooth power while hosted here. |
+| System  | `P` Power, `D` Display, `S` Health.  | Available even without a battery.              |
+| Audio   | Panel hints                          | Outputs, microphones, and per-app streams.     |
 
-Agents saves `selectedProviderId` in its inline bar entry. Selecting Codex keeps
-Codex selected after a shell restart; display-only showcase selections stay
-separate. The panel can be inspected or selected by stable provider ID:
+Standalone child controls remain available when their host panel is absent.
+Use the [doctor](troubleshooting.md#hooks-or-plugins-are-stale) to repair stale
+plugin deployment after an update.
+
+Selecting a provider in **Agents → Usage** saves the selection across shell
+restarts. This preference is separate from the agent you launch for a project
+and from optional task reporting. The installed shell also exposes:
 
 ```bash
 omarchy-shell omarchy.agents selection
 omarchy-shell omarchy.agents select codex
 ```
 
-These select an available Usage provider; opt-in task reporting is a separate
-setting. See [agent setup](workflows.md).
+### Command menu customization
+
+Add or override menu entries in
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`. Aranea merges this JSONC file
+over Omarchy’s default menu, with later fields taking precedence for matching
+item IDs. Changes are watched and apply without a shell restart.
+
+Pinned and recently launched application IDs are stored in
+`$XDG_STATE_HOME/aranea/menu.json` (normally
+`~/.local/state/aranea/menu.json`). Use **Ctrl+P** on a selected application to
+change its pinned state.
 
 ## Profiles
 
-Profiles control application integrations during installation:
+The installation profile selects integrations, rather than a different edition
+of the desktop:
 
-| Profile   | Includes                                         |
-| --------- | ------------------------------------------------ |
-| `minimal` | Core theme and GTK experience                    |
-| `full`    | All supported application integrations           |
-| `no_apps` | Theme assets, cursor, icons, wallpaper, branding |
+| Profile   | Included integration scope                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------- |
+| `minimal` | Core desktop and GTK styling.                                                                                       |
+| `full`    | Core and every supported integration, including terminals, developer tools, Qt, browser, session, and media assets. |
+| `no_apps` | Core and GTK, plus cursor, icons, wallpapers, and Aranea artwork; excludes the additional app integrations.         |
 
-The profile is persisted in `~/.local/state/aranea/profile` and read by the
-theme hooks after activation.
+Optional tools that are absent are skipped or retain their native fallback.
+Profiles do not install those tools. All profiles install the public `aranea`
+command and bundled fonts. The saved profile is in
+`~/.local/state/aranea/profile`; change it through the installer when updating.
 
 ## Wallpapers
 
-Signal Shrine is the theme default. `backgrounds/00-default.png` is a relative
-link to its existing image, putting it first in Omarchy’s sorted top-level
-background selection. A matching current background may be cycled by Omarchy on
-reapplication; user backgrounds and enabled schedules retain their native behavior.
+In Appearance, choose **Choose wallpaper**, select a thumbnail, then **Apply**.
+Selection alone does not change the desktop. **Discard** restores the observed
+wallpaper. Signal Shrine is the default on a fresh application; an enabled
+schedule continues to choose its images.
 
-Human titles and stable CLI IDs are separate:
+Displayed titles and stable CLI IDs are different:
 
 | Title                   | Stable ID        |
 | ----------------------- | ---------------- |
@@ -186,133 +154,112 @@ Human titles and stable CLI IDs are separate:
 | Deep Current            | `deep-current`   |
 | Orbital Relay           | `ultrawide`      |
 
-List and select a wallpaper:
+To list or select them directly:
 
 ```bash
 scripts/aranea-wallpaper list
 scripts/aranea-wallpaper set signal-shrine
-scripts/aranea-wallpaper set ultrawide
 ```
 
-Each daily entry has a local `HH:MM` time and a stable wallpaper ID. Keep at
-least one entry and use a different time for each; the same image can appear
-more than once. Save sorts entries by time. The most recent entry applies,
-wrapping to the previous day before the first time. Draft edits do not change
-the running schedule.
+### Set a daily schedule
 
-Existing four-phase configurations load automatically. Saving writes version 2
-JSON to `~/.config/aranea/wallpaper-schedule.conf`; the legacy four-time CLI
-remains supported. The existing enable switch and timer names are retained.
+1. Open **Settings → Aranea → Schedule**.
+2. Edit each row's local 24-hour time (`HH:MM`) and wallpaper.
+3. Use **Add entry** or remove rows as needed. Keep at least one row and use
+   unique times. An image can appear more than once.
+4. Choose **Save schedule**, then enable the schedule if it is off.
 
-Inspect or configure the schedule:
+Saving sorts entries by time and preserves the enable setting. Draft edits
+leave the running schedule unchanged. **Discard** reloads saved entries.
+The most recent transition determines the image: before today's first time,
+the last entry from the previous day applies.
+
+For example, Rain City at 07:00 and Signal Shrine at 21:00 keeps Signal Shrine
+through the night until 07:00:
 
 ```bash
-scripts/aranea-wallpaper schedule status
 scripts/aranea-wallpaper schedule configure --entries '[{"time":"07:00","wallpaper":"day"},{"time":"21:00","wallpaper":"signal-shrine"}]'
 scripts/aranea-wallpaper schedule on
+scripts/aranea-wallpaper schedule status
 scripts/aranea-wallpaper schedule off
 ```
 
+Existing four-phase schedules load automatically. The legacy command remains
+supported: `scripts/aranea-wallpaper schedule configure 06:00 08:00 18:00 20:00`
+sets dawn/day/dusk/night transitions. New saves use version 2 JSON in
+`~/.config/aranea/wallpaper-schedule.conf`.
+
 ## Motion
+
+Use the Motion toggle in Appearance, or:
 
 ```bash
 scripts/aranea-motion status
 scripts/aranea-motion set on
 scripts/aranea-motion set off
-scripts/aranea-motion toggle
 ```
 
-Reduced-motion preferences should be respected by the host shell and compositor
-configuration. The installer does not require motion to be enabled.
+Motion is independent of wallpaper selection and scheduling.
 
 ## Integrations
 
-List integration IDs and states before changing one:
+Open **Settings → Aranea → Integrations** to inspect and toggle supported
+integrations. For the same control from a checkout:
 
 ```bash
 scripts/aranea-integrations status
-scripts/aranea-integrations status --json
+scripts/aranea-integrations activate terminal --yes
+scripts/aranea-integrations deactivate terminal --yes
 ```
 
-Activation backs up managed files before linking theme-owned content. On
-uninstall, Aranea restores the saved originals unless the user changed the
-managed file after installation; customized files are preserved and recorded
-in the ownership ledger.
-
-## State and backups
-
-Aranea state normally lives under:
-
-- `~/.local/state/aranea/`: profile, ownership ledger, backups, and saved settings;
-- `~/.config/aranea/`: user-facing Aranea settings such as wallpaper schedule;
-- `~/.config/omarchy/`: hooks, shell configuration, and deployed plugins.
-
-Do not delete the ownership ledger while Aranea integrations are installed.
-Use the uninstall command so restoration decisions remain safe.
-
-## Environment variables
-
-Useful overrides include:
-
-| Variable                         | Purpose                                    |
-| -------------------------------- | ------------------------------------------ |
-| `ARANEA_THEME_SOURCE`            | Default source passed to the installer     |
-| `ARANEA_THEME_REPO_URL`          | Default remote theme source                |
-| `ARANEA_INSTALL_PROFILE`         | Profile read by activation hooks           |
-| `ARANEA_CLIPBOARD_SECRET_TTL_MS` | Clipboard secret retention time            |
-| `ARANEA_OSD_CAPTURE_COMMAND`     | Live OSD capture command for showcase work |
-
-Most scripts also expose `--dry-run`, `--json`, or `--help`. Prefer those
-interfaces over relying on internal paths.
+Inspect the available IDs before changing one. Managed files are backed up
+before theme content is linked. Restoration preserves files you customized
+after installation. Some integrations supply assets or instructions for manual
+use; browser profiles, for example, are not edited automatically.
 
 ## Projects
 
-Open **Command center → Projects**. Choose a folder through the desktop folder picker or
-enter its absolute path; **Use folder** confirms the path before scanning.
-Nothing is registered until you select discovered checkouts and press **Add
-selected**. Git worktrees are grouped by their common Git directory. Registering
-one checkout does not register its siblings. Explicit Refresh discovers newly
-added checkouts, and partial results remain available for review. Scans avoid
-symlinks and `.git` internals, stop at eight directory levels and 20,000 visited
-directories, and can be cancelled. Ignoring a group persists until you restore it
-in **Review ignored repositories**. Removing a scan folder keeps registrations.
+**Command center → Projects** manages registered Git checkouts, saved editor and
+terminal choices, and workspace behavior. **Preferences** changes the selected
+project; **Save preferences** commits changes. **Use checkout** selects its
+preferred working copy. Dedicated workspaces are the default; using the current
+workspace is an explicit preference.
 
-Details select the preferred checkout and offer **Customize**. Supported editors
-are VS Code (`code`) and Neovim (`nvim`); supported terminals are Alacritty,
-Kitty, Foot and Ghostty. Neovim uses the selected terminal. Installed supported
-defaults are offered; otherwise choose both applications and Apply. Unsupported
-applications remain unavailable. Editing the project name, tools or workspace
-mode changes a local draft until Apply. Open always uses saved preferences.
+Supported editors are VS Code (`code`) and Neovim (`nvim`); terminals are
+Alacritty, Kitty, Foot, and Ghostty. Neovim opens in the selected terminal.
+Choose installed supported tools; profile installation does not install them.
 
-Dedicated workspace is the default. Current workspace is an explicit saved
-preference or the CLI's `--use-current-workspace` option. `--separate` opens a
-checkout with a separate association. Fresh window evidence controls Resume;
-no title matching or workspace membership guessing is used. Pending work is
-shared by all clients. A failed role can be retried with `--retry-role`; an
-unconfirmed accepted role offers **Check editor again** or **Check terminal
-again** (`--reobserve-role`) without launching. An additional window requires
-an explicit `--new-window` choice. These options target one role, and unavailable
-compositor/owner state is reported truthfully. After a shell reload, occupied
-saved associations with lost ownership evidence also require per-role New window
-choices; workspace membership cannot restore ownership.
+**Manage development folders** controls discovery. Removing a development
+folder keeps existing registrations. **Locate folder** updates a moved checkout
+while checking its Git identity. **Remove registration** removes saved metadata
+and leaves repository files and running applications in place.
 
-If a checkout moved, **Locate folder** validates its Git identity while preserving
-project and checkout IDs. **Remove registration** removes saved project metadata,
-never the repository or its running applications. Registry corruption is an
-error with recovery guidance, never an empty replacement registry.
+Follow [Workflows](workflows.md) for setup, actions, and agent reporting; use the
+[project CLI reference](agent-interface.md#public-project-commands) for automation.
 
-```bash
-aranea projects configure PROJECT_ID --editor code --terminal kitty --workspace dedicated
-aranea projects open PROJECT_ID --checkout CHECKOUT_ID --separate --json
-aranea projects open PROJECT_ID --retry-role terminal --json
-aranea projects open PROJECT_ID --reobserve-role terminal --json
-aranea projects relocate PROJECT_ID --checkout CHECKOUT_ID --path '/home/me/Work/Moved Project'
-```
+## State and backups
 
-The atomic schema-1 registry lives at
-`${ARANEA_STATE_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/aranea}/projects.json`.
-Git, jq and flock are required for registry operations. The command is installed
-in `${XDG_BIN_HOME:-$HOME/.local/bin}/aranea` for every profile; live opening also
-requires the loaded project owner and Hyprland. The installed command follows the
-stable installed theme rather than whichever theme is currently active. Profile
-installation does not install unsupported editors or terminals.
+Default locations are:
+
+| Location                 | Contents                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| `~/.config/aranea/`      | User preferences, including fonts and wallpaper schedule.                      |
+| `~/.local/state/aranea/` | Profile, project registrations, retained runs, ownership records, and backups. |
+| `~/.config/omarchy/`     | Installed theme, hooks, shell configuration, and plugins.                      |
+
+XDG overrides can change these locations. Keep ownership records while
+integrations are installed, and use the uninstall command for restoration.
+Keep retained run state and lock files intact when troubleshooting interrupted
+project actions; see [action recovery](troubleshooting.md#project-actions-unavailable-or-unconfirmed).
+
+## Environment variables
+
+Most users can keep the defaults. These overrides are useful for specific tasks:
+
+| Variable                         | Purpose                                               |
+| -------------------------------- | ----------------------------------------------------- |
+| `ARANEA_THEME_SOURCE`            | Choose the installer's source checkout or URL.        |
+| `ARANEA_THEME_REPO_URL`          | Override its default repository URL.                  |
+| `ARANEA_INSTALL_PROFILE`         | Override the profile read by activation hooks.        |
+| `ARANEA_QUIET_HOURS`             | Supply the notification service's quiet-hours window. |
+| `ARANEA_CLIPBOARD_SECRET_TTL_MS` | Set clipboard secret retention time.                  |

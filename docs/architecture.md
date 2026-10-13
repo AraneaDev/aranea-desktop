@@ -1,306 +1,179 @@
 # Architecture
 
-Aranea is a theme, shell extension, integration bundle, and set of safe
-installation tools. The repository keeps those concerns separate so visual
-changes can be made centrally without coupling runtime behavior to generated
-assets or host state.
+Aranea has three main responsibilities: generate a consistent desktop style,
+compose Omarchy shell surfaces, and manage local integration and project state.
+Those responsibilities have separate editing and runtime boundaries.
 
 ## System shape
 
 ```mermaid
 flowchart TD
-    Tokens[design/tokens.toml] --> Generator[scripts/generate-tokens]
+    Tokens[design/tokens.toml] --> Generator[Token generator]
     Templates[design/templates] --> Generator
-    Generator --> Projections[Committed projections]
-    Projections --> GTK[GTK and desktop styling]
-    Projections --> QMLTokens[QML token module]
-    Projections --> Shell[Shell and terminal config]
-    Projections --> Assets[GTK, cursor, and SVG assets]
-    Shared[araneadev.shared] --> Bar[Bar]
-    Shared --> Menu[Menu]
-    Shared --> Panels[Panels and pickers]
-    Shared --> Lock[Lock and polkit]
-    Shared --> Updates[Updates and workspaces]
-    Logic[Focused JS logic modules] --> Facades[Generated QML JS facades]
-    Facades --> Bar
-    Facades --> Menu
-    Facades --> Panels
-    Hooks[Theme hooks] --> Runtime[Omarchy and Quickshell runtime]
-    Projections --> Runtime
-    Bar --> Runtime
-    Menu --> Runtime
-    Panels --> Runtime
-    Lock --> Runtime
+    Generator --> Projections[Committed styles and assets]
+    Projections --> Runtime[Omarchy / Quickshell]
+    Shared[Shared QML components] --> Plugins[Plugin composition roots]
+    Modules[Focused JS modules] --> Facades[Generated compatibility facades]
+    Facades --> Plugins
+    Plugins --> Runtime
+    Scripts[Hooks and command backends] --> Runtime
+    Scripts --> State[Local state and host integrations]
 ```
 
-The arrows describe ownership and data flow, not import syntax. The important
-boundaries are:
-
-| Layer                | Owns                                                        | Must not own                                               |
-| -------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
-| Tokens and templates | Palette, spacing, typography, motion, and asset projections | Plugin state or host detection                             |
-| Shared QML           | Reusable visual and input contracts                         | Plugin lifecycle, IPC, cursor state, or process management |
-| Plugin entry points  | Composition, lifecycle, and plugin-specific interaction     | Duplicated global chrome or token literals                 |
-| Focused JS modules   | Pure domain logic and normalization                         | QML window lifecycle or generated facade structure         |
-| Generated facades    | Stable compatibility exports for QML                        | Hand-edited business logic                                 |
-| Hooks and scripts    | Installation, activation, repair, and host integration      | Presentation decisions that belong in QML or templates     |
-
-## Consolidated panel ownership
-
-```mermaid
-flowchart LR
-    Bar --> Network[Network popup]
-    Network --> Net[Network controls]
-    Network --> VPN[Embedded VPN controller]
-    Network --> Bluetooth[Embedded Bluetooth controller]
-    Bar --> System[System popup]
-    System --> Power[Power controls]
-    System --> Display[Embedded Display controller]
-    System --> Health[Embedded Health controller]
-    Health --> HealthService[Shared Health service]
-    Bar --> Audio[Audio and microphone controls]
-```
-
-The bar keeps Notifications, Agents, Network, Audio, and System as everyday
-controls. Tray is disclosed; Health can expose a separate issue-only shortcut.
-`repair-shell-config` removes redundant child entries only when their host is
-present, preserving standalone layouts and inline settings.
-
-`araneadev.network/Panel.qml` owns one popup and tab selection. It loads the
-existing VPN and Bluetooth controllers in embedded mode, suppressing their own
-bar icons and windows. Each controller keeps its data, actions, credential
-handling, and IPC. Legacy open routes select the corresponding host page;
-closing a child closes the host. Page changes coordinate polling and scanning,
-clear stale prompts, and restore the shared key catcher. `N`/`V`/`B` select pages;
-the hosted Bluetooth power shortcut is `T`.
-
-`araneadev.power/Panel.qml` owns the System popup and Power/Display/Health pages.
-Display and Health load by URL so missing optional plugins do not break Power.
-Their controllers retain standalone operation. Health samples resources only
-while its selected page is open and shares the existing service through
-HealthBridge. `omarchy.power showPage power|display|health` validates availability
-and selects a page; screenshots use that route instead of keyboard injection.
-
-Audio owns microphone controls and a capture-only badge based on active capture
-streams. Shared `BarGroupIcon.qml` draws the linked-node Network and adjustment
-System symbols; the owning button supplies semantic color. Shared focus and
-underline components supply decoration, while hosts retain cursor identity and
-activation.
-
-Agents keeps real provider identity separate from showcase identity. Real
-provider changes save `selectedProviderId` through the host's inline settings
-boundary; reconstruction reads it back. Inert captures and showcases cannot
-write that preference. The bar ring follows the selected real provider outside
-showcase mode.
-
-Desktop search normalization and ranking live in `DesktopSearchRanking.js`.
-The generated `DesktopSearchLogic.js` facade composes it with `MenuSearch.js`,
-so matching shares the menu’s existing name, alias, and whole-word description
-semantics. The menu host owns source refresh and activation; canonical result
-keys and typed targets let it re-resolve a selection against current state.
-
-`DesktopSearchSources.qml` consumes the menu host's existing `appRows`, merged
-`menuItems`/`itemOrder`, guard results and app history. It uses `MenuModel.isVisible`
-for command destinations and the existing settings manifest availability. Its
-`setActive(bool)` boundary gates compositor subscriptions and snapshot iteration;
-a 100 ms timer coalesces changes, and generation checks discard old completions.
-`records`, `available` (live compositor availability) and `revision` expose source
-state; query ranking and selected-key ownership remain in the menu host.
-
-`DesktopSearchTargets.js` adapts those raw snapshots into typed records and
-returns host requests or argument arrays. On `activate(key)`, the controller
-reads a fresh synchronous snapshot and re-resolves the key through
-`DesktopSearchLogic.resolveTarget`, independently of cached refresh records.
-`appRequested(appId, label)` and `commandRequested(itemId)` preserve the existing
-launch and menu handlers. Settings results summon a desktop preferences section; the Projects destination
-summons the independent project manager;
-window/workspace targets use validated exact identities in the installed Lua
-focus dispatcher. Titles, descriptions and queries stay display data. Missing
-compositor data affects only live results. Failed or vanished activation emits
-`failed(message)` without closing; `activated()` reports an accepted argument-array
-submission. Apps and commands leave closing/navigation to their existing handlers.
-
-`Menu.qml` owns root-only ranking and selected-key reconciliation. Query changes
-select the highest-ranked row; refreshes retain its canonical identity or clear
-selection if it disappears. The optional desktop roles are cleared when returning
-to scoped/dmenu rows, including reused ListModel delegates. `MenuSurface.qml` shares
-the production card with `MenuWindow.qml` and the inert offscreen renderer; window
-placement, pointer gate, lifecycle and cursor state stay in the existing hosts.
-
-Tests can replace the compositor, raw window/workspace fixtures, synchronous
-`snapshotReader()`, asynchronous `refreshReader(generation, complete)` and
-`runner(argv)` boundaries. Refresh completion must echo its generation; it never
-becomes the activation snapshot. The production runner uses
-`Quickshell.execDetached` with argument arrays, so accepted dispatch does not
-claim the external command completed successfully.
-
-`DesktopActionRecords.js` projects DND, audio and wallpaper snapshots into typed
-Action records; `DesktopActionState.js` tracks one request per family with
-generation IDs and keyed feedback. `DesktopActionController.qml` lives outside
-the menu window. It observes notification preference echoes and the audio
-plugin’s keep-loaded `AudioDefaults.qml` service, which also owns the panel’s
-default-device queue. Search never duplicates device state.
-
-`DesktopWallpaperActions.qml` owns tracked processes, fresh manifest validation
-and active-ID readback. Confirmation deadlines are three seconds for DND, four
-for audio and fifteen for wallpaper. Menu closure releases observation leases
-without cancelling submitted work. Activation resolves current exact identities;
-feedback is excluded from matching. Accepted actions retain the menu, unlike
-normal argument-array launch requests. Inert showcase snapshots refuse dispatch
-and cannot replace outstanding requests.
+| Layer              | Owns                                                       | Boundary                                 |
+| ------------------ | ---------------------------------------------------------- | ---------------------------------------- |
+| Tokens/templates   | Palette, dimensions, typography, motion, asset projections | No plugin state or host detection        |
+| Shared QML         | Presentation, input frames, runtime paths                  | No plugin lifecycle or process ownership |
+| Plugin roots       | Composition, services, IPC, interaction                    | Reuse shared contracts and tokens        |
+| Focused JavaScript | Pure normalization and domain logic                        | No window lifecycle or I/O               |
+| Generated facades  | Stable QML-compatible exports                              | Regenerate rather than hand-edit         |
+| Hooks/scripts      | Install, activate, repair, persist, execute                | Keep presentation in QML/templates       |
 
 ## Token flow
 
-`design/tokens.toml` is the source of truth. Templates describe the target
-format, and the generator renders committed files for each consumer. A change
-to a color, dimension, or motion value should start in the token source or its
-template, not in a generated CSS, TOML, QML, SVG, or cursor file.
+`design/tokens.toml` and `design/templates/` feed
+`scripts/generate-tokens`. Identity and the canonical spider are fixed in the
+generator. Generated CSS, TOML, QML, SVG, raster, and cursor files are committed
+runtime inputs and review artifacts, not editing sources.
 
-```mermaid
-sequenceDiagram
-    participant Dev as Developer
-    participant Source as tokens.toml
-    participant Gen as token generator
-    participant Files as committed projections
-    participant Check as tools/check
-    Dev->>Source: Edit canonical token
-    Dev->>Gen: scripts/generate-tokens --write
-    Gen->>Files: Render all projections
-    Dev->>Check: scripts/generate-tokens --check
-    Check-->>Dev: Pass or report drift
+```bash
+scripts/generate-tokens --write
+scripts/generate-tokens --check
 ```
 
-Generated files are useful review artifacts and runtime inputs, but they are
-not an editing boundary. The same rule applies to JS facades generated by
-`tools/js-facade-generator.mjs`.
+Xcursor and Hyprcursor share geometry. The font-icon generator supplies glyph
+geometry, and token generation resolves its accent. Wallpaper artwork is
+cataloged separately through stable IDs in `backgrounds/manifest.toml`.
 
 ## Runtime composition
 
-Plugin entry points should remain composition roots. Shared components remove
-repeated contracts while leaving ownership with the plugin that understands
-the behavior.
+Plugin entry points compose local state, feature components, shared chrome, and
+pure logic. Shared `BrandHeader`, `StatusRow`, `SurfaceCard`, `Typography`,
+keyboard frames, and motion/focus primitives accept explicit properties and
+signals. Hosts keep cursor identity, focus policy, activation, and lifecycle.
+`RuntimePaths.qml` centralizes state and branding paths.
 
-```mermaid
-flowchart LR
-    Entry[Plugin entry point] --> State[Plugin state and lifecycle]
-    Entry --> SharedChrome[Shared chrome]
-    Entry --> Feature[Feature component]
-    State --> Feature
-    SharedChrome --> Tokens[Aranea tokens]
-    Feature --> Logic[Focused logic module]
-    Logic --> Stable[Stable facade API]
-```
+Extract repeated, stable contracts. Leave one-off interactions or behavior tied
+to a particular service in the owning plugin. Window visibility must not become
+the lifetime of an accepted background operation.
 
-Current shared examples include `BrandHeader`, `StatusRow`,
-`KeyboardInputFrame`, `KeyboardPanelFrame`, `RuntimePaths`, `SurfaceCard`,
-`StatusRail`, and `StatusTextPair`.
+## Consolidated panel ownership
 
-Extract a component when the contract is repeated, stable, and presentational.
-Keep it local when it depends on plugin state, a particular service, a cursor,
-or a one-off interaction. Prefer explicit properties and signals over reaching
-through root IDs.
+| Host                          | Pages                                     | Ownership                                                                       |
+| ----------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `araneadev.network/Panel.qml` | Network, VPN, Bluetooth                   | One popup and selected tab; children retain data, credentials, actions, and IPC |
+| `araneadev.power/Panel.qml`   | Power, Display, Health                    | One System popup; optional children load by URL and retain standalone support   |
+| Audio                         | Outputs, inputs, application audio, media | Shared default-device state and active-capture badge                            |
+| Agents                        | Selected provider usage and details       | Persisted real provider selection, separate inert showcase identity             |
 
-## Logic and facade decomposition
+Hosted children suppress their own bar icons/windows. Legacy VPN/Bluetooth open
+routes select the host page. Network page changes coordinate polling, scanning,
+prompts, and keyboard handling; `N`, `V`, and `B` select pages and hosted
+Bluetooth uses `T` for power. System's `showPage power|display|health` validates
+availability. Health samples resources while its page is selected and uses the
+shared Health service through HealthBridge.
 
-Large QML-compatible JavaScript facades preserve the public function names
-used by QML. Focused modules own the implementation and tests.
+`repair-shell-config` removes redundant child entries only when their host is
+present. The bar exposes Notifications, Agents, Network, Audio, and System,
+with a disclosed tray and a conditional Health issue shortcut.
+`BarGroupIcon.qml` owns Network/System vector geometry; the button supplies
+semantic color. Agents persists `selectedProviderId` through inline settings;
+capture/showcase state cannot overwrite it.
 
-```mermaid
-flowchart TD
-    QML[QML caller] --> Facade[Generated facade]
-    Facade --> Search[Search module]
-    Facade --> Tree[Tree and route module]
-    Facade --> Settings[Settings module]
-    Facade --> Domain[Other focused domain modules]
-    Search --> Tests[Direct module tests]
-    Tree --> Tests
-    Settings --> Tests
-    Domain --> Tests
-```
+## Desktop search and actions
 
-When decomposing logic:
+The menu's root is a compact grouped single column. Root search combines apps,
+commands, Settings, projects, windows/workspaces, and supported desktop actions;
+submenus and dmenu retain their scoped list behavior.
 
-1. Preserve the facade's exported names and QML-compatible syntax.
-2. Move one pure domain at a time into a sibling module.
-3. Add direct tests for the new module before removing duplicate logic.
-4. Regenerate the facade and run `node tools/js-facade-generator.mjs --check`.
+`DesktopSearchSources.qml` adapts existing app/menu/history state and live
+compositor snapshots. Its active lease gates subscriptions; refreshes coalesce
+at 100 ms and stale generations are discarded. `DesktopSearchRanking.js` and
+`MenuSearch.js` provide pure matching through `DesktopSearchLogic.js`.
+`DesktopSearchTargets.js` produces typed records and argument-array requests.
 
-## Validation boundaries
+The menu owns ranking and selected canonical keys. Activation resolves a fresh
+synchronous snapshot instead of trusting cached results. Missing compositor data
+removes only live results; vanished targets fail without closing the menu.
+Apps/commands reuse their existing handlers. Detached argument-array dispatch
+means submission was accepted, not that the external command finished.
 
-```mermaid
-flowchart LR
-    Edit[Change] --> Format[format and lint]
-    Format --> Contracts[shell, JS, QML contracts]
-    Contracts --> Runtime[QML behavior and smoke]
-    Runtime --> Review[Review generated diffs and docs]
-    Review --> Release[Merge and release]
-```
+Desktop actions have a separate keep-loaded controller. `DesktopActionRecords.js`
+projects DND, audio, and wallpaper state; `DesktopActionState.js` tracks one
+request per family by generation. Notification preference echoes, Audio's
+`AudioDefaults.qml`, and tracked wallpaper processes/readback confirm results.
+DND/audio/wallpaper deadlines are three/four/fifteen seconds. Closing the menu
+releases observation leases without cancelling accepted actions. Fixtures refuse
+dispatch and cannot replace outstanding requests.
 
-Use the narrowest useful check while iterating, then finish with the complete
-repository gate:
-
-```bash
-scripts/generate-tokens --check
-node tools/js-facade-generator.mjs --check
-tests/qml-types.test.sh
-tests/qml-behaviour.test.sh shared updates-widget workspaces-widget overlay-components polkit-components
-tools/check
-```
-
-`tools/check --fast` is useful for local iteration. The full command is the
-release gate because it includes slow contract tests and runtime smoke checks
-when the host provides the required Omarchy and Quickshell dependencies.
-
-## Further reading
-
-- [Development](development.md) for repository conventions and extraction
-  boundaries.
-- [Agent development guide](agent-development.md) for safe automated changes.
-- [Agent interface](agent-interface.md) for the installer and repair JSONL
-  protocol.
-- [Visual language](visual-language.md) for user-facing design principles.
+`MenuSurface.qml` supplies production content to both the live window and inert
+renderer. Placement, pointer gates, cursor state, and lifecycle stay in hosts.
 
 ## Project ownership
 
-`scripts/aranea-project-store` owns the locked, revision-aware atomic registry;
-`scripts/aranea-project-discover` performs bounded read-only Git discovery and
-fresh activation validation. `aranea-project-tools` probes fixed supported
-adapters. No repository scripts are executed by discovery or ordinary Open.
-Public `aranea projects` commands translate these helper contracts to schema-1
-JSONL and authoritative exit codes.
+| Component                  | Authority                                                         |
+| -------------------------- | ----------------------------------------------------------------- |
+| `aranea-project-store`     | Locked, revision-aware atomic registry                            |
+| `aranea-project-discover`  | Bounded read-only Git discovery and fresh checkout validation     |
+| `aranea-project-tools`     | Fixed supported tool/provider probes                              |
+| `ProjectsController.qml`   | Live workspace allocation, launch queue, and per-role observation |
+| `ProjectRuntime.qml`       | Compositor snapshots, process identity, exact focus readback      |
+| Project-action backend     | Headless definitions, transient services, retained run evidence   |
+| Agent activity store/owner | Reported task state, provider evidence, serialized navigation     |
 
-The keep-loaded `araneadev.projects` plugin is the only live operation owner.
-`ProjectsController.qml` serializes workspace allocation, selection persistence
-and tool submission while observing roles independently. `ProjectRuntime.qml`
-owns compositor snapshots, tracked process identity and exact focus readback.
-Generation/session guards reject stale responses; matching pending checkout
-requests coalesce. Accepted identities remain conservative after observation
-loss, preventing duplicate ordinary launches. Explicit failed-role retry and
-new-window actions use the same owner. Explicit re-observation reuses a retained
-accepted identity and its original baseline without invoking the launcher; it
-creates a new bounded operation and leaves the original outcome immutable.
-Occupied saved associations with lost session evidence retain per-role uncertainty
-until an explicit New window choice. Search retains authoritative feedback by
-current owner session, exact checkout and highest operation generation; local
-submission feedback cannot overwrite newer accepted outcomes.
+Discovery and ordinary Open do not execute repository scripts. Registered IDs
+and canonical paths are shared across CLI, search, details, and workspace views.
+Project associations persist; process/window ownership bindings remain in memory
+and expire with the owner session. Accepted launches get a ten-second observation
+period. Submission alone cannot produce an observed window outcome.
 
-The standalone Projects presentation owns registry/discovery clients for
-registration and typed project configuration requests. `ProjectsPresentation.qml`
-retains drafts and observation clients independently of the window.
-Registry and tool refresh failures remain independent of callback completion order;
-snapshot read failures do not interrupt accepted launch observation. Preference save
-readback acknowledges only matching draft values, and setup exit retains unsaved drafts.
-`ProjectsSurface.qml` owns the searchable sidebar and focused Overview, Actions,
-Agents, Preferences, and Help destinations. Settings contains desktop preferences. Search uses `ProjectClient.qml` and `ProjectRecords.js`
-for matching and owner outcomes. Its observer survives menu closure. The
-workspace overview reads owner context only while visible; it owns no launch
-queue. Durable IDs and canonical paths are shared across every projection.
-Runtime bindings stay in memory and expire with the owner session. Only verified
-process/window evidence establishes ownership, with a ten-second observation
-deadline; accepted process submission alone cannot produce an observed outcome.
+Generation/session guards reject stale results. Matching pending requests coalesce;
+retained accepted identities prevent duplicate ordinary launches after observation
+loss. Failed-role retry, explicit New window, and read-only re-observation have
+different contracts. Re-observation preserves the original launch identity and
+baseline and leaves its completed outcome unchanged. Lost ownership evidence on
+an occupied association stays uncertain until an explicit per-role choice.
 
-Project previews render production ProjectsSurface, MenuSurface and
-WorkspacePanel in isolated offscreen hosts. Capture guards refuse registry,
-chooser, owner and launch requests. Workspace capture routes to the offscreen
-panel before any compositor read or focus dispatch, so its image is a panel
-illustration rather than a full live-desktop frame.
+`ProjectsPresentation.qml` retains drafts and clients outside window visibility.
+`ProjectsSurface.qml` presents Overview, Actions, Agents, Preferences, and Help.
+Settings owns desktop preferences. Search's `ProjectClient.qml` observer survives
+menu closure; the workspace overview reads context only while visible and owns
+no launch queue. Capture hosts render production content but refuse registry,
+chooser, owner, and launch requests.
+
+Configured actions use the headless backend independently of the workspace
+owner. A saved argument array is inert until explicit Start. Runs retain immutable
+command snapshots and exact systemd ownership evidence. Agent task reports are
+separate from usage limits and from action execution: neither a reported finish
+nor a successful command supplies independent verification of a task.
+
+## Logic and facade decomposition
+
+Keep public facade exports stable while extracting one pure domain at a time
+into sibling modules. Add direct tests and regenerate with:
+
+```bash
+node tools/js-facade-generator.mjs --write
+node tools/js-facade-generator.mjs --check
+```
+
+For example, `MenuSearch.js` owns search and `MenuTree.js` owns traversal.
+Shared throughput graphs use `GraphLogic.js` for bounded sample history and plot
+math, `LinkGraph.qml` for presentation, and host-owned live sampling. History
+resets when the interface changes; illustrative capture names do not turn graph
+samples into invented telemetry.
+
+## Validation boundaries
+
+Use focused shell/JS/QML checks while editing, then `tools/check` for handoff.
+Generator drift, formatting, links, assets, inline docs, QML behavior, coverage,
+and runtime smoke are separate gates. `tools/check --fast` is an iteration aid.
+Host-dependent checks that are unavailable need an explicit limitation in the
+handoff; offscreen fixtures do not prove live portal, focus, or application reuse.
+
+## Further reading
+
+- [Development](development.md): source edits, checks, captures, and upstream tracking.
+- [Agent development guide](agent-development.md): automated editing and handoff.
+- [Agent interface](agent-interface.md): CLI envelopes, schemas, and recovery.
+- [Visual language](visual-language.md): design decisions and shared treatments.

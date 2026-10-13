@@ -1,47 +1,47 @@
 # Aranea documentation
 
-Aranea is a cinematic Omarchy desktop theme: obsidian surfaces, mint signal
-lines, violet depth, animated instrument panels, and thirteen distinct cyberpunk
-wallpapers. Signal Shrine is the default. The command center, Network tabs, and
-System tabs keep common actions close without filling the bar with buttons.
+Start with your task. The user guides explain the desktop; the technical
+references cover development and automation.
 
-## Choose a path
+## Install and use
 
-| If you are...                  | Start here                                          |
-| ------------------------------ | --------------------------------------------------- |
-| Learning everyday controls     | [Features](features.md) · [Workflows](workflows.md) |
-| Installing Aranea              | [Getting started](getting-started.md)               |
-| Exploring the experience       | [Features](features.md)                             |
-| Changing behavior              | [Configuration](configuration.md)                   |
-| Fixing an installation         | [Troubleshooting](troubleshooting.md)               |
-| Writing automation or an agent | [Agent interface](agent-interface.md)               |
-| Developing with an agent       | [Agent development guide](agent-development.md)     |
-| Looking for icons              | [Icon gallery](icons.md)                            |
-| Working on the project         | [Development](development.md)                       |
-| Understanding the architecture | [Architecture](architecture.md)                     |
+| I want to...                                         | Read                                  |
+| ---------------------------------------------------- | ------------------------------------- |
+| Install Aranea or change an existing installation    | [Getting started](getting-started.md) |
+| Find a control or understand a panel                 | [Features](features.md)               |
+| Set up a project, actions, or agent activity         | [Workflows](workflows.md)             |
+| Change wallpapers, schedules, fonts, or integrations | [Configuration](configuration.md)     |
+| Resolve an issue or repair an installation           | [Troubleshooting](troubleshooting.md) |
 
-## Command map
+For your first visit, install Aranea, open the command center from the spider,
+and use **Settings → Aranea** for desktop preferences. **Network** holds Network,
+VPN, and Bluetooth; **System** holds Power, Display, and Health. The full control
+map is in Features.
 
-```text
-./installer                         human-guided TUI
-scripts/install.sh                  install/update CLI
-scripts/uninstall.sh                remove integration or everything
-scripts/aranea-doctor               inspect and repair installation
-scripts/aranea-wallpaper            list, select, and schedule wallpapers
-scripts/aranea-motion               inspect or toggle animation
-scripts/aranea-settings             read or change desktop preferences
-aranea                              projects, actions, and local agent activity
-scripts/aranea-integrations         inspect or toggle integrations
-scripts/aranea-about                version and active-theme summary
-```
+## Develop and automate
 
-Agents should use the same commands with `--json` where supported. The
-[agent interface](agent-interface.md) documents the JSONL protocol and exit
-codes.
+| I want to...                                     | Read                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------- |
+| Call the public CLI or consume structured output | [Agent interface](agent-interface.md)                          |
+| Develop safely with a coding agent               | [Agent development](agent-development.md)                      |
+| Edit, test, capture, or release the project      | [Development](development.md)                                  |
+| Understand module ownership and dependencies     | [Architecture](architecture.md)                                |
+| Follow the visual system                         | [Visual language](visual-language.md)                          |
+| Browse available icons and fonts                 | [Icon gallery](icons.md) · [Bundled fonts](../fonts/README.md) |
 
-## Design vocabulary
+## Where to run commands
 
-The public visual principles are collected in [Visual language](visual-language.md).
-The implementation is organized into theme, shell, integration, and tooling
-layers; see [Architecture](architecture.md) for dependency boundaries and
-[Development](development.md) for the repository map.
+Install the project from a Git checkout with `./installer`. The `scripts/`
+helpers can be run from that checkout or from
+`~/.config/omarchy/themes/aranea/scripts/` after installation. The installed
+`aranea` command manages projects, actions, and opt-in local agent reporting.
+
+Use [Agent interface](agent-interface.md) for exact command syntax, JSON
+contracts, and exit codes. The process exit code determines whether an operation
+succeeded; a visible result or event alone is not confirmation.
+
+## Report a problem
+
+Start with [Troubleshooting](troubleshooting.md) and `scripts/aranea-doctor`.
+Include the installation profile, affected panel, and diagnostic output when
+opening a [GitHub issue](https://github.com/AraneaDev/aranea-desktop/issues).
