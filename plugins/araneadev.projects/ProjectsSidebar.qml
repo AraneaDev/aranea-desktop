@@ -41,6 +41,35 @@ ColumnLayout {
   property string highlightedId: ''
   // Project matching includes every known checkout branch and path.
   readonly property var filteredProjects: rows !== null ? rows : Navigation.rows(projects, navigation, query, frozenIds)
+  // Keep delegates keyed by exact identity so publication cannot destroy focused controls.
+  function syncRows() {
+    for (var i = 0; i < filteredProjects.length; i++) {
+      var row = filteredProjects[i]
+      var found = -1
+      for (var j = i; j < projectModel.count; j++) {
+        if (projectModel.get(j).row.id === row.id) {
+          found = j
+          break
+        }
+      }
+      if (found < 0)
+        projectModel.insert(i, {
+          row: row
+        })
+      else {
+        if (found !== i)
+          projectModel.move(found, i, 1)
+        projectModel.setProperty(i, 'row', row)
+      }
+    }
+    if (projectModel.count > filteredProjects.length)
+      projectModel.remove(filteredProjects.length, projectModel.count - filteredProjects.length)
+  }
+  onFilteredProjectsChanged: syncRows()
+  Component.onCompleted: syncRows()
+  ListModel {
+    id: projectModel
+  }
   // Focus the existing search field without moving focus during refresh.
   function focusSearch() {
     freezeOrder()
@@ -222,10 +251,12 @@ ColumnLayout {
       spacing: Style.space(4)
       Repeater {
         id: projectRows
-        model: sidebar.filteredProjects
+        model: projectModel
         Aranea.ActionButton {
           id: projectRow
-          required property var modelData
+          required property var row
+          // The keyed model updates labels in place while retaining delegate children.
+          readonly property var modelData: row
           required property int index
           Layout.fillWidth: true
           implicitHeight: Math.max(Style.space(48), rowLabels.implicitHeight + Style.space(16))
