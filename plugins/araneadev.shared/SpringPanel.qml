@@ -217,13 +217,6 @@ PanelWindow {
     return Math.round(Math.min(desired, maxHeight))
   }
 
-  // Clamps an already padded outer height to the output.
-  function cappedContentHeight(height) {
-    var desired = Math.max(root.padding * 2, Number(height) || root.padding * 2)
-    var maxHeight = root.availableCardHeight > 0 ? root.availableCardHeight : desired
-    return Math.round(Math.min(desired, maxHeight))
-  }
-
   // Desired top-left of the card in screen coordinates. For the
   // perpendicular axis (away-from-bar) we anchor to the bar window's edge
   // directly; not the anchor item's y/x; because mapToItem(barContent)
@@ -465,6 +458,12 @@ PanelWindow {
     padding: root.padding
     radius: Style.cornerRadius
     opacity: motion.opacity
+
+    CircuitFrame {
+      anchors.fill: parent
+      cornerRadius: card.radius
+      visible: card.borderTop + card.borderRight + card.borderBottom + card.borderLeft > 0
+    }
 
     // Swallow clicks on the card so they don't bubble to the dismissal
     // MouseArea behind us.

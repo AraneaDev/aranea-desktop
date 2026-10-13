@@ -1,8 +1,8 @@
 // Choice pill in the Filament style (the network dropdown's band and DNS
-// rows): a thin muted border and muted text, or, when selected, an accent
-// border, full text, a 2 px accent underline and the selected fill
+// rows): a quiet inset bezel, or, when selected, a tinted surface,
+// full text and a short illuminated underline
 // (selectedColor swaps the accent for another token, e.g. the tray's violet
-// Hidden pill). The keyboard cursor draws the same mint outline as
+// Hidden pill). The keyboard cursor draws the same corner reticle as
 // NodeDeviceRow; pointer hover never draws one, only the hover fill, and
 // only after a real pointer move (pointerGate, else the pill's own gate).
 // A busy pill breathes like a busy NodeDeviceRow marker. A pill sitting on
@@ -37,6 +37,8 @@ Item {
   property bool borderVisible: true
   // Draw the selected underline; Settings navigation uses a side marker.
   property bool underlineVisible: true
+  // Extra separation shared between the label and its inset indicator.
+  property real underlineTextGap: Style.space(3)
   // Show the centered label; Settings navigation supplies an icon-label row.
   property bool labelVisible: true
   // Label colour, preserving the shared selected and muted defaults.
@@ -119,10 +121,28 @@ Item {
   }
   Rectangle {
     // The selected fill (the chosen option).
+    id: selectedSurface
     objectName: "selectedFill"
     anchors.fill: parent
-    color: Util.alpha(pill.selectedColor, DesignTokens.selectedFill.a)
-    visible: pill.selected
+    gradient: Gradient {
+      orientation: Gradient.Horizontal
+      GradientStop {
+        position: 0
+        color: Util.alpha(pill.selectedColor, 0.16)
+      }
+      GradientStop {
+        position: 1
+        color: Util.alpha(DesignTokens.strandEnd, 0.07)
+      }
+    }
+    opacity: pill.selected ? 1 : 0
+    visible: pill.selected || opacity > 0
+    Behavior on opacity {
+      enabled: DesignTokens.motionEnabled
+      NumberAnimation {
+        duration: DesignTokens.motionEnabled ? DesignTokens.feedbackDuration : 0
+      }
+    }
   }
   Rectangle {
     // The hover fill.
@@ -131,38 +151,79 @@ Item {
     color: DesignTokens.hoverFill
     visible: pill.pointerHovered && pill.enabled
   }
-  Rectangle {
-    // The keyboard cursor outline.
+  FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
     anchors.margins: pill.cursorOutlineMargin
-    color: pill.hasCursor ? Util.alpha(DesignTokens.accent, 0.08) : "transparent"
-    border.width: pill.hasCursor ? 1 : 0
-    border.color: DesignTokens.accent
+    focused: pill.hasCursor
   }
   Rectangle {
+    id: bezel
     objectName: "pillBorder"
     visible: pill.borderVisible
     anchors.fill: parent
     color: "transparent"
     border.width: 1
-    border.color: pill.selected ? pill.selectedColor : Util.alpha(DesignTokens.foreground, 0.2)
+    border.color: Util.alpha(DesignTokens.foreground, pill.selected ? 0.18 : 0.10)
+    Behavior on border.color {
+      enabled: DesignTokens.motionEnabled
+      ColorAnimation {
+        duration: DesignTokens.motionEnabled ? DesignTokens.feedbackDuration : 0
+      }
+    }
     opacity: pill.busy ? (DesignTokens.motionEnabled ? pill.pulseOpacity : 0.7) : 1
   }
   Rectangle {
+    id: underline
     objectName: "pillUnderline"
-    anchors.left: parent.left
-    anchors.right: parent.right
+    anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
+    anchors.bottomMargin: Style.space(2) - pill.underlineTextGap / 2
+    width: pill.selected ? Math.max(Style.space(12), pill.width - Style.space(24)) : 0
     height: 2
-    color: pill.selectedColor
-    visible: pill.selected && pill.underlineVisible
+    radius: 1
+    gradient: Gradient {
+      orientation: Gradient.Horizontal
+      GradientStop {
+        position: 0
+        color: pill.selectedColor
+      }
+      GradientStop {
+        position: 1
+        color: DesignTokens.strandEnd
+      }
+    }
+    visible: pill.underlineVisible && (pill.selected || width > 0)
+    Behavior on width {
+      enabled: DesignTokens.motionEnabled
+      NumberAnimation {
+        duration: DesignTokens.motionEnabled ? DesignTokens.settleDuration : 0
+        easing.type: Easing.OutCubic
+      }
+    }
     opacity: pill.busy ? (DesignTokens.motionEnabled ? pill.pulseOpacity : 0.7) : 1
+  }
+  Connections {
+    target: MotionState
+    function onMotionEnabledChanged() {
+      if (MotionState.motionEnabled)
+        return
+      selectedSurface.opacity = Qt.binding(function () {
+        return pill.selected ? 1 : 0
+      })
+      bezel.border.color = Qt.binding(function () {
+        return Util.alpha(DesignTokens.foreground, pill.selected ? 0.18 : 0.10)
+      })
+      underline.width = Qt.binding(function () {
+        return pill.selected ? Math.max(Style.space(12), pill.width - Style.space(24)) : 0
+      })
+    }
   }
   Item {
     id: labelRow
     visible: pill.labelVisible
     anchors.centerIn: parent
+    anchors.verticalCenterOffset: pill.underlineVisible ? -pill.underlineTextGap / 2 : 0
     readonly property real glyphSpace: glyphLabel.visible ? glyphLabel.implicitWidth + Style.space(4) : 0
     implicitWidth: label.implicitWidth + glyphSpace
     implicitHeight: Math.max(label.implicitHeight, glyphLabel.implicitHeight)

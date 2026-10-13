@@ -86,6 +86,87 @@ reactivates activity under that same lock; public reports cannot reactivate it.
 If activity teardown cannot acquire its lock, uninstall reports failure instead
 of claiming state removal succeeded.
 
+## Find a control after bar consolidation
+
+VPN and Bluetooth are inside **Network** (`V` and `B`). Brightness, night light,
+keyboard light, and monitor controls are inside **System → Display** (`D`).
+Resources and issues are inside **System → Health** (`S`). Audio contains both
+output and microphone controls. A separate microphone indicator appears only
+while a capture stream is active; a separate Health shortcut appears only for
+issues or an open alert popup. Their absence is normal.
+
+The linked-node icon opens Network; the adjustment-sliders icon opens System.
+System remains available on machines without a battery. Standalone child widgets
+are retained when their host is absent. If a tab is missing after an update,
+run `scripts/aranea-doctor --fix` and restart the shell to reconcile the installed
+plugins. Desktop preferences moved to **Command center → Settings → Aranea**;
+search `aranea-settings` to reach the same window.
+
+## Resolve a Health issue
+
+Click the issue or select it with the keyboard and press Enter. The panel opens
+a terminal with diagnostics for the exact service, container, filesystem, or
+kernel update. Opening the resolver does not restart anything. Select the offered
+recovery action and confirm it; successful actions trigger another Health check.
+Disk actions inspect usage and open folders, without deleting files.
+
+An intentionally stopped container may still be reported because it has a
+nonzero recorded exit. In its resolver, choose `a` to acknowledge that stop.
+Acknowledgment matches both the container ID and its stop timestamp. Restarting
+it, replacing it, or stopping it again creates a different occurrence, so a later
+failure remains visible. A changed container state refuses an old acknowledgment.
+Memory-kill wording requires Docker's OOM evidence; exit code 137 or 143 alone
+does not establish that cause.
+
+Inspect or undo acknowledgments with the installed helper:
+
+```bash
+scripts/aranea-health-ack status
+scripts/aranea-health-ack forget container:NAME
+```
+
+Active service, disk, and reboot issues must be resolved at their source. If an
+issue remains after recovery, reopen it and inspect the fresh diagnostic output.
+See the [Health plugin](../plugins/araneadev.health/README.md) for check details.
+
+## Updates appear empty or stale
+
+The update center now checks repository packages with `checkupdates --nocolor`
+and AUR packages with `yay -Qua --color never` when yay is installed. Repository
+results include Omarchy itself; a development checkout adds its native check.
+It refreshes at shell startup, hourly, and when its panel opens. Update actions
+still use Omarchy's native updater.
+
+Read the same source results without installing packages:
+
+```bash
+scripts/aranea-update-status
+```
+
+A no-update exit is an empty successful result. Missing tools, network failures,
+or malformed output are errors: the panel shows **Check failed** and keeps its
+last valid status rather than replacing it with a false zero. Check the returned
+`error` field and the named package tool. The native updater's gcc14/gcc14-libs AUR
+exclusions are also applied here. See [Updates](../plugins/araneadev.updates/README.md).
+
+## Agents returns to the wrong provider
+
+Selecting a Usage provider saves its stable ID in the Agents inline bar entry.
+Codex stays selected across shell restarts; screenshot stand-ins never overwrite
+the real choice. Read or change that selection with:
+
+```bash
+omarchy-shell omarchy.agents selection
+omarchy-shell omarchy.agents select codex
+```
+
+`select` returns `unavailable` when the provider has not been discovered and
+`refused` during an inert capture or active showcase. A preferred provider that
+is currently unavailable falls back to a discovered provider for display while
+retaining the preference. This choice controls Usage and its bar ring; it does
+not enable task-reporting hooks. If selection still resets, update the deployed
+Agents plugin and run the doctor before restarting.
+
 ## Collect useful information
 
 For a bug report, include:

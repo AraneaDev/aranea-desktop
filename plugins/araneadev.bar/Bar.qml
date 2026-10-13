@@ -1586,24 +1586,58 @@ Item {
 
     implicitWidth: root.vertical ? root.barSize : 0
     implicitHeight: root.vertical ? 0 : root.barSize
-    // This theme's bar is a glass layer. Keep the layer itself transparent;
-    // the widget groups provide their own surfaces when requested.
+    // A transparent native layer with an obsidian instrument shelf below the widgets.
     color: "transparent"
     surfaceFormat.opaque: false
     WlrLayershell.namespace: "omarchy-bar"
     WlrLayershell.layer: WlrLayer.Top
 
     Rectangle {
-      visible: false
+      anchors.fill: parent
+      gradient: Gradient {
+        GradientStop {
+          position: 0
+          color: Util.alpha(Color.background, 0.97)
+        }
+        GradientStop {
+          position: 1
+          color: Util.alpha(Color.background, 0.78)
+        }
+      }
+    }
+
+    // The bar delegate is created in the host's monitor context.
+    // qmllint disable unqualified
+    Rectangle {
+      visible: !root.vertical
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.leftMargin: Style.space(8)
       anchors.rightMargin: Style.space(8)
       anchors.bottom: parent.bottom
       height: 1
-      color: Color.accent
-      opacity: 0.22
+      opacity: 0.26
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop {
+          position: 0
+          color: "transparent"
+        }
+        GradientStop {
+          position: 0.15
+          color: Color.accent
+        }
+        GradientStop {
+          position: 0.85
+          color: Aranea.DesignTokens.strandEnd
+        }
+        GradientStop {
+          position: 1
+          color: "transparent"
+        }
+      }
     }
+    // qmllint enable unqualified
 
     Loader {
       anchors.fill: parent

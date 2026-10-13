@@ -63,13 +63,10 @@ Column {
     width: parent.width
     implicitHeight: content.implicitHeight
 
-    Rectangle {
-      // The keyboard cursor outline.
+    Aranea.FocusFrame {
       objectName: "cursorOutline"
       anchors.fill: parent
-      color: "transparent"
-      border.width: strip.hasCursor ? 1 : 0
-      border.color: Aranea.DesignTokens.accent
+      focused: strip.hasCursor
     }
     Column {
       id: content

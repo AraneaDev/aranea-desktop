@@ -25,30 +25,25 @@ scripts/install.sh --source "$PWD" --profile minimal --yes
 scripts/install.sh --dry-run --yes
 ```
 
+The installer normally uses the public repository. Use `--source "$PWD"` to
+clone the local repository instead. Omarchy clones committed Git content, not
+uncommitted working files. The guided installer can use the same source with `ARANEA_THEME_SOURCE="$PWD" ./installer`.
+
 The selected profile is stored in `~/.local/state/aranea/profile`.
-
-## Rebrand a theme fork
-
-Edit `design/brand.toml` for visible identity text and replace
-`branding/marks/aranea-primary.svg` with the fork's source mark. Change colors
-in `design/tokens.toml`, then regenerate every projection:
-
-```bash
-scripts/generate-tokens --write
-scripts/generate-tokens --check
-```
-
-The generated mark is used by the shell and lock screen. The same source also
-produces the `unlock.png` boot logo, motif and status glyph colors, Kvantum
-artwork, and shell-readable brand values.
 
 ## Activate the theme
 
 ```bash
 omarchy theme set aranea
 scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set day
+scripts/aranea-wallpaper set signal-shrine
 ```
+
+Signal Shrine is selected first when Aranea is applied with no matching current
+background. You can choose another scene in **Command center → Settings →
+Aranea → Appearance**. An enabled daily schedule continues to select its
+scheduled wallpapers. The installer already activates Aranea; setting the theme
+again is only necessary when switching back from another theme.
 
 Apply the optional boot splash separately:
 
@@ -79,6 +74,16 @@ scripts/uninstall.sh --scope complete --replacement-theme Omarchy --yes
 The TUI presents these as separate, clearly confirmed actions.
 
 ## After installation
+
+Open the command center from the spider button. Files, Terminal, and Projects
+are the three top tiles; Apps, Actions, Software, Settings, Help, and System form
+the single-column command list. **Settings → Aranea** opens desktop
+preferences.
+
+The right bar groups connections in Network, output and microphone controls in
+Audio, and Power/Display/Health in System. Use `N`/`V`/`B` inside Network and
+`P`/`D`/`S` inside System. Health resource details open expanded; selecting an
+issue opens guided diagnostics and recovery. See [Features](features.md).
 
 Use `scripts/aranea-doctor` to inspect the installation. Use
 `scripts/aranea-doctor --fix` to repair stale hooks and plugin deployment.

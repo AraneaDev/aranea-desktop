@@ -54,8 +54,8 @@ RowLayout {
       color: header.foreground
       font.family: header.fontFamily
       font.pixelSize: header.titleSize
-      font.weight: Font.Medium
-      font.letterSpacing: header.letterSpacing
+      font.weight: Font.DemiBold
+      font.letterSpacing: header.refined ? 0.8 : header.letterSpacing
       elide: Text.ElideRight
     }
 
@@ -78,7 +78,7 @@ RowLayout {
     text: header.counts
     color: header.accent
     opacity: 0.8
-    font.family: header.fontFamily
+    font.family: header.refined ? Typography.technicalFamily : header.fontFamily
     font.pixelSize: header.subtitleSize
     font.weight: Font.Medium
     font.letterSpacing: header.letterSpacing

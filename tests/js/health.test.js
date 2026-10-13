@@ -10,6 +10,74 @@ test("health presentation owns byte formatting", () => {
   if (presentation.humanBytes(1536) !== "1.5 KB") throw new Error("byte formatting")
 })
 
+test("acknowledgments hide only named stopped-container alerts", () => {
+  const rows = [
+    { check: "container", key: "container:demo" },
+    { check: "unit", key: "unit:user:demo.service" }
+  ]
+  for (const logic of [h, presentation]) {
+    deepEq(
+      logic.filterAcknowledged(rows, ["container:demo", "unit:user:demo.service"]),
+      [rows[1]],
+      "only container alert clears"
+    )
+    deepEq(
+      logic.filterAcknowledged(rows, []),
+      rows,
+      "new or unacknowledged occurrences stay visible"
+    )
+    deepEq(logic.filterAcknowledged(rows, null), rows, "unavailable acknowledgments keep alerts")
+    deepEq(logic.filterAcknowledged(null, []), [], "missing problems remain empty")
+  }
+})
+
+test("health issue actions open the guided resolver with the exact key as one argument", () => {
+  for (const logic of [h, presentation]) {
+    deepEq(logic.resolutionArgv(null, "/resolver"), [], "missing issue cannot dispatch")
+    deepEq(
+      logic.resolutionArgv({ check: "custom" }, "/resolver"),
+      [],
+      "missing custom command cannot dispatch"
+    )
+    deepEq(
+      logic.resolutionArgv(
+        { check: "container", key: "container:app-test" },
+        "/theme/scripts/aranea-health-resolve"
+      ),
+      ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "container:app-test"],
+      "guided container resolution"
+    )
+    deepEq(
+      logic.resolutionArgv(
+        { check: "disk", key: "disk:/path with spaces" },
+        "/theme/scripts/aranea-health-resolve"
+      ),
+      ["xdg-terminal-exec", "/theme/scripts/aranea-health-resolve", "disk:/path with spaces"],
+      "disk path remains one argument"
+    )
+    deepEq(
+      logic.resolutionArgv({ check: "custom", execArgv: ["custom-helper"] }, "/resolver"),
+      ["custom-helper"],
+      "custom problem commands still work"
+    )
+  }
+})
+
+test("health resolution preserves disk and reboot actions without a terminal", () => {
+  for (const problem of [
+    { check: "disk", key: "disk:/", target: "/" },
+    { check: "reboot", key: "reboot" },
+    { check: "unit", key: "unit:user:demo.service", unit: "demo.service", scope: "user" }
+  ]) {
+    const row = Object.assign({}, problem, h.itemFor(problem, { terminal: false }))
+    deepEq(
+      presentation.resolutionArgv(row, "/resolver", false),
+      row.execArgv,
+      "native fallback for " + problem.check
+    )
+  }
+})
+
 const assert = (cond, msg) => {
   if (!cond) throw new Error(msg)
 }

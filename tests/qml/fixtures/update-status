@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Inert collector responses; state lives only inside the QML test's runtime.
+set -euo pipefail
+counter="$XDG_RUNTIME_DIR/update-status-counter"
+attempt=0
+[[ ! -f "$counter" ]] || attempt=$(cat "$counter")
+echo $((attempt + 1)) >"$counter"
+case "$attempt" in
+  0) echo '{"updates":[{"source":"system","name":"curl"},{"source":"system","name":"linux"},{"source":"aur","name":"my-app"}],"rebootRequired":false}' ;;
+  1)
+    echo '{"error":"system check unavailable"}'
+    exit 1
+    ;;
+  *) echo '{"updates":[],"rebootRequired":false}' ;;
+esac

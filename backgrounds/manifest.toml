@@ -2,7 +2,16 @@
 # See ARTWORK.md for original sources, prompts, and reproducible export commands.
 
 [[wallpapers]]
+id = "cockpit"
+label = "Neural Deck"
+path = "backgrounds/variants/cockpit.png"
+aspect = "16:9"
+contrast = "high"
+motion = false
+
+[[wallpapers]]
 id = "day"
+label = "Rain City"
 path = "backgrounds/background-day.png"
 aspect = "16:9"
 contrast = "standard"
@@ -10,6 +19,7 @@ motion = false
 
 [[wallpapers]]
 id = "night"
+label = "Silent Vault"
 path = "backgrounds/background-night.png"
 aspect = "16:9"
 contrast = "standard"
@@ -17,6 +27,7 @@ motion = false
 
 [[wallpapers]]
 id = "sparse"
+label = "Black Signal"
 path = "backgrounds/variants/sparse.png"
 aspect = "16:9"
 contrast = "standard"
@@ -24,6 +35,7 @@ motion = false
 
 [[wallpapers]]
 id = "dense"
+label = "Undercity"
 path = "backgrounds/variants/dense.png"
 aspect = "16:9"
 contrast = "standard"
@@ -31,6 +43,7 @@ motion = false
 
 [[wallpapers]]
 id = "dusk"
+label = "Dead Frequency"
 path = "backgrounds/variants/dusk.png"
 aspect = "16:9"
 contrast = "soft"
@@ -38,6 +51,7 @@ motion = false
 
 [[wallpapers]]
 id = "dawn"
+label = "First Departure"
 path = "backgrounds/variants/dawn.png"
 aspect = "16:9"
 contrast = "soft"
@@ -45,6 +59,7 @@ motion = false
 
 [[wallpapers]]
 id = "monochrome"
+label = "Ghost in the Wire"
 path = "backgrounds/variants/monochrome.png"
 aspect = "16:9"
 contrast = "high"
@@ -52,7 +67,40 @@ motion = false
 
 [[wallpapers]]
 id = "ultrawide"
+label = "Orbital Relay"
 path = "backgrounds/variants/ultrawide.png"
 aspect = "3:1"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "aranea-core"
+label = "Aranea Core"
+path = "backgrounds/variants/aranea-core.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "signal-shrine"
+label = "Signal Shrine"
+path = "backgrounds/variants/signal-shrine.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "violet-pursuit"
+label = "Violet Pursuit"
+path = "backgrounds/variants/violet-pursuit.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "deep-current"
+label = "Deep Current"
+path = "backgrounds/variants/deep-current.png"
+aspect = "16:9"
 contrast = "standard"
 motion = false

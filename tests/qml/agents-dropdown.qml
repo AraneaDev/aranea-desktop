@@ -193,7 +193,7 @@ ShellRoot {
   // Whether ITEM's keyboard outline is lit.
   function outlined(item) {
     var outline = t.findChild(item, "cursorOutline")
-    return outline !== null && outline.border.width > 0
+    return outline !== null && outline.focused
   }
 
   // Rows of the section named NAME.

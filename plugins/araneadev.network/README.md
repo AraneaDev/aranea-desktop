@@ -7,15 +7,18 @@ prompt and enterprise connect, DNS and band selection, the cursor model,
 the bar icon and IPC) and draws an Aranea view, `NetworkDropdown.qml`, in
 place of stock's.
 
-Stock's root code is kept except for four edits: the caption fade animates
-`captionOpacity` instead of stock's caption Text, `updateDetails` ends by
-recording a Link graph sample, `keyCatcher` names the frame's key catcher
-so stock's prompt-close focus hand-back still resolves, and `setDns`
-leaves the dropdown open on a DNS provider pick instead of closing it
-immediately (stock's own behaviour). Stock's per-row NetworkManager hooks
-(connect failures, completion checks) and the 2 s "Wrong password" timer
-moved from the stock row to the root, and the prompt's submit moved there
-too.
+Network now owns one popup with **Network**, **VPN**, and **Bluetooth** tabs.
+The existing child controllers load in embedded mode and retain their connection
+logic, IPC, and pure views. Their own bar buttons and windows are suppressed.
+Legacy open routes select the host tab; close routes close the shared popup.
+`N`, `V`, and `B` switch tabs, while hosted Bluetooth uses `T` for its power
+switch. Tab selection itself never changes Bluetooth hardware state. Polling,
+scan handover, stale credential prompts, and keyboard focus follow the selected
+page. Standalone child widgets remain available when Network is absent.
+
+The existing caption fade, Link graph sampler, prompt focus hand-back,
+NetworkManager completion/failure hooks, and password error timer remain in the
+controller. DNS picks settle in the open panel rather than closing it.
 
 Picking a DNS provider (DHCP, Cloudflare, Google) shows it chosen and
 pulsing busy at once (`pendingDnsProvider` / `selectedDnsProvider`, as the
@@ -57,10 +60,9 @@ The extras, all hidden when they have nothing to show:
   against the same poll's `ip -j -4 -br addr` output (`VpnApps.appState`).
   The `showcase` stand-ins relabel it too. Showing or hiding it moves
   every section below, so clicks there settle for 300 ms after it does
-  (see `araneadev.shared`'s `ClickSettle.js`). Pointer-only: clicking it closes
-  this dropdown and opens `araneadev.vpn`'s
-  (`bar.shell.summon("araneadev.vpn")`), which owns every other VPN
-  behaviour (connect/disconnect, sessions, uptimes, traffic).
+  (see `araneadev.shared`'s `ClickSettle.js`). Clicking it selects the VPN page
+  within this popup; `v` offers the keyboard path. The existing VPN controller
+  owns connect/disconnect, sessions, uptimes, and traffic.
 - **Saved forget:** `nmcli connection delete uuid <uuid>`; the row breathes
   and reads "Forgetting…" until the next extras read that started after
   the delete finished. A failed delete reads "Couldn't forget" in the
@@ -120,6 +122,20 @@ need nothing from this plugin.
 
 ## View sections
 
+Network, VPN and Bluetooth share one popup through `NetworkTabs`. The VPN page reuses
+the existing VPN controller, profile rows, session graphs, and password/2FA
+prompt. The Bluetooth page reuses discovery, pairing, connect/disconnect,
+forget, audio hand-off, and keyed device navigation from its existing controller.
+`n` selects Network, `v` selects VPN, and `b` selects Bluetooth when a credential
+field does not own input. On Bluetooth, `t` toggles power; `b` always selects
+the page. Legacy `aranea.vpn` IPC opens the VPN page, and `omarchy.bluetooth` IPC opens
+the Bluetooth page. Optional controllers that are absent leave Network usable. The Network bar
+icon gains a small mint marker while a VPN is connected; its VPN tab shows
+the connected count. Closing the popup or leaving VPN clears unsubmitted
+credentials. Cancelling or submitting its prompt restores focus to Network.
+Leaving Bluetooth stops its discovery lifecycle and clears queued device actions;
+its standalone popup remains available when used outside Network.
+
 Pure views for the Aranea dropdown (assembled by `NetworkDropdown`): plain
 properties in, signals out, no panel state. Hover reaches the host only
 through the `pointerGate` each section receives.
@@ -144,5 +160,5 @@ through the `pointerGate` each section receives.
 ## Validation
 
 Run `node --test tests/js/network-logic.test.js`,
-`tests/qml-behaviour.test.sh network-sections network-dropdown` and `tools/check-docs
+`tests/qml-behaviour.test.sh network-sections network-dropdown network-tabs bluetooth-embedded` and `tools/check-docs
 --root . plugins/araneadev.network/Panel.qml`.

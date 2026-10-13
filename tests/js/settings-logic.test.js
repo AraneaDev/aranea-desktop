@@ -350,3 +350,85 @@ test("font selection uses installed roles and exact argv, defaults and owner rea
   )
   assert.equal(logic.outcome("configure fonts", ["", ""], state, true), "Save not confirmed")
 })
+
+test("daily entries accept one and many rows, sort without mutating and reject row errors", () => {
+  const catalog = [
+    { id: "day", available: true },
+    { id: "night", available: true },
+    { id: "missing", available: false }
+  ]
+  assert.equal(
+    logic.validateScheduleEntries([{ time: "00:00", wallpaper: "day" }], catalog).ok,
+    true
+  )
+  const entries = ["23:59", "06:00", "12:00", "00:00", "18:00"].map((time) => ({
+    time,
+    wallpaper: "day"
+  }))
+  assert.equal(logic.validateScheduleEntries(entries, catalog).ok, true)
+  assert.deepEqual(
+    logic.normalizeScheduleEntries(entries).map((e) => e.time),
+    ["00:00", "06:00", "12:00", "18:00", "23:59"]
+  )
+  assert.equal(entries[0].time, "23:59")
+  for (const rows of [
+    [],
+    [{ time: "24:00", wallpaper: "day" }],
+    [{ time: "6:00", wallpaper: "day" }],
+    [{ time: "06:00", wallpaper: "missing" }],
+    [{ time: "06:00", wallpaper: "unknown" }],
+    [
+      { time: "06:00", wallpaper: "day" },
+      { time: "06:00", wallpaper: "night" }
+    ]
+  ]) {
+    const result = logic.validateScheduleEntries(rows, catalog)
+    assert.equal(result.ok, false)
+    assert.ok(result.message)
+  }
+})
+test("entry commands preserve literal JSON and confirmation compares normalized owner entries", () => {
+  const entries = [
+    { time: "20:00", wallpaper: "night" },
+    { time: "08:00", wallpaper: "day" }
+  ]
+  const payload = JSON.stringify(entries)
+  const state = {
+    schedule: {
+      availability: "available",
+      enabled: false,
+      applied: false,
+      entries: entries.slice().reverse()
+    },
+    wallpapersAvailability: "available",
+    wallpapers: [
+      { id: "day", available: true },
+      { id: "night", available: true }
+    ]
+  }
+  assert.deepEqual(logic.command("/adapter", "configure schedule", [payload], state), [
+    "/adapter",
+    "configure",
+    "schedule",
+    "--entries",
+    payload,
+    "--json"
+  ])
+  assert.equal(logic.outcome("configure schedule", [payload], state, true), "Saved")
+  state.schedule.entries[0] = { time: "08:00", wallpaper: "night" }
+  assert.equal(logic.outcome("configure schedule", [payload], state, true), "Save not confirmed")
+  assert.equal(logic.command("/adapter", "configure schedule", ["{bad"], state), null)
+  state.wallpapersAvailability = "unavailable"
+  assert.equal(logic.command("/adapter", "configure schedule", [payload], state), null)
+})
+test("legacy phase fixtures convert to stable image entries", () => {
+  assert.deepEqual(
+    logic.scheduleEntries({ dawn: "06:00", day: "08:00", dusk: "18:00", night: "20:00" }),
+    [
+      { time: "06:00", wallpaper: "dawn" },
+      { time: "08:00", wallpaper: "day" },
+      { time: "18:00", wallpaper: "dusk" },
+      { time: "20:00", wallpaper: "night" }
+    ]
+  )
+})

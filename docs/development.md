@@ -27,25 +27,17 @@ Run the repository quality gates:
 tools/check
 ```
 
-### Design tokens and branding
+### Design tokens
 
 Edit `design/tokens.toml` to change the shared palette, shell surfaces,
 spacing, typography, or motion defaults. Regenerate the committed projections
-with `scripts/generate-tokens --write`. Edit `design/brand.toml` for visible
-identity strings and replace `branding/marks/aranea-primary.svg` for the source
-mark. The generator color-projects that source into the runtime
-`branding/brand.svg`, the `unlock.png` boot logo, the motif/status glyph
-family, the Kvantum splash artwork, and `branding/brand.env` for shell
-scripts. The source templates for those projections live under
-`design/templates/assets/branding/`; edit the templates only when changing the
-shape or semantic role of an asset.
-Platform projections are templated in
-`design/templates/`, and `scripts/generate-tokens --check` is the drift check
-used by the token contract test.
+with `scripts/generate-tokens --write`. Aranea's identity and canonical spider
+mark are fixed in the generator. The outputs include the runtime mark, boot
+logo, motif/status glyphs, platform styles, and shared QML values.
 
-The source SVG and both TOML files are the customization surface. Generated
-files, including `branding/brand.svg` and `unlock.png`, must not be edited
-directly. `rsvg-convert` is required when regenerating the raster outputs.
+Platform projections are templated in `design/templates/`.
+`scripts/generate-tokens --check` detects drift. Generated files must not be
+edited directly; `rsvg-convert` is required to regenerate raster outputs.
 
 The GTK stylesheet and cursor families have explicit tokenized templates under
 `design/templates/gtk.css.in` and `design/templates/assets/`. The generator
@@ -61,7 +53,7 @@ runtime checks require the Omarchy tooling available on the development host.
 ### Shared QML components
 
 Use `plugins/araneadev.shared` for visual and input contracts that are
-identical across plugins: `SurfaceCard`, `PanelHeader`, `StatusRail`,
+identical across plugins: `SurfaceCard`, `StatusRail`,
 `StatusTextPair`, `StatusRow`, `BrandHeader`, `KeyboardInputFrame`,
 `KeyboardPanelFrame`, `EmptyState`, and `InkText`. `KeyboardInputFrame` owns
 only key forwarding; `KeyboardPanelFrame` adds the layer-shell panel.
@@ -122,11 +114,41 @@ composition root instead of reaching into root-only ids.
 ## Showcase captures
 
 The README is a visual showcase as well as a project introduction. Refresh
-captures with:
+captures from the intentionally empty workspace 2 with:
 
 ```bash
+omarchy-shell omarchy.agents select codex
 scripts/capture-screenshots --all --output screenshots
 ```
+
+The batch keeps workspace 2 selected and rechecks it immediately before each
+screen grab. VPN and Bluetooth are captured as Network tabs; Display and Health
+are captured as System tabs. Settings previews select Signal Shrine, and the
+Agents fixture selects Codex without changing the user's real provider choice.
+The first command explicitly saves Codex as the real bar provider too, so shell
+restarts cannot return its ring to Claude. Omit or change that command when
+capturing a different provider. Health waits for live CPU history before capture.
+The batch parks and restores the real notification inbox and returns to workspace
+1 when finished; notifications arriving during the capture are not retained.
+
+`settings-schedule` captures the daily time/image editor.
+
+The public batch captures 38 surfaces and builds a 32-frame 1280×720 hero GIF.
+Eight additional search-state PNGs are inert diagnostics, regenerated separately:
+
+```bash
+for state in mixed no-match no-compositor vanished actions action-pending action-error action-long-label; do
+  scripts/capture-screenshots --surface "menu-search-$state" --output screenshots
+done
+scripts/capture-screenshots --hero --output screenshots
+```
+
+`--hero` only rebuilds the GIF from existing stills. A failed surface retains its
+previous PNG, reports failure, and prevents a batch GIF rebuild. The workspace
+overview uses a production-content fixture over Signal Shrine in a 16:9 frame,
+without reading live repositories or dispatching workspace actions. Polkit
+launches a harmless `/usr/bin/true` authentication request through the graphical
+session and cancels it without typing a password. Wi-Fi QR codes are excluded.
 
 Lock and Plymouth are rendered rather than grabbed from the screen, so the
 capture workflow never locks the active session or reboots the machine:
@@ -151,7 +173,7 @@ when the dropdown closes. The Audio capture works the same way: its
 `showcase` method takes stand-in output, input and app labels and a made-up
 track with a position (so the progress strand shows), and the transport
 controls are refused while it is shown. The Agents capture hands its
-`showcase` method stand-in agents (Claude Code, Codex and Fireworks with
+`showcase` method stand-in agents (Codex, Claude Code and Fireworks with
 made-up plans, limits, days, models and a prepaid balance), and refresh and
 the agent picker are refused while they are shown. If the dropdown doesn't answer `ok`
 (for example, the stock panel is active), that surface fails and no
@@ -164,11 +186,11 @@ screenshot is written. These variables override the defaults:
 | `ARANEA_NETWORK_GRAPH_DELAY`     | `20`: seconds the link graph records before the grab           |
 | `ARANEA_BLUETOOTH_SCAN_DELAY`    | `3`: extra seconds for the scan to find devices                |
 | `ARANEA_CAPTURE_AUDIO_SHOWCASE`  | JSON `{outputs, inputs, apps, track}` (`Studio Monitors`, ...) |
-| `ARANEA_CAPTURE_AGENTS_SHOWCASE` | JSON `{agents: [...]}` (`Claude Code`, `Codex`, `Fireworks`)   |
+| `ARANEA_CAPTURE_AGENTS_SHOWCASE` | JSON `{agents: [...]}` (`Codex`, `Claude Code`, `Fireworks`)   |
 
 ## Tracking upstream
 
-Eight plugins are forks of Omarchy's first-party shell plugins (their
+Plugins with `omarchy.clonedFrom` are forks of Omarchy's first-party shell plugins (their
 manifests set `omarchy.clonedFrom`), and every plugin depends on Omarchy's
 shell modules. `.omarchy-version` pins the Omarchy release they were last
 brought up to date with. `tools/upstream-drift` reports what changed upstream

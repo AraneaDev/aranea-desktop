@@ -36,12 +36,6 @@ Row {
   // Emitted when the pointer really moves onto pill INDEX.
   signal pillHovered(int index)
 
-  // The pill at INDEX, or null when out of range (for tests and a host
-  // that needs its geometry).
-  function pillAt(index) {
-    return repeater.itemAt(index)
-  }
-
   visible: (section.agents || []).length > 1
   spacing: Style.space(8)
 

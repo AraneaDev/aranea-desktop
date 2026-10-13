@@ -187,7 +187,7 @@ ShellRoot {
         pointer.mouseMove(lit, 64, lit.height / 2)
       }], [60, function () {
         t.check(shows(lit, "hoverFill"), "a real move onto a row draws its hover fill")
-        t.check(t.findChild(lit, "cursorOutline").border.width === 0, "hover never draws the outline")
+        t.check(!t.findChild(lit, "cursorOutline").focused, "hover never draws the outline")
         realMove(chosen, 60, chosen.height / 2)
       }], [60, function () {
         t.check(shows(chosen, "hoverFill") && !shows(lit, "hoverFill"), "moving on lights the next row and drops the last")
@@ -209,7 +209,7 @@ ShellRoot {
         realMove(plainPill, plainPill.width / 2, plainPill.height / 2)
       }], [60, function () {
         t.check(shows(plainPill, "hoverFill") && !shows(pickedPill, "hoverFill"), "a real move onto a pill draws its hover fill")
-        t.check(t.findChild(plainPill, "cursorOutline").border.width === 0, "and never its outline")
+        t.check(!t.findChild(plainPill, "cursorOutline").focused, "and never its outline")
         pointer.mouseMove(lone, lone.width / 2, lone.height / 2)
       }], [60, function () {
         t.check(!shows(lone, "hoverFill") && !shows(plainPill, "hoverFill"), "entering a switch lights nothing until the pointer moves on it")

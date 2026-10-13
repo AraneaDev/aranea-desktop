@@ -207,6 +207,16 @@ ShellRoot {
     t.check(entry.opened, 'capture restores previously opened surface')
     t.equal(surface.captureSnapshot(), uiBefore, 'capture restores gallery, dirty drafts and scroll state')
     t.equal(entry.controller.state, original, 'capture restores owner observation')
+    var scheduleCaptureSnapshot = entry.captureSnapshot()
+    t.equal(entry.captureBegin(JSON.stringify({
+      section: 'schedule',
+      snapshot: scheduleCaptureSnapshot,
+      fixture: {
+        state: sample
+      }
+    })), 'ok', 'capture accepts daily schedule destination')
+    t.equal(entry.section, 'schedule', 'capture routes daily schedule explicitly')
+    t.equal(entry.captureRestore(scheduleCaptureSnapshot), 'ok', 'schedule capture restores prior state')
     t.equal(entry.captureBegin('{"section":"unknown","fixture":{"state":{}}}'), 'invalid', 'invalid destination cannot change owner')
     var displayPage = pageWith(surface, 'setScaleDraft')
     displayPage.setScaleDraft('2.5')

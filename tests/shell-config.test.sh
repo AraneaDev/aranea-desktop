@@ -613,66 +613,26 @@ jq -e '.bar.layout.right == ["araneadev.power"]' "$power_real" >/dev/null || {
   exit 1
 }
 
-# --- VPN bar entry: not a clone (no stock id to retarget), inserted right
-# after the network entry only once its own manifest is installed (guard:
-# $(dirname "$config_file")/plugins/araneadev.vpn/manifest.json), and only
-# once (a placed marker, parked by release like the health icon's)
+# VPN lives inside Aranea Network; an old separate bar entry is migrated away.
 vmarker="$state_root/vpn-widget-placed"
 vparked="$state_root/vpn-widget-parked"
 rm -f "$vmarker" "$vparked"
+mkdir -p "$(dirname "$config")/plugins/araneadev.vpn"
+: >"$(dirname "$config")/plugins/araneadev.vpn/manifest.json"
 cat >"$config" <<'EOF'
-{"bar": {"layout": {"right": ["omarchy.network", {"id": "omarchy.tray"}]}}}
+{"bar": {"layout": {"right": ["omarchy.network", {"id": "araneadev.vpn"}, {"id": "omarchy.tray"}]}}}
 EOF
 "$repo_root/scripts/repair-shell-config" "$config"
 jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "omarchy.tray"]' "$config" >/dev/null || {
   cat "$config"
   exit 1
 }
-mkdir -p "$(dirname "$config")/plugins/araneadev.vpn"
-: >"$(dirname "$config")/plugins/araneadev.vpn/manifest.json"
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "araneadev.vpn", "omarchy.tray"]' "$config" >/dev/null || {
-  cat "$config"
-  exit 1
-}
-# Not duplicated on a second repair.
-"$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end) | select(. == "araneadev.vpn")] | length == 1' "$config" >/dev/null || {
-  cat "$config"
-  exit 1
-}
-# release removes it.
-"$repo_root/scripts/release-shell-config" "$config"
-jq -e '[.bar.layout.right[]? | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
-  cat "$config"
-  exit 1
-}
-test -f "$vmarker"
-# It was in the bar: release parks it, and the return (the plugin deployed
-# again) puts it back once.
-test -f "$vparked"
-"$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] == ["araneadev.network", "araneadev.vpn", "omarchy.tray"]' "$config" >/dev/null || {
-  cat "$config"
-  exit 1
-}
-test ! -e "$vparked"
-test -f "$vmarker"
-# Removed by the user while on Aranea: a repair leaves it out.
-jq '.bar.layout.right |= map(select((if type == "string" then . else .id end) != "araneadev.vpn"))' "$config" >"$config.tmp" && mv "$config.tmp" "$config"
-"$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
-  cat "$config"
-  exit 1
-}
-# Leaving parks nothing, and returning adds nothing.
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null
 "$repo_root/scripts/release-shell-config" "$config"
 test ! -e "$vparked"
 "$repo_root/scripts/repair-shell-config" "$config"
-jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null || {
-  cat "$config"
-  exit 1
-}
+jq -e '[.bar.layout.right[] | (if type == "string" then . else .id end)] | index("araneadev.vpn") == null' "$config" >/dev/null
 
 # Inserted after omarchy.network when the Aranea network clone is not
 # installed (a separate dir, so network_installed stays false there).

@@ -74,14 +74,11 @@ Item {
   onBusyChanged: if (!link.busy)
     link.pulseOpacity = 1
 
-  Rectangle {
-    // The keyboard cursor outline.
+  Aranea.FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
     anchors.margins: -Style.space(3)
-    color: link.hasCursor ? Util.alpha(Aranea.DesignTokens.accent, 0.08) : "transparent"
-    border.width: link.hasCursor ? 1 : 0
-    border.color: Aranea.DesignTokens.accent
+    focused: link.hasCursor
   }
   Text {
     id: label

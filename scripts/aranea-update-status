@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Read-only package checks for the update center; installation stays native.
+# Usage: scripts/aranea-update-status
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+export LC_ALL=C
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+: >"$scratch/updates"
+: >"$scratch/errors"
+# A private temporary pacman database avoids races with native update checks.
+export CHECKUPDATES_DB="$scratch/pacman"
+
+# Record one unavailable source instead of reporting a clean empty result.
+source_failed() {
+  printf '%s check unavailable\n' "$1" >>"$scratch/errors"
+}
+
+# Package tools print NAME OLD -> NEW; their no-update exit codes differ.
+check_packages() {
+  local source="$1" empty_code="$2" rc=0
+  shift 2
+  timeout 60 "$@" >"$scratch/$source.out" 2>"$scratch/$source.err" || rc=$?
+  if ((rc != 0)); then
+    if ((rc == empty_code)) && [[ ! -s "$scratch/$source.out" && ! -s "$scratch/$source.err" ]]; then
+      return
+    fi
+    source_failed "$source"
+    return
+  fi
+  if ! jq -Rn --arg source "$source" '
+    [inputs | select(length > 0)
+      | capture("^(?<name>\\S+)\\s+(?<current>\\S+)\\s+->\\s+(?<latest>\\S+)$")
+      | . + {source:$source}]
+    | .[]' "$scratch/$source.out" >"$scratch/$source.rows"; then
+    source_failed "$source"
+    return
+  fi
+  # capture() drops nonmatching inputs, so verify every nonempty row parsed.
+  local input_count output_count
+  input_count=$(awk 'NF {n++} END {print n+0}' "$scratch/$source.out")
+  output_count=$(jq -s 'length' "$scratch/$source.rows")
+  if ((input_count != output_count)); then
+    source_failed "$source"
+    return
+  fi
+  if [[ "$source" == aur ]]; then
+    # Match the native updater's intentionally excluded legacy compilers.
+    jq 'select(.name != "gcc14" and .name != "gcc14-libs")' "$scratch/$source.rows" >>"$scratch/updates"
+  else
+    cat "$scratch/$source.rows" >>"$scratch/updates"
+  fi
+}
+
+check_packages system 2 checkupdates --nocolor
+if command -v yay >/dev/null 2>&1; then
+  check_packages aur 1 yay -Qua --color never
+fi
+
+# Repository checks already include the Omarchy package. Retain the native
+# check only for an active development checkout, avoiding duplicate counts.
+if [[ -n ${OMARCHY_PATH:-} && "$OMARCHY_PATH" != /usr/share/omarchy ]]; then
+  dev_rc=0
+  timeout 30 omarchy-update-available >"$scratch/dev.out" 2>"$scratch/dev.err" || dev_rc=$?
+  if ((dev_rc == 0)); then
+    while IFS= read -r line; do
+      if [[ "$line" == omarchy-dev-checkout\ * ]]; then
+        jq -cn --arg detail "$line" '{source:"omarchy",name:"Omarchy checkout",detail:$detail}' >>"$scratch/updates"
+      fi
+    done <"$scratch/dev.out"
+  elif ((dev_rc != 1)) || [[ "$(cat "$scratch/dev.out")" != 'Omarchy is up to date' || -s "$scratch/dev.err" ]]; then
+    source_failed omarchy
+  fi
+fi
+
+reboot=false
+[[ ! -f "$(xdg_state_home)/omarchy/reboot-required" ]] || reboot=true
+jq -cn --slurpfile updates "$scratch/updates" --rawfile errors "$scratch/errors" --argjson reboot "$reboot" \
+  '{updates:$updates,rebootRequired:$reboot} + (if $errors == "" then {} else {error:($errors | rtrimstr("\n"))} end)'
+[[ ! -s "$scratch/errors" ]]

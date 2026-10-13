@@ -4,6 +4,18 @@ Aranea’s icon integration uses a compact solid glyph language with the same
 mint signal color as the Command Center. Unsupported long-tail icons inherit
 from the host theme instead of being replaced with inconsistent approximations.
 
+## Grouped bar controls
+
+The Network icon is a linked-node hub for Network, VPN, and Bluetooth. System
+uses adjustment sliders for Power, Display, and Health, with a small battery cue
+and optional percentage. Their tooltips name the contained controls. Both are
+shared vector artwork in `plugins/araneadev.shared/BarGroupIcon.qml`, separate
+from the freedesktop icon theme and Nerd Font glyphs.
+
+The microphone badge is conditional on active recording/capture streams; the
+Health shortcut is conditional on open issues or its visible alert popup. These
+are status cues rather than permanent extra navigation buttons.
+
 ## Families
 
 The shipped gallery is organized into these freedesktop icon families:

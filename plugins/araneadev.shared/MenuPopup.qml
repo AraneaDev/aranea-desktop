@@ -178,14 +178,10 @@ Aranea.SurfaceCard {
             active: menu.interactive(row.index)
             pointerGate: menu.pointerGate
           }
-          Rectangle {
+          FocusFrame {
             objectName: 'cursorOutline'
             anchors.fill: parent
-            visible: menu.cursor === row.index && menu.interactive(row.index)
-            color: 'transparent'
-            border.width: Aranea.DesignTokens.borderWidth
-            border.color: Aranea.DesignTokens.accent
-            radius: Aranea.DesignTokens.cornerRadius
+            focused: menu.cursor === row.index && menu.interactive(row.index)
           }
           Rectangle {
             visible: row.modelData.kind === 'separator'

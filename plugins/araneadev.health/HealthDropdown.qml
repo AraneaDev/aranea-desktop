@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
 import "HealthLogic.js" as HealthLogic
+import "HealthSummaryLogic.js" as SummaryLogic
 
 Item {
   id: root
@@ -25,7 +26,7 @@ Item {
   // Whether the keyboard outline is currently shown.
   property bool keyboardCursor: false
   // Host-owned Resource details expansion state.
-  property bool resourcesExpanded: false
+  property bool resourcesExpanded: true
   // Host-owned Processes expansion state.
   property bool processesExpanded: false
   // Attention foreground token.
@@ -44,7 +45,7 @@ Item {
   // Host-owned content budget excludes the popup's padding and borders.
   property real maxContentHeight: Infinity
   // Fixed identity, decision and hint budget, including section spacing.
-  readonly property real fixedContentHeight: header.implicitHeight + decision.implicitHeight + keyHint.implicitHeight + Style.space(16) * 3
+  readonly property real fixedContentHeight: header.implicitHeight + (decision.visible ? decision.implicitHeight : 0) + keyHint.implicitHeight + Style.space(12) * (decision.visible ? 3 : 2)
   // Height left for problems, compact resources and optional details.
   readonly property real maxScrollHeight: Math.max(0, root.maxContentHeight - root.fixedContentHeight)
   // The capped body viewport, used by the host to reset scroll on close.
@@ -102,7 +103,7 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
-    spacing: Style.space(16)
+    spacing: Style.space(12)
     onImplicitHeightChanged: problemsSection.noteLayoutChange()
 
     Aranea.DropdownHeader {
@@ -115,13 +116,19 @@ Item {
       caption: root.metrics && root.metrics.uptime ? root.metrics.uptime : ""
     }
 
-    HealthSummary {
+    Text {
       id: decision
+      objectName: "healthDecision"
       Layout.fillWidth: true
-      available: root.available
-      status: root.status
-      problems: root.problems
-      showResources: false
+      visible: root.problems.length === 0
+      text: SummaryLogic.summaryFor(root.available, root.status, root.problems).label
+      color: root.statusColor
+      // Host font tokens are dynamic QObject properties.
+      // qmllint disable missing-property
+      font.family: Aranea.Typography.uiFamily
+      font.pixelSize: Style.font.caption
+      // qmllint enable missing-property
+      elide: Text.ElideRight
     }
 
     Flickable {
@@ -143,7 +150,7 @@ Item {
       ColumnLayout {
         id: bodyContent
         width: bodyScroll.width
-        spacing: Style.space(16)
+        spacing: Style.space(12)
         onImplicitHeightChanged: {
           problemsSection.noteLayoutChange()
           Qt.callLater(root.ensureCursorVisible)
@@ -164,6 +171,7 @@ Item {
 
         HealthSummary {
           Layout.fillWidth: true
+          visible: !root.resourcesExpanded
           available: root.available
           metrics: root.metrics
           showHealth: false

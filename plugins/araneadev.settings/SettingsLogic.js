@@ -1,6 +1,6 @@
 /** @typedef {{configured?:string|null,applied?:string|null,availability?:string,application?:string}} MotionState */
 /** @typedef {{activeId?:string|null,availability?:string}} WallpaperState */
-/** @typedef {{enabled?:boolean|null,applied?:boolean|null,availability?:string,dawn?:string|null,day?:string|null,dusk?:string|null,night?:string|null}} ScheduleState */
+/** @typedef {{enabled?:boolean|null,applied?:boolean|null,availability?:string,entries?:Array<{time:string,wallpaper:string}>,dawn?:string|null,day?:string|null,dusk?:string|null,night?:string|null}} ScheduleState */
 /** @typedef {{id:string,status?:string,availability?:string}} IntegrationState */
 /** @typedef {{id:string,label?:string,path?:string,available:boolean}} WallpaperAsset */
 /** @typedef {{monitor?:string|null,scale?:number|null,width?:number|null,height?:number|null,availability?:string,persistenceSupport?:string,configuredScale?:number|null}} DisplayState */
@@ -62,6 +62,89 @@ function validateSchedule(times) {
     previous = minute
   }
   return { ok: true, message: "" }
+}
+/** Copy daily entries into chronological order without mutating the draft.
+ * @param {Array<{time:string,wallpaper:string}>} entries Daily entries.
+ * @returns {Array<{time:string,wallpaper:string}>} Ordered entries.
+ */
+function normalizeScheduleEntries(entries) {
+  return entries
+    .map(function (entry) {
+      return { time: entry.time, wallpaper: entry.wallpaper }
+    })
+    .sort(function (a, b) {
+      return a.time < b.time ? -1 : a.time > b.time ? 1 : 0
+    })
+}
+/** Read current entries, including compatible legacy phase snapshots.
+ * @param {ScheduleState} schedule Owner state.
+ * @returns {Array<{time:string,wallpaper:string}>} Editable entries.
+ */
+function scheduleEntries(schedule) {
+  if (Array.isArray(schedule.entries)) return normalizeScheduleEntries(schedule.entries)
+  /** @type {Array<"dawn"|"day"|"dusk"|"night">} */
+  var phases = ["dawn", "day", "dusk", "night"]
+  return phases
+    .filter(function (phase) {
+      return typeof schedule[phase] === "string"
+    })
+    .map(function (phase) {
+      return { time: schedule[phase], wallpaper: phase }
+    })
+}
+/** Validate every row against available catalog assets and unique clock times.
+ * @param {Array<{time:string,wallpaper:string}>} entries Daily entries.
+ * @param {Array<WallpaperAsset>} catalog Registered images.
+ * @returns {{ok:boolean,message:string,errors:Array<string>}} Validation and row messages.
+ */
+function validateScheduleEntries(entries, catalog) {
+  if (!Array.isArray(entries) || entries.length === 0)
+    return { ok: false, message: "Add at least one daily entry.", errors: [] }
+  var errors = entries.map(function (entry, index) {
+    if (
+      !entry ||
+      typeof entry.time !== "string" ||
+      !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(entry.time)
+    )
+      return "Use HH:MM with a valid 24-hour time."
+    if (
+      entries.some(function (other, otherIndex) {
+        return other && otherIndex !== index && other.time === entry.time
+      })
+    )
+      return "Choose a different time; each daily time must be unique."
+    if (
+      !(catalog || []).some(function (asset) {
+        return asset.id === entry.wallpaper && asset.available === true
+      })
+    )
+      return "Choose an available wallpaper."
+    return ""
+  })
+  var message =
+    errors.filter(function (error) {
+      return !!error
+    })[0] || ""
+  return { ok: !message, message: message, errors: errors }
+}
+/** Decode a schedule submission without evaluating arbitrary text.
+ * @param {Array<string>} args Mutation arguments.
+ * @returns {Array<{time:string,wallpaper:string}>|null} Daily submission.
+ */
+function submittedScheduleEntries(args) {
+  if (!args || args.length !== 1 || typeof args[0] !== "string") return null
+  try {
+    var entries = JSON.parse(args[0])
+    return Array.isArray(entries) &&
+      entries.length > 0 &&
+      entries.every(function (entry) {
+        return entry && typeof entry.time === "string" && typeof entry.wallpaper === "string"
+      })
+      ? normalizeScheduleEntries(entries)
+      : null
+  } catch (e) {
+    return null
+  }
 }
 /** Validate a typed custom scale without trimming or normalizing the request.
  * @param {string} value Typed scale.
@@ -151,6 +234,15 @@ function command(path, operation, args, state) {
   } else if (section === "schedule" || section === "motion") {
     if (!state[section] || state[section].availability !== "available") return null
     if (operation === "configure schedule") {
+      if (args.length === 1) {
+        var entries = submittedScheduleEntries(args)
+        if (
+          state.wallpapersAvailability !== "available" ||
+          !validateScheduleEntries(entries, state.wallpapers).ok
+        )
+          return null
+        return [path, "configure", "schedule", "--entries", args[0], "--json"]
+      }
       if (!validateSchedule(args).ok) return null
     } else if (
       operation !== "set " + section ||
@@ -278,7 +370,11 @@ function outcome(operation, args, state, succeeded, result) {
   }
   var schedule = state.schedule || {}
   if (operation === "configure schedule") {
-    if (
+    if (args.length === 1) {
+      var submitted = submittedScheduleEntries(args)
+      if (!submitted || JSON.stringify(scheduleEntries(schedule)) !== JSON.stringify(submitted))
+        return "Save not confirmed"
+    } else if (
       JSON.stringify([schedule.dawn, schedule.day, schedule.dusk, schedule.night]) !==
       JSON.stringify(args)
     )
@@ -311,6 +407,10 @@ if (typeof module !== "undefined")
     normalizeProjectId: normalizeProjectId,
     normalizeFolder: normalizeFolder,
     validateSchedule: validateSchedule,
+    normalizeScheduleEntries: normalizeScheduleEntries,
+    scheduleEntries: scheduleEntries,
+    validateScheduleEntries: validateScheduleEntries,
+    submittedScheduleEntries: submittedScheduleEntries,
     validateScale: validateScale,
     acceptRead: acceptRead,
     command: command,

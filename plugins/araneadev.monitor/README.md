@@ -7,6 +7,13 @@ display toggle with its last-display guard, scale, text size with its reflow
 guard, the bar wheel accumulator and the 5 s refresh while open) and draws it
 with `DisplaysDropdown` inside the shared `KeyboardPanelFrame`.
 
+In the consolidated bar this controller is embedded in Battery/System's
+**Display** page. `omarchy.monitor` open/show/toggle still selects that page;
+brightness and state IPC retain their existing actions. The controller can
+also render its own standalone dropdown when used as an independent widget.
+Embedded mode owns no separate popup or bar icon and forwards cursor resets
+and keyboard actions to the hosted view.
+
 Added to stock:
 
 - **Night light:** `omarchy-toggle-nightlight --status` on open and every

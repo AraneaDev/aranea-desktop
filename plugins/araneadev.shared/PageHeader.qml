@@ -11,11 +11,11 @@ ColumnLayout {
   property string title: ''
   // Brief explanation below the title.
   property string description: ''
-  spacing: Style.space(4)
+  spacing: Style.space(6)
   UiLabel {
     Layout.fillWidth: true
     text: header.title
-    font.pixelSize: Style.font.heading
+    font.pixelSize: Math.round(Style.font.heading * 1.4)
     font.bold: true
   }
   UiLabel {

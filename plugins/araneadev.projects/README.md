@@ -4,7 +4,7 @@
 Its menu entry point, `Projects.qml`, stays loaded while registered in the
 Omarchy shell. The Projects window, desktop search, the workspace overview and the CLI
 consume its snapshots and results; they do not launch tools independently.
-The plugin adds no bar widget. Open **Projects** directly from the launcher.
+The plugin adds no bar widget. Open **Projects** from the command center’s top tile.
 Its own window contains a searchable project sidebar and Overview, Actions,
 Agents, Preferences, and Help destinations. A narrow window uses a compact
 project selector. The window keeps the selected project when reopened. With no selection,

@@ -1,6 +1,7 @@
 // Presentational chrome for the menu card header, root tiles, context and footer.
 // qmllint disable missing-property unqualified
 import QtQuick
+import QtQuick.Shapes
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
@@ -10,6 +11,15 @@ Item {
   id: chrome
   // Public contract member.
   property bool fullRootHeader: false
+  // Compress the command console and tile content on short screens.
+  property bool compactDeck: false
+  // Existing menu owner supplies logical open; animations never delay input.
+  property bool presented: true
+  Aranea.DeckReveal {
+    id: identityEntrance
+    opened: chrome.presented && chrome.fullRootHeader
+    motionEnabled: chrome.motionEnabled
+  }
   // Scoped queries expose a query-preserving global search route.
   property bool scopedSearch: false
   // Requests the owning menu to return to global search.
@@ -53,7 +63,7 @@ Item {
   // Public contract member.
   property real menuLetterSpacing: 0
   // Public contract member.
-  property bool motionEnabled: true
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
   // Public contract member.
   property int rootHeaderHeight: Style.space(68)
   // Public contract member.
@@ -91,65 +101,180 @@ Item {
     spacing: fullRootHeader ? chrome.sectionSpacing : Style.spacing.sm
 
     Item {
+      id: deckHeader
+      opacity: chrome.fullRootHeader ? identityEntrance.progress : 1
+      transform: Translate {
+        y: chrome.fullRootHeader ? identityEntrance.offset : 0
+      }
       width: parent.width
       height: fullRootHeader ? rootHeaderHeight : headerHeight
+      readonly property bool expanded: chrome.fullRootHeader && !chrome.compactDeck
+      readonly property int emblemSize: chrome.fullRootHeader ? Style.space(expanded ? 84 : 54) : Style.space(24)
 
-      Image {
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: fullRootHeader ? Style.space(48) : Style.space(22)
-        height: width
-        source: Aranea.RuntimePaths.brandUrl
-        fillMode: Image.PreserveAspectFit
-        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-        smooth: true
-        mipmap: true
+      Rectangle {
+        visible: chrome.fullRootHeader
+        anchors.fill: parent
+        radius: Aranea.DesignTokens.cornerRadius
+        color: Util.alpha(chrome.foreground, 0.025)
+        border.width: 1
+        border.color: Util.alpha(chrome.foreground, 0.08)
       }
 
-      Image {
-        visible: fullRootHeader
-        anchors.right: parent.right
+      Item {
+        id: emblem
+        // A fixed width with explicit placement avoids retaining both edge
+        // anchors when search swaps between the compact and root headers.
+        x: chrome.fullRootHeader ? parent.width - width - Style.space(14) : 0
         anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(220)
-        height: parent.height
-        source: "file://" + brandingMotifsPath + "menu-network.svg"
-        fillMode: Image.PreserveAspectFit
-        opacity: 0.24
-        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-        smooth: true
-        mipmap: true
+        width: deckHeader.emblemSize
+        height: width
+        Shape {
+          id: orbitalArcs
+          anchors.fill: parent
+          visible: chrome.fullRootHeader
+          ShapePath {
+            strokeWidth: 2
+            strokeColor: Util.alpha(chrome.selectedText, 0.7)
+            fillColor: "transparent"
+            startX: orbitalArcs.width / 2
+            startY: 2
+            PathArc {
+              x: orbitalArcs.width - 2
+              y: orbitalArcs.height / 2
+              radiusX: orbitalArcs.width / 2 - 2
+              radiusY: orbitalArcs.height / 2 - 2
+            }
+          }
+          ShapePath {
+            strokeWidth: 2
+            strokeColor: Util.alpha(Aranea.DesignTokens.strandEnd, 0.8)
+            fillColor: "transparent"
+            startX: orbitalArcs.width / 2
+            startY: orbitalArcs.height - 2
+            PathArc {
+              x: 2
+              y: orbitalArcs.height / 2
+              radiusX: orbitalArcs.width / 2 - 2
+              radiusY: orbitalArcs.height / 2 - 2
+            }
+          }
+          RotationAnimator on rotation {
+            from: 0
+            to: -360
+            duration: 24000
+            loops: Animation.Infinite
+            running: chrome.motionEnabled && chrome.presented && orbitalArcs.visible
+          }
+        }
+        Item {
+          anchors.fill: parent
+          visible: chrome.fullRootHeader
+          Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 0
+            width: Style.space(4)
+            height: width
+            radius: width / 2
+            color: chrome.selectedText
+          }
+          RotationAnimator on rotation {
+            from: 0
+            to: 360
+            duration: 16000
+            loops: Animation.Infinite
+            running: chrome.motionEnabled && chrome.presented && chrome.fullRootHeader && emblem.visible
+          }
+        }
+        Rectangle {
+          visible: chrome.fullRootHeader
+          anchors.fill: parent
+          radius: width / 2
+          color: Util.alpha(chrome.selectedText, 0.07)
+          border.width: 1
+          border.color: Util.alpha(chrome.selectedText, 0.4)
+          Rectangle {
+            anchors.fill: parent
+            anchors.margins: Style.space(7)
+            radius: width / 2
+            color: "transparent"
+            border.width: 1
+            border.color: Util.alpha(Aranea.DesignTokens.strandEnd, 0.45)
+          }
+        }
+        Image {
+          anchors.centerIn: parent
+          width: chrome.fullRootHeader ? parent.width * 0.65 : parent.width
+          height: width
+          source: Aranea.RuntimePaths.brandUrl
+          fillMode: Image.PreserveAspectFit
+          sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+          smooth: true
+          mipmap: true
+        }
       }
 
       Column {
         anchors.left: parent.left
-        // Glyph plus BrandHeader's 10 px gap; the root mark keeps 48 + 14.
-        anchors.leftMargin: fullRootHeader ? Style.space(62) : Style.space(32)
+        anchors.leftMargin: chrome.fullRootHeader ? Style.space(16) : Style.space(34)
         anchors.right: parent.right
+        anchors.rightMargin: chrome.fullRootHeader ? deckHeader.emblemSize + Style.space(40) : 0
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Style.space(4)
-
+        spacing: Style.space(deckHeader.expanded ? 7 : 4)
+        Text {
+          visible: deckHeader.expanded
+          text: "COMMAND DECK"
+          color: chrome.selectedText
+          font.family: Aranea.Typography.technicalFamily
+          font.pixelSize: chrome.scaled(Style.font.caption)
+          font.letterSpacing: 2.2
+        }
         Text {
           objectName: "menuHeaderTitle"
           width: parent.width
           textFormat: Text.PlainText
-          text: chrome.matchedQuery ? "› " + chrome.matchedQuery : fullRootHeader ? Aranea.BrandConfig.shortName : (dmenuActive ? dmenuPrompt : Aranea.BrandConfig.shortName + " / " + activeTitle)
-          color: foreground
-          font.family: fontFamily
-          font.pixelSize: scaled(fullRootHeader ? Style.font.title : Style.font.body)
-          font.weight: Font.Medium
-          font.letterSpacing: menuLetterSpacing
+          text: chrome.matchedQuery ? "› " + chrome.matchedQuery : chrome.fullRootHeader ? Aranea.BrandConfig.shortName : (chrome.dmenuActive ? chrome.dmenuPrompt : Aranea.BrandConfig.shortName + " / " + chrome.activeTitle)
+          color: chrome.foreground
+          font.family: chrome.fontFamily
+          font.pixelSize: chrome.scaled(chrome.fullRootHeader ? (deckHeader.expanded ? Style.font.displayLarge : Style.font.title) : Style.font.body)
+          font.weight: Font.Bold
+          font.letterSpacing: chrome.fullRootHeader ? 4 : chrome.menuLetterSpacing
           elide: chrome.matchedQuery ? Text.ElideLeft : Text.ElideRight
         }
-        Text {
-          textFormat: Text.PlainText
-          width: parent.width - (chrome.scopedSearch ? globalSearch.width + Style.spacing.md : 0)
-          text: chrome.rootSearchHint || hint
-          color: chrome.fullRootHeader ? Util.alpha(chrome.foreground, 0.8) : contextText
-          font.family: fontFamily
-          font.pixelSize: scaled(chrome.fullRootHeader ? Style.font.bodySmall : Style.font.caption)
-          font.weight: Font.Normal
-          font.letterSpacing: menuLetterSpacing
-          elide: Text.ElideRight
+        Rectangle {
+          width: parent.width
+          height: hintLabel.implicitHeight + (chrome.fullRootHeader ? Style.space(12) : 0)
+          color: "transparent"
+          border.width: 0
+          border.color: Util.alpha(chrome.selectedText, 0.22)
+          Rectangle {
+            visible: chrome.fullRootHeader
+            anchors.bottom: parent.bottom
+            width: parent.width * 0.42
+            height: 1
+            gradient: Gradient {
+              orientation: Gradient.Horizontal
+              GradientStop {
+                position: 0
+                color: Util.alpha(chrome.selectedText, 0.6)
+              }
+              GradientStop {
+                position: 1
+                color: "transparent"
+              }
+            }
+          }
+          Text {
+            id: hintLabel
+            textFormat: Text.PlainText
+            anchors.verticalCenter: parent.verticalCenter
+            x: chrome.fullRootHeader ? Style.space(10) : 0
+            width: parent.width - x * 2 - (chrome.scopedSearch ? globalSearch.width + Style.spacing.md : 0)
+            text: (chrome.fullRootHeader ? "›  " : "") + (chrome.rootSearchHint || chrome.hint)
+            color: chrome.fullRootHeader ? chrome.foreground : chrome.contextText
+            font.family: Aranea.Typography.technicalFamily
+            font.pixelSize: chrome.scaled(Style.font.caption)
+            elide: Text.ElideRight
+          }
         }
       }
 
@@ -204,30 +329,16 @@ Item {
           }
         }
       }
-
-      Image {
-        visible: fullRootHeader
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(64)
-        height: Style.space(12)
-        source: "file://" + brandingMotifsPath + "edge-trace.svg"
-        fillMode: Image.PreserveAspectFit
-        opacity: 0.55
-        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-        smooth: true
-        mipmap: true
-      }
     }
 
     Row {
-      visible: fullRootHeader
+      visible: fullRootHeader && rootContextHeight > 0
       width: parent.width
       height: rootContextHeight
       spacing: Style.spacing.md
       Text {
         text: "◈"
-        color: contextText
+        color: selectedText
         font.family: Aranea.Typography.iconFamily
         font.pixelSize: scaled(Style.font.caption)
         anchors.verticalCenter: parent.verticalCenter
@@ -235,14 +346,14 @@ Item {
       Text {
         text: workspaceContext
         color: contextText
-        font.family: fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: scaled(Style.font.caption)
         verticalAlignment: Text.AlignVCenter
       }
       Text {
         text: "System ready"
         color: contextText
-        font.family: fontFamily
+        font.family: Aranea.Typography.technicalFamily
         font.pixelSize: scaled(Style.font.caption)
         verticalAlignment: Text.AlignVCenter
       }
@@ -256,7 +367,7 @@ Item {
     }
 
     Row {
-      visible: fullRootHeader
+      visible: fullRootHeader && rootTileHeight > 0
       width: parent.width
       height: rootTileHeight
       spacing: Style.spacing.xs
@@ -264,9 +375,13 @@ Item {
         model: rootTiles
         delegate: MenuRootTile {
           required property var modelData
+          required property int index
           width: (parent.width - Style.spacing.xs * 2) / 3
           height: rootTileHeight
           tileData: modelData
+          compact: chrome.compactDeck
+          presented: chrome.presented && chrome.fullRootHeader
+          entranceDelay: 70 + index * 55
           fontFamily: chrome.fontFamily
           foreground: chrome.foreground
           contextText: chrome.contextText
@@ -282,7 +397,7 @@ Item {
     }
 
     Item {
-      visible: fullRootHeader
+      visible: fullRootHeader && footerHeight > 0
       width: parent.width
       height: footerHeight
       Text {

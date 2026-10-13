@@ -79,7 +79,7 @@ Column {
   Text {
     objectName: "problemsCaption"
     width: parent.width
-    text: "PROBLEMS · " + section.problems.length
+    text: "ISSUES · " + section.problems.length
     color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
     font.family: Aranea.Typography.uiFamily
     font.pixelSize: Style.font.caption
@@ -126,7 +126,7 @@ Column {
       width: section.width
       glyph: row.problem.glyph || ""
       label: row.problem.summary || ""
-      detail: row.critical ? "critical" : "attention"
+      detail: "Resolve ›"
       detailColor: row.critical ? Aranea.DesignTokens.urgent : section.amber
       nodeColor: row.critical ? Aranea.DesignTokens.urgent : section.amber
       active: true

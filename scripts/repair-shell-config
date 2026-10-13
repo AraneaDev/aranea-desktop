@@ -116,6 +116,14 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
   def dedupe_by_id: reduce .[] as $e ([]; ($e | entry_id) as $id | if ([.[] | entry_id] | index($id)) != null then . else . + [$e] end);
   # Whether araneadev.vpn already sits anywhere in the bar layout.
   def vpn_present: ([.bar.layout[]? | arrays | .[] | entry_id] | index("araneadev.vpn")) != null;
+  # A deployed Aranea Network owns the VPN page when it is in the bar.
+  def vpn_embedded: $network and $vpn and ([.bar.layout[]? | arrays | .[] | entry_id] | index("araneadev.network")) != null;
+  # Only consolidate controls when their owning Aranea panel is in the bar.
+  def panel_present($id): ([.bar.layout[]? | arrays | .[] | entry_id] | index($id)) != null;
+  def bluetooth_embedded: $network and $bluetooth and panel_present("araneadev.network");
+  def display_embedded: $power and $monitor and panel_present("araneadev.power");
+  def microphone_embedded: $audio and panel_present("araneadev.audio");
+  def health_embedded: $power and panel_present("araneadev.power");
   # The single layout section to insert araneadev.vpn into: the first, in a
   # fixed scan order (right, center, left, then any other section in the
   # layout object own key order), whose array holds a network entry
@@ -168,7 +176,7 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
   # pointed at a plugin that is not deployed yet would make the bar center on
   # nothing.
   | (if $clock and (.bar.centerAnchor? == "omarchy.clock") then .bar.centerAnchor = "araneadev.clock" else . end)
-  # araneadev.vpn is not a clone (there is no stock entry to swap): it gets
+  # Standalone fallback when Network does not host VPN: it gets
   # its own bar entry inserted right after the network entry, in the single
   # layout section vpn_target_section picks (the araneadev.network index
   # wins over the omarchy.network index within that section, even when
@@ -179,7 +187,10 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
   # network entry split across two sections never inserts twice. Placed
   # once ($placeVpn): an icon the user removed stays removed until a
   # release parks it.
-  | (if $vpn and $placeVpn and (.bar.layout | type) == "object" and (vpn_present | not) then
+  | (if vpn_embedded then
+       .bar.layout |= with_entries(.value |= (if type == "array" then map(select(entry_id != "araneadev.vpn")) else . end))
+     else . end)
+  | (if $vpn and $placeVpn and (vpn_embedded | not) and (.bar.layout | type) == "object" and (vpn_present | not) then
        (vpn_target_section) as $section
        | if $section != null then
            .bar.layout[$section] |= (
@@ -255,6 +266,21 @@ jq --argjson activity "$activity_installed" --argjson projects "$projects_instal
         elif $trayAt != null then .[:$trayAt + 1] + [{id: "araneadev.health"}] + .[$trayAt + 1:]
         else [{id: "araneadev.health"}] + . end)
     else . end
+  # Parent panels retain the controls; their former bar entries no longer
+  # duplicate them. Health keeps a conditional issue shortcut.
+  | (if (.bar.layout | type) == "object" then
+       bluetooth_embedded as $bt | display_embedded as $display
+       | microphone_embedded as $mic | health_embedded as $health
+       | .bar.layout |= with_entries(.value |= (if type == "array" then
+           map(select((($bt and (entry_id == "araneadev.bluetooth" or entry_id == "omarchy.bluetooth"))
+             or ($display and (entry_id == "araneadev.monitor" or entry_id == "omarchy.monitor"))
+             or ($mic and entry_id == "omarchy.microphone")) | not))
+           | map(if entry_id == "araneadev.health" then
+               if $health then (if type == "string" then {id: .} else . end) + {alertOnly: true}
+               elif type == "object" then del(.alertOnly) else . end
+             else . end)
+         else . end))
+     else . end)
 ' "$config_file" >"$tmp_file"
 
 if jq -e '[.bar.layout[]? | arrays | .[] | (if type == "string" then . else .id? end)] | index("araneadev.notifications") != null' "$tmp_file" >/dev/null 2>&1; then

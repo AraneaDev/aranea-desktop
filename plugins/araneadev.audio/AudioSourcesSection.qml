@@ -108,13 +108,10 @@ Column {
         implicitHeight: content.implicitHeight
         Component.onCompleted: card.createdAt = Date.now()
 
-        Rectangle {
-          // The keyboard cursor outline.
+        Aranea.FocusFrame {
           objectName: "cursorOutline"
           anchors.fill: parent
-          color: "transparent"
-          border.width: section.cursor === row.index ? 1 : 0
-          border.color: Aranea.DesignTokens.accent
+          focused: section.cursor === row.index
         }
         Column {
           id: content

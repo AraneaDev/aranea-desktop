@@ -3,6 +3,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs.Commons
+import "../araneadev.shared" as Aranea
 
 Rectangle {
   id: card
@@ -13,8 +14,16 @@ Rectangle {
   implicitHeight: body.implicitHeight + padding * 2
   color: Util.alpha(Color.foreground, 0.035)
   radius: Style.space(6)
-  border.color: Util.alpha(Color.foreground, 0.1)
+  border.color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
   border.width: 1
+  Rectangle {
+    parent: card
+    x: card.padding
+    width: Style.space(28)
+    height: 1
+    color: Aranea.DesignTokens.accent
+    opacity: 0.55
+  }
   ColumnLayout {
     id: body
     anchors.left: parent.left

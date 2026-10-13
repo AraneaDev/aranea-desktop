@@ -42,8 +42,6 @@ Item {
   // Public contract member.
   property color selectedText: Color.menu.selectedText
   // Public contract member.
-  property color border: Color.menu.border
-  // Public contract member.
   property string fontFamily: Aranea.Typography.uiFamily
   // Public contract member.
   property real menuFontScale: 1
@@ -97,12 +95,12 @@ Item {
   signal appContextRequested(string appId)
 
   // Public contract member.
-  readonly property alias list: resultList
+  readonly property var list: resultList
 
   ListView {
     id: resultList
     anchors.fill: parent
-    model: parent.model
+    model: results.model
     clip: true
     spacing: parent.rowSpacing
     boundsBehavior: Flickable.StopAtBounds
@@ -129,7 +127,12 @@ Item {
       }
     }
 
-    delegate: BorderSurface {
+    delegate: commandDelegate
+  }
+
+  Component {
+    id: commandDelegate
+    BorderSurface {
       id: row
       objectName: "menuRow"
       required property int index
@@ -182,21 +185,16 @@ Item {
 
       Component.onCompleted: row.createdAt = Date.now()
 
-      width: ListView.view.width
+      width: resultList.width
       height: results.rowHeightForDetail ? results.rowHeightForDetail(detail) : Style.space(44)
       radius: results.cornerRadius
       // The hover fill only, as the pickers draw it: no border.
       color: hovered ? results.selectedBackground : "transparent"
 
-      Rectangle {
-        // The keyboard cursor outline (mint, keyboard only).
+      Aranea.FocusFrame {
         objectName: "cursorOutline"
         anchors.fill: parent
-        radius: results.cornerRadius
-        visible: row.hasCursor
-        color: Util.alpha(Aranea.DesignTokens.accent, 0.08)
-        border.width: 1
-        border.color: Aranea.DesignTokens.accent
+        focused: row.hasCursor
       }
 
       Aranea.InkText {
@@ -338,7 +336,7 @@ Item {
     anchors.top: parent.top
     height: Math.min(Style.space(28), parent.height / 2)
     visible: opacity > 0
-    opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.contentY - resultList.originY) / height)) : 0
+    opacity: results.list.contentHeight > results.list.height ? Math.max(0, Math.min(1, (results.list.contentY - results.list.originY) / height)) : 0
     gradient: Gradient {
       GradientStop {
         position: 0
@@ -358,7 +356,7 @@ Item {
     // the fold affordance and must stay readable.
     height: Math.min(Math.round(results.foldPeek / 2), parent.height / 2)
     visible: opacity > 0
-    opacity: resultList.contentHeight > resultList.height ? Math.max(0, Math.min(1, (resultList.originY + resultList.contentHeight - resultList.height - resultList.contentY) / height)) : 0
+    opacity: results.list.contentHeight > results.list.height ? Math.max(0, Math.min(1, (results.list.originY + results.list.contentHeight - results.list.height - results.list.contentY) / height)) : 0
     gradient: Gradient {
       GradientStop {
         position: 0

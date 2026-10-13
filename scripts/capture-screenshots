@@ -48,7 +48,7 @@ set -euo pipefail
 # Menu search variants menu-search-mixed, menu-search-no-match,
 # menu-search-no-compositor and menu-search-vanished render production MenuSurface
 # offscreen with inert sources and dispatch.
-# Settings and Display use the normal production window in full-desktop frames.
+# Appearance, Display, and Schedule use the normal Settings window in full-desktop frames.
 # Diagnostic variants settings-narrow, settings-dirty, settings-unavailable,
 # settings-integration-failed and settings-notifications use offscreen fixtures.
 # All fixture mutation controls and controller requests refuse changes.
@@ -95,6 +95,19 @@ bar_capture_update_marker="$HOME/.local/state/omarchy/reboot-required"
 notification_state_dir="$HOME/.local/state/omarchy/notifications"
 notification_inbox_dir="$notification_state_dir/inbox"
 notification_images_dir="$notification_state_dir/images"
+
+# Pin capture batches to their clean workspace, including after long waits.
+focus_capture_workspace() {
+  [[ "${ARANEA_CAPTURE_WORKSPACE:-}" == 2 ]] || return 0
+  hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null || return 3
+  [[ "$(hyprctl activeworkspace -j | jq -r '.id')" == 2 ]] || return 3
+}
+# Recheck immediately before grabbing so a workspace change never leaks a terminal.
+capture_frame() {
+  focus_capture_workspace || return 3
+  if [[ "${ARANEA_CAPTURE_WORKSPACE:-}" == 2 ]]; then sleep 0.25; fi
+  command grim "$@"
+}
 
 # Prints the running shell's config dir, resolved like omarchy-restart-shell:
 # the session's OMARCHY_PATH (a caller may disagree after dev link/unlink),
@@ -225,10 +238,10 @@ default_clock_place='{"name":"Amsterdam","latitude":52.37,"longitude":4.90}'
 default_audio_showcase='{"outputs":["Studio Monitors","WH-1000XM5"],"inputs":["Desk Mic","WH-1000XM5"],"apps":["Spotify","Firefox"],"track":{"title":"Midnight City","artist":"M83","player":"Spotify","progress":0.4}}'
 # Stand-in agents the Agents capture draws instead of the user's real usage,
 # plans and balance (AgentsLogic.parseShowcase reads it).
-default_agents_showcase='{"agents":[{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
+default_agents_showcase='{"agents":[{"id":"codex","name":"Codex","plan":"Plus","updatedMinutesAgo":3,"todayPrompts":18,"todaySessions":2,"limits":[{"label":"5h window","percent":0.12,"resetsInMinutes":251},{"label":"Weekly (7-day)","percent":0.86,"resetsInMinutes":1490}],"days":[42100000,0,63800000,51200000,88900000,37400000,22600000],"models":[{"id":"gpt-5.6-sol","input":2100000,"output":3900000,"cacheRead":241000000,"cacheWrite":0},{"id":"gpt-5.6-mini","input":600000,"output":900000,"cacheRead":38000000,"cacheWrite":0}]},{"id":"claude","name":"Claude Code","plan":"Pro","updatedMinutesAgo":3,"todayPrompts":46,"todaySessions":5,"limits":[{"label":"Session (5-hour)","percent":0.42,"resetsInMinutes":134},{"label":"Weekly (7-day)","percent":0.63,"resetsInMinutes":3720}],"days":[182400000,241700000,96300000,318900000,275200000,204600000,128300000],"models":[{"id":"claude-sonnet-5","input":4200000,"output":9800000,"cacheRead":1186000000,"cacheWrite":52000000},{"id":"claude-opus-5","input":1900000,"output":4100000,"cacheRead":512000000,"cacheWrite":23000000},{"id":"claude-haiku-4-5","input":800000,"output":1200000,"cacheRead":64000000,"cacheWrite":3100000}]},{"id":"fireworks","name":"Fireworks","plan":"Prepaid","updatedMinutesAgo":3,"todayPrompts":12,"todaySessions":2,"limits":[],"days":[3100000,4800000,0,6200000,2900000,5400000,1700000],"models":[{"id":"deepseek-v4","input":5200000,"output":2600000,"cacheRead":0,"cacheWrite":0},{"id":"llama-4-maverick","input":1800000,"output":900000,"cacheRead":0,"cacheWrite":0}],"balance":{"remaining":18.4,"funded":50,"spent":31.6,"currency":"USD"}}]}'
 
 # The surfaces --all captures.
-all_surfaces=(menu menu-submenu settings settings-scaling menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
+all_surfaces=(menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input desktop health lock plymouth btop file-manager neovim notifications notifications-empty clipboard emojis polkit network vpn audio bluetooth agents power monitor tray tray-manage clock weather image-picker apps favorites recent dawn osd workspaces updates)
 
 # Builds $output/hero-showcase.gif from the listed frame PNGs; exits 3 when
 # magick or a frame is missing.
@@ -241,7 +254,7 @@ build_hero_showcase() {
   # application launchers, notifications and panels, then system controls and
   # the workspace/update finish. Terminal-heavy captures stay in the gallery
   # but are omitted from the short showcase loop.
-  local frames=(desktop menu menu-submenu settings settings-scaling menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents power monitor tray tray-manage clock weather lock osd)
+  local frames=(desktop menu menu-submenu settings settings-scaling settings-schedule menu-search menu-input apps favorites recent notifications notifications-empty health updates workspaces clipboard emojis image-picker network vpn audio bluetooth agents power monitor tray tray-manage clock weather lock osd)
   local frame
   local frame_paths=()
   for frame in "${frames[@]}"; do
@@ -311,6 +324,7 @@ if ((capture_all)); then
     echo "Refusing --all capture on workspace $active_workspace; switch to workspace 2 first" >&2
     exit 3
   }
+  export ARANEA_CAPTURE_WORKSPACE=2
   # The bell is part of the desktop: it stays in every capture. Notifications
   # no longer toast (they go to the center), so instead of hiding the plugin
   # the real inbox is parked for the whole batch and restored afterwards;
@@ -406,7 +420,7 @@ fi
 }
 showcase_surface="$surface"
 case "$surface" in
-  settings | settings-scaling | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
+  settings | settings-scaling | settings-schedule | settings-narrow | settings-dirty | settings-unavailable | settings-integration-failed | settings-notifications) showcase_surface=settings ;;
   menu-search-mixed | menu-search-no-match | menu-search-no-compositor | menu-search-vanished | menu-search-actions | menu-search-action-pending | menu-search-action-error | menu-search-action-long-label | menu-search-project-search) showcase_surface=menu ;;
   plymouth) showcase_surface=boot ;;
   btop) showcase_surface=about ;;
@@ -414,6 +428,7 @@ case "$surface" in
   notifications-empty) showcase_surface=notifications ;;
 esac
 "$repo_root/scripts/aranea-showcase" surface "$showcase_surface" >/dev/null
+focus_capture_workspace
 mkdir -p "$output"
 
 # Project and workspace captures are isolated before any desktop reads or dispatch.
@@ -472,14 +487,20 @@ capture_settings_surface() (
     echo 'Invalid Settings capture focus snapshot' >&2
     exit 3
   }
-  fixture="$(jq -cn --arg section "$([[ "$surface" == settings-scaling ]] && echo display || echo appearance)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
+  local settings_capture_section
+  case "$surface" in
+    settings-scaling) settings_capture_section=display ;;
+    settings-schedule) settings_capture_section=schedule ;;
+    *) settings_capture_section=appearance ;;
+  esac
+  fixture="$(jq -cn --arg section "$settings_capture_section" --argjson catalog "$("$repo_root/scripts/aranea-wallpaper" list --json)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
     {section: $section, snapshot: $snapshot, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
       display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
       fonts:{uiFamily:"Inter",technicalFamily:"JetBrains Mono",families:["Inter","IBM Plex Sans","Source Sans 3","JetBrains Mono"],monospaceFamilies:["JetBrains Mono","JetBrains Mono NL"],availability:"available"},
       motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
-      wallpaper:{activeId:"day",availability:"available"},
-      wallpapers:[{id:"day",label:"Day",path:($artwork+"background-day.png"),available:true},{id:"night",label:"Night",path:($artwork+"background-night.png"),available:true}],wallpapersAvailability:"available",
-      schedule:{enabled:true,applied:true,availability:"available",dawn:"06:00",day:"08:00",dusk:"18:00",night:"20:00"},
+      wallpaper:{activeId:"signal-shrine",availability:"available"},
+      wallpapers:$catalog,wallpapersAvailability:"available",
+      schedule:{enabled:true,applied:true,availability:"available",entries:[{time:"07:00",wallpaper:"day"},{time:"12:30",wallpaper:"aranea-core"},{time:"18:00",wallpaper:"deep-current"},{time:"21:00",wallpaper:"signal-shrine"}],dawn:null,day:"07:00",dusk:null,night:null},
       integrations:[{id:"session",status:"inactive",availability:"available"},{id:"terminal",status:"active",availability:"available"}],integrationsAvailability:"available"},
       notifications:{dnd:"off",dndAvailability:"available",quiet:"scheduled",quietAvailability:"available",window:"22:00-07:00",windowAvailability:"available"},
       results:(if $section == "display" then {"display-scale":"Applied · 2.666667 · saved"} else {} end), itemErrors:{}}}')"
@@ -493,10 +514,12 @@ capture_settings_surface() (
         echo 'Settings capture restoration failed' >&2
         failed=1
       }
-      if [[ -n "$previous_workspace" ]]; then
+      if [[ "${ARANEA_CAPTURE_WORKSPACE:-}" == 2 ]]; then
+        focus_capture_workspace || failed=1
+      elif [[ -n "$previous_workspace" ]]; then
         hyprctl dispatch "hl.dsp.focus({ workspace = \"$previous_workspace\" })" >/dev/null 2>&1 || failed=1
       fi
-      if [[ "$previous_focus" =~ ^0x[[:xdigit:]]+$ ]]; then
+      if [[ "${ARANEA_CAPTURE_WORKSPACE:-}" != 2 && "$previous_focus" =~ ^0x[[:xdigit:]]+$ ]]; then
         hyprctl dispatch "hl.dsp.focus({ window = \"address:$previous_focus\" })" >/dev/null 2>&1 || failed=1
       fi
       restore_needed=0
@@ -527,7 +550,7 @@ capture_settings_surface() (
     exit 3
   }
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
-  grim "$staged" && [[ -s "$staged" ]] || exit 3
+  capture_frame "$staged" && [[ -s "$staged" ]] || exit 3
   # Restoration failure keeps the old output, just like failed screenshot capture.
   local completed
   completed="$(mktemp "$output/.settings-complete.XXXXXX.png")"
@@ -569,7 +592,7 @@ capture_menu_surface() {
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
   # A grim error after the frame was written is not fatal; no frame is.
-  grim "$output/$surface.png" || true
+  capture_frame "$output/$surface.png" || true
   omarchy-shell shell hide araneadev.menu >/dev/null 2>&1 || true
   if [[ ! -f "$output/$surface.png" ]]; then
     echo "capture failed: $output/$surface.png was not written" >&2
@@ -621,7 +644,7 @@ capture_terminal_surface() {
   sleep 1
   hyprctl dismissnotify >/dev/null 2>&1 || true
   sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
-  grim "$output/$surface.png"
+  capture_frame "$output/$surface.png"
   # Close the capture window immediately so the next surface cannot inherit it.
   close_new_windows "$windows_before"
   kill "$child_pid" >/dev/null 2>&1 || true
@@ -636,7 +659,35 @@ capture_terminal_surface() {
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
-# Summons shell popup TARGET, grabs the screen, then hides it.
+# Embedded pages own IPC routes even when their former bar buttons are absent.
+# Keep shell summon for normal widgets; direct show/hide selects the host tab.
+open_capture_popup() {
+  local target="$1" answer
+  case "$target" in
+    omarchy.bluetooth | aranea.vpn)
+      answer="$(omarchy-shell "$target" show 2>&1)" || return 3
+      [[ -z "$answer" || "$answer" == ok ]] && printf 'ok\n'
+      ;;
+    omarchy.monitor) omarchy-shell omarchy.power showPage display ;;
+    *)
+      if [[ -n "${2:-}" ]]; then
+        omarchy-shell shell summon "$target" "$2"
+      else
+        omarchy-shell shell summon "$target"
+      fi
+      ;;
+  esac
+}
+# Close the owning popup through the same route used to open it.
+hide_capture_popup() {
+  case "$1" in
+    omarchy.bluetooth | aranea.vpn) omarchy-shell "$1" hide ;;
+    omarchy.monitor) omarchy-shell omarchy.power hide ;;
+    *) omarchy-shell shell hide "$1" ;;
+  esac
+}
+
+# Opens shell popup TARGET, grabs the screen, then hides it.
 capture_popup_surface() {
   local target="$1" payload="${2:-}"
   command -v omarchy-shell >/dev/null 2>&1 || {
@@ -649,12 +700,12 @@ capture_popup_surface() {
   }
 
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  hide_capture_popup "$target" >/dev/null 2>&1 || true
   local summon_result
   if [[ -n "$payload" ]]; then
-    summon_result="$(omarchy-shell shell summon "$target" "$payload" 2>&1)"
+    summon_result="$(open_capture_popup "$target" "$payload" 2>&1)"
   else
-    summon_result="$(omarchy-shell shell summon "$target" 2>&1)"
+    summon_result="$(open_capture_popup "$target" 2>&1)"
   fi
   if [[ "$summon_result" != "ok" ]]; then
     echo "Unable to summon popup $target: $summon_result" >&2
@@ -662,8 +713,8 @@ capture_popup_surface() {
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
-  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  capture_frame "$output/$surface.png"
+  hide_capture_popup "$target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
@@ -686,9 +737,9 @@ capture_showcase_surface() {
   }
 
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  hide_capture_popup "$target" >/dev/null 2>&1 || true
   local summon_result showcase_result seconds
-  summon_result="$(omarchy-shell shell summon "$target" 2>&1 || true)"
+  summon_result="$(open_capture_popup "$target" 2>&1 || true)"
   if [[ "$summon_result" != "ok" ]]; then
     echo "Unable to summon popup $target: $summon_result" >&2
     exit 3
@@ -697,7 +748,7 @@ capture_showcase_surface() {
   # (it would split '["a","b"]' into two arguments); JSON.parse skips it.
   showcase_result="$(omarchy-shell "$target" showcase " $names" 2>&1 || true)"
   if [[ "$showcase_result" != "ok" ]]; then
-    omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+    hide_capture_popup "$target" >/dev/null 2>&1 || true
     printf 'capture failed: %s did not take the stand-in names (showcase answered "%s"); is the Aranea dropdown active? No screenshot written.\n' "$target" "$showcase_result" >&2
     exit 3
   fi
@@ -705,12 +756,12 @@ capture_showcase_surface() {
     sleep "$seconds"
   done
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
-  omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
+  capture_frame "$output/$surface.png"
+  hide_capture_popup "$target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
-# Summons the VPN dropdown (bar widget araneadev.vpn) and hands it FIXTURE (a
+# Opens the VPN tab through aranea.vpn and hands it FIXTURE (a
 # JSON array of fixture rows) through its `showcaseFixture` IPC method on
 # target aranea.vpn, waits, grabs the screen, then hides it, which clears the
 # fixture. A failed summon, or a showcaseFixture answer other than "ok" (a
@@ -718,7 +769,7 @@ capture_showcase_surface() {
 # the machine's real VPN profiles never reach a screenshot.
 capture_vpn_surface() {
   local fixture="$1"
-  local summon_target=araneadev.vpn ipc_target=aranea.vpn
+  local summon_target=aranea.vpn ipc_target=aranea.vpn
   command -v omarchy-shell >/dev/null 2>&1 || {
     echo "omarchy-shell is required to capture $surface" >&2
     exit 3
@@ -729,9 +780,9 @@ capture_vpn_surface() {
   }
 
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  omarchy-shell shell hide "$summon_target" >/dev/null 2>&1 || true
+  hide_capture_popup "$summon_target" >/dev/null 2>&1 || true
   local summon_result fixture_result
-  summon_result="$(omarchy-shell shell summon "$summon_target" 2>&1 || true)"
+  summon_result="$(open_capture_popup "$summon_target" 2>&1 || true)"
   if [[ "$summon_result" != "ok" ]]; then
     echo "Unable to summon popup $summon_target: $summon_result" >&2
     exit 3
@@ -740,14 +791,14 @@ capture_vpn_surface() {
   # (it would split '[{...}]' into many arguments); JSON.parse skips it.
   fixture_result="$(omarchy-shell "$ipc_target" showcaseFixture " $fixture" 2>&1 || true)"
   if [[ "$fixture_result" != "ok" ]]; then
-    omarchy-shell shell hide "$summon_target" >/dev/null 2>&1 || true
+    hide_capture_popup "$summon_target" >/dev/null 2>&1 || true
     printf 'capture failed: %s did not take the fixture rows (showcaseFixture answered "%s"); is the Aranea VPN dropdown active? No screenshot written.\n' "$ipc_target" "$fixture_result" >&2
     exit 3
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
-  omarchy-shell shell hide "$summon_target" >/dev/null 2>&1 || true
+  capture_frame "$output/$surface.png"
+  hide_capture_popup "$summon_target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
 
@@ -789,7 +840,7 @@ capture_clock_surface() {
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
+  capture_frame "$output/$surface.png"
   omarchy-shell shell hide "$target" >/dev/null 2>&1 || true
   printf 'captured: %s\n' "$output/$surface.png"
 }
@@ -926,7 +977,7 @@ capture_tray_surface() {
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
+  capture_frame "$output/$surface.png"
   # The same check again: an app that registered while the popup was up
   # could be in the screenshot, which is then deleted.
   if ! mismatch="$(tray_only_fixtures)"; then
@@ -984,7 +1035,7 @@ capture_bar_widget_surface() {
   omarchy-shell "$bar_capture_target" open >/dev/null
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
+  capture_frame "$output/$surface.png"
   trap - EXIT
   restore_bar_capture_workspace
   printf 'captured: %s\n' "$output/$surface.png"
@@ -1014,13 +1065,13 @@ capture_osd_surface() {
   fi
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   hyprctl dismissnotify >/dev/null 2>&1 || true
-  grim "$output/$surface.png"
+  capture_frame "$output/$surface.png"
   omarchy-shell shell hide araneadev.osd >/dev/null 2>&1 || true
   printf 'captured: %s (workspace 2 live OSD)\n' "$output/$surface.png"
 }
 
 case "$surface" in
-  settings | settings-scaling)
+  settings | settings-scaling | settings-schedule)
     capture_settings_surface
     exit 0
     ;;
@@ -1036,7 +1087,7 @@ case "$surface" in
     trap 'rm -f -- "$desktop_staged"' EXIT
     for _ in {1..20}; do
       sleep "${ARANEA_SCREENSHOT_DELAY:-0.5}"
-      grim "$desktop_staged"
+      capture_frame "$desktop_staged"
       desktop_deviation="$(convert "$desktop_staged" -resize '160x90!' -format '%[fx:standard_deviation]' info: 2>/dev/null)"
       if awk -v deviation="$desktop_deviation" 'BEGIN { exit !(deviation > 0.02) }'; then
         mv -f -- "$desktop_staged" "$output/$surface.png"
@@ -1106,7 +1157,7 @@ case "$surface" in
         ;;
     esac
     sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
-    grim "$output/$surface.png"
+    capture_frame "$output/$surface.png"
     restore_inbox || exit 1
     trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
@@ -1206,7 +1257,7 @@ case "$surface" in
     sleep 5
     omarchy-shell shell toggle "$picker_id" >/dev/null
     sleep 1.5
-    grim "$output/$surface.png"
+    capture_frame "$output/$surface.png"
     finish_picker || exit 1
     trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
@@ -1223,8 +1274,14 @@ case "$surface" in
       echo "wtype is required to capture $surface" >&2
       exit 3
     }
-    pkexec /usr/bin/true >/dev/null 2>&1 &
-    pkexec_pid=$!
+    # Associate requests from an agent/service with the graphical session.
+    polkit_capture_dir="$(mktemp -d /tmp/aranea-polkit-capture.XXXXXX)"
+    pkexec_pid=""
+    cat >"$polkit_capture_dir/request" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" >"$1/pid"
+exec pkexec /usr/bin/true >"$1/request.log" 2>&1
+SH
     # True when the omarchy-polkit layer is on screen.
     prompt_visible() {
       hyprctl layers -j 2>/dev/null | jq -e '[.. | objects | select(.namespace? == "omarchy-polkit")] | length > 0' >/dev/null 2>&1
@@ -1236,10 +1293,22 @@ case "$surface" in
         wtype -k Escape >/dev/null 2>&1 || true
         sleep 1
       fi
-      if kill -0 "$pkexec_pid" 2>/dev/null; then kill "$pkexec_pid" 2>/dev/null || true; fi
-      wait "$pkexec_pid" 2>/dev/null || true
+      if [[ -n "$pkexec_pid" ]] && kill -0 "$pkexec_pid" 2>/dev/null; then kill "$pkexec_pid" 2>/dev/null || true; fi
+      rm -rf -- "$polkit_capture_dir"
     }
     trap finish_polkit EXIT
+    hyprctl dispatch "hl.dsp.exec_cmd(\"bash $polkit_capture_dir/request $polkit_capture_dir\")" >/dev/null
+    for _ in {1..50}; do
+      if [[ -s "$polkit_capture_dir/pid" ]]; then
+        pkexec_pid="$(cat "$polkit_capture_dir/pid")"
+        break
+      fi
+      sleep 0.1
+    done
+    [[ "$pkexec_pid" =~ ^[0-9]+$ ]] || {
+      echo 'Unable to launch authentication capture in the graphical session' >&2
+      exit 3
+    }
     shown=0
     # PAM/reader startup can outlast ten seconds; keep the wait bounded.
     for _ in $(seq 1 120); do
@@ -1257,7 +1326,7 @@ case "$surface" in
     sleep 1
     wtype -k Tab
     sleep 0.5
-    grim "$output/$surface.png"
+    capture_frame "$output/$surface.png"
     finish_polkit
     trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
@@ -1270,7 +1339,7 @@ case "$surface" in
     # Clear it before the next surface: reset the unit, recheck at once and
     # wait for the monitor to report healthy again.
     cleanup_health_probe() {
-      omarchy-shell shell hide araneadev.health >/dev/null 2>&1 || true
+      omarchy-shell omarchy.power hide >/dev/null 2>&1 || true
       systemctl --user reset-failed aranea-capture-probe >/dev/null 2>&1 || true
       omarchy-shell health refresh >/dev/null 2>&1 || true
       for _ in $(seq 1 20); do
@@ -1292,9 +1361,13 @@ case "$surface" in
       [[ "$(omarchy-shell health status 2>/dev/null)" == critical ]] && break
       sleep 1
     done
-    omarchy-shell shell toggle araneadev.health >/dev/null
+    health_page="$(omarchy-shell omarchy.power showPage health)"
+    [[ "$health_page" == ok ]] || {
+      echo "Unable to open System Health: $health_page" >&2
+      exit 3
+    }
     sleep 3
-    grim "$output/$surface.png"
+    capture_frame "$output/$surface.png"
     cleanup_health_probe
     trap - EXIT
     printf 'captured: %s\n' "$output/$surface.png"
@@ -1409,7 +1482,7 @@ case "$surface" in
     sleep 1
     hyprctl dismissnotify >/dev/null 2>&1 || true
     sleep "${ARANEA_SCREENSHOT_DELAY:-2}"
-    grim "$output/$surface.png"
+    capture_frame "$output/$surface.png"
     close_new_windows "$windows_before"
     kill "$child_pid" >/dev/null 2>&1 || true
     wait "$child_pid" >/dev/null 2>&1 || true

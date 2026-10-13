@@ -296,7 +296,7 @@ ShellRoot {
   // How many cursor outlines in ITEM are drawn (a border or a fill).
   function litOutlines(item) {
     return t.findChildren(item, "cursorOutline").filter(function (o) {
-      return o.visible && (o.border.width > 0 || o.color.a > 0)
+      return o.visible && o.focused
     }).length
   }
 

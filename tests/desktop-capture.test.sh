@@ -11,12 +11,22 @@ convert -size 160x90 xc:'#101010' "$ARANEA_TEST_SANDBOX/blank.png" 2>/dev/null
 convert -size 160x90 gradient:black-white "$ARANEA_TEST_SANDBOX/ready.png" 2>/dev/null
 cat >"$bin/grim" <<'STUB'
 #!/usr/bin/env bash
+if [[ "${ARANEA_CAPTURE_WORKSPACE:-}" == 2 ]]; then
+  [[ -f "$ARANEA_TEST_SANDBOX/focused" ]] || exit 9
+fi
 count=$(cat "$ARANEA_TEST_SANDBOX/count" 2>/dev/null || echo 0)
 count=$((count + 1))
 echo "$count" > "$ARANEA_TEST_SANDBOX/count"
 frame=blank
 if [[ "${CAPTURE_ALWAYS_BLANK:-0}" != 1 && "$count" -gt 1 ]]; then frame=ready; fi
 cp "$ARANEA_TEST_SANDBOX/$frame.png" "${@: -1}"
+STUB
+cat >"$bin/hyprctl" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  dispatch) touch "$ARANEA_TEST_SANDBOX/focused" ;;
+  activeworkspace) echo '{"id":2}' ;;
+esac
 STUB
 printf '#!/usr/bin/env bash\nexit 0\n' >"$bin/sleep"
 chmod +x "$bin"/*
@@ -34,3 +44,8 @@ fi
 [[ "$(cat "$out/desktop.png")" == previous ]]
 [[ "$(find "$out" -name '.desktop.*' | wc -l)" == 0 ]]
 echo 'desktop capture retries startup frames and preserves the prior capture on failure'
+
+# A batch must restore workspace 2 immediately before grabbing each frame.
+rm -f "$ARANEA_TEST_SANDBOX/count" "$ARANEA_TEST_SANDBOX/focused"
+ARANEA_CAPTURE_WORKSPACE=2 "$capture" --surface desktop --output "$out" >/dev/null
+test -f "$ARANEA_TEST_SANDBOX/focused"

@@ -73,13 +73,17 @@ Item {
     color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
   }
 
-  ColumnLayout {
+  GridLayout {
     id: content
+    objectName: "resourceLayout"
     anchors.fill: parent
-    spacing: Style.space(16)
+    columns: root.width >= Style.space(480) ? 2 : 1
+    columnSpacing: Style.space(24)
+    rowSpacing: Style.space(16)
 
     ColumnLayout {
       Layout.fillWidth: true
+      Layout.columnSpan: content.columns
       spacing: Style.space(4)
       RowLayout {
         Layout.fillWidth: true
@@ -107,7 +111,7 @@ Item {
       Aranea.LinkGraph {
         objectName: "cpuTrace"
         Layout.fillWidth: true
-        Layout.preferredHeight: Style.space(34)
+        Layout.preferredHeight: Style.space(64)
         // Today's source and window: one sample a second, the last 60,
         // on a fixed 0..100 % scale.
         samples: root.active && root.metrics ? HealthLogic.cpuSamples(root.metrics.cpuHistory) : []
@@ -118,10 +122,14 @@ Item {
       }
     }
 
-    Hairline {}
+    Hairline {
+      Layout.columnSpan: content.columns
+    }
 
     ColumnLayout {
       Layout.fillWidth: true
+      Layout.alignment: Qt.AlignTop
+      Layout.preferredWidth: 1
       spacing: Style.space(4)
       RowLayout {
         Layout.fillWidth: true
@@ -150,10 +158,14 @@ Item {
       }
     }
 
-    Hairline {}
+    Hairline {
+      visible: content.columns === 1
+    }
 
     ColumnLayout {
       Layout.fillWidth: true
+      Layout.alignment: Qt.AlignTop
+      Layout.preferredWidth: 1
       spacing: Style.space(4)
       Caption {
         text: "DISK"
@@ -197,10 +209,13 @@ Item {
       }
     }
 
-    Hairline {}
+    Hairline {
+      Layout.columnSpan: content.columns
+    }
 
     RowLayout {
       Layout.fillWidth: true
+      Layout.columnSpan: content.columns
       Caption {
         text: "NET"
       }

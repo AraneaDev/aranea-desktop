@@ -66,6 +66,7 @@ ShellRoot {
 
   HealthComponents.HealthResourceSection {
     id: resources
+    width: 540
     metrics: ({})
     active: true
     cpu: 42
@@ -189,8 +190,14 @@ ShellRoot {
     t.check(hasText(criticalSummary, "2 issues need attention") && hasText(criticalSummary, "critical"), "critical summary keeps count and severity text")
     t.check(hasText(criticalSummary, "/boot · 80%"), "summary chooses the fullest disk with its mount")
     t.check(hasText(emptySummary, "No detected problems"), "empty available health is clearly healthy")
-    t.check(!healthView.resourcesExpanded && !healthView.processesExpanded, "details begin collapsed")
+    t.check(healthView.resourcesExpanded && !healthView.processesExpanded, "resources show on first open while processes stay optional")
+    var wideLayout = t.findChild(resources, "resourceLayout")
+    var narrowLayout = t.findChild(unknownResources, "resourceLayout")
+    t.check(wideLayout && wideLayout.columns === 2, "wide resources place memory and disk side by side")
+    t.check(narrowLayout && narrowLayout.columns === 1, "narrow resources keep a readable single column")
     t.check(!healthView.problemsView.visible, "unavailable composition hides the old healthy fallback")
+    var decision = t.findChild(cappedView, "healthDecision")
+    t.check(decision && !decision.visible, "issues do not repeat a separate status and severity block")
     t.equal(t.findChild(unknownResources, "cpuValue").text, "—", "unknown detail CPU is not zero")
     t.equal(t.findChild(unknownResources, "memValue").text, "—", "unknown detail memory is not zero")
     t.check(hasText(emptyProcesses, "No process data"), "empty processes retain a readable empty state")

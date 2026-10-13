@@ -240,7 +240,7 @@ Panel {
   // The selection follows the provider, not the slot it happens to sit in: a
   // provider whose first scan lands while the panel is open would otherwise
   // shift the list underneath you and swap out what you were reading.
-  property string selectedProviderId: ""
+  property string selectedProviderId: String(setting("selectedProviderId", ""))
   // The stand-in agent chosen while a showcase is shown, kept apart from
   // selectedProviderId so a capture never moves the user's real choice
   // (AgentsLogic.selectId); "" outside a showcase.
@@ -364,6 +364,16 @@ Panel {
     }, !!agentsShowcase, providers[wrapped].providerId)
     selectedProviderId = next.real
     showcaseSelectedId = next.showcase
+    if (!captureActive && !agentsShowcase) {
+      root.settings = Object.assign({}, root.settings, {
+        selectedProviderId: next.real
+      })
+      // The bar supplies the host's inline-settings persistence boundary.
+      // qmllint disable missing-property
+      if (root.bar && root.bar.shell)
+        root.bar.shell.updateEntryInline(root.moduleName, root.settings)
+      // qmllint enable missing-property
+    }
   }
 
   // Forces every collector to re-run now, ignoring refreshIntervalSec.
@@ -1032,6 +1042,23 @@ Panel {
 
   IpcHandler {
     target: root.ipcTarget
+    function selection(): string {
+      return JSON.stringify({
+        preferredId: root.selectedProviderId,
+        activeId: root.provider ? root.provider.providerId : null
+      })
+    }
+    function select(providerId: string): string {
+      if (root.captureActive || root.agentsShowcase)
+        return "refused"
+      for (var i = 0; i < root.providers.length; i++) {
+        if (root.providers[i].providerId === providerId) {
+          root.selectProvider(i)
+          return "ok"
+        }
+      }
+      return "unavailable"
+    }
     function showTask(taskId: string): string {
       return JSON.stringify(root.showTask(taskId))
     }

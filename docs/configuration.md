@@ -2,7 +2,7 @@
 
 ## Aranea settings
 
-Open **Setup → Aranea settings**, or search for “settings” in the menu.
+Open **Command center → Settings → Aranea**, or search for “settings” in the menu.
 The centered window uses a compact 840×460 logical size capped to the screen,
 with scrolling for longer pages. It covers wallpaper selection and explicit Apply, motion,
 custom display scaling, wallpaper schedule enablement and validated Save, integration activation, and
@@ -12,7 +12,8 @@ choices for Aranea panels and controls. Samples preview each draft; **Apply**
 saves both choices and updates open surfaces. **Reset to defaults** edits the
 draft and also requires Apply. Icon glyphs retain their dedicated font.
 Preferences live in `~/.config/aranea/fonts.json`; changing these choices does
-not replace the native fonts used by applications or terminal content.
+replace terminal font settings. The interface family also updates GTK and
+GTK-backed Qt desktop fonts; running Qt applications may need reopening.
 
 The theme defaults to **Inter** for the interface and **JetBrains Mono** for
 technical text. It also bundles **IBM Plex Sans**, **Source Sans 3**,
@@ -120,6 +121,33 @@ offscreen with fixed fixtures and refuse reads and changes. The standalone
 Display diagnostic. Offscreen diagnostics do not summon the live desktop or change
 notifications.
 
+## Bar and panel groups
+
+The default right bar has Notifications, Agents, Network, Audio, and System,
+with a tray disclosure and an issue-only Health shortcut. `scripts/repair-shell-config`
+folds redundant VPN/Bluetooth entries into Network, Display into System, and the
+separate microphone entry into Audio when those hosts are present. Removing a
+host retains the child plugin's standalone route; repair is idempotent and keeps
+inline user settings.
+
+Network tab shortcuts are `N` Network, `V` VPN, and `B` Bluetooth. System uses
+`P` Power, `D` Display, and `S` Health. Hosted Bluetooth uses `T` to toggle power;
+standalone Bluetooth retains its original `B` toggle. The conditional Health
+entry uses `alertOnly: true`; its popup stays reachable while its last issue is
+being resolved.
+
+Agents saves `selectedProviderId` in its inline bar entry. Selecting Codex keeps
+Codex selected after a shell restart; display-only showcase selections stay
+separate. The panel can be inspected or selected by stable provider ID:
+
+```bash
+omarchy-shell omarchy.agents selection
+omarchy-shell omarchy.agents select codex
+```
+
+These select an available Usage provider; opt-in task reporting is a separate
+setting. See [agent setup](workflows.md).
+
 ## Profiles
 
 Profiles control application integrations during installation:
@@ -135,20 +163,52 @@ theme hooks after activation.
 
 ## Wallpapers
 
-List and select stable wallpaper IDs:
+Signal Shrine is the theme default. `backgrounds/00-default.png` is a relative
+link to its existing image, putting it first in Omarchy’s sorted top-level
+background selection. A matching current background may be cycled by Omarchy on
+reapplication; user backgrounds and enabled schedules retain their native behavior.
+
+Human titles and stable CLI IDs are separate:
+
+| Title                   | Stable ID        |
+| ----------------------- | ---------------- |
+| Signal Shrine (default) | `signal-shrine`  |
+| Aranea Core             | `aranea-core`    |
+| Neural Deck             | `cockpit`        |
+| Rain City               | `day`            |
+| Silent Vault            | `night`          |
+| First Departure         | `dawn`           |
+| Dead Frequency          | `dusk`           |
+| Black Signal            | `sparse`         |
+| Undercity               | `dense`          |
+| Ghost in the Wire       | `monochrome`     |
+| Violet Pursuit          | `violet-pursuit` |
+| Deep Current            | `deep-current`   |
+| Orbital Relay           | `ultrawide`      |
+
+List and select a wallpaper:
 
 ```bash
 scripts/aranea-wallpaper list
-scripts/aranea-wallpaper set day
+scripts/aranea-wallpaper set signal-shrine
 scripts/aranea-wallpaper set ultrawide
 ```
 
-The schedule uses four phase boundaries and can be inspected without changing
-it:
+Each daily entry has a local `HH:MM` time and a stable wallpaper ID. Keep at
+least one entry and use a different time for each; the same image can appear
+more than once. Save sorts entries by time. The most recent entry applies,
+wrapping to the previous day before the first time. Draft edits do not change
+the running schedule.
+
+Existing four-phase configurations load automatically. Saving writes version 2
+JSON to `~/.config/aranea/wallpaper-schedule.conf`; the legacy four-time CLI
+remains supported. The existing enable switch and timer names are retained.
+
+Inspect or configure the schedule:
 
 ```bash
 scripts/aranea-wallpaper schedule status
-scripts/aranea-wallpaper schedule configure 06:00 08:00 18:00 20:00
+scripts/aranea-wallpaper schedule configure --entries '[{"time":"07:00","wallpaper":"day"},{"time":"21:00","wallpaper":"signal-shrine"}]'
 scripts/aranea-wallpaper schedule on
 scripts/aranea-wallpaper schedule off
 ```
@@ -207,7 +267,7 @@ interfaces over relying on internal paths.
 
 ## Projects
 
-Open **Launcher → Projects**. Choose a folder through the desktop folder picker or
+Open **Command center → Projects**. Choose a folder through the desktop folder picker or
 enter its absolute path; **Use folder** confirms the path before scanning.
 Nothing is registered until you select discovered checkouts and press **Add
 selected**. Git worktrees are grouped by their common Git directory. Registering

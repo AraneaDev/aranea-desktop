@@ -6,7 +6,8 @@ singleton DesignTokens 1.0 DesignTokens.qml
 singleton BrandConfig 1.0 BrandConfig.qml
 OverlayChrome 1.0 OverlayChrome.qml
 SurfaceCard 1.0 SurfaceCard.qml
-PanelHeader 1.0 PanelHeader.qml
+CircuitFrame 1.0 CircuitFrame.qml
+DeckReveal 1.0 DeckReveal.qml
 DisclosureSection 1.0 DisclosureSection.qml
 StatusRail 1.0 StatusRail.qml
 StatusTextPair 1.0 StatusTextPair.qml
@@ -23,6 +24,8 @@ FilamentPulse 1.0 FilamentPulse.qml
 NodeDeviceRow 1.0 NodeDeviceRow.qml
 DropdownHeader 1.0 DropdownHeader.qml
 FilamentPill 1.0 FilamentPill.qml
+FocusFrame 1.0 FocusFrame.qml
+BarGroupIcon 1.0 BarGroupIcon.qml
 ForgetButton 1.0 ForgetButton.qml
 LinkGraph 1.0 LinkGraph.qml
 CredentialPrompt 1.0 CredentialPrompt.qml

@@ -1,3 +1,3 @@
-# Generated from design/brand.toml and design/tokens.toml. Do not edit directly.
-input_sha256=55364b56545fe9f5d5b8b9026ea2cca2665207ab2bdaeee0292f52a4e732e5b9
+# Generated from design/tokens.toml and the canonical Aranea mark. Do not edit directly.
+input_sha256=cafffead00228aee8d4191c11a5fae8d1c1ff0cd08b902e357d758a89284f0d8
 unlock=640x640

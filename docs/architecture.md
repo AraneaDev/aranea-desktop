@@ -45,6 +45,54 @@ boundaries are:
 | Generated facades    | Stable compatibility exports for QML                        | Hand-edited business logic                                 |
 | Hooks and scripts    | Installation, activation, repair, and host integration      | Presentation decisions that belong in QML or templates     |
 
+## Consolidated panel ownership
+
+```mermaid
+flowchart LR
+    Bar --> Network[Network popup]
+    Network --> Net[Network controls]
+    Network --> VPN[Embedded VPN controller]
+    Network --> Bluetooth[Embedded Bluetooth controller]
+    Bar --> System[System popup]
+    System --> Power[Power controls]
+    System --> Display[Embedded Display controller]
+    System --> Health[Embedded Health controller]
+    Health --> HealthService[Shared Health service]
+    Bar --> Audio[Audio and microphone controls]
+```
+
+The bar keeps Notifications, Agents, Network, Audio, and System as everyday
+controls. Tray is disclosed; Health can expose a separate issue-only shortcut.
+`repair-shell-config` removes redundant child entries only when their host is
+present, preserving standalone layouts and inline settings.
+
+`araneadev.network/Panel.qml` owns one popup and tab selection. It loads the
+existing VPN and Bluetooth controllers in embedded mode, suppressing their own
+bar icons and windows. Each controller keeps its data, actions, credential
+handling, and IPC. Legacy open routes select the corresponding host page;
+closing a child closes the host. Page changes coordinate polling and scanning,
+clear stale prompts, and restore the shared key catcher. `N`/`V`/`B` select pages;
+the hosted Bluetooth power shortcut is `T`.
+
+`araneadev.power/Panel.qml` owns the System popup and Power/Display/Health pages.
+Display and Health load by URL so missing optional plugins do not break Power.
+Their controllers retain standalone operation. Health samples resources only
+while its selected page is open and shares the existing service through
+HealthBridge. `omarchy.power showPage power|display|health` validates availability
+and selects a page; screenshots use that route instead of keyboard injection.
+
+Audio owns microphone controls and a capture-only badge based on active capture
+streams. Shared `BarGroupIcon.qml` draws the linked-node Network and adjustment
+System symbols; the owning button supplies semantic color. Shared focus and
+underline components supply decoration, while hosts retain cursor identity and
+activation.
+
+Agents keeps real provider identity separate from showcase identity. Real
+provider changes save `selectedProviderId` through the host's inline settings
+boundary; reconstruction reads it back. Inert captures and showcases cannot
+write that preference. The bar ring follows the selected real provider outside
+showcase mode.
+
 Desktop search normalization and ranking live in `DesktopSearchRanking.js`.
 The generated `DesktopSearchLogic.js` facade composes it with `MenuSearch.js`,
 so matching shares the menu’s existing name, alias, and whole-word description
@@ -145,7 +193,7 @@ flowchart LR
 
 Current shared examples include `BrandHeader`, `StatusRow`,
 `KeyboardInputFrame`, `KeyboardPanelFrame`, `RuntimePaths`, `SurfaceCard`,
-`PanelHeader`, `StatusRail`, and `StatusTextPair`.
+`StatusRail`, and `StatusTextPair`.
 
 Extract a component when the contract is repeated, stable, and presentational.
 Keep it local when it depends on plugin state, a particular service, a cursor,

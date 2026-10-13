@@ -35,6 +35,13 @@ BorderSurface {
   clip: card.clipContent
   borderSpec: card.borderSpecOverride !== null ? card.borderSpecOverride : Border.surfaceSpec(card.surface, "border", card.borderColor, Math.max(0, card.borderWidth), "border-alpha")
 
+  CircuitFrame {
+    parent: card
+    anchors.fill: parent
+    cornerRadius: card.cornerRadius
+    visible: card.borderTop + card.borderRight + card.borderBottom + card.borderLeft > 0
+  }
+
   Item {
     id: body
     anchors.fill: parent

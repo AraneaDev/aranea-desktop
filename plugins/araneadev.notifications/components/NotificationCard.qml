@@ -455,14 +455,9 @@ BorderSurface {
     }
   }
 
-  Rectangle {
-    // The keyboard cursor outline (mint, keyboard only); never in toasts.
+  Aranea.FocusFrame {
     objectName: "cursorOutline"
     anchors.fill: parent
-    radius: root.radius
-    color: "transparent"
-    border.width: root.hasCursor ? 1 : 0
-    border.color: Aranea.DesignTokens.accent
-    visible: root.hasCursor
+    focused: root.hasCursor
   }
 }

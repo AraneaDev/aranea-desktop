@@ -16,6 +16,73 @@ const parsing = loadPragma("plugins/araneadev.menu/MenuItemParsing.js")
 const guards = loadPragma("plugins/araneadev.menu/MenuGuardScript.js")
 const fixture = fs.readFileSync(path.join(root, "tests/qml/fixtures/omarchy-menu.jsonc"), "utf8")
 
+test("command center groups software and configuration without losing routes", () => {
+  const defaults = parsing.parseMenuJsonc(
+    JSON.stringify(
+      Object.fromEntries(
+        [
+          "apps",
+          "learn",
+          "trigger",
+          "style",
+          "setup",
+          "install",
+          "remove",
+          "update",
+          "about",
+          "system"
+        ].map((id) => [id, { label: id }])
+      )
+    )
+  )
+  defaults.push(parsing.normalizeItem("install.package", { action: "install-package" }))
+  const merged = parsing.mergeMenuSources(defaults, [], true)
+  assert.deepEqual(
+    plain(facade.mergeMenuSources(defaults, [], true)),
+    plain(merged),
+    "public facade preserves grouped routes"
+  )
+  const withoutSettings = facade.mergeMenuSources(defaults, [], false)
+  assert.equal(
+    withoutSettings.items.about.parent,
+    "learn",
+    "Help retains About when Settings is unavailable"
+  )
+  assert.equal(
+    withoutSettings.items["aranea.settings"],
+    undefined,
+    "unavailable Settings is not injected"
+  )
+  const roots = merged.itemOrder.filter((id) => merged.items[id].parent === "root")
+  assert.deepEqual(plain(roots), ["apps", "trigger", "software", "settings", "learn", "system"])
+  assert.equal(merged.items.trigger.label, "Actions")
+  assert.equal(merged.items.learn.label, "Help")
+  for (const id of ["install", "remove", "update"])
+    assert.equal(merged.items[id].parent, "software")
+  assert.equal(merged.items["aranea.settings"].label, "Aranea")
+  for (const id of ["style", "setup", "aranea.settings"])
+    assert.equal(merged.items[id].parent, "settings")
+  assert.equal(merged.items["install.package"].action, "install-package")
+  assert.equal(facade.resolveRoute(merged.items, merged.itemOrder, "install"), "install")
+  assert.equal(
+    facade.resolveRoute(merged.items, merged.itemOrder, "aranea-settings"),
+    "aranea.settings"
+  )
+  const custom = parsing.parseMenuJsonc(
+    '{"about":{"action":"custom-about"},"settings":{"action":"custom-settings"}}'
+  )
+  const overridden = parsing.mergeMenuSources(defaults, custom, true)
+  assert.deepEqual(
+    plain(facade.mergeMenuSources(defaults, custom, true)),
+    plain(overridden),
+    "public facade respects custom group destinations"
+  )
+  assert.ok(overridden.items.about, "custom About action stays available")
+  assert.equal(overridden.items.about.action, "custom-about")
+  assert.equal(overridden.items.style.parent, "root", "action destinations cannot contain menus")
+  assert.equal(overridden.items.install.parent, "root", "skip folding when a group collides")
+})
+
 /**
  * Round-trips a value through JSON so values from different vm realms compare.
  * @param {*} value - any JSON-able value
@@ -108,13 +175,13 @@ test("MenuGuardScript answers like the facade", () => {
   sameAsFacade(guards, "guardScript", [{}])
 })
 
-test("settings route is guarded, unique, and searchable under Setup", () => {
+test("settings route is guarded, unique, and searchable on the root", () => {
   const defaults = parsing.parseMenuJsonc(fixture)
   const merged = parsing.mergeMenuSources(defaults, [], true)
   const item = merged.items["aranea.settings"]
   assert.ok(item, "installed settings adds its route")
-  assert.equal(item.parent, "setup")
-  assert.equal(item.label, "Aranea settings")
+  assert.equal(item.parent, "root")
+  assert.equal(item.label, "Settings")
   assert.equal(
     item.icon,
     "aranea-brand",
@@ -129,6 +196,19 @@ test("settings route is guarded, unique, and searchable under Setup", () => {
   assert.equal(merged.itemOrder.filter((id) => id === "aranea.settings").length, 1)
   sameAsFacade(parsing, "mergeMenuSources", [defaults, [], true])
   assert.equal(parsing.mergeMenuSources(defaults, [], false).items["aranea.settings"], undefined)
+})
+
+test("root Settings replaces About in its original command position", () => {
+  const defaults = parsing.parseMenuJsonc(
+    '{"apps":{"label":"Apps"},"setup":{"label":"Setup"},"about":{"label":"About","action":"about"},"system":{"label":"System"}}'
+  )
+  const merged = parsing.mergeMenuSources(defaults, [], true)
+  assert.equal(merged.items.about, undefined)
+  assert.deepEqual(plain(merged.itemOrder), ["root", "apps", "setup", "aranea.settings", "system"])
+  assert.equal(merged.items["aranea.settings"].parent, "root")
+  assert.equal(merged.items["aranea.settings"].label, "Settings")
+  assert.equal(parsing.mergeMenuSources(defaults, [], false).items.about.action, "about")
+  sameAsFacade(parsing, "mergeMenuSources", [defaults, [], true])
 })
 
 test("settings route preserves user overrides and unrelated commands", () => {

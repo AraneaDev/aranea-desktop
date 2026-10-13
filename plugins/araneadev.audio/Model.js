@@ -17,6 +17,24 @@ function isPlaybackStream(node) {
 }
 
 /**
+ * Native Microphone's recorder-stream predicate. A physical source's running
+ * state also reflects level meters, so it must never drive the bar signal.
+ * Keep default-source mute separate: a recorder may still be connected to a
+ * muted input, which the capture badge represents with its muted glyph.
+ * @param {Array<*>} nodes - current PipeWire nodes
+ * @returns {boolean} whether any unmuted recorder stream is connected
+ */
+function captureActive(nodes) {
+  var values = nodes || []
+  for (var i = 0; i < values.length; i++) {
+    var node = values[i]
+    if (node && node.isStream && node.isSink === false && !(node.audio && node.audio.muted))
+      return true
+  }
+  return false
+}
+
+/**
  * Tells whether a Pipewire node is a real (non-quickshell) audio source.
  * @param {*} node - the Pipewire node, or falsy
  * @returns {boolean} true when the node is an audio source
@@ -397,6 +415,7 @@ function streamRepresentsPlayer(node, player, players, streams) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    captureActive: captureActive,
     isPlaybackStream: isPlaybackStream,
     isAudioSource: isAudioSource,
     listSnapshot: listSnapshot,

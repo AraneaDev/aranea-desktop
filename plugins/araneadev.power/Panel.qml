@@ -9,6 +9,7 @@
 // Model.js / CursorLogic.js functions, tested under Node.
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Layouts
 import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.Commons
@@ -26,6 +27,89 @@ Panel {
   // manageIpc: false so this panel can own the single IpcHandler the target
   // permits, needed for the togglePercentage method below.
   manageIpc: false
+
+  // Power remains the default page of the Battery/System control.
+  property string activePage: "power"
+  // Existing Display controller; null until its plugin loads.
+  readonly property var displayController: displayRuntime.item
+  // Existing Health controller, backed by the shared service.
+  readonly property var healthController: healthRuntime.item
+  // Keyboard focus restored after a page selection.
+  readonly property var keyCatcher: panel.focusTarget
+  // Selected embedded controller, or null for Power.
+  readonly property var activePageController: activePage === "display" ? displayController : activePage === "health" ? healthController : null
+  // Align controller lifecycles with the visible page and host window.
+  function syncSystemPages() {
+    if (displayController) {
+      if (opened && activePage === "display")
+        displayController.controller.show()
+      else
+        displayController.controller.hide()
+    }
+    if (healthController) {
+      if (opened && activePage === "health")
+        healthController.controller.show()
+      else
+        healthController.controller.hide()
+    }
+  }
+  // Choose an available page and clear stale pointer/cursor input.
+  function selectPage(page) {
+    if (page === "display" && !displayController || page === "health" && !healthController)
+      return
+    activePage = page === "display" || page === "health" ? page : "power"
+    keyboardCursor = false
+    dropdown.disarmPointer()
+    if (activePageController)
+      activePageController.disarmPointer()
+    syncSystemPages()
+    if (opened)
+      Qt.callLater(function () {
+        if (root.opened)
+          root.keyCatcher.forceActiveFocus()
+      })
+  }
+  // Legacy embedded entry points open the owning window and requested page.
+  function openSystemPage(page) {
+    root.controller.show()
+    root.selectPage(page)
+  }
+  onActivePageChanged: root.syncSystemPages()
+  Loader {
+    id: displayRuntime
+    visible: false
+    Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.monitor/Panel.qml"), {
+      embedded: true,
+      embeddingHost: root
+    })
+    onLoaded: {
+      item.bar = Qt.binding(function () {
+        return root.bar
+      })
+      item.hostedDropdown = Qt.binding(function () {
+        return displayPage.item
+      })
+      root.syncSystemPages()
+    }
+  }
+  Loader {
+    id: healthRuntime
+    visible: false
+    Component.onCompleted: setSource(Qt.resolvedUrl("../araneadev.health/Panel.qml"), {
+      embedded: true,
+      embeddingHost: root
+    })
+    onLoaded: {
+      item.bar = Qt.binding(function () {
+        return root.bar
+      })
+      item.hostedDropdown = Qt.binding(function () {
+        return healthPage.item
+      })
+      root.syncSystemPages()
+    }
+  }
+
   // The parsed `omarchy-battery-status --shell` fields (percentage, time,
   // rate, size, cycles, threshold), or {} before the first poll.
   property var batteryInfo: ({})
@@ -63,7 +147,7 @@ Panel {
   // With the percentage shown the button paints a text block wider than an
   // icon, so the open-panel mark takes the painted width instead of the
   // icon-sized fraction of the slot the fallback assumes.
-  readonly property real openPanelIndicatorWidth: showPercentage && !button.vertical ? button.glyphPaintedWidth : 0
+  readonly property real openPanelIndicatorWidth: batteryPresent && showPercentage && !button.vertical ? button.glyphPaintedWidth : 0
   // Whether UPower reports a present, usable battery device.
   readonly property bool batteryPresent: {
     var device = UPower.displayDevice
@@ -464,6 +548,15 @@ Panel {
     function show() {
       root.open()
     }
+    // Capture and command routes select a page without sending keyboard input.
+    function showPage(page: string): string {
+      if (page !== "power" && page !== "display" && page !== "health")
+        return "invalid"
+      if (page === "display" && !root.displayController || page === "health" && !root.healthController)
+        return "unavailable"
+      root.openSystemPage(page)
+      return "ok"
+    }
     function hide() {
       root.close()
     }
@@ -476,16 +569,14 @@ Panel {
   }
 
   onOpenedChanged: {
+    if (!opened)
+      activePage = "power"
+    root.syncSystemPages()
     // A fresh open starts with the outline hidden and chooses nothing: the
     // first key (Enter included) reveals the cursor on the active profile.
     keyboardCursor = false
     profileKey = ""
     if (opened) {
-      if (!batteryPresent) {
-        close()
-        return
-      }
-
       refresh()
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
@@ -500,12 +591,8 @@ Panel {
     }
   }
 
-  onBatteryPresentChanged: if (!batteryPresent)
-    close()
-
-  visible: batteryPresent
-  implicitWidth: batteryPresent ? button.implicitWidth : 0
-  implicitHeight: batteryPresent ? button.implicitHeight : 0
+  implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
 
   Process {
     id: batteryProc
@@ -660,12 +747,56 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.showPercentage && !vertical ? Math.round(root.batteryFraction * 100) + "% " + root.batteryIcon() : root.batteryIcon()
-    slotSize: Style.bar.iconSlot * (root.showPercentage && !vertical ? 2 : 1)
-    tooltipText: ""
+    text: root.batteryPresent && root.showPercentage && !vertical ? Math.round(root.batteryFraction * 100) + "% " + root.batteryIcon() : root.batteryPresent ? root.batteryIcon() : String.fromCodePoint(0xf0425)
+    slotSize: Style.bar.iconSlot * (root.batteryPresent && root.showPercentage && !vertical ? 2 : 1)
+    tooltipText: "System · Power / Display / Health" + (root.batteryPresent ? " · Battery " + Math.round(root.batteryFraction * 100) + "%" : "")
+    iconComponent: Component {
+      Item {
+        id: iconSurface
+        Row {
+          anchors.centerIn: parent
+          spacing: Style.space(4)
+          Text {
+            visible: root.batteryPresent && root.showPercentage && !button.vertical
+            text: Math.round(root.batteryFraction * 100) + "%"
+            color: button.foreground
+            font.family: Aranea.Typography.technicalFamily
+            // The host exposes font sizes as dynamic QObject tokens.
+            // qmllint disable missing-property
+            font.pixelSize: Style.font.caption
+            // qmllint enable missing-property
+            anchors.verticalCenter: parent.verticalCenter
+          }
+          Aranea.BarGroupIcon {
+            width: iconSurface.width
+            height: iconSurface.height
+            kind: "system"
+            ink: button.foreground
+          }
+        }
+      }
+    }
+    Rectangle {
+      visible: root.batteryPresent
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      anchors.rightMargin: Style.space(2)
+      anchors.bottomMargin: Style.space(3)
+      width: Style.space(10)
+      height: Style.space(5)
+      radius: 1
+      color: Aranea.DesignTokens.background
+      border.width: 1
+      border.color: root.discharging && root.batteryFraction < 0.2 ? Aranea.DesignTokens.urgent : button.foreground
+      Rectangle {
+        x: 2
+        y: 2
+        width: Math.max(0, (parent.width - 4) * root.batteryFraction)
+        height: Math.max(1, parent.height - 4)
+        color: root.discharging && root.batteryFraction < 0.2 ? Aranea.DesignTokens.urgent : root.discharging ? button.foreground : Aranea.DesignTokens.accent
+      }
+    }
     onPressed: function (b) {
-      if (!root.batteryPresent)
-        return
       if (b === Qt.RightButton)
         root.togglePercentage()
       else
@@ -680,16 +811,22 @@ Panel {
     anchorItem: button
     owner: root
     bar: root.bar
-    open: root.opened && root.batteryPresent
-    contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    open: root.opened
+    contentWidth: panel.fittedContentWidth(Style.space(root.activePage === "health" ? 540 : 380))
+    contentHeight: panel.fittedContentHeight(systemContent.implicitHeight, Style.space(780))
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
-      dropdown.disarmPointer()
-      root.keyboardCursor = true
+      if (root.activePageController)
+        root.activePageController.disarmPointer()
+      else
+        dropdown.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
+      if (root.activePageController) {
+        root.activePageController.navigateKeyboard(dx, dy)
+        return
+      }
       dropdown.disarmPointer()
       // The first key after opening or after mouse use only reveals the
       // cursor where it is.
@@ -706,6 +843,10 @@ Panel {
     // on a cursor the keyboard is showing, on the profile the user chose
     // and still sees (CursorLogic.pressIntent, cursorConfirmed).
     onActivateRequested: {
+      if (root.activePageController) {
+        root.activePageController.activateKeyboard()
+        return
+      }
       dropdown.disarmPointer()
       if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) === "act")
         root.activateSelectedProfile()
@@ -717,6 +858,11 @@ Panel {
       root.keyboardCursor = true
     }
     onTextKey: function (t) {
+      var key = String(t).toLowerCase()
+      if (key === "p" || key === "d" || key === "s") {
+        root.selectPage(key === "d" ? "display" : key === "s" ? "health" : "power")
+        return
+      }
       dropdown.disarmPointer()
       root.keyboardCursor = true
     }
@@ -725,16 +871,176 @@ Panel {
       anchors.fill: parent
       clip: true
 
-      PowerDropdown {
-        id: dropdown
+      ColumnLayout {
+        id: systemContent
         width: parent.width
-        view: root.powerView
-        statusOpacity: root.statusOpacity
-        historySegments: root.historySegments
-        drawSamples: root.drawSamples
-        nowPercent: root.nowPercent
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        spacing: Style.space(12)
+        SystemTabs {
+          id: systemTabs
+          Layout.fillWidth: true
+          page: root.activePage
+          displayAvailable: root.displayController !== null
+          healthAvailable: root.healthController !== null
+          healthStatus: root.healthController ? root.healthController.status : "healthy"
+          problemCount: root.healthController ? root.healthController.problems.length : 0
+          onPageRequested: function (page) {
+            root.selectPage(page)
+          }
+        }
+        PowerDropdown {
+          id: dropdown
+          Layout.fillWidth: true
+          visible: root.activePage === "power"
+          view: root.powerView
+          statusOpacity: root.statusOpacity
+          historySegments: root.historySegments
+          drawSamples: root.drawSamples
+          nowPercent: root.nowPercent
+          onAction: function (name, arg) {
+            root.handleAction(name, arg)
+          }
+        }
+        Loader {
+          id: displayPage
+          Layout.fillWidth: true
+          active: root.displayController !== null
+          visible: root.activePage === "display"
+          source: Qt.resolvedUrl("../araneadev.monitor/DisplaysDropdown.qml")
+          onLoaded: {
+            var c = root.displayController
+            item.view = Qt.binding(function () {
+              return c.displaysView
+            })
+            item.brightnessPercent = Qt.binding(function () {
+              return c.brightnessPercent
+            })
+            item.brightnessBusy = Qt.binding(function () {
+              return c.brightnessBusy
+            })
+            item.reflowing = Qt.binding(function () {
+              return c.reflowingText
+            })
+            item.nightlightOn = Qt.binding(function () {
+              return c.nightOn
+            })
+            item.nightlightCaption = Qt.binding(function () {
+              return c.nightCaption
+            })
+            item.nightlightPending = Qt.binding(function () {
+              return c.nightPending
+            })
+            item.kbdValue = Qt.binding(function () {
+              return c.kbdValue
+            })
+            item.kbdPending = Qt.binding(function () {
+              return c.kbdPending
+            })
+            item.textPending = Qt.binding(function () {
+              return c.textSizePreviewIndex >= 0
+            })
+            item.selectedScale = Qt.binding(function () {
+              return c.selectedScaleKey
+            })
+            item.pendingScale = Qt.binding(function () {
+              return c.pendingScale
+            })
+            item.enabledDisplays = Qt.binding(function () {
+              return c.enabledDisplayMap
+            })
+            item.pendingDisplays = Qt.binding(function () {
+              return c.pendingDisplays
+            })
+            item.lastEnabled = Qt.binding(function () {
+              return c.lastEnabled
+            })
+            item.displaysLocked = Qt.binding(function () {
+              return c.displaysLocked
+            })
+            item.textIndex = Qt.binding(function () {
+              return c.currentTextIndex()
+            })
+          }
+        }
+        Connections {
+          target: displayPage.item
+          function onAction(name, arg) {
+            if (root.displayController)
+              root.displayController.handleAction(name, arg)
+          }
+        }
+        Loader {
+          id: healthPage
+          Layout.fillWidth: true
+          active: root.healthController !== null
+          visible: root.activePage === "health"
+          source: Qt.resolvedUrl("../araneadev.health/HealthDropdown.qml")
+          onLoaded: {
+            var c = root.healthController
+            item.available = Qt.binding(function () {
+              return c.available
+            })
+            item.status = Qt.binding(function () {
+              return c.status
+            })
+            item.problems = Qt.binding(function () {
+              return c.problems
+            })
+            item.metrics = Qt.binding(function () {
+              return c.m
+            })
+            item.active = Qt.binding(function () {
+              return c.opened
+            })
+            item.cursorKey = Qt.binding(function () {
+              return c.cursorKey
+            })
+            item.keyboardCursor = Qt.binding(function () {
+              return c.keyboardCursor
+            })
+            item.resourcesExpanded = Qt.binding(function () {
+              return c.resourcesExpanded
+            })
+            item.processesExpanded = Qt.binding(function () {
+              return c.processesExpanded
+            })
+            item.maxContentHeight = Qt.binding(function () {
+              return Math.max(0, panel.availableCardHeight - panel.verticalContentInset - systemContent.spacing * 2 - systemTabs.implicitHeight - systemHint.implicitHeight)
+            })
+          }
+        }
+        Connections {
+          target: healthPage.item
+          function onProblemActivated(index, key) {
+            if (root.healthController)
+              root.healthController.activateRow(index, key)
+          }
+          function onResourcesToggleRequested() {
+            var c = root.healthController
+            if (!c)
+              return
+            c.keyboardCursor = false
+            c.cursorKey = "details:resources"
+            c.toggleResources()
+          }
+          function onProcessesToggleRequested() {
+            var c = root.healthController
+            if (!c)
+              return
+            c.keyboardCursor = false
+            c.cursorKey = "details:processes"
+            c.toggleProcesses()
+          }
+        }
+        Text {
+          id: systemHint
+          Layout.fillWidth: true
+          text: "p power" + (root.displayController ? " · d display" : "") + (root.healthController ? " · s health" : "")
+          color: Util.alpha(Aranea.DesignTokens.foreground, Aranea.DesignTokens.secondaryOpacity)
+          // Host font tokens are dynamic QObject properties.
+          // qmllint disable missing-property
+          font.family: Aranea.Typography.technicalFamily
+          font.pixelSize: Style.font.caption
+          // qmllint enable missing-property
         }
       }
     }

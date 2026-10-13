@@ -19,7 +19,8 @@ shape without changing the system.
 
 ## Protocol contract
 
-Every non-empty stdout line is one JSON object with `schema: 1`, `event`,
+For install, uninstall, and doctor, every non-empty stdout line is one JSON
+object with `schema: 1`, `event`,
 `operation`, and UTC `timestamp`. Event types are:
 
 - `started`: operation and selected options in `data`;
@@ -68,6 +69,46 @@ rm -f "$events_file"
 Do not invoke complete removal without making the replacement-theme decision
 explicit. Prefer `--dry-run` before a destructive action and preserve recovery
 events in logs.
+
+## Desktop state and panel routes
+
+Wallpaper status/catalog and package checks use JSON documents rather than the
+lifecycle JSONL stream:
+
+```bash
+scripts/aranea-wallpaper list --json
+scripts/aranea-wallpaper status --json
+scripts/aranea-update-status
+scripts/aranea-settings status --json
+```
+
+Wallpaper catalog entries include stable `id`, human `label`, absolute `path`,
+and `available`. Signal Shrine has ID `signal-shrine`; labels such as Neural Deck
+and Ghost in the Wire keep legacy IDs `cockpit` and `monochrome`. Refer to
+[Configuration](configuration.md#wallpapers) for the complete thirteen-scene map.
+Status reports the observed active wallpaper, rather than a last requested choice.
+Package checks report `updates`, `rebootRequired`, and an optional `error`, with a
+nonzero exit on an unavailable source. They never install packages.
+
+The live shell retains native IPC entry points for consolidated tabs:
+
+```bash
+omarchy-shell omarchy.network show
+omarchy-shell aranea.vpn show
+omarchy-shell omarchy.bluetooth show
+omarchy-shell omarchy.power showPage display
+omarchy-shell omarchy.power showPage health
+omarchy-shell omarchy.agents selection
+omarchy-shell omarchy.agents select codex
+```
+
+VPN/Bluetooth open their Network page while hosted, and standalone controls
+otherwise. `showPage` returns `ok`, `invalid`, or `unavailable`. Agents `selection`
+returns preferred/active provider IDs; `select` persists an available Usage
+provider, returning `unavailable` if undiscovered or `refused` during an inert
+capture/showcase. These routes open panels or select display preferences; they do
+not connect a VPN, toggle Bluetooth, resolve a Health issue, or enable task hooks.
+Their return strings are native IPC responses, not lifecycle JSONL events.
 
 ## Internal project registry
 
@@ -194,13 +235,12 @@ have been accepted. These indeterminate replies return `OWNER_UNAVAILABLE` and
 instruct inspection of owner state before any new submission. Only a conforming
 explicit refusal is trusted as a rejection.
 
-`details` sends a Settings summon payload `{section:"projects",projectId:ID}`.
-It reports observed only after the read-only
-`aranea.settings.capture captureSnapshot` endpoint confirms `opened`, the
-Projects section, and the exact `projectId`. The Settings Projects destination
-must provide this field; earlier Settings versions return partial
-`DETAILS_UNCONFIRMED` with `data.accepted: true`. The CLI never invokes capture
-mutation methods or claims that summon acceptance proves the destination.
+`details` sends `{projectId:ID}` to the standalone `araneadev.projects` menu
+entry. It reports observed only after the read-only `aranea.projects.capture
+captureSnapshot` endpoint confirms `opened` and the exact `projectId`. An
+accepted but unconfirmed destination returns partial `DETAILS_UNCONFIRMED` with
+`data.accepted: true`. The CLI never invokes capture mutation methods or claims
+that summon acceptance proves the destination.
 
 For this public CLI, exit codes are `0` observed, `1` partial/failed,
 `2` invalid usage, `3` missing required choice (including `TOOL_CHOICE_REQUIRED`),
@@ -475,3 +515,9 @@ retains only the inert action coordination files `project-actions.json.lock` and
 necessary ancestors; reinstall preserves their inodes while activating a fresh
 generation. Journal data, repositories, unrelated services and editor/provider
 processes are not removed by action cleanup.
+
+The wallpaper schedule exposes sorted `state.schedule.entries` objects with
+`time` and `wallpaper` fields. Save through
+`aranea-settings configure schedule --entries '[{"time":"07:00","wallpaper":"day"}]' --json`.
+Times must be unique local `HH:MM` values and wallpapers must be available catalog
+IDs. Existing four-time clients remain supported.

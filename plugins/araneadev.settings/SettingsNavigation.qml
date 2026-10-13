@@ -52,8 +52,10 @@ Item {
   implicitHeight: categoryGrid.implicitHeight + (navigation.compact ? 0 : Style.space(8))
   Rectangle {
     anchors.fill: parent
-    color: Util.alpha(Color.foreground, 0.025)
+    color: Util.alpha(Aranea.DesignTokens.accent, 0.04)
     radius: Style.space(4)
+    border.width: 1
+    border.color: Util.alpha(Aranea.DesignTokens.foreground, 0.08)
   }
   GridLayout {
     id: categoryGrid

@@ -50,7 +50,7 @@ Item {
       scaleDraft: displayPage.scaleDraft,
       scaleDirty: displayPage.scaleDirty,
       detailsExpanded: displayPage.detailsExpanded,
-      scheduleDraft: schedulePage.draft,
+      scheduleDraft: JSON.parse(JSON.stringify(schedulePage.draft)),
       scheduleDirty: schedulePage.dirty
     }
   }
@@ -67,7 +67,7 @@ Item {
     displayPage.scaleDraft = saved.scaleDraft
     displayPage.scaleDirty = saved.scaleDirty
     displayPage.detailsExpanded = saved.detailsExpanded
-    schedulePage.draft = saved.scheduleDraft
+    schedulePage.draft = JSON.parse(JSON.stringify(saved.scheduleDraft))
     schedulePage.dirty = saved.scheduleDirty
     pageOffsets = saved.pageOffsets
     scrollSection = saved.scrollSection
@@ -211,10 +211,10 @@ Item {
           Image {
             objectName: 'settingsGlyph'
             visible: !panel.shortScreen
-            Layout.preferredWidth: Style.space(18)
-            Layout.preferredHeight: Style.space(18)
+            Layout.preferredWidth: Style.space(38)
+            Layout.preferredHeight: Style.space(38)
             source: Aranea.RuntimePaths.glyphUrl
-            sourceSize: Qt.size(Style.space(36), Style.space(36))
+            sourceSize: Qt.size(Style.space(76), Style.space(76))
             fillMode: Image.PreserveAspectFit
           }
           ColumnLayout {
@@ -223,7 +223,7 @@ Item {
             SettingsLabel {
               Layout.fillWidth: true
               text: 'Aranea settings'
-              font.pixelSize: Style.font.body
+              font.pixelSize: panel.shortScreen ? Style.font.body : Style.font.heading
               font.bold: true
               wrapMode: Text.NoWrap
               elide: Text.ElideRight

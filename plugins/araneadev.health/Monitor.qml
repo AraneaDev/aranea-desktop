@@ -5,6 +5,7 @@
 
 import QtQuick
 import Quickshell.Io
+import "../araneadev.shared" as Aranea
 import "HealthLogic.js" as HealthLogic
 
 Item {
@@ -44,6 +45,101 @@ Item {
   // The docker command (argv prefix); tests replace it with a shell function.
   property var dockerCommand: ["docker"]
 
+  // Only backend-validated occurrences are hidden; later stops remain visible.
+  property var acknowledgedContainerKeys: []
+  // Backend command is overridable by isolated transport tests.
+  property var acknowledgmentCommand: [Aranea.RuntimePaths.themeRoot + "/scripts/aranea-health-ack", "status"]
+  // Requests queued while a validation is still running.
+  property bool acknowledgmentPending: false
+  // Guards asynchronous process startup as well as running reads.
+  property bool acknowledgmentChecking: false
+  // A changed Docker event or state file invalidates an in-flight read.
+  property int acknowledgmentRevision: 0
+  // Last file contents observed, so unrelated directory changes are harmless.
+  property string acknowledgmentText: ""
+
+  // Revalidate the persisted records against precise current Docker occurrences.
+  function refreshAcknowledgments(): void {
+    acknowledgmentRevision++
+    acknowledgmentPending = true
+    startAcknowledgmentRead()
+  }
+  // Serialize reads and replay the latest queued revision after completion.
+  function startAcknowledgmentRead(): void {
+    if (acknowledgmentChecking || !acknowledgmentPending)
+      return
+    acknowledgmentPending = false
+    acknowledgmentChecking = true
+    acknowledgmentsProc.revision = acknowledgmentRevision
+    acknowledgmentsProc.startedSuccessfully = false
+    acknowledgmentsProc.running = true
+  }
+  Process {
+    id: acknowledgmentsProc
+    // Revision captured before this read starts.
+    property int revision: 0
+    // Failed starts do not emit exited.
+    property bool startedSuccessfully: false
+    command: monitor.acknowledgmentCommand
+    stdout: StdioCollector {
+      id: acknowledgmentsOut
+      waitForEnd: true
+    }
+    onStarted: acknowledgmentsProc.startedSuccessfully = true
+    onRunningChanged: if (monitor.acknowledgmentChecking && !running && !acknowledgmentsProc.startedSuccessfully) {
+      monitor.acknowledgmentChecking = false
+      monitor.acknowledgedContainerKeys = []
+      monitor.reconcileNow()
+      Qt.callLater(monitor.startAcknowledgmentRead)
+    }
+    // Quickshell's QProcess::ExitStatus parameter is not registered with qmllint.
+    // qmllint disable signal-handler-parameters
+    onExited: function (code) {
+      monitor.acknowledgmentChecking = false
+      if (acknowledgmentsProc.revision === monitor.acknowledgmentRevision) {
+        var keys = []
+        if (code === 0) {
+          try {
+            keys = JSON.parse(acknowledgmentsOut.text).acknowledged
+          } catch (_error) {}
+        }
+        monitor.acknowledgedContainerKeys = Array.isArray(keys) ? keys : []
+        monitor.reconcileNow()
+      }
+      Qt.callLater(monitor.startAcknowledgmentRead)
+    }
+    // qmllint enable signal-handler-parameters
+  }
+  FileView {
+    id: acknowledgmentsFile
+    path: Aranea.RuntimePaths.araneaStateRoot + "/health-acknowledgments.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      var next = text()
+      if (next !== monitor.acknowledgmentText) {
+        monitor.acknowledgmentText = next
+        if (monitor.autoStart)
+          monitor.refreshAcknowledgments()
+      }
+    }
+    onLoadFailed: {
+      var wasAcknowledged = monitor.acknowledgmentText !== "" || monitor.acknowledgedContainerKeys.length > 0
+      monitor.acknowledgmentText = ""
+      monitor.acknowledgedContainerKeys = []
+      monitor.reconcileNow()
+      if (wasAcknowledged && monitor.autoStart)
+        monitor.refreshAcknowledgments()
+    }
+  }
+  FileView {
+    path: Aranea.RuntimePaths.araneaStateRoot
+    watchChanges: true
+    printErrors: false
+    onFileChanged: acknowledgmentsFile.reload()
+  }
+
   // Runs every check once and starts the docker connection (first call only).
   function startChecks(): void {
     if (checksStarted)
@@ -81,7 +177,7 @@ Item {
     var open = []
     for (var check in problems)
       open = open.concat(problems[check])
-    openProblems = HealthLogic.annotateProblems(open, tools)
+    openProblems = HealthLogic.filterAcknowledged(HealthLogic.annotateProblems(open, tools), acknowledgedContainerKeys)
   }
 
   // ---------------------------------------------------- failed units
@@ -294,6 +390,12 @@ Item {
         var event = HealthLogic.parseDockerEvent(line)
         if (!event)
           return
+        // A fresh lifecycle event must never inherit an old dismissal while
+        // its exact Docker occurrence is being checked asynchronously.
+        monitor.acknowledgedContainerKeys = monitor.acknowledgedContainerKeys.filter(function (key) {
+          return key !== "container:" + event.name
+        })
+        monitor.refreshAcknowledgments()
         var now = Date.now()
         monitor.dockerHistory = HealthLogic.recordDockerEvent(monitor.dockerHistory, event, now)
         monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
@@ -324,6 +426,7 @@ Item {
         var now = Date.now()
         monitor.dockerHistory = HealthLogic.pruneDockerHistory(monitor.dockerHistory, now)
         monitor.setProblems("container", HealthLogic.containerProblems(monitor.dockerHistory, now))
+        monitor.refreshAcknowledgments()
       }
     }
   }
@@ -344,6 +447,7 @@ Item {
     if (!monitor.autoStart)
       return
     terminalProbe.running = true
+    refreshAcknowledgments()
     startChecks()
   }
 

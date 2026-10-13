@@ -99,7 +99,7 @@ Item {
       height: card.contentTopInset + card.contentBottomInset + messageText.implicitHeight + Style.space(20) + Style.space(34)
       anchors.centerIn: parent
       color: root.background
-      borderSpec: Border.flat(root.selectedText, Style.normalBorderWidth)
+      borderSpec: Border.flat(Util.alpha(root.foreground, 0.16), Style.normalBorderWidth)
       padding: Style.space(18)
       radius: root.cornerRadius
 
@@ -147,8 +147,13 @@ Item {
               width: Style.space(88)
               height: Style.space(34)
               color: selected ? (destructive ? Util.alpha(Color.urgent, 0.22) : root.selectedBackground) : "transparent"
-              borderSpec: Border.flat(destructive ? (selected ? Color.urgent : Util.alpha(Color.urgent, 0.56)) : (selected ? root.selectedText : Util.alpha(root.foreground, 0.38)), Style.normalBorderWidth)
+              borderSpec: Border.flat(destructive ? (selected ? Color.urgent : Util.alpha(Color.urgent, 0.56)) : Util.alpha(root.foreground, selected ? 0.22 : 0.14), Style.normalBorderWidth)
               radius: 0
+
+              FocusFrame {
+                anchors.fill: parent
+                focused: action.selected && !action.destructive
+              }
 
               Text {
                 textFormat: Text.PlainText

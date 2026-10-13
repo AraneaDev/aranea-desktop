@@ -4,6 +4,7 @@ import Quickshell
 import qs.Commons
 import "plugins/araneadev.workspaces" as Workspaces
 import "ProjectPreview.js" as Projects
+import "plugins/araneadev.shared" as Aranea
 
 ShellRoot {
   FloatingWindow {
@@ -15,42 +16,66 @@ ShellRoot {
       id: surface
       anchors.fill: parent
       color: '#101315'
-      Workspaces.WorkspacePanel {
-        id: panel
-        anchors.centerIn: parent
-        width: 420
-        height: implicitHeight
-        maxContentHeight: 500
-        cursorIndex: 0
-        projectSnapshot: Projects.sample('projects-grouped').projectSnapshot
-        workspaceStates: [
-          {
-            id: 3,
-            name: '3',
-            focused: true,
-            urgent: false,
-            windows: 2,
-            titles: ['Customer dashboard']
-          },
-          {
-            id: 4,
-            name: '4',
-            focused: false,
-            urgent: false,
-            windows: 0,
-            titles: []
-          }
-        ]
-        onFocusWorkspace: console.log('SETTINGSRENDER FAIL unexpected dispatch')
+      Image {
+        id: wallpaper
+        anchors.fill: parent
+        source: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/backgrounds/00-default.png'
+        fillMode: Image.PreserveAspectCrop
+      }
+      Rectangle {
+        x: 16
+        y: 35
+        width: panel.width + 40
+        height: panel.implicitHeight + 40
+        color: Util.alpha(Aranea.DesignTokens.background, 0.96)
+        border.color: Aranea.DesignTokens.surfaceBorder
+        radius: Aranea.DesignTokens.cornerRadius
+        Aranea.CircuitFrame {
+          anchors.fill: parent
+        }
+        Workspaces.WorkspacePanel {
+          id: panel
+          x: 20
+          y: 20
+          width: 420
+          height: implicitHeight
+          maxContentHeight: 500
+          cursorIndex: 0
+          projectSnapshot: Projects.sample('projects-grouped').projectSnapshot
+          workspaceStates: [
+            {
+              id: 3,
+              name: '3',
+              focused: true,
+              urgent: false,
+              windows: 2,
+              titles: ['Customer dashboard']
+            },
+            {
+              id: 4,
+              name: '4',
+              focused: false,
+              urgent: false,
+              windows: 0,
+              titles: []
+            }
+          ]
+          onFocusWorkspace: console.log('SETTINGSRENDER FAIL unexpected dispatch')
+        }
       }
     }
   }
   Timer {
     interval: 1000
     running: true
-    onTriggered: surface.grabToImage(function (result) {
-      console.log((result.saveToFile(Quickshell.env('ARANEA_SETTINGS_RENDER_OUTPUT')) ? 'SETTINGSRENDER OK ' : 'SETTINGSRENDER FAIL ') + 'workspace panel')
-      Qt.quit()
-    }, Qt.size(Number(Quickshell.env('ARANEA_SETTINGS_RENDER_WIDTH')), Number(Quickshell.env('ARANEA_SETTINGS_RENDER_HEIGHT'))))
+    repeat: true
+    onTriggered: {
+      if (wallpaper.status !== Image.Ready)
+        return
+      surface.grabToImage(function (result) {
+        console.log((result.saveToFile(Quickshell.env('ARANEA_SETTINGS_RENDER_OUTPUT')) ? 'SETTINGSRENDER OK ' : 'SETTINGSRENDER FAIL ') + 'workspace panel')
+        Qt.quit()
+      }, Qt.size(Number(Quickshell.env('ARANEA_SETTINGS_RENDER_WIDTH')), Number(Quickshell.env('ARANEA_SETTINGS_RENDER_HEIGHT'))))
+    }
   }
 }

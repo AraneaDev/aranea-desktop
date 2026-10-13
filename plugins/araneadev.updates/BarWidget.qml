@@ -22,6 +22,8 @@ Item {
   property bool panelOpen: false
   // Open state exposed to the panel host.
   readonly property bool opened: panelOpen
+  onPanelOpenChanged: if (panelOpen)
+    service.refresh()
   // Current service status.
   readonly property var status: service.status
   // Whether Service is running a check right now.

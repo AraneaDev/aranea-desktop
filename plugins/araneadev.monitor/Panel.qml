@@ -9,6 +9,7 @@
 // in the shared keyboard frame. The rules are DisplaysLogic.js / Model.js /
 // CursorLogic.js functions, tested under Node.
 pragma ComponentBehavior: Bound
+import "."
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -26,6 +27,73 @@ Panel {
   // manageIpc: false so this panel can own the single IpcHandler the target
   // permits, needed for the brightness + state methods below.
   manageIpc: false
+
+  // System may host this controller and view without another window.
+  property bool embedded: false
+  // System owner while embedded; null for standalone use.
+  property var embeddingHost: null
+  // Display view rendered inside the System popup.
+  property var hostedDropdown: null
+  // Only the visible view receives pointer and layout resets.
+  readonly property var activeDropdown: embedded ? hostedDropdown : standaloneView.item
+  // Brightness command and queue state exposed to either view.
+  readonly property bool brightnessBusy: setBrightnessProc.running || brightnessSetQueued
+  // Open the embedded System page or the standalone controller.
+  function open() {
+    if (embedded && embeddingHost)
+      embeddingHost.openSystemPage("display")
+    else
+      root.controller.show()
+  }
+  // Close the owning System window or the standalone controller.
+  function close() {
+    if (embedded && embeddingHost)
+      embeddingHost.close()
+    else
+      root.controller.hide()
+  }
+  // Toggle the current Display surface.
+  function toggle() {
+    root.opened ? root.close() : root.open()
+  }
+  // Clear stale pointer samples on the active view.
+  function disarmPointer() {
+    if (root.activeDropdown)
+      root.activeDropdown.disarmPointer()
+  }
+  // Shared keyboard policy for hosted and standalone Display controls.
+  function navigateKeyboard(dx, dy) {
+    root.disarmPointer()
+    if (!root.cursorActive || !root.keyboardCursor) {
+      root.revealCursor()
+      return
+    }
+    if (dy !== 0) {
+      root.moveCursor(dy)
+      return
+    }
+    if (dx === 0)
+      return
+    if (root.focusSection === "brightness")
+      root.adjustBrightness(dx * 5)
+    else if (root.focusSection === "kbdlight")
+      root.adjustKbd(dx)
+    else if (root.focusSection === "textsize")
+      root.adjustTextSize(dx)
+    else if (root.focusSection === "scale") {
+      root.moveCursorH(dx)
+      return
+    }
+    root.cursorKey = root.keyAt(root.focusSection, root.selectedIndex)
+  }
+  // Reveal a keyboard cursor before acting on a confirmed control.
+  function activateKeyboard() {
+    root.disarmPointer()
+    if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) === "act")
+      root.activateCursor()
+    else
+      root.revealCursor()
+  }
 
   // The displayed device's brightness, 0-100 (DDC/sysfs, via
   // `omarchy-monitor-state`), or 0 when no backlight is controllable.
@@ -112,7 +180,8 @@ Panel {
   function markReflowing() {
     root.reflowingText = true
     reflowSettle.restart()
-    dropdown.noteLayoutChange()
+    if (root.activeDropdown)
+      root.activeDropdown.noteLayoutChange()
   }
 
   // ---------- Aranea additions: night light, keyboard light, pending ----------
@@ -752,12 +821,6 @@ Panel {
     return textSizePreviewIndex >= 0 ? textSizePreviewIndex : nearestTextStop(Style.font.baseSize)
   }
 
-  // px shown in the header: the pending stop if any, else the true base-size
-  // (which may be an off-notch value set from the CLI).
-  function displayedTextPx() {
-    return textSizePreviewIndex >= 0 ? textSizeStops[textSizePreviewIndex] : Style.font.baseSize
-  }
-
   // Applies px via omarchy-display-text-size; a request while it runs is
   // queued, the last one winning.
   function setTextSize(px) {
@@ -999,8 +1062,9 @@ Panel {
     cursorKey = keyAt(focusSection, selectedIndex)
   }
 
-  implicitWidth: button.implicitWidth
-  implicitHeight: button.implicitHeight
+  visible: !embedded
+  implicitWidth: embedded ? 0 : button.implicitWidth
+  implicitHeight: embedded ? 0 : button.implicitHeight
 
   Component.onCompleted: refresh()
 
@@ -1255,58 +1319,25 @@ Panel {
     anchorItem: button
     owner: root
     bar: root.bar
-    open: root.opened
+    open: !root.embedded && root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    contentHeight: panel.fittedContentHeight(root.activeDropdown ? root.activeDropdown.implicitHeight : 0)
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.keyboardCursor = true
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
-      dropdown.disarmPointer()
-      // The first key after opening or after mouse use only reveals the
-      // cursor where it is; a reveal never adjusts.
-      if (!root.cursorActive || !root.keyboardCursor) {
-        root.revealCursor()
-        return
-      }
-      if (dy !== 0) {
-        root.moveCursor(dy)
-        return
-      }
-      if (dx === 0)
-        return
-      if (root.focusSection === "brightness")
-        root.adjustBrightness(dx * 5)
-      else if (root.focusSection === "kbdlight")
-        root.adjustKbd(dx)
-      else if (root.focusSection === "textsize")
-        root.adjustTextSize(dx)
-      else if (root.focusSection === "scale") {
-        root.moveCursorH(dx)
-        return
-      }
-      // An adjustment is a deliberate choice of the control it lands on.
-      root.cursorKey = root.keyAt(root.focusSection, root.selectedIndex)
+      root.navigateKeyboard(dx, dy)
     }
-    // Enter, like any first key, only reveals a hidden cursor; it acts only
-    // on a cursor the keyboard is showing, on the row the user chose and
-    // still sees (CursorLogic.pressIntent, cursorConfirmed).
-    onActivateRequested: {
-      dropdown.disarmPointer()
-      if (CursorLogic.pressIntent(root.cursorActive, root.keyboardCursor) === "act")
-        root.activateCursor()
-      else
-        root.revealCursor()
-    }
+    onActivateRequested: root.activateKeyboard()
     onDeleteRequested: {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.keyboardCursor = true
     }
     onTextKey: function (t) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.keyboardCursor = true
     }
 
@@ -1314,28 +1345,34 @@ Panel {
       anchors.fill: parent
       clip: true
 
-      DisplaysDropdown {
-        id: dropdown
+      Loader {
+        id: standaloneView
         width: parent.width
-        view: root.displaysView
-        brightnessPercent: root.brightnessPercent
-        brightnessBusy: setBrightnessProc.running || root.brightnessSetQueued
-        reflowing: root.reflowingText
-        nightlightOn: root.nightOn
-        nightlightCaption: root.nightCaption
-        nightlightPending: root.nightPending
-        kbdValue: root.kbdValue
-        kbdPending: root.kbdPending
-        textIndex: root.currentTextIndex()
-        textPending: root.textSizePreviewIndex >= 0
-        selectedScale: root.selectedScaleKey
-        pendingScale: root.pendingScale
-        enabledDisplays: root.enabledDisplayMap
-        pendingDisplays: root.pendingDisplays
-        lastEnabled: root.lastEnabled
-        displaysLocked: root.displaysLocked
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        active: !root.embedded
+        sourceComponent: Component {
+          DisplaysDropdown {
+            width: parent.width
+            view: root.displaysView
+            brightnessPercent: root.brightnessPercent
+            brightnessBusy: setBrightnessProc.running || root.brightnessSetQueued
+            reflowing: root.reflowingText
+            nightlightOn: root.nightOn
+            nightlightCaption: root.nightCaption
+            nightlightPending: root.nightPending
+            kbdValue: root.kbdValue
+            kbdPending: root.kbdPending
+            textIndex: root.currentTextIndex()
+            textPending: root.textSizePreviewIndex >= 0
+            selectedScale: root.selectedScaleKey
+            pendingScale: root.pendingScale
+            enabledDisplays: root.enabledDisplayMap
+            pendingDisplays: root.pendingDisplays
+            lastEnabled: root.lastEnabled
+            displaysLocked: root.displaysLocked
+            onAction: function (name, arg) {
+              root.handleAction(name, arg)
+            }
+          }
         }
       }
     }

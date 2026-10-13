@@ -41,7 +41,8 @@ ShellRoot {
       t.check(merged.itemOrder.indexOf("system.lock") >= 0, "the default file's items merge")
       t.equal(merged.items["setup"].label, "Setup", "with their labels")
       t.check(shell.updates >= 2, "each file reported once")
-      t.equal(merged.items["aranea.settings"].parent, "setup", "installed settings route belongs under Setup")
+      t.equal(merged.items["aranea.settings"].parent, "root", "installed settings route belongs in the command center")
+      t.equal(merged.items["aranea.settings"].label, "Settings", "command center uses the concise Settings label")
       sources.settingsManifestPath = "/nonexistent/aranea-test/settings/manifest.json"
       var before = shell.updates
       sources.reload()

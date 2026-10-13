@@ -785,10 +785,16 @@ function semanticDetail(entry, detail) {
   /** @type {{[key: string]: string}} */
   var taglines = {
     apps: "FIND // LAUNCH // MANAGE",
-    learn: "DOCUMENTATION // GUIDES // IDEAS",
-    trigger: "AUTOMATE // SCRIPTS // WORKFLOWS",
+    learn: "KEYBINDINGS // GUIDES // COMMUNITY",
+    trigger: "CAPTURE // SHARE // TOGGLE",
+    software: "INSTALL // REMOVE // UPDATE",
+    settings: "APPEARANCE // DEVICES // PREFERENCES",
     style: "APPEARANCE // THEMES // BEHAVIOR",
     setup: "SYSTEM // DEVICES // PREFERENCES",
+    "aranea.settings": "WALLPAPER // FONTS // MOTION",
+    install: "APPS // TOOLS // THEMES",
+    remove: "UNINSTALL // CLEAN // RECLAIM",
+    update: "SYSTEM // PACKAGES // REFRESH",
     system: "SLEEP // RESTART // SHUTDOWN"
   }
   var key = textValue(value.id, textValue(value.label, "").toLowerCase())
@@ -871,11 +877,14 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAv
   /** @type {{[key: string]: *}} */
   var nextItems = {}
   var nextOrder = []
+  var customIds = (userItems || []).map(function (entry) {
+    return entry.id
+  })
   var settings = settingsAvailable
     ? [
         normalizeItem("aranea.settings", {
-          parent: "setup",
-          label: "Aranea settings",
+          parent: "root",
+          label: "Settings",
           icon: "aranea-brand",
           description: "Wallpaper, motion, schedule, integrations and notifications",
           aliases: ["settings", "aranea-settings"],
@@ -903,9 +912,86 @@ function mergeMenuSources(defaultItems, userItems, settingsAvailable, projectsAv
     }
   }
 
-  if (settings.length && !nextItems["aranea.settings"]) {
-    nextItems["aranea.settings"] = settings[0]
-    nextOrder.push("aranea.settings")
+  if (settings.length) {
+    if (!nextItems["aranea.settings"]) nextItems["aranea.settings"] = settings[0]
+    if (nextItems.about && nextItems.about.parent === "root" && customIds.indexOf("about") < 0) {
+      // Keep the command slot while replacing the stock About destination.
+      nextOrder = nextOrder.filter(function (id) {
+        return id !== "aranea.settings"
+      })
+      nextOrder[nextOrder.indexOf("about")] = "aranea.settings"
+      delete nextItems.about
+    } else if (nextOrder.indexOf("aranea.settings") < 0) {
+      nextOrder.push("aranea.settings")
+    }
+  }
+
+  // Fold the complete stock command center, keeping IDs and descendants intact
+  // for direct routes, providers, search, and user extensions.
+  var stockSections = [
+    "apps",
+    "learn",
+    "trigger",
+    "style",
+    "setup",
+    "install",
+    "remove",
+    "update",
+    "system"
+  ]
+  var completeCenter = stockSections.every(function (id) {
+    return !!nextItems[id]
+  })
+  completeCenter =
+    completeCenter &&
+    ["settings", "software"].every(function (id) {
+      return !nextItems[id] || nextItems[id].kind === "menu"
+    })
+  if (completeCenter) {
+    if (!nextItems.software)
+      nextItems.software = normalizeItem("software", {
+        label: "Software",
+        icon: String.fromCodePoint(0xf00d7)
+      })
+    if (!nextItems.settings)
+      nextItems.settings = normalizeItem("settings", {
+        label: "Settings",
+        icon: String.fromCodePoint(0xf0493)
+      })
+    /** @type {{[key: string]: string}} */
+    var groups = {
+      install: "software",
+      remove: "software",
+      update: "software",
+      style: "settings",
+      setup: "settings",
+      "aranea.settings": "settings"
+    }
+    if (!settingsAvailable) groups.about = "learn"
+    for (var groupedId in groups) {
+      if (nextItems[groupedId] && customIds.indexOf(groupedId) < 0)
+        nextItems[groupedId].parent = groups[groupedId]
+    }
+    /** @type {{[key: string]: string}} */
+    var labels = {
+      trigger: "Actions",
+      learn: "Help",
+      style: "Appearance",
+      setup: "Devices",
+      "aranea.settings": "Aranea"
+    }
+    for (var labelledId in labels) {
+      if (nextItems[labelledId] && customIds.indexOf(labelledId) < 0)
+        nextItems[labelledId].label = labels[labelledId]
+    }
+    var centerOrder = ["apps", "trigger", "software", "settings", "learn", "system"]
+    if (nextItems["aranea.settings"] && nextItems["aranea.settings"].parent === "settings")
+      centerOrder.push("aranea.settings")
+    nextOrder = centerOrder.concat(
+      nextOrder.filter(function (id) {
+        return centerOrder.indexOf(id) < 0
+      })
+    )
   }
 
   if (projectsAvailable && !nextItems["aranea.projects"]) {

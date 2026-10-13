@@ -97,7 +97,7 @@ ShellRoot {
       t.equal(page.selectedId, 'day', 'existing label keyboard selection remains available')
       t.equal(requests.length, 0, 'keyboard selection emits no mutation')
       var note = t.findChild(page, 'wallpaperScheduleNote')
-      t.check(!!note && note.visible && note.text.indexOf('next phase') >= 0, 'enabled schedule explains the manual wallpaper override')
+      t.check(!!note && note.visible && note.text.indexOf('next scheduled time') >= 0, 'enabled schedule explains the manual wallpaper override')
       page.backendState = Object.assign({}, page.backendState, {
         schedule: {
           enabled: false

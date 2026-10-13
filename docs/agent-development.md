@@ -74,6 +74,19 @@ genuinely unavailable.
 
 ## Isolated screenshot sessions
 
+Use workspace 2 for the full batch; it stays pinned until the batch finishes.
+Select the real Usage provider before capture if its bar ring matters:
+
+```bash
+omarchy-shell omarchy.agents select codex
+scripts/capture-screenshots --all --output screenshots
+```
+
+The provider choice is saved across shell restarts. Panel showcase choices are
+separate and cannot overwrite it. The script parks/restores the notification
+inbox, stages device/provider names, and uses graphical-session authentication
+for the cancellable polkit preview. See [capture details](development.md#showcase-captures).
+
 `scripts/capture-screenshots` captures the running shell and refuses tray
 captures while real tray apps are registered. For a separately staged shell,
 run the shell and its capture commands together under

@@ -10,7 +10,7 @@ mkdir -p "$bin" "$out"
 cat >"$bin/omarchy-shell" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$ARANEA_TEST_SANDBOX/calls"
-snapshot='{"opened":true,"section":"schedule","ui":{"draft":["07:00"]},"showcase":true}'
+snapshot='{"opened":true,"section":"schedule","ui":{"scheduleDraft":[{"time":"07:00","wallpaper":"day"}]},"showcase":true}'
 ready='{"ready":true,"readOnly":true}'
 case "$2" in
   captureSnapshot) echo "${CAPTURE_SETTINGS_SNAPSHOT-$snapshot}" ;;
@@ -94,7 +94,7 @@ for surface in settings settings-scaling; do
   [[ "$(grep -n captureSnapshot "$log" | cut -d: -f1)" -lt "$(grep -n captureBegin "$log" | cut -d: -f1)" ]]
   [[ "$(grep -n captureState "$log" | head -1 | cut -d: -f1)" -lt "$(grep -n '^grim$' "$log" | cut -d: -f1)" ]]
   [[ "$(grep -n '^grim$' "$log" | cut -d: -f1)" -lt "$(grep -n captureRestore "$log" | cut -d: -f1)" ]]
-  grep -Fq 'captureRestore {"opened":true,"section":"schedule","ui":{"draft":["07:00"]},"showcase":true}' "$log"
+  grep -Fq 'captureRestore {"opened":true,"section":"schedule","ui":{"scheduleDraft":[{"time":"07:00","wallpaper":"day"}]},"showcase":true}' "$log"
   grep -Fq 'workspace = "7"' "$log"
   grep -Fq 'window = "address:0xabc"' "$log"
   if grep -Eq 'aranea-settings.*close| set | refresh| summon' "$log"; then exit 1; fi
@@ -134,4 +134,11 @@ for failure in snapshot restore timeout; do
     grep -Fq 'window = "address:0xabc"' "$log"
   fi
 done
+# Schedule uses the same guarded production window with entry-based fixtures.
+: >"$log"
+"$capture" --surface settings-schedule --output "$out" >/dev/null
+test -f "$out/settings-schedule.png"
+grep -Fq '"section":"schedule"' "$log"
+grep -Fq '"wallpaper":"signal-shrine"' "$log"
+grep -Fq captureRestore "$log"
 echo 'Settings capture contract passed'

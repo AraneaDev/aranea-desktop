@@ -2,6 +2,7 @@
 // bar Bluetooth icon and its dropdown. Stock logic (discovery, pending
 // actions, the audio hand-off, the cursor model and IPC); the Aranea view,
 // BluetoothDropdown, replaces the stock one.
+pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -21,6 +22,76 @@ Panel {
   // manageIpc: false so this panel can own the single IpcHandler the target
   // permits — needed for the toggleBluetooth method below.
   manageIpc: false
+
+  // Network hosts this controller and pure view in its shared popup.
+  property bool embedded: false
+  // Owning Network panel, or null for the standalone fallback.
+  property var embeddingHost: null
+  // Pure Bluetooth view inside Network's popup.
+  property var hostedDropdown: null
+  // Cursor scrolling and pointer resets use the currently hosted view.
+  readonly property var activeDropdown: embedded ? hostedDropdown : standaloneView.item
+
+  // Legacy entry points select Network's Bluetooth page when hosted.
+  function open() {
+    if (embedded && embeddingHost)
+      embeddingHost.openBluetoothDropdown()
+    else
+      root.controller.show()
+  }
+  // Toggle the current Bluetooth surface.
+  function toggle() {
+    if (root.opened)
+      root.close()
+    else
+      root.open()
+  }
+  // Close the shared popup or standalone fallback.
+  function close() {
+    if (embedded && embeddingHost)
+      embeddingHost.close()
+    else
+      root.controller.hide()
+  }
+  // Disarm the visible view after keyboard navigation or a page change.
+  function disarmPointer() {
+    if (root.activeDropdown)
+      root.activeDropdown.disarmPointer()
+  }
+  // First navigation reveals the cursor; later keys move it.
+  function navigateKeyboard(dx, dy) {
+    root.disarmPointer()
+    root.pendingRemovalKey = ""
+    if (!root.cursorActive || !root.keyboardCursor) {
+      root.cursorActive = true
+      root.keyboardCursor = true
+      return
+    }
+    if (dy !== 0)
+      root.moveCursor(dy)
+    else if (dx !== 0)
+      root.moveCursorH(dx)
+  }
+  // Enter acts only after the first key reveals the cursor.
+  function activateKeyboard() {
+    root.disarmPointer()
+    if (!root.cursorActive || !root.keyboardCursor) {
+      root.cursorActive = true
+      root.keyboardCursor = true
+      return
+    }
+    root.activateCursor()
+  }
+  // Forget keeps the same reveal and keyed-follow rules in either host.
+  function deleteKeyboard() {
+    root.disarmPointer()
+    if (!root.cursorActive || !root.keyboardCursor) {
+      root.cursorActive = true
+      root.keyboardCursor = true
+      return
+    }
+    root.deleteSelected()
+  }
 
   // Address -> "connecting" | "disconnecting" | "forgetting".
   // The actual Bluetooth sequencing lives in bin/omarchy-bluetooth-device;
@@ -676,6 +747,25 @@ Panel {
     pendingRemovalIndex = -1
   }
 
+  // Include controllers embedded in Network's per-monitor widgets.
+  // Discovery debt must survive a popup handoff even without Bluetooth icons.
+  // Ui.Panel types bar as QObject; the host supplies this optional API.
+  // Guard the callable before reading its per-module widget lists.
+  // qmllint disable missing-property
+  function siblingControllers() {
+    if (!bar || typeof bar.moduleWidgets !== "function")
+      return []
+    var items = bar.moduleWidgets(moduleName).slice()
+    var hosts = bar.moduleWidgets("omarchy.network")
+    for (var i = 0; i < hosts.length; i++) {
+      if (hosts[i] && hosts[i].bluetoothController && items.indexOf(hosts[i].bluetoothController) < 0)
+        items.push(hosts[i].bluetoothController)
+    }
+    return items
+  }
+
+  // qmllint enable missing-property
+
   // Another per-monitor instance of this widget whose panel is open, if any.
   // All instances share the default adapter, and switching the popout to a
   // different monitor closes one instance as it opens the next, so the
@@ -684,7 +774,7 @@ Panel {
   function openSibling() {
     if (!bar || typeof bar.moduleWidgets !== "function")
       return null
-    var items = bar.moduleWidgets(moduleName)
+    var items = root.siblingControllers()
     for (var i = 0; i < items.length; i++) {
       if (items[i] && items[i] !== root && items[i].opened === true)
         return items[i]
@@ -794,8 +884,8 @@ Panel {
       selectedIndex = 0
   }
 
-  visible: adapter !== null
-  implicitWidth: button.implicitWidth
+  visible: !embedded && adapter !== null
+  implicitWidth: embedded ? 0 : button.implicitWidth
   implicitHeight: button.implicitHeight
 
   // BlueZ rejects StartDiscovery while the adapter is still powering up, and
@@ -874,7 +964,7 @@ Panel {
   Component.onDestruction: {
     if (!owesDiscoveryStop)
       return
-    var items = bar && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
+    var items = root.siblingControllers()
     for (var i = 0; i < items.length; i++) {
       if (items[i] && items[i] !== root) {
         items[i].owesDiscoveryStop = true
@@ -1170,7 +1260,8 @@ Panel {
   function ensureCursorVisible() {
     if (!opened || !cursorActive || !keyboardCursor)
       return
-    dropdown.ensureVisible(focusSection, selectedIndex)
+    if (root.activeDropdown)
+      root.activeDropdown.ensureVisible(focusSection, selectedIndex)
   }
 
   // Not adapter.enabled: that writes BlueZ's Powered, which nothing persists, so
@@ -1265,52 +1356,21 @@ Panel {
     anchorItem: button
     owner: root
     bar: root.bar
-    open: root.opened
+    open: !root.embedded && root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(dropdown.implicitHeight)
+    contentHeight: panel.fittedContentHeight(root.activeDropdown ? root.activeDropdown.implicitHeight : 0)
     onCloseRequested: root.close()
     onTabRequested: function (direction) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       root.switchPanel(direction)
     }
     onMoveRequested: function (dx, dy) {
-      dropdown.disarmPointer()
-      // Moving on spends a keyboard Forget's follow.
-      root.pendingRemovalKey = ""
-      // The first key after opening or after mouse use only reveals the
-      // cursor where it is.
-      if (!root.cursorActive || !root.keyboardCursor) {
-        root.cursorActive = true
-        root.keyboardCursor = true
-        return
-      }
-      if (dy !== 0)
-        root.moveCursor(dy)
-      else if (dx !== 0)
-        root.moveCursorH(dx)
+      root.navigateKeyboard(dx, dy)
     }
-    // Enter and x, like any first key, only reveal a hidden cursor; they
-    // act only on the outlined row.
-    onActivateRequested: {
-      dropdown.disarmPointer()
-      if (!root.cursorActive || !root.keyboardCursor) {
-        root.cursorActive = true
-        root.keyboardCursor = true
-        return
-      }
-      root.activateCursor()
-    }
-    onDeleteRequested: {
-      dropdown.disarmPointer()
-      if (!root.cursorActive || !root.keyboardCursor) {
-        root.cursorActive = true
-        root.keyboardCursor = true
-        return
-      }
-      root.deleteSelected()
-    }
+    onActivateRequested: root.activateKeyboard()
+    onDeleteRequested: root.deleteKeyboard()
     onTextKey: function (t) {
-      dropdown.disarmPointer()
+      root.disarmPointer()
       if (t === "b" || t === "B") {
         root.keyboardCursor = true
         root.toggleBluetooth()
@@ -1321,14 +1381,20 @@ Panel {
       anchors.fill: parent
       clip: true
 
-      BluetoothDropdown {
-        id: dropdown
+      Loader {
+        id: standaloneView
         width: parent.width
-        maxScrollHeight: Style.space(400)
-        captionOpacity: root.captionOpacity
-        view: root.bluetoothView
-        onAction: function (name, arg) {
-          root.handleAction(name, arg)
+        active: !root.embedded
+        sourceComponent: Component {
+          BluetoothDropdown {
+            width: parent.width
+            maxScrollHeight: Style.space(400)
+            captionOpacity: root.captionOpacity
+            view: root.bluetoothView
+            onAction: function (name, arg) {
+              root.handleAction(name, arg)
+            }
+          }
         }
       }
     }

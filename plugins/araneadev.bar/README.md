@@ -17,8 +17,7 @@ The bar is a composition root. Shared visual contracts belong in
 
 ## Entry points and components
 
-- `Bar.qml` owns the bar window and host-facing properties.
-- `BarSections.qml` composes the configured sections.
+- `Bar.qml` owns the bar window, configured sections, and host-facing properties.
 - `BarModuleSlot.qml` loads one configured module.
 - `BarDragOverlay.qml` owns drag and transparency gestures.
 - `CenterGestureArea.qml` handles center-bar interactions.
@@ -27,6 +26,18 @@ The bar is a composition root. Shared visual contracts belong in
 - `BarModel.js` owns pure layout, color, and configuration normalization.
 
 ## Configuration
+
+The everyday right-hand controls are Network, Audio, Battery/System,
+Notifications and Agents. Network contains Wi-Fi, VPN and Bluetooth; Audio
+contains output and microphone controls, with a capture-only microphone badge;
+Battery/System contains Power, Display and Health. The app tray stays behind its
+disclosure. A conditional Health shortcut appears only for open issues, or while
+its issue panel remains open. Separate child controls remain available when their
+owning panel is absent.
+
+Connections uses a linked-node symbol for Network, VPN and Bluetooth. System
+uses adjustment controls for Power, Display and Health, with a small battery
+level cue and optional percentage. Tooltips name the contents of both groups.
 
 The host supplies `barConfig`. The supported layout shape is:
 

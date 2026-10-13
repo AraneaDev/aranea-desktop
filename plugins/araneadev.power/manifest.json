@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "id": "araneadev.power",
-  "name": "Aranea Power",
+  "name": "Aranea Battery / System",
   "version": "1.0.0",
   "author": "AraneaDev",
-  "description": "Battery, charge history, power draw and power profiles",
+  "description": "Battery, power profiles, display controls and system health",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "Aranea Power",
-    "description": "Battery, charge history, power draw and power profiles",
+    "displayName": "Aranea Battery / System",
+    "description": "Battery, power profiles, display controls and system health",
     "category": "System",
     "allowMultiple": false
   },

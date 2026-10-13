@@ -91,10 +91,9 @@ ShellRoot {
         t.equal(requests, 2, "keyboard activation emits exactly one request")
         t.check(!section.expanded, "keyboard activation leaves expansion owned by the host")
         var outline = t.findChild(section, "cursorOutline")
-        t.equal(outline.border.width, 0, "pointer interaction never draws a mint outline")
+        t.equal(outline.focused, false, "pointer interaction never draws a mint outline")
         section.keyboardFocused = true
-        t.check(outline.border.width > 0, "host keyboard focus draws a visible outline")
-        t.check(Qt.colorEqual(outline.border.color, Shared.DesignTokens.accent), "keyboard outline uses mint")
+        t.check(outline.focused, "host keyboard focus draws a visible outline")
         section.keyboardFocused = false
 
         gate.layoutChangedAt = Date.now()

@@ -5,6 +5,7 @@
 // the menu's layout changing, unless the pointer really moved onto it.
 // qmllint disable missing-property
 import QtQuick
+import QtQuick.Shapes
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
@@ -23,6 +24,18 @@ BorderSurface {
   property string detail: tileData && tileData.detail ? tileData.detail : ""
   // External selection state.
   property bool selected: false
+  // Compact deck omits secondary tile text, preserving the primary label.
+  property bool compact: false
+  // Entrance choreography affects artwork only, never the tile's input bounds.
+  property bool presented: true
+  // Stagger this tile after the identity reveal, in milliseconds.
+  property int entranceDelay: 0
+  Aranea.DeckReveal {
+    id: entrance
+    opened: tile.presented
+    delay: tile.entranceDelay
+    motionEnabled: tile.motionEnabled
+  }
   // Font family used for all tile text.
   property string fontFamily: Aranea.Typography.uiFamily
   // Main tile text colour.
@@ -36,9 +49,17 @@ BorderSurface {
   // Letter spacing applied to tile text.
   property real menuLetterSpacing: 0
   // Whether parent animations are enabled.
-  property bool motionEnabled: true
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
   // Whether the pointer really moved onto the tile and is still over it.
   property bool hovered: false
+  // Interpolated light intensity; the tile's input rectangle remains stationary.
+  readonly property real highlight: Math.max(0, Math.min(1, hoverLight.value))
+  Aranea.SpringValue {
+    id: hoverLight
+    targetValue: tile.selected || tile.hovered ? 1 : 0
+    motionEnabled: tile.motionEnabled
+    epsilon: 0.001
+  }
   // The window's shared PointerMoveGate, or null for the tile's own.
   property var sharedGate: null
   // The gate the tile's hover goes through.
@@ -73,61 +94,130 @@ BorderSurface {
 
   implicitHeight: Style.space(64)
   radius: Aranea.DesignTokens.cornerRadius
-  color: tile.selected || tile.hovered ? Util.alpha(tile.selectedText, 0.12) : "transparent"
+  color: "transparent"
   borderSpec: Border.none()
 
-  Rectangle {
-    anchors.left: parent.left
-    anchors.top: parent.top
-    width: Style.space(18)
-    height: Style.space(2)
-    color: tile.selectedText
-    opacity: tile.selected || tile.hovered ? 0.7 : 0.12
+  Shape {
+    anchors.fill: parent
+    opacity: entrance.progress
+    transform: Translate {
+      y: entrance.offset
+    }
+    ShapePath {
+      strokeWidth: 1
+      strokeColor: Util.alpha(tile.foreground, 0.12 + tile.highlight * 0.12)
+      fillGradient: LinearGradient {
+        x1: 0
+        y1: 0
+        x2: tile.width
+        y2: tile.height
+        GradientStop {
+          position: 0
+          color: Util.alpha(tile.selectedText, 0.08 + tile.highlight * 0.12)
+        }
+        GradientStop {
+          position: 1
+          color: Util.alpha(Aranea.DesignTokens.strandEnd, 0.07 + tile.highlight * 0.09)
+        }
+      }
+      startX: 1
+      startY: 1
+      PathLine {
+        x: tile.width - Style.space(16)
+        y: 1
+      }
+      PathLine {
+        x: tile.width - 1
+        y: Style.space(16)
+      }
+      PathLine {
+        x: tile.width - 1
+        y: tile.height - 1
+      }
+      PathLine {
+        x: Style.space(12)
+        y: tile.height - 1
+      }
+      PathLine {
+        x: 1
+        y: tile.height - Style.space(12)
+      }
+      PathLine {
+        x: 1
+        y: 1
+      }
+    }
+  }
+
+  Aranea.FocusFrame {
+    anchors.fill: parent
+    anchors.margins: 1
+    focused: tile.selected
   }
 
   Rectangle {
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    width: Style.space(18)
-    height: Style.space(2)
-    color: tile.selectedText
-    opacity: tile.selected || tile.hovered ? 0.7 : 0.12
-  }
-
-  Column {
-    width: parent.width - Style.space(28)
-    anchors.centerIn: parent
-    spacing: Style.space(4)
-
+    id: glyphPlate
+    radius: Style.space(6)
+    opacity: entrance.progress
+    transform: Translate {
+      y: entrance.offset
+    }
+    x: Style.space(14)
+    y: Style.space(12)
+    width: Style.space(tile.compact ? 28 : 32)
+    height: width
+    color: Util.alpha(tile.selectedText, 0.1)
+    scale: 1 + tile.highlight * 0.1
+    border.width: 0
     Aranea.InkText {
-      width: parent.width
+      anchors.centerIn: parent
       text: tile.icon
       color: tile.selectedText
       font.family: Aranea.Typography.iconFamily
       font.pixelSize: Style.font.iconLarge
-      horizontalAlignment: Text.AlignHCenter
     }
+  }
 
+  Text {
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.margins: Style.space(18)
+    text: "↗"
+    color: tile.selectedText
+    opacity: entrance.progress * (0.55 + tile.highlight * 0.45)
+    transform: Translate {
+      x: tile.highlight * Style.space(3)
+      y: -tile.highlight * Style.space(3)
+    }
+    font.family: Aranea.Typography.technicalFamily
+    font.pixelSize: Style.font.subtitle
+  }
+
+  Column {
+    opacity: entrance.progress
+    transform: Translate {
+      y: entrance.offset
+    }
+    x: Style.space(14)
+    y: glyphPlate.y + glyphPlate.height + Style.space(6)
+    width: parent.width - Style.space(28)
+    spacing: Style.space(4)
     Text {
       width: parent.width
       text: tile.label
       color: tile.foreground
       font.family: tile.fontFamily
-      font.pixelSize: Style.font.bodySmall * tile.menuFontScale
-      font.letterSpacing: tile.menuLetterSpacing
-      horizontalAlignment: Text.AlignHCenter
+      font.pixelSize: Style.font.subtitle * tile.menuFontScale
+      font.weight: Font.DemiBold
       elide: Text.ElideRight
     }
-
     Text {
+      visible: !tile.compact
       width: parent.width
       text: tile.detail
       color: tile.contextText
-      font.family: tile.fontFamily
+      font.family: Aranea.Typography.technicalFamily
       font.pixelSize: Style.font.caption * tile.menuFontScale
-      font.weight: Font.Medium
-      font.letterSpacing: tile.menuLetterSpacing
-      horizontalAlignment: Text.AlignHCenter
       elide: Text.ElideRight
     }
   }
