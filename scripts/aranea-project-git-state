@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Bounded read-only observation of one exact registered checkout.
+# Usage: aranea-project-git-state --project PROJECT_ID --checkout CHECKOUT_ID --json
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/project-git-state.sh
+source "$script_dir/lib/project-git-state.sh"
+project_git_state_main "$@"
