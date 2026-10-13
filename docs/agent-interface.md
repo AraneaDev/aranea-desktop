@@ -1,8 +1,26 @@
 # Agent interface
 
-Aranea exposes the same operations to humans and automation. Humans can run
-`./installer`; agents should call the operation scripts directly with
-`--json` and consume JSONL events.
+Aranea exposes installation, desktop state, projects, actions, and agent activity
+through local commands. Use the public `aranea` CLI with `--json` for projects
+and tasks; use the operation scripts for installation and repair. Internal
+helpers have a different response shape.
+
+| Interface                                              | Output                                    |
+| ------------------------------------------------------ | ----------------------------------------- |
+| Install, uninstall, doctor, public `aranea ... --json` | Schema-1 JSONL lifecycle events           |
+| Wallpaper, updates, Settings                           | One JSON document, specific to the helper |
+| Registry, activity store, provider adapter             | One `{ok,state,error}` object             |
+| `omarchy-shell` routes                                 | Native IPC strings or documents           |
+
+For current command schemas and host availability, run:
+
+```bash
+scripts/aranea capabilities --json | jq -s 'last | .data'
+```
+
+Capabilities are inside the completed event's `data`, including `operations`,
+`activity`, `projectActions`, and `availability`. They do not initialize the
+project registry.
 
 ## Commands
 
@@ -109,6 +127,20 @@ provider, returning `unavailable` if undiscovered or `refused` during an inert
 capture/showcase. These routes open panels or select display preferences; they do
 not connect a VPN, toggle Bluetooth, resolve a Health issue, or enable task hooks.
 Their return strings are native IPC responses, not lifecycle JSONL events.
+
+### Daily wallpaper schedule
+
+Settings status exposes sorted `state.schedule.entries` objects with `time` and
+`wallpaper` fields. Save one or more unique local `HH:MM` times with available
+catalog IDs:
+
+```bash
+scripts/aranea-settings configure schedule --entries '[{"time":"07:00","wallpaper":"day"},{"time":"20:00","wallpaper":"signal-shrine"}]' --json
+```
+
+The Settings adapter delegates to `aranea-wallpaper schedule configure --entries`.
+The legacy `configure schedule DAWN DAY DUSK NIGHT --json` interface remains
+supported. Saving entries and enabling the schedule are separate operations.
 
 ## Internal project registry
 
@@ -313,89 +345,98 @@ canonical path. Register every desired worktree explicitly. `--separate` preserv
 a separate association; `--use-current-workspace` explicitly overrides dedicated
 allocation. These flags do not confer ownership on unrelated windows.
 
+## Agent activity commands
+
+Usage providers and activity tasks are separate. Usage selection changes the bar
+ring; activity comes from explicit reports or opt-in native provider adapters.
+All public commands below accept `--json`:
+
+```text
+aranea agents status
+aranea agents list
+aranea agents inspect TASK_ID
+aranea agents register --json-input
+aranea agents report --json-input
+aranea agents focus TASK_ID
+aranea agents reopen TASK_ID
+aranea agents open-checkout TASK_ID
+aranea agents dismiss TASK_ID
+aranea agents operation OPERATION_ID [--reobserve]
+aranea agents adapter status|install|remove claude|codex
+```
+
+Status/list/inspect read the headless store. Focus, reopen, and open-checkout use
+the live activity owner and retain an operation ID. Focus targets a proven
+hosting terminal; reopen requires a native UUID and current provider evidence.
+The observer polls for up to 30 seconds. Disconnection, timeout, or interruption
+does not cancel accepted work. Reconnect by operation ID; `--reobserve` checks
+that same operation without submitting another action. Dismissal is serialized
+through the desktop owner where required.
+
+Register reads one producer-epoch object on stdin; report reads one event.
+For example, after assigning an absolute checkout path to `checkout_path`:
+
+```bash
+scripts/aranea agents register --json-input --json <<'JSON'
+{"provider":"claude","providerSessionId":"example-session","producerEpoch":"example-epoch","tasks":[]}
+JSON
+jq -n --arg cwd "$checkout_path" '{schemaVersion:1,eventId:"example-event-1",provider:"claude",providerSessionId:"example-session",producerEpoch:"example-epoch",sequence:1,taskId:"example-task",kind:"snapshot",payload:{cwd:$cwd,reportedState:"working",description:"Review parser"}}' |
+  scripts/aranea agents report --json-input --json
+```
+
+Session/epoch/task identities and increasing sequences are required. Exact event
+replay is retained; conflicting IDs, stale sequences, and old epochs are refused.
+Reported working/finished state, blockers, connection freshness, process/window
+ownership, and verification are independent. A finish or native Stop does not
+verify the work. Structured verification records use reported-pass/reported-fail;
+absent evidence remains unknown. Full schemas live in
+`scripts/lib/agent-activity.jq`, with public examples exercised in
+`tests/agents-cli.test.sh` and `tests/agent-activity.test.sh`.
+
 ## Claude activity adapter
 
-The activity adapter is opt-in and has a single-object `{ok,state,error}` response:
+The public adapter route supports Claude and Codex. Internal inspection uses:
 
 ```bash
 scripts/aranea-agent-adapter status claude
-scripts/aranea-agent-adapter install claude
-scripts/aranea-agent-adapter remove claude
+scripts/aranea-agent-adapter status codex
 scripts/aranea-agent-store snapshot
 ```
 
-Installation atomically merges this installation's exact command into
-`~/.claude/settings.json`. Removal deletes only that command handler, preserving
-siblings, unrelated groups, permissions and file mode. Malformed settings and
-symlinks are refused without replacing the file. Commands use a quoted absolute
-reporter path, fixed `/bin/bash` and `/usr/bin/timeout`, and `/usr/bin:/bin` PATH.
-The reporter reads native JSON stdin, stays silent and exits successfully even
-when reporting fails; it never supplies an approval decision.
+Installation atomically merges only this installation's exact reporter command;
+removal deletes that handler while preserving unrelated settings, sibling
+handlers, and file mode. Malformed files and symlinks are refused. Claude uses
+`~/.claude/settings.json`; Codex uses `${CODEX_HOME:-$HOME/.codex}/hooks.json`,
+leaving inline `config.toml` hooks unchanged. Installation does not grant trust
+or change permission policies. The native reporter stays silent, returns
+success on reporting failure, and supplies no approval decision.
 
-Status distinguishes `commandAvailable`, `configured`, `runtimeObserved`, and
-`connectionProven`. Configuration entries do not prove hooks enabled or the
-project trusted: `enabled` and `trusted` remain `"unconfirmed"`.
-`runtimeObserved` requires a hook observed through proven native process ancestry;
-`connectionProven` also requires fresh receipt time and current executable,
-PID/start time, boot and ancestor proof. Neither establishes desktop window
-ownership.
+Adapter status separates `commandAvailable`, `configured`, `runtimeObserved`,
+and `connectionProven`. Enabled/trusted state remains unconfirmed. Runtime
+observation requires native ancestry proof; connection proof adds fresh receipt,
+current executable, PID/start-time, boot, and ancestry checks. Neither proves a
+desktop window belongs to a task.
 
-Baseline installation includes SessionStart, UserPromptSubmit, PreToolUse,
-PermissionRequest, PostToolUse, Stop, SessionEnd and Notification. The mapper
-also supports PostToolUseFailure, StopFailure, SubagentStart, SubagentStop and
-TaskCompleted. These optional handlers are installed only after that particular
-native event has been observed through proven provider ancestry. Status reports
-mapper support, observation, availability and owned installation separately.
-Existing owned optional handlers remain until explicit removal, even if retained
-evidence is lost. No version string proves capability. API-error, subagent,
-tool-failure and task-completion coverage can therefore be unavailable; explicit
-structured activity reports remain the fallback.
+Claude's baseline hooks cover session, prompt, tool, permission, Stop, and
+Notification events. Optional failure/subagent/completion handlers are installed
+only after their particular event has been observed through proven ancestry.
+Codex maps its native events with `turn_id`; unsupported Claude-only event names
+cannot manufacture Codex tasks. Review each adapter's reported capabilities for
+available coverage. Codex user-input and native permission resolution can remain
+unconfirmed; explicit structured reports supply the missing state.
 
-A prompt's first nonblank line supplies its label, limited to 160 characters;
-full prompts, tool arguments and provider argv are not persisted. Native prompt,
-tool, agent and task identities provide correlation. Canonical no-ID deliveries
-provide exact replay within the retained 512 receipts. Retained callbacks use their
-original task and sequence, including no-ID lifecycle replay across main turns.
-Tool results follow the task established by their native tool ID; contradictory
-turn identities or changed reuse of an event ID are refused. Native turn identity
-and duplicate-delivery certainty are unavailable without `prompt_id`.
-PermissionRequest has no native tool ID, so permission resolution stays
-unconfirmed. Matching AskUserQuestion/ExitPlanMode results resolve only their
-own blockers; unmatched failures append diagnostics. Stop means review handoff,
-StopFailure means reported failure, and TaskCompleted finishes only that native
-task. None supplies verification evidence.
+The mapper retains only bounded labels/results and correlation evidence, not
+full prompts, tool arguments, or raw provider argv. New main turns retain prior
+turns as inactive history. Late callbacks and fresh heartbeats cannot revive
+an old turn. Native callback ownership fixes the original task/sequence for
+replays; contradictory turn reuse is refused. Legacy epochs without that
+ownership require a new provider/session epoch for uncorrelated callbacks;
+`capabilities.callbackOwnership` reports the restart requirement.
 
-A genuinely new main turn preserves the earlier turn's state, question and
-blockers as inactive history. Fresh session heartbeats cannot revive it; late
-callbacks cannot select it as the current turn. Independent child tasks remain
-active. The private session metadata contains `currentTaskId`, native `turns`,
-optional `inactiveTaskIds`, optional `observedHooks` and optional `callbackOwners`. Only the native mapper
-can change these fields; ordinary register/report requests cannot manufacture
-hook-observation or callback-ownership evidence. `callbackOwners` retains at most
-512 unique records with hashed callback identity, original task/event IDs and
-optional bounded native tool ID. Records are pruned with their retained tasks and
-receipts; public event labels cannot manufacture ownership.
-
-Legacy epochs without callback ownership remain readable. Explicit mapped native
-turn identities remain usable, but uncorrelated callbacks are refused for that
-epoch. Start a new Claude provider/session epoch to establish ownership; duplicate
-SessionStart or another prompt within the legacy epoch does not enable it.
-Status `capabilities.callbackOwnership` reports legacy session count,
-`restartRequired` for fresh legacy activity, and recovery text. The count includes
-retained legacy history; that history does not block a modern active session.
-Historical optional-hook observations alone
-do not establish that a legacy epoch has callback coverage.
-
-The private heartbeat runs once per proven process epoch, updates connection
-receipts every 15 seconds, and exits on provider identity, session or epoch loss.
-Transient store or lock failures retain the same helper and retry at the bounded
-15-second cadence, with current process identity revalidated on every attempt.
-Only definitive process, session, epoch or ownership loss ends the helper.
-It never terminates the provider. Helper ownership lives in private
-`$(aranea_state_root)/agent-heartbeats/` identity files; there is no sequence
-sidecar. Provenance stores an absolute executable identity and a SHA256 command
-fingerprint, never raw argv. Navigation consumers must revalidate process and
-window proof immediately before focus.
+One private heartbeat runs per proven epoch at a 15-second cadence. Transient
+store/lock failures retry after identity revalidation; process/session/epoch
+loss ends the helper without terminating the provider. Focus always revalidates
+process and window evidence immediately before navigation.
 
 ## Configured project actions and retained runs
 
@@ -515,9 +556,3 @@ retains only the inert action coordination files `project-actions.json.lock` and
 necessary ancestors; reinstall preserves their inodes while activating a fresh
 generation. Journal data, repositories, unrelated services and editor/provider
 processes are not removed by action cleanup.
-
-The wallpaper schedule exposes sorted `state.schedule.entries` objects with
-`time` and `wallpaper` fields. Save through
-`aranea-settings configure schedule --entries '[{"time":"07:00","wallpaper":"day"}]' --json`.
-Times must be unique local `HH:MM` values and wallpapers must be available catalog
-IDs. Existing four-time clients remain supported.

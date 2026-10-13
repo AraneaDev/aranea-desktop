@@ -1,281 +1,215 @@
 # Development
 
+Start with [Contributing](../CONTRIBUTING.md) for tool installation, Git hooks,
+commit conventions, and pull requests. This guide covers source ownership,
+local verification, and visual captures. [Architecture](architecture.md) explains
+how the runtime pieces fit together.
+
 ## Repository map
 
-| Directory       | Responsibility                                                            |
-| --------------- | ------------------------------------------------------------------------- |
-| `backgrounds/`  | Wallpaper artwork and manifest IDs                                        |
-| `branding/`     | Marks, glyphs, motifs, fastfetch, and idle artwork                        |
-| `integrations/` | Cursor, icons, terminal, browser, Qt, media, session, and app styling     |
-| `plugins/`      | Aranea bar, menu, lock, notifications, health, pickers, and OSD           |
-| `hooks/`        | Theme activation and post-boot behavior                                   |
-| `scripts/`      | Installer, doctor, wallpaper, integrations, deployment, and capture tools |
-| `tests/`        | Shell contracts, QML behavior, screenshots, and JavaScript tests          |
-| `screenshots/`  | README showcase captures                                                  |
+| Path                        | Responsibility                                                         |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `design/`                   | Canonical tokens and templates for generated projections               |
+| `backgrounds/`, `branding/` | Wallpaper catalog, spider marks, motifs, and artwork                   |
+| `integrations/`             | GTK, cursor, icons, terminal, browser, Qt, and application styling     |
+| `plugins/`                  | Quickshell plugins, shared components, and pure logic modules          |
+| `hooks/`, `scripts/`        | Installation, activation, state backends, and desktop helpers          |
+| `tools/`                    | Quality gates, generators, preview renderers, and upstream reports     |
+| `tests/`                    | Sandboxed shell contracts, JavaScript tests, and QML behavior fixtures |
+| `screenshots/`              | Committed showcase PNGs and hero GIF                                   |
 
 ## Local checks
 
-Run the focused installer checks:
+Use the smallest relevant check while editing, then run the full gate before
+handoff:
 
 ```bash
 tests/run json-events install uninstall doctor installer
-```
-
-Run the repository quality gates:
-
-```bash
+node --test tests/js/graph-logic.test.js
+tests/qml-behaviour.test.sh shared
 tools/check
 ```
 
+`tests/run` accepts bare test names. `tools/check` runs format, lint, inline
+documentation, asset/link validation, QML analysis, QML behavior, contract tests,
+and runtime smoke checks. `--only format,lint,validate` selects stages;
+`--fast` skips smoke and slow shell tests. QML/runtime coverage depends on the
+host's Quickshell, Omarchy shell, and headless compositor tools. A skipped check
+is a limitation to report, not a passed check.
+
 ### Design tokens
 
-Edit `design/tokens.toml` to change the shared palette, shell surfaces,
-spacing, typography, or motion defaults. Regenerate the committed projections
-with `scripts/generate-tokens --write`. Aranea's identity and canonical spider
-mark are fixed in the generator. The outputs include the runtime mark, boot
-logo, motif/status glyphs, platform styles, and shared QML values.
+Edit `design/tokens.toml` for palette, shell surfaces, spacing, typography, and
+motion. Target formats and asset geometry live in `design/templates/`.
+Aranea's identity and canonical spider mark are fixed in the generator; there
+is no separate branding configuration.
 
-Platform projections are templated in `design/templates/`.
-`scripts/generate-tokens --check` detects drift. Generated files must not be
-edited directly; `rsvg-convert` is required to regenerate raster outputs.
+```bash
+scripts/generate-tokens --write
+scripts/generate-tokens --check
+```
 
-The GTK stylesheet and cursor families have explicit tokenized templates under
-`design/templates/gtk.css.in` and `design/templates/assets/`. The generator
-renders matching Xcursor and Hyprcursor files from the same cursor family
-source. Font-derived icon geometry remains owned by
-`scripts/generate-font-icon-theme`; its accent placeholder is resolved by the
-token generator before the committed SVG outputs are installed.
-
-The checks cover formatting, ShellCheck, Markdown, assets, QML, QML tests,
-shell contracts, JavaScript behavior, and smoke validation. Some visual or
-runtime checks require the Omarchy tooling available on the development host.
+The generator produces committed runtime inputs, including QML values, platform
+styles, mark variants, boot artwork, motifs, and cursors. Review these diffs but
+edit their source, not the projections. Raster regeneration requires
+`rsvg-convert`. Xcursor and Hyprcursor share cursor geometry. Font-derived icons
+are owned by `scripts/generate-font-icon-theme`, with their accent resolved by
+the token generator.
 
 ### Shared QML components
 
-Use `plugins/araneadev.shared` for visual and input contracts that are
-identical across plugins: `SurfaceCard`, `StatusRail`,
-`StatusTextPair`, `StatusRow`, `BrandHeader`, `KeyboardInputFrame`,
-`KeyboardPanelFrame`, `EmptyState`, and `InkText`. `KeyboardInputFrame` owns
-only key forwarding; `KeyboardPanelFrame` adds the layer-shell panel.
-`EmptyState` is the shared centered empty-state presentation for menu and
-picker surfaces. `InkText` is a `Text` whose glyph ink, rather than its
-advance width, sits on the alignment line. Keep lifecycle, cursor, and
-plugin-specific interaction logic in the owning plugin rather than adding it
-to shared components.
+`plugins/araneadev.shared` owns repeated presentation and input contracts.
+Examples include `SurfaceCard`, `BrandHeader`, `StatusRow`, `EmptyState`,
+`Typography`, and the focus/motion primitives. `KeyboardInputFrame` forwards
+keys; `KeyboardPanelFrame` adds the layer-shell panel. `InkText` aligns glyph
+ink instead of text advance width.
 
-Generated asset outputs must not be edited directly. Change
-`design/tokens.toml` or the relevant template, run
-`scripts/generate-tokens --write`, and verify with
-`scripts/generate-tokens --check`.
+Give reusable components explicit properties and action signals, token-backed
+defaults, and a `qmldir` registration. Keep plugin lifecycle, IPC, cursor
+identity, and process management in the owning plugin.
 
 ### JavaScript facades
 
-Large plugin logic files are generated compatibility facades. Put new logic in
-the focused source module for its domain, keep existing exported function names
-stable, and regenerate with:
+Generated compatibility facades preserve the function names QML imports. Change
+the focused source module beside a facade, add direct module tests, and regenerate:
 
 ```bash
 node tools/js-facade-generator.mjs --write
 node tools/js-facade-generator.mjs --check
 ```
 
-Generated files remain plain QML-compatible JavaScript: do not add `require`,
-ES module imports, or QML-only nested `.import` statements. The generator check
-runs as part of `tools/check` and fails when a facade is stale.
+Keep generated JavaScript compatible with QML. Do not add Node `require`, ES
+module imports, or nested QML `.import` statements to the generated output.
 
 ### Extraction boundaries
 
-Shared runtime paths belong in `plugins/araneadev.shared/RuntimePaths.qml`.
-Use its branding URLs and state-root properties instead of rebuilding
-`XDG_STATE_HOME`, `HOME`, or the current-theme branding path in a plugin. Keep
-lock-screen paths fixed to Omarchy's documented state root where that behavior
-is intentional.
+Use `RuntimePaths.qml` for shared state roots and branding URLs. Preserve the
+lock screen's intentional fixed Omarchy paths. Extract one responsibility at a
+time: search belongs in `MenuSearch.js`, tree traversal in `MenuTree.js`, and
+notification preferences in `NotificationSettings.js`.
 
-Large JavaScript facades should expose a stable compatibility surface while
-delegating focused pure domains to sibling modules. The menu model keeps
-search in `MenuSearch.js` and route/tree traversal in `MenuTree.js`; notification
-settings parsing lives in `NotificationSettings.js`. New extractions must add
-direct module tests and preserve the facade's exported function names.
-
-Shared QML primitives may own visual contracts, tokens, and layout defaults,
-but not plugin lifecycle, cursor state, IPC, or process management. `BrandHeader`
-and `StatusRow` are intentionally presentational: callers provide text,
-colors, trailing content, and click policy through properties and signals.
-Keep a large QML entry point as a composition root while moving one
-responsibility at a time behind tested properties and signals.
-
-Presentational picker components follow the same boundary: `EmojiCell` owns
-cell rendering and click emission, while `EmojiGrid` owns result rendering and
-selection reporting; `Emojis.qml` retains filtering, recents, persistence, and
-insertion. New components should expose explicit properties and signals, keep
-their defaults tied to shared tokens, and receive dynamic state from the
-composition root instead of reaching into root-only ids.
+Shared components render supplied state. Composition roots retain filtering,
+persistence, launch queues, and service ownership. For example, `EmojiCell` and
+`EmojiGrid` render and emit selection, while `Emojis.qml` owns recents and insertion.
 
 ## Showcase captures
 
-The README is a visual showcase as well as a project introduction. Refresh
-captures from the intentionally empty workspace 2 with:
+The public batch produces 38 surface PNGs and a 32-frame hero GIF. It mixes live
+shell captures with production QML rendered in isolated hosts; lock and boot
+previews never lock or reboot the active machine.
+
+First switch to an intentionally empty workspace 2, then run:
 
 ```bash
-omarchy-shell omarchy.agents select codex
 scripts/capture-screenshots --all --output screenshots
 ```
 
-The batch keeps workspace 2 selected and rechecks it immediately before each
-screen grab. VPN and Bluetooth are captured as Network tabs; Display and Health
-are captured as System tabs. Settings previews select Signal Shrine, and the
-Agents fixture selects Codex without changing the user's real provider choice.
-The first command explicitly saves Codex as the real bar provider too, so shell
-restarts cannot return its ring to Claude. Omit or change that command when
-capturing a different provider. Health waits for live CPU history before capture.
-The batch parks and restores the real notification inbox and returns to workspace
-1 when finished; notifications arriving during the capture are not retained.
+The script refuses a batch started on another workspace, pins workspace 2, and
+rechecks it before screen grabs. It parks and restores the real notification
+inbox, restarts the shell, and returns to workspace 1. Notifications arriving
+while the inbox is parked are discarded on successful restoration.
 
-`settings-schedule` captures the daily time/image editor.
+Captures preserve the real selected Usage provider. The Agents fixture displays
+Codex without saving that preference. To intentionally change the real bar ring
+before capturing, use `omarchy-shell omarchy.agents select codex`; that choice
+persists across restarts.
 
-The public batch captures 38 surfaces and builds a 32-frame 1280×720 hero GIF.
-Eight additional search-state PNGs are inert diagnostics, regenerated separately:
+Network hosts VPN and Bluetooth captures; System hosts Display and Health.
+Health waits for live CPU history. Settings previews use Signal Shrine, and
+`settings-schedule` shows the daily time/image editor. Nearby device names,
+audio labels, provider details, and notification contents are staged for the
+showcase. Audio transport and agent refresh/selection are refused while their
+showcase fixtures are active. Wi-Fi QR codes are excluded.
+
+A failed surface restores its previous PNG, fails the batch, and prevents a new
+GIF. Rebuild only the GIF from existing stills with:
 
 ```bash
-for state in mixed no-match no-compositor vanished actions action-pending action-error action-long-label; do
-  scripts/capture-screenshots --surface "menu-search-$state" --output screenshots
-done
 scripts/capture-screenshots --hero --output screenshots
 ```
 
-`--hero` only rebuilds the GIF from existing stills. A failed surface retains its
-previous PNG, reports failure, and prevents a batch GIF rebuild. The workspace
-overview uses a production-content fixture over Signal Shrine in a 16:9 frame,
-without reading live repositories or dispatching workspace actions. Polkit
-launches a harmless `/usr/bin/true` authentication request through the graphical
-session and cancels it without typing a password. Wi-Fi QR codes are excluded.
-
-Lock and Plymouth are rendered rather than grabbed from the screen, so the
-capture workflow never locks the active session or reboots the machine:
-
-- `tools/render-lock-preview` runs the lock plugin's real `LockView`
-  offscreen under quickshell, at the screen size and scale, with a stand-in
-  clock and an empty password field, and grabs it to a PNG.
-- `tools/render-plymouth-preview` composes the disk-unlock prompt of
-  Omarchy's Plymouth theme from the same pieces that
-  `omarchy plymouth set-by-theme aranea` installs (`unlock.png`, the
-  `colors.toml` background and foreground, Omarchy's entry, lock and
-  bullet images) with the geometry of `omarchy.script`, and refuses to
-  render if that geometry has changed upstream.
-
-Either renderer exits non-zero and writes nothing when it fails, and so does
-the capture of that surface.
-
-The Network and Bluetooth captures never show real nearby names. After
-summoning the dropdown, the script hands it stand-in names through the
-dropdown's `showcase` IPC method. The names are display only and are cleared
-when the dropdown closes. The Audio capture works the same way: its
-`showcase` method takes stand-in output, input and app labels and a made-up
-track with a position (so the progress strand shows), and the transport
-controls are refused while it is shown. The Agents capture hands its
-`showcase` method stand-in agents (Codex, Claude Code and Fireworks with
-made-up plans, limits, days, models and a prepaid balance), and refresh and
-the agent picker are refused while they are shown. If the dropdown doesn't answer `ok`
-(for example, the stock panel is active), that surface fails and no
-screenshot is written. These variables override the defaults:
-
-| Variable                         | Default                                                        |
-| -------------------------------- | -------------------------------------------------------------- |
-| `ARANEA_CAPTURE_WIFI_NAMES`      | JSON array of eight made-up SSIDs (`Aranea-Home`, ...)         |
-| `ARANEA_CAPTURE_BT_NAMES`        | JSON array of eight common device models (`WH-1000XM5`, ...)   |
-| `ARANEA_NETWORK_GRAPH_DELAY`     | `20`: seconds the link graph records before the grab           |
-| `ARANEA_BLUETOOTH_SCAN_DELAY`    | `3`: extra seconds for the scan to find devices                |
-| `ARANEA_CAPTURE_AUDIO_SHOWCASE`  | JSON `{outputs, inputs, apps, track}` (`Studio Monitors`, ...) |
-| `ARANEA_CAPTURE_AGENTS_SHOWCASE` | JSON `{agents: [...]}` (`Codex`, `Claude Code`, `Fireworks`)   |
-
-## Tracking upstream
-
-Plugins with `omarchy.clonedFrom` are forks of Omarchy's first-party shell plugins (their
-manifests set `omarchy.clonedFrom`), and every plugin depends on Omarchy's
-shell modules. `.omarchy-version` pins the Omarchy release they were last
-brought up to date with. `tools/upstream-drift` reports what changed upstream
-since that pin:
+Eight additional menu search fixtures are rendered separately:
 
 ```bash
-tools/upstream-drift                # Markdown: commits and diffstat per path
-tools/upstream-drift --diff         # with the full upstream diff per path
-tools/upstream-drift --json         # one JSON document, "drift" true or false
-tools/upstream-drift --to quattro   # against a branch (Omarchy develops on quattro) or tag
+for state in mixed no-match no-compositor vanished actions action-pending action-error action-long-label; do
+  scripts/capture-screenshots --surface "menu-search-$state" --output /tmp/aranea-previews
+done
 ```
 
-It watches `shell/plugins/<name>` for each fork and `shell/Commons`,
-`shell/Ui`, `shell/services` and `shell/shell.qml` for everyone. The forks
-are decomposed differently from upstream, so there is no merge: read each
-commit, port its intent into the matching Aranea files, run `tools/check`,
-and bump `.omarchy-version` in the same pull request.
+`tools/render-lock-preview` renders the real `LockView` offscreen with a fixture
+clock and empty password field. `tools/render-plymouth-preview` composes the
+installed unlock artwork against Omarchy's boot geometry and refuses upstream
+geometry drift. Polkit captures use a cancellable `/usr/bin/true` authentication
+request without entering a password.
 
-The `Upstream drift` workflow runs the report every Monday and keeps one
-issue labelled `upstream-drift` open while there is anything to port. It
-updates that issue as upstream moves and closes it once the pin is current.
-
-## Contributions
-
-Keep user-facing behavior documented in `README.md` or `docs/`. Keep agent
-interfaces stable and update the relevant contract tests when changing JSONL
-events, flags, or exit codes. Prefer the existing script and sandbox patterns
-for new operations.
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for hooks, commit conventions, and
-release workflow.
+Capture overrides include `ARANEA_CAPTURE_WIFI_NAMES` and
+`ARANEA_CAPTURE_BT_NAMES` (JSON arrays), `ARANEA_CAPTURE_AUDIO_SHOWCASE`
+(`{outputs,inputs,apps,track}`), and `ARANEA_CAPTURE_AGENTS_SHOWCASE`
+(`{agents:[...]}`). `ARANEA_NETWORK_GRAPH_DELAY` controls the live link-history
+wait; `ARANEA_BLUETOOTH_SCAN_DELAY` controls the extra scan delay. See the
+capture script header for other fixture inputs and defaults.
 
 ## Project acceptance and inert previews
 
-`tests/run projects-flow` creates real temporary Git repositories/worktrees,
-registers only explicit paths through JSON, then exercises the production owner
-with fake desktop evidence and real sandbox helper processes. It checks exact
-store/owner/search identities, Open/Resume without duplicate launches, and a
-partial sibling launch followed by failed-terminal-only retry. HOME/XDG/session
-isolation and application execution traps prevent live desktop or repository use.
+`tests/run projects-flow` uses temporary Git repositories, explicit registration,
+fake desktop evidence, and real sandbox helper processes. It checks owner/store
+identity, reuse without duplicate launches, partial launches, and failed-role
+retry. It does not establish native portal behavior or real compositor focus.
 
-Render the production project surfaces without loading a live owner:
-
-```bash
-scripts/capture-screenshots --surface projects-empty --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface projects-discovery --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface projects-grouped --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface projects-partial --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface project-details --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface project-search --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface project-launch-partial --output /tmp/aranea-project-previews
-scripts/capture-screenshots --surface workspaces --output /tmp/aranea-project-previews
-```
-
-Settings rendering supports `ARANEA_SETTINGS_RENDER_WIDTH`,
-`ARANEA_SETTINGS_RENDER_HEIGHT`, `ARANEA_SETTINGS_RENDER_FONT_SCALE`, and
-`ARANEA_SETTINGS_RENDER_SCROLL=bottom` for detail/recovery views. Use
-`ARANEA_PROJECT_RENDER_STATE=pending` with `project-launch-partial` for a pending
-operation. Menu rendering supports the existing logical size and font-scale
-overrides. Fixtures use invented `/fixture/` paths and refuse mutation, owner
-reads, chooser activation and tool execution. Workspace capture renders only the
-production panel offscreen; it no longer focuses or reads the live desktop.
-
-Run registry/discovery/tool/CLI/flow suites,
-`node --test --experimental-test-coverage tests/js/project-*.test.js tests/js/projects-logic.test.js`,
-and project QML behavior fixtures before the full `tools/check` gate. Projects JavaScript
-modules have enforced function coverage floors in `tools/baselines/coverage.txt`.
-The registry-client and client-refresh fixtures exercise both callback orders,
-failed reads, startup exceptions, and continued observation without resubmission.
-The setup fixture checks edits made during Save and unsaved batch-project exit.
-Offscreen
-verification does not verify the native folder portal, live compositor focus,
-real editor/terminal window observation or actual application reuse. Record those
-host checks separately; unavailable checks are limitations, never passed tests.
-
-### Projects presentation
-
-Project views, registry/discovery clients, and their capture transaction live in
-`plugins/araneadev.projects`. The persistent operation owner stays separate from
-window visibility. Shared buttons, labels, toggles, and page headers live in
-`araneadev.shared`; desktop Settings uses compatibility wrappers for these controls.
-
-Render the real standalone content without desktop mutations:
+Render production project content without a live operation owner:
 
 ```bash
 tools/render-projects-preview --output /tmp/projects.png --fixture project-details
 tools/render-project-actions-preview --output /tmp/actions.png --scene editor-service --size large-font
+scripts/capture-screenshots --surface workspaces --output /tmp/aranea-previews
 ```
+
+Other project fixtures include `projects-empty`, `projects-discovery`,
+`projects-grouped`, `projects-partial`, `project-search`, and
+`project-launch-partial`. Fixtures use invented `/fixture/` paths and refuse
+registry reads, owner actions, choosers, and execution. Workspace capture renders
+only the production panel, before live compositor reads or focus dispatch.
+
+Settings renderers accept `ARANEA_SETTINGS_RENDER_WIDTH`,
+`ARANEA_SETTINGS_RENDER_HEIGHT`, `ARANEA_SETTINGS_RENDER_FONT_SCALE`, and
+`ARANEA_SETTINGS_RENDER_SCROLL=bottom`. Use
+`ARANEA_PROJECT_RENDER_STATE=pending` for pending project-launch previews.
+
+### Projects presentation
+
+`araneadev.projects` owns project views, registry/discovery clients, retained
+drafts, and capture transactions. Its persistent operation owner stays separate
+from window visibility. Shared controls live in `araneadev.shared`; Settings
+uses compatibility wrappers.
+
+For changes here, run registry, discovery, tool, CLI, and flow suites plus the
+project JavaScript and QML fixtures. Coverage floors live in
+`tools/baselines/coverage.txt`. Record live portal, application reuse, terminal
+observation, and compositor checks separately from offscreen verification.
+
+## Tracking upstream
+
+`.omarchy-version` pins the Omarchy release last reviewed. Plugins declaring
+`omarchy.clonedFrom` are forks, and all plugins depend on Omarchy shell modules.
+
+```bash
+tools/upstream-drift
+tools/upstream-drift --diff
+tools/upstream-drift --json
+tools/upstream-drift --to quattro
+```
+
+The report watches forked plugin paths plus shell Commons, Ui, services, and
+`shell.qml`. Port the intent into Aranea's decomposed files, run `tools/check`,
+and update the pin in the same pull request. The Monday workflow maintains one
+`upstream-drift` issue until the pin is current.
+
+## Contributions
+
+Document user-facing changes in the closest guide and update contract tests for
+flags, JSON fields, and exit codes. Use conventional commits and a topic branch.
+The release sequence is verified `master`, a release-please pull request, green
+PR checks, then merge and version tag/GitHub release. Docs-only pushes are
+excluded from the release workflow's push trigger; `workflow_dispatch` can run
+it explicitly. See [Contributing](../CONTRIBUTING.md#releases) for token setup
+and release-PR checks.

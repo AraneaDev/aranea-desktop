@@ -1,164 +1,142 @@
 # Projects, workflow actions, and agents
 
-Open **Projects** from the launcher (**Super + Space**, then type `Projects`).
-Projects opens its own window. Choose **Add project**. The wizard guides you through
-adding a Git checkout, choosing your tools, defining optional workflow actions,
-and connecting agent reporting. The **Help** destination explains projects, actions,
-and agent reporting without leaving the window.
+Open **Command center → Projects** to keep a Git checkout, its tools, saved
+commands, and local agent activity together. Projects opens its own window.
+You can use it without enabling agent reporting.
 
-Use the sidebar to search and select a saved project. Narrow windows use a compact
-project selector. **Overview** shows the selected checkout, branch, and workspace;
-**Actions** contains reusable workflows and their results; **Agents** shows tasks
-reported from that project's exact registered checkouts; **Preferences** contains
-editor, terminal, checkout, workspace choices, and development folders; **Help** explains the workflow.
-Save or discard drafts before switching projects or destinations. Closing the
-window retains your selected project and drafts and does not cancel accepted operations.
+The sidebar selects a project; narrow windows use a compact selector.
+**Overview** shows the checkout and workspace, **Actions** contains saved
+commands and runs, **Agents** shows reported tasks, **Preferences** controls
+tools and checkouts, and **Help** explains setup. Save or discard unsaved drafts
+before switching projects or destinations. Closing the window retains drafts
+and does not cancel accepted operations.
 
 ## What belongs where?
 
-| Feature         | Use it for                                                                             |
-| --------------- | -------------------------------------------------------------------------------------- |
-| Project         | A registered Git repository and its saved editor, terminal, and workspace preferences. |
-| Checkout        | One working copy of a repository: the main checkout or a related Git worktree.         |
-| Workflow action | A command you configure and explicitly run, such as tests, a build, or a dev server.   |
-| Agent task      | Activity reported by a local Claude Code or Codex session.                             |
-| Usage           | Provider usage and limits; available independently of task reporting.                  |
-
-You can use projects and actions without enabling agent reporting.
+| Item            | Meaning                                                                       |
+| --------------- | ----------------------------------------------------------------------------- |
+| Project         | A registered Git repository with saved tools and workspace preferences.       |
+| Checkout        | One working copy: a main repository checkout or a related Git worktree.       |
+| Workflow action | A command you save and explicitly run, such as tests or a development server. |
+| Agent task      | Activity reported by a local Claude Code or Codex session.                    |
+| Usage           | Provider usage and limits, independent of task reporting.                     |
 
 ## Set up your first project
 
-1. Open **Command center → Projects** and choose **Add project**.
-2. **Choose folder:** pick the exact Git repository folder or a development folder
-   containing repositories. You can also enter an absolute path and choose
-   **Use folder**. The saved folder is scanned for Git checkouts.
-3. **Add repositories:** review the scan results. Select the checkouts you want,
-   including any related worktrees, then choose **Add selected**. Selection and
-   scanning alone do not register anything. Setup advances after registration
-   succeeds. You can select several repositories in one batch; related worktrees
-   are grouped into their project.
-4. **Configure workflow:** review the project name, editor, terminal, and workspace
-   preference. Choose **Use checkout** beside the working copy you want as the
-   default. Choose **Save preferences** after editing. A dedicated workspace
-   keeps the project's windows together; **Use current workspace** opens them
-   on the workspace you are using. For a batch, **Project 1 of N** shows your
-   position. **Next project** moves to the next repository; **Previous project**
-   revisits one. Each project keeps its own preferences and workflow actions.
-   Keep the current preferences and continue if you do not need customization;
-   continuing does not save or run anything.
-5. Optionally add test, build, or dev-server actions. Save or cancel any action
-   draft before continuing. You can add actions later in **Actions**.
-6. **Connect agents:** follow the reporting instructions for the provider you use,
-   or skip this optional setup by choosing **Finish setup**. This stage appears
-   after the last project. Install reporting once per provider, then start agent
-   sessions from whichever registered checkout you want to work in.
+1. Open Projects and choose **Add project**.
+2. In **Choose folder**, pick the repository itself or a parent development
+   folder. You can also enter an absolute path and choose **Use folder**.
+3. In **Add repositories**, review discovered checkouts and worktrees. Select
+   the ones you want, then choose **Add selected**. Scanning and selection alone
+   register nothing; related worktrees are grouped into one project.
+4. In **Configure workflow**, review the name, editor, terminal, and workspace.
+   Choose **Use checkout** beside the preferred working copy. Save changes with
+   **Save preferences**. A dedicated workspace keeps the tools together; using
+   the current workspace opens them where you are working.
+5. Optionally define test, build, or dev-server actions. Save or cancel each
+   draft; actions can also be added later.
+6. In **Connect agents**, follow the provider setup instructions or choose
+   **Finish setup** to skip reporting. Finishing starts no agent session.
 
-**Exit setup** returns to project management. Changes already saved remain
-registered. An existing unsaved project or action draft must be saved or discarded
-before starting another setup.
+If you add several repositories, **Project 1 of N** tracks your place.
+**Next project** and **Previous project** move through their individual
+preferences; agent setup follows the last project. **Exit setup** keeps changes
+already saved.
 
-To add more repositories later, choose **Add project** again. **Preferences → Manage development folders**
-opens the folder and discovery controls directly. **Scan again** refreshes the
-results for a saved folder. A partial scan can still contain usable candidates;
-choose a narrower folder if it reaches a limit.
+To add repositories later, choose **Add project** again. **Preferences → Manage
+development folders** opens discovery directly. **Scan again** refreshes a saved
+folder. Review ignored repositories to restore them to discovery. Partial scans
+can still offer usable results; narrow the folder if the scan reaches a limit.
 
 ## Open and resume a project
 
-Choose **Open workspace** in Projects, or search for `project:` in the launcher.
-Open launches or focuses the tools ticked under **▾ → Opens by default** (Editor
-and Terminal for new projects); toggles save immediately. **▾ → Just open one**
-starts a single tool once: an agent, the terminal, or the editor. Opening a project
-does not run workflow actions.
+Choose **Open workspace**. It opens or focuses the tools selected under
+**▾ → Opens by default**; new projects select Editor and Terminal. Those toggles
+save immediately. **▾ → Just open one** opens an editor, terminal, or agent once
+without changing the defaults. Opening a workspace does not run actions.
 
-Use **Preferences** to change the default checkout, tools, or workspace.
-**Open separately** opens another registered checkout separately. **Locate folder**
-updates a checkout's saved location after it has moved. Removing a development
-folder does not remove its project registrations. **Remove registration** removes
-only the saved project record; repository files and existing windows remain.
+Preferences changes tools, the default checkout, and workspace behavior.
+**Open separately** gives another checkout a separate workspace association.
+**Locate folder** repairs a moved checkout's saved location. Removing a
+registration leaves files and existing windows intact.
 
-If only one tool opens, inspect the individual role outcomes.
-Use the offered **Retry**, **Check … again**, or **Open new … window** control for
-that role. An unconfirmed result means observation is incomplete; it does not
-prove that a tool failed to launch.
+If only one tool opens, inspect its individual result. A failed role offers
+**Retry**. An unconfirmed role offers **Check … again** or an explicit
+**Open new … window**. Unconfirmed means Aranea cannot verify the window yet;
+it does not establish that launch failed. After a shell restart, existing
+windows may need these recovery choices because live ownership evidence is lost.
 
 ## Start an agent in a project
 
-Choose **Start Codex/Claude** from **▾ → Just open one**, **New agent session** on
-Overview, or **Start … here** on an empty Agents tab. In the launcher, type
-`claude <project>`, `codex <project>`, or `agent <project>`. Each installed provider
-has its own result; the generic `agent` query puts the suggestion first within
-equally matched results. The reason appears beside the suggestion, and the other
-provider is available when installed. Agents run in the terminal selected in
-Preferences.
+Choose **Start Codex/Claude** under **▾ → Just open one**, **New agent session**
+on Overview, or **Start … here** on an empty Agents page. Agents use the terminal
+saved in Preferences. In command-center search, try `claude <project>`,
+`codex <project>`, or `agent <project>`.
 
-Suggestions use local usage records. Aranea prefers a provider with known usage
-below 90% when it is the only such choice; otherwise, a difference of at least
-15 percentage points picks the provider with more headroom. Smaller differences
-or unknown usage fall back to the provider last started here, then Claude when
-both are installed. Expired usage is unknown. Starting an agent does not refresh
-provider usage. Provider history is saved immediately before a launch attempt;
-an unsuccessful attempt can therefore become the last choice. Focusing an
-existing agent keeps its provider history.
+Only installed providers are offered. The generic suggestion uses local usage
+headroom and previous launch history; its reason appears beside the choice.
+Choose the other provider explicitly whenever you prefer it. Starting an agent
+does not refresh usage.
 
-If a proven agent window from the project is already open, **Open workspace**
-with Agent ticked focuses it. **Start** always opens a new session. An unconfirmed
-window is not automatically started again; use the offered recovery controls.
+**Start** opens a new session. **Open workspace** with Agent enabled can instead
+focus an existing verified agent window. If the result is unconfirmed, use the
+recovery controls before starting another session.
+
+The provider selected in the bar's **Agents → Usage** is a separate preference.
+Changing it does not change project launch defaults or enable reporting.
 
 ## Example: run tests
 
-Open the project's **Actions** destination, then **Add action**. On an empty
-new draft, **Example: npm test** fills the fields for you. Adapt it to the command
-your repository actually uses:
+Open the project's **Actions**, then **Add action**. **Example: npm test** fills
+an empty draft. Adapt it to your repository:
 
-| Field          | Value                                                |
-| -------------- | ---------------------------------------------------- |
-| Name           | Run tests                                            |
-| Executable     | `npm`                                                |
-| Argument 1     | `test`                                               |
-| Working folder | `.`                                                  |
-| Kind           | Command (runs to completion)                         |
-| Timeout        | `300` seconds, or a limit appropriate for your tests |
+| Field          | Value                                        |
+| -------------- | -------------------------------------------- |
+| Name           | Run tests                                    |
+| Executable     | `npm`                                        |
+| Argument 1     | `test`                                       |
+| Working folder | `.`                                          |
+| Kind           | Command (runs to completion)                 |
+| Timeout        | `300` seconds, or an appropriate test limit. |
 
-Choose **Save**, then **Run** beside the saved action. Inspect the run for its
-status, exit code, and output.
+Choose **Save**, then **Run** beside the saved action. Inspect status, exit code,
+and **View logs** for output.
 
-Each argument field is literal. For `npm run build`, use Executable `npm` and two
-argument fields: `run` and `build`. Do not paste the full command line into the
-Executable field. `.` means the selected checkout's root; `apps/web` runs from that
-subfolder. Environment-variable expansion, pipes, and shell operators are not
-interpreted in argument fields.
-
-Choosing an example only fills an empty draft. It does not save or run anything,
-and examples do not overwrite an existing draft.
+Each argument field is literal. For `npm run build`, use Executable `npm` and
+separate arguments `run` and `build`. Do not paste the full command into
+Executable. `.` means the selected checkout's root; `apps/web` means that
+subfolder. Argument fields do not expand environment variables, pipes, or shell
+operators. Choosing an example does not save, run, or overwrite an existing draft.
 
 ## Example: start a dev server
 
-Choose **Add action**, then **Example: npm run dev**, or fill in:
+Choose **Add action**, then **Example: npm run dev**, or enter:
 
-| Field          | Value                                                                 |
-| -------------- | --------------------------------------------------------------------- |
-| Name           | Dev server                                                            |
-| Executable     | `npm`                                                                 |
-| Argument 1     | `run`                                                                 |
-| Argument 2     | `dev`                                                                 |
-| Working folder | `.`                                                                   |
-| Kind           | Service (keeps running)                                               |
-| Preview URL    | Optional: `http://127.0.0.1:5173` if that is the server's actual port |
+| Field          | Value                                                                   |
+| -------------- | ----------------------------------------------------------------------- |
+| Name           | Dev server                                                              |
+| Executable     | `npm`                                                                   |
+| Arguments      | `run`, then `dev`, in separate fields.                                  |
+| Working folder | `.`                                                                     |
+| Kind           | Service (keeps running)                                                 |
+| Preview URL    | Optional: `http://127.0.0.1:5173`, if that is the server's actual port. |
 
-Choose **Save**, then **Start**. Inspect its output, use **Open preview** to open the
-URL you supplied, and **Stop** when finished. Preview does not prove server
-readiness. Preview URLs use a loopback host (`127.0.0.1` or `[::1]`) and an explicit
-port. Services have no command timeout.
+Choose **Save**, then **Start**. Read the output, use **Open preview** for the
+saved URL, and **Stop** when finished. Preview URLs require a loopback host
+(`127.0.0.1` or `[::1]`) and an explicit port. Services have no command timeout.
+A reachable preview confirms HTTP reachability, not which process owns the port.
 
-Runs continue when the panel closes. Saving an action, opening a project, and
-reloading the shell do not start it. Stop and Restart target the selected run.
-If submission is unconfirmed, refresh and inspect the retained run before
-starting another; the first request may already have been accepted.
+Runs continue after the panel closes or the shell reloads. Services have no
+automatic restart or login startup; survival across logout or reboot is not
+promised. **Stop** and **Restart** target the selected retained run. If submission
+is unconfirmed, **Refresh** that run before starting another: it may already
+have been accepted.
 
-The Usage provider shown in the Agents panel is a separate preference from the
-provider started in a project. Selecting Codex in Usage saves the bar/panel
-choice across shell restarts; project launch suggestions still use the rules
-above and the explicit provider you choose in the project form.
+When an action changes, review the new definition and use **Run/Start**; the UI
+will not restart an older run with a changed command. If a save conflicts with
+another edit, refresh and review the latest definition, then explicitly choose
+**Save draft over latest**. See [action recovery](troubleshooting.md#project-actions-unavailable-or-unconfirmed)
+if execution or cleanup cannot be confirmed.
 
 ## Connect Claude Code or Codex
 
@@ -167,65 +145,62 @@ provider you use:
 
 ```bash
 aranea agents adapter install claude
-```
-
-For Codex:
-
-```bash
+# Or:
 aranea agents adapter install codex
 ```
 
-Review your provider's hook trust settings, then start a **new native CLI session
-from that registered checkout** and perform some work. Installing hooks alone
-does not prove that they are trusted or that activity has been reported. Existing
-sessions may not load newly installed hooks. Aranea starts agents only when you
-choose to; finishing setup starts nothing.
+Review that provider's hook trust settings, then start a **new native CLI
+session from the registered checkout** and perform some work. Existing
+sessions may not load newly installed hooks. Installing hooks alone does not
+confirm that reporting is trusted or working.
 
-Check **Agents → Tasks** for activity. **Agents → Help** explains setup, status,
-session controls, and troubleshooting. **Usage** remains separate from reporting.
+Check **Agents → Tasks** in the bar for activity across projects, or the
+selected project's Agents page. The bar's **Agents → Help** provides reporting
+and session guidance. Usage remains available separately.
 
-| Task status                   | Your next step                                                                     |
-| ----------------------------- | ---------------------------------------------------------------------------------- |
-| Working                       | Let it continue, or Go to session to inspect the terminal.                         |
-| Needs input                   | Open session and answer the agent in its terminal.                                 |
-| Ready for review              | Open checkout and inspect the reported changes and result.                         |
-| Failed                        | Inspect failure and its diagnostics before deciding to resume.                     |
-| Finished                      | Read the reported result; check verification separately.                           |
-| Connection lost / Unconfirmed | Check the terminal and observation state; this does not prove the session stopped. |
+| Task status                   | Next step                                                             |
+| ----------------------------- | --------------------------------------------------------------------- |
+| Working                       | Let it continue, or open the session to inspect its terminal.         |
+| Needs input                   | Open the session and answer in the terminal.                          |
+| Ready for review              | Open the checkout and inspect the reported changes.                   |
+| Failed                        | Read diagnostics before deciding whether to resume.                   |
+| Finished                      | Read the result and check reported verification separately.           |
+| Connection lost / Unconfirmed | Check the terminal; this does not establish that the session stopped. |
 
-Open a task's **Details** for its full summary, exact checkout path, report age,
-question or blockers, result, and independently reported verification. A finished
-task does not imply tests passed. Session focus reaches a proven hosting terminal;
-it cannot select a specific tmux pane. **Reopen session** explicitly resumes a
-supported native session. **Check session again** and **Reconnect observation**
-read the existing operation without launching another session.
+**Details** shows the summary, exact checkout, report age, question or blockers,
+result, and any separately reported verification. Finished does not imply tests
+passed. Session focus reaches a verified hosting terminal, but cannot select a
+particular tmux pane. **Reopen session** explicitly resumes a supported native
+session; **Check session again** and **Reconnect observation** inspect an existing
+operation without launching another.
 
-**Keyboard:** Tab switches Tasks, Usage, and Help. In Tasks, ↑↓ or j/k moves;
-the first Enter reveals the cursor, and the next confirms. Escape returns from
-details or closes the panel. In Help, ↑↓ or j/k scrolls.
+In the bar's Agents panel, Tab switches Tasks, Usage, and Help. In Tasks, ↑↓ or
+j/k moves the selection; the first Enter reveals the cursor and the next
+confirms. Escape returns from details or closes the panel.
 
 ## If no tasks appear
 
-Check provider availability:
+Inspect provider setup:
 
 ```bash
 aranea agents adapter status claude
 aranea agents adapter status codex
 ```
 
-Confirm that reporting hooks are installed and trusted, start a new native session,
-and perform an action that triggers reporting. Usage history alone does not
-produce task reports. Some providers do not expose every question hook; not every
-prompt can be detected automatically. Unassigned tasks need an explicitly
-registered project and exact checkout for session actions.
+Check that hooks are installed and trusted, the exact checkout is registered,
+and the session was started after installation. Perform work that triggers a
+report. Usage records do not produce tasks, and not every provider question
+exposes a reporting hook. Unassigned tasks need an exact registered checkout
+before project session controls are available.
 
-To turn reporting off, remove Aranea's owned hooks for the provider:
+To disable reporting, remove Aranea's hooks for your provider:
 
 ```bash
 aranea agents adapter remove claude
 aranea agents adapter remove codex
 ```
 
-Other provider hooks are preserved. Activity is local to this machine. For manual
-reports and automation, see the [activity interface](../plugins/araneadev.activity/README.md)
-and [project CLI reference](agent-interface.md#public-project-commands).
+Other hooks are preserved. Activity stays local to this machine. See the
+[activity interface](../plugins/araneadev.activity/README.md) for manual reports,
+and [public project commands](agent-interface.md#public-project-commands) for
+automation.
