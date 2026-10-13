@@ -49,6 +49,18 @@ If the doctor reports missing theme assets, update the theme before retrying.
 A shell restart also loses live project-window bindings; use the project's
 explicit recovery controls if an existing window cannot be verified afterward.
 
+## Use the native authentication prompt
+
+To use Omarchy’s native prompt instead of Aranea’s authentication card, disable
+the plugin and restart the shell so the native agent takes over:
+
+```bash
+omarchy plugin disable araneadev.polkit
+omarchy restart shell
+```
+
+Run `scripts/aranea-doctor` to inspect which authentication prompt is enabled.
+
 ## The spider mark is missing
 
 A blank menu, bar, or lock mark can mean the deployed plugins expect artwork

@@ -31,7 +31,7 @@ grep -Fq 'ClipboardResultsPane {' "$window"
 grep -Fq 'ClipboardLogic.displayRows' "$entry"
 grep -Fq '"--history-index", String(row.historyIndex)' "$entry"
 grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$entry"
-grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$repo_root/README.md"
+grep -Fq 'ARANEA_CLIPBOARD_SECRET_TTL_MS' "$repo_root/docs/configuration.md"
 # the preview only shows secret text after an explicit reveal (Review Focus 1)
 grep -Fq 'activeRow.secret && revealedIndex !== selectedIndex' "$plugin/components/ClipboardResultsPane.qml"
 # a reveal belongs to one item; any change to the list masks everything again

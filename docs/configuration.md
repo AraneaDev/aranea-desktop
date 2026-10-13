@@ -101,6 +101,18 @@ omarchy-shell omarchy.agents selection
 omarchy-shell omarchy.agents select codex
 ```
 
+### Command menu customization
+
+Add or override menu entries in
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`. Aranea merges this JSONC file
+over Omarchy’s default menu, with later fields taking precedence for matching
+item IDs. Changes are watched and apply without a shell restart.
+
+Pinned and recently launched application IDs are stored in
+`$XDG_STATE_HOME/aranea/menu.json` (normally
+`~/.local/state/aranea/menu.json`). Use **Ctrl+P** on a selected application to
+change its pinned state.
+
 ## Profiles
 
 The installation profile selects integrations, rather than a different edition

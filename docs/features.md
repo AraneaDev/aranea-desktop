@@ -11,7 +11,8 @@ Click the spider button to open the command center. **Files**, **Terminal**, and
 **Projects** sit above a compact list of **Apps**, **Actions**, **Software**,
 **Settings**, **Help**, and **System**. Apps keeps favorites and recently used
 applications. Software groups installation, removal, and updates; desktop
-preferences live in **Settings → Aranea**.
+preferences live in **Settings → Aranea**. Select an application and press
+**Ctrl+P** to pin or unpin it; Apps keeps up to twelve favorites.
 
 Typing at the root searches applications, commands, open windows, workspaces,
 projects, settings, and quick actions. Use a prefix to narrow your search:
@@ -76,7 +77,9 @@ when a source cannot be checked.
 
 Notifications collect in the notification center. Ordinary waiting items use a
 mint indicator; critical items use red. Do not disturb and configured quiet
-hours control notification behavior.
+hours control notification behavior. In the notification center, critical notifications stay until dismissed;
+their toast disappears after one minute. History is capped at 100 items,
+pruning ordinary entries first.
 
 Health is always available in **System → Health**. An additional shortcut
 appears while issues or their alert popup are present. Select an issue to open
@@ -91,7 +94,9 @@ See [Health recovery](troubleshooting.md#resolve-a-health-issue).
 ## Clipboard and emoji
 
 The clipboard picker labels links, paths, colors, code, images, and text. Pinned
-entries stay above recent history, and likely secrets are masked. The emoji
+entries stay above recent history, and likely secrets are masked. Unpinned
+secrets expire after ten minutes by default; the retention override is described
+in [Configuration](configuration.md#environment-variables). The emoji
 picker offers recent emoji and lets you insert or copy a selection.
 
 ![Aranea clipboard picker](../screenshots/clipboard.png)

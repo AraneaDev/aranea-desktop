@@ -82,8 +82,9 @@ grep -A1 -F 'if (root.detailsOpen)' "$agent" | grep -Fq 'Qt.callLater(root.refoc
 block_grep "$plugin/PolkitWindow.qml" 'id: card' 'clip: true'
 # m4: doctor reports whether a polkit prompt is enabled
 grep -Fq 'ARANEA_DOCTOR_POLKIT_STATUS' "$repo_root/scripts/aranea-doctor"
-# README tells a hand-disabler to restart the shell
-grep -Fq 'omarchy plugin disable araneadev.polkit' "$repo_root/README.md"
+# Troubleshooting documents the native authentication handoff
+grep -Fq 'omarchy plugin disable araneadev.polkit' "$repo_root/docs/troubleshooting.md"
+grep -Fq 'omarchy restart shell' "$repo_root/docs/troubleshooting.md"
 # --- 4a: the target has its own line that is never elided
 target_block="$(grep -A6 -B3 -F 'text: root.targetText' "$plugin/PolkitPromptCard.qml")"
 grep -Fq 'text: root.targetText' <<<"$target_block"
