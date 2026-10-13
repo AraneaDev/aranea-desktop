@@ -123,22 +123,13 @@ test("renderQmlTokens exposes semantic colors used by branding consumers", async
   assert.match(output, /readonly property color lockOverlay: Color\.lock\.background/)
 })
 
-test("renderBrandShellEnv produces shell-safe visible identity values", async () => {
-  const { renderBrandShellEnv } = await generatorPromise
-  const output = renderBrandShellEnv({
-    identity: {
-      name: "Example Desktop",
-      short_name: "EXAMPLE",
-      tagline: "A different signal.",
-      palette_name: "ink / lime",
-      lock_subtitle: "PRIVATE SESSION",
-      ceremony_title: "EXAMPLE THEME CHANGE",
-      ceremony_detail: "CEREMONY: example mark"
-    },
-    assets: { mark: "branding/marks/aranea-primary.svg" }
-  })
-  assert.match(output, /^BRAND_NAME='Example Desktop'$/m)
-  assert.match(output, /^BRAND_SHORT_NAME='EXAMPLE'$/m)
+test("identity projections always use Aranea", async () => {
+  const { renderBrandShellEnv, renderBrandQml } = await generatorPromise
+  const output = renderBrandShellEnv()
+  assert.match(output, /^BRAND_NAME='Aranea'$/m)
+  assert.match(output, /^BRAND_SHORT_NAME='ARANEA'$/m)
+  assert.match(renderBrandQml(), /shortName: "ARANEA"/)
+  assert.match(renderBrandQml(), /lockSubtitle: "SECURE SESSION"/)
 })
 
 test("canonicalPng removes rasterizer-specific ancillary chunks", async () => {
@@ -160,27 +151,13 @@ test("renderTemplate supports format-specific projections", async () => {
   )
 })
 
-test("brand projections use the configured identity and tokenized mark colors", async () => {
-  const { renderAssetSource, renderBrandQml } = await generatorPromise
-  const brand = {
-    identity: {
-      name: "Example",
-      short_name: "EXAMPLE",
-      tagline: "A different signal.",
-      palette_name: "ink / lime",
-      lock_subtitle: "PRIVATE SESSION",
-      ceremony_title: "EXAMPLE THEME CHANGE",
-      ceremony_detail: "CEREMONY: example mark"
-    },
-    assets: { mark: "branding/marks/aranea-primary.svg" }
-  }
-  const mark = renderAssetSource(brand.assets.mark, fixture)
+test("the canonical spider retains tokenized mark colors", async () => {
+  const { renderAssetSource } = await generatorPromise
+  const mark = renderAssetSource("branding/marks/aranea-primary.svg", fixture)
   assert.match(mark, /#a1b2c3/)
   assert.match(mark, /#d4e5f6/)
   assert.match(mark, /#0a1b2c/)
   assert.doesNotMatch(mark, /#8af79c|#2cf2b8|#00e5ff/i)
-  assert.match(renderBrandQml(brand), /shortName: "EXAMPLE"/)
-  assert.match(renderBrandQml(brand), /lockSubtitle: "PRIVATE SESSION"/)
 })
 
 test("renderQmlTokens projects spring tuning from canonical motion tokens", async () => {

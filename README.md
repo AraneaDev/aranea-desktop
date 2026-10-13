@@ -307,7 +307,6 @@ Start at the [documentation hub](docs/README.md), or choose a guide:
 | Configure settings and integrations  | [Configuration](docs/configuration.md)                                    |
 | Diagnose and recover                 | [Troubleshooting](docs/troubleshooting.md)                                |
 | Automate installation                | [Agent interface](docs/agent-interface.md)                                |
-| Customize identity and artwork       | [Rebranding](docs/rebranding.md)                                          |
 | Browse icons and typography          | [Icon gallery](docs/icons.md) · [Bundled fonts](fonts/README.md)          |
 | Understand or contribute to the code | [Architecture](docs/architecture.md) · [Development](docs/development.md) |
 

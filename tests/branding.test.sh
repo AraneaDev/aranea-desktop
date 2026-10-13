@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Branding source files must generate the shared identity projections and
+# Fixed Aranea identity and tokens generate shared projections and
 # raster compatibility assets from the canonical mark.
 set -euo pipefail
 
@@ -7,7 +7,6 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$repo_root/tests/lib/sandbox.sh"
 
-test -f "$repo_root/design/brand.toml"
 test -f "$repo_root/branding/marks/aranea-primary.svg"
 test -f "$repo_root/branding/brand.svg"
 grep -Fq 'brandingRoot + "/" + BrandConfig.markFile' "$repo_root/plugins/araneadev.shared/RuntimePaths.qml"

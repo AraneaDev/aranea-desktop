@@ -7,19 +7,18 @@ System tabs keep common actions close without filling the bar with buttons.
 
 ## Choose a path
 
-| If you are...                       | Start here                                          |
-| ----------------------------------- | --------------------------------------------------- |
-| Learning everyday controls          | [Features](features.md) · [Workflows](workflows.md) |
-| Installing Aranea                   | [Getting started](getting-started.md)               |
-| Rebranding or changing the identity | [Rebranding guide](rebranding.md)                   |
-| Exploring the experience            | [Features](features.md)                             |
-| Changing behavior                   | [Configuration](configuration.md)                   |
-| Fixing an installation              | [Troubleshooting](troubleshooting.md)               |
-| Writing automation or an agent      | [Agent interface](agent-interface.md)               |
-| Developing with an agent            | [Agent development guide](agent-development.md)     |
-| Looking for icons                   | [Icon gallery](icons.md)                            |
-| Working on the project              | [Development](development.md)                       |
-| Understanding the architecture      | [Architecture](architecture.md)                     |
+| If you are...                  | Start here                                          |
+| ------------------------------ | --------------------------------------------------- |
+| Learning everyday controls     | [Features](features.md) · [Workflows](workflows.md) |
+| Installing Aranea              | [Getting started](getting-started.md)               |
+| Exploring the experience       | [Features](features.md)                             |
+| Changing behavior              | [Configuration](configuration.md)                   |
+| Fixing an installation         | [Troubleshooting](troubleshooting.md)               |
+| Writing automation or an agent | [Agent interface](agent-interface.md)               |
+| Developing with an agent       | [Agent development guide](agent-development.md)     |
+| Looking for icons              | [Icon gallery](icons.md)                            |
+| Working on the project         | [Development](development.md)                       |
+| Understanding the architecture | [Architecture](architecture.md)                     |
 
 ## Command map
 

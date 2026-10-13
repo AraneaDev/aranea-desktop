@@ -27,25 +27,17 @@ Run the repository quality gates:
 tools/check
 ```
 
-### Design tokens and branding
+### Design tokens
 
 Edit `design/tokens.toml` to change the shared palette, shell surfaces,
 spacing, typography, or motion defaults. Regenerate the committed projections
-with `scripts/generate-tokens --write`. Edit `design/brand.toml` for visible
-identity strings and replace `branding/marks/aranea-primary.svg` for the source
-mark. The generator color-projects that source into the runtime
-`branding/brand.svg`, the `unlock.png` boot logo, the motif/status glyph
-family, the Kvantum splash artwork, and `branding/brand.env` for shell
-scripts. The source templates for those projections live under
-`design/templates/assets/branding/`; edit the templates only when changing the
-shape or semantic role of an asset.
-Platform projections are templated in
-`design/templates/`, and `scripts/generate-tokens --check` is the drift check
-used by the token contract test.
+with `scripts/generate-tokens --write`. Aranea's identity and canonical spider
+mark are fixed in the generator. The outputs include the runtime mark, boot
+logo, motif/status glyphs, platform styles, and shared QML values.
 
-The source SVG and both TOML files are the customization surface. Generated
-files, including `branding/brand.svg` and `unlock.png`, must not be edited
-directly. `rsvg-convert` is required when regenerating the raster outputs.
+Platform projections are templated in `design/templates/`.
+`scripts/generate-tokens --check` detects drift. Generated files must not be
+edited directly; `rsvg-convert` is required to regenerate raster outputs.
 
 The GTK stylesheet and cursor families have explicit tokenized templates under
 `design/templates/gtk.css.in` and `design/templates/assets/`. The generator
