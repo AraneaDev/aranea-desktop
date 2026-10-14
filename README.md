@@ -5,7 +5,7 @@
 **A cyberpunk command center for Omarchy.**
 
 Obsidian instruments, mint light, violet depth, animated controls, and
-thirteen distinct cyberpunk wallpapers. Signal Shrine brings the Aranea spider
+fifteen distinct cyberpunk wallpapers. Signal Shrine brings the Aranea spider
 to the desktop; the same identity carries through the command center, lock, and boot.
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/aranea-desktop?label=release)](https://github.com/AraneaDev/aranea-desktop/releases)
@@ -100,7 +100,7 @@ schedules retain their choices.
 
 The default fonts are **Inter** for the interface and **JetBrains Mono** for
 technical text. Motion can be turned off. The wallpaper collection contains
-thirteen distinct scenes in obsidian, mint, and violet, with **Signal Shrine** as
+fifteen distinct scenes in obsidian, mint, and violet, with **Signal Shrine** as
 the default. Signal Shrine and Aranea Core include the spider; Ghost in the Wire
 is the cybernetic portrait, and Neural Deck is the command room.
 
@@ -209,10 +209,10 @@ demonstration data; the desktop background is Signal Shrine.
 </details>
 
 <details>
-<summary><strong>All thirteen cyberpunk wallpapers</strong></summary>
+<summary><strong>All fifteen cyberpunk wallpapers</strong></summary>
 
-Thirteen different scenes share obsidian, mint, and violet: alleys, command rooms,
-rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, and orbit.
+Fifteen different scenes share obsidian, mint, and violet: alleys, command rooms,
+rail, rooftops, desert, markets, a cybernetic portrait, open road, ocean, orbit, suspended gardens, and polar ice.
 Human titles appear in the picker; stable IDs preserve selections and schedules.
 See the [title/ID map](docs/configuration.md#wallpapers) and
 [artwork sources and prompts](backgrounds/ARTWORK.md).
@@ -233,9 +233,9 @@ See the [title/ID map](docs/configuration.md#wallpapers) and
 | --------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
 | ![Ghost in the Wire](backgrounds/variants/monochrome.png) | ![Violet Pursuit](backgrounds/variants/violet-pursuit.png) | ![Deep Current](backgrounds/variants/deep-current.png) |
 
-| Orbital Relay                                        |     |     |
-| ---------------------------------------------------- | --- | --- |
-| ![Orbital Relay](backgrounds/variants/ultrawide.png) |     |     |
+| Orbital Relay                                        | Canopy Circuit                                             | Polar Freight                                            |
+| ---------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------- |
+| ![Orbital Relay](backgrounds/variants/ultrawide.png) | ![Canopy Circuit](backgrounds/variants/canopy-circuit.png) | ![Polar Freight](backgrounds/variants/polar-freight.png) |
 
 See [Visual language](docs/visual-language.md) for the design system behind
 these surfaces.

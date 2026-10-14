@@ -137,8 +137,8 @@ an occupied association stays uncertain until an explicit per-role choice.
 `ProjectsPresentation.qml` retains drafts and clients outside window visibility.
 `ProjectsSurface.qml` presents Overview, Actions, Agents, Preferences, and Help.
 Settings owns desktop preferences. Search's `ProjectClient.qml` observer survives
-menu closure; the workspace overview reads context only while visible and owns
-no launch queue. Capture hosts render production content but refuse registry,
+menu closure; the visible workspace bar and overview share serialized read-only
+project context and own no launch queue. Capture hosts render production content but refuse registry,
 chooser, owner, and launch requests.
 
 Configured actions use the headless backend independently of the workspace
