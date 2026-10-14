@@ -358,6 +358,25 @@ ShellRoot {
     }
     entry.projectController.runner = function (argv, input, done) {
       var request = JSON.parse(input)
+      if (request.action === 'profile-save') {
+        var profile = Object.assign({}, request.args.profile, {
+          id: 'f-preset-' + entry.projectController.state.revision,
+          revision: 1
+        })
+        var presetState = Object.assign({}, entry.projectController.state, {
+          revision: entry.projectController.state.revision + 1,
+          projects: entry.projectController.state.projects.map(function (project) {
+            return project.id === request.args.projectId ? Object.assign({}, project, {
+              profiles: (project.profiles || []).concat([profile])
+            }) : project
+          })
+        })
+        done(0, JSON.stringify({
+          ok: true,
+          state: presetState
+        }), '')
+        return
+      }
       if (request.action === 'navigation-set') {
         navigationCalls.push(request)
         var visits = {}

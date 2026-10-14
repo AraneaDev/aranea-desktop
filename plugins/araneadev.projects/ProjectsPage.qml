@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectProfiles.js" as Profiles
 
 ColumnLayout {
   id: page
@@ -113,12 +114,26 @@ ColumnLayout {
       setupAwaitingFolder = false
     }
   }
+  // Registration queues explicit preset writes; observations never create profiles.
+  property var profilePresetQueue: []
+  // A failed optional setup leaves registration usable with direct recovery.
+  property string profileSetupError: ''
+  // Optional profile writes share the host registry client and revision guards.
+  signal profileSaveRequested(string projectId, var profile, int expectedProfileRevision)
+  // Profile-list navigation shares the surrounding draft guard.
+  signal profileListRequested
+  // Removal uses the exact displayed saved revision.
+  signal profileRemoveRequested(string projectId, string profileId, int expectedProfileRevision)
   // Only successful readback of this wizard's explicit request advances it.
   function registryMutationCompleted(action: string, args: var, state: var): void {
     if (displayOnly)
       return
     if (action === 'configure' && selectedProject && args.projectId === selectedProject.id)
       details.acknowledgeDraft((state.projects || []).filter(function (project) {
+        return project.id === args.projectId
+      })[0])
+    if (action === 'profile-save' && selectedProject && args.projectId === selectedProject.id)
+      details.acknowledgeProfile(args, (state.projects || []).filter(function (project) {
         return project.id === args.projectId
       })[0])
     if (!setupActive)
@@ -142,6 +157,21 @@ ColumnLayout {
       if (ids.indexOf(added.id) < 0)
         ids.push(added.id)
     }
+    var queued = []
+    ids.forEach(function (id) {
+      var project = state.projects.filter(function (p) {
+        return p.id === id
+      })[0]
+      if (!(project.profiles || []).length)
+        Profiles.presets(page.tools).forEach(function (profile) {
+          queued.push({
+            projectId: id,
+            profile: profile
+          })
+        })
+    })
+    profileSetupError = ''
+    profilePresetQueue = profilePresetQueue.concat(queued)
     setupProjectIds = setupProjectIds.concat(ids.filter(function (id) {
       return setupProjectIds.indexOf(id) < 0
     }))
@@ -260,6 +290,14 @@ ColumnLayout {
       helpTopic: helpTopic,
       foldersExpanded: foldersExpanded,
       ignoredExpanded: ignoredExpanded,
+      profileEditing: details.profileEditing,
+      profileAdding: details.profileAdding,
+      profileDraft: JSON.parse(JSON.stringify(details.profileEditor.draft)),
+      profileRevision: details.profileEditor.expectedProfileRevision,
+      profileFieldError: details.profileEditor.fieldError,
+      submittedProfileDraft: details.submittedProfileDraft,
+      profileSetupError: profileSetupError,
+      profilePresetQueue: profilePresetQueue.slice(),
       detailsDraft: Object.assign({}, details.draft),
       actions: details.actions.captureSnapshot(),
       relocationDrafts: Object.assign({}, details.relocationDrafts),
@@ -296,6 +334,15 @@ ColumnLayout {
     recoverySelectedCheckoutId = saved.recoverySelectedCheckoutId || (selectedProject ? selectedProject.lastCheckoutId || '' : '')
     details.relocationDrafts = saved.relocationDrafts || {}
     details.actions.captureRestore(saved.actions)
+    details.profileAdding = saved.profileAdding === true
+    details.profileEditing = saved.profileEditing === true
+    if (saved.profileDraft)
+      details.profileEditor.draft = saved.profileDraft
+    details.profileEditor.expectedProfileRevision = saved.profileRevision || 0
+    details.profileEditor.fieldError = saved.profileFieldError || ''
+    details.submittedProfileDraft = saved.submittedProfileDraft || null
+    profileSetupError = saved.profileSetupError || ''
+    profilePresetQueue = saved.profilePresetQueue || []
     details.draft = saved.detailsDraft
     details.dirty = saved.detailsDirty
     details.fieldError = saved.detailsFieldError || ''
@@ -316,6 +363,12 @@ ColumnLayout {
     foldersExpanded = false
     candidates.selectedPaths = []
     ignoredExpanded = false
+    details.profileAdding = false
+    details.profileEditing = false
+    details.profileEditor.begin(null)
+    details.submittedProfileDraft = null
+    profileSetupError = ''
+    profilePresetQueue = []
     details.discardDraft()
     details.actions.captureReset(fixture)
     details.relocationDrafts = {}
@@ -640,7 +693,7 @@ ColumnLayout {
   ProjectDetails {
     id: details
     Layout.fillWidth: true
-    visible: !!page.selectedProject && (page.setupActive ? page.setupStep === 2 : ['all', 'overview', 'actions', 'preferences'].indexOf(page.viewSection) >= 0)
+    visible: !!page.selectedProject && (page.setupActive ? page.setupStep === 2 : ['all', 'overview', 'actions', 'preferences', 'profiles'].indexOf(page.viewSection) >= 0)
     project: page.selectedProject
     headerProvided: page.sidebarNavigation
     guidedSetup: page.setupActive
@@ -653,6 +706,14 @@ ColumnLayout {
     pending: page.pending || !!page.projectClient && page.projectClient.pending
     openAvailable: !!page.projectClient && page.projectClient.available && !!page.projectClient.snapshot.availability && page.projectClient.snapshot.availability.compositor === true
     pointerGate: page.pointerGate
+    onProfileListRequested: page.profileListRequested()
+    onProfileRefreshRequested: page.refreshRequested()
+    onProfileSaveRequested: function (id, profile, revision) {
+      page.profileSaveRequested(id, profile, revision)
+    }
+    onProfileRemoveRequested: function (id, profileId, revision) {
+      page.profileRemoveRequested(id, profileId, revision)
+    }
     onConfigureRequested: function (id, draft) {
       page.configureRequested(id, draft)
     }

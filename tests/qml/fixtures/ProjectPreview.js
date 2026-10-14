@@ -26,6 +26,25 @@ function sample(id, mode, count) {
     ],
     associations: [{ checkoutId: "c-preview", mode: "dedicated", workspaceId: 3, separate: false }]
   }
+  if (mode === "profiles" || mode === "profile-editor") {
+    project.profiles = [
+      {
+        id: "f-code",
+        revision: 1,
+        name: "VS Code",
+        roles: ["editor"],
+        tools: { editorId: "code", terminalId: null, agentId: null }
+      },
+      {
+        id: "f-agent",
+        revision: 2,
+        name: "Terminal + Agent",
+        roles: ["terminal", "agent"],
+        tools: { editorId: null, terminalId: "kitty", agentId: "codex" }
+      }
+    ]
+    project.lastProfileId = "f-code"
+  }
   var operation = {
     id: "op-preview",
     projectId: project.id,
@@ -202,17 +221,31 @@ function sample(id, mode, count) {
     ]
   }
   return {
+    projectSection: mode === "profiles" || mode === "profile-editor" ? "profiles" : "overview",
     projectsState: state,
     projectGitCache: gitCache,
     projectTools: {
       defaults: { editorId: "code", terminalId: "kitty" },
-      editors: [{ id: "code", label: "VS Code", available: true, supported: true }],
+      editors: [
+        { id: "code", label: "VS Code", available: true, supported: true },
+        { id: "nvim", label: "Neovim", available: true, supported: true }
+      ],
+      agents:
+        mode === "profiles" || mode === "profile-editor"
+          ? [
+              { id: "claude", label: "Claude Code", available: true, supported: true },
+              { id: "codex", label: "Codex", available: true, supported: true }
+            ]
+          : [],
       terminals:
         id === "project-launch-partial"
           ? []
           : [{ id: "kitty", label: "Kitty", available: true, supported: true }]
     },
     projectsDraft: {
+      profileEditing: mode === "profile-editor",
+      profileDraft: mode === "profile-editor" ? project.profiles[1] : null,
+      profileRevision: mode === "profile-editor" ? 2 : 0,
       exactSetup: id === "project-setup-folder",
       setupActive: id.indexOf("project-setup-") === 0,
       setupStep:

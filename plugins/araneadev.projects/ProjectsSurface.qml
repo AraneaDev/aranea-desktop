@@ -155,7 +155,7 @@ Item {
   // Unsaved drafts, wizard state and pending work prevent changing selection.
   readonly property bool navigationBlocked: projectsPage.setupActive || projectsPage.setupNavigationPending || root.activityClient.pending
   // Draft decisions are independent of accepted operation serialization.
-  readonly property bool hasUnsavedDraft: projectsPage.details.dirty || projectsPage.details.actions.editing
+  readonly property bool hasUnsavedDraft: projectsPage.details.dirty || projectsPage.details.actions.editing || projectsPage.details.profileEditing
   // Only explicit Save intent can continue after authoritative draft acknowledgement.
   property bool savingNavigationDraft: false
   // Retain the exact requested destination while asking for a draft decision.
@@ -175,7 +175,11 @@ Item {
     draftGuard.close()
     if (!target)
       return
-    if (target.setup)
+    if (target.profileList) {
+      projectsPage.details.profileAdding = false
+      section = 'profiles'
+      scrollTo(0)
+    } else if (target.setup)
       projectsPage.startSetup()
     else if (target.projectId !== root.projectId)
       navigate(target.projectId)
@@ -197,6 +201,8 @@ Item {
     savingNavigationDraft = true
     if (projectsPage.details.dirty)
       projectsPage.details.applyDraft()
+    else if (projectsPage.details.profileEditing)
+      projectsPage.details.profileEditor.save()
     else if (projectsPage.details.actions.editing)
       projectsPage.details.actions.editor.save()
     Qt.callLater(panel.finishNavigationSave)
@@ -212,7 +218,7 @@ Item {
     id: draftGuard
     parent: panel
     pending: projectsPage.setupNavigationPending || panel.root.activityClient.pending
-    error: projectsPage.details.fieldError || projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
+    error: projectsPage.details.profileEditor.fieldError || projectsPage.details.fieldError || projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
     pointerGate: pointerGate
     onSaveRequested: panel.saveNavigationDraft()
     onDiscardRequested: {
@@ -220,6 +226,8 @@ Item {
         return
       projectsPage.details.discardDraft()
       projectsPage.details.actions.editing = false
+      projectsPage.details.profileEditing = false
+      projectsPage.details.submittedProfileDraft = null
       panel.continueDraftNavigation()
     }
     onKeepEditingRequested: {
@@ -300,7 +308,7 @@ Item {
   }
   // Choose a supported destination after checking draft and pending guards.
   function chooseSection(next) {
-    if (['overview', 'actions', 'agents', 'preferences', 'help'].indexOf(next) < 0)
+    if (['overview', 'actions', 'agents', 'preferences', 'profiles', 'help'].indexOf(next) < 0)
       return false
     if (next !== section && (navigationBlocked || root.inert || guardDraft({
         projectId: root.projectId,
@@ -403,6 +411,34 @@ Item {
       panel.revealFocus(panel.Window.window.activeFocusItem)
     }
   }
+  // Only explicit registration seeds presets, serialized after any metadata write.
+  property var presetInFlight: null
+  // Drain optional setup only through the registry mutation serialization boundary.
+  function flushProfilePresets() {
+    var client = root.projectController
+    if (root.inert || client.pending || client.reading || presetInFlight || !projectsPage.profilePresetQueue.length)
+      return
+    var args = projectsPage.profilePresetQueue[0]
+    projectsPage.profilePresetQueue = projectsPage.profilePresetQueue.slice(1)
+    if (!(client.state.projects || []).some(function (p) {
+      return p.id === args.projectId
+    })) {
+      Qt.callLater(panel.flushProfilePresets)
+      return
+    }
+    presetInFlight = args
+    if (!client.request('profile-save', args)) {
+      presetInFlight = null
+      projectsPage.profilePresetQueue = []
+      projectsPage.profileSetupError = 'Project added. Open Manage profiles to choose and save your tools.'
+    }
+  }
+  Connections {
+    target: projectsPage
+    function onProfilePresetQueueChanged() {
+      Qt.callLater(panel.flushProfilePresets)
+    }
+  }
   Connections {
     target: panel.root.projectController
     function onStateChanged() {
@@ -414,6 +450,22 @@ Item {
     }
     function onMutationCompleted(action, args, state) {
       projectsPage.registryMutationCompleted(action, args, state)
+      if (action === 'profile-save' && panel.presetInFlight && JSON.stringify(panel.presetInFlight) === JSON.stringify(args))
+        panel.presetInFlight = null
+      Qt.callLater(panel.flushProfilePresets)
+    }
+    function onErrorChanged() {
+      if (panel.presetInFlight && panel.root.projectController.error) {
+        panel.presetInFlight = null
+        projectsPage.profilePresetQueue = []
+        projectsPage.profileSetupError = 'Project added, but profiles could not be saved. Open Manage profiles to choose your tools. ' + panel.root.projectController.error
+      }
+    }
+    function onPendingChanged() {
+      Qt.callLater(panel.flushProfilePresets)
+    }
+    function onReadingChanged() {
+      Qt.callLater(panel.flushProfilePresets)
     }
   }
   Connections {
@@ -663,6 +715,21 @@ Item {
                     }
                   }
                 }
+                Aranea.ActionButton {
+                  objectName: 'manageProfiles'
+                  visible: !!projectsPage.selectedProject && !projectsPage.setupActive && panel.section !== 'profiles'
+                  text: projectsPage.selectedProject && (projectsPage.selectedProject.profiles || []).length ? 'Manage profiles' : 'Set up a profile'
+                  variant: 'quiet'
+                  enabled: !panel.root.inert && !panel.navigationBlocked
+                  pointerGate: pointerGate
+                  onClicked: panel.chooseSection('profiles')
+                }
+                Aranea.UiLabel {
+                  width: content.width
+                  visible: !!projectsPage.profileSetupError
+                  text: projectsPage.profileSetupError
+                  color: Aranea.DesignTokens.attention
+                }
                 ProjectsWelcome {
                   width: content.width
                   visible: !projectsPage.selectedProject && !projectsPage.setupActive && panel.section !== 'help' && panel.section !== 'preferences'
@@ -723,6 +790,30 @@ Item {
                   onUnignoreRequested: function (path) {
                     panel.root.projectController.request('unignore', {
                       path: path
+                    })
+                  }
+                  onProfileListRequested: {
+                    if (!panel.root.inert && !panel.navigationBlocked)
+                      panel.guardDraft({
+                        projectId: panel.root.projectId,
+                        section: 'profiles',
+                        profileList: true
+                      })
+                  }
+                  onProfileSaveRequested: function (id, profile, revision) {
+                    var args = {
+                      projectId: id,
+                      profile: profile
+                    }
+                    if (revision > 0)
+                      args.expectedProfileRevision = revision
+                    panel.root.projectController.request('profile-save', args)
+                  }
+                  onProfileRemoveRequested: function (id, profileId, revision) {
+                    panel.root.projectController.request('profile-remove', {
+                      projectId: id,
+                      profileId: profileId,
+                      expectedProfileRevision: revision
                     })
                   }
                   onConfigureRequested: function (id, draft) {
