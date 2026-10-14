@@ -168,6 +168,26 @@ ShellRoot {
     var beforePoll = calls.length
     client.observeSummary()
     t.equal(calls.length, beforePoll, 'selected protected run already has a native poll and is not duplicated')
+    client.observationActive = false
+    var mismatchRead = calls.length
+    var retainedSnapshot = JSON.stringify(client.snapshot)
+    var retainedSelection = JSON.stringify([client.runId, client.requestId, client.currentRun, client.output])
+    client.observeSummary()
+    t.equal(calls.length, mismatchRead + 1, 'request identity regression holds a native summary response')
+    reply(mismatchRead, Object.assign({}, other, {
+      requestId: id('req', 4),
+      processState: 'failed'
+    }), 14)
+    t.equal(JSON.stringify(client.snapshot), retainedSnapshot, 'different valid request identity cannot publish matching response and state')
+    t.check(!!client.summaryError, 'request identity mismatch reports observation failure')
+    t.equal(JSON.stringify([client.runId, client.requestId, client.currentRun, client.output]), retainedSelection, 'request identity mismatch preserves receipt and output selection')
+    client.snapshot = JSON.parse(retainedSnapshot)
+    client.observeSummary()
+    reply(mismatchRead + 1, Object.assign({}, other, {
+      processState: 'succeeded'
+    }), 15)
+    t.equal(client.snapshot.revision, 15, 'same original request identity can publish after rejected response')
+    t.equal(client.summaryError, null, 'valid original request identity clears observation failure')
     client.captureActive = true
     t.done()
   })

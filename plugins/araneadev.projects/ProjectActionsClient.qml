@@ -553,7 +553,7 @@ Item {
         return
       }
       var observed = response.run
-      var valid = client.validRunIdentity(observed) && observed.id === read.run.id && observed.projectId === read.projectId && observed.checkoutId === read.checkoutId && observed.actionId === read.run.actionId && observed.definitionRevision === read.run.definitionRevision && observed.definitionHash === read.run.definitionHash
+      var valid = client.validRunIdentity(observed) && observed.id === read.run.id && observed.requestId === read.run.requestId && observed.projectId === read.projectId && observed.checkoutId === read.checkoutId && observed.actionId === read.run.actionId && observed.definitionRevision === read.run.definitionRevision && observed.definitionHash === read.run.definitionHash
       var state = response.state
       if (!valid || !state || typeof state.revision !== 'number' || !isFinite(state.revision) || !Array.isArray(state.runs) || !state.runs.some(function (row) {
         return client.validRunIdentity(row) && row.actionId === observed.actionId && row.requestId === observed.requestId && row.id === observed.id && row.projectId === observed.projectId && row.checkoutId === observed.checkoutId && row.definitionRevision === observed.definitionRevision && row.definitionHash === observed.definitionHash
