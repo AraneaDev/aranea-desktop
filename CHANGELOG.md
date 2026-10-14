@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.28.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.27.0...v2.28.0) (2026-10-14)
+
+
+### Features
+
+* **projects:** simplify navigation, state and working profiles ([#152](https://github.com/AraneaDev/aranea-desktop/issues/152)) ([85960c5](https://github.com/AraneaDev/aranea-desktop/commit/85960c52bc22204c1911dde8049ddaf99f7e9db8))
+
 ## [2.27.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.26.0...v2.27.0) (2026-10-13)
 
 
