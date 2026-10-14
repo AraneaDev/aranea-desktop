@@ -36,7 +36,7 @@ ShellRoot {
     return JSON.stringify({
       ok: true,
       state: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         revision: revision,
         roots: [
           {
@@ -62,6 +62,9 @@ ShellRoot {
               terminalId: null
             },
             associations: [],
+            profiles: [],
+            lastProfileId: null,
+            environments: [],
             checkouts: [
               {
                 id: 'c-main',
@@ -320,6 +323,49 @@ ShellRoot {
     t.check(!client.pending && client.error.indexOf('Refresh and retry.') >= 0, 'navigation conflict releases pending with recovery')
     client.destroy()
   }
+  // Presentation can save profiles, while all environment writes stay owner-controlled.
+  function profileMutationBoundary() {
+    var f = fixture(), client = f.client
+    client.state = JSON.parse(snapshot(7)).state
+    var args = {
+      projectId: 'p-demo',
+      profile: {
+        name: 'Terminal',
+        roles: ['terminal'],
+        tools: {
+          editorId: null,
+          terminalId: 'kitty',
+          agentId: null
+        }
+      }
+    }
+    var accepted = client.request('profile-save', args)
+    t.check(accepted, 'profile save accepted by presentation registry client')
+    if (accepted) {
+      t.equal(JSON.parse(f.reads[0].input), {
+        action: 'profile-save',
+        args: args,
+        expectedRevision: 7
+      }, 'profile draft uses revision-aware fixed store transport')
+      f.reads[0].done(0, snapshot(8), '')
+      t.check(client.request('profile-remove', {
+        projectId: 'p-demo',
+        profileId: 'f-work',
+        expectedProfileRevision: 1
+      }), 'profile removal accepted after save readback')
+      if (f.reads.length > 1)
+        f.reads[1].done(0, snapshot(9), '')
+    }
+    var count = f.reads.length
+    var ownerActions = ['environment-register', 'environment-associate', 'environment-forget']
+    ownerActions.forEach(function (action) {
+      t.check(!client.request(action, {
+        projectId: 'p-demo'
+      }), 'presentation refuses ' + action)
+    })
+    t.equal(f.reads.length, count, 'environment refusal creates no helper process')
+    client.destroy()
+  }
   Component.onCompleted: t.step(0, function () {
     failedTools(true)
     failedTools(false)
@@ -337,6 +383,7 @@ ShellRoot {
     staleCallbacks()
     throwingRunner()
     navigationMutation()
+    profileMutationBoundary()
     t.done()
   })
 }

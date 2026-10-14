@@ -35,7 +35,7 @@ snapshot_initializes_only_absent() {
     echo 'Registry store is not implemented'
     return 1
   }
-  "$store" snapshot | jq -e '.ok and .error == null and .state == {schemaVersion:1,revision:0,roots:[],ignored:[],projects:[]}'
+  "$store" snapshot | jq -e '.ok and .error == null and .state == {schemaVersion:2,revision:0,roots:[],ignored:[],projects:[]}'
   [[ -f "$registry" ]]
 }
 # Catch lost root mutations, missing revision guards, and canonical duplicates.
@@ -58,7 +58,7 @@ roots_conflicts_and_concurrency() {
 # Catch any mutation or initialization that overwrites invalid existing bytes.
 corrupt_state_is_preserved() {
   mkdir -p "$ARANEA_STATE_ROOT"
-  for text in '{broken' '{"schemaVersion":2,"revision":0,"roots":[],"ignored":[],"projects":[]}' '{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[{}]}'; do
+  for text in '{broken' '{"schemaVersion":3,"revision":0,"roots":[],"ignored":[],"projects":[]}' '{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[{}]}'; do
     printf '%s' "$text" >"$registry"
     cp "$registry" "$TMPDIR/original"
     if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
@@ -312,7 +312,7 @@ navigation_visits_and_pins_preserve_projects() {
   mutate navigation-set "$(jq -cn --arg id "$id" '{projectId:$id,visit:true}')" >"$TMPDIR/visited"
   after=$(date +%s%3N)
   jq -e --arg id "$id" --argjson before "$before" --argjson after "$after" --slurpfile original "$TMPDIR/original" '
-    .ok and .state.schemaVersion == 1 and .state.revision == 2 and .state.projects == $original[0].projects
+    .ok and .state.schemaVersion == 2 and .state.revision == 2 and .state.projects == $original[0].projects
     and (.state.navigation | .lastProjectId == $id and .pinnedProjectIds == []
       and (.visitedAt[$id] >= $before and .visitedAt[$id] <= $after))' "$TMPDIR/visited"
   mutate navigation-set "$(jq -cn --arg id "$other" '{projectId:$id,pinned:true}')" |

@@ -145,6 +145,13 @@ projects_registry_prepare_request() {
   local request=$1 state=${2:-null} action path metadata checkouts='[]'
   action=$(jq -r '.action' <<<"$request")
   case "$action" in
+    profile-save)
+      if jq -e '.args.profile|has("id")' <<<"$request" >/dev/null; then
+        printf '%s\n' "$request"
+      else
+        jq -c --arg id "$(projects_registry_id f)" '.args.profile.id=$id' <<<"$request"
+      fi
+      ;;
     navigation-set)
       # The store owns visit time; callers cannot supply or backdate recency.
       if [[ "$(jq -r '.args.visit // false' <<<"$request")" == true ]]; then
@@ -179,4 +186,13 @@ projects_registry_prepare_request() {
       ;;
     *) printf '%s\n' "$request" ;;
   esac
+}
+
+# Supply one ID per legacy project; jq migration itself remains pure.
+projects_registry_profile_ids() {
+  local state=$1 project_id ids='{}'
+  while IFS= read -r project_id; do
+    ids=$(jq -cn --argjson ids "$ids" --arg projectId "$project_id" --arg id "$(projects_registry_id f)" '$ids + {($projectId):$id}') || return 1
+  done < <(jq -r '.projects[].id' <<<"$state")
+  printf '%s\n' "$ids"
 }

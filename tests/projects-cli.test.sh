@@ -76,6 +76,8 @@ run_cli 0 projects register --path "$checkout"
 project=$(jq -r 'select(.event=="completed") | .data.state.projects[0].id' "$events")
 checkout_id=$(jq -r 'select(.event=="completed") | .data.state.projects[0].lastCheckoutId' "$events")
 export CLI_PROJECT="$project"
+# Schema-2 persistence retains the same public registration/inspection payloads.
+jq -se 'last.data.state.schemaVersion == 2 and last.data.state.projects[0].profiles == []' "$events" >/dev/null
 run_cli 1 projects register --path "$ARANEA_TEST_SANDBOX/vanished-candidate"
 run_cli 0 projects list
 jq -se 'last.data.projects|length==1' "$events" >/dev/null
