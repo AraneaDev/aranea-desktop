@@ -120,7 +120,7 @@ ShellRoot {
     t.check(!t.findChild(page.details, 'profilePresetChoices').visible, 'optional new-profile choices stay behind Add profile')
     t.findChild(page.details, 'addProfile').activate()
     t.check(t.findChild(page.details, 'profilePresetChoices').visible, 'Add profile reveals usable presets and custom selection')
-    t.check(!t.findChild(surface, 'manageProfiles').visible, 'Profiles destination omits redundant management navigation')
+    t.check(!t.findChild(surface, 'headerManageProfiles').visible, 'Profiles destination omits redundant management navigation')
     page.details.beginProfile(saved)
     page.details.profileEditor.setName('Changed')
     var refresh = t.findChild(page.details, 'profileRefreshTools')
@@ -198,7 +198,9 @@ ShellRoot {
       t.equal(page.selectedProject.profiles.length, 1, 'failed removal retains saved profile')
       page.details.beginProfile(updated)
       surface.chooseSection('overview')
+      page.details.profileEditor.fieldError = 'Invalid discarded profile'
       guard.discardRequested()
+      t.equal(page.details.profileEditor.fieldError, '', 'Discard clears stale profile field validation')
       t.check(!page.details.profileEditing && surface.section === 'overview', 'Discard restores navigation without a mutation')
       entry.projectController.state = {
         revision: 11,
@@ -208,7 +210,7 @@ ShellRoot {
         roots: [],
         ignored: []
       }
-      t.check(t.findChild(surface, 'manageProfiles').visible, 'CLI zero-profile registration has direct setup recovery')
+      t.check(t.findChild(surface, 'headerManageProfiles').visible, 'CLI zero-profile registration has direct setup recovery')
       t.equal(requests.length, 3, 'ordinary refresh does not persist presets')
       page.startSetup()
       page.setupRegistrationPaths = ['/fixture/one']

@@ -18,6 +18,21 @@ Item {
   property var requestError: null
   // Preparation retries apply only before any operation has been accepted.
   property bool preparing: false
+  // A sent request may already be accepted; cancellation only applies between rejected retries.
+  property bool submissionInFlight: false
+  // Only an explicit readiness refusal between sends is safe to cancel.
+  readonly property bool canCancelPreparation: !captureActive && preparing && pending && !submissionInFlight && !operationId && !acceptanceUnknown && !!requestError && requestError.code === 'OWNER_NOT_READY'
+  // Stop only known-unaccepted local retries; keep the original diagnostic target.
+  function cancelPreparation(): bool {
+    if (!canCancelPreparation)
+      return false
+    generation++
+    readyRetry.stop()
+    submissionJson = ''
+    preparing = false
+    pending = false
+    return true
+  }
   // Bound readiness retries; reaching this deadline leaves the request rejected.
   property int readyTimeout: 5000
   // Original serialized request is immutable throughout rejected-only retries.
@@ -111,6 +126,7 @@ Item {
   onCaptureActiveChanged: {
     generation++
     snapshotReadRevision++
+    submissionInFlight = false
     poll.stop()
     readyRetry.stop()
     submissionJson = ''
@@ -120,6 +136,8 @@ Item {
   // Snapshot reads cannot cancel independently submitted or observed work.
   function transportFailed(method: string, message: string): void {
     available = false
+    if (method !== 'snapshot')
+      submissionInFlight = false
     if (method === 'startEnvironment' || method === 'recoverEnvironment') {
       acceptanceUnknown = true
       requestError = {
@@ -208,7 +226,9 @@ Item {
       return
     }
     var revision = generation
+    submissionInFlight = true
     invoke(submissionMethod, [submissionJson], revision, function (response) {
+      submissionInFlight = false
       var environmentSubmission = submissionMethod !== 'request'
       if (environmentSubmission && (response.ok === true && (!validId(response.operationId) || !validId(response.environmentId)) || response.ok !== true && (response.operationId || response.environmentId))) {
         transportFailed(submissionMethod, 'Owner acknowledgement is incomplete. Check launch status.')

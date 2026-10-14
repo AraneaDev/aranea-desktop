@@ -39,12 +39,18 @@ ColumnLayout {
   property var pointerGate: null
   // Injected presentation clock for stale-state copy.
   property real nowMs: Date.now()
+  // Optional diagnostics always retain an exact environment target.
+  property string inspectedEnvironmentId: ''
+  // Resolve diagnostics again from the retained exact environment row.
+  readonly property var inspectedEnvironment: (model.workspaces || []).find(function (row) {
+    return row.target.environmentId === view.inspectedEnvironmentId
+  }) || null
   // Exact saved action revision or retained run request.
   signal actionRequested(string method, var target)
   // Fixed activity method and exact task identity.
   signal agentRequested(string method, string taskId)
   // Ordinary owner Open for the selected checkout.
-  signal workspaceRequested(var target)
+  signal workspaceRequested(string method, var target)
   // Open deeper information without executing saved commands.
   signal detailsRequested(string section, var target)
   // Explicit read-only refresh request.
@@ -115,19 +121,49 @@ ColumnLayout {
     }
   }
   ProjectActivitySummary {
+    id: workspaceSummary
     Layout.fillWidth: true
+    objectName: 'overviewWorkspaces'
     title: 'Workspaces'
     detailsLabel: 'Workspace details'
-    emptyHint: 'No observed workspace here. Open your tools from the project header.'
+    emptyHint: 'Start working to create a workspace for your tools.'
     rows: view.model.workspaces
     displayOnly: view.displayOnly
     pending: view.workspacePending
     pointerGate: view.pointerGate
     onRequested: function (method, target) {
-      view.workspaceRequested(target)
+      view.workspaceRequested(method, target)
     }
     onDetailsRequested: function (target) {
-      view.detailsRequested('preferences', target)
+      if (target.environmentId)
+        view.inspectedEnvironmentId = target.environmentId
+      else
+        workspaceSummary.expanded = !workspaceSummary.expanded
+    }
+  }
+  ColumnLayout {
+    objectName: 'environmentDetails'
+    Layout.fillWidth: true
+    visible: !!view.inspectedEnvironment
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: view.inspectedEnvironment ? view.inspectedEnvironment.title : ''
+      font.bold: true
+    }
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: view.inspectedEnvironment ? view.inspectedEnvironment.fullDetail || '' : ''
+    }
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Unconfirmed tools may still be open. Check looks for existing tools; New window deliberately opens another.'
+      opacity: 0.65
+    }
+    Aranea.ActionButton {
+      text: 'Hide details'
+      variant: 'quiet'
+      pointerGate: view.pointerGate
+      onClicked: view.inspectedEnvironmentId = ''
     }
   }
 }

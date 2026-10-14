@@ -24,8 +24,11 @@ Item {
   // Optional opaque details destination, empty for the Projects overview.
   property string projectId: ''
   // Every genuine selection source records once; fixture changes remain inert.
-  onProjectIdChanged: if (projectId && !inert)
-    rememberNavigation(projectId, undefined, true)
+  onProjectIdChanged: {
+    clearDismissalIntent()
+    if (projectId && !inert)
+      rememberNavigation(projectId, undefined, true)
+  }
   // Restore saved registration only after the initial registry observation.
   property bool restoreNavigationPending: false
   // Restoration is presentation-only and never asks the live owner to Open.
@@ -85,6 +88,92 @@ Item {
   readonly property var selectedProject: (projectController.state.projects || []).filter(function (project) {
     return project.id === root.projectId
   })[0] || null
+  // Dismissal belongs to one visible user action, never to observation lifetime.
+  property string awaitedLaunchId: ''
+  // Detached target and request generation awaiting asynchronous UUID assignment.
+  property var launchIntent: null
+  // Exact environment whose observed focus may dismiss this opening.
+  property string awaitedReturnId: ''
+  // Changing future launch checkout invalidates old dismissal intent.
+  readonly property string selectedCheckoutId: selectedProject ? selectedProject.lastCheckoutId : ''
+  onSelectedCheckoutIdChanged: clearDismissalIntent()
+  // Forget only local visibility intent, preserving all accepted or unknown work.
+  function clearDismissalIntent() {
+    awaitedLaunchId = ''
+    launchIntent = null
+    awaitedReturnId = ''
+  }
+  // A UUID may arrive after submit returns; bind only this request generation and target.
+  function bindLaunchIdentity() {
+    var intent = launchIntent, target = projectClient.environmentTarget
+    if (!intent || projectClient.generation !== intent.generation || !target || projectClient.submissionMethod !== 'startEnvironment')
+      return
+    if (['projectId', 'checkoutId', 'profileId', 'profileRevision'].every(function (key) {
+      return target[key] === intent.target[key]
+    }))
+      awaitedLaunchId = projectClient.activationId
+  }
+  // Start the exact displayed profile on the currently selected checkout.
+  function startProfile(profileId, profileRevision, another) {
+    if (inert || !opened || !selectedProject || projectClient.submitting)
+      return false
+    var profile = (selectedProject.profiles || []).find(function (p) {
+      return p.id === profileId && p.revision === profileRevision
+    })
+    if (!profile)
+      return false
+    var target = {
+      projectId: projectId,
+      checkoutId: selectedCheckoutId,
+      profileId: profileId,
+      profileRevision: profileRevision
+    }
+    clearDismissalIntent()
+    launchIntent = {
+      target: target,
+      generation: projectClient.generation + (another ? 2 : 1)
+    }
+    var accepted = another ? projectClient.startAnotherEnvironment(target) : projectClient.startEnvironment(target)
+    if (!accepted)
+      clearDismissalIntent()
+    else
+      bindLaunchIdentity()
+    return accepted
+  }
+  // Dismissal intent clears before stopping a known-unaccepted local retry.
+  function cancelPreparation() {
+    clearDismissalIntent()
+    return projectClient.cancelPreparation()
+  }
+  // Return is focus-only and closes only on the matching observed signal.
+  function returnEnvironment(target) {
+    if (inert || !opened || !target || target.projectId !== projectId)
+      return false
+    clearDismissalIntent()
+    awaitedReturnId = target.environmentId
+    if (!projectClient.returnEnvironment(target)) {
+      clearDismissalIntent()
+      return false
+    }
+    return true
+  }
+  Connections {
+    target: projectClient
+    function onActivationIdChanged() {
+      root.bindLaunchIdentity()
+    }
+    function onEnvironmentTargetChanged() {
+      root.bindLaunchIdentity()
+    }
+    function onSubmissionAccepted(operationId, environmentId) {
+      if (root.opened && root.launchIntent && root.awaitedLaunchId && root.awaitedLaunchId === projectClient.activationId && operationId === projectClient.operationId && environmentId === projectClient.environmentId)
+        root.close()
+    }
+    function onReturnObserved(environmentId) {
+      if (root.opened && root.awaitedReturnId === environmentId)
+        root.close()
+    }
+  }
   ProjectGitClient {
     id: gitClient
     active: root.opened
@@ -253,7 +342,8 @@ Item {
         snapshot: projectClient.snapshot,
         available: projectClient.available,
         clientError: projectClient.error,
-        requestError: projectClient.requestError
+        requestError: projectClient.requestError,
+        acceptanceUnknown: projectClient.acceptanceUnknown
       },
       actions: actionSnapshot(),
       gitCache: gitClient.cache,
@@ -305,6 +395,7 @@ Item {
     projectClient.available = f.projectAvailable === true
     projectClient.error = ''
     projectClient.requestError = null
+    projectClient.acceptanceUnknown = f.projectAcceptanceUnknown === true
     if (view)
       view.captureReset(f)
     opened = true
@@ -336,6 +427,7 @@ Item {
     projectClient.available = p.available
     projectClient.error = p.clientError
     projectClient.requestError = p.requestError
+    projectClient.acceptanceUnknown = p.acceptanceUnknown === true
     projectId = saved.projectId
     opened = saved.opened
     if (view && saved.ui)
@@ -365,6 +457,7 @@ Item {
   }
   // Accept a typed destination and refresh observations without launching tools.
   function open(payloadJson) {
+    clearDismissalIntent()
     if (inert)
       return 'busy'
     var payload = {}
@@ -391,6 +484,7 @@ Item {
   }
   // Hide presentation while retaining drafts and accepted service operations.
   function close() {
+    clearDismissalIntent()
     opened = false
   }
   Component.onCompleted: {

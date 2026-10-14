@@ -128,6 +128,46 @@ ShellRoot {
     client.snapshot = changed
     t.equal(panel.rowAt(1).label, "Renamed · fix", "fresh project labels update the existing row")
     t.check(panel.rowAt(1) === row && host.cursorKey === "7" && host.cursorRow === 1, "labels retain row and cursor identities")
+    changed = JSON.parse(JSON.stringify(changed))
+    changed.environments = [
+      {
+        id: 'e-old',
+        projectId: 'p-app',
+        checkoutId: 'c-main',
+        workspaceId: 7,
+        sessionId: 'old-creation',
+        profileSnapshot: {
+          name: 'Original terminal'
+        },
+        checkoutSnapshot: {
+          branch: 'launch-branch',
+          path: '/saved/path'
+        }
+      }
+    ]
+    changed.bindings = [
+      {
+        environmentId: 'e-old',
+        projectId: 'p-app',
+        checkoutId: 'c-main',
+        workspaceId: 7,
+        sessionId: 'session-new',
+        role: 'terminal',
+        pid: 42,
+        address: '0xaa',
+        evidence: {
+          processVerified: true,
+          mode: 'process-only'
+        }
+      }
+    ]
+    client.snapshot = changed
+    t.equal(panel.rowAt(1).label, 'Renamed · Original terminal', 'workspace uses immutable environment profile name')
+    t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('terminal observed') >= 0, 'fresh current-session recovery proves old saved environment')
+    changed = JSON.parse(JSON.stringify(changed))
+    changed.bindings[0].sessionId = 'stale'
+    client.snapshot = changed
+    t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('unconfirmed') >= 0, 'stale binding never claims saved environment live')
     panel.activateRow(1, "7")
     t.check(testRoot.lastCommand.indexOf('workspace = "7"') >= 0, "row activation keeps the original workspace focus target")
     t.equal(testRoot.calls.length, 1, "focus never submits a project request")

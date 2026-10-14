@@ -124,4 +124,42 @@ function agentRecords(registry, runtime, choiceFor) {
   return result
 }
 
-if (typeof module !== "undefined") module.exports = { records, agentRecords }
+if (typeof module !== "undefined") module.exports = { records, agentRecords, environmentRecords }
+
+/** Exact saved environment Return records; owner-supplied observed roles retain fresh proof.
+ * @param {ProjectData} registry - saved project names
+ * @param {ProjectData} runtime - shared owner snapshot
+ * @returns {Array<ProjectData>} typed focus-only targets
+ */
+function environmentRecords(registry, runtime) {
+  return ((runtime || {}).environments || []).map(function (/** @type {ProjectData} */ e) {
+    var project = ((registry || {}).projects || []).find(function (/** @type {ProjectData} */ p) {
+      return p.id === e.projectId
+    })
+    /** @type {ProjectData} */
+    var record = {
+      key: "project-environment:" + e.id,
+      type: "project-environment",
+      label: "Return " + e.profileSnapshot.name + (project ? " · " + project.name : ""),
+      target: { projectId: e.projectId, environmentId: e.id },
+      detail:
+        "Workspace " +
+        e.workspaceId +
+        " · " +
+        (e.checkoutSnapshot.branch || "detached") +
+        " at launch · " +
+        e.checkoutSnapshot.path +
+        " · " +
+        ((e.observedRoles || []).length
+          ? "Observed: " + e.observedRoles.join(", ")
+          : "Tools unconfirmed"),
+      aliases: [e.profileSnapshot.name, e.checkoutSnapshot.path, e.checkoutSnapshot.branch || ""],
+      available: !!runtime.availability && runtime.availability.compositor === true,
+      action: "return",
+      pinned: false,
+      recentRank: null,
+      activeWorkspace: false
+    }
+    return record
+  })
+}

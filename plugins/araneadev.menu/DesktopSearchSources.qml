@@ -132,7 +132,9 @@ Item {
     })
     var agents = snapshot.agents || ({})
     var now = Date.now()
-    return mapped.concat(Projects.agentRecords({
+    return mapped.concat(Projects.environmentRecords({
+      projects: snapshot.projects || []
+    }, snapshot)).concat(Projects.agentRecords({
       projects: snapshot.projects || []
     }, snapshot, function (project) {
       return Suggestion.suggest(agents.tools || [], agents.usage || ({}), project.tools ? project.tools.agentId || null : null, now)
@@ -298,6 +300,14 @@ Item {
       data.actionRecords = sources.actionController.currentRecords()
     var selected = Search.resolveTarget(sources.records, key)
     var record = Search.resolveTarget(Targets.sourceRecords(data), key)
+    if (key.indexOf('project-environment:') === 0) {
+      var environmentRequest = Targets.dispatchTarget(selected, data)
+      if (!environmentRequest || !sources.projectClient || !sources.projectClient.returnEnvironment(environmentRequest.payload)) {
+        sources.failed('Environment Return is unavailable')
+        return false
+      }
+      return true
+    }
     if (key.indexOf("project:") === 0 || key.indexOf("project-agent:") === 0) {
       var projectRequest = Targets.dispatchTarget(selected, data)
       if (!projectRequest || !sources.projectClient || sources.projectClient.captureActive || sources.projectClient.pending) {

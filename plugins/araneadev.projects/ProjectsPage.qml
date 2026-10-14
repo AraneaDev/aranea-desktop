@@ -255,7 +255,7 @@ ColumnLayout {
       recoveryCheckoutId = project.lastCheckoutId || ''
     }
     var checkouts = project.checkouts || []
-    if (reported && reported.sessionId === snapshot.sessionId && reported.projectId === project.id && checkouts.some(function (c) {
+    if (reported && !reported.environmentId && reported.sessionId === snapshot.sessionId && reported.projectId === project.id && checkouts.some(function (c) {
       return c.id === reported.checkoutId
     }))
       recoveryCheckoutId = reported.checkoutId
@@ -263,7 +263,7 @@ ColumnLayout {
     var latest = null
     for (var i = 0; i < observations.length; i++) {
       var operation = observations[i]
-      if (!operation || operation.sessionId !== snapshot.sessionId || operation.projectId !== project.id || operation.checkoutId !== recoveryCheckoutId || !checkouts.some(function (c) {
+      if (!operation || operation.environmentId || operation.sessionId !== snapshot.sessionId || operation.projectId !== project.id || operation.checkoutId !== recoveryCheckoutId || !checkouts.some(function (c) {
         return c.id === operation.checkoutId
       }))
         continue

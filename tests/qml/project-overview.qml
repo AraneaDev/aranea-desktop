@@ -62,7 +62,7 @@ ShellRoot {
       error: null
     }
     root.gitClient.cache = cache
-    t.check(t.findChild(surface, 'projectBranch').text.indexOf('fresh-branch') >= 0, 'selected header agrees with fresh exact-checkout Git branch')
+    t.check(t.findChild(surface, 'headerChooseCheckout').text.indexOf('fresh-branch') >= 0, 'selected header agrees with fresh exact-checkout Git branch')
     var actions = t.findChild(surface, 'projectActions')
     t.check(actions.client === root.actionClient, 'summary and full view share persistent action client')
     root.actionClient.runner = function (argv, input, done) {
@@ -297,11 +297,111 @@ ShellRoot {
       checkoutId: 'c',
       actionId: 'a'
     }
+    root.gitClient.captureActive = true
+    root.actionClient.captureActive = true
+    root.activityClient.captureActive = true
+    var nativeCalls = []
+    root.projectClient.runner = function (argv, done) {
+      nativeCalls.push({
+        method: argv[2],
+        payload: argv[3] ? JSON.parse(argv[3]) : null
+      })
+    }
+    root.projectClient.identityRunner = function (done) {
+      done('00000000-0000-4000-8000-000000000019')
+    }
+    root.projectClient.snapshot = {
+      availability: {
+        compositor: true
+      },
+      environments: [
+        {
+          id: 'e-old',
+          projectId: 'p',
+          checkoutId: 'old',
+          workspaceId: 8,
+          profileSnapshot: {
+            name: 'Old tools',
+            roles: ['editor', 'agent']
+          },
+          checkoutSnapshot: {
+            branch: 'earlier',
+            path: '/old'
+          },
+          resolvedTools: {
+            editorId: 'code',
+            agentId: 'codex'
+          },
+          observedRoles: ['editor']
+        }
+      ],
+      operations: []
+    }
+    root.projectClient.available = true
+    var page = t.findChild(surface, 'projectsPage')
+    var registry = JSON.parse(JSON.stringify(root.projectController.state))
+    registry.projects[0].checkouts.push({
+      id: 'c-other',
+      path: '/other'
+    })
+    root.projectController.state = registry
+    var environmentOperation = {
+      id: 'env-op',
+      environmentId: 'e-other',
+      sessionId: 's',
+      projectId: 'p',
+      checkoutId: 'c-other',
+      generation: 9,
+      state: 'completed',
+      outcome: 'partial'
+    }
+    root.projectClient.snapshot = Object.assign({}, root.projectClient.snapshot, {
+      sessionId: 's',
+      operations: [environmentOperation]
+    })
+    page.reconcileOperation(environmentOperation)
+    t.equal(page.details.operation, null, 'environment operation never enters legacy Details recovery')
+    t.equal(page.recoveryCheckoutId, 'c', 'environment report never retargets legacy recovery checkout')
+    var legacyOperation = {
+      id: 'legacy-op',
+      sessionId: 's',
+      projectId: 'p',
+      checkoutId: 'c',
+      generation: 1,
+      state: 'completed',
+      outcome: 'partial'
+    }
+    root.projectClient.snapshot = Object.assign({}, root.projectClient.snapshot, {
+      operations: [legacyOperation, environmentOperation]
+    })
+    page.reconcileOperation(environmentOperation)
+    t.equal(page.details.operation.id, 'legacy-op', 'ordinary legacy recovery remains available beside newer environment work')
+    var environmentRow = overview.model.workspaces[0]
+    t.equal(environmentRow.target, {
+      projectId: 'p',
+      environmentId: 'e-old'
+    }, 'Overview keeps old environment independently of selected checkout')
+    t.findChild(overview, 'overviewWorkspaces').detailsRequested(environmentRow.target)
+    t.equal(overview.inspectedEnvironmentId, 'e-old', 'Details inspects exact retained environment')
+    t.check(overview.inspectedEnvironment.fullDetail.indexOf('Codex') >= 0, 'Details names original saved tool even without current provider probe')
+    overview.workspaceRequested('newWindow:agent', environmentRow.target)
+    t.equal(nativeCalls[0], {
+      method: 'recoverEnvironment',
+      payload: {
+        projectId: 'p',
+        environmentId: 'e-old',
+        newWindowRole: 'agent',
+        activationId: 'a-00000000-0000-4000-8000-000000000019'
+      }
+    }, 'role recovery uses exact old environment with no selected checkout or profile override')
+    root.projectClient.captureActive = true
     root.projectId = 'other'
     t.equal(root.actionClient.runId, 'accepted-run', 'selection preserves accepted run receipt')
     t.equal(root.actionClient.submissionTarget.checkoutId, 'c', 'selection preserves immutable submission target')
     t.check(!!JSON.parse(root.captureSnapshot()).actions, 'persistent capture owns shared action observations and receipts')
     root.captureActive = true
+    root.projectClient.acceptanceUnknown = true
+    root.projectClient.activationId = 'a-00000000-0000-4000-8000-000000000021'
     var saved = root.captureSnapshot()
     var beforeCapture = calls.length
     t.equal(root.captureBegin(JSON.stringify({
@@ -319,8 +419,11 @@ ShellRoot {
       }
     })), 'ok', 'capture admits passive shared action observations')
     t.equal(root.actionClient.runId, 'fixture-run', 'inert fixture can substitute shared observation')
+    t.check(!root.projectClient.acceptanceUnknown, 'inert fixture never inherits live launch uncertainty')
     t.equal(root.captureRestore(saved), 'ok', 'shared action capture restores successfully')
     t.equal(root.actionClient.runId, 'accepted-run', 'capture restores accepted receipt identity')
+    t.check(root.projectClient.acceptanceUnknown, 'capture restores held launch uncertainty')
+    t.equal(root.projectClient.activationId, 'a-00000000-0000-4000-8000-000000000021', 'capture retains original immutable recovery identity')
     t.equal(root.actionClient.submissionTarget.checkoutId, 'c', 'capture restores exact submitted checkout')
     t.equal(calls.length, beforeCapture, 'capture restoration never starts an action')
     t.done()

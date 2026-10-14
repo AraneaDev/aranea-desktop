@@ -14,6 +14,8 @@ Popup {
   property string selectedId: ''
   // Retained query draft is owned by the host.
   property string query: ''
+  // Context-specific prompt; project and checkout consumers retain the default.
+  property string searchPlaceholder: 'Search…'
   // Shared host layout settling guard.
   property var pointerGate: null
   // Inert capture hosts refuse pointer, keyboard, and programmatic activation.
@@ -22,6 +24,8 @@ Popup {
   property bool pinningEnabled: false
   // Project pickers keep registration reachable at narrow widths.
   property bool showAddProject: false
+  // Profile choosers omit checkout-specific branch and path shortening.
+  property bool showCheckoutContext: true
   // The surface applies its draft decision before opening registration.
   signal setupRequested
   // Hosts may project branch matches from all checkouts before supplying rows.
@@ -86,7 +90,8 @@ Popup {
     selectedId: picker.selectedId
     query: picker.query
     showAddProject: picker.showAddProject
-    searchPlaceholder: 'Search…'
+    showCheckoutContext: picker.showCheckoutContext
+    searchPlaceholder: picker.searchPlaceholder
     pinningEnabled: picker.pinningEnabled
     navigationEnabled: !picker.displayOnly
     pointerGate: picker.pointerGate

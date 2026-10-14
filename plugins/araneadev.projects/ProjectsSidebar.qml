@@ -33,6 +33,8 @@ ColumnLayout {
   property bool navigationEnabled: true
   // Picker consumers hide project-specific registration controls.
   property bool showAddProject: true
+  // Shared profile rows contain a tool summary rather than checkout metadata.
+  property bool showCheckoutContext: true
   // A single quiet pin control is available only for project navigation.
   property bool pinningEnabled: true
   // Shared pointer movement and layout settling guard.
@@ -181,6 +183,8 @@ ColumnLayout {
   // Short path hints keep duplicate names distinguishable within compact rows.
   function folderLabel(row) {
     var path = row.path || ''
+    if (!showCheckoutContext)
+      return path
     var parts = path.split('/').filter(function (part) {
       return !!part
     })
@@ -326,7 +330,7 @@ ColumnLayout {
             }
             Aranea.UiLabel {
               width: parent.width
-              visible: !!projectRow.modelData.path || !!projectRow.modelData.branch
+              visible: sidebar.showCheckoutContext && (!!projectRow.modelData.path || !!projectRow.modelData.branch)
               text: (projectRow.modelData.branch || 'detached') + sidebar.workspaceLabel(projectRow.modelData.id)
               elide: Text.ElideRight
               wrapMode: Text.NoWrap

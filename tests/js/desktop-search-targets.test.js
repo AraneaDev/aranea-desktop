@@ -273,3 +273,23 @@ test("standalone Projects menu entry replaces the old Settings search destinatio
   assert.equal(matches[0].type, "command")
   assert.deepEqual(dispatch(matches[0].key, data), { kind: "command", itemId: "aranea.projects" })
 })
+
+test("typed environment Return dispatch validates retained exact identity", () => {
+  const row = {
+    key: "project-environment:e-one",
+    type: "project-environment",
+    label: "Return Original",
+    target: { projectId: "p", environmentId: "e-one" },
+    available: true
+  }
+  const data = snapshot({ projectRecords: [row] })
+  assert.deepEqual(dispatch(row.key, data), {
+    kind: "project-environment",
+    payload: { projectId: "p", environmentId: "e-one" }
+  })
+  assert.equal(
+    targets.dispatchTarget({ ...row, target: { projectId: "p", environmentId: "other" } }, data),
+    null
+  )
+  assert.equal(targets.dispatchTarget(row, snapshot({ projectRecords: [] })), null)
+})

@@ -2,8 +2,8 @@
 # Render the independent Projects component using inert production fixtures.
 # Usage: tools/render-projects-preview --output PNG [--fixture project-details] [--width N] [--height N] [--project-count 0..100]
 # With project-details, ARANEA_PROJECT_RENDER_STATE=agents, agents-menu or
-# agents-history-menu shows installed providers and headroom/history suggestions.
-# Menu variants open only the inert popup; they never activate tools or defaults.
+# agents-history-menu shows saved profiles with the installed provider.
+# Menu variants open the inert searchable profile picker; they never start tools.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 exec "$repo_root/tools/render-settings-preview" --fixture projects-empty "$@"

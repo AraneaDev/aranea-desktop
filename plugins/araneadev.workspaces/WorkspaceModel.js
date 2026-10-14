@@ -630,13 +630,54 @@ function openCaption(count) {
  * current-session binding. Neither labels nor associations prove window ownership.
  * @param {*} workspaceId - Positive compositor workspace id.
  * @param {*} projectSnapshot - Current owner projection, or null when unavailable.
- * @returns {{projectId:string, checkoutId:string, label:string, detail:string}|null} Context, or ordinary workspace fallback.
+ * @returns {{projectId:string, checkoutId:string, environmentId?:string, label:string, detail:string}|null} Context, or ordinary workspace fallback.
  */
 function projectContext(workspaceId, projectSnapshot) {
   var id = Number(workspaceId)
   if (!Number.isInteger(id) || id <= 0 || !projectSnapshot) return null
   var projects = Array.isArray(projectSnapshot.projects) ? projectSnapshot.projects : []
   var bindings = Array.isArray(projectSnapshot.bindings) ? projectSnapshot.bindings : []
+  var environment = (projectSnapshot.environments || []).find(function (/** @type {*} */ e) {
+    return e.workspaceId === id
+  })
+  if (environment) {
+    var owner = projects.find(function (/** @type {*} */ p) {
+      return p.id === environment.projectId
+    })
+    var roles = bindings
+      .filter(function (/** @type {*} */ b) {
+        return (
+          b.environmentId === environment.id &&
+          b.projectId === environment.projectId &&
+          b.checkoutId === environment.checkoutId &&
+          b.workspaceId === id &&
+          !!projectSnapshot.sessionId &&
+          b.sessionId === projectSnapshot.sessionId &&
+          b.pid > 0 &&
+          typeof b.address === "string" &&
+          /^0x[0-9a-fA-F]+$/.test(b.address) &&
+          !/^0x0+$/.test(b.address) &&
+          b.evidence &&
+          b.evidence.processVerified === true &&
+          ["process-only", "process-app-id"].indexOf(b.evidence.mode) >= 0
+        )
+      })
+      .map(function (/** @type {*} */ b) {
+        return b.role + " observed"
+      })
+    return {
+      projectId: environment.projectId,
+      checkoutId: environment.checkoutId,
+      environmentId: environment.id,
+      label: (owner ? owner.name + " · " : "") + environment.profileSnapshot.name,
+      detail:
+        (environment.checkoutSnapshot.branch || "detached") +
+        " at launch · " +
+        environment.checkoutSnapshot.path +
+        " · " +
+        (roles.length ? roles.join(", ") : "Tools unconfirmed")
+    }
+  }
   for (var i = 0; i < projects.length; i++) {
     var project = projects[i]
     if (!project || !project.id) continue

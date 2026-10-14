@@ -121,7 +121,12 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
   })
   /** @type {Array<OverviewData>} */
   var bindings = (runtime.bindings || []).filter(function (/** @type {OverviewData} */ b) {
-    return b.projectId === project.id && b.checkoutId === checkoutId && b.workspaceId > 0
+    return (
+      !b.environmentId &&
+      b.projectId === project.id &&
+      b.checkoutId === checkoutId &&
+      b.workspaceId > 0
+    )
   })
   /** @type {Array<number>} */
   var workspaces = []
@@ -161,6 +166,81 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       controls: [{ method: "open", label: "Open workspace" }]
     }
   })
+  var environments = (runtime.environments || []).filter(function (/** @type {OverviewData} */ e) {
+    return e.projectId === project.id
+  })
+  var environmentRows = environments.map(function (/** @type {OverviewData} */ e) {
+    var operations = (runtime.operations || [])
+      .filter(function (/** @type {OverviewData} */ op) {
+        return op.environmentId === e.id && !op.environmentReturn
+      })
+      .sort(function (/** @type {OverviewData} */ a, /** @type {OverviewData} */ b) {
+        return (b.generation || 0) - (a.generation || 0)
+      })
+    var observed = e.observedRoles || [],
+      controls = [{ method: "return", label: "Return" }],
+      details = []
+    var labels = {
+      code: "VS Code",
+      nvim: "Neovim",
+      kitty: "Kitty",
+      alacritty: "Alacritty",
+      foot: "Foot",
+      ghostty: "Ghostty",
+      codex: "Codex",
+      claude: "Claude Code"
+    }
+    var statuses = (e.profileSnapshot.roles || []).map(function (/** @type {string} */ role) {
+      var operation = operations.find(function (/** @type {OverviewData} */ op) {
+        return (op.steps || []).some(function (/** @type {OverviewData} */ step) { return step.role === role })
+      })
+      var step = operation && (operation.steps || []).find(function (/** @type {OverviewData} */ item) { return item.role === role })
+      var status =
+        observed.indexOf(role) >= 0
+          ? "observed"
+          : step && step.status === "failed"
+            ? "failed"
+            : "unconfirmed"
+      if (status !== "observed") {
+        controls.push({
+          method: (status === "failed" ? "retry:" : "reobserve:") + role,
+          label: (status === "failed" ? "Retry " : "Check ") + role
+        })
+        if (status === "unconfirmed")
+          controls.push({ method: "newWindow:" + role, label: "New " + role + " window" })
+      }
+      var tool = (e.resolvedTools || {})[role + "Id"]
+      var label = labels[tool] || tool || "Saved tool"
+      details.push(
+        role +
+          " · " +
+          label +
+          " · " +
+          status +
+          (step && (step.error || step.code)
+            ? " · " + ((step.error && step.error.message) || step.code)
+            : "")
+      )
+      return role + " " + status
+    })
+    return {
+      title: e.profileSnapshot.name + " · Workspace " + e.workspaceId,
+      status: statuses.join(" · "),
+      detail: (e.checkoutSnapshot.branch || "detached") + " at launch · " + e.checkoutSnapshot.path,
+      fullDetail: details.join("\n"),
+      target: { projectId: project.id, environmentId: e.id },
+      controls: controls,
+      active: observed.length > 0,
+      attention: statuses.some(function (/** @type {string} */ value) {
+        return value.indexOf("observed") < 0
+      }),
+      createdAt: e.createdAt || 0
+    }
+  })
+  environmentRows.sort(function (/** @type {OverviewData} */ a, /** @type {OverviewData} */ b) {
+    return priority(a, b) || b.createdAt - a.createdAt
+  })
+  result.workspaces = environmentRows.concat(result.workspaces)
   return result
 }
 

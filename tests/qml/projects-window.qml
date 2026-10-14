@@ -174,8 +174,8 @@ ShellRoot {
     if (page.setupActive)
       page.finishSetup()
     surface.chooseSection('agents')
-    t.findChild(surface, 'projectPrimaryOpen').activate()
-    t.equal(surface.section, 'overview', 'Open from Agents reveals the destination containing its outcome and recovery controls')
+    t.findChild(surface, 'headerManageProfiles').activate()
+    t.equal(surface.section, 'profiles', 'daily header opens optional profile management directly')
     entry.projectController.state = Object.assign({}, entry.projectController.state, {
       projects: entry.projectController.state.projects.map(function (p) {
         return p.id === 'p-one' ? Object.assign({}, p, {
@@ -192,7 +192,7 @@ ShellRoot {
     })
     surface.width = 420
     t.step(80, function () {
-      var header = t.findChild(surface, 'projectHeader'), branch = t.findChild(header, 'projectBranch')
+      var header = t.findChild(surface, 'projectHeader'), branch = t.findChild(header, 'headerChooseCheckout')
       t.check(branch.width <= header.width && branch.height > 0, 'long branch metadata stays readable inside the compact viewport')
       t.check(narrowSurface.compact, 'standalone layout adapts to narrow widths')
       t.check(!t.findChild(narrowSurface, 'compactProjectSelector'), 'narrow navigation replaces the project dropdown')
