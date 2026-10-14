@@ -55,6 +55,7 @@ ShellRoot {
     Style.spacingScale = 1
     Style.spacingScaleWithFont = false
     entry.activityClient.captureActive = true
+    entry.gitClient.captureActive = true
     var presentation = t.findChildren(inertEntry, '').filter(function (item) {
       return typeof item.captureBegin === 'function'
     })[0]
@@ -126,6 +127,8 @@ ShellRoot {
     t.equal(entry.projectId, 'p-two', 'switch chooses identity rather than list position')
     t.check(!surface.navigate('p-missing'), 'unknown project identity is refused')
     var sidebar = t.findChild(surface, 'projectsSidebar')
+    t.equal(sidebar.visibleProjectIds(), ['p-one', 'p-two'], 'background candidates include actual visible sidebar rows')
+    t.equal(t.findChild(narrowSurface, 'projectsSidebar').visibleProjectIds(), [], 'hidden sidebar exposes no visible background rows')
     sidebar.query = 'alpha'
     t.equal(sidebar.filteredProjects.map(function (p) {
       return p.id

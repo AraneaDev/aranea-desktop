@@ -17,6 +17,60 @@ Item {
   required property var root
   // Minute clock updates reset and stale usage explanations while visible.
   property real nowMs: Date.now()
+  // Deferred viewport changes belong to their original live observation epoch.
+  function scheduleGitBackground() {
+    if (!visible || !root.opened || root.inert)
+      return
+    var epoch = root.gitClient.epoch
+    Qt.callLater(function () {
+      if (panel.root.gitClient.epoch === epoch)
+        panel.queueGitBackground()
+    })
+  }
+  // Refresh only actual visible rows plus a bounded tail of recently visited projects.
+  function queueGitBackground() {
+    if (!visible || !root.opened || root.inert)
+      return
+    var projects = root.projectController.state.projects || []
+    var visits = (root.projectController.state.navigation || {}).visitedAt || {}
+    var ids = sidebar.visibleProjectIds()
+    Object.keys(visits).filter(function (id) {
+      return visits[id] > 0
+    }).sort(function (a, b) {
+      return visits[b] - visits[a]
+    }).some(function (id) {
+      if (ids.indexOf(id) < 0)
+        ids.push(id)
+      return ids.length >= 12
+    })
+    var targets = []
+    ids.slice(0, 12).forEach(function (id) {
+      var project = projects.find(function (p) {
+        return p.id === id
+      })
+      if (project && (project.checkouts || []).some(function (checkout) {
+        return checkout.id === project.lastCheckoutId
+      }))
+        targets.push({
+          projectId: id,
+          checkoutId: project.lastCheckoutId
+        })
+    })
+    root.gitClient.queueBackground(targets)
+  }
+  Timer {
+    interval: 10000
+    repeat: true
+    running: panel.visible && panel.root.opened && !panel.root.inert
+    onTriggered: panel.queueGitBackground()
+  }
+  Connections {
+    target: panel.root
+    function onOpenedChanged() {
+      if (panel.root.opened)
+        panel.scheduleGitBackground()
+    }
+  }
   // One suggestion shared by selected-project surface consumers.
   readonly property var agentChoice: {
     var agents = root.projectClient.snapshot.agents || {}, project = projectsPage.selectedProject
@@ -89,8 +143,12 @@ Item {
     }
   }
   onCompactChanged: projectPicker.close()
-  onVisibleChanged: if (!visible)
-    projectPicker.close()
+  onVisibleChanged: {
+    if (!visible)
+      projectPicker.close()
+    else
+      scheduleGitBackground()
+  }
   // Choose a supported destination after checking draft and pending guards.
   function chooseSection(next) {
     if (['overview', 'actions', 'agents', 'preferences', 'help'].indexOf(next) < 0)
@@ -189,6 +247,7 @@ Item {
     target: panel.root.projectController
     function onStateChanged() {
       panel.stampLayout()
+      panel.scheduleGitBackground()
     }
     function onToolsChanged() {
       panel.stampLayout()
@@ -300,7 +359,12 @@ Item {
                 panel.root.rememberNavigation(id, pinned)
               }
               onSetupRequested: projectsPage.startSetup()
-              onViewportChanged: panel.stampLayout()
+              onViewportChanged: {
+                panel.stampLayout()
+                panel.scheduleGitBackground()
+              }
+              onFilteredProjectsChanged: panel.scheduleGitBackground()
+              onHeightChanged: panel.scheduleGitBackground()
             }
           }
           ColumnLayout {
@@ -530,6 +594,7 @@ Item {
                   onRefreshRequested: {
                     panel.root.projectController.refresh()
                     panel.root.projectClient.refresh()
+                    panel.root.gitClient.refresh()
                   }
                 }
                 ProjectAgents {

@@ -37,6 +37,9 @@ QtObject {
   // Root directory for the active theme's branding assets.
   readonly property string themeRoot: omarchyStateRoot + "/current/theme"
 
+  // Bounded read-only collector for one exact registered project checkout.
+  readonly property string projectGitStatePath: themeRoot + "/scripts/aranea-project-git-state"
+
   // Root directory for branding assets within the active theme.
   readonly property string brandingRoot: themeRoot + "/branding"
 

@@ -79,6 +79,21 @@ Item {
   property alias projectClient: projectClient
   // Keep-loaded cancellable scan observer survives window visibility changes.
   property alias discoveryClient: discoveryClient
+  // Read-only Git cache survives visibility while launch ownership stays separate.
+  property alias gitClient: gitClient
+  // Invalid or missing selected checkouts never fall back to another worktree.
+  readonly property var selectedProject: (projectController.state.projects || []).filter(function (project) {
+    return project.id === root.projectId
+  })[0] || null
+  ProjectGitClient {
+    id: gitClient
+    active: root.opened
+    captureActive: root.inert
+    projectId: root.selectedProject ? root.selectedProject.id : ''
+    checkoutId: root.selectedProject && (root.selectedProject.checkouts || []).some(function (checkout) {
+      return checkout.id === root.selectedProject.lastCheckoutId
+    }) ? root.selectedProject.lastCheckoutId : ''
+  }
   ProjectRegistryClient {
     id: projectController
     captureActive: root.inert
@@ -181,6 +196,7 @@ Item {
         clientError: projectClient.error,
         requestError: projectClient.requestError
       },
+      gitCache: gitClient.cache,
       activity: {
         snapshot: activityClient.snapshot,
         available: activityClient.available,
@@ -207,6 +223,7 @@ Item {
     }
     projectId = Logic.normalizeProjectId(payload.projectId)
     var f = payload.fixture
+    gitClient.cache = f.projectGitCache || {}
     activityClient.snapshot = f.activitySnapshot || {
       tasks: [],
       operations: []
@@ -244,6 +261,7 @@ Item {
     if (!captureSaved || payloadJson !== captureSaved.json)
       return 'invalid'
     var saved = JSON.parse(payloadJson), focus = captureSaved.focus, p = saved.projects
+    gitClient.cache = saved.gitCache || {}
     activityClient.snapshot = saved.activity.snapshot
     activityClient.available = saved.activity.available
     activityClient.error = saved.activity.error

@@ -105,6 +105,18 @@ ColumnLayout {
   property alias contentY: projectList.contentY
   // Moving the list invalidates pointer presses made before that movement.
   signal viewportChanged
+  // Public viewport projection includes clipped rows but excludes wholly offscreen rows.
+  function visibleProjectIds() {
+    if (!visible || compact || projectList.height <= 0)
+      return []
+    var ids = []
+    for (var i = 0; i < projectRows.count && ids.length < 12; i++) {
+      var row = projectRows.itemAt(i)
+      if (row && row.y + row.height > projectList.contentY && row.y < projectList.contentY + projectList.height)
+        ids.push(row.modelData.id)
+    }
+    return ids
+  }
   // Clamp scrolling to the visible project list without changing selection.
   function scrollTo(y) {
     projectList.cancelFlick()
