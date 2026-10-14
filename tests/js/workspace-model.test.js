@@ -6,8 +6,45 @@ const model = require(
   path.join(__dirname, "..", "..", "plugins/araneadev.workspaces/WorkspaceModel.js")
 )
 
+test("bar retains launched environments across restart while hiding bare saved assignments", () => {
+  const snapshot = projectSnapshot()
+  assert.equal(model.barContext(7, snapshot), null)
+  snapshot.environments = [
+    {
+      id: "e-old",
+      projectId: "p-app",
+      checkoutId: "c-fix",
+      workspaceId: 7,
+      sessionId: "session-before-restart",
+      profileSnapshot: { name: "Terminal" },
+      checkoutSnapshot: { branch: "main", path: "/projects/app-fix" }
+    }
+  ]
+  assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
+  assert.match(model.barContext(7, snapshot).detail, /Tools unconfirmed/)
+  snapshot.environments = []
+  snapshot.bindings = [verifiedBinding({ workspaceId: 7 })]
+  assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
+  for (const overrides of [
+    { sessionId: "session-old" },
+    { pid: 0 },
+    { address: "0x0" },
+    { projectId: "other" },
+    { checkoutId: "c-main" },
+    { workspaceId: 3 },
+    { evidence: { processVerified: false, mode: "title" } }
+  ]) {
+    snapshot.bindings = [verifiedBinding({ workspaceId: 7, ...overrides })]
+    assert.equal(model.barContext(7, snapshot), null, JSON.stringify(overrides))
+  }
+  snapshot.bindings = [verifiedBinding({ workspaceId: 7 })]
+  snapshot.availability.compositor = false
+  assert.equal(model.barContext(7, snapshot), null)
+})
+
 test("bar context inspects the workspace checkout rather than the last visited worktree", () => {
   const snapshot = projectSnapshot()
+  snapshot.bindings = [verifiedBinding({ workspaceId: 7 })]
   assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
   assert.equal(model.barContext(7, snapshot).label, "App")
   assert.match(model.barContext(7, snapshot).detail, /fix/)
@@ -27,6 +64,7 @@ test("bar title stays compact while tooltip retains the launch-time branch once"
       checkoutSnapshot: { branch: "main", path: "/projects/app-fix" }
     }
   ]
+  snapshot.bindings = [verifiedBinding({ workspaceId: 7, environmentId: "e-work" })]
   const context = model.barContext(7, snapshot)
   assert.equal(context.label, "App")
   assert.match(context.detail, /main at launch/)
@@ -37,6 +75,10 @@ test("bar title stays compact while tooltip retains the launch-time branch once"
 
 test("bar context refuses ambiguous workspace ownership and deleted checkouts", () => {
   const snapshot = projectSnapshot()
+  snapshot.bindings = [
+    verifiedBinding({ workspaceId: 7 }),
+    verifiedBinding({ checkoutId: "c-main", workspaceId: 7 })
+  ]
   snapshot.projects[0].associations.push({
     checkoutId: "c-main",
     mode: "dedicated",

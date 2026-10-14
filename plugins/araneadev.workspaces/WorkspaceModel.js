@@ -736,13 +736,14 @@ function workspaceLabel(row) {
   return "Workspace " + name
 }
 
-/** Resolve a unique registered checkout for the bar's inspection shortcut.
+/** Resolve a unique observed checkout for the bar's inspection shortcut.
  * @param {number} workspaceId - focused workspace identity
  * @param {*} snapshot - read-only project owner projection
  * @returns {*} unique context or null for missing/ambiguous associations
  */
 function barContext(workspaceId, snapshot) {
   if (!snapshot || !Array.isArray(snapshot.projects)) return null
+  if (snapshot.availability && snapshot.availability.compositor === false) return null
   /** @type {Array<*>} */
   var candidates = []
   snapshot.projects.forEach(function (/** @type {*} */ project) {
@@ -764,6 +765,27 @@ function barContext(workspaceId, snapshot) {
       })
       var context = projectContext(workspaceId, scoped)
       if (!context) return
+      // A launched environment retains workspace context across owner restarts.
+      // A bare saved assignment still needs observed tools. Neither grants ownership.
+      var observed = (snapshot.bindings || []).some(function (/** @type {*} */ binding) {
+        return (
+          binding &&
+          binding.projectId === project.id &&
+          binding.checkoutId === checkout.id &&
+          binding.workspaceId === Number(workspaceId) &&
+          !!snapshot.sessionId &&
+          binding.sessionId === snapshot.sessionId &&
+          binding.pid > 0 &&
+          typeof binding.address === "string" &&
+          /^0x[0-9a-fA-F]+$/.test(binding.address) &&
+          !/^0x0+$/.test(binding.address) &&
+          binding.evidence &&
+          binding.evidence.processVerified === true &&
+          ["process-only", "process-app-id"].indexOf(binding.evidence.mode) >= 0 &&
+          (!context.environmentId || binding.environmentId === context.environmentId)
+        )
+      })
+      if (!observed && !context.environmentId) return
       context.label = String(project.name || project.id)
       if (!context.environmentId && checkout.branch)
         context.detail = "Registered branch: " + checkout.branch + "\n" + context.detail

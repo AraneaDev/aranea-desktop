@@ -54,11 +54,13 @@ components draw that treatment; hosts own cursor identity and activation.
 Dropdowns, modal cards, pickers, Projects, Settings, notifications, and OSD use a
 spring from 94% scale to full size. Opacity remains monotonic: 220 ms on opening
 and 120 ms on closing. Hover and selection feedback takes 120 ms. The permanent
-bar and lock screen do not spring.
+bar and lock screen do not spring; the workspace selection filament slides
+between fixed button positions.
 
 The launcher reveals identity, then tiles, then results. Artwork moves while
 hit targets remain stationary. Its spider stays fixed inside moving bezel
-accents. Reading surfaces keep ambient edge sweeps off; explicitly enabled sweeps
+accents. Two thin halo layers turn at different speeds around that fixed mark.
+Reading surfaces keep ambient edge sweeps off; explicitly enabled sweeps
 stop when the window is hidden or motion is disabled.
 
 `SurfaceMotion` and `SpringValue` preserve the current presentation when a

@@ -105,6 +105,23 @@ ShellRoot {
       ],
       bindings: []
     }
+    t.check(!widget.activeProjectContext, 'saved workspace assignment alone does not label a manually started terminal')
+    widget.projectClient.snapshot = Object.assign({}, widget.projectClient.snapshot, {
+      bindings: [
+        {
+          projectId: 'p-app',
+          checkoutId: 'c-main',
+          workspaceId: 1,
+          sessionId: 'session',
+          pid: 123,
+          address: '0xabc',
+          evidence: {
+            processVerified: true,
+            mode: 'process-app-id'
+          }
+        }
+      ]
+    })
     t.check(!!widget.activeProjectContext, 'closed overview still exposes focused project context')
     var contextButton = t.findChild(widget, 'workspaceProjectContext')
     t.check(!!contextButton && contextButton.visible, 'horizontal bar shows the current project')

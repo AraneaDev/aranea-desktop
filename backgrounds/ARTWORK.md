@@ -2,7 +2,7 @@
 
 ## Cyberpunk collection
 
-Thirteen wallpapers have distinct subjects,
+Fifteen wallpapers have distinct subjects,
 compositions and moods, united by obsidian, mint #3bff9e and violet #7a5cff.
 Aranea Core and Signal Shrine use the canonical Aranea spider mark as an image
 reference. The other scenes were generated without image references.
@@ -12,7 +12,7 @@ The Aranea spider marks remain unchanged.
 
 Generated with the built-in OpenAI imagegen tool. Unmodified outputs and
 embedded provenance are retained in `sources/`; the picker uses delivery files.
-The twelve 16:9 sources are 1672×941; ultrawide is 2172×724. Delivery sizes are
+The fourteen 16:9 sources are 1672×941; ultrawide is 2172×724. Delivery sizes are
 3840×2160 and 3840×1280, resampled with Lanczos rather than native 4K detail.
 No crop, retouching or sharpening was applied after generation. Stable IDs and paths
 preserve existing wallpaper selections and schedules. Human-facing titles come
@@ -33,6 +33,8 @@ from each manifest entry’s `label`, independently of its stable ID.
 | signal-shrine  | Signal Shrine: rain-soaked illuminated spider shrine                     | `variants/signal-shrine.png`  |
 | violet-pursuit | Violet Pursuit: motorcycle on a neon expressway                          | `variants/violet-pursuit.png` |
 | deep-current   | Deep Current: submerged data facility                                    | `variants/deep-current.png`   |
+| canopy-circuit | Canopy Circuit: suspended botanical habitat                              | `variants/canopy-circuit.png` |
+| polar-freight  | Polar Freight: autonomous vessel crossing fractured polar sea ice        | `variants/polar-freight.png`  |
 
 Preview: [collection contact sheet](../screenshots/cockpit-wallpapers.jpg).
 
@@ -41,7 +43,7 @@ Preview: [collection contact sheet](../screenshots/cockpit-wallpapers.jpg).
 Run from the repository root with ImageMagick:
 
 ```bash
-for id in cockpit day night dawn dusk sparse dense monochrome ultrawide aranea-core signal-shrine violet-pursuit deep-current; do
+for id in cockpit day night dawn dusk sparse dense monochrome ultrawide aranea-core signal-shrine violet-pursuit deep-current canopy-circuit polar-freight; do
   case "$id" in
     day|night) destination="backgrounds/background-$id.png" ;;
     *) destination="backgrounds/variants/$id.png" ;;
@@ -114,6 +116,14 @@ Use case: stylized-concept. Final Aranea desktop wallpaper, full-bleed wide 16:9
 ### Deep Current (`deep-current`)
 
 Use case: stylized-concept. Final Aranea desktop wallpaper, full-bleed wide 16:9 landscape, highest available resolution. Premium cinematic cyberpunk concept art, rich physical materials, atmospheric depth, sophisticated bloom and composition. Palette: obsidian #08090b, graphite and cool silver neutrals, luminous mint #3bff9e and violet #7a5cff. No orange, yellow, red or pink lighting. Keep naturally integrated darker areas for desktop windows and a subdued top-bar region. No readable text, letters, numbers, watermark, fake UI, collage or surrounding frame. A submerged cyberpunk data facility beneath a dark ocean, viewed from outside through shadowed water. Huge low glass capsules and vertical graphite server pylons rest on the seafloor, connected by flowing bundles of luminous mint fiber-optic cables. Dim violet security lights reveal geometric silhouettes through silt and drifting bubbles; mint reflections ripple in the glass. A small uncrewed maintenance drone provides scale deep in the scene. Immense dark water occupies the upper two thirds; detailed foreground rock and precise industrial architecture concentrate along the bottom. No bright blue ocean, no tropical water, no sunlight, no people, no biological creatures, no logos, no readable labels, no central giant portal. Serene ominous underwater environment with slow flowing curves, entirely different from above-ground city and corridor scenes.
+
+### Canopy Circuit (`canopy-circuit`)
+
+Use case: stylized-concept. Asset type: dark 16:9 Linux desktop wallpaper titled Canopy Circuit. Create cinematic high detail concept art of a suspended botanical habitat inside a vast obsidian megastructure: sculptural hanging gardens, cascading delicate ferns and glass cultivation pods suspended by fine structural cables, mist drifting through immense dark architectural space. Organic silhouettes and physical brushed metal, believable restrained engineering. Asymmetric wide composition with the garden clustered in the lower right and distant small suspended platforms giving scale; upper quarter and central left remain naturally dark spacious atmosphere for desktop panels. Palette overwhelmingly near black obsidian #08090b with restrained mint green #3bff9e grow-light accents and subtle violet #7a5cff reflected haze. Beautiful understated luminous foliage, deep shadow, no bright white expanses. Wide landscape 16:9, highest available resolution. No people, no city skyline, no server room, no corridor, no lettering, logos, UI, watermark or spider symbol.
+
+### Polar Freight (`polar-freight`)
+
+Use case: stylized-concept. Asset type: dark 16:9 Linux desktop wallpaper titled Polar Freight. Cinematic exceptionally detailed physical science-fiction environment: one vast uncrewed graphite-black industrial cargo vessel crossing fractured polar sea ice at night, seen from a high distant three-quarter aerial viewpoint. Sculptural low angular hull, containers and precise deck cranes, sparse thin mint navigation lights and subtle violet deck illumination. The vessel sits across lower right third, a narrow dark open-water wake recedes through irregular fractured charcoal ice floes. An expansive almost-black sky and distant low fog over the frozen sea provide readable negative space in upper half and left. Ice is dark steel grey under nocturnal illumination, with restrained mint edge reflections and violet haze, not bright white snow. Palette obsidian #08090b, cool graphite metal, tiny mint #3bff9e accents and violet #7a5cff. Majestic solitude, tangible ice texture, restrained cinematic light, realistic scale, wide landscape 16:9 highest available resolution. No people, buildings, city, underwater facility, motorcycles, logos, text, numbers, screens, UI, borders or watermark. No daylight or warm orange/pink light.
 
 ## Native vector assets
 
