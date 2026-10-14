@@ -17,6 +17,7 @@
     "plugins/araneadev.health/HealthBridge.js",
     "plugins/araneadev.notifications/ServiceBridge.js",
     "plugins/araneadev.projects/AgentSuggestion.js",
+    "plugins/araneadev.projects/ProjectOverview.js",
     "node_modules"
   ]
 }

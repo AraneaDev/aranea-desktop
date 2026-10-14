@@ -11,6 +11,19 @@ project selector. The window keeps the selected project when reopened. With no s
 a welcome card explains the next steps. Add project starts setup; development
 folder management lives under Preferences, and Help covers projects, actions, and agents. Closing the window retains drafts and accepted operations.
 
+Overview leads with Git state for the selected checkout: separate file counts,
+local-ref ahead/behind, and expandable changes. Services and checks, reported
+agent activity, and workspace observations stay together below it. Run, Stop,
+Open preview, View output, Answer, and Review use the existing action and activity
+clients; refreshing Overview never starts a command. A command result describes
+its recorded run, and agent verification remains explicitly reported.
+
+Visible Overview refreshes protected action runs in bounded rotation without
+changing the selected output or accepted receipt. Details exposes older runs,
+configuration, and recovery. Saved workspace locations without current owner
+bindings remain unconfirmed. **Open workspace** retains ordinary Open behavior
+and may launch missing tools; it does not promise environment restoration.
+
 ## Commands and installation
 
 From a checkout, run `./scripts/aranea`. After `scripts/install.sh`, run

@@ -51,7 +51,9 @@ ColumnLayout {
     return d.id === editor.draft.id
   })[0] || null
   // Production client transport is replaceable by isolated fixtures.
-  property alias client: client
+  property var sharedClient: null
+  // Public fixture contract resolves to the persistent observer when injected.
+  readonly property Projects.ProjectActionsClient client: sharedClient || fallbackClient
   // Presentation-only editor contract used by capture and behavior tests.
   property alias editor: editor
   // Exact lookup refuses missing selected checkout instead of falling back.
@@ -59,31 +61,36 @@ ColumnLayout {
     return c.id === project.lastCheckoutId
   })[0] || null : null
   // Backend projections preserve all opaque IDs and approved revisions.
-  readonly property var definitions: Records.definitions(client.snapshot, project ? project.id : '')
+  readonly property var definitions: Records.definitions(actions.client.snapshot, project ? project.id : '')
   // Runs are scoped to exactly the selected checkout.
-  readonly property var runs: checkout ? Records.runs(client.snapshot, project.id, checkout.id) : []
+  readonly property var runs: checkout ? Records.runs(actions.client.snapshot, project.id, checkout.id) : []
   // Current selected saved definition, separate from accepted immutable runs.
   readonly property var selectedAction: definitions.filter(function (d) {
     return d.id === selectedActionId
   })[0] || null
   // Live native execution availability is separate from editable configuration.
-  readonly property bool executionAvailable: client.availability.execution === true
+  readonly property bool executionAvailable: actions.client.availability.execution === true
   // Capture admission must refuse an in-flight mutation or accepted submission.
-  readonly property bool pending: client.pending
+  readonly property bool pending: actions.client.pending
   Projects.ProjectActionsClient {
-    id: client
-    captureActive: actions.displayOnly
+    id: fallbackClient
+    captureActive: actions.displayOnly || !!actions.sharedClient
     projectId: actions.project ? actions.project.id : ''
     checkoutId: actions.checkout ? actions.checkout.id : ''
-    observationActive: actions.active && actions.visible && !actions.displayOnly
-    onSnapshotChanged: if (actions.conflictRefreshPending) {
-      actions.conflictRefreshPending = false
-      actions.conflictRefreshed = true
-      actions.conflictRevision = snapshot.revision
-    } else if (actions.conflictRefreshed && snapshot.revision !== actions.conflictRevision) {
-      actions.conflictRefreshed = false
+    observationActive: !actions.sharedClient && actions.active && actions.visible && !actions.displayOnly
+  }
+  Connections {
+    target: actions.client
+    function onSnapshotChanged() {
+      if (actions.conflictRefreshPending) {
+        actions.conflictRefreshPending = false
+        actions.conflictRefreshed = true
+        actions.conflictRevision = actions.client.snapshot.revision
+      } else if (actions.conflictRefreshed && actions.client.snapshot.revision !== actions.conflictRevision) {
+        actions.conflictRefreshed = false
+      }
     }
-    onRequestFinished: function (response) {
+    function onRequestFinished(response) {
       if (actions.saving) {
         actions.saving = false
         if (response && response.ok) {
@@ -156,30 +163,30 @@ ColumnLayout {
     var identity = run ? [run.projectId, run.checkoutId, run.id, run.definitionRevision, run.definitionHash].join('|') : ''
     var pressed = pressedRunIdentity
     pressedRunIdentity = ''
-    if (displayOnly || client.captureActive || client.pending || !run || !project || !checkout || run.projectId !== project.id || run.checkoutId !== checkout.id || pointer && pressed !== identity)
+    if (displayOnly || actions.client.captureActive || actions.client.pending || !run || !project || !checkout || run.projectId !== project.id || run.checkoutId !== checkout.id || pointer && pressed !== identity)
       return
-    client.observeRun(run.id)
+    actions.client.observeRun(run.id)
   }
   // Shared client submits only displayed approved revision for this exact checkout.
   function startAction(id: string, revision: int): void {
-    if (displayOnly || client.captureActive || !checkout || !findAction(id, revision) || !executionAvailable || client.pending || client.submissionUncertain)
+    if (displayOnly || actions.client.captureActive || !checkout || !findAction(id, revision) || !executionAvailable || actions.client.pending || actions.client.submissionUncertain)
       return
-    client.start(id, revision)
+    actions.client.start(id, revision)
   }
   // Read only after binding capture, exact selection and view activity.
   function refresh(): void {
-    if (displayOnly || client.captureActive || !active || !visible || !project)
+    if (displayOnly || actions.client.captureActive || !active || !visible || !project)
       return
     if (editConflict)
       conflictRefreshPending = true
-    client.refresh()
-    client.checkAvailability()
+    actions.client.refresh()
+    actions.client.checkAvailability()
   }
   // Explicit creation opens a local draft, with no backend or execution request.
   function addAction(): void {
-    if (displayOnly || client.pending)
+    if (displayOnly || actions.client.pending)
       return
-    editor.begin(null, client.snapshot.revision)
+    editor.begin(null, actions.client.snapshot.revision)
     draftProjectId = project ? project.id : ''
     editConflict = false
     conflictRefreshed = false
@@ -188,9 +195,9 @@ ColumnLayout {
   // Edit only a stable displayed definition; retain its original store revision.
   function editAction(id: string, revision: int): void {
     var definition = findAction(id, revision)
-    if (displayOnly || client.pending || !definition)
+    if (displayOnly || actions.client.pending || !definition)
       return
-    editor.begin(definition, client.snapshot.revision)
+    editor.begin(definition, actions.client.snapshot.revision)
     draftProjectId = project.id
     editConflict = false
     conflictRefreshed = false
@@ -198,22 +205,22 @@ ColumnLayout {
   }
   // User deliberately approves the retained draft over the freshly displayed state.
   function saveOverLatest(): void {
-    if (displayOnly || client.captureActive || client.pending || !editConflict || !conflictRefreshed || !project || draftProjectId !== project.id || (editor.draft.id && !conflictDefinition))
+    if (displayOnly || actions.client.captureActive || actions.client.pending || !editConflict || !conflictRefreshed || !project || draftProjectId !== project.id || (editor.draft.id && !conflictDefinition))
       return
     editor.fieldError = editor.validate()
     if (editor.fieldError)
       return
     saving = true
-    if (!client.configure(editor.definition(), conflictRevision))
+    if (!actions.client.configure(editor.definition(), conflictRevision))
       saving = false
   }
   // Refuse removal locally for every checkout's protected evidence; backend rechecks.
   function removeAction(id: string, revision: int): void {
-    if (displayOnly || client.pending || !findAction(id, revision) || Records.runs(client.snapshot, project.id, '').some(function (r) {
+    if (displayOnly || actions.client.pending || !findAction(id, revision) || Records.runs(actions.client.snapshot, project.id, '').some(function (r) {
       return r.actionId === id && Records.protectedRun(r)
     }))
       return
-    client.remove(id, client.snapshot.revision)
+    actions.client.remove(id, actions.client.snapshot.revision)
   }
   // Presentation capture includes local observations, never serializes transport callbacks.
   function captureSnapshot(): var {
@@ -227,17 +234,17 @@ ColumnLayout {
       conflictRevision: conflictRevision,
       draftProjectId: draftProjectId,
       editor: editor.captureSnapshot(),
-      snapshot: client.snapshot,
-      currentRun: client.currentRun,
-      runId: client.runId,
-      requestId: client.requestId,
-      submissionUncertain: client.submissionUncertain,
-      submissionTarget: client.submissionTarget,
-      availability: client.availability,
-      available: client.available,
-      error: client.error,
-      output: client.output,
-      truncated: client.truncated
+      snapshot: sharedClient ? undefined : actions.client.snapshot,
+      currentRun: actions.client.currentRun,
+      runId: actions.client.runId,
+      requestId: actions.client.requestId,
+      submissionUncertain: actions.client.submissionUncertain,
+      submissionTarget: actions.client.submissionTarget,
+      availability: actions.client.availability,
+      available: actions.client.available,
+      error: actions.client.error,
+      output: actions.client.output,
+      truncated: actions.client.truncated
     }
   }
   // Restore observations/drafts without executing, reading or canceling native work.
@@ -254,38 +261,40 @@ ColumnLayout {
     conflictRevision = saved.conflictRevision || 0
     draftProjectId = saved.draftProjectId || (project ? project.id : '')
     editor.captureRestore(saved.editor)
-    client.snapshot = saved.snapshot || {
+    if (sharedClient)
+      return
+    actions.client.snapshot = saved.snapshot || {
       revision: 0,
       definitions: [],
       runs: [],
       requests: []
     }
-    client.currentRun = saved.currentRun || null
-    client.runId = saved.runId || ''
-    client.requestId = saved.requestId || ''
-    client.submissionUncertain = saved.submissionUncertain === true
-    client.submissionTarget = saved.submissionTarget || null
-    client.availability = saved.availability || {}
-    client.available = saved.available === true
-    client.error = saved.error || null
-    client.output = saved.output || ''
-    client.truncated = saved.truncated === true
+    actions.client.currentRun = saved.currentRun || null
+    actions.client.runId = saved.runId || ''
+    actions.client.requestId = saved.requestId || ''
+    actions.client.submissionUncertain = saved.submissionUncertain === true
+    actions.client.submissionTarget = saved.submissionTarget || null
+    actions.client.availability = saved.availability || {}
+    actions.client.available = saved.available === true
+    actions.client.error = saved.error || null
+    actions.client.output = saved.output || ''
+    actions.client.truncated = saved.truncated === true
   }
   // Isolated capture fixture uses this same production content and client state.
   function captureReset(fixture: var): void {
     captureRestore(fixture && fixture.projectActions ? fixture.projectActions : {})
     if (!fixture || !fixture.projectActions || !fixture.projectActions.editor)
-      editor.begin(null, client.snapshot.revision)
+      editor.begin(null, actions.client.snapshot.revision)
   }
   // Captures cannot queue a read that executes after capture restoration.
   function scheduleRefresh(): void {
-    if (displayOnly || client.captureActive || !active || !visible || !project)
+    if (sharedClient || displayOnly || actions.client.captureActive || !active || !visible || !project)
       return
-    var token = client.generation
+    var token = actions.client.generation
     var projectId = project.id
     var checkoutId = checkout ? checkout.id : ''
     Qt.callLater(function () {
-      if (token === client.generation && actions.project && actions.project.id === projectId && (actions.checkout ? actions.checkout.id : '') === checkoutId)
+      if (!actions.sharedClient && token === actions.client.generation && actions.project && actions.project.id === projectId && (actions.checkout ? actions.checkout.id : '') === checkoutId)
         actions.refresh()
     })
   }
@@ -320,7 +329,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: 'Checkout: ' + (actions.checkout ? actions.checkout.path + ' · ' + actions.checkout.id : 'Selected checkout unavailable. Locate it before running.')
+    text: 'Checkout: ' + (actions.checkout ? actions.checkout.path : 'Selected checkout unavailable. Locate it before running.')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
@@ -332,15 +341,15 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    visible: client.submissionUncertain
+    visible: actions.client.submissionUncertain
     text: 'Submission unconfirmed. Refresh to recover the exact receipt. Do not submit another run.'
     color: Aranea.DesignTokens.attention
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    visible: !!client.error
-    text: client.error ? (client.error.message || client.error.code) + (client.error.recovery ? ' ' + client.error.recovery : '') : ''
+    visible: !!actions.client.error
+    text: actions.client.error ? (actions.client.error.message || actions.client.error.code) + (actions.client.error.recovery ? ' ' + actions.client.error.recovery : '') : ''
     color: Aranea.DesignTokens.attention
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
@@ -349,13 +358,13 @@ ColumnLayout {
     spacing: Style.space(8)
     Aranea.ActionButton {
       text: 'Refresh actions'
-      enabled: !actions.displayOnly && !client.pending
+      enabled: !actions.displayOnly && !actions.client.pending
       pointerGate: actions.pointerGate
       onClicked: actions.refresh()
     }
     Aranea.ActionButton {
       text: 'Add action'
-      enabled: !actions.displayOnly && !client.pending
+      enabled: !actions.displayOnly && !actions.client.pending
       pointerGate: actions.pointerGate
       onClicked: actions.addAction()
     }
@@ -404,7 +413,7 @@ ColumnLayout {
         Aranea.ActionButton {
           objectName: 'actionStart:' + action.modelData.id
           text: action.modelData.kind === 'service' ? 'Start' : 'Run'
-          enabled: !actions.displayOnly && actions.executionAvailable && !!actions.checkout && !client.pending && !client.submissionUncertain && !Records.activeRun(client.snapshot, actions.project.id, actions.checkout.id, action.modelData.id)
+          enabled: !actions.displayOnly && actions.executionAvailable && !!actions.checkout && !actions.client.pending && !actions.client.submissionUncertain && !Records.activeRun(actions.client.snapshot, actions.project.id, actions.checkout.id, action.modelData.id)
           pointerGate: actions.pointerGate
           onPressed: actions.rememberAction(action.modelData.id, action.modelData.revision)
           onPressCanceled: actions.pressedIdentity = ''
@@ -418,7 +427,7 @@ ColumnLayout {
         Aranea.ActionButton {
           objectName: 'actionEdit:' + action.modelData.id
           text: 'Edit'
-          enabled: !actions.displayOnly && !client.pending
+          enabled: !actions.displayOnly && !actions.client.pending
           pointerGate: actions.pointerGate
           onPressed: actions.rememberAction(action.modelData.id, action.modelData.revision)
           onPressCanceled: actions.pressedIdentity = ''
@@ -432,7 +441,7 @@ ColumnLayout {
         Aranea.ActionButton {
           objectName: 'actionRemove:' + action.modelData.id
           text: 'Remove action'
-          enabled: !actions.displayOnly && !client.pending && !Records.runs(client.snapshot, actions.project.id, '').some(function (r) {
+          enabled: !actions.displayOnly && !actions.client.pending && !Records.runs(actions.client.snapshot, actions.project.id, '').some(function (r) {
             return r.actionId === action.modelData.id && Records.protectedRun(r)
           })
           pointerGate: actions.pointerGate
@@ -453,12 +462,12 @@ ColumnLayout {
     Layout.fillWidth: true
     visible: actions.editing
     displayOnly: actions.displayOnly
-    pending: client.pending
+    pending: actions.client.pending
     pointerGate: actions.pointerGate
     onSaveRequested: function (definition, revision) {
-      if (!actions.displayOnly && !client.captureActive && actions.project && actions.draftProjectId === actions.project.id) {
+      if (!actions.displayOnly && !actions.client.captureActive && actions.project && actions.draftProjectId === actions.project.id) {
         actions.saving = true
-        if (!client.configure(definition, revision))
+        if (!actions.client.configure(definition, revision))
           actions.saving = false
       }
     }
@@ -482,7 +491,7 @@ ColumnLayout {
     }
     Aranea.ActionButton {
       text: 'Save draft over latest'
-      enabled: !actions.displayOnly && !client.pending && actions.conflictRefreshed && (!editor.draft.id || !!actions.conflictDefinition)
+      enabled: !actions.displayOnly && !actions.client.pending && actions.conflictRefreshed && (!editor.draft.id || !!actions.conflictDefinition)
       pointerGate: actions.pointerGate
       onClicked: actions.saveOverLatest()
     }
@@ -499,8 +508,8 @@ ColumnLayout {
       required property var modelData
       text: (modelData.definitionSnapshot ? modelData.definitionSnapshot.name : modelData.id) + ' · ' + Records.runLabel(modelData)
       Layout.fillWidth: true
-      selected: client.currentRun && client.currentRun.id === modelData.id
-      enabled: !actions.displayOnly && !client.pending
+      selected: actions.client.currentRun && actions.client.currentRun.id === modelData.id
+      enabled: !actions.displayOnly && !actions.client.pending
       pointerGate: actions.pointerGate
       onPressed: actions.pressedRunIdentity = [modelData.projectId, modelData.checkoutId, modelData.id, modelData.definitionRevision, modelData.definitionHash].join('|')
       onPressCanceled: actions.pressedRunIdentity = ''
@@ -509,8 +518,8 @@ ColumnLayout {
   }
   ProjectRunDetails {
     Layout.fillWidth: true
-    client: client
-    run: client.currentRun
+    client: actions.client
+    run: actions.client.currentRun
     checkout: actions.checkout
     displayOnly: actions.displayOnly
     projectClient: actions.projectClient

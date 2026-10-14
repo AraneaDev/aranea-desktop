@@ -235,13 +235,9 @@ ShellRoot {
         }
       ]
     }
-    var column = t.findChild(details, 'projectAgentColumn'), start = t.findChild(details, 'newAgentSession')
-    t.check(!!column && column.visible, 'Overview renders the actual AGENT column')
-    t.equal(t.findChild(details, 'projectAgentLabel').text, 'Codex', 'AGENT column shows shared suggested provider')
-    t.equal(t.findChild(details, 'projectAgentReason').text, 'Suggested · 10% used', 'AGENT column explains shared suggestion')
-    t.check(!!start && start.visible && start.enabled, 'Overview renders enabled New agent session button')
+    t.check(!t.findChild(details, 'projectAgentColumn'), 'legacy workspace card is replaced by the shared Git-led Overview')
     var before = opens.length
-    start.activate()
+    details.startAgent('')
     t.equal(opens[before], {
       projectId: 'p-one',
       roles: ['agent'],
@@ -249,19 +245,15 @@ ShellRoot {
       agentId: 'codex'
     }, 'New agent session button starts suggested provider only')
     details.pending = true
-    t.check(!start.enabled, 'pending disables agent button')
     details.startAgent('claude')
     details.pending = false
     details.openAvailable = false
-    t.check(!start.enabled, 'unavailable owner disables agent button')
     details.startAgent('claude')
     details.openAvailable = true
     details.displayOnly = true
     details.startAgent('claude')
     details.displayOnly = false
     details.agentChoice = null
-    t.check(!start.enabled, 'null choice disables agent button without runtime errors')
-    t.equal(t.findChild(details, 'projectAgentLabel').text, 'Not installed', 'null choice renders installation state')
     details.startAgent('')
     t.equal(opens.length, before + 1, 'blocked starts submit nothing')
     details.agentChoice = {

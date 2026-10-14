@@ -20,6 +20,18 @@ ColumnLayout {
   signal checkoutRequested(string projectId, string checkoutId)
   // Current saved project identity; this view never changes registration.
   property var project: null
+  // Exact selected Git observation overrides registry branch labels only for its pair.
+  property var git: null
+  // Cached branch observations remain explicitly marked when old or failed.
+  property bool gitStale: false
+  // Branch identity comes from Git when available; registry metadata is labelled.
+  readonly property string branchText: {
+    if (!checkout)
+      return 'None'
+    if (git && project && git.projectId === project.id && git.checkoutId === checkout.id)
+      return (git.detached ? 'detached HEAD' : git.branch || 'unavailable') + (gitStale ? ' (last observed)' : '')
+    return (checkout.branch || 'detached') + ' (registered)'
+  }
   // Observed workspace bindings supplied by the persistent owner.
   property var bindings: []
   // Whether the live owner can open workspace tools.
@@ -234,7 +246,7 @@ ColumnLayout {
     Aranea.ActionButton {
       objectName: 'headerChooseCheckout'
       Layout.fillWidth: true
-      text: 'Checkout · ' + (header.checkout ? header.checkout.branch || 'detached' : 'None')
+      text: 'Checkout · ' + header.branchText
       enabled: !header.displayOnly && !header.pending && header.navigationEnabled && !!header.project && header.project.checkouts.length > 0
       pointerGate: header.pointerGate
       onClicked: checkoutPicker.open()
@@ -265,7 +277,7 @@ ColumnLayout {
     Aranea.UiLabel {
       objectName: 'projectBranch'
       width: Math.min(implicitWidth, header.width)
-      text: header.checkout ? 'Branch · ' + (header.checkout.branch || 'detached') : ''
+      text: header.checkout ? 'Branch · ' + header.branchText : ''
       opacity: 0.8
     }
     Aranea.UiLabel {

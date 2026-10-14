@@ -47,6 +47,17 @@ Item {
   property bool truncated: false
   // Only visible consumers explicitly enable native observation of retained runs.
   property bool observationActive: false
+  // Only the visible Overview may schedule background native observations.
+  property bool summaryObservationActive: false
+  // Physical summary slot remains occupied until even an invalidated callback ends.
+  property var summaryRead: null
+  // Selection/capture/visibility epochs invalidate publication, never receipts.
+  property int summaryGeneration: 0
+  // One protected run per pass rotates through exact-checkout observations.
+  property int summaryCursor: 0
+  // Background failures never overwrite an explicit action's error or receipt.
+  property var summaryError: null
+  onSummaryObservationActiveChanged: summaryGeneration++
   // Two-second presentation poll, active only for visible protected runs.
   property int pollInterval: 2000
   // Submission identity is independent of all read freshness generations.
@@ -135,6 +146,7 @@ Item {
 
   // Stop presentation observation only. Accepted native services are untouched.
   function disconnect(): void {
+    summaryGeneration++
     generation++
     snapshotGeneration++
     runGeneration++
@@ -147,6 +159,9 @@ Item {
   }
   // Invalidate selected readbacks while keeping accepted receipt identity.
   function selectionChanged(): void {
+    summaryGeneration++
+    summaryCursor = 0
+    summaryError = null
     snapshotGeneration++
     runGeneration++
     if (!submitting)
@@ -319,6 +334,7 @@ Item {
   function submit(method: string, payload: var, target: var): bool {
     if (captureActive || pending || submissionUncertain)
       return false
+    summaryGeneration++
     poll.stop()
     pending = true
     submitting = true
@@ -467,6 +483,7 @@ Item {
   function runCommand(method: string, id: string): bool {
     if (captureActive || pending || !id)
       return false
+    summaryGeneration++
     poll.stop()
     pending = true
     var read = ++runGeneration
@@ -498,6 +515,68 @@ Item {
       requestFinished(response)
       schedulePoll()
     })
+    return true
+  }
+  // Observe one retained summary without changing the selected run.
+  function observeSummary(): bool {
+    if (captureActive || !summaryObservationActive || summaryRead || pending || !projectId || !checkoutId)
+      return false
+    var runs = Records.runs(snapshot, projectId, checkoutId).filter(function (run) {
+      return Records.protectedRun(run) && !(client.observationActive && client.visible && client.matchesSelection(client.currentRun) && Records.protectedRun(client.currentRun) && client.currentRun.id === run.id)
+    })
+    if (!runs.length)
+      return false
+    var run = runs[summaryCursor % runs.length]
+    summaryCursor++
+    var read = {
+      generation: summaryGeneration,
+      snapshotGeneration: snapshotGeneration,
+      projectId: projectId,
+      checkoutId: checkoutId,
+      run: run
+    }
+    summaryRead = read
+    var complete = function (code, text, diagnostics) {
+      if (client.summaryRead !== read)
+        return
+      client.summaryRead = null
+      if (client.captureActive || !client.summaryObservationActive || read.generation !== client.summaryGeneration || read.projectId !== client.projectId || read.checkoutId !== client.checkoutId || read.snapshotGeneration !== client.snapshotGeneration)
+        return
+      var response = null
+      try {
+        response = JSON.parse(text)
+      } catch (e) {}
+      if (!response || typeof response.ok !== 'boolean' || !Object.prototype.hasOwnProperty.call(response, 'error')) {
+        client.summaryError = {
+          message: 'Service observation unavailable. Manage actions to retry.'
+        }
+        return
+      }
+      var observed = response.run
+      var valid = client.validRunIdentity(observed) && observed.id === read.run.id && observed.projectId === read.projectId && observed.checkoutId === read.checkoutId && observed.actionId === read.run.actionId && observed.definitionRevision === read.run.definitionRevision && observed.definitionHash === read.run.definitionHash
+      var state = response.state
+      if (!valid || !state || typeof state.revision !== 'number' || !isFinite(state.revision) || !Array.isArray(state.runs) || !state.runs.some(function (row) {
+        return client.validRunIdentity(row) && row.actionId === observed.actionId && row.requestId === observed.requestId && row.id === observed.id && row.projectId === observed.projectId && row.checkoutId === observed.checkoutId && row.definitionRevision === observed.definitionRevision && row.definitionHash === observed.definitionHash
+      })) {
+        client.summaryError = response.error || {
+          message: 'Service observation did not match this checkout. Manage actions to retry.'
+        }
+        return
+      }
+      if (state.revision < client.snapshot.revision)
+        return
+      client.summaryError = response.error
+      client.snapshotGeneration++
+      client.snapshot = state
+      client.changed()
+    }
+    try {
+      runner([backendPath, 'refresh'], JSON.stringify({
+        runId: run.id
+      }), complete)
+    } catch (e) {
+      complete(-1, '', String(e))
+    }
     return true
   }
   // Visible polling observes protected intent without resubmission.

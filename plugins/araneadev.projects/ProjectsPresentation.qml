@@ -94,6 +94,32 @@ Item {
       return checkout.id === root.selectedProject.lastCheckoutId
     }) ? root.selectedProject.lastCheckoutId : ''
   }
+  // One action observer shared by Overview and full Actions, including receipts.
+  property alias actionClient: actionClient
+  ProjectActionsClient {
+    id: actionClient
+    captureActive: root.inert
+    projectId: gitClient.projectId
+    checkoutId: gitClient.checkoutId
+    summaryObservationActive: root.opened && !!root.view && root.view.section === 'overview' && root.view.activityVisible && !root.inert
+    observationActive: root.opened && !!root.view && ['overview', 'actions'].indexOf(root.view.section) >= 0 && !root.inert
+  }
+  // Snapshot polling is read-only; native protected-run observation stays in the client.
+  Timer {
+    interval: 5000
+    running: actionClient.observationActive
+    triggeredOnStart: true
+    repeat: true
+    onTriggered: root.refreshActions()
+  }
+  // Explicit snapshot/capability refresh never starts a saved command.
+  function refreshActions() {
+    if (inert || !opened || !actionClient.projectId)
+      return
+    actionClient.refresh()
+    actionClient.checkAvailability()
+    actionClient.observeSummary()
+  }
   ProjectRegistryClient {
     id: projectController
     captureActive: root.inert
@@ -176,6 +202,39 @@ Item {
     triggeredOnStart: true
     onTriggered: activityClient.refresh()
   }
+  // Capture shared observations once, independently of a full Actions view.
+  function actionSnapshot() {
+    var saved = {};
+    ['snapshot', 'currentRun', 'runId', 'requestId', 'submissionUncertain', 'submissionTarget', 'availability', 'available', 'error', 'output', 'truncated', 'summaryError'].forEach(function (key) {
+      saved[key] = actionClient[key]
+    })
+    return saved
+  }
+  // Restore only passive state while capture guards all external boundaries.
+  function restoreActions(saved) {
+    var defaults = {
+      snapshot: {
+        revision: 0,
+        definitions: [],
+        runs: [],
+        requests: []
+      },
+      currentRun: null,
+      runId: '',
+      requestId: '',
+      submissionUncertain: false,
+      submissionTarget: null,
+      availability: {},
+      available: false,
+      error: null,
+      output: '',
+      truncated: false,
+      summaryError: null
+    }
+    Object.keys(defaults).forEach(function (key) {
+      actionClient[key] = saved && saved[key] !== undefined ? saved[key] : defaults[key]
+    })
+  }
   // Scoped inert capture state, with drafts restored to their exact identities.
   property var captureSaved: null
   // Serialize local presentation and observations without backend reads.
@@ -196,6 +255,7 @@ Item {
         clientError: projectClient.error,
         requestError: projectClient.requestError
       },
+      actions: actionSnapshot(),
       gitCache: gitClient.cache,
       activity: {
         snapshot: activityClient.snapshot,
@@ -207,7 +267,7 @@ Item {
   }
   // Validate and enter an inert transaction before changing any observation.
   function captureBegin(payloadJson) {
-    if (activityClient.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && view.captureBusy()))
+    if (actionClient.pending || activityClient.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && view.captureBusy()))
       return 'busy'
     var payload
     try {
@@ -223,6 +283,7 @@ Item {
     }
     projectId = Logic.normalizeProjectId(payload.projectId)
     var f = payload.fixture
+    restoreActions(f.projectActions || {})
     gitClient.cache = f.projectGitCache || {}
     activityClient.snapshot = f.activitySnapshot || {
       tasks: [],
@@ -279,6 +340,7 @@ Item {
     opened = saved.opened
     if (view && saved.ui)
       view.captureRestore(saved.ui)
+    restoreActions(saved.actions || {})
     captureSaved = null
     if (opened && focus)
       Qt.callLater(function () {

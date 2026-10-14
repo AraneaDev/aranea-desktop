@@ -50,6 +50,8 @@ ColumnLayout {
   property var pointerGate: null
   // Existing project focus authority, shared with exact-run controls.
   property var projectClient: null
+  // Persistent shared action observer; standalone hosts retain their inert fallback.
+  property var actionClient: null
   // The surrounding selected page enables visible-only observation.
   property bool actionsActive: false
   // Public presentation/client boundary for capture and isolated fixtures.
@@ -259,98 +261,6 @@ ColumnLayout {
       }
     }
   }
-  ProjectSectionCard {
-    Layout.fillWidth: true
-    visible: details.headerProvided && !details.guidedSetup && details.viewSection === 'overview'
-    Aranea.UiLabel {
-      text: 'Workspace'
-      font.pixelSize: Style.font.body
-      font.bold: true
-    }
-    Aranea.UiLabel {
-      Layout.fillWidth: true
-      text: 'Open your tools together. Existing project windows are reused when available.'
-      opacity: 0.75
-    }
-    GridLayout {
-      Layout.fillWidth: true
-      columns: width < Style.space(480) ? 1 : 3
-      columnSpacing: Style.space(24)
-      rowSpacing: Style.space(12)
-      Repeater {
-        model: ['editors', 'terminals']
-        ColumnLayout {
-          required property string modelData
-          Layout.fillWidth: true
-          Aranea.UiLabel {
-            text: parent.modelData === 'editors' ? 'EDITOR' : 'TERMINAL'
-            opacity: 0.55
-          }
-          Aranea.UiLabel {
-            Layout.fillWidth: true
-            text: {
-              var role = parent.modelData, id = details.project && details.project.tools ? details.project.tools[role === 'editors' ? 'editorId' : 'terminalId'] : ''
-              id = id || (details.tools.defaults || {})[role === 'editors' ? 'editorId' : 'terminalId']
-              var tool = (details.tools[role] || []).filter(function (t) {
-                return t.id === id
-              })[0]
-              return tool ? tool.label : id || 'Choose in Preferences'
-            }
-            font.pixelSize: Style.font.body
-          }
-        }
-      }
-      ColumnLayout {
-        objectName: 'projectAgentColumn'
-        Layout.fillWidth: true
-        Aranea.UiLabel {
-          text: 'AGENT'
-          opacity: 0.55
-        }
-        Aranea.UiLabel {
-          objectName: 'projectAgentLabel'
-          Layout.fillWidth: true
-          text: details.suggestedAgent ? details.suggestedAgent.label : 'Not installed'
-          font.pixelSize: Style.font.body
-        }
-        Aranea.UiLabel {
-          objectName: 'projectAgentReason'
-          Layout.fillWidth: true
-          text: details.suggestedAgent ? 'Suggested · ' + details.suggestedAgent.reason : 'Install Claude Code or Codex to start agents here.'
-          opacity: 0.6
-        }
-      }
-    }
-    Flow {
-      Layout.fillWidth: true
-      spacing: Style.space(8)
-      Repeater {
-        model: ['editor', 'terminal']
-        Aranea.ActionButton {
-          required property string modelData
-          text: 'New ' + modelData + ' window'
-          enabled: !details.displayOnly && !details.pending && details.openAvailable
-          pointerGate: details.pointerGate
-          onClicked: details.openRequested({
-            projectId: details.project.id,
-            newWindowRole: modelData
-          })
-        }
-      }
-      Aranea.ActionButton {
-        objectName: 'newAgentSession'
-        text: 'New agent session'
-        enabled: !details.displayOnly && !details.pending && details.openAvailable && !!details.suggestedAgent
-        pointerGate: details.pointerGate
-        onClicked: details.startAgent('')
-      }
-    }
-    Aranea.UiLabel {
-      Layout.fillWidth: true
-      text: 'Switch checkout above. Manage tools, registered checkouts, and workspace behavior in Preferences.'
-      opacity: 0.55
-    }
-  }
   Aranea.UiLabel {
     objectName: 'projectOperationError'
     Layout.fillWidth: true
@@ -558,6 +468,7 @@ ColumnLayout {
     Layout.fillWidth: true
     project: details.project
     projectClient: details.projectClient
+    sharedClient: details.actionClient
     visible: details.guidedSetup || details.viewSection === 'all' || details.viewSection === 'actions'
     active: details.actionsActive && visible
     displayOnly: details.displayOnly

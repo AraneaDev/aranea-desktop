@@ -10,6 +10,7 @@ import qs.Ui
 import "../araneadev.shared" as Aranea
 import "AgentSuggestion.js" as Suggestion
 import "ProjectsNavigation.js" as Navigation
+import "ProjectOverview.js" as Overview
 
 Item {
   id: panel
@@ -88,8 +89,67 @@ Item {
   readonly property bool shortScreen: height < Style.space(400)
   // Current project destination, retained independently of window visibility.
   property string section: 'overview'
-  // Activity observations run only while the selected Agents destination is visible.
-  readonly property bool activityVisible: section === 'agents' && !projectsPage.setupActive && !!projectsPage.selectedProject
+  // Overview and Agents reuse one activity observation lifetime.
+  readonly property bool activityVisible: (section === 'agents' || section === 'overview') && !projectsPage.setupActive && !!projectsPage.selectedProject
+  // Exact-checkout summaries reuse shared snapshots; never own process lifetimes.
+  readonly property var overviewModel: Overview.overview(projectsPage.selectedProject, root.gitClient.checkoutId, root.gitClient.current, root.actionClient.snapshot, root.activityClient.snapshot, root.projectClient.snapshot, Math.max(nowMs, Date.now()))
+  Binding {
+    target: projectsPage.details
+    property: 'actionClient'
+    value: panel.root.actionClient
+  }
+  // Refresh is observation only and every effect checks the inert boundary.
+  function refreshOverview() {
+    if (root.inert)
+      return
+    root.gitClient.refresh()
+    root.actionClient.refresh()
+    root.actionClient.checkAvailability()
+    root.actionClient.observeSummary()
+    root.activityClient.refresh()
+  }
+  // Revalidate authoritative identity when a compact control is activated.
+  function overviewAction(method, target) {
+    var client = root.actionClient
+    if (root.inert || client.pending || !target || target.projectId !== client.projectId || target.checkoutId !== client.checkoutId)
+      return
+    var row = overviewModel.services.concat(overviewModel.checks).find(function (r) {
+      return JSON.stringify(r.target) === JSON.stringify(target)
+    })
+    if (!row || !row.controls.some(function (c) {
+      return c.method === method
+    }))
+      return
+    if (method === 'start') {
+      if (client.availability.execution && !client.submissionUncertain)
+        client.start(target.actionId, target.revision)
+    } else if (method === 'stop')
+      client.stop(target.runId)
+    else if (method === 'logs') {
+      if (chooseSection('actions'))
+        client.logs(target.runId)
+    } else if (method === 'open-preview') {
+      var run = (client.snapshot.runs || []).find(function (r) {
+        return r.id === target.runId && r.projectId === target.projectId && r.checkoutId === target.checkoutId
+      })
+      if (run) {
+        client.publishRun(run)
+        client.openPreview(target.runId)
+      }
+    }
+  }
+  // Detail navigation selects the retained task/run without executing commands.
+  function overviewDetails(section, target) {
+    if (!chooseSection(section))
+      return
+    if (section === 'agents' && target.taskId)
+      agentsView.inspectTask(target.taskId)
+    if (section === 'actions' && target.actionId) {
+      projectsPage.details.actions.selectAction(target.actionId, target.revision)
+      if (!root.inert && target.runId)
+        root.actionClient.observeRun(target.runId)
+    }
+  }
   // Latest geometry/content change disarms stale pointer activation.
   property real layoutChangedAt: 0
   // Unsaved drafts, wizard state and pending work prevent changing selection.
@@ -419,6 +479,8 @@ Item {
                     })
                   }
                   project: projectsPage.selectedProject
+                  git: panel.overviewModel.git
+                  gitStale: !!panel.root.gitClient.error || !!git && panel.nowMs - git.observedAt > 30000
                   bindings: panel.root.projectClient.snapshot.bindings || []
                   openAvailable: projectsPage.details.openAvailable
                   pending: projectsPage.details.pending
@@ -595,6 +657,43 @@ Item {
                     panel.root.projectController.refresh()
                     panel.root.projectClient.refresh()
                     panel.root.gitClient.refresh()
+                  }
+                }
+                ProjectOverview {
+                  width: scroller.contentWidth
+                  visible: panel.section === 'overview' && !!projectsPage.selectedProject && !projectsPage.setupActive
+                  model: panel.overviewModel
+                  gitError: panel.root.gitClient.error
+                  gitLoading: panel.root.gitClient.loading
+                  nowMs: panel.nowMs
+                  displayOnly: panel.root.inert
+                  actionPending: panel.root.actionClient.pending || panel.root.actionClient.submissionUncertain
+                  agentPending: panel.root.activityClient.pending
+                  workspacePending: projectsPage.details.pending || !projectsPage.details.openAvailable
+                  executionAvailable: panel.root.actionClient.availability.execution === true
+                  actionError: panel.root.actionClient.submissionUncertain ? 'Submission unconfirmed. Refresh actions in Details to recover the receipt.' : panel.root.actionClient.error ? panel.root.actionClient.error.message + ' Manage actions to recover.' : panel.root.actionClient.summaryError ? panel.root.actionClient.summaryError.message : panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Execution unavailable. Manage actions to check required helpers.' : ''
+                  activityError: panel.root.activityClient.error ? 'Agent connection unavailable. Open Details to reconnect.' : ''
+                  pointerGate: pointerGate
+                  onRefreshRequested: panel.refreshOverview()
+                  onActionRequested: function (method, target) {
+                    panel.overviewAction(method, target)
+                  }
+                  onAgentRequested: function (method, taskId) {
+                    if (!panel.root.inert && panel.overviewModel.agents.some(function (r) {
+                      return r.target.taskId === taskId && r.controls.some(function (c) {
+                        return c.method === method
+                      })
+                    }))
+                      agentsView.submit(method, taskId)
+                  }
+                  onWorkspaceRequested: function (target) {
+                    if (!panel.root.inert && !projectsPage.details.pending && projectsPage.details.openAvailable && panel.overviewModel.workspaces.some(function (r) {
+                      return r.target.projectId === target.projectId && r.target.checkoutId === target.checkoutId
+                    }))
+                      panel.root.projectClient.request(target)
+                  }
+                  onDetailsRequested: function (section, target) {
+                    panel.overviewDetails(section, target)
                   }
                 }
                 ProjectAgents {
