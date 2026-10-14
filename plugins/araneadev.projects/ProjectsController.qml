@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "../araneadev.shared" as Aranea
 import "ProjectOperations.js" as Operations
+import "ProjectEnvironments.js" as Environments
 import "ProjectTools.js" as Tools
 import "AgentSuggestion.js" as Suggestion
 
@@ -23,6 +24,8 @@ Item {
     })
   // Accepted and retained completed owner operations, newest completion retention is bounded.
   property var operations: []
+  // Session-long activation receipts survive bounded completed-operation eviction.
+  property var environmentActivations: []
   // Retained identity evidence is distinct from freshly proven publication.
   property var bindings: []
   // Only recently verified bindings may be published as ownership.
@@ -154,6 +157,10 @@ Item {
     operations = operations.map(function (candidate) {
       return candidate.id === op.id ? op : candidate
     })
+    if (op.environmentId && op.activationId)
+      environmentActivations = environmentActivations.map(function (accepted) {
+        return accepted.sessionId === op.sessionId && accepted.activationId === op.activationId ? op : accepted
+      })
     if (op.state === 'completed')
       retainCompleted()
     operationChanged(op)
@@ -164,9 +171,9 @@ Item {
     syncSession()
     return !captureActive && session === sessionId && Operations.acceptsGeneration(operation(id), revision, session)
   }
-  // Retain role history by exact project/checkout/role in this session.
+  // Retain exact environment role history while preserving legacy checkout keys.
   function roleKey(op: var, role: string): string {
-    return op.projectId + '\n' + op.checkoutId + '\n' + role
+    return Environments.roleKey(op, role)
   }
   // Invalidate pending work while retaining completed results and accepted launch history.
   function abortPending(code: string, message: string): void {
@@ -202,6 +209,7 @@ Item {
       abortPending('SESSION_CHANGED', 'The desktop session changed. Open the project again.')
     agentProbeGeneration++
     sessionId = next
+    environmentActivations = []
     bindings = []
     freshBindings = []
     roleHistory = ({})
@@ -231,6 +239,7 @@ Item {
         error: error
       },
       projects: registry.projects,
+      environments: Environments.projectRows(environmentRecords(), fresh, sessionId),
       bindings: fresh,
       operations: operations,
       agents: {
@@ -286,7 +295,7 @@ Item {
       })
       bindings = bindings.map(function (binding) {
         return freshBindings.filter(function (fresh) {
-          return fresh.projectId === binding.projectId && fresh.checkoutId === binding.checkoutId && fresh.role === binding.role && fresh.address === binding.address && fresh.pid === binding.pid && fresh.evidence.startTime === binding.evidence.startTime
+          return fresh.projectId === binding.projectId && fresh.checkoutId === binding.checkoutId && roleKey(fresh, fresh.role) === roleKey(binding, binding.role) && fresh.address === binding.address && fresh.pid === binding.pid && fresh.evidence.startTime === binding.evidence.startTime
         })[0] || binding
       })
       done({
@@ -512,7 +521,7 @@ Item {
     }
     var checkoutId = payload.checkoutId || lease.checkoutId
     var pending = operations.filter(function (op) {
-      return op.state !== 'completed' && op.sessionId === sessionId && op.projectId === payload.projectId && op.checkoutId === checkoutId && (op.workspaceOnly === true) === workspaceOnly
+      return !op.environmentId && op.state !== 'completed' && op.sessionId === sessionId && op.projectId === payload.projectId && op.checkoutId === checkoutId && (op.workspaceOnly === true) === workspaceOnly
     })[0]
     if (pending)
       return {
@@ -529,16 +538,51 @@ Item {
     })
     var id = 'op-' + Date.now() + '-' + generation
     var op = Operations.begin(operations, request, id).operation
-    operations = operations.concat([op])
-    queue = queue.concat([id])
-    operationChanged(op)
-    snapshotChanged()
-    Qt.callLater(drain)
+    enqueueOperation(op)
     return {
       ok: true,
       operationId: id,
       error: null
     }
+  }
+  // Internal queue insertion shared by legacy and prepared environment operations.
+  // Environment coordinators must resolve their immutable snapshots before insertion.
+  function enqueueOperation(op: var): var {
+    var accepted = Environments.coalesced(environmentActivations, op.sessionId, op.activationId)
+    if (op.environmentId && accepted)
+      return accepted
+    operations = operations.concat([op])
+    if (op.environmentId && op.activationId)
+      environmentActivations = environmentActivations.concat([op])
+    queue = queue.concat([op.id])
+    operationChanged(op)
+    snapshotChanged()
+    Qt.callLater(drain)
+    return op
+  }
+  // Persisted environment metadata reserves space across owner restarts.
+  function environmentRecords(): var {
+    var rows = []
+    registry.projects.forEach(function (project) {
+      rows = rows.concat(project.environments || [])
+    })
+    return rows
+  }
+  // Queue reservations join saved legacy/environment records in one allocator.
+  function workspaceReservations(): var {
+    var rows = environmentRecords()
+    registry.projects.forEach(function (project) {
+      rows = rows.concat(project.associations || [])
+    })
+    return rows.concat(operations.filter(function (op) {
+      return op.sessionId === sessionId && op.state !== 'completed' && op.workspaceId > 0
+    }))
+  }
+  // Caller supplies a fresh authoritative desktop read; unavailable means refusal.
+  function chooseEnvironmentWorkspace(data: var): var {
+    if (!data || !data.available)
+      return null
+    return Environments.chooseEmptyWorkspace(data.workspaces, [], [], workspaceReservations())
   }
   // Keep the latest 100 completions without ever evicting accepted/pending work.
   function retainCompleted(): void {
@@ -736,10 +780,7 @@ Item {
         failOperation(id, 'COMPOSITOR_UNAVAILABLE', 'Connect to Hyprland to open project workspaces.')
         return
       }
-      var associations = []
-      registry.projects.forEach(function (row) {
-        associations = associations.concat(row.associations || [])
-      })
+      var associations = workspaceReservations()
       var association = Operations.chooseAssociation(project, op, data.workspaces, associations, proof.bindings, data.currentWorkspaceId)
       if (!association) {
         failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
@@ -754,7 +795,7 @@ Item {
         var holds = Object.assign({}, ownershipHolds);
         (operation(id).roles || ['editor', 'terminal']).forEach(function (role) {
           if (!roleHistory[roleKey(op, role)] && !bindings.some(function (binding) {
-            return binding.projectId === op.projectId && binding.checkoutId === op.checkoutId && binding.role === role && binding.sessionId === session
+            return binding.projectId === op.projectId && binding.checkoutId === op.checkoutId && roleKey(binding, binding.role) === roleKey(op, role) && binding.sessionId === session
           }))
             holds[roleKey(op, role)] = true
         })
@@ -796,10 +837,7 @@ Item {
                 failOperation(id, 'WORKSPACE_BUSY', 'Workspace allocation kept changing. Retry after desktop activity settles.')
                 return
               }
-              var reservations = []
-              registry.projects.forEach(function (row) {
-                reservations = reservations.concat(row.associations || [])
-              })
+              var reservations = workspaceReservations()
               var next = Object.assign({}, association, {
                 workspaceId: Operations.allocateWorkspace(data.workspaces, reservations)
               })
@@ -863,27 +901,28 @@ Item {
         return
       var prior = roleHistory[roleKey(op, role)] || null
       var ownedRoles = bindings.filter(function (row) {
-        return row.projectId === op.projectId && row.checkoutId === op.checkoutId && row.role === role && row.sessionId === session
+        return row.projectId === op.projectId && row.checkoutId === op.checkoutId && roleKey(row, row.role) === roleKey(op, role) && row.sessionId === session
       })
       var fresh = proof.bindings.filter(function (row) {
-        return row.projectId === op.projectId && row.checkoutId === op.checkoutId && row.role === role
+        return row.projectId === op.projectId && row.checkoutId === op.checkoutId && roleKey(row, row.role) === roleKey(op, role) && row.sessionId === session
       })[0] || null
       var binding = fresh || ownedRoles.filter(function (row) {
         return prior && prior.binding && row.address === prior.binding.address && row.pid === prior.binding.pid
       })[0] || ownedRoles[0] || null
       var allClosed = ownedRoles.length > 0 && ownedRoles.every(function (owned) {
         return proof.missing.some(function (closed) {
-          return closed.binding && closed.binding.address === owned.address && closed.binding.pid === owned.pid && closed.identity.startTime === owned.evidence.startTime
+          return closed.binding && roleKey(closed.binding, closed.binding.role) === roleKey(owned, owned.role) && closed.binding.sessionId === session && closed.binding.address === owned.address && closed.binding.pid === owned.pid && closed.identity.startTime === owned.evidence.startTime
         })
       })
       var closure = allClosed ? proof.missing.filter(function (row) {
-        return row.binding && binding && row.binding.address === binding.address && row.binding.pid === binding.pid
+        return row.binding && binding && roleKey(row.binding, row.binding.role) === roleKey(binding, binding.role) && row.binding.sessionId === session && row.binding.address === binding.address && row.binding.pid === binding.pid
       })[0] : null
       var disposition = closure ? {
         state: 'confirmed-missing',
         verified: true,
         projectId: op.projectId,
         checkoutId: op.checkoutId,
+        environmentId: op.environmentId || null,
         role: role,
         sessionId: session,
         generation: revision,
@@ -895,7 +934,7 @@ Item {
           })
         }) : null), prior, baseline.windows, session, disposition)
       if (decision.action === 'launch' && op.newWindowRole !== role && (ownershipHolds[roleKey(op, role)] || launchAttempts.some(function (attempt) {
-          return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && attempt.role === role && attempt.sessionId === session && (attempt.state === 'submitted' || attempt.state === 'accepted')
+          return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && roleKey(attempt, attempt.role) === roleKey(op, role) && attempt.sessionId === session && (attempt.state === 'submitted' || attempt.state === 'accepted')
         })))
         decision = {
           action: 'hold',
@@ -953,6 +992,7 @@ Item {
         spec = Object.assign({}, spec, {
           projectId: op.projectId,
           checkoutId: op.checkoutId,
+          environmentId: op.environmentId || null,
           role: role,
           agentId: role === 'agent' ? selected.agent : null,
           generation: revision,
@@ -976,6 +1016,7 @@ Item {
             id: attemptId,
             projectId: op.projectId,
             checkoutId: op.checkoutId,
+            environmentId: op.environmentId || null,
             role: role,
             sessionId: session,
             generation: revision,
@@ -1058,7 +1099,7 @@ Item {
   // Select a retained accepted identity; another unresolved copy remains independently guarded.
   function acceptedAttempt(op: var, role: string): var {
     var attempts = launchAttempts.filter(function (attempt) {
-      return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && attempt.role === role && attempt.sessionId === sessionId && attempt.state === 'accepted' && attempt.launchIdentity && attempt.spec && attempt.baseline
+      return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && roleKey(attempt, attempt.role) === roleKey(op, role) && attempt.sessionId === sessionId && attempt.state === 'accepted' && attempt.launchIdentity && attempt.spec && attempt.baseline
     })
     return attempts.length ? attempts[attempts.length - 1] : null
   }
@@ -1126,6 +1167,13 @@ Item {
       delete nextTimers[id + ':' + role]
       deadlines = nextTimers
     }
+    var bindingMatches = response.binding && response.binding.sessionId === op.sessionId && response.binding.projectId === op.projectId && response.binding.checkoutId === op.checkoutId && roleKey(response.binding, response.binding.role) === roleKey(op, role)
+    if (response.binding && !bindingMatches)
+      response = {
+        status: 'unconfirmed',
+        code: 'OWNERSHIP_UNCONFIRMED',
+        message: 'The observed binding does not belong to this operation.'
+      }
     var step = {
       role: role,
       status: response.status,
@@ -1133,13 +1181,13 @@ Item {
       message: response.message || null,
       reobserveAvailable: response.status === 'unconfirmed' && !!acceptedAttempt(op, role)
     }
-    if (response.binding) {
+    if (bindingMatches) {
       step.binding = response.binding
       bindings = bindings.filter(function (row) {
-        return !(row.projectId === op.projectId && row.checkoutId === op.checkoutId && row.role === role && row.address === response.binding.address && row.pid === response.binding.pid)
+        return !(row.projectId === op.projectId && row.checkoutId === op.checkoutId && roleKey(row, row.role) === roleKey(op, role) && row.address === response.binding.address && row.pid === response.binding.pid)
       }).concat([response.binding])
       freshBindings = freshBindings.filter(function (row) {
-        return !(row.projectId === op.projectId && row.checkoutId === op.checkoutId && row.role === role && row.address === response.binding.address && row.pid === response.binding.pid)
+        return !(row.projectId === op.projectId && row.checkoutId === op.checkoutId && roleKey(row, row.role) === roleKey(op, role) && row.address === response.binding.address && row.pid === response.binding.pid)
       }).concat([response.binding])
     }
     if (!response.preserveHistory && step.status !== 'skipped' && step.code !== 'OWNERSHIP_UNCONFIRMED' && step.code !== 'RETRY_NOT_FAILED') {

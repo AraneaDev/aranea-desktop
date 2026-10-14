@@ -378,7 +378,7 @@ Item {
       bindings.forEach(function (binding) {
         var evidence = binding.evidence || ({})
         prove(binding.launchIdentity, binding.pid, evidence.startTime, evidence.processes, function (proof) {
-          if (session === sessionId && proof && proof.ok && data.available) {
+          if (session === sessionId && binding.sessionId === session && proof && proof.ok && data.available) {
             var window = snapshot().windows.filter(function (row) {
               return row.address === binding.address && row.pid === binding.pid && (evidence.mode === 'process-only' || row.appId === binding.appId)
             })[0]
@@ -514,6 +514,7 @@ Item {
         var binding = {
           projectId: observer.spec.projectId,
           checkoutId: observer.spec.checkoutId,
+          environmentId: observer.spec.environmentId || null,
           role: observer.spec.role,
           workspaceId: observer.spec.workspaceId,
           address: window.address,

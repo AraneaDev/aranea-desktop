@@ -58,7 +58,7 @@ def valid:
   and (.roots|type == "array" and all(.[]; fields(["id","path"];[]) and (.id|opaque("r")) and (.path|path)) and (map(.id)|distinct) and (map(.path)|distinct))
   and (.ignored|type == "array" and all(.[]; fields(["path","commonDir"];[]) and (.path|path) and (.commonDir|path)) and (map(.path)|distinct))
   and (.projects|type == "array" and all(.[];project($schema)) and (map(.id)|distinct) and (map(.commonDir)|distinct))
-  and (if $schema == 2 then ([.projects[].profiles[].id]|distinct) and ([.projects[].environments[].id]|distinct) else true end)
+  and (if $schema == 2 then ([.projects[].profiles[].id]|distinct) and ([.projects[].environments[].id]|distinct) and ([.projects[].environments[]|[.sessionId,.activationId]]|distinct) else true end)
   and ([.projects[].checkouts[].id]|distinct) and ([.projects[].checkouts[].path]|distinct)
   and ((has("navigation")|not) or ([.projects[].id] as $ids | .navigation | navigation($ids)));
 # Pure migration: the shell supplies opaque profile IDs under the store lock.
@@ -72,6 +72,7 @@ def migrate_v1($profileIds):
 def request_valid:
   fields(["action","args"];["expectedRevision"]) and (.action|text) and (.args|type == "object")
   and ((has("expectedRevision")|not) or (.expectedRevision|integer and . >= 0))
+  and (if .action == "environment-associate" then has("expectedRevision") else true end)
   and (.action as $action | .args |
     if $action == "root-add" or $action == "ignore" or $action == "unignore" then fields(["path"];[]) and (.path|text)
     elif $action == "root-remove" then fields(["rootId"];[]) and (.rootId|text)
@@ -87,7 +88,7 @@ def request_valid:
       fields(["projectId","profileId","expectedProfileRevision"];[]) and (.projectId|opaque("p")) and (.profileId|opaque("f"))
       and (.expectedProfileRevision|integer and . > 0)
     elif $action == "environment-register" then
-      fields(["projectId","environment"];[]) and (.projectId|opaque("p")) and (.environment|environment) and .environment.projectId == .projectId
+      fields(["projectId","environment"];[]) and (.projectId|opaque("p")) and (.environment | if has("id") then environment else . + {id:"e-00000000-0000-4000-8000-000000000000"} | environment end) and .environment.projectId == .projectId
     elif $action == "environment-associate" then
       fields(["projectId","environmentId","previousWorkspaceId","workspaceId"];[]) and (.projectId|opaque("p")) and (.environmentId|opaque("e"))
       and (.previousWorkspaceId|workspace) and (.workspaceId|workspace)
@@ -138,7 +139,7 @@ def mutate($r):
           | if .lastProfileId == $a.profileId then .lastProfileId = (.profiles[0].id // null) else . end end
       else . end)
   elif $r.action == "environment-register" then require_checkout($a.projectId;$a.environment.checkoutId)
-    | if any(.projects[].environments[];.id == $a.environment.id) then error("ENVIRONMENT_CONFLICT") else . end
+    | if any(.projects[].environments[];.id == $a.environment.id or (.sessionId == $a.environment.sessionId and .activationId == $a.environment.activationId)) then error("ENVIRONMENT_CONFLICT") else . end
     | .projects |= map(if .id == $a.projectId then
         if any(.checkouts[];.id == $a.environment.checkoutId and . == $a.environment.checkoutSnapshot) then
           .environments += [$a.environment]

@@ -11,7 +11,7 @@ result="$TMPDIR/result.json"
 repo="$ARANEA_TEST_SANDBOX/repo"
 git init -q -b main "$repo"
 # Submit the public mutation format to the actual store.
-mutate() { jq -cn --arg action "$1" --argjson args "$2" '{action:$action,args:$args}' | "$store" mutate >"$result"; }
+mutate() { jq -cn --arg action "$1" --argjson args "$2" --argjson revision "$(if [[ -f "$registry" ]]; then jq .revision "$registry"; else printf 0; fi)" '{action:$action,args:$args} + (if $action == "environment-associate" then {expectedRevision:$revision} else {} end)' | "$store" mutate >"$result"; }
 # Fresh registration must not silently guess a usable profile.
 setup() {
   rm -rf "$ARANEA_STATE_ROOT"
@@ -216,8 +216,53 @@ invalid_saved_profiles_and_environments() {
     cmp "$registry" "$TMPDIR/invalid-registry"
   done
 }
+# Store-assigned environment IDs and session/activation uniqueness are atomic.
+environment_identity_conflicts() {
+  setup
+  save_profile Work
+  args=$(environment_args | jq 'del(.environment.id)')
+  mutate environment-register "$args"
+  jq -e '.state.projects[0].environments[0].id | test("^e-[0-9a-f-]{36}$")' "$result" >/dev/null
+  cp "$registry" "$TMPDIR/original"
+  if mutate environment-register "$args"; then return 1; fi
+  jq -e '.error.code == "ENVIRONMENT_CONFLICT"' "$result" >/dev/null
+  cmp "$registry" "$TMPDIR/original"
+  # A different ID cannot evade the duplicate activation guard.
+  if mutate environment-register "$(jq '.environment.id="e-22222222-2222-4222-8222-222222222222"' <<<"$args")"; then return 1; fi
+  cmp "$registry" "$TMPDIR/original"
+  mutate environment-register "$(jq '.environment.sessionId="new-session"' <<<"$args")"
+  jq -e '.state.projects[0].environments | length == 2 and (map(.id)|unique|length)==2' "$result" >/dev/null
+  # IDs and activation identities are global, even across different projects.
+  other_repo="$ARANEA_TEST_SANDBOX/other-repo"
+  git init -q -b main "$other_repo"
+  mutate register "$(jq -cn --arg path "$other_repo" '{paths:[$path]}')"
+  original_id=$(jq -r '.projects[0].environments[0].id' "$registry")
+  other_args=$(jq -c --slurpfile state "$registry" --arg id "$original_id" '$state[0].projects[1] as $p | .projectId=$p.id | .environment.projectId=$p.id | .environment.checkoutId=$p.lastCheckoutId | .environment.checkoutSnapshot=$p.checkouts[0] | .environment.id=$id | .environment.activationId="a-33333333-3333-4333-8333-333333333333"' <<<"$args")
+  cp "$registry" "$TMPDIR/original"
+  if mutate environment-register "$other_args"; then return 1; fi
+  jq -e '.error.code == "ENVIRONMENT_CONFLICT"' "$result" >/dev/null
+  cmp "$registry" "$TMPDIR/original"
+  if mutate environment-register "$(jq 'del(.environment.id) | .environment.activationId="a-11111111-1111-4111-8111-111111111111"' <<<"$other_args")"; then return 1; fi
+  jq -e '.error.code == "ENVIRONMENT_CONFLICT"' "$result" >/dev/null
+  cmp "$registry" "$TMPDIR/original"
+  # Workspace reassociation requires the global revision and preserves every snapshot.
+  association=$(jq -c '.projects[0] | {projectId:.id,environmentId:.environments[0].id,previousWorkspaceId:9,workspaceId:12}' "$registry")
+  cp "$registry" "$TMPDIR/original"
+  if jq -cn --argjson args "$association" '{action:"environment-associate",args:$args}' | "$store" mutate >"$result"; then return 1; fi
+  jq -e '.error.code == "INVALID_REQUEST"' "$result" >/dev/null
+  cmp "$registry" "$TMPDIR/original"
+  if jq -cn --argjson args "$association" '{action:"environment-associate",args:$args,expectedRevision:0}' | "$store" mutate >"$result"; then return 1; fi
+  jq -e '.error.code == "REGISTRY_CONFLICT"' "$result" >/dev/null
+  cmp "$registry" "$TMPDIR/original"
+  # Corrupt duplicate activation metadata is rejected on load as well.
+  jq '.projects[0].environments[1].sessionId="shell-session"' "$registry" >"$TMPDIR/duplicate"
+  cp "$TMPDIR/duplicate" "$registry"
+  if "$store" snapshot >"$result"; then return 1; fi
+  jq -e '.error.code == "REGISTRY_INVALID"' "$result" >/dev/null
+  cmp "$registry" "$TMPDIR/duplicate"
+}
 failures=0
-cases=(migration_is_atomic_once migration_failure_preserves_bytes new_projects_have_no_presets git_reads_both_schemas_without_writes profiles_revisions_and_legacy_isolation invalid_profiles_preserve_bytes environment_snapshots_and_last_used invalid_environments_preserve_bytes invalid_saved_profiles_and_environments)
+cases=(environment_identity_conflicts migration_is_atomic_once migration_failure_preserves_bytes new_projects_have_no_presets git_reads_both_schemas_without_writes profiles_revisions_and_legacy_isolation invalid_profiles_preserve_bytes environment_snapshots_and_last_used invalid_environments_preserve_bytes invalid_saved_profiles_and_environments)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

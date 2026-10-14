@@ -145,6 +145,13 @@ projects_registry_prepare_request() {
   local request=$1 state=${2:-null} action path metadata checkouts='[]'
   action=$(jq -r '.action' <<<"$request")
   case "$action" in
+    environment-register)
+      if jq -e '.args.environment|has("id")' <<<"$request" >/dev/null; then
+        printf '%s\n' "$request"
+      else
+        jq -c --arg id "$(projects_registry_id e)" '.args.environment.id=$id' <<<"$request"
+      fi
+      ;;
     profile-save)
       if jq -e '.args.profile|has("id")' <<<"$request" >/dev/null; then
         printf '%s\n' "$request"
