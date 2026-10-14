@@ -67,7 +67,12 @@ ProjectSectionCard {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!section.git
-    text: section.git && section.git.upstream ? section.git.ahead + ' ahead · ' + section.git.behind + ' behind ' + section.git.upstream + ' · Local refs; no remote fetch' : 'No upstream configured'
+    text: {
+      if (!section.git || !section.git.upstream)
+        return 'No upstream configured'
+      var comparable = typeof section.git.ahead === 'number' && typeof section.git.behind === 'number'
+      return (comparable ? section.git.ahead + ' ahead · ' + section.git.behind + ' behind ' : 'Comparison unavailable · ') + section.git.upstream + ' · Local refs; no remote fetch'
+    }
     opacity: 0.7
   }
   Aranea.UiLabel {
@@ -117,9 +122,7 @@ ProjectSectionCard {
       ColumnLayout {
         id: group
         required property var modelData
-        readonly property var files: section.git ? (section.git.files || []).filter(function (f) {
-          return f[group.modelData.key]
-        }) : []
+        readonly property var files: section.git ? Overview.gitFiles(section.git.files || [], group.modelData.key) : []
         Layout.fillWidth: true
         visible: files.length > 0
         Aranea.UiLabel {

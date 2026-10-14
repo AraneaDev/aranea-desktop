@@ -111,7 +111,9 @@ test("empty summaries are inert and valid Git retains overlapping file counts", 
     checkoutId: "c",
     observedAt: 90,
     counts: { staged: 1, unstaged: 1 },
-    files: [{ path: "same", staged: true, unstaged: true }]
+    files: [
+      { path: "same", originalPath: null, indexStatus: "M", worktreeStatus: "M", conflict: false }
+    ]
   }
   const result = model({}, {}, {}, git)
   assert.equal(result.git, git)
@@ -140,4 +142,46 @@ test("observation age stays compact and marks invalid or future clocks", () => {
   assert.equal(logic.ageLabel(0, 7200000), "2h ago")
   assert.equal(logic.ageLabel(10, 0), "clock ahead")
   assert.equal(logic.ageLabel(null, 0), "time unavailable")
+})
+
+// Missing or mutually exclusive grouping would hide paths or undercount overlap.
+test("porcelain path grouping follows collector counts and retains literal path identities", () => {
+  const files = [
+    { path: "mixed", originalPath: null, indexStatus: "M", worktreeStatus: "M", conflict: false },
+    {
+      path: 'new\n<>&"',
+      originalPath: null,
+      indexStatus: "?",
+      worktreeStatus: "?",
+      conflict: false
+    },
+    { path: "conflict", originalPath: null, indexStatus: "U", worktreeStatus: "U", conflict: true },
+    {
+      path: "renamed",
+      originalPath: "original",
+      indexStatus: "R",
+      worktreeStatus: ".",
+      conflict: false
+    },
+    { path: "deleted", originalPath: null, indexStatus: ".", worktreeStatus: "D", conflict: false }
+  ]
+  assert.deepEqual(
+    Array.from(logic.gitFiles(files, "staged"), (f) => f.path),
+    ["mixed", "conflict", "renamed"]
+  )
+  assert.deepEqual(
+    Array.from(logic.gitFiles(files, "unstaged"), (f) => f.path),
+    ["mixed", "conflict", "deleted"]
+  )
+  assert.deepEqual(
+    Array.from(logic.gitFiles(files, "untracked"), (f) => f.path),
+    ['new\n<>&"']
+  )
+  assert.deepEqual(
+    Array.from(logic.gitFiles(files, "conflict"), (f) => f.path),
+    ["conflict"]
+  )
+  assert.equal(logic.gitFiles(files, "staged")[2], files[3])
+  assert.equal(logic.gitFiles(files, "other").length, 0)
+  assert.equal(logic.gitFiles([], "staged").length, 0)
 })

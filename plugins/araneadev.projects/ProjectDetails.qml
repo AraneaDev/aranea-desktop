@@ -68,6 +68,8 @@ ColumnLayout {
   property var draft: ({})
   // Dirty drafts survive asynchronous observation refreshes.
   property bool dirty: false
+  // Failed local validation stays with the retained preferences draft.
+  property string fieldError: ''
   // Identity whose local draft is currently being edited.
   property string draftProjectId: ''
   // Locate-folder presentation drafts survive delegate recreation under stable identities.
@@ -121,6 +123,7 @@ ColumnLayout {
       workspaceMode: p.workspaceMode || 'dedicated'
     }
     dirty = false
+    fieldError = ''
   }
   // Edit one allowlisted presentation value without invoking any client.
   function setDraft(key: string, value: string): void {
@@ -130,10 +133,14 @@ ColumnLayout {
     next[key] = value
     draft = next
     dirty = true
+    fieldError = ''
   }
   // Save only valid chosen adapters and workspace mode through the backend client.
   function applyDraft(): void {
-    if (displayOnly || pending || !project || !draft.name || !supported('editors', draft.editorId) || !supported('terminals', draft.terminalId) || ['dedicated', 'current'].indexOf(draft.workspaceMode) < 0)
+    if (displayOnly || pending || !project)
+      return
+    fieldError = !draft.name ? 'Enter a project name before saving.' : !supported('editors', draft.editorId) ? 'Choose an installed supported editor before saving.' : !supported('terminals', draft.terminalId) ? 'Choose an installed supported terminal before saving.' : ['dedicated', 'current'].indexOf(draft.workspaceMode) < 0 ? 'Choose a dedicated or current workspace before saving.' : ''
+    if (fieldError)
       return
     configureRequested(project.id, Object.assign({}, draft))
   }
@@ -153,6 +160,7 @@ ColumnLayout {
     })) {
       draft = confirmed
       dirty = false
+      fieldError = ''
     }
   }
   // Ordinary Open deliberately omits all unsaved presentation draft values.
@@ -354,6 +362,13 @@ ColumnLayout {
       enabled: !details.displayOnly
       pointerGate: details.pointerGate
       onClicked: details.setDraft('workspaceMode', 'current')
+    }
+    Aranea.UiLabel {
+      objectName: 'projectPreferenceError'
+      Layout.fillWidth: true
+      visible: !!details.fieldError
+      text: details.fieldError
+      color: Aranea.DesignTokens.urgent
     }
     RowLayout {
       Aranea.ActionButton {

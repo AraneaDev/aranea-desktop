@@ -268,6 +268,7 @@ ColumnLayout {
       recoveryProjectId: recoveryProjectId,
       recoverySelectedCheckoutId: recoverySelectedCheckoutId,
       detailsDirty: details.dirty,
+      detailsFieldError: details.fieldError,
       customized: details.customized,
       folderPath: picker.pathDraft
     }
@@ -297,6 +298,7 @@ ColumnLayout {
     details.actions.captureRestore(saved.actions)
     details.draft = saved.detailsDraft
     details.dirty = saved.detailsDirty
+    details.fieldError = saved.detailsFieldError || ''
     details.customized = saved.customized
     picker.pathDraft = saved.folderPath
   }

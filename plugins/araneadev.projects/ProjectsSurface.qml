@@ -212,7 +212,7 @@ Item {
     id: draftGuard
     parent: panel
     pending: projectsPage.setupNavigationPending || panel.root.activityClient.pending
-    error: projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
+    error: projectsPage.details.fieldError || projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
     pointerGate: pointerGate
     onSaveRequested: panel.saveNavigationDraft()
     onDiscardRequested: {
@@ -223,7 +223,7 @@ Item {
       panel.continueDraftNavigation()
     }
     onKeepEditingRequested: {
-      if (pending)
+      if (pending || panel.root.inert)
         return
       panel.savingNavigationDraft = false
       pendingTarget = null

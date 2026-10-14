@@ -111,6 +111,56 @@ ShellRoot {
       t.done()
       return
     }
+    var retainedTarget = JSON.stringify(guard.pendingTarget)
+    entry.captureActive = true
+    guard.keepEditingRequested()
+    t.check(guard.opened, 'inert Keep editing preserves the open modal')
+    t.equal(JSON.stringify(guard.pendingTarget), retainedTarget, 'inert Keep editing preserves exact pending destination')
+    t.check(page.details.dirty && page.details.draft.name === 'Changed', 'inert Keep editing preserves draft')
+    entry.captureActive = false
+    surface.navigate(next.id)
+    var invalidDrafts = [
+      {
+        key: 'name',
+        value: '',
+        reason: /name/i
+      },
+      {
+        key: 'editorId',
+        value: 'missing-editor',
+        reason: /editor/i
+      },
+      {
+        key: 'terminalId',
+        value: 'missing-terminal',
+        reason: /terminal/i
+      },
+      {
+        key: 'workspaceMode',
+        value: 'invalid-mode',
+        reason: /workspace/i
+      }
+    ]
+    var validDraft = Object.assign({}, page.details.draft)
+    invalidDrafts.forEach(function (invalid) {
+      page.details.setDraft(invalid.key, invalid.value)
+      var before = JSON.stringify(page.details.draft)
+      guard.saveRequested()
+      t.check(invalid.reason.test(guard.error), 'invalid preferences Save explains ' + invalid.key + ' in the modal')
+      var feedback = t.findChild(page.details, 'projectPreferenceError')
+      t.check(!!feedback && feedback.visible && feedback.text === guard.error, 'invalid preferences feedback is visible in the editor for ' + invalid.key)
+      var retainedError = guard.error
+      var captureDraft = page.captureSnapshot()
+      page.captureReset({})
+      page.captureRestore(captureDraft)
+      t.equal(guard.error, retainedError, 'capture restores preferences validation feedback for ' + invalid.key)
+      t.check(guard.opened && entry.projectId === original.id && page.details.dirty, 'invalid preferences Save retains editor and selection for ' + invalid.key)
+      t.equal(JSON.stringify(guard.pendingTarget), retainedTarget, 'invalid preferences Save retains destination for ' + invalid.key)
+      t.equal(JSON.stringify(page.details.draft), before, 'invalid preferences Save retains exact draft for ' + invalid.key)
+      t.equal(host.saves.length, 0, 'invalid preferences Save sends no transport for ' + invalid.key)
+      page.details.setDraft(invalid.key, validDraft[invalid.key])
+      t.equal(guard.error, '', 'correcting preferences clears validation feedback for ' + invalid.key)
+    })
     guard.keepEditingRequested()
     t.equal(entry.projectId, original.id, 'keep editing preserves selection')
     t.check(page.details.dirty, 'keep editing retains dirty draft')

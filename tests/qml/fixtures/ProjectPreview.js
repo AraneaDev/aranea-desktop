@@ -103,30 +103,45 @@ function sample(id, mode, count) {
               branch: "feature/current-overview",
               detached: false,
               upstream: "origin/feature/current-overview",
-              ahead: 2,
-              behind: 1,
+              ahead: mode === "changes" ? null : 2,
+              behind: mode === "changes" ? null : 1,
               counts: {
-                staged: 2,
-                unstaged: 3,
+                staged: mode === "changes" ? 2 : 1,
+                unstaged: mode === "changes" ? 2 : 1,
                 untracked: 1,
-                conflicts: mode === "conflicts" ? 2 : 0
+                conflicts: mode === "conflicts" || mode === "changes" ? 1 : 0
               },
               files: [
                 {
                   path: "src/project.qml",
-                  staged: true,
-                  unstaged: true,
-                  untracked: false,
+                  originalPath: null,
+                  indexStatus: mode === "conflicts" ? "U" : "M",
+                  worktreeStatus: mode === "conflicts" ? "U" : "M",
                   conflict: mode === "conflicts"
                 },
                 {
-                  path: "notes/new ideas.md",
-                  staged: false,
-                  unstaged: false,
-                  untracked: true,
+                  path:
+                    mode === "changes"
+                      ? 'notes/new \t\n <>&" $(touch NEVER) ideas.md'
+                      : "notes/new ideas.md",
+                  originalPath: null,
+                  indexStatus: "?",
+                  worktreeStatus: "?",
                   conflict: false
                 }
-              ],
+              ].concat(
+                mode === "changes"
+                  ? [
+                      {
+                        path: "src/merge-conflict.qml",
+                        originalPath: null,
+                        indexStatus: "U",
+                        worktreeStatus: "U",
+                        conflict: true
+                      }
+                    ]
+                  : []
+              ),
               truncated: false
             },
       error:

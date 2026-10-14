@@ -164,7 +164,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
   return result
 }
 
-if (typeof module !== "undefined") module.exports = { overview, ageLabel }
+if (typeof module !== "undefined") module.exports = { overview, ageLabel, gitFiles }
 
 /** Compact freshness label without confusing receipt time with current correctness.
  * @param {?number} observedAt - observation wall milliseconds
@@ -179,4 +179,21 @@ function ageLabel(observedAt, nowMs) {
   if (age < 3600) return Math.floor(age / 60) + "m ago"
   if (age < 86400) return Math.floor(age / 3600) + "h ago"
   return Math.floor(age / 86400) + "d ago"
+}
+
+/** Select overlapping path groups from the collector's porcelain status fields.
+ * @param {Array<OverviewData>} files - raw collector path records
+ * @param {string} state - displayed file-count category
+ * @returns {Array<OverviewData>} unchanged records, preserving exact paths
+ */
+function gitFiles(files, state) {
+  return files.filter(function (file) {
+    if (state === "conflict") return file.conflict === true
+    var untracked = file.indexStatus === "?" && file.worktreeStatus === "?"
+    if (state === "untracked") return untracked
+    if (untracked) return false
+    if (state === "staged") return !!file.indexStatus && file.indexStatus !== "."
+    if (state === "unstaged") return !!file.worktreeStatus && file.worktreeStatus !== "."
+    return false
+  })
 }

@@ -75,9 +75,9 @@ ShellRoot {
         files: [
           {
             path: 'raw\nfile',
-            staged: false,
-            unstaged: true,
-            untracked: false,
+            originalPath: null,
+            indexStatus: '.',
+            worktreeStatus: 'M',
             conflict: false
           }
         ],

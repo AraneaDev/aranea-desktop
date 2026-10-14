@@ -243,6 +243,16 @@ ShellRoot {
       }
       if (!harness.positioned && harness.polls >= 6) {
         harness.positioned = true
+        if (Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'changes') {
+          if (!entry.inert) {
+            stop()
+            harness.finish(false, 'expanded path capture requires inert state')
+            return
+          }
+          for (var g = 0; g < objects.length; g++)
+            if (objects[g].expanded !== undefined && objects[g].git !== undefined)
+              objects[g].expanded = true
+        }
         if (harness.fixture === 'project-details' || harness.fixture === 'project-launch-partial' || harness.fixture === 'project-setup-bulk') {
           for (var j = 0; j < objects.length; j++) {
             var scroll = objects[j]
