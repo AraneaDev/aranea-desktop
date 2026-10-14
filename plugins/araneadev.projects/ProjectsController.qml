@@ -22,6 +22,31 @@ Item {
       ignored: [],
       projects: []
     })
+  // Prepared profile transactions share this owner's queue and native identity guards.
+  ProjectEnvironmentCoordinator {
+    id: environments
+    owner: controller
+  }
+  // Prepared public methods preserve ordinary Open and workspace preparation contracts.
+  function prepareEnvironment(payload: var): var {
+    return environments.prepareEnvironment(payload)
+  }
+  // Acceptance is synchronous only after an exact asynchronous preflight lease.
+  function startEnvironment(payload: var): var {
+    return environments.startEnvironment(payload)
+  }
+  // Exact Return observes only the saved workspace focus.
+  function returnEnvironment(payload: var): var {
+    return environments.returnEnvironment(payload)
+  }
+  // Exact recovery reuses saved snapshots and existing per-role ownership safeguards.
+  function recoverEnvironment(payload: var): var {
+    return environments.recoverEnvironment(payload)
+  }
+  // Read-only retained acceptance recovery never replays a start.
+  function environmentActivation(payload: var): var {
+    return environments.environmentActivation(payload)
+  }
   // Accepted and retained completed owner operations, newest completion retention is bounded.
   property var operations: []
   // Session-long activation receipts survive bounded completed-operation eviction.
@@ -97,6 +122,7 @@ Item {
   onCaptureActiveChanged: {
     agentProbeGeneration++
     if (captureActive) {
+      environments.invalidate()
       invalidateSelections()
       abortPending('INERT_MODE', 'Inert project fixture.')
     }
@@ -209,6 +235,7 @@ Item {
       abortPending('SESSION_CHANGED', 'The desktop session changed. Open the project again.')
     agentProbeGeneration++
     sessionId = next
+    environments.invalidate()
     environmentActivations = []
     bindings = []
     freshBindings = []
@@ -306,7 +333,7 @@ Item {
   }
   // Refresh inspections only when no revision-sensitive global transaction is running.
   function refresh(): bool {
-    if (captureActive || refreshing || queueActive)
+    if (captureActive || refreshing || queueActive || environments.preparing)
       return false
     syncSession()
     invalidateSelections()
@@ -574,7 +601,7 @@ Item {
     registry.projects.forEach(function (project) {
       rows = rows.concat(project.associations || [])
     })
-    return rows.concat(operations.filter(function (op) {
+    return rows.concat(environments.reservations()).concat(operations.filter(function (op) {
       return op.sessionId === sessionId && op.state !== 'completed' && op.workspaceId > 0
     }))
   }
@@ -627,7 +654,7 @@ Item {
   }
   // Start the next global transaction against a fresh registry, never a cached target.
   function drain(): void {
-    if (captureActive || refreshing || queueActive || !queue.length)
+    if (captureActive || refreshing || queueActive || environments.preparing || !queue.length)
       return
     syncSession()
     if (!queue.length)
@@ -648,6 +675,12 @@ Item {
         var problem = response && response.error
         error = problem || failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
         failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry unavailable.')
+        return
+      }
+      if (op.environmentId) {
+        registry = response.state
+        registryReady = true
+        environments.drain(id)
         return
       }
       if (op.selectionRevision !== null && op.selectionRevision !== undefined && op.selectionRevision !== response.state.revision) {
@@ -978,108 +1011,124 @@ Item {
       }
       // Record only an actual new agent start; focus/hold never rewrite history.
       var launch = function () {
-        var token = 'dev.aranea.project_' + session.replace(/[^A-Za-z0-9_]/g, '_') + '_' + revision + '_' + role
-        var spec = toolContracts.launchSpec(role, selected[role], checkout.path, token, selected.terminal)
-        if (!spec) {
-          finishRole(id, role, {
-            status: 'failed',
-            code: 'UNSUPPORTED_TOOL',
-            message: 'Choose a supported application adapter.'
-          })
-          accepted()
-          return
-        }
-        spec = Object.assign({}, spec, {
-          projectId: op.projectId,
-          checkoutId: op.checkoutId,
-          environmentId: op.environmentId || null,
-          role: role,
-          agentId: role === 'agent' ? selected.agent : null,
-          generation: revision,
-          sessionId: session,
-          workspaceId: association.workspaceId,
-          token: token
-        })
-        var timer = deadlineComponent.createObject(controller, {
-          operationId: id,
-          role: role,
-          revision: revision,
-          session: session,
-          submissionDone: accepted
-        })
-        var nextDeadlines = Object.assign({}, deadlines)
-        nextDeadlines[id + ':' + role] = timer
-        deadlines = nextDeadlines
-        var attemptId = id + ':' + role
-        launchAttempts = launchAttempts.concat([
-          {
-            id: attemptId,
+        var dispatch = function () {
+          var token = 'dev.aranea.project_' + session.replace(/[^A-Za-z0-9_]/g, '_') + '_' + revision + '_' + role
+          var spec = toolContracts.launchSpec(role, selected[role], checkout.path, token, selected.terminal)
+          if (!spec) {
+            finishRole(id, role, {
+              status: 'failed',
+              code: 'UNSUPPORTED_TOOL',
+              message: 'Choose a supported application adapter.'
+            })
+            accepted()
+            return
+          }
+          spec = Object.assign({}, spec, {
             projectId: op.projectId,
             checkoutId: op.checkoutId,
             environmentId: op.environmentId || null,
             role: role,
-            sessionId: session,
+            agentId: role === 'agent' ? selected.agent : null,
             generation: revision,
-            state: 'submitted',
-            spec: Object.assign({}, spec),
-            baseline: baseline
-          }
-        ])
-        var responded = false
-        runtime.launch(spec, function (response) {
-          if (responded)
-            return
-          responded = true
-          accepted()
-          if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
-            return
-          if (!response || !response.ok || response.status !== 'accepted') {
-            updateAttempt(attemptId, {
-              state: 'failed'
-            })
-            finishRole(id, role, {
-              status: 'failed',
-              code: response && response.code || 'LAUNCH_FAILED',
-              message: response && response.message
-            })
-            return
-          }
-          spec.launchIdentity = response.identity
-          updateAttempt(attemptId, {
-            state: 'accepted',
-            launchIdentity: response.identity,
-            spec: Object.assign({}, spec)
+            sessionId: session,
+            workspaceId: association.workspaceId,
+            token: token
           })
-          var history = Object.assign({}, roleHistory)
-          history[roleKey(op, role)] = {
+          var timer = deadlineComponent.createObject(controller, {
+            operationId: id,
             role: role,
-            status: 'unconfirmed',
-            code: 'LAUNCH_ACCEPTED',
-            launchIdentity: response.identity
-          }
-          roleHistory = history
-          publish(Object.assign({}, operation(id), {
-            state: 'observing'
-          }))
-          runtime.observe(spec, baseline, function (observed) {
+            revision: revision,
+            session: session,
+            submissionDone: accepted
+          })
+          var nextDeadlines = Object.assign({}, deadlines)
+          nextDeadlines[id + ':' + role] = timer
+          deadlines = nextDeadlines
+          var attemptId = id + ':' + role
+          launchAttempts = launchAttempts.concat([
+            {
+              id: attemptId,
+              projectId: op.projectId,
+              checkoutId: op.checkoutId,
+              environmentId: op.environmentId || null,
+              role: role,
+              sessionId: session,
+              generation: revision,
+              state: 'submitted',
+              spec: Object.assign({}, spec),
+              baseline: baseline
+            }
+          ])
+          var responded = false
+          if (op.environmentId)
+            publish(Object.assign({}, operation(id), {
+              nativeAttempted: true
+            }))
+          runtime.launch(spec, function (response) {
+            if (responded)
+              return
+            responded = true
+            accepted()
             if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
               return
-            if (observed && observed.status === 'observed' && observed.binding)
+            if (!response || !response.ok || response.status !== 'accepted') {
               updateAttempt(attemptId, {
-                state: 'observed',
-                binding: observed.binding
+                state: 'failed'
               })
-            finishRole(id, role, observed || {
+              finishRole(id, role, {
+                status: 'failed',
+                code: response && response.code || 'LAUNCH_FAILED',
+                message: response && response.message
+              })
+              return
+            }
+            spec.launchIdentity = response.identity
+            updateAttempt(attemptId, {
+              state: 'accepted',
+              launchIdentity: response.identity,
+              spec: Object.assign({}, spec)
+            })
+            var history = Object.assign({}, roleHistory)
+            history[roleKey(op, role)] = {
+              role: role,
               status: 'unconfirmed',
-              code: 'OBSERVATION_TIMEOUT'
+              code: 'LAUNCH_ACCEPTED',
+              launchIdentity: response.identity
+            }
+            roleHistory = history
+            publish(Object.assign({}, operation(id), {
+              state: 'observing'
+            }))
+            runtime.observe(spec, baseline, function (observed) {
+              if (!current(id, revision, session) || operation(id).rolesPending.indexOf(role) < 0)
+                return
+              if (observed && observed.status === 'observed' && observed.binding)
+                updateAttempt(attemptId, {
+                  state: 'observed',
+                  binding: observed.binding
+                })
+              finishRole(id, role, observed || {
+                status: 'unconfirmed',
+                code: 'OBSERVATION_TIMEOUT'
+              })
             })
           })
-        })
+        }
+        if (op.environmentId)
+          environments.beforeDispatch(id, function (data, workspace) {
+            baseline = data
+            association = {
+              workspaceId: workspace
+            }
+            dispatch()
+          })
+        else
+          dispatch()
       }
       var project = registry.projects.filter(function (row) {
         return row.id === op.projectId
       })[0]
-      if (role === 'agent' && project.tools.agentId !== selected.agent)
+      if (!op.environmentId && role === 'agent' && project.tools.agentId !== selected.agent)
         mutate(id, 'configure', {
           projectId: op.projectId,
           agentId: selected.agent

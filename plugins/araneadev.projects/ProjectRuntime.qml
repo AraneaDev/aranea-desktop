@@ -214,6 +214,17 @@ Item {
       })
     })
   }
+  // Kernel-generated UUIDs prepare accepted environment identity without a Node dependency.
+  function createEnvironmentId(done: var): void {
+    if (captureActive) {
+      done(null)
+      return
+    }
+    processRunner(['cat', '/proc/sys/kernel/random/uuid'], '', function (code, output) {
+      var uuid = String(output || '').trim()
+      done(code === 0 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(uuid) ? 'e-' + uuid : null)
+    })
+  }
   // Focus only validated standard IDs and confirm the compositor's actual focus.
   function focusWorkspace(id: int, done: var): void {
     if (captureActive) {

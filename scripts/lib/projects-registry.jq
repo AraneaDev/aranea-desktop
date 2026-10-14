@@ -138,10 +138,11 @@ def mutate($r):
         else .profiles |= map(select(.id != $a.profileId))
           | if .lastProfileId == $a.profileId then .lastProfileId = (.profiles[0].id // null) else . end end
       else . end)
+  # Branch records fresh launch context; exact ID/path/primary still guard checkout identity.
   elif $r.action == "environment-register" then require_checkout($a.projectId;$a.environment.checkoutId)
     | if any(.projects[].environments[];.id == $a.environment.id or (.sessionId == $a.environment.sessionId and .activationId == $a.environment.activationId)) then error("ENVIRONMENT_CONFLICT") else . end
     | .projects |= map(if .id == $a.projectId then
-        if any(.checkouts[];.id == $a.environment.checkoutId and . == $a.environment.checkoutSnapshot) then
+        if any(.checkouts[];.id == $a.environment.checkoutId and .id == $a.environment.checkoutSnapshot.id and .path == $a.environment.checkoutSnapshot.path and .primary == $a.environment.checkoutSnapshot.primary) then
           .environments += [$a.environment]
           | if any(.profiles[];.id == $a.environment.profileSnapshot.id) then .lastProfileId = $a.environment.profileSnapshot.id else . end
         else error("CHECKOUT_CONFLICT") end

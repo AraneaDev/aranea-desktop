@@ -187,7 +187,7 @@ invalid_environments_preserve_bytes() {
   save_profile Work
   args=$(environment_args)
   cp "$registry" "$TMPDIR/original"
-  for filter in '.environment.id="bad"' '.environment.projectId="p-22222222-2222-4222-8222-222222222222"' '.environment.checkoutId="c-22222222-2222-4222-8222-222222222222"' '.environment.checkoutSnapshot.path="/substituted"' '.environment.checkoutSnapshot.id="c-22222222-2222-4222-8222-222222222222"' '.environment.activationId="bad"' '.environment.workspaceId=0' '.environment.createdAt=-1' '.environment.profileSnapshot.tools.editorId="bash"' '.environment.resolvedTools.agentId="gemini"' '.environment.commands=[]'; do
+  for filter in '.environment.id="bad"' '.environment.projectId="p-22222222-2222-4222-8222-222222222222"' '.environment.checkoutId="c-22222222-2222-4222-8222-222222222222"' '.environment.checkoutSnapshot.path="/substituted"' '.environment.checkoutSnapshot.id="c-22222222-2222-4222-8222-222222222222"' '.environment.checkoutSnapshot.primary=false' '.environment.checkoutSnapshot.branch=42' '.environment.activationId="bad"' '.environment.workspaceId=0' '.environment.createdAt=-1' '.environment.profileSnapshot.tools.editorId="bash"' '.environment.resolvedTools.agentId="gemini"' '.environment.commands=[]'; do
     if mutate environment-register "$(jq -c "$filter" <<<"$args")"; then return 1; fi
     cmp "$registry" "$TMPDIR/original"
   done

@@ -89,6 +89,41 @@ Item {
       } catch (e) {}
       return JSON.stringify(controller.prepareWorkspaceRequest(payload))
     }
+    function prepareEnvironment(payloadJson: string): string {
+      var payload = null
+      try {
+        payload = JSON.parse(payloadJson)
+      } catch (e) {}
+      return JSON.stringify(controller.prepareEnvironment(payload))
+    }
+    function startEnvironment(payloadJson: string): string {
+      var payload = null
+      try {
+        payload = JSON.parse(payloadJson)
+      } catch (e) {}
+      return JSON.stringify(controller.startEnvironment(payload))
+    }
+    function returnEnvironment(payloadJson: string): string {
+      var payload = null
+      try {
+        payload = JSON.parse(payloadJson)
+      } catch (e) {}
+      return JSON.stringify(controller.returnEnvironment(payload))
+    }
+    function environmentActivation(payloadJson: string): string {
+      var payload = null
+      try {
+        payload = JSON.parse(payloadJson)
+      } catch (e) {}
+      return JSON.stringify(controller.environmentActivation(payload))
+    }
+    function recoverEnvironment(payloadJson: string): string {
+      var payload = null
+      try {
+        payload = JSON.parse(payloadJson)
+      } catch (e) {}
+      return JSON.stringify(controller.recoverEnvironment(payload))
+    }
     function operation(id: string): string {
       return JSON.stringify(controller.operation(id))
     }
