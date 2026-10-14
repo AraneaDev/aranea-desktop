@@ -4,3 +4,6 @@ DisplaysDropdown 1.0 DisplaysDropdown.qml
 DisplaysList 1.0 DisplaysList.qml
 DisplaysToggles 1.0 DisplaysToggles.qml
 DisplayPanel 1.0 Panel.qml
+TextSizeController 1.0 TextSizeController.qml
+NightlightController 1.0 NightlightController.qml
+KeyboardBacklightController 1.0 KeyboardBacklightController.qml

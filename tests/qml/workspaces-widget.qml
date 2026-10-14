@@ -130,6 +130,36 @@ ShellRoot {
       t.check(testRoot.lastCommand.indexOf('summon araneadev.projects') >= 0, 'project label opens Projects for inspection')
       t.check(testRoot.lastCommand.indexOf('c-main') >= 0, 'inspection retains the workspace checkout rather than the last checkout')
     }
+    var occupiedRows = widget.testWorkspaces
+    var observedSnapshot = widget.projectClient.snapshot
+    widget.projectClient.snapshot = Object.assign({}, observedSnapshot, {
+      environments: [
+        {
+          id: 'e-retained',
+          projectId: 'p-app',
+          checkoutId: 'c-main',
+          workspaceId: 1,
+          profileSnapshot: {
+            name: 'Focus'
+          },
+          checkoutSnapshot: {
+            branch: 'main',
+            path: '/app'
+          }
+        }
+      ]
+    })
+    t.check(!!widget.activeProjectContext, 'occupied workspace retains launched environment context')
+    widget.testWorkspaces = occupiedRows.map(function (row) {
+      return row.id === 1 ? Object.assign({}, row, {
+        windows: []
+      }) : row
+    })
+    t.check(!widget.activeProjectContext, 'closing every tool clears the project name despite retained environment and bindings')
+    t.check(!contextButton.visible, 'empty focused workspace hides the project inspection button')
+    widget.testWorkspaces = occupiedRows
+    t.check(!!widget.activeProjectContext, 'occupied workspace can show retained context again')
+    widget.projectClient.snapshot = observedSnapshot
     widget.refreshProjects()
     widget.refreshProjects()
     t.equal(testRoot.projectReads.length, 1, 'bar polling never overlaps a held owner read')

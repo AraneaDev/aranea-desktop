@@ -219,7 +219,7 @@ Item {
             // "" when there are none to show.
             readonly property string titles: WorkspaceModel.workspaceTitles(rowWrap.workspace)
             // Context decorates this workspace without becoming an action identity.
-            readonly property var projectContext: WorkspaceModel.projectContext(rowWrap.workspace.id, panel.projectSnapshot)
+            readonly property var projectContext: WorkspaceModel.overviewContext(rowWrap.workspace, panel.projectSnapshot)
 
             objectName: "workspaceRow"
             Layout.fillWidth: true

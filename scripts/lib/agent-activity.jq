@@ -1,6 +1,6 @@
 $activity_context[0] as $context | $activity_projects[0] as $projects | $activity_request[0] as $request |
 # Pure validation, ordering, reduction and read-only freshness projection.
-def fields($r;$o): type == "object" and (($r - keys)|length == 0) and ((keys - ($r+$o))|length == 0);
+def fields($r;$o): type == "object" and (keys as $keys | (($r - $keys)|length == 0) and (($keys - ($r+$o))|length == 0));
 def uint: type == "number" and . == floor and . >= 0 and . <= 9007199254740991;
 def text($n): type == "string" and length <= $n and (test("[\\x00-\\x1f\\x7f]")|not);
 def id: text(256) and length > 0;
@@ -13,8 +13,13 @@ def blocker: fields(["blockerId","question"];[]) and (.blockerId|id) and (.quest
 def blockers: type == "array" and length <= 32 and all(.[];blocker) and (map(.blockerId)|unique_values);
 def process_identity: fields(["pid","startTime"];[]) and (.pid|uint and . > 0) and (.startTime|id);
 def provenance: . == null or (fields(["pid","startTime","bootId","ancestors","windowAddress","observedAt"];["executable","commandHash"]) and (.pid|uint and . > 0) and (.startTime|id) and (.bootId|id) and (.observedAt|uint) and (.windowAddress == null or (.windowAddress|id)) and (.ancestors|type == "array" and length <= 32 and all(.[];process_identity) and (map(.pid)|unique_values)) and (has("executable") == has("commandHash")) and ((has("executable")|not) or ((.executable|path) and (.commandHash|type == "string" and test("^[a-f0-9]{64}$")))));
-def callback_owner: fields(["key","eventId","taskId"];["toolUseId"]) and (.key|type == "string" and test("^[a-f0-9]{64}$")) and (.eventId|id) and (.taskId|id) and ((has("toolUseId")|not) or (.toolUseId|id and length <= 180));
-def metadata: fields(["currentTaskId","turns"];["inactiveTaskIds","observedHooks","callbackOwners"]) and (.currentTaskId == null or (.currentTaskId|id)) and (.turns|type == "array" and length <= 512 and all(.[];fields(["nativeId","taskId"];[]) and (.nativeId|id) and (.taskId|id)) and (map(.nativeId)|unique_values)) and ((has("inactiveTaskIds")|not) or (.inactiveTaskIds|type == "array" and length <= 512 and all(.[];id) and unique_values)) and (. as $m | all((.inactiveTaskIds//[])[];. != $m.currentTaskId)) and ((has("observedHooks")|not) or (.observedHooks|type == "array" and length <= 32 and all(.[];type == "string" and length <= 64 and test("^[A-Za-z][A-Za-z0-9]*$")) and unique_values)) and ((has("callbackOwners")|not) or (.callbackOwners|type == "array" and length <= 512 and all(.[];callback_owner) and (map(.key)|unique_values) and (map(.eventId)|unique_values)));
+# State-only references use string guards before exact membership in fully valid
+# task/receipt ID indexes proves the complete ID constraint. Standalone metadata
+# has no such indexes and retains the original full ID validation.
+def reference_id($indexed): if $indexed then type == "string" else id end;
+def callback_owner($indexed): type == "object" and has("key") and has("eventId") and has("taskId") and (length == 3 or (length == 4 and has("toolUseId"))) and (.key|type == "string" and test("^[a-f0-9]{64}$")) and (.eventId|reference_id($indexed)) and (.taskId|reference_id($indexed)) and ((has("toolUseId")|not) or (.toolUseId|id and length <= 180));
+def metadata($indexed): fields(["currentTaskId","turns"];["inactiveTaskIds","observedHooks","callbackOwners"]) and (.currentTaskId == null or (.currentTaskId|reference_id($indexed))) and (.turns|type == "array" and length <= 512 and all(.[];fields(["nativeId","taskId"];[]) and (.nativeId|id) and (.taskId|reference_id($indexed))) and (map(.nativeId)|unique_values)) and ((has("inactiveTaskIds")|not) or (.inactiveTaskIds|type == "array" and length <= 512 and all(.[];reference_id($indexed)) and unique_values)) and (. as $m | all((.inactiveTaskIds//[])[];. != $m.currentTaskId)) and ((has("observedHooks")|not) or (.observedHooks|type == "array" and length <= 32 and all(.[];type == "string" and length <= 64 and test("^[A-Za-z][A-Za-z0-9]*$")) and unique_values)) and ((has("callbackOwners")|not) or (.callbackOwners|type == "array" and length <= 512 and all(.[];callback_owner($indexed)) and (map(.key)|unique_values) and (map(.eventId)|unique_values)));
+def metadata: metadata(false);
 def task_snapshot: fields(["cwd","reportedState"];["taskId","projectId","checkoutId","description","result","question","blockers","verification"])
   and (.cwd|path) and (.reportedState|lifecycle)
   and ((has("taskId")|not) or (.taskId|id))
@@ -51,9 +56,9 @@ def session: fields(["provider","providerSessionId","producerEpoch","highWaterSe
   and (.provider|provider) and (.providerSessionId|id) and (.producerEpoch|id) and (.highWaterSequence|uint)
   and (.registrationHash|test("^[a-f0-9]{64}$"))
   and (.retiredEpochs|type == "array" and length <= 512 and all(.[];id) and unique_values)
-  and (.receipts|type == "array" and length <= 512 and all(.[];fields(["eventId","hash","sequence"];[]) and (.eventId|id) and (.hash|test("^[a-f0-9]{64}$")) and (.sequence|uint and . > 0)) and (map(.eventId)|unique_values))
+  and (.receipts|type == "array" and length <= 512 and all(.[];type == "object" and length == 3 and has("eventId") and has("hash") and has("sequence") and (.eventId|id) and (.hash|test("^[a-f0-9]{64}$")) and (.sequence|uint and . > 0)) and (map(.eventId)|unique_values))
   and (.highWaterSequence as $max | all(.receipts[];.sequence <= $max))
-  and (.connection|connection) and (.provenance|provenance) and (.nativeMetadata|metadata);
+  and (.connection|connection) and (.provenance|provenance) and (.nativeMetadata|metadata(true));
 def association: fields(["status","projectId","checkoutId","cwd"];[]) and (.status|IN("registered","unassigned")) and (.cwd|path)
   and (if .status == "registered" then (.projectId|id) and (.checkoutId|id) else .projectId == null and .checkoutId == null end);
 def task: fields(["taskId","provider","providerSessionId","producerEpoch","reportedState","description","result","question","blockers","diagnostics","verification","association","lastReceivedAt","source"];[])
@@ -62,13 +67,24 @@ def task: fields(["taskId","provider","providerSessionId","producerEpoch","repor
   and (.diagnostics|type == "array" and length <= 20 and all(.[];fields(["summary","receivedAt"];[]) and (.summary|text(4096)) and (.receivedAt|uint)))
   and (.verification|verification) and (.association|association) and (.lastReceivedAt|uint) and (.source|IN("report","native"));
 def same_session($a): .provider == $a.provider and .providerSessionId == $a.providerSessionId;
+# Serialize tuple identities; delimiter-containing IDs must never share a key.
+def session_key: [.provider,.providerSessionId]|tojson;
+def session_index: INDEX(.[];session_key) | map_values({session:.,inactive:INDEX((.nativeMetadata.inactiveTaskIds//[])[];.)});
 def state_valid: fields(["schemaVersion","revision","sessions","tasks"];[]) and .schemaVersion == 1 and (.revision|uint)
   and (.sessions|type == "array" and length <= 1200 and all(.[];session) and (map([.provider,.providerSessionId])|unique_values))
   and (.tasks|type == "array" and length <= 700 and all(.[];task) and (map(.taskId)|unique_values))
-  and (.sessions as $s | all(.tasks[]; . as $t | any($s[];same_session($t) and .producerEpoch == $t.producerEpoch)))
-  and (.tasks as $ts | all(.sessions[]; . as $s | (.nativeMetadata.currentTaskId == null or any($ts[];same_session($s) and .taskId == $s.nativeMetadata.currentTaskId)) and all(.nativeMetadata.turns[]; .taskId as $tid | any($ts[];same_session($s) and .taskId == $tid)) and all((.nativeMetadata.inactiveTaskIds//[])[];. as $tid | any($ts[];same_session($s) and .taskId == $tid)) and all((.nativeMetadata.callbackOwners//[])[];. as $owner | any($ts[];same_session($s) and .taskId == $owner.taskId) and any($s.receipts[];.eventId == $owner.eventId))));
+  # Build membership indexes only after every indexed shape and identity validates.
+  and (INDEX(.sessions[];session_key) as $sessions
+    | (reduce .tasks[] as $task ({}; .[$task|session_key][$task.taskId] = true)) as $tasks
+    | all(.tasks[]; . as $t | $sessions[session_key].producerEpoch == $t.producerEpoch)
+      and all(.sessions[]; $tasks[session_key] as $sessionTasks | INDEX(.receipts[];.eventId) as $receipts
+        | (.nativeMetadata.currentTaskId == null or $sessionTasks[.nativeMetadata.currentTaskId] != null)
+          and all(.nativeMetadata.turns[]; $sessionTasks[.taskId] != null)
+          and all((.nativeMetadata.inactiveTaskIds//[])[]; $sessionTasks[.] != null)
+          and all((.nativeMetadata.callbackOwners//[])[]; $sessionTasks[.taskId] != null and $receipts[.eventId] != null)));
 def fresh($s): $s.connection.connected and $s.connection.bootId == $context.bootId and $context.monotonic >= $s.connection.monotonic and ($context.monotonic - $s.connection.monotonic) < 60 and $context.receivedAt >= $s.connection.receivedAt and ($context.receivedAt - $s.connection.receivedAt) < 60;
-def live($sessions): . as $t | .reportedState != "finished" and any($sessions[];same_session($t) and fresh(.) and ((.nativeMetadata.inactiveTaskIds//[])|index($t.taskId)|not));
+def live($sessions): . as $t | $sessions[session_key] as $entry
+  | .reportedState != "finished" and $entry != null and fresh($entry.session) and $entry.inactive[$t.taskId] == null;
 def clock($connected): {receivedAt:$context.receivedAt,monotonic:$context.monotonic,bootId:$context.bootId,connected:$connected};
 def associate($a): [$projects.projects[] as $p | $p.checkouts[] | select(.path == $a.cwd) | {status:"registered",projectId:$p.id,checkoutId:.id,cwd:$a.cwd}] as $found
   | if ($a|has("projectId")) and (all($found[]; .projectId != $a.projectId or .checkoutId != $a.checkoutId) or ($found|length == 0)) then error("ASSOCIATION_MISMATCH")
@@ -77,14 +93,18 @@ def make_task($a;$t;$source): {taskId:$t.taskId,provider:$a.provider,providerSes
   reportedState:$t.reportedState,description:($t.description//""),result:($t.result//""),question:($t.question//""),blockers:($t.blockers//[]),diagnostics:[],
   verification:($t.verification//{status:"unknown",summary:"",commands:[]}),association:associate($t),lastReceivedAt:$context.receivedAt,source:$source};
 def retain:
-  .sessions as $sessions | .tasks = ([.tasks[]|select(live($sessions))] + ([.tasks[]|select(live($sessions)|not)|select(.lastReceivedAt >= ($context.receivedAt - 1209600))]|sort_by(.lastReceivedAt,.taskId)|.[-500:]))
-  | .tasks as $tasks
-  | .sessions |= map(select(. as $s | any($tasks[];same_session($s)) or fresh($s))
-      | .nativeMetadata.turns |= map(select(.taskId as $tid | any($tasks[];.taskId == $tid)))
-      | if (.nativeMetadata|has("inactiveTaskIds")) then .nativeMetadata.inactiveTaskIds |= map(select(. as $tid | any($tasks[];.taskId == $tid))) else . end
-      | . as $s | if (.nativeMetadata|has("callbackOwners")) then .nativeMetadata.callbackOwners |= map(select(. as $owner | any($tasks[];same_session($s) and .taskId == $owner.taskId) and any($s.receipts[];.eventId == $owner.eventId))) else . end
-      | if (.nativeMetadata.currentTaskId as $tid | any($tasks[];.taskId == $tid)) then . else .nativeMetadata.currentTaskId = null end)
-  | if ([.tasks[]|select(live($sessions))]|length) > 200 or (.sessions|length) > 1200 then error("CAPACITY_EXCEEDED") else . end;
+  (.sessions|session_index) as $sessions
+  | [.tasks[]|select(live($sessions))] as $live
+  | .tasks = ($live + ([.tasks[]|select(live($sessions)|not)|select(.lastReceivedAt >= ($context.receivedAt - 1209600))]|sort_by(.lastReceivedAt,.taskId)|.[-500:]))
+  # Retention changes task membership. Rebuild indexes before cleaning references.
+  | INDEX(.tasks[];.taskId) as $tasks | INDEX(.tasks[];session_key) as $taskSessions
+  | .sessions |= map(select(. as $s | $taskSessions[session_key] != null or fresh($s))
+      | .nativeMetadata.turns |= map(select($tasks[.taskId] != null))
+      | if (.nativeMetadata|has("inactiveTaskIds")) then .nativeMetadata.inactiveTaskIds |= map(select($tasks[.] != null)) else . end
+      | . as $s | INDEX(.receipts[];.eventId) as $receipts
+      | if (.nativeMetadata|has("callbackOwners")) then .nativeMetadata.callbackOwners |= map(select(. as $owner | ($tasks[$owner.taskId]|same_session($s)) and $receipts[$owner.eventId] != null)) else . end
+      | if $tasks[.nativeMetadata.currentTaskId // ""] != null then . else .nativeMetadata.currentTaskId = null end)
+  | if ($live|length) > 200 or (.sessions|length) > 1200 then error("CAPACITY_EXCEEDED") else . end;
 def register($a;$source):
   ([.sessions[]|select(same_session($a))][0] // null) as $old
   | if $old.producerEpoch == $a.producerEpoch then
@@ -127,30 +147,46 @@ def report($e;$source):
               | .connection = clock($e.kind != "disconnected")
               | .receipts = ((.receipts + [{eventId:$e.eventId,sequence:$e.sequence,hash:$hash}])|.[-512:]) else . end)
           | .revision += 1 end end;
-def mutation($r;$source):
+def mutation($r;$source;$prepared_metadata):
   if $r.action == "register" then register($r.args;$source)
   elif $r.action == "report" then report($r.args;$source)
   elif $r.action == "dismiss" then
     ([.tasks[]|select(.taskId == $r.args.taskId)][0]//null) as $task
     | if $task == null then error("TASK_NOT_FOUND")
-      elif (.sessions as $sessions | $task|live($sessions)) and
+      elif ((.sessions|session_index) as $sessions | $task|live($sessions)) and
         (($task | (.reportedState|IN("ready-for-review","failed")) and (.blockers|length)==0)|not) then error("TASK_LIVE")
       else .tasks |= map(select(.taskId != $r.args.taskId)) | .revision += 1 end
   elif $r.action == "prune" then .revision += 1
   elif $r.action == "native" then $r.args.normalized as $n
-    | if ($n|fields(["action","args"];["nativeMetadata"])) and ($n.action|IN("register","report")) and ($n|del(.nativeMetadata)|request_valid) and (($n|has("nativeMetadata")|not) or ($n.nativeMetadata|metadata)) then
-      .revision as $beforeRevision | mutation(($n|del(.nativeMetadata));"native")
+    | if ($n|fields(["action","args"];["nativeMetadata"])) and ($n.action|IN("register","report")) and ($n|del(.nativeMetadata)|request_valid) and (($n|has("nativeMetadata")|not) or $prepared_metadata or ($n.nativeMetadata|metadata)) then
+      .revision as $beforeRevision | mutation(($n|del(.nativeMetadata));"native";false)
       | if .revision != $beforeRevision and ($n|has("nativeMetadata")) then .sessions |= map(if same_session($n.args) then .nativeMetadata = $n.nativeMetadata else . end) else . end
     else error("INVALID_REQUEST") end
   else error("INVALID_REQUEST") end;
+# Store transactions reuse the already fully validated, unchanged native metadata.
+# All event/registration fields are checked again after canonical path preparation.
+# Pure mutate also rechecks metadata; full final state validation is unconditional.
+def mutation($r;$source): mutation($r;$source;false);
 def project_state:
-  . as $state | .tasks |= map(. as $task | [$state.sessions[]|select(same_session($task))][0] as $s
-    | .freshness = (if (($s.nativeMetadata.inactiveTaskIds//[])|index($task.taskId)) then "connection-lost" elif fresh($s) then if $s.provenance == null or ($s.provenance|has("commandHash")|not) then "unconfirmed" else "connected" end else "connection-lost" end)
+  (.sessions|session_index) as $sessions | .tasks |= map(. as $task | $sessions[session_key] as $entry | $entry.session as $s
+    | .freshness = (if $entry.inactive[$task.taskId] != null then "connection-lost" elif fresh($s) then if $s.provenance == null or ($s.provenance|has("commandHash")|not) then "unconfirmed" else "connected" end else "connection-lost" end)
     | if .association.status == "registered" and (any($projects.projects[];.id == $task.association.projectId and any(.checkouts[];.id == $task.association.checkoutId and .path == $task.association.cwd))|not) then .association.status = "unavailable" else . end)
   | .capabilities = {heartbeatSeconds:15,connectionLostSeconds:60,maxLiveTasks:200,maxInactiveTasks:500,inactiveRetentionDays:14,duplicateReceiptWindow:512,maxRetiredEpochs:512,epochHistoryLifetime:"retained-session"};
-if $operation == "validate" then try state_valid catch false
+if $operation == "load" then
+  if utf8bytelength > 33554432 then error("ACTIVITY_INVALID")
+  else fromjson | if state_valid then . else error("ACTIVITY_INVALID") end end
+elif $operation == "validate" then try state_valid catch false
+elif $operation == "read-request" then
+  if utf8bytelength > 1048576 then error("INPUT_TOO_LARGE")
+  else (try fromjson catch error("INVALID_REQUEST_JSON"))
+    | if (try request_valid catch false) then . else error("INVALID_REQUEST_SCHEMA") end end
 elif $operation == "request" then try request_valid catch false
 elif $operation == "normalized" then try (fields(["action","args"];["nativeMetadata"]) and (.action|IN("register","report")) and (del(.nativeMetadata)|request_valid) and ((has("nativeMetadata")|not) or (.nativeMetadata|metadata))) catch false
 elif $operation == "mutate" then . as $before | mutation($request;"report") | if . == $before then . else retain end
 elif $operation == "project" then project_state
+elif $operation == "response" then project_state | {ok:true,state:.,error:null}
+elif $operation == "transaction" then
+  (. as $before | mutation($request;"report";true) | if . == $before then . else retain end) as $after
+  # Final validation uses the same in-memory result before emitting either line.
+  | if $after|state_valid then $after,($after|project_state|{ok:true,state:.,error:null}) else error("ACTIVITY_INVALID") end
 else error("INVALID_OPERATION") end

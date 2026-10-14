@@ -7,7 +7,11 @@ shell restarts, with unconfirmed tools noted in the tooltip. A bare saved
 workspace assignment alone does not show a bar label.
 Full context stays in its tooltip, including branch and launch-time context;
 ambiguous or unavailable context falls back to the workspace controls.
-The overview still shows saved assignments as project context.
+The overview shows project context only on occupied workspaces with a unique
+observed checkout or retained launched environment. Saved assignments alone keep
+the ordinary workspace label.
+The bar also hides project names as soon as the focused workspace becomes empty,
+including when its launched environment is retained for later use.
 The bar polls the existing read-only project client every five seconds while
 visible, with serialized reads and capture refusal. Clicking the label summons
 Projects with exact project and checkout IDs, without launching tools.

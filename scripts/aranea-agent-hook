@@ -4,5 +4,18 @@
 export PATH=/usr/bin:/bin
 unset BASH_ENV ENV CDPATH
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-/usr/bin/timeout 2 /bin/bash "$script_dir/aranea-agent-hook-worker" "${1:-}" >/dev/null 2>&1 || true
+{
+  # Explicit stdin keeps native payloads attached to the background monitor.
+  /usr/bin/timeout --kill-after=0.1 1.5 /bin/bash "$script_dir/aranea-agent-hook-worker" "${1:-}" <&0 &
+  worker_group=$!
+  worker_status=0
+  wait "$worker_group" || worker_status=$?
+  # timeout can exit after the worker accepts TERM, leaving a resistant child.
+  # Successful SessionStart leaves time for its background setsid to detach.
+  if ((worker_status != 0)) && kill -0 -- "-$worker_group" 2>/dev/null; then
+    kill -TERM -- "-$worker_group" 2>/dev/null || true
+    /bin/sleep 0.1
+    kill -KILL -- "-$worker_group" 2>/dev/null || true
+  fi
+} >/dev/null 2>&1
 exit 0

@@ -73,6 +73,16 @@ Bluetooth uses `T` for power. System's `showPage power|display|health` validates
 availability. Health samples resources while its page is selected and uses the
 shared Health service through HealthBridge.
 
+Display keeps `TextSizeController.qml`, `NightlightController.qml`, and
+`KeyboardBacklightController.qml` as persistent children of its Panel. Each owns
+its existing command processes, pending state, last-wins queue, and readback
+rules; text size also owns preview expiry and accepts the live base font size.
+The Panel preserves public properties and action methods through aliases and
+forwarders. It retains visibility and polling gates, cursor/input policy, text
+reflow hover suppression, brightness, monitor/scale operations, IPC, and
+hosted/standalone lifecycle. Closing either popup leaves accepted commands and
+their confirmation reads alive.
+
 `repair-shell-config` removes redundant child entries only when their host is
 present. The bar exposes Notifications, Agents, Network, Audio, and System,
 with a disclosed tray and a conditional Health issue shortcut.
@@ -134,6 +144,11 @@ different contracts. Re-observation preserves the original launch identity and
 baseline and leaves its completed outcome unchanged. Lost ownership evidence on
 an occupied association stays uncertain until an explicit per-role choice.
 
+`ProjectRoleEvidence.js` selects pure per-role ownership evidence and resolves
+launch/focus/hold policy from explicit snapshots, reusing exact environment keys
+and operation decisions. `ProjectsController.qml` retains mutation, queue, timer,
+native dispatch, observation, and generation/session authority.
+
 `ProjectsPresentation.qml` retains drafts and clients outside window visibility.
 `ProjectsSurface.qml` presents Overview, Actions, Agents, Preferences, and Help.
 Settings owns desktop preferences. Search's `ProjectClient.qml` observer survives
@@ -146,6 +161,14 @@ owner. A saved argument array is inert until explicit Start. Runs retain immutab
 command snapshots and exact systemd ownership evidence. Agent task reports are
 separate from usage limits and from action execution: neither a reported finish
 nor a successful command supplies independent verification of a task.
+
+Native activity hooks keep the provider's two-second advisory timeout. Their
+synchronous worker has a 1.5-second deadline and a 0.1-second termination grace.
+The locked store validates the loaded state and the complete reduced result,
+then atomically publishes it. Exact serialized session identities and retained
+task/receipt indexes bound history lookups without changing replay or retention
+rules. Mutation, final validation, and response projection share one in-memory
+reducer result; raw native prompts remain outside scratch storage.
 
 ## Logic and facade decomposition
 
