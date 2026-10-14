@@ -297,6 +297,40 @@ ShellRoot {
       checkoutId: 'c',
       actionId: 'a'
     }
+    var tasks = [
+      {
+        taskId: 't-freshness',
+        provider: 'codex',
+        description: 'Layout',
+        reportedState: 'working',
+        freshness: 'connected',
+        association: {
+          status: 'registered',
+          projectId: 'p',
+          checkoutId: 'c',
+          cwd: '/repo'
+        }
+      }
+    ]
+    var readSucceeded = true
+    root.activityClient.runner = function (argv, done) {
+      done(readSucceeded ? 0 : 1, readSucceeded ? JSON.stringify({
+        tasks: tasks,
+        operations: []
+      }) : '', readSucceeded ? '' : 'Owner disappeared')
+    }
+    root.activityClient.refresh()
+    t.check(overview.activitySummary.some(function (row) {
+      return row.label === '1 agent working (reported)'
+    }), 'successful owner read presents reported live work')
+    readSucceeded = false
+    root.activityClient.refresh()
+    t.check(overview.activitySummary.some(function (row) {
+      return row.label === 'Agent status unavailable'
+    }), 'failed owner read replaces retained live work with connection uncertainty')
+    t.check(!overview.activitySummary.some(function (row) {
+      return row.label === '1 agent working (reported)'
+    }), 'retained snapshot cannot keep a live summary after owner loss')
     root.gitClient.captureActive = true
     root.actionClient.captureActive = true
     root.activityClient.captureActive = true

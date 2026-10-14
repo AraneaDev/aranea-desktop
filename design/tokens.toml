@@ -107,7 +107,7 @@ base-size = 12
 
 [shell.popups]
 background = "#0b1016"
-background-alpha = 0.97
+background-alpha = 1.0
 text = "#edf3f6"
 border = "hyprland.active-border"
 border-alpha = 1.0
