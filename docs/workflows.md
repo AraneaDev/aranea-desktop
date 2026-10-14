@@ -4,12 +4,15 @@ Open **Command center → Projects** to keep a Git checkout, its tools, saved
 commands, and local agent activity together. Projects opens its own window.
 You can use it without enabling agent reporting.
 
-The sidebar selects a project; narrow windows use a compact selector.
-**Overview** shows the checkout and workspace, **Actions** contains saved
-commands and runs, **Agents** shows reported tasks, **Preferences** controls
-tools and checkouts, and **Help** explains setup. Save or discard unsaved drafts
-before switching projects or destinations. Closing the window retains drafts
-and does not cancel accepted operations.
+Search the sidebar by project name, checkout path or branch; Ctrl+K focuses
+search, arrows move through results and Enter selects. Pins appear first, followed
+by recent projects. Narrow windows open a full searchable picker.
+**Overview** leads with read-only Git state and brings services/checks, agents and
+workspaces together. **Actions** contains saved commands and runs, **Agents** shows
+reported tasks, **Preferences** controls tools and checkouts, and **Help** explains
+setup. Leaving an editor offers **Save**, **Discard**, or **Keep editing**. Save
+continues only after successful acknowledgement; a failed save retains the draft.
+Closing the window retains drafts and does not cancel accepted operations.
 
 ## What belongs where?
 
@@ -24,24 +27,20 @@ and does not cancel accepted operations.
 ## Set up your first project
 
 1. Open Projects and choose **Add project**.
-2. In **Choose folder**, pick the repository itself or a parent development
-   folder. You can also enter an absolute path and choose **Use folder**.
-3. In **Add repositories**, review discovered checkouts and worktrees. Select
-   the ones you want, then choose **Add selected**. Scanning and selection alone
-   register nothing; related worktrees are grouped into one project.
-4. In **Configure workflow**, review the name, editor, terminal, and workspace.
-   Choose **Use checkout** beside the preferred working copy. Save changes with
-   **Save preferences**. A dedicated workspace keeps the tools together; using
-   the current workspace opens them where you are working.
-5. Optionally define test, build, or dev-server actions. Save or cancel each
-   draft; actions can also be added later.
-6. In **Connect agents**, follow the provider setup instructions or choose
-   **Finish setup** to skip reporting. Finishing starts no agent session.
+2. Choose the exact Git repository, or enter its absolute path and choose
+   **Add repository**.
+3. Registration opens **Overview** immediately. Inspect Git state and choose
+   **Open workspace** to use installed tools with the existing defaults.
 
-If you add several repositories, **Project 1 of N** tracks your place.
-**Next project** and **Previous project** move through their individual
-preferences; agent setup follows the last project. **Exit setup** keeps changes
-already saved.
+Agent reporting and saved actions are optional. Configure tools or workspace
+preferences later in **Preferences**. **▾ → Just open one** also lets you open an
+installed editor or terminal independently of agents.
+
+For bulk discovery, choose **Scan development folder** from Add project. Approve
+a parent folder, review discovered repositories and select **Add selected**.
+Scanning alone registers nothing. This optional guide can walk through each
+registered project's preferences and agent help; **Exit setup** keeps saved
+registrations. Related worktrees remain grouped under one project.
 
 To add repositories later, choose **Add project** again. **Preferences → Manage
 development folders** opens discovery directly. **Scan again** refreshes a saved

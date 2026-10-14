@@ -12,9 +12,22 @@
  * @param {NavigationState|null} navigation Optional saved navigation metadata.
  * @param {string} query Search text.
  * @param {string[]|null} frozenIds Current result identities, in navigation order.
+ * @param {{[key:string]: {data?:{projectId:string,checkoutId:string,branch?:string|null}}}} [gitCache] Exact-pair cached observations.
  * @returns {NavigationRow[]} Matching rows with stable identity and order.
  */
-function rows(projects, navigation, query, frozenIds) {
+function rows(projects, navigation, query, frozenIds, gitCache) {
+  /**
+   * Validate identities even when the cache key matches.
+   * @param {NavigationProject} project Saved project.
+   * @param {NavigationCheckout} checkout Saved checkout.
+   * @returns {string} Observed branch or registered fallback.
+   */
+  function branch(project, checkout) {
+    var data = ((gitCache || {})[JSON.stringify([project.id, checkout.id])] || {}).data
+    return data && data.projectId === project.id && data.checkoutId === checkout.id
+      ? data.branch || "detached HEAD"
+      : checkout.branch || ""
+  }
   var saved = navigation || {}
   var pins = saved.pinnedProjectIds || []
   var visits = saved.visitedAt || {}
@@ -27,7 +40,7 @@ function rows(projects, navigation, query, frozenIds) {
         (project.checkouts || []).some(function (checkout) {
           return (
             checkout.path.toLowerCase().indexOf(search) >= 0 ||
-            (checkout.branch || "").toLowerCase().indexOf(search) >= 0
+            branch(project, checkout).toLowerCase().indexOf(search) >= 0
           )
         })
       )
@@ -40,7 +53,7 @@ function rows(projects, navigation, query, frozenIds) {
         id: project.id,
         name: project.name,
         path: checkout ? checkout.path : "",
-        branch: checkout ? checkout.branch || "" : "",
+        branch: checkout ? branch(project, checkout) : "",
         pinned: pins.indexOf(project.id) >= 0,
         visitedAt: visits[project.id] || 0
       }

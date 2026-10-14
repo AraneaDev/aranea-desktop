@@ -153,7 +153,83 @@ Item {
   // Latest geometry/content change disarms stale pointer activation.
   property real layoutChangedAt: 0
   // Unsaved drafts, wizard state and pending work prevent changing selection.
-  readonly property bool navigationBlocked: projectsPage.setupActive || projectsPage.setupNavigationPending || projectsPage.details.dirty || projectsPage.details.actions.editing || root.activityClient.pending
+  readonly property bool navigationBlocked: projectsPage.setupActive || projectsPage.setupNavigationPending || root.activityClient.pending
+  // Draft decisions are independent of accepted operation serialization.
+  readonly property bool hasUnsavedDraft: projectsPage.details.dirty || projectsPage.details.actions.editing
+  // Only explicit Save intent can continue after authoritative draft acknowledgement.
+  property bool savingNavigationDraft: false
+  // Retain the exact requested destination while asking for a draft decision.
+  function guardDraft(target) {
+    if (!hasUnsavedDraft)
+      return false
+    draftGuard.pendingTarget = target
+    savingNavigationDraft = false
+    draftGuard.open()
+    return true
+  }
+  // Route the retained destination through the same ordinary navigation guards.
+  function continueDraftNavigation() {
+    var target = draftGuard.pendingTarget
+    savingNavigationDraft = false
+    draftGuard.pendingTarget = null
+    draftGuard.close()
+    if (!target)
+      return
+    if (target.setup)
+      projectsPage.startSetup()
+    else if (target.projectId !== root.projectId)
+      navigate(target.projectId)
+    else
+      chooseSection(target.section)
+  }
+  // Add project is a destination too; editing never silently disables it.
+  function addProject() {
+    if (navigationBlocked || root.inert || guardDraft({
+      setup: true
+    }))
+      return
+    projectsPage.startSetup()
+  }
+  // Save each retained draft through its existing validation and transport.
+  function saveNavigationDraft() {
+    if (root.inert || draftGuard.pending || !draftGuard.pendingTarget)
+      return
+    savingNavigationDraft = true
+    if (projectsPage.details.dirty)
+      projectsPage.details.applyDraft()
+    else if (projectsPage.details.actions.editing)
+      projectsPage.details.actions.editor.save()
+    Qt.callLater(panel.finishNavigationSave)
+  }
+  // Authoritative success clears the draft; failed or newer edits keep it visible.
+  function finishNavigationSave() {
+    if (savingNavigationDraft && !hasUnsavedDraft && !projectsPage.setupNavigationPending)
+      continueDraftNavigation()
+  }
+  onHasUnsavedDraftChanged: Qt.callLater(panel.finishNavigationSave)
+  onNavigationBlockedChanged: Qt.callLater(panel.finishNavigationSave)
+  ProjectDraftGuard {
+    id: draftGuard
+    parent: panel
+    pending: projectsPage.setupNavigationPending || panel.root.activityClient.pending
+    error: projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
+    pointerGate: pointerGate
+    onSaveRequested: panel.saveNavigationDraft()
+    onDiscardRequested: {
+      if (pending || panel.root.inert)
+        return
+      projectsPage.details.discardDraft()
+      projectsPage.details.actions.editing = false
+      panel.continueDraftNavigation()
+    }
+    onKeepEditingRequested: {
+      if (pending)
+        return
+      panel.savingNavigationDraft = false
+      pendingTarget = null
+      close()
+    }
+  }
   // Select a known project only when no draft or operation would be hidden.
   function navigate(id) {
     if (id !== '' && !(root.projectController.state.projects || []).some(function (p) {
@@ -163,6 +239,11 @@ Item {
     if (id === root.projectId)
       return true
     if (navigationBlocked)
+      return false
+    if (root.inert || guardDraft({
+      projectId: id,
+      section: 'overview'
+    }))
       return false
     root.projectId = id
     root.flushNavigation()
@@ -180,21 +261,26 @@ Item {
     else
       sidebar.focusSearch()
   }
+  // Layer windows do not match Qt's active-window shortcut context.
+  // The opened overlay owns exclusive keyboard focus; hidden Projects claims no keys.
   Shortcut {
     sequence: 'Ctrl+K'
-    enabled: panel.visible && !panel.root.inert && !panel.navigationBlocked
+    context: Qt.ApplicationShortcut
+    enabled: panel.root.opened && panel.visible && !panel.root.inert && !panel.navigationBlocked
     onActivated: panel.focusProjectSearch()
   }
   ProjectPicker {
     id: projectPicker
     objectName: 'projectPicker'
     parent: panel
-    rows: Navigation.rows(panel.root.projectController.state.projects || [], panel.root.projectController.state.navigation || {}, query, frozenIds)
+    rows: Navigation.rows(panel.root.projectController.state.projects || [], panel.root.projectController.state.navigation || {}, query, frozenIds, panel.root.gitClient.cache)
     rowsFiltered: true
     selectedId: panel.root.projectId
     displayOnly: panel.root.inert || panel.navigationBlocked
     pointerGate: pointerGate
     pinningEnabled: true
+    showAddProject: true
+    onSetupRequested: panel.addProject()
     onSelected: function (id) {
       panel.navigate(id)
     }
@@ -204,16 +290,22 @@ Item {
   }
   onCompactChanged: projectPicker.close()
   onVisibleChanged: {
-    if (!visible)
+    if (!visible) {
       projectPicker.close()
-    else
+      draftGuard.close()
+      draftGuard.pendingTarget = null
+      savingNavigationDraft = false
+    } else
       scheduleGitBackground()
   }
   // Choose a supported destination after checking draft and pending guards.
   function chooseSection(next) {
     if (['overview', 'actions', 'agents', 'preferences', 'help'].indexOf(next) < 0)
       return false
-    if (next !== section && (projectsPage.details.dirty || projectsPage.details.actions.editing || projectsPage.setupNavigationPending || root.activityClient.pending))
+    if (next !== section && (navigationBlocked || root.inert || guardDraft({
+        projectId: root.projectId,
+        section: next
+      })))
       return false
     section = next
     if (next === 'agents')
@@ -239,6 +331,8 @@ Item {
       section: section,
       query: sidebar.query,
       sidebarContentY: sidebar.contentY,
+      draftTarget: draftGuard.pendingTarget,
+      draftGuardOpen: draftGuard.opened,
       projects: projectsPage.captureSnapshot()
     }
   }
@@ -249,12 +343,18 @@ Item {
     sidebar.query = saved.query || ''
     sidebar.restoreViewport(saved.sidebarContentY || 0)
     projectsPage.captureRestore(saved.projects)
+    draftGuard.pendingTarget = saved.draftTarget || null
+    if (saved.draftGuardOpen && draftGuard.pendingTarget)
+      draftGuard.open()
     Qt.callLater(function () {
       panel.scrollTo(saved.contentY || 0)
     })
   }
   // Initialize inert fixture presentation without invoking an owner operation.
   function captureReset(fixture) {
+    draftGuard.close()
+    draftGuard.pendingTarget = null
+    savingNavigationDraft = false
     section = fixture && fixture.projectSection || 'overview'
     sidebar.query = ''
     agentsView.captureRestore({})
@@ -407,6 +507,7 @@ Item {
               anchors.margins: Style.space(12)
               compact: panel.compact
               projects: panel.root.projectController.state.projects || []
+              gitCache: panel.root.gitClient.cache
               navigation: panel.root.projectController.state.navigation || {}
               bindings: panel.root.projectClient.snapshot.bindings || []
               selectedId: projectsPage.selectedProject ? projectsPage.selectedProject.id : panel.root.projectId
@@ -418,7 +519,7 @@ Item {
               onPinRequested: function (id, pinned) {
                 panel.root.rememberNavigation(id, pinned)
               }
-              onSetupRequested: projectsPage.startSetup()
+              onSetupRequested: panel.addProject()
               onViewportChanged: {
                 panel.stampLayout()
                 panel.scheduleGitBackground()
@@ -522,7 +623,7 @@ Item {
                   width: content.width
                   visible: projectsPage.setupActive
                   title: 'Add a project'
-                  description: 'Choose a repository, configure your tools, and connect agent reporting if you need it.'
+                  description: 'Add an exact Git repository to open its Overview.'
                 }
                 Flow {
                   width: content.width
@@ -556,7 +657,7 @@ Item {
                       objectName: 'projectTab:' + modelData.id
                       text: modelData.label
                       selected: panel.section === modelData.id
-                      enabled: (modelData.id === 'help' || modelData.id === 'preferences' || !!projectsPage.selectedProject) && (panel.section === modelData.id || !projectsPage.details.dirty && !projectsPage.details.actions.editing && !projectsPage.setupNavigationPending && !panel.root.activityClient.pending)
+                      enabled: (modelData.id === 'help' || modelData.id === 'preferences' || !!projectsPage.selectedProject) && (panel.section === modelData.id || !panel.navigationBlocked)
                       pointerGate: pointerGate
                       onClicked: panel.chooseSection(modelData.id)
                     }
@@ -569,7 +670,7 @@ Item {
                   pending: panel.navigationBlocked
                   displayOnly: !!panel.root.inert
                   pointerGate: pointerGate
-                  onSetupRequested: projectsPage.startSetup()
+                  onSetupRequested: panel.addProject()
                   onHelpRequested: panel.chooseSection('help')
                 }
                 Aranea.PageHeader {
@@ -651,6 +752,8 @@ Item {
                     panel.root.projectClient.request(payload)
                   }
                   onDetailsRequested: function (id) {
+                    if (projectsPage.exactSetup && !projectsPage.setupActive)
+                      panel.chooseSection('overview')
                     panel.navigate(id)
                   }
                   onRefreshRequested: {
@@ -714,7 +817,7 @@ Item {
                   }
                   displayOnly: !!panel.root.inert
                   maxHeight: Math.max(Style.space(200), scroller.height)
-                  onSetupRequested: projectsPage.startSetup()
+                  onSetupRequested: panel.chooseSection('help')
                 }
                 Aranea.WorkflowHelp {
                   width: scroller.contentWidth
@@ -738,7 +841,7 @@ Item {
         Aranea.UiLabel {
           Layout.fillWidth: true
           visible: !panel.shortScreen
-          text: projectsPage.setupActive ? 'Complete or exit setup before switching projects.' : panel.navigationBlocked ? 'Save or discard drafts before switching projects.' : panel.root.captureSaved ? 'Preview · read-only' : 'Tab navigate · Page Up/Down scroll · Esc close'
+          text: projectsPage.setupActive ? (projectsPage.exactSetup ? 'Choose a repository to add it to Projects.' : 'Complete or exit setup before switching projects.') : panel.navigationBlocked ? 'Waiting for the current operation.' : panel.root.captureSaved ? 'Preview · read-only' : 'Tab navigate · Page Up/Down scroll · Esc close'
           opacity: 0.5
         }
       }

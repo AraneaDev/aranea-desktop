@@ -37,6 +37,10 @@ ColumnLayout {
   }
   // Context-specific chooser label, including explicit checkout relocation.
   property string buttonText: 'Choose folder'
+  // Exact repository registration names its chooser and confirmation explicitly.
+  property string dialogTitle: 'Choose a development folder'
+  // Hosts can distinguish registration from discovery approval.
+  property string confirmText: 'Use folder'
   // The manual path alternative stays available independently of the dialog.
   readonly property bool fallbackVisible: true
   // Local absolute-path validation does not replace backend existence validation.
@@ -131,7 +135,7 @@ ColumnLayout {
     Accessible.name: 'Absolute project folder path'
   }
   Aranea.ActionButton {
-    text: 'Use folder'
+    text: picker.confirmText
     enabled: !picker.displayOnly && picker.validPath
     pointerGate: picker.pointerGate
     onClicked: picker.confirm()
@@ -140,7 +144,7 @@ ColumnLayout {
     id: folderDialogComponent
     FolderDialog {
       id: dialog
-      title: 'Choose a development folder'
+      title: picker.dialogTitle
       // GTK/GVFS native dialogs can segfault the shared Quickshell process.
       options: FolderDialog.DontUseNativeDialog
       // Projects is a layer-shell overlay; a separate window would tile beneath it.

@@ -194,7 +194,7 @@ ShellRoot {
       sample.error = 'Desktop settings are unavailable. Check that the settings helper is installed, then Retry.'
     }
     if (fixture.indexOf('projects-') === 0 || fixture.indexOf('project-') === 0) {
-      var projects = ProjectPreview.sample(fixture, Quickshell.env('ARANEA_PROJECT_RENDER_STATE'))
+      var projects = ProjectPreview.sample(fixture, Quickshell.env('ARANEA_PROJECT_RENDER_STATE'), Quickshell.env('ARANEA_PROJECT_RENDER_COUNT'))
       Object.keys(projects).forEach(function (key) {
         sample[key] = projects[key]
       })
@@ -246,14 +246,9 @@ ShellRoot {
         if (harness.fixture === 'project-details' || harness.fixture === 'project-launch-partial' || harness.fixture === 'project-setup-bulk') {
           for (var j = 0; j < objects.length; j++) {
             var scroll = objects[j]
-            if (scroll.contentY === undefined || !scroll.contentItem || scroll.height < 100)
+            if (scroll.objectName !== 'projectsContentViewport' || !scroll.contentItem || scroll.height < 100)
               continue
-            var target = 0
-            for (var k = 0; k < objects.length; k++) {
-              if (objects[k].text === 'Customer dashboard and developer accessibility improvements' && objects[k].visible && objects[k].font && objects[k].font.bold)
-                target = Math.max(target, objects[k].mapToItem(scroll.contentItem, 0, 0).y)
-            }
-            scroll.contentY = Quickshell.env('ARANEA_SETTINGS_RENDER_SCROLL') === 'bottom' ? Math.max(0, scroll.contentHeight - scroll.height) : Math.min(target, Math.max(0, scroll.contentHeight - scroll.height))
+            scroll.contentY = Quickshell.env('ARANEA_SETTINGS_RENDER_SCROLL') === 'bottom' ? Math.max(0, scroll.contentHeight - scroll.height) : 0
           }
         }
       }

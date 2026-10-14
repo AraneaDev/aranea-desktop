@@ -374,6 +374,11 @@ Item {
     var nextId = payload && payload.projectId !== undefined ? Logic.normalizeProjectId(payload.projectId) : projectId
     if (view && nextId !== projectId && view.navigationBlocked)
       return 'busy'
+    if (view && nextId !== projectId && view.hasUnsavedDraft) {
+      opened = true
+      view.navigate(nextId)
+      return 'ok'
+    }
     restoreNavigationPending = !payload || payload.projectId === undefined
     projectId = nextId
     opened = true

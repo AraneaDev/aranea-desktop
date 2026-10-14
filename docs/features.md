@@ -139,10 +139,11 @@ it was saved for later sessions.
 
 ## Project workspaces
 
-**Command center → Projects** opens a separate project manager. Its setup wizard
-helps you choose a development folder, review Git repositories and worktrees,
-save your preferred tools, and optionally connect agent reporting. A scan
-registers nothing until you choose **Add selected**.
+**Command center → Projects** opens a searchable project manager. **Add project**
+registers an exact Git repository and opens its Git-led Overview immediately.
+Agents, saved actions and tool preferences are optional follow-up settings.
+**Scan development folder** offers bulk discovery; a scan registers nothing
+until you choose **Add selected**.
 
 Each project remembers its checkouts, editor, terminal, and workspace
 preferences. **Open workspace** opens or focuses the selected tools; another

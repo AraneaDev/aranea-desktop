@@ -20,6 +20,10 @@ Popup {
   property bool displayOnly: false
   // Projects expose pinning; generic choosers leave it disabled.
   property bool pinningEnabled: false
+  // Project pickers keep registration reachable at narrow widths.
+  property bool showAddProject: false
+  // The surface applies its draft decision before opening registration.
+  signal setupRequested
   // Hosts may project branch matches from all checkouts before supplying rows.
   property bool rowsFiltered: false
   // Query order is supplied to the host's pure navigation projection.
@@ -81,7 +85,7 @@ Popup {
     })
     selectedId: picker.selectedId
     query: picker.query
-    showAddProject: false
+    showAddProject: picker.showAddProject
     searchPlaceholder: 'Search…'
     pinningEnabled: picker.pinningEnabled
     navigationEnabled: !picker.displayOnly
@@ -89,6 +93,10 @@ Popup {
     onQueryChanged: picker.query = query
     onProjectRequested: function (id) {
       picker.select(id)
+    }
+    onSetupRequested: {
+      picker.close()
+      picker.setupRequested()
     }
     onPinRequested: function (id, pinned) {
       picker.pinRequested(id, pinned)

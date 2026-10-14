@@ -2,9 +2,10 @@
  * Supplies fixed display data without a user directory or owner read.
  * @param {string} id - approved project fixture identifier
  * @param {string} [mode] - pending launch or installed agent display variant
+ * @param {string} [count] - optional project count, including an empty registry
  * @returns {Object<string, *>} inert settings and owner observations
  */
-function sample(id, mode) {
+function sample(id, mode, count) {
   var path =
     "/fixture/development/very-long-organization-name/customer-dashboard/worktrees/accessibility-improvements"
   var project = {
@@ -63,6 +64,80 @@ function sample(id, mode) {
     ignored: [],
     projects: empty || discovery ? [] : bulk ? [project, secondProject] : [project]
   }
+  if (count !== undefined && count !== "") {
+    state.projects = []
+    for (var i = 0; i < Number(count); i++) {
+      state.projects.push(
+        i === 0
+          ? project
+          : {
+              id: "p-many-" + i,
+              name: i % 10 === 0 ? "Customer dashboard" : "Project " + String(i).padStart(3, "0"),
+              commonDir: "/fixture/development/team-" + i + "/repository/.git",
+              lastCheckoutId: "c-many-" + i,
+              tools: { editorId: "code", terminalId: "kitty" },
+              checkouts: [
+                {
+                  id: "c-many-" + i,
+                  path: "/fixture/development/team-" + i + "/repository",
+                  branch: i % 3 === 0 ? "feature/search" : "main",
+                  primary: true
+                }
+              ],
+              associations: []
+            }
+      )
+    }
+  }
+  var gitCache = {}
+  if (state.projects.length) {
+    gitCache[JSON.stringify([project.id, "c-preview"])] = {
+      data:
+        mode === "unreadable"
+          ? null
+          : {
+              projectId: project.id,
+              checkoutId: "c-preview",
+              path: path,
+              observedAt: Date.now() - (mode === "stale" ? 180000 : 2000),
+              branch: "feature/current-overview",
+              detached: false,
+              upstream: "origin/feature/current-overview",
+              ahead: 2,
+              behind: 1,
+              counts: {
+                staged: 2,
+                unstaged: 3,
+                untracked: 1,
+                conflicts: mode === "conflicts" ? 2 : 0
+              },
+              files: [
+                {
+                  path: "src/project.qml",
+                  staged: true,
+                  unstaged: true,
+                  untracked: false,
+                  conflict: mode === "conflicts"
+                },
+                {
+                  path: "notes/new ideas.md",
+                  staged: false,
+                  unstaged: false,
+                  untracked: true,
+                  conflict: false
+                }
+              ],
+              truncated: false
+            },
+      error:
+        mode === "unreadable" || mode === "stale"
+          ? {
+              code: "UNREADABLE",
+              message: "Checkout could not be read. Check the folder and refresh."
+            }
+          : null
+    }
+  }
   var snapshot = {
     sessionId: "preview-session",
     observedAt: 123,
@@ -113,6 +188,7 @@ function sample(id, mode) {
   }
   return {
     projectsState: state,
+    projectGitCache: gitCache,
     projectTools: {
       defaults: { editorId: "code", terminalId: "kitty" },
       editors: [{ id: "code", label: "VS Code", available: true, supported: true }],
@@ -122,6 +198,7 @@ function sample(id, mode) {
           : [{ id: "kitty", label: "Kitty", available: true, supported: true }]
     },
     projectsDraft: {
+      exactSetup: id === "project-setup-folder",
       setupActive: id.indexOf("project-setup-") === 0,
       setupStep:
         id === "project-setup-folder"
@@ -179,6 +256,6 @@ function sample(id, mode) {
         : [],
     projectSnapshot: snapshot,
     projectAvailable: true,
-    projectId: project.id
+    projectId: state.projects.length ? project.id : ""
   }
 }

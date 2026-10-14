@@ -84,6 +84,7 @@ smoke_problems() {
 stage_smoke() {
   local shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}" missing=()
   command -v quickshell >/dev/null || missing+=(quickshell)
+  command -v setpriv >/dev/null || missing+=("setpriv (util-linux)")
   command -v sway >/dev/null || missing+=("sway (headless compositor)")
   command -v dbus-run-session >/dev/null || missing+=("dbus-run-session (dbus)")
   [[ -f "$shell_dir/Commons/qmldir" && -f "$shell_dir/Ui/qmldir" ]] || missing+=("Omarchy shell at $shell_dir")
@@ -112,12 +113,14 @@ echo "exit \$?" >>'$run/client.log'
 swaymsg exit
 EOF
   chmod +x "$run/client"
-  printf 'exec %s\n' "$run/client" >"$run/sway.conf"
+  printf 'swaybg_command -\nexec %s\n' "$run/client" >"$run/sway.conf"
+  # Prevent file capabilities enabling realtime scheduling under a zero RLIMIT_RTTIME.
+  # This headless compositor needs no additional privilege or background helper.
   env -u WAYLAND_DISPLAY -u HYPRLAND_INSTANCE_SIGNATURE -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$run" HOME="$run/home" XDG_CACHE_HOME="$run/cache" \
     XDG_STATE_HOME="$run/home/.local/state" XDG_CONFIG_HOME="$run/home/.config" \
     WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman \
-    timeout 90 dbus-run-session -- sway -c "$run/sway.conf" >"$run/sway.log" 2>&1
+    timeout 90 dbus-run-session -- setpriv --no-new-privs sway -c "$run/sway.conf" >"$run/sway.log" 2>&1
   local sway_status=$?
 
   local status=0

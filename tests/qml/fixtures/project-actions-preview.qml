@@ -280,7 +280,7 @@ ShellRoot {
         harness.check(before === JSON.stringify(harness.actionView.captureSnapshot()), 'all capture I/O controls leave presentation unchanged')
         var objects = harness.collect(surface, [])
         var scroll = objects.filter(function (o) {
-          return o.contentY !== undefined && o.contentItem && o.height > 100
+          return o.objectName === 'projectsContentViewport' && o.contentY !== undefined && o.contentItem && o.height > 100
         })[0]
         harness.check(!!scroll, 'production settings viewport exists even when compact content fits')
         if (!scroll)

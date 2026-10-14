@@ -7,9 +7,14 @@ consume its snapshots and results; they do not launch tools independently.
 The plugin adds no bar widget. Open **Projects** from the command center’s top tile.
 Its own window contains a searchable project sidebar and Overview, Actions,
 Agents, Preferences, and Help destinations. A narrow window uses a compact
-project selector. The window keeps the selected project when reopened. With no selection,
-a welcome card explains the next steps. Add project starts setup; development
-folder management lives under Preferences, and Help covers projects, actions, and agents. Closing the window retains drafts and accepted operations.
+searchable project picker. The window keeps the selected project when reopened. With no selection,
+a welcome card explains the next steps. Add project registers an exact repository
+and enters Overview directly, using existing installed-tool defaults. Scan
+development folder is a secondary bulk route. Agents and actions remain optional.
+Leaving a dirty editor offers Save, Discard, or Keep editing; only acknowledged
+Save or explicit Discard continues navigation. Closing retains drafts and accepted
+operations. Development folder management lives under Preferences; Help covers
+projects, actions, and agents.
 
 Overview leads with Git state for the selected checkout: separate file counts,
 local-ref ahead/behind, and expandable changes. Services and checks, reported
@@ -179,3 +184,16 @@ and required ancestor directories; reinstall fences older requests. Repository
 folders, providers, editors and unrelated services remain untouched. Sandboxed
 backend/CLI/UI tests use fake manager/browser boundaries; they do not validate
 live native unit/browser behavior.
+
+Preview production Overview at representative sizes without registry reads or
+execution:
+
+```bash
+tools/render-projects-preview --fixture project-details --project-count 50 --width 1200 --height 800 --output /tmp/projects-wide.png
+tools/render-projects-preview --fixture project-details --project-count 100 --width 600 --height 700 --output /tmp/projects-narrow.png
+```
+
+Project counts from 0 through 100 are inert fixtures. `ARANEA_PROJECT_RENDER_STATE`
+accepts `conflicts`, `stale`, or `unreadable` for Git recovery captures. The empty
+activity hints remain compact. These previews establish layout, not native window
+focus, application reuse, or portal acceptance.

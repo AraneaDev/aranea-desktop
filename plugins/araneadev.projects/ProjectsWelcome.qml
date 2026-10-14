@@ -28,7 +28,7 @@ ProjectSectionCard {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: welcome.hasProjects ? 'Select a project from the list to open its workspace, run actions, or see what your agents are doing.' : 'Add a Git repository, choose your editor and terminal, and keep your workflow close at hand.'
+    text: welcome.hasProjects ? 'Select a project from the list to open its workspace, run actions, or see what your agents are doing.' : 'Add a Git repository to see its state and open it with your installed tools. Agents and saved actions are optional.'
     font.pixelSize: Style.font.body
     opacity: 0.8
   }

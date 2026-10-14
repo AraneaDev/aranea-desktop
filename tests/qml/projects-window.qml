@@ -117,11 +117,14 @@ ShellRoot {
     page.details.setDraft('name', 'Unsaved')
     t.check(!surface.navigate('p-two'), 'unsaved preferences prevent changing project')
     t.equal(entry.projectId, 'p-one', 'refusal preserves selected identity')
+    t.check(t.findChild(surface, 'projectDraftGuard').opened, 'draft navigation presents an explicit decision')
+    t.findChild(surface, 'projectDraftGuard').keepEditingRequested()
     page.details.discardDraft()
     page.details.actions.editing = true
     t.check(!surface.navigate('p-two'), 'action editor prevents hiding an unsaved draft')
     surface.section = 'actions'
     t.check(surface.navigate('p-one') && surface.section === 'actions', 'same-project selection preserves an action draft destination')
+    t.findChild(surface, 'projectDraftGuard').keepEditingRequested()
     page.details.actions.editing = false
     t.check(surface.navigate('p-two'), 'clean selection can switch to another project')
     t.equal(entry.projectId, 'p-two', 'switch chooses identity rather than list position')
@@ -166,6 +169,11 @@ ShellRoot {
     }
     entry.projectClient.available = true
     t.check(surface.chooseSection('agents'), 'Agents remains reachable after preferences')
+    t.findChild(surface, 'projectAgents').setupRequested()
+    t.check(surface.section === 'help' && !page.setupActive, 'optional agent setup opens help without another repository wizard')
+    if (page.setupActive)
+      page.finishSetup()
+    surface.chooseSection('agents')
     t.findChild(surface, 'projectPrimaryOpen').activate()
     t.equal(surface.section, 'overview', 'Open from Agents reveals the destination containing its outcome and recovery controls')
     entry.projectController.state = Object.assign({}, entry.projectController.state, {
@@ -194,6 +202,7 @@ ShellRoot {
       t.findChild(header, 'headerChooseProject').activate()
       t.step(80, function () {
         t.check(picker.opened, 'selected narrow header opens full project search')
+        t.check(t.findChild(picker, 'sidebarAddProject').visible, 'narrow project picker keeps Add project reachable')
         input.keyClick(Qt.Key_Escape)
         t.check(!picker.opened && entry.opened, 'picker dismissal keeps Projects open')
         var checkoutPicker = t.findChild(header, 'checkoutPicker')
@@ -274,6 +283,9 @@ ShellRoot {
               input.keyClick(Qt.Key_X)
               t.check(nameField.activeFocus && nameField.text.indexOf('x') >= 0, 'ordinary typed field text is not intercepted by project navigation')
               page.details.discardDraft()
+              entry.close()
+              input.keyClick(Qt.Key_K, Qt.ControlModifier)
+              t.check(nameField.activeFocus, 'closed Projects never claims application-context Ctrl+K')
             }
             t.done()
           })

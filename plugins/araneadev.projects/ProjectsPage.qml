@@ -37,6 +37,8 @@ ColumnLayout {
   property bool ignoredExpanded: false
   // Guided setup is presentation state; saves use existing typed requests.
   property bool setupActive: false
+  // Exact registration is the default; bulk discovery is an optional route.
+  property bool exactSetup: false
   // Current zero-based stage in the local setup guide.
   property int setupStep: 0
   // Exact identity returned by this wizard’s successful registration.
@@ -66,6 +68,7 @@ ColumnLayout {
     if (displayOnly || setupNavigationPending || details.dirty || details.actions.editing)
       return
     setupActive = true
+    exactSetup = true
     setupStep = 0
     setupProjectId = ''
     setupProjectIds = []
@@ -74,6 +77,12 @@ ColumnLayout {
     helpExpanded = false
     foldersExpanded = false
     candidates.selectedPaths = []
+  }
+  // Secondary bulk discovery retains the existing optional setup route.
+  function startBulkSetup(): void {
+    startSetup()
+    if (setupActive)
+      exactSetup = false
   }
   // Forward navigation changes presentation only after its guard passes.
   function advanceSetup(): void {
@@ -139,6 +148,10 @@ ColumnLayout {
     setupProjectId = ids[0]
     setupStep = 2
     setupRegistrationPaths = []
+    if (exactSetup) {
+      setupActive = false
+      detailsRequested(setupProjectId)
+    }
   }
   onErrorChanged: if (error) {
     setupRegistrationPaths = []
@@ -236,6 +249,8 @@ ColumnLayout {
     return {
       selectedPaths: candidates.selectedPaths.slice(),
       setupActive: setupActive,
+      exactSetup: exactSetup,
+      exactPath: exactPicker.pathDraft,
       setupStep: setupStep,
       setupProjectId: setupProjectId,
       setupProjectIds: setupProjectIds.slice(),
@@ -262,6 +277,8 @@ ColumnLayout {
     if (!saved)
       return
     setupActive = saved.setupActive === true
+    exactSetup = saved.exactSetup === true
+    exactPicker.pathDraft = saved.exactPath || ''
     setupStep = saved.setupStep || 0
     setupProjectIds = saved.setupProjectIds || (saved.setupProjectId ? [saved.setupProjectId] : [])
     setupProjectId = saved.setupProjectId || ''
@@ -286,6 +303,8 @@ ColumnLayout {
   // Reset local capture presentation using typed fixture data without backend access.
   function captureReset(fixture: var): void {
     setupActive = false
+    exactSetup = false
+    exactPicker.pathDraft = ''
     setupStep = 0
     setupProjectId = ''
     setupProjectIds = []
@@ -331,7 +350,7 @@ ColumnLayout {
     visible: !page.sidebarNavigation || !page.setupActive && page.viewSection === 'preferences'
     Aranea.ActionButton {
       objectName: 'projectSetupStart'
-      text: 'Set up a project'
+      text: 'Add project'
       visible: !page.setupActive && !page.sidebarNavigation
       enabled: !page.displayOnly && !page.setupNavigationPending && !details.dirty && !details.actions.editing
       pointerGate: page.pointerGate
@@ -368,7 +387,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.setupActive && (details.dirty || details.actions.editing)
-    text: 'Save or discard your current draft before starting a new project setup.'
+    text: 'Your draft is retained until you save or discard it.'
     color: Aranea.DesignTokens.attention
   }
   Aranea.WorkflowHelp {
@@ -376,10 +395,48 @@ ColumnLayout {
     visible: page.helpExpanded
     topic: page.helpTopic
   }
+  ColumnLayout {
+    Layout.fillWidth: true
+    visible: page.setupActive && page.exactSetup
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Installed tools use your existing defaults. Agents and saved actions are optional.'
+    }
+    ProjectFolderPicker {
+      id: exactPicker
+      objectName: 'projectExactPicker'
+      Layout.fillWidth: true
+      buttonText: 'Choose repository'
+      dialogTitle: 'Choose a Git repository'
+      confirmText: 'Add repository'
+      displayOnly: page.displayOnly || page.setupNavigationPending
+      pointerGate: page.pointerGate
+      onFolderRequested: function (path) {
+        page.setupRegistrationPaths = [path]
+        page.registerRequested([path])
+      }
+    }
+    Flow {
+      Layout.fillWidth: true
+      spacing: Style.space(8)
+      Aranea.ActionButton {
+        text: 'Scan development folder'
+        enabled: !page.displayOnly && !page.setupNavigationPending
+        pointerGate: page.pointerGate
+        onClicked: page.startBulkSetup()
+      }
+      Aranea.ActionButton {
+        text: 'Cancel'
+        enabled: !page.displayOnly && !page.setupNavigationPending
+        pointerGate: page.pointerGate
+        onClicked: page.finishSetup()
+      }
+    }
+  }
   ProjectSetupProgress {
     objectName: 'setupProgress'
     Layout.fillWidth: true
-    visible: page.setupActive
+    visible: page.setupActive && !page.exactSetup
     showControls: false
     displayOnly: page.displayOnly
     step: page.setupStep
@@ -410,7 +467,7 @@ ColumnLayout {
   }
   ColumnLayout {
     Layout.fillWidth: true
-    visible: page.setupActive ? page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidates.candidates.length > 0)
+    visible: page.setupActive ? !page.exactSetup && page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidates.candidates.length > 0)
     Aranea.UiLabel {
       Layout.fillWidth: true
       visible: !!page.discoveryClient && page.discoveryClient.pending
@@ -618,7 +675,7 @@ ColumnLayout {
   }
   ProjectSetupProgress {
     Layout.fillWidth: true
-    visible: page.setupActive
+    visible: page.setupActive && !page.exactSetup
     showSteps: false
     displayOnly: page.displayOnly
     step: page.setupStep
@@ -638,7 +695,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.sidebarNavigation && !page.setupActive && !(page.registryState.projects || []).length && !candidates.candidates.length
-    text: 'No projects yet. Set up a project to choose a Git checkout, your tools, and optional workflow actions.'
+    text: 'No projects yet. Add a Git repository to view its state. Tools, actions and agents can be configured later.'
   }
   Connections {
     target: page.projectClient

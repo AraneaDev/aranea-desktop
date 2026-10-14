@@ -115,3 +115,20 @@ test("navigation remains searchable at zero, one, ten, fifty and one hundred pro
       ])
   }
 })
+
+test("matching cached Git branches update presentation and search without editing registry", () => {
+  const projects = [project("a"), project("b")]
+  const before = JSON.stringify(projects)
+  const cache = {
+    '["a","a-selected"]': {
+      data: { projectId: "a", checkoutId: "a-selected", branch: "fresh-work" }
+    },
+    '["b","b-selected"]': {
+      data: { projectId: "a", checkoutId: "b-selected", branch: "wrong-project" }
+    }
+  }
+  assert.equal(nav.rows(projects, {}, "", [], cache)[0].branch, "fresh-work")
+  assert.deepEqual(ids(nav.rows(projects, {}, "fresh-work", [], cache)), ["a"])
+  assert.equal(nav.rows(projects, {}, "", [], cache)[1].branch, "main")
+  assert.equal(JSON.stringify(projects), before)
+})

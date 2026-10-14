@@ -13,6 +13,8 @@ ColumnLayout {
   objectName: 'projectsSidebar'
   // Saved registrations; display labels never become executable arguments.
   property var projects: []
+  // Matching cached Git observations affect labels/search, never saved registrations.
+  property var gitCache: ({})
   // Observed workspace associations from the persistent project owner.
   property var bindings: []
   // Opaque selected project identity, independent of row ordering.
@@ -40,7 +42,7 @@ ColumnLayout {
   // Keyboard cursor is an identity, never a transient result position.
   property string highlightedId: ''
   // Project matching includes every known checkout branch and path.
-  readonly property var filteredProjects: rows !== null ? rows : Navigation.rows(projects, navigation, query, frozenIds)
+  readonly property var filteredProjects: rows !== null ? rows : Navigation.rows(projects, navigation, query, frozenIds, gitCache)
   // Keep delegates keyed by exact identity so publication cannot destroy focused controls.
   function syncRows() {
     for (var i = 0; i < filteredProjects.length; i++) {
@@ -59,7 +61,9 @@ ColumnLayout {
       else {
         if (found !== i)
           projectModel.move(found, i, 1)
-        projectModel.setProperty(i, 'row', row)
+        projectModel.set(i, {
+          row: row
+        })
       }
     }
     if (projectModel.count > filteredProjects.length)

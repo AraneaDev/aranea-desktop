@@ -59,62 +59,62 @@ project_git_state_parse() {
     original=''
     conflict=false
     case "$record" in
-    '# branch.head '*)
-      branch_seen=true
-      branch=${record#\# branch.head }
-      if [[ "$branch" == '(detached)' ]]; then
-        branch=''
-        detached=true
-      fi
-      continue
-      ;;
-    '# branch.upstream '*)
-      upstream=${record#\# branch.upstream }
-      continue
-      ;;
-    '# branch.ab '*)
-      if [[ "$record" =~ ^\#\ branch\.ab\ \+([0-9]+)\ -([0-9]+)$ ]]; then
-        ahead=${BASH_REMATCH[1]}
-        behind=${BASH_REMATCH[2]}
-      fi
-      continue
-      ;;
-    '# '*) continue ;;
-    '? '*)
-      xy='??'
-      rest=${record#'? '}
-      untracked=$((untracked + 1))
-      ;;
-    '1 '* | '2 '* | 'u '*)
-      kind=${record:0:1}
-      xy=${record:2:2}
-      case "$kind" in 1) fields=8 ;; 2) fields=9 ;; u)
-        fields=10
-        conflict=true
-        conflicts=$((conflicts + 1))
+      '# branch.head '*)
+        branch_seen=true
+        branch=${record#\# branch.head }
+        if [[ "$branch" == '(detached)' ]]; then
+          branch=''
+          detached=true
+        fi
+        continue
         ;;
-      esac
-      rest=$record
-      for ((i = 0; i < fields; i++)); do
-        if [[ "$rest" != *' '* ]]; then
-          project_git_state_error GIT_ERROR 'Git returned a malformed status record.' 'Retry the observation or inspect Git status in a terminal.'
-          return 1
+      '# branch.upstream '*)
+        upstream=${record#\# branch.upstream }
+        continue
+        ;;
+      '# branch.ab '*)
+        if [[ "$record" =~ ^\#\ branch\.ab\ \+([0-9]+)\ -([0-9]+)$ ]]; then
+          ahead=${BASH_REMATCH[1]}
+          behind=${BASH_REMATCH[2]}
         fi
-        rest=${rest#* }
-      done
-      [[ ${xy:0:1} == '.' ]] || staged=$((staged + 1))
-      [[ ${xy:1:1} == '.' ]] || unstaged=$((unstaged + 1))
-      if [[ "$kind" == 2 ]]; then
-        if ! IFS= read -r -d '' original || [[ -z "$original" ]]; then
-          project_git_state_error GIT_ERROR 'Git returned an incomplete rename record.' 'Retry the observation or inspect Git status in a terminal.'
-          return 1
+        continue
+        ;;
+      '# '*) continue ;;
+      '? '*)
+        xy='??'
+        rest=${record#'? '}
+        untracked=$((untracked + 1))
+        ;;
+      '1 '* | '2 '* | 'u '*)
+        kind=${record:0:1}
+        xy=${record:2:2}
+        case "$kind" in 1) fields=8 ;; 2) fields=9 ;; u)
+          fields=10
+          conflict=true
+          conflicts=$((conflicts + 1))
+          ;;
+        esac
+        rest=$record
+        for ((i = 0; i < fields; i++)); do
+          if [[ "$rest" != *' '* ]]; then
+            project_git_state_error GIT_ERROR 'Git returned a malformed status record.' 'Retry the observation or inspect Git status in a terminal.'
+            return 1
+          fi
+          rest=${rest#* }
+        done
+        [[ ${xy:0:1} == '.' ]] || staged=$((staged + 1))
+        [[ ${xy:1:1} == '.' ]] || unstaged=$((unstaged + 1))
+        if [[ "$kind" == 2 ]]; then
+          if ! IFS= read -r -d '' original || [[ -z "$original" ]]; then
+            project_git_state_error GIT_ERROR 'Git returned an incomplete rename record.' 'Retry the observation or inspect Git status in a terminal.'
+            return 1
+          fi
         fi
-      fi
-      ;;
-    *)
-      project_git_state_error GIT_ERROR 'Git returned an unsupported status record.' 'Retry using a supported Git version.'
-      return 1
-      ;;
+        ;;
+      *)
+        project_git_state_error GIT_ERROR 'Git returned an unsupported status record.' 'Retry using a supported Git version.'
+        return 1
+        ;;
     esac
     [[ -n "$rest" ]] || return 1
     if ((count < 500)); then
@@ -201,22 +201,22 @@ project_git_state_main() (
   done
   while (($#)); do
     case "$1" in
-    --project | --checkout)
-      [[ $# -ge 2 && -n "$2" ]] || {
-        project_git_state_error INVALID_REQUEST 'Provide project and checkout IDs.' 'Select a registered checkout and retry.'
+      --project | --checkout)
+        [[ $# -ge 2 && -n "$2" ]] || {
+          project_git_state_error INVALID_REQUEST 'Provide project and checkout IDs.' 'Select a registered checkout and retry.'
+          return 1
+        }
+        if [[ "$1" == --project ]]; then project=$2; else checkout=$2; fi
+        shift 2
+        ;;
+      --json)
+        json=true
+        shift
+        ;;
+      *)
+        project_git_state_error INVALID_REQUEST 'Unsupported Git-state argument.' 'Use --project, --checkout and --json.'
         return 1
-      }
-      if [[ "$1" == --project ]]; then project=$2; else checkout=$2; fi
-      shift 2
-      ;;
-    --json)
-      json=true
-      shift
-      ;;
-    *)
-      project_git_state_error INVALID_REQUEST 'Unsupported Git-state argument.' 'Use --project, --checkout and --json.'
-      return 1
-      ;;
+        ;;
     esac
   done
   [[ -n "$project" && -n "$checkout" && "$json" == true ]] || {

@@ -211,9 +211,9 @@ GIT
   chmod +x "$TMPDIR/git-bin/git"
   for mode in oversized oversized-slow oversized-identity incomplete empty git-error slow-identity; do
     case "$mode" in
-    oversized*) code=GIT_OUTPUT_LIMIT ;;
-    slow-identity) code=GIT_TIMEOUT ;;
-    *) code=GIT_ERROR ;;
+      oversized*) code=GIT_OUTPUT_LIMIT ;;
+      slow-identity) code=GIT_TIMEOUT ;;
+      *) code=GIT_ERROR ;;
     esac
     start=$SECONDS
     PATH="$TMPDIR/git-bin:$PATH" TEST_GIT_MODE="$mode" expect_error "$code"

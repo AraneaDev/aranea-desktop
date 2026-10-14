@@ -88,7 +88,7 @@ ShellRoot {
     t.findChild(page, 'agentHelpToggle').activate()
     t.check(page.helpExpanded && page.helpTopic === 'agents', 'agent setup help is available without a registered project or bar item')
     t.equal(requests.length, 0, 'offline help performs no registry action')
-    page.startSetup()
+    page.startBulkSetup()
     t.equal(page.setupStep, 0, 'setup starts with choosing a folder')
     page.advanceSetup()
     t.equal(page.setupStep, 0, 'cannot skip an unsaved folder')
@@ -181,7 +181,7 @@ ShellRoot {
     t.check(!page.setupActive, 'finish returns to project management')
     page.projectId = 'p-demo'
     page.details.setDraft('name', 'Keep my draft')
-    page.startSetup()
+    page.startBulkSetup()
     t.check(!page.setupActive && page.details.dirty, 'starting setup preserves an existing unsaved project draft')
     page.details.discardDraft()
     page.captureRestore(saved)
@@ -189,24 +189,68 @@ ShellRoot {
     page.captureReset({})
     t.check(!page.setupActive, 'inert fixture reset does not inherit setup progress')
     page.displayOnly = true
-    page.startSetup()
+    page.startBulkSetup()
     t.check(!page.setupActive, 'read-only capture cannot start setup')
     t.equal(requests.length, 1, 'all progress and help controls remain local')
+    quickSetup()
     bulkSetup()
     integratedSetup()
   })
+  // Exact repository registration skips optional configuration stages.
+  function quickSetup() {
+    page.displayOnly = false
+    page.startSetup()
+    var picker = t.findChild(page, 'projectExactPicker')
+    t.check(!!picker && picker.visible, 'Add project defaults to an exact repository')
+    if (!picker) {
+      page.captureReset({})
+      return
+    }
+    picker.setPath('/work/exact')
+    var before = requests.length
+    picker.confirm()
+    t.equal(requests[before], ['/work/exact'], 'exact folder uses existing registration transport')
+    var project = {
+      id: 'p-exact',
+      name: 'Exact',
+      tools: {},
+      lastCheckoutId: 'c-exact',
+      checkouts: [
+        {
+          id: 'c-exact',
+          path: '/work/exact',
+          branch: 'main'
+        }
+      ]
+    }
+    page.registryState = {
+      roots: [],
+      projects: [project],
+      ignored: []
+    }
+    page.registryMutationCompleted('register', {
+      paths: ['/wrong']
+    }, page.registryState)
+    t.check(page.setupActive, 'unrelated acknowledgement cannot finish exact registration')
+    page.registryMutationCompleted('register', {
+      paths: ['/work/exact']
+    }, page.registryState)
+    t.check(!page.setupActive, 'exact registration reaches usable Overview without configuration')
+    t.equal(page.setupProjectId, 'p-exact', 'exact registration retains returned identity')
+    page.captureReset({})
+  }
   // A parent-folder batch configures every distinct repository in selection order.
   function bulkSetup() {
     page.displayOnly = false
     entry.projectClient.runner = function () {}
     entry.projectClient.pending = true
     page.projectClient = entry.projectClient
-    page.startSetup()
+    page.startBulkSetup()
     t.check(!page.setupActive, 'setup cannot replace an in-flight project owner operation')
     t.check(!t.findChild(page, 'projectSetupStart').enabled, 'start button is disabled during an owner operation')
     page.projectClient = null
     entry.projectClient.pending = false
-    page.startSetup()
+    page.startBulkSetup()
     page.advanceSetup()
     var first = {
       id: 'bulk-a',
@@ -336,7 +380,7 @@ ShellRoot {
     }
     entry.projectController.tools = page.tools
     entry.section = 'projects'
-    realPage.startSetup()
+    realPage.startBulkSetup()
     var picker = t.findChild(realPage, 'projectFolderPicker')
     picker.setPath('/work')
     picker.confirm()
@@ -548,7 +592,54 @@ ShellRoot {
         Style.fontOverrides = fonts
         checkStageLayout(0, true)
       } else
-        t.done()
+        integratedExactSetup()
     })
+  }
+  // Default exact registration crosses the real controller and lands on Overview.
+  function integratedExactSetup() {
+    var realPage = t.findChild(surface, 'projectsPage')
+    realPage.captureReset({})
+    surface.chooseSection('preferences')
+    realPage.startSetup()
+    var picker = t.findChild(realPage, 'projectExactPicker')
+    picker.setPath('/work/exact-native')
+    picker.confirm()
+    t.check(entry.projectController.pending && realPage.setupActive, 'exact registration waits for the actual controller acknowledgement')
+    responses.pop()(1, JSON.stringify({
+      ok: false,
+      error: {
+        message: 'Not a Git repository'
+      }
+    }), '')
+    t.check(realPage.setupActive && picker.pathDraft === '/work/exact-native', 'failed exact registration retains the path for retry')
+    picker.confirm()
+    var exact = {
+      id: 'p-exact-real',
+      name: 'Exact repository',
+      lastCheckoutId: 'c-exact',
+      tools: {},
+      checkouts: [
+        {
+          id: 'c-exact',
+          path: '/work/exact-native',
+          branch: 'main'
+        }
+      ]
+    }
+    responses.pop()(0, JSON.stringify({
+      ok: true,
+      state: {
+        revision: 20,
+        roots: [],
+        ignored: [],
+        projects: [exact]
+      }
+    }), '')
+    t.equal(entry.projectId, exact.id, 'exact registration selects the returned identity')
+    t.check(!realPage.setupActive && surface.section === 'overview', 'real exact registration goes directly from Preferences to Overview')
+    t.equal(realPage.details.draft.editorId, 'code', 'available supported editor default is resolved without mandatory save')
+    t.equal(realPage.details.draft.terminalId, 'foot', 'available supported terminal default is resolved without agent setup')
+    t.check(!realPage.details.dirty, 'default tool resolution does not introduce an unsaved draft')
+    t.done()
   }
 }

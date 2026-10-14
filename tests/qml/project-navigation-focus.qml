@@ -53,6 +53,22 @@ ShellRoot {
       t.check(row.activeFocus, 'row holds keyboard focus before metadata publication')
       sidebar.scrollTo(240)
       var y = sidebar.contentY
+      var cache = {}
+      cache[JSON.stringify(['p-2', 'c-2'])] = {
+        data: {
+          projectId: 'p-2',
+          checkoutId: 'c-2',
+          branch: 'fresh-work'
+        }
+      }
+      if (sidebar.gitCache !== undefined)
+        sidebar.gitCache = cache
+      t.equal(sidebar.filteredProjects.filter(function (r) {
+        return r.id === 'p-2'
+      })[0].branch, 'fresh-work', 'matching cached branch replaces registered label')
+      t.check(row.fullLabel.indexOf('fresh-work') >= 0, 'focused delegate displays the newly observed branch')
+      t.check(row.activeFocus, 'cached branch publication retains exact row focus')
+      t.equal(sidebar.contentY, y, 'cached branch publication preserves viewport')
       sidebar.navigation = {
         pinnedProjectIds: ['p-8'],
         visitedAt: {

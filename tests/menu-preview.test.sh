@@ -17,7 +17,7 @@ fi
 out="$ARANEA_TEST_SANDBOX/shots"
 for fixture in mixed no-match no-compositor vanished actions action-pending action-error action-long-label project-search; do
   ARANEA_MENU_PREVIEW_QUICKSHELL="$quickshell_bin" "$repo_root/scripts/capture-screenshots" --surface "menu-search-$fixture" --output "$out"
-  [[ "$(magick identify -format '%w' "$out/menu-search-$fixture.png")" == 480 ]]
+  [[ "$(magick identify -format '%w' "$out/menu-search-$fixture.png")" == 540 ]]
 done
 # Isolated preview must never summon or mutate the active desktop owners.
 # Shared host Style probes compositor geometry read-only. With session sockets
