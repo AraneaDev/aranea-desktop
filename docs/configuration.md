@@ -138,23 +138,28 @@ schedule continues to choose its images.
 
 Displayed titles and stable CLI IDs are different:
 
-| Title                   | Stable ID        |
-| ----------------------- | ---------------- |
-| Signal Shrine (default) | `signal-shrine`  |
-| Aranea Core             | `aranea-core`    |
-| Neural Deck             | `cockpit`        |
-| Rain City               | `day`            |
-| Silent Vault            | `night`          |
-| First Departure         | `dawn`           |
-| Dead Frequency          | `dusk`           |
-| Black Signal            | `sparse`         |
-| Undercity               | `dense`          |
-| Ghost in the Wire       | `monochrome`     |
-| Violet Pursuit          | `violet-pursuit` |
-| Deep Current            | `deep-current`   |
-| Orbital Relay           | `ultrawide`      |
-| Canopy Circuit          | `canopy-circuit` |
-| Polar Freight           | `polar-freight`  |
+| Title                   | Stable ID          |
+| ----------------------- | ------------------ |
+| Signal Shrine (default) | `signal-shrine`    |
+| Aranea Core             | `aranea-core`      |
+| Neural Deck             | `cockpit`          |
+| Rain City               | `day`              |
+| Silent Vault            | `night`            |
+| First Departure         | `dawn`             |
+| Dead Frequency          | `dusk`             |
+| Black Signal            | `sparse`           |
+| Undercity               | `dense`            |
+| Ghost in the Wire       | `monochrome`       |
+| Violet Pursuit          | `violet-pursuit`   |
+| Deep Current            | `deep-current`     |
+| Orbital Relay           | `ultrawide`        |
+| Canopy Circuit          | `canopy-circuit`   |
+| Polar Freight           | `polar-freight`    |
+| Lunar Weaver            | `lunar-weaver`     |
+| Abyssal Sanctum         | `abyssal-sanctum`  |
+| Ghost Weaver            | `ghost-weaver`     |
+| Skyline Sentinel        | `skyline-sentinel` |
+| Frostbound Nexus        | `frostbound-nexus` |
 
 To list or select them directly:
 

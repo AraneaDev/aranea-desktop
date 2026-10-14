@@ -29,8 +29,15 @@ Item {
   readonly property bool opened: panelOpen
   // Visible bar and overview share a read-only owner projection.
   readonly property var projectSnapshot: visible && !captureActive && projectClient.available ? projectClient.snapshot : null
-  // The focused workspace's launched environment or observed checkout, never assignment alone.
-  readonly property var activeProjectContext: WorkspaceModel.barContext(activeWorkspaceId, projectSnapshot)
+  // Project context requires windows on the focused workspace, even for retained launches.
+  readonly property var activeProjectContext: {
+    for (var i = 0; i < workspaceStates.length; i++) {
+      var workspace = workspaceStates[i]
+      if (workspace.id === activeWorkspaceId)
+        return workspace.occupied ? WorkspaceModel.barContext(activeWorkspaceId, projectSnapshot) : null
+    }
+    return null
+  }
   // Read-only boundary exposed to inert fixtures for transport replacement.
   readonly property alias projectClient: projectClient
 

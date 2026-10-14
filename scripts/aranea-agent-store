@@ -56,7 +56,7 @@ printf '%s\n' "$context" >"$activity_scratch/context"
 # Run the pure reducer using private files to avoid operating-system argv limits.
 run_filter() {
   # Validation uses stdin; never write raw native prompts into scratch storage.
-  if [[ " $* " == *" operation request "* || " $* " == *" operation normalized "* ]]; then
+  if [[ " $* " == *" operation request "* || " $* " == *" operation normalized "* || " $* " == *" operation read-request "* ]]; then
     printf 'null\n' >"$activity_scratch/request"
   else
     printf '%s\n' "${request:-null}" >"$activity_scratch/request"
@@ -65,29 +65,37 @@ run_filter() {
 }
 if [[ -e "$registry" ]]; then
   [[ -f "$registry" ]] || respond_error ACTIVITY_INVALID 'Activity state is not a regular file.'
-  loaded=$(head -c 33554433 -- "$registry" | jq -Rces 'if utf8bytelength > 33554432 then error("size") else fromjson end' 2>/dev/null) || respond_error ACTIVITY_INVALID 'Activity state is malformed or exceeds the read limit.'
-  run_filter -e --arg operation validate <<<"$loaded" >/dev/null 2>&1 || respond_error ACTIVITY_INVALID 'Activity schema is invalid or unsupported.'
+  # Decode and fully validate in one pass; keep the same bounded raw read.
+  loaded=$(head -c 33554433 -- "$registry" | run_filter -Rces --arg operation load 2>/dev/null) || respond_error ACTIVITY_INVALID 'Activity state is malformed, oversized or has an invalid schema.'
   state=$loaded
 else
   state='{"schemaVersion":1,"revision":0,"sessions":[],"tasks":[]}'
 fi
 if [[ "$1" == mutate ]]; then
-  input=$(head -c 1048577 | jq -Rcs 'if utf8bytelength > 1048576 then {tooLarge:true} else {request:fromjson} end' 2>/dev/null) || respond_error INVALID_REQUEST 'Provide one JSON request.'
-  [[ $(jq -r '.tooLarge // false' <<<"$input") != true ]] || respond_error INPUT_TOO_LARGE 'Request exceeds 1 MiB.'
-  request=$(jq -c .request <<<"$input")
-  run_filter -e --arg operation request <<<"$request" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Unsupported or invalid activity request.'
-  jq -e --argjson revision "$(jq .revision <<<"$state")" 'has("expectedRevision")|not' <<<"$request" >/dev/null ||
-    jq -e --argjson revision "$(jq .revision <<<"$state")" '.expectedRevision == $revision' <<<"$request" >/dev/null || respond_error ACTIVITY_CONFLICT 'Activity revision changed.'
-  if [[ $(jq -r .action <<<"$request") == native ]]; then
+  # Decode, bound and validate the in-memory request in one pass, never scratch.
+  if ! request=$(head -c 1048577 | run_filter -Rces --arg operation read-request 2>"$activity_scratch/request.error"); then
+    case $(<"$activity_scratch/request.error") in
+      *INPUT_TOO_LARGE*) respond_error INPUT_TOO_LARGE 'Request exceeds 1 MiB.' ;;
+      *INVALID_REQUEST_SCHEMA*) respond_error INVALID_REQUEST 'Unsupported or invalid activity request.' ;;
+      *) respond_error INVALID_REQUEST 'Provide one JSON request.' ;;
+    esac
+  fi
+  IFS=$'\t' read -r request_action has_expected_revision expected_revision native_provider < <(jq -r '[.action,has("expectedRevision"),(.expectedRevision//0),(.args.provider//"")]|@tsv' <<<"$request")
+  [[ "$has_expected_revision" != true ]] ||
+    jq -e --argjson revision "$expected_revision" '.revision == $revision' <<<"$state" >/dev/null || respond_error ACTIVITY_CONFLICT 'Activity revision changed.'
+  if [[ "$request_action" == native ]]; then
     [[ -f "$script_dir/lib/agent-hooks.sh" ]] || respond_error ADAPTER_UNSUPPORTED 'Native provider mapping is unavailable.'
     # shellcheck source=/dev/null
     source "$script_dir/lib/agent-hooks.sh"
     declare -F agent_hooks_prepare_request >/dev/null || respond_error ADAPTER_UNSUPPORTED 'Native provider mapping is unavailable.'
-    normalized=$(agent_hooks_prepare_request "$request" "$state" "$context") || respond_error ADAPTER_UNSUPPORTED 'Native provider request is unsupported.'
+    # Mapping/replay need one exact session, not every session's private history.
+    # Keep all tasks for identity checks; never pass this read-only view to mutation.
+    native_state=$(printf '%s\n%s\n' "$request" "$state" | jq -cs '.[0].args as $a | .[1] | if ($a.payload.session_id|type) == "string" then .sessions |= map(select(.provider == $a.provider and .providerSessionId == $a.payload.session_id)) else . end')
+    normalized=$(agent_hooks_prepare_request "$request" "$native_state" "$context" "$native_provider") || respond_error ADAPTER_UNSUPPORTED 'Native provider request is unsupported.'
     run_filter -e --arg operation normalized <<<"$normalized" >/dev/null 2>&1 || respond_error INVALID_REQUEST 'Native mapping returned an invalid request.'
-    [[ $(jq -r .args.provider <<<"$normalized") == "$(jq -r .args.provider <<<"$request")" ]] || respond_error INVALID_REQUEST 'Native mapping changed the provider.'
+    [[ $(jq -r .args.provider <<<"$normalized") == "$native_provider" ]] || respond_error INVALID_REQUEST 'Native mapping changed the provider.'
     hash=$(jq -Sc 'del(.nativeMetadata)' <<<"$normalized" | sha256sum | cut -d' ' -f1)
-    if ! agent_activity_is_replay "$normalized" "$state" "$hash"; then
+    if ! agent_activity_is_replay "$normalized" "$native_state" "$hash"; then
       normalized=$(agent_activity_prepare "$normalized") || respond_error ASSOCIATION_MISMATCH 'Native checkout path is invalid.'
     fi
     request=$(jq -c '{action:"native",args:{normalized:.}}' <<<"$normalized")
@@ -100,19 +108,20 @@ if [[ "$1" == mutate ]]; then
     fi
   fi
   activity_tmp=$(mktemp "${registry}.XXXXXX") || respond_error ACTIVITY_WRITE_FAILED 'Cannot create atomic activity write.'
-  if ! run_filter --arg operation mutate <<<"$state" >"$activity_tmp" 2>"${activity_tmp}.error"; then
+  # Emit a fully validated candidate and its response without reparsing history.
+  if ! run_filter -c --arg operation transaction <<<"$state" >"$activity_scratch/transaction" 2>"${activity_tmp}.error"; then
     code=$(sed -nE 's/.*: ([A-Z_]+)$/\1/p' "${activity_tmp}.error" | tail -1)
     respond_error "${code:-INVALID_REQUEST}" 'Activity mutation was rejected.'
   fi
+  head -n 1 -- "$activity_scratch/transaction" >"$activity_tmp"
   [[ $(stat -c %s -- "$activity_tmp") -le 33554432 ]] || respond_error CAPACITY_EXCEEDED 'Activity storage limit reached.'
-  run_filter -e --arg operation validate <"$activity_tmp" >/dev/null 2>&1 || respond_error ACTIVITY_INVALID 'Mutation would produce invalid activity state.'
   [[ ! -L "$registry" ]] || respond_error UNSAFE_STATE_PATH 'Activity destination changed to a symlink.'
-  if [[ $(jq -c . <"$activity_tmp") != "$state" ]]; then
+  if [[ $(<"$activity_tmp") != "$state" ]]; then
     mv -T -- "$activity_tmp" "$registry" || respond_error ACTIVITY_WRITE_FAILED 'Cannot replace activity state atomically.'
   fi
   rm -f -- "$activity_tmp" "${activity_tmp}.error"
   activity_tmp=''
-  state=$(cat "$registry")
+  tail -n 1 -- "$activity_scratch/transaction"
+  exit 0
 fi
-projection=$(run_filter -c --arg operation project <<<"$state") || respond_error ACTIVITY_INVALID 'Cannot project activity state.'
-jq -c '{ok:true,state:.,error:null}' <<<"$projection"
+run_filter -c --arg operation response <<<"$state" || respond_error ACTIVITY_INVALID 'Cannot project activity state.'

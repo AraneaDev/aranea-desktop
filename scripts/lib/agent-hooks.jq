@@ -69,3 +69,9 @@ else
       if $proof != null and $s.provenance != null and $name != "AraneaHeartbeat" then .observedHooks=(((.observedHooks//[])+[$name])|unique) else . end |
       if $modern and $name != "AraneaHeartbeat" then .callbackOwners = ([.callbackOwners[]|select(.key != $callbackKey)] + [{key:$callbackKey,eventId:$eventId,taskId:$task} + (if ($p.tool_use_id|id) then {toolUseId:$p.tool_use_id} else {} end)] | .[-512:]) else . end)}
 end
+
+# Optional private transport header avoids reparsing full ownership metadata for
+# the canonical pending-event hash input. Default mapping output stays unchanged.
+| if $ARGS.named.native_header == "true" then
+    (if .action == "report" and .args.eventId == ("pending:"+$callbackKey) then [$callbackKey,.args.taskId] else null end), .
+  else . end

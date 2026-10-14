@@ -2,39 +2,45 @@
 
 ## Cyberpunk collection
 
-Fifteen wallpapers have distinct subjects,
+Twenty wallpapers have distinct subjects,
 compositions and moods, united by obsidian, mint #3bff9e and violet #7a5cff.
 Aranea Core and Signal Shrine use the canonical Aranea spider mark as an image
-reference. The other scenes were generated without image references.
+reference. The five new spider scenes use those two original artworks as style
+and emblem references. The remaining scenes were generated without image references.
 The Aranea spider marks remain unchanged.
 
 ## Provenance and resolution
 
 Generated with the built-in OpenAI imagegen tool. Unmodified outputs and
 embedded provenance are retained in `sources/`; the picker uses delivery files.
-The fourteen 16:9 sources are 1672×941; ultrawide is 2172×724. Delivery sizes are
+The nineteen 16:9 sources are 1672×941; ultrawide is 2172×724. Delivery sizes are
 3840×2160 and 3840×1280, resampled with Lanczos rather than native 4K detail.
 No crop, retouching or sharpening was applied after generation. Stable IDs and paths
 preserve existing wallpaper selections and schedules. Human-facing titles come
 from each manifest entry’s `label`, independently of its stable ID.
 
-| ID             | Scene                                                                    | Delivery file                 |
-| -------------- | ------------------------------------------------------------------------ | ----------------------------- |
-| cockpit        | Neural Deck: cinematic hacker command room                               | `variants/cockpit.png`        |
-| day            | Rain City: wet megacity and elevated transit                             | `background-day.png`          |
-| night          | Silent Vault: subterranean server archive                                | `background-night.png`        |
-| dawn           | First Departure: sweeping maglev station                                 | `variants/dawn.png`           |
-| dusk           | Dead Frequency: rooftop satellite dish                                   | `variants/dusk.png`           |
-| sparse         | Black Signal: isolated desert monolith                                   | `variants/sparse.png`         |
-| dense          | Undercity: crowded electronics market                                    | `variants/dense.png`          |
-| monochrome     | Ghost in the Wire: silver cybernetic portrait, small mint/violet accents | `variants/monochrome.png`     |
-| ultrawide      | Orbital Relay: panoramic station above a dark planet                     | `variants/ultrawide.png`      |
-| aranea-core    | Aranea Core: holographic spider reactor                                  | `variants/aranea-core.png`    |
-| signal-shrine  | Signal Shrine: rain-soaked illuminated spider shrine                     | `variants/signal-shrine.png`  |
-| violet-pursuit | Violet Pursuit: motorcycle on a neon expressway                          | `variants/violet-pursuit.png` |
-| deep-current   | Deep Current: submerged data facility                                    | `variants/deep-current.png`   |
-| canopy-circuit | Canopy Circuit: suspended botanical habitat                              | `variants/canopy-circuit.png` |
-| polar-freight  | Polar Freight: autonomous vessel crossing fractured polar sea ice        | `variants/polar-freight.png`  |
+| ID               | Scene                                                                                                                                                                | Delivery file                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| cockpit          | Neural Deck: cinematic hacker command room                                                                                                                           | `variants/cockpit.png`          |
+| day              | Rain City: wet megacity and elevated transit                                                                                                                         | `background-day.png`            |
+| night            | Silent Vault: subterranean server archive                                                                                                                            | `background-night.png`          |
+| dawn             | First Departure: sweeping maglev station                                                                                                                             | `variants/dawn.png`             |
+| dusk             | Dead Frequency: rooftop satellite dish                                                                                                                               | `variants/dusk.png`             |
+| sparse           | Black Signal: isolated desert monolith                                                                                                                               | `variants/sparse.png`           |
+| dense            | Undercity: crowded electronics market                                                                                                                                | `variants/dense.png`            |
+| monochrome       | Ghost in the Wire: silver cybernetic portrait, small mint/violet accents                                                                                             | `variants/monochrome.png`       |
+| ultrawide        | Orbital Relay: panoramic station above a dark planet                                                                                                                 | `variants/ultrawide.png`        |
+| aranea-core      | Aranea Core: holographic spider reactor                                                                                                                              | `variants/aranea-core.png`      |
+| signal-shrine    | Signal Shrine: rain-soaked illuminated spider shrine                                                                                                                 | `variants/signal-shrine.png`    |
+| violet-pursuit   | Violet Pursuit: motorcycle on a neon expressway                                                                                                                      | `variants/violet-pursuit.png`   |
+| deep-current     | Deep Current: submerged data facility                                                                                                                                | `variants/deep-current.png`     |
+| canopy-circuit   | Canopy Circuit: suspended botanical habitat                                                                                                                          | `variants/canopy-circuit.png`   |
+| polar-freight    | Polar Freight: autonomous vessel crossing fractured polar sea ice                                                                                                    | `variants/polar-freight.png`    |
+| lunar-weaver     | Lunar Weaver: A vast lunar communications array on a silent crater rim                                                                                               | `variants/lunar-weaver.png`     |
+| abyssal-sanctum  | Abyssal Sanctum: An immense flooded brutalist sanctuary deep beneath the ocean                                                                                       | `variants/abyssal-sanctum.png`  |
+| ghost-weaver     | Ghost Weaver: A colossal obsidian Aranea spider emblem carved into a fractured monolith standing in a dark desert of glassy sand                                     | `variants/ghost-weaver.png`     |
+| skyline-sentinel | Skyline Sentinel: The roof of a rain-soaked cyberpunk megatower at night: a huge mint-neon Aranea spider emblem suspended within an open industrial beacon structure | `variants/skyline-sentinel.png` |
+| frostbound-nexus | Frostbound Nexus: An ancient black data archive embedded inside a vast fractured glacier                                                                             | `variants/frostbound-nexus.png` |
 
 Preview: [collection contact sheet](../screenshots/cockpit-wallpapers.jpg).
 
@@ -43,7 +49,7 @@ Preview: [collection contact sheet](../screenshots/cockpit-wallpapers.jpg).
 Run from the repository root with ImageMagick:
 
 ```bash
-for id in cockpit day night dawn dusk sparse dense monochrome ultrawide aranea-core signal-shrine violet-pursuit deep-current canopy-circuit polar-freight; do
+for id in cockpit day night dawn dusk sparse dense monochrome ultrawide aranea-core signal-shrine violet-pursuit deep-current canopy-circuit polar-freight lunar-weaver abyssal-sanctum ghost-weaver skyline-sentinel frostbound-nexus; do
   case "$id" in
     day|night) destination="backgrounds/background-$id.png" ;;
     *) destination="backgrounds/variants/$id.png" ;;
@@ -129,3 +135,33 @@ Use case: stylized-concept. Asset type: dark 16:9 Linux desktop wallpaper titled
 
 The existing Aranea spider silhouette, semantic state glyphs, and cursor
 geometry are preserved. Cursor source trees remain byte-identical.
+
+### Lunar Weaver (`lunar-weaver`)
+
+References: `sources/signal-shrine.png` and `sources/aranea-core.png`. Generated with the built-in imagegen tool.
+
+Use case: stylized-concept. Create ONE new production Linux desktop wallpaper, full bleed wide landscape 16:9, highest available resolution. References show the canonical Aranea angular spider emblem and existing collection style; create a genuinely new scene, do not copy either composition. Preserve the emblem's recognizable angular legs, central triangular cutout, pointed abdomen. A vast lunar communications array on a silent crater rim, enormous freestanding Aranea spider emblem constructed from luminous mint glass and dark titanium suspended between asymmetrical radio towers. Low oblique viewpoint across powdery black lunar regolith, distant planet partly obscured behind violet atmospheric light, delicate illuminated fiber lines across terrain; epic isolation, subtle and credible scale. Premium cinematic environment concept art with convincing materials, depth and controlled bloom. Palette obsidian #08090b, charcoal, neutral silver, luminous mint #3bff9e and violet #7a5cff only. Natural subdued areas for desktop readability. No readable text, numbers, watermark, UI, border, people, warm orange/red/yellow/pink light. Do not include the artwork title as text.
+
+### Abyssal Sanctum (`abyssal-sanctum`)
+
+References: `sources/signal-shrine.png` and `sources/aranea-core.png`. Generated with the built-in imagegen tool.
+
+Use case: stylized-concept. Create ONE new production Linux desktop wallpaper, full bleed wide landscape 16:9, highest available resolution. References show the canonical Aranea angular spider emblem and existing collection style; create a genuinely new scene, do not copy either composition. Preserve the emblem's recognizable angular legs, central triangular cutout, pointed abdomen. An immense flooded brutalist sanctuary deep beneath the ocean, an unmistakable luminous Aranea spider emblem embedded inside a weathered black glass monolith, pale mint caustics shimmering through cold water. Asymmetrical collapsed colonnades, floating fine particulate and violet bioluminescent strands, strong diagonal composition from the shadowed seabed; serene, mysterious, no animals. Premium cinematic environment concept art with convincing materials, depth and controlled bloom. Palette obsidian #08090b, charcoal, neutral silver, luminous mint #3bff9e and violet #7a5cff only. Natural subdued areas for desktop readability. No readable text, numbers, watermark, UI, border, people, warm orange/red/yellow/pink light. Do not include the artwork title as text.
+
+### Ghost Weaver (`ghost-weaver`)
+
+References: `sources/signal-shrine.png` and `sources/aranea-core.png`. Generated with the built-in imagegen tool.
+
+Use case: stylized-concept. Create ONE new production Linux desktop wallpaper, full bleed wide landscape 16:9, highest available resolution. References show the canonical Aranea angular spider emblem and existing collection style; create a genuinely new scene, do not copy either composition. Preserve the emblem's recognizable angular legs, central triangular cutout, pointed abdomen. A colossal obsidian Aranea spider emblem carved into a fractured monolith standing in a dark desert of glassy sand, mint light escaping narrow inset channels of the emblem, violet electrical storm far on the horizon. Wide oblique composition with monolith to the right, delicate wind-driven sand across foreground, distant abandoned antennas, minimalist monumental scale, quiet empty left sky. Premium cinematic environment concept art with convincing materials, depth and controlled bloom. Palette obsidian #08090b, charcoal, neutral silver, luminous mint #3bff9e and violet #7a5cff only. Natural subdued areas for desktop readability. No readable text, numbers, watermark, UI, border, people, warm orange/red/yellow/pink light. Do not include the artwork title as text.
+
+### Skyline Sentinel (`skyline-sentinel`)
+
+References: `sources/signal-shrine.png` and `sources/aranea-core.png`. Generated with the built-in imagegen tool.
+
+Use case: stylized-concept. Create ONE new production Linux desktop wallpaper, full bleed wide landscape 16:9, highest available resolution. References show the canonical Aranea angular spider emblem and existing collection style; create a genuinely new scene, do not copy either composition. Preserve the emblem's recognizable angular legs, central triangular cutout, pointed abdomen. The roof of a rain-soaked cyberpunk megatower at night: a huge mint-neon Aranea spider emblem suspended within an open industrial beacon structure, seen from a dramatic aerial three-quarter angle. Layered black towers descend into violet mist, wet roof surfaces reflect the emblem, fine cables stretch diagonally, asymmetrical urban depth, no alley and no reactor cylinder. Premium cinematic environment concept art with convincing materials, depth and controlled bloom. Palette obsidian #08090b, charcoal, neutral silver, luminous mint #3bff9e and violet #7a5cff only. Natural subdued areas for desktop readability. No readable text, numbers, watermark, UI, border, people, warm orange/red/yellow/pink light. Do not include the artwork title as text.
+
+### Frostbound Nexus (`frostbound-nexus`)
+
+References: `sources/signal-shrine.png` and `sources/aranea-core.png`. Generated with the built-in imagegen tool.
+
+Use case: stylized-concept. Create ONE new production Linux desktop wallpaper, full bleed wide landscape 16:9, highest available resolution. References show the canonical Aranea angular spider emblem and existing collection style; create a genuinely new scene, do not copy either composition. Preserve the emblem's recognizable angular legs, central triangular cutout, pointed abdomen. An ancient black data archive embedded inside a vast fractured glacier, giant translucent mint Aranea spider emblem frozen within a vertical clear-ice wall, graphite walkways over a crevasse, subdued violet equipment lights beneath ice. Wide cinematic view from shadowed cave entrance without a framing border, rich ice texture and suspended frost, contemplative immense scale, no people. Premium cinematic environment concept art with convincing materials, depth and controlled bloom. Palette obsidian #08090b, charcoal, neutral silver, luminous mint #3bff9e and violet #7a5cff only. Natural subdued areas for desktop readability. No readable text, numbers, watermark, UI, border, people, warm orange/red/yellow/pink light. Do not include the artwork title as text.

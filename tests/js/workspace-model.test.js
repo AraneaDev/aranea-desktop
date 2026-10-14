@@ -6,6 +6,53 @@ const model = require(
   path.join(__dirname, "..", "..", "plugins/araneadev.workspaces/WorkspaceModel.js")
 )
 
+test("overview does not label an empty or unconfirmed saved project workspace", () => {
+  const snapshot = projectSnapshot()
+  snapshot.projects[0].name = "GezinsApp"
+  snapshot.projects[0].checkouts[1].branch = "master"
+  snapshot.projects[0].associations[1].workspaceId = 3
+  const before = JSON.stringify(snapshot)
+  assert.equal(model.overviewContext({ id: 3, occupied: false }, snapshot), null)
+  assert.equal(model.overviewContext({ id: 3, occupied: true }, snapshot), null)
+  assert.equal(JSON.stringify(snapshot), before)
+  snapshot.bindings = [verifiedBinding({ workspaceId: 3 })]
+  assert.deepEqual(model.overviewContext({ id: 3, occupied: true }, snapshot), {
+    projectId: "p-app",
+    checkoutId: "c-fix",
+    label: "GezinsApp · master",
+    detail: "/projects/app-fix"
+  })
+  assert.equal(model.overviewContext({ id: 3, occupied: false }, snapshot), null)
+  snapshot.bindings[0].sessionId = "old-session"
+  assert.equal(model.overviewContext({ id: 3, occupied: true }, snapshot), null)
+})
+
+test("overview keeps launched context only on occupied unambiguous workspaces", () => {
+  const snapshot = projectSnapshot()
+  snapshot.environments = [
+    {
+      id: "e-old",
+      projectId: "p-app",
+      checkoutId: "c-fix",
+      workspaceId: 7,
+      profileSnapshot: { name: "Terminal" },
+      checkoutSnapshot: { branch: "launch-branch", path: "/saved/checkout" }
+    }
+  ]
+  assert.equal(model.overviewContext({ id: 7, occupied: false }, snapshot), null)
+  const context = model.overviewContext({ id: 7, occupied: true }, snapshot)
+  assert.equal(context.label, "App · Terminal")
+  assert.match(context.detail, /launch-branch at launch/)
+  assert.match(context.detail, /Tools unconfirmed/)
+  snapshot.environments = []
+  snapshot.projects[0].associations[0].workspaceId = 7
+  snapshot.bindings = [
+    verifiedBinding({ workspaceId: 7 }),
+    verifiedBinding({ workspaceId: 7, checkoutId: "c-main" })
+  ]
+  assert.equal(model.overviewContext({ id: 7, occupied: true }, snapshot), null)
+})
+
 test("bar retains launched environments across restart while hiding bare saved assignments", () => {
   const snapshot = projectSnapshot()
   assert.equal(model.barContext(7, snapshot), null)

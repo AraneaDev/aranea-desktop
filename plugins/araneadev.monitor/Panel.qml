@@ -161,14 +161,14 @@ Panel {
 
   // Text size slider: curated macOS-style notches (px). The panel snaps to
   // these stops; the CLI (omarchy-display-text-size) accepts any integer in range.
-  readonly property var textSizeStops: [9, 10, 11, 12, 14, 16, 20]
+  readonly property var textSizeStops: textSizeController.textSizeStops
   // While a change is in flight, the chosen stop index overrides the live
   // base-size so the knob doesn't snap back during the file round-trip. -1 =
   // no pending change; follow Style.font.baseSize.
-  property int textSizePreviewIndex: -1
+  property alias textSizePreviewIndex: textSizeController.textSizePreviewIndex
   // A text size (px) asked for while textScaleProc was already running, run
   // when it exits (the last one wins); 0 for none.
-  property int queuedTextPx: 0
+  property alias queuedTextPx: textSizeController.queuedTextPx
 
   // A text-size change reflows the whole panel (both font and spacing scale),
   // which slides rows under a stationary pointer and fires synthetic hover.
@@ -188,45 +188,45 @@ Panel {
 
   // Whether `omarchy-toggle-nightlight --status` answered (the row hides
   // otherwise).
-  property bool nightAvailable: false
+  property alias nightAvailable: nightlightController.nightAvailable
   // Whether the night light is on, as read.
-  property bool nightOn: false
+  property alias nightOn: nightlightController.nightOn
   // The night light row's caption (DisplaysLogic.nightlightCaption).
-  property string nightCaption: "Off"
+  property alias nightCaption: nightlightController.nightCaption
   // The night light temperature as read (K), or null with none; the
   // toggle's prediction depends on it (DisplaysLogic.nightToggleTarget).
-  property var nightTemperature: null
+  property alias nightTemperature: nightlightController.nightTemperature
   // The night light state asked for but not yet confirmed by a re-read, or
   // null for none. Shown at once and pulsing busy.
-  property var nightPending: null
+  property alias nightPending: nightlightController.nightPending
   // The state the running omarchy-toggle-nightlight will leave, so its exit
   // handler can toggle again when the latest request differs (last wins).
-  property bool nightTarget: false
+  property alias nightTarget: nightlightController.nightTarget
   // How many night light toggles have exited, and the count when the
   // running status read started: a read only settles a request when it
   // started after the last toggle exited.
-  property int nightSerial: 0
+  property alias nightSerial: nightlightController.nightSerial
   // See nightSerial.
-  property int nightReadSerial: -1
+  property alias nightReadSerial: nightlightController.nightReadSerial
 
   // The keyboard backlight device (DisplaysLogic.kbdDevice), "" for none.
-  property string kbdDevice: ""
+  property alias kbdDevice: keyboardBacklightController.kbdDevice
   // Whether `ls /sys/class/leds` has been read (the device is found once).
-  property bool kbdDeviceChecked: false
+  property alias kbdDeviceChecked: keyboardBacklightController.kbdDeviceChecked
   // The keyboard light's level and maximum, as read (max 0 hides the row).
-  property int kbdValue: 0
+  property alias kbdValue: keyboardBacklightController.kbdValue
   // See kbdValue.
-  property int kbdMax: 0
+  property alias kbdMax: keyboardBacklightController.kbdMax
   // A keyboard light level asked for but not yet confirmed, or -1.
-  property int kbdPending: -1
+  property alias kbdPending: keyboardBacklightController.kbdPending
   // A level asked for while kbdSetProc was already running, or -1.
-  property int kbdQueued: -1
+  property alias kbdQueued: keyboardBacklightController.kbdQueued
   // Exit and read counters for the keyboard light, as nightSerial.
-  property int kbdSerial: 0
+  property alias kbdSerial: keyboardBacklightController.kbdSerial
   // See kbdSerial.
-  property int kbdReadSerial: -1
+  property alias kbdReadSerial: keyboardBacklightController.kbdReadSerial
   // The keyboard light row's control (DisplaysLogic.kbdMode).
-  readonly property string kbdMode: DisplaysLogic.kbdMode(kbdMax)
+  readonly property string kbdMode: keyboardBacklightController.kbdMode
 
   // A scale asked for but not yet confirmed by a re-read; "" for none.
   property string pendingScale: ""
@@ -803,99 +803,50 @@ Panel {
   // ---- Text size (shell base font + GTK text-scaling, via one CLI) ----
   // The index into textSizeStops nearest to px.
   function nearestTextStop(px) {
-    var best = 0
-    var bestDist = 1e9
-    for (var i = 0; i < textSizeStops.length; i++) {
-      var d = Math.abs(textSizeStops[i] - px)
-      if (d < bestDist) {
-        bestDist = d
-        best = i
-      }
-    }
-    return best
+    return textSizeController.nearestTextStop(px)
   }
-
   // Effective stop index: the pending choice while a change is in flight,
   // otherwise whatever Style's live base-size rounds to.
   function currentTextIndex() {
-    return textSizePreviewIndex >= 0 ? textSizePreviewIndex : nearestTextStop(Style.font.baseSize)
+    return textSizeController.currentTextIndex()
   }
-
   // Applies px via omarchy-display-text-size; a request while it runs is
   // queued, the last one winning.
   function setTextSize(px) {
-    if (textScaleProc.running) {
-      root.queuedTextPx = px
-      return
-    }
-    textScaleProc.command = ["omarchy-display-text-size", String(px)]
-    textScaleProc.running = true
+    return textSizeController.setTextSize(px)
   }
-
   // Moves the text-size stop by deltaSteps, previewing it at once while the
   // CLI round-trips. Nothing at either end.
   function adjustTextSize(deltaSteps) {
-    var idx = currentTextIndex() + deltaSteps
-    if (idx < 0)
-      idx = 0
-    if (idx > textSizeStops.length - 1)
-      idx = textSizeStops.length - 1
-    if (idx === currentTextIndex())
-      return
-    requestTextStop(idx)
+    return textSizeController.adjustTextSize(deltaSteps)
   }
-
   // Asks for text stop IDX: previews it at once (pulsing busy) and runs
   // the CLI; textPreviewTimeout drops the preview if the base size never
   // follows.
   function requestTextStop(idx) {
-    markReflowing()
-    textSizePreviewIndex = idx
-    textPreviewTimeout.restart()
-    setTextSize(textSizeStops[idx])
+    return textSizeController.requestTextStop(idx)
   }
-
   // The base size never followed a text-size request within 5 s: drops
   // the preview and any queued size, so the slider shows the real size.
   function textPreviewTimedOut() {
-    root.textSizePreviewIndex = -1
-    root.queuedTextPx = 0
+    return textSizeController.textPreviewTimedOut()
   }
-
   // textScaleProc exited with EXITCODE: runs the queued size, else drops a
   // preview the CLI failed on or that Style already shows.
   function textScaleExited(exitCode) {
-    if (root.queuedTextPx > 0) {
-      var px = root.queuedTextPx
-      root.queuedTextPx = 0
-      setTextSize(px)
-      return
-    }
-    if (exitCode !== 0 || (root.textSizePreviewIndex >= 0 && nearestTextStop(Style.font.baseSize) === root.textSizePreviewIndex))
-      root.textSizePreviewIndex = -1
+    return textSizeController.textScaleExited(exitCode)
   }
 
   // ---- Night light ----
   // Reads `omarchy-toggle-nightlight --status` when it isn't already running.
   function readNight() {
-    if (!nightProc.running)
-      nightProc.running = true
+    return nightlightController.readNight()
   }
-
   // Applies a status read: shows it, settles a request it confirms, and
   // drops any request once the read started after the last toggle exited.
   function applyNight(text) {
-    var state = DisplaysLogic.parseNightlight(text)
-    root.nightAvailable = state.available
-    root.nightOn = state.enabled
-    root.nightTemperature = state.temperature
-    root.nightCaption = DisplaysLogic.nightlightCaption(state)
-    if (typeof root.nightPending !== "boolean" || nightToggleProc.running)
-      return
-    if (root.nightPending === root.nightOn || root.nightReadSerial === root.nightSerial)
-      root.nightPending = null
+    return nightlightController.applyNight(text)
   }
-
   // Flips the night light, only while its row shows: the state the toggle
   // will leave is shown at once (nightPending, pulsing busy). From a read
   // that is the script's own rule (DisplaysLogic.nightToggleTarget: an odd
@@ -905,110 +856,53 @@ Panel {
   function toggleNightlight() {
     if (visibleSections.indexOf("nightlight") < 0)
       return
-    var target = typeof root.nightPending === "boolean" ? !root.nightPending : DisplaysLogic.nightToggleTarget({
-      temperature: root.nightTemperature
-    })
-    root.nightPending = target
-    if (nightToggleProc.running)
-      return
-    runNightToggle(target)
+    return nightlightController.toggleNightlight()
   }
-
   // Starts omarchy-toggle-nightlight, which will leave the light at TARGET.
   function runNightToggle(target) {
-    root.nightTarget = target
-    nightToggleProc.running = true
+    return nightlightController.runNightToggle(target)
   }
-
   // nightToggleProc exited with EXITCODE: toggles again when the latest
   // request differs from what this toggle left; else a failure drops the
   // request, and the status is re-read either way.
   function nightExited(exitCode) {
-    root.nightSerial++
-    if (exitCode === 0 && typeof root.nightPending === "boolean" && root.nightPending !== root.nightTarget) {
-      runNightToggle(root.nightPending)
-      return
-    }
-    if (exitCode !== 0)
-      root.nightPending = null
-    readNight()
+    return nightlightController.nightExited(exitCode)
   }
 
   // ---- Keyboard light ----
   // Reads the keyboard light: finds the device once, then runs
   // `brightnessctl -d <device> -m` when it isn't already running.
   function readKbd() {
-    if (!root.kbdDeviceChecked) {
-      if (!kbdFindProc.running)
-        kbdFindProc.running = true
-      return
-    }
-    if (root.kbdDevice === "" || kbdProc.running)
-      return
-    kbdProc.command = ["brightnessctl", "-d", root.kbdDevice, "-m"]
-    kbdProc.running = true
+    return keyboardBacklightController.readKbd()
   }
-
   // Applies `ls /sys/class/leds`: caches the device and reads it.
   function applyKbdDevice(text) {
-    root.kbdDevice = DisplaysLogic.kbdDevice(text)
-    root.kbdDeviceChecked = true
-    if (root.kbdDevice !== "")
-      readKbd()
+    return keyboardBacklightController.applyKbdDevice(text)
   }
-
   // Applies a brightnessctl read, settling requests as applyNight does.
   function applyKbd(text) {
-    var state = DisplaysLogic.parseKbdLight(text)
-    root.kbdValue = state.current
-    root.kbdMax = state.max
-    if (root.kbdPending < 0 || kbdSetProc.running || root.kbdQueued >= 0)
-      return
-    if (root.kbdPending === root.kbdValue || root.kbdReadSerial === root.kbdSerial)
-      root.kbdPending = -1
+    return keyboardBacklightController.applyKbd(text)
   }
-
   // The keyboard light level shown: the pending request, else as read.
   function kbdShownLevel() {
-    return root.kbdPending >= 0 ? root.kbdPending : root.kbdValue
+    return keyboardBacklightController.kbdShownLevel()
   }
-
   // Sets the keyboard light to VALUE (clamped to 0..kbdMax), only while its
   // row shows: shown at once (kbdPending), queued behind a running set, the
   // last one winning.
   function setKbd(value) {
-    if (root.kbdDevice === "" || root.kbdMax <= 0 || visibleSections.indexOf("kbdlight") < 0)
+    if (visibleSections.indexOf("kbdlight") < 0)
       return
-    var level = Math.max(0, Math.min(root.kbdMax, Math.round(Number(value) || 0)))
-    if (level === kbdShownLevel())
-      return
-    root.kbdPending = level
-    if (kbdSetProc.running) {
-      root.kbdQueued = level
-      return
-    }
-    runKbdCommand(level)
+    return keyboardBacklightController.setKbd(value)
   }
-
   // Starts the keyboard light command for LEVEL (DisplaysLogic.kbdCommand).
   function runKbdCommand(level) {
-    kbdSetProc.command = DisplaysLogic.kbdCommand(root.kbdDevice, level, root.kbdMax)
-    kbdSetProc.running = true
+    return keyboardBacklightController.runKbdCommand(level)
   }
-
   // kbdSetProc exited with EXITCODE: runs the queued level, else a failure
   // drops the request, and the level is re-read either way.
   function kbdExited(exitCode) {
-    root.kbdSerial++
-    if (root.kbdQueued >= 0) {
-      var level = root.kbdQueued
-      root.kbdQueued = -1
-      runKbdCommand(level)
-      return
-    }
-    if (exitCode !== 0)
-      root.kbdPending = -1
-    readKbd()
+    return keyboardBacklightController.kbdExited(exitCode)
   }
 
   // ---- The view's actions ----
@@ -1184,92 +1078,7 @@ Panel {
     }
   }
 
-  // Applies text size via the CLI, which rewrites the shell override file;
-  // Style picks the new base-size up through its own file watch, so there's
-  // nothing to refresh here.
-  Process {
-    id: textScaleProc
-    stdout: StdioCollector {
-      waitForEnd: true
-    }
-    onExited: function (exitCode) {
-      root.textScaleExited(exitCode)
-    }
-  }
-
-  // omarchy-toggle-nightlight (no arguments: it flips the light).
-  Process {
-    id: nightToggleProc
-    command: ["omarchy-toggle-nightlight"]
-    onExited: function (exitCode) {
-      root.nightExited(exitCode)
-    }
-  }
-
-  // The keyboard light setter (runKbdCommand sets the command).
-  Process {
-    id: kbdSetProc
-    onExited: function (exitCode) {
-      root.kbdExited(exitCode)
-    }
-  }
   // qmllint enable signal-handler-parameters
-
-  // The night light status read; records which toggle exit it started
-  // after, as stateProc does.
-  Process {
-    id: nightProc
-    command: ["omarchy-toggle-nightlight", "--status"]
-    onRunningChanged: {
-      if (nightProc.running)
-        root.nightReadSerial = root.nightSerial
-      else if (typeof root.nightPending === "boolean" && !nightToggleProc.running && root.nightReadSerial !== root.nightSerial)
-        Qt.callLater(root.readNight)
-    }
-    stdout: StdioCollector {
-      id: nightOut
-      waitForEnd: true
-      onStreamFinished: root.applyNight(nightOut.text)
-    }
-  }
-
-  // `ls /sys/class/leds`, once, for the keyboard backlight device.
-  Process {
-    id: kbdFindProc
-    command: ["ls", "/sys/class/leds"]
-    stdout: StdioCollector {
-      id: kbdFindOut
-      waitForEnd: true
-      onStreamFinished: root.applyKbdDevice(kbdFindOut.text)
-    }
-  }
-
-  // The keyboard light read (readKbd sets the command); records which set
-  // exit it started after, as stateProc does.
-  Process {
-    id: kbdProc
-    onRunningChanged: {
-      if (kbdProc.running)
-        root.kbdReadSerial = root.kbdSerial
-      else if (root.kbdPending >= 0 && !kbdSetProc.running && root.kbdReadSerial !== root.kbdSerial)
-        Qt.callLater(root.readKbd)
-    }
-    stdout: StdioCollector {
-      id: kbdOut
-      waitForEnd: true
-      onStreamFinished: root.applyKbd(kbdOut.text)
-    }
-  }
-
-  // Drops a text-size preview the base size never followed (see
-  // textPreviewTimedOut).
-  Timer {
-    id: textPreviewTimeout
-    interval: 5000
-    repeat: false
-    onTriggered: if (root.textSizePreviewIndex >= 0)
-      root.textPreviewTimedOut()
-  }
 
   // Clears the hover-suppression flag once the reflow triggered by a text-size
   // change has settled.
@@ -1280,16 +1089,18 @@ Panel {
     onTriggered: root.reflowingText = false
   }
 
-  // Once Style's base-size catches up to the pending choice, drop the preview
-  // so the slider tracks the live value again. The change itself reflows the
-  // panel, so suppress hover for a beat while it lands.
-  Connections {
-    target: Style
-    function onFontBaseSizeChanged() {
-      root.markReflowing()
-      if (root.textSizePreviewIndex >= 0 && root.nearestTextStop(Style.font.baseSize) === root.textSizePreviewIndex)
-        root.textSizePreviewIndex = -1
-    }
+  KeyboardBacklightController {
+    id: keyboardBacklightController
+  }
+
+  NightlightController {
+    id: nightlightController
+  }
+
+  TextSizeController {
+    id: textSizeController
+    baseFontSize: Style.font.baseSize
+    onReflowRequested: root.markReflowing()
   }
 
   BarIconButton {

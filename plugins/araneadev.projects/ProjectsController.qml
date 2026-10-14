@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "../araneadev.shared" as Aranea
 import "ProjectOperations.js" as Operations
+import "ProjectRoleEvidence.js" as RoleEvidence
 import "ProjectEnvironments.js" as Environments
 import "ProjectTools.js" as Tools
 import "AgentSuggestion.js" as Suggestion
@@ -932,47 +933,20 @@ Item {
       }
       if (!current(id, revision, session))
         return
-      var prior = roleHistory[roleKey(op, role)] || null
-      var ownedRoles = bindings.filter(function (row) {
-        return row.projectId === op.projectId && row.checkoutId === op.checkoutId && roleKey(row, row.role) === roleKey(op, role) && row.sessionId === session
-      })
-      var fresh = proof.bindings.filter(function (row) {
-        return row.projectId === op.projectId && row.checkoutId === op.checkoutId && roleKey(row, row.role) === roleKey(op, role) && row.sessionId === session
-      })[0] || null
-      var binding = fresh || ownedRoles.filter(function (row) {
-        return prior && prior.binding && row.address === prior.binding.address && row.pid === prior.binding.pid
-      })[0] || ownedRoles[0] || null
-      var allClosed = ownedRoles.length > 0 && ownedRoles.every(function (owned) {
-        return proof.missing.some(function (closed) {
-          return closed.binding && roleKey(closed.binding, closed.binding.role) === roleKey(owned, owned.role) && closed.binding.sessionId === session && closed.binding.address === owned.address && closed.binding.pid === owned.pid && closed.identity.startTime === owned.evidence.startTime
-        })
-      })
-      var closure = allClosed ? proof.missing.filter(function (row) {
-        return row.binding && binding && roleKey(row.binding, row.binding.role) === roleKey(binding, binding.role) && row.binding.sessionId === session && row.binding.address === binding.address && row.binding.pid === binding.pid
-      })[0] : null
-      var disposition = closure ? {
-        state: 'confirmed-missing',
-        verified: true,
-        projectId: op.projectId,
-        checkoutId: op.checkoutId,
-        environmentId: op.environmentId || null,
+      var context = {
+        operation: op,
         role: role,
         sessionId: session,
-        generation: revision,
-        identity: closure.identity
-      } : null
-      var decision = Operations.roleDecision(role, op, fresh || (binding ? Object.assign({}, binding, {
-          evidence: Object.assign({}, binding.evidence, {
-            processVerified: false
-          })
-        }) : null), prior, baseline.windows, session, disposition)
-      if (decision.action === 'launch' && op.newWindowRole !== role && (ownershipHolds[roleKey(op, role)] || launchAttempts.some(function (attempt) {
-          return attempt.projectId === op.projectId && attempt.checkoutId === op.checkoutId && roleKey(attempt, attempt.role) === roleKey(op, role) && attempt.sessionId === session && (attempt.state === 'submitted' || attempt.state === 'accepted')
-        })))
-        decision = {
-          action: 'hold',
-          code: 'OWNERSHIP_UNCONFIRMED'
-        }
+        bindings: bindings,
+        roleHistory: roleHistory,
+        proof: proof,
+        ownershipHolds: ownershipHolds,
+        launchAttempts: launchAttempts,
+        windows: baseline.windows
+      }
+      var evidence = RoleEvidence.selectRoleEvidence(context)
+      var fresh = evidence.fresh
+      var decision = RoleEvidence.resolveRoleDecision(context, evidence)
       if (decision.action === 'focus' && typeof runtime.focusBinding === 'function') {
         runtime.focusBinding(fresh, function (focused) {
           if (!current(id, revision, session))

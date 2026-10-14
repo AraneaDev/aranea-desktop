@@ -292,7 +292,7 @@ agent_hooks_prepare_request() {
       ([$session.receipts[]|select(.eventId == $p.id)][0].sequence // ($session.highWaterSequence+1)) as $seq |
       {action:"report",args:{schemaVersion:1,eventId:$p.id,provider:"claude",providerSessionId:"native",producerEpoch:"native-epoch",sequence:$seq,taskId:$task,kind:"snapshot",payload:{cwd:$p.cwd,reportedState:"working"}},
        nativeMetadata:{currentTaskId:$task,turns:([$session.nativeMetadata.turns[]|select(.nativeId != $p.id)]+[{nativeId:$p.id,taskId:$task}])}}
-    end'
+    end | if $p.badMetadata then .nativeMetadata.currentTaskId="" else . end'
 }
 MAPPER
   mutate native '{"provider":"claude","payload":{"kind":"start"},"caller":null}' >/dev/null
@@ -308,6 +308,8 @@ MAPPER
   older=$(jq -r '.sessions[0].receipts[0].eventId' "$registry")
   mutate native "$(jq -cn --arg id "$older" --arg cwd "$checkout" '{provider:"claude",payload:{id:$id,cwd:$cwd},caller:null}')" | jq -e '.state.revision == 3' >/dev/null
   cmp "$registry" "$TMPDIR/before"
+  # Prepared transactions must never bypass standalone metadata rejection.
+  reject native "$(jq -cn --arg cwd "$checkout" '{provider:"claude",payload:{id:"bad-metadata",cwd:$cwd,badMetadata:true},caller:null}')" INVALID_REQUEST
 }
 # Catch failed atomic replacement corrupting bytes or an unbounded lock wait.
 write_failure_lock_timeout_and_clock_regression() {

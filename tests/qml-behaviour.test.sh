@@ -63,7 +63,7 @@ run_test() {
   ln -s "$repo_root/tests/qml/fixtures" "$run_dir/cfg/fixtures"
   for plugin in "$repo_root"/plugins/araneadev.*; do
     [[ -d "$plugin" ]] || continue
-    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == health-alerts) ]]; then
+    if [[ "$plugin" == */araneadev.shared && ("$name" == agent-tasks-panel || "$name" == agents-provider-selection || "$name" == spring-panel || "$name" == vpn-embedded || "$name" == bluetooth-embedded || "$name" == system-embedded || "$name" == display-persistent-commands || "$name" == health-alerts) ]]; then
       # Adapt only native windows/attached layer-shell state. Placement, mask,
       # motion, coordinator, focus timer and production panel content stay real.
       mkdir -p "$run_dir/cfg/plugins/araneadev.shared"
@@ -87,6 +87,13 @@ PYBOUNDARY
   done
   ln -s "$repo_root/shell.toml" "$run_dir/cfg/theme-shell.toml"
   cp "$test_file" "$run_dir/cfg/shell.qml"
+  # Fixed Display command boundary: controllers and hosted System tests never
+  # discover host devices or execute desktop mutations. Other ls calls delegate.
+  mkdir -p "$run_dir/display-bin" "$run_dir/display-state"
+  local display_command
+  for display_command in display-fixture omarchy-display-text-size omarchy-toggle-nightlight brightnessctl omarchy-brightness-keyboard omarchy-monitor-state omarchy-battery-status omarchy-powerprofiles-list upower ls; do
+    ln -s "$repo_root/tests/qml/fixtures/display-command.py" "$run_dir/display-bin/$display_command"
+  done
   # No display, compositor, session bus or desktop platform theme (the gtk3
   # theme aborts without a display).
   # From the run directory, so a relative path in a test can never write
@@ -94,6 +101,7 @@ PYBOUNDARY
   # cleanup also stops the commands a test started.
   (cd "$run_dir" && exec setsid env -u WAYLAND_DISPLAY -u DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u HYPRLAND_INSTANCE_SIGNATURE \
     -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE QT_QPA_PLATFORM=offscreen \
+    PATH="$run_dir/display-bin:$PATH" ARANEA_DISPLAY_FIXTURE_ROOT="$run_dir/display-state" \
     XDG_RUNTIME_DIR="$run_dir/run" XDG_CACHE_HOME="$run_dir/cache" \
     "$quickshell_bin" -p "$run_dir/cfg") >"$run_dir/log" 2>&1 &
   qs_pid=$!

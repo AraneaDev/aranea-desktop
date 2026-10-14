@@ -144,11 +144,13 @@ agent_hooks_helper_proof() {
 }
 
 # Allocate epoch, turn and sequence from the current locked state, including replay.
+# The store may supply its already-validated provider enum as the fourth argument.
 agent_hooks_prepare_request() {
-  local request="$1" state="$2" context="$3" provider proof session epoch evidence fingerprint normalized candidate hash callback_key event_digest
-  provider=$(jq -r .args.provider <<<"$request")
+  local request="$1" state="$2" context="$3" provider proof session epoch evidence fingerprint normalized candidate hash callback_key event_digest hook_name mapping_fd mapping_pid digest_input
+  provider=${4:-$(jq -r .args.provider <<<"$request")}
   [[ "$provider" == claude || "$provider" == codex ]] || return 1
-  if [[ $(jq -r .args.payload.hook_event_name <<<"$request") == AraneaHeartbeat ]]; then
+  hook_name=$(jq -r .args.payload.hook_event_name <<<"$request")
+  if [[ "$hook_name" == AraneaHeartbeat ]]; then
     session=$(jq -r .args.payload.session_id <<<"$request")
     epoch=$(jq -r .args.payload.producer_epoch <<<"$request")
     evidence=$(jq -c --arg provider "$provider" --arg session "$session" --arg epoch "$epoch" '.sessions[] | select(.provider == $provider and .providerSessionId == $session and .producerEpoch == $epoch and .connection.connected) | .provenance' <<<"$state")
@@ -171,14 +173,22 @@ agent_hooks_prepare_request() {
        elif $provider == "codex" and (.turn_id|native_id) then "turn:"+.turn_id
        elif $provider == "claude" and (.prompt_id|native_id) then "prompt:"+.prompt_id
        else "fingerprint:"+$fingerprint end)]' <<<"$request" | sha256sum | cut -d' ' -f1)
-  normalized=$(printf '%s\n%s\n%s\n%s\n' "$request" "$state" "$context" "$proof" | jq -c -s --arg fingerprint "$fingerprint" --arg callbackKey "$callback_key" -f "$script_dir/lib/agent-hooks.jq") || return 1
-  if [[ $(jq -r .args.eventId <<<"$normalized") == "pending:$callback_key" ]]; then
-    event_digest=$(jq -Sc --arg key "$callback_key" '[$key,.args.taskId]' <<<"$normalized" | sha256sum | cut -d' ' -f1)
-    normalized=$(jq -c --arg key "$callback_key" --arg eventId "$(jq -r .args.payload.hook_event_name <<<"$request"):$event_digest" '.args.eventId=$eventId | .nativeMetadata.callbackOwners |= map(if .key == $key then .eventId=$eventId else . end)' <<<"$normalized")
+  # Read the tiny hash preimage header before the unchanged normalized record.
+  # Both lines are in-memory; keep the producer status and close its private fd.
+  exec {mapping_fd}< <(printf '%s\n%s\n%s\n%s\n' "$request" "$state" "$context" "$proof" | jq -c -s --arg native_header true --arg fingerprint "$fingerprint" --arg callbackKey "$callback_key" -f "$script_dir/lib/agent-hooks.jq")
+  mapping_pid=$!
+  IFS= read -r digest_input <&"$mapping_fd" || digest_input=''
+  normalized=$(cat <&"$mapping_fd")
+  exec {mapping_fd}<&-
+  wait "$mapping_pid" || return 1
+  [[ -n "$digest_input" && -n "$normalized" ]] || return 1
+  if [[ "$digest_input" != null ]]; then
+    event_digest=$(printf '%s\n' "$digest_input" | sha256sum | cut -d' ' -f1)
+    normalized=$(jq -c --arg key "$callback_key" --arg eventId "$hook_name:$event_digest" '.args.eventId=$eventId | .nativeMetadata.callbackOwners |= map(if .key == $key then .eventId=$eventId else . end)' <<<"$normalized")
   fi
   # A resolved failure replay has no remaining blocker. Only its exact retained
   # canonical receipt authorizes replay of that resolution; otherwise diagnostic.
-  if [[ $(jq -r .args.payload.hook_event_name <<<"$request") == PostToolUseFailure && $(jq -r .args.kind <<<"$normalized") == diagnostic ]] && jq -e '.args.payload | (.tool_name == "AskUserQuestion" or .tool_name == "ExitPlanMode") and (.tool_use_id|type == "string" and length > 0 and length <= 180 and (test("[\\x00-\\x1f\\x7f]")|not))' <<<"$request" >/dev/null; then
+  if [[ "$hook_name" == PostToolUseFailure && $(jq -r .args.kind <<<"$normalized") == diagnostic ]] && jq -e '.args.payload | (.tool_name == "AskUserQuestion" or .tool_name == "ExitPlanMode") and (.tool_use_id|type == "string" and length > 0 and length <= 180 and (test("[\\x00-\\x1f\\x7f]")|not))' <<<"$request" >/dev/null; then
     # Keep native input outside jq's argv and use the same receipt hash as store.
     candidate=$(printf '%s\n%s\n' "$normalized" "$request" | jq -cs '.[1].args.payload.tool_use_id as $id | .[0] | .args.kind="blocker-resolved" | .args.payload={blockerId:("tool:"+$id),summary:.args.payload.summary}')
     hash=$(jq -Sc 'del(.nativeMetadata)' <<<"$candidate" | sha256sum | cut -d' ' -f1)

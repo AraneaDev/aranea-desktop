@@ -795,6 +795,34 @@ function barContext(workspaceId, snapshot) {
   return candidates.length === 1 ? candidates[0] : null
 }
 
+/** Resolve project text for an occupied overview row with unique live context.
+ * @param {*} row - Normalized workspace row.
+ * @param {*} snapshot - Read-only project owner projection.
+ * @returns {*} Project context or ordinary workspace fallback.
+ */
+function overviewContext(row, snapshot) {
+  if (!row || !row.occupied) return null
+  var context = barContext(Number(row.id), snapshot)
+  if (!context) return null
+  var project = snapshot.projects.find(function (/** @type {*} */ candidate) {
+    return candidate.id === context.projectId
+  })
+  var checkout = project.checkouts.find(function (/** @type {*} */ candidate) {
+    return candidate.id === context.checkoutId
+  })
+  if (context.environmentId) {
+    var environment = snapshot.environments.find(function (/** @type {*} */ candidate) {
+      return candidate.id === context.environmentId
+    })
+    context.label = String(project.name || project.id) + " · " + environment.profileSnapshot.name
+  } else {
+    context.label =
+      String(project.name || project.id) + (checkout.branch ? " · " + checkout.branch : "")
+    context.detail = String(checkout.path || "")
+  }
+  return context
+}
+
 /**
  * A row's trailing detail: the window count ("empty" for none), with
  * "current" appended for the active workspace and "attention" appended for
@@ -860,6 +888,7 @@ if (typeof module !== "undefined") {
     openCaption,
     projectContext,
     barContext,
+    overviewContext,
     workspaceLabel,
     workspaceDetail,
     workspaceTitles,

@@ -120,3 +120,43 @@ path = "backgrounds/variants/polar-freight.png"
 aspect = "16:9"
 contrast = "standard"
 motion = false
+
+[[wallpapers]]
+id = "lunar-weaver"
+label = "Lunar Weaver"
+path = "backgrounds/variants/lunar-weaver.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "abyssal-sanctum"
+label = "Abyssal Sanctum"
+path = "backgrounds/variants/abyssal-sanctum.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "ghost-weaver"
+label = "Ghost Weaver"
+path = "backgrounds/variants/ghost-weaver.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "skyline-sentinel"
+label = "Skyline Sentinel"
+path = "backgrounds/variants/skyline-sentinel.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "frostbound-nexus"
+label = "Frostbound Nexus"
+path = "backgrounds/variants/frostbound-nexus.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false

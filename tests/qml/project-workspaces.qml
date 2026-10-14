@@ -124,6 +124,37 @@ ShellRoot {
     t.equal(testRoot.calls.length, 1, "leaving capture in an open overview refreshes once")
     t.equal(testRoot.calls[0], ["omarchy-shell", "aranea.projects", "snapshot"], "overview only reads the owner snapshot")
     testRoot.replies[0](0, JSON.stringify(testRoot.snapshot), "")
+    t.equal(panel.rowAt(0).label, "Workspace 2", "saved assignment alone does not label unrelated windows")
+    t.equal(panel.rowAt(1).label, "Workspace 7", "unconfirmed worktree falls back to its workspace label")
+    testRoot.snapshot.bindings = [
+      {
+        projectId: "p-app",
+        checkoutId: "c-main",
+        workspaceId: 2,
+        sessionId: "session-new",
+        role: "editor",
+        pid: 41,
+        address: "0xab",
+        evidence: {
+          processVerified: true,
+          mode: "process-only"
+        }
+      },
+      {
+        projectId: "p-app",
+        checkoutId: "c-fix",
+        workspaceId: 7,
+        sessionId: "session-new",
+        role: "terminal",
+        pid: 42,
+        address: "0xac",
+        evidence: {
+          processVerified: true,
+          mode: "process-only"
+        }
+      }
+    ]
+    client.snapshot = JSON.parse(JSON.stringify(testRoot.snapshot))
     t.equal(panel.rowAt(0).label, "App · main", "dedicated association decorates main checkout")
     t.equal(panel.rowAt(1).label, "App · fix", "separate association selects exact worktree")
     var path = t.findChildren(panel, "workspaceProjectPath")[1]
