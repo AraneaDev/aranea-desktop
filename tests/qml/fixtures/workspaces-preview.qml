@@ -19,7 +19,7 @@ ShellRoot {
       Image {
         id: wallpaper
         anchors.fill: parent
-        source: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/backgrounds/00-default.png'
+        source: Quickshell.env('ARANEA_SETTINGS_RENDER_ROOT') + '/backgrounds/variants/lunar-weaver.png'
         fillMode: Image.PreserveAspectCrop
       }
       Rectangle {
