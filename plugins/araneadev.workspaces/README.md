@@ -1,5 +1,13 @@
 # Aranea workspaces
 
+Horizontal bars show a bounded project-name inspection label for a focused
+workspace with one registered checkout association. Full context stays in its
+tooltip, including branch and launch-time context; ambiguous or unavailable
+context falls back to the workspace controls.
+The bar polls the existing read-only project client every five seconds while
+visible, with serialized reads and capture refusal. Clicking the label summons
+Projects with exact project and checkout IDs, without launching tools.
+
 `araneadev.workspaces` is the compact workspace bar widget. Its manifest
 exposes `BarWidget.qml` and places the widget in the left bar section by
 default.

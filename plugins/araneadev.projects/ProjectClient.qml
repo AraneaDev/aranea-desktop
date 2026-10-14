@@ -10,6 +10,10 @@ Item {
   property var snapshot: ({})
   // Owner IPC availability is independent of compositor launch capability.
   property bool available: false
+  // Background bar observers serialize reads; interactive clients keep latest-read-wins.
+  property bool serializeSnapshotReads: false
+  // Held owner reads must not accumulate while a background observer polls.
+  property bool readingSnapshot: false
   // One local observer may reconnect without cancelling its owner operation.
   property bool pending: false
   // Latest actionable IPC or owner request error.
@@ -128,6 +132,7 @@ Item {
     }
   }
   onCaptureActiveChanged: {
+    readingSnapshot = false
     generation++
     snapshotReadRevision++
     submissionInFlight = false
@@ -150,6 +155,7 @@ Item {
       }
     }
     if (method === 'snapshot') {
+      readingSnapshot = false
       error = message
       return
     }
@@ -191,11 +197,13 @@ Item {
   }
   // Refresh owner observations without creating or cancelling operations.
   function refresh(): bool {
-    if (captureActive)
+    if (captureActive || serializeSnapshotReads && readingSnapshot)
       return false
+    readingSnapshot = true
     var revision = generation
     snapshotReadRevision++
     invoke('snapshot', [], revision, function (response) {
+      readingSnapshot = false
       snapshot = response
     })
     return true

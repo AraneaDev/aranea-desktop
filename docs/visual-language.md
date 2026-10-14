@@ -12,6 +12,10 @@ preserve useful result space. Settings, Projects, and dropdowns share the same
 shaded material. The bar's obsidian shelf keeps controls legible over bright
 wallpapers. Status graphics represent available system evidence.
 
+Settings, Projects, and popup reading surfaces use opaque fills. Decorative
+corner traces and header gradients stay dimmer than the keyboard focus reticle.
+Ordinary popups use neutral borders, preserving configured edge widths.
+
 ## Material and color
 
 | Role                 | Default   | Use                                            |
@@ -54,7 +58,8 @@ bar and lock screen do not spring.
 
 The launcher reveals identity, then tiles, then results. Artwork moves while
 hit targets remain stationary. Its spider stays fixed inside moving bezel
-accents; ambient edge highlights stop when the window is hidden.
+accents. Reading surfaces keep ambient edge sweeps off; explicitly enabled sweeps
+stop when the window is hidden or motion is disabled.
 
 `SurfaceMotion` and `SpringValue` preserve the current presentation when a
 transition reverses. Reduced motion stops active transitions and ambient loops

@@ -5,7 +5,7 @@ import QtQuick
 SpringPanel {
   id: frame
   // Opt into neutral panel chrome while keeping the configured width and radius.
-  property bool refined: false
+  property bool refined: true
   borderSpec: PanelChrome.popupBorder(refined)
   // Emitted when the panel should close.
   signal closeRequested

@@ -6,6 +6,48 @@ const model = require(
   path.join(__dirname, "..", "..", "plugins/araneadev.workspaces/WorkspaceModel.js")
 )
 
+test("bar context inspects the workspace checkout rather than the last visited worktree", () => {
+  const snapshot = projectSnapshot()
+  assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
+  assert.equal(model.barContext(7, snapshot).label, "App")
+  assert.match(model.barContext(7, snapshot).detail, /fix/)
+  assert.equal(model.barContext(1, snapshot), null)
+  assert.equal(model.barContext(7, null), null)
+})
+
+test("bar title stays compact while tooltip retains the launch-time branch once", () => {
+  const snapshot = projectSnapshot()
+  snapshot.environments = [
+    {
+      id: "e-work",
+      projectId: "p-app",
+      checkoutId: "c-fix",
+      workspaceId: 7,
+      profileSnapshot: { name: "Terminal + Agent" },
+      checkoutSnapshot: { branch: "main", path: "/projects/app-fix" }
+    }
+  ]
+  const context = model.barContext(7, snapshot)
+  assert.equal(context.label, "App")
+  assert.match(context.detail, /main at launch/)
+  const tooltip = context.label + "\n" + context.detail
+  assert.equal(tooltip.indexOf("main"), tooltip.lastIndexOf("main"))
+  assert.equal(context.checkoutId, "c-fix")
+})
+
+test("bar context refuses ambiguous workspace ownership and deleted checkouts", () => {
+  const snapshot = projectSnapshot()
+  snapshot.projects[0].associations.push({
+    checkoutId: "c-main",
+    mode: "dedicated",
+    workspaceId: 7
+  })
+  assert.equal(model.barContext(7, snapshot), null)
+  snapshot.projects[0].associations.pop()
+  snapshot.projects[0].checkouts.pop()
+  assert.equal(model.barContext(7, snapshot), null)
+})
+
 test("normalizes workspace rows and marks the focused workspace active", () => {
   const states = model.normalizeWorkspaces(
     [

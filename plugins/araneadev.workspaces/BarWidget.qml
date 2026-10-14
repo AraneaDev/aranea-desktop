@@ -26,26 +26,30 @@ Item {
   property bool panelOpen: false
   // Open state exposed to the panel host.
   readonly property bool opened: panelOpen
-  // Only a visible overview consumes project state; unavailable owners fall back.
-  readonly property var projectSnapshot: panelOpen && !captureActive && projectClient.available ? projectClient.snapshot : null
+  // Visible bar and overview share a read-only owner projection.
+  readonly property var projectSnapshot: visible && !captureActive && projectClient.available ? projectClient.snapshot : null
+  // The focused workspace's unique registered checkout, never a title guess.
+  readonly property var activeProjectContext: WorkspaceModel.barContext(activeWorkspaceId, projectSnapshot)
   // Read-only boundary exposed to inert fixtures for transport replacement.
   readonly property alias projectClient: projectClient
 
   Projects.ProjectClient {
     id: projectClient
-    captureActive: root.captureActive || !root.panelOpen
+    captureActive: root.captureActive || !root.visible
+    serializeSnapshotReads: true
     onCaptureActiveChanged: if (!captureActive)
       root.refreshProjects()
   }
-  // Read the owner projection while visible; closing invalidates pending reads.
+  // Observe workspace context without launching or focusing project tools.
   function refreshProjects() {
-    if (root.panelOpen && !root.captureActive)
+    if (root.visible && !root.captureActive)
       projectClient.refresh()
   }
   Timer {
-    interval: 2000
+    interval: 5000
     repeat: true
-    running: root.panelOpen && !root.captureActive
+    running: root.visible && !root.captureActive
+    triggeredOnStart: true
     onTriggered: root.refreshProjects()
   }
   // Read live workspace rows without indexing unstable toplevel objects.
@@ -110,7 +114,7 @@ Item {
     }
   }
 
-  implicitWidth: button.implicitWidth + indicators.implicitWidth
+  implicitWidth: button.implicitWidth + indicators.implicitWidth + (projectButton.visible ? projectButton.implicitWidth : 0)
   implicitHeight: Math.max(button.implicitHeight, indicators.implicitHeight)
   // Open the overview panel.
   function open() {
@@ -237,6 +241,52 @@ Item {
     }
   }
 
+  // The host supplies runtime typography token properties.
+  // qmllint disable missing-property
+  TextMetrics {
+    id: projectLabelMetrics
+    text: root.activeProjectContext ? root.activeProjectContext.label : ''
+    font.family: Aranea.Typography.uiFamily
+    font.pixelSize: Style.font.body
+  }
+  WidgetButton {
+    id: projectButton
+    objectName: 'workspaceProjectContext'
+    anchors.left: indicators.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    bar: root.bar
+    visible: !!root.activeProjectContext && !!root.bar && !root.bar.vertical
+    text: root.activeProjectContext ? root.activeProjectContext.label : ''
+    labelVisible: false
+    fixedWidth: Math.min(Style.space(200), projectLabelMetrics.width + Style.space(20))
+    fixedHeight: root.bar ? root.bar.barSize : Style.space(32)
+    tooltipText: root.activeProjectContext ? root.activeProjectContext.label + '\n' + root.activeProjectContext.detail + '\nOpen project overview' : ''
+    Text {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      text: projectButton.text
+      textFormat: Text.PlainText
+      font.family: Aranea.Typography.uiFamily
+      font.pixelSize: Style.font.body
+      color: root.bar ? root.bar.foreground : Color.foreground
+      verticalAlignment: Text.AlignVCenter
+      elide: Text.ElideRight
+    }
+    onPressed: function (mouseButton) {
+      var context = root.activeProjectContext
+      if (root.captureActive || mouseButton !== Qt.LeftButton || !context || !root.bar)
+        return
+      var payload = JSON.stringify({
+        projectId: context.projectId,
+        checkoutId: context.checkoutId
+      })
+      root.bar.run('omarchy-shell shell summon araneadev.projects ' + Util.shellQuote(payload))
+    }
+  }
+
+  // qmllint enable missing-property
   component PanelContent: Item {
     // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []
