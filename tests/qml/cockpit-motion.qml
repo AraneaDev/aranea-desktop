@@ -68,6 +68,8 @@ ShellRoot {
           reveal.motionEnabled = true
           t.equal(reveal.running, false, "enabling motion does not replay a completed entrance")
           Aranea.MotionState.motionEnabled = true
+          t.equal(frame.ambientRunning, false, "reading surfaces do not run decorative sweeps")
+          frame.ambientEnabled = true
           t.check(frame.ambientRunning, "visible instrument frame animates")
           frame.visible = false
           t.equal(frame.ambientRunning, false, "hidden instrument frame stops ambient work")

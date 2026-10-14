@@ -72,6 +72,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       },
       controls: controls,
       active: !!active,
+      observationState: run ? run.submissionUnconfirmed ? "unconfirmed" : run.processState : "",
       attention:
         !!run &&
         (run.processState === "failed" ||
@@ -114,7 +115,10 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       detail: task.verificationLabel + " · " + task.lastReportLabel,
       target: { taskId: task.key },
       controls: controls,
-      attention: task.attention
+      attention: task.attention,
+      reportedState: task.reportedState,
+      connected: task.freshnessLabel === "Connected",
+      connectionLost: task.freshnessLabel === "Connection lost"
     }
     if (row.attention) result.attention.push(row)
     return row
@@ -244,7 +248,42 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
   return result
 }
 
-if (typeof module !== "undefined") module.exports = { overview, ageLabel, gitFiles }
+if (typeof module !== "undefined") module.exports = { overview, activitySummary, ageLabel, gitFiles }
+
+/** Summarize exact-checkout observations with navigation-only destinations.
+ * @param {OverviewData} model - scoped Overview projection
+ * @param {{actions?:boolean,agents?:boolean}} [availability] - current observer connections
+ * @returns {Array<OverviewData>} separate action and reported-agent status chips
+ */
+function activitySummary(model, availability) {
+  availability = availability || {}
+  var services = availability.actions === false ? [] : model.services || []
+  var checks = availability.actions === false ? [] : model.checks || []
+  var actions = services.concat(checks)
+  var agents = availability.agents === false ? [] : model.agents || []
+  /** @type {Array<OverviewData>} */
+  var summary = []
+  if (availability.actions === false && (model.services || []).length + (model.checks || []).length)
+    summary.push({ label: "Action status unavailable", section: "actions", attention: true })
+  if (availability.agents === false && (model.agents || []).length)
+    summary.push({ label: "Agent status unavailable", section: "agents", attention: true })
+  var add = function (/** @type {Array<OverviewData>} */ rows, /** @type {string} */ singular, /** @type {string} */ plural, /** @type {string} */ section, /** @type {boolean} */ attention) {
+    if (rows.length) summary.push({ label: rows.length + " " + (rows.length === 1 ? singular : plural), section: section, attention: attention })
+  }
+  add(actions.filter(function (r) { return r.observationState === "failed" }), "failed run", "failed runs", "actions", true)
+  add(actions.filter(function (r) { return r.observationState === "unconfirmed" }), "run unconfirmed", "runs unconfirmed", "actions", true)
+  var live = agents.filter(function (r) { return r.connected })
+  add(live.filter(function (r) { return r.reportedState === "needs-input" }), "agent needs input (reported)", "agents need input (reported)", "agents", true)
+  add(live.filter(function (r) { return r.reportedState === "ready-for-review" }), "agent ready for review (reported)", "agents ready for review (reported)", "agents", true)
+  add(live.filter(function (r) { return r.reportedState === "failed" }), "agent failed (reported)", "agents failed (reported)", "agents", true)
+  add(services.filter(function (r) { return r.observationState === "running" }), "service running", "services running", "actions", false)
+  add(checks.filter(function (r) { return r.observationState === "running" }), "check running", "checks running", "actions", false)
+  add(live.filter(function (r) { return r.reportedState === "working" }), "agent working (reported)", "agents working (reported)", "agents", false)
+  add(checks.filter(function (r) { return r.observationState === "succeeded" }), "check succeeded (latest run)", "checks succeeded (latest runs)", "actions", false)
+  add(agents.filter(function (r) { return r.connectionLost }), "agent disconnected", "agents disconnected", "agents", false)
+  add(agents.filter(function (r) { return !r.connected && !r.connectionLost }), "agent connection unconfirmed", "agent connections unconfirmed", "agents", false)
+  return summary
+}
 
 /** Compact freshness label without confusing receipt time with current correctness.
  * @param {?number} observedAt - observation wall milliseconds

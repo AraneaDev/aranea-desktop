@@ -9,7 +9,7 @@ ShellRoot {
   id: testRoot
   // Snapshot argv observed at the fake IPC boundary.
   property var calls: []
-  // Delayed transport completions for freshness and close tests.
+  // Delayed transport completions for freshness and visibility tests.
   property var replies: []
   // Compositor command observed through the fake bar boundary.
   property string lastCommand: ""
@@ -76,21 +76,30 @@ ShellRoot {
     function run(command) {
       testRoot.lastCommand = command
     }
+    function hideTooltip(owner) {
+    }
+    function showTooltip(owner, text) {
+    }
   }
-  Workspace.BarWidget {
-    id: widget
-    bar: fakeBar
-    testWorkspaces: [
-      {
-        id: 2,
-        windows: 1
-      },
-      {
-        id: 7,
-        windows: 1
-      }
-    ]
-    testFocusedWorkspace: 2
+  FloatingWindow {
+    visible: true
+    implicitWidth: 500
+    implicitHeight: 32
+    Workspace.BarWidget {
+      id: widget
+      bar: fakeBar
+      testWorkspaces: [
+        {
+          id: 2,
+          windows: 1
+        },
+        {
+          id: 7,
+          windows: 1
+        }
+      ]
+      testFocusedWorkspace: 2
+    }
   }
   Component.onCompleted: {
     var client = widget.projectClient
@@ -172,40 +181,49 @@ ShellRoot {
     t.check(testRoot.lastCommand.indexOf('workspace = "7"') >= 0, "row activation keeps the original workspace focus target")
     t.equal(testRoot.calls.length, 1, "focus never submits a project request")
     widget.close()
-    t.check(client.captureActive, "closed overview invalidates snapshot reads")
-    widget.open()
-    t.equal(testRoot.calls.length, 2, "reopening refreshes owner state")
+    t.check(!client.captureActive, "visible bar keeps project context after closing the overview")
+    widget.refreshProjects()
+    t.equal(testRoot.calls.length, 2, "visible bar can refresh while the overview is closed")
     testRoot.replies[1](1, "", "Owner unavailable")
     t.equal(panel.rowAt(0).label, "Workspace 2", "unavailable owner restores ordinary labels despite cached projects")
     t.check(!t.findChildren(panel, "workspaceProjectPath")[0].visible, "unavailable owner hides project path")
-    widget.close()
+    widget.visible = false
+    t.check(client.captureActive, "hidden bar invalidates snapshot reads")
     var count = testRoot.calls.length
     widget.refreshProjects()
-    t.equal(testRoot.calls.length, count, "explicit refresh while closed refuses reads")
+    t.equal(testRoot.calls.length, count, "hidden bar refuses explicit reads")
+    widget.visible = true
     widget.open()
     testRoot.replies[count](0, JSON.stringify(testRoot.snapshot), "")
     var beforePoll = testRoot.calls.length
-    t.step(2100, function () {
-      t.equal(testRoot.calls.length, beforePoll + 1, "visible overview refreshes periodically")
+    t.step(5100, function () {
+      t.equal(testRoot.calls.length, beforePoll + 1, "visible bar refreshes periodically")
       t.equal(testRoot.calls[beforePoll], ["omarchy-shell", "aranea.projects", "snapshot"], "periodic refresh stays read-only")
       panel.maxContentHeight = 110
-      t.check(panel.implicitHeight <= 110, "project path rows respect the capped panel height")
-      widget.close()
-      count = testRoot.calls.length
-      t.step(2100, function () {
-        t.equal(testRoot.calls.length, count, "closed overview does not poll owner")
-        widget.open()
-        t.equal(testRoot.calls.length, count + 1, "next opening reads again")
+      t.step(30, function () {
+        t.check(panel.implicitHeight <= 110, "project path rows respect the capped panel height")
         widget.close()
-        testRoot.replies[count](0, JSON.stringify(testRoot.snapshot), "")
-        t.equal(panel.rowAt(0).label, "Workspace 2", "late closed response cannot restore project context")
-        widget.captureActive = true
-        testRoot.lastCommand = ""
-        widget.open()
-        widget.focusPanelWorkspace(7)
-        t.equal(testRoot.calls.length, count + 1, "capture remains inert across reopening")
-        t.equal(testRoot.lastCommand, "", "capture panel activation cannot focus workspace")
-        t.done()
+        count = testRoot.calls.length
+        widget.refreshProjects()
+        t.equal(testRoot.calls.length, count, "periodic polling serializes a held owner read")
+        widget.visible = false
+        testRoot.replies[beforePoll](0, JSON.stringify(testRoot.snapshot), "")
+        t.equal(panel.rowAt(0).label, "Workspace 2", "late hidden response cannot restore project context")
+        t.step(100, function () {
+          t.equal(testRoot.calls.length, count, "hidden bar does not poll owner")
+          widget.visible = true
+          widget.open()
+          t.equal(testRoot.calls.length, count + 1, "showing the bar reads again")
+          widget.captureActive = true
+          testRoot.replies[count](0, JSON.stringify(testRoot.snapshot), "")
+          t.equal(panel.rowAt(0).label, "Workspace 2", "late capture response cannot restore project context")
+          testRoot.lastCommand = ""
+          widget.open()
+          widget.focusPanelWorkspace(7)
+          t.equal(testRoot.calls.length, count + 1, "capture remains inert across reopening")
+          t.equal(testRoot.lastCommand, "", "capture panel activation cannot focus workspace")
+          t.done()
+        })
       })
     })
   }

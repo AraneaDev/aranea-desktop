@@ -104,3 +104,19 @@ path = "backgrounds/variants/deep-current.png"
 aspect = "16:9"
 contrast = "standard"
 motion = false
+
+[[wallpapers]]
+id = "canopy-circuit"
+label = "Canopy Circuit"
+path = "backgrounds/variants/canopy-circuit.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false
+
+[[wallpapers]]
+id = "polar-freight"
+label = "Polar Freight"
+path = "backgrounds/variants/polar-freight.png"
+aspect = "16:9"
+contrast = "standard"
+motion = false

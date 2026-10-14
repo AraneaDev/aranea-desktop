@@ -1,4 +1,4 @@
-// Instrument material and traveling light, paused when hidden or motion is off.
+// Quiet instrument material keeps keyboard focus brighter than decorative chrome.
 // qmllint disable missing-property
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -17,8 +17,10 @@ Item {
   property bool material: true
   // Shared motion preference, overridable by deterministic captures.
   property bool motionEnabled: MotionState.motionEnabled
+  // Decorative sweeps are opt-in; ordinary reading surfaces stay still.
+  property bool ambientEnabled: false
   // Animate only while a visible window can display the frame.
-  readonly property bool ambientRunning: motionEnabled && visible && frame.Window.window !== null && frame.Window.window.visible && width > 0 && height > 0
+  readonly property bool ambientRunning: ambientEnabled && motionEnabled && visible && frame.Window.window !== null && frame.Window.window.visible && width > 0 && height > 0
   // Progress of the repeating edge-light sweep.
   property real energyPhase: 0
   // Keep edge marks clear of the host border and corner radius.
@@ -44,7 +46,7 @@ Item {
     gradient: Gradient {
       GradientStop {
         position: 0
-        color: Util.alpha(frame.accent, 0.09)
+        color: Util.alpha(frame.accent, 0.035)
       }
       GradientStop {
         position: 0.3
@@ -52,7 +54,7 @@ Item {
       }
       GradientStop {
         position: 1
-        color: Util.alpha(frame.secondary, 0.055)
+        color: Util.alpha(frame.secondary, 0.025)
       }
     }
   }
@@ -62,20 +64,20 @@ Item {
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.margins: 2
-    width: Style.space(4)
+    width: Math.max(1, Style.space(1))
     visible: frame.material
     gradient: Gradient {
       GradientStop {
         position: 0
-        color: Util.alpha(frame.accent, 0.65)
+        color: Util.alpha(frame.accent, 0.28)
       }
       GradientStop {
         position: 0.45
-        color: Util.alpha(frame.accent, 0.06)
+        color: Util.alpha(frame.accent, 0.025)
       }
       GradientStop {
         position: 1
-        color: Util.alpha(frame.secondary, 0.4)
+        color: Util.alpha(frame.secondary, 0.18)
       }
     }
   }
@@ -118,7 +120,7 @@ Item {
       y: index < 2 ? frame.inset : frame.height - frame.inset - height
       width: frame.traceLength
       height: frame.traceLength
-      opacity: 0.62
+      opacity: 0.3
       Rectangle {
         width: parent.width
         height: 1
@@ -140,7 +142,7 @@ Item {
     anchors.topMargin: 1
     width: Math.min(Style.space(180), parent.width * 0.4)
     height: 1
-    opacity: 0.65
+    opacity: 0.28
     gradient: Gradient {
       orientation: Gradient.Horizontal
       GradientStop {

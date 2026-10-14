@@ -17,6 +17,126 @@ const run = {
 function model(actions = {}, activity = {}, runtime = {}, git = null, checkout = "c") {
   return logic.overview(project, checkout, git, actions, activity, runtime, 100000)
 }
+
+test("activity summary links observed actions and reported agent input without counting another checkout", () => {
+  const service = { ...def, id: "server", name: "Dev server", kind: "service" }
+  const task = {
+    taskId: "t",
+    provider: "codex",
+    description: "Fix layout",
+    reportedState: "needs-input",
+    freshness: "connected",
+    association: { status: "registered", projectId: "p", checkoutId: "c", cwd: "/repo" }
+  }
+  const result = model(
+    {
+      runs: [
+        run,
+        {
+          ...run,
+          id: "server-run",
+          actionId: "server",
+          processState: "running",
+          invocationId: "inv",
+          definitionSnapshot: service
+        }
+      ]
+    },
+    {
+      tasks: [
+        task,
+        { ...task, taskId: "other", association: { ...task.association, checkoutId: "other" } }
+      ]
+    }
+  )
+  assert.deepEqual(JSON.parse(JSON.stringify(logic.activitySummary(result))), [
+    { label: "1 failed run", section: "actions", attention: true },
+    { label: "1 agent needs input (reported)", section: "agents", attention: true },
+    { label: "1 service running", section: "actions", attention: false }
+  ])
+})
+
+test("activity summary never presents lost or uncertain task connections as live work", () => {
+  const task = {
+    taskId: "t",
+    provider: "codex",
+    reportedState: "working",
+    description: "Fix layout",
+    association: { status: "registered", projectId: "p", checkoutId: "c", cwd: "/repo" }
+  }
+  const result = model(
+    { runs: [{ ...run, processState: "unconfirmed" }] },
+    {
+      tasks: [
+        { ...task, freshness: "connection-lost", displayState: "connection-lost" },
+        { ...task, taskId: "u", freshness: "unconfirmed" }
+      ]
+    }
+  )
+  const summary = JSON.parse(JSON.stringify(logic.activitySummary(result)))
+  assert.deepEqual(summary, [
+    { label: "1 run unconfirmed", section: "actions", attention: true },
+    { label: "1 agent disconnected", section: "agents", attention: false },
+    { label: "1 agent connection unconfirmed", section: "agents", attention: false }
+  ])
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(logic.activitySummary(model({}, {}, {}, null, "missing")))),
+    []
+  )
+})
+
+test("ready-for-review stays distinct from verification and completed check history", () => {
+  const result = model(
+    { runs: [{ ...run, processState: "succeeded" }] },
+    {
+      tasks: [
+        {
+          taskId: "t",
+          provider: "codex",
+          reportedState: "ready-for-review",
+          freshness: "connected",
+          verification: { status: "not-reported" },
+          association: { status: "registered", projectId: "p", checkoutId: "c", cwd: "/repo" }
+        }
+      ]
+    }
+  )
+  assert.deepEqual(JSON.parse(JSON.stringify(logic.activitySummary(result))), [
+    { label: "1 agent ready for review (reported)", section: "agents", attention: true },
+    { label: "1 check succeeded (latest run)", section: "actions", attention: false }
+  ])
+})
+
+test("unavailable observers replace retained live chips until a fresh read succeeds", () => {
+  const result = model(
+    { runs: [{ ...run, processState: "running", invocationId: "inv" }] },
+    {
+      tasks: [
+        {
+          taskId: "t",
+          provider: "codex",
+          reportedState: "working",
+          freshness: "connected",
+          association: { status: "registered", projectId: "p", checkoutId: "c", cwd: "/repo" }
+        }
+      ]
+    }
+  )
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(logic.activitySummary(result, { actions: false, agents: false }))),
+    [
+      { label: "Action status unavailable", section: "actions", attention: true },
+      { label: "Agent status unavailable", section: "agents", attention: true }
+    ]
+  )
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(logic.activitySummary(result, { actions: true, agents: true }))),
+    [
+      { label: "1 check running", section: "actions", attention: false },
+      { label: "1 agent working (reported)", section: "agents", attention: false }
+    ]
+  )
+})
 test("exact checkout scope prevents stale outcomes and Git crossing selection", () => {
   assert.equal(model({ runs: [run] }, {}, {}, { projectId: "p", checkoutId: "old" }).git, null)
   assert.equal(model({ runs: [run] }, {}, {}, null, "new").checks.length, 0)

@@ -154,6 +154,17 @@ configuration. Saved metadata alone does not prove that a window is still runnin
 and Return does not restore editor or terminal contents. Removing a registration
 leaves the repository and existing windows in place.
 
+On a horizontal bar, a workspace linked to one registered checkout shows a
+compact project name beside its numbers, with branch and path in the tooltip. Click it to inspect that
+exact checkout in Projects. Inspection preserves the saved checkout preference
+and uses the existing draft decision before leaving an editor. Launch-time
+branches are labeled **at launch** in the tooltip; conflicting associations leave the ordinary
+workspace controls visible.
+
+Overview opens with an activity summary when action or agent observations exist.
+Its links open Actions or Agents. Running services, latest check results,
+reported input and review requests, and disconnected agents remain distinct.
+
 Follow [Set up your first project](workflows.md#set-up-your-first-project).
 
 ## Project commands and previews

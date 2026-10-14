@@ -153,6 +153,8 @@ Displayed titles and stable CLI IDs are different:
 | Violet Pursuit          | `violet-pursuit` |
 | Deep Current            | `deep-current`   |
 | Orbital Relay           | `ultrawide`      |
+| Canopy Circuit          | `canopy-circuit` |
+| Polar Freight           | `polar-freight`  |
 
 To list or select them directly:
 
