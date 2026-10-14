@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.30.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.29.0...v2.30.0) (2026-10-14)
+
+
+### Features
+
+* **desktop:** connect workspace context and harden agent hooks ([#161](https://github.com/AraneaDev/aranea-desktop/issues/161)) ([c7aab2a](https://github.com/AraneaDev/aranea-desktop/commit/c7aab2adfde094355d56798b2cd3107faa74dfc5))
+
 ## [2.29.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.28.0...v2.29.0) (2026-10-14)
 
 
