@@ -95,3 +95,50 @@ test("projection requires current exact environment process evidence and never m
   rows[0].profileSnapshot.roles.push("agent")
   assert.deepEqual(saved[0].profileSnapshot.roles, ["editor", "terminal"])
 })
+
+test("fresh recovery bindings project an environment created in an older session without rewriting it", () => {
+  const saved = {
+    id: "e-old",
+    projectId: "p",
+    checkoutId: "c",
+    sessionId: "creation-session",
+    workspaceId: 2,
+    checkoutSnapshot: { id: "c", path: "/repo", branch: "launch-branch", primary: true },
+    profileSnapshot: { id: "f", name: "Original", revision: 1, roles: ["editor"] }
+  }
+  const original = JSON.stringify(saved)
+  const proof = {
+    environmentId: "e-old",
+    projectId: "p",
+    checkoutId: "c",
+    sessionId: "recovery-session",
+    role: "editor",
+    pid: 42,
+    address: "0xa",
+    evidence: { processVerified: true, mode: "process-only" }
+  }
+  const observed = env.projectRows([saved], [proof], "recovery-session")[0]
+  assert.equal(observed.status, "observed")
+  assert.deepEqual(plain(observed.observedRoles), ["editor"])
+  assert.equal(observed.sessionId, "creation-session")
+  assert.equal(JSON.stringify(saved), original)
+  assert.equal(env.projectRows([saved], [], "recovery-session")[0].status, "unconfirmed")
+  for (const patch of [
+    { sessionId: "creation-session" },
+    { environmentId: "e-other" },
+    { projectId: "p-other" },
+    { checkoutId: "c-other" },
+    { role: "unsupported" },
+    { pid: 0 },
+    { address: "0x0" },
+    { evidence: { processVerified: false, mode: "process-only" } },
+    { evidence: { processVerified: true, mode: "workspace-only" } }
+  ]) {
+    const row = env.projectRows([saved], [{ ...proof, ...patch }], "recovery-session")[0]
+    assert.equal(row.status, "unconfirmed", JSON.stringify(patch))
+    assert.deepEqual(plain(row.observedRoles), [])
+  }
+  observed.checkoutSnapshot.branch = "mutated-output"
+  observed.profileSnapshot.name = "mutated-output"
+  assert.equal(JSON.stringify(saved), original)
+})

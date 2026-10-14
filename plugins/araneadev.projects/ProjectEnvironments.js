@@ -67,7 +67,8 @@ function coalesced(operations, sessionId, activationId) {
 /**
  * Project saved environments separately from legacy associations. Bindings must
  * already have been freshly verified by the runtime in this publication cycle.
- * Metadata alone never establishes tool liveness or confirms closure.
+ * The immutable creation session is historical; recovery proof belongs to the
+ * current binding session. Metadata alone never establishes liveness or closure.
  * @param {Array<EnvironmentData>} environments - immutable saved records
  * @param {Array<EnvironmentData>} bindings - freshly verified native bindings
  * @param {string} sessionId - current owner session
@@ -79,7 +80,6 @@ function projectRows(environments, bindings, sessionId) {
       return (bindings || []).some(function (binding) {
         return (
           !!sessionId &&
-          environment.sessionId === sessionId &&
           binding.sessionId === sessionId &&
           binding.environmentId === environment.id &&
           binding.projectId === environment.projectId &&

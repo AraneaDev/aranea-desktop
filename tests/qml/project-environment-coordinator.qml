@@ -78,6 +78,10 @@ ShellRoot {
   property bool raceAtFocus: false
   // Missing native callbacks exercise the real role deadline.
   property bool silentLaunch: false
+  // Successful fake native recovery supplies fresh process/window proof to the real owner.
+  property bool successfulObservation: false
+  // Native evidence stays distinct from immutable saved environment metadata.
+  property var nativeBindings: []
   // One stalled external read must not block the shared queue forever.
   property bool hangNextRead: false
   // Post-dispatch unrelated occupancy must hold all later ambiguous work.
@@ -98,8 +102,44 @@ ShellRoot {
           return {
             available: true,
             workspaces: root.occupied,
-            windows: []
+            windows: root.nativeBindings.map(function (binding) {
+              return {
+                address: binding.address,
+                pid: binding.pid,
+                workspaceId: binding.workspaceId
+              }
+            })
           }
+        },
+        validateBindings: function (bindings, done) {
+          done({
+            bindings: root.nativeBindings,
+            missing: []
+          })
+        },
+        observe: function (spec, baseline, done) {
+          var binding = {
+            environmentId: spec.environmentId,
+            projectId: spec.projectId,
+            checkoutId: spec.checkoutId,
+            sessionId: spec.sessionId,
+            role: spec.role,
+            workspaceId: spec.workspaceId,
+            pid: 420,
+            address: '0x420',
+            evidence: {
+              mode: 'process-only',
+              processVerified: true,
+              startTime: '123',
+              verifiedAt: Date.now()
+            }
+          }
+          root.nativeBindings = [binding]
+          done({
+            ok: true,
+            status: 'observed',
+            binding: binding
+          })
         },
         createEnvironmentId: function (done) {
           root.serial++
@@ -141,6 +181,19 @@ ShellRoot {
                 windows: 1
               }
             ])
+          if (root.successfulObservation) {
+            done({
+              ok: true,
+              status: 'accepted',
+              identity: {
+                pid: 420,
+                startTime: '123',
+                sessionId: spec.sessionId,
+                token: spec.token
+              }
+            })
+            return
+          }
           if (!root.silentLaunch)
             done({
               ok: false,
@@ -474,6 +527,10 @@ ShellRoot {
         t.equal(owner.operation(observed.operationId).outcome, 'partial', 'reobserve after restart remains unconfirmed without accepted native proof')
         t.equal(launched.length, before, 'reobserve never adopts or launches from metadata')
         root.silentLaunch = false
+        root.successfulObservation = true
+        var saved = JSON.stringify(owner.environmentRecords().filter(function (row) {
+          return row.id === first.environmentId
+        })[0])
         var fresh = owner.recoverEnvironment({
           projectId: 'p-one',
           environmentId: first.environmentId,
@@ -484,10 +541,48 @@ ShellRoot {
           t.equal(launched.length, before + 1, 'explicit New window can deliberately start a role after restart')
           t.equal(launched[launched.length - 1].environmentId, first.environmentId, 'explicit New window stays in the exact saved environment')
           t.equal(launched[launched.length - 1].workspaceId, 2, 'explicit New window never relocates the old environment')
-          preparationTimeout()
+          t.equal(owner.operation(fresh.operationId).outcome, 'observed', 'fresh native process/window proof completes recovery after restart')
+          recoveryProjection(saved)
         })
       })
     })
+  }
+  // The real owner projection accepts fresh proof without rewriting the historical creation session.
+  function recoveryProjection(saved) {
+    var row = owner.snapshot().environments.filter(function (env) {
+      return env.id === first.environmentId
+    })[0]
+    t.equal(row.sessionId, 'session-one', 'saved creation session remains immutable after successful recovery')
+    t.equal(row.status, 'observed', 'current native binding makes an older saved environment observed')
+    t.equal(row.observedRoles, ['editor'], 'projection exposes exactly the freshly observed recovered role')
+    t.equal(JSON.stringify(owner.environmentRecords().filter(function (env) {
+      return env.id === first.environmentId
+    })[0]), saved, 'successful recovery preserves the complete saved environment and snapshots')
+    var proof = JSON.parse(JSON.stringify(root.nativeBindings[0]))
+    t.equal(proof.sessionId, 'session-two', 'recovered binding belongs to the current owner session')
+    var cases = [[], [Object.assign({}, proof, {
+          sessionId: 'session-one'
+        })], [Object.assign({}, proof, {
+          environmentId: 'e-other'
+        })]]
+    var labels = ['metadata alone', 'old-session binding', 'wrong-environment binding']
+    var check = function (index) {
+      root.nativeBindings = index < cases.length ? cases[index] : [proof]
+      owner.validate(function () {
+        var projected = owner.snapshot().environments.filter(function (env) {
+          return env.id === first.environmentId
+        })[0]
+        if (index < cases.length) {
+          t.equal(projected.status, 'unconfirmed', labels[index] + ' cannot become current native evidence')
+          t.equal(projected.observedRoles, [], labels[index] + ' exposes no observed role')
+          check(index + 1)
+        } else {
+          t.equal(projected.status, 'observed', 'fresh exact proof restores observation without changing metadata')
+          preparationTimeout()
+        }
+      })
+    }
+    check(0)
   }
   // A stalled preflight must release the shared queue so ordinary Open remains usable.
   function preparationTimeout() {
