@@ -75,7 +75,9 @@ jq -e '.schemaVersion == 1 and .operation == "status" and .ok
   and .state.motion.configured == "on" and .state.motion.applied == "on"
   and .state.wallpaper.activeId == null and .state.wallpaper.availability == "unavailable"
   and .state.schedule.enabled == false and .state.schedule.dawn == "06:00"
-  and (.state.wallpapers | length == 13)
+  and (.state.wallpapers | length == 15)
+  and any(.state.wallpapers[]; .id == "canopy-circuit" and .label == "Canopy Circuit" and .available)
+  and any(.state.wallpapers[]; .id == "polar-freight" and .label == "Polar Freight" and .available)
   and (.state.wallpapers[] | (.path | startswith("/")) and (.available | type == "boolean"))' "$sandbox_root/status.json" >/dev/null
 [[ "$(jq -s length "$sandbox_root/status.json")" == 1 ]]
 test ! -e "$ARANEA_STATE_ROOT" # Reads do not create state.

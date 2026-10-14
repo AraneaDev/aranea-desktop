@@ -34,10 +34,14 @@ ShellRoot {
     function run(command) {
       testRoot.lastCommand = command
     }
+    function hideTooltip(owner) {
+    }
   }
 
   // Last command sent through the fake bar.
   property string lastCommand: ""
+  // Held owner reads expose overlapping polling without native IPC.
+  property var projectReads: []
 
   Workspace.BarWidget {
     id: widget
@@ -71,7 +75,70 @@ ShellRoot {
 
   Component.onCompleted: {
     // Install inert IPC before exercising focus against the fake bar transport.
-    widget.projectClient.runner = function () {}
+    widget.projectClient.runner = function (argv, done) {
+      testRoot.projectReads.push(done)
+    }
+    widget.captureActive = false
+    widget.projectClient.available = true
+    widget.projectClient.snapshot = {
+      sessionId: 'session',
+      projects: [
+        {
+          id: 'p-app',
+          name: 'App',
+          lastCheckoutId: 'c-other',
+          checkouts: [
+            {
+              id: 'c-main',
+              path: '/app',
+              branch: 'main'
+            }
+          ],
+          associations: [
+            {
+              checkoutId: 'c-main',
+              mode: 'dedicated',
+              workspaceId: 1
+            }
+          ]
+        }
+      ],
+      bindings: []
+    }
+    t.check(!widget.activeProjectContext, 'saved workspace assignment alone does not label a manually started terminal')
+    widget.projectClient.snapshot = Object.assign({}, widget.projectClient.snapshot, {
+      bindings: [
+        {
+          projectId: 'p-app',
+          checkoutId: 'c-main',
+          workspaceId: 1,
+          sessionId: 'session',
+          pid: 123,
+          address: '0xabc',
+          evidence: {
+            processVerified: true,
+            mode: 'process-app-id'
+          }
+        }
+      ]
+    })
+    t.check(!!widget.activeProjectContext, 'closed overview still exposes focused project context')
+    var contextButton = t.findChild(widget, 'workspaceProjectContext')
+    t.check(!!contextButton && contextButton.visible, 'horizontal bar shows the current project')
+    if (contextButton) {
+      contextButton.triggerPress(Qt.LeftButton)
+      t.check(testRoot.lastCommand.indexOf('summon araneadev.projects') >= 0, 'project label opens Projects for inspection')
+      t.check(testRoot.lastCommand.indexOf('c-main') >= 0, 'inspection retains the workspace checkout rather than the last checkout')
+    }
+    widget.refreshProjects()
+    widget.refreshProjects()
+    t.equal(testRoot.projectReads.length, 1, 'bar polling never overlaps a held owner read')
+    widget.captureActive = true
+    testRoot.lastCommand = ''
+    if (contextButton)
+      contextButton.triggerPress(Qt.LeftButton)
+    t.equal(testRoot.lastCommand, '', 'capture context never dispatches inspection')
+    t.check(!widget.activeProjectContext, 'capture context never exposes real project data')
     widget.captureActive = false
     t.check(widget.activeWorkspaceId === 1, "active workspace is exposed")
     t.equal(widget.indicatorDots.length, 3, "all normal workspaces are dotted")
@@ -81,6 +148,8 @@ ShellRoot {
     t.check(testRoot.lastCommand.indexOf('workspace = "3"') >= 0, "popover workspace focus dispatches")
     t.check(widget.implicitWidth > 0 && widget.implicitHeight > 0, "widget has bar geometry")
     fakeBar.vertical = true
+    if (contextButton)
+      t.check(!contextButton.visible, 'vertical bars keep the compact workspace controls')
     t.check(widget.implicitHeight > 0, "vertical bar geometry remains valid")
     var panelHost = t.findChild(widget, "testPanelHost")
     t.check(panelHost !== null, "the test panel host is loaded")

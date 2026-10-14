@@ -736,6 +736,65 @@ function workspaceLabel(row) {
   return "Workspace " + name
 }
 
+/** Resolve a unique observed checkout for the bar's inspection shortcut.
+ * @param {number} workspaceId - focused workspace identity
+ * @param {*} snapshot - read-only project owner projection
+ * @returns {*} unique context or null for missing/ambiguous associations
+ */
+function barContext(workspaceId, snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.projects)) return null
+  if (snapshot.availability && snapshot.availability.compositor === false) return null
+  /** @type {Array<*>} */
+  var candidates = []
+  snapshot.projects.forEach(function (/** @type {*} */ project) {
+    ;(project.checkouts || []).forEach(function (/** @type {*} */ checkout) {
+      var scoped = Object.assign({}, snapshot, {
+        projects: [
+          Object.assign({}, project, {
+            checkouts: [checkout],
+            associations: (project.associations || []).filter(
+              function (/** @type {*} */ association) {
+                return association.checkoutId === checkout.id
+              }
+            )
+          })
+        ],
+        environments: (snapshot.environments || []).filter(function (/** @type {*} */ environment) {
+          return environment.projectId === project.id && environment.checkoutId === checkout.id
+        })
+      })
+      var context = projectContext(workspaceId, scoped)
+      if (!context) return
+      // A launched environment retains workspace context across owner restarts.
+      // A bare saved assignment still needs observed tools. Neither grants ownership.
+      var observed = (snapshot.bindings || []).some(function (/** @type {*} */ binding) {
+        return (
+          binding &&
+          binding.projectId === project.id &&
+          binding.checkoutId === checkout.id &&
+          binding.workspaceId === Number(workspaceId) &&
+          !!snapshot.sessionId &&
+          binding.sessionId === snapshot.sessionId &&
+          binding.pid > 0 &&
+          typeof binding.address === "string" &&
+          /^0x[0-9a-fA-F]+$/.test(binding.address) &&
+          !/^0x0+$/.test(binding.address) &&
+          binding.evidence &&
+          binding.evidence.processVerified === true &&
+          ["process-only", "process-app-id"].indexOf(binding.evidence.mode) >= 0 &&
+          (!context.environmentId || binding.environmentId === context.environmentId)
+        )
+      })
+      if (!observed && !context.environmentId) return
+      context.label = String(project.name || project.id)
+      if (!context.environmentId && checkout.branch)
+        context.detail = "Registered branch: " + checkout.branch + "\n" + context.detail
+      candidates.push(context)
+    })
+  })
+  return candidates.length === 1 ? candidates[0] : null
+}
+
 /**
  * A row's trailing detail: the window count ("empty" for none), with
  * "current" appended for the active workspace and "attention" appended for
@@ -800,6 +859,7 @@ if (typeof module !== "undefined") {
     outlineIndex,
     openCaption,
     projectContext,
+    barContext,
     workspaceLabel,
     workspaceDetail,
     workspaceTitles,

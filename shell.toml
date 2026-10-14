@@ -49,7 +49,7 @@ base-size = 12
 
 [popups]
 background = "#0b1016"
-background-alpha = 0.97
+background-alpha = 1
 text = "#edf3f6"
 border = "hyprland.active-border"
 border-alpha = 1

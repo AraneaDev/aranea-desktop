@@ -23,8 +23,25 @@ Item {
   property string section: 'projects'
   // Optional opaque details destination, empty for the Projects overview.
   property string projectId: ''
+  // Inspection can select an exact checkout without changing saved launch preferences.
+  property string inspectionCheckoutId: ''
+  // External inspection waits for registry readback and the production draft guards.
+  property var inspectionDestination: null
+  // Missing external destinations never silently substitute another worktree.
+  property string inspectionError: ''
+  // Explicit profile Start may first select its inspected checkout in the registry.
+  property var inspectionLaunchIntent: null
+  // Presentation-only checkout selection is shared by header, actions, Git and agents.
+  readonly property var presentationState: Object.assign({}, projectController.state, {
+    projects: (projectController.state.projects || []).map(function (project) {
+      return project.id === root.projectId && root.inspectionCheckoutId ? Object.assign({}, project, {
+        lastCheckoutId: root.inspectionCheckoutId
+      }) : project
+    })
+  })
   // Every genuine selection source records once; fixture changes remain inert.
   onProjectIdChanged: {
+    inspectionCheckoutId = ''
     clearDismissalIntent()
     if (projectId && !inert)
       rememberNavigation(projectId, undefined, true)
@@ -85,7 +102,7 @@ Item {
   // Read-only Git cache survives visibility while launch ownership stays separate.
   property alias gitClient: gitClient
   // Invalid or missing selected checkouts never fall back to another worktree.
-  readonly property var selectedProject: (projectController.state.projects || []).filter(function (project) {
+  readonly property var selectedProject: (presentationState.projects || []).filter(function (project) {
     return project.id === root.projectId
   })[0] || null
   // Dismissal belongs to one visible user action, never to observation lifetime.
@@ -99,6 +116,7 @@ Item {
   onSelectedCheckoutIdChanged: clearDismissalIntent()
   // Forget only local visibility intent, preserving all accepted or unknown work.
   function clearDismissalIntent() {
+    inspectionLaunchIntent = null
     awaitedLaunchId = ''
     launchIntent = null
     awaitedReturnId = ''
@@ -115,7 +133,7 @@ Item {
   }
   // Start the exact displayed profile on the currently selected checkout.
   function startProfile(profileId, profileRevision, another) {
-    if (inert || !opened || !selectedProject || projectClient.submitting)
+    if (inert || !opened || !selectedProject || projectClient.submitting || inspectionLaunchIntent)
       return false
     var profile = (selectedProject.profiles || []).find(function (p) {
       return p.id === profileId && p.revision === profileRevision
@@ -129,6 +147,24 @@ Item {
       profileRevision: profileRevision
     }
     clearDismissalIntent()
+    var saved = (projectController.state.projects || []).find(function (project) {
+      return project.id === root.projectId
+    })
+    if (inspectionCheckoutId && saved && saved.lastCheckoutId !== target.checkoutId) {
+      if (projectController.pending || projectController.reading)
+        return false
+      inspectionLaunchIntent = Object.assign({}, target, {
+        another: another === true
+      })
+      if (!projectController.request('select-checkout', {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId
+      })) {
+        inspectionLaunchIntent = null
+        return false
+      }
+      return true
+    }
     launchIntent = {
       target: target,
       generation: null
@@ -239,16 +275,21 @@ Item {
     target: projectController
     function onStateChanged() {
       root.restoreNavigation()
+      root.applyInspection()
     }
     function onReadingChanged() {
       if (!projectController.reading) {
         root.restoreNavigation()
+        root.applyInspection()
         root.flushNavigation()
       }
     }
     function onPendingChanged() {
       if (!projectController.pending) {
+        if (projectController.error)
+          root.inspectionLaunchIntent = null
         root.navigationSaving = false
+        root.applyInspection()
         root.flushNavigation()
       }
     }
@@ -256,6 +297,13 @@ Item {
       discoveryClient.start(rootId)
     }
     function onMutationCompleted(action, args, state) {
+      if (action === 'select-checkout' && root.projectId === args.projectId) {
+        var intent = root.inspectionLaunchIntent
+        root.inspectionLaunchIntent = null
+        root.inspectionCheckoutId = ''
+        if (intent && root.opened && !root.inert && intent.projectId === args.projectId && intent.checkoutId === args.checkoutId && root.selectedCheckoutId === intent.checkoutId)
+          root.startProfile(intent.profileId, intent.profileRevision, intent.another)
+      }
       if (action === 'register') {
         var added = state.projects.filter(function (p) {
           return p.checkouts.some(function (c) {
@@ -346,6 +394,8 @@ Item {
       opened: opened,
       section: section,
       projectId: projectId,
+      inspectionCheckoutId: inspectionCheckoutId,
+      inspectionError: inspectionError,
       projects: {
         state: projectController.state,
         tools: projectController.tools,
@@ -371,7 +421,7 @@ Item {
   }
   // Validate and enter an inert transaction before changing any observation.
   function captureBegin(payloadJson) {
-    if (actionClient.pending || activityClient.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && view.captureBusy()))
+    if (inspectionDestination || actionClient.pending || activityClient.pending || projectController.pending || projectController.reading || projectClient.pending || projectClient.preparing || discoveryClient.pending || captureSaved || (view && view.captureBusy()))
       return 'busy'
     var payload
     try {
@@ -385,6 +435,8 @@ Item {
       json: payload.snapshot,
       focus: view ? view.captureFocus() : null
     }
+    inspectionCheckoutId = ''
+    inspectionError = ''
     projectId = Logic.normalizeProjectId(payload.projectId)
     var f = payload.fixture
     restoreActions(f.projectActions || {})
@@ -443,6 +495,8 @@ Item {
     projectClient.requestError = p.requestError
     projectClient.acceptanceUnknown = p.acceptanceUnknown === true
     projectId = saved.projectId
+    inspectionCheckoutId = saved.inspectionCheckoutId || ''
+    inspectionError = saved.inspectionError || ''
     opened = saved.opened
     if (view && saved.ui)
       view.captureRestore(saved.ui)
@@ -470,6 +524,23 @@ Item {
     }
   }
   // Accept a typed destination and refresh observations without launching tools.
+  function applyInspection() {
+    if (inert || !opened || !inspectionDestination || !view || projectController.reading || projectController.pending)
+      return
+    var target = inspectionDestination
+    inspectionDestination = null
+    var project = (projectController.state.projects || []).find(function (row) {
+      return row.id === target.projectId
+    })
+    if (!project || !(project.checkouts || []).some(function (checkout) {
+      return checkout.id === target.checkoutId
+    })) {
+      inspectionError = 'The requested checkout is no longer registered. Choose a project or add its folder again.'
+      return
+    }
+    view.inspectCheckout(target.projectId, target.checkoutId)
+  }
+  // Accept a typed destination and refresh observations without launching tools.
   function open(payloadJson) {
     clearDismissalIntent()
     if (inert)
@@ -479,6 +550,26 @@ Item {
       payload = JSON.parse(payloadJson || '{}')
     } catch (e) {}
     var nextId = payload && payload.projectId !== undefined ? Logic.normalizeProjectId(payload.projectId) : projectId
+    inspectionError = ''
+    inspectionDestination = null
+    if (payload && payload.checkoutId !== undefined) {
+      if (!nextId || typeof payload.checkoutId !== 'string' || !payload.checkoutId || /[\x00-\x1f\x7f]/.test(payload.checkoutId))
+        return 'invalid'
+      if (view && view.navigationBlocked)
+        return 'busy'
+      restoreNavigationPending = false
+      inspectionDestination = {
+        projectId: nextId,
+        checkoutId: payload.checkoutId
+      }
+      opened = true
+      projectController.refresh()
+      applyInspection()
+      projectClient.refresh()
+      if (view)
+        view.focusKeys()
+      return 'ok'
+    }
     if (view && nextId !== projectId && view.navigationBlocked)
       return 'busy'
     if (view && nextId !== projectId && view.hasUnsavedDraft) {
@@ -498,6 +589,7 @@ Item {
   }
   // Hide presentation while retaining drafts and accepted service operations.
   function close() {
+    inspectionDestination = null
     clearDismissalIntent()
     opened = false
   }
