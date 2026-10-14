@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.29.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.28.0...v2.29.0) (2026-10-14)
+
+
+### Features
+
+* **desktop:** connect project workspaces and expand artwork ([#159](https://github.com/AraneaDev/aranea-desktop/issues/159)) ([4966604](https://github.com/AraneaDev/aranea-desktop/commit/4966604f5181a6ac9ae9bff0671d6c717301364a))
+
 ## [2.28.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.27.0...v2.28.0) (2026-10-14)
 
 
