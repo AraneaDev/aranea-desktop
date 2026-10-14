@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectOverview.js" as Overview
 
 ColumnLayout {
   id: view
@@ -17,6 +18,15 @@ ColumnLayout {
       agents: [],
       workspaces: []
     })
+  // Read-only summary links expose work and attention before the detailed sections.
+  readonly property var activitySummary: Overview.activitySummary(model, {
+    actions: actionObservationAvailable,
+    agents: agentObservationAvailable
+  })
+  // Retained records do not imply that either observer is still connected.
+  property bool actionObservationAvailable: true
+  // Current agent-owner transport availability is independent of cached task freshness.
+  property bool agentObservationAvailable: true
   // Selected Git read error retains its prior snapshot.
   property var gitError: null
   // Independent selected Git read progress.
@@ -56,6 +66,35 @@ ColumnLayout {
   // Explicit read-only refresh request.
   signal refreshRequested
   spacing: Style.space(20)
+  ColumnLayout {
+    Layout.fillWidth: true
+    visible: view.activitySummary.length > 0
+    spacing: Style.space(8)
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Activity in this checkout'
+      font.bold: true
+    }
+    Flow {
+      Layout.fillWidth: true
+      spacing: Style.space(6)
+      Repeater {
+        model: view.activitySummary
+        Aranea.ActionButton {
+          required property var modelData
+          objectName: 'activitySummary:' + modelData.section
+          text: modelData.label
+          width: Math.min(implicitWidth, parent.width)
+          tooltipText: modelData.label
+          variant: 'quiet'
+          labelColor: modelData.attention ? Aranea.DesignTokens.urgent : Aranea.DesignTokens.foreground
+          enabled: !view.displayOnly
+          pointerGate: view.pointerGate
+          onClicked: view.detailsRequested(modelData.section, {})
+        }
+      }
+    }
+  }
   ProjectGitSection {
     Layout.fillWidth: true
     git: view.model.git

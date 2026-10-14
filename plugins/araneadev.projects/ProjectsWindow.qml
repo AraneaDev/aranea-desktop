@@ -36,6 +36,10 @@ PanelWindow {
   function navigate(id) {
     return surface.navigate(id)
   }
+  // External bar inspection preserves exact checkout identity and local drafts.
+  function inspectCheckout(projectId, checkoutId) {
+    return surface.inspectCheckout(projectId, checkoutId)
+  }
   // Snapshot local presentation for the scoped capture transaction.
   function captureSnapshot() {
     return surface.captureSnapshot()

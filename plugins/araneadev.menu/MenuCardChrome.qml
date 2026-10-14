@@ -1,7 +1,6 @@
 // Presentational chrome for the menu card header, root tiles, context and footer.
 // qmllint disable missing-property unqualified
 import QtQuick
-import QtQuick.Shapes
 import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
@@ -128,80 +127,17 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: deckHeader.emblemSize
         height: width
-        Shape {
-          id: orbitalArcs
+        Aranea.OrbitalHalo {
+          objectName: "menuOrbitalHalo"
           anchors.fill: parent
           visible: chrome.fullRootHeader
-          ShapePath {
-            strokeWidth: 2
-            strokeColor: Util.alpha(chrome.selectedText, 0.7)
-            fillColor: "transparent"
-            startX: orbitalArcs.width / 2
-            startY: 2
-            PathArc {
-              x: orbitalArcs.width - 2
-              y: orbitalArcs.height / 2
-              radiusX: orbitalArcs.width / 2 - 2
-              radiusY: orbitalArcs.height / 2 - 2
-            }
-          }
-          ShapePath {
-            strokeWidth: 2
-            strokeColor: Util.alpha(Aranea.DesignTokens.strandEnd, 0.8)
-            fillColor: "transparent"
-            startX: orbitalArcs.width / 2
-            startY: orbitalArcs.height - 2
-            PathArc {
-              x: 2
-              y: orbitalArcs.height / 2
-              radiusX: orbitalArcs.width / 2 - 2
-              radiusY: orbitalArcs.height / 2 - 2
-            }
-          }
-          RotationAnimator on rotation {
-            from: 0
-            to: -360
-            duration: 24000
-            loops: Animation.Infinite
-            running: chrome.motionEnabled && chrome.presented && orbitalArcs.visible
-          }
-        }
-        Item {
-          anchors.fill: parent
-          visible: chrome.fullRootHeader
-          Rectangle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: 0
-            width: Style.space(4)
-            height: width
-            radius: width / 2
-            color: chrome.selectedText
-          }
-          RotationAnimator on rotation {
-            from: 0
-            to: 360
-            duration: 16000
-            loops: Animation.Infinite
-            running: chrome.motionEnabled && chrome.presented && chrome.fullRootHeader && emblem.visible
-          }
-        }
-        Rectangle {
-          visible: chrome.fullRootHeader
-          anchors.fill: parent
-          radius: width / 2
-          color: Util.alpha(chrome.selectedText, 0.07)
-          border.width: 1
-          border.color: Util.alpha(chrome.selectedText, 0.4)
-          Rectangle {
-            anchors.fill: parent
-            anchors.margins: Style.space(7)
-            radius: width / 2
-            color: "transparent"
-            border.width: 1
-            border.color: Util.alpha(Aranea.DesignTokens.strandEnd, 0.45)
-          }
+          presented: chrome.presented
+          motionEnabled: chrome.motionEnabled
+          primary: chrome.selectedText
+          secondary: Aranea.DesignTokens.strandEnd
         }
         Image {
+          objectName: "menuBrandEmblem"
           anchors.centerIn: parent
           width: chrome.fullRootHeader ? parent.width * 0.65 : parent.width
           height: width

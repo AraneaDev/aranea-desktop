@@ -33,7 +33,7 @@ BorderSurface {
   radius: card.cornerRadius
   padding: card.contentPadding
   clip: card.clipContent
-  borderSpec: card.borderSpecOverride !== null ? card.borderSpecOverride : Border.surfaceSpec(card.surface, "border", card.borderColor, Math.max(0, card.borderWidth), "border-alpha")
+  borderSpec: card.borderSpecOverride !== null ? card.borderSpecOverride : PanelChrome.surfaceBorder(card.surface, "border", card.borderColor, Math.max(0, card.borderWidth), true)
 
   CircuitFrame {
     parent: card

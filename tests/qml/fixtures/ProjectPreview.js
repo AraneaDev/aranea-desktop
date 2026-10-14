@@ -279,6 +279,63 @@ function sample(id, mode, count) {
     ]
   }
   return {
+    projectActions:
+      mode === "activity"
+        ? {
+            snapshot: {
+              revision: 1,
+              definitions: [
+                {
+                  id: "a-server",
+                  projectId: project.id,
+                  revision: 1,
+                  name: "Dev server",
+                  kind: "service",
+                  argv: ["npm", "run", "dev"],
+                  cwdRelative: "."
+                }
+              ],
+              runs: [
+                {
+                  id: "r-server",
+                  projectId: project.id,
+                  checkoutId: "c-preview",
+                  actionId: "a-server",
+                  createdAt: Math.floor(Date.now() / 1000) - 90,
+                  updatedAt: Math.floor(Date.now() / 1000),
+                  processState: "running",
+                  invocationId: "fixture-invocation",
+                  definitionSnapshot: { id: "a-server", name: "Dev server", kind: "service" }
+                }
+              ],
+              requests: []
+            }
+          }
+        : {},
+    activitySnapshot:
+      mode === "activity"
+        ? {
+            tasks: [
+              {
+                taskId: "t-layout",
+                provider: "codex",
+                description: "Refine project navigation",
+                reportedState: "needs-input",
+                freshness: "connected",
+                nativeSessionEligible: true,
+                lastReceivedAt: Math.floor(Date.now() / 1000),
+                verification: { status: "not-reported" },
+                association: {
+                  status: "registered",
+                  projectId: project.id,
+                  checkoutId: "c-preview",
+                  cwd: path
+                }
+              }
+            ],
+            operations: []
+          }
+        : { tasks: [], operations: [] },
     projectSection: mode === "profiles" || mode === "profile-editor" ? "profiles" : "overview",
     projectsState: state,
     projectGitCache: gitCache,
