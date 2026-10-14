@@ -2,6 +2,7 @@
 import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
+import QtQuick.Window
 import qs.Commons
 import qs.Ui
 import "WorkspaceModel.js" as WorkspaceModel
@@ -26,26 +27,30 @@ Item {
   property bool panelOpen: false
   // Open state exposed to the panel host.
   readonly property bool opened: panelOpen
-  // Only a visible overview consumes project state; unavailable owners fall back.
-  readonly property var projectSnapshot: panelOpen && !captureActive && projectClient.available ? projectClient.snapshot : null
+  // Visible bar and overview share a read-only owner projection.
+  readonly property var projectSnapshot: visible && !captureActive && projectClient.available ? projectClient.snapshot : null
+  // The focused workspace's launched environment or observed checkout, never assignment alone.
+  readonly property var activeProjectContext: WorkspaceModel.barContext(activeWorkspaceId, projectSnapshot)
   // Read-only boundary exposed to inert fixtures for transport replacement.
   readonly property alias projectClient: projectClient
 
   Projects.ProjectClient {
     id: projectClient
-    captureActive: root.captureActive || !root.panelOpen
+    captureActive: root.captureActive || !root.visible
+    serializeSnapshotReads: true
     onCaptureActiveChanged: if (!captureActive)
       root.refreshProjects()
   }
-  // Read the owner projection while visible; closing invalidates pending reads.
+  // Observe workspace context without launching or focusing project tools.
   function refreshProjects() {
-    if (root.panelOpen && !root.captureActive)
+    if (root.visible && !root.captureActive)
       projectClient.refresh()
   }
   Timer {
-    interval: 2000
+    interval: 5000
     repeat: true
-    running: root.panelOpen && !root.captureActive
+    running: root.visible && !root.captureActive
+    triggeredOnStart: true
     onTriggered: root.refreshProjects()
   }
   // Read live workspace rows without indexing unstable toplevel objects.
@@ -80,6 +85,17 @@ Item {
   readonly property var visibleStates: WorkspaceModel.visibleWorkspaces(workspaceStates)
   // Standard workspace indicators shown in the bar.
   readonly property var indicatorDots: WorkspaceModel.indicatorDots(workspaceStates)
+  // Decorative motion never controls workspace focus or hit target geometry.
+  property bool motionEnabled: Aranea.MotionState.motionEnabled
+  // Vertical bars arrange the same fixed workspace targets down their axis.
+  readonly property bool vertical: !!root.bar && root.bar.vertical
+  // Index of the focused workspace among the fixed bar slots, -1 when absent.
+  readonly property int activeIndicatorIndex: {
+    for (var i = 0; i < root.indicatorDots.length; i++)
+      if (root.indicatorDots[i].active)
+        return i
+    return -1
+  }
   // Width used by the shell's open-panel indicator.
   readonly property real openPanelIndicatorWidth: button.implicitWidth
 
@@ -110,8 +126,8 @@ Item {
     }
   }
 
-  implicitWidth: button.implicitWidth + indicators.implicitWidth
-  implicitHeight: Math.max(button.implicitHeight, indicators.implicitHeight)
+  implicitWidth: root.vertical ? Math.max(button.implicitWidth, indicators.implicitWidth) : button.implicitWidth + indicators.implicitWidth + (projectButton.visible ? projectButton.implicitWidth : 0)
+  implicitHeight: root.vertical ? button.implicitHeight + indicators.implicitHeight : Math.max(button.implicitHeight, indicators.implicitHeight)
   // Open the overview panel.
   function open() {
     panelOpen = true
@@ -162,12 +178,12 @@ Item {
     id: button
     anchors.left: parent.left
     anchors.top: parent.top
-    anchors.bottom: parent.bottom
+    anchors.bottom: root.vertical ? undefined : parent.bottom
     bar: root.bar
     text: "workspace"
     labelVisible: false
     keepSpace: true
-    fixedWidth: Style.space(30)
+    fixedWidth: root.vertical && root.bar ? root.bar.barSize : Style.space(30)
     fixedHeight: root.bar ? root.bar.barSize : Style.space(32)
     tooltipText: "Workspace overview"
     active: root.panelOpen
@@ -202,17 +218,32 @@ Item {
 
   Item {
     id: indicators
-    anchors.left: button.right
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    implicitWidth: Style.space(64)
-    implicitHeight: root.bar ? root.bar.barSize : Style.space(32)
+    anchors.left: root.vertical ? parent.left : button.right
+    anchors.top: root.vertical ? button.bottom : parent.top
+    anchors.bottom: root.vertical ? undefined : parent.bottom
+    implicitWidth: root.vertical ? (root.bar ? root.bar.barSize : Style.space(32)) : Math.max(Style.space(64), indicatorGrid.implicitWidth)
+    implicitHeight: root.vertical ? indicatorGrid.implicitHeight : (root.bar ? root.bar.barSize : Style.space(32))
+    width: implicitWidth
+    height: implicitHeight
 
-    Row {
+    ActiveIndicator {
+      objectName: "workspaceActiveIndicator"
+      activeIndex: root.activeIndicatorIndex
+      vertical: root.vertical
+      slotSize: Style.space(12)
+      slotSpacing: Style.space(1)
+      crossSize: root.bar ? root.bar.barSize : Style.space(32)
+      thickness: Style.space(2)
+      presented: root.visible && (!root.bar || !root.bar.barHidden) && (!root.Window.window || root.Window.window.visible)
+      motionEnabled: root.motionEnabled
+      color: root.bar ? root.bar.urgent : Color.accent
+    }
+    Grid {
+      id: indicatorGrid
       z: 1
       anchors.left: parent.left
-      anchors.leftMargin: 0
-      anchors.verticalCenter: parent.verticalCenter
+      anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
+      columns: root.vertical ? 1 : Math.max(1, root.indicatorDots.length)
       spacing: Style.space(1)
       Repeater {
         model: root.indicatorDots
@@ -224,8 +255,8 @@ Item {
           keepSpace: true
           horizontalMargin: 0
           verticalPadding: 0
-          fixedWidth: Style.space(12)
-          fixedHeight: root.bar ? root.bar.barSize : Style.space(32)
+          fixedWidth: vertical ? barSize : Style.space(12)
+          fixedHeight: vertical ? Style.space(12) : (root.bar ? root.bar.barSize : Style.space(32))
           active: modelData.urgent || modelData.active
           opacity: active ? 1 : 0.55
           onPressed: function (mouseButton) {
@@ -237,6 +268,52 @@ Item {
     }
   }
 
+  // The host supplies runtime typography token properties.
+  // qmllint disable missing-property
+  TextMetrics {
+    id: projectLabelMetrics
+    text: root.activeProjectContext ? root.activeProjectContext.label : ''
+    font.family: Aranea.Typography.uiFamily
+    font.pixelSize: Style.font.body
+  }
+  WidgetButton {
+    id: projectButton
+    objectName: 'workspaceProjectContext'
+    anchors.left: indicators.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    bar: root.bar
+    visible: !!root.activeProjectContext && !!root.bar && !root.bar.vertical
+    text: root.activeProjectContext ? root.activeProjectContext.label : ''
+    labelVisible: false
+    fixedWidth: Math.min(Style.space(200), projectLabelMetrics.width + Style.space(20))
+    fixedHeight: root.bar ? root.bar.barSize : Style.space(32)
+    tooltipText: root.activeProjectContext ? root.activeProjectContext.label + '\n' + root.activeProjectContext.detail + '\nOpen project overview' : ''
+    Text {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      text: projectButton.text
+      textFormat: Text.PlainText
+      font.family: Aranea.Typography.uiFamily
+      font.pixelSize: Style.font.body
+      color: root.bar ? root.bar.foreground : Color.foreground
+      verticalAlignment: Text.AlignVCenter
+      elide: Text.ElideRight
+    }
+    onPressed: function (mouseButton) {
+      var context = root.activeProjectContext
+      if (root.captureActive || mouseButton !== Qt.LeftButton || !context || !root.bar)
+        return
+      var payload = JSON.stringify({
+        projectId: context.projectId,
+        checkoutId: context.checkoutId
+      })
+      root.bar.run('omarchy-shell shell summon araneadev.projects ' + Util.shellQuote(payload))
+    }
+  }
+
+  // qmllint enable missing-property
   component PanelContent: Item {
     // The normalized workspace rows rendered by the panel.
     property var workspaceStates: []

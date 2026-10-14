@@ -195,6 +195,7 @@ Item {
     id: card
     anchors.fill: parent
     contentPadding: Style.space(16)
+    fillColor: Qt.rgba(Color.popups.background.r, Color.popups.background.g, Color.popups.background.b, 1)
     borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
     FocusScope {
       anchors.fill: parent

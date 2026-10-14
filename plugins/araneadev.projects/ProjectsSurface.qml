@@ -182,7 +182,9 @@ Item {
       projectsPage.details.profileAdding = false
       section = 'profiles'
       scrollTo(0)
-    } else if (target.setup)
+    } else if (target.checkoutId)
+      inspectCheckout(target.projectId, target.checkoutId)
+    else if (target.setup)
       projectsPage.startSetup()
     else if (target.projectId !== root.projectId)
       navigate(target.projectId)
@@ -241,6 +243,28 @@ Item {
       pendingTarget = null
       close()
     }
+  }
+  // Select a known project only when no draft or operation would be hidden.
+  function inspectCheckout(id, checkoutId) {
+    var project = (root.projectController.state.projects || []).find(function (row) {
+      return row.id === id
+    })
+    if (root.inert || navigationBlocked || !project || !(project.checkouts || []).some(function (checkout) {
+      return checkout.id === checkoutId
+    }))
+      return false
+    if ((id !== root.projectId || checkoutId !== root.selectedCheckoutId || section !== 'overview') && guardDraft({
+      projectId: id,
+      checkoutId: checkoutId,
+      section: 'overview'
+    }))
+      return false
+    root.projectId = id
+    root.inspectionCheckoutId = checkoutId
+    section = 'overview'
+    scrollTo(0)
+    stampLayout()
+    return true
   }
   // Select a known project only when no draft or operation would be hidden.
   function navigate(id) {
@@ -499,7 +523,7 @@ Item {
     id: card
     anchors.fill: parent
     contentPadding: Style.space(16)
-    fillColor: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 0.98)
+    fillColor: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 1)
     borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
     FocusScope {
       anchors.fill: parent
@@ -641,7 +665,7 @@ Item {
                   git: panel.overviewModel.git
                   gitStale: !!panel.root.gitClient.error || !!git && panel.nowMs - git.observedAt > 30000
                   openAvailable: panel.root.projectClient.available && !!panel.root.projectClient.snapshot.availability && panel.root.projectClient.snapshot.availability.compositor === true
-                  pending: panel.root.projectClient.submitting
+                  pending: panel.root.projectClient.submitting || !!panel.root.inspectionLaunchIntent
                   acceptanceUnknown: panel.root.projectClient.acceptanceUnknown
                   displayOnly: !!panel.root.inert
                   pointerGate: pointerGate
@@ -698,6 +722,12 @@ Item {
                 }
                 Aranea.UiLabel {
                   width: content.width
+                  visible: !!panel.root.inspectionError
+                  text: panel.root.inspectionError
+                  color: Aranea.DesignTokens.urgent
+                }
+                Aranea.UiLabel {
+                  width: content.width
                   visible: !!projectsPage.profileSetupError
                   text: projectsPage.profileSetupError
                   color: Aranea.DesignTokens.attention
@@ -724,7 +754,7 @@ Item {
                   width: scroller.contentWidth
                   sidebarNavigation: true
                   viewSection: panel.section
-                  registryState: panel.root.projectController.state
+                  registryState: panel.root.presentationState
                   tools: panel.root.projectController.tools
                   agentChoice: panel.agentChoice
                   discoveryClient: panel.root.discoveryClient
@@ -812,6 +842,10 @@ Item {
                     })
                   }
                   onOpenRequested: function (payload) {
+                    if (panel.root.inspectionCheckoutId && payload.projectId === panel.root.projectId && payload.checkoutId === undefined)
+                      payload = Object.assign({}, payload, {
+                        checkoutId: panel.root.inspectionCheckoutId
+                      })
                     panel.root.projectClient.request(payload)
                   }
                   onDetailsRequested: function (id) {
@@ -891,6 +925,8 @@ Item {
                   nowMs: panel.nowMs
                   displayOnly: panel.root.inert
                   actionPending: panel.root.actionClient.pending || panel.root.actionClient.submissionUncertain
+                  actionObservationAvailable: panel.root.inert || panel.root.actionClient.available
+                  agentObservationAvailable: panel.root.inert || panel.root.activityClient.available
                   agentPending: panel.root.activityClient.pending
                   workspacePending: panel.root.projectClient.submitting || panel.root.projectClient.acceptanceUnknown || !projectsPage.details.openAvailable
                   executionAvailable: panel.root.actionClient.availability.execution === true
