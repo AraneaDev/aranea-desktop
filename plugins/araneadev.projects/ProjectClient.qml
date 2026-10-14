@@ -31,6 +31,8 @@ Item {
     submissionJson = ''
     preparing = false
     pending = false
+    requestError = null
+    error = ''
     return true
   }
   // Bound readiness retries; reaching this deadline leaves the request rejected.
@@ -68,6 +70,8 @@ Item {
     process.startRequested = true
     process.running = true
   }
+  // Publish the actual request generation and detached target before synchronous callbacks.
+  signal environmentRequestStarted(int requestGeneration, string method, var target)
   // Only validated launch acceptance allows the profile UI to dismiss itself.
   signal submissionAccepted(string operationId, string environmentId)
   // Only observed exact Return focus allows the existing-environment UI to dismiss itself.
@@ -230,7 +234,7 @@ Item {
     invoke(submissionMethod, [submissionJson], revision, function (response) {
       submissionInFlight = false
       var environmentSubmission = submissionMethod !== 'request'
-      if (environmentSubmission && (response.ok === true && (!validId(response.operationId) || !validId(response.environmentId)) || response.ok !== true && (response.operationId || response.environmentId))) {
+      if (environmentSubmission && (typeof response.ok !== 'boolean' || response.ok === true && (response.error != null || !validId(response.operationId) || !validId(response.environmentId)) || response.ok !== true && (response.operationId || response.environmentId))) {
         transportFailed(submissionMethod, 'Owner acknowledgement is incomplete. Check launch status.')
         return
       }
@@ -289,6 +293,7 @@ Item {
     error = ''
     preparing = false
     pending = true
+    environmentRequestStarted(revision, method, JSON.parse(JSON.stringify(environmentTarget)))
     var submit = function () {
       if (captureActive || revision !== generation)
         return
@@ -370,7 +375,7 @@ Item {
       })], generation, function (response) {
       pending = false
       var op = response.operation
-      if (!response.ok || !response.found || response.activationId !== activation || !validId(response.sessionId) || environmentSession && response.sessionId !== environmentSession || !op || op.id !== response.operationId || op.environmentId !== response.environmentId || op.activationId !== activation || op.sessionId !== response.sessionId || op.projectId !== environmentTarget.projectId || (submissionMethod === 'startEnvironment' ? op.checkoutId !== environmentTarget.checkoutId : op.environmentId !== environmentTarget.environmentId) || !validId(op.id) || !validId(op.environmentId) || !sameTarget(submissionMethod === 'startEnvironment' ? op.startTarget : op.recoveryTarget)) {
+      if (response.ok !== true || response.error != null || response.found !== true || response.activationId !== activation || !validId(response.sessionId) || environmentSession && response.sessionId !== environmentSession || !op || op.id !== response.operationId || op.environmentId !== response.environmentId || op.activationId !== activation || op.sessionId !== response.sessionId || op.projectId !== environmentTarget.projectId || (submissionMethod === 'startEnvironment' ? op.checkoutId !== environmentTarget.checkoutId : op.environmentId !== environmentTarget.environmentId) || !validId(op.id) || !validId(op.environmentId) || !sameTarget(submissionMethod === 'startEnvironment' ? op.startTarget : op.recoveryTarget)) {
         requestError = {
           code: 'ACCEPTANCE_UNKNOWN',
           message: 'No matching acceptance was confirmed. The earlier launch will not be replayed.'

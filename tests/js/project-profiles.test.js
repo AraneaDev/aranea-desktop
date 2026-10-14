@@ -110,3 +110,18 @@ test("human tool summaries name adapters and explain terminal dependencies", () 
     "Neovim in Kitty terminal"
   )
 })
+
+test("initial primary skips unusable saved profiles without inventing acceptance", () => {
+  const unavailable = { id: "missing", roles: ["editor"], tools: { editorId: "nvim" } }
+  const usable = { id: "available", roles: ["editor"], tools: { editorId: "code" } }
+  const project = { lastProfileId: null, profiles: [unavailable, usable] }
+  const before = JSON.stringify(project)
+  assert.equal(profiles.primary(project, probes(["code"])).id, "available")
+  assert.equal(JSON.stringify(project), before)
+  assert.equal(profiles.remembered(project), null)
+  assert.equal(profiles.primary(project, probes()), null)
+  project.lastProfileId = "missing"
+  assert.equal(profiles.primary(project, probes(["code"])).id, "missing")
+  project.lastProfileId = "removed"
+  assert.equal(profiles.primary(project, probes(["code"])), null)
+})

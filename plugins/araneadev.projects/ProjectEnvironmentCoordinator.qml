@@ -1,6 +1,7 @@
 // Session-bound profile preflight and independent environment transactions for the sole owner.
 import QtQuick
 import "ProjectOperations.js" as Operations
+import "ProjectProfiles.js" as Profiles
 import "ProjectEnvironments.js" as Environments
 
 Item {
@@ -157,16 +158,22 @@ Item {
       profile: profile
     }
   }
-  // Resolve only the immutable profile's adapters; availability is freshly probed.
-  function toolSelection(profile: var, tools: var): var {
+  // Initial preflight may resolve defaults; recovery validates only frozen launch choices.
+  function toolSelection(profile: var, tools: var, resolveDefaults: bool): var {
     if (!tools || !Array.isArray(tools.editors) || !Array.isArray(tools.terminals))
       return {
         error: owner.failure('DEPENDENCY_MISSING', 'The installed tool probe is unavailable.')
       }
+    var resolved = resolveDefaults ? Profiles.resolve(profile, tools) : null
+    if (resolved && !resolved.ok)
+      return {
+        error: owner.failure('TOOL_MISSING', resolved.error)
+      }
+    var choices = resolved ? resolved.tools : profile.tools
     var selected = {
-      editor: profile.tools.editorId,
-      terminal: profile.tools.terminalId,
-      agent: profile.tools.agentId
+      editor: choices.editorId,
+      terminal: choices.terminalId,
+      agent: choices.agentId
     }
     var available = {
       editor: tools.editors,
@@ -263,7 +270,7 @@ Item {
         owner.invoke(owner.toolsRunner, [owner.toolsPath, '--json'], function (tools) {
           if (!current())
             return
-          var choices = toolSelection(resolved.profile, tools)
+          var choices = toolSelection(resolved.profile, tools, true)
           if (choices.error) {
             finish(choices)
             return
@@ -308,7 +315,11 @@ Item {
                   createdAt: Date.now(),
                   checkoutSnapshot: copy(launchCheckout),
                   profileSnapshot: copy(resolved.profile),
-                  resolvedTools: copy(resolved.profile.tools)
+                  resolvedTools: {
+                    editorId: choices.selected.editor,
+                    terminalId: choices.selected.terminal,
+                    agentId: choices.selected.agent
+                  }
                 }
               })
             })
@@ -471,7 +482,7 @@ Item {
         var choices = toolSelection({
           roles: op.roles,
           tools: env.resolvedTools
-        }, tools)
+        }, tools, false)
         if (choices.error) {
           owner.failOperation(id, choices.error.code, choices.error.message)
           return

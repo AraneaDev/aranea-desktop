@@ -135,6 +135,23 @@ function remembered(project) {
 }
 
 /**
+ * Select a usable first-use default locally, preserving every remembered identity.
+ * @param {{[key:string]:*}} project - saved project
+ * @param {{[key:string]:*}} tools - supported installed observations
+ * @returns {?{[key:string]:*}} remembered profile or first usable saved profile
+ */
+function primary(project, tools) {
+  if (!project || project.lastProfileId != null) return remembered(project)
+  /** @type {Array<{[key:string]:*}>} */
+  var saved = project.profiles || []
+  return (
+    saved.find(function (profile) {
+      return resolve(profile, tools).ok
+    }) || null
+  )
+}
+
+/**
  * Describe actual adapters with readable names and dependent terminals.
  * @param {{[key:string]:*}} profile - saved profile or local draft
  * @param {{[key:string]:*}} tools - installed observations
@@ -175,5 +192,6 @@ if (typeof module !== "undefined")
     resolve: resolve,
     presets: presets,
     remembered: remembered,
+    primary: primary,
     summary: summary
   }

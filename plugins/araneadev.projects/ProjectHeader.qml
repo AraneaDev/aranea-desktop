@@ -53,8 +53,8 @@ ColumnLayout {
   readonly property var checkout: project ? (project.checkouts || []).find(function (c) {
     return c.id === header.project.lastCheckoutId
   }) || null : null
-  // Use the remembered accepted profile without selecting a substitute.
-  readonly property var profile: Profiles.remembered(project)
+  // Use a local usable initial choice only until an accepted profile is remembered.
+  readonly property var profile: Profiles.primary(project, tools)
   // Readable actual adapters or one actionable missing-tool explanation.
   readonly property string profileSummary: profile ? Profiles.summary(profile, tools) : 'Choose a profile to start working.'
   // Explicit saved profile identity and revision for the current checkout.

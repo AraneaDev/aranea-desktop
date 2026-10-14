@@ -90,9 +90,10 @@ command retains its existing focus/reuse behavior for automation.
 
 ## Start an agent in a project
 
-Choose a profile with an agent, **New agent session** on Overview, or
-**Start … here** on an empty Agents page. Agents use the terminal
-saved in Preferences. In command-center search, try `claude <project>`,
+Choose a profile with an agent to use that profile’s saved or resolved terminal.
+For a standalone agent, choose **Start … here** on an empty Agents page;
+standalone agent starts use the terminal saved in Preferences.
+In command-center search, try `claude <project>`,
 `codex <project>`, or `agent <project>`.
 
 Only installed providers are offered. The generic suggestion uses local usage

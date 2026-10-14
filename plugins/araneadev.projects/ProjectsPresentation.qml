@@ -131,7 +131,7 @@ Item {
     clearDismissalIntent()
     launchIntent = {
       target: target,
-      generation: projectClient.generation + (another ? 2 : 1)
+      generation: null
     }
     var accepted = another ? projectClient.startAnotherEnvironment(target) : projectClient.startEnvironment(target)
     if (!accepted)
@@ -159,6 +159,20 @@ Item {
   }
   Connections {
     target: projectClient
+    function onEnvironmentRequestStarted(requestGeneration, method, target) {
+      var intent = root.launchIntent
+      if (!intent || intent.generation !== null || method !== 'startEnvironment' || !root.opened)
+        return
+      if (['projectId', 'checkoutId', 'profileId', 'profileRevision'].every(function (key) {
+        return target[key] === intent.target[key]
+      })) {
+        root.launchIntent = {
+          target: intent.target,
+          generation: requestGeneration
+        }
+        root.bindLaunchIdentity()
+      }
+    }
     function onActivationIdChanged() {
       root.bindLaunchIdentity()
     }

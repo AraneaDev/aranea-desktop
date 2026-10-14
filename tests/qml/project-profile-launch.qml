@@ -143,6 +143,7 @@ ShellRoot {
     var identity = client.activationId, target = JSON.stringify(client.environmentTarget)
     entry.cancelPreparation()
     t.check(!client.pending && !client.preparing, 'cancel stops local readiness retry')
+    t.check(!client.requestError && !client.error, 'cancel clears transient Preparing feedback')
     t.equal(client.activationId, identity, 'cancel retains diagnostic activation')
     t.equal(JSON.stringify(client.environmentTarget), target, 'cancel retains exact immutable target')
     held.done(0, JSON.stringify({
@@ -189,6 +190,229 @@ ShellRoot {
     t.check(entry.startProfile('f-one', 2), 'another deliberate Start is allowed while accepted work observes')
     host.identityDone('00000000-0000-4000-8000-000000000006')
     t.equal(JSON.parse(host.calls[host.calls.length - 1].args[0]).checkoutId, 'c-two', 'later deliberate Start uses newly selected checkout')
+    client.captureActive = true
+    client.captureActive = false
+    client.operationId = ''
+    host.calls = []
+    client.snapshot = {
+      sessionId: 's'
+    }
+    entry.startProfile('f-one', 2)
+    host.identityDone('00000000-0000-4000-8000-000000000007')
+    var uncertainTarget = JSON.stringify(client.environmentTarget), uncertainId = client.activationId
+    host.calls[0].done(0, JSON.stringify({
+      ok: true,
+      operationId: 'op-contradictory',
+      environmentId: 'e-contradictory',
+      error: {
+        code: 'FAILED'
+      }
+    }), '')
+    t.check(entry.opened && client.acceptanceUnknown && !client.operationId, 'contradictory initial acknowledgement stays unknown and open')
+    t.equal(JSON.stringify(client.environmentTarget), uncertainTarget, 'contradiction preserves immutable original target')
+    t.equal(client.activationId, uncertainId, 'contradiction preserves original activation')
+    // Keep testing the retained boundary even when the initial guard regresses.
+    client.pending = false
+    client.acceptanceUnknown = true
+    client.operationId = ''
+    client.checkEnvironmentActivation()
+    var receipt = {
+      ok: true,
+      found: true,
+      sessionId: 's',
+      activationId: uncertainId,
+      operationId: 'op-retained',
+      environmentId: 'e-retained',
+      error: {
+        code: 'FAILED'
+      },
+      operation: {
+        id: 'op-retained',
+        environmentId: 'e-retained',
+        activationId: uncertainId,
+        sessionId: 's',
+        projectId: 'p-one',
+        checkoutId: 'c-two',
+        startTarget: JSON.parse(uncertainTarget),
+        state: 'completed'
+      }
+    }
+    host.calls[host.calls.length - 1].done(0, JSON.stringify(receipt), '')
+    t.check(entry.opened && client.acceptanceUnknown && !client.operationId, 'contradictory retained acknowledgement stays unknown and open')
+    t.equal(JSON.stringify(client.environmentTarget), uncertainTarget, 'retained contradiction preserves immutable target')
+    t.equal(host.calls.filter(function (call) {
+      return call.method === 'startEnvironment'
+    }).length, 1, 'contradictory lookup never replays Start')
+    client.pending = false
+    client.acceptanceUnknown = true
+    entry.opened = true
+    t.check(entry.startProfile('f-one', 2, true), 'explicit uncertainty escape starts independent work')
+    host.identityDone('00000000-0000-4000-8000-000000000008')
+    t.check(client.activationId !== uncertainId, 'uncertainty escape creates fresh activation')
+    t.equal(client.unresolvedEnvironmentActivations[0].target, JSON.parse(uncertainTarget), 'escape archives exact earlier target')
+    var newStart = host.calls[host.calls.length - 1]
+    newStart.done(0, JSON.stringify({
+      ok: true,
+      error: null,
+      operationId: 'op-new',
+      environmentId: 'e-new'
+    }), '')
+    t.check(!entry.opened, 'matching fresh acceptance dismisses after uncertainty escape')
+    entry.open('{}')
+    client.submissionAccepted('op-new', 'e-new')
+    t.check(entry.opened, 'duplicate fresh acceptance cannot dismiss reopened Projects')
+    client.captureActive = true
+    client.captureActive = false
+    client.operationId = ''
+    // Synchronous identity and acknowledgement must bind the same explicit intent.
+    var heldRunner = client.runner, heldIdentityRunner = client.identityRunner
+    client.identityRunner = function (done) {
+      done('00000000-0000-4000-8000-000000000009')
+    }
+    client.runner = function (argv, done) {
+      if (argv[2] === 'startEnvironment')
+        done(0, JSON.stringify({
+          ok: true,
+          operationId: 'op-sync',
+          environmentId: 'e-sync'
+        }), '')
+    }
+    entry.startProfile('f-one', 2)
+    t.check(!entry.opened, 'request notification binds synchronous identity and acceptance before dismissal')
+    entry.open('{}')
+    client.runner = heldRunner
+    client.identityRunner = heldIdentityRunner
+    client.captureActive = true
+    client.captureActive = false
+    client.operationId = ''
+    host.calls = []
+    client.recoverEnvironment({
+      projectId: 'p-one',
+      environmentId: 'e-saved',
+      retryRole: 'editor'
+    })
+    host.identityDone('00000000-0000-4000-8000-000000000010')
+    var recoveryTarget = JSON.stringify(client.environmentTarget), recoveryId = client.activationId
+    host.calls[0].done(0, JSON.stringify({
+      ok: true,
+      operationId: 'op-recovery',
+      environmentId: 'e-saved',
+      error: {
+        code: 'FAILED'
+      }
+    }), '')
+    t.check(client.acceptanceUnknown && !client.operationId && entry.opened, 'contradictory recovery acknowledgement stays unknown and open')
+    client.pending = false
+    client.acceptanceUnknown = true
+    client.operationId = ''
+    client.checkEnvironmentActivation()
+    host.calls[host.calls.length - 1].done(0, JSON.stringify({
+      ok: true,
+      found: true,
+      error: {
+        code: 'FAILED'
+      },
+      sessionId: 's',
+      activationId: recoveryId,
+      operationId: 'op-recovery',
+      environmentId: 'e-saved',
+      operation: {
+        id: 'op-recovery',
+        projectId: 'p-one',
+        environmentId: 'e-saved',
+        activationId: recoveryId,
+        sessionId: 's',
+        recoveryTarget: JSON.parse(recoveryTarget),
+        state: 'completed'
+      }
+    }), '')
+    t.check(client.acceptanceUnknown && !client.operationId && entry.opened, 'contradictory retained recovery stays unknown and open')
+    t.equal(JSON.stringify(client.environmentTarget), recoveryTarget, 'recovery contradiction retains immutable target')
+    t.equal(client.activationId, recoveryId, 'recovery contradiction retains activation')
+    t.equal(host.calls.filter(function (call) {
+      return call.method === 'recoverEnvironment'
+    }).length, 1, 'retained recovery never replays role dispatch')
+    client.captureActive = true
+    client.captureActive = false
+    client.acceptanceUnknown = false
+    client.operationId = ''
+    // Malformed success envelopes must never look like known refusal or acceptance.
+    var malformedReplies = [
+      {
+        ok: 'true',
+        operationId: 'op-invalid',
+        environmentId: 'e-invalid'
+      },
+      {
+        ok: 'true'
+      }
+    ]
+    malformedReplies.forEach(function (reply, index) {
+      host.calls = []
+      entry.startProfile('f-one', 2)
+      host.identityDone('00000000-0000-4000-8000-00000000002' + index)
+      var target = JSON.stringify(client.environmentTarget)
+      host.calls[0].done(0, JSON.stringify(reply), '')
+      t.check(client.acceptanceUnknown && entry.opened && !client.operationId, 'nonboolean initial success remains unconfirmed ' + index)
+      t.equal(JSON.stringify(client.environmentTarget), target, 'malformed initial reply retains target ' + index)
+      client.pending = false
+      client.acceptanceUnknown = true
+      client.checkEnvironmentActivation()
+      var original = JSON.parse(target)
+      host.calls[host.calls.length - 1].done(0, JSON.stringify({
+        ok: index ? true : 'true',
+        found: index ? 'true' : true,
+        sessionId: 's',
+        activationId: client.activationId,
+        operationId: 'op-invalid',
+        environmentId: 'e-invalid',
+        operation: {
+          id: 'op-invalid',
+          environmentId: 'e-invalid',
+          activationId: client.activationId,
+          projectId: original.projectId,
+          checkoutId: original.checkoutId,
+          sessionId: 's',
+          startTarget: original,
+          state: 'completed'
+        }
+      }), '')
+      t.check(client.acceptanceUnknown && entry.opened && !client.operationId, 'nonboolean retained success remains unconfirmed ' + index)
+      t.equal(host.calls.length, 2, 'malformed success does not replay Start or observe an unconfirmed operation ' + index)
+      client.captureActive = true
+      client.captureActive = false
+      client.acceptanceUnknown = false
+      client.operationId = ''
+    })
+    host.calls = []
+    entry.startProfile('f-one', 2)
+    host.identityDone('00000000-0000-4000-8000-000000000030')
+    host.calls[0].done(1, '', 'lost acknowledgement')
+    client.checkEnvironmentActivation()
+    var retainedTarget = JSON.parse(JSON.stringify(client.environmentTarget))
+    host.calls[host.calls.length - 1].done(0, JSON.stringify({
+      ok: true,
+      found: true,
+      error: null,
+      sessionId: 's',
+      activationId: client.activationId,
+      operationId: 'op-confirmed',
+      environmentId: 'e-confirmed',
+      operation: {
+        id: 'op-confirmed',
+        environmentId: 'e-confirmed',
+        activationId: client.activationId,
+        projectId: retainedTarget.projectId,
+        checkoutId: retainedTarget.checkoutId,
+        sessionId: 's',
+        startTarget: retainedTarget,
+        state: 'completed'
+      }
+    }), '')
+    t.check(!entry.opened && !client.acceptanceUnknown, 'conforming retained acceptance dismisses matching original intent')
+    entry.open('{}')
+    client.submissionAccepted('op-confirmed', 'e-confirmed')
+    t.check(entry.opened, 'retained acceptance cannot dismiss reopened Projects twice')
     client.captureActive = true
     client.captureActive = false
     client.operationId = ''

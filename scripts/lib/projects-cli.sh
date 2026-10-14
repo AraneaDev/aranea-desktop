@@ -526,7 +526,7 @@ projects_cli_activation() {
   if ! response=$(projects_cli_ipc aranea.projects environmentActivation "$payload"); then
     projects_cli_fail OWNER_UNAVAILABLE 'Retained activation lookup is unavailable.' "Reconnect with aranea projects activation $cli_activation_id --json; do not replay Start."
   fi
-  if ! jq -e -s --arg id "$cli_activation_id" 'length==1 and (.[0] | .ok==true and .activationId==$id and (.sessionId|type=="string" and length>0) and (.found|type=="boolean") and
+  if ! jq -e -s --arg id "$cli_activation_id" 'length==1 and (.[0] | .ok==true and .error==null and .activationId==$id and (.sessionId|type=="string" and length>0) and (.found|type=="boolean") and
     (if .found then . as $r | (.operation|type=="object") and .operation.id==.operationId and (.operationId|type=="string" and test("^op-[0-9]+-[0-9]+$")) and
       (.environmentId|type=="string" and test("^e-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")) and
       .operation.environmentId==.environmentId and .operation.activationId==$id and .operation.sessionId==.sessionId and

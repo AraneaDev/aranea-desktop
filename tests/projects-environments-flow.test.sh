@@ -21,12 +21,22 @@ TRAP
   chmod +x "$ARANEA_TEST_SANDBOX/bin/$tool"
 done
 export PATH="$ARANEA_TEST_SANDBOX/bin:$PATH"
+# Pin only sandbox defaults so installed host adapters cannot change the expected launch.
+mkdir -p "$XDG_STATE_HOME/omarchy/defaults"
+printf 'code\n' >"$XDG_STATE_HOME/omarchy/defaults/editor"
+printf 'kitty.desktop\n' >"$XDG_CONFIG_HOME/xdg-terminals.list"
 cli="$repo_root/scripts/aranea"
 "$cli" projects register --path "$checkout" --json >"$ARANEA_TEST_SANDBOX/register.jsonl"
 project=$(jq -r 'select(.event=="completed")|.data.state.projects[0].id' "$ARANEA_TEST_SANDBOX/register.jsonl")
 "$cli" projects register --path "$sibling" --json >/dev/null
-"$cli" projects configure "$project" --editor code --terminal kitty --json >/dev/null
-jq -cn --arg project "$project" '{action:"profile-save",args:{projectId:$project,profile:{name:"Code and Terminal",roles:["editor","terminal"],tools:{editorId:"code",terminalId:"kitty",agentId:null}}}}' | "$repo_root/scripts/aranea-project-store" mutate >"$ARANEA_TEST_SANDBOX/profile.json"
+# Exercise nullable legacy choices through the actual locked migration and owner.
+# Registration used the default state root; resolve it through the shared helper.
+source "$repo_root/scripts/lib/paths.sh"
+registry="$(aranea_state_root)/projects.json"
+jq '.schemaVersion=1 | .projects |= map(del(.profiles,.lastProfileId,.environments,.openRoles) | .tools={editorId:null,terminalId:null})' "$registry" >"$ARANEA_TEST_SANDBOX/legacy.json"
+cp "$ARANEA_TEST_SANDBOX/legacy.json" "$registry"
+"$repo_root/scripts/aranea-project-store" snapshot | jq -e '.state.projects[0].profiles[0].tools=={editorId:null,terminalId:null,agentId:null}' >/dev/null
+
 "$cli" projects inspect "$project" --json >"$ARANEA_TEST_SANDBOX/inspect.jsonl"
 jq -se --arg path "$checkout" 'last.data.project.checkouts[0].path==$path' "$ARANEA_TEST_SANDBOX/inspect.jsonl" >/dev/null
 git -C "$checkout" switch -qc feature
@@ -63,5 +73,8 @@ sed -n 's/.*FLOW_SNAPSHOT //p' "$work/log" >"$ARANEA_TEST_SANDBOX/owner.json"
 "$repo_root/scripts/aranea-project-store" snapshot >"$ARANEA_TEST_SANDBOX/store.json"
 jq -e '.state.projects[0] | (.environments|length==2) and (.environments[0].id != .environments[1].id) and (.environments[0].workspaceId != .environments[1].workspaceId) and (.associations|length==0) and .checkouts[0].branch=="main" and .environments[0].checkoutSnapshot.branch=="feature" and .environments[1].checkoutSnapshot.branch=="after-launch"' "$ARANEA_TEST_SANDBOX/store.json" >/dev/null
 jq -en --slurpfile store "$ARANEA_TEST_SANDBOX/store.json" --slurpfile owner "$ARANEA_TEST_SANDBOX/owner.json" '$store[0].state.projects==$owner[0].projects' >/dev/null
-[[ ! -e "$ARANEA_TEST_SANDBOX/execution-trap" && ! -s "$ARANEA_TEST_SANDBOX/guard.log" ]]
+if [[ -e "$ARANEA_TEST_SANDBOX/execution-trap" || -s "$ARANEA_TEST_SANDBOX/guard.log" ]]; then
+  cat "$ARANEA_TEST_SANDBOX/guard.log"
+  exit 1
+fi
 echo 'projects environments flow: real Git/store and independently accepted native environments passed'

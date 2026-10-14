@@ -44,7 +44,7 @@ case "$2" in
     if [[ "$PROFILE_MODE" == notfound ]]; then
       jq -cn --argjson p "$3" '{ok:true,sessionId:"profile-owner",activationId:$p.activationId,found:false}'
     else
-      operation | jq --argjson p "$3" --arg mode "$PROFILE_MODE" '{ok:true,sessionId:"profile-owner",activationId:$p.activationId,found:true,operationId:.id,environmentId:.environmentId,operation:.} | if $mode=="mismatch" then .operation.activationId="a-22222222-2222-4222-8222-222222222222" else . end'
+      operation | jq --argjson p "$3" --arg mode "$PROFILE_MODE" '{ok:true,sessionId:"profile-owner",activationId:$p.activationId,found:true,operationId:.id,environmentId:.environmentId,operation:.} | if $mode=="mismatch" then .operation.activationId="a-22222222-2222-4222-8222-222222222222" elif $mode=="contradictory" then .error={code:"FAILED"} else . end'
     fi ;;
   *) exit 99 ;;
 esac
@@ -114,6 +114,8 @@ jq -se 'last.data.found and last.data.operation.state=="completed" and last.data
 PROFILE_MODE=notfound run_cli 1 projects activation "$activation"
 jq -se 'last.data.found==false and last.data.outcome=="partial"' "$events" >/dev/null
 PROFILE_MODE=mismatch run_cli 1 projects activation "$activation"
+jq -se 'last.code=="ACTIVATION_UNCONFIRMED"' "$events" >/dev/null
+PROFILE_MODE=contradictory run_cli 1 projects activation "$activation"
 jq -se 'last.code=="ACTIVATION_UNCONFIRMED"' "$events" >/dev/null
 PROFILE_MODE=absent run_cli 1 projects activation "$activation"
 run_cli 2 projects activation a-invalid
