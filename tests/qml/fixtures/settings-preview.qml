@@ -205,6 +205,10 @@ ShellRoot {
     }
     if (fixture.indexOf('projects-') === 0 || fixture.indexOf('project-') === 0) {
       var projects = ProjectPreview.sample(fixture, Quickshell.env('ARANEA_PROJECT_RENDER_STATE'), Quickshell.env('ARANEA_PROJECT_RENDER_COUNT'))
+      if ((Quickshell.env('ARANEA_PROJECT_RENDER_STATE') || '').indexOf('daily') === 0 && projects.projectsState.projects.length > 0 && projects.projectsState.projects[0].profiles.length < 3) {
+        finish(false, 'daily fixture requires several selectable profiles')
+        return
+      }
       Object.keys(projects).forEach(function (key) {
         sample[key] = projects[key]
       })

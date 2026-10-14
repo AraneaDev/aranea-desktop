@@ -76,6 +76,10 @@ run_cli 0 projects register --path "$checkout"
 project=$(jq -r 'select(.event=="completed") | .data.state.projects[0].id' "$events")
 checkout_id=$(jq -r 'select(.event=="completed") | .data.state.projects[0].lastCheckoutId' "$events")
 export CLI_PROJECT="$project"
+# Profile capabilities are additive; the legacy Open schema and payload stay intact.
+run_cli 0 capabilities
+jq -se 'last.data.operations | any(.name=="projects.activation" and .readOnly==true) and any(.name=="projects.start" and .arguments.profile.required)' "$events" >/dev/null
+run_cli 0 projects register --path "$checkout"
 # Schema-2 persistence retains the same public registration/inspection payloads.
 jq -se 'last.data.state.schemaVersion == 2 and last.data.state.projects[0].profiles == []' "$events" >/dev/null
 run_cli 1 projects register --path "$ARANEA_TEST_SANDBOX/vanished-candidate"

@@ -129,6 +129,23 @@ open_project 0 --roles agent
 jq -se 'last.data.operation.roles == ["agent"] and last.data.operation.agentId == "claude" and any(last.data.operation.steps[];.role=="agent" and .status=="observed")' "$work/events" >/dev/null
 open_project 0 --roles terminal --new-window agent --agent codex
 jq -se 'last.data.operation.roles == ["terminal","agent"] and last.data.operation.agentId == "codex" and any(last.data.operation.steps[];.role=="agent" and .status=="observed")' "$work/events" >/dev/null
+omarchy-shell fixture mode profiles >/dev/null
+# Public profile starts traverse the real endpoint/owner/store with fake native boundaries.
+"$cli" projects profiles save "$project" --definition '{"name":"Focus","roles":["editor","terminal"],"tools":{"editorId":"code","terminalId":"kitty","agentId":null}}' --json >"$work/profile"
+profile=$(jq -r 'select(.event=="completed")|.data.state.projects[0].profiles[0].id' "$work/profile")
+"$cli" projects start "$project" --profile "$profile" --json >"$work/start"
+jq -se 'last.data.outcome=="observed" and last.data.operation.environmentId!=null' "$work/start" >/dev/null
+first_env=$(jq -r 'select(.event=="completed")|.data.operation.environmentId' "$work/start")
+activation=$(jq -r 'select(.event=="completed")|.data.operation.activationId' "$work/start")
+"$cli" projects activation "$activation" --json >"$work/activation"
+jq -se --arg env "$first_env" 'last.data.found==true and last.data.environmentId==$env and last.data.operation.state=="completed"' "$work/activation" >/dev/null
+"$cli" projects start "$project" --profile "$profile" --json >"$work/second"
+"$cli" projects environments list --project "$project" --json >"$work/environments"
+jq -se 'last.data.environments | length==2 and .[0].workspaceId!=.[1].workspaceId and .[0].id!=.[1].id' "$work/environments" >/dev/null
+launches_before=$(omarchy-shell fixture mode normal | jq -c .launches)
+"$cli" projects environments return "$first_env" --json >"$work/return"
+jq -se --arg env "$first_env" 'last.data.outcome=="observed" and last.data.operation.environmentId==$env and last.data.operation.environmentReturn==true and any(last.data.operation.steps[];.role=="workspace" and .status=="observed")' "$work/return" >/dev/null
+[[ $(omarchy-shell fixture mode normal | jq -c .launches) == "$launches_before" ]]
 if grep -Eq 'TypeError|ReferenceError|Unable to assign|Binding loop|Failed to load configuration' "$work/log"; then
   cat "$work/log"
   exit 1

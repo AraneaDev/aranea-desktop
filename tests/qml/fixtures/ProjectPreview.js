@@ -38,6 +38,13 @@ function sample(id, mode, count) {
         tools: { editorId: "code", terminalId: null, agentId: null }
       },
       {
+        id: "f-review",
+        revision: 1,
+        name: "Review with terminal",
+        roles: ["editor", "terminal"],
+        tools: { editorId: "code", terminalId: "kitty", agentId: null }
+      },
+      {
         id: "f-agent",
         revision: 2,
         name: "Terminal + Agent",
@@ -204,9 +211,9 @@ function sample(id, mode, count) {
         workspaceId: 5,
         sessionId: "preview-session",
         createdAt: 3,
-        profileSnapshot: project.profiles[1],
+        profileSnapshot: project.profiles[2],
         checkoutSnapshot: Object.assign({}, project.checkouts[0], { branch: "earlier-topic" }),
-        resolvedTools: project.profiles[1].tools,
+        resolvedTools: project.profiles[2].tools,
         observedRoles: ["terminal"],
         status: "observed"
       }
@@ -233,7 +240,7 @@ function sample(id, mode, count) {
     var history = mode === "agents-history-menu"
     project.openRoles = ["editor", "terminal", "agent"]
     project.tools.agentId = history ? "claude" : "codex"
-    project.profiles[1].tools.agentId = project.tools.agentId
+    project.profiles[2].tools.agentId = project.tools.agentId
     project.lastProfileId = "f-agent"
     snapshot.agents = {
       tools: [
@@ -299,7 +306,7 @@ function sample(id, mode, count) {
     },
     projectsDraft: {
       profileEditing: mode === "profile-editor",
-      profileDraft: mode === "profile-editor" ? project.profiles[1] : null,
+      profileDraft: mode === "profile-editor" ? project.profiles[2] : null,
       profileRevision: mode === "profile-editor" ? 2 : 0,
       exactSetup: id === "project-setup-folder",
       setupActive: id.indexOf("project-setup-") === 0,
