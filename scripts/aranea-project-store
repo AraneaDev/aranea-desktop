@@ -40,7 +40,22 @@ if [[ -e "$registry" || -L "$registry" ]]; then
   fi
   state=$loaded
 else
-  state='{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[]}'
+  state='{"schemaVersion":2,"revision":0,"roots":[],"ignored":[],"projects":[]}'
+fi
+# Migrate a validated legacy registry under the same exclusive transaction lock.
+# Validate the complete result before replacing any original bytes.
+if [[ "$(jq -r '.schemaVersion' <<<"$state")" == 1 ]]; then
+  profile_ids=$(projects_registry_profile_ids "$state") || respond_error REGISTRY_INVALID 'Cannot prepare profile migration.' 'Back up projects.json and retry after checking registry storage.'
+  project_tmp=$(mktemp "${registry}.XXXXXX") || respond_error REGISTRY_WRITE_FAILED 'Cannot create an atomic migration.' 'Check state-directory permissions and retry.'
+  if ! jq --arg operation migrate --argjson request "$profile_ids" -f "$filter" <<<"$state" >"$project_tmp" 2>/dev/null ||
+    ! jq -e --arg operation validate --argjson request null -f "$filter" "$project_tmp" >/dev/null 2>&1; then
+    respond_error REGISTRY_INVALID 'Profile migration would produce an invalid registry.' 'Back up projects.json and repair it before retrying.'
+  fi
+  if ! mv -- "$project_tmp" "$registry"; then
+    respond_error REGISTRY_WRITE_FAILED 'Cannot replace the registry atomically for migration.' 'Check state-directory permissions and available space, then retry.'
+  fi
+  project_tmp=''
+  state=$(cat "$registry")
 fi
 if [[ "$1" == mutate ]]; then
   if ! request=$(jq -cs 'if length == 1 then .[0] else error("Expected one request object") end' 2>/dev/null); then
@@ -56,6 +71,11 @@ if [[ "$1" == mutate ]]; then
     respond_error REGISTRY_CONFLICT 'The registry changed since the supplied revision.' 'Refresh the registry and retry with the current revision.'
   fi
   case "$(jq -r .action <<<"$request")" in
+    navigation-set)
+      if [[ "$(jq -r '.args.visit // false' <<<"$request")" == true ]]; then
+        command -v date >/dev/null || respond_error DEPENDENCY_MISSING 'Install date to record project visits.' 'Install the missing dependency and retry.'
+      fi
+      ;;
     register | ignore | relocate)
       command -v git >/dev/null || respond_error DEPENDENCY_MISSING 'Install Git to validate project checkouts.' 'Install Git and retry.'
       ;;
@@ -70,7 +90,7 @@ if [[ "$1" == mutate ]]; then
   fi
   project_tmp=$(mktemp "${registry}.XXXXXX") || respond_error REGISTRY_WRITE_FAILED 'Cannot create an atomic registry write.' 'Check state-directory permissions and retry.'
   if ! jq --arg operation mutate --argjson request "$prepared" -f "$filter" <<<"$state" >"$project_tmp" 2>"${project_tmp}.error"; then
-    code=$(sed -nE 's/.*: (PROJECT_NOT_FOUND|CHECKOUT_NOT_FOUND|ROOT_NOT_FOUND|CHECKOUT_CONFLICT)$/\1/p' "${project_tmp}.error")
+    code=$(sed -nE 's/.*: (PROJECT_NOT_FOUND|CHECKOUT_NOT_FOUND|ROOT_NOT_FOUND|CHECKOUT_CONFLICT|PROFILE_NOT_FOUND|PROFILE_CONFLICT|ENVIRONMENT_NOT_FOUND|ENVIRONMENT_CONFLICT)$/\1/p' "${project_tmp}.error")
     rm -f -- "${project_tmp}.error"
     respond_error "${code:-INVALID_REQUEST}" 'The project mutation could not be applied.' 'Refresh the registry and check the selected project and checkout.'
   fi

@@ -16,6 +16,8 @@ PanelWindow {
   required property var root
   // Unsaved drafts, wizard state and pending work prevent changing selection.
   readonly property bool navigationBlocked: surface.navigationBlocked
+  // External destinations use the same focused draft decision as local selection.
+  readonly property bool hasUnsavedDraft: surface.hasUnsavedDraft
   // Current project destination, retained independently of window visibility.
   readonly property string section: surface.section
   // Refuse capture while action acceptance or activity work is pending.

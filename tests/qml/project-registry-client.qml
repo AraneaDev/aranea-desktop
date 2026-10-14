@@ -36,7 +36,7 @@ ShellRoot {
     return JSON.stringify({
       ok: true,
       state: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         revision: revision,
         roots: [
           {
@@ -62,6 +62,9 @@ ShellRoot {
               terminalId: null
             },
             associations: [],
+            profiles: [],
+            lastProfileId: null,
+            environments: [],
             checkouts: [
               {
                 id: 'c-main',
@@ -258,6 +261,111 @@ ShellRoot {
     t.check(!threw && !client.pending && !!client.error, 'throwing mutation helper cannot wedge pending')
     client.destroy()
   }
+  // Navigation metadata uses the same serialized, revision-aware store transport.
+  function navigationMutation() {
+    var f = fixture(), client = f.client
+    client.state = JSON.parse(snapshot(7)).state
+    var accepted = client.request('navigation-set', {
+      projectId: 'p-demo',
+      visit: true
+    })
+    t.check(accepted, 'navigation visit accepted by the internal registry client')
+    t.equal(f.reads.length, 1, 'navigation creates exactly one store mutation')
+    if (!accepted) {
+      client.destroy()
+      return
+    }
+    t.equal(f.reads[0].argv, ['/fixture/store', 'mutate'], 'navigation uses fixed store argv')
+    t.equal(JSON.parse(f.reads[0].input), {
+      action: 'navigation-set',
+      args: {
+        projectId: 'p-demo',
+        visit: true
+      },
+      expectedRevision: 7
+    }, 'visit sends identity with current revision and no caller timestamp')
+    t.check(!client.request('navigation-set', {
+      projectId: 'p-demo',
+      pinned: true
+    }), 'pin cannot race an in-flight visit')
+    var visited = JSON.parse(snapshot(8))
+    visited.state.navigation = {
+      lastProjectId: 'p-demo',
+      pinnedProjectIds: [],
+      visitedAt: {
+        'p-demo': 123
+      }
+    }
+    f.reads[0].done(0, JSON.stringify(visited), '')
+    t.equal(client.state.navigation, visited.state.navigation, 'visit saves authoritative navigation readback')
+    t.check(!client.pending && !client.error, 'visit completes the mutation envelope')
+    t.check(client.request('navigation-set', {
+      projectId: 'p-demo',
+      pinned: true
+    }), 'pin accepted after visit completes')
+    t.equal(JSON.parse(f.reads[1].input), {
+      action: 'navigation-set',
+      args: {
+        projectId: 'p-demo',
+        pinned: true
+      },
+      expectedRevision: 8
+    }, 'pin uses the new durable revision')
+    f.reads[1].done(1, JSON.stringify({
+      ok: false,
+      state: visited.state,
+      error: {
+        message: 'Registry changed.',
+        recovery: 'Refresh and retry.'
+      }
+    }), '')
+    t.equal(client.state, visited.state, 'failed navigation write retains readable project and navigation state')
+    t.check(!client.pending && client.error.indexOf('Refresh and retry.') >= 0, 'navigation conflict releases pending with recovery')
+    client.destroy()
+  }
+  // Presentation can save profiles, while all environment writes stay owner-controlled.
+  function profileMutationBoundary() {
+    var f = fixture(), client = f.client
+    client.state = JSON.parse(snapshot(7)).state
+    var args = {
+      projectId: 'p-demo',
+      profile: {
+        name: 'Terminal',
+        roles: ['terminal'],
+        tools: {
+          editorId: null,
+          terminalId: 'kitty',
+          agentId: null
+        }
+      }
+    }
+    var accepted = client.request('profile-save', args)
+    t.check(accepted, 'profile save accepted by presentation registry client')
+    if (accepted) {
+      t.equal(JSON.parse(f.reads[0].input), {
+        action: 'profile-save',
+        args: args,
+        expectedRevision: 7
+      }, 'profile draft uses revision-aware fixed store transport')
+      f.reads[0].done(0, snapshot(8), '')
+      t.check(client.request('profile-remove', {
+        projectId: 'p-demo',
+        profileId: 'f-work',
+        expectedProfileRevision: 1
+      }), 'profile removal accepted after save readback')
+      if (f.reads.length > 1)
+        f.reads[1].done(0, snapshot(9), '')
+    }
+    var count = f.reads.length
+    var ownerActions = ['environment-register', 'environment-associate', 'environment-forget']
+    ownerActions.forEach(function (action) {
+      t.check(!client.request(action, {
+        projectId: 'p-demo'
+      }), 'presentation refuses ' + action)
+    })
+    t.equal(f.reads.length, count, 'environment refusal creates no helper process')
+    client.destroy()
+  }
   Component.onCompleted: t.step(0, function () {
     failedTools(true)
     failedTools(false)
@@ -274,6 +382,8 @@ ShellRoot {
     failedStore(1, snapshot(99))
     staleCallbacks()
     throwingRunner()
+    navigationMutation()
+    profileMutationBoundary()
     t.done()
   })
 }

@@ -23,7 +23,8 @@ function allocateWorkspace(workspaces, associations) {
 }
 
 /**
- * Coalesces pending requests by project and checkout in the current session.
+ * Coalesces legacy pending requests by checkout and environment requests by
+ * activation in the current session, including retained completed acceptances.
  * Caller owns queue insertion and assigns monotonically increasing generations.
  * No input objects are mutated; new-window/retry flags do not bypass coalescing.
  * @param {Array<OperationData>} operations - owner queue
@@ -33,6 +34,14 @@ function allocateWorkspace(workspaces, associations) {
  */
 function begin(operations, request, id) {
   var existing = (operations || []).filter(function (operation) {
+    if (operation.environmentId || request.environmentId)
+      return (
+        !!operation.environmentId &&
+        !!request.environmentId &&
+        !!request.activationId &&
+        operation.activationId === request.activationId &&
+        operation.sessionId === request.sessionId
+      )
     return (
       operation.state !== "completed" &&
       operation.projectId === request.projectId &&
@@ -143,7 +152,7 @@ function bindingMatches(binding, windows, sessionId) {
  * verify the exact PID/startTime/address has closed or exited, including every
  * remaining owned window/process descendant. Absence of a title/class is not
  * proof. The disposition is {state:"confirmed-missing",verified:true,projectId,
- * checkoutId,role,sessionId,generation,identity:{pid,startTime,address}} and must
+ * checkoutId,environmentId?,role,sessionId,generation,identity:{pid,startTime,address}} and must
  * belong to this request generation/session and retained prior observed binding.
  * lastStep.binding archives that identity when the live binding is removed.
  * @param {string} role - editor or terminal
@@ -162,6 +171,7 @@ function roleDecision(role, request, binding, lastStep, windows, sessionId, disp
     binding &&
     binding.projectId === request.projectId &&
     binding.checkoutId === request.checkoutId &&
+    (binding.environmentId || null) === (request.environmentId || null) &&
     binding.role === role
   var own = related && binding.sessionId === sessionId
   if (own && bindingMatches(binding, windows, sessionId)) return { action: "focus", code: null }
@@ -178,10 +188,12 @@ function roleDecision(role, request, binding, lastStep, windows, sessionId, disp
     disposition.sessionId === sessionId &&
     disposition.projectId === request.projectId &&
     disposition.checkoutId === request.checkoutId &&
+    (disposition.environmentId || null) === (request.environmentId || null) &&
     disposition.role === role &&
     prior.sessionId === sessionId &&
     prior.projectId === request.projectId &&
     prior.checkoutId === request.checkoutId &&
+    (prior.environmentId || null) === (request.environmentId || null) &&
     prior.role === role &&
     prior.evidence &&
     ["process-only", "process-app-id"].indexOf(prior.evidence.mode) >= 0 &&

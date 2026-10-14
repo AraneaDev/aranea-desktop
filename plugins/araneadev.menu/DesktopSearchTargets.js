@@ -227,7 +227,12 @@ function sourceRecords(snapshot) {
   if (Array.isArray(data.projectRecords))
     rows = rows.concat(
       data.projectRecords.filter(function (row) {
-        return row && (row.type === "project" || row.type === "project-agent")
+        return (
+          row &&
+          (row.type === "project" ||
+            row.type === "project-agent" ||
+            row.type === "project-environment")
+        )
       })
     )
   if (data.compositorAvailable !== true) return rows
@@ -288,6 +293,19 @@ function dispatchTarget(record, snapshot) {
     return row.key === record.key
   })[0]
   if (!current) return null
+  if (current.type === "project-environment") {
+    if (
+      current.available === false ||
+      !record.target ||
+      record.target.projectId !== current.target.projectId ||
+      record.target.environmentId !== current.target.environmentId
+    )
+      return null
+    return {
+      kind: "project-environment",
+      payload: { projectId: current.target.projectId, environmentId: current.target.environmentId }
+    }
+  }
   if (current.type === "project") {
     if (
       current.available === false ||

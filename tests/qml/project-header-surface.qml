@@ -1,4 +1,4 @@
-// Header role saves cross the real registry client; short-window menus escape clipping.
+// Daily saved profile starts cross the real client; searchable short-window pickers escape clipping.
 import QtQuick
 import QtTest
 import Quickshell
@@ -9,6 +9,8 @@ ShellRoot {
   id: host
   // Held helper callbacks expose serialization and authoritative publication.
   property var calls: []
+  // Visit writes have their own acknowledged transport, separate from held role saves.
+  property var navigationCalls: []
   // Real one-off owner transport requests intercepted at the IPC boundary.
   property var ipcCalls: []
   // Real owner requests exercise omitted-checkout leases at the IPC boundary.
@@ -137,10 +139,32 @@ ShellRoot {
     }
   }
   Component.onCompleted: t.step(80, function () {
+    entry.gitClient.captureActive = true
+    entry.actionClient.captureActive = true
+    entry.opened = true
     entry.activityClient.captureActive = true
     entry.discoveryClient.captureActive = true
     entry.projectClient.captureActive = true
     entry.projectController.runner = function (argv, payload, done) {
+      var request = JSON.parse(payload)
+      if (request.action === 'navigation-set') {
+        host.navigationCalls.push(request)
+        var state = Object.assign({}, entry.projectController.state, {
+          revision: entry.projectController.state.revision + 1,
+          navigation: {
+            lastProjectId: request.args.projectId,
+            pinnedProjectIds: [],
+            visitedAt: {
+              'p-one': Date.now()
+            }
+          }
+        })
+        done(0, JSON.stringify({
+          ok: true,
+          state: state
+        }), '')
+        return
+      }
       host.calls.push({
         argv: argv,
         payload: payload,
@@ -163,6 +187,27 @@ ShellRoot {
             agentId: 'codex'
           },
           openRoles: ['editor', 'agent'],
+          lastProfileId: 'f-code',
+          profiles: [
+            {
+              id: 'f-code',
+              revision: 3,
+              name: 'VS Code',
+              roles: ['editor'],
+              tools: {
+                editorId: 'code'
+              }
+            },
+            {
+              id: 'f-term',
+              revision: 2,
+              name: 'Terminal',
+              roles: ['terminal'],
+              tools: {
+                terminalId: 'kitty'
+              }
+            }
+          ],
           lastCheckoutId: 'c-main',
           checkouts: [
             {
@@ -219,86 +264,68 @@ ShellRoot {
     entry.projectClient.available = true
     surface.navigate('p-one')
     t.step(80, function () {
+      t.equal(host.navigationCalls, [
+        {
+          action: 'navigation-set',
+          args: {
+            projectId: 'p-one',
+            visit: true
+          },
+          expectedRevision: 4
+        }
+      ], 'inspection saves exact visit metadata independently of configure')
       var header = t.findChild(surface, 'projectHeader')
-      t.check(header.agentChoice === surface.agentChoice, 'surface supplies its shared suggestion to header')
       var page = t.findChild(surface, 'projectsPage'), agents = t.findChild(surface, 'projectAgents')
-      t.check(page.agentChoice === surface.agentChoice && page.details.agentChoice === surface.agentChoice, 'surface and page pass one shared choice to Details')
-      t.check(!!agents && agents.agentChoice === surface.agentChoice, 'surface passes same choice to Agents')
-      header.choose('role:terminal')
-      t.equal(host.calls.length, 1, 'default toggle dispatches exactly one configure helper')
-      t.equal(JSON.parse(host.calls[0].payload), {
-        action: 'configure',
-        args: {
-          projectId: 'p-one',
-          openRoles: ['editor', 'terminal', 'agent']
-        },
-        expectedRevision: 4
-      }, 'autosave encodes canonical roles through real registry transport')
-      t.check(entry.projectController.pending && header.pending, 'held configure disables header immediately')
-      header.choose('role:editor')
-      t.equal(host.calls.length, 1, 'rapid second toggle cannot overwrite pending selection')
-      t.equal(header.openRoles, ['editor', 'agent'], 'pending save retains authoritative roles until readback')
-      var saved = Object.assign({}, entry.projectController.state, {
-        revision: 5,
-        projects: [Object.assign({}, entry.projectController.state.projects[0], {
-            openRoles: ['editor', 'terminal', 'agent']
-          })]
-      })
-      host.calls[0].done(0, JSON.stringify({
-        ok: true,
-        state: saved
-      }), '')
-      t.equal(header.openRoles, ['editor', 'terminal', 'agent'], 'authoritative configure readback updates header checks')
-      t.check(!header.pending && !t.findChild(surface, 'projectsPage').details.dirty, 'autosave unlocks controls without creating a preference draft')
-      header.choose('role:editor')
-      t.equal(JSON.parse(host.calls[1].payload).args.openRoles, ['terminal', 'agent'], 'next toggle derives from completed readback rather than stale roles')
-      host.calls[1].done(1, JSON.stringify({
-        ok: false,
-        error: {
-          message: 'Save refused'
-        }
-      }), '')
-      t.equal(header.openRoles, ['editor', 'terminal', 'agent'], 'failed autosave preserves saved selection and unlocks retry')
-      var split = t.findChild(surface, 'projectPrimaryOpen'), toggle = t.findChild(split, 'splitToggle')
-      toggle.forceActiveFocus()
-      input.keyClick(Qt.Key_Down)
+      t.check(page.agentChoice === surface.agentChoice && page.details.agentChoice === surface.agentChoice, 'optional agent destinations retain the shared provider suggestion')
+      t.check(agents.agentChoice === surface.agentChoice, 'Agents retains the shared suggestion')
+      entry.projectClient.identityRunner = function (done) {
+        done('00000000-0000-4000-8000-000000000041')
+      }
+      entry.projectClient.runner = function (argv, done) {
+        host.ipcCalls.push(argv)
+        done(0, JSON.stringify({
+          ok: false,
+          error: {
+            code: 'FIXTURE',
+            message: 'Inert request captured'
+          }
+        }), '')
+      }
+      entry.projectClient.captureActive = false
+      t.findChild(header, 'projectPrimaryStart').activate()
+      t.equal(JSON.parse(host.ipcCalls[0][3]), {
+        projectId: 'p-one',
+        checkoutId: 'c-main',
+        profileId: 'f-code',
+        profileRevision: 3,
+        activationId: 'a-00000000-0000-4000-8000-000000000041'
+      }, 'primary uses exact remembered profile revision and selected checkout')
+      t.equal(host.calls.length, 0, 'daily starts never rewrite saved role defaults')
+      var choose = t.findChild(header, 'headerChooseProfile')
+      choose.forceActiveFocus()
+      input.keyClick(Qt.Key_Return)
       t.step(80, function () {
-        var menu = t.findChild(surface, 'splitMenu')
-        t.check(menu.opened && menu.activeFocus, 'actual surface dropdown opens with keyboard focus')
-        t.check(menu.parent === surface && menu.z > 0, 'menu uses unclipped surface overlay above siblings')
-        var p = menu.mapToItem(surface, 0, 0)
-        t.check(p.x >= 0 && p.y >= 0 && p.x + menu.width <= surface.width && p.y + menu.height <= surface.height, 'short narrow menu fits actual host bounds')
-        t.check(menu.height < menu.implicitHeight, 'tall menu becomes scrollable rather than overflowing window')
-        input.keyClick(Qt.Key_End)
-        for (var i = 0; i < 12; i++)
-          input.keyClick(Qt.Key_Down)
-        var rows = t.findChildren(menu, 'menuRow'), cursorRow = rows[menu.cursor], pos = cursorRow.mapToItem(menu, 0, 0)
-        t.check(pos.y >= 0 && pos.y + cursorRow.height <= menu.height, 'keyboard navigation reveals lower menu rows in bounded popup')
-        entry.projectClient.runner = function (argv, done) {
-          host.ipcCalls.push(argv)
-          done(0, JSON.stringify({
-            ok: false,
-            error: {
-              code: 'FIXTURE',
-              message: 'Inert request captured'
-            }
-          }), '')
-        }
-        entry.projectClient.captureActive = false
-        input.mouseClick(cursorRow)
-        t.equal(JSON.parse(host.ipcCalls[host.ipcCalls.length - 1].slice(-1)[0]), {
-          projectId: 'p-one',
-          checkoutId: 'c-main',
-          roles: ['editor']
-        }, 'overlay pointer row reaches real owner request route with one-off role only')
-        t.check(!menu.opened, 'overlay action pointer closes the menu')
-        toggle.forceActiveFocus()
-        input.keyClick(Qt.Key_Down)
+        var menu = t.findChild(surface, 'profilePicker')
+        t.check(menu.opened && t.findChild(menu, 'projectSearch').activeFocus, 'real profile popup opens with searchable keyboard focus')
+        t.check(menu.parent === surface, 'profile picker uses unclipped surface overlay')
+        t.check(menu.x >= 0 && menu.y >= 0 && menu.x + menu.width <= surface.width && menu.y + menu.height <= surface.height, 'short narrow picker fits host bounds')
+        menu.query = 'Terminal'
+        var list = t.findChild(menu, 'pickerList')
+        t.equal(list.filteredProjects.length, 1, 'profile query filters real popup rows')
+        var row = t.findChild(menu, 'selectProject:f-term')
+        row.forceActiveFocus()
+        input.keyClick(Qt.Key_Return)
+        t.equal(JSON.parse(host.ipcCalls[1][3]).profileId, 'f-term', 'keyboard selection immediately starts exact chosen profile')
+        t.check(!menu.opened, 'profile activation closes chooser')
+        t.equal(entry.projectController.state.projects[0].openRoles, ['editor', 'agent'], 'chooser never changes legacy saved defaults')
+        choose.forceActiveFocus()
+        input.keyClick(Qt.Key_Return)
         input.keyClick(Qt.Key_Escape)
-        t.check(!menu.opened && toggle.activeFocus, 'Esc restores focus to surface dropdown')
-        input.keyClick(Qt.Key_Down)
+        t.check(!menu.opened, 'Escape closes chooser without a start')
+        t.equal(host.ipcCalls.length, 2, 'Escape never submits a profile')
+        choose.activate()
         header.visible = false
-        t.check(!menu.opened, 'hiding the header closes its reparented overlay menu')
+        t.check(!menu.opened, 'hiding header closes reparented profile popup')
         header.visible = true
         entry.projectClient.captureActive = true
         entry.projectClient.runner = function (argv, done) {

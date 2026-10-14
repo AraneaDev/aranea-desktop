@@ -9,6 +9,9 @@ import qs.Commons
 import qs.Ui
 import "../araneadev.shared" as Aranea
 import "AgentSuggestion.js" as Suggestion
+import "ProjectsNavigation.js" as Navigation
+import "ProjectOverview.js" as Overview
+import "ProjectProfiles.js" as Profiles
 
 Item {
   id: panel
@@ -16,6 +19,60 @@ Item {
   required property var root
   // Minute clock updates reset and stale usage explanations while visible.
   property real nowMs: Date.now()
+  // Deferred viewport changes belong to their original live observation epoch.
+  function scheduleGitBackground() {
+    if (!visible || !root.opened || root.inert)
+      return
+    var epoch = root.gitClient.epoch
+    Qt.callLater(function () {
+      if (panel.root.gitClient.epoch === epoch)
+        panel.queueGitBackground()
+    })
+  }
+  // Refresh only actual visible rows plus a bounded tail of recently visited projects.
+  function queueGitBackground() {
+    if (!visible || !root.opened || root.inert)
+      return
+    var projects = root.projectController.state.projects || []
+    var visits = (root.projectController.state.navigation || {}).visitedAt || {}
+    var ids = sidebar.visibleProjectIds()
+    Object.keys(visits).filter(function (id) {
+      return visits[id] > 0
+    }).sort(function (a, b) {
+      return visits[b] - visits[a]
+    }).some(function (id) {
+      if (ids.indexOf(id) < 0)
+        ids.push(id)
+      return ids.length >= 12
+    })
+    var targets = []
+    ids.slice(0, 12).forEach(function (id) {
+      var project = projects.find(function (p) {
+        return p.id === id
+      })
+      if (project && (project.checkouts || []).some(function (checkout) {
+        return checkout.id === project.lastCheckoutId
+      }))
+        targets.push({
+          projectId: id,
+          checkoutId: project.lastCheckoutId
+        })
+    })
+    root.gitClient.queueBackground(targets)
+  }
+  Timer {
+    interval: 10000
+    repeat: true
+    running: panel.visible && panel.root.opened && !panel.root.inert
+    onTriggered: panel.queueGitBackground()
+  }
+  Connections {
+    target: panel.root
+    function onOpenedChanged() {
+      if (panel.root.opened)
+        panel.scheduleGitBackground()
+    }
+  }
   // One suggestion shared by selected-project surface consumers.
   readonly property var agentChoice: {
     var agents = root.projectClient.snapshot.agents || {}, project = projectsPage.selectedProject
@@ -33,12 +90,158 @@ Item {
   readonly property bool shortScreen: height < Style.space(400)
   // Current project destination, retained independently of window visibility.
   property string section: 'overview'
-  // Activity observations run only while the selected Agents destination is visible.
-  readonly property bool activityVisible: section === 'agents' && !projectsPage.setupActive && !!projectsPage.selectedProject
+  // Opaque request identities stay one explicit step below daily recovery actions.
+  property bool requestDetailsExpanded: false
+  // Overview and Agents reuse one activity observation lifetime.
+  readonly property bool activityVisible: (section === 'agents' || section === 'overview') && !projectsPage.setupActive && !!projectsPage.selectedProject
+  // Exact-checkout summaries reuse shared snapshots; never own process lifetimes.
+  readonly property var overviewModel: Overview.overview(projectsPage.selectedProject, root.gitClient.checkoutId, root.gitClient.current, root.actionClient.snapshot, root.activityClient.snapshot, root.projectClient.snapshot, Math.max(nowMs, Date.now()))
+  Binding {
+    target: projectsPage.details
+    property: 'actionClient'
+    value: panel.root.actionClient
+  }
+  // Refresh is observation only and every effect checks the inert boundary.
+  function refreshOverview() {
+    if (root.inert)
+      return
+    root.gitClient.refresh()
+    root.actionClient.refresh()
+    root.actionClient.checkAvailability()
+    root.actionClient.observeSummary()
+    root.activityClient.refresh()
+  }
+  // Revalidate authoritative identity when a compact control is activated.
+  function overviewAction(method, target) {
+    var client = root.actionClient
+    if (root.inert || client.pending || !target || target.projectId !== client.projectId || target.checkoutId !== client.checkoutId)
+      return
+    var row = overviewModel.services.concat(overviewModel.checks).find(function (r) {
+      return JSON.stringify(r.target) === JSON.stringify(target)
+    })
+    if (!row || !row.controls.some(function (c) {
+      return c.method === method
+    }))
+      return
+    if (method === 'start') {
+      if (client.availability.execution && !client.submissionUncertain)
+        client.start(target.actionId, target.revision)
+    } else if (method === 'stop')
+      client.stop(target.runId)
+    else if (method === 'logs') {
+      if (chooseSection('actions'))
+        client.logs(target.runId)
+    } else if (method === 'open-preview') {
+      var run = (client.snapshot.runs || []).find(function (r) {
+        return r.id === target.runId && r.projectId === target.projectId && r.checkoutId === target.checkoutId
+      })
+      if (run) {
+        client.publishRun(run)
+        client.openPreview(target.runId)
+      }
+    }
+  }
+  // Detail navigation selects the retained task/run without executing commands.
+  function overviewDetails(section, target) {
+    if (!chooseSection(section))
+      return
+    if (section === 'agents' && target.taskId)
+      agentsView.inspectTask(target.taskId)
+    if (section === 'actions' && target.actionId) {
+      projectsPage.details.actions.selectAction(target.actionId, target.revision)
+      if (!root.inert && target.runId)
+        root.actionClient.observeRun(target.runId)
+    }
+  }
   // Latest geometry/content change disarms stale pointer activation.
   property real layoutChangedAt: 0
   // Unsaved drafts, wizard state and pending work prevent changing selection.
-  readonly property bool navigationBlocked: projectsPage.setupActive || projectsPage.setupNavigationPending || projectsPage.details.dirty || projectsPage.details.actions.editing || root.activityClient.pending
+  readonly property bool navigationBlocked: projectsPage.setupActive || projectsPage.setupNavigationPending || root.activityClient.pending
+  // Draft decisions are independent of accepted operation serialization.
+  readonly property bool hasUnsavedDraft: projectsPage.details.dirty || projectsPage.details.actions.editing || projectsPage.details.profileEditing
+  // Only explicit Save intent can continue after authoritative draft acknowledgement.
+  property bool savingNavigationDraft: false
+  // Retain the exact requested destination while asking for a draft decision.
+  function guardDraft(target) {
+    if (!hasUnsavedDraft)
+      return false
+    draftGuard.pendingTarget = target
+    savingNavigationDraft = false
+    draftGuard.open()
+    return true
+  }
+  // Route the retained destination through the same ordinary navigation guards.
+  function continueDraftNavigation() {
+    var target = draftGuard.pendingTarget
+    savingNavigationDraft = false
+    draftGuard.pendingTarget = null
+    draftGuard.close()
+    if (!target)
+      return
+    if (target.profileList) {
+      projectsPage.details.profileAdding = false
+      section = 'profiles'
+      scrollTo(0)
+    } else if (target.setup)
+      projectsPage.startSetup()
+    else if (target.projectId !== root.projectId)
+      navigate(target.projectId)
+    else
+      chooseSection(target.section)
+  }
+  // Add project is a destination too; editing never silently disables it.
+  function addProject() {
+    if (navigationBlocked || root.inert || guardDraft({
+      setup: true
+    }))
+      return
+    projectsPage.startSetup()
+  }
+  // Save each retained draft through its existing validation and transport.
+  function saveNavigationDraft() {
+    if (root.inert || draftGuard.pending || !draftGuard.pendingTarget)
+      return
+    savingNavigationDraft = true
+    if (projectsPage.details.dirty)
+      projectsPage.details.applyDraft()
+    else if (projectsPage.details.profileEditing)
+      projectsPage.details.profileEditor.save()
+    else if (projectsPage.details.actions.editing)
+      projectsPage.details.actions.editor.save()
+    Qt.callLater(panel.finishNavigationSave)
+  }
+  // Authoritative success clears the draft; failed or newer edits keep it visible.
+  function finishNavigationSave() {
+    if (savingNavigationDraft && !hasUnsavedDraft && !projectsPage.setupNavigationPending)
+      continueDraftNavigation()
+  }
+  onHasUnsavedDraftChanged: Qt.callLater(panel.finishNavigationSave)
+  onNavigationBlockedChanged: Qt.callLater(panel.finishNavigationSave)
+  ProjectDraftGuard {
+    id: draftGuard
+    parent: panel
+    pending: projectsPage.setupNavigationPending || panel.root.activityClient.pending
+    error: (projectsPage.details.profileEditing ? projectsPage.details.profileEditor.fieldError : '') || projectsPage.details.fieldError || projectsPage.error || (panel.root.actionClient.error ? panel.root.actionClient.error.message : '') || projectsPage.details.actions.editor.fieldError
+    pointerGate: pointerGate
+    onSaveRequested: panel.saveNavigationDraft()
+    onDiscardRequested: {
+      if (pending || panel.root.inert)
+        return
+      projectsPage.details.discardDraft()
+      projectsPage.details.actions.editing = false
+      projectsPage.details.profileEditing = false
+      projectsPage.details.profileEditor.fieldError = ''
+      projectsPage.details.submittedProfileDraft = null
+      panel.continueDraftNavigation()
+    }
+    onKeepEditingRequested: {
+      if (pending || panel.root.inert)
+        return
+      panel.savingNavigationDraft = false
+      pendingTarget = null
+      close()
+    }
+  }
   // Select a known project only when no draft or operation would be hidden.
   function navigate(id) {
     if (id !== '' && !(root.projectController.state.projects || []).some(function (p) {
@@ -49,17 +252,72 @@ Item {
       return true
     if (navigationBlocked)
       return false
+    if (root.inert || guardDraft({
+      projectId: id,
+      section: 'overview'
+    }))
+      return false
     root.projectId = id
+    root.flushNavigation()
     section = 'overview'
     scrollTo(0)
     stampLayout()
     return true
   }
+  // Ctrl+K is deliberate navigation and does not consume ordinary field text.
+  function focusProjectSearch() {
+    if (navigationBlocked || root.inert)
+      return
+    if (compact)
+      projectPicker.open()
+    else
+      sidebar.focusSearch()
+  }
+  // Layer windows do not match Qt's active-window shortcut context.
+  // The opened overlay owns exclusive keyboard focus; hidden Projects claims no keys.
+  Shortcut {
+    sequence: 'Ctrl+K'
+    context: Qt.ApplicationShortcut
+    enabled: panel.root.opened && panel.visible && !panel.root.inert && !panel.navigationBlocked
+    onActivated: panel.focusProjectSearch()
+  }
+  ProjectPicker {
+    id: projectPicker
+    objectName: 'projectPicker'
+    parent: panel
+    rows: Navigation.rows(panel.root.projectController.state.projects || [], panel.root.projectController.state.navigation || {}, query, frozenIds, panel.root.gitClient.cache)
+    rowsFiltered: true
+    selectedId: panel.root.projectId
+    displayOnly: panel.root.inert || panel.navigationBlocked
+    pointerGate: pointerGate
+    pinningEnabled: true
+    showAddProject: true
+    onSetupRequested: panel.addProject()
+    onSelected: function (id) {
+      panel.navigate(id)
+    }
+    onPinRequested: function (id, pinned) {
+      panel.root.rememberNavigation(id, pinned)
+    }
+  }
+  onCompactChanged: projectPicker.close()
+  onVisibleChanged: {
+    if (!visible) {
+      projectPicker.close()
+      draftGuard.close()
+      draftGuard.pendingTarget = null
+      savingNavigationDraft = false
+    } else
+      scheduleGitBackground()
+  }
   // Choose a supported destination after checking draft and pending guards.
   function chooseSection(next) {
-    if (['overview', 'actions', 'agents', 'preferences', 'help'].indexOf(next) < 0)
+    if (['overview', 'actions', 'agents', 'preferences', 'profiles', 'help'].indexOf(next) < 0)
       return false
-    if (next !== section && (projectsPage.details.dirty || projectsPage.details.actions.editing || projectsPage.setupNavigationPending || root.activityClient.pending))
+    if (next !== section && (navigationBlocked || root.inert || guardDraft({
+        projectId: root.projectId,
+        section: next
+      })))
       return false
     section = next
     if (next === 'agents')
@@ -85,6 +343,8 @@ Item {
       section: section,
       query: sidebar.query,
       sidebarContentY: sidebar.contentY,
+      draftTarget: draftGuard.pendingTarget,
+      draftGuardOpen: draftGuard.opened,
       projects: projectsPage.captureSnapshot()
     }
   }
@@ -95,12 +355,18 @@ Item {
     sidebar.query = saved.query || ''
     sidebar.restoreViewport(saved.sidebarContentY || 0)
     projectsPage.captureRestore(saved.projects)
+    draftGuard.pendingTarget = saved.draftTarget || null
+    if (saved.draftGuardOpen && draftGuard.pendingTarget)
+      draftGuard.open()
     Qt.callLater(function () {
       panel.scrollTo(saved.contentY || 0)
     })
   }
   // Initialize inert fixture presentation without invoking an owner operation.
   function captureReset(fixture) {
+    draftGuard.close()
+    draftGuard.pendingTarget = null
+    savingNavigationDraft = false
     section = fixture && fixture.projectSection || 'overview'
     sidebar.query = ''
     agentsView.captureRestore({})
@@ -149,16 +415,61 @@ Item {
       panel.revealFocus(panel.Window.window.activeFocusItem)
     }
   }
+  // Only explicit registration seeds presets, serialized after any metadata write.
+  property var presetInFlight: null
+  // Drain optional setup only through the registry mutation serialization boundary.
+  function flushProfilePresets() {
+    var client = root.projectController
+    if (root.inert || client.pending || client.reading || presetInFlight || !projectsPage.profilePresetQueue.length)
+      return
+    var args = projectsPage.profilePresetQueue[0]
+    projectsPage.profilePresetQueue = projectsPage.profilePresetQueue.slice(1)
+    if (!(client.state.projects || []).some(function (p) {
+      return p.id === args.projectId
+    })) {
+      Qt.callLater(panel.flushProfilePresets)
+      return
+    }
+    presetInFlight = args
+    if (!client.request('profile-save', args)) {
+      presetInFlight = null
+      projectsPage.profilePresetQueue = []
+      projectsPage.profileSetupError = 'Project added. Open Manage profiles to choose and save your tools.'
+    }
+  }
+  Connections {
+    target: projectsPage
+    function onProfilePresetQueueChanged() {
+      Qt.callLater(panel.flushProfilePresets)
+    }
+  }
   Connections {
     target: panel.root.projectController
     function onStateChanged() {
       panel.stampLayout()
+      panel.scheduleGitBackground()
     }
     function onToolsChanged() {
       panel.stampLayout()
     }
     function onMutationCompleted(action, args, state) {
       projectsPage.registryMutationCompleted(action, args, state)
+      if (action === 'profile-save' && panel.presetInFlight && JSON.stringify(panel.presetInFlight) === JSON.stringify(args))
+        panel.presetInFlight = null
+      Qt.callLater(panel.flushProfilePresets)
+    }
+    function onErrorChanged() {
+      if (panel.presetInFlight && panel.root.projectController.error) {
+        panel.presetInFlight = null
+        projectsPage.profilePresetQueue = []
+        projectsPage.profileSetupError = 'Project added, but profiles could not be saved. Open Manage profiles to choose your tools. ' + panel.root.projectController.error
+      }
+    }
+    function onPendingChanged() {
+      Qt.callLater(panel.flushProfilePresets)
+    }
+    function onReadingChanged() {
+      Qt.callLater(panel.flushProfilePresets)
     }
   }
   Connections {
@@ -208,6 +519,14 @@ Item {
         spacing: Style.space(16)
         RowLayout {
           Layout.fillWidth: true
+          Aranea.ActionButton {
+            objectName: 'chooseProject'
+            visible: panel.compact && !projectsPage.selectedProject && !projectsPage.setupActive
+            text: 'Choose project'
+            enabled: !panel.root.inert && !panel.navigationBlocked
+            pointerGate: pointerGate
+            onClicked: projectPicker.open()
+          }
           Aranea.UiLabel {
             Layout.fillWidth: true
             text: 'Projects'
@@ -229,7 +548,7 @@ Item {
           columnSpacing: Style.space(16)
           rowSpacing: Style.space(8)
           Rectangle {
-            visible: !projectsPage.setupActive
+            visible: !projectsPage.setupActive && !panel.compact
             Layout.fillWidth: panel.compact
             Layout.preferredWidth: panel.compact ? -1 : Style.space(260)
             Layout.fillHeight: !panel.compact
@@ -244,6 +563,8 @@ Item {
               anchors.margins: Style.space(12)
               compact: panel.compact
               projects: panel.root.projectController.state.projects || []
+              gitCache: panel.root.gitClient.cache
+              navigation: panel.root.projectController.state.navigation || {}
               bindings: panel.root.projectClient.snapshot.bindings || []
               selectedId: projectsPage.selectedProject ? projectsPage.selectedProject.id : panel.root.projectId
               navigationEnabled: !panel.navigationBlocked && !panel.root.inert
@@ -251,8 +572,16 @@ Item {
               onProjectRequested: function (id) {
                 panel.navigate(id)
               }
-              onSetupRequested: projectsPage.startSetup()
-              onViewportChanged: panel.stampLayout()
+              onPinRequested: function (id, pinned) {
+                panel.root.rememberNavigation(id, pinned)
+              }
+              onSetupRequested: panel.addProject()
+              onViewportChanged: {
+                panel.stampLayout()
+                panel.scheduleGitBackground()
+              }
+              onFilteredProjectsChanged: panel.scheduleGitBackground()
+              onHeightChanged: panel.scheduleGitBackground()
             }
           }
           ColumnLayout {
@@ -297,49 +626,37 @@ Item {
                 ProjectHeader {
                   width: content.width
                   visible: !!projectsPage.selectedProject && !projectsPage.setupActive
-                  project: projectsPage.selectedProject
-                  bindings: panel.root.projectClient.snapshot.bindings || []
-                  openAvailable: projectsPage.details.openAvailable
-                  pending: projectsPage.details.pending
-                  displayOnly: !!panel.root.inert
-                  pointerGate: pointerGate
-                  agentChoice: panel.agentChoice
-                  tools: panel.root.projectController.tools
-                  menuHost: panel
-                  menuRevision: panel.layoutChangedAt
-                  toolLabels: {
-                    var tools = panel.root.projectController.tools || {}, project = projectsPage.selectedProject || {}, saved = project.tools || {}, defaults = tools.defaults || {}
-                    var label = function (list, id) {
-                      var row = (list || []).filter(function (tool) {
-                        return tool.id === id
-                      })[0]
-                      return row ? row.label : id || ''
-                    }
-                    return {
-                      editor: label(tools.editors, saved.editorId || defaults.editorId),
-                      terminal: label(tools.terminals, saved.terminalId || defaults.terminalId)
-                    }
-                  }
-                  onOneOffRequested: function (payload) {
-                    if (['agents', 'help'].indexOf(panel.section) < 0 || panel.chooseSection('overview'))
-                      projectsPage.details.openRequested(payload)
-                  }
-                  onDefaultRolesRequested: function (roles) {
-                    panel.root.projectController.request('configure', {
-                      projectId: projectsPage.selectedProject.id,
-                      openRoles: roles
+                  compact: panel.compact
+                  managementActive: panel.section === 'profiles'
+                  navigationEnabled: !panel.navigationBlocked
+                  onProjectPickerRequested: projectPicker.open()
+                  onCheckoutRequested: function (id, checkoutId) {
+                    panel.root.clearDismissalIntent()
+                    panel.root.projectController.request('select-checkout', {
+                      projectId: id,
+                      checkoutId: checkoutId
                     })
                   }
-                  onOpenRequested: {
-                    if (['agents', 'help'].indexOf(panel.section) < 0 || panel.chooseSection('overview'))
-                      projectsPage.details.openProject()
+                  project: projectsPage.selectedProject
+                  git: panel.overviewModel.git
+                  gitStale: !!panel.root.gitClient.error || !!git && panel.nowMs - git.observedAt > 30000
+                  openAvailable: panel.root.projectClient.available && !!panel.root.projectClient.snapshot.availability && panel.root.projectClient.snapshot.availability.compositor === true
+                  pending: panel.root.projectClient.submitting
+                  acceptanceUnknown: panel.root.projectClient.acceptanceUnknown
+                  displayOnly: !!panel.root.inert
+                  pointerGate: pointerGate
+                  tools: panel.root.projectController.tools
+                  menuHost: panel
+                  onStartProfile: function (id, revision) {
+                    panel.root.startProfile(id, revision, false)
                   }
+                  onManageProfilesRequested: panel.chooseSection('profiles')
                 }
                 Aranea.PageHeader {
                   width: content.width
                   visible: projectsPage.setupActive
                   title: 'Add a project'
-                  description: 'Choose a repository, configure your tools, and connect agent reporting if you need it.'
+                  description: 'Add an exact Git repository to open its Overview.'
                 }
                 Flow {
                   width: content.width
@@ -373,11 +690,17 @@ Item {
                       objectName: 'projectTab:' + modelData.id
                       text: modelData.label
                       selected: panel.section === modelData.id
-                      enabled: (modelData.id === 'help' || modelData.id === 'preferences' || !!projectsPage.selectedProject) && (panel.section === modelData.id || !projectsPage.details.dirty && !projectsPage.details.actions.editing && !projectsPage.setupNavigationPending && !panel.root.activityClient.pending)
+                      enabled: (modelData.id === 'help' || modelData.id === 'preferences' || !!projectsPage.selectedProject) && (panel.section === modelData.id || !panel.navigationBlocked)
                       pointerGate: pointerGate
                       onClicked: panel.chooseSection(modelData.id)
                     }
                   }
+                }
+                Aranea.UiLabel {
+                  width: content.width
+                  visible: !!projectsPage.profileSetupError
+                  text: projectsPage.profileSetupError
+                  color: Aranea.DesignTokens.attention
                 }
                 ProjectsWelcome {
                   width: content.width
@@ -386,7 +709,7 @@ Item {
                   pending: panel.navigationBlocked
                   displayOnly: !!panel.root.inert
                   pointerGate: pointerGate
-                  onSetupRequested: projectsPage.startSetup()
+                  onSetupRequested: panel.addProject()
                   onHelpRequested: panel.chooseSection('help')
                 }
                 Aranea.PageHeader {
@@ -408,6 +731,7 @@ Item {
                   projectClient: panel.root.projectClient
                   projectId: panel.root.projectId
                   displayOnly: !!panel.root.inert
+                  metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
                   error: panel.root.projectController.error || panel.root.projectClient.error
                   pointerGate: pointerGate
@@ -440,6 +764,30 @@ Item {
                       path: path
                     })
                   }
+                  onProfileListRequested: {
+                    if (!panel.root.inert && !panel.navigationBlocked)
+                      panel.guardDraft({
+                        projectId: panel.root.projectId,
+                        section: 'profiles',
+                        profileList: true
+                      })
+                  }
+                  onProfileSaveRequested: function (id, profile, revision) {
+                    var args = {
+                      projectId: id,
+                      profile: profile
+                    }
+                    if (revision > 0)
+                      args.expectedProfileRevision = revision
+                    panel.root.projectController.request('profile-save', args)
+                  }
+                  onProfileRemoveRequested: function (id, profileId, revision) {
+                    panel.root.projectController.request('profile-remove', {
+                      projectId: id,
+                      profileId: profileId,
+                      expectedProfileRevision: revision
+                    })
+                  }
                   onConfigureRequested: function (id, draft) {
                     panel.root.projectController.request('configure', Object.assign({
                       projectId: id
@@ -467,11 +815,120 @@ Item {
                     panel.root.projectClient.request(payload)
                   }
                   onDetailsRequested: function (id) {
+                    if (projectsPage.exactSetup && !projectsPage.setupActive)
+                      panel.chooseSection('overview')
                     panel.navigate(id)
                   }
                   onRefreshRequested: {
                     panel.root.projectController.refresh()
                     panel.root.projectClient.refresh()
+                    panel.root.gitClient.refresh()
+                  }
+                }
+                ColumnLayout {
+                  width: content.width
+                  visible: !!projectsPage.selectedProject && (panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError || panel.root.projectClient.preparing)
+                  Aranea.UiLabel {
+                    Layout.fillWidth: true
+                    text: panel.root.projectClient.acceptanceUnknown ? 'Launch acceptance is unknown. The earlier request may still finish.' : panel.root.projectClient.preparing ? 'Preparing this profile…' : panel.root.projectClient.requestError ? panel.root.projectClient.requestError.message : ''
+                    color: Aranea.DesignTokens.attention
+                  }
+                  Flow {
+                    Layout.fillWidth: true
+                    spacing: Style.space(8)
+                    Aranea.ActionButton {
+                      text: 'Cancel preparation'
+                      visible: panel.root.projectClient.canCancelPreparation
+                      enabled: !panel.root.inert
+                      pointerGate: pointerGate
+                      onClicked: panel.root.cancelPreparation()
+                    }
+                    Aranea.ActionButton {
+                      text: 'Check launch status'
+                      visible: panel.root.projectClient.acceptanceUnknown
+                      enabled: !panel.root.inert && !panel.root.projectClient.submitting
+                      pointerGate: pointerGate
+                      onClicked: panel.root.projectClient.checkEnvironmentActivation()
+                    }
+                    Aranea.ActionButton {
+                      text: 'Start another environment'
+                      visible: panel.root.projectClient.acceptanceUnknown
+                      enabled: !panel.root.inert && !panel.root.projectClient.submitting && !!Profiles.remembered(projectsPage.selectedProject)
+                      pointerGate: pointerGate
+                      onClicked: {
+                        var profile = Profiles.remembered(projectsPage.selectedProject)
+                        if (profile)
+                          panel.root.startProfile(profile.id, profile.revision, true)
+                      }
+                    }
+                    Aranea.ActionButton {
+                      text: panel.requestDetailsExpanded ? 'Hide request details' : 'Request details'
+                      visible: panel.root.projectClient.acceptanceUnknown
+                      variant: 'quiet'
+                      pointerGate: pointerGate
+                      onClicked: panel.requestDetailsExpanded = !panel.requestDetailsExpanded
+                    }
+                    Aranea.ActionButton {
+                      text: 'Manage profiles'
+                      visible: !panel.root.projectClient.acceptanceUnknown && !panel.root.projectClient.preparing
+                      pointerGate: pointerGate
+                      onClicked: panel.chooseSection('profiles')
+                    }
+                  }
+                  Aranea.UiLabel {
+                    Layout.fillWidth: true
+                    visible: panel.requestDetailsExpanded && panel.root.projectClient.acceptanceUnknown
+                    text: 'Request: ' + panel.root.projectClient.activationId + '\nEarlier unresolved requests: ' + panel.root.projectClient.unresolvedEnvironmentActivations.length
+                    technical: true
+                  }
+                }
+                ProjectOverview {
+                  width: scroller.contentWidth
+                  visible: panel.section === 'overview' && !!projectsPage.selectedProject && !projectsPage.setupActive
+                  model: panel.overviewModel
+                  gitError: panel.root.gitClient.error
+                  gitLoading: panel.root.gitClient.loading
+                  nowMs: panel.nowMs
+                  displayOnly: panel.root.inert
+                  actionPending: panel.root.actionClient.pending || panel.root.actionClient.submissionUncertain
+                  agentPending: panel.root.activityClient.pending
+                  workspacePending: panel.root.projectClient.submitting || panel.root.projectClient.acceptanceUnknown || !projectsPage.details.openAvailable
+                  executionAvailable: panel.root.actionClient.availability.execution === true
+                  actionError: panel.root.actionClient.submissionUncertain ? 'Submission unconfirmed. Refresh actions in Details to recover the receipt.' : panel.root.actionClient.error ? panel.root.actionClient.error.message + ' Manage actions to recover.' : panel.root.actionClient.summaryError ? panel.root.actionClient.summaryError.message : panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Execution unavailable. Manage actions to check required helpers.' : ''
+                  activityError: panel.root.activityClient.error ? 'Agent connection unavailable. Open Details to reconnect.' : ''
+                  pointerGate: pointerGate
+                  onRefreshRequested: panel.refreshOverview()
+                  onActionRequested: function (method, target) {
+                    panel.overviewAction(method, target)
+                  }
+                  onAgentRequested: function (method, taskId) {
+                    if (!panel.root.inert && panel.overviewModel.agents.some(function (r) {
+                      return r.target.taskId === taskId && r.controls.some(function (c) {
+                        return c.method === method
+                      })
+                    }))
+                      agentsView.submit(method, taskId)
+                  }
+                  onWorkspaceRequested: function (method, target) {
+                    if (panel.root.inert || panel.root.projectClient.submitting || !panel.overviewModel.workspaces.some(function (r) {
+                      return JSON.stringify(r.target) === JSON.stringify(target) && r.controls.some(function (c) {
+                        return c.method === method
+                      })
+                    }))
+                      return
+                    if (method === 'return')
+                      panel.root.returnEnvironment(target)
+                    else if (method === 'open')
+                      panel.root.projectClient.request(target)
+                    else {
+                      var parts = method.split(':'), payload = Object.assign({}, target)
+                      payload[parts[0] + 'Role'] = parts[1]
+                      panel.root.clearDismissalIntent()
+                      panel.root.projectClient.recoverEnvironment(payload)
+                    }
+                  }
+                  onDetailsRequested: function (section, target) {
+                    panel.overviewDetails(section, target)
                   }
                 }
                 ProjectAgents {
@@ -492,7 +949,7 @@ Item {
                   }
                   displayOnly: !!panel.root.inert
                   maxHeight: Math.max(Style.space(200), scroller.height)
-                  onSetupRequested: projectsPage.startSetup()
+                  onSetupRequested: panel.chooseSection('help')
                 }
                 Aranea.WorkflowHelp {
                   width: scroller.contentWidth
@@ -516,7 +973,7 @@ Item {
         Aranea.UiLabel {
           Layout.fillWidth: true
           visible: !panel.shortScreen
-          text: projectsPage.setupActive ? 'Complete or exit setup before switching projects.' : panel.navigationBlocked ? 'Save or discard drafts before switching projects.' : panel.root.captureSaved ? 'Preview · read-only' : 'Tab navigate · Page Up/Down scroll · Esc close'
+          text: projectsPage.setupActive ? (projectsPage.exactSetup ? 'Choose a repository to add it to Projects.' : 'Complete or exit setup before switching projects.') : panel.navigationBlocked ? 'Waiting for the current operation.' : panel.root.captureSaved ? 'Preview · read-only' : 'Tab navigate · Page Up/Down scroll · Esc close'
           opacity: 0.5
         }
       }

@@ -407,3 +407,32 @@ test("missing agent providers return installation guidance or the selected provi
   }
   assert.equal(ops.toolProblem(["agent"], { terminal: "kitty", agent: "codex" }, codexTools), null)
 })
+
+test("independent environments and legacy requests never merge on a shared checkout", () => {
+  const a = { ...request, environmentId: "e-a", activationId: "a" }
+  const accepted = ops.begin([], a, "op-a").operation
+  assert.equal(
+    ops.begin([accepted], { ...a, environmentId: "e-b", activationId: "b" }, "op-b").reused,
+    false
+  )
+  assert.equal(ops.begin([accepted], request, "op-legacy").reused, false)
+  assert.equal(
+    ops.begin([{ ...accepted, state: "completed" }], a, "op-duplicate").operation.id,
+    "op-a"
+  )
+  assert.equal(
+    ops.roleDecision("editor", { ...a }, { ...binding, environmentId: "e-b" }, null, windows, "s-1")
+      .action,
+    "launch"
+  )
+  assert.equal(
+    ops.roleDecision("editor", request, { ...binding, environmentId: "e-a" }, null, windows, "s-1")
+      .action,
+    "launch"
+  )
+  assert.equal(
+    ops.roleDecision("editor", a, { ...binding, environmentId: "e-a" }, null, windows, "s-1")
+      .action,
+    "focus"
+  )
+})

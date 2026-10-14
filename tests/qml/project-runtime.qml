@@ -111,6 +111,15 @@ ShellRoot {
       done(0, '', '')
     }
   }
+  Projects.ProjectsController {
+    id: owner
+    runtime: runtime
+    captureActive: true
+    refreshing: true
+    storeRunner: function (argv, done, input) {
+      t.check(false, 'identity foundation must not access the live registry')
+    }
+  }
   Projects.ProjectRuntime {
     id: missing
     compositor: null
@@ -124,6 +133,7 @@ ShellRoot {
       role: 'terminal',
       projectId: 'p-fixture',
       checkoutId: 'c-main',
+      environmentId: 'e-one',
       workspaceId: 7,
       generation: 1,
       sessionId: 'runtime-fixture',
@@ -167,6 +177,149 @@ ShellRoot {
         })
       })
     })
+  }
+  // Exercise production owner scope, queue, eviction and publication boundaries.
+  function verifyOwner(binding): void {
+    owner.captureActive = false
+    owner.syncSession()
+    owner.registryReady = true
+    var record = {
+      id: 'e-one',
+      projectId: 'p-fixture',
+      checkoutId: 'c-main',
+      sessionId: runtime.sessionId,
+      workspaceId: 7
+    }
+    owner.registry = {
+      projects: [
+        {
+          id: 'p-fixture',
+          associations: [
+            {
+              workspaceId: 2
+            }
+          ],
+          environments: [record]
+        }
+      ]
+    }
+    var base = {
+      projectId: 'p-fixture',
+      checkoutId: 'c-main',
+      sessionId: runtime.sessionId,
+      state: 'launching',
+      rolesPending: ['terminal'],
+      steps: [],
+      generation: 1
+    }
+    var one = Object.assign({}, base, {
+      id: 'one',
+      environmentId: 'e-one',
+      activationId: 'a-one',
+      workspaceId: 3
+    })
+    var two = Object.assign({}, base, {
+      id: 'two',
+      environmentId: 'e-two',
+      activationId: 'a-two',
+      workspaceId: 4
+    })
+    owner.enqueueOperation(one)
+    owner.enqueueOperation(two)
+    t.equal(owner.enqueueOperation(Object.assign({}, one, {
+      id: 'duplicate'
+    })).id, 'one', 'duplicate activation uses exact accepted operation')
+    t.equal(owner.queue, ['one', 'two'], 'same checkout environments share one queue without merging')
+    var legacy = owner.request({
+      projectId: 'p-fixture',
+      checkoutId: 'c-main'
+    })
+    t.check(legacy.ok && legacy.operationId !== 'one' && legacy.operationId !== 'two', 'legacy public Open never coalesces with environment work')
+    t.equal(owner.queue.length, 3, 'legacy and environment operations enter the same queue')
+    t.equal(owner.chooseEnvironmentWorkspace({
+      available: true,
+      workspaces: [
+        {
+          id: 1,
+          windows: 1
+        }
+      ]
+    }), 5, 'owner allocation excludes occupied legacy persisted and queued reservations')
+    t.equal(owner.chooseEnvironmentWorkspace({
+      available: true
+    }), null, 'owner refuses unknown occupancy')
+    t.equal(owner.chooseEnvironmentWorkspace({
+      available: false,
+      workspaces: []
+    }), null, 'owner refuses unavailable compositor')
+    owner.finishRole('one', 'terminal', {
+      status: 'observed',
+      binding: binding
+    })
+    owner.finishRole('two', 'terminal', {
+      status: 'observed',
+      binding: Object.assign({}, binding, {
+        environmentId: 'e-two',
+        address: '0x123',
+        pid: 45
+      })
+    })
+    t.equal(owner.bindings.length, 2, 'same checkout keeps independently observed environment bindings')
+    t.equal(owner.roleHistory[owner.roleKey(one, 'terminal')].binding.environmentId, 'e-one', 'first environment keeps its role history')
+    t.equal(owner.roleHistory[owner.roleKey(two, 'terminal')].binding.environmentId, 'e-two', 'second environment keeps its role history')
+    t.equal(owner.snapshot().environments[0].status, 'observed', 'fresh owner evidence projects observed environment')
+    owner.freshBindings = [Object.assign({}, binding, {
+        evidence: Object.assign({}, binding.evidence, {
+          verifiedAt: Date.now() - 3000
+        })
+      })]
+    t.equal(owner.snapshot().environments[0].status, 'unconfirmed', 'saved environment never makes expired proof live')
+    owner.launchAttempts = [
+      {
+        environmentId: 'e-two',
+        projectId: 'p-fixture',
+        checkoutId: 'c-main',
+        role: 'terminal',
+        sessionId: runtime.sessionId,
+        state: 'accepted',
+        launchIdentity: {},
+        spec: {},
+        baseline: {}
+      }
+    ]
+    t.equal(owner.acceptedAttempt(one, 'terminal'), null, 'reobservation never borrows another environment launch')
+    t.check(!!owner.acceptedAttempt(two, 'terminal'), 'reobservation resolves exact environment acceptance')
+    var wrong = Object.assign({}, base, {
+      id: 'wrong',
+      environmentId: 'e-other',
+      activationId: 'a-other'
+    })
+    owner.enqueueOperation(wrong)
+    owner.finishRole('wrong', 'terminal', {
+      status: 'observed',
+      binding: binding
+    })
+    t.equal(owner.operation('wrong').outcome, 'partial', 'wrong environment callback cannot claim observed success')
+    t.equal(owner.bindings.length, 2, 'wrong environment callback cannot import a binding')
+    var completions = []
+    for (var i = 0; i < 105; i++)
+      completions.push({
+        id: 'old-' + i,
+        state: 'completed',
+        completedAt: Date.now() + 100 + i
+      })
+    owner.operations = owner.operations.concat(completions)
+    owner.retainCompleted()
+    t.check(!owner.operation('one').id, 'completed operation eviction really occurred')
+    t.equal(owner.enqueueOperation(Object.assign({}, one, {
+      id: 'after-eviction'
+    })).id, 'one', 'activation receipt survives completed operation eviction')
+    t.equal(owner.registry.projects[0].associations, [
+      {
+        workspaceId: 2
+      }
+    ], 'environment publication leaves legacy associations untouched')
+    owner.captureActive = true
   }
   Component.onCompleted: {
     runtime.captureActive = true
@@ -213,9 +366,11 @@ ShellRoot {
           windows: []
         }, function (result3) {
           t.equal(result3.status, 'observed', 'new identity observed only after exact workspace readback')
+          t.equal(result3.binding.environmentId, 'e-one', 'native observed binding retains exact environment identity')
           t.equal(result3.binding.workspaceId, 7, 'identified window targets reserved workspace despite user focus switch')
           t.equal(result3.binding.evidence.startTime, '123', 'binding retains verified process start time')
           t.check(result3.binding.evidence.processVerified, 'binding includes fresh process verification')
+          verifyOwner(result3.binding)
           t.check(commands.length === 1 && commands[0][2].indexOf('0xdef') >= 0, 'only exact launched address moved')
           runtime.focusBinding(result3.binding, function (focusResult) {
             t.equal(focusResult.status, 'observed', 'resume focuses only exact freshly verified address')

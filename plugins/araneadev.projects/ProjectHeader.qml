@@ -6,157 +6,119 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectProfiles.js" as Profiles
 
 ColumnLayout {
   id: header
   objectName: 'projectHeader'
+  // Narrow hosts reach the full project picker from the selected header.
+  property bool compact: false
+  // Host draft guards prevent changing the checkout underneath an editor.
+  property bool navigationEnabled: true
+  // Project inspection and checkout switching never submit Open.
+  signal projectPickerRequested
+  // Select an exact registered checkout without launching tools.
+  signal checkoutRequested(string projectId, string checkoutId)
   // Current saved project identity; this view never changes registration.
   property var project: null
-  // Observed workspace bindings supplied by the persistent owner.
-  property var bindings: []
-  // Whether the live owner can open workspace tools.
+  // Exact selected Git observation overrides registry branch labels only for its pair.
+  property var git: null
+  // Cached branch observations remain explicitly marked when old or failed.
+  property bool gitStale: false
+  // Branch identity comes from Git when available; registry metadata is labelled.
+  readonly property string branchText: {
+    if (!checkout)
+      return 'None'
+    if (git && project && git.projectId === project.id && git.checkoutId === checkout.id)
+      return (git.detached ? 'detached HEAD' : git.branch || 'unavailable') + (gitStale ? ' (last observed)' : '')
+    return (checkout.branch || 'detached') + ' (registered)'
+  }
+  // Submission state only; accepted native work continues independently.
   property bool openAvailable: false
-  // A project operation is pending; duplicate Open is disabled.
+  // Disable rapid duplicate submission while the owner is preparing.
   property bool pending: false
-  // Inert captures refuse workspace activation.
+  // A held acknowledgement is uncertainty, not active preparation.
+  property bool acceptanceUnknown: false
+  // The current management destination already supplies its own heading.
+  property bool managementActive: false
+  // Inert capture refuses launch and registry effects.
   property bool displayOnly: false
-  // Shared pointer settling gate for content that moves during refresh.
+  // Shared content-settlement pointer guard.
   property var pointerGate: null
-  // Resolve the saved selected checkout, falling back to its primary listing.
-  readonly property var checkout: project ? (project.checkouts || []).filter(function (c) {
-    return c.id === header.project.lastCheckoutId
-  })[0] || (project.checkouts || [])[0] || null : null
-  // Match only the observed workspace for the displayed project and checkout.
-  readonly property var binding: project ? bindings.filter(function (b) {
-    return b.projectId === header.project.id && (!header.checkout || b.checkoutId === header.checkout.id)
-  })[0] || null : null
-  // Request ordinary Open through the existing typed owner boundary.
-  signal openRequested
-  // Installed adapters and supported defaults from the current tool probe.
+  // Current supported adapter probe supplies readable actual tool labels.
   property var tools: ({})
-  // Optional unclipped menu layer supplied by the window surface.
+  // Optional unclipped parent for searchable popups.
   property Item menuHost: null
-  // Surface geometry epoch updates mapped popup anchors.
-  property real menuRevision: 0
-  // Suggestion result for this project (AgentSuggestion.suggest), or null.
-  property var agentChoice: null
-  // Display labels for the saved editor and terminal.
-  property var toolLabels: ({})
-  // Saved default roles; legacy registrations open editor and terminal.
-  readonly property var openRoles: project && Array.isArray(project.openRoles) ? project.openRoles : ['editor', 'terminal']
-  // Installed agent options in suggestion order.
-  readonly property var agentOptions: {
-    var choice = agentChoice || {
-      options: []
-    }
-    return (choice.options || []).filter(function (o) {
-      return o.available
-    }).sort(function (a, b) {
-      return (b.id === choice.suggestedId) - (a.id === choice.suggestedId)
+  // Resolve only the registered current selection.
+  readonly property var checkout: project ? (project.checkouts || []).find(function (c) {
+    return c.id === header.project.lastCheckoutId
+  }) || null : null
+  // Use a local usable initial choice only until an accepted profile is remembered.
+  readonly property var profile: Profiles.primary(project, tools)
+  // Readable actual adapters or one actionable missing-tool explanation.
+  readonly property string profileSummary: profile ? Profiles.summary(profile, tools) : 'Choose a profile to start working.'
+  // Explicit saved profile identity and revision for the current checkout.
+  signal startProfile(string profileId, int profileRevision)
+  // Navigate to optional profile management without launching.
+  signal manageProfilesRequested
+  // Resolve again at activation so removed profiles cannot be started from stale rows.
+  function chooseProfile(id) {
+    if (!project || displayOnly || pending || acceptanceUnknown || !openAvailable)
+      return
+    var selected = (project.profiles || []).find(function (p) {
+      return p.id === id
     })
+    if (selected)
+      startProfile(selected.id, selected.revision)
   }
-  // Compact provider label used by the saved-role summary.
-  readonly property string suggestedLabel: agentOptions.length ? agentOptions[0].label.replace(' Code', '') : ''
-  // Plain summary of what the primary Open does.
-  readonly property string opensText: 'Opens ' + openRoles.map(function (role) {
-    return role === 'agent' ? 'Agent' + (header.suggestedLabel ? ' (' + header.suggestedLabel + ')' : '') : role.charAt(0).toUpperCase() + role.slice(1)
-  }).join(' + ')
-  // One-off owner request for this project's selected checkout.
-  signal oneOffRequested(var payload)
-  // Immediate default-roles save (canonical order).
-  signal defaultRolesRequested(var roles)
-  // Resolve the saved adapter only through the current installed supported probe.
-  function roleAvailable(role: string): bool {
-    var saved = project && project.tools || {}, defaults = tools.defaults || {}
-    var id = saved[role + 'Id'] || defaults[role + 'Id']
-    return (tools[role === 'editor' ? 'editors' : 'terminals'] || []).some(function (tool) {
-      return tool.id === id && tool.available === true && tool.supported === true
-    })
-  }
-  // Menu rows for the split button.
-  function menuEntries(): var {
-    var roles = openRoles, rows = [
-      {
-        kind: 'header',
-        label: 'Opens by default'
+  ProjectPicker {
+    id: profilePicker
+    objectName: 'profilePicker'
+    showCheckoutContext: false
+    searchPlaceholder: 'Search profiles…'
+    parent: header.menuHost || header
+    rows: header.project ? (header.project.profiles || []).map(function (p) {
+      return {
+        id: p.id,
+        name: p.name,
+        path: Profiles.summary(p, header.tools)
       }
-    ];
-    ['editor', 'terminal', 'agent'].forEach(function (role) {
-      var checked = roles.indexOf(role) >= 0
-      var last = checked && roles.length === 1
-      var noAgent = role === 'agent' && header.agentOptions.length === 0
-      var noHost = role === 'agent' && !header.roleAvailable('terminal')
-      var unavailable = role !== 'agent' && !header.roleAvailable(role)
-      rows.push({
-        kind: 'check',
-        key: 'role:' + role,
-        label: role === 'agent' ? 'Agent' : role === 'editor' ? 'Editor' : 'Terminal',
-        detail: role === 'agent' ? (noAgent ? 'Install Claude Code or Codex to start agents here.' : noHost ? 'Agents run in a terminal. Choose one in Preferences.' : header.suggestedLabel + ' · Suggested · ' + header.agentOptions[0].reason) : header.toolLabels[role] || '',
-        checked: checked,
-        enabled: !header.pending && !last && !noAgent && !noHost && !unavailable,
-        tooltip: last ? 'Open needs at least one tool' : unavailable ? 'Choose an installed ' + role + ' in Preferences.' : ''
-      })
-    })
-    rows.push({
-      kind: 'separator'
-    }, {
-      kind: 'header',
-      label: 'Just open one'
-    })
-    header.agentOptions.forEach(function (option, index) {
-      rows.push({
-        kind: 'action',
-        key: 'start:' + option.id,
-        label: 'Start ' + option.label.replace(' Code', ''),
-        detail: (index === 0 ? 'Suggested · ' : '') + option.reason,
-        enabled: !header.pending && header.roleAvailable('terminal')
-      })
-    })
-    rows.push({
-      kind: 'action',
-      key: 'only:terminal',
-      label: 'Terminal only',
-      detail: header.toolLabels.terminal || '',
-      enabled: !header.pending && header.roleAvailable('terminal')
-    }, {
-      kind: 'action',
-      key: 'only:editor',
-      label: 'Editor only',
-      detail: header.toolLabels.editor || '',
-      enabled: !header.pending && header.roleAvailable('editor')
-    })
-    return rows
-  }
-  // Route one menu key to a default save or a one-off request.
-  function choose(key: string): void {
-    if (!project || displayOnly || pending || !openAvailable)
-      return
-    var selected = menuEntries().filter(function (row) {
-      return row.key === key
-    })[0]
-    if (!selected || selected.enabled === false)
-      return
-    var parts = key.split(':'), base = {
-      projectId: project.id,
-      checkoutId: checkout ? checkout.id : project.lastCheckoutId
+    }) : []
+    selectedId: header.profile ? header.profile.id : ''
+    displayOnly: header.displayOnly || header.pending || header.acceptanceUnknown || !header.openAvailable
+    pointerGate: header.pointerGate
+    onSelected: function (id) {
+      header.chooseProfile(id)
     }
-    if (parts[0] === 'role') {
-      var next = ['editor', 'terminal', 'agent'].filter(function (role) {
-        return role === parts[1] ? !selected.checked : openRoles.indexOf(role) >= 0
-      })
-      defaultRolesRequested(next)
-    } else if (parts[0] === 'start')
-      oneOffRequested(Object.assign(base, {
-        roles: ['agent'],
-        newWindowRole: 'agent',
-        agentId: parts[1]
-      }))
-    else if (parts[0] === 'only')
-      oneOffRequested(Object.assign(base, {
-        roles: [parts[1]]
-      }))
   }
-  z: openSplit.menuOpen ? 10 : 0
+  ProjectPicker {
+    id: checkoutPicker
+    objectName: 'checkoutPicker'
+    parent: header.menuHost || header
+    rows: header.project ? (header.project.checkouts || []).map(function (checkout) {
+      return {
+        id: checkout.id,
+        name: checkout.branch || 'detached',
+        branch: checkout.branch || '',
+        path: checkout.path
+      }
+    }) : []
+    selectedId: header.checkout ? header.checkout.id : ''
+    displayOnly: header.displayOnly || !header.navigationEnabled
+    pointerGate: header.pointerGate
+    onSelected: function (id) {
+      if (header.project)
+        header.checkoutRequested(header.project.id, id)
+    }
+  }
+  onVisibleChanged: if (!visible) {
+    checkoutPicker.close()
+    profilePicker.close()
+  }
+  onProjectChanged: {
+    checkoutPicker.close()
+    profilePicker.close()
+  }
   spacing: Style.space(8)
   GridLayout {
     Layout.fillWidth: true
@@ -176,20 +138,33 @@ ColumnLayout {
         id: nameHover
       }
     }
-    Aranea.SplitButton {
-      id: openSplit
-      objectName: 'projectPrimaryOpen'
+    Aranea.ActionButton {
+      objectName: 'projectPrimaryStart'
       Layout.fillWidth: header.width < Style.space(440)
-      text: header.pending ? 'Preparing…' : 'Open workspace'
-      enabled: !header.displayOnly && !header.pending && header.openAvailable
+      text: header.acceptanceUnknown ? 'Launch status unknown' : header.pending ? 'Preparing…' : 'Start working'
+      enabled: !header.displayOnly && !header.pending && !header.acceptanceUnknown && header.openAvailable && !!header.profile
       pointerGate: header.pointerGate
-      menuHost: header.menuHost
-      menuRevision: header.menuRevision
-      entries: header.menuEntries()
-      onClicked: header.openRequested()
-      onTriggered: function (key) {
-        header.choose(key)
-      }
+      onClicked: if (header.profile)
+        header.chooseProfile(header.profile.id)
+    }
+  }
+  RowLayout {
+    Layout.fillWidth: true
+    Aranea.ActionButton {
+      objectName: 'headerChooseProject'
+      visible: header.compact
+      text: 'Choose project'
+      enabled: !header.displayOnly && header.navigationEnabled
+      pointerGate: header.pointerGate
+      onClicked: header.projectPickerRequested()
+    }
+    Aranea.ActionButton {
+      objectName: 'headerChooseCheckout'
+      Layout.fillWidth: true
+      text: 'Checkout · ' + header.branchText
+      enabled: !header.displayOnly && header.navigationEnabled && !!header.project && header.project.checkouts.length > 0
+      pointerGate: header.pointerGate
+      onClicked: checkoutPicker.open()
     }
   }
   Aranea.UiLabel {
@@ -205,30 +180,30 @@ ColumnLayout {
       id: pathHover
     }
   }
+  Aranea.UiLabel {
+    objectName: 'projectProfileSummary'
+    Layout.fillWidth: true
+    text: (header.profile ? header.profile.name + ' · ' : '') + header.profileSummary
+    opacity: 0.8
+  }
   Flow {
     Layout.fillWidth: true
-    spacing: Style.space(12)
-    Aranea.UiLabel {
-      objectName: 'projectOpensText'
-      width: Math.min(implicitWidth, header.width)
-      text: header.opensText
-      opacity: 0.8
+    spacing: Style.space(8)
+    Aranea.ActionButton {
+      objectName: 'headerChooseProfile'
+      text: 'Choose another profile'
+      visible: !!header.project && (header.project.profiles || []).length > 0
+      enabled: !header.displayOnly && !header.pending && !header.acceptanceUnknown && header.openAvailable
+      pointerGate: header.pointerGate
+      onClicked: profilePicker.open()
     }
-    Aranea.UiLabel {
-      objectName: 'projectBranch'
-      width: Math.min(implicitWidth, header.width)
-      text: header.checkout ? 'Branch · ' + (header.checkout.branch || 'detached') : ''
-      opacity: 0.8
-    }
-    Aranea.UiLabel {
-      width: Math.min(implicitWidth, header.width)
-      text: header.binding ? 'Workspace ' + header.binding.workspaceId : header.project && header.project.workspaceMode === 'current' ? 'Uses current workspace' : 'Dedicated workspace'
-      opacity: 0.8
-    }
-    Aranea.UiLabel {
-      width: Math.min(implicitWidth, header.width)
-      text: header.openAvailable ? 'Ready to open' : 'Workspace opening unavailable'
-      color: header.openAvailable ? Aranea.DesignTokens.accent : Aranea.DesignTokens.attention
+    Aranea.ActionButton {
+      objectName: 'headerManageProfiles'
+      visible: !header.managementActive
+      text: header.project && (header.project.profiles || []).length ? 'Manage profiles' : 'Set up a profile'
+      variant: 'quiet'
+      pointerGate: header.pointerGate
+      onClicked: header.manageProfilesRequested()
     }
   }
 }

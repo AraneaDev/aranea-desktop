@@ -25,8 +25,11 @@ projects_cli_finish() {
 # Fail with stable code and explicit recovery, preserving operation reconnection.
 projects_cli_fail() {
   local code=$1 message=$2 recovery=$3 exit_code=${4:-1} outcome=failed data
-  [[ "$code" != OBSERVATION_TIMEOUT && "$code" != OBSERVER_CANCELLED && "$code" != OWNER_UNAVAILABLE ]] || outcome=partial
+  [[ "$code" != OBSERVATION_TIMEOUT && "$code" != OBSERVER_CANCELLED && "$code" != OWNER_UNAVAILABLE && "$code" != ACCEPTANCE_UNKNOWN ]] || outcome=partial
   data=$(jq -cn --arg recovery "$recovery" '{recovery:$recovery}')
+  if [[ -n "${cli_activation_id:-}" ]]; then
+    data=$(jq -c --arg activation "$cli_activation_id" --arg session "${cli_environment_session:-}" --argjson target "${cli_environment_target:-null}" --argjson unknown "${cli_acceptance_unknown:-false}" '.+{activationId:$activation,sessionId:(if $session=="" then null else $session end),target:$target,acceptanceUnknown:$unknown}' <<<"$data")
+  fi
   printf '%s: %s\n' "$code" "$message" >&2
   projects_cli_event recovery action_required '' "$recovery" "$code" "$data"
   projects_cli_finish "$outcome" "$code" "$message" "$data" "$exit_code"
@@ -141,6 +144,9 @@ projects_cli_observe() {
     if [[ -n "$cli_project_id" ]]; then
       jq -e --arg project "$cli_project_id" --arg checkout "$cli_checkout_id" '.projectId==$project and .checkoutId==$checkout' <<<"$operation" >/dev/null || projects_cli_fail OPERATION_LOST 'The returned operation targets a different registered checkout.' 'Inspect owner state before deciding to submit again.'
     fi
+    if [[ -n "${cli_environment_id:-}" ]]; then
+      projects_cli_environment_operation "$operation" || projects_cli_fail OPERATION_LOST 'The environment operation identity does not match.' 'Inspect the retained activation or exact environment; do not replay the request.'
+    fi
     if [[ -z "$generation" ]]; then generation=$(jq -r .generation <<<"$operation"); fi
     [[ $(jq -r .generation <<<"$operation") == "$generation" ]] || projects_cli_fail OPERATION_LOST 'The operation generation changed.' 'Inspect current state; do not automatically resubmit.'
     while IFS= read -r step; do
@@ -199,6 +205,14 @@ projects_cli_capabilities() {
 {"name":"projects.relocate","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string","required":true},"path":{"type":"string","required":true}}},
 {"name":"projects.remove","arguments":{"projectId":{"type":"string","required":true}}},
 {"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"roles":{"type":"string","description":"Nonempty distinct comma-separated subset of editor,terminal,agent; normalized to canonical order"},"agent":{"type":"string","enum":["claude","codex"],"description":"Choose a provider for agent launches; requires requested agent. Retry/reobserve must target agent; reobserve retains the prior launch provider"},"new-window":{"type":"string","enum":["editor","terminal","agent"],"description":"Includes the target role; agent defaults to agent-only unless roles is explicit"},"retry-role":{"type":"string","enum":["editor","terminal","agent"]},"reobserve-role":{"type":"string","enum":["editor","terminal","agent"]}}},
+{"name":"projects.profiles.list","arguments":{"projectId":{"type":"string","required":true}},"readOnly":true},
+{"name":"projects.profiles.save","arguments":{"projectId":{"type":"string","required":true},"definition":{"type":"object","required":true,"description":"JSON profile with name, canonical roles, tools; existing profiles include id and require expected-profile-revision. No checkout override."},"expected-profile-revision":{"type":"integer","description":"Positive saved revision; omit for a new draft"}}},
+{"name":"projects.profiles.remove","arguments":{"projectId":{"type":"string","required":true},"profileId":{"type":"string","required":true},"expected-profile-revision":{"type":"integer","required":true}}},
+{"name":"projects.start","arguments":{"projectId":{"type":"string","required":true},"profile":{"type":"string","required":true}},"description":"Snapshot the selected checkout and profile revision; start on an empty unreserved workspace. Unknown acceptance retains activation identity; never replay automatically."},
+{"name":"projects.environments.list","arguments":{"project":{"type":"string","required":true}},"readOnly":true,"description":"Saved immutable environment metadata, not proof of live windows"},
+{"name":"projects.environments.return","arguments":{"environmentId":{"type":"string","required":true}},"description":"Focus the exact existing environment only; never launch missing tools"},
+{"name":"projects.environments.forget","arguments":{"environmentId":{"type":"string","required":true}},"description":"Forget saved metadata; never close native windows"},
+{"name":"projects.activation","arguments":{"activationId":{"type":"string","required":true,"pattern":"^a-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}},"readOnly":true,"description":"Read current-owner retained acceptance receipt, including completed operations. Not-found remains unconfirmed and never permits automatic replay."},
 {"name":"projects.operation","arguments":{"operationId":{"type":"string","required":true}}},
 {"name":"projects.details","arguments":{"projectId":{"type":"string","required":true}}},
 {"name":"desktop.status","arguments":{}}
@@ -214,6 +228,7 @@ JSON
 # Parse all public syntax before crossing registry or desktop boundaries.
 projects_cli_main() {
   cli_json=false cli_operation=aranea cli_operation_id='' cli_checkout_id='' cli_project_id='' cli_state='' cli_snapshot=''
+  cli_activation_id='' cli_environment_id='' cli_environment_target=null cli_environment_session='' cli_acceptance_unknown=false cli_environment_workspace=0
   local -a words=() paths=() discovery_args=()
   local arg command option value root_id='' path='' args='{}' action='' separate=false current=false new_role=null retry_role=null reobserve_role=null roles=null agent=null
   local -A supplied=()
@@ -236,6 +251,10 @@ projects_cli_main() {
   fi
   set -- "${words[@]}"
   [[ $# -gt 0 ]] || projects_cli_usage
+  if [[ "$1" == projects && ("${2:-}" == profiles || "${2:-}" == environments || "${2:-}" == start || "${2:-}" == activation) ]]; then
+    shift
+    projects_cli_profiles_main "$@"
+  fi
   case "$1" in
     capabilities)
       [[ $# == 1 ]] || projects_cli_usage
@@ -470,6 +489,212 @@ projects_cli_main() {
     relocate)
       action=relocate
       args=$(jq -c --arg path "$path" '.+{path:$path}' <<<"$args")
+      ;;
+  esac
+  local request
+  request=$(jq -cn --arg action "$action" --argjson args "$args" --argjson revision "$(jq .revision <<<"$cli_state")" '{action:$action,args:$args,expectedRevision:$revision}')
+  projects_cli_store mutate <<<"$request"
+  projects_cli_finish observed '' 'Registry mutation observed.' "$(jq -cn --argjson state "$cli_state" '{state:$state}')"
+}
+
+# Require the exact UUID form used by registry and owner activation identities.
+projects_cli_uuid() {
+  [[ "$2" =~ ^$1-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+}
+
+# Preserve the immutable submission identity when an acknowledgement is uncertain.
+projects_cli_unknown() {
+  cli_acceptance_unknown=true
+  projects_cli_fail ACCEPTANCE_UNKNOWN 'Launch acceptance is unknown; the original request may still finish.' "Check without replaying: aranea projects activation $cli_activation_id --json."
+}
+
+# Validate new environment observation independently of legacy Open operations.
+projects_cli_environment_operation() {
+  jq -e --arg env "$cli_environment_id" --arg activation "$cli_activation_id" --argjson target "$cli_environment_target" --argjson workspace "$cli_environment_workspace" '
+    .environmentId==$env and
+    (if $activation!="" then .activationId==$activation and .startTarget==$target
+     else .environmentReturn==true and .workspaceId==$workspace and
+       (if .state=="completed" and .outcome=="observed" then any(.steps[];.role=="workspace" and .status=="observed" and .workspaceId==$workspace) else true end)
+     end)' <<<"$1" >/dev/null 2>&1
+}
+
+# Query only retained owner receipts. A missing receipt cannot authorize replay.
+projects_cli_activation() {
+  local response payload
+  payload=$(jq -cn --arg id "$cli_activation_id" '{activationId:$id}')
+  projects_cli_require omarchy-shell timeout
+  if ! response=$(projects_cli_ipc aranea.projects environmentActivation "$payload"); then
+    projects_cli_fail OWNER_UNAVAILABLE 'Retained activation lookup is unavailable.' "Reconnect with aranea projects activation $cli_activation_id --json; do not replay Start."
+  fi
+  if ! jq -e -s --arg id "$cli_activation_id" 'length==1 and (.[0] | .ok==true and .error==null and .activationId==$id and (.sessionId|type=="string" and length>0) and (.found|type=="boolean") and
+    (if .found then . as $r | (.operation|type=="object") and .operation.id==.operationId and (.operationId|type=="string" and test("^op-[0-9]+-[0-9]+$")) and
+      (.environmentId|type=="string" and test("^e-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")) and
+      .operation.environmentId==.environmentId and .operation.activationId==$id and .operation.sessionId==.sessionId and
+      (.operation.generation|type=="number") and (.operation.steps|type=="array") and
+      (.operation.projectId|type=="string" and length>0) and (.operation.checkoutId|type=="string" and length>0) and
+      (if .operation.environmentRecovery==true then .operation.recoveryTarget.activationId==$id and .operation.recoveryTarget.projectId==.operation.projectId and .operation.recoveryTarget.environmentId==.environmentId
+       else .operation.startTarget.activationId==$id and .operation.startTarget.projectId==.operation.projectId and .operation.startTarget.checkoutId==.operation.checkoutId and (.operation.startTarget.profileId|type=="string" and length>0) and (.operation.startTarget.profileRevision|type=="number" and .>0) end)
+     else (has("operationId")|not) and (has("environmentId")|not) and (has("operation")|not) end))' <<<"$response" >/dev/null 2>&1; then
+    projects_cli_fail ACTIVATION_UNCONFIRMED 'The retained receipt could not be validated.' "Check aranea projects activation $cli_activation_id --json again; do not replay Start."
+  fi
+  if [[ $(jq -r .found <<<"$response") != true ]]; then
+    response=$(jq -c '.+{recovery:"No current-owner receipt was found. The earlier request remains unconfirmed; do not automatically replay it."}' <<<"$response")
+    projects_cli_finish partial ACTIVATION_UNCONFIRMED 'No current-owner receipt was found.' "$response" 1
+  fi
+  cli_operation_id=$(jq -r .operationId <<<"$response")
+  projects_cli_finish observed '' 'Retained acceptance receipt observed; inspect operation for its launch outcome.' "$response"
+}
+
+# Submit the same explicit target only after a known-unaccepted readiness refusal.
+projects_cli_environment_submit() {
+  local method=$1 payload=$2 response preparing=false session
+  local cli_deadline=$((SECONDS + 5))
+  session=$(jq -r .sessionId <<<"$cli_snapshot")
+  cli_environment_session=$session
+  while true; do
+    if [[ "$preparing" == true ]] && ((SECONDS >= cli_deadline)); then projects_cli_internal_error "$response"; fi
+    if ! response=$(projects_cli_ipc aranea.projects "$method" "$payload"); then
+      if [[ "$method" == startEnvironment ]]; then projects_cli_unknown; fi
+      projects_cli_fail OWNER_UNAVAILABLE 'Return acceptance could not be confirmed.' 'Inspect the exact environment and current workspace before a new Return.'
+    fi
+    if jq -e -s 'length==1 and (.[0]|.ok==true and .error==null and (.operationId|type=="string" and test("^op-[0-9]+-[0-9]+$")) and (.environmentId|type=="string" and test("^e-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")))' <<<"$response" >/dev/null 2>&1; then
+      if [[ -n "$cli_environment_id" && $(jq -r .environmentId <<<"$response") != "$cli_environment_id" ]]; then
+        projects_cli_fail OPERATION_LOST 'Return accepted a different environment identity.' 'Inspect owner state before another Return.'
+      fi
+      cli_environment_id=$(jq -r .environmentId <<<"$response")
+      cli_operation_id=$(jq -r .operationId <<<"$response")
+      break
+    fi
+    if ! jq -e -s 'length==1 and (.[0]|.ok==false and has("operationId") and .operationId==null and (.environmentId==null) and all(.error.code,.error.message,.error.recovery;type=="string" and length>0))' <<<"$response" >/dev/null 2>&1; then
+      if [[ "$method" == startEnvironment ]]; then projects_cli_unknown; fi
+      projects_cli_fail OWNER_UNAVAILABLE 'Return acceptance could not be confirmed.' 'Inspect the exact environment and current workspace.'
+    fi
+    if [[ $(jq -r .error.code <<<"$response") == OWNER_NOT_READY ]] && ((SECONDS < cli_deadline)); then
+      preparing=true
+      sleep 0.25
+    else projects_cli_internal_error "$response"; fi
+  done
+  projects_cli_event step accepted request 'Owner accepted the environment operation; observation follows.' '' "$response"
+  projects_cli_observe
+}
+
+# Parse additive profile commands without changing any legacy Open syntax or payload.
+projects_cli_profiles_main() {
+  local command=$1 option value profile_id='' environment_id='' definition='' revision='' action='' args='{}'
+  local -A supplied=()
+  shift
+  if [[ "$command" == profiles || "$command" == environments ]]; then
+    [[ $# -gt 0 ]] || projects_cli_usage
+    command+=".$1"
+    shift
+  fi
+  cli_operation="projects.$command"
+  case "$command" in
+    profiles.list | profiles.save | profiles.remove | start)
+      [[ $# -gt 0 ]] || projects_cli_usage
+      projects_cli_uuid p "$1" || projects_cli_usage
+      cli_project_id=$1
+      shift
+      if [[ "$command" == profiles.remove ]]; then
+        [[ $# -gt 0 ]] || projects_cli_usage
+        projects_cli_uuid f "$1" || projects_cli_usage
+        profile_id=$1
+        shift
+      fi
+      ;;
+    environments.return | environments.forget)
+      [[ $# -eq 1 ]] || projects_cli_usage
+      projects_cli_uuid e "$1" || projects_cli_usage
+      environment_id=$1
+      shift
+      ;;
+    activation)
+      [[ $# -eq 1 ]] || projects_cli_usage
+      projects_cli_uuid a "$1" || projects_cli_usage
+      cli_activation_id=$1
+      shift
+      ;;
+    environments.list) ;;
+    *) projects_cli_usage ;;
+  esac
+  while (($#)); do
+    option=$1
+    [[ $# -ge 2 && -n "$2" && ! -v supplied[$option] ]] || projects_cli_usage
+    supplied[$option]=1
+    value=$2
+    shift 2
+    case "$command:$option" in
+      profiles.save:--definition)
+        jq -e -s 'length==1 and (.[0]|type=="object")' <<<"$value" >/dev/null 2>&1 || projects_cli_usage
+        definition=$value
+        ;;
+      profiles.save:--expected-profile-revision | profiles.remove:--expected-profile-revision)
+        [[ "$value" =~ ^[1-9][0-9]*$ ]] || projects_cli_usage
+        revision=$value
+        ;;
+      start:--profile)
+        projects_cli_uuid f "$value" || projects_cli_usage
+        profile_id=$value
+        ;;
+      environments.list:--project)
+        projects_cli_uuid p "$value" || projects_cli_usage
+        cli_project_id=$value
+        ;;
+      *) projects_cli_usage ;;
+    esac
+  done
+  case "$command" in
+    profiles.save) [[ -n "$definition" ]] || projects_cli_usage ;;
+    profiles.remove) [[ -n "$revision" ]] || projects_cli_usage ;;
+    start) [[ -n "$profile_id" ]] || projects_cli_usage ;;
+    environments.list) [[ -n "$cli_project_id" ]] || projects_cli_usage ;;
+  esac
+  projects_cli_event started '' '' 'Starting project command.' '' '{}'
+  [[ "$command" != activation ]] || projects_cli_activation
+  projects_cli_require flock realpath
+  projects_cli_store snapshot
+  if [[ -n "$environment_id" ]]; then
+    cli_project_id=$(jq -r --arg id "$environment_id" '.projects[]|select(any(.environments[];.id==$id))|.id' <<<"$cli_state")
+    [[ -n "$cli_project_id" ]] || projects_cli_fail ENVIRONMENT_NOT_FOUND 'The exact saved environment is unavailable.' 'List saved environments for the project.'
+  fi
+  projects_cli_select
+  args=$(jq -cn --arg id "$cli_project_id" '{projectId:$id}')
+  case "$command" in
+    profiles.list) projects_cli_finish observed '' 'Saved profiles.' "$(jq -c '{projectId:.id,profiles,lastProfileId}' <<<"$cli_project")" ;;
+    profiles.save)
+      action=profile-save
+      args=$(jq -c --argjson profile "$definition" --arg revision "$revision" '.+{profile:$profile}+(if $revision=="" then {} else {expectedProfileRevision:($revision|tonumber)} end)' <<<"$args")
+      ;;
+    profiles.remove)
+      action=profile-remove
+      args=$(jq -c --arg id "$profile_id" --argjson revision "$revision" '.+{profileId:$id,expectedProfileRevision:$revision}' <<<"$args")
+      ;;
+    environments.list) projects_cli_finish observed '' 'Saved environment metadata; live windows require fresh owner evidence.' "$(jq -c '{projectId:.id,environments}' <<<"$cli_project")" ;;
+    environments.forget)
+      action=environment-forget
+      args=$(jq -c --arg id "$environment_id" '.+{environmentId:$id}' <<<"$args")
+      ;;
+    start | environments.return)
+      local payload method
+      if [[ "$command" == start ]]; then
+        revision=$(jq -r --arg id "$profile_id" '.profiles[]|select(.id==$id)|.revision' <<<"$cli_project")
+        [[ -n "$revision" ]] || projects_cli_fail PROFILE_NOT_FOUND 'The saved profile is unavailable.' 'List profiles and choose an existing profile.'
+        cli_checkout_id=$(jq -r .lastCheckoutId <<<"$cli_project")
+        cli_activation_id=$(projects_registry_id a)
+        projects_cli_uuid a "$cli_activation_id" || projects_cli_fail DEPENDENCY_MISSING 'A fresh activation UUID is unavailable.' 'Restore access to the kernel UUID source.' 4
+        payload=$(jq -cn --arg project "$cli_project_id" --arg checkout "$cli_checkout_id" --arg profile "$profile_id" --arg activation "$cli_activation_id" --argjson revision "$revision" '{projectId:$project,checkoutId:$checkout,profileId:$profile,profileRevision:$revision,activationId:$activation}')
+        cli_environment_target=$payload
+        method=startEnvironment
+      else
+        cli_environment_id=$environment_id
+        cli_checkout_id=$(jq -r --arg id "$environment_id" '.environments[]|select(.id==$id)|.checkoutId' <<<"$cli_project")
+        cli_environment_workspace=$(jq -r --arg id "$environment_id" '.environments[]|select(.id==$id)|.workspaceId' <<<"$cli_project")
+        payload=$(jq -c --arg id "$environment_id" '.+{environmentId:$id}' <<<"$args")
+        method=returnEnvironment
+      fi
+      projects_cli_require omarchy-shell timeout
+      projects_cli_snapshot
+      projects_cli_environment_submit "$method" "$payload"
       ;;
   esac
   local request

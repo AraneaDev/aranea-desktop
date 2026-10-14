@@ -442,6 +442,17 @@ ShellRoot {
     t.check(picker.error.length > 0, 'unavailable chooser explains editable fallback')
     t.check(picker.fallbackVisible, 'unavailable chooser offers editable fallback')
     entry.projectController.runner = function (argv, input, done) {
+      // Navigation persistence completes independently of held capture/read requests.
+      var request = input ? JSON.parse(input) : {}
+      if (request.action === 'navigation-set') {
+        done(0, JSON.stringify({
+          ok: true,
+          state: Object.assign({}, entry.projectController.state, {
+            revision: entry.projectController.state.revision + 1
+          })
+        }), '')
+        return
+      }
       host.sent = host.sent.concat([['backend', argv, input]])
       host.entryResponses.push(done)
     }

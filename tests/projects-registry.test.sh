@@ -35,7 +35,7 @@ snapshot_initializes_only_absent() {
     echo 'Registry store is not implemented'
     return 1
   }
-  "$store" snapshot | jq -e '.ok and .error == null and .state == {schemaVersion:1,revision:0,roots:[],ignored:[],projects:[]}'
+  "$store" snapshot | jq -e '.ok and .error == null and .state == {schemaVersion:2,revision:0,roots:[],ignored:[],projects:[]}'
   [[ -f "$registry" ]]
 }
 # Catch lost root mutations, missing revision guards, and canonical duplicates.
@@ -58,7 +58,7 @@ roots_conflicts_and_concurrency() {
 # Catch any mutation or initialization that overwrites invalid existing bytes.
 corrupt_state_is_preserved() {
   mkdir -p "$ARANEA_STATE_ROOT"
-  for text in '{broken' '{"schemaVersion":2,"revision":0,"roots":[],"ignored":[],"projects":[]}' '{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[{}]}'; do
+  for text in '{broken' '{"schemaVersion":3,"revision":0,"roots":[],"ignored":[],"projects":[]}' '{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[{}]}'; do
     printf '%s' "$text" >"$registry"
     cp "$registry" "$TMPDIR/original"
     if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
@@ -300,5 +300,74 @@ invalid_saved_roles_and_agents_are_preserved() {
     cmp "$registry" "$TMPDIR/invalid-registry"
   done
 }
-for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling open_roles_and_agent_configure invalid_roles_and_agents_preserve_state invalid_saved_roles_and_agents_are_preserved; do run_case "$case_name"; done
+# Catch navigation writes altering launch preferences, checkout identities, or pin recency.
+navigation_visits_and_pins_preserve_projects() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" --arg other "$ARANEA_TEST_SANDBOX/other" '{paths:[$p,$other]}')" >"$TMPDIR/registered"
+  id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  other=$(jq -r '.state.projects[1].id' "$TMPDIR/registered")
+  cp "$registry" "$TMPDIR/original"
+  "$store" snapshot | jq -e '.state | has("navigation") | not'
+  cmp "$registry" "$TMPDIR/original"
+  before=$(date +%s%3N)
+  mutate navigation-set "$(jq -cn --arg id "$id" '{projectId:$id,visit:true}')" >"$TMPDIR/visited"
+  after=$(date +%s%3N)
+  jq -e --arg id "$id" --argjson before "$before" --argjson after "$after" --slurpfile original "$TMPDIR/original" '
+    .ok and .state.schemaVersion == 2 and .state.revision == 2 and .state.projects == $original[0].projects
+    and (.state.navigation | .lastProjectId == $id and .pinnedProjectIds == []
+      and (.visitedAt[$id] >= $before and .visitedAt[$id] <= $after))' "$TMPDIR/visited"
+  mutate navigation-set "$(jq -cn --arg id "$other" '{projectId:$id,pinned:true}')" |
+    jq -e --arg id "$other" --slurpfile visited "$TMPDIR/visited" '.ok and .state.navigation.pinnedProjectIds == [$id] and .state.navigation.lastProjectId == $visited[0].state.navigation.lastProjectId and .state.navigation.visitedAt == $visited[0].state.navigation.visitedAt and .state.projects == $visited[0].state.projects'
+  mutate navigation-set "$(jq -cn --arg id "$other" '{projectId:$id,pinned:true}')" | jq -e --arg id "$other" '.state.navigation.pinnedProjectIds == [$id]'
+  mutate navigation-set "$(jq -cn --arg id "$other" '{projectId:$id,pinned:false}')" | jq -e '.state.navigation.pinnedProjectIds == []'
+  mutate navigation-set "$(jq -cn --arg id "$other" '{projectId:$id,visit:true}')" | jq -e --arg id "$other" --arg first "$id" '.state.navigation.lastProjectId == $id and (.state.navigation.visitedAt | has($id) and has($first))'
+}
+# Catch unsupported IDs, stale revisions, or client-supplied visit times bypassing validation.
+navigation_invalid_requests_and_conflicts_preserve_state() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >"$TMPDIR/registered"
+  id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  cp "$registry" "$TMPDIR/original"
+  if mutate navigation-set '{"projectId":"p-missing","visit":true}' >"$TMPDIR/error"; then return 1; fi
+  jq -e '.error.code == "PROJECT_NOT_FOUND"' "$TMPDIR/error"
+  cmp "$registry" "$TMPDIR/original"
+  if jq -cn --arg id "$id" '{action:"navigation-set",args:{projectId:$id,visit:true},expectedRevision:0}' | "$store" mutate >"$TMPDIR/error"; then return 1; fi
+  jq -e '.error.code == "REGISTRY_CONFLICT" and .state.revision == 1' "$TMPDIR/error"
+  cmp "$registry" "$TMPDIR/original"
+  for patch in '{}' '{"visit":false}' '{"visit":1}' '{"pinned":null}' '{"pinned":"true"}' '{"visit":true,"pinned":true}' '{"visit":true,"visitedAt":5}'; do
+    if mutate navigation-set "$(jq -cn --arg id "$id" --argjson patch "$patch" '{projectId:$id} + $patch')" >"$TMPDIR/error"; then return 1; fi
+    jq -e '.error.code == "INVALID_REQUEST"' "$TMPDIR/error"
+    cmp "$registry" "$TMPDIR/original"
+  done
+}
+# Catch removal retaining stale navigation IDs or erasing other projects' metadata.
+navigation_removal_prunes_only_removed_identity() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" --arg other "$ARANEA_TEST_SANDBOX/other" '{paths:[$p,$other]}')" >"$TMPDIR/registered"
+  id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  other=$(jq -r '.state.projects[1].id' "$TMPDIR/registered")
+  for project in "$other" "$id"; do
+    mutate navigation-set "$(jq -cn --arg id "$project" '{projectId:$id,visit:true}')" >/dev/null
+    mutate navigation-set "$(jq -cn --arg id "$project" '{projectId:$id,pinned:true}')" >/dev/null
+  done
+  cp "$registry" "$TMPDIR/before-removal"
+  mutate remove "$(jq -cn --arg id "$id" '{projectId:$id}')" |
+    jq -e --arg id "$id" --arg other "$other" --slurpfile prior "$TMPDIR/before-removal" '.ok and .state.navigation.lastProjectId == null and .state.navigation.pinnedProjectIds == [$other] and (.state.navigation.visitedAt | has($id)|not) and .state.navigation.visitedAt[$other] == $prior[0].navigation.visitedAt[$other] and .state.projects == [$prior[0].projects[]|select(.id == $other)]'
+  mutate remove "$(jq -cn --arg id "$other" '{projectId:$id}')" | jq -e '.state.navigation == {lastProjectId:null,pinnedProjectIds:[],visitedAt:{}}'
+  rm -rf "$ARANEA_STATE_ROOT"
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >"$TMPDIR/registered"
+  id=$(jq -r '.state.projects[0].id' "$TMPDIR/registered")
+  mutate remove "$(jq -cn --arg id "$id" '{projectId:$id}')" | jq -e '.state | has("navigation")|not'
+}
+# Catch invalid optional metadata being accepted or overwritten while loading schema 1.
+navigation_invalid_saved_metadata_is_preserved() {
+  mutate register "$(jq -cn --arg p "$ARANEA_TEST_SANDBOX/dev" '{paths:[$p]}')" >/dev/null
+  cp "$registry" "$TMPDIR/original"
+  id=$(jq -r '.projects[0].id' "$registry")
+  for patch in 'null' '{}' '{"lastProjectId":"p-missing","pinnedProjectIds":[],"visitedAt":{}}' '{"lastProjectId":null,"pinnedProjectIds":["p-missing"],"visitedAt":{}}' '{"lastProjectId":null,"pinnedProjectIds":[],"visitedAt":{"p-missing":1}}' "$(jq -cn --arg id "$id" '{lastProjectId:null,pinnedProjectIds:[$id,$id],visitedAt:{}}')" "$(jq -cn --arg id "$id" '{lastProjectId:null,pinnedProjectIds:[],visitedAt:{($id):-1}}')" "$(jq -cn --arg id "$id" '{lastProjectId:null,pinnedProjectIds:[],visitedAt:{($id):1.5}}')" "$(jq -cn --arg id "$id" '{lastProjectId:null,pinnedProjectIds:[],visitedAt:{($id):"now"}}')"; do
+    jq --argjson patch "$patch" '.navigation = $patch' "$TMPDIR/original" >"$registry"
+    cp "$registry" "$TMPDIR/invalid-registry"
+    if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
+    jq -e '.ok == false and .state == null and .error.code == "REGISTRY_INVALID"' "$TMPDIR/error"
+    cmp "$registry" "$TMPDIR/invalid-registry"
+  done
+}
+for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling open_roles_and_agent_configure invalid_roles_and_agents_preserve_state invalid_saved_roles_and_agents_are_preserved navigation_visits_and_pins_preserve_projects navigation_invalid_requests_and_conflicts_preserve_state navigation_removal_prunes_only_removed_identity navigation_invalid_saved_metadata_is_preserved; do run_case "$case_name"; done
 ((failures == 0))

@@ -12,3 +12,4 @@ plugins/araneadev.audio/AudioBridge.js
 plugins/araneadev.notifications/ServiceBridge.js
 # QML .import syntax cannot be parsed by Prettier; keep this JS formatted by hand.
 plugins/araneadev.projects/AgentSuggestion.js
+plugins/araneadev.projects/ProjectOverview.js

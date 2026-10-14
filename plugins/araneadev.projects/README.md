@@ -7,9 +7,39 @@ consume its snapshots and results; they do not launch tools independently.
 The plugin adds no bar widget. Open **Projects** from the command center’s top tile.
 Its own window contains a searchable project sidebar and Overview, Actions,
 Agents, Preferences, and Help destinations. A narrow window uses a compact
-project selector. The window keeps the selected project when reopened. With no selection,
-a welcome card explains the next steps. Add project starts setup; development
-folder management lives under Preferences, and Help covers projects, actions, and agents. Closing the window retains drafts and accepted operations.
+searchable project picker. The window keeps the selected project when reopened. With no selection,
+a welcome card explains the next steps. Add project registers an exact repository
+and enters Overview directly, using existing installed-tool defaults. Scan
+development folder is a secondary bulk route. Agents and actions remain optional.
+Leaving a dirty editor offers Save, Discard, or Keep editing; only acknowledged
+Save or explicit Discard continues navigation. Closing retains drafts and accepted
+operations. Development folder management lives under Preferences; Help covers
+projects, actions, and agents.
+
+Overview leads with Git state for the selected checkout: separate file counts,
+local-ref ahead/behind, and expandable changes. Services and checks, reported
+agent activity, and workspace observations stay together below it. Run, Stop,
+Open preview, View output, Answer, and Review use the existing action and activity
+clients; refreshing Overview never starts a command. A command result describes
+its recorded run, and agent verification remains explicitly reported.
+
+Visible Overview refreshes protected action runs in bounded rotation without
+changing the selected output or accepted receipt. Details exposes older runs,
+configuration, and recovery. Saved workspace locations without current owner
+bindings remain unconfirmed. **Start working** shows the remembered profile and starts
+its tools on the selected checkout in an empty workspace. **Choose another profile**
+is searchable and starts immediately. Only matching confirmed acceptance dismisses
+Projects; later operation outcomes cannot close a reopened window. **Return** focuses
+an exact existing environment and dismisses only after observed focus. Existing windows
+remain open. Neither Start nor Return restores terminal/editor session contents.
+
+Profile names, resolved tools and checkout/branch snapshots remain fixed for each
+environment. Live role labels need fresh current-session process/window proof; saved
+metadata after restart is unconfirmed. A lost acknowledgement exposes Check launch
+status. Deliberate Start another environment retains the earlier request identity and
+uses a fresh activation; a missing receipt never triggers replay. Manage profiles
+contains advanced tool choices, separate from daily Start and Return. Legacy public
+`projects open` retains its original focus/reuse and recovery behavior.
 
 ## Commands and installation
 
@@ -28,6 +58,11 @@ aranea projects roots add ~/Work --json
 aranea projects discover --json
 aranea projects register --path ~/Work/my-project --json
 aranea projects list --json
+aranea projects profiles list PROJECT_ID --json
+aranea projects start PROJECT_ID --profile PROFILE_ID --json
+aranea projects environments list --project PROJECT_ID --json
+aranea projects environments return ENVIRONMENT_ID --json
+aranea projects activation ACTIVATION_ID --json
 aranea projects open PROJECT_ID --json
 aranea desktop status --json
 ```
@@ -166,3 +201,35 @@ and required ancestor directories; reinstall fences older requests. Repository
 folders, providers, editors and unrelated services remain untouched. Sandboxed
 backend/CLI/UI tests use fake manager/browser boundaries; they do not validate
 live native unit/browser behavior.
+
+Preview production Overview at representative sizes without registry reads or
+execution:
+
+```bash
+tools/render-projects-preview --fixture project-details --project-count 50 --width 1200 --height 800 --output /tmp/projects-wide.png
+tools/render-projects-preview --fixture project-details --project-count 100 --width 600 --height 700 --output /tmp/projects-narrow.png
+```
+
+Project counts from 0 through 100 are inert fixtures. `ARANEA_PROJECT_RENDER_STATE`
+accepts `conflicts`, `stale`, or `unreadable` for Git recovery captures. The empty
+activity hints remain compact. These previews establish layout, not native window
+focus, application reuse, or portal acceptance.
+
+## Profile automation contracts
+
+`projects profiles save PROJECT_ID --definition JSON` saves a new draft headlessly.
+Updates include the profile ID in the definition and `--expected-profile-revision N`;
+removal also requires that revision. Definitions contain name, canonical role order
+(editor, terminal, agent subset) and supported tools. `projects environments forget`
+removes metadata only. See [the public command schemas](../../docs/agent-interface.md#profiles-and-environments)
+for examples, errors and retained activation recovery.
+
+The owner adds prepareEnvironment, startEnvironment, returnEnvironment,
+environmentActivation and recoverEnvironment. Start uses an immutable a-UUID target,
+short-lived empty-workspace reservation, exact preflight and a shared serialized queue.
+Only an explicit OWNER_NOT_READY/null-operation refusal permits readiness retries.
+Accepted receipts outlive bounded operation history for the current owner session;
+lookup is read-only and not-found remains unconfirmed. Return is focus-only. Recovery
+uses exactly one original role on the fixed environment, without profile substitutions.
+The compositor can change after final occupancy readback; that external race cannot
+be made atomic. After first native dispatch an environment never relocates.

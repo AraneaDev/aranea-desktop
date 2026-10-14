@@ -1,187 +1,112 @@
-// Header Open choices: saved roles summary, immediate default toggles, last-role guard, one-off starts.
+// Daily profile choices retain exact saved revisions and never mutate defaults.
 import QtQuick
 import Quickshell
 import "lib"
-import "plugins/araneadev.projects" as ProjectUi
+import "plugins/araneadev.projects" as Projects
 
 ShellRoot {
   id: host
-  // Exact one-off requests emitted by the real header.
-  property var oneOffs: []
-  // Immediate default-role requests emitted by the real header.
-  property var defaults: []
+  // Record real header requests without external effects.
+  property var starts: []
   QmlTest {
     id: t
   }
-  ProjectUi.ProjectHeader {
+  Projects.ProjectHeader {
     id: header
     width: 600
     openAvailable: true
     project: ({
-        id: 'p-one',
+        id: 'p',
         name: 'Repo',
-        lastCheckoutId: 'c-main',
-        openRoles: ['editor', 'agent'],
-        tools: {
-          editorId: 'code',
-          terminalId: 'kitty',
-          agentId: 'claude'
-        },
+        lastCheckoutId: 'c',
+        lastProfileId: 'f-two',
         checkouts: [
           {
-            id: 'c-main',
+            id: 'c',
             path: '/repo',
             branch: 'main'
+          }
+        ],
+        profiles: [
+          {
+            id: 'f-one',
+            revision: 1,
+            name: 'Editor',
+            roles: ['editor'],
+            tools: {
+              editorId: 'code'
+            }
+          },
+          {
+            id: 'f-two',
+            revision: 4,
+            name: 'Terminal work',
+            roles: ['terminal'],
+            tools: {
+              terminalId: 'kitty'
+            }
           }
         ]
       })
     tools: ({
-        defaults: {},
         editors: [
           {
-            id: "code",
+            id: 'code',
+            label: 'VS Code',
             available: true,
             supported: true
           }
         ],
         terminals: [
           {
-            id: "kitty",
+            id: 'kitty',
+            label: 'Kitty',
             available: true,
             supported: true
           }
         ]
       })
-    toolLabels: ({
-        editor: 'VS Code',
-        terminal: 'Kitty'
-      })
-    agentChoice: ({
-        suggestedId: 'codex',
-        options: [
-          {
-            id: 'claude',
-            label: 'Claude Code',
-            available: true,
-            reason: '92% of Session (5-hour) · resets 14:20 · last used here'
-          },
-          {
-            id: 'codex',
-            label: 'Codex',
-            available: true,
-            reason: '10% used'
-          }
-        ]
-      })
-    onOneOffRequested: function (payload) {
-      host.oneOffs.push(payload)
-    }
-    onDefaultRolesRequested: function (roles) {
-      host.defaults.push(roles)
-    }
   }
-  Component.onCompleted: t.step(50, function () {
-    t.equal(header.opensText, 'Opens Editor + Agent (Codex)', 'summary names saved roles and suggested provider')
-    var rows = header.menuEntries()
-    t.equal(rows.map(function (r) {
-      return r.key || r.kind
-    }), ['header', 'role:editor', 'role:terminal', 'role:agent', 'separator', 'header', 'start:codex', 'start:claude', 'only:terminal', 'only:editor'], 'menu lists defaults then one-off starts, suggested first')
-    t.equal(rows[6].label, 'Start Codex', 'suggested start label')
-    t.equal(rows[6].detail, 'Suggested · 10% used', 'suggested start explains why')
-    header.choose('role:terminal')
-    t.equal(host.defaults[0], ['editor', 'terminal', 'agent'], 'toggling saves canonical roles immediately')
-    header.choose('start:claude')
-    t.equal(host.oneOffs[0], {
-      projectId: 'p-one',
-      checkoutId: 'c-main',
-      roles: ['agent'],
-      newWindowRole: 'agent',
-      agentId: 'claude'
-    }, 'other provider is one click away')
-    header.choose('only:terminal')
-    t.equal(host.oneOffs[1], {
-      projectId: 'p-one',
-      checkoutId: 'c-main',
-      roles: ['terminal']
-    }, 'terminal only is a one-off role set')
-    header.project = Object.assign({}, header.project, {
-      openRoles: ['editor']
+  Component.onCompleted: t.step(60, function () {
+    t.check(typeof header.chooseProfile === 'function', 'header exposes explicit saved profile activation')
+    if (typeof header.chooseProfile !== 'function') {
+      t.done()
+      return
+    }
+    header.startProfile.connect(function (id, revision) {
+      host.starts.push([id, revision])
     })
-    var editorRow = header.menuEntries()[1]
-    t.check(editorRow.enabled === false && editorRow.tooltip === 'Open needs at least one tool', 'last role cannot be unticked')
-    header.choose('role:editor')
-    t.equal(host.defaults.length, 1, 'last-role toggle is ignored')
-    header.agentChoice = {
-      suggestedId: null,
-      options: [
-        {
-          id: 'claude',
-          label: 'Claude Code',
-          available: false,
-          reason: 'Usage unknown'
-        },
-        {
-          id: 'codex',
-          label: 'Codex',
-          available: false,
-          reason: 'Usage unknown'
-        }
-      ]
-    }
-    var agentRow = header.menuEntries()[3]
-    t.check(agentRow.enabled === false && agentRow.detail === 'Install Claude Code or Codex to start agents here.', 'agent role disabled without CLIs')
-    t.check(header.menuEntries().every(function (r) {
-      return (r.key || '').indexOf('start:') !== 0
-    }), 'no start rows without CLIs')
-    header.tools = {
-      defaults: {},
-      editors: [],
-      terminals: []
-    }
-    t.check(header.menuEntries()[1].enabled === false && header.menuEntries()[2].enabled === false, 'missing adapters disable default roles')
-    var before = host.oneOffs.length
-    header.choose('only:terminal')
-    header.choose('only:editor')
-    header.choose('start:untrusted')
-    t.equal(host.oneOffs.length, before, 'disabled and unknown one-offs refuse dispatch')
-    header.agentChoice = {
-      suggestedId: 'codex',
-      options: [
-        {
-          id: 'codex',
-          label: 'Codex',
-          available: true,
-          reason: '10% used'
-        }
-      ]
-    }
-    t.equal(header.menuEntries()[3].detail, 'Agents run in a terminal. Choose one in Preferences.', 'agents require a supported host terminal')
-    header.choose('start:codex')
-    t.equal(host.oneOffs.length, before, 'agent one-off refuses unavailable terminal')
-    header.tools = {
-      defaults: {
-        terminalId: 'kitty'
-      },
-      editors: [],
-      terminals: [
-        {
-          id: 'kitty',
-          available: true,
-          supported: true
-        }
-      ]
-    }
+    t.equal(header.profile.name, 'Terminal work', 'remembered profile is primary')
+    t.equal(header.profileSummary, 'Kitty terminal', 'primary shows actual tools')
+    t.findChild(header, 'projectPrimaryStart').clicked()
+    t.equal(host.starts, [['f-two', 4]], 'Start uses remembered exact revision')
+    var picker = t.findChild(header, 'profilePicker')
+    t.equal(picker.showCheckoutContext, false, 'profile chooser hides irrelevant checkout branch context')
+    t.equal(picker.searchPlaceholder, 'Search profiles…', 'chooser identifies its searchable profile context')
+    picker.query = 'Editor'
+    picker.select('f-one')
+    t.equal(host.starts[1], ['f-one', 1], 'searchable chooser starts selected profile directly')
     header.pending = true
-    header.choose('role:terminal')
-    header.choose('start:codex')
-    t.equal(host.defaults.length, 1, 'pending configure blocks another role toggle')
-    t.equal(host.oneOffs.length, before, 'pending operation blocks one-offs')
+    header.chooseProfile('f-one')
+    t.equal(host.starts.length, 2, 'pending submission refuses duplicate start')
     header.pending = false
-    t.equal(header.menuEntries()[3].detail, 'Codex · Suggested · 10% used', 'agent checkbox includes provider and suggestion reason')
+    t.check(header.acceptanceUnknown !== undefined, 'header distinguishes unknown acceptance from preparation')
+    if (header.acceptanceUnknown !== undefined) {
+      header.acceptanceUnknown = true
+      t.equal(t.findChild(header, 'projectPrimaryStart').text, 'Launch status unknown', 'unknown acknowledgement is not ongoing preparation')
+      header.acceptanceUnknown = false
+    }
+    header.displayOnly = true
+    header.chooseProfile('f-one')
+    t.equal(host.starts.length, 2, 'inert header refuses start')
+    header.displayOnly = false
     header.project = Object.assign({}, header.project, {
-      openRoles: undefined
+      lastProfileId: null,
+      profiles: []
     })
-    t.equal(header.openRoles, ['editor', 'terminal'], 'legacy registrations retain their default roles')
+    t.equal(header.profile, null, 'missing profile never silently substitutes another')
+    t.check(t.findChild(header, 'headerManageProfiles').visible, 'zero profile offers direct setup')
+    t.equal(t.findChild(header, 'projectBranch'), null, 'branch appears only once in checkout control')
     t.done()
   })
 }

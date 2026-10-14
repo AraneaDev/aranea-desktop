@@ -30,6 +30,16 @@ ShellRoot {
   property var launches: []
   // Current bindings are fixture process proof, never inferred by the owner.
   property var proven: []
+  // Fake compositor tracks exact owner focus and known workspaces.
+  property bool environmentMode: false
+  // Exact fake focus readback for environment Return.
+  property int currentWorkspace: 1
+  // Known workspace identities used only in the profile fixture phase.
+  property var workspaces: [
+    {
+      id: 1
+    }
+  ]
   // Control only the external application acceptance boundary.
   property bool failTerminal: false
   // Withhold window observation for safe explicit re-observation tests.
@@ -41,6 +51,11 @@ ShellRoot {
   // Fake desktop replaces every launcher/compositor call before owner activation.
   property var desktop: ({
       sessionId: 'cli-owner',
+      createEnvironmentId: function (done) {
+        helpers.processRunner(['cat', '/proc/sys/kernel/random/uuid'], '', function (code, output) {
+          done(code === 0 ? 'e-' + String(output).trim() : null)
+        })
+      },
       processRunner: function (argv, input, done) {
         helpers.processRunner(argv, input, function (code, output, diagnostics) {
           if ((root.delayRefresh || root.holdRefresh) && argv[1] === 'snapshot') {
@@ -58,8 +73,15 @@ ShellRoot {
         return {
           available: true,
           observedAt: Date.now(),
-          currentWorkspaceId: 1,
-          workspaces: [],
+          currentWorkspaceId: root.environmentMode ? root.currentWorkspace : 1,
+          workspaces: !root.environmentMode ? [] : root.workspaces.map(function (row) {
+            return {
+              id: row.id,
+              windows: root.proven.filter(function (binding) {
+                return binding.workspaceId === row.id
+              }).length
+            }
+          }),
           windows: root.proven.map(function (b) {
             return {
               address: b.address,
@@ -77,6 +99,15 @@ ShellRoot {
         })
       },
       focusWorkspace: function (id, done) {
+        root.currentWorkspace = id
+        if (!root.workspaces.some(function (row) {
+          return row.id === id
+        }))
+          root.workspaces = root.workspaces.concat([
+            {
+              id: id
+            }
+          ])
         done({
           ok: true,
           status: 'observed'
@@ -131,6 +162,8 @@ ShellRoot {
             verifiedAt: Date.now()
           }
         }
+        if (spec.environmentId)
+          binding.environmentId = spec.environmentId
         root.proven.push(binding)
         done({
           status: 'observed',
@@ -147,6 +180,8 @@ ShellRoot {
       return true
     }
     function mode(value: string): string {
+      if (value === 'profiles')
+        root.environmentMode = true
       root.failTerminal = value === 'failure'
       root.uncertain = value === 'uncertain'
       if (value === 'readiness' || value === 'readiness-delayed') {

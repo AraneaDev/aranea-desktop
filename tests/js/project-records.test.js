@@ -268,3 +268,48 @@ test("activation revalidates checkout, provider availability, and cached provide
   })
   assert.deepEqual(p.openRoles, ["editor", "terminal", "agent"])
 })
+
+test("typed environment search keeps exact saved identity and launch snapshot", () => {
+  assert.equal(typeof records.environmentRecords, "function")
+  const rows = records.environmentRecords(
+    { projects: [project("p-1", "/current")] },
+    {
+      availability: { compositor: true },
+      environments: [
+        {
+          id: "e-one",
+          projectId: "p-1",
+          checkoutId: "old",
+          workspaceId: 4,
+          profileSnapshot: { name: "Original" },
+          checkoutSnapshot: { path: "/old", branch: "topic" },
+          observedRoles: []
+        }
+      ]
+    }
+  )
+  assert.equal(rows[0].type, "project-environment")
+  assert.deepEqual(JSON.parse(JSON.stringify(rows[0].target)), {
+    projectId: "p-1",
+    environmentId: "e-one"
+  })
+  assert.match(rows[0].label, /Return.*Original/)
+  assert.match(rows[0].detail, /unconfirmed/)
+})
+
+test("environment records survive the ranking facade with exact Return identities", () => {
+  const search = loadPragma("plugins/araneadev.menu/DesktopSearchLogic.js")
+  const row = {
+    key: "project-environment:e-one",
+    type: "project-environment",
+    label: "Return Terminal",
+    target: { projectId: "p-one", environmentId: "e-one" },
+    available: true
+  }
+  const normalized = search.normalizeRecord(row)
+  assert.ok(normalized, "typed environment must not disappear during source publication")
+  assert.equal(normalized.key, row.key)
+  assert.deepEqual(JSON.parse(JSON.stringify(normalized.target)), row.target)
+  assert.equal(search.parseQuery("project-environment: Terminal").type, "project-environment")
+  assert.equal(search.normalizeRecord({ ...row, target: { environmentId: "e-one" } }), null)
+})

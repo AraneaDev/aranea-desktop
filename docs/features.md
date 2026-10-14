@@ -139,16 +139,20 @@ it was saved for later sessions.
 
 ## Project workspaces
 
-**Command center → Projects** opens a separate project manager. Its setup wizard
-helps you choose a development folder, review Git repositories and worktrees,
-save your preferred tools, and optionally connect agent reporting. A scan
-registers nothing until you choose **Add selected**.
+**Command center → Projects** opens a searchable project manager. **Add project**
+registers an exact Git repository and opens its Git-led Overview immediately.
+Agents, saved actions and tool preferences are optional follow-up settings.
+**Scan development folder** offers bulk discovery; a scan registers nothing
+until you choose **Add selected**.
 
-Each project remembers its checkouts, editor, terminal, and workspace
-preferences. **Open workspace** opens or focuses the selected tools; another
-checkout can be opened separately. Overview, Actions, Agents, Preferences, and
-Help keep project context together. Removing a registration leaves the
-repository and existing windows in place.
+Each project remembers named profiles and its selected checkout. **Start working**
+starts the remembered tools on an empty workspace; **Choose another profile** is
+searchable and starts the chosen combination immediately. Existing environments stay
+open. **Return** focuses an exact saved environment without starting missing tools.
+Overview keeps launch-time context and per-tool results; Profiles holds advanced
+configuration. Saved metadata alone does not prove that a window is still running,
+and Return does not restore editor or terminal contents. Removing a registration
+leaves the repository and existing windows in place.
 
 Follow [Set up your first project](workflows.md#set-up-your-first-project).
 

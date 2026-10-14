@@ -163,8 +163,8 @@ if (typeof module !== "undefined") {
 // Pure desktop record normalization and ranking. Matching is injected by the
 // generated DesktopSearchLogic facade from the canonical MenuSearch module.
 
-/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"|"project"|"project-agent"} DesktopType */
-/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string, projectId?:string, checkoutId?:string, agentId?:string}} DesktopTarget */
+/** @typedef {"app"|"command"|"window"|"workspace"|"setting"|"action"|"project"|"project-agent"|"project-environment"} DesktopType */
+/** @typedef {{appId?: string, itemId?: string, address?: string, workspaceId?: number|string, selector?: string, section?: string, actionId?:string, projectId?:string, checkoutId?:string, agentId?:string, environmentId?:string}} DesktopTarget */
 /** @typedef {{key: string, type: DesktopType, label: string, detail: string, aliases: Array<string>, target: DesktopTarget, available: boolean, pinned: boolean, recentRank: ?number, activeWorkspace: boolean, suggested?: boolean}} DesktopRecord */
 /** @typedef {{id: string, label: string, aliases: Array<string>, description: string}} DesktopMatchEntry */
 /**
@@ -183,7 +183,10 @@ if (typeof module !== "undefined") {
  */
 function parseQuery(text) {
   var raw = String(text || "").trim()
-  var prefix = /^(app|command|window|workspace|setting|action|project|project-agent):\s*/i.exec(raw)
+  var prefix =
+    /^(app|command|window|workspace|setting|action|project|project-agent|project-environment):\s*/i.exec(
+      raw
+    )
   return {
     type: prefix ? /** @type {DesktopType} */ (prefix[1].toLowerCase()) : null,
     text: prefix ? raw.slice(prefix[0].length).trim() : raw
@@ -209,7 +212,8 @@ function normalizeRecord(record) {
     setting: "section",
     action: "actionId",
     project: "projectId",
-    "project-agent": "projectId"
+    "project-agent": "projectId",
+    "project-environment": "environmentId"
   }
   if (!Object.prototype.hasOwnProperty.call(fields, type)) return null
   var label = typeof record.label === "string" ? record.label.trim() : ""
@@ -232,6 +236,10 @@ function normalizeRecord(record) {
   /** @type {DesktopTarget & {[key: string]: *}} */
   var target = {}
   target[fields[type]] = identity
+  if (type === "project-environment") {
+    if (typeof sourceTarget.projectId !== "string" || !sourceTarget.projectId.trim()) return null
+    target.projectId = sourceTarget.projectId
+  }
   if (type === "project" || type === "project-agent") {
     if (typeof sourceTarget.checkoutId !== "string" || !sourceTarget.checkoutId.trim()) return null
     target.checkoutId = sourceTarget.checkoutId

@@ -289,6 +289,79 @@ an installed alternative or install Claude Code or Codex; agents also require a
 supported terminal. A missing terminal remains a tool-choice/tool failure rather
 than proof that an agent window opened.
 
+### Profiles and environments
+
+All commands accept `--json` and preserve the existing schema-1 JSONL/exit conventions:
+
+```text
+aranea projects profiles list PROJECT_ID
+aranea projects profiles save PROJECT_ID --definition JSON [--expected-profile-revision N]
+aranea projects profiles remove PROJECT_ID PROFILE_ID --expected-profile-revision N
+aranea projects start PROJECT_ID --profile PROFILE_ID
+aranea projects environments list --project PROJECT_ID
+aranea projects environments return ENVIRONMENT_ID
+aranea projects environments forget ENVIRONMENT_ID
+aranea projects activation ACTIVATION_ID
+```
+
+Profile list returns `data.profiles` and `lastProfileId`. Save/remove return the
+acknowledged `data.state`. Configuration works without a desktop owner. A newly
+registered CLI project has no profiles; save one directly, for example:
+
+```bash
+aranea projects profiles save PROJECT_ID --definition '{"name":"Focus","roles":["editor","terminal"],"tools":{"editorId":"code","terminalId":"kitty","agentId":null}}' --json
+```
+
+For an update include the existing `id` in that definition and supply its positive
+`--expected-profile-revision`; omit the expected revision for a new draft. A stale
+revision returns `PROFILE_CONFLICT` without overwriting concurrent changes. Roles
+are a nonempty distinct subset in editor, terminal, agent order; tool IDs come from
+capabilities. There is no profile checkout override or arbitrary shell command.
+
+Start reads the currently selected checkout and exact saved profile revision once,
+generates a fresh `a-UUID`, and submits this immutable target to the owner. Preflight
+validates current checkout identity, tools, and empty unreserved workspace occupancy.
+Acceptance snapshots `checkoutSnapshot`, `profileSnapshot`, `resolvedTools`, workspace,
+session, time and UUID identities. Branch is observed at launch, including null for
+detached/unborn state. Later edits do not relabel earlier work. Start never runs saved
+actions; accepted work continues after the CLI observer exits. Existing ordinary
+`projects open` output and behavior are unchanged.
+
+Start may retry only an explicit OWNER_NOT_READY refusal with no operation identity,
+within five seconds. Lost, malformed, or contradictory acceptance replies return
+`ACCEPTANCE_UNKNOWN`, exit 1, and `data.acceptanceUnknown: true`, preserving
+`data.activationId`, immutable `data.target`, known `data.sessionId`, and a concrete
+`projects activation a-… --json` recovery command. Never replay that request automatically.
+
+Activation lookup sends only read-only `environmentActivation({activationId})` to the
+owner. It validates the current-session retained receipt and returns `data.found`,
+`sessionId`, `activationId`, `operationId`, `environmentId`, and a detached `operation`
+snapshot when found, including completed operations evicted from ordinary lookup.
+Exit 0 means the receipt was observed; inspect `data.operation.outcome` for launch
+success. Pending work can be followed with `projects operation OPERATION_ID --json`.
+Not-found is partial/unconfirmed with exit 1: receipts are scoped to the current owner,
+and a restart or missing receipt does not prove rejection. A later deliberate Start
+uses a new identity and may coexist with an earlier request that still finishes.
+
+Environment list returns saved `data.environments`; these records alone do not prove
+windows are live. Return resolves the exact environment across registered projects,
+observes focus on its saved workspace, and never starts missing roles or another
+profile. Forget removes saved metadata and closes no windows. Start/Return require a
+live owner; no headless launch is reported. Partial or failed launch outcomes exit 1.
+Current-session process/window evidence is required to call a role observed, including
+after owner restart. Terminal commands, editor buffers and session contents are never
+claimed restored.
+
+The additive owner IPC methods are `prepareEnvironment`, `startEnvironment`,
+`returnEnvironment`, `environmentActivation`, and `recoverEnvironment`. Preparation
+accepts `{projectId,checkoutId,profileId,profileRevision,activationId}` and reserves
+without launching; Start consumes that exact target. Return accepts only
+`{projectId,environmentId}`. Recovery accepts those two IDs plus a fresh activation ID
+and exactly one original `retryRole`, `newWindowRole` or `reobserveRole`; it retains
+the original environment snapshots and workspace. It is separate from Return and
+does not dismiss Projects. External occupancy can race after final compositor
+readback; after first native dispatch the environment cannot relocate.
+
 ### Project outcomes and safe recovery
 
 A completed public event retains the operation identity and exact owner result.

@@ -119,6 +119,13 @@ ColumnLayout {
   function focusTasks() {
     tasks.forceActiveFocus(Qt.TabFocusReason)
   }
+  // Overview opens one exact retained task's local details, without provider input.
+  function inspectTask(id) {
+    if (projectTasks.some(function (task) {
+      return task.taskId === id
+    }))
+      tasks.selectedId = id
+  }
   // Reuse the reveal-first task/detail keyboard model and local Escape behavior.
   function handleKey(event) {
     if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {

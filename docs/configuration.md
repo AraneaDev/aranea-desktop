@@ -229,6 +229,18 @@ Supported editors are VS Code (`code`) and Neovim (`nvim`); terminals are
 Alacritty, Kitty, Foot, and Ghostty. Neovim opens in the selected terminal.
 Choose installed supported tools; profile installation does not install them.
 
+**Manage profiles** opens saved tool combinations. **Add profile** reveals usable
+presets and custom tool selection; agents are optional. New UI registrations save
+available presets after registration. Projects added through the CLI can use
+**Set up a profile** whenever convenient. Editor-only and terminal-only profiles
+work without an agent; Neovim and agent providers require a supported terminal.
+**Refresh tools** rereads installed tools while retaining the current draft.
+
+Profile edits and removals use saved revisions and leave running environments
+unchanged. Leaving a profile editor offers **Save**, **Discard**, or **Keep
+editing**; closing Projects retains the draft. Saving a profile configures tools
+without launching them.
+
 **Manage development folders** controls discovery. Removing a development
 folder keeps existing registrations. **Locate folder** updates a moved checkout
 while checking its Git identity. **Remove registration** removes saved metadata

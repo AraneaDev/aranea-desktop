@@ -8,12 +8,15 @@ ShellRoot {
   id: root
   // Only backend transport is replaced; all view/client logic remains production.
   property var calls: []
+  // Public grouped signal syntax retains its statically typed client API.
+  property int acceptanceCount: 0
   QmlTest {
     id: t
   }
   ProjectUi.ProjectActions {
     id: actions
     width: 380
+    client.onRunAccepted: root.acceptanceCount++
     displayOnly: true
     project: ({
         id: 'p-00000000-0000-4000-8000-000000000001',

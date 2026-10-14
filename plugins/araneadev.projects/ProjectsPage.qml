@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectProfiles.js" as Profiles
 
 ColumnLayout {
   id: page
@@ -25,6 +26,8 @@ ColumnLayout {
   property bool displayOnly: false
   // Registry mutations are serialized by the focused operation client.
   property bool pending: false
+  // Best-effort visit/pin writes never block local wizard navigation.
+  property bool metadataPending: false
   // Shared suggestion propagated to the selected project Details.
   property var agentChoice: null
   // Actionable backend error retained independently of discovery outcomes.
@@ -35,6 +38,8 @@ ColumnLayout {
   property bool ignoredExpanded: false
   // Guided setup is presentation state; saves use existing typed requests.
   property bool setupActive: false
+  // Exact registration is the default; bulk discovery is an optional route.
+  property bool exactSetup: false
   // Current zero-based stage in the local setup guide.
   property int setupStep: 0
   // Exact identity returned by this wizard’s successful registration.
@@ -43,8 +48,8 @@ ColumnLayout {
   property var setupProjectIds: []
   // Current position follows exact identity, independent of registry ordering.
   readonly property int setupProjectIndex: setupProjectIds.indexOf(setupProjectId)
-  // Any active mutation or scan pauses switching projects and wizard stages.
-  readonly property bool setupNavigationPending: pending || !!discoveryClient && discoveryClient.pending || details.pending || details.actions.pending
+  // Registration/action saves, owner work, and scans pause wizard navigation.
+  readonly property bool setupNavigationPending: pending && !metadataPending || !!discoveryClient && discoveryClient.pending || !!projectClient && projectClient.pending || details.actions.pending
   // Exiting setup must retain every unsaved preference or action draft.
   readonly property bool setupCanExit: !setupNavigationPending && !details.dirty && !details.actions.editing
   // Explicit submitted selection matched against successful readback.
@@ -64,6 +69,7 @@ ColumnLayout {
     if (displayOnly || setupNavigationPending || details.dirty || details.actions.editing)
       return
     setupActive = true
+    exactSetup = true
     setupStep = 0
     setupProjectId = ''
     setupProjectIds = []
@@ -72,6 +78,12 @@ ColumnLayout {
     helpExpanded = false
     foldersExpanded = false
     candidates.selectedPaths = []
+  }
+  // Secondary bulk discovery retains the existing optional setup route.
+  function startBulkSetup(): void {
+    startSetup()
+    if (setupActive)
+      exactSetup = false
   }
   // Forward navigation changes presentation only after its guard passes.
   function advanceSetup(): void {
@@ -102,12 +114,26 @@ ColumnLayout {
       setupAwaitingFolder = false
     }
   }
+  // Registration queues explicit preset writes; observations never create profiles.
+  property var profilePresetQueue: []
+  // A failed optional setup leaves registration usable with direct recovery.
+  property string profileSetupError: ''
+  // Optional profile writes share the host registry client and revision guards.
+  signal profileSaveRequested(string projectId, var profile, int expectedProfileRevision)
+  // Profile-list navigation shares the surrounding draft guard.
+  signal profileListRequested
+  // Removal uses the exact displayed saved revision.
+  signal profileRemoveRequested(string projectId, string profileId, int expectedProfileRevision)
   // Only successful readback of this wizard's explicit request advances it.
   function registryMutationCompleted(action: string, args: var, state: var): void {
     if (displayOnly)
       return
     if (action === 'configure' && selectedProject && args.projectId === selectedProject.id)
       details.acknowledgeDraft((state.projects || []).filter(function (project) {
+        return project.id === args.projectId
+      })[0])
+    if (action === 'profile-save' && selectedProject && args.projectId === selectedProject.id)
+      details.acknowledgeProfile(args, (state.projects || []).filter(function (project) {
         return project.id === args.projectId
       })[0])
     if (!setupActive)
@@ -131,12 +157,31 @@ ColumnLayout {
       if (ids.indexOf(added.id) < 0)
         ids.push(added.id)
     }
+    var queued = []
+    ids.forEach(function (id) {
+      var project = state.projects.filter(function (p) {
+        return p.id === id
+      })[0]
+      if (!(project.profiles || []).length)
+        Profiles.presets(page.tools).forEach(function (profile) {
+          queued.push({
+            projectId: id,
+            profile: profile
+          })
+        })
+    })
+    profileSetupError = ''
+    profilePresetQueue = profilePresetQueue.concat(queued)
     setupProjectIds = setupProjectIds.concat(ids.filter(function (id) {
       return setupProjectIds.indexOf(id) < 0
     }))
     setupProjectId = ids[0]
     setupStep = 2
     setupRegistrationPaths = []
+    if (exactSetup) {
+      setupActive = false
+      detailsRequested(setupProjectId)
+    }
   }
   onErrorChanged: if (error) {
     setupRegistrationPaths = []
@@ -210,7 +255,7 @@ ColumnLayout {
       recoveryCheckoutId = project.lastCheckoutId || ''
     }
     var checkouts = project.checkouts || []
-    if (reported && reported.sessionId === snapshot.sessionId && reported.projectId === project.id && checkouts.some(function (c) {
+    if (reported && !reported.environmentId && reported.sessionId === snapshot.sessionId && reported.projectId === project.id && checkouts.some(function (c) {
       return c.id === reported.checkoutId
     }))
       recoveryCheckoutId = reported.checkoutId
@@ -218,7 +263,7 @@ ColumnLayout {
     var latest = null
     for (var i = 0; i < observations.length; i++) {
       var operation = observations[i]
-      if (!operation || operation.sessionId !== snapshot.sessionId || operation.projectId !== project.id || operation.checkoutId !== recoveryCheckoutId || !checkouts.some(function (c) {
+      if (!operation || operation.environmentId || operation.sessionId !== snapshot.sessionId || operation.projectId !== project.id || operation.checkoutId !== recoveryCheckoutId || !checkouts.some(function (c) {
         return c.id === operation.checkoutId
       }))
         continue
@@ -234,6 +279,8 @@ ColumnLayout {
     return {
       selectedPaths: candidates.selectedPaths.slice(),
       setupActive: setupActive,
+      exactSetup: exactSetup,
+      exactPath: exactPicker.pathDraft,
       setupStep: setupStep,
       setupProjectId: setupProjectId,
       setupProjectIds: setupProjectIds.slice(),
@@ -243,6 +290,14 @@ ColumnLayout {
       helpTopic: helpTopic,
       foldersExpanded: foldersExpanded,
       ignoredExpanded: ignoredExpanded,
+      profileEditing: details.profileEditing,
+      profileAdding: details.profileAdding,
+      profileDraft: JSON.parse(JSON.stringify(details.profileEditor.draft)),
+      profileRevision: details.profileEditor.expectedProfileRevision,
+      profileFieldError: details.profileEditor.fieldError,
+      submittedProfileDraft: details.submittedProfileDraft,
+      profileSetupError: profileSetupError,
+      profilePresetQueue: profilePresetQueue.slice(),
       detailsDraft: Object.assign({}, details.draft),
       actions: details.actions.captureSnapshot(),
       relocationDrafts: Object.assign({}, details.relocationDrafts),
@@ -251,6 +306,7 @@ ColumnLayout {
       recoveryProjectId: recoveryProjectId,
       recoverySelectedCheckoutId: recoverySelectedCheckoutId,
       detailsDirty: details.dirty,
+      detailsFieldError: details.fieldError,
       customized: details.customized,
       folderPath: picker.pathDraft
     }
@@ -260,6 +316,8 @@ ColumnLayout {
     if (!saved)
       return
     setupActive = saved.setupActive === true
+    exactSetup = saved.exactSetup === true
+    exactPicker.pathDraft = saved.exactPath || ''
     setupStep = saved.setupStep || 0
     setupProjectIds = saved.setupProjectIds || (saved.setupProjectId ? [saved.setupProjectId] : [])
     setupProjectId = saved.setupProjectId || ''
@@ -276,14 +334,26 @@ ColumnLayout {
     recoverySelectedCheckoutId = saved.recoverySelectedCheckoutId || (selectedProject ? selectedProject.lastCheckoutId || '' : '')
     details.relocationDrafts = saved.relocationDrafts || {}
     details.actions.captureRestore(saved.actions)
+    details.profileAdding = saved.profileAdding === true
+    details.profileEditing = saved.profileEditing === true
+    if (saved.profileDraft)
+      details.profileEditor.draft = saved.profileDraft
+    details.profileEditor.expectedProfileRevision = saved.profileRevision || 0
+    details.profileEditor.fieldError = saved.profileFieldError || ''
+    details.submittedProfileDraft = saved.submittedProfileDraft || null
+    profileSetupError = saved.profileSetupError || ''
+    profilePresetQueue = saved.profilePresetQueue || []
     details.draft = saved.detailsDraft
     details.dirty = saved.detailsDirty
+    details.fieldError = saved.detailsFieldError || ''
     details.customized = saved.customized
     picker.pathDraft = saved.folderPath
   }
   // Reset local capture presentation using typed fixture data without backend access.
   function captureReset(fixture: var): void {
     setupActive = false
+    exactSetup = false
+    exactPicker.pathDraft = ''
     setupStep = 0
     setupProjectId = ''
     setupProjectIds = []
@@ -293,6 +363,12 @@ ColumnLayout {
     foldersExpanded = false
     candidates.selectedPaths = []
     ignoredExpanded = false
+    details.profileAdding = false
+    details.profileEditing = false
+    details.profileEditor.begin(null)
+    details.submittedProfileDraft = null
+    profileSetupError = ''
+    profilePresetQueue = []
     details.discardDraft()
     details.actions.captureReset(fixture)
     details.relocationDrafts = {}
@@ -329,7 +405,7 @@ ColumnLayout {
     visible: !page.sidebarNavigation || !page.setupActive && page.viewSection === 'preferences'
     Aranea.ActionButton {
       objectName: 'projectSetupStart'
-      text: 'Set up a project'
+      text: 'Add project'
       visible: !page.setupActive && !page.sidebarNavigation
       enabled: !page.displayOnly && !page.setupNavigationPending && !details.dirty && !details.actions.editing
       pointerGate: page.pointerGate
@@ -366,7 +442,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.setupActive && (details.dirty || details.actions.editing)
-    text: 'Save or discard your current draft before starting a new project setup.'
+    text: 'Your draft is retained until you save or discard it.'
     color: Aranea.DesignTokens.attention
   }
   Aranea.WorkflowHelp {
@@ -374,10 +450,48 @@ ColumnLayout {
     visible: page.helpExpanded
     topic: page.helpTopic
   }
+  ColumnLayout {
+    Layout.fillWidth: true
+    visible: page.setupActive && page.exactSetup
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Installed tools use your existing defaults. Agents and saved actions are optional.'
+    }
+    ProjectFolderPicker {
+      id: exactPicker
+      objectName: 'projectExactPicker'
+      Layout.fillWidth: true
+      buttonText: 'Choose repository'
+      dialogTitle: 'Choose a Git repository'
+      confirmText: 'Add repository'
+      displayOnly: page.displayOnly || page.setupNavigationPending
+      pointerGate: page.pointerGate
+      onFolderRequested: function (path) {
+        page.setupRegistrationPaths = [path]
+        page.registerRequested([path])
+      }
+    }
+    Flow {
+      Layout.fillWidth: true
+      spacing: Style.space(8)
+      Aranea.ActionButton {
+        text: 'Scan development folder'
+        enabled: !page.displayOnly && !page.setupNavigationPending
+        pointerGate: page.pointerGate
+        onClicked: page.startBulkSetup()
+      }
+      Aranea.ActionButton {
+        text: 'Cancel'
+        enabled: !page.displayOnly && !page.setupNavigationPending
+        pointerGate: page.pointerGate
+        onClicked: page.finishSetup()
+      }
+    }
+  }
   ProjectSetupProgress {
     objectName: 'setupProgress'
     Layout.fillWidth: true
-    visible: page.setupActive
+    visible: page.setupActive && !page.exactSetup
     showControls: false
     displayOnly: page.displayOnly
     step: page.setupStep
@@ -408,7 +522,7 @@ ColumnLayout {
   }
   ColumnLayout {
     Layout.fillWidth: true
-    visible: page.setupActive ? page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidates.candidates.length > 0)
+    visible: page.setupActive ? !page.exactSetup && page.setupStep < 2 : (!page.sidebarNavigation || page.viewSection === 'preferences') && (page.foldersExpanded || candidates.candidates.length > 0)
     Aranea.UiLabel {
       Layout.fillWidth: true
       visible: !!page.discoveryClient && page.discoveryClient.pending
@@ -579,7 +693,7 @@ ColumnLayout {
   ProjectDetails {
     id: details
     Layout.fillWidth: true
-    visible: !!page.selectedProject && (page.setupActive ? page.setupStep === 2 : ['all', 'overview', 'actions', 'preferences'].indexOf(page.viewSection) >= 0)
+    visible: !!page.selectedProject && (page.setupActive ? page.setupStep === 2 : ['all', 'overview', 'actions', 'preferences', 'profiles'].indexOf(page.viewSection) >= 0)
     project: page.selectedProject
     headerProvided: page.sidebarNavigation
     guidedSetup: page.setupActive
@@ -592,6 +706,14 @@ ColumnLayout {
     pending: page.pending || !!page.projectClient && page.projectClient.pending
     openAvailable: !!page.projectClient && page.projectClient.available && !!page.projectClient.snapshot.availability && page.projectClient.snapshot.availability.compositor === true
     pointerGate: page.pointerGate
+    onProfileListRequested: page.profileListRequested()
+    onProfileRefreshRequested: page.refreshRequested()
+    onProfileSaveRequested: function (id, profile, revision) {
+      page.profileSaveRequested(id, profile, revision)
+    }
+    onProfileRemoveRequested: function (id, profileId, revision) {
+      page.profileRemoveRequested(id, profileId, revision)
+    }
     onConfigureRequested: function (id, draft) {
       page.configureRequested(id, draft)
     }
@@ -616,7 +738,7 @@ ColumnLayout {
   }
   ProjectSetupProgress {
     Layout.fillWidth: true
-    visible: page.setupActive
+    visible: page.setupActive && !page.exactSetup
     showSteps: false
     displayOnly: page.displayOnly
     step: page.setupStep
@@ -636,7 +758,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.sidebarNavigation && !page.setupActive && !(page.registryState.projects || []).length && !candidates.candidates.length
-    text: 'No projects yet. Set up a project to choose a Git checkout, your tools, and optional workflow actions.'
+    text: 'No projects yet. Add a Git repository to view its state. Tools, actions and agents can be configured later.'
   }
   Connections {
     target: page.projectClient

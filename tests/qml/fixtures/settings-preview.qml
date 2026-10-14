@@ -1,5 +1,6 @@
 // Inert offscreen host of the production settings content, never the desktop.
 import QtQuick
+import QtQuick.Controls
 import Quickshell
 import qs.Commons
 import "plugins/araneadev.settings" as Settings
@@ -26,6 +27,8 @@ ShellRoot {
   property bool positioned: false
   // Menu captures change only inert presentation state, never activate a row.
   property bool menuPrepared: false
+  // Both legacy menu aliases and current chooser captures use the production profile popup.
+  readonly property bool profileMenu: Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'daily-chooser' || /^agents.*menu$/.test(Quickshell.env('ARANEA_PROJECT_RENDER_STATE'))
   // Report the offscreen render outcome to the parent process.
   function finish(ok, message) {
     console.log((ok ? 'SETTINGSRENDER OK ' : 'SETTINGSRENDER FAIL ') + message)
@@ -54,21 +57,28 @@ ShellRoot {
     windowEnabled: false
   }
   FloatingWindow {
+    id: previewWindow
     implicitWidth: Number(Quickshell.env('ARANEA_SETTINGS_RENDER_WIDTH'))
     implicitHeight: Number(Quickshell.env('ARANEA_SETTINGS_RENDER_HEIGHT'))
     color: 'transparent'
     visible: true
-    Settings.SettingsSurface {
-      id: settingsSurface
-      visible: !harness.isProject
+    Item {
+      id: captureFrame
       anchors.fill: parent
-      root: settingsEntry
-    }
-    Projects.ProjectsSurface {
-      id: projectSurface
-      visible: harness.isProject
-      anchors.fill: parent
-      root: projectEntry
+      // Include the actual popup overlay in this QML-owned capture item.
+      property Item popupOverlay: Overlay.overlay
+      Settings.SettingsSurface {
+        id: settingsSurface
+        visible: !harness.isProject
+        anchors.fill: parent
+        root: settingsEntry
+      }
+      Projects.ProjectsSurface {
+        id: projectSurface
+        visible: harness.isProject
+        anchors.fill: parent
+        root: projectEntry
+      }
     }
   }
   Component.onCompleted: {
@@ -194,7 +204,11 @@ ShellRoot {
       sample.error = 'Desktop settings are unavailable. Check that the settings helper is installed, then Retry.'
     }
     if (fixture.indexOf('projects-') === 0 || fixture.indexOf('project-') === 0) {
-      var projects = ProjectPreview.sample(fixture, Quickshell.env('ARANEA_PROJECT_RENDER_STATE'))
+      var projects = ProjectPreview.sample(fixture, Quickshell.env('ARANEA_PROJECT_RENDER_STATE'), Quickshell.env('ARANEA_PROJECT_RENDER_COUNT'))
+      if ((Quickshell.env('ARANEA_PROJECT_RENDER_STATE') || '').indexOf('daily') === 0 && projects.projectsState.projects.length > 0 && projects.projectsState.projects[0].profiles.length < 3) {
+        finish(false, 'daily fixture requires several selectable profiles')
+        return
+      }
       Object.keys(projects).forEach(function (key) {
         sample[key] = projects[key]
       })
@@ -206,6 +220,7 @@ ShellRoot {
         fixture: sample
       })) !== 'ok')
         finish(false, 'project fixture refused')
+
       return
     }
     if (entry.showcase(JSON.stringify(sample)) !== 'ok') {
@@ -243,19 +258,44 @@ ShellRoot {
       }
       if (!harness.positioned && harness.polls >= 6) {
         harness.positioned = true
+        var dailyMode = Quickshell.env('ARANEA_PROJECT_RENDER_STATE')
+        if (dailyMode === 'daily-details' && entry.inert) {
+          for (var d = 0; d < objects.length; d++)
+            if (objects[d].objectName === 'projectOverview')
+              objects[d].inspectedEnvironmentId = 'e-agent'
+        }
+        if (harness.profileMenu && entry.inert) {
+          if (captureFrame.popupOverlay)
+            captureFrame.popupOverlay.parent = captureFrame
+          for (var c = 0; c < objects.length; c++)
+            if (objects[c].objectName === 'profilePicker') {
+              objects[c].displayOnly = false
+              objects[c].open()
+            }
+        }
+        if (Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'changes') {
+          if (!entry.inert) {
+            stop()
+            harness.finish(false, 'expanded path capture requires inert state')
+            return
+          }
+          for (var g = 0; g < objects.length; g++)
+            if (objects[g].expanded !== undefined && objects[g].git !== undefined)
+              objects[g].expanded = true
+        }
         if (harness.fixture === 'project-details' || harness.fixture === 'project-launch-partial' || harness.fixture === 'project-setup-bulk') {
           for (var j = 0; j < objects.length; j++) {
             var scroll = objects[j]
-            if (scroll.contentY === undefined || !scroll.contentItem || scroll.height < 100)
+            if (scroll.objectName !== 'projectsContentViewport' || !scroll.contentItem || scroll.height < 100)
               continue
-            var target = 0
-            for (var k = 0; k < objects.length; k++) {
-              if (objects[k].text === 'Customer dashboard and developer accessibility improvements' && objects[k].visible && objects[k].font && objects[k].font.bold)
-                target = Math.max(target, objects[k].mapToItem(scroll.contentItem, 0, 0).y)
-            }
-            scroll.contentY = Quickshell.env('ARANEA_SETTINGS_RENDER_SCROLL') === 'bottom' ? Math.max(0, scroll.contentHeight - scroll.height) : Math.min(target, Math.max(0, scroll.contentHeight - scroll.height))
+            scroll.contentY = Quickshell.env('ARANEA_SETTINGS_RENDER_SCROLL') === 'bottom' ? Math.max(0, scroll.contentHeight - scroll.height) : 0
           }
         }
+      }
+      if (harness.polls === 9 && Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'daily-details') {
+        for (var r = 0; r < objects.length; r++)
+          if (objects[r].objectName === 'projectsContentViewport')
+            objects[r].contentY = Math.max(0, objects[r].contentHeight - objects[r].height)
       }
       var loading = false
       for (var i = 0; i < objects.length; i++) {
@@ -270,29 +310,22 @@ ShellRoot {
         if (item.status !== Image.Ready)
           loading = true
       }
-      var agentMode = Quickshell.env('ARANEA_PROJECT_RENDER_STATE') || ''
-      if (!harness.menuPrepared && harness.polls >= 8 && agentMode.indexOf('agents') === 0 && agentMode.indexOf('menu') >= 0) {
-        if (!entry.inert) {
-          stop()
-          harness.finish(false, 'agent menu capture requires inert state')
-          return
-        }
-        for (var m = 0; m < objects.length; m++) {
-          var menu = objects[m]
-          if (menu.objectName === 'splitMenu') {
-            menu.opened = true
-            harness.menuPrepared = true
-          }
-        }
-        if (!harness.menuPrepared) {
-          stop()
-          harness.finish(false, 'project menu not found')
-          return
-        }
-      }
       if (!loading && harness.polls >= 10) {
         stop()
-        if (!surface.grabToImage(function (result) {
+        var captureItem = harness.profileMenu ? captureFrame : surface
+        if (harness.profileMenu && !objects.some(function (item) {
+          return item.objectName === 'profilePicker' && item.opened
+        })) {
+          harness.finish(false, 'profile chooser was not opened')
+          return
+        }
+        if (Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'daily-details' && !objects.some(function (item) {
+          return item.objectName === 'projectOverview' && !!item.inspectedEnvironment
+        })) {
+          harness.finish(false, 'environment details were not expanded')
+          return
+        }
+        if (!captureItem.grabToImage(function (result) {
           harness.finish(result.saveToFile(Quickshell.env('ARANEA_SETTINGS_RENDER_OUTPUT')), result.image.width + 'x' + result.image.height)
         }, Qt.size(surface.width, surface.height)))
           harness.finish(false, 'grabToImage refused')

@@ -4,9 +4,11 @@ pragma ComponentBehavior: Bound
 // qmllint disable missing-property
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import qs.Commons
 import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
+import "ProjectProfiles.js" as Profiles
 
 ColumnLayout {
   id: details
@@ -50,6 +52,8 @@ ColumnLayout {
   property var pointerGate: null
   // Existing project focus authority, shared with exact-run controls.
   property var projectClient: null
+  // Persistent shared action observer; standalone hosts retain their inert fallback.
+  property var actionClient: null
   // The surrounding selected page enables visible-only observation.
   property bool actionsActive: false
   // Public presentation/client boundary for capture and isolated fixtures.
@@ -66,6 +70,8 @@ ColumnLayout {
   property var draft: ({})
   // Dirty drafts survive asynchronous observation refreshes.
   property bool dirty: false
+  // Failed local validation stays with the retained preferences draft.
+  property string fieldError: ''
   // Identity whose local draft is currently being edited.
   property string draftProjectId: ''
   // Locate-folder presentation drafts survive delegate recreation under stable identities.
@@ -82,6 +88,58 @@ ColumnLayout {
   signal locateRequested(string projectId, string checkoutId, string path)
   // Removing registration never closes windows or deletes repository files.
   signal removeRequested(string projectId)
+  // Profiles have an independent retained editor and exact saved revision.
+  property bool profileEditing: false
+  // Additional presets and custom configuration are revealed only on request.
+  property bool profileAdding: false
+  // Public draft boundary participates in the surrounding navigation guard.
+  property alias profileEditor: profileEditor
+  // Successful readback must match the actual submitted draft, not just any refresh.
+  property var submittedProfileDraft: null
+  // Parent serializes these typed requests with other registry mutations.
+  signal profileSaveRequested(string projectId, var profile, int expectedProfileRevision)
+  // Returning to the list is navigation and must pass the parent draft decision.
+  signal profileListRequested
+  // Explicit tool refresh is observation only and retains drafts.
+  signal profileRefreshRequested
+  // Removal never changes immutable environment snapshots or running tools.
+  signal profileRemoveRequested(string projectId, string profileId, int expectedProfileRevision)
+  // Open an existing profile or a usable preset without persisting it.
+  function beginProfile(profile: var): void {
+    if (displayOnly || pending || !project || profileEditing)
+      return
+    profileEditor.begin(profile)
+    profileEditing = true
+    profileAdding = false
+    submittedProfileDraft = null
+  }
+  // Explicit removal uses the currently displayed saved revision.
+  function removeProfile(profile: var): void {
+    if (displayOnly || pending || !project || profileEditing || !profile || !(project.profiles || []).some(function (p) {
+      return p.id === profile.id && p.revision === profile.revision
+    }))
+      return
+    profileRemoveRequested(project.id, profile.id, profile.revision)
+  }
+  // A profile save acknowledges the exact original revision and submitted values.
+  function acknowledgeProfile(args: var, savedProject: var): void {
+    if (!profileEditing || !project || !savedProject || project.id !== savedProject.id || args.projectId !== project.id || !submittedProfileDraft || JSON.stringify(submittedProfileDraft) !== JSON.stringify(profileEditor.draft))
+      return
+    var submitted = args.profile, expected = profileEditor.expectedProfileRevision
+    if (!submitted || (args.expectedProfileRevision || 0) !== expected || (submitted.id || '') !== (profileEditor.draft.id || ''))
+      return
+    var confirmed = (savedProject.profiles || []).some(function (p) {
+      return (!submitted.id || submitted.id === p.id) && p.revision === expected + 1 && p.name === submitted.name && JSON.stringify(p.roles) === JSON.stringify(submitted.roles) && ['editorId', 'terminalId', 'agentId'].every(function (key) {
+        return p.tools[key] === submitted.tools[key]
+      })
+    })
+    if (confirmed) {
+      profileEditing = false
+      profileAdding = false
+      submittedProfileDraft = null
+      profileEditor.fieldError = ''
+    }
+  }
   // Edit one exact checkout relocation draft without persisting or launching anything.
   function setRelocationDraft(projectId: string, checkoutId: string, path: string): void {
     if (!project || project.id !== projectId || !(project.checkouts || []).some(function (c) {
@@ -119,6 +177,7 @@ ColumnLayout {
       workspaceMode: p.workspaceMode || 'dedicated'
     }
     dirty = false
+    fieldError = ''
   }
   // Edit one allowlisted presentation value without invoking any client.
   function setDraft(key: string, value: string): void {
@@ -128,10 +187,14 @@ ColumnLayout {
     next[key] = value
     draft = next
     dirty = true
+    fieldError = ''
   }
   // Save only valid chosen adapters and workspace mode through the backend client.
   function applyDraft(): void {
-    if (displayOnly || pending || !project || !draft.name || !supported('editors', draft.editorId) || !supported('terminals', draft.terminalId) || ['dedicated', 'current'].indexOf(draft.workspaceMode) < 0)
+    if (displayOnly || pending || !project)
+      return
+    fieldError = !draft.name ? 'Enter a project name before saving.' : !supported('editors', draft.editorId) ? 'Choose an installed supported editor before saving.' : !supported('terminals', draft.terminalId) ? 'Choose an installed supported terminal before saving.' : ['dedicated', 'current'].indexOf(draft.workspaceMode) < 0 ? 'Choose a dedicated or current workspace before saving.' : ''
+    if (fieldError)
       return
     configureRequested(project.id, Object.assign({}, draft))
   }
@@ -151,6 +214,7 @@ ColumnLayout {
     })) {
       draft = confirmed
       dirty = false
+      fieldError = ''
     }
   }
   // Ordinary Open deliberately omits all unsaved presentation draft values.
@@ -211,6 +275,11 @@ ColumnLayout {
   onProjectChanged: if (!dirty || !project || draftProjectId !== project.id) {
     if (!project || draftProjectId !== project.id)
       operation = null
+    if (!project || draftProjectId !== project.id) {
+      profileEditing = false
+      profileAdding = false
+      submittedProfileDraft = null
+    }
     discardDraft()
     draftProjectId = project ? project.id : ''
   }
@@ -259,98 +328,6 @@ ColumnLayout {
       }
     }
   }
-  ProjectSectionCard {
-    Layout.fillWidth: true
-    visible: details.headerProvided && !details.guidedSetup && details.viewSection === 'overview'
-    Aranea.UiLabel {
-      text: 'Workspace'
-      font.pixelSize: Style.font.body
-      font.bold: true
-    }
-    Aranea.UiLabel {
-      Layout.fillWidth: true
-      text: 'Open your tools together. Existing project windows are reused when available.'
-      opacity: 0.75
-    }
-    GridLayout {
-      Layout.fillWidth: true
-      columns: width < Style.space(480) ? 1 : 3
-      columnSpacing: Style.space(24)
-      rowSpacing: Style.space(12)
-      Repeater {
-        model: ['editors', 'terminals']
-        ColumnLayout {
-          required property string modelData
-          Layout.fillWidth: true
-          Aranea.UiLabel {
-            text: parent.modelData === 'editors' ? 'EDITOR' : 'TERMINAL'
-            opacity: 0.55
-          }
-          Aranea.UiLabel {
-            Layout.fillWidth: true
-            text: {
-              var role = parent.modelData, id = details.project && details.project.tools ? details.project.tools[role === 'editors' ? 'editorId' : 'terminalId'] : ''
-              id = id || (details.tools.defaults || {})[role === 'editors' ? 'editorId' : 'terminalId']
-              var tool = (details.tools[role] || []).filter(function (t) {
-                return t.id === id
-              })[0]
-              return tool ? tool.label : id || 'Choose in Preferences'
-            }
-            font.pixelSize: Style.font.body
-          }
-        }
-      }
-      ColumnLayout {
-        objectName: 'projectAgentColumn'
-        Layout.fillWidth: true
-        Aranea.UiLabel {
-          text: 'AGENT'
-          opacity: 0.55
-        }
-        Aranea.UiLabel {
-          objectName: 'projectAgentLabel'
-          Layout.fillWidth: true
-          text: details.suggestedAgent ? details.suggestedAgent.label : 'Not installed'
-          font.pixelSize: Style.font.body
-        }
-        Aranea.UiLabel {
-          objectName: 'projectAgentReason'
-          Layout.fillWidth: true
-          text: details.suggestedAgent ? 'Suggested · ' + details.suggestedAgent.reason : 'Install Claude Code or Codex to start agents here.'
-          opacity: 0.6
-        }
-      }
-    }
-    Flow {
-      Layout.fillWidth: true
-      spacing: Style.space(8)
-      Repeater {
-        model: ['editor', 'terminal']
-        Aranea.ActionButton {
-          required property string modelData
-          text: 'New ' + modelData + ' window'
-          enabled: !details.displayOnly && !details.pending && details.openAvailable
-          pointerGate: details.pointerGate
-          onClicked: details.openRequested({
-            projectId: details.project.id,
-            newWindowRole: modelData
-          })
-        }
-      }
-      Aranea.ActionButton {
-        objectName: 'newAgentSession'
-        text: 'New agent session'
-        enabled: !details.displayOnly && !details.pending && details.openAvailable && !!details.suggestedAgent
-        pointerGate: details.pointerGate
-        onClicked: details.startAgent('')
-      }
-    }
-    Aranea.UiLabel {
-      Layout.fillWidth: true
-      text: 'Change tools, checkouts, and workspace behavior in Preferences.'
-      opacity: 0.55
-    }
-  }
   Aranea.UiLabel {
     objectName: 'projectOperationError'
     Layout.fillWidth: true
@@ -382,8 +359,158 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    visible: details.toolChoiceRequired
+    visible: details.toolChoiceRequired && ['preferences', 'all'].indexOf(details.viewSection) >= 0
     text: 'Choose an installed supported editor and terminal, then Save preferences.'
+  }
+  ColumnLayout {
+    Layout.fillWidth: true
+    visible: details.viewSection === 'profiles'
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Profiles'
+      font.bold: true
+    }
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: 'Choose tools for this project. Profiles use the project’s selected checkout. Agent setup is optional.'
+    }
+    Aranea.ActionButton {
+      objectName: 'profileRefreshTools'
+      text: 'Refresh tools'
+      variant: 'quiet'
+      enabled: !details.displayOnly && !details.pending
+      pointerGate: details.pointerGate
+      onClicked: details.profileRefreshRequested()
+    }
+    ColumnLayout {
+      Layout.fillWidth: true
+      visible: !details.profileEditing
+      Repeater {
+        model: details.project ? details.project.profiles || [] : []
+        ColumnLayout {
+          id: profileRow
+          required property var modelData
+          Layout.fillWidth: true
+          spacing: Style.space(10)
+          RowLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: Style.space(8)
+            spacing: Style.space(12)
+            ColumnLayout {
+              Layout.fillWidth: true
+              Layout.minimumWidth: 0
+              spacing: Style.space(4)
+              Aranea.UiLabel {
+                id: profileName
+                objectName: 'profileName:' + profileRow.modelData.id
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: profileRow.modelData.name
+                Accessible.name: text
+                font.bold: true
+                wrapMode: Text.NoWrap
+                elide: Text.ElideRight
+                HoverHandler {
+                  id: profileNameHover
+                }
+                ToolTip {
+                  visible: profileNameHover.hovered && profileName.truncated
+                  delay: 400
+                  width: Math.min(Style.space(320), details.width)
+                  contentItem: Aranea.UiLabel {
+                    text: profileRow.modelData.name
+                  }
+                }
+              }
+              Aranea.UiLabel {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: Profiles.summary(profileRow.modelData, details.tools)
+              }
+            }
+            Aranea.ActionButton {
+              text: 'Edit'
+              enabled: !details.displayOnly && !details.pending
+              pointerGate: details.pointerGate
+              onClicked: details.beginProfile(profileRow.modelData)
+            }
+            Aranea.ActionButton {
+              text: 'Remove'
+              variant: 'quiet'
+              enabled: !details.displayOnly && !details.pending
+              pointerGate: details.pointerGate
+              onClicked: details.removeProfile(profileRow.modelData)
+            }
+          }
+          Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 1
+            color: Util.alpha(Color.foreground, 0.10)
+          }
+        }
+      }
+      Aranea.ActionButton {
+        objectName: 'addProfile'
+        text: details.profileAdding ? 'Hide new profile choices' : 'Add profile'
+        enabled: !details.displayOnly && !details.pending
+        pointerGate: details.pointerGate
+        onClicked: details.profileAdding = !details.profileAdding
+      }
+      Aranea.UiLabel {
+        Layout.fillWidth: true
+        visible: details.profileAdding
+        text: Profiles.presets(details.tools).length ? 'Start with an available preset, or choose your tools.' : 'No supported tools are available. Install VS Code or a supported terminal, then Refresh. You can choose roles below.'
+      }
+      Flow {
+        objectName: 'profilePresetChoices'
+        visible: details.profileAdding
+        Layout.fillWidth: true
+        spacing: Style.space(8)
+        Repeater {
+          model: Profiles.presets(details.tools)
+          Aranea.ActionButton {
+            required property var modelData
+            text: 'Add ' + modelData.name
+            enabled: !details.displayOnly && !details.pending
+            pointerGate: details.pointerGate
+            onClicked: details.beginProfile(modelData)
+          }
+        }
+        Aranea.ActionButton {
+          text: 'Choose tools'
+          enabled: !details.displayOnly && !details.pending
+          pointerGate: details.pointerGate
+          onClicked: details.beginProfile(null)
+        }
+      }
+    }
+    Aranea.ActionButton {
+      objectName: 'profileListReturn'
+      visible: details.profileEditing
+      text: 'All profiles'
+      enabled: !details.displayOnly && !details.pending
+      pointerGate: details.pointerGate
+      onClicked: details.profileListRequested()
+    }
+    ProjectProfileEditor {
+      id: profileEditor
+      Layout.fillWidth: true
+      visible: details.profileEditing
+      tools: details.tools
+      displayOnly: details.displayOnly
+      pending: details.pending
+      pointerGate: details.pointerGate
+      onSaveRequested: function (profile, revision) {
+        if (!details.project || details.displayOnly || details.pending)
+          return
+        details.submittedProfileDraft = JSON.parse(JSON.stringify(profileEditor.draft))
+        details.profileSaveRequested(details.project.id, profile, revision)
+      }
+      onCancelRequested: {
+        details.profileEditing = false
+        details.submittedProfileDraft = null
+      }
+    }
   }
   ProjectSectionCard {
     Layout.fillWidth: true
@@ -392,6 +519,7 @@ ColumnLayout {
       text: 'Project name'
     }
     Ui.TextField {
+      objectName: 'projectNameDraft'
       Layout.fillWidth: true
       text: details.draft.name || ''
       enabled: !details.displayOnly
@@ -443,6 +571,13 @@ ColumnLayout {
       enabled: !details.displayOnly
       pointerGate: details.pointerGate
       onClicked: details.setDraft('workspaceMode', 'current')
+    }
+    Aranea.UiLabel {
+      objectName: 'projectPreferenceError'
+      Layout.fillWidth: true
+      visible: !!details.fieldError
+      text: details.fieldError
+      color: Aranea.DesignTokens.urgent
     }
     RowLayout {
       Aranea.ActionButton {
@@ -557,6 +692,7 @@ ColumnLayout {
     Layout.fillWidth: true
     project: details.project
     projectClient: details.projectClient
+    sharedClient: details.actionClient
     visible: details.guidedSetup || details.viewSection === 'all' || details.viewSection === 'actions'
     active: details.actionsActive && visible
     displayOnly: details.displayOnly
