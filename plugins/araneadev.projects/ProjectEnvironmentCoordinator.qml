@@ -289,7 +289,7 @@ Item {
             var workspace = shared ? data && data.available && data.currentWorkspaceId : owner.chooseEnvironmentWorkspace(data)
             if (!workspace) {
               finish({
-                error: owner.failure('WORKSPACE_UNAVAILABLE', 'Fresh empty workspace occupancy is unavailable.')
+                error: owner.failure('WORKSPACE_UNAVAILABLE', shared ? 'The current workspace is unavailable.' : 'Fresh empty workspace occupancy is unavailable.')
               })
               return
             }
@@ -621,7 +621,7 @@ Item {
       return row.id === workspaceId && (Array.isArray(row.windows) ? row.windows.length : row.windows) > 0
     })
   }
-  // Fresh foreign associations and queued reservations can claim an otherwise empty leased workspace.
+  // Other leases and in-flight operations can claim an otherwise empty leased workspace.
   function reservedElsewhere(op: var): bool {
     return owner.workspaceReservations().some(function (row) {
       return row.workspaceId === op.workspaceId && row.id !== op.id && row.id !== op.environmentId && row.environmentId !== op.environmentId

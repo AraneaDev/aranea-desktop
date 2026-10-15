@@ -104,6 +104,8 @@ ShellRoot {
   ]
   // Focused workspace reported by the fake compositor.
   property var currentWorkspace: 5
+  // The fake compositor answers; false simulates Hyprland being unreachable.
+  property bool desktopAvailable: true
   // Native attempt specs expose the workspace each role targeted.
   property var launched: []
   // Focus targets reveal which workspace an operation moved to.
@@ -126,7 +128,7 @@ ShellRoot {
         sessionId: 'session-one',
         snapshot: function () {
           return {
-            available: true,
+            available: root.desktopAvailable,
             currentWorkspaceId: root.currentWorkspace,
             workspaces: root.occupied,
             windows: root.nativeBindings.map(function (binding) {
@@ -376,7 +378,13 @@ ShellRoot {
     ready(payload(3), function (prepared) {
       t.equal(prepared.error && prepared.error.code, 'INVALID_WORKSPACE', 'unknown current workspace refuses current-mode start')
       root.currentWorkspace = 7
-      returnTests()
+      root.desktopAvailable = false
+      ready(payload(4), function (offline) {
+        t.equal(offline.error && offline.error.code, 'WORKSPACE_UNAVAILABLE', 'an unreachable compositor refuses current-mode start')
+        t.equal(offline.error && offline.error.message, 'The current workspace is unavailable.', 'current-mode refusal never describes dedicated allocation')
+        root.desktopAvailable = true
+        returnTests()
+      })
     })
   }
   // Return refuses a workspace a newer dedicated environment took; Recover relocates.
