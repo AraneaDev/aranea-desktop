@@ -492,7 +492,7 @@ Item {
   // Ask the backend once per session to save defaults for a project without profiles.
   function requestSeed(projectId) {
     var client = root.projectController
-    if (root.inert || !projectId || seedingProjectId || client.pending || client.reading)
+    if (root.inert || !projectId || seededProjects[projectId] || seedingProjectId || client.pending || client.reading)
       return
     var project = (client.state.projects || []).find(function (p) {
       return p.id === projectId

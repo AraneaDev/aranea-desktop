@@ -174,7 +174,7 @@ function fallbackNote(project, tools) {
   var chosen = primary(project, tools)
   if (!remembered_ || !chosen || usable(remembered_, tools) || chosen.id === remembered_.id)
     return ""
-  return remembered_.name + " isn't available \u2014 using " + chosen.name + "."
+  return remembered_.name + " isn't available, using " + chosen.name + "."
 }
 
 /**
