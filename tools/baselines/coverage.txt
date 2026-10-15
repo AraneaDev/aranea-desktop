@@ -22,6 +22,7 @@ plugins/araneadev.osd/OsdModel.js 100
 plugins/araneadev.polkit/PolkitLogic.js 100
 plugins/araneadev.power/PowerLogic.js 100
 plugins/araneadev.projects/ProjectActionRecords.js 100
+plugins/araneadev.projects/ProjectActionSuggestions.js 100
 plugins/araneadev.projects/AgentSuggestion.js 100
 plugins/araneadev.projects/ProjectOperations.js 100
 plugins/araneadev.projects/ProjectRecords.js 100
