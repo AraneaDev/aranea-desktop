@@ -201,4 +201,11 @@ expect '.sources[]|select(.source=="justfile")|.status=="unavailable" and .reaso
 printf '#!/usr/bin/env bash\necho nope\n' >"$fake_just"
 detect "$r" '[]' --just "$fake_just"
 expect '.sources[]|select(.source=="justfile")|.status=="invalid"' 'just dump unreadable'
+
+# A rule error on valid JSON of an unexpected shape marks only that source invalid.
+printf '{"scripts":{"test":"x"},"workspaces":{"packages":5}}\n' >"$r/package.json"
+printf '#!/usr/bin/env bash\necho '"'"'{"recipes":{"a":"x"}}'"'"'\n' >"$fake_just"
+detect "$r" '[]' --just "$fake_just"
+expect '.sources[]|select(.source=="justfile")|.status=="invalid"' 'just odd shape invalid'
+expect '[.suggestions[]|select(.source=="justfile")]==[] and ([.suggestions[]|select(.source=="package.json")|.entry]==["test"])' 'odd just keeps other sources'
 echo 'project-detect: ok'

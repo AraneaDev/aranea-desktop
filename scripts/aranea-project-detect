@@ -40,6 +40,19 @@ rule() {
   shift 2
   jq -c --arg op "$op" --argjson ctx "$ctx" -f "$filter" "$@"
 }
+# Run a suggestion-producing rule; a rule error (valid JSON of an unexpected shape)
+# marks the source invalid and appends nothing, so one bad source never aborts detection.
+# Usage: emit_rule SOURCE FILE_LABEL OP CTXJSON [jq args]
+emit_rule() {
+  local source=$1 label=$2
+  shift 2
+  if rule "$@" >"$scratch/emit" 2>/dev/null; then
+    cat "$scratch/emit" >>"$scratch/suggestions"
+  else
+    status "$source" invalid "$label could not be read."
+    return 1
+  fi
+}
 # Record one source status; assembly keeps the most severe one per source.
 status() {
   jq -cn --arg s "$1" --arg st "$2" --arg r "${3:-}" '{source:$s,status:$st,reason:(if $r=="" then null else $r end)}' >>"$scratch/sources"
@@ -127,7 +140,7 @@ workspace_dirs() {
 }
 # One package.json's scripts as suggestions.
 package_scripts() {
-  rule package-json "$(jq -cn --arg cwd "$1" --arg path "$2" --arg pm "$3" '{cwd:$cwd,path:$path,pm:$pm}')" "$4" >>"$scratch/suggestions"
+  emit_rule package.json "$2" package-json "$(jq -cn --arg cwd "$1" --arg path "$2" --arg pm "$3" '{cwd:$cwd,path:$path,pm:$pm}')" "$4"
 }
 # Valid package.json: an object whose scripts, if present, is an object.
 package_valid() { jq -e 'type=="object" and ((.scripts // {})|type=="object")' "$1" >/dev/null 2>&1; }
@@ -150,7 +163,7 @@ detect_package_json() {
     if [[ -f $root/$lock && ! -L $root/$lock ]]; then locks=$(jq -c --arg l "$lock" '.+[$l]' <<<"$locks"); fi
   done
   pm=$(rule package-manager "{\"locks\":$locks}" -r "$file")
-  package_scripts . package.json "$pm" "$file"
+  package_scripts . package.json "$pm" "$file" || return 0
   status package.json found
   mapfile -t dirs < <(workspace_patterns "$file" | workspace_dirs | LC_ALL=C sort)
   if ((${#dirs[@]} > 32)); then
@@ -163,7 +176,7 @@ detect_package_json() {
     pkg=$(source_file package.json "$dir/package.json") || code=$?
     ((code == 0)) || continue
     if package_valid "$pkg"; then
-      package_scripts "$dir" "$dir/package.json" "$pm" "$pkg"
+      package_scripts "$dir" "$dir/package.json" "$pm" "$pkg" || true
     else
       status package.json invalid "$dir/package.json could not be read."
     fi
@@ -220,7 +233,8 @@ detect_makefile() {
     ((code != 1)) || status makefile absent
     return 0
   fi
-  awk "$make_targets" "$found_file" | rule make "$(jq -cn --arg path "$found_name" '{path:$path}')" -R >>"$scratch/suggestions"
+  awk "$make_targets" "$found_file" >"$scratch/make.targets"
+  emit_rule makefile "$found_name" make "$(jq -cn --arg path "$found_name" '{path:$path}')" -R "$scratch/make.targets" || return 0
   status makefile found
 }
 
@@ -241,7 +255,7 @@ detect_justfile() {
     status justfile invalid "$found_name could not be read."
     return 0
   fi
-  rule just "$(jq -cn --arg path "$found_name" '{path:$path}')" "$scratch/just.json" >>"$scratch/suggestions"
+  emit_rule justfile "$found_name" just "$(jq -cn --arg path "$found_name" '{path:$path}')" "$scratch/just.json" || return 0
   status justfile found
 }
 
