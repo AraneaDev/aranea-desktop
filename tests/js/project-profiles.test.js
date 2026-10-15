@@ -111,17 +111,85 @@ test("human tool summaries name adapters and explain terminal dependencies", () 
   )
 })
 
-test("initial primary skips unusable saved profiles without inventing acceptance", () => {
-  const unavailable = { id: "missing", roles: ["editor"], tools: { editorId: "nvim" } }
-  const usable = { id: "available", roles: ["editor"], tools: { editorId: "code" } }
+test("primary falls back from an unusable remembered profile without persisting", () => {
+  const unavailable = {
+    id: "missing",
+    name: "Neovim",
+    roles: ["editor"],
+    tools: { editorId: "nvim" }
+  }
+  const usable = {
+    id: "available",
+    name: "VS Code",
+    roles: ["editor"],
+    tools: { editorId: "code" }
+  }
   const project = { lastProfileId: null, profiles: [unavailable, usable] }
   const before = JSON.stringify(project)
   assert.equal(profiles.primary(project, probes(["code"])).id, "available")
   assert.equal(JSON.stringify(project), before)
   assert.equal(profiles.remembered(project), null)
   assert.equal(profiles.primary(project, probes()), null)
+  assert.equal(profiles.primary(null, probes(["code"])), null)
   project.lastProfileId = "missing"
-  assert.equal(profiles.primary(project, probes(["code"])).id, "missing")
+  assert.equal(profiles.primary(project, probes(["code"])).id, "available")
+  assert.equal(
+    profiles.fallbackNote(project, probes(["code"])),
+    "Neovim isn't available — using VS Code."
+  )
+  project.lastProfileId = "available"
+  assert.equal(profiles.primary(project, probes(["code"])).id, "available")
+  assert.equal(profiles.fallbackNote(project, probes(["code"])), "")
   project.lastProfileId = "removed"
-  assert.equal(profiles.primary(project, probes(["code"])), null)
+  assert.equal(profiles.primary(project, probes(["code"])).id, "available")
+  assert.equal(profiles.fallbackNote(project, probes(["code"])), "")
+  assert.equal(profiles.fallbackNote(project, probes()), "")
+  assert.equal(JSON.stringify(project.profiles), JSON.stringify([unavailable, usable]))
+  assert.equal(profiles.primary({ lastProfileId: null }, probes(["code"])), null)
+})
+
+test("blocked reasons distinguish no tools, unusable profiles and seeding", () => {
+  const nvim = { id: "n", name: "Neovim", roles: ["editor"], tools: { editorId: "nvim" } }
+  assert.equal(profiles.blockedReason({ profiles: [] }, probes()), "")
+  assert.equal(profiles.blockedReason({}, probes()), "")
+  assert.equal(profiles.blockedReason(null, probes()), "")
+  assert.equal(
+    profiles.blockedReason({ profiles: [nvim] }, probes()),
+    "Install a supported editor or terminal (VS Code, Neovim, Kitty, Alacritty, Foot or Ghostty), then Refresh."
+  )
+  assert.match(
+    profiles.blockedReason({ profiles: [nvim] }, probes(["code"])),
+    /^None of this project's profiles can start: /
+  )
+  assert.equal(profiles.blockedReason({ profiles: [nvim] }, probes(["nvim"], ["kitty"])), "")
+  assert.equal(profiles.usable(nvim, probes(["code"])), false)
+  assert.equal(profiles.usable(nvim, probes(["nvim"], ["kitty"])), true)
+})
+
+test("JS presets match the backend preset rule", () => {
+  const { execFileSync } = require("node:child_process")
+  const fixtures = [
+    probes(["code", "nvim"], ["alacritty", "kitty"], ["claude"]),
+    probes([], ["foot"], []),
+    probes(["code"], [], ["codex"]),
+    probes()
+  ]
+  fixtures[0].defaults = { terminalId: "kitty" }
+  for (const tools of fixtures) {
+    const backend = JSON.parse(
+      execFileSync(
+        "jq",
+        [
+          "-cn",
+          "--argjson",
+          "tools",
+          JSON.stringify(tools),
+          "-f",
+          "scripts/lib/project-presets.jq"
+        ],
+        { encoding: "utf8" }
+      )
+    )
+    assert.deepEqual(plain(profiles.presets(tools)), backend)
+  }
 })

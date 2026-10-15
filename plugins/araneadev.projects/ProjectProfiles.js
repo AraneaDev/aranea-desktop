@@ -135,20 +135,61 @@ function remembered(project) {
 }
 
 /**
- * Select a usable first-use default locally, preserving every remembered identity.
+ * Whether a saved profile can start with the installed tools.
+ * @param {{[key:string]:*}} profile - saved profile
+ * @param {{[key:string]:*}} tools - installed observations
+ * @returns {boolean} usable
+ */
+function usable(profile, tools) {
+  return resolve(profile, tools).ok
+}
+
+/**
+ * The profile Start working uses: remembered when usable, else the first usable saved one.
  * @param {{[key:string]:*}} project - saved project
  * @param {{[key:string]:*}} tools - supported installed observations
- * @returns {?{[key:string]:*}} remembered profile or first usable saved profile
+ * @returns {?{[key:string]:*}} profile to start, or null
  */
 function primary(project, tools) {
-  if (!project || project.lastProfileId != null) return remembered(project)
+  if (!project) return null
+  var remembered_ = remembered(project)
+  if (remembered_ && usable(remembered_, tools)) return remembered_
   /** @type {Array<{[key:string]:*}>} */
   var saved = project.profiles || []
   return (
     saved.find(function (profile) {
-      return resolve(profile, tools).ok
+      return usable(profile, tools)
     }) || null
   )
+}
+
+/**
+ * Explain a fallback from an unusable remembered profile.
+ * @param {{[key:string]:*}} project - saved project
+ * @param {{[key:string]:*}} tools - installed observations
+ * @returns {string} note or empty
+ */
+function fallbackNote(project, tools) {
+  var remembered_ = remembered(project)
+  var chosen = primary(project, tools)
+  if (!remembered_ || !chosen || usable(remembered_, tools) || chosen.id === remembered_.id)
+    return ""
+  return remembered_.name + " isn't available \u2014 using " + chosen.name + "."
+}
+
+/**
+ * Why Start working cannot start anything, when profiles exist.
+ * @param {{[key:string]:*}} project - saved project
+ * @param {{[key:string]:*}} tools - installed observations
+ * @returns {string} reason or empty
+ */
+function blockedReason(project, tools) {
+  /** @type {Array<{[key:string]:*}>} */
+  var saved = (project && project.profiles) || []
+  if (!saved.length || primary(project, tools)) return ""
+  if (!presets(tools).length)
+    return "Install a supported editor or terminal (VS Code, Neovim, Kitty, Alacritty, Foot or Ghostty), then Refresh."
+  return "None of this project's profiles can start: " + resolve(saved[0], tools).error
 }
 
 /**
@@ -193,5 +234,8 @@ if (typeof module !== "undefined")
     presets: presets,
     remembered: remembered,
     primary: primary,
+    usable: usable,
+    fallbackNote: fallbackNote,
+    blockedReason: blockedReason,
     summary: summary
   }
