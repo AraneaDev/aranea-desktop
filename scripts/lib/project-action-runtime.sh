@@ -19,6 +19,7 @@ runtime_validate() {
     elif $op=="snapshot" then keys_only(["projectId"]) and ((has("projectId")|not) or (.projectId|id("p")))
     elif $op=="configure" then keys_only(["projectId","definition","expectedRevision"]) and (.projectId|id("p")) and (.definition|type)=="object"
     elif $op=="remove" then keys_only(["projectId","actionId","expectedRevision"]) and (.projectId|id("p")) and (.actionId|id("a"))
+    elif $op=="detect" then keys_only(["projectId","checkoutId"]) and (.projectId|id("p")) and ((has("checkoutId")|not) or (.checkoutId|id("c")))
     elif (["availability","activate","deactivate"]|index($op))!=null then .=={}
     else false end' "$scratch/request" >/dev/null 2>&1
 }
@@ -151,9 +152,41 @@ runtime_available() {
 
 # Publish dependency availability without pretending that a missing manager is idle.
 runtime_availability() {
-  local available=false
+  local available=false just_ok=false toml_ok=false python_tool
   runtime_available && available=true
-  jq -cn --argjson a "$available" --argjson j "$([[ -n $journal ]] && echo true || echo false)" --argjson c "$([[ -n $curl_tool ]] && echo true || echo false)" --argjson o "$([[ -n $opener ]] && echo true || echo false)" '{ok:true,state:null,error:null,availability:{execution:$a,userManager:$a,journal:$j,previewProbe:$c,opener:$o}}' >"$scratch/result"
+  [[ -z $(runtime_find just || true) ]] || just_ok=true
+  python_tool=$(runtime_find python3 || true)
+  if [[ -n $python_tool ]] && runtime_transport 2s "$python_tool" -I -c 'import tomllib' </dev/null >/dev/null 2>&1; then toml_ok=true; fi
+  jq -cn --argjson a "$available" --argjson j "$([[ -n $journal ]] && echo true || echo false)" --argjson c "$([[ -n $curl_tool ]] && echo true || echo false)" --argjson o "$([[ -n $opener ]] && echo true || echo false)" --argjson dj "$just_ok" --argjson dt "$toml_ok" '{ok:true,state:null,error:null,availability:{execution:$a,userManager:$a,journal:$j,previewProbe:$c,opener:$o,detectJust:$dj,detectToml:$dt}}' >"$scratch/result"
+}
+
+# Read-only detection: verify the exact registered checkout, then read its declarations
+# with trusted helpers. Dispatch authority is already released by the caller.
+runtime_detect() {
+  local id checkout metadata just_tool python_tool
+  local -a args
+  id=$(jq -r .projectId "$scratch/request")
+  "$script_dir/aranea-project-store" snapshot >"$scratch/projects-result" || runtime_error REGISTRY_INVALID 'The project registry could not be read.'
+  jq '.state' "$scratch/projects-result" >"$scratch/projects"
+  jq -e --arg p "$id" 'any(.projects[];.id==$p)' "$scratch/projects" >/dev/null || runtime_error PROJECT_NOT_FOUND 'The registered project was removed.'
+  jq --slurpfile p "$scratch/projects" '. as $q | .checkoutId //= ($p[0].projects[]|select(.id==$q.projectId)|.lastCheckoutId)' "$scratch/request" >"$scratch/selected"
+  mv "$scratch/selected" "$scratch/request"
+  checkout=$(jq -r .checkoutId "$scratch/request")
+  checkout_path=$(jq -r --arg p "$id" --arg c "$checkout" '.projects[]|select(.id==$p)|.checkouts[]|select(.id==$c)|.path' "$scratch/projects")
+  [[ -n $checkout_path ]] || runtime_error CHECKOUT_INVALID 'The exact selected checkout is no longer registered.'
+  # Same identity proof as Start: the path must still be this project's Git checkout.
+  metadata=$(project_git_metadata "$checkout_path" 2>/dev/null) || runtime_error CHECKOUT_INVALID 'The exact checkout is unavailable; locate it before detecting commands.'
+  [[ $(jq -r .path <<<"$metadata") == "$checkout_path" && $(jq -r .commonDir <<<"$metadata") == "$(jq -r --arg p "$id" '.projects[]|select(.id==$p)|.commonDir' "$scratch/projects")" ]] || runtime_error CHECKOUT_INVALID 'The exact checkout changed.'
+  runtime_path
+  just_tool=$(runtime_find just || true)
+  python_tool=$(runtime_find python3 || true)
+  args=(--root "$checkout_path")
+  [[ -z $just_tool ]] || args+=(--just "$just_tool")
+  [[ -z $python_tool ]] || args+=(--python "$python_tool")
+  jq --arg p "$id" '[.state.definitions[]|select(.projectId==$p)|{argv,cwdRelative}]' "$scratch/result" >"$scratch/saved"
+  runtime_transport 8s "$script_dir/aranea-project-detect" "${args[@]}" <"$scratch/saved" >"$scratch/detected" 2>/dev/null || runtime_error DETECTION_FAILED 'Commands could not be read from this checkout.'
+  jq --arg p "$id" --arg c "$checkout" '{ok:true,state:null,error:null,projectId:$p,checkoutId:$c} + {suggestions,sources}' "$scratch/detected" >"$scratch/next" || runtime_error DETECTION_FAILED 'Commands could not be read from this checkout.'
+  mv "$scratch/next" "$scratch/result"
 }
 
 # Guarded observations compare both the loaded global revision and invocation pin.
