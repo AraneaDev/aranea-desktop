@@ -24,10 +24,15 @@ ColumnLayout {
   property bool expanded: false
   // Unsaved suggestions according to live definitions.
   readonly property var rows: client ? Suggestions.pending(client.detection, definitions) : []
+  // Rows grouped by source for presentation.
   readonly property var grouped: Suggestions.groups(rows)
+  // How many rows Add all may save within the action limit.
   readonly property var plan: Suggestions.addPlan(rows, definitions.length)
+  // Rows are listed when nothing is saved yet or the user expanded them.
   readonly property bool open: definitions.length === 0 || expanded
+  // Sources that could not be checked.
   readonly property string note: client && client.detection ? Suggestions.sourceNote(client.detection.sources) : ''
+  // Saves are refused while any mutation or Add all is in progress.
   readonly property bool busy: !client || displayOnly || client.pending || client.addActive
   // Open the editor with this draft; saving there follows the usual rules.
   signal editRequested(var definition)

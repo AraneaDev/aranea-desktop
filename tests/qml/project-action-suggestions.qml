@@ -19,11 +19,13 @@ ShellRoot {
     project: ({
         id: 'p-00000000-0000-4000-8000-000000000001',
         lastCheckoutId: 'c-00000000-0000-4000-8000-000000000001',
-        checkouts: [{
+        checkouts: [
+          {
             id: 'c-00000000-0000-4000-8000-000000000001',
             path: '/repo',
             branch: 'main'
-          }]
+          }
+        ]
       })
   }
   // Suggestion fixture.
@@ -89,11 +91,13 @@ ShellRoot {
     t.check(calls.some(function (c) {
       return c.argv[1] === 'detect'
     }), 'visible Actions page detects')
-    detected([suggestion('.', 'test', 'command'), suggestion('.', 'dev', 'service'), suggestion('apps/web', 'build', 'command')], [{
+    detected([suggestion('.', 'test', 'command'), suggestion('.', 'dev', 'service'), suggestion('apps/web', 'build', 'command')], [
+      {
         source: 'cargo',
         status: 'unavailable',
         reason: 'Needs python3'
-      }])
+      }
+    ])
     t.step(30, function () {
       t.check(!!find(actions, 'suggestionAdd:package.json:.:test'), 'expanded with no saved actions')
       t.check(!find(actions, 'suggestionsToggle') || !find(actions, 'suggestionsToggle').visible, 'no disclosure without saved actions')
@@ -176,11 +180,13 @@ ShellRoot {
             t.check(find(actions, 'suggestionsRetry').visible, 'Retry offered')
             t.check(fallbackVisible(), 'fallback shown with the error')
             actions.client.detect(true)
-            detected([], [{
+            detected([], [
+              {
                 source: 'cargo',
                 status: 'unavailable',
                 reason: 'Needs python3'
-              }])
+              }
+            ])
             t.step(30, function () {
               var h = find(actions, 'suggestionsHeading')
               t.check(!h || !h.visible, 'no heading for a note-only result')
