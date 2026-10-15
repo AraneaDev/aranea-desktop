@@ -14,14 +14,12 @@ function roleKey(operation, role) {
 
 /**
  * Allocate from a fresh, known occupancy snapshot. Null means no safe decision.
- * Retained metadata reserves space even when its runtime evidence is unconfirmed.
+ * Saved records never reserve space; only windows and in-flight work do.
  * @param {?Array<EnvironmentData>} workspaces - fresh compositor workspace rows
- * @param {Array<EnvironmentData>} legacyAssociations - all legacy reservations
- * @param {Array<EnvironmentData>} environments - all retained environment records
- * @param {Array<EnvironmentData>} reservations - queued owner reservations
+ * @param {Array<EnvironmentData>} reservations - in-flight leases and operations
  * @returns {?number} lowest empty positive workspace, or unknown occupancy
  */
-function chooseEmptyWorkspace(workspaces, legacyAssociations, environments, reservations) {
+function chooseEmptyWorkspace(workspaces, reservations) {
   if (!Array.isArray(workspaces)) return null
   /** @type {{[key:string]:boolean}} */
   var used = {}
@@ -32,15 +30,59 @@ function chooseEmptyWorkspace(workspaces, legacyAssociations, environments, rese
     if (!Number.isInteger(count) || count < 0) return null
     if (row.id > 0 && count > 0) used[String(row.id)] = true
   }
-  ;(legacyAssociations || [])
-    .concat(environments || [], reservations || [])
-    .forEach(function (row) {
-      if (Number.isInteger(row.workspaceId) && row.workspaceId > 0)
-        used[String(row.workspaceId)] = true
-    })
+  ;(reservations || []).forEach(function (row) {
+    if (Number.isInteger(row.workspaceId) && row.workspaceId > 0)
+      used[String(row.workspaceId)] = true
+  })
   var id = 1
   while (used[String(id)]) id++
   return id
+}
+
+/**
+ * The newest placement on a workspace owns it. Environments are placed when
+ * created or relocated; dedicated associations when allocated. Current-mode
+ * records share a workspace and never claim one; associations saved before
+ * placement stamps existed count as the oldest.
+ * @param {Array<EnvironmentData>} projects - registry projects
+ * @param {number} workspaceId - workspace in question
+ * @param {number} since - the caller's own placement time
+ * @param {(row: EnvironmentData, project: EnvironmentData) => boolean} isSelf - identifies the caller's record
+ * @returns {boolean} whether another record was placed there later
+ */
+function newerClaim(projects, workspaceId, since, isSelf) {
+  return (projects || []).some(function (project) {
+    var environments = /** @type {Array<EnvironmentData>} */ (project.environments || []).filter(
+      function (row) {
+        return (
+          row.mode !== "current" &&
+          row.workspaceId === workspaceId &&
+          placedAt(row) > since &&
+          !isSelf(row, project)
+        )
+      }
+    )
+    var associations = /** @type {Array<EnvironmentData>} */ (project.associations || []).filter(
+      function (row) {
+        return (
+          row.mode === "dedicated" &&
+          row.workspaceId === workspaceId &&
+          (row.placedAt || 0) > since &&
+          !isSelf(row, project)
+        )
+      }
+    )
+    return environments.length > 0 || associations.length > 0
+  })
+}
+
+/**
+ * When an environment record took its workspace.
+ * @param {EnvironmentData} row - environment record
+ * @returns {number} placement time, falling back to creation
+ */
+function placedAt(row) {
+  return Number.isInteger(row.placedAt) ? row.placedAt : row.createdAt || 0
 }
 
 /**
@@ -103,4 +145,4 @@ function projectRows(environments, bindings, sessionId) {
 }
 
 if (typeof module !== "undefined")
-  module.exports = { roleKey, chooseEmptyWorkspace, coalesced, projectRows }
+  module.exports = { roleKey, chooseEmptyWorkspace, newerClaim, placedAt, coalesced, projectRows }
