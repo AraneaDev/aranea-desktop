@@ -39,7 +39,11 @@ function pending(detection, definitions) {
     return JSON.stringify([d.argv, d.cwdRelative])
   })
   return rows.filter(function (row) {
-    return !!row && !!row.definition && saved.indexOf(JSON.stringify([row.definition.argv, row.definition.cwdRelative])) < 0
+    return (
+      !!row &&
+      !!row.definition &&
+      saved.indexOf(JSON.stringify([row.definition.argv, row.definition.cwdRelative])) < 0
+    )
   })
 }
 
@@ -64,9 +68,17 @@ function groups(rows) {
         path: path,
         title: path === "." ? "Repository root" : path,
         rows: byPath[path]
-          .sort(function (/** @type {{row:SuggestionData,index:number}} */ a, /** @type {{row:SuggestionData,index:number}} */ b) {
-            return SOURCE_ORDER.indexOf(a.row.source) - SOURCE_ORDER.indexOf(b.row.source) || a.index - b.index
-          })
+          .sort(
+            function (
+              /** @type {{row:SuggestionData,index:number}} */ a,
+              /** @type {{row:SuggestionData,index:number}} */ b
+            ) {
+              return (
+                SOURCE_ORDER.indexOf(a.row.source) - SOURCE_ORDER.indexOf(b.row.source) ||
+                a.index - b.index
+              )
+            }
+          )
           .map(function (/** @type {{row:SuggestionData,index:number}} */ item) {
             return item.row
           })
@@ -147,7 +159,10 @@ function sourceNote(sources) {
     })
     .map(function (s) {
       var reason = String(s.reason || "")
-      return sourceName(s.source) + (reason ? " (" + reason.charAt(0).toLowerCase() + reason.slice(1) + ")" : "")
+      return (
+        sourceName(s.source) +
+        (reason ? " (" + reason.charAt(0).toLowerCase() + reason.slice(1) + ")" : "")
+      )
     })
   if (missing.length) parts.push("Not checked: " + missing.join(", "))
   list.forEach(function (s) {
@@ -155,3 +170,15 @@ function sourceNote(sources) {
   })
   return parts.join(" · ")
 }
+
+if (typeof module !== "undefined")
+  module.exports = {
+    sourceName,
+    pending,
+    groups,
+    overviewPicks,
+    addPlan,
+    sourceLine,
+    previewLine,
+    sourceNote
+  }
