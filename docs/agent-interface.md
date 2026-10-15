@@ -306,8 +306,9 @@ aranea projects activation ACTIVATION_ID
 ```
 
 Profile list returns `data.profiles` and `lastProfileId`. Save/remove return the
-acknowledged `data.state`. Configuration works without a desktop owner. Registration saves default profiles (VS Code, Terminal + Agent, Neovim,
-Terminal — each only when its tools are installed). `profiles seed` saves them
+acknowledged `data.state`. Configuration works without a desktop owner.
+Registration saves default profiles (VS Code, Terminal + Agent, Neovim and
+Terminal, each only when its tools are installed). `profiles seed` saves them
 for a project that has none; it never changes a project that already has
 profiles. Its result reports `seeded` and, when 0, `reason`
 (`HAS_PROFILES` or `NO_SUPPORTED_TOOLS`). Saving a profile never launches

@@ -35,7 +35,9 @@ Closing the window retains drafts and does not cancel accepted operations.
    **Start working** to use the remembered profile on the selected checkout.
 
 Agent reporting and saved actions are optional. First-use profiles offer installed
-tools without requiring agent setup. Every registration — Projects, the CLI or a folder scan — saves default profiles
+tools without requiring agent setup.
+
+Every registration (Projects, the CLI or a folder scan) saves default profiles
 from the editors, terminals and agents installed on this computer, so **Start
 working** is ready at once. Projects registered earlier without profiles get
 them the first time you open them. If no supported editor or terminal is
