@@ -113,9 +113,9 @@ ShellRoot {
       })
     })
   })
-  // Direct registration has no setup intent; its first profile is explicitly saved.
+  // Direct registration has no setup intent but seeds detected presets; one more is saved explicitly.
   function saveManual() {
-    t.equal(entry.selectedProject.profiles.length, 0, 'direct registration starts without automatic presets')
+    t.check(entry.selectedProject.profiles.length > 0, 'direct registration seeds detected presets')
     entry.projectController.request('profile-save', {
       projectId: entry.projectId,
       profile: {
@@ -129,7 +129,8 @@ ShellRoot {
       }
     })
     settled(function () {
-      primary('Manual Terminal', entry.selectedProject.lastCheckoutId)
+      // The first saved profile (a seeded preset) stays the initial default.
+      primary(entry.selectedProject.profiles[0].name, entry.selectedProject.lastCheckoutId)
       var original = entry.projectController.state, tools = entry.projectController.tools
       var state = JSON.parse(JSON.stringify(original))
       var selected = state.projects.find(function (p) {

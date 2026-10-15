@@ -139,6 +139,24 @@ projects_registry_relocation_valid() {
   done < <(jq -c --argjson request "$request" '.projects[] | select(.id == $request.args.projectId) | .checkouts[] | select(.id != $request.args.checkoutId) | .path' <<<"$state")
 }
 
+# Default profile drafts from the read-only tool probe; empty on any probe failure.
+projects_registry_presets() {
+  local probe
+  # shellcheck disable=SC2154 # script_dir is the scripts/ directory set by every sourcing caller
+  probe=$(timeout -k 0.2s 5s "$script_dir/aranea-project-tools" --json </dev/null 2>/dev/null) || probe=''
+  jq -e 'type=="object"' <<<"$probe" >/dev/null 2>&1 || probe='{}'
+  jq -cn --argjson tools "$probe" -f "$script_dir/lib/project-presets.jq" 2>/dev/null || printf '[]\n'
+}
+
+# Give each draft its own fresh opaque profile ID.
+projects_registry_preset_ids() {
+  local drafts=$1 out='[]' draft
+  while IFS= read -r draft; do
+    out=$(jq -c --argjson d "$draft" --arg id "$(projects_registry_id f)" '. + [$d + {id:$id}]' <<<"$out")
+  done < <(jq -c '.[]' <<<"$drafts")
+  printf '%s\n' "$out"
+}
+
 # Enrich a validated raw request with canonical metadata under the store lock.
 # Return 1 for invalid checkout, 2 for unsafe path, 3 for incompatible grouping.
 projects_registry_prepare_request() {
@@ -151,6 +169,9 @@ projects_registry_prepare_request() {
       else
         jq -c --arg id "$(projects_registry_id e)" '.args.environment.id=$id' <<<"$request"
       fi
+      ;;
+    profiles-seed)
+      jq -c --argjson profiles "$(projects_registry_preset_ids "$(projects_registry_presets)")" '.args.profiles=$profiles' <<<"$request"
       ;;
     profile-save)
       if jq -e '.args.profile|has("id")' <<<"$request" >/dev/null; then
@@ -189,7 +210,12 @@ projects_registry_prepare_request() {
         metadata=$(projects_registry_checkout "$path") || return $?
         checkouts=$(jq -cn --argjson current "$checkouts" --argjson metadata "$metadata" '$current + [$metadata] | unique_by(.path) | sort_by(.primary | not)') || return 1
       done < <(jq -c '.args.paths[]' <<<"$request")
-      jq -c --argjson checkouts "$checkouts" '.args.checkouts=$checkouts' <<<"$request"
+      local drafts presets='{}' new_id
+      drafts=$(projects_registry_presets)
+      while IFS= read -r new_id; do
+        presets=$(jq -c --arg p "$new_id" --argjson ids "$(projects_registry_preset_ids "$drafts")" '. + {($p):$ids}' <<<"$presets")
+      done < <(jq -r --argjson state "$state" '.[] | .projectId as $p | .commonDir as $c | select(($state.projects // []) | any(.[]; .commonDir == $c) | not) | $p' <<<"$checkouts" | sort -u)
+      jq -c --argjson checkouts "$checkouts" --argjson presets "$presets" '.args.checkouts=$checkouts | .args.presets=$presets' <<<"$request"
       ;;
     *) printf '%s\n' "$request" ;;
   esac

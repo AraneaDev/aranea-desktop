@@ -89,6 +89,7 @@ def request_valid:
     elif $action == "profile-remove" then
       fields(["projectId","profileId","expectedProfileRevision"];[]) and (.projectId|opaque("p")) and (.profileId|opaque("f"))
       and (.expectedProfileRevision|integer and . > 0)
+    elif $action == "profiles-seed" then fields(["projectId"];[]) and (.projectId|opaque("p"))
     elif $action == "environment-register" then
       fields(["projectId","environment"];[]) and (.projectId|opaque("p")) and (.environment | if has("id") then environment else . + {id:"e-00000000-0000-4000-8000-000000000000"} | environment end) and .environment.projectId == .projectId
     elif $action == "environment-associate" then
@@ -123,7 +124,7 @@ def mutate($r):
         .projects |= map(if .commonDir == $checkout.commonDir and (any(.checkouts[];.path == $checkout.path)|not)
           then .checkouts += [($checkout|{id,path,branch,primary})] else . end)
       else .projects += [{id:$checkout.projectId,name:$checkout.name,commonDir:$checkout.commonDir,lastCheckoutId:$checkout.id,
-        workspaceMode:"dedicated",tools:{editorId:null,terminalId:null},checkouts:[($checkout|{id,path,branch,primary})],associations:[],profiles:[],lastProfileId:null,environments:[]}] end
+        workspaceMode:"dedicated",tools:{editorId:null,terminalId:null},checkouts:[($checkout|{id,path,branch,primary})],associations:[],profiles:((($a.presets // {})[$checkout.projectId] // [])|map(. + {revision:1})),lastProfileId:null,environments:[]}] end
       | .ignored |= map(select(.path != $checkout.path)))
   elif $r.action == "profile-save" then require_project($a.projectId)
     | if any(.projects[]|select(.id != $a.projectId)|.profiles[];.id == $a.profile.id) then error("PROFILE_CONFLICT") else . end
@@ -142,6 +143,9 @@ def mutate($r):
           | if .lastProfileId == $a.profileId then .lastProfileId = (.profiles[0].id // null) else . end end
       else . end)
   # Branch records fresh launch context; exact ID/path/primary still guard checkout identity.
+  elif $r.action == "profiles-seed" then require_project($a.projectId)
+    | .projects |= map(if .id == $a.projectId and (.profiles|length) == 0
+        then .profiles = [$a.profiles[] | . + {revision:1}] else . end)
   elif $r.action == "environment-register" then require_checkout($a.projectId;$a.environment.checkoutId)
     | if any(.projects[].environments[];.id == $a.environment.id or (.sessionId == $a.environment.sessionId and .activationId == $a.environment.activationId)) then error("ENVIRONMENT_CONFLICT") else . end
     | .projects |= map(if .id == $a.projectId then

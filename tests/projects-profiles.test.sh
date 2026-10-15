@@ -12,12 +12,21 @@ repo="$ARANEA_TEST_SANDBOX/repo"
 git init -q -b main "$repo"
 # Submit the public mutation format to the actual store.
 mutate() { jq -cn --arg action "$1" --argjson args "$2" --argjson revision "$(if [[ -f "$registry" ]]; then jq .revision "$registry"; else printf 0; fi)" '{action:$action,args:$args} + (if $action == "environment-associate" then {expectedRevision:$revision} else {} end)' | "$store" mutate >"$result"; }
-# Fresh registration must not silently guess a usable profile.
-setup() {
+# Register with the sandbox's stub tools; registration seeds detected presets.
+register_seeded() {
   rm -rf "$ARANEA_STATE_ROOT"
   mutate register "$(jq -cn --arg path "$repo" '{paths:[$path]}')"
   project_id=$(jq -r '.state.projects[0].id' "$result")
   checkout_id=$(jq -r '.state.projects[0].checkouts[0].id' "$result")
+}
+# Profile contracts start from a project with no profiles: drop the seeded presets.
+setup() {
+  local profile
+  register_seeded
+  while IFS= read -r profile; do
+    mutate profile-remove "$(jq -cn --arg p "$project_id" --argjson f "$profile" '{projectId:$p,profileId:$f.id,expectedProfileRevision:$f.revision}')"
+  done < <(jq -c '.state.projects[0].profiles[]|{id,revision}' "$result")
+  jq -e '.state.projects[0].profiles == []' "$result" >/dev/null
 }
 # Build a real legacy registry, retaining every legacy field and navigation.
 legacy() {
@@ -79,10 +88,10 @@ CAT
   jq -e '.error.code == "REGISTRY_INVALID"' "$result" >/dev/null
   cmp "$registry" "$TMPDIR/original"
 }
-# New registration permits no profiles until explicit presets are saved.
-new_projects_have_no_presets() {
-  setup
-  jq -e '.state.schemaVersion == 2 and (.state.projects[0] | .profiles == [] and .lastProfileId == null and .environments == [])' "$result" >/dev/null
+# New registration seeds detected presets without remembering any as last used.
+new_projects_seed_detected_presets() {
+  register_seeded
+  jq -e '.state.schemaVersion == 2 and (.state.projects[0] | (.profiles|length) > 0 and all(.profiles[];.revision == 1) and .lastProfileId == null and .environments == [])' "$result" >/dev/null
 }
 # Git refresh accepts old/new registry schemas while never initializing/migrating.
 git_reads_both_schemas_without_writes() {
@@ -265,7 +274,7 @@ environment_identity_conflicts() {
   cmp "$registry" "$TMPDIR/duplicate"
 }
 failures=0
-cases=(environment_identity_conflicts migration_is_atomic_once migration_failure_preserves_bytes new_projects_have_no_presets git_reads_both_schemas_without_writes profiles_revisions_and_legacy_isolation invalid_profiles_preserve_bytes environment_snapshots_and_last_used invalid_environments_preserve_bytes invalid_saved_profiles_and_environments)
+cases=(environment_identity_conflicts migration_is_atomic_once migration_failure_preserves_bytes new_projects_seed_detected_presets git_reads_both_schemas_without_writes profiles_revisions_and_legacy_isolation invalid_profiles_preserve_bytes environment_snapshots_and_last_used invalid_environments_preserve_bytes invalid_saved_profiles_and_environments)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

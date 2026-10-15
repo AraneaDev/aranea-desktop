@@ -80,8 +80,8 @@ export CLI_PROJECT="$project"
 run_cli 0 capabilities
 jq -se 'last.data.operations | any(.name=="projects.activation" and .readOnly==true) and any(.name=="projects.start" and .arguments.profile.required)' "$events" >/dev/null
 run_cli 0 projects register --path "$checkout"
-# Schema-2 persistence retains the same public registration/inspection payloads.
-jq -se 'last.data.state.schemaVersion == 2 and last.data.state.projects[0].profiles == []' "$events" >/dev/null
+# Schema-2 persistence retains the same public payloads; registration seeds detected stub-tool presets.
+jq -se 'last.data.state.schemaVersion == 2 and (last.data.state.projects[0].profiles|length) > 0 and last.data.state.projects[0].lastProfileId == null' "$events" >/dev/null
 run_cli 1 projects register --path "$ARANEA_TEST_SANDBOX/vanished-candidate"
 run_cli 0 projects list
 jq -se 'last.data.projects|length==1' "$events" >/dev/null
