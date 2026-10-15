@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# shellcheck disable=SC2034 # just_bin and python_bin are consumed by later sources.
+# shellcheck disable=SC2034 # python_bin is consumed by a later source.
 # Read-only command discovery for one exact checkout; never executes repository code.
 # Usage: aranea-project-detect --root CHECKOUT [--just PATH] [--python PATH] <saved.json
 # stdin: [{argv,cwdRelative}] saved definitions (for alreadySaved); stdout: {suggestions,sources}.
@@ -170,5 +170,83 @@ detect_package_json() {
   done
 }
 
+# Explicit rule targets, .PHONY first; never evaluates make syntax.
+# File-like targets (with . or /) appear only when declared .PHONY.
+# shellcheck disable=SC2016
+make_targets='
+/^define([ \t]|$)/ { indef = 1; next }
+indef { if ($0 ~ /^endef/) indef = 0; next }
+/^\t/ { next }
+/^[ \t]*#/ { next }
+/^\.PHONY[ \t]*:/ {
+  line = $0
+  sub(/^\.PHONY[ \t]*:/, "", line)
+  sub(/#.*/, "", line)
+  n = split(line, names, /[ \t]+/)
+  for (i = 1; i <= n; i++) if (names[i] != "") phony[names[i]] = 1
+  next
+}
+/^[ \t]*(-?include|sinclude|override|export|unexport|vpath|ifeq|ifneq|ifdef|ifndef|else|endif)([ \t]|$)/ { next }
+/^[A-Za-z0-9_.\/ \t-]*(:::=|::=|:=|\?=|\+=|!=|=)/ { next }
+/^[A-Za-z0-9][A-Za-z0-9_.\/-]*([ \t]+[A-Za-z0-9][A-Za-z0-9_.\/-]*)*[ \t]*::?([^=]|$)/ {
+  line = $0
+  sub(/[ \t]*::?([^=].*)?$/, "", line)
+  n = split(line, names, /[ \t]+/)
+  for (i = 1; i <= n; i++) if (names[i] != "" && !(names[i] in seen)) { seen[names[i]] = 1; order[++count] = names[i] }
+}
+END {
+  for (i = 1; i <= count; i++) if (order[i] in phony) print order[i]
+  for (i = 1; i <= count; i++) if (!(order[i] in phony) && order[i] !~ /[.\/]/) print order[i]
+}
+'
+# First present name of a source's candidates: sets found_name/found_file; returns 0/1/2/3 like checkout_file.
+first_file() {
+  local source=$1 name code=1
+  shift
+  for name in "$@"; do
+    code=0
+    found_file=$(source_file "$source" "$name") || code=$?
+    found_name=$name
+    ((code == 1)) || break
+  done
+  return "$code"
+}
+
+detect_makefile() {
+  local code=0
+  in_time makefile || return 0
+  first_file makefile GNUmakefile makefile Makefile || code=$?
+  if ((code)); then
+    ((code != 1)) || status makefile absent
+    return 0
+  fi
+  awk "$make_targets" "$found_file" | rule make "$(jq -cn --arg path "$found_name" '{path:$path}')" -R >>"$scratch/suggestions"
+  status makefile found
+}
+
+detect_justfile() {
+  local code=0
+  in_time justfile || return 0
+  first_file justfile justfile Justfile .justfile || code=$?
+  if ((code)); then
+    ((code != 1)) || status justfile absent
+    return 0
+  fi
+  if [[ -z $just_bin ]]; then
+    status justfile unavailable 'Needs just'
+    return 0
+  fi
+  if ! helper "$just_bin" --justfile "$found_file" --working-directory "$root" --dump --dump-format json >"$scratch/just.json" 2>/dev/null ||
+    ! jq -e 'type=="object"' "$scratch/just.json" >/dev/null 2>&1; then
+    status justfile invalid "$found_name could not be read."
+    return 0
+  fi
+  rule just "$(jq -cn --arg path "$found_name" '{path:$path}')" "$scratch/just.json" >>"$scratch/suggestions"
+  status justfile found
+}
+
+found_file='' found_name=''
 detect_package_json
+detect_makefile
+detect_justfile
 rule assemble "$(jq -cn --argjson saved "$saved" --slurpfile sources "$scratch/sources" '{saved:$saved,sources:$sources}')" -s "$scratch/suggestions"

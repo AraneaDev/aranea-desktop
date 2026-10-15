@@ -143,4 +143,62 @@ r=$(repo saved)
 printf '{"scripts":{"test":"x","build":"y"}}\n' >"$r/package.json"
 detect "$r" '[{"argv":["npm","run","test"],"cwdRelative":"."},{"argv":["npm","run","build"],"cwdRelative":"sub"}]'
 expect "($(s 'package.json:.:test')|.alreadySaved) and ($(s 'package.json:.:build')|.alreadySaved|not)" 'alreadySaved'
+# Make edge cases: phony first, assignments, patterns, specials, define blocks, file targets.
+r=$(repo make)
+cat >"$r/Makefile" <<'MAKE'
+CC := gcc
+X ::= y
+Y ?= z
+build: main.o
+	$(CC) -o app main.o
+main.o: main.c
+%.o: %.c
+.SUFFIXES:
+define RECIPE
+fake: target
+endef
+dev serve: build
+lint: CFLAGS=-Wall
+-include extra.mk
+.PHONY: test lint build.release
+test:
+build.release:
+MAKE
+detect "$r"
+expect '[.suggestions[]|select(.source=="makefile")|.entry]==["lint","test","build.release","build","dev","serve"]' 'make edge cases'
+expect "$(s 'makefile:.:dev')|.definition.kind==\"service\" and .definition.argv==[\"make\",\"dev\"] and .sourcePath==\"Makefile\"" 'make service'
+expect '.sources[]|select(.source=="makefile")|.status=="found"' 'make found'
+r=$(repo gnumake)
+printf 'a:\n' >"$r/GNUmakefile"
+printf 'b:\n' >"$r/Makefile"
+detect "$r"
+expect '[.suggestions[]|select(.source=="makefile")|.entry]==["a"]' 'GNUmakefile wins'
+
+# justfile through a fake just: public recipes without required parameters.
+r=$(repo just)
+printf 'test:\n\techo hi\n' >"$r/justfile"
+fake_just="$ARANEA_TEST_SANDBOX/bin/just"
+mkdir -p "$(dirname "$fake_just")"
+cat >"$fake_just" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${ARANEA_TEST_SANDBOX:?}/just-args"
+cat <<'JSON'
+{"recipes":{"test":{"name":"test","private":false,"attributes":[],"parameters":[]},
+"_hidden":{"name":"_hidden","private":false,"attributes":[],"parameters":[]},
+"secret":{"name":"secret","private":false,"attributes":["private"],"parameters":[]},
+"deploy":{"name":"deploy","private":false,"attributes":[],"parameters":[{"name":"env","default":null,"kind":"singular"}]},
+"fmt":{"name":"fmt","private":false,"attributes":[],"parameters":[{"name":"args","default":null,"kind":"star"}]},
+"serve":{"name":"serve","private":false,"attributes":[],"parameters":[{"name":"port","default":"8000","kind":"singular"}]}}}
+JSON
+SH
+chmod +x "$fake_just"
+detect "$r" '[]' --just "$fake_just"
+expect '[.suggestions[]|select(.source=="justfile")|.entry]==["test","fmt","serve"]' 'just recipes'
+expect "$(s 'justfile:.:serve')|.definition.kind==\"service\" and .definition.argv==[\"just\",\"serve\"]" 'just service'
+grep -q -- '--dump --dump-format json' "$ARANEA_TEST_SANDBOX/just-args"
+detect "$r"
+expect '.sources[]|select(.source=="justfile")|.status=="unavailable" and .reason=="Needs just"' 'just missing'
+printf '#!/usr/bin/env bash\necho nope\n' >"$fake_just"
+detect "$r" '[]' --just "$fake_just"
+expect '.sources[]|select(.source=="justfile")|.status=="invalid"' 'just dump unreadable'
 echo 'project-detect: ok'

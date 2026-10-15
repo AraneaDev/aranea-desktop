@@ -50,6 +50,15 @@ def package_json:
   | select((($k|test("\\A(pre|post).")) and ($s|has($k|sub("\\A(pre|post)";""))))|not)
   | suggestion("package.json"; $ctx.path; $ctx.cwd; $k; (if $k|service_script then "service" else "command" end); [$ctx.pm,"run",$k]; .value);
 
+# One target name per input line, already filtered by the shell's awk reader.
+def make: select(usable_name) | suggestion("makefile"; $ctx.path; "."; .; (if service_target then "service" else "command" end); ["make", .]; "");
+# `just --dump --dump-format json`: public recipes whose parameters all have defaults or are variadic-star.
+def just:
+  (.recipes // {}) | to_entries[] | .key as $k | .value as $r
+  | select(($k|usable_name) and ($k|startswith("_")|not) and ($r.private != true) and ((($r.attributes // [])|index("private"))==null))
+  | select(($r.parameters // []) | all(.default != null or .kind == "star"))
+  | suggestion("justfile"; $ctx.path; "."; $k; (if $k|service_target then "service" else "command" end); ["just", $k]; "");
+
 # Deduplicate, cap at 100, mark saved and keep the most severe status per source.
 def severity: {"invalid":4,"truncated":3,"unavailable":2,"found":1,"absent":0}[.status] // 0;
 def assemble:
@@ -62,5 +71,7 @@ def assemble:
 if $op=="package-manager" then package_manager
 elif $op=="workspaces" then workspaces
 elif $op=="package-json" then package_json
+elif $op=="make" then make
+elif $op=="just" then just
 elif $op=="assemble" then assemble
 else error("unknown op") end
