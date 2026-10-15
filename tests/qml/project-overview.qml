@@ -66,6 +66,9 @@ ShellRoot {
     var actions = t.findChild(surface, 'projectActions')
     t.check(actions.client === root.actionClient, 'summary and full view share persistent action client')
     root.actionClient.runner = function (argv, input, done) {
+      // Detection is observation on opening Actions; this suite counts explicit action calls only.
+      if (argv[argv.length - 1] === 'detect')
+        return
       host.calls.push({
         method: argv[argv.length - 1],
         payload: JSON.parse(input || '{}'),

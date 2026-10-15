@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
 import "ProjectOverview.js" as Overview
+import "ProjectActionSuggestions.js" as Suggestions
 
 ColumnLayout {
   id: view
@@ -55,6 +56,10 @@ ColumnLayout {
   readonly property var inspectedEnvironment: (model.workspaces || []).find(function (row) {
     return row.target.environmentId === view.inspectedEnvironmentId
   }) || null
+  // Up to three detected commands, offered only while the project has no saved actions.
+  property var suggestions: []
+  // Save one detected command by its stable key; never runs it.
+  signal suggestionAddRequested(string key)
   // Exact saved action revision or retained run request.
   signal actionRequested(string method, var target)
   // Fixed activity method and exact task identity.
@@ -118,7 +123,7 @@ ColumnLayout {
       objectName: 'overviewCommands'
       title: 'Services and checks'
       detailsLabel: 'Manage actions'
-      emptyHint: 'Save a test, build or dev server to run from here.'
+      emptyHint: view.suggestions.length ? '' : 'Save a test, build or dev server to run from here.'
       rows: view.model.services.concat(view.model.checks).sort(function (a, b) {
         return Number(b.active) - Number(a.active) || Number(b.attention) - Number(a.attention)
       })
@@ -131,6 +136,43 @@ ColumnLayout {
       }
       onDetailsRequested: function (target) {
         view.detailsRequested('actions', target)
+      }
+    }
+    ColumnLayout {
+      Layout.fillWidth: true
+      visible: view.suggestions.length > 0
+      spacing: Style.space(6)
+      Aranea.UiLabel {
+        Layout.fillWidth: true
+        text: 'Found in this repo'
+        opacity: 0.8
+      }
+      Repeater {
+        model: view.suggestions
+        RowLayout {
+          id: pick
+          required property var modelData
+          Layout.fillWidth: true
+          Aranea.UiLabel {
+            Layout.fillWidth: true
+            text: pick.modelData.definition.name + ' · ' + Suggestions.sourceLine(pick.modelData)
+            elide: Text.ElideRight
+          }
+          Aranea.ActionButton {
+            objectName: 'overviewSuggestionAdd:' + pick.modelData.key
+            text: 'Add'
+            enabled: !view.displayOnly && !view.actionPending
+            pointerGate: view.pointerGate
+            onClicked: view.suggestionAddRequested(pick.modelData.key)
+          }
+        }
+      }
+      Aranea.ActionButton {
+        objectName: 'overviewSuggestionsAll'
+        text: 'See all in Actions'
+        variant: 'quiet'
+        pointerGate: view.pointerGate
+        onClicked: view.detailsRequested('actions', {})
       }
     }
   }

@@ -11,6 +11,8 @@ import "../araneadev.shared" as Aranea
 import "AgentSuggestion.js" as Suggestion
 import "ProjectsNavigation.js" as Navigation
 import "ProjectOverview.js" as Overview
+import "ProjectActionRecords.js" as Records
+import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
 
 Item {
@@ -96,6 +98,31 @@ Item {
   readonly property bool activityVisible: (section === 'agents' || section === 'overview') && !projectsPage.setupActive && !!projectsPage.selectedProject
   // Exact-checkout summaries reuse shared snapshots; never own process lifetimes.
   readonly property var overviewModel: Overview.overview(projectsPage.selectedProject, root.gitClient.checkoutId, root.gitClient.current, root.actionClient.snapshot, root.activityClient.snapshot, root.projectClient.snapshot, Math.max(nowMs, Date.now()))
+  // Saved definitions of the selected project, live from the shared client.
+  readonly property var selectedDefinitions: projectsPage.selectedProject ? Records.definitions(root.actionClient.snapshot, projectsPage.selectedProject.id) : []
+  // Overview wants detected commands only while the project has no saved actions.
+  readonly property bool overviewWantsSuggestions: section === 'overview' && !!projectsPage.selectedProject && !projectsPage.setupActive && !root.inert && selectedDefinitions.length === 0
+  // Up to three unsaved detected commands for the empty Overview.
+  readonly property var overviewSuggestions: overviewWantsSuggestions ? Suggestions.overviewPicks(Suggestions.pending(root.actionClient.detection, selectedDefinitions)) : []
+  onOverviewWantsSuggestionsChanged: if (overviewWantsSuggestions)
+    root.actionClient.detect(false)
+  Connections {
+    target: panel.root.actionClient
+    function onCheckoutIdChanged() {
+      if (panel.overviewWantsSuggestions)
+        panel.root.actionClient.detect(false)
+    }
+  }
+  // Save one detected command the Overview still shows; Run stays separate.
+  function addOverviewSuggestion(key) {
+    if (root.inert)
+      return
+    var row = overviewSuggestions.find(function (r) {
+      return r.key === key
+    })
+    if (row)
+      root.actionClient.addSuggestions([row.definition])
+  }
   Binding {
     target: projectsPage.details
     property: 'actionClient'
@@ -109,6 +136,8 @@ Item {
     root.actionClient.refresh()
     root.actionClient.checkAvailability()
     root.actionClient.observeSummary()
+    if (overviewWantsSuggestions)
+      root.actionClient.detect(true)
     root.activityClient.refresh()
   }
   // Revalidate authoritative identity when a compact control is activated.
@@ -933,6 +962,10 @@ Item {
                   actionError: panel.root.actionClient.submissionUncertain ? 'Submission unconfirmed. Refresh actions in Details to recover the receipt.' : panel.root.actionClient.error ? panel.root.actionClient.error.message + ' Manage actions to recover.' : panel.root.actionClient.summaryError ? panel.root.actionClient.summaryError.message : panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Execution unavailable. Manage actions to check required helpers.' : ''
                   activityError: panel.root.activityClient.error ? 'Agent connection unavailable. Open Details to reconnect.' : ''
                   pointerGate: pointerGate
+                  suggestions: panel.overviewSuggestions
+                  onSuggestionAddRequested: function (key) {
+                    panel.addOverviewSuggestion(key)
+                  }
                   onRefreshRequested: panel.refreshOverview()
                   onActionRequested: function (method, target) {
                     panel.overviewAction(method, target)
