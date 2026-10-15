@@ -70,6 +70,8 @@ ShellRoot {
     t.equal(client.detection.suggestions.length, 1, 'cached for the selection')
     t.check(!client.detect(false), 'cache hit does not resubmit')
     t.check(client.detect(true), 'force refreshes')
+    t.check(!client.detect(false), 'same key already in flight is not read twice')
+    t.equal(calls.length, 2, 'in-flight skip spawned nothing')
     reply(1, {
       ok: false,
       state: null,

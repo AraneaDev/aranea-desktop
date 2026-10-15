@@ -34,8 +34,9 @@ ColumnLayout {
   spacing: Style.space(8)
   visible: !!client && (rows.length > 0 || client.detecting || !!(client.detection && client.detection.error) || note !== '')
   Aranea.UiLabel {
+    objectName: 'suggestionsHeading'
     Layout.fillWidth: true
-    visible: section.definitions.length === 0
+    visible: section.definitions.length === 0 && section.rows.length > 0
     text: 'Found in this repo'
     font.bold: true
   }

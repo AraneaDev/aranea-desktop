@@ -63,6 +63,8 @@ Item {
   readonly property var detection: detections[projectId + '|' + checkoutId] || null
   // A detection read is in flight for some selection.
   property bool detecting: false
+  // The project|checkout key of the detection read in flight; empty when idle.
+  property string detectingKey: ''
   // Detection reads supersede only other detection reads.
   property int detectionGeneration: 0
   // Remaining inert drafts of one Add all; each waits for the previous acknowledgement.
@@ -173,6 +175,7 @@ Item {
     availabilityGeneration++
     detectionGeneration++
     detecting = false
+    detectingKey = ''
     if (addActive)
       finishAdd(null)
     poll.stop()
@@ -342,7 +345,7 @@ Item {
       return false
     var key = projectId + '|' + checkoutId
     var cached = detections[key]
-    if (!force && cached && !cached.error)
+    if (!force && (detecting && detectingKey === key || cached && !cached.error))
       return false
     var read = ++detectionGeneration
     var target = {
@@ -350,10 +353,12 @@ Item {
       checkoutId: checkoutId
     }
     detecting = true
+    detectingKey = key
     invoke('detect', target, function () {
       return read === client.detectionGeneration
     }, function (response, failure) {
       client.detecting = false
+      client.detectingKey = ''
       var next = Object.assign({}, client.detections)
       next[key] = response && response.ok && response.checkoutId === target.checkoutId ? {
         projectId: target.projectId,

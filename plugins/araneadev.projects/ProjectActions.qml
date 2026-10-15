@@ -403,6 +403,7 @@ ColumnLayout {
     }
   }
   Aranea.UiLabel {
+    objectName: 'actionsEmptyFallback'
     Layout.fillWidth: true
     visible: !actions.definitions.length && !actions.client.detecting && Suggestions.pending(actions.client.detection, actions.definitions).length === 0
     text: 'No actions yet. Add action to define a test, build, or dev server. Examples are available in the editor.'

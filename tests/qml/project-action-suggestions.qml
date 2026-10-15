@@ -50,6 +50,11 @@ ShellRoot {
   function find(item, name) {
     return t.findChild(item, name)
   }
+  // The empty-state fallback label under the page.
+  function fallbackVisible() {
+    var label = find(actions, 'actionsEmptyFallback')
+    return !!label && label.visible
+  }
   // Answer the held detection call.
   function detected(rows, sources) {
     var call = calls.filter(function (c) {
@@ -142,7 +147,54 @@ ShellRoot {
           t.equal(calls.length, 1, 'sequential saves')
           t.equal(calls[0].input.definition.name, 'dev', 'root first')
           t.check(find(actions, 'suggestionsNote').text.indexOf('Cargo (needs python3)') >= 0, 'unavailable source note')
-          t.done()
+          // Phase two: no saved actions; failures and notes only.
+          actions.client.disconnect()
+          actions.client.detections = ({})
+          actions.client.snapshot = {
+            revision: 9,
+            definitions: [],
+            runs: [],
+            requests: []
+          }
+          calls = []
+          actions.detectSuggestions(false)
+          actions.detectSuggestions(false)
+          t.equal(calls.length, 1, 'a second unforced detect while in flight is skipped')
+          actions.detectSuggestions(true)
+          t.equal(calls.length, 2, 'forced detect while in flight reads again')
+          calls[1].done(1, JSON.stringify({
+            ok: false,
+            state: null,
+            error: {
+              code: 'DETECTION_FAILED',
+              message: 'no'
+            }
+          }), '')
+          t.step(30, function () {
+            var heading = find(actions, 'suggestionsHeading')
+            t.check(!heading || !heading.visible, 'no heading for a failed detection')
+            t.check(find(actions, 'suggestionsRetry').visible, 'Retry offered')
+            t.check(fallbackVisible(), 'fallback shown with the error')
+            actions.client.detect(true)
+            detected([], [{
+                source: 'cargo',
+                status: 'unavailable',
+                reason: 'Needs python3'
+              }])
+            t.step(30, function () {
+              var h = find(actions, 'suggestionsHeading')
+              t.check(!h || !h.visible, 'no heading for a note-only result')
+              t.check(find(actions, 'suggestionsNote').visible, 'note shown')
+              t.check(fallbackVisible(), 'fallback shown with the note')
+              actions.client.detect(true)
+              detected([suggestion('.', 'test', 'command')], [])
+              t.step(30, function () {
+                t.check(find(actions, 'suggestionsHeading').visible, 'heading with rows')
+                t.check(!fallbackVisible(), 'fallback hidden with rows')
+                t.done()
+              })
+            })
+          })
         })
       })
     })
