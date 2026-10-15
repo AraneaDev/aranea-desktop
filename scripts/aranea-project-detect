@@ -1,0 +1,174 @@
+#!/usr/bin/bash
+# shellcheck disable=SC2034 # just_bin and python_bin are consumed by later sources.
+# Read-only command discovery for one exact checkout; never executes repository code.
+# Usage: aranea-project-detect --root CHECKOUT [--just PATH] [--python PATH] <saved.json
+# stdin: [{argv,cwdRelative}] saved definitions (for alreadySaved); stdout: {suggestions,sources}.
+set -euo pipefail
+export PATH=/usr/local/bin:/usr/bin
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+filter="$script_dir/lib/project-detect.jq"
+root='' just_bin='' python_bin=''
+usage() {
+  printf 'Usage: aranea-project-detect --root CHECKOUT [--just PATH] [--python PATH]\n' >&2
+  exit 2
+}
+while (($#)); do
+  [[ $# -ge 2 && -n $2 ]] || usage
+  case $1 in
+    --root) root=$2 ;;
+    --just) just_bin=$2 ;;
+    --python) python_bin=$2 ;;
+    *) usage ;;
+  esac
+  shift 2
+done
+[[ -n $root ]] || usage
+root=$(realpath -e -- "$root" 2>/dev/null) && [[ -d $root ]] || usage
+umask 077
+scratch=$(mktemp -d)
+trap 'rm -rf -- "$scratch"' EXIT
+: >"$scratch/suggestions"
+: >"$scratch/sources"
+saved=$(head -c 1048576 | jq -c 'if type=="array" then map({argv,cwdRelative}) else [] end' 2>/dev/null || true)
+[[ -n $saved ]] || saved='[]'
+deadline=$((SECONDS + 5))
+max_bytes=1048576
+
+# Apply one pure rule; every rule reads its arguments from $ctx.
+rule() {
+  local op=$1 ctx=$2
+  shift 2
+  jq -c --arg op "$op" --argjson ctx "$ctx" -f "$filter" "$@"
+}
+# Record one source status; assembly keeps the most severe one per source.
+status() {
+  jq -cn --arg s "$1" --arg st "$2" --arg r "${3:-}" '{source:$s,status:$st,reason:(if $r=="" then null else $r end)}' >>"$scratch/sources"
+}
+# Later sources report the deadline instead of starting.
+in_time() {
+  ((SECONDS < deadline)) && return 0
+  status "$1" truncated 'Detection time limit reached.'
+  return 1
+}
+# Bounded helper process; its stdin is never the caller's.
+helper() { timeout -k 0.2s 2s "$@" </dev/null; }
+# Resolve a checkout-relative regular file: 0 found (path on stdout), 1 absent,
+# 2 larger than the read cap, 3 a link or not a regular file.
+checkout_file() {
+  local path=$root/$1 resolved
+  [[ -e $path || -L $path ]] || return 1
+  resolved=$(realpath -e -- "$path" 2>/dev/null) || return 3
+  [[ $resolved == "$path" && -f $resolved ]] || return 3
+  (($(stat -c %s -- "$resolved") <= max_bytes)) || return 2
+  printf '%s\n' "$resolved"
+}
+# checkout_file plus status for files that exist but cannot be used.
+source_file() {
+  local code=0 found
+  found=$(checkout_file "$2") || code=$?
+  case $code in
+    0) printf '%s\n' "$found" ;;
+    2) status "$1" truncated "$2 is larger than 1 MiB." ;;
+    3) status "$1" invalid "$2 is a link or not a regular file." ;;
+  esac
+  return "$code"
+}
+# Workspace folders: relative, no empty/dot/parent segments, no glob or control characters.
+relative_dir() {
+  local segment
+  local -a parts
+  [[ -n $1 && $1 != /* && ${#1} -le 512 ]] || return 1
+  [[ ! $1 =~ [][*?{}] && ! $1 =~ [[:cntrl:]] ]] || return 1
+  IFS=/ read -r -a parts <<<"$1"
+  for segment in "${parts[@]}"; do
+    [[ -n $segment && $segment != . && $segment != .. ]] || return 1
+  done
+}
+# pnpm-workspace.yaml `packages:` list items, without a YAML parser.
+# shellcheck disable=SC2016
+pnpm_packages='
+/^packages:[ \t]*$/ { inlist = 1; next }
+inlist && /^[ \t]*-[ \t]*/ {
+  value = $0
+  sub(/^[ \t]*-[ \t]*/, "", value)
+  sub(/[ \t]+#.*$/, "", value)
+  gsub(/^["\047]|["\047][ \t]*$/, "", value)
+  print value
+  next
+}
+inlist && /^[^ \t#]/ { inlist = 0 }
+'
+# Root declarations of workspace patterns (package.json and pnpm-workspace.yaml).
+workspace_patterns() {
+  local yaml code=0
+  rule workspaces '{}' -r "$1"
+  yaml=$(checkout_file pnpm-workspace.yaml) || code=$?
+  ((code)) || awk "$pnpm_packages" "$yaml"
+}
+# Expand literal folders and single-level dir/* patterns into unique package folders.
+workspace_dirs() {
+  local pattern base child
+  while IFS= read -r pattern; do
+    [[ -n $pattern && $pattern != '!'* ]] || continue
+    pattern=${pattern%/}
+    if [[ $pattern == */\* ]]; then base=${pattern%/\*}; else base=$pattern; fi
+    relative_dir "$base" || continue
+    if [[ $pattern == "$base" ]]; then
+      printf '%s\n' "$base"
+      continue
+    fi
+    [[ -d $root/$base && ! -L $root/$base ]] || continue
+    for child in "$root/$base"/*/; do
+      child=${child%/}
+      [[ -d $child && ! -L $child ]] || continue
+      printf '%s\n' "${child#"$root/"}"
+    done
+  done | awk '!seen[$0]++'
+}
+# One package.json's scripts as suggestions.
+package_scripts() {
+  rule package-json "$(jq -cn --arg cwd "$1" --arg path "$2" --arg pm "$3" '{cwd:$cwd,path:$path,pm:$pm}')" "$4" >>"$scratch/suggestions"
+}
+# Valid package.json: an object whose scripts, if present, is an object.
+package_valid() { jq -e 'type=="object" and ((.scripts // {})|type=="object")' "$1" >/dev/null 2>&1; }
+
+detect_package_json() {
+  local file pkg code=0 locks pm dir lock
+  local -a dirs
+  in_time package.json || return 0
+  file=$(source_file package.json package.json) || code=$?
+  if ((code)); then
+    ((code != 1)) || status package.json absent
+    return 0
+  fi
+  if ! package_valid "$file"; then
+    status package.json invalid 'package.json could not be read.'
+    return 0
+  fi
+  locks='[]'
+  for lock in pnpm-lock.yaml yarn.lock bun.lock bun.lockb; do
+    if [[ -f $root/$lock && ! -L $root/$lock ]]; then locks=$(jq -c --arg l "$lock" '.+[$l]' <<<"$locks"); fi
+  done
+  pm=$(rule package-manager "{\"locks\":$locks}" -r "$file")
+  package_scripts . package.json "$pm" "$file"
+  status package.json found
+  mapfile -t dirs < <(workspace_patterns "$file" | workspace_dirs | LC_ALL=C sort)
+  if ((${#dirs[@]} > 32)); then
+    status package.json truncated 'More than 32 workspace packages; showing the first 32.'
+    dirs=("${dirs[@]:0:32}")
+  fi
+  for dir in "${dirs[@]}"; do
+    in_time package.json || return 0
+    code=0
+    pkg=$(source_file package.json "$dir/package.json") || code=$?
+    ((code == 0)) || continue
+    if package_valid "$pkg"; then
+      package_scripts "$dir" "$dir/package.json" "$pm" "$pkg"
+    else
+      status package.json invalid "$dir/package.json could not be read."
+    fi
+  done
+}
+
+detect_package_json
+rule assemble "$(jq -cn --argjson saved "$saved" --slurpfile sources "$scratch/sources" '{saved:$saved,sources:$sources}')" -s "$scratch/suggestions"
