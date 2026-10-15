@@ -29,8 +29,10 @@ scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 : >"$scratch/suggestions"
 : >"$scratch/sources"
-saved=$(head -c 1048576 | jq -c 'if type=="array" then map({argv,cwdRelative}) else [] end' 2>/dev/null || true)
-[[ -n $saved ]] || saved='[]'
+# Saved definitions go to a file, never an argument: large argv lists exceed the
+# per-argument limit, and anything but exactly one JSON array counts as none saved.
+head -c 1048576 | jq -cs 'if length==1 and (.[0]|type)=="array" then .[0]|map(objects|{argv,cwdRelative}) else [] end' >"$scratch/saved" 2>/dev/null || true
+[[ -s $scratch/saved ]] || printf '[]\n' >"$scratch/saved"
 deadline=$((SECONDS + 5))
 max_bytes=1048576
 
@@ -134,7 +136,9 @@ workspace_dirs() {
     for child in "$root/$base"/*/; do
       child=${child%/}
       [[ -d $child && ! -L $child ]] || continue
-      printf '%s\n' "${child#"$root/"}"
+      child=${child#"$root/"}
+      relative_dir "$child" || continue
+      printf '%s\n' "$child"
     done
   done | awk '!seen[$0]++'
 }
@@ -334,4 +338,4 @@ detect_makefile
 detect_justfile
 detect_cargo
 detect_python
-rule assemble "$(jq -cn --argjson saved "$saved" --slurpfile sources "$scratch/sources" '{saved:$saved,sources:$sources}')" -s "$scratch/suggestions"
+rule assemble "$(jq -cn --slurpfile sources "$scratch/sources" '{sources:$sources}')" --slurpfile saved "$scratch/saved" -s "$scratch/suggestions"

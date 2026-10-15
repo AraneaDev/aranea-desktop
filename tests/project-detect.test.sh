@@ -123,6 +123,25 @@ detect "$r"
 expect "$(s 'package.json:.:dev')|.definition.argv==[\"npm\",\"run\",\"dev\"] and .definition.previewUrl==\"http://127.0.0.1:3001/\"" 'hostile script literal'
 expect '[.suggestions[].entry]|map(select(test("bad")))==[]' 'control characters skipped'
 
+# Entry names starting with "-" would reach the runner as options; they are skipped.
+r=$(repo dashname)
+jq -n '{scripts:{"--prefix=/tmp":"x","-x":"y","ok":"z"}}' >"$r/package.json"
+jq -n '{scripts:{"--evil":"x","fine":"y"}}' >"$r/composer.json"
+printf '[project]\nname = "x"\n[project.scripts]\n"--with=evil" = "x:y"\ngood = "x:z"\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$(command -v python3)"
+expect '[.suggestions[].entry]|sort==["fine","good","ok"]' 'dash-leading names skipped'
+expect '[.suggestions[].definition.argv[]|select(startswith("-"))]==[]' 'no option-like argv'
+
+# Workspace child folders are validated like declared ones: a newline-named
+# folder must not inject an undeclared package folder.
+r=$(repo wsnewline)
+mkdir -p "$r/apps/a"$'\n'"secret" "$r/secret" "$r/apps/web"
+printf '{"workspaces":["apps/*"],"scripts":{}}\n' >"$r/package.json"
+printf '{"scripts":{"evil":"x"}}\n' >"$r/secret/package.json"
+printf '{"scripts":{"build":"x"}}\n' >"$r/apps/web/package.json"
+detect "$r"
+expect '([.suggestions[].key]|map(select(test("secret|evil")))==[]) and ([.suggestions[].key]|index("package.json:apps/web:build")!=null)' 'newline workspace child rejected'
+
 # Malformed, oversized and symlinked package.json.
 r=$(repo malformed)
 printf '{"scripts":' >"$r/package.json"
@@ -143,6 +162,14 @@ r=$(repo saved)
 printf '{"scripts":{"test":"x","build":"y"}}\n' >"$r/package.json"
 detect "$r" '[{"argv":["npm","run","test"],"cwdRelative":"."},{"argv":["npm","run","build"],"cwdRelative":"sub"}]'
 expect "($(s 'package.json:.:test')|.alreadySaved) and ($(s 'package.json:.:build')|.alreadySaved|not)" 'alreadySaved'
+# Large saved definitions (beyond the argument length limit) still mark alreadySaved,
+# and multi-document stdin falls back to nothing saved instead of failing.
+big=$(head -c 16000 /dev/zero | tr '\0' 'a')
+jq -cn --arg b "$big" '[range(50)|{argv:["x",$b,"\(.)"],cwdRelative:"."}]+[{argv:["npm","run","test"],cwdRelative:"."}]' >"$TMPDIR/saved-big"
+"$detector" --root "$r" <"$TMPDIR/saved-big" >"$TMPDIR/out"
+expect "($(s 'package.json:.:test')|.alreadySaved) and ($(s 'package.json:.:build')|.alreadySaved|not)" 'large saved definitions'
+printf '[{"argv":["npm","run","test"],"cwdRelative":"."}]\n[]\n' | "$detector" --root "$r" >"$TMPDIR/out"
+expect "($(s 'package.json:.:test')|.alreadySaved|not) and (.suggestions|length)==2" 'multi-document saved ignored'
 # Make edge cases: phony first, assignments, patterns, specials, define blocks, file targets.
 r=$(repo make)
 cat >"$r/Makefile" <<'MAKE'

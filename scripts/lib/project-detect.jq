@@ -1,7 +1,8 @@
 # Pure detection rules. The shell owns every file read and helper process;
 # values from repository files only ever leave here as JSON strings.
 def plain: type=="string" and (test("[\\x00-\\x1f\\x7f]")|not);
-def usable_name: plain and length>=1 and length<=100;
+# Entry names: printable, bounded, and never option-like (a leading "-" would reach the runner as a flag).
+def usable_name: plain and length>=1 and length<=100 and (startswith("-")|not);
 def service_script: test("\\A(dev|start|serve|preview|watch)([:-].*)?\\z");
 def service_target: (["dev","serve","run","watch","start"]|index(.))!=null;
 # Words of a command after leading VAR=value assignments.
@@ -92,11 +93,12 @@ def composer:
    else empty end);
 
 # Deduplicate, cap at 100, mark saved and keep the most severe status per source.
+# Saved definitions arrive as --slurpfile saved (too large for an argument).
 def severity: {"invalid":4,"truncated":3,"unavailable":2,"found":1,"absent":0}[.status] // 0;
 def assemble:
   (reduce .[] as $s ({seen:{},out:[]}; if .seen[$s.key] then . else .seen[$s.key]=true | .out+=[$s] end) | .out) as $all
   | ($all[100:]|map(.source)|unique) as $dropped
-  | {suggestions:($all[:100]|map(. as $s | .alreadySaved=any($ctx.saved[]; .argv==$s.definition.argv and .cwdRelative==$s.definition.cwdRelative))),
+  | {suggestions:($all[:100]|map(. as $s | .alreadySaved=any($ARGS.named.saved[0][]; .argv==$s.definition.argv and .cwdRelative==$s.definition.cwdRelative))),
      sources:(($ctx.sources + ($dropped|map({source:.,status:"truncated",reason:"More than 100 commands found; showing the first 100."})))
        | group_by(.source) | map(max_by(severity)))};
 
