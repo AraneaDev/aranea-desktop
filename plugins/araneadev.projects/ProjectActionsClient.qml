@@ -57,6 +57,22 @@ Item {
   property int summaryCursor: 0
   // Background failures never overwrite an explicit action's error or receipt.
   property var summaryError: null
+  // Read-only detection per exact project|checkout; never saved automatically.
+  property var detections: ({})
+  // Detection for the current selection, or null before the first read.
+  readonly property var detection: detections[projectId + '|' + checkoutId] || null
+  // A detection read is in flight for some selection.
+  property bool detecting: false
+  // Detection reads supersede only other detection reads.
+  property int detectionGeneration: 0
+  // Remaining inert drafts of one Add all; each waits for the previous acknowledgement.
+  property var addQueue: []
+  // Size of the current or last Add all.
+  property int addTotal: 0
+  // Saves acknowledged so far by the current or last Add all.
+  property int addCount: 0
+  // {added,total,error} once an Add all finishes; error is the first refusal or null.
+  property var addResult: null
   onSummaryObservationActiveChanged: summaryGeneration++
   // Two-second presentation poll, active only for visible protected runs.
   property int pollInterval: 2000
@@ -170,6 +186,8 @@ Item {
     output = ''
     truncated = false
     poll.stop()
+    if (addQueue.length)
+      finishAdd(null)
   }
   // Require both project and checkout equality for attached presentation evidence.
   function matchesSelection(run: var): bool {
@@ -193,7 +211,7 @@ Item {
   }
   // Fixed private command argv and JSON stdin; errors can still carry accepted runs.
   function invoke(method: string, payload: var, fresh: var, done: var): void {
-    if (captureActive || ['snapshot', 'configure', 'remove', 'start', 'inspect', 'refresh', 'stop', 'restart', 'logs', 'open-preview', 'availability'].indexOf(method) < 0)
+    if (captureActive || ['snapshot', 'configure', 'remove', 'start', 'inspect', 'refresh', 'stop', 'restart', 'logs', 'open-preview', 'availability', 'detect'].indexOf(method) < 0)
       return
     var complete = function (code, text, diagnostics) {
       if (client.captureActive || !fresh())
@@ -307,6 +325,87 @@ Item {
     if (expectedRevision !== undefined && expectedRevision !== null)
       payload.expectedRevision = expectedRevision
     return mutation('remove', payload)
+  }
+  // Read the selected checkout's declared commands; cached until forced or failed.
+  function detect(force: bool): bool {
+    if (captureActive || !projectId || !checkoutId)
+      return false
+    var key = projectId + '|' + checkoutId
+    var cached = detections[key]
+    if (!force && cached && !cached.error)
+      return false
+    var read = ++detectionGeneration
+    var target = {
+      projectId: projectId,
+      checkoutId: checkoutId
+    }
+    detecting = true
+    invoke('detect', target, function () {
+      return read === client.detectionGeneration
+    }, function (response, failure) {
+      client.detecting = false
+      var next = Object.assign({}, client.detections)
+      next[key] = response && response.ok && response.checkoutId === target.checkoutId ? {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId,
+        suggestions: Array.isArray(response.suggestions) ? response.suggestions : [],
+        sources: Array.isArray(response.sources) ? response.sources : [],
+        error: null
+      } : {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId,
+        suggestions: [],
+        sources: [],
+        error: failure || (response && response.error) || client.transportError('')
+      }
+      client.detections = next
+    })
+    return true
+  }
+  // Save drafts one at a time through configure; never start a run.
+  function addSuggestions(definitions: var): bool {
+    if (captureActive || pending || submissionUncertain || addQueue.length || !Array.isArray(definitions) || !definitions.length)
+      return false
+    addResult = null
+    addTotal = definitions.length
+    addCount = 0
+    addQueue = definitions.slice(1)
+    if (!configure(definitions[0], undefined)) {
+      finishAdd(error)
+      return false
+    }
+    return true
+  }
+  // Advance or stop the queue after one acknowledged save.
+  function advanceAdd(response: var): void {
+    if (!addTotal || addResult)
+      return
+    if (!response || !response.ok) {
+      finishAdd(response ? response.error : transportError(''))
+      return
+    }
+    addCount++
+    if (!addQueue.length) {
+      finishAdd(null)
+      return
+    }
+    var next = addQueue[0]
+    addQueue = addQueue.slice(1)
+    if (!configure(next, undefined))
+      finishAdd(error)
+  }
+  // Publish the Add all outcome; remaining drafts are dropped, never retried.
+  function finishAdd(failure: var): void {
+    addQueue = []
+    addResult = {
+      added: addCount,
+      total: addTotal,
+      error: failure || null
+    }
+  }
+  onRequestFinished: function (response) {
+    if (addTotal && !addResult)
+      advanceAdd(response)
   }
   // Submit one inert definition mutation; never call Start implicitly.
   function mutation(method: string, payload: var): bool {
