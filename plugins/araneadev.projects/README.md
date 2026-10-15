@@ -32,7 +32,10 @@ Visible Overview refreshes protected action runs in bounded rotation without
 changing the selected output or accepted receipt. Details exposes older runs,
 configuration, and recovery. Saved workspace locations without current owner
 bindings remain unconfirmed. **Start working** shows the remembered profile and starts
-its tools on the selected checkout in an empty workspace. **Choose another profile**
+its tools on the selected checkout: on the current workspace when the project uses
+current workspace mode, otherwise on the lowest workspace without windows. Saved
+environments and workspace locations whose windows are gone no longer reserve their
+workspaces. **Choose another profile**
 is searchable and starts immediately. Only matching confirmed acceptance dismisses
 Projects; later operation outcomes cannot close a reopened window. **Return** focuses
 an exact existing environment and dismisses only after observed focus. Existing windows
@@ -126,8 +129,8 @@ a proven existing agent; Start explicitly creates another session. The last
 provider is recorded immediately before an attempted launch, even if that launch
 fails; focus and reobserve do not change it.
 
-Dedicated workspaces are the default. Use `--use-current-workspace` explicitly
-to choose the current workspace. Related worktrees are grouped; `--separate`
+Dedicated workspaces are the default; Start working follows the same project
+setting. Use `--use-current-workspace` explicitly to choose the current workspace. Related worktrees are grouped; `--separate`
 opens a checkout with a separate association. Open focuses bindings supported
 by fresh ownership evidence or launches the missing roles. Application class,
 window title or workspace membership alone does not establish ownership.

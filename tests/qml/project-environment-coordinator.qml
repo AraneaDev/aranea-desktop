@@ -347,12 +347,12 @@ ShellRoot {
             complete(second, function () {
               t.check(second.environmentId !== first.environmentId, 'later activation creates another environment')
               t.equal(launched[1].role, 'terminal', 'second profile uses its own role')
-              t.equal(launched[1].workspaceId, 4, 'occupation after focus reallocates before dispatch')
-              t.equal(owner.operation(second.operationId).steps[0].workspaceId, 4, 'workspace observation follows final pre-dispatch reassociation')
+              t.equal(launched[1].workspaceId, 3, 'occupation after focus reallocates before dispatch')
+              t.equal(owner.operation(second.operationId).steps[0].workspaceId, 3, 'workspace observation follows final pre-dispatch reassociation')
               var moved = writes.filter(function (row) {
                 return row.action === 'environment-associate'
               })[0]
-              t.equal(moved.args.previousWorkspaceId, 3, 'reassociation guards old reservation')
+              t.equal(moved.args.previousWorkspaceId, 2, 'reassociation guards old reservation')
               t.check(Number.isInteger(moved.expectedRevision), 'reassociation guards global revision')
               recoveryTests()
             })
@@ -482,7 +482,7 @@ ShellRoot {
       })
     })
   }
-  // Another association can claim an empty leased location before the queued start drains.
+  // A saved association without windows cannot take a leased workspace from a queued start.
   function reservationRace() {
     ready(payload(41), function () {
       var result = owner.startEnvironment(payload(41))
@@ -497,7 +497,7 @@ ShellRoot {
       next.revision++
       root.state = next
       complete(result, function () {
-        t.check(owner.operation(result.operationId).workspaceId !== reserved, 'new environment excludes an empty workspace claimed by another association after preparation')
+        t.equal(owner.operation(result.operationId).workspaceId, reserved, 'a saved association without windows does not displace a leased start')
         leaseLifecycle()
       })
     })

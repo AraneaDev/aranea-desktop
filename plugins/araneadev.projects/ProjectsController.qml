@@ -588,7 +588,7 @@ Item {
     Qt.callLater(drain)
     return op
   }
-  // Persisted environment metadata reserves space across owner restarts.
+  // Persisted environment metadata for Return, Recover and claim checks.
   function environmentRecords(): var {
     var rows = []
     registry.projects.forEach(function (project) {
@@ -596,13 +596,9 @@ Item {
     })
     return rows
   }
-  // Queue reservations join saved legacy/environment records in one allocator.
+  // Only in-flight work reserves a workspace; saved records yield once their windows are gone.
   function workspaceReservations(): var {
-    var rows = environmentRecords()
-    registry.projects.forEach(function (project) {
-      rows = rows.concat(project.associations || [])
-    })
-    return rows.concat(environments.reservations()).concat(operations.filter(function (op) {
+    return environments.reservations().concat(operations.filter(function (op) {
       return op.sessionId === sessionId && op.state !== 'completed' && op.workspaceId > 0
     }))
   }
@@ -610,7 +606,7 @@ Item {
   function chooseEnvironmentWorkspace(data: var): var {
     if (!data || !data.available)
       return null
-    return Environments.chooseEmptyWorkspace(data.workspaces, [], [], workspaceReservations())
+    return Environments.chooseEmptyWorkspace(data.workspaces, workspaceReservations())
   }
   // Keep the latest 100 completions without ever evicting accepted/pending work.
   function retainCompleted(): void {
@@ -820,9 +816,32 @@ Item {
         failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
         return
       }
+      // A saved dedicated association yields to any record placed on its workspace later.
+      var own = project.associations.filter(function (row) {
+        return row.workspaceId === association.workspaceId && row.checkoutId === association.checkoutId
+      })[0]
+      if (own && association.mode === 'dedicated' && Environments.newerClaim(registry.projects, association.workspaceId, own.placedAt || 0, function (row, owner) {
+        return owner.id === project.id && !row.id && row.checkoutId === own.checkoutId && row.separate === own.separate
+      }))
+        association = Object.assign({}, association, {
+          workspaceId: Operations.allocateWorkspace(data.workspaces, associations.concat([
+            {
+              workspaceId: association.workspaceId
+            }
+          ]))
+        })
       var existing = project.associations.some(function (row) {
         return row.workspaceId === association.workspaceId && row.checkoutId === association.checkoutId
       })
+      // New placements are stamped; a reused association keeps its original stamp.
+      if (!existing)
+        association = Object.assign({}, association, {
+          placedAt: Date.now()
+        })
+      else if (own && Number.isInteger(own.placedAt))
+        association = Object.assign({}, association, {
+          placedAt: own.placedAt
+        })
       if (existing && data.workspaces.some(function (row) {
         return row.id === association.workspaceId && (Array.isArray(row.windows) ? row.windows.length > 0 : row.windows > 0)
       })) {
@@ -873,7 +892,8 @@ Item {
               }
               var reservations = workspaceReservations()
               var next = Object.assign({}, association, {
-                workspaceId: Operations.allocateWorkspace(data.workspaces, reservations)
+                workspaceId: Operations.allocateWorkspace(data.workspaces, reservations),
+                placedAt: Date.now()
               })
               persistAndFocus(id, project, checkout, selected, available, proof, next, true, attempts + 1)
               return

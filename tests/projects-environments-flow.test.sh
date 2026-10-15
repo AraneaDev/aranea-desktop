@@ -71,7 +71,8 @@ if ! grep -q 'QMLTEST DONE 0' "$work/log" || grep -Eq 'QMLTEST FAIL|TypeError|Re
 fi
 sed -n 's/.*FLOW_SNAPSHOT //p' "$work/log" >"$ARANEA_TEST_SANDBOX/owner.json"
 "$repo_root/scripts/aranea-project-store" snapshot >"$ARANEA_TEST_SANDBOX/store.json"
-jq -e '.state.projects[0] | (.environments|length==2) and (.environments[0].id != .environments[1].id) and (.environments[0].workspaceId != .environments[1].workspaceId) and (.associations|length==0) and .checkouts[0].branch=="main" and .environments[0].checkoutSnapshot.branch=="feature" and .environments[1].checkoutSnapshot.branch=="after-launch"' "$ARANEA_TEST_SANDBOX/store.json" >/dev/null
+# Fake launches never open windows, so the first environment's workspace stays free.
+jq -e '.state.projects[0] | (.environments|length==2) and (.environments[0].id != .environments[1].id) and (.environments|map(.workspaceId)) == [2,2] and (.associations|length==0) and .checkouts[0].branch=="main" and .environments[0].checkoutSnapshot.branch=="feature" and .environments[1].checkoutSnapshot.branch=="after-launch"' "$ARANEA_TEST_SANDBOX/store.json" >/dev/null
 jq -en --slurpfile store "$ARANEA_TEST_SANDBOX/store.json" --slurpfile owner "$ARANEA_TEST_SANDBOX/owner.json" '$store[0].state.projects==$owner[0].projects' >/dev/null
 if [[ -e "$ARANEA_TEST_SANDBOX/execution-trap" || -s "$ARANEA_TEST_SANDBOX/guard.log" ]]; then
   cat "$ARANEA_TEST_SANDBOX/guard.log"
