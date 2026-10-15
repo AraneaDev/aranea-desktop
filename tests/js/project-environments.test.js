@@ -141,3 +141,68 @@ test("fresh recovery bindings project an environment created in an older session
   observed.profileSnapshot.name = "mutated-output"
   assert.equal(JSON.stringify(saved), original)
 })
+test("the newest placement on a workspace owns it", () => {
+  assert.equal(typeof env.newerClaim, "function")
+  const project = (id, environments, associations) => ({ id, environments, associations })
+  const self = { id: "e-a", workspaceId: 3, createdAt: 100, placedAt: 500 }
+  const isSelf = (row) => row.id === "e-a"
+  // A relocated record is placed later than a newer-created released record.
+  const released = { id: "e-c", workspaceId: 3, createdAt: 300 }
+  assert.equal(env.newerClaim([project("p", [self, released], [])], 3, 500, isSelf), false)
+  assert.equal(
+    env.newerClaim([project("p", [self, released], [])], 3, 200, () => false),
+    true
+  )
+  // placedAt wins over createdAt; current-mode records never claim.
+  assert.equal(
+    env.newerClaim(
+      [project("p", [{ id: "e-b", workspaceId: 3, createdAt: 1, placedAt: 900 }], [])],
+      3,
+      500,
+      isSelf
+    ),
+    true
+  )
+  assert.equal(
+    env.newerClaim(
+      [project("p", [{ id: "e-b", workspaceId: 3, createdAt: 900, mode: "current" }], [])],
+      3,
+      500,
+      isSelf
+    ),
+    false
+  )
+  assert.equal(
+    env.newerClaim(
+      [project("p", [{ id: "e-b", workspaceId: 4, createdAt: 900 }], [])],
+      3,
+      500,
+      isSelf
+    ),
+    false
+  )
+  // Dedicated associations claim by placedAt; legacy ones without it are oldest.
+  const assoc = (extra) => ({
+    checkoutId: "c",
+    mode: "dedicated",
+    workspaceId: 3,
+    separate: false,
+    ...extra
+  })
+  assert.equal(env.newerClaim([project("q", [], [assoc({ placedAt: 900 })])], 3, 500, isSelf), true)
+  assert.equal(env.newerClaim([project("q", [], [assoc({})])], 3, 500, isSelf), false)
+  assert.equal(
+    env.newerClaim([project("q", [], [assoc({ placedAt: 900, mode: "current" })])], 3, 500, isSelf),
+    false
+  )
+  // The caller identifies its own association, which never claims against itself.
+  assert.equal(
+    env.newerClaim(
+      [project("q", [], [assoc({ placedAt: 900 })])],
+      3,
+      500,
+      (row, p) => p.id === "q" && row.checkoutId === "c"
+    ),
+    false
+  )
+})

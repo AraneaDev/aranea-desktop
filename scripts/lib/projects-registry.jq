@@ -25,8 +25,8 @@ def profile:
   profile_draft and has("id") and has("revision");
 def workspace: integer and . > 0;
 def environment:
-  fields(["id","projectId","checkoutId","activationId","workspaceId","sessionId","createdAt","checkoutSnapshot","profileSnapshot","resolvedTools"];["mode"])
-  and ((has("mode")|not) or (.mode|mode))
+  fields(["id","projectId","checkoutId","activationId","workspaceId","sessionId","createdAt","checkoutSnapshot","profileSnapshot","resolvedTools"];["mode","placedAt"])
+  and ((has("mode")|not) or (.mode|mode)) and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
   and (.id|opaque("e")) and (.projectId|opaque("p")) and (.checkoutId|opaque("c")) and (.activationId|opaque("a"))
   and (.workspaceId|workspace) and (.sessionId|text) and (.createdAt|integer and . >= 0)
   and (.checkoutSnapshot|checkout) and (.profileSnapshot|profile) and (.resolvedTools|tools)
@@ -39,7 +39,8 @@ def project($schema):
   and (.checkouts|type == "array" and length > 0 and all(.[];checkout) and (map(.id)|distinct) and (map(.path)|distinct))
   and (.lastCheckoutId as $last | any(.checkouts[];.id == $last))
   and (.checkouts as $checkouts | .associations|type == "array" and all(.[];
-    fields(["checkoutId","mode","workspaceId","separate"];[]) and (.checkoutId as $id | any($checkouts[];.id == $id))
+    fields(["checkoutId","mode","workspaceId","separate"];["placedAt"]) and (.checkoutId as $id | any($checkouts[];.id == $id))
+    and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
     and (.mode|mode) and (.workspaceId == null or (.workspaceId|integer and . > 0)) and (.separate|type == "boolean")))
   and ([.associations[]|if .separate then .checkoutId else "normal" end]|distinct)
   and (if $schema == 2 then
@@ -91,8 +92,8 @@ def request_valid:
     elif $action == "environment-register" then
       fields(["projectId","environment"];[]) and (.projectId|opaque("p")) and (.environment | if has("id") then environment else . + {id:"e-00000000-0000-4000-8000-000000000000"} | environment end) and .environment.projectId == .projectId
     elif $action == "environment-associate" then
-      fields(["projectId","environmentId","previousWorkspaceId","workspaceId"];[]) and (.projectId|opaque("p")) and (.environmentId|opaque("e"))
-      and (.previousWorkspaceId|workspace) and (.workspaceId|workspace)
+      fields(["projectId","environmentId","previousWorkspaceId","workspaceId"];["placedAt"]) and (.projectId|opaque("p")) and (.environmentId|opaque("e"))
+      and (.previousWorkspaceId|workspace) and (.workspaceId|workspace) and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
     elif $action == "environment-forget" then
       fields(["projectId","environmentId"];[]) and (.projectId|opaque("p")) and (.environmentId|opaque("e"))
     elif $action == "configure" then fields(["projectId"];["name","editorId","terminalId","workspaceMode","openRoles","agentId"]) and (.projectId|text)
@@ -101,7 +102,8 @@ def request_valid:
       and ((has("openRoles")|not) or (.openRoles|roles)) and ((has("agentId")|not) or (.agentId|agent))
     elif $action == "relocate" then fields(["projectId","checkoutId","path"];[]) and (.projectId|text) and (.checkoutId|text) and (.path|text)
     elif $action == "select-checkout" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
-    elif $action == "associate" then fields(["projectId","checkoutId","mode","workspaceId","separate"];[]) and (.projectId|text) and (.checkoutId|text)
+    elif $action == "associate" then fields(["projectId","checkoutId","mode","workspaceId","separate"];["placedAt"]) and (.projectId|text) and (.checkoutId|text)
+      and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
       and (.mode|mode) and (.workspaceId == null or (.workspaceId|integer and . > 0)) and (.separate|type == "boolean")
     else false end);
 def require_project($id): if any(.projects[];.id == $id) then . else error("PROJECT_NOT_FOUND") end;
@@ -153,7 +155,7 @@ def mutate($r):
         if any(.environments[];.id == $a.environmentId) then
           if $r.action == "environment-forget" then .environments |= map(select(.id != $a.environmentId))
           else .environments |= map(if .id == $a.environmentId then
-            if .workspaceId == $a.previousWorkspaceId then .workspaceId = $a.workspaceId else error("ENVIRONMENT_CONFLICT") end
+            if .workspaceId == $a.previousWorkspaceId then .workspaceId = $a.workspaceId | (if $a|has("placedAt") then .placedAt = $a.placedAt else . end) else error("ENVIRONMENT_CONFLICT") end
             else . end) end
         else error("ENVIRONMENT_NOT_FOUND") end
       else . end)
@@ -180,7 +182,7 @@ def mutate($r):
   elif $r.action == "select-checkout" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then .lastCheckoutId = $a.checkoutId else . end)
   elif $r.action == "associate" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then
     .associations = ([.associations[]|select(if $a.separate then (.separate|not) or .checkoutId != $a.checkoutId else .separate end)]
-      + [($a|{checkoutId,mode,workspaceId,separate})]) else . end)
+      + [($a|{checkoutId,mode,workspaceId,separate} + (if has("placedAt") then {placedAt} else {} end))]) else . end)
   else error("INVALID_REQUEST") end) | .revision += 1;
 if $operation == "validate" then try valid catch false
 elif $operation == "migrate" then migrate_v1($request)

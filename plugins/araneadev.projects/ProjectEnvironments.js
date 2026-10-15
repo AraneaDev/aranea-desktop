@@ -40,6 +40,52 @@ function chooseEmptyWorkspace(workspaces, reservations) {
 }
 
 /**
+ * The newest placement on a workspace owns it. Environments are placed when
+ * created or relocated; dedicated associations when allocated. Current-mode
+ * records share a workspace and never claim one; associations saved before
+ * placement stamps existed count as the oldest.
+ * @param {Array<EnvironmentData>} projects - registry projects
+ * @param {number} workspaceId - workspace in question
+ * @param {number} since - the caller's own placement time
+ * @param {(row: EnvironmentData, project: EnvironmentData) => boolean} isSelf - identifies the caller's record
+ * @returns {boolean} whether another record was placed there later
+ */
+function newerClaim(projects, workspaceId, since, isSelf) {
+  return (projects || []).some(function (project) {
+    var environments = /** @type {Array<EnvironmentData>} */ (project.environments || []).filter(
+      function (row) {
+        return (
+          row.mode !== "current" &&
+          row.workspaceId === workspaceId &&
+          placedAt(row) > since &&
+          !isSelf(row, project)
+        )
+      }
+    )
+    var associations = /** @type {Array<EnvironmentData>} */ (project.associations || []).filter(
+      function (row) {
+        return (
+          row.mode === "dedicated" &&
+          row.workspaceId === workspaceId &&
+          (row.placedAt || 0) > since &&
+          !isSelf(row, project)
+        )
+      }
+    )
+    return environments.length > 0 || associations.length > 0
+  })
+}
+
+/**
+ * When an environment record took its workspace.
+ * @param {EnvironmentData} row - environment record
+ * @returns {number} placement time, falling back to creation
+ */
+function placedAt(row) {
+  return Number.isInteger(row.placedAt) ? row.placedAt : row.createdAt || 0
+}
+
+/**
  * Find accepted activation identity, including retained completed operations.
  * The owner retains this mapping separately from bounded operation history.
  * @param {Array<EnvironmentData>} operations - accepted identities
@@ -99,4 +145,4 @@ function projectRows(environments, bindings, sessionId) {
 }
 
 if (typeof module !== "undefined")
-  module.exports = { roleKey, chooseEmptyWorkspace, coalesced, projectRows }
+  module.exports = { roleKey, chooseEmptyWorkspace, newerClaim, placedAt, coalesced, projectRows }

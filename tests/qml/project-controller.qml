@@ -399,7 +399,11 @@ ShellRoot {
           var next = JSON.parse(JSON.stringify(root.registry))
           next.revision++
           if (request.action === 'associate') {
-            t.equal(Object.keys(request.args).sort(), ['checkoutId', 'mode', 'projectId', 'separate', 'workspaceId'], 'association sends only declared store fields')
+            // placedAt is optional: new placements carry it, reused legacy associations may not.
+            t.equal(Object.keys(request.args).sort().filter(function (key) {
+              return key !== 'placedAt'
+            }), ['checkoutId', 'mode', 'projectId', 'separate', 'workspaceId'], 'association sends only declared store fields')
+            t.check(request.args.placedAt === undefined || Number.isInteger(request.args.placedAt), 'association placement is an integer stamp')
             var a = request.args
             next.projects[0].associations = next.projects[0].associations.filter(function (row) {
               return a.separate ? !row.separate || row.checkoutId !== a.checkoutId : row.separate

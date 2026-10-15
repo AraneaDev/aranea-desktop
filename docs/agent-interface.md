@@ -326,9 +326,12 @@ environments and associations alone never reserve one); current shares the focus
 workspace beside existing windows and refuses with `INVALID_WORKSPACE` when no current
 workspace is known. Acceptance snapshots `checkoutSnapshot`, `profileSnapshot`,
 `resolvedTools`, workspace, `mode` (`dedicated` or `current`; absent on older records
-means `dedicated`), session, time and UUID identities. Return refuses with
-`ENVIRONMENT_CHANGED` when a newer dedicated environment now uses the saved workspace;
-Recover then moves the environment to a fresh workspace. Branch is observed at launch, including null for
+means `dedicated`), session, time and UUID identities. The newest placement on a
+workspace owns it: environments and dedicated associations record `placedAt` when they
+take a workspace. Return refuses with `ENVIRONMENT_CHANGED` when another record was
+placed on the saved workspace later; Recover then moves a dedicated environment to a
+fresh workspace, and a current-mode environment recovers in place. Open allocates a
+fresh workspace instead of reusing an association whose workspace was placed later. Branch is observed at launch, including null for
 detached/unborn state. Later edits do not relabel earlier work. Start never runs saved
 actions; accepted work continues after the CLI observer exits. Existing ordinary
 `projects open` output and behavior are unchanged.

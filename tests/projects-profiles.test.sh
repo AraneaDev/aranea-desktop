@@ -171,6 +171,9 @@ environment_snapshots_and_last_used() {
   jq -e '.state.projects[0].lastProfileId == null and (.state.projects[0].environments|length)==2' "$result" >/dev/null
   mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:9,workspaceId:12}')"
   jq -e --slurpfile env "$TMPDIR/environments" '.state.projects[0].environments[0] == ($env[0][0]+{workspaceId:12})' "$result" >/dev/null
+  # A relocation stamps when the environment took its new workspace.
+  mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:12,workspaceId:14,placedAt:5000}')"
+  jq -e '.state.projects[0].environments[0] | .workspaceId == 14 and .placedAt == 5000' "$result" >/dev/null
   cp "$registry" "$TMPDIR/original"
   if mutate environment-associate "$(jq -cn --arg p "$project_id" '{projectId:$p,environmentId:"e-11111111-1111-4111-8111-111111111111",previousWorkspaceId:9,workspaceId:13}')"; then return 1; fi
   jq -e '.error.code == "ENVIRONMENT_CONFLICT"' "$result" >/dev/null

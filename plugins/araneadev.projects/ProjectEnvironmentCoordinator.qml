@@ -504,7 +504,8 @@ Item {
         owner.readDesktop(function (data) {
           if (!owner.current(id, generation, session))
             return
-          if (workspaceAvailable(data, op.workspaceId) && !claimedElsewhere(env)) {
+          // Shared records recover in place while their workspace exists.
+          if (workspaceAvailable(data, op.workspaceId) && (env.mode === 'current' || !claimedElsewhere(env))) {
             focusAndLaunch(id)
             return
           }
@@ -522,7 +523,8 @@ Item {
             projectId: op.projectId,
             environmentId: op.environmentId,
             previousWorkspaceId: op.workspaceId,
-            workspaceId: next
+            workspaceId: next,
+            placedAt: Date.now()
           }, function () {
             var moved = owner.operation(id)
             owner.publish(Object.assign({}, moved, {
@@ -537,10 +539,10 @@ Item {
       }, '')
     }, '')
   }
-  // A newer dedicated environment on the same workspace owns it now.
+  // A record placed on the same workspace after this environment owns it now.
   function claimedElsewhere(env: var): bool {
-    return owner.environmentRecords().some(function (row) {
-      return row.id !== env.id && row.mode !== 'current' && row.workspaceId === env.workspaceId && row.createdAt > env.createdAt
+    return Environments.newerClaim(owner.registry.projects, env.workspaceId, Environments.placedAt(env), function (row) {
+      return row.id === env.id
     })
   }
   // A saved ID alone cannot prove that a workspace exists in the current desktop.
@@ -665,7 +667,8 @@ Item {
           projectId: op.projectId,
           environmentId: op.environmentId,
           previousWorkspaceId: op.workspaceId,
-          workspaceId: workspace
+          workspaceId: workspace,
+          placedAt: Date.now()
         }, function () {
           ensureEmpty(id, true, done)
         })

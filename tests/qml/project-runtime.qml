@@ -242,9 +242,13 @@ ShellRoot {
         {
           id: 1,
           windows: 1
+        },
+        {
+          id: 2,
+          windows: 1
         }
       ]
-    }), 2, 'owner allocation excludes occupied and queued reservations, never persisted records alone')
+    }), 5, 'owner allocation excludes occupied and queued reservations')
     t.equal(owner.chooseEnvironmentWorkspace({
       available: true
     }), null, 'owner refuses unknown occupancy')

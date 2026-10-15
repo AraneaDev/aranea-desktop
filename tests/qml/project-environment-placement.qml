@@ -114,6 +114,8 @@ ShellRoot {
   property int serial: 0
   // The environment the dedicated start created, for later mode checks.
   property string firstEnvironment: ''
+  // The current-mode environment, for in-place recovery checks.
+  property string sharedEnvironment: ''
   QmlTest {
     id: t
   }
@@ -248,8 +250,11 @@ ShellRoot {
           }
           if (request.action === 'environment-associate')
             next.projects[0].environments.forEach(function (env) {
-              if (env.id === request.args.environmentId)
+              if (env.id === request.args.environmentId) {
                 env.workspaceId = request.args.workspaceId
+                if (request.args.placedAt !== undefined)
+                  env.placedAt = request.args.placedAt
+              }
             })
           next.revision++
           root.state = next
@@ -358,6 +363,7 @@ ShellRoot {
             return spec.workspaceId
           }), [7, 7], 'both roles launch on the current workspace')
           t.equal(environmentNamed(started.environmentId).mode, 'current', 'shared environments record current mode')
+          root.sharedEnvironment = started.environmentId
           t.equal(owner.chooseEnvironmentWorkspace(owner.runtime.snapshot()), 1, 'neither shared nor finished dedicated records reserve a workspace')
           noCurrentWorkspace()
         })
@@ -412,8 +418,73 @@ ShellRoot {
           t.equal(launched.slice(before).map(function (spec) {
             return spec.workspaceId
           }), [moved], 'recovered role launches on the relocated workspace')
-          t.done()
+          relocationOwnership()
         })
+      })
+    })
+  }
+  // The newest placement owns a workspace, not the newest creation.
+  function relocationOwnership() {
+    var stale = 'e-11111111-0000-4000-8000-000000000002'
+    t.check(environmentNamed(stale).placedAt >= environmentNamed(root.firstEnvironment).createdAt, 'relocation stamps its placement')
+    var back = owner.returnEnvironment({
+      projectId: 'p-one',
+      environmentId: stale
+    })
+    complete(back, function () {
+      t.equal(failure(owner.operation(back.operationId)), '', 'a relocated environment returns to its own workspace')
+      var displaced = owner.returnEnvironment({
+        projectId: 'p-one',
+        environmentId: root.firstEnvironment
+      })
+      complete(displaced, function () {
+        t.equal(failure(owner.operation(displaced.operationId)), 'ENVIRONMENT_CHANGED', 'the record it displaced cannot return onto it')
+        legacyReuse()
+      })
+    })
+  }
+  // Open never reuses an association onto a workspace a newer environment owns.
+  function legacyReuse() {
+    setState(function (project) {
+      project.tools = {
+        editorId: 'code',
+        terminalId: 'kitty'
+      }
+    }, function () {
+      var open = owner.request({
+        projectId: 'p-one',
+        checkoutId: 'c-one'
+      })
+      t.check(open.ok, 'legacy open accepts')
+      complete(open, function () {
+        var op = owner.operation(open.operationId)
+        t.check(Number.isInteger(op.workspaceId) && op.workspaceId !== 1, 'legacy open moves off a workspace a newer environment owns: ' + op.workspaceId + ' ' + failure(op))
+        sharedRecovery()
+      })
+    })
+  }
+  // A shared record recovers onto its saved workspace while it exists.
+  function sharedRecovery() {
+    setState(function (project) {
+      var newer = staleEnvironment('e-33333333-0000-4000-8000-000000000007', 7, Date.now() + 1000000)
+      newer.activationId = 'a-33333333-0000-4000-8000-000000000007'
+      newer.mode = 'dedicated'
+      project.environments.push(newer)
+    }, function () {
+      root.currentWorkspace = 5
+      var before = launched.length
+      var recovery = owner.recoverEnvironment({
+        projectId: 'p-one',
+        environmentId: root.sharedEnvironment,
+        activationId: payload(40).activationId,
+        newWindowRole: 'editor'
+      })
+      complete(recovery, function () {
+        t.equal(environmentNamed(root.sharedEnvironment).workspaceId, 7, 'shared recovery keeps its saved workspace')
+        t.equal(launched.slice(before).map(function (spec) {
+          return spec.workspaceId
+        }), [7], 'shared recovery launches in place')
+        t.done()
       })
     })
   }
