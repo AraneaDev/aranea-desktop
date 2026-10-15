@@ -14,6 +14,7 @@ printf 'build:\n' >"$checkout/Makefile"
 jq -cn --arg p "$checkout" '{action:"register",args:{paths:[$p]}}' | "$repo_root/scripts/aranea-project-store" mutate >"$TMPDIR/project"
 project=$(jq -r '.state.projects[0].id' "$TMPDIR/project")
 checkout_id=$(jq -r '.state.projects[0].lastCheckoutId' "$TMPDIR/project")
+# Run a public projects subcommand and capture its JSON stream.
 call() { "$cli" projects "$@" --json >"$TMPDIR/result"; }
 
 # Backend envelope with the default checkout resolved.
