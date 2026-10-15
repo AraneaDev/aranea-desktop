@@ -18,6 +18,9 @@ const binding = {
 const windows = [{ address: "0xa", pid: 42, appId: "token" }]
 test("occupied and reserved workspaces are preserved", () => {
   assert.equal(ops.allocateWorkspace([{ id: 1, windows: 2 }], [{ workspaceId: 2 }]), 3)
+  // Observed 2026-10-15: saved records on 1-4, windows only on 5. Callers pass
+  // only in-flight reservations, so the lowest empty workspace wins.
+  assert.equal(ops.allocateWorkspace([{ id: 5, windows: 1 }], []), 1)
   assert.equal(
     ops.allocateWorkspace(
       [
