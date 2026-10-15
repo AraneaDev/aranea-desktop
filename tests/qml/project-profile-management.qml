@@ -219,20 +219,10 @@ ShellRoot {
       }, entry.projectController.state)
       t.step(60, function () {
         t.check(!page.setupActive && surface.section === 'overview', 'quick registration keeps direct Overview destination')
-        t.equal(requests.length, 4, 'explicit registration saves available presets')
-        t.equal(requests[3].action, 'profile-save', 'preset persistence uses existing registry client')
-        t.equal(requests[3].args.profile.roles, ['editor'], 'missing agents and terminals still allow code preset')
-        callbacks.shift()(1, JSON.stringify({
-          ok: false,
-          error: {
-            message: 'Preset save failed'
-          }
-        }), '')
-        t.step(30, function () {
-          t.check(!!page.profileSetupError, 'preset failure has recovery feedback without retrying registration')
-          t.equal(requests.length, 4, 'failed presets are not automatically resubmitted')
-          t.done()
-        })
+        t.check(requests.slice(3).every(function (r) {
+          return r.action !== 'profile-save'
+        }), 'registration completion saves no presets from the UI')
+        t.done()
       })
     })
   })

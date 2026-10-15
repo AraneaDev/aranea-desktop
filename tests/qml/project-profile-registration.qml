@@ -1,4 +1,4 @@
-// Explicit registration presets serialize with visit metadata and retain partial success.
+// Registration reaches Overview without the UI writing preset profiles.
 import QtQuick
 import Quickshell
 import "lib"
@@ -99,57 +99,15 @@ ShellRoot {
       ok: true,
       state: registered
     }), '')
-    t.check(!page.setupActive && surface.section === 'overview', 'exact registration reaches Overview before optional preset transport')
-    t.step(30, function () {
+    t.check(!page.setupActive && surface.section === 'overview', 'exact registration reaches Overview before any optional transport')
+    t.step(60, function () {
       t.equal(requests.map(function (r) {
         return r.action
-      }), ['register', 'navigation-set'], 'project visit metadata serializes ahead of optional presets')
-      callbacks.shift()(0, JSON.stringify({
-        ok: true,
-        state: Object.assign({}, registered, {
-          revision: 3
-        })
-      }), '')
-      t.step(30, function () {
-        t.equal(requests[2].action, 'profile-save', 'first preset waits for visit acknowledgement')
-        t.equal(requests[2].expectedRevision, 3, 'preset uses latest metadata registry revision')
-        t.equal(requests[2].args.profile.name, 'VS Code', 'first usable preset is editor-only')
-        var saved = Object.assign({}, requests[2].args.profile, {
-          id: 'f-code',
-          revision: 1
-        })
-        var partial = Object.assign({}, registered, {
-          revision: 4,
-          projects: [Object.assign({}, project, {
-              profiles: [saved]
-            })]
-        })
-        callbacks.shift()(0, JSON.stringify({
-          ok: true,
-          state: partial
-        }), '')
-        t.step(30, function () {
-          t.equal(requests[3].args.profile.name, 'Terminal + Agent', 'additional explicit preset follows first acknowledgement')
-          t.equal(requests[3].expectedRevision, 4, 'each preset uses latest successful revision')
-          callbacks.shift()(0, 'truncated receipt', '')
-          t.step(30, function () {
-            t.equal(page.selectedProject.profiles.length, 1, 'unknown later acceptance preserves earlier usable saved preset')
-            t.equal(page.selectedProject.profiles[0].id, 'f-code', 'partial failure does not rewrite saved profile identity')
-            t.equal(page.profilePresetQueue.length, 0, 'unknown acceptance clears automatic replay queue')
-            t.check(!!page.profileSetupError && !entry.projectController.pending, 'partial failure offers direct optional recovery')
-            entry.projectController.state = Object.assign({}, partial)
-            page.startSetup()
-            page.setupRegistrationPaths = ['/fixture/one']
-            page.registryMutationCompleted('register', {
-              paths: ['/fixture/one']
-            }, entry.projectController.state)
-            t.step(30, function () {
-              t.equal(requests.length, 4, 'refresh and re-registering existing saved profiles do not duplicate presets')
-              t.done()
-            })
-          })
-        })
-      })
+      }).filter(function (a) {
+        return a === 'profile-save'
+      }), [], 'registration never saves presets from the UI; the store seeds them')
+      t.check(!!entry.selectedProject, 'registered project stays selected')
+      t.done()
     })
   })
 }
