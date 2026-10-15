@@ -287,6 +287,10 @@ ShellRoot {
               input.keyClick(Qt.Key_K, Qt.ControlModifier)
               t.check(nameField.activeFocus, 'closed Projects never claims application-context Ctrl+K')
             }
+            entry.close()
+            t.equal(['projectExactPicker', 'projectFolderPicker'].map(function (name) {
+              return t.findChild(surface, name).windowOpen
+            }), [false, false], 'closing Projects closes its folder choosers')
             t.done()
           })
         })

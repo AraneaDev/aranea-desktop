@@ -25,6 +25,8 @@ ColumnLayout {
   property var pointerGate: null
   // Explain chooser errors while keeping the manual alternative accessible.
   property string error: ''
+  // The owning presentation is open; closing it releases any open chooser.
+  property bool windowOpen: true
   // A fresh dialog avoids Qt retaining a popup deleted with a hidden shell window.
   property var activeDialog: null
   // Release only the dialog that closed; queued cleanup cannot affect a newer one.
@@ -104,14 +106,11 @@ ColumnLayout {
       error = 'Folder chooser unavailable. Enter an absolute folder path below.'
     }
   }
-  // Shell windows are destroyed when hidden; close their chooser first.
-  Connections {
-    target: picker.Window.window
-    function onVisibleChanged() {
-      if (target && !target.visible)
-        picker.releaseDialog()
-    }
-  }
+  // Shell windows are destroyed when hidden; the host closes the chooser first.
+  // Deliberately not a Connections on Window.window: retargeting it while the
+  // window is recreated crashed the shell (QQmlConnections::setTarget).
+  onWindowOpenChanged: if (!windowOpen)
+    releaseDialog()
   spacing: Style.space(8)
   Aranea.ActionButton {
     text: picker.buttonText

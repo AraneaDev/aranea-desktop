@@ -36,6 +36,8 @@ ColumnLayout {
   property var pointerGate: null
   // Toggle durable ignored review without rescanning.
   property bool ignoredExpanded: false
+  // The owning presentation is open; folder choosers close with it.
+  property bool windowOpen: true
   // Guided setup is presentation state; saves use existing typed requests.
   property bool setupActive: false
   // Exact registration is the default; bulk discovery is an optional route.
@@ -460,6 +462,7 @@ ColumnLayout {
     ProjectFolderPicker {
       id: exactPicker
       objectName: 'projectExactPicker'
+      windowOpen: page.windowOpen
       Layout.fillWidth: true
       buttonText: 'Choose repository'
       dialogTitle: 'Choose a Git repository'
@@ -531,6 +534,7 @@ ColumnLayout {
     ProjectFolderPicker {
       id: picker
       objectName: 'projectFolderPicker'
+      windowOpen: page.windowOpen
       Layout.fillWidth: true
       visible: !page.setupActive || page.setupStep === 0
       displayOnly: page.displayOnly || page.pending || !!page.discoveryClient && page.discoveryClient.pending
@@ -698,6 +702,7 @@ ColumnLayout {
     headerProvided: page.sidebarNavigation
     guidedSetup: page.setupActive
     viewSection: page.viewSection
+    windowOpen: page.windowOpen
     projectClient: page.projectClient
     actionsActive: page.visible && details.visible && !page.displayOnly
     tools: page.tools

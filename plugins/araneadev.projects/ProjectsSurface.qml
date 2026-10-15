@@ -433,12 +433,11 @@ Item {
   onWidthChanged: stampLayout()
   onHeightChanged: stampLayout()
   onSectionChanged: stampLayout()
-  Connections {
-    target: panel.Window.window
-    function onActiveFocusItemChanged() {
-      panel.revealFocus(panel.Window.window.activeFocusItem)
-    }
-  }
+  // Keyboard focus stays visible. A plain binding, deliberately not a Connections
+  // on Window.window: retargeting one while the shell window is recreated crashed
+  // the shell (QQmlConnections::setTarget).
+  readonly property Item windowFocusItem: panel.Window.activeFocusItem
+  onWindowFocusItemChanged: panel.revealFocus(windowFocusItem)
   // Only explicit registration seeds presets, serialized after any metadata write.
   property var presetInFlight: null
   // Drain optional setup only through the registry mutation serialization boundary.
@@ -761,6 +760,7 @@ Item {
                   projectClient: panel.root.projectClient
                   projectId: panel.root.projectId
                   displayOnly: !!panel.root.inert
+                  windowOpen: !!panel.root.opened
                   metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
                   error: panel.root.projectController.error || panel.root.projectClient.error

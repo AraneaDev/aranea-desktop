@@ -84,11 +84,13 @@ ShellRoot {
               picker.choose()
               t.waitFor(function () {
                 return picker.activeDialog && picker.activeDialog.visible
-              }, 3000, 'chooser opens before hiding Settings', function () {
-                window.visible = false
+              }, 3000, 'chooser opens before its host closes', function () {
+                // The host's open state, never the native window, releases the chooser.
+                picker.windowOpen = false
                 t.step(100, function () {
-                  t.check(picker.activeDialog === null, 'hiding Settings releases an open chooser')
-                  window.visible = true
+                  t.check(picker.activeDialog === null, 'closing the host releases an open chooser')
+                  t.check(window.visible, 'release does not depend on the native window')
+                  picker.windowOpen = true
                   t.step(100, function () {
                     picker.choose()
                     t.waitFor(function () {
