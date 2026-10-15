@@ -223,7 +223,7 @@ ShellRoot {
     t.waitFor(function () {
       return start.enabled
     }, 3000, 'fallback profile starts', function () {
-      t.equal(t.findChild(header, 'projectFallbackNote').text, "Neovim isn't available — using VS Code.", 'fallback is explained')
+      t.equal(t.findChild(header, 'projectFallbackNote').text, "Neovim isn't available \u2014 using VS Code.", 'fallback is explained')
       start.clicked()
       t.equal(host.starts, [['f-b', 1]], 'Start uses the fallback profile')
       host.starts = []

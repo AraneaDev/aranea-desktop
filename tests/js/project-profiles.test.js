@@ -135,7 +135,7 @@ test("primary falls back from an unusable remembered profile without persisting"
   assert.equal(profiles.primary(project, probes(["code"])).id, "available")
   assert.equal(
     profiles.fallbackNote(project, probes(["code"])),
-    "Neovim isn't available — using VS Code."
+    "Neovim isn't available \u2014 using VS Code."
   )
   project.lastProfileId = "available"
   assert.equal(profiles.primary(project, probes(["code"])).id, "available")
