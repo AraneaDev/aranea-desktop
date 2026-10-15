@@ -103,9 +103,7 @@ ShellRoot {
     t.step(60, function () {
       t.equal(requests.map(function (r) {
         return r.action
-      }).filter(function (a) {
-        return a === 'profile-save'
-      }), [], 'registration never saves presets from the UI; the store seeds them')
+      }), ['register', 'navigation-set'], 'registration then visit metadata, never a UI preset save')
       t.check(!!entry.selectedProject, 'registered project stays selected')
       t.done()
     })

@@ -43,6 +43,8 @@ ShellRoot {
       terminals: [],
       agents: []
     })
+  // Tool probe the next Refresh returns.
+  property var probe: codeOnly
   // Probe with nothing installed.
   readonly property var emptyTools: ({
       defaults: {},
@@ -99,6 +101,22 @@ ShellRoot {
   }
   Component.onCompleted: t.step(80, function () {
     entry.projectController.runner = function (argv, input, done) {
+      // Refresh reads: registry snapshot and tool probe answer immediately.
+      if (argv[1] === 'snapshot') {
+        Qt.callLater(function () {
+          done(0, JSON.stringify({
+            ok: true,
+            state: entry.projectController.state
+          }), '')
+        })
+        return
+      }
+      if (argv[1] === '--json') {
+        Qt.callLater(function () {
+          done(0, JSON.stringify(host.probe), '')
+        })
+        return
+      }
       var request = JSON.parse(input)
       host.requests.push(request)
       // Visit metadata is acknowledged at once; only seeds are held.
@@ -237,7 +255,73 @@ ShellRoot {
       t.check(t.findChild(header, 'headerManageProfiles').visible, 'management stays reachable')
       header.chooseProfile('f-a')
       t.equal(host.starts.length, 0, 'unusable profile cannot be chosen')
-      t.done()
+      t.equal(t.findChild(header, 'projectBlockedReason').text.length > 0 && t.findChild(header, 'headerManageProfiles').text, 'Set up a profile', 'no usable profile offers setup')
+      t.equal(t.findChild(header, 'profilePicker').rows[0].path.indexOf('Unavailable · '), 0, 'picker rows mark unusable profiles')
+      queuedNavigation()
+    })
+  }
+  // A navigation queued during a seed cannot hide the seed outcome; errors are per project.
+  function queuedNavigation() {
+    var header = t.findChild(surface, 'projectHeader')
+    var before = host.only('profiles-seed').length
+    host.show([host.project('p-nav', []), host.project('p-other', [host.editor('f-o', 'VS Code', 'code')])], 'p-nav', 7)
+    t.waitFor(function () {
+      return host.only('profiles-seed').length === before + 1 && surface.seedingProjectId === 'p-nav'
+    }, 3000, 'nav project seeds', function () {
+      host.show([host.project('p-nav', []), host.project('p-other', [host.editor('f-o', 'VS Code', 'code')])], 'p-nav', 7)
+      entry.projectId = 'p-other'
+      entry.projectId = 'p-nav'
+      t.step(60, function () {
+        t.equal(host.only('profiles-seed').length, before + 1, 're-selecting during a seed sends no duplicate')
+        entry.projectId = 'p-other'
+        host.callbacks.shift()(1, JSON.stringify({
+          ok: false,
+          error: {
+            code: 'INTERNAL',
+            message: 'nav boom'
+          }
+        }), '')
+        t.waitFor(function () {
+          return surface.seedingProjectId === '' && !!surface.seedFailures['p-nav']
+        }, 3000, 'seed outcome survives queued navigation', function () {
+          t.check(!t.findChild(header, 'projectRetrySeed').visible, 'another project shows no Retry')
+          entry.projectId = 'p-nav'
+          t.waitFor(function () {
+            return t.findChild(header, 'projectRetrySeed').visible
+          }, 3000, 'failed project keeps its Retry', refreshReseeds)
+        })
+      })
+    })
+  }
+  // Refresh in the no-tools state seeds again once tools appear.
+  function refreshReseeds() {
+    var header = t.findChild(surface, 'projectHeader')
+    entry.projectController.tools = host.emptyTools
+    host.show([host.project('p-nt', [])], 'p-nt', 8)
+    t.waitFor(function () {
+      return surface.seedingProjectId === 'p-nt'
+    }, 3000, 'no-tools project seeds', function () {
+      var before = host.only('profiles-seed').length
+      host.callbacks.shift()(0, JSON.stringify({
+        ok: true,
+        state: {
+          revision: 9,
+          projects: [host.project('p-nt', [])],
+          roots: [],
+          ignored: []
+        }
+      }), '')
+      t.waitFor(function () {
+        return t.findChild(header, 'projectRefreshTools').visible && surface.seedingProjectId === ''
+      }, 3000, 'no-tools hint shown', function () {
+        host.probe = host.codeOnly
+        t.findChild(header, 'projectRefreshTools').clicked()
+        t.waitFor(function () {
+          return host.only('profiles-seed').length === before + 1
+        }, 3000, 'Refresh seeds again', function () {
+          t.done()
+        })
+      })
     })
   }
 }

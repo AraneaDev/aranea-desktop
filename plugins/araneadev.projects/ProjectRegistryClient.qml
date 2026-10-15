@@ -33,6 +33,8 @@ QtObject {
   property int generation: 0
   // Typed successful mutations let the composition root update presentation.
   signal mutationCompleted(string action, var args, var state)
+  // A mutation request failed; carries the exact request and its message.
+  signal mutationFailed(string action, var args, string message)
   // Canonical root identity comes from backend readback, independent of entered spelling.
   signal rootReady(string rootId)
   // Safe helper argv/stdin transport, injectable for inert offscreen fixtures.
@@ -155,6 +157,7 @@ QtObject {
       if (code !== 0 || !value.ok) {
         error = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
         pending = false
+        mutationFailed(action, args, error)
         return
       }
       state = value.state

@@ -478,8 +478,17 @@ Item {
   property var seededProjects: ({})
   // Project whose seed request is in flight, or ''.
   property string seedingProjectId: ''
-  // Last seed failure message for the selected project, or ''.
-  property string seedError: ''
+  // Projects whose last seed request failed (id → true).
+  property var seedFailures: ({})
+  // Record or clear one project's seed failure.
+  function setSeedFailure(projectId, failed) {
+    var next = Object.assign({}, seedFailures)
+    if (failed)
+      next[projectId] = true
+    else
+      delete next[projectId]
+    seedFailures = next
+  }
   // Ask the backend once per session to save defaults for a project without profiles.
   function requestSeed(projectId) {
     var client = root.projectController
@@ -493,13 +502,13 @@ Item {
     var next = Object.assign({}, seededProjects)
     next[projectId] = true
     seededProjects = next
-    seedError = ''
+    setSeedFailure(projectId, false)
     seedingProjectId = projectId
     if (!client.request('profiles-seed', {
       projectId: projectId
     })) {
       seedingProjectId = ''
-      seedError = "Couldn't prepare a default profile."
+      setSeedFailure(projectId, true)
     }
   }
   // Seed the selected project when it has no profiles and was not asked yet.
@@ -517,12 +526,31 @@ Item {
     seededProjects = next
     requestSeed(projectId)
   }
-  // A finished seed request that left an error is a failure, even with a repeated message.
-  function settleSeed() {
-    var client = root.projectController
-    if (seedingProjectId && !client.pending && client.error) {
+  // Re-probe tools; a zero-profile project may seed again once tools exist.
+  function refreshTools() {
+    var project = projectsPage.selectedProject
+    if (project && !(project.profiles || []).length && project.id !== seedingProjectId) {
+      var next = Object.assign({}, seededProjects)
+      delete next[project.id]
+      seededProjects = next
+      setSeedFailure(project.id, false)
+    }
+    root.projectController.refresh()
+  }
+  // Drop an in-flight seed whose project vanished or whose request capture cancelled.
+  function dropStaleSeed() {
+    if (!seedingProjectId)
+      return
+    var gone = !(root.projectController.state.projects || []).some(function (p) {
+      return p.id === seedingProjectId
+    })
+    if (gone || root.inert)
       seedingProjectId = ''
-      seedError = "Couldn't prepare a default profile."
+  }
+  Connections {
+    target: panel.root
+    function onInertChanged() {
+      panel.dropStaleSeed()
     }
   }
   Connections {
@@ -536,6 +564,7 @@ Item {
     function onStateChanged() {
       panel.stampLayout()
       panel.scheduleGitBackground()
+      panel.dropStaleSeed()
       panel.maybeSeedSelected()
     }
     function onToolsChanged() {
@@ -547,8 +576,13 @@ Item {
         panel.seedingProjectId = ''
       panel.maybeSeedSelected()
     }
+    function onMutationFailed(action, args) {
+      if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId) {
+        panel.seedingProjectId = ''
+        panel.setSeedFailure(args.projectId, true)
+      }
+    }
     function onPendingChanged() {
-      panel.settleSeed()
       panel.maybeSeedSelected()
     }
     function onReadingChanged() {
@@ -734,8 +768,8 @@ Item {
                     panel.root.startProfile(id, revision, false)
                   }
                   seeding: panel.seedingProjectId !== '' && !!projectsPage.selectedProject && panel.seedingProjectId === projectsPage.selectedProject.id
-                  seedError: panel.seedError
-                  onRefreshToolsRequested: panel.root.projectController.refresh()
+                  seedError: projectsPage.selectedProject && panel.seedFailures[projectsPage.selectedProject.id] ? "Couldn't prepare a default profile." : ''
+                  onRefreshToolsRequested: panel.refreshTools()
                   onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')
                 }

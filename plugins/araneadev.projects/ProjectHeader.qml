@@ -223,7 +223,7 @@ ColumnLayout {
   }
   RowLayout {
     Layout.fillWidth: true
-    visible: header.seedError !== ''
+    visible: header.seedError !== '' && !header.displayOnly
     Aranea.UiLabel {
       Layout.fillWidth: true
       text: "Couldn't prepare a default profile."
@@ -232,7 +232,6 @@ ColumnLayout {
     }
     Aranea.ActionButton {
       objectName: 'projectRetrySeed'
-      enabled: !header.displayOnly
       text: 'Retry'
       pointerGate: header.pointerGate
       onClicked: header.retrySeedRequested()
@@ -252,7 +251,7 @@ ColumnLayout {
     Aranea.ActionButton {
       objectName: 'headerManageProfiles'
       visible: !header.managementActive
-      text: header.project && (header.project.profiles || []).length ? 'Manage profiles' : 'Set up a profile'
+      text: header.project && (header.project.profiles || []).length && header.profile ? 'Manage profiles' : 'Set up a profile'
       variant: 'quiet'
       pointerGate: header.pointerGate
       onClicked: header.manageProfilesRequested()
