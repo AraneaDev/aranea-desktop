@@ -22,8 +22,8 @@ ColumnLayout {
   property var pointerGate: null
   // Collapsed once the project has saved actions; the user may expand it.
   property bool expanded: false
-  // Unsaved suggestions according to live definitions.
-  readonly property var rows: client ? Suggestions.pending(client.detection, definitions) : []
+  // Unsaved suggestions according to live definitions; none until the snapshot is this project's.
+  readonly property var rows: client && client.suggestionsReady ? Suggestions.pending(client.detection, definitions) : []
   // Rows grouped by source for presentation.
   readonly property var grouped: Suggestions.groups(rows)
   // How many rows Add all may save within the action limit.
@@ -37,7 +37,8 @@ ColumnLayout {
   // Open the editor with this draft; saving there follows the usual rules.
   signal editRequested(var definition)
   spacing: Style.space(8)
-  visible: !!client && (rows.length > 0 || client.detecting || !!(client.detection && client.detection.error) || note !== '')
+  // Once actions exist the section shows only unsaved rows; status lines are for an empty project.
+  visible: !!client && client.suggestionsReady && (rows.length > 0 || definitions.length === 0 && (client.detecting || !!(client.detection && client.detection.error) || note !== ''))
   Aranea.UiLabel {
     objectName: 'suggestionsHeading'
     Layout.fillWidth: true
@@ -150,6 +151,7 @@ ColumnLayout {
     }))
   }
   Aranea.UiLabel {
+    objectName: 'suggestionsLimit'
     Layout.fillWidth: true
     visible: section.open && section.plan.limited
     text: 'A project can save up to 50 actions; ' + (section.rows.length - section.plan.capacity) + ' more would exceed it.'
@@ -157,9 +159,10 @@ ColumnLayout {
     opacity: 0.65
   }
   Aranea.UiLabel {
+    objectName: 'suggestionsResult'
     Layout.fillWidth: true
-    visible: !!section.client && !!section.client.addResult && (section.client.addResult.total > 1 || !!section.client.addResult.error)
-    text: !section.client || !section.client.addResult ? '' : section.client.addResult.error ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + ' · Save failed: ' + (section.client.addResult.error.message || section.client.addResult.error.code) + ' Nothing else was changed.' : 'Added ' + section.client.addResult.added + ' actions.'
+    visible: !!section.client && !!section.client.addResult && (section.client.addResult.total > 1 || !!section.client.addResult.error || section.client.addResult.cancelled)
+    text: !section.client || !section.client.addResult ? '' : section.client.addResult.error ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + ' · Save failed: ' + (section.client.addResult.error.message || section.client.addResult.error.code) + ' Nothing else was changed.' : section.client.addResult.cancelled ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + ' · Stopped; the rest were not saved.' : 'Added ' + section.client.addResult.added + ' actions.'
     color: section.client && section.client.addResult && section.client.addResult.error ? Aranea.DesignTokens.attention : Aranea.DesignTokens.foreground
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }

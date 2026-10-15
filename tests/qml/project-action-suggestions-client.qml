@@ -132,6 +132,7 @@ ShellRoot {
     })
     t.equal(calls.length, 1, 'queue stops on selection change')
     t.equal(client.addQueue.length, 0, 'queue cleared')
+    t.equal(client.addResult, null, 'a cancelled Add all leaves no result on the new project')
     // (a) Capture mid-Add-all clears the queue; a later unrelated save advances nothing.
     calls = []
     t.check(client.addSuggestions([draft('m'), draft('n')]), 'queue before capture')
@@ -139,6 +140,7 @@ ShellRoot {
     client.captureActive = false
     t.equal(client.addQueue.length, 0, 'capture clears queue')
     t.check(!client.addActive, 'capture ends Add all')
+    t.check(client.addResult.cancelled === true, 'a capture-cancelled Add all is not reported as success')
     t.check(client.configure(draft('own'), undefined), 'unrelated save accepted')
     reply(1, {
       ok: true,
@@ -160,6 +162,7 @@ ShellRoot {
     t.check(client.addSuggestions([draft('last')]), 'single-item queue')
     client.projectId = 'p-00000000-0000-4000-8000-000000000003'
     t.check(!client.addActive, 'selection change ends Add all with save in flight')
+    t.equal(client.addResult, null, 'result cleared with the selection')
     t.check(client.addSuggestions([draft('new1'), draft('new2')]), 'new queue on new project')
     t.equal(calls.length, 2, 'new queue issued its first save')
     reply(0, {
@@ -176,6 +179,71 @@ ShellRoot {
       error: null
     })
     t.equal(calls.length, 3, 'own ack advances')
+    reply(2, {
+      ok: true,
+      state: stateAfter(7),
+      error: null
+    })
+    t.check(!client.addActive, 'second queue finished')
+    // (c) A queued save that cannot begin reports its own refusal, never the client's unrelated error.
+    calls = []
+    var unrelated = {
+      code: 'UNRELATED',
+      message: 'Some other read failed.'
+    }
+    var block = function () {
+      client.submissionUncertain = true
+      client.error = unrelated
+    }
+    client.changed.connect(block)
+    t.check(client.addSuggestions([draft('s1'), draft('s2')]), 'queue before a blocked save')
+    reply(0, {
+      ok: true,
+      state: stateAfter(8),
+      error: null
+    })
+    client.changed.disconnect(block)
+    client.submissionUncertain = false
+    t.check(!client.addActive, 'a save that cannot begin ends Add all')
+    t.equal(client.addResult.added, 1, 'first save counted')
+    t.equal(client.addResult.error && client.addResult.error.code, 'SAVE_NOT_STARTED', 'own refusal, not the unrelated client error')
+    // (d) A transport that answers synchronously still advances every save.
+    calls = []
+    client.runner = function (argv, input, done) {
+      root.calls.push({
+        argv: argv,
+        input: JSON.parse(input),
+        done: done
+      })
+      done(0, JSON.stringify({
+        ok: true,
+        state: root.stateAfter(9),
+        error: null
+      }), '')
+    }
+    t.check(client.addSuggestions([draft('y1'), draft('y2'), draft('y3')]), 'synchronous queue accepted')
+    t.equal(calls.length, 3, 'every synchronous save issued')
+    t.check(!client.addActive, 'synchronous Add all finishes')
+    t.equal(client.addResult && client.addResult.added, 3, 'all synchronous saves counted')
+    // (e) Suggestions are ready only once the snapshot answers for the selected project.
+    client.runner = function (argv, input, done) {
+      root.calls.push({
+        argv: argv,
+        input: JSON.parse(input),
+        done: done
+      })
+    }
+    t.check(client.suggestionsReady === true, 'a save answered for this project')
+    client.projectId = 'p-00000000-0000-4000-8000-000000000004'
+    t.check(client.suggestionsReady === false, 'another project\'s snapshot is not ready')
+    calls = []
+    client.refresh()
+    reply(0, {
+      ok: true,
+      state: stateAfter(10),
+      error: null
+    })
+    t.check(client.suggestionsReady === true, 'ready once the snapshot answers for this project')
     t.done()
   })
 }

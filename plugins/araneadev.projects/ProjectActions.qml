@@ -8,7 +8,6 @@ import qs.Commons
 import "../araneadev.shared" as Aranea
 import "../araneadev.projects" as Projects
 import "../araneadev.projects/ProjectActionRecords.js" as Records
-import "../araneadev.projects/ProjectActionSuggestions.js" as Suggestions
 
 ColumnLayout {
   id: actions
@@ -393,6 +392,7 @@ ColumnLayout {
     }
   }
   ProjectActionSuggestions {
+    id: suggestionsSection
     Layout.fillWidth: true
     client: actions.client
     definitions: actions.definitions
@@ -405,7 +405,7 @@ ColumnLayout {
   Aranea.UiLabel {
     objectName: 'actionsEmptyFallback'
     Layout.fillWidth: true
-    visible: !actions.definitions.length && !actions.client.detecting && Suggestions.pending(actions.client.detection, actions.definitions).length === 0
+    visible: !actions.definitions.length && !actions.client.detecting && suggestionsSection.rows.length === 0
     text: 'No actions yet. Add action to define a test, build, or dev server. Examples are available in the editor.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }

@@ -103,14 +103,21 @@ Item {
   // Overview wants detected commands only while the project has no saved actions.
   readonly property bool overviewWantsSuggestions: section === 'overview' && !!projectsPage.selectedProject && !projectsPage.setupActive && !root.inert && selectedDefinitions.length === 0
   // Up to three unsaved detected commands for the empty Overview.
-  readonly property var overviewSuggestions: overviewWantsSuggestions ? Suggestions.overviewPicks(Suggestions.pending(root.actionClient.detection, selectedDefinitions)) : []
+  readonly property var overviewSuggestions: overviewWantsSuggestions && root.actionClient.suggestionsReady ? Suggestions.overviewPicks(Suggestions.pending(root.actionClient.detection, selectedDefinitions)) : []
   onOverviewWantsSuggestionsChanged: if (overviewWantsSuggestions)
     root.actionClient.detect(false)
+  // Re-detect once a project or checkout switch has settled both identities.
+  function redetectOverview() {
+    if (overviewWantsSuggestions)
+      root.actionClient.detect(false)
+  }
   Connections {
     target: panel.root.actionClient
+    function onProjectIdChanged() {
+      Qt.callLater(panel.redetectOverview)
+    }
     function onCheckoutIdChanged() {
-      if (panel.overviewWantsSuggestions)
-        panel.root.actionClient.detect(false)
+      Qt.callLater(panel.redetectOverview)
     }
   }
   // Save one detected command the Overview still shows; Run stays separate.
