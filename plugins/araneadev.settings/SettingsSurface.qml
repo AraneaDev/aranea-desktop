@@ -137,12 +137,11 @@ Item {
     else if (pos.y + item.height > scroller.contentY + scroller.height)
       scrollTo(pos.y + item.height - scroller.height)
   }
-  Connections {
-    target: panel.Window.window
-    function onActiveFocusItemChanged() {
-      panel.revealFocus(panel.Window.window.activeFocusItem)
-    }
-  }
+  // Keyboard focus stays visible. A plain binding, deliberately not a Connections
+  // on Window.window: retargeting one while the shell window is recreated crashed
+  // the shell (QQmlConnections::setTarget).
+  readonly property Item windowFocusItem: panel.Window.activeFocusItem
+  onWindowFocusItemChanged: panel.revealFocus(windowFocusItem)
   // Give the first keyboard target focus on summon.
   function focusKeys() {
     closeButton.forceActiveFocus()

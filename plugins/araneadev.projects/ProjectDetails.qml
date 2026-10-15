@@ -60,6 +60,8 @@ ColumnLayout {
   property alias actions: actions
   // Optional preferences stay collapsed after installed defaults resolve.
   property bool customized: false
+  // The owning presentation is open; folder choosers close with it.
+  property bool windowOpen: true
   // Guided setup exposes preferences while deferring maintenance controls.
   property bool guidedSetup: false
   // Standalone navigation chooses one focused section; direct consumers retain all.
@@ -623,6 +625,7 @@ ColumnLayout {
         ProjectFolderPicker {
           visible: !details.guidedSetup
           objectName: 'locateFolder:' + details.project.id + ':' + checkout.modelData.id
+          windowOpen: details.windowOpen
           buttonText: 'Locate folder'
           externalDraft: true
           pathDraft: details.relocationDrafts[details.project.id + ':' + checkout.modelData.id] || ''
