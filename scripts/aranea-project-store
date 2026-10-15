@@ -96,7 +96,15 @@ if [[ "$1" == mutate ]]; then
   fi
   rm -f -- "${project_tmp}.error"
   if ! jq -e --arg operation validate --argjson request null -f "$filter" "$project_tmp" >/dev/null 2>&1; then
-    respond_error REGISTRY_INVALID 'The mutation would produce an invalid registry.' 'Check project identity and retry after refreshing.'
+    # Default presets are best-effort: retry registration or seeding without them before refusing.
+    if jq -e '.action == "register" or .action == "profiles-seed"' <<<"$prepared" >/dev/null 2>&1 &&
+      stripped=$(jq -c 'if .action == "register" then .args.presets={} else .args.profiles=[] end' <<<"$prepared") &&
+      jq --arg operation mutate --argjson request "$stripped" -f "$filter" <<<"$state" >"$project_tmp" 2>/dev/null &&
+      jq -e --arg operation validate --argjson request null -f "$filter" "$project_tmp" >/dev/null 2>&1; then
+      :
+    else
+      respond_error REGISTRY_INVALID 'The mutation would produce an invalid registry.' 'Check project identity and retry after refreshing.'
+    fi
   fi
 elif [[ -e "$registry" ]]; then
   jq -cn --argjson state "$state" '{ok:true,state:$state,error:null}'

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Registration and explicit seeding give every project a startable default profile.
+# shellcheck disable=SC2016 # jq predicates are single-quoted on purpose
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tests/lib/sandbox.sh"
@@ -32,12 +33,16 @@ expect() {
     exit 1
   }
 }
+# Create a fresh git repository and print its path.
 repo() {
   git init -q -b main "$ARANEA_TEST_SANDBOX/repos/$1"
   printf '%s\n' "$ARANEA_TEST_SANDBOX/repos/$1"
 }
+# Register one path through the store with only the stub tools on PATH.
 register() { jq -cn --arg p "$1" '{action:"register",args:{paths:[$p]}}' | PATH="$tools:$minbin" "$store" mutate >"$TMPDIR/out"; }
+# Project ID owning the checkout path.
 project_of() { jq -r --arg p "$1" '.state.projects[]|select(any(.checkouts[];.path==$p))|.id' "$TMPDIR/out"; }
+# Saved profiles of one project from the last store response.
 profiles_of() { jq -c --arg p "$1" '.state.projects[]|select(.id==$p)|.profiles' "$TMPDIR/out"; }
 mkdir -p "$ARANEA_TEST_SANDBOX/repos"
 
@@ -47,6 +52,12 @@ jq -n --argjson tools "$probe" -f "$repo_root/scripts/lib/project-presets.jq" >"
 expect "$TMPDIR/presets" '' '. == [{name:"VS Code",roles:["editor"],tools:{editorId:"code",terminalId:null,agentId:null}},{name:"Terminal + Agent",roles:["terminal","agent"],tools:{editorId:null,terminalId:"kitty",agentId:"claude"}},{name:"Neovim",roles:["editor"],tools:{editorId:"nvim",terminalId:"kitty",agentId:null}},{name:"Terminal",roles:["terminal"],tools:{editorId:null,terminalId:"kitty",agentId:null}}]' 'preset rule'
 jq -n --argjson tools '{"editors":[],"terminals":[],"agents":[]}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
 expect "$TMPDIR/presets" '' '. == []' 'no tools, no presets'
+
+# Bad probe IDs never become drafts the store would refuse.
+jq -n --argjson tools '{"editors":[{"id":"code;rm","available":true,"supported":true},{"id":7,"available":true,"supported":true}],"terminals":[{"id":7,"available":true,"supported":true},{"id":null,"available":true,"supported":true},"junk"],"agents":[{"id":["claude"],"available":true,"supported":true}],"defaults":{"terminalId":7}}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
+expect "$TMPDIR/presets" '' '. == []' 'bad probe IDs yield no drafts'
+jq -n --argjson tools '{"editors":"x","terminals":{"id":"kitty"},"agents":null}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
+expect "$TMPDIR/presets" '' '. == []' 'malformed groups yield no drafts'
 
 # Registration seeds presets from the probe (code + kitty + claude).
 fake_tool code
@@ -69,6 +80,20 @@ register "$wt"
 # Repeat seed is a no-op once profiles exist.
 jq -cn --arg p "$p1" '{action:"profiles-seed",args:{projectId:$p}}' | PATH="$tools:$minbin" "$store" mutate >"$TMPDIR/out"
 [[ $(profiles_of "$p1") == "$before" ]]
+
+# Explicit save first, then seed: unchanged.
+fake_tool_save_target=$(repo saved)
+rm -f "$tools"/*
+register "$fake_tool_save_target"
+ps=$(project_of "$fake_tool_save_target")
+jq -cn --arg p "$ps" '{action:"profile-save",args:{projectId:$p,profile:{name:"Mine",roles:["terminal"],tools:{editorId:null,terminalId:"kitty",agentId:null}}}}' | PATH="$tools:$minbin" "$store" mutate >"$TMPDIR/out"
+saved=$(profiles_of "$ps")
+fake_tool code
+fake_tool kitty
+fake_tool claude
+jq -cn --arg p "$ps" '{action:"profiles-seed",args:{projectId:$p}}' | PATH="$tools:$minbin" "$store" mutate >"$TMPDIR/out"
+[[ $(profiles_of "$ps") == "$saved" ]]
+expect "$TMPDIR/out" "$ps" '.state.projects[]|select(.id==$p)|(.profiles|map(.name))==["Mine"]' 'seed after save keeps only the saved profile'
 
 # No supported tools: registration succeeds with zero profiles.
 rm -f "$tools"/*

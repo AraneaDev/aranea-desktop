@@ -171,7 +171,12 @@ projects_registry_prepare_request() {
       fi
       ;;
     profiles-seed)
-      jq -c --argjson profiles "$(projects_registry_preset_ids "$(projects_registry_presets)")" '.args.profiles=$profiles' <<<"$request"
+      # No probe for a missing or already-profiled project; the reducer ignores the draft anyway.
+      if ! jq -e --argjson state "$state" '.args.projectId as $id | any(($state.projects // [])[]; .id == $id and (.profiles|length) == 0)' <<<"$request" >/dev/null; then
+        jq -c '.args.profiles=[]' <<<"$request"
+      else
+        jq -c --argjson profiles "$(projects_registry_preset_ids "$(projects_registry_presets)")" '.args.profiles=$profiles' <<<"$request"
+      fi
       ;;
     profile-save)
       if jq -e '.args.profile|has("id")' <<<"$request" >/dev/null; then
@@ -210,11 +215,16 @@ projects_registry_prepare_request() {
         metadata=$(projects_registry_checkout "$path") || return $?
         checkouts=$(jq -cn --argjson current "$checkouts" --argjson metadata "$metadata" '$current + [$metadata] | unique_by(.path) | sort_by(.primary | not)') || return 1
       done < <(jq -c '.args.paths[]' <<<"$request")
-      local drafts presets='{}' new_id
-      drafts=$(projects_registry_presets)
-      while IFS= read -r new_id; do
-        presets=$(jq -c --arg p "$new_id" --argjson ids "$(projects_registry_preset_ids "$drafts")" '. + {($p):$ids}' <<<"$presets")
-      done < <(jq -r --argjson state "$state" '.[] | .projectId as $p | .commonDir as $c | select(($state.projects // []) | any(.[]; .commonDir == $c) | not) | $p' <<<"$checkouts" | sort -u)
+      local drafts presets='{}' new_id new_ids
+      # Presets are best-effort: any failure leaves registration without them.
+      new_ids=$(jq -r --argjson state "$state" '.[] | .projectId as $p | .commonDir as $c | select(($state.projects // []) | any(.[]; .commonDir == $c) | not) | $p' <<<"$checkouts" | sort -u) || new_ids=''
+      if [[ -n "$new_ids" ]]; then
+        drafts=$(projects_registry_presets) || drafts='[]'
+        while IFS= read -r new_id; do
+          presets=$(jq -c --arg p "$new_id" --argjson ids "$(projects_registry_preset_ids "$drafts")" '. + {($p):$ids}' <<<"$presets" 2>/dev/null) || presets='{}'
+        done <<<"$new_ids"
+      fi
+      [[ -n "$presets" ]] || presets='{}'
       jq -c --argjson checkouts "$checkouts" --argjson presets "$presets" '.args.checkouts=$checkouts | .args.presets=$presets' <<<"$request"
       ;;
     *) printf '%s\n' "$request" ;;
