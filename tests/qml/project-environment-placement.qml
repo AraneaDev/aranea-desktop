@@ -364,8 +364,48 @@ ShellRoot {
       returnTests()
     })
   }
+  // Return refuses a workspace a newer dedicated environment took; Recover relocates.
   function returnTests() {
-    // Task 4 replaces this body.
-    t.done()
+    var stale = 'e-11111111-0000-4000-8000-000000000002'
+    setState(function (project) {
+      project.workspaceMode = 'dedicated'
+      // A newer dedicated environment now owns workspace 2, which has its windows.
+      var newer = staleEnvironment('e-22222222-0000-4000-8000-000000000002', 2, 9000)
+      newer.activationId = 'a-22222222-0000-4000-8000-000000000002'
+      newer.mode = 'dedicated'
+      project.environments.push(newer)
+    }, function () {
+      root.occupied = root.occupied.concat([
+        {
+          id: 2,
+          windows: 1
+        }
+      ])
+      var focusCount = focused.length
+      var refused = owner.returnEnvironment({
+        projectId: 'p-one',
+        environmentId: stale
+      })
+      complete(refused, function () {
+        t.equal(failure(owner.operation(refused.operationId)), 'ENVIRONMENT_CHANGED', 'return refuses a workspace another environment claimed')
+        t.equal(focused.length, focusCount, 'refused return focuses nothing')
+        var before = launched.length
+        var recovery = owner.recoverEnvironment({
+          projectId: 'p-one',
+          environmentId: stale,
+          activationId: payload(30).activationId,
+          newWindowRole: 'editor'
+        })
+        t.check(recovery.ok, 'released record accepts recovery')
+        complete(recovery, function () {
+          var moved = environmentNamed(stale).workspaceId
+          t.check(moved !== 2, 'recovery moves off the claimed workspace')
+          t.equal(launched.slice(before).map(function (spec) {
+            return spec.workspaceId
+          }), [moved], 'recovered role launches on the relocated workspace')
+          t.done()
+        })
+      })
+    })
   }
 }

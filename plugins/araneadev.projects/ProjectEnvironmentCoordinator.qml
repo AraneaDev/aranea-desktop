@@ -504,14 +504,44 @@ Item {
         owner.readDesktop(function (data) {
           if (!owner.current(id, generation, session))
             return
-          if (!workspaceAvailable(data, op.workspaceId)) {
-            owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The original workspace is unavailable.')
+          if (workspaceAvailable(data, op.workspaceId) && !claimedElsewhere(env)) {
+            focusAndLaunch(id)
             return
           }
-          focusAndLaunch(id)
+          // Released records move: dedicated to the lowest empty workspace, shared to the current one.
+          var shared = env.mode === 'current'
+          var next = !data.available ? null : shared ? data.currentWorkspaceId : owner.chooseEnvironmentWorkspace(data)
+          if (!(Number.isInteger(next) && next > 0)) {
+            if (shared && data.available)
+              owner.failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
+            else
+              owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The original workspace is unavailable.')
+            return
+          }
+          owner.mutate(id, 'environment-associate', {
+            projectId: op.projectId,
+            environmentId: op.environmentId,
+            previousWorkspaceId: op.workspaceId,
+            workspaceId: next
+          }, function () {
+            var moved = owner.operation(id)
+            owner.publish(Object.assign({}, moved, {
+              workspaceId: next,
+              environment: Object.assign({}, moved.environment, {
+                workspaceId: next
+              })
+            }))
+            focusAndLaunch(id)
+          })
         })
       }, '')
     }, '')
+  }
+  // A newer dedicated environment on the same workspace owns it now.
+  function claimedElsewhere(env: var): bool {
+    return owner.environmentRecords().some(function (row) {
+      return row.id !== env.id && row.mode !== 'current' && row.workspaceId === env.workspaceId && row.createdAt > env.createdAt
+    })
   }
   // A saved ID alone cannot prove that a workspace exists in the current desktop.
   function workspaceAvailable(data: var, workspace: int): bool {
@@ -532,6 +562,10 @@ Item {
       })[0]
       if (!env) {
         owner.failOperation(id, 'ENVIRONMENT_NOT_FOUND', 'The environment is unavailable.')
+        return
+      }
+      if (claimedElsewhere(env)) {
+        owner.failOperation(id, 'ENVIRONMENT_CHANGED', 'Another environment now uses this workspace. Start working to open a new one.')
         return
       }
       owner.readDesktop(function (data) {
