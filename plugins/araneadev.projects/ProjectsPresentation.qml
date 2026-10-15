@@ -356,7 +356,7 @@ Item {
   // Capture shared observations once, independently of a full Actions view.
   function actionSnapshot() {
     var saved = {};
-    ['snapshot', 'currentRun', 'runId', 'requestId', 'submissionUncertain', 'submissionTarget', 'availability', 'available', 'error', 'output', 'truncated', 'summaryError'].forEach(function (key) {
+    ['snapshot', 'snapshotProjectId', 'currentRun', 'runId', 'requestId', 'submissionUncertain', 'submissionTarget', 'availability', 'available', 'error', 'output', 'truncated', 'summaryError'].forEach(function (key) {
       saved[key] = actionClient[key]
     })
     return saved
@@ -370,6 +370,7 @@ Item {
         runs: [],
         requests: []
       },
+      snapshotProjectId: '',
       currentRun: null,
       runId: '',
       requestId: '',

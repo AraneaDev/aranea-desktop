@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+# Read-only detection maps repository declarations to inert configure drafts.
+set -euo pipefail
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo_root/tests/lib/sandbox.sh"
+detector="$repo_root/scripts/aranea-project-detect"
+work="$ARANEA_TEST_SANDBOX/work"
+mkdir -p "$work"
+# Fresh fixture checkout per case.
+repo() {
+  rm -rf -- "${work:?}/$1"
+  mkdir -p "$work/$1"
+  printf '%s\n' "$work/$1"
+}
+# Run the detector with optional saved definitions on stdin.
+detect() {
+  local dir=$1 saved=${2:-[]}
+  shift 2 || shift $#
+  printf '%s\n' "$saved" | "$detector" --root "$dir" "$@" >"$TMPDIR/out"
+}
+# Assert a jq predicate against the latest output, printing it on failure.
+expect() {
+  jq -e "$1" "$TMPDIR/out" >/dev/null || {
+    echo "FAIL: $2" >&2
+    jq . "$TMPDIR/out" >&2
+    exit 1
+  }
+}
+# One suggestion by key.
+s() { printf '.suggestions[]|select(.key=="%s")' "$1"; }
+
+# Usage errors exit 2 without output.
+status=0
+"$detector" --root </dev/null >/dev/null 2>&1 || status=$?
+[[ $status == 2 ]]
+
+# Empty checkout: every source absent, no suggestions.
+r=$(repo empty)
+detect "$r"
+expect '.suggestions==[] and ([.sources[]|select(.status=="absent")|.source]|sort)==["cargo","composer","justfile","makefile","package.json","python"]' 'empty checkout'
+
+# npm default, lifecycle and pre/post hooks skipped, service classification, evidence.
+r=$(repo npm)
+cat >"$r/package.json" <<'JSON'
+{"scripts":{"test":"node --test","pretest":"lint","build":"tsc","postinstall":"x","prepare":"husky",
+ "dev":"vite","dev:api":"node api.js --port 4000","start":"PORT=8080 node server.js","preview":"vite preview",
+ "watch":"tsc -w","serve":"next dev","lint":"eslint ."}}
+JSON
+detect "$r"
+expect "$(s 'package.json:.:test')|.definition==({name:\"test\",kind:\"command\",argv:[\"npm\",\"run\",\"test\"],cwdRelative:\".\",timeoutSeconds:300,previewUrl:null})" 'npm test command'
+expect '[.suggestions[].entry]|index("pretest")==null and index("postinstall")==null and index("prepare")==null' 'lifecycle skipped'
+expect "$(s 'package.json:.:dev')|.definition.kind==\"service\" and .definition.previewUrl==\"http://127.0.0.1:5173/\" and .previewEvidence==\"Vite default port\" and .definition.timeoutSeconds==null" 'vite default'
+expect "$(s 'package.json:.:dev:api')|.definition.previewUrl==\"http://127.0.0.1:4000/\" and .previewEvidence==\"Port set in the command\"" 'explicit --port'
+expect "$(s 'package.json:.:start')|.definition.previewUrl==\"http://127.0.0.1:8080/\" and .previewEvidence==\"PORT set in the command\"" 'PORT= prefix'
+expect "$(s 'package.json:.:preview')|.definition.kind==\"service\" and .definition.previewUrl==null and .previewEvidence==null" 'vite preview has no evidence'
+expect "$(s 'package.json:.:watch')|.definition.kind==\"service\" and .definition.previewUrl==null" 'watch service without port'
+expect "$(s 'package.json:.:serve')|.definition.previewUrl==\"http://127.0.0.1:3000/\"" 'next dev default'
+expect "$(s 'package.json:.:lint')|.definition.kind==\"command\" and .label==\"lint\"" 'lint command'
+expect '.sources[]|select(.source=="package.json")|.status=="found"' 'package.json found'
+
+# PORT=N counts only as a leading assignment.
+r=$(repo portlate)
+printf '{"scripts":{"start":"node server.js PORT=9","serve":"echo PORT=9"}}\n' >"$r/package.json"
+detect "$r"
+expect "($(s 'package.json:.:start')|.definition.previewUrl==null and .previewEvidence==null) and ($(s 'package.json:.:serve')|.definition.previewUrl==null)" 'trailing PORT= is not evidence'
+
+# Package manager: packageManager field beats lockfiles; lockfiles pick pnpm/yarn/bun.
+r=$(repo pm)
+printf '{"scripts":{"test":"x"}}\n' >"$r/package.json"
+for case in pnpm-lock.yaml:pnpm yarn.lock:yarn bun.lock:bun bun.lockb:bun; do
+  rm -f "$r"/*.lock* "$r"/pnpm-lock.yaml
+  touch "$r/${case%%:*}"
+  detect "$r"
+  expect "$(s 'package.json:.:test')|.definition.argv[0]==\"${case##*:}\"" "lockfile ${case%%:*}"
+done
+printf '{"packageManager":"yarn@4.1.0","scripts":{"test":"x"}}\n' >"$r/package.json"
+detect "$r"
+expect "$(s 'package.json:.:test')|.definition.argv[0]==\"yarn\"" 'packageManager precedence'
+
+# Workspaces: object form, dir/* expansion, literal folders, pnpm yaml, escapes ignored.
+r=$(repo mono)
+mkdir -p "$r/apps/web" "$r/apps/docs" "$r/packages/ui" "$r/tools/cli" "$work/outside"
+printf '{"workspaces":{"packages":["apps/*","tools/cli","../outside","/abs","packages/**","!apps/docs"]},"scripts":{"test":"x"}}\n' >"$r/package.json"
+printf '{"scripts":{"dev":"vite --port 5174"}}\n' >"$r/apps/web/package.json"
+printf '{"scripts":{"build":"x"}}\n' >"$r/apps/docs/package.json"
+printf '{"scripts":{"build":"x"}}\n' >"$r/tools/cli/package.json"
+printf '{"scripts":{"test":"x"}}\n' >"$r/packages/ui/package.json"
+printf '{"scripts":{"evil":"x"}}\n' >"$work/outside/package.json"
+ln -s "$work/outside" "$r/apps/linked"
+touch "$r/pnpm-lock.yaml"
+detect "$r"
+expect "$(s 'package.json:apps/web:dev')|.definition==({name:\"web: dev\",kind:\"service\",argv:[\"pnpm\",\"run\",\"dev\"],cwdRelative:\"apps/web\",timeoutSeconds:null,previewUrl:\"http://127.0.0.1:5174/\"}) and .label==\"apps/web · dev\" and .sourcePath==\"apps/web/package.json\"" 'workspace package'
+expect "$(s 'package.json:tools/cli:build')|.definition.cwdRelative==\"tools/cli\"" 'literal workspace folder'
+expect '[.suggestions[].key]|map(select(test("outside|linked|packages/ui")))==[]' 'workspace escape'
+expect "$(s 'package.json:apps/docs:build')|.definition.cwdRelative==\"apps/docs\"" 'negations ignored, not applied'
+printf '{"scripts":{"test":"x"}}\n' >"$r/package.json"
+printf 'packages:\n  - "packages/*"   # shared\n  - '"'"'apps/web'"'"'\nother: 1\n' >"$r/pnpm-workspace.yaml"
+detect "$r"
+expect "($(s 'package.json:packages/ui:test')|.definition.argv[0]==\"pnpm\") and ([.suggestions[].key]|index(\"package.json:apps/docs:build\")==null)" 'pnpm-workspace.yaml'
+
+# Workspace limit: 33 packages → first 32 and truncated.
+r=$(repo many)
+printf '{"workspaces":["p/*"],"scripts":{}}\n' >"$r/package.json"
+for i in $(seq -w 1 33); do
+  mkdir -p "$r/p/$i"
+  printf '{"scripts":{"t":"x"}}\n' >"$r/p/$i/package.json"
+done
+detect "$r"
+expect '([.suggestions[]|select(.source=="package.json")]|length)==32 and (.sources[]|select(.source=="package.json")|.status=="truncated")' 'workspace limit'
+
+# Suggestion limit: 101 scripts → 100 and truncated.
+r=$(repo big)
+jq -n '{scripts:([range(101)]|map({key:"s\(.)",value:"x"})|from_entries)}' >"$r/package.json"
+detect "$r"
+expect '(.suggestions|length)==100 and (.sources[]|select(.source=="package.json")|.status=="truncated")' 'suggestion limit'
+
+# Hostile script bodies stay literal and never run.
+r=$(repo hostile)
+# shellcheck disable=SC2016
+jq -n '{scripts:{"dev":"$(touch PWNED) `touch PWNED2` \"q\" --port 3001\nsecond","bad\u0001name":"x"}}' >"$r/package.json"
+detect "$r"
+[[ ! -e $r/PWNED && ! -e $r/PWNED2 ]]
+expect "$(s 'package.json:.:dev')|.definition.argv==[\"npm\",\"run\",\"dev\"] and .definition.previewUrl==\"http://127.0.0.1:3001/\"" 'hostile script literal'
+expect '[.suggestions[].entry]|map(select(test("bad")))==[]' 'control characters skipped'
+
+# Entry names starting with "-" would reach the runner as options; they are skipped.
+r=$(repo dashname)
+jq -n '{scripts:{"--prefix=/tmp":"x","-x":"y","ok":"z"}}' >"$r/package.json"
+jq -n '{scripts:{"--evil":"x","fine":"y"}}' >"$r/composer.json"
+printf '[project]\nname = "x"\n[project.scripts]\n"--with=evil" = "x:y"\ngood = "x:z"\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$(command -v python3)"
+expect '[.suggestions[].entry]|sort==["fine","good","ok"]' 'dash-leading names skipped'
+expect '[.suggestions[].definition.argv[]|select(startswith("-"))]==[]' 'no option-like argv'
+
+# Workspace child folders are validated like declared ones: a newline-named
+# folder must not inject an undeclared package folder.
+r=$(repo wsnewline)
+mkdir -p "$r/apps/a"$'\n'"secret" "$r/secret" "$r/apps/web"
+printf '{"workspaces":["apps/*"],"scripts":{}}\n' >"$r/package.json"
+printf '{"scripts":{"evil":"x"}}\n' >"$r/secret/package.json"
+printf '{"scripts":{"build":"x"}}\n' >"$r/apps/web/package.json"
+detect "$r"
+expect '([.suggestions[].key]|map(select(test("secret|evil")))==[]) and ([.suggestions[].key]|index("package.json:apps/web:build")!=null)' 'newline workspace child rejected'
+
+# Malformed, oversized and symlinked package.json.
+r=$(repo malformed)
+printf '{"scripts":' >"$r/package.json"
+detect "$r"
+expect '.suggestions==[] and (.sources[]|select(.source=="package.json")|.status=="invalid" and .reason=="package.json could not be read.")' 'malformed json'
+r=$(repo oversized)
+head -c 1048577 /dev/zero | tr '\0' ' ' >"$r/package.json"
+detect "$r"
+expect '.sources[]|select(.source=="package.json")|.status=="truncated" and (.reason|test("larger than 1 MiB"))' 'oversized file'
+r=$(repo linked)
+printf '{"scripts":{"evil":"x"}}\n' >"$work/outside/real.json"
+ln -s "$work/outside/real.json" "$r/package.json"
+detect "$r"
+expect '.suggestions==[] and (.sources[]|select(.source=="package.json")|.status=="invalid")' 'symlinked file refused'
+
+# alreadySaved compares argv and cwdRelative only.
+r=$(repo saved)
+printf '{"scripts":{"test":"x","build":"y"}}\n' >"$r/package.json"
+detect "$r" '[{"argv":["npm","run","test"],"cwdRelative":"."},{"argv":["npm","run","build"],"cwdRelative":"sub"}]'
+expect "($(s 'package.json:.:test')|.alreadySaved) and ($(s 'package.json:.:build')|.alreadySaved|not)" 'alreadySaved'
+# Large saved definitions (beyond the argument length limit) still mark alreadySaved,
+# and multi-document stdin falls back to nothing saved instead of failing.
+big=$(head -c 16000 /dev/zero | tr '\0' 'a')
+jq -cn --arg b "$big" '[range(50)|{argv:["x",$b,"\(.)"],cwdRelative:"."}]+[{argv:["npm","run","test"],cwdRelative:"."}]' >"$TMPDIR/saved-big"
+"$detector" --root "$r" <"$TMPDIR/saved-big" >"$TMPDIR/out"
+expect "($(s 'package.json:.:test')|.alreadySaved) and ($(s 'package.json:.:build')|.alreadySaved|not)" 'large saved definitions'
+printf '[{"argv":["npm","run","test"],"cwdRelative":"."}]\n[]\n' | "$detector" --root "$r" >"$TMPDIR/out"
+expect "($(s 'package.json:.:test')|.alreadySaved|not) and (.suggestions|length)==2" 'multi-document saved ignored'
+# Make edge cases: phony first, assignments, patterns, specials, define blocks, file targets.
+r=$(repo make)
+cat >"$r/Makefile" <<'MAKE'
+CC := gcc
+X ::= y
+Y ?= z
+build: main.o
+	$(CC) -o app main.o
+main.o: main.c
+%.o: %.c
+.SUFFIXES:
+define RECIPE
+fake: target
+endef
+dev serve: build
+lint: CFLAGS=-Wall
+-include extra.mk
+.PHONY: test lint build.release
+test:
+build.release:
+MAKE
+detect "$r"
+expect '[.suggestions[]|select(.source=="makefile")|.entry]==["lint","test","build.release","build","dev","serve"]' 'make edge cases'
+expect "$(s 'makefile:.:dev')|.definition.kind==\"service\" and .definition.argv==[\"make\",\"dev\"] and .sourcePath==\"Makefile\"" 'make service'
+expect '.sources[]|select(.source=="makefile")|.status=="found"' 'make found'
+r=$(repo gnumake)
+printf 'a:\n' >"$r/GNUmakefile"
+printf 'b:\n' >"$r/Makefile"
+detect "$r"
+expect '[.suggestions[]|select(.source=="makefile")|.entry]==["a"]' 'GNUmakefile wins'
+
+# justfile through a fake just: public recipes without required parameters.
+r=$(repo just)
+printf 'test:\n\techo hi\n' >"$r/justfile"
+fake_just="$ARANEA_TEST_SANDBOX/bin/just"
+mkdir -p "$(dirname "$fake_just")"
+cat >"$fake_just" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${ARANEA_TEST_SANDBOX:?}/just-args"
+cat <<'JSON'
+{"recipes":{"test":{"name":"test","private":false,"attributes":[],"parameters":[]},
+"_hidden":{"name":"_hidden","private":false,"attributes":[],"parameters":[]},
+"secret":{"name":"secret","private":false,"attributes":["private"],"parameters":[]},
+"deploy":{"name":"deploy","private":false,"attributes":[],"parameters":[{"name":"env","default":null,"kind":"singular"}]},
+"fmt":{"name":"fmt","private":false,"attributes":[],"parameters":[{"name":"args","default":null,"kind":"star"}]},
+"serve":{"name":"serve","private":false,"attributes":[],"parameters":[{"name":"port","default":"8000","kind":"singular"}]}}}
+JSON
+SH
+chmod +x "$fake_just"
+detect "$r" '[]' --just "$fake_just"
+expect '[.suggestions[]|select(.source=="justfile")|.entry]==["test","fmt","serve"]' 'just recipes'
+expect "$(s 'justfile:.:serve')|.definition.kind==\"service\" and .definition.argv==[\"just\",\"serve\"]" 'just service'
+grep -q -- '--dump --dump-format json' "$ARANEA_TEST_SANDBOX/just-args"
+detect "$r"
+expect '.sources[]|select(.source=="justfile")|.status=="unavailable" and .reason=="Needs just"' 'just missing'
+printf '#!/usr/bin/env bash\necho nope\n' >"$fake_just"
+detect "$r" '[]' --just "$fake_just"
+expect '.sources[]|select(.source=="justfile")|.status=="invalid"' 'just dump unreadable'
+
+# A rule error on valid JSON of an unexpected shape marks only that source invalid.
+printf '{"scripts":{"test":"x"},"workspaces":{"packages":5}}\n' >"$r/package.json"
+printf '#!/usr/bin/env bash\necho '"'"'{"recipes":{"a":"x"}}'"'"'\n' >"$fake_just"
+detect "$r" '[]' --just "$fake_just"
+expect '.sources[]|select(.source=="justfile")|.status=="invalid"' 'just odd shape invalid'
+expect '[.suggestions[]|select(.source=="justfile")]==[] and ([.suggestions[]|select(.source=="package.json")|.entry]==["test"])' 'odd just keeps other sources'
+python=$(command -v python3)
+# Cargo package with a binary, workspace root, malformed and unavailable.
+r=$(repo cargo)
+mkdir -p "$r/src"
+printf '[package]\nname = "app"\nversion = "0.1.0"\n' >"$r/Cargo.toml"
+touch "$r/src/main.rs"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.definition.argv]==[["cargo","test"],["cargo","build"],["cargo","clippy"],["cargo","run"]]' 'cargo package'
+rm "$r/src/main.rs"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.entry]|index("run")==null' 'cargo library has no run'
+printf '[package]\nname = "app"\n[[bin]]\nname = "tool"\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.entry]|index("run")!=null' 'cargo [[bin]]'
+printf '[workspace]\nmembers = ["a", "b"]\n[package]\nname = "root"\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.definition.argv]==[["cargo","test","--workspace"],["cargo","build","--workspace"],["cargo","clippy","--workspace"]]' 'cargo workspace'
+printf '[package\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '.sources[]|select(.source=="cargo")|.status=="invalid" and .reason=="Cargo.toml could not be read."' 'cargo malformed'
+detect "$r"
+expect '.sources[]|select(.source=="cargo")|.status=="unavailable" and .reason=="Needs python3"' 'cargo needs python3'
+
+# Python: uv/poetry/bare runners, pytest detection, project scripts.
+r=$(repo py)
+cat >"$r/pyproject.toml" <<'TOML'
+[project]
+name = "app"
+dependencies = ["requests"]
+[project.optional-dependencies]
+test = ["pytest>=8"]
+[project.scripts]
+app-cli = "app:main"
+TOML
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="python")|.definition.argv]==[["pytest"],["app-cli"]]' 'python bare'
+touch "$r/uv.lock"
+detect "$r" '[]' --python "$python"
+expect "$(s 'python:.:pytest')|.definition.argv==[\"uv\",\"run\",\"pytest\"]" 'uv runner'
+rm "$r/uv.lock"
+touch "$r/poetry.lock"
+detect "$r" '[]' --python "$python"
+expect "$(s 'python:.:app-cli')|.definition.argv==[\"poetry\",\"run\",\"app-cli\"]" 'poetry runner'
+rm "$r/poetry.lock"
+printf '[project]\nname = "x"\ndependencies = ["pytest-cov"]\n[dependency-groups]\ndev = [{include-group = "x"}]\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="python")]==[]' 'pytest-cov is not pytest; include-group ignored'
+printf '[tool.pytest.ini_options]\naddopts = "-q"\n[tool.uv]\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$python"
+expect "$(s 'python:.:pytest')|.definition.argv==[\"uv\",\"run\",\"pytest\"]" 'tool.pytest and tool.uv'
+
+# A python3 without tomllib reports unavailable, not invalid.
+fake_python="$ARANEA_TEST_SANDBOX/bin/python-old"
+printf '#!/usr/bin/env bash\nexit 3\n' >"$fake_python"
+chmod +x "$fake_python"
+detect "$r" '[]' --python "$fake_python"
+expect '.sources[]|select(.source=="python")|.status=="unavailable" and .reason=="Needs python3 with tomllib"' 'no tomllib'
+
+# TOML that parses but has an unexpected shape marks only that source invalid.
+printf '[project]\nname = "x"\nscripts = "x"\n' >"$r/pyproject.toml"
+printf '[package]\nname = "ok"\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '.sources[]|select(.source=="python")|.status=="invalid" and .reason=="pyproject.toml could not be read."' 'python odd shape invalid'
+printf '[project]\nname = "x"\ndependencies = "x"\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$python"
+expect '.sources[]|select(.source=="python")|.status=="invalid"' 'python odd dependencies invalid'
+expect '[.suggestions[]|select(.source=="python")]==[] and ([.suggestions[]|select(.source=="cargo")]|length>0)' 'odd python keeps other sources'
+# Composer scripts without event hooks; Laravel adds artisan test/serve.
+r=$(repo composer)
+cat >"$r/composer.json" <<'JSON'
+{"require":{"laravel/framework":"^11"},
+ "scripts":{"test":"phpunit","post-install-cmd":"x","pre-update-cmd":"y","dev":["@php artisan serve --port=8001","npm run dev"]}}
+JSON
+detect "$r"
+expect '[.suggestions[]|select(.source=="composer")|.entry]==["test","dev"]' 'composer hooks skipped, no artisan without file'
+expect "$(s 'composer:.:dev')|.definition.kind==\"service\" and .definition.previewUrl==\"http://127.0.0.1:8001/\"" 'composer array script evidence'
+touch "$r/artisan"
+detect "$r"
+expect "$(s 'composer:.:artisan serve')|.definition==({name:\"artisan serve\",kind:\"service\",argv:[\"php\",\"artisan\",\"serve\"],cwdRelative:\".\",timeoutSeconds:null,previewUrl:\"http://127.0.0.1:8000/\"}) and .previewEvidence==\"Laravel default port\"" 'laravel serve'
+expect "$(s 'composer:.:artisan test')|.definition.argv==[\"php\",\"artisan\",\"test\"]" 'laravel test'
+printf '{"scripts":{"test":"x"}}\n' >"$r/composer.json"
+detect "$r"
+expect '[.suggestions[]|select(.source=="composer")|.entry]==["test"]' 'artisan without laravel/framework'
+printf '[]\n' >"$r/composer.json"
+detect "$r"
+expect '.sources[]|select(.source=="composer")|.status=="invalid"' 'composer not an object'
+# A valid object with an unexpected shape marks only composer invalid.
+printf '{"require":"x"}\n' >"$r/composer.json"
+printf '{"name":"ok"}\n' >"$r/package.json"
+detect "$r"
+expect '.sources[]|select(.source=="composer")|.status=="invalid" and .reason=="composer.json could not be read."' 'composer odd require invalid'
+expect '.sources[]|select(.source=="package.json")|.status=="found"' 'odd composer keeps other sources'
+printf '{"scripts":{"test":{"a":1}}}\n' >"$r/composer.json"
+detect "$r"
+expect '.sources[]|select(.source=="composer")|.status!="absent"' 'composer object script value tolerated'
+echo 'project-detect: ok'

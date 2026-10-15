@@ -7,7 +7,8 @@
 project_actions_cli_capabilities() {
   local availability
   availability=$("$script_dir/aranea-project-actions" availability </dev/null) || availability='{"availability":null}'
-  jq -c '{availability:.availability,projectActions:{schemaVersion:1,namedDefinitions:true,headless:true,automaticExecution:false,automaticRestart:false,definitionDefaults:{commandTimeoutSeconds:300,serviceTimeoutSeconds:null},formDefaults:{cwdRelative:".",previewUrl:null},definitionFields:["id?","name","kind","argv","cwdRelative","timeoutSeconds?","previewUrl"],runOwnership:["bootId","unitName","transient","definitionHash","invocationId"],protection:"pending/running/unconfirmed processState or submissionUnconfirmed",lifetime:"user-manager; independent of UI and observers",journalSource:"local user journal; retention follows system policy",observationSeconds:10,transportTerminationGraceSeconds:0.2,backendTransportSeconds:60,bounds:{requestBytes:1048576,stateBytes:16777216,definitions:200,definitionsPerProject:50,protectedRuns:50,terminalRuns:100,terminalRetentionDays:7,receipts:512,argvItems:64,argumentCharacters:1024,argvBytes:16384,outputEntries:200,outputBytes:262144}},operations:[
+  jq -c '{availability:.availability,projectActions:{schemaVersion:1,namedDefinitions:true,headless:true,automaticExecution:false,automaticRestart:false,definitionDefaults:{commandTimeoutSeconds:300,serviceTimeoutSeconds:null},formDefaults:{cwdRelative:".",previewUrl:null},definitionFields:["id?","name","kind","argv","cwdRelative","timeoutSeconds?","previewUrl"],runOwnership:["bootId","unitName","transient","definitionHash","invocationId"],protection:"pending/running/unconfirmed processState or submissionUnconfirmed",lifetime:"user-manager; independent of UI and observers",journalSource:"local user journal; retention follows system policy",observationSeconds:10,transportTerminationGraceSeconds:0.2,backendTransportSeconds:60,bounds:{requestBytes:1048576,stateBytes:16777216,definitions:200,definitionsPerProject:50,protectedRuns:50,terminalRuns:100,terminalRetentionDays:7,receipts:512,argvItems:64,argumentCharacters:1024,argvBytes:16384,outputEntries:200,outputBytes:262144},detect:{readOnly:true,automaticSave:false,sources:["package.json","composer","makefile","justfile","cargo","python"],statuses:["found","absent","unavailable","invalid","truncated"],limits:{fileBytes:1048576,workspacePackages:32,suggestions:100,helperSeconds:2,deadlineSeconds:5}}},operations:[
+    {name:"projects.actions.detect",arguments:{projectId:{type:"string",required:true},checkout:{type:"string"}}},
     {name:"projects.actions.list",arguments:{projectId:{type:"string",required:true}}},
     {name:"projects.actions.configure",arguments:{projectId:{type:"string",required:true},"json-input":{type:"boolean",required:true},stdin:{type:"object",description:"definition draft or {definition,expectedRevision?}; save never executes"}}},
     {name:"projects.actions.remove",arguments:{projectId:{type:"string",required:true},actionId:{type:"string",required:true}}},
@@ -198,7 +199,7 @@ project_actions_cli_main() {
   shift 3
   cli_operation="projects.$group.$command"
   case "$group:$command" in
-    actions:list | actions:configure | actions:remove | actions:run)
+    actions:list | actions:configure | actions:remove | actions:run | actions:detect)
       [[ $# -ge 1 && $1 != -* && -n $1 ]] || projects_cli_usage
       project=$1
       shift
@@ -226,7 +227,7 @@ project_actions_cli_main() {
         shift
         continue
         ;;
-      actions:run:--checkout | actions:run:--request-id | actions:run:--definition-revision | runs:restart:--request-id | runs:list:--project) ;;
+      actions:run:--checkout | actions:detect:--checkout | actions:run:--request-id | actions:run:--definition-revision | runs:restart:--request-id | runs:list:--project) ;;
       *) projects_cli_usage ;;
     esac
     [[ $# -ge 2 && -n $2 && $2 != --* ]] || projects_cli_usage

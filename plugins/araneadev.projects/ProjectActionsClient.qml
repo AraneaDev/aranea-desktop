@@ -21,6 +21,10 @@ Item {
       runs: [],
       requests: []
     })
+  // Project whose backend-filtered state `snapshot` holds; cleared when the project changes.
+  property string snapshotProjectId: ''
+  // Suggestions compare against saved definitions only once the snapshot is this project's own.
+  readonly property bool suggestionsReady: projectId !== '' && snapshotProjectId === projectId
   // Selected exact run only; accepted IDs can outlive the selection.
   property var currentRun: null
   // Accepted or explicitly inspected retained ID for reconnection.
@@ -57,6 +61,28 @@ Item {
   property int summaryCursor: 0
   // Background failures never overwrite an explicit action's error or receipt.
   property var summaryError: null
+  // Read-only detection per exact project|checkout; never saved automatically.
+  property var detections: ({})
+  // Detection for the current selection, or null before the first read.
+  readonly property var detection: detections[projectId + '|' + checkoutId] || null
+  // A detection read is in flight for some selection.
+  property bool detecting: false
+  // The project|checkout key of the detection read in flight; empty when idle.
+  property string detectingKey: ''
+  // Detection reads supersede only other detection reads.
+  property int detectionGeneration: 0
+  // Remaining inert drafts of one Add all; each waits for the previous acknowledgement.
+  property var addQueue: []
+  // Size of the current or last Add all.
+  property int addTotal: 0
+  // Saves acknowledged so far by the current or last Add all.
+  property int addCount: 0
+  // {added,total,error,cancelled} once an Add all finishes; error is the first refusal or null.
+  property var addResult: null
+  // Mutation generation of the save this queue issued; other acknowledgements never advance it.
+  property int addToken: 0
+  // An Add all has started and not yet published its outcome.
+  readonly property bool addActive: addTotal > 0 && addResult === null
   onSummaryObservationActiveChanged: summaryGeneration++
   // Two-second presentation poll, active only for visible protected runs.
   property int pollInterval: 2000
@@ -139,7 +165,10 @@ Item {
     if (!captureActive)
       schedulePoll()
   }
-  onProjectIdChanged: selectionChanged()
+  onProjectIdChanged: {
+    snapshotProjectId = ''
+    selectionChanged()
+  }
   onCheckoutIdChanged: selectionChanged()
   onObservationActiveChanged: schedulePoll()
   onVisibleChanged: schedulePoll()
@@ -151,6 +180,11 @@ Item {
     snapshotGeneration++
     runGeneration++
     availabilityGeneration++
+    detectionGeneration++
+    detecting = false
+    detectingKey = ''
+    if (addActive)
+      finishAdd(null, true)
     poll.stop()
     if (submitting && requestId && submissionTarget)
       submissionUncertain = true
@@ -170,6 +204,9 @@ Item {
     output = ''
     truncated = false
     poll.stop()
+    if (addActive)
+      generation++
+    clearAdd()
   }
   // Require both project and checkout equality for attached presentation evidence.
   function matchesSelection(run: var): bool {
@@ -193,7 +230,7 @@ Item {
   }
   // Fixed private command argv and JSON stdin; errors can still carry accepted runs.
   function invoke(method: string, payload: var, fresh: var, done: var): void {
-    if (captureActive || ['snapshot', 'configure', 'remove', 'start', 'inspect', 'refresh', 'stop', 'restart', 'logs', 'open-preview', 'availability'].indexOf(method) < 0)
+    if (captureActive || ['snapshot', 'configure', 'remove', 'start', 'inspect', 'refresh', 'stop', 'restart', 'logs', 'open-preview', 'availability', 'detect'].indexOf(method) < 0)
       return
     var complete = function (code, text, diagnostics) {
       if (client.captureActive || !fresh())
@@ -266,6 +303,7 @@ Item {
       error = failure || response.error
       if (response && response.state) {
         snapshot = response.state
+        snapshotProjectId = selectedProject
         recoverReceipt(snapshot)
         changed()
       }
@@ -308,6 +346,108 @@ Item {
       payload.expectedRevision = expectedRevision
     return mutation('remove', payload)
   }
+  // Read the selected checkout's declared commands; cached until forced or failed.
+  function detect(force: bool): bool {
+    if (captureActive || !projectId || !checkoutId)
+      return false
+    var key = projectId + '|' + checkoutId
+    var cached = detections[key]
+    if (!force && (detecting && detectingKey === key || cached && !cached.error))
+      return false
+    var read = ++detectionGeneration
+    var target = {
+      projectId: projectId,
+      checkoutId: checkoutId
+    }
+    detecting = true
+    detectingKey = key
+    invoke('detect', target, function () {
+      return read === client.detectionGeneration
+    }, function (response, failure) {
+      client.detecting = false
+      client.detectingKey = ''
+      var next = Object.assign({}, client.detections)
+      next[key] = response && response.ok && response.checkoutId === target.checkoutId ? {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId,
+        suggestions: Array.isArray(response.suggestions) ? response.suggestions : [],
+        sources: Array.isArray(response.sources) ? response.sources : [],
+        error: null
+      } : {
+        projectId: target.projectId,
+        checkoutId: target.checkoutId,
+        suggestions: [],
+        sources: [],
+        error: failure || (response && response.error) || client.transportError('')
+      }
+      client.detections = next
+    })
+    return true
+  }
+  // Save drafts one at a time through configure; never start a run.
+  function addSuggestions(definitions: var): bool {
+    if (captureActive || pending || submissionUncertain || addActive || !Array.isArray(definitions) || !definitions.length)
+      return false
+    addResult = null
+    addTotal = definitions.length
+    addCount = 0
+    addQueue = definitions.slice(1)
+    // The save's generation is claimed first so a synchronous acknowledgement still advances.
+    addToken = generation + 1
+    if (!configure(definitions[0], undefined)) {
+      finishAdd(addStartError(), false)
+      return false
+    }
+    return true
+  }
+  // Advance or stop the queue after one acknowledged save.
+  function advanceAdd(response: var): void {
+    if (!addActive)
+      return
+    if (!response || !response.ok) {
+      finishAdd(response ? response.error : transportError(''), false)
+      return
+    }
+    addCount++
+    if (!addQueue.length) {
+      finishAdd(null, false)
+      return
+    }
+    var next = addQueue[0]
+    addQueue = addQueue.slice(1)
+    addToken = generation + 1
+    if (!configure(next, undefined))
+      finishAdd(addStartError(), false)
+  }
+  // Local refusal for a queued save that could not begin; never the client's unrelated error.
+  function addStartError(): var {
+    return {
+      code: 'SAVE_NOT_STARTED',
+      message: 'The next save could not start.',
+      recovery: 'Wait for the current change to finish, then add the remaining commands again.'
+    }
+  }
+  // Publish the Add all outcome; remaining drafts are dropped, never retried.
+  function finishAdd(failure: var, cancelled: bool): void {
+    addQueue = []
+    addResult = {
+      added: addCount,
+      total: addTotal,
+      error: failure || null,
+      cancelled: cancelled === true
+    }
+  }
+  // Forget the queue and its outcome; a result never outlives its project.
+  function clearAdd(): void {
+    addQueue = []
+    addTotal = 0
+    addCount = 0
+    addResult = null
+  }
+  onRequestFinished: function (response) {
+    if (addActive && addToken === generation)
+      advanceAdd(response)
+  }
   // Submit one inert definition mutation; never call Start implicitly.
   function mutation(method: string, payload: var): bool {
     if (captureActive || pending || submissionUncertain)
@@ -323,6 +463,7 @@ Item {
       if (response && response.state && payload.projectId === projectId) {
         snapshotGeneration++
         snapshot = response.state
+        snapshotProjectId = payload.projectId
         changed()
       }
       requestFinished(response)
@@ -408,6 +549,7 @@ Item {
             if (response.state && client.projectId === target.projectId) {
               client.snapshotGeneration++
               client.snapshot = response.state
+              client.snapshotProjectId = target.projectId
               client.changed()
             }
           }
@@ -504,6 +646,7 @@ Item {
           if (response.state) {
             snapshotGeneration++
             snapshot = response.state
+            snapshotProjectId = selectedProject
             changed()
           }
           if (method === 'logs') {
@@ -568,6 +711,7 @@ Item {
       client.summaryError = response.error
       client.snapshotGeneration++
       client.snapshot = state
+      client.snapshotProjectId = read.projectId
       client.changed()
     }
     try {

@@ -181,12 +181,29 @@ ColumnLayout {
       conflictRefreshPending = true
     actions.client.refresh()
     actions.client.checkAvailability()
+    detectSuggestions(true)
   }
   // Explicit creation opens a local draft, with no backend or execution request.
   function addAction(): void {
     if (displayOnly || actions.client.pending)
       return
     editor.begin(null, actions.client.snapshot.revision)
+    draftProjectId = project ? project.id : ''
+    editConflict = false
+    conflictRefreshed = false
+    editing = true
+  }
+  // Detection reads only; it runs when the page is visible or explicitly refreshed.
+  function detectSuggestions(force: bool): void {
+    if (displayOnly || actions.client.captureActive || !active || !visible || !project || !checkout)
+      return
+    actions.client.detect(force)
+  }
+  // A suggestion opens as a new local draft; Save follows the usual draft rules.
+  function editSuggestion(definition: var): void {
+    if (displayOnly || actions.client.pending || !definition)
+      return
+    editor.begin(definition, actions.client.snapshot.revision)
     draftProjectId = project ? project.id : ''
     editConflict = false
     conflictRefreshed = false
@@ -306,7 +323,12 @@ ColumnLayout {
     }
     scheduleRefresh()
   }
-  onCheckoutChanged: scheduleRefresh()
+  onCheckoutChanged: {
+    scheduleRefresh()
+    detectSuggestions(false)
+  }
+  onActiveChanged: detectSuggestions(false)
+  onVisibleChanged: detectSuggestions(false)
   spacing: Style.space(8)
   Aranea.UiLabel {
     text: 'Workflow actions'
@@ -369,9 +391,21 @@ ColumnLayout {
       onClicked: actions.addAction()
     }
   }
-  Aranea.UiLabel {
+  ProjectActionSuggestions {
+    id: suggestionsSection
     Layout.fillWidth: true
-    visible: !actions.definitions.length
+    client: actions.client
+    definitions: actions.definitions
+    displayOnly: actions.displayOnly
+    pointerGate: actions.pointerGate
+    onEditRequested: function (definition) {
+      actions.editSuggestion(definition)
+    }
+  }
+  Aranea.UiLabel {
+    objectName: 'actionsEmptyFallback'
+    Layout.fillWidth: true
+    visible: !actions.definitions.length && !actions.client.detecting && suggestionsSection.rows.length === 0
     text: 'No actions yet. Add action to define a test, build, or dev server. Examples are available in the editor.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }

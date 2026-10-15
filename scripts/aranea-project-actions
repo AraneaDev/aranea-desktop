@@ -48,6 +48,13 @@ case "$operation" in
     runtime_store snapshot
     jq --slurpfile r "$scratch/request" 'if $r[0].projectId then .state.definitions|=map(select(.projectId==$r[0].projectId)) | .state.runs|=map(select(.projectId==$r[0].projectId)) | .state.runs as $runs | .state.requests|=map(select(.runId as $id | any($runs[];.id==$id))) else . end' "$scratch/result"
     ;;
+  detect)
+    # Detection reads only; it never holds dispatch authority across repository I/O.
+    runtime_store snapshot
+    runtime_ungate
+    runtime_detect
+    cat "$scratch/result"
+    ;;
   start)
     runtime_start
     cat "$scratch/result"

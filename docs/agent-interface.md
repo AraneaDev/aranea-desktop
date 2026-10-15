@@ -530,6 +530,7 @@ schema 1 JSONL protocol. IDs below are opaque IDs returned by list/configure/run
 aranea projects actions list PROJECT_ID
 aranea projects actions configure PROJECT_ID --json-input
 aranea projects actions remove PROJECT_ID ACTION_ID
+aranea projects actions detect PROJECT_ID [--checkout CHECKOUT_ID]
 aranea projects actions run PROJECT_ID ACTION_ID [--checkout CHECKOUT_ID]
     [--request-id REQ_ID] [--definition-revision INTEGER]
 aranea projects runs list [--project PROJECT_ID]
@@ -560,6 +561,41 @@ must itself be saved as the executable with its arguments. There are no runtime
 command overrides, environment-value fields, repository manifests, automatic
 dependency installation, privilege prompts, automatic execution or automatic
 restart. Configuration is local to Aranea, outside the repository.
+
+`detect` reads the selected exact checkout's own command declarations and
+returns suggestions; it saves and runs nothing. Sources are `package.json`
+scripts (package manager from `packageManager`, else the lockfile), Composer
+scripts and Laravel `artisan`, Makefile targets, justfile recipes (through
+`just --dump`), Cargo and `pyproject.toml` (through `python3 -I` and
+`tomllib`). Only the root and workspaces declared by `package.json` or
+`pnpm-workspace.yaml` are read. Each suggestion's `definition` is a
+`configure` draft; `alreadySaved` compares `argv` and `cwdRelative`. Per-source
+`status` is `found`, `absent`, `unavailable` (helper missing), `invalid` or
+`truncated`; one failing source, including one that cannot be read, never
+fails the request. Names starting with `-` are never suggested, so no entry
+reaches its runner as an option. Files must be regular files inside the checkout without
+symlinks; limits are 1 MiB per file, 32 workspace packages, 100 suggestions,
+2 s per helper and 5 s overall. Preview URLs are set only from explicit command
+text (`--port N`, `--port=N`, `-p N`, or a leading `PORT=N` assignment) or a
+framework's fixed default, and `previewEvidence` says which. Reading
+declarations does not make them repository manifests: saved actions remain
+local definitions. Detection is read-only, but like other action operations it
+is refused while action ingress is retired or draining.
+
+The `detect` backend response, carried as the final CLI event's `data`, is
+`{ok,state,error,projectId,checkoutId,suggestions,sources}`; `state` is always
+`null`, and `checkoutId` names the exact checkout that was read. Each
+suggestion has `key` (`source:cwdRelative:entry`, stable across reads),
+`source`, `sourcePath` (checkout-relative declaring file), `entry`, `label`,
+`definition`, `previewEvidence` (or `null`) and `alreadySaved`. Each `sources`
+row is `{source,status,reason}`, with `reason` `null` unless there is something
+to explain. Refusals use `PROJECT_NOT_FOUND` (the project is not registered),
+`CHECKOUT_INVALID` (the exact checkout is not registered or unavailable),
+`REGISTRY_INVALID` (the project registry could not be read), `DETECTION_FAILED`
+(the detector itself failed; individual source failures never do this) and
+`INVALID_REQUEST` (malformed request fields). `just --dump` resolves the
+justfile's own `import` and `mod` statements; just only parses them and runs
+no recipe.
 
 To edit, include the saved action `id`. For revision-checked edits, stdin may
 instead be exactly `{"definition":{...},"expectedRevision":42}`, where 42 is the
@@ -601,8 +637,10 @@ immutable command marker and pinned invocation must match before control.
 
 `aranea capabilities --json` includes action operation schemas, `projectActions`
 lifetime/bounds contracts and `availability.projectActions` execution, userManager,
-journal, previewProbe and opener flags. Execution requires a responsive systemd
-user manager and systemd-run 254+; the shell panel may be closed. Execution uses
+journal, previewProbe and opener flags, plus `detectJust` (`just` is present)
+and `detectToml` (a `python3` with `tomllib` is present), the helpers `detect`
+needs. Execution requires a responsive systemd user manager and systemd-run
+254+; the shell panel may be closed. Execution uses
 transient user services, noninteractive stdin, no automatic restart, and whole
 control-group stopping. Services are not enabled at login and do not promise to
 survive logout, user-manager shutdown or reboot. Definition/status metadata remains
