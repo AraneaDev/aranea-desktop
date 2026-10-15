@@ -297,6 +297,7 @@ All commands accept `--json` and preserve the existing schema-1 JSONL/exit conve
 aranea projects profiles list PROJECT_ID
 aranea projects profiles save PROJECT_ID --definition JSON [--expected-profile-revision N]
 aranea projects profiles remove PROJECT_ID PROFILE_ID --expected-profile-revision N
+aranea projects profiles seed PROJECT_ID
 aranea projects start PROJECT_ID --profile PROFILE_ID
 aranea projects environments list --project PROJECT_ID
 aranea projects environments return ENVIRONMENT_ID
@@ -305,8 +306,12 @@ aranea projects activation ACTIVATION_ID
 ```
 
 Profile list returns `data.profiles` and `lastProfileId`. Save/remove return the
-acknowledged `data.state`. Configuration works without a desktop owner. A newly
-registered CLI project has no profiles; save one directly, for example:
+acknowledged `data.state`. Configuration works without a desktop owner. Registration saves default profiles (VS Code, Terminal + Agent, Neovim,
+Terminal — each only when its tools are installed). `profiles seed` saves them
+for a project that has none; it never changes a project that already has
+profiles. Its result reports `seeded` and, when 0, `reason`
+(`HAS_PROFILES` or `NO_SUPPORTED_TOOLS`). Saving a profile never launches
+anything. To save a custom profile:
 
 ```bash
 aranea projects profiles save PROJECT_ID --definition '{"name":"Focus","roles":["editor","terminal"],"tools":{"editorId":"code","terminalId":"kitty","agentId":null}}' --json

@@ -35,8 +35,11 @@ Closing the window retains drafts and does not cancel accepted operations.
    **Start working** to use the remembered profile on the selected checkout.
 
 Agent reporting and saved actions are optional. First-use profiles offer installed
-tools without requiring agent setup. A project registered through the CLI may have
-no profiles yet; use the direct profile setup action or save one with the CLI.
+tools without requiring agent setup. Every registration — Projects, the CLI or a folder scan — saves default profiles
+from the editors, terminals and agents installed on this computer, so **Start
+working** is ready at once. Projects registered earlier without profiles get
+them the first time you open them. If no supported editor or terminal is
+installed, Projects says so; install one and choose **Refresh**.
 
 For bulk discovery, choose **Scan development folder** from Add project. Approve
 a parent folder, review discovered repositories and select **Add selected**.
@@ -55,6 +58,10 @@ Select a project and checkout to inspect them. **Start working** shows the remem
 profile name and tools. It starts that combination in an empty, unreserved workspace,
 switches there, and dismisses Projects once this request is confirmed accepted.
 Existing windows and environments stay open. Starting a profile never runs saved actions.
+
+If the remembered profile can no longer start (for example its editor was
+uninstalled), **Start working** uses the first saved profile that can and says
+which one. Starting it makes it the remembered profile.
 
 **Choose another profile** opens a searchable list. Selecting a profile starts it
 immediately on the currently selected checkout; there is no extra confirmation.
