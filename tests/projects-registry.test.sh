@@ -369,5 +369,32 @@ navigation_invalid_saved_metadata_is_preserved() {
     cmp "$registry" "$TMPDIR/invalid-registry"
   done
 }
-for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling open_roles_and_agent_configure invalid_roles_and_agents_preserve_state invalid_saved_roles_and_agents_are_preserved navigation_visits_and_pins_preserve_projects navigation_invalid_requests_and_conflicts_preserve_state navigation_removal_prunes_only_removed_identity navigation_invalid_saved_metadata_is_preserved; do run_case "$case_name"; done
+# Environment mode is optional; only dedicated/current are accepted.
+environment_mode_is_optional_and_validated() {
+  "$store" snapshot >/dev/null
+  local base
+  base=$(jq -c --arg path "$ARANEA_TEST_SANDBOX/dev" '
+    .projects = [{id:"p-00000000-0000-4000-8000-000000000001",name:"dev",commonDir:($path+"/.git"),
+      lastCheckoutId:"c-00000000-0000-4000-8000-000000000001",workspaceMode:"dedicated",
+      tools:{editorId:"code",terminalId:"kitty"},
+      checkouts:[{id:"c-00000000-0000-4000-8000-000000000001",path:$path,branch:"main",primary:true}],
+      associations:[],profiles:[],lastProfileId:null,environments:[]}]' "$registry")
+  env_record() {
+    jq -cn --arg path "$ARANEA_TEST_SANDBOX/dev" --argjson extra "$1" '{
+      id:"e-00000000-0000-4000-8000-000000000001",projectId:"p-00000000-0000-4000-8000-000000000001",
+      checkoutId:"c-00000000-0000-4000-8000-000000000001",activationId:"a-00000000-0000-4000-8000-000000000001",
+      workspaceId:2,sessionId:"s",createdAt:1,
+      checkoutSnapshot:{id:"c-00000000-0000-4000-8000-000000000001",path:$path,branch:"main",primary:true},
+      profileSnapshot:{id:"f-00000000-0000-4000-8000-000000000001",name:"Code",revision:1,roles:["editor"],tools:{editorId:"code",terminalId:null,agentId:null}},
+      resolvedTools:{editorId:"code",terminalId:null,agentId:null}} + $extra'
+  }
+  for extra in '{}' '{"mode":"dedicated"}' '{"mode":"current"}'; do
+    jq -c --argjson env "$(env_record "$extra")" '.projects[0].environments = [$env]' <<<"$base" >"$registry"
+    "$store" snapshot | jq -e '.ok == true' >/dev/null
+  done
+  jq -c --argjson env "$(env_record '{"mode":"shared"}')" '.projects[0].environments = [$env]' <<<"$base" >"$registry"
+  if "$store" snapshot >"$TMPDIR/error"; then return 1; fi
+  jq -e '.ok == false' "$TMPDIR/error" >/dev/null
+}
+for case_name in snapshot_initializes_only_absent roots_conflicts_and_concurrency corrupt_state_is_preserved registration_configuration_and_removal ignore_unignore_and_safe_paths relocate_and_association_isolation invalid_requests_preserve_state grouped_checkouts_preserve_normal_and_separate_associations atomic_write_failure_preserves_previous_state missing_git_keeps_registration_unavailable_without_affecting_roots competing_registrations_are_both_retained inherited_git_context_cannot_register_an_ordinary_directory relocation_rejects_an_unrelated_group_without_changing_bytes relocation_allows_a_whole_group_move_when_old_paths_are_absent control_paths_never_silently_select_a_sibling open_roles_and_agent_configure invalid_roles_and_agents_preserve_state invalid_saved_roles_and_agents_are_preserved navigation_visits_and_pins_preserve_projects navigation_invalid_requests_and_conflicts_preserve_state navigation_removal_prunes_only_removed_identity navigation_invalid_saved_metadata_is_preserved environment_mode_is_optional_and_validated; do run_case "$case_name"; done
 ((failures == 0))

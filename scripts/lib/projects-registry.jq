@@ -25,7 +25,8 @@ def profile:
   profile_draft and has("id") and has("revision");
 def workspace: integer and . > 0;
 def environment:
-  fields(["id","projectId","checkoutId","activationId","workspaceId","sessionId","createdAt","checkoutSnapshot","profileSnapshot","resolvedTools"];[])
+  fields(["id","projectId","checkoutId","activationId","workspaceId","sessionId","createdAt","checkoutSnapshot","profileSnapshot","resolvedTools"];["mode"])
+  and ((has("mode")|not) or (.mode|mode))
   and (.id|opaque("e")) and (.projectId|opaque("p")) and (.checkoutId|opaque("c")) and (.activationId|opaque("a"))
   and (.workspaceId|workspace) and (.sessionId|text) and (.createdAt|integer and . >= 0)
   and (.checkoutSnapshot|checkout) and (.profileSnapshot|profile) and (.resolvedTools|tools)
