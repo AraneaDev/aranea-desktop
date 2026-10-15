@@ -58,6 +58,12 @@ expect "$(s 'package.json:.:serve')|.definition.previewUrl==\"http://127.0.0.1:3
 expect "$(s 'package.json:.:lint')|.definition.kind==\"command\" and .label==\"lint\"" 'lint command'
 expect '.sources[]|select(.source=="package.json")|.status=="found"' 'package.json found'
 
+# PORT=N counts only as a leading assignment.
+r=$(repo portlate)
+printf '{"scripts":{"start":"node server.js PORT=9","serve":"echo PORT=9"}}\n' >"$r/package.json"
+detect "$r"
+expect "($(s 'package.json:.:start')|.definition.previewUrl==null and .previewEvidence==null) and ($(s 'package.json:.:serve')|.definition.previewUrl==null)" 'trailing PORT= is not evidence'
+
 # Package manager: packageManager field beats lockfiles; lockfiles pick pnpm/yarn/bun.
 r=$(repo pm)
 printf '{"scripts":{"test":"x"}}\n' >"$r/package.json"

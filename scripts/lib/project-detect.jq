@@ -10,8 +10,9 @@ def command_words: [splits("\\s+")|select(length>0)] | until((length==0) or (.[0
 def evidence($body):
   ($body|tostring) as $b
   | ([$b|capture("(?:\\A|\\s)(?:--port[= ]|-p\\s+)(?<port>[0-9]{1,5})(?:\\s|\\z)")][0].port) as $flag
-  | ([$b|capture("(?:\\A|\\s)PORT=(?<port>[0-9]{1,5})(?:\\s|\\z)")][0].port) as $env
+  | ([$b|splits("\\s+")|select(length>0)]) as $all
   | ($b|command_words) as $w
+  | ([$all[:(($all|length)-($w|length))][]|capture("\\APORT=(?<port>[0-9]{1,5})\\z")][0].port) as $env
   | (if $flag then {port:($flag|tonumber),evidence:"Port set in the command"}
     elif $env then {port:($env|tonumber),evidence:"PORT set in the command"}
     elif $w[0]=="vite" and (($w|length)==1 or (["dev","serve"]|index($w[1]))!=null or ($w[1]|startswith("-"))) then {port:5173,evidence:"Vite default port"}
