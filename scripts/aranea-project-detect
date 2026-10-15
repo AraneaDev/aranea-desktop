@@ -7,6 +7,7 @@ export PATH=/usr/local/bin:/usr/bin
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 filter="$script_dir/lib/project-detect.jq"
 root='' just_bin='' python_bin=''
+# Print usage and exit with the invalid-usage status.
 usage() {
   printf 'Usage: aranea-project-detect --root CHECKOUT [--just PATH] [--python PATH]\n' >&2
   exit 2
@@ -144,6 +145,7 @@ package_scripts() {
 # Valid package.json: an object whose scripts, if present, is an object.
 package_valid() { jq -e 'type=="object" and ((.scripts // {})|type=="object")' "$1" >/dev/null 2>&1; }
 
+# Detect package.json scripts, including workspace packages.
 detect_package_json() {
   local file pkg code=0 locks pm dir lock
   local -a dirs
@@ -182,6 +184,7 @@ detect_package_json() {
   done
 }
 
+# Detect Composer scripts and Laravel commands.
 detect_composer() {
   local file code=0
   in_time composer || return 0
@@ -240,6 +243,7 @@ first_file() {
   return "$code"
 }
 
+# Detect Makefile targets.
 detect_makefile() {
   local code=0
   in_time makefile || return 0
@@ -253,6 +257,7 @@ detect_makefile() {
   status makefile found
 }
 
+# Detect just recipes from the justfile.
 detect_justfile() {
   local code=0
   in_time justfile || return 0
@@ -308,12 +313,14 @@ toml_source() {
 # Present regular non-link file at the checkout root, as a JSON boolean.
 present() { if checkout_file "$1" >/dev/null; then echo true; else echo false; fi; }
 
+# Detect Cargo commands from Cargo.toml.
 detect_cargo() {
   toml_source cargo Cargo.toml || return 0
   emit_rule cargo Cargo.toml cargo "{\"main\":$(present src/main.rs)}" "$scratch/cargo.json" || return 0
   status cargo found
 }
 
+# Detect Python project commands from pyproject.toml.
 detect_python() {
   toml_source python pyproject.toml || return 0
   emit_rule python pyproject.toml python "{\"uv\":$(present uv.lock),\"poetry\":$(present poetry.lock)}" "$scratch/python.json" || return 0
