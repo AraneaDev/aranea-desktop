@@ -64,6 +64,9 @@ ShellRoot {
   }
   Component.onCompleted: t.step(50, function () {
     actions.client.runner = function (argv, input, done) {
+      // Suggestion detection is covered by project-action-suggestions.
+      if (argv[1] === 'detect')
+        return
       root.calls.push({
         argv: argv,
         input: input,
