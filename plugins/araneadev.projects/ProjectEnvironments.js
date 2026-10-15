@@ -31,7 +31,8 @@ function chooseEmptyWorkspace(workspaces, reservations) {
     if (row.id > 0 && count > 0) used[String(row.id)] = true
   }
   ;(reservations || []).forEach(function (row) {
-    if (Number.isInteger(row.workspaceId) && row.workspaceId > 0) used[String(row.workspaceId)] = true
+    if (Number.isInteger(row.workspaceId) && row.workspaceId > 0)
+      used[String(row.workspaceId)] = true
   })
   var id = 1
   while (used[String(id)]) id++

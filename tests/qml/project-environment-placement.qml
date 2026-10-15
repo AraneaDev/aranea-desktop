@@ -95,6 +95,7 @@ ShellRoot {
         }
       ]
     })
+  // Fresh fake desktop occupancy: only workspace 5 has windows.
   property var occupied: [
     {
       id: 5,
@@ -103,9 +104,13 @@ ShellRoot {
   ]
   // Focused workspace reported by the fake compositor.
   property var currentWorkspace: 5
+  // Native attempt specs expose the workspace each role targeted.
   property var launched: []
+  // Focus targets reveal which workspace an operation moved to.
   property var focused: []
+  // Proven native windows launched by the owner.
   property var nativeBindings: []
+  // Deterministic environment ID suffixes.
   property int serial: 0
   // The environment the dedicated start created, for later mode checks.
   property string firstEnvironment: ''
@@ -256,6 +261,7 @@ ShellRoot {
       })
     }
   }
+  // Independent explicit activations use stable opaque identities.
   function payload(n, profile) {
     return {
       projectId: 'p-one',
@@ -265,6 +271,7 @@ ShellRoot {
       activationId: 'a-00000000-0000-4000-8000-' + ('000000000000' + n).slice(-12)
     }
   }
+  // Poll preflight until the lease is ready or refused.
   function ready(request, done) {
     owner.prepareEnvironment(request)
     t.waitFor(function () {
@@ -274,6 +281,7 @@ ShellRoot {
       done(owner.prepareEnvironment(request))
     })
   }
+  // Wait on observable completion rather than dispatch callback order.
   function complete(response, done) {
     t.waitFor(function () {
       return owner.operation(response.operationId).state === 'completed'
@@ -297,6 +305,7 @@ ShellRoot {
       return owner.registryReady && !owner.refreshing && owner.registry.revision === root.state.revision
     }, 1500, 'registry reload', done)
   }
+  // The saved environment record with this ID.
   function environmentNamed(id) {
     return root.state.projects[0].environments.filter(function (env) {
       return env.id === id

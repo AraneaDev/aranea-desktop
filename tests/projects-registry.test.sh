@@ -379,6 +379,7 @@ environment_mode_is_optional_and_validated() {
       tools:{editorId:"code",terminalId:"kitty"},
       checkouts:[{id:"c-00000000-0000-4000-8000-000000000001",path:$path,branch:"main",primary:true}],
       associations:[],profiles:[],lastProfileId:null,environments:[]}]' "$registry")
+  # One valid environment record merged with EXTRA fields.
   env_record() {
     jq -cn --arg path "$ARANEA_TEST_SANDBOX/dev" --argjson extra "$1" '{
       id:"e-00000000-0000-4000-8000-000000000001",projectId:"p-00000000-0000-4000-8000-000000000001",

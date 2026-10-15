@@ -763,10 +763,10 @@ Item {
         // A shared workspace holds unrelated windows by design; only dedicated ones must be exclusive.
         var shared = op.environment && op.environment.mode === 'current'
         if (!data.available || Environments.chooseEmptyWorkspace(data.workspaces, []) === null || !shared && (count > own.length || windows.some(function (window) {
-          return !own.some(function (binding) {
-            return binding.address === window.address && binding.pid === window.pid
-          })
-        }))) {
+            return !own.some(function (binding) {
+              return binding.address === window.address && binding.pid === window.pid
+            })
+          }))) {
           owner.failOperation(id, 'WORKSPACE_BUSY', 'Workspace ownership changed after a native attempt. Review the partial environment.')
           return
         }
