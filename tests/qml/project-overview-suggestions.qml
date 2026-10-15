@@ -45,16 +45,20 @@ ShellRoot {
   Component.onCompleted: t.step(80, function () {
     root.view = surface
     root.projectController.state = {
-      projects: [{
+      projects: [
+        {
           id: 'p',
           name: 'Repo',
           lastCheckoutId: 'c',
-          checkouts: [{
+          checkouts: [
+            {
               id: 'c',
               path: '/repo',
               branch: 'main'
-            }]
-        }],
+            }
+          ]
+        }
+      ],
       roots: [],
       ignored: []
     }
