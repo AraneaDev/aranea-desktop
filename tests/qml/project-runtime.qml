@@ -244,7 +244,7 @@ ShellRoot {
           windows: 1
         }
       ]
-    }), 5, 'owner allocation excludes occupied legacy persisted and queued reservations')
+    }), 2, 'owner allocation excludes occupied and queued reservations, never persisted records alone')
     t.equal(owner.chooseEnvironmentWorkspace({
       available: true
     }), null, 'owner refuses unknown occupancy')
