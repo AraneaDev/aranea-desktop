@@ -208,4 +208,71 @@ printf '#!/usr/bin/env bash\necho '"'"'{"recipes":{"a":"x"}}'"'"'\n' >"$fake_jus
 detect "$r" '[]' --just "$fake_just"
 expect '.sources[]|select(.source=="justfile")|.status=="invalid"' 'just odd shape invalid'
 expect '[.suggestions[]|select(.source=="justfile")]==[] and ([.suggestions[]|select(.source=="package.json")|.entry]==["test"])' 'odd just keeps other sources'
+python=$(command -v python3)
+# Cargo package with a binary, workspace root, malformed and unavailable.
+r=$(repo cargo)
+mkdir -p "$r/src"
+printf '[package]\nname = "app"\nversion = "0.1.0"\n' >"$r/Cargo.toml"
+touch "$r/src/main.rs"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.definition.argv]==[["cargo","test"],["cargo","build"],["cargo","clippy"],["cargo","run"]]' 'cargo package'
+rm "$r/src/main.rs"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.entry]|index("run")==null' 'cargo library has no run'
+printf '[package]\nname = "app"\n[[bin]]\nname = "tool"\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.entry]|index("run")!=null' 'cargo [[bin]]'
+printf '[workspace]\nmembers = ["a", "b"]\n[package]\nname = "root"\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="cargo")|.definition.argv]==[["cargo","test","--workspace"],["cargo","build","--workspace"],["cargo","clippy","--workspace"]]' 'cargo workspace'
+printf '[package\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '.sources[]|select(.source=="cargo")|.status=="invalid" and .reason=="Cargo.toml could not be read."' 'cargo malformed'
+detect "$r"
+expect '.sources[]|select(.source=="cargo")|.status=="unavailable" and .reason=="Needs python3"' 'cargo needs python3'
+
+# Python: uv/poetry/bare runners, pytest detection, project scripts.
+r=$(repo py)
+cat >"$r/pyproject.toml" <<'TOML'
+[project]
+name = "app"
+dependencies = ["requests"]
+[project.optional-dependencies]
+test = ["pytest>=8"]
+[project.scripts]
+app-cli = "app:main"
+TOML
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="python")|.definition.argv]==[["pytest"],["app-cli"]]' 'python bare'
+touch "$r/uv.lock"
+detect "$r" '[]' --python "$python"
+expect "$(s 'python:.:pytest')|.definition.argv==[\"uv\",\"run\",\"pytest\"]" 'uv runner'
+rm "$r/uv.lock"
+touch "$r/poetry.lock"
+detect "$r" '[]' --python "$python"
+expect "$(s 'python:.:app-cli')|.definition.argv==[\"poetry\",\"run\",\"app-cli\"]" 'poetry runner'
+rm "$r/poetry.lock"
+printf '[project]\nname = "x"\ndependencies = ["pytest-cov"]\n[dependency-groups]\ndev = [{include-group = "x"}]\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$python"
+expect '[.suggestions[]|select(.source=="python")]==[]' 'pytest-cov is not pytest; include-group ignored'
+printf '[tool.pytest.ini_options]\naddopts = "-q"\n[tool.uv]\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$python"
+expect "$(s 'python:.:pytest')|.definition.argv==[\"uv\",\"run\",\"pytest\"]" 'tool.pytest and tool.uv'
+
+# A python3 without tomllib reports unavailable, not invalid.
+fake_python="$ARANEA_TEST_SANDBOX/bin/python-old"
+printf '#!/usr/bin/env bash\nexit 3\n' >"$fake_python"
+chmod +x "$fake_python"
+detect "$r" '[]' --python "$fake_python"
+expect '.sources[]|select(.source=="python")|.status=="unavailable" and .reason=="Needs python3 with tomllib"' 'no tomllib'
+
+# TOML that parses but has an unexpected shape marks only that source invalid.
+printf '[project]\nname = "x"\nscripts = "x"\n' >"$r/pyproject.toml"
+printf '[package]\nname = "ok"\n' >"$r/Cargo.toml"
+detect "$r" '[]' --python "$python"
+expect '.sources[]|select(.source=="python")|.status=="invalid" and .reason=="pyproject.toml could not be read."' 'python odd shape invalid'
+printf '[project]\nname = "x"\ndependencies = "x"\n' >"$r/pyproject.toml"
+detect "$r" '[]' --python "$python"
+expect '.sources[]|select(.source=="python")|.status=="invalid"' 'python odd dependencies invalid'
+expect '[.suggestions[]|select(.source=="python")]==[] and ([.suggestions[]|select(.source=="cargo")]|length>0)' 'odd python keeps other sources'
 echo 'project-detect: ok'

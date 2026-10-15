@@ -1,5 +1,4 @@
 #!/usr/bin/bash
-# shellcheck disable=SC2034 # python_bin is consumed by a later source.
 # Read-only command discovery for one exact checkout; never executes repository code.
 # Usage: aranea-project-detect --root CHECKOUT [--just PATH] [--python PATH] <saved.json
 # stdin: [{argv,cwdRelative}] saved definitions (for alreadySaved); stdout: {suggestions,sources}.
@@ -259,8 +258,56 @@ detect_justfile() {
   status justfile found
 }
 
+# Isolated TOML-to-JSON reader; exit 3 means this python3 has no tomllib.
+toml_reader='import json, sys
+try:
+    import tomllib
+except ImportError:
+    sys.exit(3)
+with open(sys.argv[1], "rb") as handle:
+    json.dump(tomllib.load(handle), sys.stdout, default=str)'
+# Read one TOML source into $scratch/<source>.json, recording why it is skipped.
+toml_source() {
+  local source=$1 name=$2 file code=0
+  in_time "$source" || return 1
+  file=$(source_file "$source" "$name") || code=$?
+  if ((code)); then
+    ((code != 1)) || status "$source" absent
+    return 1
+  fi
+  if [[ -z $python_bin ]]; then
+    status "$source" unavailable 'Needs python3'
+    return 1
+  fi
+  code=0
+  helper "$python_bin" -I -c "$toml_reader" "$file" >"$scratch/$source.json" 2>/dev/null || code=$?
+  if ((code == 3)); then
+    status "$source" unavailable 'Needs python3 with tomllib'
+    return 1
+  elif ((code)) || ! jq -e 'type=="object"' "$scratch/$source.json" >/dev/null 2>&1; then
+    status "$source" invalid "$name could not be read."
+    return 1
+  fi
+}
+# Present regular non-link file at the checkout root, as a JSON boolean.
+present() { if checkout_file "$1" >/dev/null; then echo true; else echo false; fi; }
+
+detect_cargo() {
+  toml_source cargo Cargo.toml || return 0
+  emit_rule cargo Cargo.toml cargo "{\"main\":$(present src/main.rs)}" "$scratch/cargo.json" || return 0
+  status cargo found
+}
+
+detect_python() {
+  toml_source python pyproject.toml || return 0
+  emit_rule python pyproject.toml python "{\"uv\":$(present uv.lock),\"poetry\":$(present poetry.lock)}" "$scratch/python.json" || return 0
+  status python found
+}
+
 found_file='' found_name=''
 detect_package_json
 detect_makefile
 detect_justfile
+detect_cargo
+detect_python
 rule assemble "$(jq -cn --argjson saved "$saved" --slurpfile sources "$scratch/sources" '{saved:$saved,sources:$sources}')" -s "$scratch/suggestions"

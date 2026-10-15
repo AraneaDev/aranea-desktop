@@ -59,6 +59,27 @@ def just:
   | select(($r.parameters // []) | all(.default != null or .kind == "star"))
   | suggestion("justfile"; $ctx.path; "."; $k; (if $k|service_target then "service" else "command" end); ["just", $k]; "");
 
+# `cargo`: workspace roots get --workspace commands; packages get run only with a binary.
+def cargo:
+  if has("workspace") then
+    (["test","build","clippy"][] as $c | suggestion("cargo"; "Cargo.toml"; "."; $c; "command"; ["cargo",$c,"--workspace"]; ""))
+  elif has("package") then
+    (["test","build","clippy"][] as $c | suggestion("cargo"; "Cargo.toml"; "."; $c; "command"; ["cargo",$c]; "")),
+    (if (((.bin // [])|length) > 0) or $ctx.main then suggestion("cargo"; "Cargo.toml"; "."; "run"; "command"; ["cargo","run"]; "") else empty end)
+  else empty end;
+# Declared dependency strings across PEP 621, PEP 735 and poetry tables.
+def python_deps:
+  [ (.project.dependencies // [])[],
+    ((.project["optional-dependencies"] // {})|.[]?|arrays|.[]),
+    ((.["dependency-groups"] // {})|.[]?|arrays|.[]),
+    ((.tool.poetry.group // {})|.[]?|(.dependencies // {})|keys[]),
+    ((.tool.poetry["dev-dependencies"] // {})|keys[]) ] | map(select(type=="string"));
+def python:
+  (if $ctx.uv or (.tool.uv != null) then ["uv","run"] elif $ctx.poetry or (.tool.poetry != null) then ["poetry","run"] else [] end) as $run
+  | (if (.tool.pytest != null) or (python_deps|any(test("\\Apytest(\\z|[^A-Za-z0-9_.-])"; "i")))
+     then suggestion("python"; "pyproject.toml"; "."; "pytest"; "command"; $run+["pytest"]; "") else empty end),
+    ((.project.scripts // {})|keys_unsorted[]|select(usable_name)|suggestion("python"; "pyproject.toml"; "."; .; "command"; $run+[.]; ""));
+
 # Deduplicate, cap at 100, mark saved and keep the most severe status per source.
 def severity: {"invalid":4,"truncated":3,"unavailable":2,"found":1,"absent":0}[.status] // 0;
 def assemble:
@@ -73,5 +94,7 @@ elif $op=="workspaces" then workspaces
 elif $op=="package-json" then package_json
 elif $op=="make" then make
 elif $op=="just" then just
+elif $op=="cargo" then cargo
+elif $op=="python" then python
 elif $op=="assemble" then assemble
 else error("unknown op") end
