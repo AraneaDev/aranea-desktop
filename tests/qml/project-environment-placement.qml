@@ -324,8 +324,48 @@ ShellRoot {
       })
     })
   }
+  // Current mode launches beside unrelated windows and is verified by its own bindings.
   function sharedTests() {
-    // Task 3 replaces this body.
+    t.equal(environmentNamed(root.firstEnvironment).mode, 'dedicated', 'dedicated environments record their mode')
+    root.currentWorkspace = 7
+    root.occupied = root.occupied.concat([
+      {
+        id: 7,
+        windows: 3
+      }
+    ])
+    setState(function (project) {
+      project.workspaceMode = 'current'
+    }, function () {
+      var request = payload(2, 'f-both')
+      ready(request, function (prepared) {
+        t.check(prepared.ok, 'current-mode start prepares on an occupied workspace')
+        var before = launched.length
+        var started = owner.startEnvironment(request)
+        complete(started, function () {
+          var op = owner.operation(started.operationId)
+          t.equal(failure(op), '', 'shared start never fails on unrelated windows')
+          t.equal(launched.slice(before).map(function (spec) {
+            return spec.workspaceId
+          }), [7, 7], 'both roles launch on the current workspace')
+          t.equal(environmentNamed(started.environmentId).mode, 'current', 'shared environments record current mode')
+          t.equal(owner.chooseEnvironmentWorkspace(owner.runtime.snapshot()), 1, 'neither shared nor finished dedicated records reserve a workspace')
+          noCurrentWorkspace()
+        })
+      })
+    })
+  }
+  // Without a known current workspace, current mode refuses instead of guessing.
+  function noCurrentWorkspace() {
+    root.currentWorkspace = null
+    ready(payload(3), function (prepared) {
+      t.equal(prepared.error && prepared.error.code, 'INVALID_WORKSPACE', 'unknown current workspace refuses current-mode start')
+      root.currentWorkspace = 7
+      returnTests()
+    })
+  }
+  function returnTests() {
+    // Task 4 replaces this body.
     t.done()
   }
 }

@@ -278,7 +278,15 @@ Item {
           owner.readDesktop(function (data) {
             if (!current())
               return
-            var workspace = owner.chooseEnvironmentWorkspace(data)
+            // Current mode shares the focused workspace; dedicated takes the lowest empty one.
+            var shared = (resolved.project.workspaceMode || 'dedicated') === 'current'
+            if (shared && data && data.available && !(Number.isInteger(data.currentWorkspaceId) && data.currentWorkspaceId > 0)) {
+              finish({
+                error: owner.failure('INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
+              })
+              return
+            }
+            var workspace = shared ? data && data.available && data.currentWorkspaceId : owner.chooseEnvironmentWorkspace(data)
             if (!workspace) {
               finish({
                 error: owner.failure('WORKSPACE_UNAVAILABLE', 'Fresh empty workspace occupancy is unavailable.')
@@ -311,6 +319,7 @@ Item {
                   checkoutId: payload.checkoutId,
                   activationId: payload.activationId,
                   workspaceId: workspace,
+                  mode: shared ? 'current' : 'dedicated',
                   sessionId: session,
                   createdAt: Date.now(),
                   checkoutSnapshot: copy(launchCheckout),
@@ -588,6 +597,14 @@ Item {
     owner.readDesktop(function (data) {
       if (!owner.current(id, generation, session))
         return
+      // Shared environments launch beside existing windows and are never moved.
+      if (op.environment && op.environment.mode === 'current') {
+        if (workspaceAvailable(data, op.workspaceId))
+          done(data)
+        else
+          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The current workspace is unavailable.')
+        return
+      }
       if (empty(data, op.workspaceId) && !reservedElsewhere(op)) {
         done(data)
         return
@@ -709,11 +726,13 @@ Item {
         var windows = (data.windows || []).filter(function (window) {
           return window.workspaceId === op.workspaceId
         })
-        if (!data.available || Environments.chooseEmptyWorkspace(data.workspaces, []) === null || count > own.length || windows.some(function (window) {
+        // A shared workspace holds unrelated windows by design; only dedicated ones must be exclusive.
+        var shared = op.environment && op.environment.mode === 'current'
+        if (!data.available || Environments.chooseEmptyWorkspace(data.workspaces, []) === null || !shared && (count > own.length || windows.some(function (window) {
           return !own.some(function (binding) {
             return binding.address === window.address && binding.pid === window.pid
           })
-        })) {
+        }))) {
           owner.failOperation(id, 'WORKSPACE_BUSY', 'Workspace ownership changed after a native attempt. Review the partial environment.')
           return
         }
