@@ -58,10 +58,12 @@ ShellRoot {
       error: null,
       projectId: client.projectId,
       checkoutId: client.checkoutId,
-      suggestions: [{
+      suggestions: [
+        {
           key: 'makefile:.:test',
           definition: draft('test')
-        }],
+        }
+      ],
       sources: []
     })
     t.check(!client.detecting, 'detection finished')
@@ -90,6 +92,8 @@ ShellRoot {
       sources: []
     })
     t.equal(client.detection, null, 'other checkout has no cache yet')
+    t.equal(client.detections['p-00000000-0000-4000-8000-000000000001|c-00000000-0000-4000-8000-000000000001'].error, null, 'late reply lands only under its own checkout key')
+    t.equal(client.detections['p-00000000-0000-4000-8000-000000000001|c-00000000-0000-4000-8000-000000000002'], undefined, 'superseded reply is not published for either key')
     // Sequential Add all stops at the first refusal.
     calls = []
     t.check(client.addSuggestions([draft('a'), draft('b'), draft('c')]), 'queue accepted')
@@ -126,6 +130,50 @@ ShellRoot {
     })
     t.equal(calls.length, 1, 'queue stops on selection change')
     t.equal(client.addQueue.length, 0, 'queue cleared')
+    // (a) Capture mid-Add-all clears the queue; a later unrelated save advances nothing.
+    calls = []
+    t.check(client.addSuggestions([draft('m'), draft('n')]), 'queue before capture')
+    client.captureActive = true
+    client.captureActive = false
+    t.equal(client.addQueue.length, 0, 'capture clears queue')
+    t.check(!client.addActive, 'capture ends Add all')
+    t.check(client.configure(draft('own'), undefined), 'unrelated save accepted')
+    reply(1, {
+      ok: true,
+      state: stateAfter(3),
+      error: null
+    })
+    t.equal(calls.length, 2, 'unrelated ack saves nothing further')
+    t.equal(client.addResult.added, 0, 'unrelated ack not counted')
+    calls = []
+    t.check(client.addSuggestions([draft('q')]), 'Add all accepted again')
+    reply(0, {
+      ok: true,
+      state: stateAfter(4),
+      error: null
+    })
+    t.equal(client.addResult.added, 1, 'fresh queue completes')
+    // (b) Selection change while the last save is in flight.
+    calls = []
+    t.check(client.addSuggestions([draft('last')]), 'single-item queue')
+    client.projectId = 'p-00000000-0000-4000-8000-000000000003'
+    t.check(!client.addActive, 'selection change ends Add all with save in flight')
+    t.check(client.addSuggestions([draft('new1'), draft('new2')]), 'new queue on new project')
+    t.equal(calls.length, 2, 'new queue issued its first save')
+    reply(0, {
+      ok: true,
+      state: stateAfter(5),
+      error: null
+    })
+    t.equal(calls.length, 2, 'late ack neither advances nor counts')
+    t.equal(client.addCount, 0, 'late ack not counted')
+    t.check(client.pending, 'late ack does not release the new save')
+    reply(1, {
+      ok: true,
+      state: stateAfter(6),
+      error: null
+    })
+    t.equal(calls.length, 3, 'own ack advances')
     t.done()
   })
 }

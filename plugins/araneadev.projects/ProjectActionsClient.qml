@@ -73,6 +73,10 @@ Item {
   property int addCount: 0
   // {added,total,error} once an Add all finishes; error is the first refusal or null.
   property var addResult: null
+  // Mutation generation of the save this queue issued; other acknowledgements never advance it.
+  property int addToken: 0
+  // An Add all has started and not yet published its outcome.
+  readonly property bool addActive: addTotal > 0 && addResult === null
   onSummaryObservationActiveChanged: summaryGeneration++
   // Two-second presentation poll, active only for visible protected runs.
   property int pollInterval: 2000
@@ -167,6 +171,10 @@ Item {
     snapshotGeneration++
     runGeneration++
     availabilityGeneration++
+    detectionGeneration++
+    detecting = false
+    if (addActive)
+      finishAdd(null)
     poll.stop()
     if (submitting && requestId && submissionTarget)
       submissionUncertain = true
@@ -186,8 +194,10 @@ Item {
     output = ''
     truncated = false
     poll.stop()
-    if (addQueue.length)
+    if (addActive) {
+      generation++
       finishAdd(null)
+    }
   }
   // Require both project and checkout equality for attached presentation evidence.
   function matchesSelection(run: var): bool {
@@ -364,7 +374,7 @@ Item {
   }
   // Save drafts one at a time through configure; never start a run.
   function addSuggestions(definitions: var): bool {
-    if (captureActive || pending || submissionUncertain || addQueue.length || !Array.isArray(definitions) || !definitions.length)
+    if (captureActive || pending || submissionUncertain || addActive || !Array.isArray(definitions) || !definitions.length)
       return false
     addResult = null
     addTotal = definitions.length
@@ -374,11 +384,12 @@ Item {
       finishAdd(error)
       return false
     }
+    addToken = generation
     return true
   }
   // Advance or stop the queue after one acknowledged save.
   function advanceAdd(response: var): void {
-    if (!addTotal || addResult)
+    if (!addActive)
       return
     if (!response || !response.ok) {
       finishAdd(response ? response.error : transportError(''))
@@ -393,6 +404,8 @@ Item {
     addQueue = addQueue.slice(1)
     if (!configure(next, undefined))
       finishAdd(error)
+    else
+      addToken = generation
   }
   // Publish the Add all outcome; remaining drafts are dropped, never retried.
   function finishAdd(failure: var): void {
@@ -404,7 +417,7 @@ Item {
     }
   }
   onRequestFinished: function (response) {
-    if (addTotal && !addResult)
+    if (addActive && addToken === generation)
       advanceAdd(response)
   }
   // Submit one inert definition mutation; never call Start implicitly.
