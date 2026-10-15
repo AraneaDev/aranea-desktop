@@ -80,6 +80,17 @@ def python:
      then suggestion("python"; "pyproject.toml"; "."; "pytest"; "command"; $run+["pytest"]; "") else empty end),
     ((.project.scripts // {})|keys_unsorted[]|select(usable_name)|suggestion("python"; "pyproject.toml"; "."; .; "command"; $run+[.]; ""));
 
+# `composer.json`: scripts without event hooks; Laravel adds artisan test/serve.
+def composer:
+  ((.scripts // {})|to_entries[]
+    | select((.key|usable_name) and (.key|test("\\A(pre|post)-")|not))
+    | (.value|if type=="array" then map(tostring)|join(" && ") else tostring end) as $body
+    | suggestion("composer"; "composer.json"; "."; .key; (if .key|service_script then "service" else "command" end); ["composer","run-script",.key]; $body)),
+  (if $ctx.artisan and ((.require // {})|has("laravel/framework")) then
+     suggestion("composer"; "composer.json"; "."; "artisan test"; "command"; ["php","artisan","test"]; ""),
+     suggestion("composer"; "composer.json"; "."; "artisan serve"; "service"; ["php","artisan","serve"]; "php artisan serve")
+   else empty end);
+
 # Deduplicate, cap at 100, mark saved and keep the most severe status per source.
 def severity: {"invalid":4,"truncated":3,"unavailable":2,"found":1,"absent":0}[.status] // 0;
 def assemble:
@@ -92,6 +103,7 @@ def assemble:
 if $op=="package-manager" then package_manager
 elif $op=="workspaces" then workspaces
 elif $op=="package-json" then package_json
+elif $op=="composer" then composer
 elif $op=="make" then make
 elif $op=="just" then just
 elif $op=="cargo" then cargo

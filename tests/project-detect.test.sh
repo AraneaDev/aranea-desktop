@@ -37,7 +37,7 @@ status=0
 # Empty checkout: every source absent, no suggestions.
 r=$(repo empty)
 detect "$r"
-expect '.suggestions==[] and (.sources|map(select(.source=="package.json"))[0].status=="absent")' 'empty checkout'
+expect '.suggestions==[] and ([.sources[]|select(.status=="absent")|.source]|sort)==["cargo","composer","justfile","makefile","package.json","python"]' 'empty checkout'
 
 # npm default, lifecycle and pre/post hooks skipped, service classification, evidence.
 r=$(repo npm)
@@ -275,4 +275,32 @@ printf '[project]\nname = "x"\ndependencies = "x"\n' >"$r/pyproject.toml"
 detect "$r" '[]' --python "$python"
 expect '.sources[]|select(.source=="python")|.status=="invalid"' 'python odd dependencies invalid'
 expect '[.suggestions[]|select(.source=="python")]==[] and ([.suggestions[]|select(.source=="cargo")]|length>0)' 'odd python keeps other sources'
+# Composer scripts without event hooks; Laravel adds artisan test/serve.
+r=$(repo composer)
+cat >"$r/composer.json" <<'JSON'
+{"require":{"laravel/framework":"^11"},
+ "scripts":{"test":"phpunit","post-install-cmd":"x","pre-update-cmd":"y","dev":["@php artisan serve --port=8001","npm run dev"]}}
+JSON
+detect "$r"
+expect '[.suggestions[]|select(.source=="composer")|.entry]==["test","dev"]' 'composer hooks skipped, no artisan without file'
+expect "$(s 'composer:.:dev')|.definition.kind==\"service\" and .definition.previewUrl==\"http://127.0.0.1:8001/\"" 'composer array script evidence'
+touch "$r/artisan"
+detect "$r"
+expect "$(s 'composer:.:artisan serve')|.definition==({name:\"artisan serve\",kind:\"service\",argv:[\"php\",\"artisan\",\"serve\"],cwdRelative:\".\",timeoutSeconds:null,previewUrl:\"http://127.0.0.1:8000/\"}) and .previewEvidence==\"Laravel default port\"" 'laravel serve'
+expect "$(s 'composer:.:artisan test')|.definition.argv==[\"php\",\"artisan\",\"test\"]" 'laravel test'
+printf '{"scripts":{"test":"x"}}\n' >"$r/composer.json"
+detect "$r"
+expect '[.suggestions[]|select(.source=="composer")|.entry]==["test"]' 'artisan without laravel/framework'
+printf '[]\n' >"$r/composer.json"
+detect "$r"
+expect '.sources[]|select(.source=="composer")|.status=="invalid"' 'composer not an object'
+# A valid object with an unexpected shape marks only composer invalid.
+printf '{"require":"x"}\n' >"$r/composer.json"
+printf '{"name":"ok"}\n' >"$r/package.json"
+detect "$r"
+expect '.sources[]|select(.source=="composer")|.status=="invalid" and .reason=="composer.json could not be read."' 'composer odd require invalid'
+expect '.sources[]|select(.source=="package.json")|.status=="found"' 'odd composer keeps other sources'
+printf '{"scripts":{"test":{"a":1}}}\n' >"$r/composer.json"
+detect "$r"
+expect '.sources[]|select(.source=="composer")|.status!="absent"' 'composer object script value tolerated'
 echo 'project-detect: ok'

@@ -182,6 +182,22 @@ detect_package_json() {
   done
 }
 
+detect_composer() {
+  local file code=0
+  in_time composer || return 0
+  file=$(source_file composer composer.json) || code=$?
+  if ((code)); then
+    ((code != 1)) || status composer absent
+    return 0
+  fi
+  if ! package_valid "$file"; then
+    status composer invalid 'composer.json could not be read.'
+    return 0
+  fi
+  emit_rule composer composer.json composer "{\"artisan\":$(present artisan)}" "$file" || return 0
+  status composer found
+}
+
 # Explicit rule targets, .PHONY first; never evaluates make syntax.
 # File-like targets (with . or /) appear only when declared .PHONY.
 # shellcheck disable=SC2016
@@ -306,6 +322,7 @@ detect_python() {
 
 found_file='' found_name=''
 detect_package_json
+detect_composer
 detect_makefile
 detect_justfile
 detect_cargo
