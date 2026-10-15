@@ -110,8 +110,10 @@ Changing it does not change project launch defaults or enable reporting.
 
 ## Example: run tests
 
-Open the project's **Actions**, then **Add action**. **Example: npm test** fills
-an empty draft. Adapt it to your repository:
+Open the project's **Actions**. If the repository declares a test command,
+it appears under **Found in this repo**: choose **Add**, then **Run**. To
+enter one yourself, choose **Add action**; **Example: npm test** fills an
+empty draft. Adapt it to your repository:
 
 | Field          | Value                                        |
 | -------------- | -------------------------------------------- |
@@ -133,7 +135,10 @@ operators. Choosing an example does not save, run, or overwrite an existing draf
 
 ## Example: start a dev server
 
-Choose **Add action**, then **Example: npm run dev**, or enter:
+Detected dev servers appear under **Found in this repo** as services, with a
+preview URL when the port is stated in the command or is the framework's
+default. Choose **Add**, then **Start**. Otherwise choose **Add action**, then
+**Example: npm run dev**, or enter:
 
 | Field          | Value                                                                   |
 | -------------- | ----------------------------------------------------------------------- |

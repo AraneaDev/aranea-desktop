@@ -174,6 +174,10 @@ action uses an executable, separate argument fields, and a working folder inside
 the selected checkout. **Save** defines it; **Run** or **Start** executes it.
 Opening a project or reloading the shell never runs saved actions automatically.
 
+Projects suggests commands the repository already declares (package.json,
+Composer, Makefile, justfile, Cargo, pyproject.toml). Adding one saves it;
+running stays a separate choice.
+
 Commands report completion and exit status. Services report their running state
 and can have a local preview URL. **View logs**, **Stop**, and **Restart** operate
 on the selected run. Runs continue when you close the panel; services do not
