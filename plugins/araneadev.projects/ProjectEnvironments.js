@@ -14,14 +14,12 @@ function roleKey(operation, role) {
 
 /**
  * Allocate from a fresh, known occupancy snapshot. Null means no safe decision.
- * Retained metadata reserves space even when its runtime evidence is unconfirmed.
+ * Saved records never reserve space; only windows and in-flight work do.
  * @param {?Array<EnvironmentData>} workspaces - fresh compositor workspace rows
- * @param {Array<EnvironmentData>} legacyAssociations - all legacy reservations
- * @param {Array<EnvironmentData>} environments - all retained environment records
- * @param {Array<EnvironmentData>} reservations - queued owner reservations
+ * @param {Array<EnvironmentData>} reservations - in-flight leases and operations
  * @returns {?number} lowest empty positive workspace, or unknown occupancy
  */
-function chooseEmptyWorkspace(workspaces, legacyAssociations, environments, reservations) {
+function chooseEmptyWorkspace(workspaces, reservations) {
   if (!Array.isArray(workspaces)) return null
   /** @type {{[key:string]:boolean}} */
   var used = {}
@@ -32,12 +30,9 @@ function chooseEmptyWorkspace(workspaces, legacyAssociations, environments, rese
     if (!Number.isInteger(count) || count < 0) return null
     if (row.id > 0 && count > 0) used[String(row.id)] = true
   }
-  ;(legacyAssociations || [])
-    .concat(environments || [], reservations || [])
-    .forEach(function (row) {
-      if (Number.isInteger(row.workspaceId) && row.workspaceId > 0)
-        used[String(row.workspaceId)] = true
-    })
+  ;(reservations || []).forEach(function (row) {
+    if (Number.isInteger(row.workspaceId) && row.workspaceId > 0) used[String(row.workspaceId)] = true
+  })
   var id = 1
   while (used[String(id)]) id++
   return id

@@ -570,7 +570,7 @@ Item {
   }
   // Unknown occupancy refuses allocation; no unrelated window is ever moved.
   function empty(data: var, workspaceId: int): bool {
-    if (!data || !data.available || Environments.chooseEmptyWorkspace(data.workspaces, [], [], []) === null)
+    if (!data || !data.available || Environments.chooseEmptyWorkspace(data.workspaces, []) === null)
       return false
     return !data.workspaces.some(function (row) {
       return row.id === workspaceId && (Array.isArray(row.windows) ? row.windows.length : row.windows) > 0
@@ -709,7 +709,7 @@ Item {
         var windows = (data.windows || []).filter(function (window) {
           return window.workspaceId === op.workspaceId
         })
-        if (!data.available || Environments.chooseEmptyWorkspace(data.workspaces, [], [], []) === null || count > own.length || windows.some(function (window) {
+        if (!data.available || Environments.chooseEmptyWorkspace(data.workspaces, []) === null || count > own.length || windows.some(function (window) {
           return !own.some(function (binding) {
             return binding.address === window.address && binding.pid === window.pid
           })

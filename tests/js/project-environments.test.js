@@ -11,28 +11,27 @@ test("environment role identities preserve the exact legacy key", () => {
     env.roleKey({ environmentId: "e-b" }, "editor")
   )
 })
-test("allocation excludes live occupancy, legacy, retained and queued reservations", () => {
+test("allocation excludes live occupancy and in-flight reservations only", () => {
   assert.equal(typeof env.chooseEmptyWorkspace, "function")
+  assert.equal(env.chooseEmptyWorkspace.length, 2)
   assert.equal(
     env.chooseEmptyWorkspace(
       [
         { id: 1, windows: 1 },
         { id: 5, windows: 0 }
       ],
-      [{ workspaceId: 2 }],
-      [{ workspaceId: 3 }],
-      [{ workspaceId: 4 }]
+      [{ workspaceId: 2 }]
     ),
-    5
+    3
   )
+  // Observed 2026-10-15: saved records on 1-4, windows only on 5.
+  assert.equal(env.chooseEmptyWorkspace([{ id: 5, windows: 1 }], []), 1)
   assert.equal(
     env.chooseEmptyWorkspace(
       [
         { id: 1, windows: [] },
         { id: -1, windows: [1] }
       ],
-      [],
-      [],
       []
     ),
     1
@@ -44,7 +43,7 @@ test("allocation excludes live occupancy, legacy, retained and queued reservatio
     [{ id: 1, windows: -1 }],
     [{ id: 1, windows: "0" }]
   ])
-    assert.equal(env.chooseEmptyWorkspace(unknown, [], [], []), null)
+    assert.equal(env.chooseEmptyWorkspace(unknown, []), null)
 })
 test("activation coalescing retains completed acceptance but respects session and deliberate activations", () => {
   assert.equal(typeof env.coalesced, "function")

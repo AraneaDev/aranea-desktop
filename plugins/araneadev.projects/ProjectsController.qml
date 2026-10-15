@@ -588,7 +588,7 @@ Item {
     Qt.callLater(drain)
     return op
   }
-  // Persisted environment metadata reserves space across owner restarts.
+  // Persisted environment metadata for Return, Recover and claim checks.
   function environmentRecords(): var {
     var rows = []
     registry.projects.forEach(function (project) {
@@ -596,13 +596,9 @@ Item {
     })
     return rows
   }
-  // Queue reservations join saved legacy/environment records in one allocator.
+  // Only in-flight work reserves a workspace; saved records yield once their windows are gone.
   function workspaceReservations(): var {
-    var rows = environmentRecords()
-    registry.projects.forEach(function (project) {
-      rows = rows.concat(project.associations || [])
-    })
-    return rows.concat(environments.reservations()).concat(operations.filter(function (op) {
+    return environments.reservations().concat(operations.filter(function (op) {
       return op.sessionId === sessionId && op.state !== 'completed' && op.workspaceId > 0
     }))
   }
@@ -610,7 +606,7 @@ Item {
   function chooseEnvironmentWorkspace(data: var): var {
     if (!data || !data.available)
       return null
-    return Environments.chooseEmptyWorkspace(data.workspaces, [], [], workspaceReservations())
+    return Environments.chooseEmptyWorkspace(data.workspaces, workspaceReservations())
   }
   // Keep the latest 100 completions without ever evicting accepted/pending work.
   function retainCompleted(): void {

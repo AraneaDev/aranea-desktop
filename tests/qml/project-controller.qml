@@ -595,6 +595,15 @@ ShellRoot {
           workspaceId: 2
         }
       ]
+      // Occupancy agrees with the window list, as one compositor read does.
+      workspaces = workspaces.filter(function (row) {
+        return row.id !== 2
+      }).concat([
+        {
+          id: 2,
+          windows: 1
+        }
+      ])
       proven = [binding]
       var resume = controller.request({
         projectId: 'p-fixture',
@@ -613,7 +622,7 @@ ShellRoot {
         t.waitFor(function () {
           return controller.operation(alternate.operationId).state === 'completed'
         }, 2000, 'alternate checkout protects identified existing editor', function () {
-          t.equal(controller.operation(alternate.operationId).workspaceId, 4, 'occupied alternate checkout gets a distinct reserved workspace')
+          t.equal(controller.operation(alternate.operationId).workspaceId, 3, 'occupied alternate checkout gets a distinct reserved workspace')
           t.equal(controller.bindings[0].workspaceId, 2, 'existing checkout window is never moved into alternate checkout')
           t.equal(launches, 8, 'uncertain alternate roles stay held instead of duplicating')
           windows = []
