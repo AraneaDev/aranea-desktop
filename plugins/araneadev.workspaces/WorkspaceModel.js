@@ -675,7 +675,7 @@ function projectContext(workspaceId, projectSnapshot) {
         " at launch · " +
         environment.checkoutSnapshot.path +
         " · " +
-        (roles.length ? roles.join(", ") : "Tools unconfirmed")
+        (roles.length ? roles.join(", ") : "Tools not checked")
     }
   }
   for (var i = 0; i < projects.length; i++) {
