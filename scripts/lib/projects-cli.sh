@@ -402,7 +402,7 @@ projects_cli_main() {
   fi
   if [[ "$command" == switch ]]; then
     projects_cli_require omarchy-shell timeout
-    projects_cli_ipc shell toggle araneadev.projects '{"mode":"switcher"}' >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'The quick switcher could not be opened.' 'Activate Aranea and retry.'
+    projects_cli_ipc shell summon araneadev.projects '{"mode":"switcher"}' >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'The quick switcher could not be opened.' 'Activate Aranea and retry.'
     projects_cli_finish observed '' 'Quick switcher opened.' '{}'
   fi
   projects_cli_require flock realpath

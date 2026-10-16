@@ -44,8 +44,8 @@ case "$1 $2" in
     checkout=$(jq -r .checkoutId "$CLI_PAYLOAD")
     [[ "$CLI_MODE" != wrongtarget ]] || checkout=another-checkout
     jq -cn --arg project "$project" --arg checkout "$checkout" --arg state "$state" --arg outcome "$outcome" '{id:"op-123-1",projectId:$project,checkoutId:$checkout,sessionId:"s1",generation:1,state:$state,outcome:(if $outcome=="null" then null else $outcome end),steps:[{id:"editor",status:"observed"},(if $outcome=="observed" then {id:"terminal",status:"observed"} else {id:"terminal",status:"failed",code:"TOOL_MISSING"} end)],error:null}' ;;
-  'shell summon') echo ok ;;
-  'shell toggle') [[ "$CLI_MODE" != noswitch ]] || exit 1; echo ok ;;
+  'shell summon') [[ "$CLI_MODE" != noswitch || "${3:-}" != araneadev.projects || "${4:-}" != *switcher* ]] || exit 1; echo ok ;;
+  'shell toggle') echo 'toggle is not allowed' >&2; exit 1 ;;
   'aranea.projects.capture captureSnapshot')
     if [[ "$CLI_MODE" == details ]]; then
       jq -cn --arg id "$CLI_PROJECT" '{opened:true,projectId:$id,ui:null}'
@@ -123,12 +123,17 @@ run_cli 1 projects details "$project"
 jq -se 'last.code=="DETAILS_UNCONFIRMED" and last.data.accepted' "$events" >/dev/null
 CLI_MODE=details run_cli 0 projects details "$project"
 jq -se --arg id "$project" 'any(.[]; .[0:3]==["shell","summon","araneadev.projects"] and (.[3]|fromjson).projectId==$id)' "$CLI_CALLS" >/dev/null
-# Quick switcher: toggles the shell component with the switcher payload.
+# Quick switcher: summons (never toggles) the shell component with the switcher payload.
 run_cli 0 projects switch
-jq -se 'any(.[]; . == ["shell","toggle","araneadev.projects","{\"mode\":\"switcher\"}"])' "$CLI_CALLS" >/dev/null
+jq -se 'any(.[]; . == ["shell","summon","araneadev.projects","{\"mode\":\"switcher\"}"])' "$CLI_CALLS" >/dev/null
 jq -se 'last as $l | $l.operation=="projects.switch" and $l.status=="observed" and $l.message=="Quick switcher opened." and ($l.data|del(.outcome))=={}' "$events" >/dev/null
 run_cli 0 capabilities
 jq -se 'last.data.operations | any(.[]; .name=="projects.switch" and .arguments=={})' "$events" >/dev/null
+: >"$CLI_CALLS"
+run_cli 0 projects switch
+run_cli 0 projects switch
+jq -se '[.[] | select(.[0:3]==["shell","summon","araneadev.projects"])] | length==2 and all(.[]; .[3]=="{\"mode\":\"switcher\"}")' "$CLI_CALLS" >/dev/null
+jq -se 'any(.[]; .[1]=="toggle") | not' "$CLI_CALLS" >/dev/null
 CLI_MODE=noswitch run_cli 1 projects switch
 jq -se 'last.code=="OWNER_UNAVAILABLE"' "$events" >/dev/null
 run_cli 2 projects switch extra
