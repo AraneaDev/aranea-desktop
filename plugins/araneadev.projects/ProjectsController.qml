@@ -350,7 +350,7 @@ Item {
         registryReady = true
         error = null
       } else
-        error = response && response.error || failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
+        error = response && response.error || failure('REGISTRY_UNAVAILABLE', 'Project registry is not available.')
       readDesktop(function (data) {
         validate(function (proof) {
           refreshing = false
@@ -670,8 +670,8 @@ Item {
         return
       if (!response || !response.ok || !response.state) {
         var problem = response && response.error
-        error = problem || failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
-        failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry unavailable.')
+        error = problem || failure('REGISTRY_UNAVAILABLE', 'Project registry is not available.')
+        failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry is not available.')
         return
       }
       if (op.environmentId) {

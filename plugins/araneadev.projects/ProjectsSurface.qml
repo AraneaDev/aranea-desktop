@@ -1274,7 +1274,7 @@ Item {
                       panel.root.actionClient.refresh()
                   }
                   actionError: !panel.root.actionClient.submissionUncertain && !panel.root.actionClient.error && !panel.root.actionClient.summaryError && panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Running is not available. Manage actions to check required helpers.' : ''
-                  activityError: panel.root.activityClient.error ? 'Agent connection unavailable. Open Details to reconnect.' : ''
+                  activityError: panel.root.activityClient.error ? 'Agent connection not available. Open Details to reconnect.' : ''
                   pointerGate: pointerGate
                   suggestions: panel.overviewSuggestions
                   onSuggestionAddRequested: function (key) {

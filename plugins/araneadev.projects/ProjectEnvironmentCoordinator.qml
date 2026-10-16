@@ -97,7 +97,7 @@ Item {
       return refused('INERT_MODE', 'Inert project fixture.')
     owner.syncSession()
     if (!owner.runtime || !owner.sessionId)
-      return refused('DEPENDENCY_MISSING', 'The project runtime is unavailable.')
+      return refused('DEPENDENCY_MISSING', 'The project runtime is not available.')
     if (!valid(payload))
       return refused('INVALID_REQUEST', 'Choose an exact checkout and profile revision.')
     prune()
@@ -343,7 +343,7 @@ Item {
       return refused('INERT_MODE', 'Inert project fixture.')
     owner.syncSession()
     if (!owner.runtime || !owner.sessionId)
-      return refused('DEPENDENCY_MISSING', 'The project runtime is unavailable.')
+      return refused('DEPENDENCY_MISSING', 'The project runtime is not available.')
     if (!valid(payload))
       return refused('INVALID_REQUEST', 'Choose an exact checkout and profile revision.')
     var accepted = Environments.coalesced(owner.environmentActivations, owner.sessionId, payload.activationId)
@@ -400,7 +400,7 @@ Item {
       return row.projectId === payload.projectId && row.id === payload.environmentId
     })[0]
     if (!env)
-      return refused('ENVIRONMENT_NOT_FOUND', 'The environment is unavailable. Refresh Projects.')
+      return refused('ENVIRONMENT_NOT_FOUND', 'The environment is not available. Refresh Projects.')
     var op = Operations.begin(owner.operations, {
       projectId: env.projectId,
       checkoutId: env.checkoutId,
@@ -429,7 +429,7 @@ Item {
       return row.projectId === payload.projectId && row.id === payload.environmentId
     })[0]
     if (!env)
-      return refused('ENVIRONMENT_NOT_FOUND', 'The environment is unavailable. Refresh Projects.')
+      return refused('ENVIRONMENT_NOT_FOUND', 'The environment is not available. Refresh Projects.')
     if (env.profileSnapshot.roles.indexOf(payload[action[0]]) < 0)
       return refused('INVALID_REQUEST', 'Choose a role from the original environment profile.')
     var accepted = Environments.coalesced(owner.environmentActivations, owner.sessionId, payload.activationId)
@@ -563,7 +563,7 @@ Item {
         return row.id === op.environmentId && row.projectId === op.projectId
       })[0]
       if (!env) {
-        owner.failOperation(id, 'ENVIRONMENT_NOT_FOUND', 'The environment is unavailable.')
+        owner.failOperation(id, 'ENVIRONMENT_NOT_FOUND', 'The environment is not available.')
         return
       }
       if (claimedElsewhere(env)) {

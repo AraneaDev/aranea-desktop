@@ -484,7 +484,7 @@ Item {
         return
       if (!operation.id || operation.id !== id || environmentTarget && (operation.environmentId !== environmentId || operation.projectId !== environmentTarget.projectId)) {
         pending = false
-        error = operation.error ? operation.error.message : 'Operation is unavailable.'
+        error = operation.error ? operation.error.message : 'Operation is not available.'
         return
       }
       pending = operation.state !== 'completed'

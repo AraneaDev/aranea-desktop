@@ -329,7 +329,7 @@ ShellRoot {
     var picker = t.findChild(details, 'locateFolder:p-one:c-main')
     picker.chooserAvailable = false
     locate.clicked()
-    t.check(picker.error.indexOf('Folder chooser unavailable') === 0, 'Locate folder runs the checkout folder chooser')
+    t.check(picker.error.indexOf('Folder chooser not available') === 0, 'Locate folder runs the checkout folder chooser')
     details.operation = roleOperation('terminal', 'unconfirmed', true)
     var role = t.findChild(details, 'roleProblem:terminal')
     t.equal(t.findChild(role, 'projectProblemTitle').text, "Couldn't confirm it started", 'role uncertainty title')

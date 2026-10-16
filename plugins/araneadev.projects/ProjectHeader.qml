@@ -34,7 +34,7 @@ ColumnLayout {
     if (!checkout)
       return 'None'
     if (git && project && git.projectId === project.id && git.checkoutId === checkout.id)
-      return (git.detached ? 'detached HEAD' : git.branch || 'unavailable') + (gitStale ? ' (last checked)' : '')
+      return (git.detached ? 'detached HEAD' : git.branch || 'not available') + (gitStale ? ' (last checked)' : '')
     return (checkout.branch || 'detached') + ' (registered)'
   }
   // Submission state only; accepted native work continues independently.

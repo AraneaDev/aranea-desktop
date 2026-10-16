@@ -119,3 +119,27 @@ test("old status words are gone", () => {
     /\b(Unconfirmed|Unavailable|Tools unconfirmed|Awaiting observation|Usage unknown|Launch status unknown)\b/i
   assert.deepEqual(scanAll(visibleStrings, old, jsVisibleStrings), [])
 })
+
+/**
+ * String literals on QML lines that assign or return user-visible text through
+ * error/return forms the property scanner does not see.
+ * @param {string} source - file contents
+ * @returns {string[]} literals from those lines
+ */
+function assignedStrings(source) {
+  const out = []
+  const noComments = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1")
+  for (const line of noComments.split("\n"))
+    if (/\b(return\s|error\s*=|\w*Error\s*:|\w*Hint\s*:)/.test(line))
+      for (const s of line.matchAll(/'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g)) {
+        if (/[=!]==?\s*$/.test(line.slice(0, s.index))) continue
+        out.push(s[1] ?? s[2])
+      }
+  return out
+}
+
+test("assignment and return forms say not available instead of unavailable", () => {
+  const sample = "error = 'Folder chooser unavailable.'\nreturn x || 'unavailable'\nvar code = 'unavailable'\nreturn s.status === 'unavailable'"
+  assert.deepEqual(assignedStrings(sample), ["Folder chooser unavailable.", "unavailable"])
+  assert.deepEqual(scanAll(assignedStrings, /\bunavailable\b/i, () => []), [])
+})

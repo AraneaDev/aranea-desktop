@@ -72,7 +72,7 @@ ColumnLayout {
     if (displayOnly)
       return
     if (!chooserAvailable) {
-      error = 'Folder chooser unavailable. Enter an absolute folder path below.'
+      error = 'Folder chooser not available. Enter an absolute folder path below.'
       return
     }
     try {
@@ -103,7 +103,7 @@ ColumnLayout {
       }
     } catch (e) {
       releaseDialog()
-      error = 'Folder chooser unavailable. Enter an absolute folder path below.'
+      error = 'Folder chooser not available. Enter an absolute folder path below.'
     }
   }
   // Shell windows are destroyed when hidden; the host closes the chooser first.

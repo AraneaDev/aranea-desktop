@@ -130,7 +130,7 @@ ProjectSectionCard {
       if (!section.git || !section.git.upstream)
         return 'No upstream configured'
       var comparable = typeof section.git.ahead === 'number' && typeof section.git.behind === 'number'
-      return (comparable ? section.git.ahead + ' ahead · ' + section.git.behind + ' behind ' : 'Comparison unavailable · ') + section.git.upstream + ' · Local refs; no remote fetch'
+      return (comparable ? section.git.ahead + ' ahead · ' + section.git.behind + ' behind ' : 'Comparison not available · ') + section.git.upstream + ' · Local refs; no remote fetch'
     }
     opacity: 0.7
   }
