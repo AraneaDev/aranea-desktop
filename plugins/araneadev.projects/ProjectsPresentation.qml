@@ -406,6 +406,7 @@ Item {
   function captureSnapshot() {
     return JSON.stringify({
       opened: opened,
+      mode: mode,
       section: section,
       projectId: projectId,
       inspectionCheckoutId: inspectionCheckoutId,

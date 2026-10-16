@@ -49,7 +49,8 @@ case "$1 $2" in
   'aranea.projects.capture captureSnapshot')
     if [[ "$CLI_MODE" == details ]]; then
       jq -cn --arg id "$CLI_PROJECT" '{opened:true,projectId:$id,ui:null}'
-    else echo '{"opened":true,"section":"appearance","ui":null}'; fi ;;
+    elif [[ "$CLI_MODE" == blocked ]]; then echo '{"opened":true,"mode":"","section":"projects","ui":null}'
+    else echo '{"opened":true,"mode":"switcher","section":"appearance","ui":null}'; fi ;;
   *) echo 'unexpected IPC' >&2; exit 1 ;;
 esac
 FAKE
@@ -134,6 +135,9 @@ run_cli 0 projects switch
 run_cli 0 projects switch
 jq -se '[.[] | select(.[0:3]==["shell","summon","araneadev.projects"])] | length==2 and all(.[]; .[3]=="{\"mode\":\"switcher\"}")' "$CLI_CALLS" >/dev/null
 jq -se 'any(.[]; .[1]=="toggle") | not' "$CLI_CALLS" >/dev/null
+# A window that keeps its full layout is reported as partial, never as opened.
+CLI_MODE=blocked run_cli 1 projects switch
+jq -se 'last as $l | $l.status=="partial" and $l.code=="SWITCHER_BLOCKED" and $l.message=="Projects has unsaved changes; the full window stays open."' "$events" >/dev/null
 CLI_MODE=noswitch run_cli 1 projects switch
 jq -se 'last.code=="OWNER_UNAVAILABLE"' "$events" >/dev/null
 run_cli 2 projects switch extra
