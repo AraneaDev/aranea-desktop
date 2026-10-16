@@ -64,7 +64,7 @@ function busiest(record, nowMs) {
  */
 function reasonFor(option, last) {
   var text
-  if (option.fraction < 0) text = "Usage unknown"
+  if (option.fraction < 0) text = "Not known yet"
   else {
     var pct = Math.round(option.fraction * 100)
     if (option.fraction >= 0.8 && option.headline) {

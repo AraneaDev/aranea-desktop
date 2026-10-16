@@ -120,7 +120,7 @@ test("preview failures remain independent from terminal command outcomes", () =>
       "Command failed · Previous preview reachability"
     ],
     [{ processState: "stopped", readiness: "unknown" }, "Stopped · Preview not checked"],
-    [{ processState: "unknown", readiness: "unknown" }, "Unavailable · Preview not checked"]
+    [{ processState: "unknown", readiness: "unknown" }, "Not available · Preview not checked"]
   ])
     assert.equal(Records.runLabel(run), expected)
 })
@@ -131,7 +131,7 @@ test("process result and independent preview evidence never claim agent verifica
   )
   assert.equal(
     Records.runLabel({ processState: "unconfirmed", readiness: "reachable" }),
-    "Unconfirmed · Previous preview reachability"
+    "Not confirmed · Previous preview reachability"
   )
   assert.equal(
     Records.runLabel({
@@ -140,7 +140,7 @@ test("process result and independent preview evidence never claim agent verifica
       submissionUnconfirmed: true,
       exitCode: 0
     }),
-    "Command succeeded · Cleanup unconfirmed · Preview not checked"
+    "Command succeeded · Cleanup not confirmed · Preview not checked"
   )
   assert.equal(
     Records.protectedRun({ processState: "succeeded", submissionUnconfirmed: true }),

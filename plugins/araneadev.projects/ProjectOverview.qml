@@ -274,7 +274,7 @@ ColumnLayout {
     }
     Aranea.UiLabel {
       Layout.fillWidth: true
-      text: 'Unconfirmed tools may still be open. Check looks for existing tools; New window deliberately opens another.'
+      text: 'Tools may still be open. Check looks for existing tools; New window opens another.'
       opacity: 0.65
     }
     Aranea.ActionButton {

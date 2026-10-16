@@ -374,7 +374,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !details.headerProvided || !!details.operation || !details.openAvailable
-    text: !details.openAvailable ? 'Workspace opening unavailable. Restore the project owner and compositor, then retry.' : details.operation ? 'Open · ' + (details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
+    text: !details.openAvailable ? 'Cannot open a workspace right now. Make sure Projects and the window manager are running, then retry.' : details.operation ? 'Open · ' + (details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
   }
   Aranea.UiLabel {
     Layout.fillWidth: true

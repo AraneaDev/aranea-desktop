@@ -294,7 +294,7 @@ test("typed environment search keeps exact saved identity and launch snapshot", 
     environmentId: "e-one"
   })
   assert.match(rows[0].label, /Return.*Original/)
-  assert.match(rows[0].detail, /unconfirmed/)
+  assert.match(rows[0].detail, /not checked/)
 })
 
 test("environment records survive the ranking facade with exact Return identities", () => {

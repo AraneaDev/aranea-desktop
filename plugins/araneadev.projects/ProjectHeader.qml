@@ -34,7 +34,7 @@ ColumnLayout {
     if (!checkout)
       return 'None'
     if (git && project && git.projectId === project.id && git.checkoutId === checkout.id)
-      return (git.detached ? 'detached HEAD' : git.branch || 'unavailable') + (gitStale ? ' (last observed)' : '')
+      return (git.detached ? 'detached HEAD' : git.branch || 'unavailable') + (gitStale ? ' (last checked)' : '')
     return (checkout.branch || 'detached') + ' (registered)'
   }
   // Submission state only; accepted native work continues independently.
@@ -97,7 +97,7 @@ ColumnLayout {
       return {
         id: p.id,
         name: p.name,
-        path: Profiles.usable(p, header.tools) ? Profiles.summary(p, header.tools) : 'Unavailable · ' + Profiles.summary(p, header.tools)
+        path: Profiles.usable(p, header.tools) ? Profiles.summary(p, header.tools) : 'Not available · ' + Profiles.summary(p, header.tools)
       }
     }) : []
     selectedId: header.profile ? header.profile.id : ''

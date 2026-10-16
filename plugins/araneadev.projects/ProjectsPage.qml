@@ -454,7 +454,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.setupActive && (details.dirty || details.actions.editing)
-    text: 'Your draft is retained until you save or discard it.'
+    text: 'Your draft is kept until you save or discard it.'
     color: Aranea.DesignTokens.attention
   }
   Aranea.WorkflowHelp {

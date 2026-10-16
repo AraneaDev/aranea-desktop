@@ -116,7 +116,7 @@ Item {
       }
       onStarted: startedSuccessfully = true
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The project owner IPC executable is unavailable.')
+        finish(-1, '', 'The project helper is not available.')
       stdout: StdioCollector {
         id: output
       }
@@ -204,7 +204,7 @@ Item {
       acceptanceUnknown = true
       requestError = {
         code: 'ACCEPTANCE_UNKNOWN',
-        message: 'Launch acceptance is unknown. Check launch status before starting again.'
+        message: 'Could not confirm it started. Check before starting again.'
       }
     }
     if (method === 'snapshot') {
@@ -235,7 +235,7 @@ Item {
           response = JSON.parse(output)
         } catch (e) {}
         if (code !== 0 || !response || typeof response !== 'object') {
-          transportFailed(method, diagnostics || 'Project owner unavailable. Activate Aranea and retry.')
+          transportFailed(method, diagnostics || 'Projects is not running. Activate Aranea and retry.')
           return
         }
         available = true
@@ -296,7 +296,7 @@ Item {
       submissionInFlight = false
       var environmentSubmission = submissionMethod !== 'request'
       if (environmentSubmission && (typeof response.ok !== 'boolean' || response.ok === true && (response.error != null || !validId(response.operationId) || !validId(response.environmentId)) || response.ok !== true && (response.operationId || response.environmentId))) {
-        transportFailed(submissionMethod, 'Owner acknowledgement is incomplete. Check launch status.')
+        transportFailed(submissionMethod, 'Could not confirm it started. Check before starting again.')
         return
       }
       if (!response.ok || !response.operationId) {
@@ -318,7 +318,7 @@ Item {
       requestError = null
       if (environmentSubmission) {
         if (submissionMethod !== 'startEnvironment' && response.environmentId !== environmentTarget.environmentId) {
-          transportFailed(submissionMethod, 'Owner acknowledged another environment.')
+          transportFailed(submissionMethod, 'Projects answered for a different environment.')
           return
         }
         environmentId = response.environmentId
@@ -440,7 +440,7 @@ Item {
       if (response.ok !== true || response.error != null || response.found !== true || response.activationId !== activation || !validId(response.sessionId) || environmentSession && response.sessionId !== environmentSession || !op || op.id !== response.operationId || op.environmentId !== response.environmentId || op.activationId !== activation || op.sessionId !== response.sessionId || op.projectId !== environmentTarget.projectId || (submissionMethod === 'startEnvironment' ? op.checkoutId !== environmentTarget.checkoutId : op.environmentId !== environmentTarget.environmentId) || !validId(op.id) || !validId(op.environmentId) || !sameTarget(submissionMethod === 'startEnvironment' ? op.startTarget : op.recoveryTarget)) {
         requestError = {
           code: 'ACCEPTANCE_UNKNOWN',
-          message: 'No matching acceptance was confirmed. The earlier launch will not be replayed.'
+          message: 'Could not confirm the earlier start. It will not be run again.'
         }
         error = requestError.message
         return

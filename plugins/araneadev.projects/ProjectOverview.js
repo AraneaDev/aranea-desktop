@@ -53,12 +53,12 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
           Records.runLabel(run).split(" · Preview not checked")[0]
         : "Not run in this checkout",
       detail: run
-        ? "Observed " +
+        ? "Checked " +
           ageLabel((run.updatedAt || run.createdAt) * 1000, nowMs) +
           (service ? "" : " · Result applies to that run")
         : "Saved command",
       tooltip: run
-        ? "Observed " +
+        ? "Checked " +
           new Date((run.updatedAt || run.createdAt) * 1000).toLocaleString() +
           " · Run started " +
           new Date(run.createdAt * 1000).toLocaleString()
@@ -158,13 +158,13 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
     return {
       title: "Workspace " + id,
       status: confirmed
-        ? "Observed tools · " +
+        ? "Tools found · " +
           rows
             .map(function (/** @type {OverviewData} */ b) {
               return b.role
             })
             .join(", ")
-        : "Saved location · tools unconfirmed",
+        : "Saved location · tools not checked",
       detail: "Uses saved tools; Open may launch missing tools",
       target: { projectId: project.id, checkoutId: checkoutId },
       controls: [{ method: "open", label: "Open workspace" }]
@@ -271,7 +271,7 @@ function activitySummary(model, availability) {
     if (rows.length) summary.push({ label: rows.length + " " + (rows.length === 1 ? singular : plural), section: section, attention: attention })
   }
   add(actions.filter(function (r) { return r.observationState === "failed" }), "failed run", "failed runs", "actions", true)
-  add(actions.filter(function (r) { return r.observationState === "unconfirmed" }), "run unconfirmed", "runs unconfirmed", "actions", true)
+  add(actions.filter(function (r) { return r.observationState === "unconfirmed" }), "run not confirmed", "runs not confirmed", "actions", true)
   var live = agents.filter(function (r) { return r.connected })
   add(live.filter(function (r) { return r.reportedState === "needs-input" }), "agent needs input (reported)", "agents need input (reported)", "agents", true)
   add(live.filter(function (r) { return r.reportedState === "ready-for-review" }), "agent ready for review (reported)", "agents ready for review (reported)", "agents", true)
@@ -281,7 +281,7 @@ function activitySummary(model, availability) {
   add(live.filter(function (r) { return r.reportedState === "working" }), "agent working (reported)", "agents working (reported)", "agents", false)
   add(checks.filter(function (r) { return r.observationState === "succeeded" }), "check succeeded (latest run)", "checks succeeded (latest runs)", "actions", false)
   add(agents.filter(function (r) { return r.connectionLost }), "agent disconnected", "agents disconnected", "agents", false)
-  add(agents.filter(function (r) { return !r.connected && !r.connectionLost }), "agent connection unconfirmed", "agent connections unconfirmed", "agents", false)
+  add(agents.filter(function (r) { return !r.connected && !r.connectionLost }), "agent connection not confirmed", "agent connections not confirmed", "agents", false)
   return summary
 }
 

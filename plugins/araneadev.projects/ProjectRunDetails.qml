@@ -111,7 +111,7 @@ ColumnLayout {
   visible: !!run
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: details.run && details.run.definitionSnapshot ? details.run.definitionSnapshot.name : 'Retained run'
+    text: details.run && details.run.definitionSnapshot ? details.run.definitionSnapshot.name : 'Saved run'
     font.bold: true
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
@@ -123,7 +123,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: 'Checkout: ' + (details.checkout ? details.checkout.path : 'Unavailable') + ' · ' + (details.run ? details.run.checkoutId : '')
+    text: 'Checkout: ' + (details.checkout ? details.checkout.path : 'Not available') + ' · ' + (details.run ? details.run.checkoutId : '')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
@@ -141,7 +141,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: details.run ? 'Run: ' + details.run.id + ' · Receipt: ' + (details.run.createdAt ? new Date(details.run.createdAt * 1000).toLocaleString() : 'Unavailable') + ' · Outcome: ' + (details.run.outcome || 'Awaiting observation') : ''
+    text: details.run ? 'Run: ' + details.run.id + ' · Started: ' + (details.run.createdAt ? new Date(details.run.createdAt * 1000).toLocaleString() : 'Not available') + ' · Outcome: ' + (details.run.outcome || 'Checking…') : ''
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
   Aranea.UiLabel {

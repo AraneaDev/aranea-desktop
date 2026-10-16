@@ -137,7 +137,7 @@ ProjectSectionCard {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!section.git
-    text: section.git ? 'Observed ' + Overview.ageLabel(section.git.observedAt, Math.max(section.nowMs, Date.now())) + (section.nowMs - section.git.observedAt > 30000 ? ' · May be stale' : '') : ''
+    text: section.git ? 'Checked ' + Overview.ageLabel(section.git.observedAt, Math.max(section.nowMs, Date.now())) + (section.nowMs - section.git.observedAt > 30000 ? ' · May be stale' : '') : ''
     opacity: 0.6
     ToolTip.visible: observationHover.hovered
     ToolTip.text: section.git ? new Date(section.git.observedAt).toLocaleString() : ''

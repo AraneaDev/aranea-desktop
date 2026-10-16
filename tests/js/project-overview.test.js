@@ -75,9 +75,9 @@ test("activity summary never presents lost or uncertain task connections as live
   )
   const summary = JSON.parse(JSON.stringify(logic.activitySummary(result)))
   assert.deepEqual(summary, [
-    { label: "1 run unconfirmed", section: "actions", attention: true },
+    { label: "1 run not confirmed", section: "actions", attention: true },
     { label: "1 agent disconnected", section: "agents", attention: false },
-    { label: "1 agent connection unconfirmed", section: "agents", attention: false }
+    { label: "1 agent connection not confirmed", section: "agents", attention: false }
   ])
   assert.deepEqual(
     JSON.parse(JSON.stringify(logic.activitySummary(model({}, {}, {}, null, "missing")))),
@@ -254,7 +254,7 @@ test("saved workspace locations remain discoverable without claiming live tools"
     1000
   )
   assert.equal(result.workspaces.length, 1)
-  assert.match(result.workspaces[0].status, /unconfirmed/)
+  assert.match(result.workspaces[0].status, /tools not checked/)
 })
 
 test("observation age stays compact and marks invalid or future clocks", () => {

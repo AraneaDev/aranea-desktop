@@ -530,7 +530,7 @@ ColumnLayout {
     visible: actions.editing && actions.editConflict
     Aranea.UiLabel {
       Layout.fillWidth: true
-      text: 'Draft retained. Refresh actions to review the latest saved definition before saving over it.'
+      text: 'Your draft is kept. Refresh actions to review the latest saved version before saving over it.'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
     Aranea.UiLabel {

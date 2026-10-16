@@ -111,7 +111,7 @@ test("stale, empty, missing and malformed usage is unknown", () => {
       fraction: -1,
       headline: null,
       resetsAt: null,
-      reason: "Usage unknown"
+      reason: "Not known yet"
     })
     assert.equal(r.suggestedId, "codex", "known below 0.9 beats unknown")
   }
@@ -194,7 +194,7 @@ test("both unknown falls back to last used then claude", () => {
   assert.equal(s.suggest(both, {}, "other", now).suggestedId, "claude")
   assert.equal(
     s.suggest(both, {}, "codex", now).options[1].reason,
-    "Usage unknown · last used here"
+    "Not known yet · last used here"
   )
 })
 

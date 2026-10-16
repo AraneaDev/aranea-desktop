@@ -186,7 +186,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: 'Only sessions reported from an exact registered checkout appear here.'
+    text: 'Only sessions reported from the saved checkouts appear here.'
     opacity: 0.65
   }
   Aranea.ActionButton {
