@@ -130,7 +130,7 @@ function assignedStrings(source) {
   const out = []
   const noComments = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1")
   for (const line of noComments.split("\n"))
-    if (/\b(return\s|error\s*=|\w*Error\s*:|\w*Hint\s*:)/.test(line))
+    if (/\b(return\s|error\s*=|\w*Error\s*:|\w*Hint\s*:)/i.test(line))
       for (const s of line.matchAll(/'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g)) {
         if (/[=!]==?\s*$/.test(line.slice(0, s.index))) continue
         out.push(s[1] ?? s[2])

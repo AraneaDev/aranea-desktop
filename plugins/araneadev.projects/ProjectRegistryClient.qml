@@ -64,7 +64,7 @@ QtObject {
     try {
       runner(argv, input, complete)
     } catch (e) {
-      complete(-1, '', 'Project backend executable unavailable. Activate Aranea and retry.')
+      complete(-1, '', 'Project backend executable not available. Activate Aranea and retry.')
     }
   }
   // Parse one private store response without silently resetting malformed data.
@@ -79,7 +79,7 @@ QtObject {
       state: null,
       error: {
         code: 'REGISTRY_UNAVAILABLE',
-        message: 'Project registry unavailable. Check registry storage and retry.'
+        message: 'Project registry not available. Check registry storage and retry.'
       }
     }
   }
@@ -120,9 +120,9 @@ QtObject {
         finished(0, '', null)
       } else {
         var message = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
-        finished(0, message || 'Project registry unavailable. Check registry storage and retry.', value.error || {
+        finished(0, message || 'Project registry not available. Check registry storage and retry.', value.error || {
           code: 'REGISTRY_UNAVAILABLE',
-          message: diagnostics || 'Project registry unavailable. Check registry storage and retry.'
+          message: diagnostics || 'Project registry not available. Check registry storage and retry.'
         })
       }
     })
@@ -141,7 +141,7 @@ QtObject {
           editors: [],
           terminals: []
         }
-        message = diagnostics || 'Tool choices unavailable. Install supported tools and retry.'
+        message = diagnostics || 'Tool choices not available. Install supported tools and retry.'
       }
       finished(1, message, message ? {
         code: 'TOOL_MISSING',
@@ -245,7 +245,7 @@ QtObject {
         stdinEnabled = false
       }
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'Project backend executable unavailable. Activate Aranea and retry.')
+        finish(-1, '', 'Project backend executable not available. Activate Aranea and retry.')
       stdout: StdioCollector {
         id: output
       }

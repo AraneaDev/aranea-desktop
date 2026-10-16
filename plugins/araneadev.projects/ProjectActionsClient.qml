@@ -145,7 +145,7 @@ Item {
         stdinEnabled = false
       }
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The project action backend is unavailable.')
+        finish(-1, '', 'The project action backend is not available.')
       stdout: StdioCollector {
         id: collected
       }
@@ -266,7 +266,7 @@ Item {
   function transportError(text: string): var {
     return {
       code: 'SUBMISSION_UNCONFIRMED',
-      message: text || 'Backend response unavailable.',
+      message: text || 'Backend response not available.',
       recovery: 'Refresh the exact action and checkout to recover its receipt; never automatically resubmit.'
     }
   }
@@ -534,7 +534,7 @@ Item {
         client.submitting = false
         client.error = {
           code: 'DEPENDENCY_MISSING',
-          message: diagnostics || 'Native request UUID unavailable.',
+          message: diagnostics || 'Native request UUID not available.',
           recovery: 'Restore the native UUID helper before starting.'
         }
         return
@@ -733,7 +733,7 @@ Item {
       } catch (e) {}
       if (!response || typeof response.ok !== 'boolean' || !Object.prototype.hasOwnProperty.call(response, 'error')) {
         client.summaryError = {
-          message: 'Service observation unavailable. Manage actions to retry.'
+          message: 'Service observation not available. Manage actions to retry.'
         }
         return
       }

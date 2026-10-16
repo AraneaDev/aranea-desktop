@@ -265,7 +265,7 @@ Item {
       return
     }
     if (!binding || binding.sessionId !== sessionId || !(binding.pid > 0) || !/^0x[0-9a-fA-F]+$/.test(binding.address) || /^0x0+$/.test(binding.address)) {
-      done(result(false, 'unconfirmed', 'OWNERSHIP_UNCONFIRMED', 'Window ownership is unavailable. Use Open new window explicitly.', null))
+      done(result(false, 'unconfirmed', 'OWNERSHIP_UNCONFIRMED', 'Window ownership is not available. Use Open new window explicitly.', null))
       return
     }
     var session = sessionId
@@ -465,7 +465,7 @@ Item {
           if (observer.completed)
             return
           if (!data.available) {
-            observer.finish(runtime.result(false, 'unconfirmed', 'COMPOSITOR_UNAVAILABLE', 'The compositor is unavailable; launch remains unconfirmed.', null))
+            observer.finish(runtime.result(false, 'unconfirmed', 'COMPOSITOR_UNAVAILABLE', 'The compositor is not available; launch remains unconfirmed.', null))
             return
           }
           var candidates = data.windows.filter(function (row) {

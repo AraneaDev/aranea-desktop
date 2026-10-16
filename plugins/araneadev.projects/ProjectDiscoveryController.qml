@@ -149,7 +149,7 @@ Item {
           write('cancel\n')
       }
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, 'Discovery helper unavailable. Activate Aranea and retry.')
+        finish(-1, 'Discovery helper not available. Activate Aranea and retry.')
       stdout: SplitParser {
         onRead: function (data) {
           process.lineCallback(data)

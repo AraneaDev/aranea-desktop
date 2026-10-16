@@ -162,7 +162,7 @@ Item {
   function toolSelection(profile: var, tools: var, resolveDefaults: bool): var {
     if (!tools || !Array.isArray(tools.editors) || !Array.isArray(tools.terminals))
       return {
-        error: owner.failure('DEPENDENCY_MISSING', 'The installed tool probe is unavailable.')
+        error: owner.failure('DEPENDENCY_MISSING', 'The installed tool probe is not available.')
       }
     var resolved = resolveDefaults ? Profiles.resolve(profile, tools) : null
     if (resolved && !resolved.ok)
@@ -194,7 +194,7 @@ Item {
       })
     }))
       return {
-        error: owner.failure('TOOL_MISSING', 'A profile application is unavailable. Review the profile tools.')
+        error: owner.failure('TOOL_MISSING', 'A profile application is not available. Review the profile tools.')
       }
     return {
       selected: selected,
@@ -235,7 +235,7 @@ Item {
         return
       if (!response || !response.ok || !response.state) {
         finish({
-          error: response && response.error || owner.failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
+          error: response && response.error || owner.failure('REGISTRY_UNAVAILABLE', 'Project registry not available.')
         })
         return
       }
@@ -260,7 +260,7 @@ Item {
         })[0]
         if (!observedCheckout || !(observedCheckout.branch === null || typeof observedCheckout.branch === 'string' && observedCheckout.branch.length > 0)) {
           finish({
-            error: owner.failure('CHECKOUT_INVALID', 'Fresh checkout branch metadata is unavailable.')
+            error: owner.failure('CHECKOUT_INVALID', 'Fresh checkout branch metadata is not available.')
           })
           return
         }
@@ -282,20 +282,20 @@ Item {
             var shared = (resolved.project.workspaceMode || 'dedicated') === 'current'
             if (shared && data && data.available && !(Number.isInteger(data.currentWorkspaceId) && data.currentWorkspaceId > 0)) {
               finish({
-                error: owner.failure('INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
+                error: owner.failure('INVALID_WORKSPACE', 'The current workspace is not available. Choose dedicated workspace mode.')
               })
               return
             }
             var workspace = shared ? data && data.available && data.currentWorkspaceId : owner.chooseEnvironmentWorkspace(data)
             if (!workspace) {
               finish({
-                error: owner.failure('WORKSPACE_UNAVAILABLE', shared ? 'The current workspace is unavailable.' : 'Fresh empty workspace occupancy is unavailable.')
+                error: owner.failure('WORKSPACE_UNAVAILABLE', shared ? 'The current workspace is not available.' : 'Fresh empty workspace occupancy is not available.')
               })
               return
             }
             if (typeof owner.runtime.createEnvironmentId !== 'function') {
               finish({
-                error: owner.failure('DEPENDENCY_MISSING', 'The environment identity source is unavailable.')
+                error: owner.failure('DEPENDENCY_MISSING', 'The environment identity source is not available.')
               })
               return
             }
@@ -475,7 +475,7 @@ Item {
       return row.id === op.checkoutId && row.path === env.checkoutSnapshot.path
     })[0]
     if (!checkout) {
-      owner.failOperation(id, 'CHECKOUT_INVALID', 'The original registered checkout is unavailable.')
+      owner.failOperation(id, 'CHECKOUT_INVALID', 'The original registered checkout is not available.')
       return
     }
     owner.invoke(owner.metadataRunner, [owner.metadataPath, '--metadata', checkout.path, '--json'], function (metadata) {
@@ -514,9 +514,9 @@ Item {
           var next = !data.available ? null : shared ? data.currentWorkspaceId : owner.chooseEnvironmentWorkspace(data)
           if (!(Number.isInteger(next) && next > 0)) {
             if (shared && data.available)
-              owner.failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
+              owner.failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is not available. Choose dedicated workspace mode.')
             else
-              owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The original workspace is unavailable.')
+              owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The original workspace is not available.')
             return
           }
           owner.mutate(id, 'environment-associate', {
@@ -576,7 +576,7 @@ Item {
         if (!data.available || !Array.isArray(data.workspaces) || !data.workspaces.some(function (row) {
           return row.id === env.workspaceId
         })) {
-          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The saved workspace is unavailable.')
+          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The saved workspace is not available.')
           return
         }
         owner.runtime.focusWorkspace(env.workspaceId, function (response) {
@@ -638,7 +638,7 @@ Item {
         if (workspaceAvailable(data, op.workspaceId))
           done(data)
         else
-          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The current workspace is unavailable.')
+          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The current workspace is not available.')
         return
       }
       if (empty(data, op.workspaceId) && !reservedElsewhere(op)) {
@@ -651,7 +651,7 @@ Item {
       }
       var workspace = owner.chooseEnvironmentWorkspace(data)
       if (!workspace) {
-        owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'Fresh empty workspace occupancy is unavailable.')
+        owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'Fresh empty workspace occupancy is not available.')
         return
       }
       var changed = Object.assign({}, op, {
@@ -714,7 +714,7 @@ Item {
         if (!owner.current(id, generation, session))
           return
         if (!workspaceAvailable(data, op.workspaceId)) {
-          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The original workspace is unavailable.')
+          owner.failOperation(id, 'WORKSPACE_UNAVAILABLE', 'The original workspace is not available.')
           return
         }
         done(data, op.workspaceId)
