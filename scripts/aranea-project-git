@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Bounded, non-interactive Git operations on one exact registered checkout.
+# Usage: aranea-project-git fetch|pull|task-create|task-remove --project ID --checkout ID
+#        [--branch NAME] [--check] [--confirm-unpushed] --json
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+# shellcheck source=scripts/lib/projects-registry.sh
+source "$script_dir/lib/projects-registry.sh"
+# shellcheck source=scripts/lib/project-git-state.sh
+source "$script_dir/lib/project-git-state.sh"
+# shellcheck source=scripts/lib/project-git.sh
+source "$script_dir/lib/project-git.sh"
+project_git_main "$@"

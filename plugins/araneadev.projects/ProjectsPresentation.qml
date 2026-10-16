@@ -101,6 +101,8 @@ Item {
   property alias discoveryClient: discoveryClient
   // Read-only Git cache survives visibility while launch ownership stays separate.
   property alias gitClient: gitClient
+  // Explicit fetch, pull and task-checkout commands share one slot.
+  property alias gitCommands: gitCommands
   // Invalid or missing selected checkouts never fall back to another worktree.
   readonly property var selectedProject: (presentationState.projects || []).filter(function (project) {
     return project.id === root.projectId
@@ -232,6 +234,10 @@ Item {
     checkoutId: root.selectedProject && (root.selectedProject.checkouts || []).some(function (checkout) {
       return checkout.id === root.selectedProject.lastCheckoutId
     }) ? root.selectedProject.lastCheckoutId : ''
+  }
+  ProjectGitCommands {
+    id: gitCommands
+    captureActive: root.inert
   }
   // One action observer shared by Overview and full Actions, including receipts.
   property alias actionClient: actionClient

@@ -220,10 +220,11 @@ projects_cli_capabilities() {
 ]
 JSON
   )
-  local activity action_capabilities
+  local activity action_capabilities git_capabilities
   activity=$(agents_cli_capabilities)
   action_capabilities=$(project_actions_cli_capabilities)
-  projects_cli_finish observed '' 'Aranea capabilities.' "$(printf '%s\n' "$activity" "$schemas" "$dependencies" "$tools" "$owner" "$action_capabilities" | jq -cs '{operations:(.[1]+.[0].operations+.[5].operations),activity:.[0].activity,projectActions:.[5].projectActions,availability:{dependencies:.[2],tools:.[3],owner:.[4],projectActions:.[5].availability}}')"
+  git_capabilities=$(project_git_cli_capabilities)
+  projects_cli_finish observed '' 'Aranea capabilities.' "$(printf '%s\n' "$activity" "$schemas" "$dependencies" "$tools" "$owner" "$action_capabilities" "$git_capabilities" | jq -cs '{operations:(.[1]+.[0].operations+.[5].operations+.[6].operations),activity:.[0].activity,projectActions:.[5].projectActions,projectGit:.[6].projectGit,availability:{dependencies:.[2],tools:.[3],owner:.[4],projectActions:.[5].availability}}')"
 }
 
 # Parse all public syntax before crossing registry or desktop boundaries.

@@ -537,6 +537,157 @@ Item {
     }
     root.projectController.refresh()
   }
+  // Project whose new task checkout form is open, or ''.
+  property string taskFormProjectId: ''
+  // Last task creation failure for the open form, or null.
+  property var taskFormError: null
+  // Linked checkout awaiting removal confirmation: {projectId, checkoutId}, or null.
+  property var removeTarget: null
+  // Removal check facts for the target, or null while checking.
+  property var removeFacts: null
+  // Last removal check or removal failure for the target, or null.
+  property var removeError: null
+  // The running task-remove call is the dry-run check, not the removal.
+  property bool removeChecking: false
+  // Last fetch or pull failure as {projectId, checkoutId, error}; shown only for that pair.
+  property var gitCommandError: null
+  // Running fetch or pull for the selected pair, or ''.
+  readonly property string gitCommandPending: {
+    var run = root.gitCommands.pending
+    if (!run || (run.operation !== 'fetch' && run.operation !== 'pull'))
+      return ''
+    var project = projectsPage.selectedProject
+    return project && run.projectId === project.id && run.checkoutId === root.gitClient.checkoutId ? run.operation : ''
+  }
+  // The stored fetch or pull failure when it belongs to the selected pair.
+  readonly property var selectedGitCommandError: {
+    var project = projectsPage.selectedProject, stored = gitCommandError
+    return project && stored && stored.projectId === project.id && stored.checkoutId === root.gitClient.checkoutId ? stored.error : null
+  }
+  // Selected registered checkout record, or null.
+  readonly property var selectedCheckout: {
+    var project = projectsPage.selectedProject
+    return project ? (project.checkouts || []).find(function (c) {
+      return c.id === project.lastCheckoutId
+    }) || null : null
+  }
+  // Start one Git command for the selected pair; false means nothing started.
+  function runGit(operation, extra) {
+    var project = projectsPage.selectedProject, checkoutId = root.gitClient.checkoutId
+    if (root.inert || !project || !checkoutId)
+      return false
+    return root.gitCommands.run(operation, project.id, checkoutId, extra || [])
+  }
+  // Start a new task from the selected project's main checkout, never the selected one.
+  function runTaskCreate(branch) {
+    var project = projectsPage.selectedProject
+    if (root.inert || !project)
+      return false
+    var primary = (project.checkouts || []).find(function (c) {
+      return c.primary
+    })
+    return !!primary && root.gitCommands.run('task-create', project.id, primary.id, ['--branch', branch])
+  }
+  // A capture dropped a Git run and the registry has not been re-read since.
+  property bool refreshAfterDrop: false
+  // Re-read the registry once a dropped Git run can no longer be answered, outside capture.
+  function refreshDroppedGit() {
+    if (!refreshAfterDrop || root.inert)
+      return
+    refreshAfterDrop = false
+    root.projectController.refresh()
+  }
+  // Open the removal card and run the dry-run check for one linked checkout.
+  function requestTaskRemove(projectId, checkoutId) {
+    if (root.inert)
+      return
+    removeTarget = {
+      projectId: projectId,
+      checkoutId: checkoutId
+    }
+    removeFacts = null
+    removeError = null
+    removeChecking = true
+    if (!root.gitCommands.run('task-remove', projectId, checkoutId, ['--check'])) {
+      removeChecking = false
+      removeTarget = null
+    }
+  }
+  // Close both task cards when the selection no longer matches them.
+  function dropStaleTaskCards() {
+    var project = projectsPage.selectedProject
+    if (taskFormProjectId !== '' && (!project || project.id !== taskFormProjectId)) {
+      taskFormProjectId = ''
+      taskFormError = null
+    }
+    if (removeTarget && (!project || project.id !== removeTarget.projectId || project.lastCheckoutId !== removeTarget.checkoutId || !(project.checkouts || []).some(function (c) {
+        return c.id === removeTarget.checkoutId
+      })) && !(root.gitCommands.pending && root.gitCommands.pending.operation === 'task-remove')) {
+      removeTarget = null
+      removeFacts = null
+      removeError = null
+      removeChecking = false
+    }
+  }
+  Connections {
+    target: panel.root.gitCommands
+    // A capture drops running Git work without a completion, so forget what waited on it.
+    function onDropped() {
+      panel.taskFormError = null
+      panel.removeTarget = null
+      panel.removeFacts = null
+      panel.removeError = null
+      panel.removeChecking = false
+      panel.refreshAfterDrop = true
+      panel.refreshDroppedGit()
+    }
+    function onEpochChanged() {
+      panel.refreshDroppedGit()
+    }
+    function onFinished(operation, projectId, checkoutId, response) {
+      var project = projectsPage.selectedProject
+      if (operation === 'fetch' || operation === 'pull') {
+        var stored = panel.gitCommandError
+        if (!response.ok)
+          panel.gitCommandError = {
+            projectId: projectId,
+            checkoutId: checkoutId,
+            error: response.error
+          }
+        else if (stored && stored.projectId === projectId && stored.checkoutId === checkoutId)
+          panel.gitCommandError = null
+        if (project && project.id === projectId && panel.root.gitClient.checkoutId === checkoutId)
+          panel.root.gitClient.refresh()
+      } else if (operation === 'task-create') {
+        if (response.ok) {
+          if (panel.taskFormProjectId === projectId) {
+            panel.taskFormProjectId = ''
+            panel.taskFormError = null
+          }
+          panel.root.projectController.refresh()
+        } else if (panel.taskFormProjectId === projectId) {
+          panel.taskFormError = response.error
+        }
+      } else if (operation === 'task-remove') {
+        var target = panel.removeTarget
+        var matches = !!target && target.projectId === projectId && target.checkoutId === checkoutId
+        if (panel.removeChecking) {
+          panel.removeChecking = false
+          if (matches) {
+            panel.removeFacts = response.ok ? response.data : null
+            panel.removeError = response.ok ? null : response.error
+          }
+        } else if (response.ok) {
+          panel.removeTarget = null
+          panel.removeFacts = null
+          panel.removeError = null
+          panel.root.projectController.refresh()
+        } else if (matches) {
+          panel.removeError = response.error
+        }
+      }
+    }
+  }
   // Drop an in-flight seed whose project vanished or whose request capture cancelled.
   function dropStaleSeed() {
     if (!seedingProjectId)
@@ -556,6 +707,7 @@ Item {
   Connections {
     target: projectsPage
     function onSelectedProjectChanged() {
+      panel.dropStaleTaskCards()
       panel.maybeSeedSelected()
     }
   }
@@ -565,6 +717,7 @@ Item {
       panel.stampLayout()
       panel.scheduleGitBackground()
       panel.dropStaleSeed()
+      panel.dropStaleTaskCards()
       panel.maybeSeedSelected()
     }
     function onToolsChanged() {
@@ -772,6 +925,59 @@ Item {
                   onRefreshToolsRequested: panel.refreshTools()
                   onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')
+                  onTaskCreateRequested: function (projectId) {
+                    if (panel.root.inert)
+                      return
+                    panel.removeTarget = null
+                    panel.taskFormProjectId = projectId
+                    panel.taskFormError = null
+                  }
+                  onTaskRemoveRequested: function (projectId, checkoutId) {
+                    panel.taskFormProjectId = ''
+                    panel.requestTaskRemove(projectId, checkoutId)
+                  }
+                }
+                ProjectTaskForm {
+                  width: content.width
+                  visible: !!projectsPage.selectedProject && !projectsPage.setupActive && panel.taskFormProjectId !== '' && projectsPage.selectedProject.id === panel.taskFormProjectId
+                  project: projectsPage.selectedProject
+                  pending: !!panel.root.gitCommands.pending && panel.root.gitCommands.pending.operation === 'task-create' && panel.root.gitCommands.pending.projectId === panel.taskFormProjectId
+                  blocked: !!panel.root.gitCommands.pending
+                  error: panel.taskFormError
+                  displayOnly: !!panel.root.inert
+                  pointerGate: pointerGate
+                  onCreateRequested: function (branch) {
+                    panel.taskFormError = null
+                    panel.runTaskCreate(branch)
+                  }
+                  onCancelled: {
+                    panel.taskFormProjectId = ''
+                    panel.taskFormError = null
+                  }
+                }
+                ProjectTaskRemove {
+                  width: content.width
+                  visible: !!projectsPage.selectedProject && !projectsPage.setupActive && !!panel.removeTarget && panel.removeTarget.projectId === projectsPage.selectedProject.id && panel.removeTarget.checkoutId === projectsPage.selectedProject.lastCheckoutId
+                  checkout: panel.selectedCheckout
+                  facts: panel.removeFacts
+                  pending: !!panel.root.gitCommands.pending && panel.root.gitCommands.pending.operation === 'task-remove' && !panel.removeChecking
+                  blocked: !!panel.root.gitCommands.pending
+                  error: panel.removeError
+                  displayOnly: !!panel.root.inert
+                  pointerGate: pointerGate
+                  onConfirmRequested: function (confirmUnpushed) {
+                    var target = panel.removeTarget
+                    if (panel.root.inert || !target)
+                      return
+                    panel.removeError = null
+                    panel.removeChecking = false
+                    panel.root.gitCommands.run('task-remove', target.projectId, target.checkoutId, confirmUnpushed ? ['--confirm-unpushed'] : [])
+                  }
+                  onCancelled: {
+                    panel.removeTarget = null
+                    panel.removeFacts = null
+                    panel.removeError = null
+                  }
                 }
                 Aranea.PageHeader {
                   width: content.width
@@ -1029,7 +1235,12 @@ Item {
                   onSuggestionAddRequested: function (key) {
                     panel.addOverviewSuggestion(key)
                   }
+                  gitCommandPending: panel.gitCommandPending
+                  gitCommandError: panel.selectedGitCommandError
+                  gitCommandBusy: !!panel.root.gitCommands.pending
                   onRefreshRequested: panel.refreshOverview()
+                  onFetchRequested: panel.runGit('fetch')
+                  onPullRequested: panel.runGit('pull')
                   onActionRequested: function (method, target) {
                     panel.overviewAction(method, target)
                   }

@@ -68,8 +68,18 @@ ColumnLayout {
   signal workspaceRequested(string method, var target)
   // Open deeper information without executing saved commands.
   signal detailsRequested(string section, var target)
+  // Running Git command for the selected checkout: '', 'fetch' or 'pull'.
+  property string gitCommandPending: ''
+  // Last Git command failure for the selected checkout, or null.
+  property var gitCommandError: null
+  // Any Git command is running anywhere; new ones are refused meanwhile.
+  property bool gitCommandBusy: false
   // Explicit read-only refresh request.
   signal refreshRequested
+  // Explicit network fetch request.
+  signal fetchRequested
+  // Explicit fast-forward pull request.
+  signal pullRequested
   spacing: Style.space(20)
   ColumnLayout {
     Layout.fillWidth: true
@@ -108,7 +118,12 @@ ColumnLayout {
     displayOnly: view.displayOnly
     pointerGate: view.pointerGate
     nowMs: view.nowMs
+    commandPending: view.gitCommandPending
+    commandError: view.gitCommandError
+    commandBusy: view.gitCommandBusy
     onRefreshRequested: view.refreshRequested()
+    onFetchRequested: view.fetchRequested()
+    onPullRequested: view.pullRequested()
   }
   ColumnLayout {
     Layout.fillWidth: true
