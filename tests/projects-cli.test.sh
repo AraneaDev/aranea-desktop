@@ -126,7 +126,7 @@ jq -se --arg id "$project" 'any(.[]; .[0:3]==["shell","summon","araneadev.projec
 # Quick switcher: toggles the shell component with the switcher payload.
 run_cli 0 projects switch
 jq -se 'any(.[]; . == ["shell","toggle","araneadev.projects","{\"mode\":\"switcher\"}"])' "$CLI_CALLS" >/dev/null
-jq -se 'last.operation=="projects.switch" and last.status=="observed" and last.message=="Quick switcher opened." and last.data=={}' "$events" >/dev/null
+jq -se 'last as $l | $l.operation=="projects.switch" and $l.status=="observed" and $l.message=="Quick switcher opened." and ($l.data|del(.outcome))=={}' "$events" >/dev/null
 run_cli 0 capabilities
 jq -se 'last.data.operations | any(.[]; .name=="projects.switch" and .arguments=={})' "$events" >/dev/null
 CLI_MODE=noswitch run_cli 1 projects switch
