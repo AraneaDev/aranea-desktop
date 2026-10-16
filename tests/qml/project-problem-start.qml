@@ -367,6 +367,21 @@ ShellRoot {
     t.check(t.findChild(role, 'projectProblemCopy').enabled, 'Copy is not tied to the action guard')
     role.expanded = false
     details.pending = false
+    // Display-only (capture) role problem: shown, but inert and silent.
+    var opensBefore = host.opens.length
+    details.displayOnly = true
+    t.check(role.visible, 'role problem still shown when display-only')
+    var checkAction = t.findChild(role, 'projectProblemAction:checkAgain')
+    var anotherAction = t.findChild(role, 'projectProblemAction:openAnother')
+    t.check(!!checkAction && !checkAction.enabled, 'Check again is disabled when display-only')
+    t.check(!!anotherAction && !anotherAction.enabled, 'Open another window is disabled when display-only')
+    role.expanded = true
+    t.check(!t.findChild(role, 'projectProblemCopy').enabled, 'Copy is disabled when display-only')
+    checkAction.clicked()
+    anotherAction.clicked()
+    t.equal(host.opens.length, opensBefore, 'nothing is requested when display-only')
+    role.expanded = false
+    details.displayOnly = false
     details.operation = roleOperation('editor', 'failed', false)
     t.check(!t.findChild(details, 'roleProblem:editor').visible, 'a failed role is not an unconfirmed problem')
     details.operation = roleOperation('terminal', 'unconfirmed', true)
