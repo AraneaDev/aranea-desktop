@@ -205,7 +205,9 @@ demonstration data; the desktop background is Signal Shrine.
 | ------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------- |
 | ![Projects](screenshots/projects.png) | ![Project overview with task checkouts and Git](screenshots/project-overview.png) | ![Project actions](screenshots/project-actions.png) |
 
-![Plain problem with Details](screenshots/project-problem.png)
+| Plain problem with Details                                     | Quick switcher                                      |
+| -------------------------------------------------------------- | --------------------------------------------------- |
+| ![Plain problem with Details](screenshots/project-problem.png) | ![Quick switcher](screenshots/project-switcher.png) |
 
 ### Pickers and applications
 

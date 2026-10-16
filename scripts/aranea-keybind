@@ -11,11 +11,14 @@
 # Errors: INVALID_KEY INVALID_REQUEST KEY_TAKEN NO_BINDINGS_FILE RELOAD_FAILED
 #         WRITE_FAILED BUSY HYPRCTL_UNAVAILABLE
 set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
 baseline='[]'
 preexisting=0
 
 marker='-- aranea:projects-switcher'
-bindings="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/bindings.lua"
+bindings="$(xdg_config_home)/hypr/bindings.lua"
 # The backup sits beside the path as given; a symlinked file (stow, chezmoi)
 # is edited where it really lives.
 backup="$bindings.aranea.bak"
@@ -191,7 +194,7 @@ take_lock() {
   if [[ -n ${XDG_RUNTIME_DIR:-} ]]; then
     lock="$XDG_RUNTIME_DIR/aranea-keybind.lock"
   else
-    dir="${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+    dir="$(xdg_state_home)/aranea"
     { mkdir -p "$dir" && chmod 700 "$dir"; } 2>/dev/null || fail BUSY "The change lock could not be created." "Check that your state folder is writable, then try again."
     lock="$dir/aranea-keybind.lock"
   fi

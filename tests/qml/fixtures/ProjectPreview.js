@@ -121,6 +121,88 @@ function sample(id, mode, count) {
       )
     }
   }
+  // The quick switcher shows six projects: pinned first, then most recent visit.
+  var switcherEnvironments = []
+  if (mode === "switcher") {
+    var names = [
+      ["p-aranea", "Aranea shell", "main", "VS Code"],
+      ["p-dashboard", "Customer dashboard", "feature/search", "Review with terminal"],
+      ["p-backend", "Backend API", "main", "VS Code"],
+      ["p-docs", "Docs site", "docs/rewrite", "VS Code"],
+      ["p-mobile", "Mobile app", "main", "Terminal"],
+      ["p-scratch", "Scratch notes", "main", ""]
+    ]
+    var visited = {}
+    state.projects = names.map(function (entry, index) {
+      var profiles = entry[3]
+        ? [
+            {
+              id: "f-" + entry[0],
+              revision: 1,
+              name: entry[3],
+              roles:
+                entry[3] === "VS Code"
+                  ? ["editor"]
+                  : entry[3] === "Terminal"
+                    ? ["terminal"]
+                    : ["editor", "terminal"],
+              tools: {
+                editorId: entry[3] === "Terminal" ? null : "code",
+                terminalId: entry[3] === "VS Code" ? null : "kitty",
+                agentId: null
+              }
+            }
+          ]
+        : []
+      visited[entry[0]] = 1000 - index * 10
+      return {
+        id: entry[0],
+        name: entry[1],
+        commonDir: "/fixture/development/" + entry[0] + "/.git",
+        lastCheckoutId: "c-" + entry[0],
+        lastProfileId: profiles.length ? profiles[0].id : null,
+        profiles: profiles,
+        workspaceMode: "dedicated",
+        tools: { editorId: "code", terminalId: "kitty" },
+        checkouts: [
+          {
+            id: "c-" + entry[0],
+            path: "/fixture/development/" + entry[0].slice(2),
+            branch: entry[2],
+            primary: true
+          }
+        ],
+        associations: []
+      }
+    })
+    state.navigation = {
+      lastProjectId: "p-aranea",
+      pinnedProjectIds: ["p-aranea"],
+      visitedAt: visited
+    }
+    switcherEnvironments = [
+      {
+        id: "e-aranea",
+        projectId: "p-aranea",
+        checkoutId: "c-p-aranea",
+        workspaceId: 3,
+        generation: 1,
+        sessionId: "preview-session",
+        observedRoles: ["editor"],
+        status: "observed"
+      },
+      {
+        id: "e-docs",
+        projectId: "p-docs",
+        checkoutId: "c-p-docs",
+        workspaceId: 5,
+        generation: 1,
+        sessionId: "preview-session",
+        observedRoles: ["editor", "terminal"],
+        status: "observed"
+      }
+    ]
+  }
   var gitCache = {}
   if (state.projects.length) {
     gitCache[JSON.stringify([project.id, "c-preview"])] = {
@@ -201,6 +283,7 @@ function sample(id, mode, count) {
     bindings: [],
     operations: id === "project-launch-partial" ? [operation] : []
   }
+  if (mode === "switcher") snapshot.environments = switcherEnvironments
   if (daily) {
     snapshot.environments = [
       {

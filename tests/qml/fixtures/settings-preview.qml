@@ -67,6 +67,13 @@ ShellRoot {
       anchors.fill: parent
       // Include the actual popup overlay in this QML-owned capture item.
       property Item popupOverlay: Overlay.overlay
+      // The compact switcher floats over the desktop, so its capture gets the repository wallpaper behind it.
+      Image {
+        anchors.fill: parent
+        visible: Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'switcher'
+        source: visible ? harness.artwork + 'background-night.png' : ''
+        fillMode: Image.PreserveAspectCrop
+      }
       Settings.SettingsSurface {
         id: settingsSurface
         visible: !harness.isProject
@@ -220,6 +227,9 @@ ShellRoot {
         fixture: sample
       })) !== 'ok')
         finish(false, 'project fixture refused')
+      // The quick switcher capture opens the real compact switcher over the same inert fixture.
+      if (Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'switcher')
+        entry.mode = 'switcher'
 
       return
     }
@@ -312,7 +322,7 @@ ShellRoot {
       }
       if (!loading && harness.polls >= 10) {
         stop()
-        var captureItem = harness.profileMenu ? captureFrame : surface
+        var captureItem = harness.profileMenu || Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'switcher' ? captureFrame : surface
         if (harness.profileMenu && !objects.some(function (item) {
           return item.objectName === 'profilePicker' && item.opened
         })) {
