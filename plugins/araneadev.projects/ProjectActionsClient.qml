@@ -160,7 +160,48 @@ Item {
       // qmllint enable signal-handler-parameters
     }
   }
+  // How many automatic receipt checks have run for the current uncertainty, 0 to 3.
+  property int autoChecksDone: 0
+  // Offsets from the moment the submission became uncertain; overridable in tests.
+  property var autoCheckDelays: [2000, 5000, 10000]
+  // True while another automatic check is still scheduled.
+  readonly property bool autoChecking: autoTimer.running
+  // Wait before the next automatic check, from the previous one.
+  function autoInterval(): int {
+    var i = autoChecksDone
+    return Math.max(1, autoCheckDelays[i] - (i > 0 ? autoCheckDelays[i - 1] : 0))
+  }
+  // Cancel scheduled checks; they only read, never submit.
+  function stopAutoCheck(): void {
+    autoTimer.stop()
+  }
+  Timer {
+    id: autoTimer
+    repeat: false
+    onTriggered: {
+      if (client.captureActive || !client.submissionUncertain || client.autoChecksDone >= 3 || client.autoChecksDone >= client.autoCheckDelays.length)
+        return
+      // Reading the snapshot is the receipt recovery path; a run id may not exist yet.
+      if (!client.pending && !client.submitting) {
+        client.autoChecksDone++
+        client.refresh()
+      }
+      if (client.autoChecksDone < 3 && client.autoChecksDone < client.autoCheckDelays.length) {
+        autoTimer.interval = client.autoInterval()
+        autoTimer.start()
+      }
+    }
+  }
+  onSubmissionUncertainChanged: {
+    autoTimer.stop()
+    if (submissionUncertain && !captureActive && autoCheckDelays.length) {
+      autoChecksDone = 0
+      autoTimer.interval = autoInterval()
+      autoTimer.start()
+    }
+  }
   onCaptureActiveChanged: {
+    autoTimer.stop()
     disconnect()
     if (!captureActive)
       schedulePoll()
@@ -193,6 +234,7 @@ Item {
   }
   // Invalidate selected readbacks while keeping accepted receipt identity.
   function selectionChanged(): void {
+    autoTimer.stop()
     summaryGeneration++
     summaryCursor = 0
     summaryError = null

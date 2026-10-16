@@ -131,7 +131,62 @@ Item {
       // qmllint enable signal-handler-parameters
     }
   }
+  // How many automatic lookups have run for the current uncertainty, 0 to 3.
+  property int autoChecksDone: 0
+  // Offsets from the moment acceptance became unknown; overridable in tests.
+  property var autoCheckDelays: [2000, 5000, 10000]
+  // True while another automatic lookup is still scheduled.
+  readonly property bool autoChecking: autoTimer.running
+  // The generation an automatic lookup was started in, so a stale flag never cancels other work.
+  property int autoLookupGeneration: -1
+  // An automatic lookup is, or was last, the one in flight.
+  property bool autoLookup: false
+  // Wait before the next automatic lookup, from the previous one.
+  function autoInterval(): int {
+    var i = autoChecksDone
+    return Math.max(1, autoCheckDelays[i] - (i > 0 ? autoCheckDelays[i - 1] : 0))
+  }
+  // Cancel pending lookups; an automatic lookup already in flight is discarded.
+  function stopAutoCheck(): void {
+    autoTimer.stop()
+    if (autoLookup && pending && autoLookupGeneration === generation) {
+      autoLookup = false
+      generation++
+      pending = false
+    }
+  }
+  Timer {
+    id: autoTimer
+    repeat: false
+    onTriggered: {
+      if (client.captureActive || !client.acceptanceUnknown || client.autoChecksDone >= 3 || client.autoChecksDone >= client.autoCheckDelays.length)
+        return
+      if (client.pending) {
+        autoTimer.interval = client.autoInterval()
+        autoTimer.start()
+        return
+      }
+      client.autoLookupGeneration = client.generation
+      client.autoLookup = true
+      client.autoChecksDone++
+      client.checkEnvironmentActivation()
+      if (client.autoChecksDone < 3 && client.autoChecksDone < client.autoCheckDelays.length && client.acceptanceUnknown) {
+        autoTimer.interval = client.autoInterval()
+        autoTimer.start()
+      }
+    }
+  }
+  onAcceptanceUnknownChanged: {
+    autoTimer.stop()
+    if (acceptanceUnknown && !captureActive && autoCheckDelays.length) {
+      autoChecksDone = 0
+      autoTimer.interval = autoInterval()
+      autoTimer.start()
+    }
+  }
+  onGenerationChanged: autoTimer.stop()
   onCaptureActiveChanged: {
+    autoTimer.stop()
     readingSnapshot = false
     generation++
     snapshotReadRevision++
@@ -382,6 +437,7 @@ Item {
         activationId: activation
       })], generation, function (response) {
       pending = false
+      autoLookup = false
       var op = response.operation
       if (response.ok !== true || response.error != null || response.found !== true || response.activationId !== activation || !validId(response.sessionId) || environmentSession && response.sessionId !== environmentSession || !op || op.id !== response.operationId || op.environmentId !== response.environmentId || op.activationId !== activation || op.sessionId !== response.sessionId || op.projectId !== environmentTarget.projectId || (submissionMethod === 'startEnvironment' ? op.checkoutId !== environmentTarget.checkoutId : op.environmentId !== environmentTarget.environmentId) || !validId(op.id) || !validId(op.environmentId) || !sameTarget(submissionMethod === 'startEnvironment' ? op.startTarget : op.recoveryTarget)) {
         requestError = {

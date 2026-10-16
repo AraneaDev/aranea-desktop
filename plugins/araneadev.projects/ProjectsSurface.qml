@@ -707,6 +707,8 @@ Item {
   Connections {
     target: projectsPage
     function onSelectedProjectChanged() {
+      panel.root.projectClient.stopAutoCheck()
+      panel.root.actionClient.stopAutoCheck()
       panel.dropStaleTaskCards()
       panel.maybeSeedSelected()
     }

@@ -254,6 +254,56 @@ ColumnLayout {
       return !!step && step.status === 'unconfirmed' && step.reobserveAvailable === true
     return !!step && (kind === 'retry' ? ['failed', 'missing'].indexOf(step.status) >= 0 : ['unconfirmed', 'uncertain'].indexOf(step.status) >= 0)
   }
+  // One automatic re-check per role and operation, three seconds after it is first offered.
+  property int roleAutoDelay: 3000
+  // Operation and role pairs already scheduled; each is checked automatically only once.
+  property var autoReobserved: ({})
+  // Roles waiting for their one automatic re-check.
+  property var autoRoleQueue: []
+  // Queue the roles whose one automatic re-check is now allowed.
+  function scanAutoReobserve(): void {
+    if (displayOnly || !windowOpen || !operation)
+      return
+    ['editor', 'terminal', 'agent'].forEach(function (role) {
+      var key = (operation.id || '') + ':' + role
+      if (autoReobserved[key] || !recoveryAllowed(role, 'reobserve'))
+        return
+      autoReobserved[key] = true
+      autoRoleQueue = autoRoleQueue.concat([
+        {
+          key: key,
+          role: role
+        }
+      ])
+    })
+    if (autoRoleQueue.length && !roleAutoTimer.running)
+      Qt.callLater(function () {
+        if (autoRoleQueue.length && !roleAutoTimer.running) {
+          roleAutoTimer.interval = roleAutoDelay
+          roleAutoTimer.start()
+        }
+      })
+  }
+  Timer {
+    id: roleAutoTimer
+    repeat: false
+    onTriggered: {
+      var next = details.autoRoleQueue[0]
+      details.autoRoleQueue = details.autoRoleQueue.slice(1)
+      // A reobserve only reads; it never launches a window.
+      if (next && !details.displayOnly && details.windowOpen && !details.pending && next.key === (details.operation && (details.operation.id || '') + ':' + next.role))
+        details.recover(next.role, 'reobserve')
+      if (details.autoRoleQueue.length) {
+        roleAutoTimer.interval = details.roleAutoDelay
+        roleAutoTimer.start()
+      }
+    }
+  }
+  onOperationChanged: scanAutoReobserve()
+  onWindowOpenChanged: if (!windowOpen) {
+    roleAutoTimer.stop()
+    autoRoleQueue = []
+  }
   // Explicit recovery requests do not retry ordinary Open automatically.
   function recover(role: string, kind: string): void {
     if (displayOnly || pending || !openAvailable || !project || !recoveryAllowed(role, kind))
