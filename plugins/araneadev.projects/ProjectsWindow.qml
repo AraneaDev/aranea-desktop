@@ -69,6 +69,11 @@ PanelWindow {
   }
 
   visible: surfaceMotion.present
+  // The compact switcher spans the screen so a click outside its card can close it.
+  anchors.left: root.mode === 'switcher'
+  anchors.right: root.mode === 'switcher'
+  anchors.top: root.mode === 'switcher'
+  anchors.bottom: root.mode === 'switcher'
   implicitWidth: geometry.width + Style.space(8)
   implicitHeight: geometry.height + Style.space(8)
   color: 'transparent'

@@ -389,6 +389,50 @@ ShellRoot {
         return c.method === 'startEnvironment' || c.method === 'returnEnvironment'
       }).length, 0, 'no start or return is sent while submitting')
       entry.projectClient.pending = false
+      guardCase()
+    })
+  }
+  // Registry work in progress blocks Enter and Alt+Enter and the rows read Busy right now.
+  function guardCase() {
+    host.openSwitcher()
+    t.step(60, function () {
+      entry.projectController.pending = true
+      t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Busy right now', 'row reads Busy right now')
+      keys.keyClick(Qt.Key_Return)
+      keys.keyClick(Qt.Key_Return, Qt.AltModifier)
+      t.equal(entry.mode, 'switcher', 'Alt+Enter does nothing while busy')
+      t.equal(host.method('startEnvironment').length, 0, 'Enter starts nothing while busy')
+      host.note()
+      entry.projectController.pending = false
+      t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Start · VS Code', 'label returns when idle')
+      outsideCase()
+    })
+  }
+  // A click outside the card closes; a click inside does not.
+  function outsideCase() {
+    var backdrop = t.findChild(surface, 'projectSwitcherBackdrop')
+    var card = t.findChild(surface, 'projectSwitcherCard')
+    t.check(!!backdrop && !!card, 'backdrop and card exist')
+    t.check(card.width <= 560 && card.height <= 440 && card.width > 0, 'card is compact')
+    keys.mouseClick(backdrop, backdrop.width / 2, backdrop.height / 2)
+    t.check(entry.opened, 'a click inside the card keeps it open')
+    keys.mouseClick(backdrop, 3, 3)
+    t.check(!entry.opened, 'a click outside closes')
+    loadFailureCase()
+  }
+  // A read failure replaces the list even with stale projects.
+  function loadFailureCase() {
+    host.openSwitcher()
+    t.step(60, function () {
+      entry.projectController.error = 'Project registry not available.'
+      var problem = t.findChild(surface, 'projectSwitcherLoadProblem')
+      t.check(problem.visible, 'load problem shown')
+      t.check(!t.findChild(surface, 'projectSwitcherList').visible, 'list hidden')
+      keys.keyClick(Qt.Key_Return)
+      t.equal(host.method('startEnvironment').length, 0, 'Enter starts nothing')
+      host.note()
+      entry.projectController.error = ''
+      t.check(t.findChild(surface, 'projectSwitcherList').visible, 'list returns')
       expandCase()
     })
   }
@@ -455,6 +499,13 @@ ShellRoot {
       t.equal(entry.open('{"mode":"switcher"}'), 'busy', 'the switcher does not replace a draft')
       t.equal(entry.mode, '', 'layout is unchanged')
       t.check(page.details.dirty && page.details.draft.name === 'Changed', 'the draft survives')
+      entry.close()
+      t.equal(entry.open('{"mode":"switcher"}'), 'ok', 'a hidden window with a draft opens')
+      t.equal(entry.mode, '', 'as the full layout')
+      t.check(entry.opened && page.details.dirty && page.details.draft.name === 'Changed', 'the draft is kept')
+      t.equal(host.calls.filter(function (c) {
+        return c.method === 'startEnvironment' || c.method === 'returnEnvironment'
+      }).length, 0, 'nothing launches')
       page.details.discardDraft()
       emptyCase()
     })
@@ -480,10 +531,13 @@ ShellRoot {
   function wordsCase() {
     var hits = host.seenTexts.filter(function (text) {
       return Problems.BANNED.some(function (word) {
-        return new RegExp('\\b' + word + '\\b', 'i').test(text) || text.indexOf('\u2014') >= 0
+        return new RegExp('\\b' + word + '\\b', 'i').test(text)
       })
     })
-    t.equal(hits, [], 'no banned words or em dashes in switcher text')
+    t.equal(hits, [], 'no banned words in switcher text')
+    t.equal(host.seenTexts.filter(function (text) {
+      return text.indexOf('\u2014') >= 0
+    }), [], 'no em dashes in switcher text')
     t.equal(entry.projectClient.unresolvedEnvironmentActivations.length, 0, 'Start another was never used')
     t.done()
   }

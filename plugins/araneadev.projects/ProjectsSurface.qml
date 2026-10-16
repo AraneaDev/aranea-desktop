@@ -15,6 +15,7 @@ import "ProjectActionRecords.js" as Records
 import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
 import "ProjectProblems.js" as Problems
+import "ProjectsLogic.js" as Logic
 
 Item {
   id: panel
@@ -331,15 +332,19 @@ Item {
   readonly property bool switcherMode: root.mode === 'switcher'
   // The switcher never hides a setup wizard or an unsaved draft; a running operation does not stop it.
   readonly property bool switcherBlocked: projectsPage.setupActive || hasUnsavedDraft
+  // Registry, discovery, action or activity work that navigation also waits for; a watched start is not one.
+  readonly property bool switcherPending: (root.projectController.pending || root.projectController.reading) && !root.navigationSaving || root.discoveryClient.pending || projectsPage.details.actions.pending || root.activityClient.pending
   // Select a known project for the switcher; an operation that is only being watched does not block this.
   function switcherSelect(id) {
     if (!(root.projectController.state.projects || []).some(function (p) {
       return p.id === id
     }))
       return false
+    if (root.inert || switcherPending)
+      return false
     if (id === root.projectId)
       return true
-    if (root.inert || switcherBlocked)
+    if (switcherBlocked)
       return false
     return selectProject(id)
   }
@@ -836,9 +841,26 @@ Item {
     referenceItem: card
     property real layoutChangedAt: panel.layoutChangedAt
   }
+  // Transparent catcher around the compact card; a click outside the card closes the switcher.
+  MouseArea {
+    objectName: 'projectSwitcherBackdrop'
+    anchors.fill: parent
+    enabled: panel.switcherMode && !panel.root.inert
+    onClicked: function (mouse) {
+      var inside = card.x <= mouse.x && mouse.x <= card.x + card.width && card.y <= mouse.y && mouse.y <= card.y + card.height
+      if (!inside)
+        panel.root.close()
+    }
+  }
+  // Size of the compact card, capped to the surface.
+  readonly property var switcherSize: Logic.switcherGeometry(width, height, Style.spaceReal(1))
   Aranea.SurfaceCard {
     id: card
-    anchors.fill: parent
+    objectName: 'projectSwitcherCard'
+    x: panel.switcherMode ? (panel.width - width) / 2 : 0
+    y: panel.switcherMode ? (panel.height - height) / 2 : 0
+    width: panel.switcherMode ? panel.switcherSize.width : panel.width
+    height: panel.switcherMode ? panel.switcherSize.height : panel.height
     contentPadding: Style.space(16)
     fillColor: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 1)
     borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
@@ -856,7 +878,8 @@ Item {
       launching: !!panel.root.inspectionLaunchIntent
       displayOnly: panel.root.inert
       pointerGate: pointerGate
-      loadProblem: panel.root.projectController.error ? Problems.problem(panel.root.projectController.errorObject || {
+      systemBusy: panel.switcherPending
+      loadProblem: panel.root.projectController.error || panel.root.projectController.errorObject ? Problems.problem(panel.root.projectController.errorObject || {
         message: panel.root.projectController.error
       }, {
         surface: 'switcher',

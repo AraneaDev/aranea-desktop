@@ -28,6 +28,8 @@ ColumnLayout {
   property bool launching: false
   // Plain problem shown in place of the list when the registry cannot be read.
   property var loadProblem: null
+  // Registry, discovery, action or activity work is running: nothing may begin.
+  property bool systemBusy: false
   // Inert capture hosts refuse every action.
   property bool displayOnly: false
   // Shared pointer settlement gate.
@@ -49,7 +51,7 @@ ColumnLayout {
     return row.id === switcher.cursorId
   })
   // A request is on its way or an earlier start is unconfirmed: nothing new may begin.
-  readonly property bool busy: displayOnly || launching || !!client && (client.submitting || client.preparing || client.acceptanceUnknown)
+  readonly property bool busy: displayOnly || launching || systemBusy || !!client && (client.submitting || client.preparing || client.acceptanceUnknown)
   // Project whose start is under way, including while the automatic checks run.
   readonly property string startingId: {
     var target = client ? client.environmentTarget : null
@@ -129,17 +131,17 @@ ColumnLayout {
   // Enter: run the row action, or fall back to the full layout.
   function go() {
     var row = currentRow()
-    if (!row || displayOnly)
+    if (!row || displayOnly || loadProblem)
       return
     if (row.action.kind === 'setup')
-      expandRequested(row.id)
+      expand()
     else if (!busy)
       goRequested(row)
   }
   // Alt+Enter: open Projects on the row without launching.
   function expand() {
     var row = currentRow()
-    if (!displayOnly)
+    if (!displayOnly && !systemBusy)
       expandRequested(row ? row.id : '')
   }
   // Label of a row's action, reflecting a start or return that is under way.
@@ -148,12 +150,12 @@ ColumnLayout {
       return 'Starting…'
     if (row.id === returningId)
       return 'Returning…'
-    return row.action.label
+    return systemBusy ? 'Busy right now' : row.action.label
   }
   Connections {
     target: switcher.client
     function onOperationChanged(operation) {
-      if (operation && operation.error && operation.projectId && switcher.client.submissionMethod === 'returnEnvironment')
+      if (switcher.visible && operation && operation.error && operation.projectId && switcher.client.submissionMethod === 'returnEnvironment')
         switcher.returnFailure = {
           projectId: operation.projectId,
           error: operation.error
@@ -215,7 +217,7 @@ ColumnLayout {
     Layout.fillWidth: true
     Layout.fillHeight: true
     Layout.minimumHeight: Style.space(44)
-    visible: switcher.rows.length > 0
+    visible: switcher.rows.length > 0 && !switcher.loadProblem
     clip: true
     model: switcher.rows
     boundsBehavior: Flickable.StopAtBounds
@@ -276,7 +278,7 @@ ColumnLayout {
       visible: !switcher.query
       text: 'Add project'
       variant: 'primary'
-      enabled: !switcher.displayOnly
+      enabled: !switcher.displayOnly && !switcher.systemBusy
       pointerGate: switcher.pointerGate
       onClicked: switcher.expandRequested('')
     }
