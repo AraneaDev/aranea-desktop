@@ -624,6 +624,23 @@ function openCaption(count) {
   return Math.max(0, Number(count) || 0) + " open"
 }
 
+/** Plain word for one tool step status; the raw value stays in the data.
+ * @param {string} [status] - raw step status
+ * @returns {string} display word
+ */
+function stepStatusWord(status) {
+  /** @type {{[key:string]:string}} */
+  var words = {
+    observed: "open",
+    unconfirmed: "not confirmed",
+    uncertain: "not confirmed",
+    failed: "failed",
+    missing: "missing",
+    skipped: "skipped"
+  }
+  return (status && words[status]) || "not available"
+}
+
 /**
  * Informational context for an exact associated checkout. Dedicated associations
  * describe persistent intent; current associations require the owner's verified
@@ -663,7 +680,8 @@ function projectContext(workspaceId, projectSnapshot) {
         )
       })
       .map(function (/** @type {*} */ b) {
-        return b.role + " observed"
+        var status = "observed"
+        return b.role + " " + stepStatusWord(status)
       })
     return {
       projectId: environment.projectId,
@@ -887,6 +905,7 @@ if (typeof module !== "undefined") {
     outlineIndex,
     openCaption,
     projectContext,
+    stepStatusWord,
     barContext,
     overviewContext,
     workspaceLabel,

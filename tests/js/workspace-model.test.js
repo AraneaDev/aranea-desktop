@@ -546,3 +546,44 @@ test("changing project labels never changes workspace cursor identity or focus t
     { id: 7, name: "7" }
   ])
 })
+
+test("tooltip step words are plain for every known status", () => {
+  const banned =
+    /\b(acceptance|receipt|owner|observation|observe|observed|binding|exact|retained|ipc|replay|resubmit|unconfirmed)\b/i
+  const expected = {
+    observed: "open",
+    unconfirmed: "not confirmed",
+    uncertain: "not confirmed",
+    failed: "failed",
+    missing: "missing",
+    skipped: "skipped"
+  }
+  for (const [status, word] of Object.entries(expected)) {
+    assert.equal(model.stepStatusWord(status), word)
+    assert.doesNotMatch(model.stepStatusWord(status), banned)
+  }
+  assert.equal(model.stepStatusWord("something-new"), "not available")
+  assert.equal(model.stepStatusWord(undefined), "not available")
+})
+
+test("launched workspace tooltip says open instead of observed", () => {
+  const snapshot = projectSnapshot()
+  snapshot.sessionId = "session-new"
+  snapshot.environments = [
+    {
+      id: "e1",
+      projectId: "p-app",
+      checkoutId: "c-fix",
+      workspaceId: 4,
+      profileSnapshot: { name: "Default" },
+      checkoutSnapshot: { branch: "fix", path: "/projects/app-fix" }
+    }
+  ]
+  snapshot.bindings = [
+    verifiedBinding({ environmentId: "e1", role: "terminal" }),
+    verifiedBinding({ environmentId: "e1", role: "editor", pid: 124 })
+  ]
+  const detail = model.projectContext(4, snapshot).detail
+  assert.match(detail, /terminal open, editor open/)
+  assert.doesNotMatch(detail, /observed/i)
+})

@@ -69,8 +69,8 @@ Item {
         client.available = false
         client.error = {
           code: 'OWNER_UNAVAILABLE',
-          message: diagnostics || 'Activity owner unavailable. Reconnect to the accepted operation.',
-          recovery: 'Reconnect without resubmitting accepted work.'
+          message: diagnostics || 'Activity is not available. Reconnect to the running operation.',
+          recovery: 'Reconnect without starting the work again.'
         }
         if (method !== 'snapshot') {
           client.pending = false
@@ -189,7 +189,7 @@ Item {
         pending = false
         error = response.error || {
           code: 'OPERATION_LOST',
-          message: 'Accepted owner lifetime changed.'
+          message: 'The desktop restarted since this started.'
         }
         return
       }
@@ -209,7 +209,7 @@ Item {
         pending = false
         error = op.error || {
           code: 'OPERATION_LOST',
-          message: 'Accepted operation is no longer retained by this owner.'
+          message: 'This operation is no longer tracked.'
         }
         return
       }

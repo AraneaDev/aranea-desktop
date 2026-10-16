@@ -56,7 +56,7 @@ Item {
   // Delivery acceptance is separate from an unobservable desktop popup.
   property var notificationStatus: ({
       status: 'unavailable',
-      message: 'No notification delivery observed.'
+      message: 'No notification was seen.'
     })
   // Public projection changed without transferring operation ownership.
   signal snapshotChanged
@@ -78,7 +78,7 @@ Item {
     return {
       code: code,
       message: message,
-      recovery: 'Refresh activity; inspect the retained operation before submitting another action.'
+      recovery: 'Refresh activity and check the operation before trying another action.'
     }
   }
   // Public state exposes reported facts and owner uncertainty separately.
@@ -117,7 +117,7 @@ Item {
       if (captureActive || revision !== readGeneration)
         return
       if (!response || !response.ok || !response.state) {
-        error = response && response.error || failure('STORE_UNAVAILABLE', 'Activity store unavailable.')
+        error = response && response.error || failure('STORE_UNAVAILABLE', 'Activity store is not available.')
       } else {
         var previous = ready ? storeState : null
         storeState = response.state
@@ -230,7 +230,7 @@ Item {
             return
           notificationStatus = {
             status: result && result.accepted ? 'accepted' : 'unavailable',
-            message: 'Desktop display is not observed. Open Agents Tasks to inspect activity.'
+            message: 'Desktop display is not confirmed. Open Agents Tasks to check activity.'
           }
           if (result && result.activated)
             activateNotification(notice.taskId)
@@ -267,10 +267,10 @@ Item {
         if (!captureActive)
           notificationStatus = result && result.ok ? {
             status: 'requested',
-            message: 'Task inspection requested; desktop opening is unconfirmed.'
+            message: 'Task inspection requested; desktop opening is not confirmed.'
           } : {
             status: 'unavailable',
-            message: 'Agents widget is unavailable. Add Agents to the bar or run aranea agents list.'
+            message: 'Agents widget is not available. Add Agents to the bar or run aranea agents list.'
           }
       })
     })
@@ -318,14 +318,14 @@ Item {
       return {
         ok: false,
         operationId: null,
-        error: failure('OWNER_NOT_READY', 'Activity owner is reading its initial snapshot.')
+        error: failure('OWNER_NOT_READY', 'Activity is still loading.')
       }
     }
     if (!runtime || !runtime.sessionId)
       return {
         ok: false,
         operationId: null,
-        error: failure('DEPENDENCY_MISSING', 'Activity runtime unavailable. Activate the activity plugin.')
+        error: failure('DEPENDENCY_MISSING', 'Activity is not available. Activate the activity plugin.')
       }
     invalidateSubmissions()
     var task = payload && storeState.tasks.filter(function (row) {
@@ -338,7 +338,7 @@ Item {
       return {
         ok: false,
         operationId: null,
-        error: failure('TASK_NOT_FOUND', 'The task is no longer retained.')
+        error: failure('TASK_NOT_FOUND', 'The task is no longer tracked.')
       }
     if (!result.reused) {
       var op = Object.assign({}, result.operation, {
@@ -365,7 +365,7 @@ Item {
     return operations.filter(function (op) {
       return op.id === id
     })[0] || {
-      error: failure('OPERATION_LOST', 'This owner does not retain that operation. Accepted work may still be running.')
+      error: failure('OPERATION_LOST', 'Activity no longer tracks that operation. The work may still be running.')
     }
   }
   // Publish a copied operation so consumers receive progress reliably.
@@ -393,7 +393,7 @@ Item {
     operations.filter(function (op) {
       return (op.submissionPending || op.submissionUnconfirmed) && op.desktopId !== runtime.sessionId && (!op.error || op.error.code !== 'OPERATION_LOST')
     }).forEach(function (op) {
-      var problem = failure('OPERATION_LOST', 'The desktop lifetime changed while launch acceptance was unresolved. Inspect running terminals; this retained session will not be submitted again.')
+      var problem = failure('OPERATION_LOST', 'The desktop restarted while it was unclear whether the launch started. Check the running terminals; this session will not be launched again.')
       publish(Object.assign({}, op, {
         submissionPending: true,
         submissionUnconfirmed: true,
@@ -437,7 +437,7 @@ Item {
     var id = queue[0], op = operation(id), attempt = op.attempt
     busy = true
     if (!current(id, attempt)) {
-      finish(id, 'partial', failure('OPERATION_LOST', 'The desktop lifetime changed.'), null)
+      finish(id, 'partial', failure('OPERATION_LOST', 'The desktop session restarted.'), null)
       return
     }
     publish(Object.assign({}, op, {
@@ -476,7 +476,7 @@ Item {
       runtime.focusSession(op.task, Logic.sessionFor(storeState, op.task), function (response) {
         if (!current(id, attempt))
           return
-        finish(id, response && response.status === 'observed' ? 'observed' : 'failed', response && response.ok ? null : failure(response && response.code || 'OWNERSHIP_UNCONFIRMED', response && response.message || 'Session ownership is unconfirmed. Open its checkout or explicitly reopen the session.'), [
+        finish(id, response && response.status === 'observed' ? 'observed' : 'failed', response && response.ok ? null : failure(response && response.code || 'OWNERSHIP_UNCONFIRMED', response && response.message || 'Could not confirm which project this session belongs to. Open its checkout or reopen the session yourself.'), [
           {
             role: 'hosting-terminal',
             status: response && response.status || 'failed'
@@ -486,7 +486,7 @@ Item {
       return
     }
     if (op.task.association.status !== 'registered') {
-      finish(id, 'failed', failure('PROJECT_UNASSIGNED', 'Explicitly register or restore the exact checkout before navigation.'), null)
+      finish(id, 'failed', failure('PROJECT_UNASSIGNED', 'Register or restore the checkout before opening it.'), null)
       return
     }
     var nativeSession = Logic.sessionFor(storeState, op.task)
@@ -515,7 +515,7 @@ Item {
         var retained = operation(id), observationEnded = retained.state === 'completed'
         if (!response || !response.ok) {
           var uncertain = !response || response.submissionUnconfirmed === true
-          var problem = failure(uncertain ? 'LAUNCH_UNCONFIRMED' : response.code || 'LAUNCH_FAILED', uncertain ? 'Launch submission may have started an agent, but acceptance could not be read. Inspect the retained operation and running terminals; this session will not be submitted again.' : response.message || 'Resume launch failed.')
+          var problem = failure(uncertain ? 'LAUNCH_UNCONFIRMED' : response.code || 'LAUNCH_FAILED', uncertain ? 'The launch may have started an agent, but that could not be confirmed. Check the operation and the running terminals; this session will not be launched again.' : response.message || 'Resume launch failed.')
           publish(Object.assign({}, retained, {
             submissionPending: uncertain,
             submissionUnconfirmed: uncertain,
@@ -583,13 +583,13 @@ Item {
       return {
         ok: false,
         operationId: id,
-        error: failure('SUBMISSION_PENDING', 'Launch acceptance is unresolved. Inspect this operation and running terminals; another launch will not be submitted.')
+        error: failure('SUBMISSION_PENDING', 'It is not clear whether the launch started. Check this operation and the running terminals; it will not be launched again.')
       }
     if (!op.id || op.ownerId !== ownerId || !runtime || op.desktopId !== runtime.sessionId || !op.launchIdentity || op.action !== 'reopen')
       return {
         ok: false,
         operationId: id,
-        error: failure('OPERATION_LOST', 'Accepted launch identity is unavailable in this desktop lifetime.')
+        error: failure('OPERATION_LOST', 'This launch is not available after the desktop restarted.')
       }
     if (op.state !== 'completed')
       return {
@@ -602,7 +602,7 @@ Item {
       return {
         ok: false,
         operationId: id,
-        error: failure('INVALID_REQUEST', 'Only partial accepted resumes need reobservation.')
+        error: failure('INVALID_REQUEST', 'Only partly confirmed resumes can be checked again.')
       }
     var attempt = op.attempt + 1
     publish(Object.assign({}, op, {
@@ -618,7 +618,7 @@ Item {
       if (!current(id, attempt))
         return
       if (!valid) {
-        finish(id, 'partial', failure('OPERATION_LOST', 'The retained launch process can no longer be proven.'), null)
+        finish(id, 'partial', failure('OPERATION_LOST', 'The launched process can no longer be confirmed.'), null)
         return
       }
       publish(Object.assign({}, operation(id), {
@@ -651,7 +651,7 @@ Item {
         return op.validating && op.state !== 'completed'
       }).forEach(function (op) {
         if (op.remaining <= interval || op.desktopId !== controller.runtime.sessionId)
-          controller.finish(op.id, 'partial', controller.failure('OPERATION_LOST', 'Retained launch proof is unavailable.'), null)
+          controller.finish(op.id, 'partial', controller.failure('OPERATION_LOST', 'The launch can no longer be confirmed.'), null)
         else
           controller.publish(Object.assign({}, op, {
             remaining: op.remaining - interval
@@ -660,13 +660,13 @@ Item {
       if (controller.busy && controller.queue.length) {
         var id = controller.queue[0], op = controller.operation(id)
         if (!controller.current(id))
-          controller.finish(id, 'partial', controller.failure('OPERATION_LOST', 'Desktop lifetime changed; accepted work remains unconfirmed.'), null)
+          controller.finish(id, 'partial', controller.failure('OPERATION_LOST', 'The desktop restarted; the work is not confirmed.'), null)
         else if (op.remaining <= interval || controller.clock() >= op.deadline) {
           if (op.action === 'reopen' && op.launchIdentity) {
             var next = Operations.observe(op, op.terminal, null, true)
             controller.finish(id, 'partial', next.error, next.steps)
           } else
-            controller.finish(id, 'partial', controller.failure('OBSERVATION_TIMEOUT', 'The accepted action remains unconfirmed.'), null)
+            controller.finish(id, 'partial', controller.failure('OBSERVATION_TIMEOUT', 'The action is still not confirmed.'), null)
         } else {
           controller.publish(Object.assign({}, op, {
             remaining: op.remaining - interval

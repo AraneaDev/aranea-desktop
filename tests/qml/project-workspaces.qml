@@ -203,7 +203,7 @@ ShellRoot {
     ]
     client.snapshot = changed
     t.equal(panel.rowAt(1).label, 'Renamed · Original terminal', 'workspace uses immutable environment profile name')
-    t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('terminal observed') >= 0, 'fresh current-session recovery proves old saved environment')
+    t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('terminal open') >= 0, 'fresh current-session recovery proves old saved environment')
     changed = JSON.parse(JSON.stringify(changed))
     changed.bindings[0].sessionId = 'stale'
     client.snapshot = changed

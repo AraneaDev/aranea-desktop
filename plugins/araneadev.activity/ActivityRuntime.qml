@@ -59,7 +59,7 @@ Item {
           transportUnconfirmed: !runtime.negativeHelperError(data) || code === 124 || code === 137,
           error: data && data.error || {
             code: data && data.code || 'DEPENDENCY_MISSING',
-            message: data && data.message || diagnostics || 'Activity dependency unavailable.'
+            message: data && data.message || diagnostics || 'Activity dependency is not available.'
           }
         })
       })
@@ -297,7 +297,7 @@ Item {
             done({
               ok: false,
               code: 'COMPOSITOR_UNAVAILABLE',
-              message: 'Desktop unavailable.'
+              message: 'Desktop is not available.'
             })
             return
           }
@@ -318,7 +318,7 @@ Item {
                 ok: false,
                 submissionUnconfirmed: response.transportUnconfirmed === true || lifetime !== runtime.sessionId || !refusal,
                 code: response.error && response.error.code || 'LAUNCH_UNCONFIRMED',
-                message: response.error && response.error.message || 'Launch remains unconfirmed.'
+                message: response.error && response.error.message || 'Launch is still not confirmed.'
               })
               return
             }
@@ -453,7 +453,7 @@ Item {
             outcome: operationId ? 'partial' : 'failed',
             error: {
               code: 'PROJECT_UNCONFIRMED',
-              message: 'Project owner observation unavailable; accepted work is not resubmitted.'
+              message: 'Projects could not be checked; the work will not be started again.'
             }
           })
           return
@@ -483,7 +483,7 @@ Item {
                 outcome: 'partial',
                 error: {
                   code: 'OPERATION_LOST',
-                  message: 'Project operation no longer belongs to the accepted owner.'
+                  message: 'This project operation is no longer tracked.'
                 }
               })
               return
@@ -512,7 +512,7 @@ Item {
                   ok: false,
                   error: {
                     code: 'CHECKOUT_INVALID',
-                    message: 'The exact registered checkout is unavailable.'
+                    message: 'The registered checkout is not available.'
                   }
                 })
                 return
