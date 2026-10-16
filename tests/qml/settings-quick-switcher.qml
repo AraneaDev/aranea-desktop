@@ -1,5 +1,6 @@
 // The Quick switcher row asks only the controller; a fake runner stands in for the helper.
 import QtQuick
+import QtTest
 import Quickshell
 import "lib"
 import "plugins/araneadev.settings" as Settings
@@ -19,6 +20,10 @@ ShellRoot {
   QmlTest {
     id: t
   }
+  TestCase {
+    id: keys
+    when: false
+  }
   Settings.Settings {
     id: firstOpen
     windowEnabled: false
@@ -26,19 +31,24 @@ ShellRoot {
       host.openCommands = host.openCommands.concat([argv.join(' ')])
     }
   }
-  Settings.IntegrationsPage {
-    id: page
+  FloatingWindow {
+    visible: true
     width: 400
-    backendState: ({
-        integrationsAvailability: 'available',
-        integrations: [],
-        keybind: {
-          bound: false,
-          key: null
-        }
-      })
-    onRequest: function (operation, args) {
-      host.requests = host.requests.concat([[operation, args]])
+    height: 700
+    Settings.IntegrationsPage {
+      id: page
+      width: 400
+      backendState: ({
+          integrationsAvailability: 'available',
+          integrations: [],
+          keybind: {
+            bound: false,
+            key: null
+          }
+        })
+      onRequest: function (operation, args) {
+        host.requests = host.requests.concat([[operation, args]])
+      }
     }
   }
   Settings.SettingsController {
@@ -93,6 +103,20 @@ ShellRoot {
           key: 'SUPER + CTRL + O'
         }
       ]], 'Add sends the edited key')
+    // Enter in the key field submits when Add is enabled, and does nothing when it is not.
+    host.requests = []
+    child('quickSwitcherKey').forceActiveFocus()
+    keys.keyClick(Qt.Key_Return)
+    t.equal(host.requests, [['keybind-add',
+        {
+          key: 'SUPER + CTRL + O'
+        }
+      ]], 'Enter in the key field adds the binding')
+    child('quickSwitcherKey').text = ' '
+    host.requests = []
+    keys.keyClick(Qt.Key_Return)
+    t.equal(host.requests, [], 'Enter does nothing while Add is disabled')
+    child('quickSwitcherKey').text = 'SUPER + CTRL + O'
     page.backendState = {
       integrations: [],
       keybind: {
@@ -101,6 +125,7 @@ ShellRoot {
       }
     }
     t.equal(child('quickSwitcherState').text, 'SUPER + ALT + P', 'bound state shows key')
+    t.equal(child('quickSwitcherKey').text, 'SUPER + ALT + P', 'the field shows the bound key')
     t.check(child('quickSwitcherRemove').visible, 'Remove visible when bound')
     host.requests = []
     child('quickSwitcherRemove').clicked()
@@ -158,6 +183,8 @@ ShellRoot {
             controller.refreshKeybind(function () {})
             t.step(30, function () {
               t.equal(controller.keybindError.code, 'WRITE_FAILED', 'failed status read sets a plain error')
+              t.equal(controller.keybindError.message + ' ' + controller.keybindError.recovery, "Couldn't read the result. Try again.", 'raw helper text is not shown as the message')
+              t.check(controller.keybindError.details.indexOf('Could not run the shortcut helper.') >= 0, 'raw helper text is kept as details')
               page.errors = {
                 keybind: controller.keybindError
               }

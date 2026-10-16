@@ -75,6 +75,8 @@ ColumnLayout {
       }
     }
   }
+  // The quick-switcher key is already bound, so Add is hidden.
+  readonly property bool boundNow: !!page.backendState.keybind && page.backendState.keybind.bound === true
   SettingsSection {
     Layout.fillWidth: true
     SettingsLabel {
@@ -117,6 +119,16 @@ ColumnLayout {
             anchors.rightMargin: Style.space(8)
             verticalAlignment: TextInput.AlignVCenter
             text: 'SUPER + ALT + P'
+            // When a key is bound the field shows it, so Remove and Add agree.
+            readonly property string boundKey: page.backendState.keybind && page.backendState.keybind.bound ? page.backendState.keybind.key || '' : ''
+            onBoundKeyChanged: if (boundKey !== '')
+              text = boundKey
+            Component.onCompleted: if (boundKey !== '')
+              text = boundKey
+            onAccepted: if (!page.displayOnly && !page.pending && text.trim() !== '' && !page.boundNow)
+              page.request('keybind-add', {
+                key: text.trim()
+              })
             color: Color.foreground
             font.family: Aranea.Typography.technicalFamily
             font.pixelSize: Style.font.body

@@ -198,8 +198,9 @@ QtObject {
   function keybindFailure(stderr) {
     return {
       code: 'WRITE_FAILED',
-      message: stderr || 'The shortcut helper gave no answer.',
-      recovery: 'Try again.'
+      message: "Couldn't read the result.",
+      recovery: 'Try again.',
+      details: stderr || 'The shortcut helper gave no answer.'
     }
   }
   // Read whether the quick-switcher key is bound; failures keep the last status.
