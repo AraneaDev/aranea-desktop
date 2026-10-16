@@ -128,7 +128,7 @@ project_git_primary_path() {
 
 project_git_task_create() {
   local primary_path folder remote base='' candidate state new_id status=0
-  if [[ -z $branch || $branch == -* ]] || ! projects_registry_git check-ref-format --branch "$branch" >/dev/null 2>&1; then
+  if [[ -z $branch || $branch == -* || $branch == *'@{'* ]] || ! projects_registry_git check-ref-format --branch "$branch" >/dev/null 2>&1; then
     project_git_fail INVALID_BRANCH 'That is not a valid branch name.' 'Use letters, numbers, - _ . and /, without spaces or ~ ^ : ? * [ \.'
   fi
   ! projects_registry_git -C "$path" show-ref --verify --quiet "refs/heads/$branch" ||
@@ -164,51 +164,69 @@ project_git_task_create() {
   project_git_ok "$(jq -cn --arg p "$project" --arg c "$new_id" --arg path "$folder" --arg b "$branch" --arg base "$base" '{projectId:$p,checkoutId:$c,path:$path,branch:$b,base:$base}')"
 }
 
-# Commits on HEAD that no remote has; without remotes, those not on main/master.
+# Sets `unpushed` to the commits of REF (in DIR) that no remote has; without
+# remotes, those not on main/master. Returns 1 when Git fails.
 project_git_unpushed() {
-  local candidate
-  if [[ -n $(projects_registry_git -C "$path" remote 2>/dev/null) ]]; then
-    projects_registry_git -C "$path" rev-list --count HEAD --not --remotes
-    return
+  local dir=$1 ref=$2 candidate
+  unpushed=0
+  if [[ -n $(projects_registry_git -C "$dir" remote 2>/dev/null) ]]; then
+    unpushed=$(projects_registry_git -C "$dir" rev-list --count "$ref" --not --remotes 2>/dev/null) || return 1
+    return 0
   fi
   for candidate in main master; do
-    if projects_registry_git -C "$path" rev-parse --verify --quiet "refs/heads/$candidate" >/dev/null; then
-      projects_registry_git -C "$path" rev-list --count HEAD --not "refs/heads/$candidate"
-      return
+    if projects_registry_git -C "$dir" rev-parse --verify --quiet "refs/heads/$candidate" >/dev/null; then
+      unpushed=$(projects_registry_git -C "$dir" rev-list --count "$ref" --not "refs/heads/$candidate" 2>/dev/null) || return 1
+      return 0
     fi
   done
-  printf '0\n'
+  return 0
 }
 
-# Prints true when a protected action run exists for this checkout. Fails
-# closed (ACTIONS_UNAVAILABLE) when the action store cannot be read.
+# Sets `busy` to true when a protected action run exists for this checkout.
+# Returns 1 when the action store cannot be read, so callers fail closed.
 project_git_busy() {
   local runs
   runs=$("$git_state_lib/../aranea-project-action-store" snapshot 2>/dev/null) || runs=''
-  jq -e '.ok == true' <<<"$runs" >/dev/null 2>&1 ||
-    project_git_fail ACTIONS_UNAVAILABLE 'Could not check for running actions in this checkout.' 'Refresh Projects and retry.'
-  jq --arg p "$project" --arg c "$checkout" '[.state.runs[]? | select(.projectId == $p and .checkoutId == $c and (.submissionUnconfirmed or .processState == "pending" or .processState == "running" or .processState == "unconfirmed"))] | length > 0' <<<"$runs"
+  jq -e '.ok == true' <<<"$runs" >/dev/null 2>&1 || return 1
+  busy=$(jq --arg p "$project" --arg c "$checkout" '[.state.runs[]? | select(.projectId == $p and .checkoutId == $c and (.submissionUnconfirmed or .processState == "pending" or .processState == "running" or .processState == "unconfirmed"))] | length > 0' <<<"$runs") || return 1
+}
+
+project_git_busy_or_fail() {
+  project_git_busy || project_git_fail ACTIONS_UNAVAILABLE 'Could not check for running actions in this checkout.' 'Refresh Projects and retry.'
 }
 
 project_git_task_remove() {
-  local primary_path current_branch status_file record dirty=false untracked=false busy unpushed facts status=0
+  local primary_path current_branch status_file record dirty=false untracked=false ignored=0 busy='' unpushed=0 detached=0 facts status=0
   [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout cannot be removed.' 'Choose a task checkout.'
   primary_path=$(project_git_primary_path)
   current_branch=$(projects_registry_git -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
   status_file="$git_tmp/status"
-  projects_registry_git -C "$path" status --porcelain=v1 -z --untracked-files=normal >"$status_file" 2>/dev/null ||
+  projects_registry_git -C "$path" status --porcelain=v1 -z --ignored=matching --untracked-files=normal >"$status_file" 2>/dev/null ||
     project_git_fail GIT_ERROR 'Git could not read the task checkout.' 'Inspect this checkout in a terminal, then refresh.'
   while IFS= read -r -d '' record; do
     [[ -n $record ]] || continue
-    if [[ $record == '?? '* ]]; then untracked=true; else dirty=true; fi
+    if [[ $record == '?? '* ]]; then
+      untracked=true
+    elif [[ $record == '!! '* ]]; then
+      ignored=$((ignored + 1))
+    else
+      dirty=true
+    fi
   done <"$status_file"
-  busy=$(project_git_busy)
-  unpushed=$(project_git_unpushed)
-  facts=$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$path" --arg b "$current_branch" --argjson d "$dirty" --argjson u "$untracked" --argjson busy "$busy" --argjson n "$unpushed" \
-    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:$d,untracked:$u,busy:$busy,unpushed:$n,missing:false}')
+  project_git_busy_or_fail
+  project_git_unpushed "$path" HEAD || project_git_fail GIT_ERROR 'Git could not count unpushed commits.' 'Inspect this checkout in a terminal, then refresh.'
+  if [[ -z $current_branch ]]; then
+    detached=$(projects_registry_git -C "$path" rev-list --count HEAD --not --branches --remotes 2>/dev/null) ||
+      project_git_fail GIT_ERROR 'Git could not count unpushed commits.' 'Inspect this checkout in a terminal, then refresh.'
+  fi
+  facts=$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$path" --arg b "$current_branch" --argjson d "$dirty" --argjson u "$untracked" --argjson i "$ignored" --argjson busy "$busy" --argjson n "$unpushed" \
+    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:$d,untracked:$u,ignored:$i,busy:$busy,unpushed:$n,missing:false}')
   [[ $check != true ]] || project_git_ok "$facts"
   [[ $dirty == false && $untracked == false ]] || project_git_fail CHECKOUT_DIRTY 'This checkout has uncommitted or untracked changes.' 'Commit, stash or delete them, then retry.'
   [[ $busy == false ]] || project_git_fail CHECKOUT_BUSY 'An action is still running in this checkout.' 'Stop the running action, then retry.'
+  if ((detached > 0)); then
+    project_git_fail UNPUSHED_COMMITS "$detached commit$( ((detached == 1)) || printf s) on a detached HEAD would be lost." 'Create a branch for them first.'
+  fi
   if ((unpushed > 0)) && [[ $confirm != true ]]; then
     project_git_fail UNPUSHED_COMMITS "$unpushed commit$( ((unpushed == 1)) || printf s) on ${current_branch:-this checkout} $( ((unpushed == 1)) && printf "isn't" || printf "aren't") on any remote." 'Push first, or confirm removal; the branch is kept.'
   fi
@@ -219,10 +237,41 @@ project_git_task_remove() {
   project_git_ok "$(jq -c '{projectId,checkoutId,path,branch,removed:true}' <<<"$facts")"
 }
 
-# A task checkout whose folder is gone cannot be proved; prune Git's record of
+# Forget Git's record of exactly one vanished worktree. Plain removal first;
+# otherwise prune only when that one worktree is the sole stale entry.
+project_git_forget_worktree() {
+  local primary_path=$1 registered=$2 status=0 entry own='' listed name
+  local -a names=()
+  project_git_user "$project_git_local_seconds" -C "$primary_path" worktree remove -- "$registered" || status=$?
+  ((status == 0)) && return 0
+  if ((status == 124 || status == 137)); then project_git_classify "$status"; fi
+  for entry in "$common"/worktrees/*/gitdir; do
+    [[ -f $entry ]] || continue
+    [[ $(<"$entry") == "$registered/.git" ]] && own=$(basename -- "$(dirname -- "$entry")")
+  done
+  [[ -n $own ]] || return 0
+  listed=$(projects_registry_git -C "$primary_path" worktree prune --dry-run --verbose 2>&1) ||
+    project_git_fail GIT_ERROR 'Git could not list stale worktrees.' 'Run git worktree prune in a terminal, then retry.'
+  while IFS= read -r name; do
+    [[ $name == 'Removing worktrees/'* ]] || continue
+    name=${name#Removing worktrees/}
+    names+=("${name%%:*}")
+  done <<<"$listed"
+  if ((${#names[@]} == 1)) && [[ ${names[0]} == "$own" ]]; then
+    projects_registry_git -C "$primary_path" worktree prune >/dev/null 2>&1 ||
+      project_git_fail GIT_ERROR 'Git could not prune the missing worktree.' 'Run git worktree prune in a terminal, then retry.'
+  elif ((${#names[@]} > 1)) || { ((${#names[@]} == 1)) && [[ ${names[0]} != "$own" ]]; }; then
+    project_git_fail GIT_ERROR 'Other stale worktrees exist; run git worktree prune in a terminal.' 'Run git worktree prune in a terminal, then retry.'
+  else
+    project_git_fail GIT_ERROR 'Git still tracks this worktree and will not prune it; it may be locked.' 'Run git worktree list in a terminal, then retry.'
+  fi
+}
+
+# A task checkout whose folder is gone cannot be proved; forget Git's record of
 # it from the primary checkout and unregister it. Returns 1 when not applicable.
+# Proving the primary overwrites path/common/primary, never project/checkout.
 project_git_remove_missing() {
-  local registered primary_flag primary_id primary_path registered_branch busy facts
+  local registered primary_flag primary_id primary_path registered_branch busy='' unpushed=0 facts
   [[ -s $git_tmp/registry ]] || return 1
   registered=$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.path' "$git_tmp/registry") || return 1
   primary_flag=$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.primary' "$git_tmp/registry") || return 1
@@ -230,15 +279,18 @@ project_git_remove_missing() {
   primary_id=$(jq -r --arg p "$project" '.projects[]|select(.id == $p)|.checkouts[]|select(.primary)|.id' "$git_tmp/registry")
   primary_path=$(project_git_primary_path)
   [[ -n $primary_id && -n $primary_path ]] || return 1
-  project_git_state_prove "$project" "$primary_id" >"$git_tmp/primary-proof" || return 1
   registered_branch=$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.branch // empty' "$git_tmp/registry")
-  busy=$(project_git_busy)
-  facts=$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$registered" --arg b "$registered_branch" --argjson busy "$busy" \
-    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:false,untracked:false,busy:$busy,unpushed:0,missing:true}')
+  project_git_state_prove "$project" "$primary_id" >"$git_tmp/primary-proof" || return 1
+  project_git_busy_or_fail
+  if [[ -n $registered_branch ]] && projects_registry_git -C "$primary_path" show-ref --verify --quiet "refs/heads/$registered_branch"; then
+    project_git_unpushed "$primary_path" "refs/heads/$registered_branch" || project_git_fail GIT_ERROR 'Git could not count unpushed commits.' 'Inspect the main checkout in a terminal, then refresh.'
+  fi
+  facts=$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$registered" --arg b "$registered_branch" --argjson busy "$busy" --argjson n "$unpushed" \
+    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:false,untracked:false,ignored:0,busy:$busy,unpushed:$n,missing:true}')
   [[ $check != true ]] || project_git_ok "$facts"
   [[ $busy == false ]] || project_git_fail CHECKOUT_BUSY 'An action is still running in this checkout.' 'Stop the running action, then retry.'
   project_git_lock
-  projects_registry_git -C "$primary_path" worktree prune >/dev/null 2>&1 || true
+  project_git_forget_worktree "$primary_path" "$registered"
   project_git_store "$(jq -cn --arg p "$project" --arg c "$checkout" '{action:"checkout-remove",args:{projectId:$p,checkoutId:$c}}')" >/dev/null ||
     project_git_fail UNREGISTER_FAILED 'Projects could not forget the missing checkout.' 'Refresh Projects and retry.'
   project_git_ok "$(jq -c '{projectId,checkoutId,path,branch,removed:true}' <<<"$facts")"

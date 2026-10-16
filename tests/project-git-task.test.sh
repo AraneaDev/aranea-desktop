@@ -83,7 +83,7 @@ task_create_rejects_hostile_names() {
   local name folder
   cd "$TMPDIR"
   # shellcheck disable=SC2016
-  for name in -x --force 'a..b' '$(touch PWNED)' 'a;b'; do
+  for name in -x --force 'a..b' '$(touch PWNED)' 'a;b' 'x@{1}'; do
     folder=$ARANEA_TEST_SANDBOX/w/app-worktrees/${name//\//-}
     if git check-ref-format --branch "$name" >/dev/null 2>&1; then
       task_new "$name"
@@ -171,6 +171,111 @@ missing_folder_check_changes_nothing() {
   [[ $(sha256sum "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]]
   [[ $(git -C "$repo" worktree list --porcelain) == "$worktrees_before" ]]
 }
+broken_action_store_fails_closed() {
+  setup
+  make_task closed
+  printf 'not json' >"$ARANEA_STATE_ROOT/project-actions.json"
+  task_expect ACTIONS_UNAVAILABLE task-remove --check
+  task_expect ACTIONS_UNAVAILABLE task-remove
+  [[ -d $task_path ]]
+  rm -rf "$task_path"
+  task_expect ACTIONS_UNAVAILABLE task-remove --check
+  task_expect ACTIONS_UNAVAILABLE task-remove
+  [[ $(registry_count) == 2 ]]
+}
+missing_folder_never_prunes_other_worktrees() {
+  setup
+  make_task ours
+  git -C "$repo" worktree add -q -b other "$ARANEA_TEST_SANDBOX/w/other-wt"
+  git -C "$repo" worktree add -q -b healthy "$ARANEA_TEST_SANDBOX/w/healthy-wt"
+  rm -rf "$task_path" "$ARANEA_TEST_SANDBOX/w/other-wt"
+  # Git either removes just this record or refuses; the other stale record must survive.
+  task_run task-remove
+  if jq -e '.ok' "$result" >/dev/null; then
+    [[ $(registry_count) == 1 ]]
+  else
+    jq -e '.error.code == "GIT_ERROR" and (.error.message | contains("Other stale worktrees"))' "$result" >/dev/null
+    [[ $(registry_count) == 2 ]]
+  fi
+  grep -qx "$ARANEA_TEST_SANDBOX/w/other-wt/.git" "$repo"/.git/worktrees/*/gitdir
+  [[ -d $ARANEA_TEST_SANDBOX/w/healthy-wt ]]
+}
+missing_folder_refuses_when_other_stale_records_exist() {
+  setup
+  make_task ours
+  git -C "$repo" worktree add -q -b other "$ARANEA_TEST_SANDBOX/w/other-wt"
+  rm -rf "$task_path" "$ARANEA_TEST_SANDBOX/w/other-wt"
+  # Make plain removal refuse, as Git does for a vanished folder in some versions.
+  cat >"$TMPDIR/bin/git" <<WRAP
+#!/bin/bash
+for argument in "\$@"; do
+  if [[ \$argument == remove ]]; then echo "fatal: validation failed, cannot remove working tree" >&2; exit 128; fi
+done
+exec "$(command -v git)" "\$@"
+WRAP
+  chmod +x "$TMPDIR/bin/git"
+  PATH="$TMPDIR/bin:$PATH" task_expect GIT_ERROR task-remove
+  jq -e '.error.message | contains("Other stale worktrees exist")' "$result" >/dev/null
+  [[ $(registry_count) == 2 ]]
+  [[ $(find "$repo/.git/worktrees" -mindepth 1 -maxdepth 1 | wc -l) == 2 ]]
+}
+missing_folder_prunes_alone_when_removal_refuses() {
+  setup
+  make_task ours
+  git -C "$repo" worktree add -q -b healthy "$ARANEA_TEST_SANDBOX/w/healthy-wt"
+  rm -rf "$task_path"
+  cat >"$TMPDIR/bin/git" <<WRAP
+#!/bin/bash
+for argument in "\$@"; do
+  if [[ \$argument == remove ]]; then echo "fatal: validation failed, cannot remove working tree" >&2; exit 128; fi
+done
+exec "$(command -v git)" "\$@"
+WRAP
+  chmod +x "$TMPDIR/bin/git"
+  PATH="$TMPDIR/bin:$PATH" task_run task-remove
+  jq -e '.ok and .data.removed' "$result" >/dev/null
+  [[ $(registry_count) == 1 ]]
+  [[ $(find "$repo/.git/worktrees" -mindepth 1 -maxdepth 1 | wc -l) == 1 ]]
+}
+missing_folder_prunes_only_its_own_record() {
+  setup
+  make_task ours
+  git -C "$repo" worktree add -q -b healthy "$ARANEA_TEST_SANDBOX/w/healthy-wt"
+  rm -rf "$task_path"
+  task_run task-remove
+  jq -e '.ok and .data.removed' "$result" >/dev/null
+  [[ $(find "$repo/.git/worktrees" -mindepth 1 -maxdepth 1 | wc -l) == 1 ]]
+  [[ -d $ARANEA_TEST_SANDBOX/w/healthy-wt ]]
+}
+ignored_files_are_counted_not_blocking() {
+  setup
+  make_task ign
+  printf '.env\n' >"$task_path/.gitignore"
+  git -C "$task_path" add .gitignore
+  git -C "$task_path" -c user.name=T -c user.email=t@example.invalid commit -q -m ignore
+  printf 'S=1\n' >"$task_path/.env"
+  task_run task-remove --check
+  jq -e '.ok and .data.ignored == 1 and .data.dirty == false and .data.untracked == false' "$result" >/dev/null
+  task_run task-remove --confirm-unpushed
+  jq -e '.ok and .data.removed' "$result" >/dev/null
+}
+detached_head_commits_are_never_discarded() {
+  setup
+  make_task det
+  git -C "$task_path" checkout -q --detach
+  commit_in "$task_path" lost
+  task_expect UNPUSHED_COMMITS task-remove --confirm-unpushed
+  jq -e '.error.message | contains("1 commit on a detached HEAD would be lost")' "$result" >/dev/null
+  [[ -d $task_path ]]
+}
+missing_folder_check_counts_unpushed() {
+  setup
+  make_task cnt
+  commit_in "$task_path" one
+  rm -rf "$task_path"
+  task_run task-remove --check
+  jq -e '.ok and .data.missing == true and .data.unpushed == 1 and .data.ignored == 0' "$result" >/dev/null
+}
 missing_primary_folder_is_still_refused() {
   setup
   mv "$repo" "$repo.moved"
@@ -186,7 +291,7 @@ unpushed_without_remote_counts_against_main() {
   jq -e '.ok and .data.unpushed == 2' "$result" >/dev/null
 }
 
-cases=(task_create_from_remote_default task_create_without_remote task_create_no_default_branch task_create_refusals task_create_rejects_hostile_names task_create_from_linked_checkout_uses_primary_name task_remove_clean task_remove_refusals task_remove_busy task_remove_missing_folder_unregisters missing_folder_check_changes_nothing missing_primary_folder_is_still_refused unpushed_without_remote_counts_against_main)
+cases=(task_create_from_remote_default task_create_without_remote task_create_no_default_branch task_create_refusals task_create_rejects_hostile_names task_create_from_linked_checkout_uses_primary_name task_remove_clean task_remove_refusals task_remove_busy task_remove_missing_folder_unregisters missing_folder_check_changes_nothing missing_primary_folder_is_still_refused broken_action_store_fails_closed missing_folder_never_prunes_other_worktrees missing_folder_refuses_when_other_stale_records_exist missing_folder_prunes_alone_when_removal_refuses missing_folder_prunes_only_its_own_record ignored_files_are_counted_not_blocking detached_head_commits_are_never_discarded missing_folder_check_counts_unpushed unpushed_without_remote_counts_against_main)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e
