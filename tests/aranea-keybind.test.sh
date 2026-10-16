@@ -15,7 +15,7 @@ default_binds='[{"modmask":64,"key":"Return","description":"Terminal","dispatche
 failures=0
 # Fresh bindings file, fake hyprctl first on PATH, default bind list.
 setup() {
-  rm -rf "$XDG_CONFIG_HOME" "${TMPDIR:?}/bin" "$TMPDIR/reloads" "$TMPDIR/reload-status" "$TMPDIR/PWNED"
+  rm -rf "$XDG_CONFIG_HOME" "${TMPDIR:?}/bin" "$TMPDIR/reloads" "$TMPDIR/reload-status" "$TMPDIR/configerrors.json" "$TMPDIR/PWNED"
   mkdir -p "$XDG_CONFIG_HOME/hypr" "$TMPDIR/bin"
   printf '%s\n' 'o.bind("SUPER + RETURN", "Terminal", "uwsm app -- kitty")' '-- a comment' \
     'o.bind("SUPER + CTRL + SHIFT + D", "Toggle Aranea health", "omarchy-shell shell toggle araneadev.health")' >"$file"
@@ -24,6 +24,7 @@ setup() {
 #!/bin/bash
 case "\$*" in
   "binds -j"|"-j binds") cat "$TMPDIR/binds.json" ;;
+  "configerrors -j"|"-j configerrors") cat "$TMPDIR/configerrors.json" 2>/dev/null || echo '[""]' ;;
   reload) echo x >>"$TMPDIR/reloads"; exit "\$(cat "$TMPDIR/reload-status" 2>/dev/null || echo 0)" ;;
 esac
 FAKE
@@ -125,7 +126,7 @@ no_hyprctl() {
   setup
   local bare="$TMPDIR/bare" tool
   mkdir -p "$bare"
-  for tool in bash env jq awk cp mv mktemp tr sed grep cat dirname rm chmod tail head cmp wc; do
+  for tool in bash env jq awk cp mv mktemp tr sed grep cat dirname rm chmod tail head cmp wc flock readlink od; do
     ln -s "$(command -v "$tool")" "$bare/$tool"
   done
   cp "$file" "$TMPDIR/orig"
@@ -141,7 +142,7 @@ odd_files_keep_their_bytes() {
   run add --key "SUPER + ALT + P"
   jq -e '.ok' "$result" >/dev/null
   [[ $(grep -c -e '^o\.bind.*-- aranea:projects-switcher' "$file") == 1 ]]
-  [[ $(head -c "$(stat -c %s "$TMPDIR/orig")" "$file" | tr -d '\r\n') == "$(tr -d '\r\n' <"$TMPDIR/orig")" ]]
+  cmp -n "$(stat -c %s "$TMPDIR/orig")" "$file" "$TMPDIR/orig"
   grep -q -e '^-- o.bind("SUPER + ALT + P", "x", "y") -- aranea:projects-switcher' "$file"
   [[ $(head -c 21 "$file") == 'o.bind("A", "a", "b")' ]]
   run remove
@@ -149,7 +150,86 @@ odd_files_keep_their_bytes() {
   cmp "$file" "$TMPDIR/orig"
 }
 
-cases=(add_writes_one_marked_line readd_replaces remove_deletes_only_ours status_reports conflict_detection_normalises invalid_keys reload_failure_restores missing_file_creates_nothing no_hyprctl odd_files_keep_their_bytes)
+# Catch a failing rewrite installing a partial file or leaving a temp file.
+rewrite_failure_keeps_file() {
+  setup
+  printf '#!/bin/sh\nexit 2\n' >"$TMPDIR/bin/awk"
+  chmod +x "$TMPDIR/bin/awk"
+  cp "$file" "$TMPDIR/orig"
+  expect_code WRITE_FAILED add --key "SUPER + ALT + P"
+  cmp "$file" "$TMPDIR/orig"
+  [[ $(find "$(dirname "$file")" -name 'bindings.lua.*' ! -name '*.bak' | wc -l) == 0 ]]
+}
+# Catch a symlinked bindings file being replaced by a regular file.
+symlink_survives() {
+  setup
+  mkdir -p "$ARANEA_TEST_SANDBOX/dotfiles"
+  mv "$file" "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua"
+  ln -s "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua" "$file"
+  cp "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua" "$TMPDIR/orig"
+  run add --key "SUPER + ALT + P"
+  jq -e '.ok' "$result" >/dev/null
+  [[ -L $file ]]
+  grep -q -e "$marker" "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua"
+  run remove
+  [[ -L $file ]]
+  cmp "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua" "$TMPDIR/orig"
+  echo 1 >"$TMPDIR/reload-status"
+  expect_code RELOAD_FAILED add --key "SUPER + ALT + P"
+  [[ -L $file ]]
+  cmp "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua" "$TMPDIR/orig"
+}
+# Catch a Lua config error that reload does not report being kept.
+config_errors_restore() {
+  setup
+  cp "$file" "$TMPDIR/orig"
+  printf '%s' '["", "bindings.lua:4: syntax error"]' >"$TMPDIR/configerrors.json"
+  expect_code RELOAD_FAILED add --key "SUPER + ALT + P"
+  jq -e '.error.message | contains("syntax error")' "$result" >/dev/null
+  cmp "$file" "$TMPDIR/orig"
+  [[ $(reloads) == 2 ]]
+}
+# Catch two runs overlapping.
+lock_gives_busy() {
+  setup
+  export ARANEA_KEYBIND_LOCK_WAIT=1
+  cp "$file" "$TMPDIR/orig"
+  (
+    flock 9
+    sleep 4
+  ) 9>"$XDG_RUNTIME_DIR/aranea-keybind.lock" &
+  sleep 0.5
+  expect_code BUSY add --key "SUPER + ALT + P"
+  expect_code BUSY remove
+  cmp "$file" "$TMPDIR/orig"
+  wait
+}
+# Catch a managed line with trailing spaces being missed.
+trailing_whitespace_is_managed() {
+  setup
+  printf '%s  \t\n' "$line_p" >>"$file"
+  run status
+  jq -e '.data.bound == true' "$result" >/dev/null
+  run add --key "SUPER + ALT + O"
+  [[ $(managed_count) == 1 ]]
+}
+# Catch an empty description hiding what a taken key does, and submap binds counting.
+conflict_details() {
+  setup
+  printf '%s' '[{"modmask":72,"key":"P","description":"","dispatcher":"exec","arg":"firefox"}]' >"$TMPDIR/binds.json"
+  expect_code KEY_TAKEN add --key "SUPER + ALT + P"
+  jq -e '.error.message | contains("firefox")' "$result" >/dev/null
+  printf '%s' '[{"modmask":72,"key":"P","submap":"resize","description":"Grow","dispatcher":"exec","arg":"x"}]' >"$TMPDIR/binds.json"
+  run add --key "SUPER + ALT + P"
+  jq -e '.ok' "$result" >/dev/null
+}
+# Catch an unknown subcommand reporting a key error.
+unknown_subcommand() {
+  setup
+  expect_code INVALID_REQUEST bogus
+}
+
+cases=(add_writes_one_marked_line readd_replaces remove_deletes_only_ours status_reports conflict_detection_normalises invalid_keys reload_failure_restores missing_file_creates_nothing no_hyprctl odd_files_keep_their_bytes rewrite_failure_keeps_file symlink_survives config_errors_restore lock_gives_busy trailing_whitespace_is_managed conflict_details unknown_subcommand)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e
