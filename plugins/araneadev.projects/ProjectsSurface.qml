@@ -563,6 +563,8 @@ Item {
     var project = projectsPage.selectedProject, stored = gitCommandError
     return project && stored && stored.projectId === project.id && stored.checkoutId === root.gitClient.checkoutId ? stored.error : null
   }
+  // The command ('fetch' or 'pull') behind the stored failure of the selected pair, or ''.
+  readonly property string selectedGitCommandOperation: selectedGitCommandError ? gitCommandError.operation || '' : ''
   // Selected registered checkout record, or null.
   readonly property var selectedCheckout: {
     var project = projectsPage.selectedProject
@@ -651,6 +653,7 @@ Item {
           panel.gitCommandError = {
             projectId: projectId,
             checkoutId: checkoutId,
+            operation: operation,
             error: response.error
           }
         else if (stored && stored.projectId === projectId && stored.checkoutId === checkoutId)
@@ -1070,6 +1073,9 @@ Item {
                   metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
                   error: panel.root.projectController.error || panel.root.projectClient.error
+                  errorObject: panel.root.projectController.errorObject || (!panel.root.projectController.error && panel.root.projectClient.error ? {
+                      message: panel.root.projectClient.error
+                    } : null)
                   pointerGate: pointerGate
                   onRegisterRequested: function (paths) {
                     panel.root.projectController.request('register', {
@@ -1250,7 +1256,14 @@ Item {
                   agentPending: panel.root.activityClient.pending
                   workspacePending: panel.root.projectClient.submitting || panel.root.projectClient.acceptanceUnknown || !projectsPage.details.openAvailable
                   executionAvailable: panel.root.actionClient.availability.execution === true
-                  actionError: panel.root.actionClient.submissionUncertain ? 'Submission unconfirmed. Refresh actions in Details to recover the receipt.' : panel.root.actionClient.error ? panel.root.actionClient.error.message + ' Manage actions to recover.' : panel.root.actionClient.summaryError ? panel.root.actionClient.summaryError.message : panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Execution unavailable. Manage actions to check required helpers.' : ''
+                  actionProblem: panel.root.actionClient.submissionUncertain ? (panel.root.actionClient.autoChecking ? null : {
+                      code: 'SUBMISSION_UNCONFIRMED'
+                    }) : panel.root.actionClient.error || panel.root.actionClient.summaryError || null
+                  onActionRefreshRequested: {
+                    if (!panel.root.inert && !panel.root.actionClient.pending)
+                      panel.root.actionClient.refresh()
+                  }
+                  actionError: !panel.root.actionClient.submissionUncertain && !panel.root.actionClient.error && !panel.root.actionClient.summaryError && panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Execution unavailable. Manage actions to check required helpers.' : ''
                   activityError: panel.root.activityClient.error ? 'Agent connection unavailable. Open Details to reconnect.' : ''
                   pointerGate: pointerGate
                   suggestions: panel.overviewSuggestions
@@ -1259,6 +1272,7 @@ Item {
                   }
                   gitCommandPending: panel.gitCommandPending
                   gitCommandError: panel.selectedGitCommandError
+                  gitCommandOperation: panel.selectedGitCommandOperation
                   gitCommandBusy: !!panel.root.gitCommands.pending
                   onRefreshRequested: panel.refreshOverview()
                   onFetchRequested: panel.runGit('fetch')

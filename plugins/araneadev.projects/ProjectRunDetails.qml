@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
 import "../araneadev.projects/ProjectActionRecords.js" as Records
+import "ProjectProblems.js" as Problems
 
 ColumnLayout {
   id: details
@@ -149,12 +150,20 @@ ColumnLayout {
     text: details.run ? 'Process result: exit ' + (details.run.exitCode === null || details.run.exitCode === undefined ? 'unknown' : details.run.exitCode) + (details.run.exitSignal ? ' · signal ' + details.run.exitSignal : '') : ''
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    objectName: 'actionRunProblem'
     Layout.fillWidth: true
-    visible: !!details.run && !!details.run.error
-    text: details.run && details.run.error ? (details.run.error.message || details.run.error.code) + (details.run.error.recovery ? ' ' + details.run.error.recovery : '') : ''
-    color: Aranea.DesignTokens.attention
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: details.displayOnly
+    pointerGate: details.pointerGate
+    actionsEnabled: !!details.client && !details.client.pending && details.restartAllowed && !details.client.submissionUncertain
+    problem: details.run && details.run.error ? Problems.problem(details.run.error, {
+      surface: 'run',
+      actions: details.restartAllowed ? ['retry'] : []
+    }) : null
+    onActionRequested: function () {
+      if (details.run)
+        details.perform('restart', details.run.id)
+    }
   }
   Aranea.UiLabel {
     Layout.fillWidth: true

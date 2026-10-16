@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import "ProjectOverview.js" as Overview
+import "ProjectProblems.js" as Problems
 import qs.Commons
 import "../araneadev.shared" as Aranea
 
@@ -28,6 +29,8 @@ ProjectSectionCard {
   property string commandPending: ''
   // Last fetch or pull failure for this checkout as {message, recovery}, or null.
   property var commandError: null
+  // Which command failed: 'fetch' or 'pull'; Retry repeats it.
+  property string commandOperation: ''
   // Any Git command is running, for this or another checkout; starting is refused.
   property bool commandBusy: false
   // Pull needs a branch with an upstream.
@@ -77,12 +80,39 @@ ProjectSectionCard {
     font.pixelSize: Style.font.body
     font.bold: true
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    id: gitProblem
     objectName: 'projectGitError'
     Layout.fillWidth: true
-    visible: !!section.error || !!section.commandError
-    text: section.commandError ? section.commandError.message + ' ' + (section.commandError.recovery || '') : section.error ? section.error.message + (section.git ? ' · Showing last observation.' : '') : ''
-    color: Aranea.DesignTokens.urgent
+    displayOnly: section.displayOnly
+    pointerGate: section.pointerGate
+    actionsEnabled: !section.loading && section.commandPending === '' && !section.commandBusy
+    problem: section.commandError ? Problems.problem(section.commandError, {
+      surface: 'git',
+      actions: section.commandOperation === 'fetch' || section.commandOperation === 'pull' ? ['retry'] : []
+    }) : section.error ? Problems.problem(section.error, {
+      surface: 'git',
+      actions: ['retry']
+    }) : null
+    onActionRequested: function () {
+      if (section.displayOnly || section.loading || section.commandPending !== '' || section.commandBusy)
+        return
+      if (section.commandError) {
+        if (section.commandOperation === 'fetch')
+          section.fetchRequested()
+        else if (section.commandOperation === 'pull')
+          section.pullRequested()
+      } else {
+        section.refreshRequested()
+      }
+    }
+  }
+  Aranea.UiLabel {
+    objectName: 'projectGitStale'
+    Layout.fillWidth: true
+    visible: !section.commandError && !!section.error && !!section.git
+    text: 'Showing the last information that was read.'
+    opacity: 0.7
   }
   Aranea.UiLabel {
     Layout.fillWidth: true

@@ -7,6 +7,7 @@ import qs.Commons
 import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
 import "ProjectTasks.js" as Tasks
+import "ProjectProblems.js" as Problems
 
 ProjectSectionCard {
   id: form
@@ -67,13 +68,15 @@ ProjectSectionCard {
     opacity: 0.7
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  Aranea.UiLabel {
+  ProjectProblem {
     objectName: 'projectTaskError'
     Layout.fillWidth: true
-    visible: !!form.error
-    text: form.error ? form.error.message + ' ' + (form.error.recovery || '') : ''
-    color: Aranea.DesignTokens.urgent
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: form.displayOnly
+    pointerGate: form.pointerGate
+    problem: form.error ? Problems.problem(form.error, {
+      surface: 'tasks',
+      actions: []
+    }) : null
   }
   RowLayout {
     Layout.fillWidth: true

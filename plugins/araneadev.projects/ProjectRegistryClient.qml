@@ -29,6 +29,8 @@ QtObject {
   property bool reading: false
   // Actionable failures never replace unreadable registry data with empty defaults.
   property string error: ''
+  // The original {code, message, recovery} behind `error`, or null; problem views use it.
+  property var errorObject: null
   // Reject callbacks from superseded reads or capture transactions.
   property int generation: 0
   // Typed successful mutations let the composition root update presentation.
@@ -74,6 +76,7 @@ QtObject {
       ok: false,
       state: null,
       error: {
+        code: 'REGISTRY_UNAVAILABLE',
         message: 'Project registry unavailable. Check registry storage and retry.'
       }
     }
@@ -87,17 +90,21 @@ QtObject {
     reading = true
     var remaining = 2
     var failures = ['', '']
+    var failureObjects = [null, null]
     // Complete the grouped read only after both independent helpers return.
-    function finished(index, message) {
+    function finished(index, message, object) {
       failures[index] = message
+      failureObjects[index] = object || null
       remaining--
       var combined = failures.filter(function (failure) {
         return !!failure
       }).join(' ')
       // Retain an earlier error until the entire retry succeeds. Independent
       // failures are reported in registry/tool order regardless of callback timing.
-      if (combined || !remaining)
+      if (combined || !remaining) {
         error = combined
+        errorObject = combined ? failureObjects[0] || failureObjects[1] : null
+      }
       if (!remaining)
         reading = false
     }
@@ -107,10 +114,13 @@ QtObject {
       var value = parseStore(output, code)
       if (code === 0 && value.ok) {
         state = value.state
-        finished(0, '')
+        finished(0, '', null)
       } else {
         var message = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
-        finished(0, message || 'Project registry unavailable. Check registry storage and retry.')
+        finished(0, message || 'Project registry unavailable. Check registry storage and retry.', value.error || {
+          code: 'REGISTRY_UNAVAILABLE',
+          message: diagnostics || 'Project registry unavailable. Check registry storage and retry.'
+        })
       }
     })
     runHelper([toolsPath, '--json'], '', function (code, output, diagnostics) {
@@ -130,7 +140,10 @@ QtObject {
         }
         message = diagnostics || 'Tool choices unavailable. Install supported tools and retry.'
       }
-      finished(1, message)
+      finished(1, message, message ? {
+        code: 'TOOL_MISSING',
+        message: message
+      } : null)
     })
     return true
   }
@@ -156,12 +169,17 @@ QtObject {
       var value = parseStore(output, code)
       if (code !== 0 || !value.ok) {
         error = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
+        errorObject = value.error || {
+          code: 'REGISTRY_UNAVAILABLE',
+          message: diagnostics || ''
+        }
         pending = false
         mutationFailed(action, args, error)
         return
       }
       state = value.state
       error = ''
+      errorObject = null
       // Complete registry feedback before an explicit folder scan is requested.
       function complete(rootId) {
         pending = false

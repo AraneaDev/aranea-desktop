@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectProblems.js" as Problems
 import "../araneadev.projects" as Projects
 import "../araneadev.projects/ProjectActionRecords.js" as Records
 
@@ -361,19 +362,34 @@ ColumnLayout {
     text: 'Execution unavailable. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    objectName: 'actionSubmissionProblem'
     Layout.fillWidth: true
-    visible: actions.client.submissionUncertain
-    text: 'Submission unconfirmed. Refresh to recover the exact receipt. Do not submit another run.'
-    color: Aranea.DesignTokens.attention
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: actions.displayOnly
+    pointerGate: actions.pointerGate
+    // Automatic checks run first; this appears when they could not settle it.
+    problem: actions.client.submissionUncertain && !actions.client.autoChecking ? Problems.problem({
+      code: 'SUBMISSION_UNCONFIRMED'
+    }, {
+      surface: 'actions',
+      actions: ['checkAgain']
+    }) : null
+    onActionRequested: function () {
+      actions.refresh()
+    }
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    objectName: 'actionClientProblem'
     Layout.fillWidth: true
-    visible: !!actions.client.error
-    text: actions.client.error ? (actions.client.error.message || actions.client.error.code) + (actions.client.error.recovery ? ' ' + actions.client.error.recovery : '') : ''
-    color: Aranea.DesignTokens.attention
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: actions.displayOnly
+    pointerGate: actions.pointerGate
+    problem: actions.client.error ? Problems.problem(actions.client.error, {
+      surface: 'actions',
+      actions: ['refresh']
+    }) : null
+    onActionRequested: function () {
+      actions.refresh()
+    }
   }
   Flow {
     Layout.fillWidth: true

@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectProblems.js" as Problems
 
 ColumnLayout {
   id: page
@@ -31,6 +32,8 @@ ColumnLayout {
   property var agentChoice: null
   // Actionable backend error retained independently of discovery outcomes.
   property string error: ''
+  // The original {code, message, recovery} behind `error` when there is one; shown as a plain problem.
+  property var errorObject: null
   // Shared pointer/layout settling gate.
   property var pointerGate: null
   // Toggle durable ignored review without rescanning.
@@ -360,10 +363,26 @@ ColumnLayout {
     title: 'Projects'
     description: 'Keep your editor, terminal, and workflow actions together for each project.'
   }
+  ProjectProblem {
+    objectName: 'projectsPageProblem'
+    Layout.fillWidth: true
+    displayOnly: page.displayOnly
+    pointerGate: page.pointerGate
+    actionsEnabled: !page.pending
+    problem: page.errorObject ? Problems.problem(page.errorObject, {
+      surface: 'page',
+      actions: ['refresh']
+    }) : null
+    onActionRequested: function () {
+      if (!page.displayOnly && !page.pending)
+        page.refreshRequested()
+    }
+  }
   RowLayout {
     Layout.fillWidth: true
-    visible: !!page.error
+    visible: !!page.error && !page.errorObject
     Aranea.UiLabel {
+      objectName: 'projectsPageNote'
       Layout.fillWidth: true
       text: page.error
       color: Aranea.DesignTokens.attention
@@ -558,8 +577,24 @@ ColumnLayout {
       visible: page.partial
       text: 'Partial scan. Review the results or choose a narrower folder.'
     }
+    ProjectProblem {
+      objectName: 'projectsDiscoveryProblem'
+      Layout.fillWidth: true
+      displayOnly: page.displayOnly
+      pointerGate: page.pointerGate
+      readonly property bool canScan: !!page.discoveryClient && page.discoveryClient.rootId !== '' && !page.discoveryClient.pending && !page.pending
+      actionsEnabled: canScan
+      problem: page.discoveryClient && page.discoveryClient.failure && !page.discoveryClient.pending ? Problems.problem(page.discoveryClient.failure, {
+        surface: 'setup',
+        actions: page.discoveryClient.rootId !== '' ? ['retry'] : []
+      }) : null
+      onActionRequested: function () {
+        if (!page.displayOnly && canScan)
+          page.discoverRequested(page.discoveryClient.rootId)
+      }
+    }
     Repeater {
-      model: page.discoveryClient ? page.discoveryClient.errors : []
+      model: page.discoveryClient && !page.discoveryClient.failure ? page.discoveryClient.errors : []
       Aranea.UiLabel {
         required property var modelData
         Layout.fillWidth: true
