@@ -65,6 +65,8 @@ project_git_cli_main() {
   if [[ -z $checkout ]]; then
     projects_cli_store snapshot
     checkout=$(jq -r --arg p "$project" '.projects[]|select(.id == $p)|.lastCheckoutId // empty' <<<"$cli_state")
+    # A new task is proved and placed from the main checkout, never the selected one.
+    [[ $operation != task-create ]] || checkout=$(jq -r --arg p "$project" '.projects[]|select(.id == $p)|.checkouts[]|select(.primary)|.id // empty' <<<"$cli_state")
     [[ -n $checkout ]] || projects_cli_fail PROJECT_NOT_FOUND 'The project is not registered.' 'List projects and use an existing project ID.'
   fi
   helper_args=("$operation" --project "$project" --checkout "$checkout")

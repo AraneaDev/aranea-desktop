@@ -66,6 +66,16 @@ task_new_and_remove() {
   last '.status=="observed" and .data.removed==true'
   [[ ! -d $path ]]
 }
+# Catch a task made while a vanished task checkout is selected failing instead of using the main checkout.
+task_new_ignores_selected_checkout() {
+  setup
+  cli_run projects task new "$project_id" --branch first
+  local path
+  path=$(jq -sr 'last.data.path' "$events")
+  rm -rf "$path"
+  cli_run projects task new "$project_id" --branch second
+  last '.status=="observed" and (.data.path|endswith("/app-worktrees/second"))'
+}
 # Catch a helper failure that loses its error code, recovery or exit status 1.
 failure_envelope() {
   setup
@@ -94,7 +104,7 @@ capabilities_list_git() {
   jq -se 'last.data as $d | all(["projects.git.fetch","projects.git.pull","projects.task.new","projects.task.remove"][]; . as $n | any($d.operations[]; .name==$n)) and $d.projectGit.worktreeLocation=="<repo>-worktrees/<branch>"' "$events" >/dev/null
 }
 
-cases=(fetch_envelope checkout_defaults_to_last task_new_and_remove failure_envelope usage_errors capabilities_list_git)
+cases=(fetch_envelope checkout_defaults_to_last task_new_and_remove task_new_ignores_selected_checkout failure_envelope usage_errors capabilities_list_git)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e
