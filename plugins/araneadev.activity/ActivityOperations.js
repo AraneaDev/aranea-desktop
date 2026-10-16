@@ -100,7 +100,7 @@ function observe(operation, terminal, native, expired) {
         ? {
             code: "SESSION_UNCONFIRMED",
             message: "Launch started; the resumed session is not confirmed.",
-            recovery: "Reobserve this operation or inspect the hosting terminal."
+            recovery: "Check again, or look at the terminal it runs in."
           }
         : null
   })

@@ -437,7 +437,7 @@ Item {
     var id = queue[0], op = operation(id), attempt = op.attempt
     busy = true
     if (!current(id, attempt)) {
-      finish(id, 'partial', failure('OPERATION_LOST', 'The desktop lifetime changed.'), null)
+      finish(id, 'partial', failure('OPERATION_LOST', 'The desktop session restarted.'), null)
       return
     }
     publish(Object.assign({}, op, {
@@ -602,7 +602,7 @@ Item {
       return {
         ok: false,
         operationId: id,
-        error: failure('INVALID_REQUEST', 'Only partial accepted resumes need reobservation.')
+        error: failure('INVALID_REQUEST', 'Only partly confirmed resumes can be checked again.')
       }
     var attempt = op.attempt + 1
     publish(Object.assign({}, op, {

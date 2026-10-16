@@ -5,7 +5,8 @@ const path = require("node:path")
 const { loadPragma } = require("./lib/load-pragma.js")
 const { BANNED } = loadPragma("plugins/araneadev.projects/ProjectProblems.js")
 const dir = path.join(__dirname, "../../plugins/araneadev.projects")
-const banned = new RegExp("\\b(" + BANNED.join("|") + ")\\b", "i")
+// \b misses compounds such as "Reobserve", so observ stems and "lifetime" are matched anywhere.
+const banned = new RegExp("\\b(" + BANNED.join("|") + ")\\b|observ|lifetime", "i")
 
 /**
  * User-visible string literals in one QML/JS source: values of text:, label:, title:,
@@ -46,9 +47,16 @@ function jsVisibleStrings(source) {
     if (/^\s*(===?|!==?)/.test(after)) continue
     if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue
     if (/^[A-Z][A-Z0-9_]*$/.test(value)) continue
+    // Method-id prefixes such as 'retry:' are identifiers.
+    if (/^[a-z]+:$/.test(value)) continue
     // Raw lowercase state values assigned to a status field are data, not text.
-    const lineStart = before.slice(before.lastIndexOf("\n") + 1)
-    if (/^[a-z]+$/.test(value) && /\bstatus\s*[:=][^\n]*$/.test(lineStart)) continue
+    if (
+      /^[a-z]+$/.test(value) &&
+      /\bstatus\s*[:=]\s*(?:[^\n?:=]*\?\s*'[a-z]+'\s*:\s*)?$/.test(
+        before.slice(before.lastIndexOf("\n") + 1)
+      )
+    )
+      continue
     if (/^[a-z][a-z0-9_.-]*$/.test(value) && !/^(unavailable|unknown)$/.test(value)) continue
     out.push(value)
   }
@@ -109,6 +117,27 @@ test("JS scanner includes UI text and excludes codes, comparisons and keys", () 
     "unavailable",
     "unavailable"
   ])
+})
+
+test("status exclusion covers only the raw value right after status", () => {
+  const sample = [
+    "var a = { status: 'Not available', detail: 'x' }",
+    "var b = { status: 'Command failed and nothing ran', text: 'ok' }",
+    "var c = { status: 'x', text: 'Failed to start' }",
+    "var e = (s === 'failed' ? 'retry:' : 'reobserve:') + role",
+    "var d = { status: ok ? 'suppressed' : 'unavailable', text: 'unavailable' }"
+  ].join("\n")
+  assert.deepEqual(jsVisibleStrings(sample), [
+    "Not available",
+    "Command failed and nothing ran",
+    "Failed to start",
+    "unavailable"
+  ])
+})
+
+test("banned pattern catches compounds and lifetime", () => {
+  for (const s of ["Reobserve this operation", "The desktop lifetime changed.", "owner restarted"])
+    assert.match(s, banned)
 })
 
 test("guard finds visible strings and ignores identifiers and comments", () => {
