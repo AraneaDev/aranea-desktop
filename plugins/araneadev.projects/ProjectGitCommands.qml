@@ -24,6 +24,8 @@ Item {
   property var expire: null
   // Latest envelope per [operation, project, checkout]: {ok, data, error}.
   property var results: ({})
+  // Emitted when a capture discards a run that was still waiting for its helper.
+  signal dropped
   // Emitted once per accepted run with the parsed envelope.
   signal finished(string operation, string projectId, string checkoutId, var response)
   // Tests replace only the external process boundary with held completions.
@@ -79,8 +81,11 @@ Item {
       commands.expire()
   }
   onCaptureActiveChanged: {
+    var hadRun = !!slot
     epoch++
     slot = null
+    if (hadRun)
+      dropped()
     expire = null
     watchdog.stop()
   }

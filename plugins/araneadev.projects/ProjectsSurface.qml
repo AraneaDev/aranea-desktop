@@ -588,6 +588,15 @@ Item {
     })
     return !!primary && root.gitCommands.run('task-create', project.id, primary.id, ['--branch', branch])
   }
+  // A capture dropped a Git run and the registry has not been re-read since.
+  property bool refreshAfterDrop: false
+  // Re-read the registry once a dropped Git run can no longer be answered, outside capture.
+  function refreshDroppedGit() {
+    if (!refreshAfterDrop || root.inert)
+      return
+    refreshAfterDrop = false
+    root.projectController.refresh()
+  }
   // Open the removal card and run the dry-run check for one linked checkout.
   function requestTaskRemove(projectId, checkoutId) {
     if (root.inert)
@@ -623,14 +632,17 @@ Item {
   Connections {
     target: panel.root.gitCommands
     // A capture drops running Git work without a completion, so forget what waited on it.
-    function onEpochChanged() {
+    function onDropped() {
       panel.taskFormError = null
       panel.removeTarget = null
       panel.removeFacts = null
       panel.removeError = null
       panel.removeChecking = false
-      if (!panel.root.inert)
-        panel.root.projectController.refresh()
+      panel.refreshAfterDrop = true
+      panel.refreshDroppedGit()
+    }
+    function onEpochChanged() {
+      panel.refreshDroppedGit()
     }
     function onFinished(operation, projectId, checkoutId, response) {
       var project = projectsPage.selectedProject
