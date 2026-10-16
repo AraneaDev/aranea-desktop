@@ -106,7 +106,7 @@ task_remove_clean() {
   setup
   make_task t1
   task_run task-remove --check
-  jq -e '.ok and .data.dirty == false and .data.untracked == false and .data.busy == false and .data.unpushed == 0' "$result" >/dev/null
+  jq -e '.ok and .data.dirty == false and .data.untracked == false and .data.busy == false and .data.unpushed == 0 and .data.missing == false' "$result" >/dev/null
   [[ -d $task_path ]]
   task_run task-remove
   jq -e '.ok and .data.removed == true' "$result" >/dev/null
@@ -159,6 +159,18 @@ task_remove_missing_folder_unregisters() {
   [[ $(registry_count) == 1 ]]
   git -C "$repo" show-ref --verify --quiet refs/heads/gone
 }
+missing_folder_check_changes_nothing() {
+  setup
+  make_task gone2
+  rm -rf "$task_path"
+  local registry_before worktrees_before
+  registry_before=$(sha256sum "$ARANEA_STATE_ROOT/projects.json")
+  worktrees_before=$(git -C "$repo" worktree list --porcelain)
+  task_run task-remove --check
+  jq -e --arg p "$task_path" '.ok and .data.missing == true and .data.path == $p and .data.branch == "gone2" and .data.dirty == false and .data.untracked == false and .data.busy == false and .data.unpushed == 0' "$result" >/dev/null
+  [[ $(sha256sum "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]]
+  [[ $(git -C "$repo" worktree list --porcelain) == "$worktrees_before" ]]
+}
 missing_primary_folder_is_still_refused() {
   setup
   mv "$repo" "$repo.moved"
@@ -174,7 +186,7 @@ unpushed_without_remote_counts_against_main() {
   jq -e '.ok and .data.unpushed == 2' "$result" >/dev/null
 }
 
-cases=(task_create_from_remote_default task_create_without_remote task_create_no_default_branch task_create_refusals task_create_rejects_hostile_names task_create_from_linked_checkout_uses_primary_name task_remove_clean task_remove_refusals task_remove_busy task_remove_missing_folder_unregisters missing_primary_folder_is_still_refused unpushed_without_remote_counts_against_main)
+cases=(task_create_from_remote_default task_create_without_remote task_create_no_default_branch task_create_refusals task_create_rejects_hostile_names task_create_from_linked_checkout_uses_primary_name task_remove_clean task_remove_refusals task_remove_busy task_remove_missing_folder_unregisters missing_folder_check_changes_nothing missing_primary_folder_is_still_refused unpushed_without_remote_counts_against_main)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

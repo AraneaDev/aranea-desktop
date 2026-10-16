@@ -180,8 +180,18 @@ project_git_unpushed() {
   printf '0\n'
 }
 
+# Prints true when a protected action run exists for this checkout. Fails
+# closed (ACTIONS_UNAVAILABLE) when the action store cannot be read.
+project_git_busy() {
+  local runs
+  runs=$("$git_state_lib/../aranea-project-action-store" snapshot 2>/dev/null) || runs=''
+  jq -e '.ok == true' <<<"$runs" >/dev/null 2>&1 ||
+    project_git_fail ACTIONS_UNAVAILABLE 'Could not check for running actions in this checkout.' 'Refresh Projects and retry.'
+  jq --arg p "$project" --arg c "$checkout" '[.state.runs[]? | select(.projectId == $p and .checkoutId == $c and (.submissionUnconfirmed or .processState == "pending" or .processState == "running" or .processState == "unconfirmed"))] | length > 0' <<<"$runs"
+}
+
 project_git_task_remove() {
-  local primary_path current_branch status_file record dirty=false untracked=false busy unpushed runs facts status=0
+  local primary_path current_branch status_file record dirty=false untracked=false busy unpushed facts status=0
   [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout cannot be removed.' 'Choose a task checkout.'
   primary_path=$(project_git_primary_path)
   current_branch=$(projects_registry_git -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
@@ -192,13 +202,10 @@ project_git_task_remove() {
     [[ -n $record ]] || continue
     if [[ $record == '?? '* ]]; then untracked=true; else dirty=true; fi
   done <"$status_file"
-  runs=$("$git_state_lib/../aranea-project-action-store" snapshot 2>/dev/null) || runs=''
-  jq -e '.ok == true' <<<"$runs" >/dev/null 2>&1 ||
-    project_git_fail ACTIONS_UNAVAILABLE 'Could not check for running actions in this checkout.' 'Refresh Projects and retry.'
-  busy=$(jq --arg p "$project" --arg c "$checkout" '[.state.runs[]? | select(.projectId == $p and .checkoutId == $c and (.submissionUnconfirmed or .processState == "pending" or .processState == "running" or .processState == "unconfirmed"))] | length > 0' <<<"$runs")
+  busy=$(project_git_busy)
   unpushed=$(project_git_unpushed)
   facts=$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$path" --arg b "$current_branch" --argjson d "$dirty" --argjson u "$untracked" --argjson busy "$busy" --argjson n "$unpushed" \
-    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:$d,untracked:$u,busy:$busy,unpushed:$n}')
+    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:$d,untracked:$u,busy:$busy,unpushed:$n,missing:false}')
   [[ $check != true ]] || project_git_ok "$facts"
   [[ $dirty == false && $untracked == false ]] || project_git_fail CHECKOUT_DIRTY 'This checkout has uncommitted or untracked changes.' 'Commit, stash or delete them, then retry.'
   [[ $busy == false ]] || project_git_fail CHECKOUT_BUSY 'An action is still running in this checkout.' 'Stop the running action, then retry.'
@@ -215,7 +222,7 @@ project_git_task_remove() {
 # A task checkout whose folder is gone cannot be proved; prune Git's record of
 # it from the primary checkout and unregister it. Returns 1 when not applicable.
 project_git_remove_missing() {
-  local registered primary_flag primary_id primary_path
+  local registered primary_flag primary_id primary_path registered_branch busy facts
   [[ -s $git_tmp/registry ]] || return 1
   registered=$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.path' "$git_tmp/registry") || return 1
   primary_flag=$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.primary' "$git_tmp/registry") || return 1
@@ -224,12 +231,17 @@ project_git_remove_missing() {
   primary_path=$(project_git_primary_path)
   [[ -n $primary_id && -n $primary_path ]] || return 1
   project_git_state_prove "$project" "$primary_id" >"$git_tmp/primary-proof" || return 1
+  registered_branch=$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.branch // empty' "$git_tmp/registry")
+  busy=$(project_git_busy)
+  facts=$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$registered" --arg b "$registered_branch" --argjson busy "$busy" \
+    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),dirty:false,untracked:false,busy:$busy,unpushed:0,missing:true}')
+  [[ $check != true ]] || project_git_ok "$facts"
+  [[ $busy == false ]] || project_git_fail CHECKOUT_BUSY 'An action is still running in this checkout.' 'Stop the running action, then retry.'
   project_git_lock
   projects_registry_git -C "$primary_path" worktree prune >/dev/null 2>&1 || true
   project_git_store "$(jq -cn --arg p "$project" --arg c "$checkout" '{action:"checkout-remove",args:{projectId:$p,checkoutId:$c}}')" >/dev/null ||
     project_git_fail UNREGISTER_FAILED 'Projects could not forget the missing checkout.' 'Refresh Projects and retry.'
-  project_git_ok "$(jq -cn --arg p "$project" --arg c "$checkout" --arg path "$registered" --arg b "$(jq -r --arg p "$project" --arg c "$checkout" '.projects[]|select(.id == $p)|.checkouts[]|select(.id == $c)|.branch // empty' "$git_tmp/registry")" \
-    '{projectId:$p,checkoutId:$c,path:$path,branch:(if $b == "" then null else $b end),removed:true}')"
+  project_git_ok "$(jq -c '{projectId,checkoutId,path,branch,removed:true}' <<<"$facts")"
 }
 
 project_git_main() {
@@ -270,7 +282,7 @@ project_git_main() {
   git_state_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   trap 'rm -rf -- "$git_tmp"' EXIT
   if ! project_git_state_prove "$project" "$checkout" >"$git_tmp/proof"; then
-    if [[ $operation == task-remove && $check != true ]] && jq -e '.error.code == "CHECKOUT_INVALID"' "$git_tmp/proof" >/dev/null 2>&1; then
+    if [[ $operation == task-remove ]] && jq -e '.error.code == "CHECKOUT_INVALID"' "$git_tmp/proof" >/dev/null 2>&1; then
       project_git_remove_missing || true
     fi
     cat "$git_tmp/proof"
