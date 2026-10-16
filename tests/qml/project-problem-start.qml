@@ -261,6 +261,10 @@ ShellRoot {
       t.check(texts(problem).join('\n').indexOf('Earlier unresolved requests: 0') >= 0, 'Details keep the unresolved count')
       t.findChild(problem, 'projectProblemDetailsToggle').clicked()
       t.equal(banned(texts(t.findChild(surface, 'projectStartProblem').parent)), [], 'start block has no banned words')
+      entry.projectClient.pending = true
+      t.check(entry.projectClient.submitting, 'client is submitting')
+      t.check(!t.findChild(problem, 'projectProblemAction:checkAgain').enabled && !t.findChild(problem, 'projectProblemAction:startAnother').enabled, 'start actions are disabled while submitting')
+      entry.projectClient.pending = false
       t.findChild(problem, 'projectProblemAction:startAnother').clicked()
       t.equal(entry.projectClient.unresolvedEnvironmentActivations.length, 1, 'the earlier start is kept as unresolved, not replayed')
       t.waitFor(function () {
@@ -343,6 +347,18 @@ ShellRoot {
         newWindowRole: 'terminal'
       }
     ], 'Check again and Open another window map to the existing role recovery')
+    var early = roleOperation('terminal', 'unconfirmed', true)
+    early.state = 'accepted'
+    details.operation = early
+    t.check(role.visible && t.findChild(role, 'projectProblemTitle').text === "Couldn't confirm it started", 'an unconfirmed step is shown before completion')
+    t.check(!t.findChild(role, 'projectProblemAction:checkAgain') && !t.findChild(role, 'projectProblemAction:openAnother'), 'no actions before completion')
+    details.operation = roleOperation('terminal', 'unconfirmed', true)
+    details.pending = true
+    t.check(!t.findChild(role, 'projectProblemAction:checkAgain').enabled, 'role actions are disabled while pending')
+    role.expanded = true
+    t.check(t.findChild(role, 'projectProblemCopy').enabled, 'Copy is not tied to the action guard')
+    role.expanded = false
+    details.pending = false
     details.operation = roleOperation('editor', 'failed', false)
     t.check(!t.findChild(details, 'roleProblem:editor').visible, 'a failed role is not an unconfirmed problem')
     details.operation = roleOperation('terminal', 'unconfirmed', true)

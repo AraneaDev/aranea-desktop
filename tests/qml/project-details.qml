@@ -179,7 +179,7 @@ ShellRoot {
       }
     }
     var operationError = t.findChild(details, 'projectOperationError')
-    t.check(!!operationError && operationError.visible && t.findChild(operationError, 'projectProblemTitle').text === 'Something went wrong', 'owner failure exposes actionable recovery message')
+    t.check(!!operationError && operationError.visible && t.findChild(operationError, 'projectProblemTitle').text === 'Something went wrong' && operationError.problem.details.message === 'Folder missing.' && operationError.problem.details.recovery === 'Locate folder and retry.', 'owner failure keeps its message and recovery in Details')
     details.project = Object.assign({}, details.project, {
       tools: {
         editorId: null,

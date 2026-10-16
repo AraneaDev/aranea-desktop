@@ -13,6 +13,8 @@ ColumnLayout {
   property var problem: null
   // Capture boundary refuses every external action.
   property bool displayOnly: false
+  // The caller's guards allow the action buttons; Copy and Details stay usable.
+  property bool actionsEnabled: true
   // Shared pointer settlement gate for moving content.
   property var pointerGate: null
   // Technical details are shown.
@@ -88,7 +90,7 @@ ColumnLayout {
         objectName: 'projectProblemAction:' + modelData.id
         text: modelData.label
         variant: index === 0 ? 'primary' : 'secondary'
-        enabled: !view.displayOnly
+        enabled: !view.displayOnly && view.actionsEnabled
         pointerGate: view.pointerGate
         onClicked: view.actionRequested(modelData.id)
       }

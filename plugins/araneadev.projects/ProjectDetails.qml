@@ -311,6 +311,13 @@ ColumnLayout {
     autoRoleQueue = []
   } else
     scanAutoReobserve()
+  // Status of the latest step reported for one role, or an empty string.
+  function roleStatus(role: string): string {
+    var steps = operation ? (operation.steps || []).filter(function (s) {
+      return s.role === role
+    }) : []
+    return steps.length ? steps[steps.length - 1].status : ''
+  }
   // Folder picker of one checkout, or null when none is shown.
   function locatorFor(checkoutId: string): var {
     if (guidedSetup || !checkoutId)
@@ -742,7 +749,9 @@ ColumnLayout {
       id: role
       required property string modelData
       Layout.fillWidth: true
-      visible: details.recoveryAllowed(modelData, 'retry') || details.recoveryAllowed(modelData, 'new')
+      // The latest step of this role is unconfirmed, whatever state the operation is in.
+      readonly property bool unconfirmed: !!details.project && !!details.operation && details.operation.projectId === details.project.id && details.roleStatus(modelData) === 'unconfirmed'
+      visible: details.recoveryAllowed(modelData, 'retry') || unconfirmed || details.recoveryAllowed(modelData, 'new')
       Aranea.ActionButton {
         text: 'Retry ' + role.modelData
         visible: details.recoveryAllowed(role.modelData, 'retry')
@@ -753,9 +762,10 @@ ColumnLayout {
       ProjectProblem {
         objectName: role.modelData === 'agent' ? 'agentUnconfirmed' : 'roleProblem:' + role.modelData
         Layout.fillWidth: true
-        displayOnly: details.displayOnly || details.pending || !details.openAvailable
+        displayOnly: details.displayOnly
+        actionsEnabled: !details.pending && details.openAvailable
         pointerGate: details.pointerGate
-        problem: details.recoveryAllowed(role.modelData, 'reobserve') || details.recoveryAllowed(role.modelData, 'new') ? Problems.problem({
+        problem: role.unconfirmed ? Problems.problem({
           code: 'WINDOW_TARGET_UNCONFIRMED',
           message: role.modelData + ' window'
         }, {

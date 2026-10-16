@@ -1180,6 +1180,7 @@ Item {
                     objectName: 'projectStartProblem'
                     Layout.fillWidth: true
                     displayOnly: panel.root.inert
+                    actionsEnabled: !panel.root.projectClient.submitting
                     pointerGate: pointerGate
                     readonly property var client: panel.root.projectClient
                     // Remembered profile that Start another would reuse.
