@@ -151,10 +151,11 @@ project_git_state_parse() {
     '{ok:true,error:null,data:{projectId:$project,checkoutId:$checkout,path:$path,observedAt:$observed,branch:(if $branch == "" then null else $branch end),detached:$detached,upstream:(if $upstream == "" then null else $upstream end),ahead:$ahead,behind:$behind,counts:{staged:$staged,unstaged:$unstaged,untracked:$untracked,conflicts:$conflicts},files:.,truncated:($truncated == 1)}}' "$git_state_tmp/files"
 }
 
-# Validate only the selected registered checkout, without enumerating relatives.
-project_git_state_observe() {
-  local project=$1 checkout=$2 registry selected path canonical common registered_common primary registered_primary top bare git_dir
-  local git_state_failure_code=CHECKOUT_INVALID
+# Prove the selected registered checkout still has its registered identity,
+# without enumerating relatives. Assigns path, common and primary in the
+# caller's scope (the caller declares them and git_state_failure_code).
+project_git_state_prove() {
+  local project=$1 checkout=$2 registry selected canonical registered_common registered_primary top bare git_dir
   registry="$(aranea_state_root)/projects.json"
   if [[ ! -f "$registry" ]] || ! jq -es \
     'if length == 1 then .[0] else null end' "$registry" >"$git_state_tmp/registry" 2>/dev/null ||
@@ -185,9 +186,15 @@ project_git_state_observe() {
     project_git_state_error CHECKOUT_INVALID 'The checkout no longer matches its registered Git identity.' 'Repair or locate the registered checkout in Manage project.'
     return 1
   fi
+}
+
+# Validate only the selected registered checkout, without enumerating relatives.
+project_git_state_observe() {
+  local path common primary git_state_failure_code=CHECKOUT_INVALID
+  project_git_state_prove "$1" "$2" || return 1
   git_state_failure_code=GIT_ERROR
   project_git_state_capture "$git_state_tmp/status" -C "$path" status --porcelain=v2 --branch -z --untracked-files=all || return 1
-  project_git_state_parse "$git_state_tmp/status" "$project" "$checkout" "$path"
+  project_git_state_parse "$git_state_tmp/status" "$1" "$2" "$path"
 }
 
 # Public argument/dependency boundary and private deadline supervisor.
