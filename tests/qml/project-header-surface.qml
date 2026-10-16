@@ -378,7 +378,7 @@ ShellRoot {
           t.check(!routeOwner.defaultSelections['p-one'], 'accepted Start consumes selection lease')
           t.equal(op.error.code, 'AGENT_MISSING', 'actual accepted start fails for missing selected provider')
           var explanation = t.findChild(page.details, 'projectOperationError'), alternative = t.findChild(page.details, 'startAlternativeAgent')
-          t.check(page.details.visible && explanation.visible && explanation.text.indexOf('Codex') >= 0 && explanation.text.indexOf('installed') >= 0, 'accepted start failure explanation is visible in real surface')
+          t.check(page.details.visible && explanation.visible && t.findChild(explanation, 'projectProblemTitle').text === 'A tool is missing' && explanation.problem.details.message.indexOf('Codex') >= 0 && explanation.problem.details.message.indexOf('installed') >= 0, 'accepted start failure explanation is visible in real surface')
           t.check(alternative.visible && alternative.enabled && alternative.text === 'Start Claude', 'failed Start exposes installed alternative recovery')
           host.missingProvider = false
           surface.chooseSection('agents')
@@ -388,9 +388,9 @@ ShellRoot {
             return host.agentResponses.length >= 3 && !entry.projectClient.pending
           }, 2000, 'second surface start observes accepted unconfirmed outcome', function () {
             t.equal(routeOwner.operations.length, 2, 'readiness retries accept exactly one operation per explicit Start')
-            var uncertain = routeOwner.operations[1], message = t.findChild(page.details, 'agentUnconfirmed'), checkAgain = t.findChild(page.details, 'reobserveRole:agent')
+            var uncertain = routeOwner.operations[1], message = t.findChild(page.details, 'agentUnconfirmed'), checkAgain = t.findChild(t.findChild(page.details, 'agentUnconfirmed'), 'projectProblemAction:checkAgain')
             t.equal(uncertain.outcome, 'partial', 'real owner retains unconfirmed accepted launch')
-            t.check(surface.section === 'overview' && page.details.visible && message.visible && message.text === "Couldn't confirm the agent window opened.", 'unconfirmed Start explanation is visible in real surface')
+            t.check(surface.section === 'overview' && page.details.visible && message.visible && t.findChild(message, 'projectProblemTitle').text === "Couldn't confirm it started", 'unconfirmed Start explanation is visible in real surface')
             t.check(checkAgain.visible && checkAgain.enabled, 'unconfirmed Start exposes applicable Check agent again recovery')
             routeOwner.captureActive = true
             entry.projectClient.captureActive = true

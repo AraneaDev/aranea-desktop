@@ -157,7 +157,7 @@ ColumnLayout {
     Aranea.ActionButton {
       objectName: 'projectPrimaryStart'
       Layout.fillWidth: header.width < Style.space(440)
-      text: header.acceptanceUnknown ? 'Launch status unknown' : header.pending ? 'Preparing…' : 'Start working'
+      text: header.acceptanceUnknown ? 'Starting…' : header.pending ? 'Preparing…' : 'Start working'
       enabled: !header.displayOnly && !header.pending && !header.acceptanceUnknown && header.openAvailable && !!header.profile
       pointerGate: header.pointerGate
       onClicked: if (header.profile)

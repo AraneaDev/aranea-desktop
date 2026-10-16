@@ -7,6 +7,7 @@ import qs.Commons
 import "../araneadev.agents" as Agents
 import "../araneadev.agents/AgentTasksLogic.js" as Logic
 import "../araneadev.shared" as Aranea
+import "ProjectProblems.js" as Problems
 
 ColumnLayout {
   id: view
@@ -193,8 +194,24 @@ ColumnLayout {
     enabled: !view.displayOnly && !!view.client && !view.client.pending
     onClicked: view.client.refresh()
   }
+  ProjectProblem {
+    id: agentsProblem
+    objectName: 'projectAgentsProblem'
+    Layout.fillWidth: true
+    displayOnly: view.displayOnly
+    pointerGate: view.pointerGate
+    problem: view.client && view.client.error && !tasks.selectedRow ? Problems.problem(view.client.error, {
+      surface: 'agents',
+      actions: ['retry', 'refresh']
+    }) : null
+    onActionRequested: function () {
+      if (!view.displayOnly && view.client && !view.client.pending)
+        view.client.refresh()
+    }
+  }
   Agents.AgentTasks {
     id: tasks
+    listErrorShown: false
     activeFocusOnTab: true
     Keys.onPressed: function (event) {
       view.handleKey(event)

@@ -23,6 +23,8 @@ Item {
   property bool helpActive: false
   // Client structured error; the previous snapshot remains displayed.
   property var error: null
+  // A host that shows the list error in its own plain view turns this off.
+  property bool listErrorShown: true
   // One client cannot submit another action while observing.
   property bool pending: false
   // Hosts opt into bulk dismissal through their existing activity client.
@@ -268,7 +270,7 @@ Item {
         objectName: 'tasksError'
         width: parent.width
         visible: text !== ''
-        text: tasks.error ? [Logic.text(tasks.error.message), Logic.text(tasks.error.recovery)].filter(Boolean).join('\n') : ''
+        text: tasks.error && tasks.listErrorShown ? [Logic.text(tasks.error.message), Logic.text(tasks.error.recovery)].filter(Boolean).join('\n') : ''
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.attention

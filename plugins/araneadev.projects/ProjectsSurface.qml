@@ -14,6 +14,7 @@ import "ProjectOverview.js" as Overview
 import "ProjectActionRecords.js" as Records
 import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
+import "ProjectProblems.js" as Problems
 
 Item {
   id: panel
@@ -92,8 +93,6 @@ Item {
   readonly property bool shortScreen: height < Style.space(400)
   // Current project destination, retained independently of window visibility.
   property string section: 'overview'
-  // Opaque request identities stay one explicit step below daily recovery actions.
-  property bool requestDetailsExpanded: false
   // Overview and Agents reuse one activity observation lifetime.
   readonly property bool activityVisible: (section === 'agents' || section === 'overview') && !projectsPage.setupActive && !!projectsPage.selectedProject
   // Exact-checkout summaries reuse shared snapshots; never own process lifetimes.
@@ -1170,9 +1169,53 @@ Item {
                   width: content.width
                   visible: !!projectsPage.selectedProject && (panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError || panel.root.projectClient.preparing)
                   Aranea.UiLabel {
+                    objectName: 'projectPreparing'
                     Layout.fillWidth: true
-                    text: panel.root.projectClient.acceptanceUnknown ? 'Launch acceptance is unknown. The earlier request may still finish.' : panel.root.projectClient.preparing ? 'Preparing this profile…' : panel.root.projectClient.requestError ? panel.root.projectClient.requestError.message : ''
+                    visible: panel.root.projectClient.preparing && !panel.root.projectClient.acceptanceUnknown
+                    text: 'Preparing this profile…'
                     color: Aranea.DesignTokens.attention
+                  }
+                  ProjectProblem {
+                    id: startProblem
+                    objectName: 'projectStartProblem'
+                    Layout.fillWidth: true
+                    displayOnly: panel.root.inert
+                    pointerGate: pointerGate
+                    readonly property var client: panel.root.projectClient
+                    // Remembered profile that Start another would reuse.
+                    readonly property var another: projectsPage.selectedProject ? Profiles.remembered(projectsPage.selectedProject) : null
+                    problem: {
+                      if (!projectsPage.selectedProject || client.preparing && !client.acceptanceUnknown || client.autoChecking)
+                        return null
+                      if (!client.acceptanceUnknown && !client.requestError)
+                        return null
+                      var error = client.requestError || {
+                        code: 'ACCEPTANCE_UNKNOWN',
+                        message: client.error
+                      }
+                      var actions = []
+                      if (client.acceptanceUnknown) {
+                        actions.push('checkAgain')
+                        if (startProblem.another)
+                          actions.push('startAnother')
+                      }
+                      var plain = Problems.problem(error, {
+                        surface: 'start',
+                        actions: actions
+                      })
+                      // The activation and earlier unresolved requests stay available under Details.
+                      if (client.acceptanceUnknown)
+                        plain.details.recovery = [plain.details.recovery, 'Request: ' + client.activationId, 'Earlier unresolved requests: ' + client.unresolvedEnvironmentActivations.length].filter(Boolean).join('\n')
+                      return plain
+                    }
+                    onActionRequested: function (id) {
+                      if (id === 'checkAgain') {
+                        if (!panel.root.inert && !startProblem.client.submitting)
+                          startProblem.client.checkEnvironmentActivation()
+                      } else if (id === 'startAnother' && startProblem.another && !panel.root.inert && !startProblem.client.submitting) {
+                        panel.root.startProfile(startProblem.another.id, startProblem.another.revision, true)
+                      }
+                    }
                   }
                   Flow {
                     Layout.fillWidth: true
@@ -1185,42 +1228,11 @@ Item {
                       onClicked: panel.root.cancelPreparation()
                     }
                     Aranea.ActionButton {
-                      text: 'Check launch status'
-                      visible: panel.root.projectClient.acceptanceUnknown
-                      enabled: !panel.root.inert && !panel.root.projectClient.submitting
-                      pointerGate: pointerGate
-                      onClicked: panel.root.projectClient.checkEnvironmentActivation()
-                    }
-                    Aranea.ActionButton {
-                      text: 'Start another environment'
-                      visible: panel.root.projectClient.acceptanceUnknown
-                      enabled: !panel.root.inert && !panel.root.projectClient.submitting && !!Profiles.remembered(projectsPage.selectedProject)
-                      pointerGate: pointerGate
-                      onClicked: {
-                        var profile = Profiles.remembered(projectsPage.selectedProject)
-                        if (profile)
-                          panel.root.startProfile(profile.id, profile.revision, true)
-                      }
-                    }
-                    Aranea.ActionButton {
-                      text: panel.requestDetailsExpanded ? 'Hide request details' : 'Request details'
-                      visible: panel.root.projectClient.acceptanceUnknown
-                      variant: 'quiet'
-                      pointerGate: pointerGate
-                      onClicked: panel.requestDetailsExpanded = !panel.requestDetailsExpanded
-                    }
-                    Aranea.ActionButton {
                       text: 'Manage profiles'
                       visible: !panel.root.projectClient.acceptanceUnknown && !panel.root.projectClient.preparing
                       pointerGate: pointerGate
                       onClicked: panel.chooseSection('profiles')
                     }
-                  }
-                  Aranea.UiLabel {
-                    Layout.fillWidth: true
-                    visible: panel.requestDetailsExpanded && panel.root.projectClient.acceptanceUnknown
-                    text: 'Request: ' + panel.root.projectClient.activationId + '\nEarlier unresolved requests: ' + panel.root.projectClient.unresolvedEnvironmentActivations.length
-                    technical: true
                   }
                 }
                 ProjectOverview {
