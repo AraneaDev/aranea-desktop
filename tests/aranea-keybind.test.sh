@@ -92,9 +92,17 @@ conflict_detection_normalises() {
   expect_code KEY_TAKEN add --key "super+alt+p"
   jq -e '.error.message | contains("Something")' "$result" >/dev/null
   cmp "$file" "$TMPDIR/orig"
-  printf '%s' '[{"modmask":72,"key":"P","description":"Aranea project switcher","dispatcher":"exec","arg":"omarchy-shell shell toggle araneadev.projects x"}]' >"$TMPDIR/binds.json"
+  printf '%s' '[{"modmask":72,"key":"P","description":"Aranea project switcher","dispatcher":"exec","arg":"__lua"}]' >"$TMPDIR/binds.json"
   run add --key "SUPER + ALT + P"
   jq -e '.ok' "$result" >/dev/null
+  # Our own bind is recognised by its managed description alone: Lua binds report __lua as the argument.
+  printf '%s' '[{"modmask":72,"key":"P","description":"Aranea project switcher","dispatcher":"exec","arg":"__lua"}]' >"$TMPDIR/binds.json"
+  run add --key "SUPER + ALT + P"
+  jq -e '.ok' "$result" >/dev/null
+  # A user's own bind to Projects is not ours, so it still blocks the key.
+  printf '%s' '[{"modmask":72,"key":"P","description":"My projects","dispatcher":"exec","arg":"omarchy-shell shell toggle araneadev.projects"}]' >"$TMPDIR/binds.json"
+  expect_code KEY_TAKEN add --key "SUPER + ALT + P"
+  jq -e '.error.message | contains("My projects")' "$result" >/dev/null
 }
 # Catch keys outside the grammar being accepted, or reaching a shell.
 invalid_keys() {

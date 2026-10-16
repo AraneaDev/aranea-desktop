@@ -85,7 +85,6 @@ taken_by() {
     .[] | . as $b
       | ([1, 4, 8, 64] | map(select((($b.modmask // 0) / . | floor) % 2 == 1)) | add // 0) as $mods
       | select(($b.key | ascii_upcase) == $key and $mods == $mask)
-      | select((($b.arg // "") | contains("araneadev.projects")) | not)
       | select(($b.submap // "") == "")
       | select($b.description != "Aranea project switcher")
       | (if ($b.description // "") != "" then $b.description elif ($b.arg // "") != "" then $b.arg else "another binding" end)' <<<"$binds" | head -n 1
