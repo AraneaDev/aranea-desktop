@@ -682,3 +682,91 @@ retains only the inert action coordination files `project-actions.json.lock` and
 necessary ancestors; reinstall preserves their inodes while activating a fresh
 generation. Journal data, repositories, unrelated services and editor/provider
 processes are not removed by action cleanup.
+
+## Task checkouts and Git
+
+These commands create and remove task checkouts and fetch or pull a checkout.
+Every command accepts `--json` and preserves the schema 1 JSONL protocol. When
+`--checkout` is omitted for `git fetch`/`git pull`, the project's selected
+checkout is used.
+
+```text
+aranea projects git fetch PROJECT_ID [--checkout CHECKOUT_ID]
+aranea projects git pull PROJECT_ID [--checkout CHECKOUT_ID]
+aranea projects task new PROJECT_ID --branch BRANCH
+aranea projects task remove PROJECT_ID --checkout CHECKOUT_ID
+    [--check] [--confirm-unpushed]
+```
+
+Agents that want an isolated working copy should use `aranea projects task new`
+and work in the returned `path`; remove it with `task remove` when done.
+
+Git runs without prompts: `GIT_TERMINAL_PROMPT=0`, no askpass, stdin from
+`/dev/null`, and `-o BatchMode=yes` appended to the SSH command (your
+`core.sshCommand` or `GIT_SSH_COMMAND`, else `ssh`). Your own Git config,
+credentials and hooks apply. Network operations and `worktree add` stop after
+60 s, local ones after 15 s. One operation runs per repository at a time; a
+second waits up to 75 s.
+
+Result fields, carried as the final CLI event's `data`:
+
+- `git fetch`: `{projectId,checkoutId,remote}`. The remote is the current
+  branch's upstream remote, else `origin`, else the only remote.
+- `git pull`: `{projectId,checkoutId,remote,from,to,updated}`. It fetches, then
+  runs `git merge --ff-only @{upstream}`; it never creates a merge commit or
+  stashes.
+- `task new`: `{projectId,checkoutId,path,branch,base}`. It fetches, then starts
+  the new branch (with `--no-track`) from `refs/remotes/<remote>/HEAD`, else
+  `<remote>/main`, else `<remote>/master`; without a remote, from local `main`,
+  else `master`. The folder is
+  `<dirname of the primary path>/<basename>-worktrees/<branch with / as ->`. It
+  is registered and selected; nothing launches.
+- `task remove --check`:
+  `{projectId,checkoutId,path,branch,dirty,untracked,ignored,busy,unpushed,missing}`.
+  Nothing is changed. `ignored` is the count of ignored paths that would be
+  deleted with the folder; they warn but never refuse. `busy` is true while an
+  action run for that checkout is pending, running or unconfirmed. `unpushed`
+  counts commits on no remote (without remotes, commits not on local
+  `main`/`master`). `missing` is true when the folder is gone.
+- `task remove`: `{projectId,checkoutId,path,branch,removed}`. It never uses
+  `--force` and always keeps the branch. A task checkout whose folder was
+  deleted by hand can still be removed: `missing` is `true` and removal only
+  forgets it (with `GIT_ERROR` if other stale worktrees would also be pruned).
+  A detached HEAD with commits on no branch is always refused with
+  `UNPUSHED_COMMITS`, even with `--confirm-unpushed`.
+
+Refusals use these codes:
+
+- `REGISTRY_INVALID`: the project registry could not be read.
+- `CHECKOUT_INVALID`: the exact checkout is not registered or does not prove as
+  that repository.
+- `PROJECT_NOT_FOUND`: the project is not registered (no checkout to default to).
+- `INVALID_REQUEST`: malformed or unsupported arguments.
+- `DEPENDENCY_MISSING`: `jq`, `git`, `timeout`, `flock`, `mktemp`, `sha256sum`
+  or `realpath` is not installed.
+- `GIT_BUSY`: another operation on the repository held the lock for more than 75 s.
+- `AUTH_REQUIRED`: the remote needs credentials; run `git fetch` once in a terminal.
+- `GIT_TIMEOUT`: Git did not finish in time.
+- `GIT_ERROR`: any other Git failure, with Git's first error line.
+- `NO_REMOTE`: fetch with no remote.
+- `NO_UPSTREAM`: pull on a branch that tracks nothing, or a detached HEAD.
+- `NOT_FAST_FORWARD`: pull on diverged branches.
+- `LOCAL_CHANGES`: pull would overwrite local changes.
+- `INVALID_BRANCH`: not a valid branch name, starts with `-`, or contains `@{`.
+- `BRANCH_EXISTS`: a local branch of that name exists.
+- `NO_DEFAULT_BRANCH`: no remote default, `main` or `master` to start from.
+- `PATH_EXISTS`: the target folder already exists.
+- `REGISTER_FAILED`: the checkout was created but could not be registered; the
+  recovery names the folder.
+- `PRIMARY_CHECKOUT`: removal of the main checkout was requested.
+- `CHECKOUT_DIRTY`: uncommitted or untracked changes.
+- `CHECKOUT_BUSY`: a protected action run exists for the checkout.
+- `ACTIONS_UNAVAILABLE`: the action store could not be read, so removal fails closed.
+- `UNPUSHED_COMMITS`: commits on no remote without `--confirm-unpushed`, or any
+  commits on a detached HEAD.
+- `UNREGISTER_FAILED`: the folder was removed but Projects could not forget it.
+
+The `capabilities` result carries `projectGit`:
+`{schemaVersion:1,worktreeLocation:"<repo>-worktrees/<branch>",base:"remote default branch, else local main/master",pull:"fast-forward only",removeKeepsBranch:true,networkSeconds:60,localSeconds:15}`,
+and lists the operations `projects.git.fetch`, `projects.git.pull`,
+`projects.task.new` and `projects.task.remove`.

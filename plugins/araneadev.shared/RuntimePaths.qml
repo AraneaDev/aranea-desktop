@@ -39,6 +39,7 @@ QtObject {
 
   // Bounded read-only collector for one exact registered project checkout.
   readonly property string projectGitStatePath: themeRoot + "/scripts/aranea-project-git-state"
+  // Mutating Git helper for fetch, pull and task checkouts.
   readonly property string projectGitPath: themeRoot + "/scripts/aranea-project-git"
 
   // Root directory for branding assets within the active theme.

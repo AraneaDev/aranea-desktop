@@ -31,12 +31,16 @@ setup() {
   project_id=$(jq -r '.state.projects[0].id' "$result")
   checkout_id=$(jq -r '.state.projects[0].checkouts[0].id' "$result")
 }
+# Test: push upstream.
 push_upstream() { git -C "$seed" -c user.name=T -c user.email=t@example.invalid commit -q --allow-empty -m "$1" && git -C "$seed" push -q origin HEAD:main; }
+# Test: run.
 run() { "$helper" "$1" --project "$project_id" --checkout "$checkout_id" "${@:2}" --json >"$result"; }
+# Test: expect code.
 expect_code() { ! run "${@:2}" && jq -e --arg c "$1" '.ok == false and .data == null and .error.code == $c and (.error.recovery|length > 0)' "$result" >/dev/null; }
 # A fake ssh that fails or stalls; it sits in $TMPDIR/bin, which cases put first on PATH.
 fake_ssh() { printf '#!/bin/sh\n%s\n' "$1" >"$TMPDIR/bin/ssh" && chmod +x "$TMPDIR/bin/ssh"; }
 
+# Test: fetch updates remote refs.
 fetch_updates_remote_refs() {
   setup
   local head_before
@@ -47,6 +51,7 @@ fetch_updates_remote_refs() {
   [[ $(git -C "$repo" rev-parse origin/main) == "$(git -C "$seed" rev-parse HEAD)" ]]
   [[ $(git -C "$repo" rev-parse HEAD) == "$head_before" ]]
 }
+# Test: pull fast forwards.
 pull_fast_forwards() {
   setup
   push_upstream two
@@ -55,6 +60,7 @@ pull_fast_forwards() {
   run pull
   jq -e '.ok and .data.updated == false and .data.from == .data.to' "$result" >/dev/null
 }
+# Test: pull refuses divergence.
 pull_refuses_divergence() {
   setup
   git -C "$repo" commit -q --allow-empty -m local
@@ -65,6 +71,7 @@ pull_refuses_divergence() {
   [[ $(git -C "$repo" rev-parse HEAD) == "$before" ]]
   [[ -z $(git -C "$repo" rev-list --merges HEAD) ]]
 }
+# Test: pull refuses overwriting local changes.
 pull_refuses_overwriting_local_changes() {
   setup
   printf 'a\n' >"$seed/file.txt"
@@ -80,22 +87,26 @@ pull_refuses_overwriting_local_changes() {
   expect_code LOCAL_CHANGES pull
   [[ $(<"$repo/file.txt") == local ]]
 }
+# Test: pull without upstream.
 pull_without_upstream() {
   setup
   git -C "$repo" switch -q -c lonely
   expect_code NO_UPSTREAM pull
 }
+# Test: fetch without remote.
 fetch_without_remote() {
   setup
   git -C "$repo" remote remove origin
   expect_code NO_REMOTE fetch
 }
+# Test: fetch auth required.
 fetch_auth_required() {
   setup
   fake_ssh 'echo "Permission denied (publickey)." >&2; exit 255'
   git -C "$repo" remote set-url origin ssh://example.invalid/repo.git
   PATH="$TMPDIR/bin:$PATH" expect_code AUTH_REQUIRED fetch
 }
+# Test: fetch timeout releases lock.
 fetch_timeout_releases_lock() {
   setup
   fake_ssh 'sleep 30'
@@ -109,11 +120,13 @@ fetch_timeout_releases_lock() {
   jq -e '.ok' "$result" >/dev/null
   ((SECONDS - start <= 5))
 }
+# Test: identity is proved.
 identity_is_proved() {
   setup
   mv "$repo" "$repo.moved"
   expect_code CHECKOUT_INVALID fetch
 }
+# Test: usage is validated.
 usage_is_validated() {
   setup
   if "$helper" fetch --json >"$result"; then return 1; fi
@@ -121,6 +134,7 @@ usage_is_validated() {
   if "$helper" bogus --project x --checkout y --json >"$result"; then return 1; fi
   jq -e '.error.code == "INVALID_REQUEST"' "$result" >/dev/null
 }
+# Test: concurrent operations serialise.
 concurrent_operations_serialise() {
   setup
   local log="$TMPDIR/git.log"
@@ -151,6 +165,7 @@ WRAP
   jq -e '.ok' "$second" >/dev/null
   [[ $(paste -sd, "$log") == start,end,start,end ]]
 }
+# Test: batchmode reaches ssh.
 batchmode_reaches_ssh() {
   setup
   fake_ssh "printf '%s\\n' \"\$*\" >\"$TMPDIR/ssh.args\"; echo \"Permission denied (publickey).\" >&2; exit 255"
@@ -158,6 +173,7 @@ batchmode_reaches_ssh() {
   PATH="$TMPDIR/bin:$PATH" expect_code AUTH_REQUIRED fetch
   grep -q -- '-o BatchMode=yes' "$TMPDIR/ssh.args"
 }
+# Test: core ssh command is honoured.
 core_ssh_command_is_honoured() {
   setup
   printf '#!/bin/sh\necho "$*" >"%s"\necho "Permission denied (publickey)." >&2\nexit 255\n' "$TMPDIR/myssh.args" >"$TMPDIR/bin/myssh"
@@ -169,6 +185,7 @@ core_ssh_command_is_honoured() {
   grep -q -- '-o BatchMode=yes' "$TMPDIR/myssh.args"
   [[ ! -e "$TMPDIR/wrong" ]]
 }
+# Test: lock fd does not reach git.
 lock_fd_does_not_reach_git() {
   setup
   local fds="$TMPDIR/git.fds"
@@ -185,6 +202,7 @@ WRAP
   [[ -s $fds ]]
   if grep -q git-locks "$fds"; then return 1; fi
 }
+# Test: inherited git context is ignored.
 inherited_git_context_is_ignored() {
   setup
   GIT_DIR=/nonexistent GIT_WORK_TREE=/nonexistent run fetch

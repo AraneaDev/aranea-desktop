@@ -173,6 +173,7 @@ ShellRoot {
     removeChecks()
     surfaceChecks()
   })
+  // Test: section checks.
   function sectionChecks() {
     var fetch = t.findChild(section, 'projectGitFetch')
     var pull = t.findChild(section, 'projectGitPull')
@@ -202,6 +203,7 @@ ShellRoot {
     t.check(!fetch.enabled && !pull.enabled, 'display only disables both')
     section.displayOnly = false
   }
+  // Test: header checks.
   function headerChecks() {
     var create = t.findChild(header, 'headerNewTask')
     var remove = t.findChild(header, 'headerRemoveTask')
@@ -213,6 +215,7 @@ ShellRoot {
     remove.clicked()
     t.equal(host.headerSignals, [['create', 'p-h'], ['remove', 'p-h', 'c-l']], 'header signals carry exact IDs')
   }
+  // Test: form checks.
   function formChecks() {
     var field = t.findChild(form, 'projectTaskBranch')
     var preview = t.findChild(form, 'projectTaskPreview')
@@ -241,6 +244,7 @@ ShellRoot {
     t.check(!create.enabled, 'Create is disabled while pending')
     form.pending = false
   }
+  // Test: remove checks.
   function removeChecks() {
     var confirm = t.findChild(removal, 'projectTaskRemoveConfirm')
     t.equal(t.findChild(removal, 'projectTaskRemoveQuestion').text, 'Remove the folder /home/u/Work/myapp-worktrees/feat? The branch feat is kept.', 'question names folder and branch')
@@ -280,6 +284,7 @@ ShellRoot {
     }
     t.check(!confirm.enabled, 'untracked files disable Confirm')
   }
+  // Test: surface checks.
   function surfaceChecks() {
     entry.projectController.runner = function (argv, input, done) {
       if (argv[1] === 'snapshot') {
@@ -359,6 +364,7 @@ ShellRoot {
       })
     })
   }
+  // Test: stale fetch.
   function staleFetch() {
     var fetch = t.findChild(surface, 'projectGitFetch')
     t.waitFor(function () {
@@ -447,6 +453,7 @@ ShellRoot {
       })
     })
   }
+  // Test: create flow.
   function createFlow() {
     var header = t.findChild(surface, 'projectHeader')
     header.startProfile.connect(function (id, revision) {
@@ -476,6 +483,7 @@ ShellRoot {
       removeFlow()
     })
   }
+  // Test: remove flow.
   function removeFlow() {
     var header = t.findChild(surface, 'projectHeader')
     host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 2)
@@ -557,6 +565,7 @@ ShellRoot {
       })
     })
   }
+  // Test: inert checks.
   function inertChecks() {
     host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 3)
     host.gitCalls = []

@@ -72,6 +72,7 @@ project_git_fetch_remote() {
   ((status == 0)) || project_git_classify "$status"
 }
 
+# Fetch the chosen remote and report it.
 project_git_fetch() {
   local remote
   remote=$(project_git_remote)
@@ -80,6 +81,7 @@ project_git_fetch() {
   project_git_ok "$(jq -cn --arg p "$project" --arg c "$checkout" --arg r "$remote" '{projectId:$p,checkoutId:$c,remote:$r}')"
 }
 
+# Fetch, then fast-forward only; never merge or stash.
 project_git_pull() {
   local branch remote from to status=0
   branch=$(projects_registry_git -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
@@ -126,6 +128,7 @@ project_git_primary_path() {
   jq -r --arg p "$project" '.projects[]|select(.id == $p)|.checkouts[]|select(.primary)|.path' "$git_tmp/registry"
 }
 
+# Create a branch and worktree from the default branch, then register and select it.
 project_git_task_create() {
   local primary_path folder remote base='' candidate state new_id status=0
   if [[ -z $branch || $branch == -* || $branch == *'@{'* ]] || ! projects_registry_git check-ref-format --branch "$branch" >/dev/null 2>&1; then
@@ -191,10 +194,12 @@ project_git_busy() {
   busy=$(jq --arg p "$project" --arg c "$checkout" '[.state.runs[]? | select(.projectId == $p and .checkoutId == $c and (.submissionUnconfirmed or .processState == "pending" or .processState == "running" or .processState == "unconfirmed"))] | length > 0' <<<"$runs") || return 1
 }
 
+# Fail closed with ACTIONS_UNAVAILABLE when the action store cannot be read.
 project_git_busy_or_fail() {
   project_git_busy || project_git_fail ACTIONS_UNAVAILABLE 'Could not check for running actions in this checkout.' 'Refresh Projects and retry.'
 }
 
+# Remove a clean task checkout folder, keeping its branch; --check only reports facts.
 project_git_task_remove() {
   local primary_path current_branch status_file record dirty=false untracked=false ignored=0 busy='' unpushed=0 detached=0 facts status=0
   [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout cannot be removed.' 'Choose a task checkout.'
@@ -296,6 +301,7 @@ project_git_remove_missing() {
   project_git_ok "$(jq -c '{projectId,checkoutId,path,branch,removed:true}' <<<"$facts")"
 }
 
+# Parse arguments, prove the checkout, lock the repository and dispatch.
 project_git_main() {
   local operation=${1:-} project='' checkout='' branch='' check=false confirm=false json=false dependency
   local path common primary git_state_failure_code=CHECKOUT_INVALID

@@ -74,9 +74,11 @@ Item {
   function resultKey(operation, projectId, checkoutId) {
     return JSON.stringify([operation, projectId, checkoutId])
   }
+  // Last result recorded for a checkout and operation, or null.
   function resultFor(operation, projectId, checkoutId) {
     return results[resultKey(operation, projectId, checkoutId)] || null
   }
+  // Forget the recorded result for a checkout and operation.
   function clear(operation, projectId, checkoutId) {
     var next = Object.assign({}, results)
     delete next[resultKey(operation, projectId, checkoutId)]

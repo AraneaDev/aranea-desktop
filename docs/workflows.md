@@ -85,6 +85,30 @@ new work with a new identity; the earlier request may still finish. A missing lo
 never automatically replays a start. **Cancel preparation** is available only while
 the owner has explicitly refused acceptance; accepted or uncertain native work continues.
 
+## Task checkouts
+
+Give each piece of work its own checkout. Choose **New task checkout** in the
+project header, type a branch name and choose **Create**. Aranea fetches, starts
+the branch from the remote's default branch (or local `main`/`master` without a
+remote) and creates the folder next to your repository as
+`<repo>-worktrees/<branch>`. The new checkout is selected; press **Start working**
+to open your tools there.
+
+When the work is merged, select the task checkout and choose **Remove task
+checkout**. Aranea removes the folder only when it has no uncommitted or
+untracked changes and no running action, and warns when commits are not on any
+remote. It also warns when ignored files, such as `.env` or build output, will
+be deleted with the folder. The branch is always kept. A commit on a detached
+HEAD that is on no branch always blocks removal; create a branch for it first.
+If you deleted a task checkout's folder by hand, **Remove task checkout** just
+forgets it.
+
+The **Git** section has **Fetch** and **Pull**. Pull only fast-forwards: when
+branches have diverged or local changes would be overwritten, it changes
+nothing and tells you to merge, rebase or commit in a terminal. Git never asks
+for passwords here; if a remote needs credentials, run `git fetch` once in a
+terminal. Your own `core.sshCommand` is honoured.
+
 ## Advanced profile configuration
 
 Use **Manage profiles** to name a profile and select its editor, terminal and optional

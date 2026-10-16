@@ -10,6 +10,7 @@ export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/state"
 events="$TMPDIR/events"
 result="$TMPDIR/result.json"
 failures=0
+# Test: setup.
 setup() {
   rm -rf "$ARANEA_STATE_ROOT" "$ARANEA_TEST_SANDBOX/w"
   mkdir -p "$ARANEA_TEST_SANDBOX/w"
@@ -33,19 +34,23 @@ cli_run() {
   "$cli" "$@" --json >"$events" 2>/dev/null </dev/null || status=$?
   return "$status"
 }
+# Test: last.
 last() { jq -se "last | $1" "$events" >/dev/null; }
 
+# Test: fetch envelope.
 fetch_envelope() {
   setup
   cli_run projects git fetch "$project_id" --checkout "$checkout_id"
   last '.event=="completed" and .operation=="projects.git.fetch" and .status=="observed" and .data.remote=="origin"'
   jq -se 'first.event=="started"' "$events" >/dev/null
 }
+# Test: checkout defaults to last.
 checkout_defaults_to_last() {
   setup
   cli_run projects git fetch "$project_id"
   jq -se --arg c "$checkout_id" 'last.data.checkoutId==$c' "$events" >/dev/null
 }
+# Test: task new and remove.
 task_new_and_remove() {
   setup
   cli_run projects task new "$project_id" --branch t
@@ -61,6 +66,7 @@ task_new_and_remove() {
   last '.status=="observed" and .data.removed==true'
   [[ ! -d $path ]]
 }
+# Test: failure envelope.
 failure_envelope() {
   setup
   git -C "$repo" branch --unset-upstream
@@ -69,6 +75,7 @@ failure_envelope() {
   [[ $s == 1 ]]
   last '.event=="completed" and .status=="failed" and .code=="NO_UPSTREAM" and (.data.recovery|length>0)'
 }
+# Test: usage errors.
 usage_errors() {
   setup
   local s
@@ -80,6 +87,7 @@ usage_errors() {
     last '.code=="INVALID_USAGE"'
   done
 }
+# Test: capabilities list git.
 capabilities_list_git() {
   setup
   cli_run capabilities

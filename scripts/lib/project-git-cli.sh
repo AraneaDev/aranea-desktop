@@ -2,6 +2,7 @@
 # Public adapter for task checkouts and Fetch/Pull; the helper owns all Git work.
 # shellcheck disable=SC2154,SC2034
 
+# Print the projectGit capability object and git/task operations.
 project_git_cli_capabilities() {
   jq -cn '{projectGit:{schemaVersion:1,worktreeLocation:"<repo>-worktrees/<branch>",base:"remote default branch, else local main/master",pull:"fast-forward only",removeKeepsBranch:true,networkSeconds:60,localSeconds:15},operations:[
     {name:"projects.git.fetch",arguments:{projectId:{type:"string",required:true},checkout:{type:"string"}}},
@@ -10,6 +11,7 @@ project_git_cli_capabilities() {
     {name:"projects.task.remove",arguments:{projectId:{type:"string",required:true},checkout:{type:"string",required:true},check:{type:"boolean"},"confirm-unpushed":{type:"boolean"}},description:"Removes a clean task checkout folder; keeps the branch"}]}'
 }
 
+# Parse the public git/task commands and run the Git helper.
 project_git_cli_main() {
   cli_json=false cli_operation_id='' cli_operation=aranea
   local arg group command project='' checkout='' branch='' check=false confirm=false option response operation message
