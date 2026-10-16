@@ -46,6 +46,9 @@ function jsVisibleStrings(source) {
     if (/^\s*(===?|!==?)/.test(after)) continue
     if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue
     if (/^[A-Z][A-Z0-9_]*$/.test(value)) continue
+    // Raw lowercase state values assigned to a status field are data, not text.
+    const lineStart = before.slice(before.lastIndexOf("\n") + 1)
+    if (/^[a-z]+$/.test(value) && /\bstatus\s*[:=][^\n]*$/.test(lineStart)) continue
     if (/^[a-z][a-z0-9_.-]*$/.test(value) && !/^(unavailable|unknown)$/.test(value)) continue
     out.push(value)
   }
@@ -88,7 +91,10 @@ test("JS scanner includes UI text and excludes codes, comparisons and keys", () 
     "  ? 'Fine'",
     "  : 'Unavailable'",
     "var low = 'unavailable'",
-    "var id = 'unconfirmed'"
+    "var id = 'unconfirmed'",
+    "task.status = 'unavailable'",
+    "  status: ok ? 'suppressed' : 'unavailable',",
+    "  message: 'unavailable'"
   ].join("\n")
   assert.deepEqual(jsVisibleStrings(sample), [
     "Observed tools",
@@ -100,6 +106,7 @@ test("JS scanner includes UI text and excludes codes, comparisons and keys", () 
     "Unconfirmed",
     "Fine",
     "Unavailable",
+    "unavailable",
     "unavailable"
   ])
 })
@@ -185,3 +192,41 @@ test("agent task view has no old status words", () => {
     []
   )
 })
+
+const pluginsDir = path.join(__dirname, "../../plugins")
+
+/**
+ * Every visible-string scanner applied to all QML/JS sources of one plugin.
+ * Same patterns, no allowlist.
+ * @param {string} plugin - plugin directory name
+ * @returns {string[]} unique "file: string" entries
+ */
+function pluginStrings(plugin) {
+  const base = path.join(pluginsDir, plugin)
+  const out = []
+  for (const file of fs.readdirSync(base).filter((f) => /\.(qml|js)$/.test(f))) {
+    const source = fs.readFileSync(path.join(base, file), "utf8")
+    const strings = new Set([
+      ...visibleStrings(source),
+      ...assignedStrings(source),
+      ...jsVisibleStrings(source)
+    ])
+    for (const s of strings) out.push(file + ": " + s)
+  }
+  return out
+}
+
+for (const plugin of ["araneadev.activity", "araneadev.workspaces"]) {
+  test(plugin + " has no banned internal words in visible strings", () => {
+    assert.deepEqual(
+      pluginStrings(plugin).filter((s) => banned.test(s.replace(/^[^:]*: /, ""))),
+      []
+    )
+  })
+  test(plugin + " has no old status words", () => {
+    assert.deepEqual(
+      pluginStrings(plugin).filter((s) => oldStatus.test(s.replace(/^[^:]*: /, ""))),
+      []
+    )
+  })
+}
