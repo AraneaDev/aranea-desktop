@@ -358,6 +358,32 @@ ShellRoot {
     }
     entry.projectController.runner = function (argv, input, done) {
       var request = JSON.parse(input)
+      // The store seeds default profiles for a project without any; one editor preset stands in.
+      if (request.action === 'profiles-seed') {
+        var seeded = {
+          id: 'f-seed-' + entry.projectController.state.revision,
+          name: 'VS Code',
+          roles: ['editor'],
+          tools: {
+            editorId: 'code',
+            terminalId: null,
+            agentId: null
+          },
+          revision: 1
+        }
+        done(0, JSON.stringify({
+          ok: true,
+          state: Object.assign({}, entry.projectController.state, {
+            revision: entry.projectController.state.revision + 1,
+            projects: entry.projectController.state.projects.map(function (project) {
+              return project.id === request.args.projectId && !(project.profiles || []).length ? Object.assign({}, project, {
+                profiles: [seeded]
+              }) : project
+            })
+          })
+        }), '')
+        return
+      }
       if (request.action === 'profile-save') {
         var profile = Object.assign({}, request.args.profile, {
           id: 'f-preset-' + entry.projectController.state.revision,

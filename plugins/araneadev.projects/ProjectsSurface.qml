@@ -474,32 +474,89 @@ Item {
   // the shell (QQmlConnections::setTarget).
   readonly property Item windowFocusItem: panel.Window.activeFocusItem
   onWindowFocusItemChanged: panel.revealFocus(windowFocusItem)
-  // Only explicit registration seeds presets, serialized after any metadata write.
-  property var presetInFlight: null
-  // Drain optional setup only through the registry mutation serialization boundary.
-  function flushProfilePresets() {
+  // Projects already asked to seed this session (id → true); never re-requested.
+  property var seededProjects: ({})
+  // Project whose seed request is in flight, or ''.
+  property string seedingProjectId: ''
+  // Projects whose last seed request failed (id → true).
+  property var seedFailures: ({})
+  // Record or clear one project's seed failure.
+  function setSeedFailure(projectId, failed) {
+    var next = Object.assign({}, seedFailures)
+    if (failed)
+      next[projectId] = true
+    else
+      delete next[projectId]
+    seedFailures = next
+  }
+  // Ask the backend once per session to save defaults for a project without profiles.
+  function requestSeed(projectId) {
     var client = root.projectController
-    if (root.inert || client.pending || client.reading || presetInFlight || !projectsPage.profilePresetQueue.length)
+    if (root.inert || !projectId || seededProjects[projectId] || seedingProjectId || client.pending || client.reading)
       return
-    var args = projectsPage.profilePresetQueue[0]
-    projectsPage.profilePresetQueue = projectsPage.profilePresetQueue.slice(1)
-    if (!(client.state.projects || []).some(function (p) {
-      return p.id === args.projectId
+    var project = (client.state.projects || []).find(function (p) {
+      return p.id === projectId
+    })
+    if (!project || (project.profiles || []).length)
+      return
+    var next = Object.assign({}, seededProjects)
+    next[projectId] = true
+    seededProjects = next
+    setSeedFailure(projectId, false)
+    seedingProjectId = projectId
+    if (!client.request('profiles-seed', {
+      projectId: projectId
     })) {
-      Qt.callLater(panel.flushProfilePresets)
-      return
+      seedingProjectId = ''
+      setSeedFailure(projectId, true)
     }
-    presetInFlight = args
-    if (!client.request('profile-save', args)) {
-      presetInFlight = null
-      projectsPage.profilePresetQueue = []
-      projectsPage.profileSetupError = 'Project added. Open Manage profiles to choose and save your tools.'
+  }
+  // Seed the selected project when it has no profiles and was not asked yet.
+  function maybeSeedSelected() {
+    var project = projectsPage.selectedProject
+    if (project && !(project.profiles || []).length && !seededProjects[project.id])
+      Qt.callLater(function () {
+        panel.requestSeed(project.id)
+      })
+  }
+  // Forget a failed seed so the next request is allowed, then ask again.
+  function retrySeed(projectId) {
+    var next = Object.assign({}, seededProjects)
+    delete next[projectId]
+    seededProjects = next
+    requestSeed(projectId)
+  }
+  // Re-probe tools; a zero-profile project may seed again once tools exist.
+  function refreshTools() {
+    var project = projectsPage.selectedProject
+    if (project && !(project.profiles || []).length && project.id !== seedingProjectId) {
+      var next = Object.assign({}, seededProjects)
+      delete next[project.id]
+      seededProjects = next
+      setSeedFailure(project.id, false)
+    }
+    root.projectController.refresh()
+  }
+  // Drop an in-flight seed whose project vanished or whose request capture cancelled.
+  function dropStaleSeed() {
+    if (!seedingProjectId)
+      return
+    var gone = !(root.projectController.state.projects || []).some(function (p) {
+      return p.id === seedingProjectId
+    })
+    if (gone || root.inert)
+      seedingProjectId = ''
+  }
+  Connections {
+    target: panel.root
+    function onInertChanged() {
+      panel.dropStaleSeed()
     }
   }
   Connections {
     target: projectsPage
-    function onProfilePresetQueueChanged() {
-      Qt.callLater(panel.flushProfilePresets)
+    function onSelectedProjectChanged() {
+      panel.maybeSeedSelected()
     }
   }
   Connections {
@@ -507,28 +564,29 @@ Item {
     function onStateChanged() {
       panel.stampLayout()
       panel.scheduleGitBackground()
+      panel.dropStaleSeed()
+      panel.maybeSeedSelected()
     }
     function onToolsChanged() {
       panel.stampLayout()
     }
     function onMutationCompleted(action, args, state) {
       projectsPage.registryMutationCompleted(action, args, state)
-      if (action === 'profile-save' && panel.presetInFlight && JSON.stringify(panel.presetInFlight) === JSON.stringify(args))
-        panel.presetInFlight = null
-      Qt.callLater(panel.flushProfilePresets)
+      if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId)
+        panel.seedingProjectId = ''
+      panel.maybeSeedSelected()
     }
-    function onErrorChanged() {
-      if (panel.presetInFlight && panel.root.projectController.error) {
-        panel.presetInFlight = null
-        projectsPage.profilePresetQueue = []
-        projectsPage.profileSetupError = 'Project added, but profiles could not be saved. Open Manage profiles to choose your tools. ' + panel.root.projectController.error
+    function onMutationFailed(action, args) {
+      if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId) {
+        panel.seedingProjectId = ''
+        panel.setSeedFailure(args.projectId, true)
       }
     }
     function onPendingChanged() {
-      Qt.callLater(panel.flushProfilePresets)
+      panel.maybeSeedSelected()
     }
     function onReadingChanged() {
-      Qt.callLater(panel.flushProfilePresets)
+      panel.maybeSeedSelected()
     }
   }
   Connections {
@@ -709,6 +767,10 @@ Item {
                   onStartProfile: function (id, revision) {
                     panel.root.startProfile(id, revision, false)
                   }
+                  seeding: panel.seedingProjectId !== '' && !!projectsPage.selectedProject && panel.seedingProjectId === projectsPage.selectedProject.id
+                  seedError: projectsPage.selectedProject && panel.seedFailures[projectsPage.selectedProject.id] ? "Couldn't prepare a default profile." : ''
+                  onRefreshToolsRequested: panel.refreshTools()
+                  onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')
                 }
                 Aranea.PageHeader {
@@ -760,12 +822,6 @@ Item {
                   visible: !!panel.root.inspectionError
                   text: panel.root.inspectionError
                   color: Aranea.DesignTokens.urgent
-                }
-                Aranea.UiLabel {
-                  width: content.width
-                  visible: !!projectsPage.profileSetupError
-                  text: projectsPage.profileSetupError
-                  color: Aranea.DesignTokens.attention
                 }
                 ProjectsWelcome {
                   width: content.width

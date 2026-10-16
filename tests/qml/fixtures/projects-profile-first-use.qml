@@ -48,7 +48,7 @@ ShellRoot {
   // Wait for queued visit and preset writes to finish through the real store.
   function settled(done) {
     t.waitFor(function () {
-      return !entry.projectController.pending && !entry.navigationQueue.length && !surface.presetInFlight
+      return !entry.projectController.pending && !entry.navigationQueue.length
     }, 5000, 'real registry mutations settle', done)
   }
   Component.onCompleted: t.step(60, function () {
@@ -83,7 +83,7 @@ ShellRoot {
       picker.setPath(Quickshell.env('ARANEA_FIRST_USE_PATH'))
       picker.confirm()
       t.waitFor(function () {
-        return !!entry.selectedProject && entry.selectedProject.profiles.length > 0 && !page.profilePresetQueue.length
+        return !!entry.selectedProject && entry.selectedProject.profiles.length > 0
       }, 5000, 'registration persists usable presets', function () {
         settled(function () {
           t.check(!page.setupActive && surface.section === 'overview', 'actual registration reaches Overview')
@@ -113,9 +113,9 @@ ShellRoot {
       })
     })
   })
-  // Direct registration has no setup intent; its first profile is explicitly saved.
+  // Direct registration has no setup intent but seeds detected presets; one more is saved explicitly.
   function saveManual() {
-    t.equal(entry.selectedProject.profiles.length, 0, 'direct registration starts without automatic presets')
+    t.check(entry.selectedProject.profiles.length > 0, 'direct registration seeds detected presets')
     entry.projectController.request('profile-save', {
       projectId: entry.projectId,
       profile: {
@@ -129,7 +129,12 @@ ShellRoot {
       }
     })
     settled(function () {
-      primary('Manual Terminal', entry.selectedProject.lastCheckoutId)
+      t.check(entry.selectedProject.profiles.some(function (p) {
+        return p.name === 'Manual Terminal'
+      }), 'manually saved profile exists beside the seeded presets')
+      // The first saved profile (the seeded VS Code preset) stays the initial default.
+      t.equal(entry.selectedProject.profiles[0].name, 'VS Code', 'first seeded preset is VS Code')
+      primary('VS Code', entry.selectedProject.lastCheckoutId)
       var original = entry.projectController.state, tools = entry.projectController.tools
       var state = JSON.parse(JSON.stringify(original))
       var selected = state.projects.find(function (p) {
@@ -138,7 +143,8 @@ ShellRoot {
       selected.lastProfileId = 'stale-profile'
       entry.projectController.state = state
       var header = t.findChild(surface, 'projectHeader'), button = t.findChild(header, 'projectPrimaryStart')
-      t.check(!header.profile && !button.enabled, 'stale remembered ID refuses silent substitution')
+      t.equal(header.profile.id, selected.profiles[0].id, 'stale remembered ID falls back to the first usable saved profile')
+      t.check(button.enabled && selected.lastProfileId === 'stale-profile', 'fallback starts without rewriting the remembered ID')
       state = JSON.parse(JSON.stringify(original))
       selected = state.projects.find(function (p) {
         return p.id === entry.projectId
@@ -151,8 +157,9 @@ ShellRoot {
         agents: [],
         defaults: {}
       }
-      t.equal(header.profile.id, selected.lastProfileId, 'unavailable remembered profile keeps exact identity')
-      t.check(header.profileSummary.indexOf('Choose') >= 0, 'unavailable remembered profile exposes recovery')
+      t.check(!header.profile && !button.enabled, 'no usable profile without tools')
+      t.check(header.profileSummary.indexOf('Choose') >= 0, 'unavailable profiles expose recovery')
+      t.check(header.blockedReason !== '', 'blocked start is explained')
       entry.projectController.state = original
       t.check(!header.profile && !button.enabled, 'zero supported tools cannot supply a usable initial default')
       t.check(t.findChild(header, 'headerManageProfiles').visible, 'zero tools retain direct profile setup recovery')

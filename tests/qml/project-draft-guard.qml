@@ -30,7 +30,7 @@ ShellRoot {
   Component.onCompleted: t.step(80, function () {
     entry.projectController.runner = function (argv, input, done) {
       var request = JSON.parse(input)
-      if (request.action === 'navigation-set') {
+      if (request.action === 'navigation-set' || request.action === 'profiles-seed') {
         done(0, JSON.stringify({
           ok: true,
           state: entry.projectController.state

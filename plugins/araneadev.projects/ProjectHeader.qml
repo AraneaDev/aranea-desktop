@@ -53,10 +53,22 @@ ColumnLayout {
   readonly property var checkout: project ? (project.checkouts || []).find(function (c) {
     return c.id === header.project.lastCheckoutId
   }) || null : null
-  // Use a local usable initial choice only until an accepted profile is remembered.
+  // The remembered profile when usable, else the first usable saved profile; never persisted.
   readonly property var profile: Profiles.primary(project, tools)
-  // Readable actual adapters or one actionable missing-tool explanation.
-  readonly property string profileSummary: profile ? Profiles.summary(profile, tools) : 'Choose a profile to start working.'
+  // A default-profile seed for this project is in flight.
+  property bool seeding: false
+  // Last seed failure for this project, or ''.
+  property string seedError: ''
+  // Re-probe installed tools.
+  signal refreshToolsRequested
+  // Retry saving default profiles.
+  signal retrySeedRequested
+  // Shown when the remembered profile is unusable and another one is used.
+  readonly property string fallbackNote: project ? Profiles.fallbackNote(project, tools) : ''
+  // Why nothing can start, when profiles exist; or the no-tools hint for a zero-profile project.
+  readonly property string blockedReason: !project ? '' : (project.profiles || []).length ? Profiles.blockedReason(project, tools) : (!seeding && !seedError && !Profiles.presets(tools).length ? 'Install a supported editor or terminal (VS Code, Neovim, Kitty, Alacritty, Foot or Ghostty), then Refresh.' : '')
+  // Readable actual adapters, the seeding state or one actionable explanation.
+  readonly property string profileSummary: profile ? Profiles.summary(profile, tools) : seeding ? 'Preparing a default profile…' : 'Choose a profile to start working.'
   // Explicit saved profile identity and revision for the current checkout.
   signal startProfile(string profileId, int profileRevision)
   // Navigate to optional profile management without launching.
@@ -68,7 +80,7 @@ ColumnLayout {
     var selected = (project.profiles || []).find(function (p) {
       return p.id === id
     })
-    if (selected)
+    if (selected && Profiles.usable(selected, tools))
       startProfile(selected.id, selected.revision)
   }
   ProjectPicker {
@@ -81,7 +93,7 @@ ColumnLayout {
       return {
         id: p.id,
         name: p.name,
-        path: Profiles.summary(p, header.tools)
+        path: Profiles.usable(p, header.tools) ? Profiles.summary(p, header.tools) : 'Unavailable · ' + Profiles.summary(p, header.tools)
       }
     }) : []
     selectedId: header.profile ? header.profile.id : ''
@@ -186,6 +198,45 @@ ColumnLayout {
     text: (header.profile ? header.profile.name + ' · ' : '') + header.profileSummary
     opacity: 0.8
   }
+  Aranea.UiLabel {
+    objectName: 'projectFallbackNote'
+    Layout.fillWidth: true
+    visible: text !== ''
+    text: header.fallbackNote
+    opacity: 0.65
+  }
+  Aranea.UiLabel {
+    objectName: 'projectBlockedReason'
+    Layout.fillWidth: true
+    visible: text !== '' && !header.profile
+    text: header.blockedReason
+    color: Aranea.DesignTokens.attention
+    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+  }
+  Aranea.ActionButton {
+    objectName: 'projectRefreshTools'
+    visible: header.blockedReason.indexOf('Install a supported') === 0
+    enabled: !header.displayOnly
+    text: 'Refresh'
+    pointerGate: header.pointerGate
+    onClicked: header.refreshToolsRequested()
+  }
+  RowLayout {
+    Layout.fillWidth: true
+    visible: header.seedError !== '' && !header.displayOnly
+    Aranea.UiLabel {
+      Layout.fillWidth: true
+      text: "Couldn't prepare a default profile."
+      color: Aranea.DesignTokens.attention
+      wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    }
+    Aranea.ActionButton {
+      objectName: 'projectRetrySeed'
+      text: 'Retry'
+      pointerGate: header.pointerGate
+      onClicked: header.retrySeedRequested()
+    }
+  }
   Flow {
     Layout.fillWidth: true
     spacing: Style.space(8)
@@ -200,7 +251,7 @@ ColumnLayout {
     Aranea.ActionButton {
       objectName: 'headerManageProfiles'
       visible: !header.managementActive
-      text: header.project && (header.project.profiles || []).length ? 'Manage profiles' : 'Set up a profile'
+      text: header.project && (header.project.profiles || []).length && header.profile ? 'Manage profiles' : 'Set up a profile'
       variant: 'quiet'
       pointerGate: header.pointerGate
       onClicked: header.manageProfilesRequested()

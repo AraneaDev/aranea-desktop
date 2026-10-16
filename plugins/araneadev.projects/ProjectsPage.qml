@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
-import "ProjectProfiles.js" as Profiles
 
 ColumnLayout {
   id: page
@@ -116,10 +115,6 @@ ColumnLayout {
       setupAwaitingFolder = false
     }
   }
-  // Registration queues explicit preset writes; observations never create profiles.
-  property var profilePresetQueue: []
-  // A failed optional setup leaves registration usable with direct recovery.
-  property string profileSetupError: ''
   // Optional profile writes share the host registry client and revision guards.
   signal profileSaveRequested(string projectId, var profile, int expectedProfileRevision)
   // Profile-list navigation shares the surrounding draft guard.
@@ -159,21 +154,6 @@ ColumnLayout {
       if (ids.indexOf(added.id) < 0)
         ids.push(added.id)
     }
-    var queued = []
-    ids.forEach(function (id) {
-      var project = state.projects.filter(function (p) {
-        return p.id === id
-      })[0]
-      if (!(project.profiles || []).length)
-        Profiles.presets(page.tools).forEach(function (profile) {
-          queued.push({
-            projectId: id,
-            profile: profile
-          })
-        })
-    })
-    profileSetupError = ''
-    profilePresetQueue = profilePresetQueue.concat(queued)
     setupProjectIds = setupProjectIds.concat(ids.filter(function (id) {
       return setupProjectIds.indexOf(id) < 0
     }))
@@ -298,8 +278,6 @@ ColumnLayout {
       profileRevision: details.profileEditor.expectedProfileRevision,
       profileFieldError: details.profileEditor.fieldError,
       submittedProfileDraft: details.submittedProfileDraft,
-      profileSetupError: profileSetupError,
-      profilePresetQueue: profilePresetQueue.slice(),
       detailsDraft: Object.assign({}, details.draft),
       actions: details.actions.captureSnapshot(),
       relocationDrafts: Object.assign({}, details.relocationDrafts),
@@ -343,8 +321,6 @@ ColumnLayout {
     details.profileEditor.expectedProfileRevision = saved.profileRevision || 0
     details.profileEditor.fieldError = saved.profileFieldError || ''
     details.submittedProfileDraft = saved.submittedProfileDraft || null
-    profileSetupError = saved.profileSetupError || ''
-    profilePresetQueue = saved.profilePresetQueue || []
     details.draft = saved.detailsDraft
     details.dirty = saved.detailsDirty
     details.fieldError = saved.detailsFieldError || ''
@@ -369,8 +345,6 @@ ColumnLayout {
     details.profileEditing = false
     details.profileEditor.begin(null)
     details.submittedProfileDraft = null
-    profileSetupError = ''
-    profilePresetQueue = []
     details.discardDraft()
     details.actions.captureReset(fixture)
     details.relocationDrafts = {}

@@ -72,6 +72,13 @@ run_cli() {
 run_cli 0 projects register --path "$checkout"
 project=$(jq -r 'select(.event=="completed")|.data.state.projects[0].id' "$events")
 run_cli 0 projects profiles list "$project"
+# Registration seeded the sandbox stub tools; remove them so the rest starts from no profiles.
+jq -se 'last.operation=="projects.profiles.list" and (last.data.profiles|length)>0 and all(last.data.profiles[];.revision==1) and last.data.lastProfileId==null' "$events" >/dev/null
+seeded_ids=$(jq -r 'select(.event=="completed")|.data.profiles[].id' "$events")
+while IFS= read -r seeded; do
+  run_cli 0 projects profiles remove "$project" "$seeded" --expected-profile-revision 1
+done <<<"$seeded_ids"
+run_cli 0 projects profiles list "$project"
 jq -se 'last.operation=="projects.profiles.list" and last.data.profiles==[]' "$events" >/dev/null
 # Shell-looking names stay literal, and headless profile reads/writes never use IPC.
 # shellcheck disable=SC2016

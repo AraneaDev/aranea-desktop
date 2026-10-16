@@ -207,6 +207,7 @@ projects_cli_capabilities() {
 {"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"roles":{"type":"string","description":"Nonempty distinct comma-separated subset of editor,terminal,agent; normalized to canonical order"},"agent":{"type":"string","enum":["claude","codex"],"description":"Choose a provider for agent launches; requires requested agent. Retry/reobserve must target agent; reobserve retains the prior launch provider"},"new-window":{"type":"string","enum":["editor","terminal","agent"],"description":"Includes the target role; agent defaults to agent-only unless roles is explicit"},"retry-role":{"type":"string","enum":["editor","terminal","agent"]},"reobserve-role":{"type":"string","enum":["editor","terminal","agent"]}}},
 {"name":"projects.profiles.list","arguments":{"projectId":{"type":"string","required":true}},"readOnly":true},
 {"name":"projects.profiles.save","arguments":{"projectId":{"type":"string","required":true},"definition":{"type":"object","required":true,"description":"JSON profile with name, canonical roles, tools; existing profiles include id and require expected-profile-revision. No checkout override."},"expected-profile-revision":{"type":"integer","description":"Positive saved revision; omit for a new draft"}}},
+{"name":"projects.profiles.seed","arguments":{"projectId":{"type":"string","required":true}},"description":"Save default profiles from installed tools only when the project has none; never launches."},
 {"name":"projects.profiles.remove","arguments":{"projectId":{"type":"string","required":true},"profileId":{"type":"string","required":true},"expected-profile-revision":{"type":"integer","required":true}}},
 {"name":"projects.start","arguments":{"projectId":{"type":"string","required":true},"profile":{"type":"string","required":true}},"description":"Snapshot the selected checkout and profile revision; start on an empty unreserved workspace. Unknown acceptance retains activation identity; never replay automatically."},
 {"name":"projects.environments.list","arguments":{"project":{"type":"string","required":true}},"readOnly":true,"description":"Saved immutable environment metadata, not proof of live windows"},
@@ -580,7 +581,7 @@ projects_cli_environment_submit() {
 
 # Parse additive profile commands without changing any legacy Open syntax or payload.
 projects_cli_profiles_main() {
-  local command=$1 option value profile_id='' environment_id='' definition='' revision='' action='' args='{}'
+  local command=$1 seed_before='[]' option value profile_id='' environment_id='' definition='' revision='' action='' args='{}'
   local -A supplied=()
   shift
   if [[ "$command" == profiles || "$command" == environments ]]; then
@@ -590,7 +591,7 @@ projects_cli_profiles_main() {
   fi
   cli_operation="projects.$command"
   case "$command" in
-    profiles.list | profiles.save | profiles.remove | start)
+    profiles.list | profiles.seed | profiles.save | profiles.remove | start)
       [[ $# -gt 0 ]] || projects_cli_usage
       projects_cli_uuid p "$1" || projects_cli_usage
       cli_project_id=$1
@@ -661,6 +662,10 @@ projects_cli_profiles_main() {
   args=$(jq -cn --arg id "$cli_project_id" '{projectId:$id}')
   case "$command" in
     profiles.list) projects_cli_finish observed '' 'Saved profiles.' "$(jq -c '{projectId:.id,profiles,lastProfileId}' <<<"$cli_project")" ;;
+    profiles.seed)
+      action=profiles-seed
+      seed_before=$(jq -c '.profiles' <<<"$cli_project")
+      ;;
     profiles.save)
       action=profile-save
       args=$(jq -c --argjson profile "$definition" --arg revision "$revision" '.+{profile:$profile}+(if $revision=="" then {} else {expectedProfileRevision:($revision|tonumber)} end)' <<<"$args")
@@ -700,5 +705,10 @@ projects_cli_profiles_main() {
   local request
   request=$(jq -cn --arg action "$action" --argjson args "$args" --argjson revision "$(jq .revision <<<"$cli_state")" '{action:$action,args:$args,expectedRevision:$revision}')
   projects_cli_store mutate <<<"$request"
+  if [[ "$command" == profiles.seed ]]; then
+    local seeded_project
+    seeded_project=$(jq -c --arg id "$cli_project_id" '.projects[]|select(.id==$id)' <<<"$cli_state")
+    projects_cli_finish observed '' 'Default profiles checked.' "$(jq -cn --arg id "$cli_project_id" --argjson before "$seed_before" --argjson project "$seeded_project" '($project.profiles|length) as $n | ($before|length) as $b | {projectId:$id,seeded:($n-$b),reason:(if $n>$b then null elif $b>0 then "HAS_PROFILES" else "NO_SUPPORTED_TOOLS" end),profiles:$project.profiles}')"
+  fi
   projects_cli_finish observed '' 'Registry mutation observed.' "$(jq -cn --argjson state "$cli_state" '{state:$state}')"
 }

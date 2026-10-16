@@ -33,6 +33,8 @@ QtObject {
   property int generation: 0
   // Typed successful mutations let the composition root update presentation.
   signal mutationCompleted(string action, var args, var state)
+  // A mutation request failed; carries the exact request and its message.
+  signal mutationFailed(string action, var args, string message)
   // Canonical root identity comes from backend readback, independent of entered spelling.
   signal rootReady(string rootId)
   // Safe helper argv/stdin transport, injectable for inert offscreen fixtures.
@@ -134,7 +136,7 @@ QtObject {
   }
   // Submit only fixed registry actions with data encoded on stdin, never shell code.
   function request(action: string, args: var): bool {
-    if (captureActive || pending || reading || ['root-add', 'root-remove', 'register', 'ignore', 'unignore', 'configure', 'select-checkout', 'relocate', 'remove', 'navigation-set', 'profile-save', 'profile-remove'].indexOf(action) < 0)
+    if (captureActive || pending || reading || ['root-add', 'root-remove', 'register', 'ignore', 'unignore', 'configure', 'select-checkout', 'relocate', 'remove', 'navigation-set', 'profile-save', 'profile-remove', 'profiles-seed'].indexOf(action) < 0)
       return false
     if (!args || typeof args !== 'object' || Array.isArray(args))
       return false
@@ -155,6 +157,7 @@ QtObject {
       if (code !== 0 || !value.ok) {
         error = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
         pending = false
+        mutationFailed(action, args, error)
         return
       }
       state = value.state
