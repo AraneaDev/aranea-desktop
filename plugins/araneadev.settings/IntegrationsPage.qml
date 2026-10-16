@@ -75,6 +75,69 @@ ColumnLayout {
       }
     }
   }
+  SettingsSection {
+    Layout.fillWidth: true
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Quick switcher'
+      font.bold: true
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Open the project switcher with one key from anywhere.'
+      opacity: 0.65
+    }
+    GridLayout {
+      Layout.fillWidth: true
+      columns: page.width < Style.space(300) ? 1 : 2
+      rowSpacing: Style.space(8)
+      ColumnLayout {
+        Layout.fillWidth: true
+        SettingsLabel {
+          objectName: 'quickSwitcherState'
+          Layout.fillWidth: true
+          text: page.backendState.keybind && page.backendState.keybind.bound ? page.backendState.keybind.key || '' : 'Not set'
+        }
+        SettingsLabel {
+          objectName: 'quickSwitcherKey'
+          Layout.fillWidth: true
+          text: 'SUPER + ALT + P'
+          opacity: 0.65
+        }
+      }
+      RowLayout {
+        SettingsButton {
+          objectName: 'quickSwitcherAdd'
+          text: 'Add'
+          visible: !page.backendState.keybind || !page.backendState.keybind.bound
+          enabled: !page.displayOnly && !page.pending
+          busy: page.pendingKey === 'keybind'
+          pointerGate: page.pointerGate
+          onClicked: if (!page.displayOnly && !page.pending)
+            page.request('keybind-add', {
+              key: 'SUPER + ALT + P'
+            })
+        }
+        SettingsButton {
+          objectName: 'quickSwitcherRemove'
+          text: 'Remove'
+          visible: !!page.backendState.keybind && page.backendState.keybind.bound === true
+          enabled: !page.displayOnly && !page.pending
+          busy: page.pendingKey === 'keybind'
+          pointerGate: page.pointerGate
+          onClicked: if (!page.displayOnly && !page.pending)
+            page.request('keybind-remove', {})
+        }
+      }
+    }
+    SettingsLabel {
+      objectName: 'quickSwitcherError'
+      Layout.fillWidth: true
+      visible: !!page.errors.keybind
+      text: page.errors.keybind ? page.errors.keybind.message + ' ' + page.errors.keybind.recovery : ''
+      color: Aranea.DesignTokens.attention
+    }
+  }
   SettingsButton {
     text: 'Retry'
     enabled: !page.displayOnly && !page.pending

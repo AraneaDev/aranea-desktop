@@ -357,12 +357,16 @@ Item {
                 }
                 IntegrationsPage {
                   Layout.fillHeight: false
-                  backendState: panel.controller.state
+                  backendState: Object.assign({}, panel.controller.state, {
+                    keybind: panel.controller.keybind
+                  })
                   displayOnly: panel.controller.showcaseActive
                   pending: panel.controller.pending
                   pendingKey: panel.controller.pendingKey
                   results: panel.controller.results
-                  errors: panel.controller.itemErrors
+                  errors: Object.assign({}, panel.controller.itemErrors, {
+                    keybind: panel.controller.keybindError
+                  })
                   pointerGate: pointerGate
                   onRequest: function (operation, args) {
                     panel.controller.request(operation, args)

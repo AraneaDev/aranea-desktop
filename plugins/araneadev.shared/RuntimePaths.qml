@@ -42,6 +42,9 @@ QtObject {
   // Mutating Git helper for fetch, pull and task checkouts.
   readonly property string projectGitPath: themeRoot + "/scripts/aranea-project-git"
 
+  // Adds or removes the quick-switcher key binding; the only writer of bindings.lua.
+  readonly property string keybindPath: themeRoot + "/scripts/aranea-keybind"
+
   // Root directory for branding assets within the active theme.
   readonly property string brandingRoot: themeRoot + "/branding"
 

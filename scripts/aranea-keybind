@@ -233,7 +233,7 @@ cmd_add() {
   need_file
   command -v hyprctl >/dev/null 2>&1 || fail HYPRCTL_UNAVAILABLE "Hyprland could not be reached." "Run this from your Hyprland session."
   taken=$(taken_by "$key") || fail HYPRCTL_UNAVAILABLE "Hyprland could not list its key bindings." "Run this from your Hyprland session."
-  [[ -z $taken ]] || fail KEY_TAKEN "$key is already used by \"$taken\"." "Pick a different key combination."
+  [[ -z $taken ]] || fail KEY_TAKEN "That key is already used by $taken." "Choose another key."
   line="o.bind(\"$key\", \"Aranea project switcher\", \"omarchy-shell shell toggle araneadev.projects '{\\\"mode\\\":\\\"switcher\\\"}'\") $marker"
   begin_change
   install_rewrite add "$line"

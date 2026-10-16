@@ -19,6 +19,12 @@ QtObject {
     process.startRequested = true
     process.running = true
   }
+  // Quick-switcher key helper; it alone edits the user's bindings file.
+  property string keybindPath: Aranea.RuntimePaths.keybindPath
+  // Latest key binding status, {bound, key}, or null while unknown.
+  property var keybind: null
+  // Latest key binding error, {code, message, recovery}, or null.
+  property var keybindError: null
   // Whether an inert display fixture replaces observed owner state.
   property bool showcaseActive: false
   // Observed state saved while a display fixture is visible.
@@ -176,7 +182,69 @@ QtObject {
     if (!pending) {
       refresh()
       refreshNotifications()
+      refreshKeybind()
     }
+  }
+  // Parse a helper envelope; anything unreadable counts as a failure.
+  function parseKeybind(stdout) {
+    try {
+      var value = JSON.parse(stdout)
+      return value && typeof value === 'object' ? value : null
+    } catch (e) {
+      return null
+    }
+  }
+  // Plain error for output that is not a usable helper envelope.
+  function keybindFailure(stderr) {
+    return {
+      code: 'WRITE_FAILED',
+      message: stderr || 'The shortcut helper gave no answer.',
+      recovery: 'Try again.'
+    }
+  }
+  // Read whether the quick-switcher key is bound; failures keep the last status.
+  function refreshKeybind(done) {
+    if (showcaseActive)
+      return false
+    runCommand([keybindPath, 'status', '--json'], function (code, stdout, stderr) {
+      var response = parseKeybind(stdout)
+      if (response && response.ok && response.data && typeof response.data.bound === 'boolean') {
+        keybind = {
+          bound: response.data.bound,
+          key: response.data.key || null
+        }
+      } else if (done) {
+        keybindError = response && response.error ? response.error : keybindFailure(stderr)
+      }
+      if (done)
+        done()
+    })
+  }
+  // Add or remove the key binding, then read the status back.
+  function requestKeybind(operation, args) {
+    var argv
+    if (operation === 'keybind-add') {
+      var key = args && args.key
+      if (typeof key !== 'string' || key === '')
+        return false
+      argv = [keybindPath, 'add', '--key', key, '--json']
+    } else {
+      argv = [keybindPath, 'remove', '--json']
+    }
+    pending = true
+    pendingKey = 'keybind'
+    keybindError = null
+    runCommand(argv, function (code, stdout, stderr) {
+      var response = parseKeybind(stdout)
+      var failure = response && response.ok ? null : response && response.error ? response.error : keybindFailure(stderr)
+      refreshKeybind(function () {
+        if (failure)
+          keybindError = failure
+        pending = false
+        pendingKey = ''
+      })
+    })
+    return true
   }
   // Read each notification field independently from the service IPC.
   function refreshNotifications() {
@@ -207,9 +275,11 @@ QtObject {
   }
   // Validate and serialize mutations, then confirm against independent owner readback.
   function request(operation, args) {
-    args = args || []
+    args = args || (operation.indexOf('keybind-') === 0 ? ({}) : [])
     if (showcaseActive || pending)
       return false
+    if (operation === 'keybind-add' || operation === 'keybind-remove')
+      return requestKeybind(operation, args)
     if (operation === 'set dnd') {
       if (notifications.dndAvailability !== 'available' || args.length !== 1 || ['on', 'off'].indexOf(args[0]) < 0)
         return false
