@@ -296,7 +296,7 @@ ShellRoot {
     t.equal(calls.length, 0, 'cleared transport error never restores same-task launch/checkout')
     panel.handleTaskAction('reconnect', 'stable')
     t.equal(calls.pop(), ['reconnect', 'accepted-lost'], 'lost owner recovery reconnects exact accepted ID')
-    t.check(t.findChild(tasks, 'operationStatus').text.indexOf('unconfirmed') >= 0, 'loss remains visible in actual details after global error clearing')
+    t.equal(t.findChild(tasks, 'operationStatus').text, "Can't confirm the action is still running", 'loss remains visible in actual details after global error clearing')
     t.check(t.findChild(tasks, 'operationError').text.indexOf('Owner restarted') >= 0, 'exact retained loss diagnostic remains visible')
     activity.operationChanged({
       id: 'accepted-lost',

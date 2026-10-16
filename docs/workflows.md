@@ -251,7 +251,7 @@ and session guidance. Usage remains available separately.
 result, and any separately reported verification. Finished does not imply tests
 passed. Session focus reaches a verified hosting terminal, but cannot select a
 particular tmux pane. **Reopen session** explicitly resumes a supported native
-session; **Check session again** and **Reconnect observation** inspect an existing
+session; **Check session again** and **Reconnect** inspect an existing
 operation without launching another.
 
 In the bar's Agents panel, Tab switches Tasks, Usage, and Help. In Tasks, ↑↓ or

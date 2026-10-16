@@ -122,7 +122,7 @@ function rows(snapshot, registry, now) {
       var report = reportTime(task.lastReceivedAt, now)
       var canFocus = assigned && task.nativeSessionEligible === true && freshness === "connected"
       var canReopen = assigned && task.nativeSessionEligible === true && !!task.resumeCommand
-      var primary = { kind: "", label: "Session unavailable", local: false }
+      var primary = { kind: "", label: "Session not available", local: false }
       var secondary = { kind: "", label: "" }
       if (state === "finished")
         primary = { kind: "inspect-result", label: "View reported result", local: true }
@@ -147,7 +147,7 @@ function rows(snapshot, registry, now) {
           ? text(p.name, 256)
           : a.status === "unassigned"
             ? "Unassigned checkout"
-            : "Checkout unavailable",
+            : "Checkout not available",
         assigned ? text(co.branch, 512) : "",
         text(a.cwd, 4096)
       ]
@@ -176,7 +176,7 @@ function rows(snapshot, registry, now) {
             ? "Connected"
             : freshness === "connection-lost"
               ? "Connection lost"
-              : "Connection unconfirmed",
+              : "Connection not confirmed",
         context: context,
         path: text(a.cwd),
         branch: assigned ? text(co.branch, 512) : "",
@@ -185,7 +185,7 @@ function rows(snapshot, registry, now) {
           ? "Registered checkout"
           : a.status === "unassigned"
             ? "Unassigned checkout"
-            : "Checkout unavailable",
+            : "Checkout not available",
         assigned: assigned,
         result: text(task.result),
         question: text(task.question),
@@ -287,6 +287,16 @@ function visible(usageCount, list) {
   return usageCount > 0 || list.length > 0
 }
 
+/** Plain display words for raw operation step states; the raw values stay in the data.
+ * @type {{[key:string]:string}} */
+var stepWords = {
+  observed: "confirmed",
+  unconfirmed: "not confirmed",
+  failed: "failed",
+  pending: "checking…",
+  accepted: "started"
+}
+
 /** Retain independent acceptance and observation status; never prescribe a repeat.
  * @param {?TaskData} operation - retained owner operation
  * @param {?TaskData} error - actionable client error
@@ -301,15 +311,15 @@ function operationView(operation, error, pending) {
     op.ownerUnconfirmed
   )
   var label = op.ownerUnconfirmed
-    ? "Accepted operation owner unconfirmed"
+    ? "Can't confirm the action is still running"
     : protectedSubmission
-      ? "Launch acceptance unconfirmed"
+      ? "Couldn't confirm it started"
       : pending || op.state === "accepted" || op.state === "observing"
-        ? "Observing accepted operation"
+        ? "Checking…"
         : op.outcome === "observed"
-          ? "Observed"
+          ? "Confirmed"
           : op.outcome === "partial"
-            ? "Partially observed"
+            ? "Partly confirmed"
             : op.outcome === "failed"
               ? "Action failed"
               : ""
@@ -329,9 +339,9 @@ function operationView(operation, error, pending) {
         return (
           role +
           ": " +
-          (["observed", "unconfirmed", "failed", "pending", "accepted"].indexOf(step.status) >= 0
-            ? step.status
-            : "unconfirmed")
+          (Object.prototype.hasOwnProperty.call(stepWords, step.status)
+            ? stepWords[step.status]
+            : stepWords.unconfirmed)
         )
       })
       .join("\n"),

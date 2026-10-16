@@ -457,7 +457,7 @@ Item {
         objectName: 'taskSetupCommands'
         width: parent.width
         visible: tasks.taskRows.length === 0 && tasks.setupGuideExpanded
-        text: 'Enable reporting (opt-in)\naranea agents adapter install claude\naranea agents adapter install codex\n\nReview provider trust, then start a new CLI session. Configured hooks do not prove trust or observed activity.\n\nCheck availability\naranea agents adapter status claude\naranea agents adapter status codex\n\nRemove owned hooks\naranea agents adapter remove claude\naranea agents adapter remove codex'
+        text: 'Enable reporting (opt-in)\naranea agents adapter install claude\naranea agents adapter install codex\n\nReview provider trust, then start a new CLI session. Configured hooks do not prove trust or recorded activity.\n\nCheck availability\naranea agents adapter status claude\naranea agents adapter status codex\n\nRemove owned hooks\naranea agents adapter remove claude\naranea agents adapter remove codex'
         readOnly: true
         selectByMouse: true
         textFormat: TextEdit.PlainText

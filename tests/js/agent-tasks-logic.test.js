@@ -109,8 +109,16 @@ test("association joins exact IDs and path; provider text is bounded with indepe
   assert.equal(rows.find((r) => r.key === "a").diagnostics, "diagnostic")
   assert.equal(rows.find((r) => r.key === "b").providerLabel, "Codex")
   assert.equal(rows.find((r) => r.key === "b").associationLabel, "Unassigned checkout")
-  assert.equal(rows.find((r) => r.key === "c").associationLabel, "Checkout unavailable")
+  assert.equal(rows.find((r) => r.key === "c").associationLabel, "Checkout not available")
   assert.equal(rows.find((r) => r.key === "c").primary.kind, "")
+})
+test("connection and session wording is plain when freshness or sessions are not known", () => {
+  const rows = logic.rows(
+    { tasks: [task("u", "working", { freshness: undefined, nativeSessionEligible: false })] },
+    registry
+  )
+  assert.equal(rows[0].freshnessLabel, "Connection not confirmed")
+  assert.equal(rows[0].primary.label, "Session not available")
 })
 test("cursor identities survive re-sort; removal and action changes require another reveal", () => {
   assert.equal(typeof logic.reconcileSelection, "function")
@@ -150,7 +158,7 @@ test("retained operation outcomes never advertise a repeated uncertain launch", 
   assert.equal(logic.operationView(op, null, false).canReobserve, true)
   assert.equal(
     logic.operationView(op, null, false).steps,
-    "Hosting terminal: observed\nNative session: unconfirmed"
+    "Hosting terminal: confirmed\nNative session: not confirmed"
   )
   assert.equal(
     logic.operationView({ ...op, submissionPending: true }, null, false).canReobserve,
@@ -168,7 +176,20 @@ test("retained operation outcomes never advertise a repeated uncertain launch", 
     ).canReconnect,
     true
   )
-  assert.equal(logic.operationView({ ...op, outcome: "observed" }, null, false).label, "Observed")
+  assert.equal(logic.operationView({ ...op, outcome: "observed" }, null, false).label, "Confirmed")
+  assert.equal(
+    logic.operationView({ ...op, outcome: "partial" }, null, false).label,
+    "Partly confirmed"
+  )
+  assert.equal(
+    logic.operationView({ ...op, submissionUnconfirmed: true }, null, false).label,
+    "Couldn't confirm it started"
+  )
+  assert.equal(
+    logic.operationView({ ...op, ownerUnconfirmed: true }, null, false).label,
+    "Can't confirm the action is still running"
+  )
+  assert.equal(logic.operationView(op, null, true).label, "Checking…")
 })
 test("approved lifecycle actions vary by exact checkout, native capability and resume availability", () => {
   const expected = {

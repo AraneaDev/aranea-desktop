@@ -147,3 +147,41 @@ test("assignment and return forms say not available instead of unavailable", () 
     []
   )
 })
+
+const agentsDir = path.join(__dirname, "../../plugins/araneadev.agents")
+const agentFiles = ["AgentTasksLogic.js", "AgentTaskDetails.qml", "AgentTasks.qml"]
+const oldStatus =
+  /\b(Unconfirmed|Unavailable|Tools unconfirmed|Awaiting observation|Usage unknown|Launch status unknown)\b/i
+
+/**
+ * Every visible-string scanner applied to the shared agent task view, which
+ * Projects shows under Agents. Same patterns, no allowlist.
+ * @returns {string[]} unique "file: string" entries
+ */
+function agentStrings() {
+  const out = []
+  for (const file of agentFiles) {
+    const source = fs.readFileSync(path.join(agentsDir, file), "utf8")
+    const strings = new Set([
+      ...visibleStrings(source),
+      ...assignedStrings(source),
+      ...jsVisibleStrings(source)
+    ])
+    for (const s of strings) out.push(file + ": " + s)
+  }
+  return out
+}
+
+test("agent task view has no banned internal words in visible strings", () => {
+  assert.deepEqual(
+    agentStrings().filter((s) => banned.test(s.replace(/^[^:]*: /, ""))),
+    []
+  )
+})
+
+test("agent task view has no old status words", () => {
+  assert.deepEqual(
+    agentStrings().filter((s) => oldStatus.test(s.replace(/^[^:]*: /, ""))),
+    []
+  )
+})
