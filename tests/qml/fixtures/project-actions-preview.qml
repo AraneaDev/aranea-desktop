@@ -221,6 +221,14 @@ ShellRoot {
         }
       },
       projectAvailable: true,
+      projectSnapshot: {
+        sessionId: 'preview-session',
+        availability: {
+          ready: true,
+          registry: true,
+          compositor: true
+        }
+      },
       projectActions: actions
     }
   }
