@@ -15,7 +15,7 @@ default_binds='[{"modmask":64,"key":"Return","description":"Terminal","dispatche
 failures=0
 # Fresh bindings file, fake hyprctl first on PATH, default bind list.
 setup() {
-  rm -rf "$XDG_CONFIG_HOME" "${TMPDIR:?}/bin" "$TMPDIR/reloads" "$TMPDIR/reload-status" "$TMPDIR/configerrors.json" "$TMPDIR/PWNED"
+  rm -rf "$XDG_CONFIG_HOME" "${TMPDIR:?}/bin" "$TMPDIR/reloads" "$TMPDIR/reload-status" "$TMPDIR/configerrors.json" "$TMPDIR/configerrors.after.json" "$TMPDIR/cp.count" "$TMPDIR/PWNED"
   mkdir -p "$XDG_CONFIG_HOME/hypr" "$TMPDIR/bin"
   printf '%s\n' 'o.bind("SUPER + RETURN", "Terminal", "uwsm app -- kitty")' '-- a comment' \
     'o.bind("SUPER + CTRL + SHIFT + D", "Toggle Aranea health", "omarchy-shell shell toggle araneadev.health")' >"$file"
@@ -24,7 +24,9 @@ setup() {
 #!/bin/bash
 case "\$*" in
   "binds -j"|"-j binds") cat "$TMPDIR/binds.json" ;;
-  "configerrors -j"|"-j configerrors") cat "$TMPDIR/configerrors.json" 2>/dev/null || echo '[""]' ;;
+  "configerrors -j"|"-j configerrors")
+    if [ -f "$TMPDIR/reloads" ] && [ -f "$TMPDIR/configerrors.after.json" ]; then cat "$TMPDIR/configerrors.after.json"
+    else cat "$TMPDIR/configerrors.json" 2>/dev/null || echo '[""]'; fi ;;
   reload) echo x >>"$TMPDIR/reloads"; exit "\$(cat "$TMPDIR/reload-status" 2>/dev/null || echo 0)" ;;
 esac
 FAKE
@@ -111,6 +113,7 @@ reload_failure_restores() {
   before=$(sha256sum <"$file")
   echo 1 >"$TMPDIR/reload-status"
   expect_code RELOAD_FAILED add --key "SUPER + ALT + P"
+  [[ $(reloads) == 2 ]]
   [[ $(sha256sum <"$file") == "$before" ]]
   [[ -f $file.aranea.bak ]]
 }
@@ -171,6 +174,7 @@ symlink_survives() {
   jq -e '.ok' "$result" >/dev/null
   [[ -L $file ]]
   grep -q -e "$marker" "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua"
+  [[ -f $file.aranea.bak && ! -e $ARANEA_TEST_SANDBOX/dotfiles/bindings.lua.aranea.bak ]]
   run remove
   [[ -L $file ]]
   cmp "$ARANEA_TEST_SANDBOX/dotfiles/bindings.lua" "$TMPDIR/orig"
@@ -183,7 +187,7 @@ symlink_survives() {
 config_errors_restore() {
   setup
   cp "$file" "$TMPDIR/orig"
-  printf '%s' '["", "bindings.lua:4: syntax error"]' >"$TMPDIR/configerrors.json"
+  printf '%s' '["", "bindings.lua:4: syntax error"]' >"$TMPDIR/configerrors.after.json"
   expect_code RELOAD_FAILED add --key "SUPER + ALT + P"
   jq -e '.error.message | contains("syntax error")' "$result" >/dev/null
   cmp "$file" "$TMPDIR/orig"
@@ -229,7 +233,55 @@ unknown_subcommand() {
   expect_code INVALID_REQUEST bogus
 }
 
-cases=(add_writes_one_marked_line readd_replaces remove_deletes_only_ours status_reports conflict_detection_normalises invalid_keys reload_failure_restores missing_file_creates_nothing no_hyprctl odd_files_keep_their_bytes rewrite_failure_keeps_file symlink_survives config_errors_restore lock_gives_busy trailing_whitespace_is_managed conflict_details unknown_subcommand)
+# Catch a failed restore exiting silently, or skipping the second reload.
+restore_failure_reports() {
+  setup
+  # shellcheck disable=SC2016
+  printf '#!/bin/sh\nn=$(cat "%s" 2>/dev/null || echo 0)\necho $((n+1)) >"%s"\n[ "$n" -ge 1 ] && exit 1\nexec %s "$@"\n' "$TMPDIR/cp.count" "$TMPDIR/cp.count" "$(command -v cp)" >"$TMPDIR/bin/cp"
+  chmod +x "$TMPDIR/bin/cp"
+  echo 1 >"$TMPDIR/reload-status"
+  expect_code RELOAD_FAILED add --key "SUPER + ALT + P"
+  jq -e --arg b "$file.aranea.bak" '.error.message | contains($b)' "$result" >/dev/null
+  [[ $(reloads) == 2 ]]
+  [[ $(find "$(dirname "$file")" -name 'bindings.lua.*' ! -name '*.bak' | wc -l) == 0 ]]
+}
+# Catch errors that existed before the change blocking it, or being unreported.
+preexisting_errors_do_not_block() {
+  setup
+  printf '%s' '["", "old problem"]' >"$TMPDIR/configerrors.json"
+  run add --key "SUPER + ALT + P"
+  jq -e '.ok and .data.preexistingErrors == 1' "$result" >/dev/null
+  run remove
+  jq -e '.ok and .data.preexistingErrors == 1' "$result" >/dev/null
+}
+# Catch unreadable config errors being treated as success.
+unreadable_config_errors_fail() {
+  setup
+  cp "$file" "$TMPDIR/orig"
+  printf '%s' 'not json' >"$TMPDIR/configerrors.after.json"
+  expect_code RELOAD_FAILED add --key "SUPER + ALT + P"
+  jq -e '.error.message | contains("could not read config errors")' "$result" >/dev/null
+  cmp "$file" "$TMPDIR/orig"
+  [[ $(reloads) == 2 ]]
+}
+# Catch the lock landing in /tmp, or an unusable lock path exiting silently.
+lock_location() {
+  setup
+  (
+    unset XDG_RUNTIME_DIR
+    run add --key "SUPER + ALT + P"
+    jq -e '.ok' "$result" >/dev/null
+  )
+  [[ -f $XDG_STATE_HOME/aranea/aranea-keybind.lock && $(stat -c %a "$XDG_STATE_HOME/aranea") == 700 ]]
+  XDG_RUNTIME_DIR="$ARANEA_TEST_SANDBOX/nowhere" expect_code BUSY add --key "SUPER + ALT + O"
+}
+# Catch an unknown add option reporting a key error.
+unknown_add_option() {
+  setup
+  expect_code INVALID_REQUEST add --bogus
+}
+
+cases=(add_writes_one_marked_line readd_replaces remove_deletes_only_ours status_reports conflict_detection_normalises invalid_keys reload_failure_restores missing_file_creates_nothing no_hyprctl odd_files_keep_their_bytes rewrite_failure_keeps_file symlink_survives config_errors_restore lock_gives_busy trailing_whitespace_is_managed conflict_details unknown_subcommand restore_failure_reports preexisting_errors_do_not_block unreadable_config_errors_fail lock_location unknown_add_option)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

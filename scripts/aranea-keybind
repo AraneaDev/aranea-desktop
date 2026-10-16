@@ -11,12 +11,15 @@
 # Errors: INVALID_KEY INVALID_REQUEST KEY_TAKEN NO_BINDINGS_FILE RELOAD_FAILED
 #         WRITE_FAILED BUSY HYPRCTL_UNAVAILABLE
 set -euo pipefail
+baseline='[]'
+preexisting=0
 
 marker='-- aranea:projects-switcher'
 bindings="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/bindings.lua"
-# A symlinked file (stow, chezmoi) is edited where it really lives.
-bindings=$(readlink -f -- "$bindings" 2>/dev/null || printf '%s' "$bindings")
+# The backup sits beside the path as given; a symlinked file (stow, chezmoi)
+# is edited where it really lives.
 backup="$bindings.aranea.bak"
+bindings=$(readlink -f -- "$bindings" 2>/dev/null || printf '%s' "$bindings")
 
 # Print a success envelope around the given JSON data.
 ok() { jq -cn --argjson data "$1" '{ok:true,data:$data,error:null}'; }
@@ -135,34 +138,64 @@ install_rewrite() {
   fi
 }
 
-# Put the backed up bytes back after a failed reload.
+# Put the backed up bytes back; fails (leaving no temp file) if any step fails.
 restore_backup() {
   local tmp
-  tmp=$(mktemp "$bindings.XXXXXX")
-  cp -p "$backup" "$tmp"
-  mv "$tmp" "$bindings"
+  tmp=$(mktemp "$bindings.XXXXXX") || return 1
+  if ! cp -p "$backup" "$tmp" || ! mv "$tmp" "$bindings"; then
+    rm -f "$tmp"
+    return 1
+  fi
 }
 
-# Reload Hyprland; on a reload or Lua config error restore the backup, reload again and fail RELOAD_FAILED.
+# Print the non-empty Hyprland config errors as a JSON array; fail if unreadable.
+config_errors() {
+  local raw
+  raw=$(hyprctl -j configerrors 2>/dev/null) || return 1
+  jq -c '[.[] | strings | select(length > 0)]' <<<"$raw" 2>/dev/null
+}
+
+# Undo a change for REASON: restore, reload again, then fail RELOAD_FAILED.
+undo_and_fail() {
+  local restored=1
+  restore_backup || restored=0
+  hyprctl reload >/dev/null 2>&1 || true
+  if ((restored)); then
+    fail RELOAD_FAILED "$1" "Your bindings file is as it was. Check it for mistakes, then try again."
+  fi
+  fail RELOAD_FAILED "$1 The old file could not be put back; it is saved at $backup." "Copy $backup over your bindings file, then reload Hyprland."
+}
+
+# Reload Hyprland and undo the change on a reload error or any new config error; sets preexisting.
 reload_or_restore() {
-  local out rc=0 errors="" first=""
+  local out rc=0 after="" fresh
   out=$(hyprctl reload 2>&1) || rc=$?
   if ((rc != 0)) || [[ ${out,,} == *error* ]]; then
-    restore_backup
-    fail RELOAD_FAILED "Hyprland did not accept the change, so it was undone." "Your bindings file is as it was. Check it for mistakes, then try again."
+    undo_and_fail "Hyprland did not accept the change, so it was undone."
   fi
-  errors=$(hyprctl -j configerrors 2>/dev/null) || errors=""
-  first=$(jq -r '[.[] | strings | select(length > 0)][0] // empty' <<<"$errors" 2>/dev/null) || first=""
-  if [[ -n $first ]]; then
-    restore_backup
-    hyprctl reload >/dev/null 2>&1 || true
-    fail RELOAD_FAILED "Hyprland found a problem, so the change was undone: $first" "Your bindings file is as it was. Check it for mistakes, then try again."
-  fi
+  after=$(config_errors) || undo_and_fail "Hyprland could not read config errors after the change, so it was undone (could not read config errors)."
+  fresh=$(jq -r --argjson before "$baseline" '. - $before | .[0] // empty' <<<"$after")
+  [[ -z $fresh ]] || undo_and_fail "Hyprland found a problem, so the change was undone: $fresh"
+  preexisting=$(jq -r 'length' <<<"$baseline")
+}
+
+# Back up the bindings file and note the config errors that already exist.
+begin_change() {
+  cp -p "$bindings" "$backup" || fail WRITE_FAILED "The backup could not be written, so nothing was changed." "Check that the hypr folder is writable, then try again."
+  baseline=$(config_errors) || baseline='[]'
 }
 
 # Take the exclusive lock for add and remove, or fail BUSY.
 take_lock() {
-  exec 9>"${XDG_RUNTIME_DIR:-/tmp}/aranea-keybind.lock"
+  local lock dir
+  if [[ -n ${XDG_RUNTIME_DIR:-} ]]; then
+    lock="$XDG_RUNTIME_DIR/aranea-keybind.lock"
+  else
+    dir="${XDG_STATE_HOME:-$HOME/.local/state}/aranea"
+    { mkdir -p "$dir" && chmod 700 "$dir"; } 2>/dev/null || fail BUSY "The change lock could not be created." "Check that your state folder is writable, then try again."
+    lock="$dir/aranea-keybind.lock"
+  fi
+  { exec 9>>"$lock"; } 2>/dev/null || fail BUSY "The change lock could not be opened." "Check that your runtime folder is writable, then try again."
   flock -w "${ARANEA_KEYBIND_LOCK_WAIT:-10}" 9 || fail BUSY "Another key binding change is running." "Wait a moment, then try again."
 }
 
@@ -191,7 +224,7 @@ cmd_add() {
         shift 2 || true
         ;;
       --json) shift ;;
-      *) fail INVALID_KEY "Unknown option $1." "Use add --key \"SUPER + ALT + P\"." ;;
+      *) fail INVALID_REQUEST "Unknown option $1." "Use add --key \"SUPER + ALT + P\"." ;;
     esac
   done
   canonical_key "$key"
@@ -202,10 +235,10 @@ cmd_add() {
   taken=$(taken_by "$key") || fail HYPRCTL_UNAVAILABLE "Hyprland could not list its key bindings." "Run this from your Hyprland session."
   [[ -z $taken ]] || fail KEY_TAKEN "$key is already used by \"$taken\"." "Pick a different key combination."
   line="o.bind(\"$key\", \"Aranea project switcher\", \"omarchy-shell shell toggle araneadev.projects '{\\\"mode\\\":\\\"switcher\\\"}'\") $marker"
-  cp -p "$bindings" "$backup"
+  begin_change
   install_rewrite add "$line"
   reload_or_restore
-  ok "$(jq -cn --arg k "$key" '{bound:true,key:$k}')"
+  ok "$(jq -cn --arg k "$key" --argjson n "$preexisting" '{bound:true,key:$k,preexistingErrors:$n}')"
 }
 
 # Remove the marked binding, if there is one.
@@ -217,10 +250,10 @@ cmd_remove() {
     return
   fi
   command -v hyprctl >/dev/null 2>&1 || fail HYPRCTL_UNAVAILABLE "Hyprland could not be reached." "Run this from your Hyprland session."
-  cp -p "$bindings" "$backup"
+  begin_change
   install_rewrite remove
   reload_or_restore
-  ok '{"removed":true}'
+  ok "$(jq -cn --argjson n "$preexisting" '{removed:true,preexistingErrors:$n}')"
 }
 
 # Dispatch the subcommand.
