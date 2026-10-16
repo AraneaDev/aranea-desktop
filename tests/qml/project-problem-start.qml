@@ -333,6 +333,14 @@ ShellRoot {
     details.operation = roleOperation('terminal', 'unconfirmed', true)
     var role = t.findChild(details, 'roleProblem:terminal')
     t.equal(t.findChild(role, 'projectProblemTitle').text, "Couldn't confirm it started", 'role uncertainty title')
+    t.equal(t.findChild(role, 'projectProblemBody').text, "Projects couldn't confirm the terminal window opened. It may still open.", 'terminal body names the terminal')
+    details.operation = roleOperation('editor', 'unconfirmed', true)
+    t.equal(t.findChild(t.findChild(details, 'roleProblem:editor'), 'projectProblemBody').text, "Projects couldn't confirm the editor window opened. It may still open.", 'editor body names the editor')
+    details.operation = roleOperation('agent', 'unconfirmed', true)
+    t.equal(t.findChild(t.findChild(details, 'agentUnconfirmed'), 'projectProblemBody').text, "Projects couldn't confirm the agent window opened. It may still open.", 'agent body names the agent')
+    details.operation = roleOperation('terminal', 'uncertain', true)
+    t.check(role.visible && t.findChild(role, 'projectProblemTitle').text === "Couldn't confirm it started", 'an uncertain step shows the problem too')
+    details.operation = roleOperation('terminal', 'unconfirmed', true)
     t.findChild(role, 'projectProblemAction:checkAgain').clicked()
     t.findChild(role, 'projectProblemAction:openAnother').clicked()
     t.equal(host.opens, [
@@ -362,7 +370,16 @@ ShellRoot {
     details.operation = roleOperation('editor', 'failed', false)
     t.check(!t.findChild(details, 'roleProblem:editor').visible, 'a failed role is not an unconfirmed problem')
     details.operation = roleOperation('terminal', 'unconfirmed', true)
+    t.equal(role.copyText(), 'WINDOW_TARGET_UNCONFIRMED: terminal window', 'copy text keeps code and message')
+    details.operation = Object.assign({}, roleOperation('terminal', 'failed', false), {
+      error: {
+        message: 'No code here.'
+      }
+    })
+    t.equal(t.findChild(details, 'projectOperationError').copyText(), 'No code here.', 'copy text without a code has no stray colon')
+    details.operation = roleOperation('terminal', 'unconfirmed', true)
     var all = texts(details).concat(texts(t.findChild(details, 'projectOperationError')))
+    t.check(all.indexOf('Open · done') >= 0, 'the open status reads as a plain word')
     t.equal(banned(texts(role)), [], 'role recovery has no banned words')
     t.equal(banned(all), [], 'Details has no banned words')
     t.done()

@@ -8,6 +8,7 @@ import QtQuick.Controls
 import qs.Commons
 import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
+import "ProjectOverview.js" as Overview
 import "ProjectProfiles.js" as Profiles
 import "ProjectProblems.js" as Problems
 
@@ -374,7 +375,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !details.headerProvided || !!details.operation || !details.openAvailable
-    text: !details.openAvailable ? 'Cannot open a workspace right now. Make sure Projects and the window manager are running, then retry.' : details.operation ? 'Open · ' + (details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
+    text: !details.openAvailable ? 'Cannot open a workspace right now. Make sure Projects and the window manager are running, then retry.' : details.operation ? 'Open · ' + Overview.outcomeLabel(details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
@@ -749,8 +750,8 @@ ColumnLayout {
       id: role
       required property string modelData
       Layout.fillWidth: true
-      // The latest step of this role is unconfirmed, whatever state the operation is in.
-      readonly property bool unconfirmed: !!details.project && !!details.operation && details.operation.projectId === details.project.id && details.roleStatus(modelData) === 'unconfirmed'
+      // The latest step of this role is not confirmed, whatever state the operation is in.
+      readonly property bool unconfirmed: !!details.project && !!details.operation && details.operation.projectId === details.project.id && ['unconfirmed', 'uncertain'].indexOf(details.roleStatus(modelData)) >= 0
       visible: details.recoveryAllowed(modelData, 'retry') || unconfirmed || details.recoveryAllowed(modelData, 'new')
       Aranea.ActionButton {
         text: 'Retry ' + role.modelData
@@ -770,6 +771,7 @@ ColumnLayout {
           message: role.modelData + ' window'
         }, {
           surface: 'details',
+          subject: role.modelData,
           actions: (details.recoveryAllowed(role.modelData, 'reobserve') ? ['checkAgain'] : []).concat(details.recoveryAllowed(role.modelData, 'new') ? ['openAnother'] : [])
         }) : null
         onActionRequested: function (id) {

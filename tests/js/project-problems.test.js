@@ -209,3 +209,34 @@ test("details keep the original code, message and recovery", () => {
     recovery: "Activate Aranea and retry."
   })
 })
+
+test("role window problems name the role and run problems talk about the run", () => {
+  const body = (role) =>
+    p.problem({ code: "WINDOW_TARGET_UNCONFIRMED" }, { surface: "details", subject: role, actions: ALL }).body
+  assert.equal(body("agent"), "Projects couldn't confirm the agent window opened. It may still open.")
+  assert.equal(body("editor"), "Projects couldn't confirm the editor window opened. It may still open.")
+  assert.equal(body("terminal"), "Projects couldn't confirm the terminal window opened. It may still open.")
+  assert.equal(
+    p.problem({ code: "SUBMISSION_UNCONFIRMED" }, { surface: "run", actions: ALL }).body,
+    "Projects couldn't tell whether the run started. It may still be running."
+  )
+  assert.equal(
+    p.problem({ code: "SUBMISSION_UNCONFIRMED" }, { surface: "actions", actions: ALL }).body,
+    "Projects couldn't tell whether it started. It may still open."
+  )
+})
+
+test("a missing agent names the tool through its plain backend message", () => {
+  assert.equal(
+    p.problem({ code: "AGENT_MISSING", message: "Codex isn't installed." }, {}).body,
+    "Codex isn't installed."
+  )
+  assert.equal(
+    p.problem({ code: "AGENT_MISSING", message: "Owner has no binding." }, {}).body,
+    "A tool this needs isn't installed."
+  )
+  assert.equal(
+    p.problem({ code: "TOOL_MISSING", message: "kitty is not installed." }, {}).body,
+    "A tool this needs isn't installed."
+  )
+})

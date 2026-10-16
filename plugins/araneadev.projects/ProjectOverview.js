@@ -194,6 +194,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       codex: "Codex",
       claude: "Claude Code"
     }
+    var raws = []
     var statuses = (e.profileSnapshot.roles || []).map(function (/** @type {string} */ role) {
       var operation = operations.find(function (/** @type {OverviewData} */ op) {
         return (op.steps || []).some(function (/** @type {OverviewData} */ step) { return step.role === role })
@@ -220,12 +221,13 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
           " · " +
           label +
           " · " +
-          status +
+          stepLabel(status) +
           (step && (step.error || step.code)
             ? " · " + ((step.error && step.error.message) || step.code)
             : "")
       )
-      return role + " " + status
+      raws.push(status)
+      return role + " " + stepLabel(status)
     })
     return {
       title: e.profileSnapshot.name + " · Workspace " + e.workspaceId,
@@ -235,8 +237,8 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       target: { projectId: project.id, environmentId: e.id },
       controls: controls,
       active: observed.length > 0,
-      attention: statuses.some(function (/** @type {string} */ value) {
-        return value.indexOf("observed") < 0
+      attention: raws.some(function (/** @type {string} */ value) {
+        return value !== "observed"
       }),
       createdAt: e.createdAt || 0
     }
@@ -248,7 +250,41 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
   return result
 }
 
-if (typeof module !== "undefined") module.exports = { overview, activitySummary, ageLabel, gitFiles }
+/** Plain word for one role step status; the raw value stays in the data.
+ * @param {string} [status] - raw step status
+ * @returns {string} display word
+ */
+function stepLabel(status) {
+  /** @type {{[key:string]:string}} */
+  var words = {
+    observed: "open",
+    unconfirmed: "not confirmed",
+    uncertain: "not confirmed",
+    failed: "failed",
+    missing: "missing",
+    skipped: "skipped"
+  }
+  return (status && words[status]) || "not available"
+}
+
+/** Plain phrase for an operation outcome (or state when there is no outcome yet).
+ * @param {?string} [value] - raw outcome or state
+ * @returns {string} display phrase
+ */
+function outcomeLabel(value) {
+  /** @type {{[key:string]:string}} */
+  var words = {
+    observed: "opened",
+    partial: "partly opened",
+    failed: "failed",
+    accepted: "starting",
+    completed: "done",
+    running: "running"
+  }
+  return (value && words[value]) || "not available"
+}
+
+if (typeof module !== "undefined") module.exports = { overview, stepLabel, outcomeLabel, activitySummary, ageLabel, gitFiles }
 
 /** Summarize exact-checkout observations with navigation-only destinations.
  * @param {OverviewData} model - scoped Overview projection

@@ -51,7 +51,7 @@ ColumnLayout {
   // Technical line handed to the clipboard.
   function copyText() {
     var d = view.problem.details
-    return d.code + ': ' + d.message + (d.recovery ? ' (' + d.recovery + ')' : '')
+    return (d.code ? d.code + ': ' : '') + d.message + (d.recovery ? ' (' + d.recovery + ')' : '')
   }
   visible: !!view.problem
   spacing: 6

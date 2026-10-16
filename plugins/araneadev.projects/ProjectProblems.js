@@ -171,6 +171,10 @@ var BODIES = {
 /** @type {{[key:string]:boolean}} */
 var KEEP_MESSAGE = { git: true, notAllowed: true }
 
+/** Codes whose plain backend message names the tool and is kept as the body. */
+/** @type {{[key:string]:boolean}} */
+var KEEP_CODE_MESSAGE = { AGENT_MISSING: true }
+
 /** Git codes worth retrying as they are. */
 /** @type {{[key:string]:boolean}} */
 var TRANSIENT_GIT = { GIT_TIMEOUT: true, AUTH_REQUIRED: true }
@@ -217,7 +221,7 @@ function preferred(kind, code, surface) {
 /**
  * Turn any error into a plain problem with at most two actions.
  * @param {*} error - {code, message, recovery}; may be missing or partial
- * @param {*} context - {surface, operation, actions:[ids the caller can do]}
+ * @param {*} context - {surface, operation, subject (role shown in a window problem), actions:[ids the caller can do]}
  * @returns {{kind:string,title:string,body:string,actions:{id:string,label:string}[],details:{code:string,message:string,recovery:string}}} plain problem
  */
 function problem(error, context) {
@@ -227,7 +231,14 @@ function problem(error, context) {
   var message = typeof e.message === "string" ? e.message : ""
   var recovery = typeof e.recovery === "string" ? e.recovery : ""
   var kind = kindOf(code)
-  var body = KEEP_MESSAGE[kind] && message && !bannedIn(message) ? message : BODIES[kind]
+  var keep = (KEEP_MESSAGE[kind] || KEEP_CODE_MESSAGE[code]) && message && !bannedIn(message)
+  var body = keep ? message : BODIES[kind]
+  if (!keep && kind === "unconfirmed") {
+    if (c.surface === "details" && typeof c.subject === "string" && c.subject)
+      body = "Projects couldn't confirm the " + c.subject + " window opened. It may still open."
+    else if (c.surface === "run")
+      body = "Projects couldn't tell whether the run started. It may still be running."
+  }
   var allowed = Array.isArray(c.actions) ? c.actions : []
   var actions = preferred(kind, code, c.surface || "")
     .filter(function (id) {
