@@ -17,6 +17,8 @@ source "$script_dir/lib/projects-registry.sh"
 source "$script_dir/lib/projects-cli.sh"
 # shellcheck source=scripts/lib/project-actions-cli.sh
 source "$script_dir/lib/project-actions-cli.sh"
+# shellcheck source=scripts/lib/project-git-cli.sh
+source "$script_dir/lib/project-git-cli.sh"
 # shellcheck source=scripts/lib/agents-cli.sh
 source "$script_dir/lib/agents-cli.sh"
 if [[ ${1:-} == agents ]]; then
@@ -24,6 +26,8 @@ if [[ ${1:-} == agents ]]; then
   agents_cli_main "$@"
 elif [[ ${1:-} == projects && (${2:-} == actions || ${2:-} == runs) ]]; then
   project_actions_cli_main "$@"
+elif [[ ${1:-} == projects && (${2:-} == git || ${2:-} == task) ]]; then
+  project_git_cli_main "$@"
 else
   projects_cli_main "$@"
 fi
