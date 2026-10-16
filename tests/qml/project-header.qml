@@ -93,7 +93,7 @@ ShellRoot {
     t.check(header.acceptanceUnknown !== undefined, 'header distinguishes unknown acceptance from preparation')
     if (header.acceptanceUnknown !== undefined) {
       header.acceptanceUnknown = true
-      t.equal(t.findChild(header, 'projectPrimaryStart').text, 'Launch status unknown', 'unknown acknowledgement is not ongoing preparation')
+      t.equal(t.findChild(header, 'projectPrimaryStart').text, 'Starting…', 'unknown acknowledgement is not ongoing preparation')
       header.acceptanceUnknown = false
     }
     header.displayOnly = true

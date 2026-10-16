@@ -93,14 +93,14 @@ function runLabel(run) {
     succeeded: "Command succeeded",
     failed: "Command failed",
     stopped: "Stopped",
-    unconfirmed: "Unconfirmed"
+    unconfirmed: "Not confirmed"
   }
-  var process = labels[run.processState] || "Unavailable"
+  var process = labels[run.processState] || "Not available"
   if (
     run.submissionUnconfirmed &&
     ["succeeded", "failed", "stopped"].indexOf(run.processState) >= 0
   )
-    process += " · Cleanup unconfirmed"
+    process += " · Cleanup not confirmed"
   var preview = "Preview not checked"
   if (run.readiness === "reachable")
     preview =

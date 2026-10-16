@@ -75,9 +75,9 @@ test("activity summary never presents lost or uncertain task connections as live
   )
   const summary = JSON.parse(JSON.stringify(logic.activitySummary(result)))
   assert.deepEqual(summary, [
-    { label: "1 run unconfirmed", section: "actions", attention: true },
+    { label: "1 run not confirmed", section: "actions", attention: true },
     { label: "1 agent disconnected", section: "agents", attention: false },
-    { label: "1 agent connection unconfirmed", section: "agents", attention: false }
+    { label: "1 agent connection not confirmed", section: "agents", attention: false }
   ])
   assert.deepEqual(
     JSON.parse(JSON.stringify(logic.activitySummary(model({}, {}, {}, null, "missing")))),
@@ -125,8 +125,8 @@ test("unavailable observers replace retained live chips until a fresh read succe
   assert.deepEqual(
     JSON.parse(JSON.stringify(logic.activitySummary(result, { actions: false, agents: false }))),
     [
-      { label: "Action status unavailable", section: "actions", attention: true },
-      { label: "Agent status unavailable", section: "agents", attention: true }
+      { label: "Action status not available", section: "actions", attention: true },
+      { label: "Agent status not available", section: "agents", attention: true }
     ]
   )
   assert.deepEqual(
@@ -254,14 +254,14 @@ test("saved workspace locations remain discoverable without claiming live tools"
     1000
   )
   assert.equal(result.workspaces.length, 1)
-  assert.match(result.workspaces[0].status, /unconfirmed/)
+  assert.match(result.workspaces[0].status, /tools not checked/)
 })
 
 test("observation age stays compact and marks invalid or future clocks", () => {
   assert.equal(logic.ageLabel(60000, 120000), "1m ago")
   assert.equal(logic.ageLabel(0, 7200000), "2h ago")
   assert.equal(logic.ageLabel(10, 0), "clock ahead")
-  assert.equal(logic.ageLabel(null, 0), "time unavailable")
+  assert.equal(logic.ageLabel(null, 0), "time not available")
 })
 
 // Missing or mutually exclusive grouping would hide paths or undercount overlap.
@@ -338,7 +338,7 @@ test("environments retain snapshots across checkout selection and expose exact R
   const row = result.workspaces[0]
   assert.equal(row.title, "Original terminal · Workspace 3")
   assert.match(row.detail, /feature.*launch|launch.*feature/)
-  assert.match(row.status, /terminal.*observed.*agent.*failed/i)
+  assert.match(row.status, /terminal open.*agent failed/i)
   assert.deepEqual(JSON.parse(JSON.stringify(row.target)), {
     projectId: "p",
     environmentId: "e-one"
@@ -371,4 +371,93 @@ test("recovering one environment role retains the latest outcome for its other r
     }
   )
   assert.ok(result.workspaces[0].controls.some((c) => c.method === "retry:agent"))
+})
+
+test("workspace rows never show internal state words for any step status", () => {
+  const banned =
+    /\b(acceptance|receipt|owner|observation|observe|binding|exact|retained|IPC|replay|resubmit|unconfirmed|observed)\b/i
+  const statuses = [
+    "observed",
+    "unconfirmed",
+    "uncertain",
+    "failed",
+    "missing",
+    "skipped",
+    "other-new-value",
+    undefined
+  ]
+  for (const status of statuses) {
+    const environment = {
+      id: "e",
+      projectId: "p",
+      checkoutId: "c",
+      workspaceId: 1,
+      profileSnapshot: { name: "Work", roles: ["editor", "terminal", "agent"] },
+      checkoutSnapshot: { path: "/repo", branch: "main" },
+      resolvedTools: { editorId: "code", terminalId: "kitty", agentId: "codex" },
+      observedRoles: status === "observed" ? ["editor", "terminal", "agent"] : []
+    }
+    const steps = ["editor", "terminal", "agent"].map((role) => ({
+      role,
+      status,
+      error: status === "failed" ? { message: "Provider is not installed." } : undefined
+    }))
+    const result = model(
+      {},
+      {},
+      { environments: [environment], operations: [{ environmentId: "e", steps }] }
+    )
+    const row = result.workspaces[0]
+    for (const text of [row.title, row.status, row.detail, row.fullDetail])
+      assert.doesNotMatch(text, banned, "status " + status + ": " + text)
+  }
+  const raw = logic.overview(
+    project,
+    "c",
+    null,
+    {},
+    {},
+    {
+      environments: [
+        {
+          id: "e",
+          projectId: "p",
+          checkoutId: "c",
+          workspaceId: 1,
+          profileSnapshot: { name: "Work", roles: ["terminal", "agent"] },
+          checkoutSnapshot: { path: "/repo", branch: "main" },
+          resolvedTools: { terminalId: "kitty", agentId: "codex" },
+          observedRoles: ["terminal"]
+        }
+      ]
+    },
+    100000
+  ).workspaces[0]
+  assert.equal(raw.status, "terminal open \u00b7 agent not confirmed")
+  assert.ok(raw.attention, "an unconfirmed role still needs attention")
+  assert.ok(
+    raw.controls.some((c) => c.method === "reobserve:agent"),
+    "logic still uses the raw status"
+  )
+})
+
+test("operation outcomes and states read as plain words", () => {
+  const words = [
+    "observed",
+    "partial",
+    "failed",
+    "accepted",
+    "completed",
+    "running",
+    "something-new",
+    null,
+    undefined
+  ]
+  for (const value of words) {
+    const text = logic.outcomeLabel(value)
+    assert.doesNotMatch(text, /\b(observed|unconfirmed|acceptance|owner|receipt)\b/i, String(value))
+    assert.ok(text.length > 0)
+  }
+  assert.equal(logic.outcomeLabel("observed"), "opened")
+  assert.equal(logic.outcomeLabel("partial"), "partly opened")
 })

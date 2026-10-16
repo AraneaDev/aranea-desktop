@@ -8,7 +8,9 @@ import QtQuick.Controls
 import qs.Commons
 import qs.Ui as Ui
 import "../araneadev.shared" as Aranea
+import "ProjectOverview.js" as Overview
 import "ProjectProfiles.js" as Profiles
+import "ProjectProblems.js" as Problems
 
 ColumnLayout {
   id: details
@@ -254,6 +256,80 @@ ColumnLayout {
       return !!step && step.status === 'unconfirmed' && step.reobserveAvailable === true
     return !!step && (kind === 'retry' ? ['failed', 'missing'].indexOf(step.status) >= 0 : ['unconfirmed', 'uncertain'].indexOf(step.status) >= 0)
   }
+  // One automatic re-check per role and operation, three seconds after it is first offered.
+  property int roleAutoDelay: 3000
+  // Operation and role pairs already scheduled; each is checked automatically only once.
+  property var autoReobserved: ({})
+  // Roles waiting for their one automatic re-check.
+  property var autoRoleQueue: []
+  // Queue the roles whose one automatic re-check is now allowed.
+  function scanAutoReobserve(): void {
+    if (displayOnly || !windowOpen || !operation || !operation.id)
+      return
+    ['editor', 'terminal', 'agent'].forEach(function (role) {
+      var key = operation.id + ':' + role
+      if (autoReobserved[key] || !recoveryAllowed(role, 'reobserve'))
+        return
+      autoReobserved[key] = true
+      autoRoleQueue = autoRoleQueue.concat([
+        {
+          key: key,
+          role: role
+        }
+      ])
+    })
+    if (autoRoleQueue.length && !roleAutoTimer.running)
+      Qt.callLater(function () {
+        if (autoRoleQueue.length && !roleAutoTimer.running) {
+          roleAutoTimer.interval = roleAutoDelay
+          roleAutoTimer.start()
+        }
+      })
+  }
+  Timer {
+    id: roleAutoTimer
+    repeat: false
+    onTriggered: {
+      var next = details.autoRoleQueue[0]
+      details.autoRoleQueue = details.autoRoleQueue.slice(1)
+      // A reobserve only reads; it never launches a window.
+      if (next && !details.displayOnly && details.windowOpen && !details.pending && !!details.operation && !!details.operation.id && next.key === details.operation.id + ':' + next.role)
+        details.recover(next.role, 'reobserve')
+      if (details.autoRoleQueue.length) {
+        roleAutoTimer.interval = details.roleAutoDelay
+        roleAutoTimer.start()
+      }
+    }
+  }
+  onOperationChanged: scanAutoReobserve()
+  onWindowOpenChanged: if (!windowOpen) {
+    roleAutoTimer.stop()
+    autoRoleQueue = []
+  } else
+    scanAutoReobserve()
+  onDisplayOnlyChanged: if (displayOnly) {
+    roleAutoTimer.stop()
+    autoRoleQueue = []
+  } else
+    scanAutoReobserve()
+  // Status of the latest step reported for one role, or an empty string.
+  function roleStatus(role: string): string {
+    var steps = operation ? (operation.steps || []).filter(function (s) {
+      return s.role === role
+    }) : []
+    return steps.length ? steps[steps.length - 1].status : ''
+  }
+  // Folder picker of one checkout, or null when none is shown.
+  function locatorFor(checkoutId: string): var {
+    if (guidedSetup || !checkoutId)
+      return null
+    for (var i = 0; i < checkoutRepeater.count; i++) {
+      var item = checkoutRepeater.itemAt(i)
+      if (item && item.checkoutId === checkoutId)
+        return item.locator
+    }
+    return null
+  }
   // Explicit recovery requests do not retry ordinary Open automatically.
   function recover(role: string, kind: string): void {
     if (displayOnly || pending || !openAvailable || !project || !recoveryAllowed(role, kind))
@@ -299,7 +375,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !details.headerProvided || !!details.operation || !details.openAvailable
-    text: !details.openAvailable ? 'Workspace opening unavailable. Restore the project owner and compositor, then retry.' : details.operation ? 'Open · ' + (details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
+    text: !details.openAvailable ? 'Cannot open a workspace right now. Make sure Projects and the window manager are running, then retry.' : details.operation ? 'Open · ' + Overview.outcomeLabel(details.operation.outcome || details.operation.state) : 'Open uses saved preferences.'
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
@@ -330,12 +406,22 @@ ColumnLayout {
       }
     }
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    id: operationProblem
     objectName: 'projectOperationError'
     Layout.fillWidth: true
-    visible: !!details.operation && !!details.operation.error
-    text: details.operation && details.operation.error ? details.operation.error.message + (details.operation.error.recovery ? ' ' + details.operation.error.recovery : '') : ''
-    color: Aranea.DesignTokens.attention
+    displayOnly: details.displayOnly
+    pointerGate: details.pointerGate
+    // The checkout picker of the failed operation, when Locate folder can be offered.
+    readonly property var locator: details.locatorFor(details.operation ? details.operation.checkoutId : '')
+    problem: details.operation && details.operation.error ? Problems.problem(details.operation.error, {
+      surface: 'details',
+      actions: operationProblem.locator ? ['locate'] : []
+    }) : null
+    onActionRequested: function (id) {
+      if (id === 'locate' && operationProblem.locator)
+        operationProblem.locator.choose()
+    }
   }
   Aranea.ActionButton {
     objectName: 'startAlternativeAgent'
@@ -596,10 +682,13 @@ ColumnLayout {
       }
     }
     Repeater {
+      id: checkoutRepeater
       model: details.project ? details.project.checkouts : []
       ColumnLayout {
         id: checkout
         required property var modelData
+        readonly property string checkoutId: modelData.id
+        readonly property alias locator: locatePicker
         Layout.fillWidth: true
         Aranea.UiLabel {
           Layout.fillWidth: true
@@ -623,6 +712,7 @@ ColumnLayout {
           })
         }
         ProjectFolderPicker {
+          id: locatePicker
           visible: !details.guidedSetup
           objectName: 'locateFolder:' + details.project.id + ':' + checkout.modelData.id
           windowOpen: details.windowOpen
@@ -654,18 +744,15 @@ ColumnLayout {
       onClicked: details.removeRequested(details.project.id)
     }
   }
-  Aranea.UiLabel {
-    objectName: 'agentUnconfirmed'
-    Layout.fillWidth: true
-    visible: !!details.project && !!details.operation && details.operation.projectId === details.project.id && !!details.agentStep && details.agentStep.status === 'unconfirmed'
-    text: "Couldn't confirm the agent window opened."
-  }
   Repeater {
     model: ['editor', 'terminal', 'agent']
-    RowLayout {
+    ColumnLayout {
       id: role
       required property string modelData
-      visible: details.recoveryAllowed(modelData, 'retry') || details.recoveryAllowed(modelData, 'new')
+      Layout.fillWidth: true
+      // The latest step of this role is not confirmed, whatever state the operation is in.
+      readonly property bool unconfirmed: !!details.project && !!details.operation && details.operation.projectId === details.project.id && ['unconfirmed', 'uncertain'].indexOf(details.roleStatus(modelData)) >= 0
+      visible: details.recoveryAllowed(modelData, 'retry') || unconfirmed || details.recoveryAllowed(modelData, 'new')
       Aranea.ActionButton {
         text: 'Retry ' + role.modelData
         visible: details.recoveryAllowed(role.modelData, 'retry')
@@ -673,20 +760,23 @@ ColumnLayout {
         pointerGate: details.pointerGate
         onClicked: details.recover(role.modelData, 'retry')
       }
-      Aranea.ActionButton {
-        objectName: 'reobserveRole:' + role.modelData
-        text: 'Check ' + role.modelData + ' again'
-        visible: details.recoveryAllowed(role.modelData, 'reobserve')
-        enabled: !details.displayOnly && !details.pending && details.openAvailable
+      ProjectProblem {
+        objectName: role.modelData === 'agent' ? 'agentUnconfirmed' : 'roleProblem:' + role.modelData
+        Layout.fillWidth: true
+        displayOnly: details.displayOnly
+        actionsEnabled: !details.pending && details.openAvailable
         pointerGate: details.pointerGate
-        onClicked: details.recover(role.modelData, 'reobserve')
-      }
-      Aranea.ActionButton {
-        text: 'Open new ' + role.modelData + ' window'
-        visible: details.recoveryAllowed(role.modelData, 'new')
-        enabled: !details.displayOnly && !details.pending && details.openAvailable
-        pointerGate: details.pointerGate
-        onClicked: details.recover(role.modelData, 'new')
+        problem: role.unconfirmed ? Problems.problem({
+          code: 'WINDOW_TARGET_UNCONFIRMED',
+          message: role.modelData + ' window'
+        }, {
+          surface: 'details',
+          subject: role.modelData,
+          actions: (details.recoveryAllowed(role.modelData, 'reobserve') ? ['checkAgain'] : []).concat(details.recoveryAllowed(role.modelData, 'new') ? ['openAnother'] : [])
+        }) : null
+        onActionRequested: function (id) {
+          details.recover(role.modelData, id === 'checkAgain' ? 'reobserve' : 'new')
+        }
       }
     }
   }

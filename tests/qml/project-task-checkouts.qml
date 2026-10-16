@@ -194,10 +194,12 @@ ShellRoot {
     t.equal(pull.text, 'Pulling…', 'Pull reads Pulling while pending')
     section.commandPending = ''
     section.commandError = {
+      code: 'GIT_ERROR',
       message: 'No network.',
       recovery: 'Check the connection.'
     }
-    t.equal(t.findChild(section, 'projectGitError').text, 'No network. Check the connection.', 'command error shows message and recovery')
+    var gitProblem = t.findChild(section, 'projectGitError').problem
+    t.equal([gitProblem.details.message, gitProblem.details.recovery], ['No network.', 'Check the connection.'], 'command error keeps message and recovery under details')
     section.commandError = null
     section.displayOnly = true
     t.check(!fetch.enabled && !pull.enabled, 'display only disables both')
@@ -234,11 +236,12 @@ ShellRoot {
     t.equal(host.created.length, 2, 'Enter does nothing for a bad name')
     field.text = 'feat/login'
     form.error = {
+      code: 'BRANCH_EXISTS',
       message: 'A branch named x already exists.',
       recovery: 'Choose another branch name.'
     }
     t.equal(field.text, 'feat/login', 'an error keeps the typed text')
-    t.check(t.findChild(form, 'projectTaskError').text.indexOf('A branch named x already exists.') === 0, 'error is shown')
+    t.equal(t.findChild(form, 'projectTaskError').problem.details.message, 'A branch named x already exists.', 'error is shown')
     form.pending = true
     t.equal(create.text, 'Creating task checkout…', 'Create reads pending')
     t.check(!create.enabled, 'Create is disabled while pending')
@@ -389,11 +392,11 @@ ShellRoot {
         t.step(150, function () {
           var errorLabel = t.findChild(surface, 'projectGitError')
           t.equal(host.readCalls.length, before, 'a result for an unselected pair triggers no Git refresh')
-          t.check(!errorLabel.visible || errorLabel.text.indexOf('The remote refused.') < 0, "another project's section shows no command error")
+          t.check(!errorLabel.visible || errorLabel.problem.details.message.indexOf('The remote refused.') < 0, "another project's section shows no command error")
           entry.projectId = 'p-a'
           t.waitFor(function () {
             var label = t.findChild(surface, 'projectGitError')
-            return label.visible && label.text === 'The remote refused. Try again.'
+            return label.visible && label.problem.details.message === 'The remote refused.' && label.problem.details.recovery === 'Try again.'
           }, 3000, 'the error waits for its project', keepError)
         })
       })
@@ -418,7 +421,7 @@ ShellRoot {
         entry.projectId = 'p-a'
         t.waitFor(function () {
           var label = t.findChild(surface, 'projectGitError')
-          return label.visible && label.text === 'The remote refused. Try again.'
+          return label.visible && label.problem.details.message === 'The remote refused.' && label.problem.details.recovery === 'Try again.'
         }, 3000, 'the first pair keeps its error', scopedCreate)
       })
     })

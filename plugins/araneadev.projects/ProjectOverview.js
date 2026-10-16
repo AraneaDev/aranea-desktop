@@ -53,12 +53,12 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
           Records.runLabel(run).split(" · Preview not checked")[0]
         : "Not run in this checkout",
       detail: run
-        ? "Observed " +
+        ? "Checked " +
           ageLabel((run.updatedAt || run.createdAt) * 1000, nowMs) +
           (service ? "" : " · Result applies to that run")
         : "Saved command",
       tooltip: run
-        ? "Observed " +
+        ? "Checked " +
           new Date((run.updatedAt || run.createdAt) * 1000).toLocaleString() +
           " · Run started " +
           new Date(run.createdAt * 1000).toLocaleString()
@@ -158,13 +158,13 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
     return {
       title: "Workspace " + id,
       status: confirmed
-        ? "Observed tools · " +
+        ? "Tools found · " +
           rows
             .map(function (/** @type {OverviewData} */ b) {
               return b.role
             })
             .join(", ")
-        : "Saved location · tools unconfirmed",
+        : "Saved location · tools not checked",
       detail: "Uses saved tools; Open may launch missing tools",
       target: { projectId: project.id, checkoutId: checkoutId },
       controls: [{ method: "open", label: "Open workspace" }]
@@ -194,6 +194,7 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       codex: "Codex",
       claude: "Claude Code"
     }
+    var raws = []
     var statuses = (e.profileSnapshot.roles || []).map(function (/** @type {string} */ role) {
       var operation = operations.find(function (/** @type {OverviewData} */ op) {
         return (op.steps || []).some(function (/** @type {OverviewData} */ step) { return step.role === role })
@@ -220,12 +221,13 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
           " · " +
           label +
           " · " +
-          status +
+          stepLabel(status) +
           (step && (step.error || step.code)
             ? " · " + ((step.error && step.error.message) || step.code)
             : "")
       )
-      return role + " " + status
+      raws.push(status)
+      return role + " " + stepLabel(status)
     })
     return {
       title: e.profileSnapshot.name + " · Workspace " + e.workspaceId,
@@ -235,8 +237,8 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
       target: { projectId: project.id, environmentId: e.id },
       controls: controls,
       active: observed.length > 0,
-      attention: statuses.some(function (/** @type {string} */ value) {
-        return value.indexOf("observed") < 0
+      attention: raws.some(function (/** @type {string} */ value) {
+        return value !== "observed"
       }),
       createdAt: e.createdAt || 0
     }
@@ -248,7 +250,41 @@ function overview(project, checkoutId, git, actions, activity, runtime, nowMs) {
   return result
 }
 
-if (typeof module !== "undefined") module.exports = { overview, activitySummary, ageLabel, gitFiles }
+/** Plain word for one role step status; the raw value stays in the data.
+ * @param {string} [status] - raw step status
+ * @returns {string} display word
+ */
+function stepLabel(status) {
+  /** @type {{[key:string]:string}} */
+  var words = {
+    observed: "open",
+    unconfirmed: "not confirmed",
+    uncertain: "not confirmed",
+    failed: "failed",
+    missing: "missing",
+    skipped: "skipped"
+  }
+  return (status && words[status]) || "not available"
+}
+
+/** Plain phrase for an operation outcome (or state when there is no outcome yet).
+ * @param {?string} [value] - raw outcome or state
+ * @returns {string} display phrase
+ */
+function outcomeLabel(value) {
+  /** @type {{[key:string]:string}} */
+  var words = {
+    observed: "opened",
+    partial: "partly opened",
+    failed: "failed",
+    accepted: "starting",
+    completed: "done",
+    running: "running"
+  }
+  return (value && words[value]) || "not available"
+}
+
+if (typeof module !== "undefined") module.exports = { overview, stepLabel, outcomeLabel, activitySummary, ageLabel, gitFiles }
 
 /** Summarize exact-checkout observations with navigation-only destinations.
  * @param {OverviewData} model - scoped Overview projection
@@ -264,14 +300,14 @@ function activitySummary(model, availability) {
   /** @type {Array<OverviewData>} */
   var summary = []
   if (availability.actions === false && (model.services || []).length + (model.checks || []).length)
-    summary.push({ label: "Action status unavailable", section: "actions", attention: true })
+    summary.push({ label: "Action status not available", section: "actions", attention: true })
   if (availability.agents === false && (model.agents || []).length)
-    summary.push({ label: "Agent status unavailable", section: "agents", attention: true })
+    summary.push({ label: "Agent status not available", section: "agents", attention: true })
   var add = function (/** @type {Array<OverviewData>} */ rows, /** @type {string} */ singular, /** @type {string} */ plural, /** @type {string} */ section, /** @type {boolean} */ attention) {
     if (rows.length) summary.push({ label: rows.length + " " + (rows.length === 1 ? singular : plural), section: section, attention: attention })
   }
   add(actions.filter(function (r) { return r.observationState === "failed" }), "failed run", "failed runs", "actions", true)
-  add(actions.filter(function (r) { return r.observationState === "unconfirmed" }), "run unconfirmed", "runs unconfirmed", "actions", true)
+  add(actions.filter(function (r) { return r.observationState === "unconfirmed" }), "run not confirmed", "runs not confirmed", "actions", true)
   var live = agents.filter(function (r) { return r.connected })
   add(live.filter(function (r) { return r.reportedState === "needs-input" }), "agent needs input (reported)", "agents need input (reported)", "agents", true)
   add(live.filter(function (r) { return r.reportedState === "ready-for-review" }), "agent ready for review (reported)", "agents ready for review (reported)", "agents", true)
@@ -281,7 +317,7 @@ function activitySummary(model, availability) {
   add(live.filter(function (r) { return r.reportedState === "working" }), "agent working (reported)", "agents working (reported)", "agents", false)
   add(checks.filter(function (r) { return r.observationState === "succeeded" }), "check succeeded (latest run)", "checks succeeded (latest runs)", "actions", false)
   add(agents.filter(function (r) { return r.connectionLost }), "agent disconnected", "agents disconnected", "agents", false)
-  add(agents.filter(function (r) { return !r.connected && !r.connectionLost }), "agent connection unconfirmed", "agent connections unconfirmed", "agents", false)
+  add(agents.filter(function (r) { return !r.connected && !r.connectionLost }), "agent connection not confirmed", "agent connections not confirmed", "agents", false)
   return summary
 }
 
@@ -291,7 +327,7 @@ function activitySummary(model, availability) {
  * @returns {string} relative age or honest clock uncertainty
  */
 function ageLabel(observedAt, nowMs) {
-  if (typeof observedAt !== "number" || !isFinite(observedAt)) return "time unavailable"
+  if (typeof observedAt !== "number" || !isFinite(observedAt)) return "time not available"
   var age = Math.floor((nowMs - observedAt) / 1000)
   if (age < 0) return "clock ahead"
   if (age < 60) return "just now"

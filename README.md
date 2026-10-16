@@ -130,7 +130,9 @@ Project **Actions** are saved commands or services that you start explicitly.
 Their runs retain status and bounded local-journal output, with Stop/Restart and
 an optional local preview. Registering or opening a project does not run its
 repository scripts. Follow the [project workflow guide](docs/workflows.md) to
-set up a project, tools, and actions.
+set up a project, tools, and actions. Task checkouts give each task its own
+working copy, and Projects explains any problem in plain words with **Details**
+and **Copy**.
 
 **Agents → Usage** shows provider usage. **Tasks** shows opt-in local Claude Code
 and Codex activity. Install an adapter only when you want local task reporting;
@@ -196,6 +198,14 @@ demonstration data; the desktop background is Signal Shrine.
 | Calendar                           | Weather                             |
 | ---------------------------------- | ----------------------------------- |
 | ![Calendar](screenshots/clock.png) | ![Weather](screenshots/weather.png) |
+
+### Projects
+
+| Projects                              | Overview and Git                                                                  | Actions                                             |
+| ------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------- |
+| ![Projects](screenshots/projects.png) | ![Project overview with task checkouts and Git](screenshots/project-overview.png) | ![Project actions](screenshots/project-actions.png) |
+
+![Plain problem with Details](screenshots/project-problem.png)
 
 ### Pickers and applications
 

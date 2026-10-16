@@ -17,6 +17,8 @@ Item {
   property bool partial: false
   // Actionable scan diagnostics and bounded-traversal reasons.
   property var errors: []
+  // A failed scan as {code, message}, or null; the page shows it as a plain problem.
+  property var failure: null
   // Explicitly selected registered root, retained for refresh and diagnostics.
   property string rootId: ''
   // Late callbacks cannot publish after cancellation or a replacement scan.
@@ -47,6 +49,10 @@ Item {
       event = JSON.parse(line)
     } catch (e) {
       errors = errors.concat(['Invalid discovery response. Retry the scan.'])
+      failure = {
+        code: 'READ_FAILED',
+        message: 'Invalid discovery response. Retry the scan.'
+      }
       return
     }
     var data = event.data || {}
@@ -60,8 +66,15 @@ Item {
     if (event.event === 'completed') {
       partial = data.outcome === 'partial'
       errors = data.errors || []
-      if (event.code)
+      failure = null
+      if (event.code) {
         errors = errors.concat([event.message || event.code, data.recovery || 'Retry after checking the folder.'])
+        failure = {
+          code: event.code,
+          message: event.message || '',
+          recovery: data.recovery || ''
+        }
+      }
     }
   }
   // Scan only an explicitly selected opaque root ID through fixed helper argv.
@@ -73,6 +86,7 @@ Item {
     rootId = id
     candidates = []
     errors = []
+    failure = null
     partial = false
     pending = true
     try {
@@ -83,12 +97,21 @@ Item {
         stopOwnedScan = null
         if (revision !== generation || captureActive)
           return
-        if (code !== 0 && !partial && !errors.length)
+        if (code !== 0 && !partial && !errors.length) {
           errors = [diagnostics || 'Discovery failed. Check the folder and retry.']
+          failure = {
+            code: 'READ_FAILED',
+            message: diagnostics || 'Discovery failed. Check the folder and retry.'
+          }
+        }
       })
     } catch (e) {
       pending = false
       errors = [String(e)]
+      failure = {
+        code: 'READ_FAILED',
+        message: String(e)
+      }
       return false
     }
     return true
@@ -126,7 +149,7 @@ Item {
           write('cancel\n')
       }
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, 'Discovery helper unavailable. Activate Aranea and retry.')
+        finish(-1, 'Discovery helper not available. Activate Aranea and retry.')
       stdout: SplitParser {
         onRead: function (data) {
           process.lineCallback(data)

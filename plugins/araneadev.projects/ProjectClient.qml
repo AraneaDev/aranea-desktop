@@ -116,7 +116,7 @@ Item {
       }
       onStarted: startedSuccessfully = true
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The project owner IPC executable is unavailable.')
+        finish(-1, '', 'The project helper is not available.')
       stdout: StdioCollector {
         id: output
       }
@@ -131,7 +131,60 @@ Item {
       // qmllint enable signal-handler-parameters
     }
   }
+  // How many automatic lookups have run for the current uncertainty, 0 to 3.
+  property int autoChecksDone: 0
+  // Offsets from the moment acceptance became unknown; overridable in tests.
+  property var autoCheckDelays: [2000, 5000, 10000]
+  // True while another automatic lookup is still scheduled.
+  readonly property bool autoChecking: autoTimer.running
+  // The generation an automatic lookup was started in, so a stale flag never cancels other work.
+  property int autoLookupGeneration: -1
+  // An automatic lookup is, or was last, the one in flight.
+  property bool autoLookup: false
+  // Wait before the next automatic lookup, from the previous one.
+  function autoInterval(): int {
+    var i = autoChecksDone
+    return Math.max(1, autoCheckDelays[i] - (i > 0 ? autoCheckDelays[i - 1] : 0))
+  }
+  // Cancel pending lookups; an automatic lookup already in flight is discarded.
+  function stopAutoCheck(): void {
+    autoTimer.stop()
+    if (autoLookup && pending && autoLookupGeneration === generation) {
+      autoLookup = false
+      generation++
+      pending = false
+    }
+  }
+  Timer {
+    id: autoTimer
+    repeat: false
+    onTriggered: {
+      if (client.captureActive || !client.acceptanceUnknown || client.autoChecksDone >= 3 || client.autoChecksDone >= client.autoCheckDelays.length)
+        return
+      // A busy client still uses up this check, so the schedule always ends.
+      client.autoChecksDone++
+      if (!client.pending) {
+        client.autoLookupGeneration = client.generation
+        client.autoLookup = true
+        client.checkEnvironmentActivation()
+      }
+      if (client.autoChecksDone < 3 && client.autoChecksDone < client.autoCheckDelays.length && client.acceptanceUnknown) {
+        autoTimer.interval = client.autoInterval()
+        autoTimer.start()
+      }
+    }
+  }
+  onAcceptanceUnknownChanged: {
+    autoTimer.stop()
+    if (acceptanceUnknown && !captureActive && autoCheckDelays.length) {
+      autoChecksDone = 0
+      autoTimer.interval = autoInterval()
+      autoTimer.start()
+    }
+  }
+  onGenerationChanged: autoTimer.stop()
   onCaptureActiveChanged: {
+    autoTimer.stop()
     readingSnapshot = false
     generation++
     snapshotReadRevision++
@@ -151,7 +204,7 @@ Item {
       acceptanceUnknown = true
       requestError = {
         code: 'ACCEPTANCE_UNKNOWN',
-        message: 'Launch acceptance is unknown. Check launch status before starting again.'
+        message: 'Could not confirm it started. Check before starting again.'
       }
     }
     if (method === 'snapshot') {
@@ -182,7 +235,7 @@ Item {
           response = JSON.parse(output)
         } catch (e) {}
         if (code !== 0 || !response || typeof response !== 'object') {
-          transportFailed(method, diagnostics || 'Project owner unavailable. Activate Aranea and retry.')
+          transportFailed(method, diagnostics || 'Projects is not running. Activate Aranea and retry.')
           return
         }
         available = true
@@ -243,7 +296,7 @@ Item {
       submissionInFlight = false
       var environmentSubmission = submissionMethod !== 'request'
       if (environmentSubmission && (typeof response.ok !== 'boolean' || response.ok === true && (response.error != null || !validId(response.operationId) || !validId(response.environmentId)) || response.ok !== true && (response.operationId || response.environmentId))) {
-        transportFailed(submissionMethod, 'Owner acknowledgement is incomplete. Check launch status.')
+        transportFailed(submissionMethod, 'Could not confirm it started. Check before starting again.')
         return
       }
       if (!response.ok || !response.operationId) {
@@ -265,7 +318,7 @@ Item {
       requestError = null
       if (environmentSubmission) {
         if (submissionMethod !== 'startEnvironment' && response.environmentId !== environmentTarget.environmentId) {
-          transportFailed(submissionMethod, 'Owner acknowledged another environment.')
+          transportFailed(submissionMethod, 'Projects answered for a different environment.')
           return
         }
         environmentId = response.environmentId
@@ -382,11 +435,12 @@ Item {
         activationId: activation
       })], generation, function (response) {
       pending = false
+      autoLookup = false
       var op = response.operation
       if (response.ok !== true || response.error != null || response.found !== true || response.activationId !== activation || !validId(response.sessionId) || environmentSession && response.sessionId !== environmentSession || !op || op.id !== response.operationId || op.environmentId !== response.environmentId || op.activationId !== activation || op.sessionId !== response.sessionId || op.projectId !== environmentTarget.projectId || (submissionMethod === 'startEnvironment' ? op.checkoutId !== environmentTarget.checkoutId : op.environmentId !== environmentTarget.environmentId) || !validId(op.id) || !validId(op.environmentId) || !sameTarget(submissionMethod === 'startEnvironment' ? op.startTarget : op.recoveryTarget)) {
         requestError = {
           code: 'ACCEPTANCE_UNKNOWN',
-          message: 'No matching acceptance was confirmed. The earlier launch will not be replayed.'
+          message: 'Could not confirm the earlier start. It will not be run again.'
         }
         error = requestError.message
         return
@@ -430,7 +484,7 @@ Item {
         return
       if (!operation.id || operation.id !== id || environmentTarget && (operation.environmentId !== environmentId || operation.projectId !== environmentTarget.projectId)) {
         pending = false
-        error = operation.error ? operation.error.message : 'Operation is unavailable.'
+        error = operation.error ? operation.error.message : 'Operation is not available.'
         return
       }
       pending = operation.state !== 'completed'

@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
 import "../araneadev.projects/ProjectActionRecords.js" as Records
+import "ProjectProblems.js" as Problems
 
 ColumnLayout {
   id: details
@@ -110,7 +111,7 @@ ColumnLayout {
   visible: !!run
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: details.run && details.run.definitionSnapshot ? details.run.definitionSnapshot.name : 'Retained run'
+    text: details.run && details.run.definitionSnapshot ? details.run.definitionSnapshot.name : 'Saved run'
     font.bold: true
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
@@ -122,7 +123,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: 'Checkout: ' + (details.checkout ? details.checkout.path : 'Unavailable') + ' · ' + (details.run ? details.run.checkoutId : '')
+    text: 'Checkout: ' + (details.checkout ? details.checkout.path : 'Not available') + ' · ' + (details.run ? details.run.checkoutId : '')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
@@ -140,7 +141,7 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: details.run ? 'Run: ' + details.run.id + ' · Receipt: ' + (details.run.createdAt ? new Date(details.run.createdAt * 1000).toLocaleString() : 'Unavailable') + ' · Outcome: ' + (details.run.outcome || 'Awaiting observation') : ''
+    text: details.run ? 'Run: ' + details.run.id + ' · Started: ' + (details.run.createdAt ? new Date(details.run.createdAt * 1000).toLocaleString() : 'Not available') + ' · Outcome: ' + (details.run.outcome || 'Checking…') : ''
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
   Aranea.UiLabel {
@@ -149,12 +150,20 @@ ColumnLayout {
     text: details.run ? 'Process result: exit ' + (details.run.exitCode === null || details.run.exitCode === undefined ? 'unknown' : details.run.exitCode) + (details.run.exitSignal ? ' · signal ' + details.run.exitSignal : '') : ''
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    objectName: 'actionRunProblem'
     Layout.fillWidth: true
-    visible: !!details.run && !!details.run.error
-    text: details.run && details.run.error ? (details.run.error.message || details.run.error.code) + (details.run.error.recovery ? ' ' + details.run.error.recovery : '') : ''
-    color: Aranea.DesignTokens.attention
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: details.displayOnly
+    pointerGate: details.pointerGate
+    actionsEnabled: !!details.client && !details.client.pending && details.restartAllowed && !details.client.submissionUncertain
+    problem: details.run && details.run.error ? Problems.problem(details.run.error, {
+      surface: 'run',
+      actions: details.restartAllowed ? ['retry'] : []
+    }) : null
+    onActionRequested: function () {
+      if (details.run)
+        details.perform('restart', details.run.id)
+    }
   }
   Aranea.UiLabel {
     Layout.fillWidth: true

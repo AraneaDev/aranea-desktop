@@ -3,7 +3,7 @@
 Horizontal bars show a bounded project-name inspection label for a focused
 workspace with one launched environment or a checkout confirmed by a verified
 tool in the current session. Launched environments retain their context across
-shell restarts, with unconfirmed tools noted in the tooltip. A bare saved
+shell restarts, with tools not checked noted in the tooltip. A bare saved
 workspace assignment alone does not show a bar label.
 Full context stays in its tooltip, including branch and launch-time context;
 ambiguous or unavailable context falls back to the workspace controls.

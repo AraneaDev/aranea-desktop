@@ -207,7 +207,7 @@ ShellRoot {
     changed = JSON.parse(JSON.stringify(changed))
     changed.bindings[0].sessionId = 'stale'
     client.snapshot = changed
-    t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('unconfirmed') >= 0, 'stale binding never claims saved environment live')
+    t.check(t.findChildren(panel, 'workspaceProjectPath')[1].text.indexOf('Tools not checked') >= 0, 'stale binding never claims saved environment live')
     panel.activateRow(1, "7")
     t.check(testRoot.lastCommand.indexOf('workspace = "7"') >= 0, "row activation keeps the original workspace focus target")
     t.equal(testRoot.calls.length, 1, "focus never submits a project request")

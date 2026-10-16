@@ -14,6 +14,7 @@ import "ProjectOverview.js" as Overview
 import "ProjectActionRecords.js" as Records
 import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
+import "ProjectProblems.js" as Problems
 
 Item {
   id: panel
@@ -92,8 +93,6 @@ Item {
   readonly property bool shortScreen: height < Style.space(400)
   // Current project destination, retained independently of window visibility.
   property string section: 'overview'
-  // Opaque request identities stay one explicit step below daily recovery actions.
-  property bool requestDetailsExpanded: false
   // Overview and Agents reuse one activity observation lifetime.
   readonly property bool activityVisible: (section === 'agents' || section === 'overview') && !projectsPage.setupActive && !!projectsPage.selectedProject
   // Exact-checkout summaries reuse shared snapshots; never own process lifetimes.
@@ -478,6 +477,10 @@ Item {
   property var seededProjects: ({})
   // Project whose seed request is in flight, or ''.
   property string seedingProjectId: ''
+  // The start block shows the project client's error while a start is uncertain or refused.
+  readonly property bool startOwnsError: panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError
+  // Project the automatic checks belong to; only a different project ends them.
+  property string autoCheckProjectId: ''
   // Projects whose last seed request failed (id → true).
   property var seedFailures: ({})
   // Record or clear one project's seed failure.
@@ -564,6 +567,8 @@ Item {
     var project = projectsPage.selectedProject, stored = gitCommandError
     return project && stored && stored.projectId === project.id && stored.checkoutId === root.gitClient.checkoutId ? stored.error : null
   }
+  // The command ('fetch' or 'pull') behind the stored failure of the selected pair, or ''.
+  readonly property string selectedGitCommandOperation: selectedGitCommandError ? gitCommandError.operation || '' : ''
   // Selected registered checkout record, or null.
   readonly property var selectedCheckout: {
     var project = projectsPage.selectedProject
@@ -652,6 +657,7 @@ Item {
           panel.gitCommandError = {
             projectId: projectId,
             checkoutId: checkoutId,
+            operation: operation,
             error: response.error
           }
         else if (stored && stored.projectId === projectId && stored.checkoutId === checkoutId)
@@ -705,8 +711,22 @@ Item {
     }
   }
   Connections {
+    target: panel.root
+    function onSelectedCheckoutIdChanged() {
+      panel.root.projectClient.stopAutoCheck()
+      panel.root.actionClient.stopAutoCheck()
+    }
+  }
+  Connections {
     target: projectsPage
     function onSelectedProjectChanged() {
+      // A registry refresh hands over a new object for the same project: only a different id ends the checks.
+      var id = projectsPage.selectedProject ? projectsPage.selectedProject.id : ''
+      if (id !== panel.autoCheckProjectId) {
+        panel.autoCheckProjectId = id
+        panel.root.projectClient.stopAutoCheck()
+        panel.root.actionClient.stopAutoCheck()
+      }
       panel.dropStaleTaskCards()
       panel.maybeSeedSelected()
     }
@@ -1061,7 +1081,11 @@ Item {
                   windowOpen: !!panel.root.opened
                   metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
-                  error: panel.root.projectController.error || panel.root.projectClient.error
+                  error: panel.root.projectController.error || (panel.startOwnsError ? '' : panel.root.projectClient.error)
+                  extraErrorObject: panel.root.projectController.extraErrorObject
+                  errorObject: panel.root.projectController.errorObject || (!panel.root.projectController.error && !panel.startOwnsError && panel.root.projectClient.error ? {
+                      message: panel.root.projectClient.error
+                    } : null)
                   pointerGate: pointerGate
                   onRegisterRequested: function (paths) {
                     panel.root.projectController.request('register', {
@@ -1161,9 +1185,54 @@ Item {
                   width: content.width
                   visible: !!projectsPage.selectedProject && (panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError || panel.root.projectClient.preparing)
                   Aranea.UiLabel {
+                    objectName: 'projectPreparing'
                     Layout.fillWidth: true
-                    text: panel.root.projectClient.acceptanceUnknown ? 'Launch acceptance is unknown. The earlier request may still finish.' : panel.root.projectClient.preparing ? 'Preparing this profile…' : panel.root.projectClient.requestError ? panel.root.projectClient.requestError.message : ''
+                    visible: panel.root.projectClient.preparing && !panel.root.projectClient.acceptanceUnknown
+                    text: 'Preparing this profile…'
                     color: Aranea.DesignTokens.attention
+                  }
+                  ProjectProblem {
+                    id: startProblem
+                    objectName: 'projectStartProblem'
+                    Layout.fillWidth: true
+                    displayOnly: panel.root.inert
+                    actionsEnabled: !panel.root.projectClient.submitting
+                    pointerGate: pointerGate
+                    readonly property var client: panel.root.projectClient
+                    // Remembered profile that Start another would reuse.
+                    readonly property var another: projectsPage.selectedProject ? Profiles.remembered(projectsPage.selectedProject) : null
+                    problem: {
+                      if (!projectsPage.selectedProject || client.preparing && !client.acceptanceUnknown || client.autoChecking)
+                        return null
+                      if (!client.acceptanceUnknown && !client.requestError)
+                        return null
+                      var error = client.requestError || {
+                        code: 'ACCEPTANCE_UNKNOWN',
+                        message: client.error
+                      }
+                      var actions = []
+                      if (client.acceptanceUnknown) {
+                        actions.push('checkAgain')
+                        if (startProblem.another)
+                          actions.push('startAnother')
+                      }
+                      var plain = Problems.problem(error, {
+                        surface: 'start',
+                        actions: actions
+                      })
+                      // The activation and earlier unresolved requests stay available under Details.
+                      if (client.acceptanceUnknown)
+                        plain.details.recovery = [plain.details.recovery, 'Request: ' + client.activationId, 'Earlier unresolved requests: ' + client.unresolvedEnvironmentActivations.length].filter(Boolean).join('\n')
+                      return plain
+                    }
+                    onActionRequested: function (id) {
+                      if (id === 'checkAgain') {
+                        if (!panel.root.inert && !startProblem.client.submitting)
+                          startProblem.client.checkEnvironmentActivation()
+                      } else if (id === 'startAnother' && startProblem.another && !panel.root.inert && !startProblem.client.submitting) {
+                        panel.root.startProfile(startProblem.another.id, startProblem.another.revision, true)
+                      }
+                    }
                   }
                   Flow {
                     Layout.fillWidth: true
@@ -1176,42 +1245,11 @@ Item {
                       onClicked: panel.root.cancelPreparation()
                     }
                     Aranea.ActionButton {
-                      text: 'Check launch status'
-                      visible: panel.root.projectClient.acceptanceUnknown
-                      enabled: !panel.root.inert && !panel.root.projectClient.submitting
-                      pointerGate: pointerGate
-                      onClicked: panel.root.projectClient.checkEnvironmentActivation()
-                    }
-                    Aranea.ActionButton {
-                      text: 'Start another environment'
-                      visible: panel.root.projectClient.acceptanceUnknown
-                      enabled: !panel.root.inert && !panel.root.projectClient.submitting && !!Profiles.remembered(projectsPage.selectedProject)
-                      pointerGate: pointerGate
-                      onClicked: {
-                        var profile = Profiles.remembered(projectsPage.selectedProject)
-                        if (profile)
-                          panel.root.startProfile(profile.id, profile.revision, true)
-                      }
-                    }
-                    Aranea.ActionButton {
-                      text: panel.requestDetailsExpanded ? 'Hide request details' : 'Request details'
-                      visible: panel.root.projectClient.acceptanceUnknown
-                      variant: 'quiet'
-                      pointerGate: pointerGate
-                      onClicked: panel.requestDetailsExpanded = !panel.requestDetailsExpanded
-                    }
-                    Aranea.ActionButton {
                       text: 'Manage profiles'
                       visible: !panel.root.projectClient.acceptanceUnknown && !panel.root.projectClient.preparing
                       pointerGate: pointerGate
                       onClicked: panel.chooseSection('profiles')
                     }
-                  }
-                  Aranea.UiLabel {
-                    Layout.fillWidth: true
-                    visible: panel.requestDetailsExpanded && panel.root.projectClient.acceptanceUnknown
-                    text: 'Request: ' + panel.root.projectClient.activationId + '\nEarlier unresolved requests: ' + panel.root.projectClient.unresolvedEnvironmentActivations.length
-                    technical: true
                   }
                 }
                 ProjectOverview {
@@ -1228,8 +1266,15 @@ Item {
                   agentPending: panel.root.activityClient.pending
                   workspacePending: panel.root.projectClient.submitting || panel.root.projectClient.acceptanceUnknown || !projectsPage.details.openAvailable
                   executionAvailable: panel.root.actionClient.availability.execution === true
-                  actionError: panel.root.actionClient.submissionUncertain ? 'Submission unconfirmed. Refresh actions in Details to recover the receipt.' : panel.root.actionClient.error ? panel.root.actionClient.error.message + ' Manage actions to recover.' : panel.root.actionClient.summaryError ? panel.root.actionClient.summaryError.message : panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Execution unavailable. Manage actions to check required helpers.' : ''
-                  activityError: panel.root.activityClient.error ? 'Agent connection unavailable. Open Details to reconnect.' : ''
+                  actionProblem: panel.root.actionClient.submissionUncertain ? (panel.root.actionClient.autoChecking ? null : {
+                      code: 'SUBMISSION_UNCONFIRMED'
+                    }) : panel.root.actionClient.error || panel.root.actionClient.summaryError || null
+                  onActionRefreshRequested: {
+                    if (!panel.root.inert && !panel.root.actionClient.pending)
+                      panel.root.actionClient.refresh()
+                  }
+                  actionError: !panel.root.actionClient.submissionUncertain && !panel.root.actionClient.error && !panel.root.actionClient.summaryError && panel.root.actionClient.available && panel.overviewModel.services.concat(panel.overviewModel.checks).length && panel.root.actionClient.availability.execution !== true ? 'Running is not available. Manage actions to check required helpers.' : ''
+                  activityError: panel.root.activityClient.error ? 'Agent connection not available. Open Details to reconnect.' : ''
                   pointerGate: pointerGate
                   suggestions: panel.overviewSuggestions
                   onSuggestionAddRequested: function (key) {
@@ -1237,6 +1282,7 @@ Item {
                   }
                   gitCommandPending: panel.gitCommandPending
                   gitCommandError: panel.selectedGitCommandError
+                  gitCommandOperation: panel.selectedGitCommandOperation
                   gitCommandBusy: !!panel.root.gitCommands.pending
                   onRefreshRequested: panel.refreshOverview()
                   onFetchRequested: panel.runGit('fetch')

@@ -145,7 +145,7 @@ Item {
         stdinEnabled = false
       }
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The project action backend is unavailable.')
+        finish(-1, '', 'The project action backend is not available.')
       stdout: StdioCollector {
         id: collected
       }
@@ -160,7 +160,48 @@ Item {
       // qmllint enable signal-handler-parameters
     }
   }
+  // How many automatic receipt checks have run for the current uncertainty, 0 to 3.
+  property int autoChecksDone: 0
+  // Offsets from the moment the submission became uncertain; overridable in tests.
+  property var autoCheckDelays: [2000, 5000, 10000]
+  // True while another automatic check is still scheduled.
+  readonly property bool autoChecking: autoTimer.running
+  // Wait before the next automatic check, from the previous one.
+  function autoInterval(): int {
+    var i = autoChecksDone
+    return Math.max(1, autoCheckDelays[i] - (i > 0 ? autoCheckDelays[i - 1] : 0))
+  }
+  // Cancel scheduled checks; they only read, never submit.
+  function stopAutoCheck(): void {
+    autoTimer.stop()
+  }
+  Timer {
+    id: autoTimer
+    repeat: false
+    onTriggered: {
+      if (client.captureActive || !client.submissionUncertain || client.autoChecksDone >= 3 || client.autoChecksDone >= client.autoCheckDelays.length)
+        return
+      // Reading the snapshot is the receipt recovery path; a run id may not exist yet.
+      // A busy client still uses up this check, so the schedule always ends.
+      client.autoChecksDone++
+      if (!client.pending && !client.submitting)
+        client.refresh()
+      if (client.autoChecksDone < 3 && client.autoChecksDone < client.autoCheckDelays.length) {
+        autoTimer.interval = client.autoInterval()
+        autoTimer.start()
+      }
+    }
+  }
+  onSubmissionUncertainChanged: {
+    autoTimer.stop()
+    if (submissionUncertain && !captureActive && autoCheckDelays.length) {
+      autoChecksDone = 0
+      autoTimer.interval = autoInterval()
+      autoTimer.start()
+    }
+  }
   onCaptureActiveChanged: {
+    autoTimer.stop()
     disconnect()
     if (!captureActive)
       schedulePoll()
@@ -193,6 +234,7 @@ Item {
   }
   // Invalidate selected readbacks while keeping accepted receipt identity.
   function selectionChanged(): void {
+    autoTimer.stop()
     summaryGeneration++
     summaryCursor = 0
     summaryError = null
@@ -224,7 +266,7 @@ Item {
   function transportError(text: string): var {
     return {
       code: 'SUBMISSION_UNCONFIRMED',
-      message: text || 'Backend response unavailable.',
+      message: text || 'Backend response not available.',
       recovery: 'Refresh the exact action and checkout to recover its receipt; never automatically resubmit.'
     }
   }
@@ -492,7 +534,7 @@ Item {
         client.submitting = false
         client.error = {
           code: 'DEPENDENCY_MISSING',
-          message: diagnostics || 'Native request UUID unavailable.',
+          message: diagnostics || 'Native request UUID not available.',
           recovery: 'Restore the native UUID helper before starting.'
         }
         return
@@ -691,7 +733,7 @@ Item {
       } catch (e) {}
       if (!response || typeof response.ok !== 'boolean' || !Object.prototype.hasOwnProperty.call(response, 'error')) {
         client.summaryError = {
-          message: 'Service observation unavailable. Manage actions to retry.'
+          message: 'Service observation not available. Manage actions to retry.'
         }
         return
       }

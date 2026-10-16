@@ -111,6 +111,23 @@ nothing and tells you to merge, rebase or commit in a terminal. Git never asks
 for passwords here; if a remote needs credentials, run `git fetch` once in a
 terminal. Your own `core.sshCommand` is honoured.
 
+## When something goes wrong
+
+Projects explains problems in plain words with at most two actions. **Starting…**
+means Projects is still checking whether your tools opened; it checks a few
+times by itself. If it still can't tell, choose **Check again**, or **Start
+another** to deliberately open a second set. Projects never starts a second set
+by itself.
+
+Common problems: **Folder moved or missing** (choose **Locate folder**),
+**Projects isn't running** (make sure Aranea is running, then **Retry**), **A tool
+is missing**, **Changed elsewhere** (choose **Refresh**), **Busy right now**, and
+**Git couldn't do that**, which keeps Git's own explanation.
+
+Every problem has **Details** with the exact error code and message, and **Copy**
+for bug reports or for pasting to an agent. The command line and
+`aranea … --json` keep the original codes and messages.
+
 ## Advanced profile configuration
 
 Use **Manage profiles** to name a profile and select its editor, terminal and optional
@@ -234,7 +251,7 @@ and session guidance. Usage remains available separately.
 result, and any separately reported verification. Finished does not imply tests
 passed. Session focus reaches a verified hosting terminal, but cannot select a
 particular tmux pane. **Reopen session** explicitly resumes a supported native
-session; **Check session again** and **Reconnect observation** inspect an existing
+session; **Check session again** and **Reconnect** inspect an existing
 operation without launching another.
 
 In the bar's Agents panel, Tab switches Tasks, Usage, and Help. In Tasks, ↑↓ or

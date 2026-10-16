@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import "ProjectOverview.js" as Overview
+import "ProjectProblems.js" as Problems
 import qs.Commons
 import "../araneadev.shared" as Aranea
 
@@ -28,6 +29,8 @@ ProjectSectionCard {
   property string commandPending: ''
   // Last fetch or pull failure for this checkout as {message, recovery}, or null.
   property var commandError: null
+  // Which command failed: 'fetch' or 'pull'; Retry repeats it.
+  property string commandOperation: ''
   // Any Git command is running, for this or another checkout; starting is refused.
   property bool commandBusy: false
   // Pull needs a branch with an upstream.
@@ -73,16 +76,43 @@ ProjectSectionCard {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: section.git ? (section.git.detached ? 'Detached HEAD' : section.git.branch || 'Branch unavailable') : section.loading ? 'Reading selected checkout…' : 'Git state not available. Refresh to read this checkout.'
+    text: section.git ? (section.git.detached ? 'Detached HEAD' : section.git.branch || 'Branch not available') : section.loading ? 'Reading selected checkout…' : 'Git state not available. Refresh to read this checkout.'
     font.pixelSize: Style.font.body
     font.bold: true
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    id: gitProblem
     objectName: 'projectGitError'
     Layout.fillWidth: true
-    visible: !!section.error || !!section.commandError
-    text: section.commandError ? section.commandError.message + ' ' + (section.commandError.recovery || '') : section.error ? section.error.message + (section.git ? ' · Showing last observation.' : '') : ''
-    color: Aranea.DesignTokens.urgent
+    displayOnly: section.displayOnly
+    pointerGate: section.pointerGate
+    actionsEnabled: !section.loading && section.commandPending === '' && !section.commandBusy
+    problem: section.commandError ? Problems.problem(section.commandError, {
+      surface: 'git',
+      actions: section.commandOperation === 'fetch' || section.commandOperation === 'pull' && section.canPull && !section.upToDate ? ['retry'] : []
+    }) : section.error ? Problems.problem(section.error, {
+      surface: 'git',
+      actions: ['retry']
+    }) : null
+    onActionRequested: function () {
+      if (section.displayOnly || section.loading || section.commandPending !== '' || section.commandBusy)
+        return
+      if (section.commandError) {
+        if (section.commandOperation === 'fetch')
+          section.fetchRequested()
+        else if (section.commandOperation === 'pull' && section.canPull && !section.upToDate)
+          section.pullRequested()
+      } else {
+        section.refreshRequested()
+      }
+    }
+  }
+  Aranea.UiLabel {
+    objectName: 'projectGitStale'
+    Layout.fillWidth: true
+    visible: !section.commandError && !!section.error && !!section.git
+    text: 'Showing the last information that was read.'
+    opacity: 0.7
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
@@ -100,14 +130,14 @@ ProjectSectionCard {
       if (!section.git || !section.git.upstream)
         return 'No upstream configured'
       var comparable = typeof section.git.ahead === 'number' && typeof section.git.behind === 'number'
-      return (comparable ? section.git.ahead + ' ahead · ' + section.git.behind + ' behind ' : 'Comparison unavailable · ') + section.git.upstream + ' · Local refs; no remote fetch'
+      return (comparable ? section.git.ahead + ' ahead · ' + section.git.behind + ' behind ' : 'Comparison not available · ') + section.git.upstream + ' · Local refs; no remote fetch'
     }
     opacity: 0.7
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !!section.git
-    text: section.git ? 'Observed ' + Overview.ageLabel(section.git.observedAt, Math.max(section.nowMs, Date.now())) + (section.nowMs - section.git.observedAt > 30000 ? ' · May be stale' : '') : ''
+    text: section.git ? 'Checked ' + Overview.ageLabel(section.git.observedAt, Math.max(section.nowMs, Date.now())) + (section.nowMs - section.git.observedAt > 30000 ? ' · May be stale' : '') : ''
     opacity: 0.6
     ToolTip.visible: observationHover.hovered
     ToolTip.text: section.git ? new Date(section.git.observedAt).toLocaleString() : ''

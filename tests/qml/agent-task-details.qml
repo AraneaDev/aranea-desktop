@@ -106,7 +106,7 @@ ShellRoot {
       ]
     }
     t.check(view.actionKinds.indexOf('reobserve') >= 0, 'partial operation offers explicit observation')
-    t.equal(t.findChild(view, 'operationSteps').text, 'Hosting terminal: observed\nNative session: unconfirmed', 'partial outcome preserves independent steps')
+    t.equal(t.findChild(view, 'operationSteps').text, 'Hosting terminal: confirmed\nNative session: not confirmed', 'partial outcome preserves independent steps')
     view.operation = {
       id: 'op',
       taskId: 'stable',
@@ -116,7 +116,7 @@ ShellRoot {
       submissionUnconfirmed: true
     }
     t.check(view.actionKinds.indexOf('reobserve') < 0 && view.actionKinds.indexOf('reopen') < 0, 'uncertain acceptance prevents a repeat')
-    t.check(t.findChild(view, 'operationStatus').text.indexOf('unconfirmed') >= 0, 'acceptance uncertainty stays visible')
+    t.equal(t.findChild(view, 'operationStatus').text, "Couldn't confirm it started", 'acceptance uncertainty stays visible')
     view.error = {
       code: 'OPERATION_LOST',
       message: 'Owner changed',

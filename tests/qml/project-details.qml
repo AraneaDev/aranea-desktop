@@ -131,7 +131,7 @@ ShellRoot {
     ], 'only explicit role recovery is sent')
     details.recover('editor', 'new')
     t.equal(opens.length, 3, 'unsupported recovery cannot silently duplicate a role')
-    var checkAgain = t.findChild(details, 'reobserveRole:terminal')
+    var checkAgain = t.findChild(t.findChild(details, 'roleProblem:terminal'), 'projectProblemAction:checkAgain')
     t.check(!!checkAgain && checkAgain.visible, 'accepted uncertainty exposes Check terminal again control')
     checkAgain.clicked()
     t.equal(opens[3], {
@@ -179,7 +179,7 @@ ShellRoot {
       }
     }
     var operationError = t.findChild(details, 'projectOperationError')
-    t.check(!!operationError && operationError.text === 'Folder missing. Locate folder and retry.', 'owner failure exposes actionable recovery message')
+    t.check(!!operationError && operationError.visible && t.findChild(operationError, 'projectProblemTitle').text === 'Something went wrong' && operationError.problem.details.message === 'Folder missing.' && operationError.problem.details.recovery === 'Locate folder and retry.', 'owner failure keeps its message and recovery in Details')
     details.project = Object.assign({}, details.project, {
       tools: {
         editorId: null,
@@ -288,9 +288,9 @@ ShellRoot {
         }
       ]
     }
-    var plain = t.findChild(details, 'agentUnconfirmed'), reobserve = t.findChild(details, 'reobserveRole:agent')
-    t.check(!!plain && plain.visible && plain.text === "Couldn't confirm the agent window opened.", 'agent uncertainty uses required plain-language copy')
-    t.check(!!reobserve && reobserve.visible && reobserve.text === 'Check agent again', 'agent has real Check again recovery control')
+    var plain = t.findChild(details, 'agentUnconfirmed'), reobserve = t.findChild(plain, 'projectProblemAction:checkAgain')
+    t.check(!!plain && plain.visible && t.findChild(plain, 'projectProblemTitle').text === "Couldn't confirm it started", 'agent uncertainty uses required plain-language copy')
+    t.check(!!reobserve && reobserve.visible && reobserve.text === 'Check again', 'agent has real Check again recovery control')
     reobserve.activate()
     details.recover('agent', 'new')
     t.equal(opens.slice(before + 1), [

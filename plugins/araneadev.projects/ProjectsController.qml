@@ -140,7 +140,7 @@ Item {
     if (!runtime || typeof runtime.processRunner !== 'function') {
       done({
         ok: false,
-        error: failure('DEPENDENCY_MISSING', 'The project process adapter is unavailable.')
+        error: failure('DEPENDENCY_MISSING', 'The project process adapter is not available.')
       })
       return
     }
@@ -152,7 +152,7 @@ Item {
         } catch (e) {}
         done(response && (code === 0 || response.ok === false) ? response : {
           ok: false,
-          error: failure('DEPENDENCY_MISSING', diagnostics || 'Project helper unavailable. Reinstall the theme and required dependencies.')
+          error: failure('DEPENDENCY_MISSING', diagnostics || 'Project helper not available. Reinstall the theme and required dependencies.')
         })
       })
     } catch (e) {
@@ -176,7 +176,7 @@ Item {
       return candidate.id === id
     })[0] || {
       ok: false,
-      error: failure('OPERATION_NOT_FOUND', 'Operation unavailable; it may belong to an earlier shell session.')
+      error: failure('OPERATION_NOT_FOUND', 'Operation not available; it may belong to an earlier shell session.')
     }
   }
   // Replace an operation atomically so clients observe state transitions.
@@ -350,7 +350,7 @@ Item {
         registryReady = true
         error = null
       } else
-        error = response && response.error || failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
+        error = response && response.error || failure('REGISTRY_UNAVAILABLE', 'Project registry is not available.')
       readDesktop(function (data) {
         validate(function (proof) {
           refreshing = false
@@ -464,7 +464,7 @@ Item {
       })[0]
       if (!state || !project || !checkout) {
         var errors = Object.assign({}, selectionErrors)
-        errors[projectId] = response && response.error || failure(!state ? 'REGISTRY_UNAVAILABLE' : !project ? 'PROJECT_NOT_FOUND' : 'CHECKOUT_NOT_FOUND', 'The selected project or checkout is unavailable. Locate its folder in project details.')
+        errors[projectId] = response && response.error || failure(!state ? 'REGISTRY_UNAVAILABLE' : !project ? 'PROJECT_NOT_FOUND' : 'CHECKOUT_NOT_FOUND', 'The selected project or checkout is not available. Locate its folder in project details.')
         selectionErrors = errors
         return
       }
@@ -518,7 +518,7 @@ Item {
       return {
         ok: false,
         operationId: null,
-        error: failure('DEPENDENCY_MISSING', 'The project runtime is unavailable. Reinstall the project plugin and retry.')
+        error: failure('DEPENDENCY_MISSING', 'The project runtime is not available. Reinstall the project plugin and retry.')
       }
     syncSession()
     if (!registryReady) {
@@ -670,8 +670,8 @@ Item {
         return
       if (!response || !response.ok || !response.state) {
         var problem = response && response.error
-        error = problem || failure('REGISTRY_UNAVAILABLE', 'Project registry unavailable.')
-        failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry unavailable.')
+        error = problem || failure('REGISTRY_UNAVAILABLE', 'Project registry is not available.')
+        failOperation(id, problem && problem.code || 'REGISTRY_UNAVAILABLE', problem && problem.message || 'Project registry is not available.')
         return
       }
       if (op.environmentId) {
@@ -695,7 +695,7 @@ Item {
         return row.id === checkoutId
       })[0]
       if (!project || !checkout) {
-        failOperation(id, project ? 'CHECKOUT_NOT_FOUND' : 'PROJECT_NOT_FOUND', 'The selected project or checkout is unavailable. Locate its folder in project details.')
+        failOperation(id, project ? 'CHECKOUT_NOT_FOUND' : 'PROJECT_NOT_FOUND', 'The selected project or checkout is not available. Locate its folder in project details.')
         return
       }
       op = Object.assign({}, operation(id), {
@@ -731,7 +731,7 @@ Item {
           if (!current(id, revision, session))
             return
           if (!tools || !Array.isArray(tools.editors) || !Array.isArray(tools.terminals)) {
-            failOperation(id, 'DEPENDENCY_MISSING', tools && tools.error && tools.error.message || 'Project tool probe unavailable. Install required dependencies.')
+            failOperation(id, 'DEPENDENCY_MISSING', tools && tools.error && tools.error.message || 'Project tool probe not available. Install required dependencies.')
             return
           }
           agentProbeGeneration++
@@ -813,7 +813,7 @@ Item {
       var associations = workspaceReservations()
       var association = Operations.chooseAssociation(project, op, data.workspaces, associations, proof.bindings, data.currentWorkspaceId)
       if (!association) {
-        failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is unavailable. Choose dedicated workspace mode.')
+        failOperation(id, 'INVALID_WORKSPACE', 'The current workspace is not available. Choose dedicated workspace mode.')
         return
       }
       // A saved dedicated association yields to any record placed on its workspace later.
@@ -879,7 +879,7 @@ Item {
             if (!current(id, revision, session))
               return
             if (!data.available) {
-              failOperation(id, 'COMPOSITOR_UNAVAILABLE', 'The compositor became unavailable.')
+              failOperation(id, 'COMPOSITOR_UNAVAILABLE', 'The compositor stopped being available.')
               return
             }
             var occupied = allocated && association.mode === 'dedicated' && data.workspaces.some(function (row) {

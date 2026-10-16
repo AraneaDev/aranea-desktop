@@ -23,6 +23,8 @@ Item {
   property bool helpActive: false
   // Client structured error; the previous snapshot remains displayed.
   property var error: null
+  // A host that shows the list error in its own plain view turns this off.
+  property bool listErrorShown: true
   // One client cannot submit another action while observing.
   property bool pending: false
   // Hosts opt into bulk dismissal through their existing activity client.
@@ -268,7 +270,7 @@ Item {
         objectName: 'tasksError'
         width: parent.width
         visible: text !== ''
-        text: tasks.error ? [Logic.text(tasks.error.message), Logic.text(tasks.error.recovery)].filter(Boolean).join('\n') : ''
+        text: tasks.error && tasks.listErrorShown ? [Logic.text(tasks.error.message), Logic.text(tasks.error.recovery)].filter(Boolean).join('\n') : ''
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.attention
@@ -455,7 +457,7 @@ Item {
         objectName: 'taskSetupCommands'
         width: parent.width
         visible: tasks.taskRows.length === 0 && tasks.setupGuideExpanded
-        text: 'Enable reporting (opt-in)\naranea agents adapter install claude\naranea agents adapter install codex\n\nReview provider trust, then start a new CLI session. Configured hooks do not prove trust or observed activity.\n\nCheck availability\naranea agents adapter status claude\naranea agents adapter status codex\n\nRemove owned hooks\naranea agents adapter remove claude\naranea agents adapter remove codex'
+        text: 'Enable reporting (opt-in)\naranea agents adapter install claude\naranea agents adapter install codex\n\nReview provider trust, then start a new CLI session. Configured hooks do not prove trust or recorded activity.\n\nCheck availability\naranea agents adapter status claude\naranea agents adapter status codex\n\nRemove owned hooks\naranea agents adapter remove claude\naranea agents adapter remove codex'
         readOnly: true
         selectByMouse: true
         textFormat: TextEdit.PlainText

@@ -6,6 +6,7 @@ import QtQuick
 import QtQuick.Layouts
 import qs.Commons
 import "../araneadev.shared" as Aranea
+import "ProjectProblems.js" as Problems
 import "../araneadev.projects" as Projects
 import "../araneadev.projects/ProjectActionRecords.js" as Records
 
@@ -351,29 +352,46 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: 'Checkout: ' + (actions.checkout ? actions.checkout.path : 'Selected checkout unavailable. Locate it before running.')
+    text: 'Checkout: ' + (actions.checkout ? actions.checkout.path : 'Selected checkout not available. Locate it before running.')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !actions.executionAvailable
-    text: 'Execution unavailable. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
+    text: 'Running is not available. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    objectName: 'actionSubmissionProblem'
     Layout.fillWidth: true
-    visible: actions.client.submissionUncertain
-    text: 'Submission unconfirmed. Refresh to recover the exact receipt. Do not submit another run.'
-    color: Aranea.DesignTokens.attention
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: actions.displayOnly
+    pointerGate: actions.pointerGate
+    actionsEnabled: !actions.client.pending
+    // Automatic checks run first; this appears when they could not settle it.
+    problem: actions.client.submissionUncertain && !actions.client.autoChecking ? Problems.problem({
+      code: 'SUBMISSION_UNCONFIRMED'
+    }, {
+      surface: 'actions',
+      actions: ['checkAgain']
+    }) : null
+    onActionRequested: function () {
+      actions.refresh()
+    }
   }
-  Aranea.UiLabel {
+  ProjectProblem {
+    objectName: 'actionClientProblem'
     Layout.fillWidth: true
-    visible: !!actions.client.error
-    text: actions.client.error ? (actions.client.error.message || actions.client.error.code) + (actions.client.error.recovery ? ' ' + actions.client.error.recovery : '') : ''
-    color: Aranea.DesignTokens.attention
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: actions.displayOnly
+    pointerGate: actions.pointerGate
+    actionsEnabled: !actions.client.pending
+    problem: actions.client.error ? Problems.problem(actions.client.error, {
+      surface: 'actions',
+      actions: ['refresh']
+    }) : null
+    onActionRequested: function () {
+      actions.refresh()
+    }
   }
   Flow {
     Layout.fillWidth: true
@@ -512,7 +530,7 @@ ColumnLayout {
     visible: actions.editing && actions.editConflict
     Aranea.UiLabel {
       Layout.fillWidth: true
-      text: 'Draft retained. Refresh actions to review the latest saved definition before saving over it.'
+      text: 'Your draft is kept. Refresh actions to review the latest saved version before saving over it.'
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
     Aranea.UiLabel {

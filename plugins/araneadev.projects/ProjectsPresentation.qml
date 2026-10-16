@@ -19,6 +19,11 @@ Item {
   readonly property bool inert: captureActive || !!captureSaved
   // Whether the host should display the Projects window.
   property bool opened: false
+  // Closing the window ends every automatic check; they only ever read.
+  onOpenedChanged: if (!opened) {
+    projectClient.stopAutoCheck()
+    actionClient.stopAutoCheck()
+  }
   // Current Projects destination retained for typed capture fixtures.
   property string section: 'projects'
   // Optional opaque details destination, empty for the Projects overview.
@@ -407,6 +412,9 @@ Item {
         state: projectController.state,
         tools: projectController.tools,
         error: projectController.error,
+        errorObject: projectController.errorObject,
+        extraErrorObject: projectController.extraErrorObject,
+        failure: discoveryClient.failure,
         candidates: discoveryClient.candidates,
         partial: discoveryClient.partial,
         errors: discoveryClient.errors,
@@ -461,9 +469,12 @@ Item {
       terminals: []
     }
     projectController.error = f.projectError || ''
+    projectController.errorObject = null
+    projectController.extraErrorObject = null
     discoveryClient.candidates = f.projectCandidates || []
     discoveryClient.partial = f.projectPartial === true
     discoveryClient.errors = f.projectErrors || []
+    discoveryClient.failure = null
     projectClient.snapshot = f.projectSnapshot || {}
     projectClient.available = f.projectAvailable === true
     projectClient.error = ''
@@ -493,9 +504,12 @@ Item {
     projectController.state = p.state
     projectController.tools = p.tools
     projectController.error = p.error
+    projectController.errorObject = p.errorObject || null
+    projectController.extraErrorObject = p.extraErrorObject || null
     discoveryClient.candidates = p.candidates
     discoveryClient.partial = p.partial
     discoveryClient.errors = p.errors
+    discoveryClient.failure = p.failure || null
     projectClient.snapshot = p.snapshot
     projectClient.available = p.available
     projectClient.error = p.clientError

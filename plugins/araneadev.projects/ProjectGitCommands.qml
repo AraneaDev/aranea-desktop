@@ -57,7 +57,7 @@ Item {
       }
       onStarted: startedSuccessfully = true
       onRunningChanged: if (startRequested && !running && !startedSuccessfully)
-        finish(-1, '', 'The Git helper is unavailable.')
+        finish(-1, '', 'The Git helper is not available.')
       stdout: StdioCollector {
         id: collected
       }

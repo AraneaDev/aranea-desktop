@@ -45,7 +45,7 @@ ShellRoot {
   }
   FloatingWindow {
     implicitWidth: Number(Quickshell.env('ARANEA_ACTION_RENDER_WIDTH'))
-    implicitHeight: 680
+    implicitHeight: Number(Quickshell.env('ARANEA_ACTION_RENDER_HEIGHT') || 680)
     visible: true
     Projects.ProjectsSurface {
       id: surface
@@ -221,6 +221,14 @@ ShellRoot {
         }
       },
       projectAvailable: true,
+      projectSnapshot: {
+        sessionId: 'preview-session',
+        availability: {
+          ready: true,
+          registry: true,
+          compositor: true
+        }
+      },
       projectActions: actions
     }
   }

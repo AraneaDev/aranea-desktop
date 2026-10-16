@@ -381,7 +381,7 @@ ShellRoot {
       root.desktopAvailable = false
       ready(payload(4), function (offline) {
         t.equal(offline.error && offline.error.code, 'WORKSPACE_UNAVAILABLE', 'an unreachable compositor refuses current-mode start')
-        t.equal(offline.error && offline.error.message, 'The current workspace is unavailable.', 'current-mode refusal never describes dedicated allocation')
+        t.equal(offline.error && offline.error.message, 'The current workspace is not available.', 'current-mode refusal never describes dedicated allocation')
         root.desktopAvailable = true
         returnTests()
       })

@@ -50,7 +50,7 @@ function records(registry, runtime) {
       target: { projectId: project.id, checkoutId: project.lastCheckoutId },
       detail: checkout
         ? checkout.path + (checkout.branch ? " · " + checkout.branch : "")
-        : "Selected checkout unavailable",
+        : "Selected checkout not available",
       aliases: checkout ? [checkout.path, checkout.branch || ""] : [],
       available: !!checkout && !!live.availability && live.availability.compositor === true,
       action: resume ? "resume" : "open",
@@ -110,7 +110,7 @@ function agentRecords(registry, runtime, choiceFor) {
         type: "project-agent",
         label: "Start " + (option.id === "claude" ? "Claude" : "Codex") + " in " + project.name,
         target: { projectId: project.id, checkoutId: project.lastCheckoutId, agentId: option.id },
-        detail: (suggested ? "Suggested · " : "") + (option.reason || "Usage unknown"),
+        detail: (suggested ? "Suggested · " : "") + (option.reason || "Not known yet"),
         aliases: ["agent", option.id, project.name],
         available: !!checkout && !!live.availability && live.availability.compositor === true,
         action: "agent",
@@ -151,8 +151,8 @@ function environmentRecords(registry, runtime) {
         e.checkoutSnapshot.path +
         " · " +
         ((e.observedRoles || []).length
-          ? "Observed: " + e.observedRoles.join(", ")
-          : "Tools unconfirmed"),
+          ? "Found: " + e.observedRoles.join(", ")
+          : "Tools not checked"),
       aliases: [e.profileSnapshot.name, e.checkoutSnapshot.path, e.checkoutSnapshot.branch || ""],
       available: !!runtime.availability && runtime.availability.compositor === true,
       action: "return",

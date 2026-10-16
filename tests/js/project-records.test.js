@@ -110,7 +110,7 @@ test("branchless and missing checkouts retain honest exact search metadata", () 
   assert.equal(rows[0].detail, "/tmp/a")
   assert.deepEqual(JSON.parse(JSON.stringify(rows[0].aliases)), ["/tmp/a", ""])
   assert.equal(rows[0].available, false, "offline compositor cannot advertise an available launch")
-  assert.equal(rows[1].detail, "Selected checkout unavailable")
+  assert.equal(rows[1].detail, "Selected checkout not available")
   assert.deepEqual(JSON.parse(JSON.stringify(rows[1].target)), {
     projectId: "p-2",
     checkoutId: "c-gone"
@@ -294,7 +294,7 @@ test("typed environment search keeps exact saved identity and launch snapshot", 
     environmentId: "e-one"
   })
   assert.match(rows[0].label, /Return.*Original/)
-  assert.match(rows[0].detail, /unconfirmed/)
+  assert.match(rows[0].detail, /not checked/)
 })
 
 test("environment records survive the ranking facade with exact Return identities", () => {

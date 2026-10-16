@@ -7,6 +7,7 @@ import qs.Commons
 import "../araneadev.shared" as Aranea
 import "ProjectOverview.js" as Overview
 import "ProjectActionSuggestions.js" as Suggestions
+import "ProjectProblems.js" as Problems
 
 ColumnLayout {
   id: view
@@ -42,8 +43,12 @@ ColumnLayout {
   property bool workspacePending: false
   // Native command availability gates Run and Start.
   property bool executionAvailable: false
-  // Readable shared-action transport or receipt uncertainty.
+  // Plain note about shared actions that is not a failure.
   property string actionError: ''
+  // Shared-action failure or uncertain start as {code, message, recovery}, or null.
+  property var actionProblem: null
+  // Check again and Refresh read the shared action state; they never run anything.
+  signal actionRefreshRequested
   // Readable activity connection uncertainty.
   property string activityError: ''
   // Shared pointer settlement gate for moving content.
@@ -72,6 +77,8 @@ ColumnLayout {
   property string gitCommandPending: ''
   // Last Git command failure for the selected checkout, or null.
   property var gitCommandError: null
+  // Which Git command failed: 'fetch' or 'pull'.
+  property string gitCommandOperation: ''
   // Any Git command is running anywhere; new ones are refused meanwhile.
   property bool gitCommandBusy: false
   // Explicit read-only refresh request.
@@ -120,6 +127,7 @@ ColumnLayout {
     nowMs: view.nowMs
     commandPending: view.gitCommandPending
     commandError: view.gitCommandError
+    commandOperation: view.gitCommandOperation
     commandBusy: view.gitCommandBusy
     onRefreshRequested: view.refreshRequested()
     onFetchRequested: view.fetchRequested()
@@ -127,6 +135,20 @@ ColumnLayout {
   }
   ColumnLayout {
     Layout.fillWidth: true
+    ProjectProblem {
+      objectName: 'overviewActionProblem'
+      Layout.fillWidth: true
+      displayOnly: view.displayOnly
+      pointerGate: view.pointerGate
+      problem: view.actionProblem ? Problems.problem(view.actionProblem, {
+        surface: 'overview',
+        actions: ['checkAgain', 'refresh']
+      }) : null
+      onActionRequested: function () {
+        if (!view.displayOnly)
+          view.actionRefreshRequested()
+      }
+    }
     Aranea.UiLabel {
       Layout.fillWidth: true
       visible: !!view.actionError
@@ -252,7 +274,7 @@ ColumnLayout {
     }
     Aranea.UiLabel {
       Layout.fillWidth: true
-      text: 'Unconfirmed tools may still be open. Check looks for existing tools; New window deliberately opens another.'
+      text: 'Tools may still be open. Check looks for existing tools; New window opens another.'
       opacity: 0.65
     }
     Aranea.ActionButton {

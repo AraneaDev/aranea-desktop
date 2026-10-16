@@ -76,7 +76,7 @@ function sections(topic) {
     },
     {
       title: "What session buttons do",
-      body: "Open session / Go to session focuses the proven hosting terminal, not a particular tmux pane. Reopen session explicitly resumes a supported native session. Open checkout brings up the project's saved tools. Check session again and Reconnect observation read an existing operation; they do not launch another session."
+      body: "Open session / Go to session focuses the proven hosting terminal, not a particular tmux pane. Reopen session explicitly resumes a supported native session. Open checkout brings up the project's saved tools. Check session again and Reconnect look at an existing operation; they do not launch another session."
     },
     {
       title: "No tasks appearing?",

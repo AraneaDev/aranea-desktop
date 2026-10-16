@@ -68,7 +68,7 @@ Item {
       'back': 'Back to tasks',
       'open-checkout': 'Open checkout',
       'reobserve': 'Check session again',
-      'reconnect': 'Reconnect observation',
+      'reconnect': 'Reconnect',
       'dismiss': 'Dismiss task',
       'setup': 'Project settings'
     }[kind] || kind
@@ -266,7 +266,7 @@ Item {
         objectName: 'sessionUnavailable'
         width: parent.width
         visible: details.row && !details.row.primary.kind
-        text: details.row && !details.row.assigned ? 'Register this exact checkout in Project settings to enable checkout actions.' : 'No proven session is available. Enable the provider adapter explicitly; manual reports do not prove a hosting terminal.'
+        text: details.row && !details.row.assigned ? 'Register this checkout in Project settings to enable checkout actions.' : 'No proven session is available. Enable the provider adapter explicitly; manual reports do not prove a hosting terminal.'
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground
@@ -315,7 +315,7 @@ Item {
       Text {
         width: parent.width
         visible: details.outcome.protected
-        text: 'Acceptance is uncertain. Check the existing terminal; reconnect only reads the retained operation and never launches again.'
+        text: 'Couldn\'t confirm it started. Check the existing terminal. Reconnect only looks again and never starts anything new.'
         textFormat: Text.PlainText
         wrapMode: Text.Wrap
         color: Aranea.DesignTokens.foreground

@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import "../araneadev.shared" as Aranea
 import "ProjectTasks.js" as Tasks
+import "ProjectProblems.js" as Problems
 
 ProjectSectionCard {
   id: card
@@ -59,13 +60,15 @@ ProjectSectionCard {
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
   }
-  Aranea.UiLabel {
+  ProjectProblem {
     objectName: 'projectTaskRemoveError'
     Layout.fillWidth: true
-    visible: !!card.error
-    text: card.error ? card.error.message + ' ' + (card.error.recovery || '') : ''
-    color: Aranea.DesignTokens.urgent
-    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+    displayOnly: card.displayOnly
+    pointerGate: card.pointerGate
+    problem: card.error ? Problems.problem(card.error, {
+      surface: 'tasks',
+      actions: []
+    }) : null
   }
   RowLayout {
     Layout.fillWidth: true

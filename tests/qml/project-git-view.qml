@@ -98,7 +98,7 @@ ShellRoot {
           var comparison = descendants(section).filter(function (item) {
             return item.text !== undefined && item.text.indexOf('Local refs; no remote fetch') >= 0
           })[0]
-          t.check(!!comparison && /comparison unavailable/i.test(comparison.text) && comparison.text.indexOf('local-base') >= 0 && comparison.text.indexOf('null') < 0, 'unresolved real local upstream explains unavailable comparison without null values')
+          t.check(!!comparison && /comparison not available/i.test(comparison.text) && comparison.text.indexOf('local-base') >= 0 && comparison.text.indexOf('null') < 0, 'unresolved real local upstream explains unavailable comparison without null values')
           view.model = {
             git: Object.assign({}, client.current, {
               ahead: 0,

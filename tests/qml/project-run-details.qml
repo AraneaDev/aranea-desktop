@@ -77,7 +77,7 @@ ShellRoot {
   }
   Component.onCompleted: t.step(50, function () {
     client.currentRun = details.run
-    t.check(details.statusText.indexOf('Cleanup unconfirmed') >= 0, 'terminal main result honestly retains cleanup uncertainty')
+    t.check(details.statusText.indexOf('Cleanup not confirmed') >= 0, 'terminal main result honestly retains cleanup uncertainty')
     t.check(details.statusText.indexOf('Previous preview reachability') >= 0, 'preview evidence separate from process result')
     t.check(!details.restartAllowed, 'unconfirmed cleanup refuses restart')
     details.perform('restart', 'r-00000000-0000-4000-8000-000000000001')
@@ -127,7 +127,7 @@ ShellRoot {
       },
       {
         state: 'unconfirmed',
-        expected: 'Unconfirmed'
+        expected: 'Not confirmed'
       }
     ]
     statusFixtures.forEach(function (fixture) {

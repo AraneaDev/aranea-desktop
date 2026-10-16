@@ -43,7 +43,7 @@ test("overview keeps launched context only on occupied unambiguous workspaces", 
   const context = model.overviewContext({ id: 7, occupied: true }, snapshot)
   assert.equal(context.label, "App · Terminal")
   assert.match(context.detail, /launch-branch at launch/)
-  assert.match(context.detail, /Tools unconfirmed/)
+  assert.match(context.detail, /Tools not checked/)
   snapshot.environments = []
   snapshot.projects[0].associations[0].workspaceId = 7
   snapshot.bindings = [
@@ -68,7 +68,7 @@ test("bar retains launched environments across restart while hiding bare saved a
     }
   ]
   assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")
-  assert.match(model.barContext(7, snapshot).detail, /Tools unconfirmed/)
+  assert.match(model.barContext(7, snapshot).detail, /Tools not checked/)
   snapshot.environments = []
   snapshot.bindings = [verifiedBinding({ workspaceId: 7 })]
   assert.equal(model.barContext(7, snapshot).checkoutId, "c-fix")

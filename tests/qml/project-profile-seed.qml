@@ -256,7 +256,7 @@ ShellRoot {
       header.chooseProfile('f-a')
       t.equal(host.starts.length, 0, 'unusable profile cannot be chosen')
       t.equal(t.findChild(header, 'projectBlockedReason').text.length > 0 && t.findChild(header, 'headerManageProfiles').text, 'Set up a profile', 'no usable profile offers setup')
-      t.equal(t.findChild(header, 'profilePicker').rows[0].path.indexOf('Unavailable · '), 0, 'picker rows mark unusable profiles')
+      t.equal(t.findChild(header, 'profilePicker').rows[0].path.indexOf('Not available · '), 0, 'picker rows mark unusable profiles')
       queuedNavigation()
     })
   }
