@@ -8,7 +8,7 @@ ShellRoot {
   id: host
   // Only the external helper boundary is replaced; the client logic stays real.
   property var calls: []
-  // Records the order of results observed by the test.
+  // Records {operation, response} from each finished signal.
   property var seen: []
   QmlTest {
     id: t

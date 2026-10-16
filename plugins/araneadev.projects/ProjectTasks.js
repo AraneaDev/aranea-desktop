@@ -34,6 +34,7 @@ function branchProblem(name) {
  * @returns {{allowed:boolean,confirmLabel:string,lines:Array<string>}} dialog content after the view's own first line
  */
 function removeSummary(facts) {
+  // `facts || {}` narrows to `{}`, which has none of the fact fields.
   var f = /** @type {any} */ (facts || {})
   var lines = []
   var allowed = true

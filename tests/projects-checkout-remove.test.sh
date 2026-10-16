@@ -22,16 +22,16 @@ setup() {
   primary_id=$(jq -r '.state.projects[0].checkouts[]|select(.primary)|.id' "$result")
   linked_id=$(jq -r '.state.projects[0].checkouts[]|select(.primary|not)|.id' "$result")
 }
-# Test: remove.
+# Remove the checkout through the store and save the response.
 remove() { jq -cn --arg p "$1" --arg c "$2" '{action:"checkout-remove",args:{projectId:$p,checkoutId:$c}}' | "$store" mutate >"$result"; }
-# Test: removes linked and moves selection.
+# Catch removing a task checkout that fails or leaves it selected.
 removes_linked_and_moves_selection() {
   setup
   jq -cn --arg p "$project_id" --arg c "$linked_id" '{action:"select-checkout",args:{projectId:$p,checkoutId:$c}}' | "$store" mutate >/dev/null
   remove "$project_id" "$linked_id"
   jq -e --arg p "$primary_id" '.ok and (.state.projects[0].checkouts|length == 1) and .state.projects[0].lastCheckoutId == $p' "$result" >/dev/null
 }
-# Test: refuses primary and last.
+# Catch removal of the primary or the only remaining checkout.
 refuses_primary_and_last() {
   setup
   if remove "$project_id" "$primary_id"; then return 1; fi
@@ -40,7 +40,7 @@ refuses_primary_and_last() {
   if remove "$project_id" "$primary_id"; then return 1; fi
   jq -e '.error.code == "CHECKOUT_REQUIRED"' "$result" >/dev/null
 }
-# Test: unknown ids fail cleanly.
+# Catch unknown checkout or project ids that do not fail with a clear code.
 unknown_ids_fail_cleanly() {
   setup
   if remove "$project_id" c-00000000-0000-4000-8000-000000000000; then return 1; fi
@@ -48,15 +48,15 @@ unknown_ids_fail_cleanly() {
   if remove p-00000000-0000-4000-8000-000000000000 "$linked_id"; then return 1; fi
   jq -e '.error.code == "PROJECT_NOT_FOUND"' "$result" >/dev/null
 }
-# Test: extra fields are rejected.
+# Catch extra request fields such as force being accepted.
 extra_fields_are_rejected() {
   setup
   if jq -cn --arg p "$project_id" --arg c "$linked_id" '{action:"checkout-remove",args:{projectId:$p,checkoutId:$c,force:true}}' | "$store" mutate >"$result"; then return 1; fi
   jq -e '.error.code == "INVALID_REQUEST"' "$result" >/dev/null
 }
-# Test: mutate args.
+# Send one store mutation with the given action and arguments.
 mutate_args() { jq -cn --arg a "$1" --argjson args "$2" '{action:$a,args:$args}' | "$store" mutate >"$result"; }
-# Test: drops associations and environments.
+# Catch removal leaving associations or environments of the removed checkout.
 drops_associations_and_environments() {
   setup
   mutate_args profile-save "$(jq -cn --arg p "$project_id" '{projectId:$p,profile:{name:"Dev",roles:["terminal"],tools:{editorId:null,terminalId:"kitty",agentId:null}}}')"

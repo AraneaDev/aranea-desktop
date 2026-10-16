@@ -28,18 +28,18 @@ setup() {
   project_id=$(jq -r '.state.projects[0].id' "$result")
   checkout_id=$(jq -r '.state.projects[0].checkouts[0].id' "$result")
 }
-# Test: push upstream.
+# Commit on the seed clone and push it to the remote, as another person would.
 push_upstream() { git -C "$seed" -c user.name=T -c user.email=t@example.invalid commit -q --allow-empty -m "$1" && git -C "$seed" push -q origin HEAD:main; }
-# Test: run.
+# Run the Git helper operation on the primary checkout and save its envelope.
 run() { "$helper" "$1" --project "$project_id" --checkout "$checkout_id" "${@:2}" --json >"$result"; }
-# Test: expect code.
+# Assert the helper fails with this error code, no data and a recovery hint.
 expect_code() { ! run "${@:2}" && jq -e --arg c "$1" '.ok == false and .data == null and .error.code == $c and (.error.recovery|length > 0)' "$result" >/dev/null; }
 action_store="$repo_root/scripts/aranea-project-action-store"
-# Test: task new.
+# Run task-create on the primary checkout for the branch and save the envelope.
 task_new() { "$helper" task-create --project "$project_id" --checkout "$checkout_id" --branch "$1" --json >"$result"; }
-# Test: linked id.
+# Checkout id registered for this path.
 linked_id() { jq -r --arg p "$1" '.projects[0].checkouts[]|select(.path == $p)|.id' "$ARANEA_STATE_ROOT/projects.json"; }
-# Test: registry count.
+# Number of checkouts registered for the project.
 registry_count() { jq '.projects[0].checkouts|length' "$ARANEA_STATE_ROOT/projects.json"; }
 # Create a task checkout and leave its id in $task_id and path in $task_path.
 make_task() {
@@ -48,14 +48,14 @@ make_task() {
   task_id=$(jq -r .data.checkoutId "$result")
   task_path=$(jq -r .data.path "$result")
 }
-# Test: task run.
+# Run the Git helper operation on the task checkout and save its envelope.
 task_run() { "$helper" "$1" --project "$project_id" --checkout "$task_id" "${@:2}" --json >"$result"; }
-# Test: task expect.
+# Assert the helper fails on the task checkout with this error code and a recovery hint.
 task_expect() { ! task_run "${@:2}" && jq -e --arg c "$1" '.ok == false and .data == null and .error.code == $c and (.error.recovery|length > 0)' "$result" >/dev/null; }
-# Test: commit in.
+# Add an empty commit in the given checkout.
 commit_in() { git -C "$1" -c user.name=T -c user.email=t@example.invalid commit -q --allow-empty -m "$2"; }
 
-# Test: task create from remote default.
+# Catch a new branch not started at the freshly fetched remote default, or not registered and selected.
 task_create_from_remote_default() {
   setup
   push_upstream two
@@ -67,21 +67,21 @@ task_create_from_remote_default() {
   [[ $(jq -r '.projects[0].lastCheckoutId' "$ARANEA_STATE_ROOT/projects.json") == "$(jq -r .data.checkoutId "$result")" ]]
   ! git -C "$new" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1
 }
-# Test: task create without remote.
+# Catch a repository without remote that cannot start a task from local main.
 task_create_without_remote() {
   setup
   git -C "$repo" remote remove origin
   task_new x
   jq -e '.ok and .data.base == "main"' "$result" >/dev/null
 }
-# Test: task create no default branch.
+# Catch a missing main or master that creates a branch anyway instead of NO_DEFAULT_BRANCH.
 task_create_no_default_branch() {
   setup
   git -C "$repo" remote remove origin
   git -C "$repo" branch -m main trunk
   expect_code NO_DEFAULT_BRANCH task-create --branch x
 }
-# Test: task create refusals.
+# Catch bad names, existing branches or folders being accepted, or a refusal that registers anything.
 task_create_refusals() {
   setup
   expect_code INVALID_BRANCH task-create --branch 'bad name'
@@ -91,7 +91,7 @@ task_create_refusals() {
   expect_code PATH_EXISTS task-create --branch occupied
   [[ $(registry_count) == 1 ]]
 }
-# Test: task create rejects hostile names.
+# Catch option-like or shell-like branch names being run, or leaving files behind.
 task_create_rejects_hostile_names() {
   setup
   local name folder
@@ -110,14 +110,14 @@ task_create_rejects_hostile_names() {
   done
   [[ ! -e PWNED && ! -e "$ARANEA_TEST_SANDBOX/w/app-worktrees/PWNED" ]]
 }
-# Test: task create from linked checkout uses primary name.
+# Catch a task made from another task checkout being placed beside that task instead of the primary.
 task_create_from_linked_checkout_uses_primary_name() {
   setup
   make_task feat-a
   "$helper" task-create --project "$project_id" --checkout "$task_id" --branch feat-b --json >"$result"
   jq -e '.ok and (.data.path|endswith("/app-worktrees/feat-b"))' "$result" >/dev/null
 }
-# Test: task remove clean.
+# Catch a clean task checkout whose check changes anything or whose removal leaves the folder.
 task_remove_clean() {
   setup
   make_task t1
@@ -131,7 +131,7 @@ task_remove_clean() {
   [[ $(registry_count) == 1 ]]
   [[ $(jq -r '.projects[0].lastCheckoutId' "$ARANEA_STATE_ROOT/projects.json") == "$checkout_id" ]]
 }
-# Test: task remove refusals.
+# Catch removal of the primary, dirty or unpushed checkouts, or a removal that loses the branch.
 task_remove_refusals() {
   setup
   expect_code PRIMARY_CHECKOUT task-remove
@@ -152,7 +152,7 @@ task_remove_refusals() {
   [[ ! -e $task_path ]]
   [[ $(git -C "$repo" rev-list --count main..t2) == 1 ]]
 }
-# Test: task remove busy.
+# Catch removal of a checkout with a protected action run.
 task_remove_busy() {
   setup
   make_task busy
@@ -167,7 +167,7 @@ task_remove_busy() {
   task_expect CHECKOUT_BUSY task-remove
   [[ -d $task_path ]]
 }
-# Test: task remove missing folder unregisters.
+# Catch a hand-deleted task checkout that cannot be forgotten, or loses its branch.
 task_remove_missing_folder_unregisters() {
   setup
   make_task gone
@@ -178,7 +178,7 @@ task_remove_missing_folder_unregisters() {
   [[ $(registry_count) == 1 ]]
   git -C "$repo" show-ref --verify --quiet refs/heads/gone
 }
-# Test: missing folder check changes nothing.
+# Catch a --check on a vanished folder that edits the registry or Git worktree records.
 missing_folder_check_changes_nothing() {
   setup
   make_task gone2
@@ -191,7 +191,7 @@ missing_folder_check_changes_nothing() {
   [[ $(sha256sum "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]]
   [[ $(git -C "$repo" worktree list --porcelain) == "$worktrees_before" ]]
 }
-# Test: broken action store fails closed.
+# Catch removal proceeding when running actions cannot be read.
 broken_action_store_fails_closed() {
   setup
   make_task closed
@@ -204,7 +204,7 @@ broken_action_store_fails_closed() {
   task_expect ACTIONS_UNAVAILABLE task-remove
   [[ $(registry_count) == 2 ]]
 }
-# Test: missing folder never prunes other worktrees.
+# Catch forgetting a vanished task also pruning another stale worktree.
 missing_folder_never_prunes_other_worktrees() {
   setup
   make_task ours
@@ -222,7 +222,7 @@ missing_folder_never_prunes_other_worktrees() {
   grep -qx "$ARANEA_TEST_SANDBOX/w/other-wt/.git" "$repo"/.git/worktrees/*/gitdir
   [[ -d $ARANEA_TEST_SANDBOX/w/healthy-wt ]]
 }
-# Test: missing folder refuses when other stale records exist.
+# Catch a refused plain removal that prunes despite other stale worktrees.
 missing_folder_refuses_when_other_stale_records_exist() {
   setup
   make_task ours
@@ -242,7 +242,7 @@ WRAP
   [[ $(registry_count) == 2 ]]
   [[ $(find "$repo/.git/worktrees" -mindepth 1 -maxdepth 1 | wc -l) == 2 ]]
 }
-# Test: missing folder prunes alone when removal refuses.
+# Catch a vanished task that cannot be forgotten when plain removal refuses.
 missing_folder_prunes_alone_when_removal_refuses() {
   setup
   make_task ours
@@ -261,7 +261,7 @@ WRAP
   [[ $(registry_count) == 1 ]]
   [[ $(find "$repo/.git/worktrees" -mindepth 1 -maxdepth 1 | wc -l) == 1 ]]
 }
-# Test: missing folder prunes only its own record.
+# Catch forgetting a vanished task removing a healthy worktree record.
 missing_folder_prunes_only_its_own_record() {
   setup
   make_task ours
@@ -272,7 +272,7 @@ missing_folder_prunes_only_its_own_record() {
   [[ $(find "$repo/.git/worktrees" -mindepth 1 -maxdepth 1 | wc -l) == 1 ]]
   [[ -d $ARANEA_TEST_SANDBOX/w/healthy-wt ]]
 }
-# Test: ignored files are counted not blocking.
+# Catch ignored files blocking removal or going uncounted.
 ignored_files_are_counted_not_blocking() {
   setup
   make_task ign
@@ -285,7 +285,7 @@ ignored_files_are_counted_not_blocking() {
   task_run task-remove --confirm-unpushed
   jq -e '.ok and .data.removed' "$result" >/dev/null
 }
-# Test: detached head commits are never discarded.
+# Catch removal of a detached HEAD with commits on no branch, even when confirmed.
 detached_head_commits_are_never_discarded() {
   setup
   make_task det
@@ -295,7 +295,7 @@ detached_head_commits_are_never_discarded() {
   jq -e '.error.message | contains("1 commit on a detached HEAD would be lost")' "$result" >/dev/null
   [[ -d $task_path ]]
 }
-# Test: missing folder check counts unpushed.
+# Catch a vanished folder check that misses commits its branch still holds.
 missing_folder_check_counts_unpushed() {
   setup
   make_task cnt
@@ -304,13 +304,13 @@ missing_folder_check_counts_unpushed() {
   task_run task-remove --check
   jq -e '.ok and .data.missing == true and .data.unpushed == 1 and .data.ignored == 0' "$result" >/dev/null
 }
-# Test: missing primary folder is still refused.
+# Catch a moved primary checkout being treated as a forgettable task.
 missing_primary_folder_is_still_refused() {
   setup
   mv "$repo" "$repo.moved"
   expect_code CHECKOUT_INVALID task-remove
 }
-# Test: unpushed without remote counts against main.
+# Catch a repository without remote counting its whole history as unpushed.
 unpushed_without_remote_counts_against_main() {
   setup
   git -C "$repo" remote remove origin

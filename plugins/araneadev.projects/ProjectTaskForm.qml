@@ -36,7 +36,7 @@ ProjectSectionCard {
   signal createRequested(string branch)
   // Close without creating.
   signal cancelled
-  // Validate the branch name and emit create.
+  // Emit create when the form is valid.
   function submit() {
     if (canCreate)
       createRequested(branch)

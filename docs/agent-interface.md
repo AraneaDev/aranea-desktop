@@ -725,7 +725,8 @@ Result fields, carried as the final CLI event's `data`:
   `{projectId,checkoutId,path,branch,dirty,untracked,ignored,busy,unpushed,missing}`.
   Nothing is changed. `ignored` is the count of ignored paths that would be
   deleted with the folder; they warn but never refuse. `busy` is true while an
-  action run for that checkout is pending, running or unconfirmed. `unpushed`
+  action run for that checkout is pending, running or unconfirmed, or has
+  `submissionUnconfirmed`. `unpushed`
   counts commits on no remote (without remotes, commits not on local
   `main`/`master`). `missing` is true when the folder is gone.
 - `task remove`: `{projectId,checkoutId,path,branch,removed}`. It never uses
@@ -763,7 +764,9 @@ Refusals use these codes:
 - `CHECKOUT_BUSY`: a protected action run exists for the checkout.
 - `ACTIONS_UNAVAILABLE`: the action store could not be read, so removal fails closed.
 - `UNPUSHED_COMMITS`: commits on no remote without `--confirm-unpushed`, or any
-  commits on a detached HEAD.
+  commits on a detached HEAD that are reachable from no branch and no remote. It
+  never fires for a checkout whose folder is missing, which has no unpushed gate
+  because the branch is kept.
 - `UNREGISTER_FAILED`: the folder was removed but Projects could not forget it.
 
 The `capabilities` result carries `projectGit`:

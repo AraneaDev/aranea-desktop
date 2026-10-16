@@ -173,7 +173,7 @@ ShellRoot {
     removeChecks()
     surfaceChecks()
   })
-  // Test: section checks.
+  // Catch Fetch and Pull states, labels and errors that do not follow git state and pending commands.
   function sectionChecks() {
     var fetch = t.findChild(section, 'projectGitFetch')
     var pull = t.findChild(section, 'projectGitPull')
@@ -203,7 +203,7 @@ ShellRoot {
     t.check(!fetch.enabled && !pull.enabled, 'display only disables both')
     section.displayOnly = false
   }
-  // Test: header checks.
+  // Catch New and Remove task buttons shown on the wrong checkout or emitting wrong ids.
   function headerChecks() {
     var create = t.findChild(header, 'headerNewTask')
     var remove = t.findChild(header, 'headerRemoveTask')
@@ -215,7 +215,7 @@ ShellRoot {
     remove.clicked()
     t.equal(host.headerSignals, [['create', 'p-h'], ['remove', 'p-h', 'c-l']], 'header signals carry exact IDs')
   }
-  // Test: form checks.
+  // Catch the form creating with a bad name, losing its text on error, or ignoring pending.
   function formChecks() {
     var field = t.findChild(form, 'projectTaskBranch')
     var preview = t.findChild(form, 'projectTaskPreview')
@@ -244,7 +244,7 @@ ShellRoot {
     t.check(!create.enabled, 'Create is disabled while pending')
     form.pending = false
   }
-  // Test: remove checks.
+  // Catch removal confirmation text, labels and gating that disagree with the check facts.
   function removeChecks() {
     var confirm = t.findChild(removal, 'projectTaskRemoveConfirm')
     t.equal(t.findChild(removal, 'projectTaskRemoveQuestion').text, 'Remove the folder /home/u/Work/myapp-worktrees/feat? The branch feat is kept.', 'question names folder and branch')
@@ -284,7 +284,7 @@ ShellRoot {
     }
     t.check(!confirm.enabled, 'untracked files disable Confirm')
   }
-  // Test: surface checks.
+  // Catch Fetch that does not send its command, show pending, or refresh the selected pair.
   function surfaceChecks() {
     entry.projectController.runner = function (argv, input, done) {
       if (argv[1] === 'snapshot') {
@@ -364,7 +364,7 @@ ShellRoot {
       })
     })
   }
-  // Test: stale fetch.
+  // Catch a result for a previously selected project refreshing or marking the current one.
   function staleFetch() {
     var fetch = t.findChild(surface, 'projectGitFetch')
     t.waitFor(function () {
@@ -453,7 +453,7 @@ ShellRoot {
       })
     })
   }
-  // Test: create flow.
+  // Catch task creation that sends the wrong command, shows stale form state or launches tools.
   function createFlow() {
     var header = t.findChild(surface, 'projectHeader')
     header.startProfile.connect(function (id, revision) {
@@ -483,7 +483,7 @@ ShellRoot {
       removeFlow()
     })
   }
-  // Test: remove flow.
+  // Catch removal that skips the check, the focused card or the unpushed confirmation flag.
   function removeFlow() {
     var header = t.findChild(surface, 'projectHeader')
     host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 2)
@@ -565,7 +565,7 @@ ShellRoot {
       })
     })
   }
-  // Test: inert checks.
+  // Catch capture mode running Git commands.
   function inertChecks() {
     host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 3)
     host.gitCalls = []
