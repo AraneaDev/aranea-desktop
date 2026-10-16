@@ -12,8 +12,19 @@ ShellRoot {
   property var commands: []
   // Next status answer the fake helper gives.
   property bool fakeBound: false
+  // Make the fake helper answer garbage.
+  property bool failStatus: false
+  // Commands seen by the first-open Settings fixture.
+  property var openCommands: []
   QmlTest {
     id: t
+  }
+  Settings.Settings {
+    id: firstOpen
+    windowEnabled: false
+    runner: function (argv, done) {
+      host.openCommands = host.openCommands.concat([argv.join(' ')])
+    }
   }
   Settings.IntegrationsPage {
     id: page
@@ -36,6 +47,8 @@ ShellRoot {
     runner: function (argv, done) {
       host.commands = host.commands.concat([argv.slice(1).join(' ')])
       var sub = argv[1]
+      if (host.failStatus)
+        return done(1, '', 'Could not run the shortcut helper.')
       if (sub === 'add')
         host.fakeBound = true
       if (sub === 'remove')
@@ -66,14 +79,20 @@ ShellRoot {
   }
   Component.onCompleted: t.step(50, function () {
     t.equal(child('quickSwitcherState').text, 'Not set', 'unbound state reads Not set')
-    t.equal(child('quickSwitcherKey').text, 'SUPER + ALT + P', 'default key shown')
+    t.equal(child('quickSwitcherKey').text, 'SUPER + ALT + P', 'default key prefilled')
+    t.equal(child('quickSwitcherAdd').text, 'Add to bindings', 'Add button label')
+    child('quickSwitcherKey').text = ''
+    t.check(!child('quickSwitcherAdd').enabled, 'Add disabled when the field is empty')
+    child('quickSwitcherKey').text = '   '
+    t.check(!child('quickSwitcherAdd').enabled, 'Add disabled when the field is blank')
+    child('quickSwitcherKey').text = 'SUPER + CTRL + O'
     t.check(!child('quickSwitcherRemove').visible, 'Remove hidden when unbound')
     child('quickSwitcherAdd').clicked()
     t.equal(host.requests, [['keybind-add',
         {
-          key: 'SUPER + ALT + P'
+          key: 'SUPER + CTRL + O'
         }
-      ]], 'Add requests the default key')
+      ]], 'Add sends the edited key')
     page.backendState = {
       integrations: [],
       keybind: {
@@ -133,7 +152,23 @@ ShellRoot {
             t.check(controller.request('keybind-add', {
               key: 'SUPER + ALT + P'
             }) === false && host.commands.length === n, 'showcase refuses add')
-            t.done()
+            host.failStatus = true
+            controller.showcaseActive = false
+            controller.keybindError = null
+            controller.refreshKeybind(function () {})
+            t.step(30, function () {
+              t.equal(controller.keybindError.code, 'WRITE_FAILED', 'failed status read sets a plain error')
+              page.errors = {
+                keybind: controller.keybindError
+              }
+              t.check(child('quickSwitcherError').text.length > 0, 'failed status shows an error')
+              host.openCommands = []
+              firstOpen.open('{}')
+              t.check(host.openCommands.some(function (c) {
+                return c.indexOf('aranea-keybind') >= 0 && c.indexOf('status --json') >= 0
+              }), 'first open reads status')
+              t.done()
+            })
           })
         })
       })

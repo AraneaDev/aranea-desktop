@@ -213,7 +213,9 @@ QtObject {
           bound: response.data.bound,
           key: response.data.key || null
         }
-      } else if (done) {
+        if (!done)
+          keybindError = null
+      } else {
         keybindError = response && response.error ? response.error : keybindFailure(stderr)
       }
       if (done)

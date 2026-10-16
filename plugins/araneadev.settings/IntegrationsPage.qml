@@ -98,24 +98,46 @@ ColumnLayout {
           Layout.fillWidth: true
           text: page.backendState.keybind && page.backendState.keybind.bound ? page.backendState.keybind.key || '' : 'Not set'
         }
-        SettingsLabel {
-          objectName: 'quickSwitcherKey'
+        Rectangle {
           Layout.fillWidth: true
-          text: 'SUPER + ALT + P'
-          opacity: 0.65
+          Layout.preferredHeight: Style.space(28)
+          radius: Style.space(3)
+          color: Util.alpha(Color.foreground, 0.04)
+          border.width: 1
+          border.color: Util.alpha(Color.foreground, 0.15)
+          Aranea.FocusFrame {
+            anchors.fill: parent
+            focused: keyField.activeFocus
+          }
+          TextInput {
+            id: keyField
+            objectName: 'quickSwitcherKey'
+            anchors.fill: parent
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(8)
+            verticalAlignment: TextInput.AlignVCenter
+            text: 'SUPER + ALT + P'
+            color: Color.foreground
+            font.family: Aranea.Typography.technicalFamily
+            font.pixelSize: Style.font.body
+            enabled: !page.displayOnly && !page.pending
+            activeFocusOnTab: true
+            selectByMouse: true
+            Accessible.name: 'Quick switcher key'
+          }
         }
       }
       RowLayout {
         SettingsButton {
           objectName: 'quickSwitcherAdd'
-          text: 'Add'
+          text: 'Add to bindings'
           visible: !page.backendState.keybind || !page.backendState.keybind.bound
-          enabled: !page.displayOnly && !page.pending
+          enabled: !page.displayOnly && !page.pending && keyField.text.trim() !== ''
           busy: page.pendingKey === 'keybind'
           pointerGate: page.pointerGate
-          onClicked: if (!page.displayOnly && !page.pending)
+          onClicked: if (!page.displayOnly && !page.pending && keyField.text.trim() !== '')
             page.request('keybind-add', {
-              key: 'SUPER + ALT + P'
+              key: keyField.text.trim()
             })
         }
         SettingsButton {
