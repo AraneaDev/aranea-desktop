@@ -477,6 +477,10 @@ Item {
   property var seededProjects: ({})
   // Project whose seed request is in flight, or ''.
   property string seedingProjectId: ''
+  // The start block shows the project client's error while a start is uncertain or refused.
+  readonly property bool startOwnsError: panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError
+  // Project the automatic checks belong to; only a different project ends them.
+  property string autoCheckProjectId: ''
   // Projects whose last seed request failed (id → true).
   property var seedFailures: ({})
   // Record or clear one project's seed failure.
@@ -716,8 +720,13 @@ Item {
   Connections {
     target: projectsPage
     function onSelectedProjectChanged() {
-      panel.root.projectClient.stopAutoCheck()
-      panel.root.actionClient.stopAutoCheck()
+      // A registry refresh hands over a new object for the same project: only a different id ends the checks.
+      var id = projectsPage.selectedProject ? projectsPage.selectedProject.id : ''
+      if (id !== panel.autoCheckProjectId) {
+        panel.autoCheckProjectId = id
+        panel.root.projectClient.stopAutoCheck()
+        panel.root.actionClient.stopAutoCheck()
+      }
       panel.dropStaleTaskCards()
       panel.maybeSeedSelected()
     }
@@ -1072,9 +1081,9 @@ Item {
                   windowOpen: !!panel.root.opened
                   metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
-                  error: panel.root.projectController.error || panel.root.projectClient.error
+                  error: panel.root.projectController.error || (panel.startOwnsError ? '' : panel.root.projectClient.error)
                   extraErrorObject: panel.root.projectController.extraErrorObject
-                  errorObject: panel.root.projectController.errorObject || (!panel.root.projectController.error && panel.root.projectClient.error ? {
+                  errorObject: panel.root.projectController.errorObject || (!panel.root.projectController.error && !panel.startOwnsError && panel.root.projectClient.error ? {
                       message: panel.root.projectClient.error
                     } : null)
                   pointerGate: pointerGate
