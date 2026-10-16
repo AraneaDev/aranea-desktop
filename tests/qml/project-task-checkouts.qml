@@ -465,6 +465,8 @@ ShellRoot {
     t.check(field.visible, 'the task form opens')
     t.check(field.activeFocus, 'the branch field has focus')
     field.text = 'feat/login'
+    t.check(field.nextItemInFocusChain(true) === t.findChild(surface, 'projectTaskCreate'), 'Tab goes from the field to Create')
+    t.check(t.findChild(surface, 'projectTaskCreate').nextItemInFocusChain(true) === t.findChild(surface, 'projectTaskCancel'), 'Tab goes from Create to Cancel')
     t.findChild(surface, 'projectTaskCreate').clicked()
     t.equal(host.gitCalls.length, 1, 'Create sends one command')
     t.equal(host.gitCalls[0].argv.slice(1), ['task-create', '--project', 'p-a', '--checkout', 'c-p', '--branch', 'feat/login', '--json'], 'Create names the branch')
@@ -535,7 +537,7 @@ ShellRoot {
         error: null
       })
       var confirm = t.findChild(surface, 'projectTaskRemoveConfirm')
-      t.check(t.findChild(surface, 'projectTaskRemove').activeFocus, 'the removal card has focus so Esc cancels')
+      t.check(t.findChild(surface, 'projectTaskRemoveCancel').activeFocus, 'focus is inside the removal card, so Esc reaches it')
       t.waitFor(function () {
         return confirm.enabled
       }, 3000, 'Confirm is enabled after the check', function () {
@@ -563,6 +565,8 @@ ShellRoot {
       return remove.visible
     }, 3000, 'Remove is offered again', function () {
       remove.clicked()
+      var cancelButton = t.findChild(surface, 'projectTaskRemoveCancel')
+      t.check(cancelButton.activeFocus, 'Cancel has focus when the removal card opens')
       host.answer(0, {
         ok: true,
         data: {
@@ -579,6 +583,8 @@ ShellRoot {
       t.waitFor(function () {
         return confirm.enabled && confirm.text === 'Remove anyway'
       }, 3000, 'Confirm reads Remove anyway', function () {
+        t.check(cancelButton.nextItemInFocusChain(false) === confirm, 'Shift+Tab goes from Cancel to Remove')
+        t.check(confirm.nextItemInFocusChain(true) === cancelButton, 'Tab goes from Remove to Cancel')
         confirm.clicked()
         t.equal(host.gitCalls[1].argv.slice(1), ['task-remove', '--project', 'p-a', '--checkout', 'c-l', '--confirm-unpushed', '--json'], 'unpushed removal passes the flag')
         host.answer(1, {
@@ -588,7 +594,57 @@ ShellRoot {
         })
         t.waitFor(function () {
           return surface.removeTarget === null
-        }, 3000, 'the card closes again', captureMidRunFlow)
+        }, 3000, 'the card closes again', staleTargets)
+      })
+    })
+  }
+  // A card whose checkout or project left the registry closes and checks nothing more.
+  function staleTargets() {
+    var header = t.findChild(surface, 'projectHeader')
+    host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 10)
+    host.gitCalls = []
+    var remove = t.findChild(header, 'headerRemoveTask')
+    t.waitFor(function () {
+      return remove.visible
+    }, 3000, 'Remove is offered for the stale case', function () {
+      remove.clicked()
+      host.answer(0, {
+        ok: true,
+        data: {
+          dirty: false,
+          untracked: false,
+          busy: false,
+          unpushed: 0,
+          ignored: 0,
+          missing: false
+        },
+        error: null
+      })
+      t.waitFor(function () {
+        return surface.removeFacts !== null
+      }, 3000, 'the check answered', function () {
+        var gone = host.project('p-a', 'c-l')
+        gone.checkouts = gone.checkouts.filter(function (c) {
+          return c.id !== 'c-l'
+        })
+        host.show([gone, host.project('p-b', 'c-p')], 'p-a', 11)
+        t.waitFor(function () {
+          return surface.removeTarget === null
+        }, 3000, 'the card closes when its checkout is gone', function () {
+          t.equal(host.gitCalls.length, 1, 'no further helper call for the vanished checkout')
+          host.show([host.project('p-a', 'c-p'), host.project('p-b', 'c-p')], 'p-a', 12)
+          t.step(100, function () {
+            t.findChild(header, 'headerNewTask').clicked()
+            t.check(surface.taskFormProjectId === 'p-a', 'the form opens')
+            host.show([host.project('p-b', 'c-p')], 'p-a', 13)
+            t.waitFor(function () {
+              return surface.taskFormProjectId === ''
+            }, 3000, 'the form closes when its project is gone', function () {
+              host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 14)
+              t.step(100, captureMidRunFlow)
+            })
+          })
+        })
       })
     })
   }

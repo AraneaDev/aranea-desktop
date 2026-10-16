@@ -611,7 +611,9 @@ Item {
       taskFormProjectId = ''
       taskFormError = null
     }
-    if (removeTarget && (!project || project.id !== removeTarget.projectId || project.lastCheckoutId !== removeTarget.checkoutId) && !(root.gitCommands.pending && root.gitCommands.pending.operation === 'task-remove')) {
+    if (removeTarget && (!project || project.id !== removeTarget.projectId || project.lastCheckoutId !== removeTarget.checkoutId || !(project.checkouts || []).some(function (c) {
+        return c.id === removeTarget.checkoutId
+      })) && !(root.gitCommands.pending && root.gitCommands.pending.operation === 'task-remove')) {
       removeTarget = null
       removeFacts = null
       removeError = null
@@ -703,6 +705,7 @@ Item {
       panel.stampLayout()
       panel.scheduleGitBackground()
       panel.dropStaleSeed()
+      panel.dropStaleTaskCards()
       panel.maybeSeedSelected()
     }
     function onToolsChanged() {

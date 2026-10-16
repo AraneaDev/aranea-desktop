@@ -29,9 +29,11 @@ ProjectSectionCard {
   signal confirmRequested(bool confirmUnpushed)
   // Close without removing.
   signal cancelled
-  focus: visible
+  // Cancel is the safe default, so it takes focus (and its outline) when the card opens.
   onVisibleChanged: if (visible)
-    card.forceActiveFocus()
+    projectTaskRemoveCancel.forceActiveFocus()
+  Component.onCompleted: if (visible)
+    projectTaskRemoveCancel.forceActiveFocus()
   Keys.onEscapePressed: card.cancelled()
   Aranea.UiLabel {
     objectName: 'projectTaskRemoveQuestion'
@@ -75,6 +77,7 @@ ProjectSectionCard {
       onClicked: card.confirmRequested(!!card.facts && Number(card.facts.unpushed) > 0)
     }
     Aranea.ActionButton {
+      id: projectTaskRemoveCancel
       objectName: 'projectTaskRemoveCancel'
       text: 'Cancel'
       variant: 'quiet'
