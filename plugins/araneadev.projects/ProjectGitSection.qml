@@ -28,6 +28,8 @@ ProjectSectionCard {
   property string commandPending: ''
   // Last fetch or pull failure for this checkout as {message, recovery}, or null.
   property var commandError: null
+  // Any Git command is running, for this or another checkout; starting is refused.
+  property bool commandBusy: false
   // Pull needs a branch with an upstream.
   readonly property bool canPull: !!git && !git.detached && !!git.upstream
   // Nothing to pull from the last observed upstream.
@@ -57,14 +59,14 @@ ProjectSectionCard {
     Aranea.ActionButton {
       objectName: 'projectGitFetch'
       text: section.commandPending === 'fetch' ? 'Fetching…' : 'Fetch'
-      enabled: !section.displayOnly && !section.loading && section.commandPending === ''
+      enabled: !section.displayOnly && !section.loading && section.commandPending === '' && !section.commandBusy
       pointerGate: section.pointerGate
       onClicked: section.fetchRequested()
     }
     Aranea.ActionButton {
       objectName: 'projectGitPull'
       text: section.commandPending === 'pull' ? 'Pulling…' : section.upToDate ? 'Up to date' : 'Pull'
-      enabled: !section.displayOnly && !section.loading && section.commandPending === '' && section.canPull && !section.upToDate
+      enabled: !section.displayOnly && !section.loading && section.commandPending === '' && !section.commandBusy && section.canPull && !section.upToDate
       pointerGate: section.pointerGate
       onClicked: section.pullRequested()
     }

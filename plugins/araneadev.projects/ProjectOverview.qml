@@ -72,6 +72,8 @@ ColumnLayout {
   property string gitCommandPending: ''
   // Last Git command failure for the selected checkout, or null.
   property var gitCommandError: null
+  // Any Git command is running anywhere; new ones are refused meanwhile.
+  property bool gitCommandBusy: false
   // Explicit read-only refresh request.
   signal refreshRequested
   // Explicit network fetch request.
@@ -118,6 +120,7 @@ ColumnLayout {
     nowMs: view.nowMs
     commandPending: view.gitCommandPending
     commandError: view.gitCommandError
+    commandBusy: view.gitCommandBusy
     onRefreshRequested: view.refreshRequested()
     onFetchRequested: view.fetchRequested()
     onPullRequested: view.pullRequested()

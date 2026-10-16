@@ -15,6 +15,8 @@ ProjectSectionCard {
   property var project: null
   // A create request is running; the form stays open and editable text is kept.
   property bool pending: false
+  // Any Git command is running anywhere; creating waits for it.
+  property bool blocked: false
   // Last create failure as {message, recovery}, or null.
   property var error: null
   // Capture boundary refuses every external action.
@@ -26,7 +28,10 @@ ProjectSectionCard {
   // Obvious problem with the typed name, or ''.
   readonly property string problem: Tasks.branchProblem(branch)
   // Create is allowed for a plausible name while nothing is running.
-  readonly property bool canCreate: !pending && !displayOnly && problem === ''
+  readonly property bool canCreate: !pending && !blocked && !displayOnly && problem === ''
+  // Identity of the project the typed name belongs to.
+  readonly property string projectId: project ? project.id : ''
+  onProjectIdChanged: projectTaskBranch.text = ''
   // Ask the surface to create the branch and its checkout.
   signal createRequested(string branch)
   // Close without creating.

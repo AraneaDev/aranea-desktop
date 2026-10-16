@@ -15,6 +15,8 @@ ProjectSectionCard {
   property var facts: null
   // The real removal is running.
   property bool pending: false
+  // Any Git command is running anywhere; removing waits for it.
+  property bool blocked: false
   // Last check or removal failure as {message, recovery}, or null.
   property var error: null
   // Capture boundary refuses every external action.
@@ -27,6 +29,9 @@ ProjectSectionCard {
   signal confirmRequested(bool confirmUnpushed)
   // Close without removing.
   signal cancelled
+  focus: visible
+  onVisibleChanged: if (visible)
+    card.forceActiveFocus()
   Keys.onEscapePressed: card.cancelled()
   Aranea.UiLabel {
     objectName: 'projectTaskRemoveQuestion'
@@ -65,7 +70,7 @@ ProjectSectionCard {
     Aranea.ActionButton {
       objectName: 'projectTaskRemoveConfirm'
       text: card.pending ? 'Removing…' : card.summary.confirmLabel
-      enabled: !!card.facts && card.summary.allowed && !card.pending && !card.displayOnly
+      enabled: !!card.facts && card.summary.allowed && !card.pending && !card.blocked && !card.displayOnly
       pointerGate: card.pointerGate
       onClicked: card.confirmRequested(!!card.facts && Number(card.facts.unpushed) > 0)
     }

@@ -613,17 +613,23 @@ Item {
     function onFinished(operation, projectId, checkoutId, response) {
       var project = projectsPage.selectedProject
       if (operation === 'fetch' || operation === 'pull') {
-        panel.gitCommandError = response.ok ? null : {
-          projectId: projectId,
-          checkoutId: checkoutId,
-          error: response.error
-        }
+        var stored = panel.gitCommandError
+        if (!response.ok)
+          panel.gitCommandError = {
+            projectId: projectId,
+            checkoutId: checkoutId,
+            error: response.error
+          }
+        else if (stored && stored.projectId === projectId && stored.checkoutId === checkoutId)
+          panel.gitCommandError = null
         if (project && project.id === projectId && panel.root.gitClient.checkoutId === checkoutId)
           panel.root.gitClient.refresh()
       } else if (operation === 'task-create') {
         if (response.ok) {
-          panel.taskFormProjectId = ''
-          panel.taskFormError = null
+          if (panel.taskFormProjectId === projectId) {
+            panel.taskFormProjectId = ''
+            panel.taskFormError = null
+          }
           panel.root.projectController.refresh()
         } else if (panel.taskFormProjectId === projectId) {
           panel.taskFormError = response.error
@@ -900,7 +906,8 @@ Item {
                   width: content.width
                   visible: !!projectsPage.selectedProject && !projectsPage.setupActive && panel.taskFormProjectId !== '' && projectsPage.selectedProject.id === panel.taskFormProjectId
                   project: projectsPage.selectedProject
-                  pending: !!panel.root.gitCommands.pending && panel.root.gitCommands.pending.operation === 'task-create'
+                  pending: !!panel.root.gitCommands.pending && panel.root.gitCommands.pending.operation === 'task-create' && panel.root.gitCommands.pending.projectId === panel.taskFormProjectId
+                  blocked: !!panel.root.gitCommands.pending
                   error: panel.taskFormError
                   displayOnly: !!panel.root.inert
                   pointerGate: pointerGate
@@ -919,6 +926,7 @@ Item {
                   checkout: panel.selectedCheckout
                   facts: panel.removeFacts
                   pending: !!panel.root.gitCommands.pending && panel.root.gitCommands.pending.operation === 'task-remove' && !panel.removeChecking
+                  blocked: !!panel.root.gitCommands.pending
                   error: panel.removeError
                   displayOnly: !!panel.root.inert
                   pointerGate: pointerGate
@@ -1194,6 +1202,7 @@ Item {
                   }
                   gitCommandPending: panel.gitCommandPending
                   gitCommandError: panel.selectedGitCommandError
+                  gitCommandBusy: !!panel.root.gitCommands.pending
                   onRefreshRequested: panel.refreshOverview()
                   onFetchRequested: panel.runGit('fetch')
                   onPullRequested: panel.runGit('pull')

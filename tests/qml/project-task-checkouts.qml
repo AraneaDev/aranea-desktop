@@ -266,7 +266,7 @@ ShellRoot {
       missing: false
     }
     t.equal(confirm.text, 'Remove anyway', 'unpushed commits read Remove anyway')
-    t.check(JSON.stringify(t.findChild(removal, 'projectTaskRemoveLines').count) === '1', 'unpushed adds one line')
+    t.equal(t.findChild(removal, 'projectTaskRemoveLines').count, 1, 'unpushed adds one line')
     t.equal(t.findChild(removal, 'projectTaskRemoveLines').itemAt(0).text, "3 commits aren't on any remote.", 'unpushed line text')
     confirm.clicked()
     t.equal(host.confirmed, [false, true], 'confirm carries the unpushed choice')
@@ -353,12 +353,14 @@ ShellRoot {
       })
       t.waitFor(function () {
         return host.readCalls.length === before + 1
-      }, 3000, 'one Git refresh follows', staleFetch)
+      }, 3000, 'one Git refresh follows', function () {
+        t.equal(host.readCalls[before].slice(1), ['--project', 'p-a', '--checkout', 'c-p', '--json'], 'the refresh reads the selected pair')
+        staleFetch()
+      })
     })
   }
   function staleFetch() {
     var fetch = t.findChild(surface, 'projectGitFetch')
-    var errorLabel = t.findChild(surface, 'projectGitError')
     t.waitFor(function () {
       return fetch.enabled
     }, 3000, 'Fetch is idle', function () {
@@ -366,22 +368,82 @@ ShellRoot {
       fetch.clicked()
       t.equal(host.gitCalls.length, 1, 'second Fetch starts')
       entry.projectId = 'p-b'
-      var before = host.readCalls.length
+      t.step(150, function () {
+        t.check(!t.findChild(surface, 'projectGitFetch').enabled, "Fetch on another project is disabled while a fetch is pending")
+        var before = host.readCalls.length
+        host.answer(0, {
+          ok: false,
+          data: null,
+          error: {
+            code: 'GIT_ERROR',
+            message: 'The remote refused.',
+            recovery: 'Try again.'
+          }
+        })
+        t.step(150, function () {
+          var errorLabel = t.findChild(surface, 'projectGitError')
+          t.equal(host.readCalls.length, before, 'a result for an unselected pair triggers no Git refresh')
+          t.check(!errorLabel.visible || errorLabel.text.indexOf('The remote refused.') < 0, "another project's section shows no command error")
+          entry.projectId = 'p-a'
+          t.waitFor(function () {
+            var label = t.findChild(surface, 'projectGitError')
+            return label.visible && label.text === 'The remote refused. Try again.'
+          }, 3000, 'the error waits for its project', keepError)
+        })
+      })
+    })
+  }
+  // Another pair's success never clears a stored error that belongs to a different pair.
+  function keepError() {
+    host.gitCalls = []
+    entry.projectId = 'p-b'
+    var fetch = t.findChild(surface, 'projectGitFetch')
+    t.waitFor(function () {
+      return fetch.enabled
+    }, 3000, 'Fetch is idle on the other project', function () {
+      fetch.clicked()
+      t.equal(host.gitCalls.length, 1, 'Fetch on the other project starts')
       host.answer(0, {
-        ok: false,
-        data: null,
-        error: {
-          code: 'GIT_ERROR',
-          message: 'The remote refused.',
-          recovery: 'Try again.'
-        }
+        ok: true,
+        data: {},
+        error: null
       })
       t.step(150, function () {
-        t.check(!errorLabel.visible || errorLabel.text.indexOf('The remote refused.') < 0, "another project's section shows no command error")
         entry.projectId = 'p-a'
         t.waitFor(function () {
-          return errorLabel.visible && errorLabel.text === 'The remote refused. Try again.'
-        }, 3000, 'the error waits for its project', createFlow)
+          var label = t.findChild(surface, 'projectGitError')
+          return label.visible && label.text === 'The remote refused. Try again.'
+        }, 3000, 'the first pair keeps its error', scopedCreate)
+      })
+    })
+  }
+  // A create started on one project never affects the form of another.
+  function scopedCreate() {
+    var header = t.findChild(surface, 'projectHeader')
+    host.gitCalls = []
+    t.findChild(header, 'headerNewTask').clicked()
+    t.findChild(surface, 'projectTaskBranch').text = 'feat/x'
+    t.findChild(surface, 'projectTaskCreate').clicked()
+    t.equal(host.gitCalls.length, 1, 'Create on the first project starts')
+    entry.projectId = 'p-b'
+    t.step(100, function () {
+      t.findChild(header, 'headerNewTask').clicked()
+      var field = t.findChild(surface, 'projectTaskBranch')
+      t.check(field.visible, "the other project's form opens")
+      t.equal(field.text, '', 'the branch field starts empty for another project')
+      t.equal(t.findChild(surface, 'projectTaskCreate').text, 'Create', "another project's form is not pending")
+      host.answer(0, {
+        ok: true,
+        data: {
+          checkoutId: 'c-x'
+        },
+        error: null
+      })
+      t.step(150, function () {
+        t.check(t.findChild(surface, 'projectTaskBranch').visible, "a result for another project does not close this form")
+        t.findChild(surface, 'projectTaskCancel').clicked()
+        entry.projectId = 'p-a'
+        t.step(100, createFlow)
       })
     })
   }
@@ -394,6 +456,7 @@ ShellRoot {
     t.findChild(header, 'headerNewTask').clicked()
     var field = t.findChild(surface, 'projectTaskBranch')
     t.check(field.visible, 'the task form opens')
+    t.check(field.activeFocus, 'the branch field has focus')
     field.text = 'feat/login'
     t.findChild(surface, 'projectTaskCreate').clicked()
     t.equal(host.gitCalls.length, 1, 'Create sends one command')
@@ -437,6 +500,7 @@ ShellRoot {
         error: null
       })
       var confirm = t.findChild(surface, 'projectTaskRemoveConfirm')
+      t.check(t.findChild(surface, 'projectTaskRemove').activeFocus, 'the removal card has focus so Esc cancels')
       t.waitFor(function () {
         return confirm.enabled
       }, 3000, 'Confirm is enabled after the check', function () {
@@ -450,7 +514,46 @@ ShellRoot {
         })
         t.waitFor(function () {
           return surface.removeTarget === null
-        }, 3000, 'the card closes', inertChecks)
+        }, 3000, 'the card closes', unpushedFlow)
+      })
+    })
+  }
+  // Unpushed commits need the explicit flag.
+  function unpushedFlow() {
+    var header = t.findChild(surface, 'projectHeader')
+    host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 4)
+    host.gitCalls = []
+    var remove = t.findChild(header, 'headerRemoveTask')
+    t.waitFor(function () {
+      return remove.visible
+    }, 3000, 'Remove is offered again', function () {
+      remove.clicked()
+      host.answer(0, {
+        ok: true,
+        data: {
+          dirty: false,
+          untracked: false,
+          busy: false,
+          unpushed: 2,
+          ignored: 0,
+          missing: false
+        },
+        error: null
+      })
+      var confirm = t.findChild(surface, 'projectTaskRemoveConfirm')
+      t.waitFor(function () {
+        return confirm.enabled && confirm.text === 'Remove anyway'
+      }, 3000, 'Confirm reads Remove anyway', function () {
+        confirm.clicked()
+        t.equal(host.gitCalls[1].argv.slice(1), ['task-remove', '--project', 'p-a', '--checkout', 'c-l', '--confirm-unpushed', '--json'], 'unpushed removal passes the flag')
+        host.answer(1, {
+          ok: true,
+          data: {},
+          error: null
+        })
+        t.waitFor(function () {
+          return surface.removeTarget === null
+        }, 3000, 'the card closes again', inertChecks)
       })
     })
   }
