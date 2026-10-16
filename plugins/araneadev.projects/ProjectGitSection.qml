@@ -24,8 +24,20 @@ ProjectSectionCard {
   property bool expanded: false
   // Injected presentation clock for stale-state copy.
   property real nowMs: Date.now()
+  // Running explicit Git command for this checkout: '', 'fetch' or 'pull'.
+  property string commandPending: ''
+  // Last fetch or pull failure for this checkout as {message, recovery}, or null.
+  property var commandError: null
+  // Pull needs a branch with an upstream.
+  readonly property bool canPull: !!git && !git.detached && !!git.upstream
+  // Nothing to pull from the last observed upstream.
+  readonly property bool upToDate: canPull && git.behind === 0
   // Explicit read-only refresh request.
   signal refreshRequested
+  // Explicit network fetch request.
+  signal fetchRequested
+  // Explicit fast-forward pull request.
+  signal pullRequested
   onGitChanged: if (!git)
     expanded = false
   RowLayout {
@@ -42,6 +54,20 @@ ProjectSectionCard {
       pointerGate: section.pointerGate
       onClicked: section.refreshRequested()
     }
+    Aranea.ActionButton {
+      objectName: 'projectGitFetch'
+      text: section.commandPending === 'fetch' ? 'Fetching…' : 'Fetch'
+      enabled: !section.displayOnly && !section.loading && section.commandPending === ''
+      pointerGate: section.pointerGate
+      onClicked: section.fetchRequested()
+    }
+    Aranea.ActionButton {
+      objectName: 'projectGitPull'
+      text: section.commandPending === 'pull' ? 'Pulling…' : section.upToDate ? 'Up to date' : 'Pull'
+      enabled: !section.displayOnly && !section.loading && section.commandPending === '' && section.canPull && !section.upToDate
+      pointerGate: section.pointerGate
+      onClicked: section.pullRequested()
+    }
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
@@ -50,9 +76,10 @@ ProjectSectionCard {
     font.bold: true
   }
   Aranea.UiLabel {
+    objectName: 'projectGitError'
     Layout.fillWidth: true
-    visible: !!section.error
-    text: section.error ? section.error.message + (section.git ? ' · Showing last observation.' : '') : ''
+    visible: !!section.error || !!section.commandError
+    text: section.commandError ? section.commandError.message + ' ' + (section.commandError.recovery || '') : section.error ? section.error.message + (section.git ? ' · Showing last observation.' : '') : ''
     color: Aranea.DesignTokens.urgent
   }
   Aranea.UiLabel {

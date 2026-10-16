@@ -19,6 +19,10 @@ ColumnLayout {
   signal projectPickerRequested
   // Select an exact registered checkout without launching tools.
   signal checkoutRequested(string projectId, string checkoutId)
+  // Ask to name a new task checkout for this project.
+  signal taskCreateRequested(string projectId)
+  // Ask to remove the selected linked checkout.
+  signal taskRemoveRequested(string projectId, string checkoutId)
   // Current saved project identity; this view never changes registration.
   property var project: null
   // Exact selected Git observation overrides registry branch labels only for its pair.
@@ -177,6 +181,22 @@ ColumnLayout {
       enabled: !header.displayOnly && header.navigationEnabled && !!header.project && header.project.checkouts.length > 0
       pointerGate: header.pointerGate
       onClicked: checkoutPicker.open()
+    }
+    Aranea.ActionButton {
+      objectName: 'headerNewTask'
+      text: 'New task checkout'
+      enabled: !header.displayOnly && header.navigationEnabled && !!header.project
+      pointerGate: header.pointerGate
+      onClicked: header.taskCreateRequested(header.project.id)
+    }
+    Aranea.ActionButton {
+      objectName: 'headerRemoveTask'
+      visible: !!header.checkout && !header.checkout.primary
+      text: 'Remove task checkout'
+      variant: 'quiet'
+      enabled: !header.displayOnly && header.navigationEnabled
+      pointerGate: header.pointerGate
+      onClicked: header.taskRemoveRequested(header.project.id, header.checkout.id)
     }
   }
   Aranea.UiLabel {
