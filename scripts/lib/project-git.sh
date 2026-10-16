@@ -22,11 +22,16 @@ project_git_user() {
   local seconds=$1
   shift
   (
-    local variable
+    local variable ssh_base=${GIT_SSH_COMMAND:-}
+    # The lock belongs to this helper alone; detached Git children must not keep it.
+    [[ -z ${project_git_lock_fd:-} ]] || exec {project_git_lock_fd}>&-
     for variable in "${!GIT_@}"; do [[ $variable == GIT_SSH_COMMAND || $variable == GIT_SSH ]] || unset "$variable"; done
     unset SSH_ASKPASS
-    export GIT_TERMINAL_PROMPT=0 SSH_ASKPASS_REQUIRE=never GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh} -o BatchMode=yes"
-    exec timeout -k 1s "${seconds}s" git -c credential.interactive=never "$@"
+    if [[ -z $ssh_base ]]; then
+      ssh_base=$(timeout -k 1s 15s git -C "$path" config --get core.sshCommand 2>/dev/null </dev/null || true)
+    fi
+    export GIT_TERMINAL_PROMPT=0 SSH_ASKPASS_REQUIRE=never GIT_SSH_COMMAND="${ssh_base:-ssh} -o BatchMode=yes"
+    exec timeout -k 1s "${seconds}s" git -c credential.interactive=never -c core.askPass= "$@"
   ) </dev/null >"$git_tmp/out" 2>"$git_tmp/err"
 }
 
@@ -133,9 +138,18 @@ project_git_main() {
         case "$1" in --project) project=$2 ;; --checkout) checkout=$2 ;; --branch) branch=$2 ;; esac
         shift 2
         ;;
-      --check) check=true; shift ;;
-      --confirm-unpushed) confirm=true; shift ;;
-      --json) json=true; shift ;;
+      --check)
+        check=true
+        shift
+        ;;
+      --confirm-unpushed)
+        confirm=true
+        shift
+        ;;
+      --json)
+        json=true
+        shift
+        ;;
       *) project_git_fail INVALID_REQUEST 'Unsupported Git argument.' 'Use --project, --checkout, --branch, --check, --confirm-unpushed and --json.' ;;
     esac
   done

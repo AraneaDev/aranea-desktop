@@ -151,13 +151,47 @@ WRAP
   jq -e '.ok' "$second" >/dev/null
   [[ $(paste -sd, "$log") == start,end,start,end ]]
 }
+batchmode_reaches_ssh() {
+  setup
+  fake_ssh "printf '%s\\n' \"\$*\" >\"$TMPDIR/ssh.args\"; echo \"Permission denied (publickey).\" >&2; exit 255"
+  git -C "$repo" remote set-url origin ssh://example.invalid/repo.git
+  PATH="$TMPDIR/bin:$PATH" expect_code AUTH_REQUIRED fetch
+  grep -q -- '-o BatchMode=yes' "$TMPDIR/ssh.args"
+}
+core_ssh_command_is_honoured() {
+  setup
+  printf '#!/bin/sh\necho "$*" >"%s"\necho "Permission denied (publickey)." >&2\nexit 255\n' "$TMPDIR/myssh.args" >"$TMPDIR/bin/myssh"
+  chmod +x "$TMPDIR/bin/myssh"
+  fake_ssh "echo wrong >\"$TMPDIR/wrong\"; exit 255"
+  git -C "$repo" config core.sshCommand "$TMPDIR/bin/myssh"
+  git -C "$repo" remote set-url origin ssh://example.invalid/repo.git
+  PATH="$TMPDIR/bin:$PATH" expect_code AUTH_REQUIRED fetch
+  grep -q -- '-o BatchMode=yes' "$TMPDIR/myssh.args"
+  [[ ! -e "$TMPDIR/wrong" ]]
+}
+lock_fd_does_not_reach_git() {
+  setup
+  local fds="$TMPDIR/git.fds"
+  cat >"$TMPDIR/bin/git" <<WRAP
+#!/bin/bash
+for argument in "\$@"; do
+  if [[ \$argument == fetch ]]; then ls -l /proc/\$\$/fd >"$fds" 2>&1; fi
+done
+exec "$real_git" "\$@"
+WRAP
+  chmod +x "$TMPDIR/bin/git"
+  PATH="$TMPDIR/bin:$PATH" run fetch
+  jq -e '.ok' "$result" >/dev/null
+  [[ -s $fds ]]
+  if grep -q git-locks "$fds"; then return 1; fi
+}
 inherited_git_context_is_ignored() {
   setup
   GIT_DIR=/nonexistent GIT_WORK_TREE=/nonexistent run fetch
   jq -e '.ok' "$result" >/dev/null
 }
 
-cases=(fetch_updates_remote_refs pull_fast_forwards pull_refuses_divergence pull_refuses_overwriting_local_changes pull_without_upstream fetch_without_remote fetch_auth_required fetch_timeout_releases_lock identity_is_proved usage_is_validated concurrent_operations_serialise inherited_git_context_is_ignored)
+cases=(fetch_updates_remote_refs pull_fast_forwards pull_refuses_divergence pull_refuses_overwriting_local_changes pull_without_upstream fetch_without_remote fetch_auth_required fetch_timeout_releases_lock identity_is_proved usage_is_validated concurrent_operations_serialise inherited_git_context_is_ignored batchmode_reaches_ssh core_ssh_command_is_honoured lock_fd_does_not_reach_git)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e
