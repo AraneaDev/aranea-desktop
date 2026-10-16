@@ -103,6 +103,7 @@ def request_valid:
       and ((has("openRoles")|not) or (.openRoles|roles)) and ((has("agentId")|not) or (.agentId|agent))
     elif $action == "relocate" then fields(["projectId","checkoutId","path"];[]) and (.projectId|text) and (.checkoutId|text) and (.path|text)
     elif $action == "select-checkout" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
+    elif $action == "checkout-remove" then fields(["projectId","checkoutId"];[]) and (.projectId|text) and (.checkoutId|text)
     elif $action == "associate" then fields(["projectId","checkoutId","mode","workspaceId","separate"];["placedAt"]) and (.projectId|text) and (.checkoutId|text)
       and ((has("placedAt")|not) or (.placedAt|integer and . >= 0))
       and (.mode|mode) and (.workspaceId == null or (.workspaceId|integer and . > 0)) and (.separate|type == "boolean")
@@ -184,6 +185,15 @@ def mutate($r):
           | .pinnedProjectIds |= map(select(. != $a.projectId)) | del(.visitedAt[$a.projectId]))
       else . end
   elif $r.action == "select-checkout" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then .lastCheckoutId = $a.checkoutId else . end)
+  elif $r.action == "checkout-remove" then require_checkout($a.projectId;$a.checkoutId)
+    | if any(.projects[]|select(.id == $a.projectId)|.checkouts[];.id == $a.checkoutId and .primary)
+        or ([.projects[]|select(.id == $a.projectId)|.checkouts[]]|length) < 2 then error("CHECKOUT_REQUIRED") else . end
+    | .projects |= map(if .id == $a.projectId then
+        .checkouts |= map(select(.id != $a.checkoutId))
+        | .associations |= map(select(.checkoutId != $a.checkoutId))
+        | .environments |= map(select(.checkoutId != $a.checkoutId))
+        | if .lastCheckoutId == $a.checkoutId then .lastCheckoutId = ([.checkouts[]|select(.primary)|.id][0] // .checkouts[0].id) else . end
+      else . end)
   elif $r.action == "associate" then require_checkout($a.projectId;$a.checkoutId) | .projects |= map(if .id == $a.projectId then
     .associations = ([.associations[]|select(if $a.separate then (.separate|not) or .checkoutId != $a.checkoutId else .separate end)]
       + [($a|{checkoutId,mode,workspaceId,separate} + (if has("placedAt") then {placedAt} else {} end))]) else . end)

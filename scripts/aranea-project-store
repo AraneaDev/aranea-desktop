@@ -90,7 +90,7 @@ if [[ "$1" == mutate ]]; then
   fi
   project_tmp=$(mktemp "${registry}.XXXXXX") || respond_error REGISTRY_WRITE_FAILED 'Cannot create an atomic registry write.' 'Check state-directory permissions and retry.'
   if ! jq --arg operation mutate --argjson request "$prepared" -f "$filter" <<<"$state" >"$project_tmp" 2>"${project_tmp}.error"; then
-    code=$(sed -nE 's/.*: (PROJECT_NOT_FOUND|CHECKOUT_NOT_FOUND|ROOT_NOT_FOUND|CHECKOUT_CONFLICT|PROFILE_NOT_FOUND|PROFILE_CONFLICT|ENVIRONMENT_NOT_FOUND|ENVIRONMENT_CONFLICT)$/\1/p' "${project_tmp}.error")
+    code=$(sed -nE 's/.*: (PROJECT_NOT_FOUND|CHECKOUT_NOT_FOUND|ROOT_NOT_FOUND|CHECKOUT_CONFLICT|PROFILE_NOT_FOUND|PROFILE_CONFLICT|ENVIRONMENT_NOT_FOUND|ENVIRONMENT_CONFLICT|CHECKOUT_REQUIRED)$/\1/p' "${project_tmp}.error")
     rm -f -- "${project_tmp}.error"
     respond_error "${code:-INVALID_REQUEST}" 'The project mutation could not be applied.' 'Refresh the registry and check the selected project and checkout.'
   fi
