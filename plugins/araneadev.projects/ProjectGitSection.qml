@@ -76,7 +76,7 @@ ProjectSectionCard {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: section.git ? (section.git.detached ? 'Detached HEAD' : section.git.branch || 'Branch unavailable') : section.loading ? 'Reading selected checkout…' : 'Git state not available. Refresh to read this checkout.'
+    text: section.git ? (section.git.detached ? 'Detached HEAD' : section.git.branch || 'Branch not available') : section.loading ? 'Reading selected checkout…' : 'Git state not available. Refresh to read this checkout.'
     font.pixelSize: Style.font.body
     font.bold: true
   }

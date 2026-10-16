@@ -125,8 +125,8 @@ test("unavailable observers replace retained live chips until a fresh read succe
   assert.deepEqual(
     JSON.parse(JSON.stringify(logic.activitySummary(result, { actions: false, agents: false }))),
     [
-      { label: "Action status unavailable", section: "actions", attention: true },
-      { label: "Agent status unavailable", section: "agents", attention: true }
+      { label: "Action status not available", section: "actions", attention: true },
+      { label: "Agent status not available", section: "agents", attention: true }
     ]
   )
   assert.deepEqual(
@@ -261,7 +261,7 @@ test("observation age stays compact and marks invalid or future clocks", () => {
   assert.equal(logic.ageLabel(60000, 120000), "1m ago")
   assert.equal(logic.ageLabel(0, 7200000), "2h ago")
   assert.equal(logic.ageLabel(10, 0), "clock ahead")
-  assert.equal(logic.ageLabel(null, 0), "time unavailable")
+  assert.equal(logic.ageLabel(null, 0), "time not available")
 })
 
 // Missing or mutually exclusive grouping would hide paths or undercount overlap.

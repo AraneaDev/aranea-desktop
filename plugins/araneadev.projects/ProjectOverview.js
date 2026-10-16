@@ -264,9 +264,9 @@ function activitySummary(model, availability) {
   /** @type {Array<OverviewData>} */
   var summary = []
   if (availability.actions === false && (model.services || []).length + (model.checks || []).length)
-    summary.push({ label: "Action status unavailable", section: "actions", attention: true })
+    summary.push({ label: "Action status not available", section: "actions", attention: true })
   if (availability.agents === false && (model.agents || []).length)
-    summary.push({ label: "Agent status unavailable", section: "agents", attention: true })
+    summary.push({ label: "Agent status not available", section: "agents", attention: true })
   var add = function (/** @type {Array<OverviewData>} */ rows, /** @type {string} */ singular, /** @type {string} */ plural, /** @type {string} */ section, /** @type {boolean} */ attention) {
     if (rows.length) summary.push({ label: rows.length + " " + (rows.length === 1 ? singular : plural), section: section, attention: attention })
   }
@@ -291,7 +291,7 @@ function activitySummary(model, availability) {
  * @returns {string} relative age or honest clock uncertainty
  */
 function ageLabel(observedAt, nowMs) {
-  if (typeof observedAt !== "number" || !isFinite(observedAt)) return "time unavailable"
+  if (typeof observedAt !== "number" || !isFinite(observedAt)) return "time not available"
   var age = Math.floor((nowMs - observedAt) / 1000)
   if (age < 0) return "clock ahead"
   if (age < 60) return "just now"

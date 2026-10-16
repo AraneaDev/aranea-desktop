@@ -352,14 +352,14 @@ ColumnLayout {
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
-    text: 'Checkout: ' + (actions.checkout ? actions.checkout.path : 'Selected checkout unavailable. Locate it before running.')
+    text: 'Checkout: ' + (actions.checkout ? actions.checkout.path : 'Selected checkout not available. Locate it before running.')
     technical: true
     wrapMode: Text.WrapAnywhere
   }
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !actions.executionAvailable
-    text: 'Execution unavailable. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
+    text: 'Running is not available. Action configuration remains available. Refresh after restoring the user manager and required helpers.'
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }
   ProjectProblem {

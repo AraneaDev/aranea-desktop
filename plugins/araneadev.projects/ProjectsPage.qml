@@ -726,7 +726,7 @@ ColumnLayout {
   Aranea.UiLabel {
     Layout.fillWidth: true
     visible: !page.setupActive && !!page.projectId && !page.selectedProject
-    text: 'Project unavailable. Refresh or choose a registered project.'
+    text: 'Project not available. Refresh or choose a registered project.'
   }
   ProjectDetails {
     id: details

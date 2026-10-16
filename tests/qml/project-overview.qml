@@ -329,7 +329,7 @@ ShellRoot {
     readSucceeded = false
     root.activityClient.refresh()
     t.check(overview.activitySummary.some(function (row) {
-      return row.label === 'Agent status unavailable'
+      return row.label === 'Agent status not available'
     }), 'failed owner read replaces retained live work with connection uncertainty')
     t.check(!overview.activitySummary.some(function (row) {
       return row.label === '1 agent working (reported)'

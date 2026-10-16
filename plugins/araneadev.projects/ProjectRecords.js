@@ -50,7 +50,7 @@ function records(registry, runtime) {
       target: { projectId: project.id, checkoutId: project.lastCheckoutId },
       detail: checkout
         ? checkout.path + (checkout.branch ? " · " + checkout.branch : "")
-        : "Selected checkout unavailable",
+        : "Selected checkout not available",
       aliases: checkout ? [checkout.path, checkout.branch || ""] : [],
       available: !!checkout && !!live.availability && live.availability.compositor === true,
       action: resume ? "resume" : "open",

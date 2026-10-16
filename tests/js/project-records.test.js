@@ -110,7 +110,7 @@ test("branchless and missing checkouts retain honest exact search metadata", () 
   assert.equal(rows[0].detail, "/tmp/a")
   assert.deepEqual(JSON.parse(JSON.stringify(rows[0].aliases)), ["/tmp/a", ""])
   assert.equal(rows[0].available, false, "offline compositor cannot advertise an available launch")
-  assert.equal(rows[1].detail, "Selected checkout unavailable")
+  assert.equal(rows[1].detail, "Selected checkout not available")
   assert.deepEqual(JSON.parse(JSON.stringify(rows[1].target)), {
     projectId: "p-2",
     checkoutId: "c-gone"
