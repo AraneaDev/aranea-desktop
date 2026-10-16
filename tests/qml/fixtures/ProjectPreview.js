@@ -26,7 +26,11 @@ function sample(id, mode, count) {
     ],
     associations: [{ checkoutId: "c-preview", mode: "dedicated", workspaceId: 3, separate: false }]
   }
+  // The problem capture shows the plain start problem of a daily profile start.
+  if (mode === "problem") mode = "daily-unknown"
   var daily = mode && mode.indexOf("daily") === 0
+  // A linked task checkout is selected so Remove task checkout shows too.
+  if (mode === "daily-task") project.lastCheckoutId = "c-review"
   var agentPreview = mode && mode.indexOf("agents") === 0
   if (daily || agentPreview || mode === "profiles" || mode === "profile-editor") {
     project.profiles = [
@@ -180,6 +184,14 @@ function sample(id, mode, count) {
             }
           : null
     }
+  }
+  if (mode === "daily-task" && state.projects.length) {
+    var taskGit = JSON.parse(JSON.stringify(gitCache[JSON.stringify([project.id, "c-preview"])]))
+    taskGit.data.checkoutId = "c-review"
+    taskGit.data.path = project.checkouts[1].path
+    taskGit.data.branch = "review"
+    taskGit.data.upstream = "origin/review"
+    gitCache[JSON.stringify([project.id, "c-review"])] = taskGit
   }
   var snapshot = {
     sessionId: "preview-session",

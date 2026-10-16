@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Render actual inert SettingsSurface actions; matrix evidence stays outside Git.
-# Usage: tools/render-project-actions-preview --output PNG [--scene NAME] [--size wide|narrow|large-font] [--scroll target|bottom] | --matrix DIR
+# Usage: tools/render-project-actions-preview --output PNG [--scene NAME] [--size wide|narrow|large-font|showcase] [--scroll target|bottom] | --matrix DIR
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/tools/lib/render-capture.sh"
@@ -15,7 +15,7 @@ while (($#)); do
       shift 2
       ;;
     *)
-      echo 'Usage: render-project-actions-preview --output PNG [--scene NAME] [--size wide|narrow|large-font] [--scroll target|bottom] | --matrix DIR' >&2
+      echo 'Usage: render-project-actions-preview --output PNG [--scene NAME] [--size wide|narrow|large-font|showcase] [--scroll target|bottom] | --matrix DIR' >&2
       exit 2
       ;;
   esac
@@ -41,7 +41,8 @@ if [[ -n $matrix ]]; then
 fi
 [[ $scroll == target || $scroll == bottom ]] || exit 2
 [[ -n $output && " ${scenes[*]} " == *" $scene "* ]] || exit 2
-case "$size" in wide) width=840 font_scale=1 ;; narrow) width=420 font_scale=1 ;; large-font) width=420 font_scale=1.5 ;; *) exit 2 ;; esac
+height=680
+case "$size" in wide) width=840 font_scale=1 ;; showcase) width=1440 height=810 font_scale=1 ;; narrow) width=420 font_scale=1 ;; large-font) width=420 font_scale=1.5 ;; *) exit 2 ;; esac
 shell_dir="${ARANEA_QML_SHELL_DIR:-/usr/share/omarchy/shell}"
 [[ -f $shell_dir/Commons/qmldir && -f $shell_dir/Ui/qmldir ]]
 qs=$(command -v "${ARANEA_ACTION_PREVIEW_QUICKSHELL:-quickshell}")
@@ -88,7 +89,7 @@ before=$(state_hash)
   -u QT_QPA_PLATFORMTHEME -u QT_STYLE_OVERRIDE -u QT_SCREEN_SCALE_FACTORS -u QT_AUTO_SCREEN_SCALE_FACTOR \
   PATH="$work/traps:$PATH" ARANEA_CAPTURE_EXECUTION_LOG="$work/execution.log" QT_QPA_PLATFORM=offscreen QT_IM_MODULE=compose QT_SCALE_FACTOR=1 ARANEA_REDUCED_MOTION=1 \
   HOME="$work/home" CODEX_HOME="$work/codex" XDG_CONFIG_HOME="$work/home/.config" XDG_DATA_HOME="$work/home/.local/share" XDG_STATE_HOME="$work/state" \
-  XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" ARANEA_ACTION_RENDER_SCENE="$scene" ARANEA_ACTION_RENDER_WIDTH="$width" \
+  XDG_RUNTIME_DIR="$work/run" XDG_CACHE_HOME="$work/cache" ARANEA_ACTION_RENDER_SCENE="$scene" ARANEA_ACTION_RENDER_WIDTH="$width" ARANEA_ACTION_RENDER_HEIGHT="$height" \
   ARANEA_ACTION_RENDER_SCROLL="$scroll" ARANEA_ACTION_RENDER_FONT_SCALE="$font_scale" ARANEA_ACTION_RENDER_OUTPUT="$work/grab.png" "$qs" -p "$work/cfg") >"$work/log" 2>&1 &
 qs_pid=$!
 for _ in {1..150}; do
@@ -103,11 +104,11 @@ if [[ $before != "$after" || -s $work/execution.log ]] || ! grep -q 'ACTIONRENDE
   echo "state before=$before after=$after" >&2
   exit 1
 fi
-[[ $(magick identify -format '%wx%h' "$work/grab.png") == "${width}x680" ]]
+[[ $(magick identify -format '%wx%h' "$work/grab.png") == "${width}x${height}" ]]
 mkdir -p "$(dirname "$output")"
 staged=$(mktemp "$(dirname "$output")/.render-actions.XXXXXX")
 magick "$work/grab.png" -strip "PNG32:$staged"
 mv -f "$staged" "$output"
 staged=''
 grep 'ACTIONRENDER PASS' "$work/log"
-printf 'rendered: %s (%sx680 font=%s) state-before=%s state-after=%s effects=0\n' "$output" "$width" "$font_scale" "$before" "$after"
+printf 'rendered: %s (%sx%s font=%s) state-before=%s state-after=%s effects=0\n' "$output" "$width" "$height" "$font_scale" "$before" "$after"
