@@ -296,6 +296,11 @@ ShellRoot {
   // Enter on a return row sends one return and closes on the observed return.
   function returnCase() {
     host.openSwitcher()
+    // Closing now resets the mode, so the search field takes focus a moment after reopening.
+    t.step(60, returnSend)
+  }
+  // Send the return from the reopened switcher.
+  function returnSend() {
     keys.keyClick(Qt.Key_Down)
     keys.keyClick(Qt.Key_Return)
     var returns = host.method('returnEnvironment')
@@ -318,6 +323,10 @@ ShellRoot {
   // A return whose windows are gone shows the problem and a Start button that waits for a click.
   function changedCase() {
     host.openSwitcher()
+    t.step(60, changedSend)
+  }
+  // Return from the reopened switcher; the windows turn out to be gone.
+  function changedSend() {
     keys.keyClick(Qt.Key_Down)
     keys.keyClick(Qt.Key_Return)
     host.method('returnEnvironment')[0].done(0, JSON.stringify({
@@ -507,7 +516,7 @@ ShellRoot {
         return c.method === 'startEnvironment' || c.method === 'returnEnvironment'
       }).length, 0, 'nothing launches')
       page.details.discardDraft()
-      emptyCase()
+      escapeCase()
     })
   }
   // An empty registry offers Add project, which opens setup.
@@ -525,6 +534,68 @@ ShellRoot {
       t.equal(entry.mode, '', 'Add project leaves switcher mode')
       t.check(t.findChild(surface, 'projectsPage').setupActive, 'setup is active')
       wordsCase()
+    })
+  }
+  // Escape closes the switcher from any focused control, not only the search field.
+  function escapeCase() {
+    host.show([])
+    host.openSwitcher()
+    t.step(100, function () {
+      var add = t.findChild(surface, 'projectSwitcherAddProject')
+      add.forceActiveFocus()
+      t.check(add.activeFocus && !host.search().activeFocus, 'focus is on a control other than the search field')
+      keys.keyClick(Qt.Key_Escape)
+      t.check(!entry.opened, 'Escape closes from a focused action')
+      captureModeCase()
+    })
+  }
+  // Capture never leaves a full-screen inert switcher behind, and closing forgets the mode.
+  function captureModeCase() {
+    host.show([host.project('p-start', 'Alpha', true), host.project('p-ret', 'Beta', true), host.project('p-bare', 'Gamma', false)])
+    host.openSwitcher()
+    t.step(100, function () {
+      var snapshot = entry.captureSnapshot()
+      t.equal(JSON.parse(snapshot).mode, 'switcher', 'the snapshot records the mode')
+      var payload = JSON.stringify({
+        snapshot: snapshot,
+        fixture: {
+          projectsState: {
+            revision: 1,
+            roots: [],
+            ignored: [],
+            projects: []
+          }
+        }
+      })
+      t.equal(entry.captureBegin(payload), 'ok', 'capture begins')
+      t.equal(entry.mode, '', 'capture starts from the full layout')
+      t.equal(entry.captureRestore(snapshot), 'ok', 'capture restores')
+      t.equal(entry.mode, 'switcher', 'the switcher mode comes back')
+      t.check(entry.opened, 'still open')
+      entry.captureActive = true
+      var inertSwitcher = t.findChild(surface, 'projectSwitcher')
+      inertSwitcher.forceActiveFocus()
+      keys.keyClick(Qt.Key_Escape)
+      t.check(!entry.opened, 'Escape closes even while display-only')
+      entry.captureActive = false
+      t.equal(entry.mode, '', 'closing resets the mode')
+      lateRowsCase()
+    })
+  }
+  // While an earlier start is unconfirmed, the other rows say they are busy.
+  function lateRowsCase() {
+    host.openSwitcher()
+    t.step(60, function () {
+      keys.keyClick(Qt.Key_Return)
+      host.method('startEnvironment')[0].done(1, '', 'acknowledgement lost')
+      host.pumpLookups(function () {
+        t.check(entry.projectClient.acceptanceUnknown, 'the start is unconfirmed')
+        t.equal(t.findChild(surface, 'projectSwitcherAction:p-ret').text, 'Busy right now', 'another row reads Busy right now')
+        t.equal(t.findChild(surface, 'projectSwitcherAction:p-bare').text, 'Busy right now', 'and so does the setup row')
+        t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Start · VS Code', 'the unconfirmed row keeps its own label')
+        host.note()
+        emptyCase()
+      })
     })
   }
   // No banned word appears in any text the switcher showed.

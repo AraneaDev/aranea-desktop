@@ -50,8 +50,12 @@ ColumnLayout {
   readonly property int cursorIndex: rows.findIndex(function (row) {
     return row.id === switcher.cursorId
   })
+  // A start or return is on its way or unconfirmed, so no other row may begin.
+  readonly property bool clientBusy: launching || !!client && (client.submitting || client.preparing || client.acceptanceUnknown)
   // A request is on its way or an earlier start is unconfirmed: nothing new may begin.
-  readonly property bool busy: displayOnly || launching || systemBusy || !!client && (client.submitting || client.preparing || client.acceptanceUnknown)
+  readonly property bool busy: displayOnly || systemBusy || clientBusy
+  // Project whose own request is the one in flight, which keeps its own label.
+  readonly property string busyOwnerId: client && client.environmentTarget ? client.environmentTarget.projectId || '' : ''
   // Project whose start is under way, including while the automatic checks run.
   readonly property string startingId: {
     var target = client ? client.environmentTarget : null
@@ -114,7 +118,10 @@ ColumnLayout {
   }
   // Put the keyboard in the search field.
   function focusSearch() {
-    search.forceActiveFocus()
+    if (displayOnly)
+      forceActiveFocus()
+    else
+      search.forceActiveFocus()
   }
   // The row under the cursor, or null.
   function currentRow() {
@@ -150,7 +157,35 @@ ColumnLayout {
       return 'Starting…'
     if (row.id === returningId)
       return 'Returning…'
-    return systemBusy ? 'Busy right now' : row.action.label
+    if (systemBusy || clientBusy && row.id !== busyOwnerId)
+      return 'Busy right now'
+    return row.action.label
+  }
+  // Escape and the navigation keys work from any focused control; true when handled.
+  function handleKey(event) {
+    var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
+    var alt = (event.modifiers & Qt.AltModifier) !== 0
+    if (event.key === Qt.Key_Escape) {
+      closeRequested()
+    } else if (displayOnly) {
+      return false
+    } else if (event.key === Qt.Key_Down || ctrl && event.key === Qt.Key_J) {
+      move(1)
+    } else if (event.key === Qt.Key_Up || ctrl && event.key === Qt.Key_K) {
+      move(-1)
+    } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+      if (alt)
+        expand()
+      else
+        go()
+    } else {
+      return false
+    }
+    event.accepted = true
+    return true
+  }
+  Keys.onPressed: function (event) {
+    handleKey(event)
   }
   Connections {
     target: switcher.client
@@ -185,23 +220,7 @@ ColumnLayout {
       radius: Style.space(3)
     }
     Keys.onPressed: function (event) {
-      var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
-      var alt = (event.modifiers & Qt.AltModifier) !== 0
-      if (event.key === Qt.Key_Escape) {
-        switcher.closeRequested()
-      } else if (event.key === Qt.Key_Down || ctrl && event.key === Qt.Key_J) {
-        switcher.move(1)
-      } else if (event.key === Qt.Key_Up || ctrl && event.key === Qt.Key_K) {
-        switcher.move(-1)
-      } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-        if (alt)
-          switcher.expand()
-        else
-          switcher.go()
-      } else {
-        return
-      }
-      event.accepted = true
+      switcher.handleKey(event)
     }
   }
   ProjectProblem {

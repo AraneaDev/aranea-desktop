@@ -455,6 +455,7 @@ Item {
     }
     inspectionCheckoutId = ''
     inspectionError = ''
+    mode = ''
     projectId = Logic.normalizeProjectId(payload.projectId)
     var f = payload.fixture
     restoreActions(f.projectActions || {})
@@ -522,6 +523,7 @@ Item {
     inspectionCheckoutId = saved.inspectionCheckoutId || ''
     inspectionError = saved.inspectionError || ''
     opened = saved.opened
+    mode = saved.mode || ''
     if (view && saved.ui)
       view.captureRestore(saved.ui)
     restoreActions(saved.actions || {})
@@ -635,6 +637,7 @@ Item {
   function close() {
     inspectionDestination = null
     clearDismissalIntent()
+    mode = ''
     opened = false
   }
   Component.onCompleted: {
