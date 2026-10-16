@@ -34,6 +34,8 @@ ColumnLayout {
   property string error: ''
   // The original {code, message, recovery} behind `error` when there is one; shown as a plain problem.
   property var errorObject: null
+  // A second failure shown beside the first, or null.
+  property var extraErrorObject: null
   // Shared pointer/layout settling gate.
   property var pointerGate: null
   // Toggle durable ignored review without rescanning.
@@ -378,6 +380,21 @@ ColumnLayout {
         page.refreshRequested()
     }
   }
+  ProjectProblem {
+    objectName: 'projectsPageExtraProblem'
+    Layout.fillWidth: true
+    displayOnly: page.displayOnly
+    pointerGate: page.pointerGate
+    actionsEnabled: !page.pending
+    problem: page.extraErrorObject ? Problems.problem(page.extraErrorObject, {
+      surface: 'page',
+      actions: ['refresh']
+    }) : null
+    onActionRequested: function () {
+      if (!page.displayOnly && !page.pending)
+        page.refreshRequested()
+    }
+  }
   RowLayout {
     Layout.fillWidth: true
     visible: !!page.error && !page.errorObject
@@ -594,9 +611,17 @@ ColumnLayout {
       }
     }
     Repeater {
-      model: page.discoveryClient && !page.discoveryClient.failure ? page.discoveryClient.errors : []
+      model: {
+        if (!page.discoveryClient)
+          return []
+        var failure = page.discoveryClient.failure
+        return page.discoveryClient.errors.filter(function (entry) {
+          return !failure || (typeof entry === 'string' ? entry : entry.message) !== failure.message
+        })
+      }
       Aranea.UiLabel {
         required property var modelData
+        objectName: 'projectsDiscoveryReason'
         Layout.fillWidth: true
         text: typeof modelData === 'string' ? modelData : (modelData.message || modelData.code || 'Scan error') + (modelData.path ? ' · ' + modelData.path : '')
       }

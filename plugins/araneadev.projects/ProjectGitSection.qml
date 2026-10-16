@@ -89,7 +89,7 @@ ProjectSectionCard {
     actionsEnabled: !section.loading && section.commandPending === '' && !section.commandBusy
     problem: section.commandError ? Problems.problem(section.commandError, {
       surface: 'git',
-      actions: section.commandOperation === 'fetch' || section.commandOperation === 'pull' ? ['retry'] : []
+      actions: section.commandOperation === 'fetch' || section.commandOperation === 'pull' && section.canPull && !section.upToDate ? ['retry'] : []
     }) : section.error ? Problems.problem(section.error, {
       surface: 'git',
       actions: ['retry']
@@ -100,7 +100,7 @@ ProjectSectionCard {
       if (section.commandError) {
         if (section.commandOperation === 'fetch')
           section.fetchRequested()
-        else if (section.commandOperation === 'pull')
+        else if (section.commandOperation === 'pull' && section.canPull && !section.upToDate)
           section.pullRequested()
       } else {
         section.refreshRequested()

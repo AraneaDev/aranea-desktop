@@ -367,6 +367,7 @@ ColumnLayout {
     Layout.fillWidth: true
     displayOnly: actions.displayOnly
     pointerGate: actions.pointerGate
+    actionsEnabled: !actions.client.pending
     // Automatic checks run first; this appears when they could not settle it.
     problem: actions.client.submissionUncertain && !actions.client.autoChecking ? Problems.problem({
       code: 'SUBMISSION_UNCONFIRMED'
@@ -383,6 +384,7 @@ ColumnLayout {
     Layout.fillWidth: true
     displayOnly: actions.displayOnly
     pointerGate: actions.pointerGate
+    actionsEnabled: !actions.client.pending
     problem: actions.client.error ? Problems.problem(actions.client.error, {
       surface: 'actions',
       actions: ['refresh']

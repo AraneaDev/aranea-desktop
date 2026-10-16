@@ -163,7 +163,7 @@ ColumnLayout {
     objectName: 'suggestionsResult'
     Layout.fillWidth: true
     visible: !!section.client && !!section.client.addResult && (section.client.addResult.total > 1 || !!section.client.addResult.error || section.client.addResult.cancelled)
-    text: !section.client || !section.client.addResult ? '' : section.client.addResult.error ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + '.' : section.client.addResult.cancelled ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + ' · Stopped; the rest were not saved.' : 'Added ' + section.client.addResult.added + ' actions.'
+    text: !section.client || !section.client.addResult ? '' : section.client.addResult.error ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + '. Nothing else was changed.' : section.client.addResult.cancelled ? 'Added ' + section.client.addResult.added + ' of ' + section.client.addResult.total + ' · Stopped; the rest were not saved.' : 'Added ' + section.client.addResult.added + ' actions.'
     color: section.client && section.client.addResult && section.client.addResult.error ? Aranea.DesignTokens.attention : Aranea.DesignTokens.foreground
     wrapMode: Text.WrapAtWordBoundaryOrAnywhere
   }

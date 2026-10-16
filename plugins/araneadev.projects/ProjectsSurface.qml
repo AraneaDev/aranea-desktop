@@ -1073,6 +1073,7 @@ Item {
                   metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
                   error: panel.root.projectController.error || panel.root.projectClient.error
+                  extraErrorObject: panel.root.projectController.extraErrorObject
                   errorObject: panel.root.projectController.errorObject || (!panel.root.projectController.error && panel.root.projectClient.error ? {
                       message: panel.root.projectClient.error
                     } : null)

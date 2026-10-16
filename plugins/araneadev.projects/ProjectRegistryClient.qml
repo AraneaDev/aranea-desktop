@@ -31,6 +31,8 @@ QtObject {
   property string error: ''
   // The original {code, message, recovery} behind `error`, or null; problem views use it.
   property var errorObject: null
+  // The tools failure when the registry read failed too, or null; both stay visible.
+  property var extraErrorObject: null
   // Reject callbacks from superseded reads or capture transactions.
   property int generation: 0
   // Typed successful mutations let the composition root update presentation.
@@ -104,6 +106,7 @@ QtObject {
       if (combined || !remaining) {
         error = combined
         errorObject = combined ? failureObjects[0] || failureObjects[1] : null
+        extraErrorObject = failureObjects[0] && failureObjects[1] ? failureObjects[1] : null
       }
       if (!remaining)
         reading = false
@@ -169,6 +172,7 @@ QtObject {
       var value = parseStore(output, code)
       if (code !== 0 || !value.ok) {
         error = value.error ? value.error.message + (value.error.recovery ? ' ' + value.error.recovery : '') : diagnostics
+        extraErrorObject = null
         errorObject = value.error || {
           code: 'REGISTRY_UNAVAILABLE',
           message: diagnostics || ''
@@ -180,6 +184,7 @@ QtObject {
       state = value.state
       error = ''
       errorObject = null
+      extraErrorObject = null
       // Complete registry feedback before an explicit folder scan is requested.
       function complete(rootId) {
         pending = false

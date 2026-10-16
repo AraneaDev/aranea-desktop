@@ -13,6 +13,10 @@ ShellRoot {
   property var refreshes: []
   // Scans recorded from the page.
   property var scans: []
+  // Scan callbacks {line, done} of the real discovery controller.
+  property var scanRuns: []
+  // Helper callbacks of the real registry client.
+  property var registryRuns: []
   // Transport calls of the actions client.
   property var calls: []
   // Project id of the fixtures.
@@ -134,9 +138,27 @@ ShellRoot {
   Projects.ProjectDiscoveryController {
     id: discovery
     runner: function (argv, line, done) {
-      host.scans.push(argv)
+      host.scanRuns.push({
+        line: line,
+        done: done
+      })
       return function () {}
     }
+  }
+  Projects.ProjectRegistryClient {
+    id: registry
+    storePath: '/fixture/store'
+    toolsPath: '/fixture/tools'
+    runner: function (argv, input, done) {
+      host.registryRuns.push(done)
+    }
+  }
+  Projects.ProjectsPage {
+    id: registryPage
+    width: 500
+    error: registry.error
+    errorObject: registry.errorObject
+    extraErrorObject: registry.extraErrorObject
   }
   Projects.ProjectsPage {
     id: page
@@ -188,6 +210,9 @@ ShellRoot {
     runChecks()
     registryChecks()
     discoveryChecks()
+    bothRegistryChecks()
+    pullRetryChecks()
+    pendingChecks()
     t.done()
   })
   // Catch raw Git text, wrong retry mapping and missing last-read note.
@@ -336,19 +361,102 @@ ShellRoot {
     }
     t.equal(shown(view).title, 'Something went wrong', 'a text-only error is unknown')
   }
-  // Catch a discovery failure that shows raw text or maps Retry to the wrong scan.
+  // Catch a discovery failure that shows raw text, hides path reasons, or maps Retry to the wrong scan.
   function discoveryChecks() {
-    t.check(discovery.start('r-one'), 'scan starts')
-    discovery.failure = {
-      code: 'READ_FAILED',
-      message: 'Discovery failed. Check the folder and retry.'
-    }
-    discovery.pending = false
     var view = t.findChild(page, 'projectsDiscoveryProblem')
+    t.check(discovery.start('r-one'), 'scan starts')
+    host.scanRuns[0].line('not json')
+    host.scanRuns[0].done(0, '')
+    t.equal(view.problem.details.code, 'READ_FAILED', 'a broken scan reply is a failure')
     t.equal(shown(view).title, "Couldn't start", 'discovery failure kind')
     t.equal(shown(view).actions, ['retry'], 'discovery offers Retry')
     t.findChild(view, 'projectProblemAction:retry').clicked()
     t.equal(host.scans[host.scans.length - 1], ['again', 'r-one'], 'Retry scans the same folder again')
     clean(view, 'discovery')
+    host.scanRuns[0].line(JSON.stringify({
+      event: 'completed',
+      data: {
+        outcome: 'partial',
+        errors: ['/work/a: permission denied']
+      }
+    }))
+    t.check(!discovery.failure, 'a later completed reply without a code clears the failure')
+    t.equal(t.findChildren(page, 'projectsDiscoveryReason').map(function (l) {
+      return l.text
+    }), ['/work/a: permission denied'], 'path reasons show once the failure is gone')
+    t.check(discovery.start('r-one'), 'second scan starts')
+    host.scanRuns[1].line(JSON.stringify({
+      event: 'completed',
+      code: 'READ_FAILED',
+      message: 'The scan stopped.',
+      data: {
+        errors: ['/work/b: permission denied'],
+        recovery: 'Choose a narrower folder.'
+      }
+    }))
+    host.scanRuns[1].done(1, '')
+    t.equal(view.problem.details.message, 'The scan stopped.', 'a coded failure is shown')
+    var reasons = t.findChildren(page, 'projectsDiscoveryReason').map(function (l) {
+      return l.text
+    })
+    t.check(reasons.indexOf('/work/b: permission denied') >= 0, 'path reasons stay visible next to a failure')
+    t.check(reasons.indexOf('The scan stopped.') < 0, 'the failure message is not repeated')
+  }
+  // Catch a second registry failure that is hidden, using the real client.
+  function bothRegistryChecks() {
+    t.check(registry.refresh(), 'registry read starts')
+    host.registryRuns[0](1, JSON.stringify({
+      ok: false,
+      error: {
+        code: 'REGISTRY_UNAVAILABLE',
+        message: 'Registry broke.',
+        recovery: 'Check storage.'
+      }
+    }), '')
+    host.registryRuns[1](1, '', 'Tools broke.')
+    t.equal(registry.errorObject.code, 'REGISTRY_UNAVAILABLE', 'registry failure is the first problem')
+    t.equal(registry.extraErrorObject.code, 'TOOL_MISSING', 'tools failure is kept as the second problem')
+    t.equal(shown(t.findChild(registryPage, 'projectsPageProblem')).title, 'Projects isn\'t running', 'first failure on screen')
+    var extra = t.findChild(registryPage, 'projectsPageExtraProblem')
+    t.equal(shown(extra).title, 'A tool is missing', 'second failure on screen')
+    t.equal(extra.problem.details.message, 'Tools broke.', 'second failure keeps its message')
+    clean(extra, 'second registry failure')
+  }
+  // Catch a Pull retry that the Pull button itself would refuse.
+  function pullRetryChecks() {
+    section.commandOperation = 'pull'
+    section.git = {
+      branch: 'main',
+      upstream: 'origin/main',
+      ahead: 0,
+      behind: 0,
+      counts: {}
+    }
+    section.commandError = {
+      code: 'GIT_TIMEOUT',
+      message: 'Git took too long.'
+    }
+    t.equal(t.findChild(section, 'projectGitError').problem.actions, [], 'no pull Retry when up to date')
+    section.git = {
+      branch: 'main',
+      upstream: 'origin/main',
+      ahead: 0,
+      behind: 2,
+      counts: {}
+    }
+    t.equal(t.findChild(section, 'projectGitError').problem.actions.length, 1, 'pull Retry when Pull is possible')
+    section.commandError = null
+  }
+  // Catch action problem buttons that stay enabled during a request.
+  function pendingChecks() {
+    client.error = {
+      code: 'REGISTRY_CONFLICT',
+      message: 'Changed.'
+    }
+    client.pending = true
+    t.check(!t.findChild(actions, 'actionClientProblem').actionsEnabled, 'buttons wait for a running request')
+    client.pending = false
+    t.check(t.findChild(actions, 'actionClientProblem').actionsEnabled, 'buttons work when idle')
+    client.error = null
   }
 }

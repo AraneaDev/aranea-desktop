@@ -66,6 +66,7 @@ Item {
     if (event.event === 'completed') {
       partial = data.outcome === 'partial'
       errors = data.errors || []
+      failure = null
       if (event.code) {
         errors = errors.concat([event.message || event.code, data.recovery || 'Retry after checking the folder.'])
         failure = {

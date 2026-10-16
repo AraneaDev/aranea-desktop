@@ -413,6 +413,7 @@ Item {
         tools: projectController.tools,
         error: projectController.error,
         errorObject: projectController.errorObject,
+        extraErrorObject: projectController.extraErrorObject,
         failure: discoveryClient.failure,
         candidates: discoveryClient.candidates,
         partial: discoveryClient.partial,
@@ -469,6 +470,7 @@ Item {
     }
     projectController.error = f.projectError || ''
     projectController.errorObject = null
+    projectController.extraErrorObject = null
     discoveryClient.candidates = f.projectCandidates || []
     discoveryClient.partial = f.projectPartial === true
     discoveryClient.errors = f.projectErrors || []
@@ -503,6 +505,7 @@ Item {
     projectController.tools = p.tools
     projectController.error = p.error
     projectController.errorObject = p.errorObject || null
+    projectController.extraErrorObject = p.extraErrorObject || null
     discoveryClient.candidates = p.candidates
     discoveryClient.partial = p.partial
     discoveryClient.errors = p.errors
