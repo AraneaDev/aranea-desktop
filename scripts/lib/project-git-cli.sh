@@ -40,8 +40,16 @@ project_git_cli_main() {
     [[ $option == --* && ! -v supplied[$option] ]] || projects_cli_usage
     supplied[$option]=1
     case "$group:$command:$option" in
-      task:remove:--check) check=true; shift; continue ;;
-      task:remove:--confirm-unpushed) confirm=true; shift; continue ;;
+      task:remove:--check)
+        check=true
+        shift
+        continue
+        ;;
+      task:remove:--confirm-unpushed)
+        confirm=true
+        shift
+        continue
+        ;;
       git:fetch:--checkout | git:pull:--checkout | task:remove:--checkout | task:new:--branch) ;;
       *) projects_cli_usage ;;
     esac
