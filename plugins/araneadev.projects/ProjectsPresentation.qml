@@ -19,6 +19,8 @@ Item {
   readonly property bool inert: captureActive || !!captureSaved
   // Whether the host should display the Projects window.
   property bool opened: false
+  // Layout of the window: empty for the full Projects layout, or the compact quick switcher.
+  property string mode: ''
   // Closing the window ends every automatic check; they only ever read.
   onOpenedChanged: if (!opened) {
     projectClient.stopAutoCheck()
@@ -573,6 +575,23 @@ Item {
     var nextId = payload && payload.projectId !== undefined ? Logic.normalizeProjectId(payload.projectId) : projectId
     inspectionError = ''
     inspectionDestination = null
+    var switcher = !!payload && payload.mode === 'switcher'
+    if (switcher && view && view.switcherBlocked) {
+      // An open window keeps its draft; a hidden one comes back as the full layout.
+      if (opened)
+        return 'busy'
+      switcher = false
+    }
+    if (switcher) {
+      mode = 'switcher'
+      restoreNavigationPending = false
+      opened = true
+      projectController.refresh()
+      projectClient.refresh()
+      if (view)
+        view.focusKeys()
+      return 'ok'
+    }
     if (payload && payload.checkoutId !== undefined) {
       if (!nextId || typeof payload.checkoutId !== 'string' || !payload.checkoutId || /[\x00-\x1f\x7f]/.test(payload.checkoutId))
         return 'invalid'
@@ -583,6 +602,7 @@ Item {
         projectId: nextId,
         checkoutId: payload.checkoutId
       }
+      mode = ''
       opened = true
       projectController.refresh()
       applyInspection()
@@ -594,10 +614,12 @@ Item {
     if (view && nextId !== projectId && view.navigationBlocked)
       return 'busy'
     if (view && nextId !== projectId && view.hasUnsavedDraft) {
+      mode = ''
       opened = true
       view.navigate(nextId)
       return 'ok'
     }
+    mode = ''
     restoreNavigationPending = !payload || payload.projectId === undefined
     projectId = nextId
     opened = true

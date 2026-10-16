@@ -18,6 +18,8 @@ PanelWindow {
   readonly property bool navigationBlocked: surface.navigationBlocked
   // External destinations use the same focused draft decision as local selection.
   readonly property bool hasUnsavedDraft: surface.hasUnsavedDraft
+  // The compact switcher must not hide a setup wizard or an unsaved draft.
+  readonly property bool switcherBlocked: surface.switcherBlocked
   // Current project destination, retained independently of window visibility.
   readonly property string section: surface.section
   // Refuse capture while action acceptance or activity work is pending.
@@ -27,7 +29,7 @@ PanelWindow {
   // Activity observation follows the selected visible destination.
   readonly property bool activityVisible: surface.activityVisible
   // Desired size capped to the screen with 24-unit margins.
-  readonly property var geometry: Logic.geometry(screen ? screen.width : 1920, screen ? screen.height : 1080, Style.spaceReal(1))
+  readonly property var geometry: (root.mode === 'switcher' ? Logic.switcherGeometry : Logic.geometry)(screen ? screen.width : 1920, screen ? screen.height : 1080, Style.spaceReal(1))
   // Give the first keyboard target focus on summon.
   function focusKeys() {
     surface.focusKeys()

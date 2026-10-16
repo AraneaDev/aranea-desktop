@@ -66,3 +66,17 @@ test("Projects window fits screen margins at normal and enlarged desktop spacing
   ])
     assert.deepEqual(JSON.parse(JSON.stringify(logic.geometry(width, height, scale))), expected)
 })
+
+test("switcher geometry is 560 by 440 and stays inside the screen", () => {
+  for (const [width, height, scale, expected] of [
+    [1920, 1080, 1, { width: 560, height: 440 }],
+    [1920, 1080, 2, { width: 1120, height: 880 }],
+    [500, 400, 1, { width: 452, height: 352 }],
+    [40, 40, 1, { width: 1, height: 1 }],
+    [800, 600, undefined, { width: 560, height: 440 }]
+  ])
+    assert.deepEqual(
+      JSON.parse(JSON.stringify(logic.switcherGeometry(width, height, scale))),
+      expected
+    )
+})

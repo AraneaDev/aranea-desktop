@@ -39,5 +39,20 @@ function geometry(screenWidth, screenHeight, scale) {
     height: Math.max(1, Math.min(720 * scale, screenHeight - 48 * scale))
   }
 }
+
+/**
+ * Compact quick switcher size, capped to the screen with the same margins.
+ * @param {number} screenWidth Screen width.
+ * @param {number} screenHeight Screen height.
+ * @param {number} [scale] Interface scale.
+ * @returns {{width:number,height:number}} Desired window geometry.
+ */
+function switcherGeometry(screenWidth, screenHeight, scale) {
+  scale = scale || 1
+  return {
+    width: Math.max(1, Math.min(560 * scale, screenWidth - 48 * scale)),
+    height: Math.max(1, Math.min(440 * scale, screenHeight - 48 * scale))
+  }
+}
 if (typeof module !== "undefined")
-  module.exports = { normalizeProjectId, normalizeFolder, geometry }
+  module.exports = { normalizeProjectId, normalizeFolder, geometry, switcherGeometry }
