@@ -139,7 +139,11 @@ function assignedStrings(source) {
 }
 
 test("assignment and return forms say not available instead of unavailable", () => {
-  const sample = "error = 'Folder chooser unavailable.'\nreturn x || 'unavailable'\nvar code = 'unavailable'\nreturn s.status === 'unavailable'"
+  const sample =
+    "error = 'Folder chooser unavailable.'\nreturn x || 'unavailable'\nvar code = 'unavailable'\nreturn s.status === 'unavailable'"
   assert.deepEqual(assignedStrings(sample), ["Folder chooser unavailable.", "unavailable"])
-  assert.deepEqual(scanAll(assignedStrings, /\bunavailable\b/i, () => []), [])
+  assert.deepEqual(
+    scanAll(assignedStrings, /\bunavailable\b/i, () => []),
+    []
+  )
 })

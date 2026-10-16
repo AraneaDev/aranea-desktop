@@ -212,10 +212,22 @@ test("details keep the original code, message and recovery", () => {
 
 test("role window problems name the role and run problems talk about the run", () => {
   const body = (role) =>
-    p.problem({ code: "WINDOW_TARGET_UNCONFIRMED" }, { surface: "details", subject: role, actions: ALL }).body
-  assert.equal(body("agent"), "Projects couldn't confirm the agent window opened. It may still open.")
-  assert.equal(body("editor"), "Projects couldn't confirm the editor window opened. It may still open.")
-  assert.equal(body("terminal"), "Projects couldn't confirm the terminal window opened. It may still open.")
+    p.problem(
+      { code: "WINDOW_TARGET_UNCONFIRMED" },
+      { surface: "details", subject: role, actions: ALL }
+    ).body
+  assert.equal(
+    body("agent"),
+    "Projects couldn't confirm the agent window opened. It may still open."
+  )
+  assert.equal(
+    body("editor"),
+    "Projects couldn't confirm the editor window opened. It may still open."
+  )
+  assert.equal(
+    body("terminal"),
+    "Projects couldn't confirm the terminal window opened. It may still open."
+  )
   assert.equal(
     p.problem({ code: "SUBMISSION_UNCONFIRMED" }, { surface: "run", actions: ALL }).body,
     "Projects couldn't tell whether the run started. It may still be running."

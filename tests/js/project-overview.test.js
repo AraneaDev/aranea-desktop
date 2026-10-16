@@ -374,8 +374,18 @@ test("recovering one environment role retains the latest outcome for its other r
 })
 
 test("workspace rows never show internal state words for any step status", () => {
-  const banned = /\b(acceptance|receipt|owner|observation|observe|binding|exact|retained|IPC|replay|resubmit|unconfirmed|observed)\b/i
-  const statuses = ["observed", "unconfirmed", "uncertain", "failed", "missing", "skipped", "other-new-value", undefined]
+  const banned =
+    /\b(acceptance|receipt|owner|observation|observe|binding|exact|retained|IPC|replay|resubmit|unconfirmed|observed)\b/i
+  const statuses = [
+    "observed",
+    "unconfirmed",
+    "uncertain",
+    "failed",
+    "missing",
+    "skipped",
+    "other-new-value",
+    undefined
+  ]
   for (const status of statuses) {
     const environment = {
       id: "e",
@@ -392,31 +402,57 @@ test("workspace rows never show internal state words for any step status", () =>
       status,
       error: status === "failed" ? { message: "Provider is not installed." } : undefined
     }))
-    const result = model({}, {}, { environments: [environment], operations: [{ environmentId: "e", steps }] })
+    const result = model(
+      {},
+      {},
+      { environments: [environment], operations: [{ environmentId: "e", steps }] }
+    )
     const row = result.workspaces[0]
     for (const text of [row.title, row.status, row.detail, row.fullDetail])
       assert.doesNotMatch(text, banned, "status " + status + ": " + text)
   }
   const raw = logic.overview(
-    project, "c", null, {}, {},
+    project,
+    "c",
+    null,
+    {},
+    {},
     {
-      environments: [{
-        id: "e", projectId: "p", checkoutId: "c", workspaceId: 1,
-        profileSnapshot: { name: "Work", roles: ["terminal", "agent"] },
-        checkoutSnapshot: { path: "/repo", branch: "main" },
-        resolvedTools: { terminalId: "kitty", agentId: "codex" },
-        observedRoles: ["terminal"]
-      }]
+      environments: [
+        {
+          id: "e",
+          projectId: "p",
+          checkoutId: "c",
+          workspaceId: 1,
+          profileSnapshot: { name: "Work", roles: ["terminal", "agent"] },
+          checkoutSnapshot: { path: "/repo", branch: "main" },
+          resolvedTools: { terminalId: "kitty", agentId: "codex" },
+          observedRoles: ["terminal"]
+        }
+      ]
     },
     100000
   ).workspaces[0]
   assert.equal(raw.status, "terminal open \u00b7 agent not confirmed")
   assert.ok(raw.attention, "an unconfirmed role still needs attention")
-  assert.ok(raw.controls.some((c) => c.method === "reobserve:agent"), "logic still uses the raw status")
+  assert.ok(
+    raw.controls.some((c) => c.method === "reobserve:agent"),
+    "logic still uses the raw status"
+  )
 })
 
 test("operation outcomes and states read as plain words", () => {
-  const words = ["observed", "partial", "failed", "accepted", "completed", "running", "something-new", null, undefined]
+  const words = [
+    "observed",
+    "partial",
+    "failed",
+    "accepted",
+    "completed",
+    "running",
+    "something-new",
+    null,
+    undefined
+  ]
   for (const value of words) {
     const text = logic.outcomeLabel(value)
     assert.doesNotMatch(text, /\b(observed|unconfirmed|acceptance|owner|receipt)\b/i, String(value))
