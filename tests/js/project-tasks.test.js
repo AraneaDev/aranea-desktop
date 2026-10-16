@@ -35,6 +35,17 @@ test("remove summary explains each blocker", () => {
     "3 commits aren't on any remote."
   ])
 })
+test("remove summary blocks removal on detached commits", () => {
+  const clean = { dirty: false, untracked: false, busy: false, unpushed: 0, detached: 0 }
+  const one = tasks.removeSummary({ ...clean, detached: 1 })
+  assert.equal(one.allowed, false)
+  assert.deepEqual(plain(one.lines), [
+    "1 commit on a detached HEAD would be lost. Create a branch for them first."
+  ])
+  assert.deepEqual(plain(tasks.removeSummary({ ...clean, detached: 2 }).lines), [
+    "2 commits on a detached HEAD would be lost. Create a branch for them first."
+  ])
+})
 test("remove summary mentions ignored items and a missing folder", () => {
   const clean = {
     dirty: false,

@@ -92,14 +92,16 @@ project header, type a branch name and choose **Create**. Aranea fetches, starts
 the branch from the remote's default branch (or local `main`/`master` without a
 remote) and creates the folder next to your repository as
 `<repo>-worktrees/<branch>`. The new checkout is selected; press **Start working**
-to open your tools there.
+to open your tools there. A new task always starts from the main checkout, even
+when a task checkout is selected.
 
 When the work is merged, select the task checkout and choose **Remove task
 checkout**. Aranea removes the folder only when it has no uncommitted or
 untracked changes and no running action, and warns when commits are not on any
 remote. It also warns when ignored files, such as `.env` or build output, will
 be deleted with the folder. The branch is always kept. A commit on a detached
-HEAD that is on no branch always blocks removal; create a branch for it first.
+HEAD that is on no branch always blocks removal, and the removal card says so
+before you confirm; create a branch for it first.
 If you deleted a task checkout's folder by hand, **Remove task checkout** just
 forgets it.
 

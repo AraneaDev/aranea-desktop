@@ -152,16 +152,20 @@ task_remove_refusals() {
   [[ ! -e $task_path ]]
   [[ $(git -C "$repo" rev-list --count main..t2) == 1 ]]
 }
-# Catch removal of a checkout with a protected action run.
-task_remove_busy() {
-  setup
-  make_task busy
+# Start a protected action run in the task checkout so it counts as busy.
+reserve_busy_run() {
   local definition hash
   jq -cn --arg p "$project_id" '{action:"configure",args:{projectId:$p,definition:{name:"Run",kind:"command",argv:["true"],cwdRelative:".",timeoutSeconds:300,previewUrl:null}}}' | "$action_store" mutate >"$TMPDIR/configured"
   definition=$(jq -r '.state.definitions[0].id' "$TMPDIR/configured")
   hash=$(jq -Sc '.state.definitions[0] | del(.createdAt,.updatedAt)' "$TMPDIR/configured" | sha256sum | cut -d' ' -f1)
   jq -cn --arg p "$project_id" --arg c "$task_id" --arg a "$definition" --arg h "$hash" --arg cwd "$task_path" --argjson rev "$(jq '.state.definitions[0].revision' "$TMPDIR/configured")" '{action:"reserve",args:{projectId:$p,checkoutId:$c,actionId:$a,requestId:"req-00000000-0000-0000-0000-000000000001",cwd:$cwd,definitionRevision:$rev,definitionHash:$h,bootId:"00000000-0000-0000-0000-000000000000"}}' | "$action_store" mutate >"$TMPDIR/reserved"
   jq -e '.ok' "$TMPDIR/reserved" >/dev/null
+}
+# Catch removal of a checkout with a protected action run.
+task_remove_busy() {
+  setup
+  make_task busy
+  reserve_busy_run
   task_run task-remove --check
   jq -e '.data.busy == true' "$result" >/dev/null
   task_expect CHECKOUT_BUSY task-remove
@@ -320,8 +324,109 @@ unpushed_without_remote_counts_against_main() {
   task_run task-remove --check
   jq -e '.ok and .data.unpushed == 2' "$result" >/dev/null
 }
+# Catch a --check that hides commits reachable only from a detached HEAD.
+check_reports_detached_commits() {
+  setup
+  make_task dc
+  task_run task-remove --check
+  jq -e '.ok and .data.detached == 0' "$result" >/dev/null
+  git -C "$task_path" checkout -q --detach
+  commit_in "$task_path" lost
+  task_run task-remove --check
+  jq -e '.ok and .data.detached == 1' "$result" >/dev/null
+  rm -rf "$task_path"
+  task_run task-remove --check
+  jq -e '.ok and .data.missing == true and .data.detached == 0' "$result" >/dev/null
+}
+# Catch a post-checkout timeout that leaves an unregistered folder without saying so, or deletes it.
+task_create_timeout_after_checkout_names_folder() {
+  setup
+  mkdir -p "$TMPDIR/hooks"
+  printf '#!/bin/sh\nsleep 30\n' >"$TMPDIR/hooks/post-checkout"
+  chmod +x "$TMPDIR/hooks/post-checkout"
+  git -C "$repo" config core.hooksPath "$TMPDIR/hooks"
+  local folder=$ARANEA_TEST_SANDBOX/w/app-worktrees/slow
+  ARANEA_GIT_NETWORK_SECONDS=2 expect_code REGISTER_FAILED task-create --branch slow
+  jq -e --arg f "$folder" '.error.message | contains($f)' "$result" >/dev/null
+  jq -e '.error.recovery | contains("register") and contains("git worktree remove")' "$result" >/dev/null
+  [[ -d $folder ]]
+  [[ $(registry_count) == 1 ]]
+}
+# Catch a failed add that left only its branch without naming the cleanup command.
+task_create_failure_leaving_branch_names_it() {
+  setup
+  mkdir -p "$TMPDIR/hooks"
+  # shellcheck disable=SC2016
+  printf '#!/bin/sh\nrm -rf "$PWD"\nsleep 30\n' >"$TMPDIR/hooks/post-checkout"
+  chmod +x "$TMPDIR/hooks/post-checkout"
+  git -C "$repo" config core.hooksPath "$TMPDIR/hooks"
+  ARANEA_GIT_NETWORK_SECONDS=2 expect_code GIT_ERROR task-create --branch gone
+  jq -e '.error.recovery | contains("git branch -d gone")' "$result" >/dev/null
+}
+# Catch ignore rules from the user global excludes file being ignored by the dirty check.
+dirty_check_honours_global_excludes() {
+  setup
+  make_task gx
+  printf 'junk.tmp\n' >"$TMPDIR/home-excludes"
+  printf '[core]\n\texcludesFile = %s\n' "$TMPDIR/home-excludes" >"$TMPDIR/gitconfig"
+  : >"$task_path/junk.tmp"
+  GIT_CONFIG_GLOBAL=$TMPDIR/gitconfig HOME=$TMPDIR/nohome task_run task-remove --check
+  jq -e '.ok and .data.untracked == false and .data.ignored == 1' "$result" >/dev/null
+}
+# Catch the prune dry-run output being parsed under the user locale.
+prune_listing_runs_in_c_locale() {
+  setup
+  make_task loc
+  rm -rf "$task_path"
+  cat >"$TMPDIR/bin/git" <<WRAP
+#!/bin/bash
+for argument in "\$@"; do
+  if [[ \$argument == remove ]]; then echo "fatal: validation failed, cannot remove working tree" >&2; exit 128; fi
+  if [[ \$argument == --dry-run ]]; then echo "\${LC_ALL:-unset}" >"$TMPDIR/prune.locale"; fi
+done
+exec "$(command -v git)" "\$@"
+WRAP
+  chmod +x "$TMPDIR/bin/git"
+  PATH="$TMPDIR/bin:$PATH" LANG=de_DE.UTF-8 task_run task-remove
+  jq -e '.ok and .data.removed' "$result" >/dev/null
+  [[ $(<"$TMPDIR/prune.locale") == C ]]
+}
+# Catch an unbounded local read holding the repository lock, or a timeout reported as another error.
+local_read_timeout_is_reported() {
+  setup
+  make_task slowread
+  cat >"$TMPDIR/bin/git" <<WRAP
+#!/bin/bash
+for argument in "\$@"; do
+  if [[ \$argument == status ]]; then sleep 30; fi
+done
+exec "$(command -v git)" "\$@"
+WRAP
+  chmod +x "$TMPDIR/bin/git"
+  local start=$SECONDS
+  PATH="$TMPDIR/bin:$PATH" ARANEA_GIT_LOCAL_SECONDS=2 task_expect GIT_TIMEOUT task-remove
+  ((SECONDS - start <= 8))
+  [[ -d $task_path ]]
+}
+# Catch a missing-folder removal that checks for busy actions before holding the repository lock.
+missing_folder_removal_takes_lock_before_busy_check() {
+  setup
+  make_task lockfirst
+  rm -rf "$task_path"
+  local key
+  key=$(printf '%s' "$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)" | sha256sum | cut -c1-32)
+  mkdir -p "$ARANEA_STATE_ROOT/git-locks"
+  flock "$ARANEA_STATE_ROOT/git-locks/$key.lock" sleep 4 &
+  sleep 0.5
+  task_run task-remove &
+  local waiting=$!
+  sleep 1
+  printf 'not json' >"$ARANEA_STATE_ROOT/project-actions.json"
+  wait "$waiting" || true
+  jq -e '.ok == false and .error.code == "ACTIONS_UNAVAILABLE"' "$result" >/dev/null
+}
 
-cases=(task_create_from_remote_default task_create_without_remote task_create_no_default_branch task_create_refusals task_create_rejects_hostile_names task_create_from_linked_checkout_uses_primary_name task_remove_clean task_remove_refusals task_remove_busy task_remove_missing_folder_unregisters missing_folder_check_changes_nothing missing_primary_folder_is_still_refused broken_action_store_fails_closed missing_folder_never_prunes_other_worktrees missing_folder_refuses_when_other_stale_records_exist missing_folder_prunes_alone_when_removal_refuses missing_folder_prunes_only_its_own_record ignored_files_are_counted_not_blocking detached_head_commits_are_never_discarded missing_folder_check_counts_unpushed unpushed_without_remote_counts_against_main)
+cases=(task_create_from_remote_default task_create_without_remote task_create_no_default_branch task_create_refusals task_create_rejects_hostile_names task_create_from_linked_checkout_uses_primary_name task_remove_clean task_remove_refusals task_remove_busy task_remove_missing_folder_unregisters missing_folder_check_changes_nothing missing_primary_folder_is_still_refused broken_action_store_fails_closed missing_folder_never_prunes_other_worktrees missing_folder_refuses_when_other_stale_records_exist missing_folder_prunes_alone_when_removal_refuses missing_folder_prunes_only_its_own_record ignored_files_are_counted_not_blocking detached_head_commits_are_never_discarded missing_folder_check_counts_unpushed unpushed_without_remote_counts_against_main check_reports_detached_commits task_create_timeout_after_checkout_names_folder task_create_failure_leaving_branch_names_it dirty_check_honours_global_excludes prune_listing_runs_in_c_locale local_read_timeout_is_reported missing_folder_removal_takes_lock_before_busy_check)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

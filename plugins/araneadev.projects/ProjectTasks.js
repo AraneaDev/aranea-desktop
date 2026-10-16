@@ -48,6 +48,15 @@ function removeSummary(facts) {
     allowed = false
     lines.push("An action is still running in this checkout. Stop it first.")
   }
+  var detached = Number(f.detached) || 0
+  if (detached > 0) {
+    allowed = false
+    lines.push(
+      detached +
+        (detached === 1 ? " commit" : " commits") +
+        " on a detached HEAD would be lost. Create a branch for them first."
+    )
+  }
   var unpushed = Number(f.unpushed) || 0
   if (unpushed > 0)
     lines.push(

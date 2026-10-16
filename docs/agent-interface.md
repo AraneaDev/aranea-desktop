@@ -705,7 +705,8 @@ Git runs without prompts: `GIT_TERMINAL_PROMPT=0`, no askpass, stdin from
 `/dev/null`, and `-o BatchMode=yes` appended to the SSH command (your
 `core.sshCommand` or `GIT_SSH_COMMAND`, else `ssh`). Your own Git config,
 credentials and hooks apply. Network operations and `worktree add` stop after
-60 s, local ones after 15 s. One operation runs per repository at a time; a
+60 s; every local Git call (status, ref reads, `worktree remove`) stops after
+15 s with `GIT_TIMEOUT`. One operation runs per repository at a time; a
 second waits up to 75 s.
 
 Result fields, carried as the final CLI event's `data`:
@@ -722,13 +723,15 @@ Result fields, carried as the final CLI event's `data`:
   `<dirname of the primary path>/<basename>-worktrees/<branch with / as ->`. It
   is registered and selected; nothing launches.
 - `task remove --check`:
-  `{projectId,checkoutId,path,branch,dirty,untracked,ignored,busy,unpushed,missing}`.
+  `{projectId,checkoutId,path,branch,dirty,untracked,ignored,busy,unpushed,detached,missing}`.
   Nothing is changed. `ignored` is the count of ignored paths that would be
   deleted with the folder; they warn but never refuse. `busy` is true while an
   action run for that checkout is pending, running or unconfirmed, or has
   `submissionUnconfirmed`. `unpushed`
   counts commits on no remote (without remotes, commits not on local
-  `main`/`master`). `missing` is true when the folder is gone.
+  `main`/`master`). `detached` counts commits reachable from no branch and no
+  remote when HEAD is detached, else 0 (always 0 when `missing`). It blocks
+  removal. Ignore rules include your own `core.excludesFile`. `missing` is true when the folder is gone.
 - `task remove`: `{projectId,checkoutId,path,branch,removed}`. It never uses
   `--force` and always keeps the branch. A task checkout whose folder was
   deleted by hand can still be removed: `missing` is `true` and removal only
@@ -747,7 +750,7 @@ Refusals use these codes:
   or `realpath` is not installed.
 - `GIT_BUSY`: another operation on the repository held the lock for more than 75 s.
 - `AUTH_REQUIRED`: the remote needs credentials; run `git fetch` once in a terminal.
-- `GIT_TIMEOUT`: Git did not finish in time.
+- `GIT_TIMEOUT`: Git did not finish in time. Nothing is deleted after a timeout.
 - `GIT_ERROR`: any other Git failure, with Git's first error line.
 - `NO_REMOTE`: fetch with no remote.
 - `NO_UPSTREAM`: pull on a branch that tracks nothing, or a detached HEAD.
@@ -757,8 +760,9 @@ Refusals use these codes:
 - `BRANCH_EXISTS`: a local branch of that name exists.
 - `NO_DEFAULT_BRANCH`: no remote default, `main` or `master` to start from.
 - `PATH_EXISTS`: the target folder already exists.
-- `REGISTER_FAILED`: the checkout was created but could not be registered; the
-  recovery names the folder.
+- `REGISTER_FAILED`: the checkout was created (or Git stopped after creating
+  its folder, for example in a slow `post-checkout` hook) but could not be
+  registered; the recovery names the folder and how to register or remove it.
 - `PRIMARY_CHECKOUT`: removal of the main checkout was requested.
 - `CHECKOUT_DIRTY`: uncommitted or untracked changes.
 - `CHECKOUT_BUSY`: a protected action run exists for the checkout.
