@@ -161,15 +161,13 @@ Item {
     onTriggered: {
       if (client.captureActive || !client.acceptanceUnknown || client.autoChecksDone >= 3 || client.autoChecksDone >= client.autoCheckDelays.length)
         return
-      if (client.pending) {
-        autoTimer.interval = client.autoInterval()
-        autoTimer.start()
-        return
-      }
-      client.autoLookupGeneration = client.generation
-      client.autoLookup = true
+      // A busy client still uses up this check, so the schedule always ends.
       client.autoChecksDone++
-      client.checkEnvironmentActivation()
+      if (!client.pending) {
+        client.autoLookupGeneration = client.generation
+        client.autoLookup = true
+        client.checkEnvironmentActivation()
+      }
       if (client.autoChecksDone < 3 && client.autoChecksDone < client.autoCheckDelays.length && client.acceptanceUnknown) {
         autoTimer.interval = client.autoInterval()
         autoTimer.start()

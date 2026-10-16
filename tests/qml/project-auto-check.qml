@@ -293,10 +293,186 @@ ShellRoot {
           t.equal(calls.filter(function (call) {
             return call.method === 'startAnotherEnvironment'
           }).length, 0, 'Start another is never called automatically')
-          t.done()
+          roleGuardCase()
         })
       })
     })
   }
-  Component.onCompleted: startCase()
+  // Closed windows, display-only views and id-less operations never re-check; reopening does.
+  function roleGuardCase(): void {
+    var before = root.opens.length
+    details.windowOpen = false
+    details.operation = roleOperation('op-c')
+    t.step(250, function () {
+      t.equal(root.opens.length, before, 'role: a closed window never re-checks')
+      details.windowOpen = true
+      t.waitFor(function () {
+        return root.opens.length === before + 1
+      }, 2000, 'role: reopening the window schedules the check', function () {
+        details.displayOnly = true
+        details.operation = roleOperation('op-d')
+        t.step(250, function () {
+          t.equal(root.opens.length, before + 1, 'role: a display-only view never re-checks')
+          details.displayOnly = false
+          t.waitFor(function () {
+            return root.opens.length === before + 2
+          }, 2000, 'role: leaving display-only schedules the check', function () {
+            var noId = roleOperation('')
+            delete noId.id
+            details.operation = noId
+            t.step(250, function () {
+              t.equal(root.opens.length, before + 2, 'role: an operation without an id is skipped')
+              neverAnsweredCase()
+            })
+          })
+        })
+      })
+    })
+  }
+  // A lookup that never answers still ends the schedule after three firings.
+  function neverAnsweredCase(): void {
+    var client = uncertainStart()
+    t.waitFor(function () {
+      return client.autoChecksDone === 3 && !client.autoChecking
+    }, 2000, 'bounded: the schedule ends without answers', function () {
+      t.equal(callsOf(client, 'environmentActivation').length, 1, 'bounded: only one lookup was ever sent')
+      neverLaunched(client, 'bounded')
+      actions.submissionUncertain = false
+      root.runCalls = []
+      actions.pending = true
+      actions.submissionUncertain = true
+      t.waitFor(function () {
+        return actions.autoChecksDone === 3 && !actions.autoChecking
+      }, 2000, 'bounded: the run schedule ends while busy', function () {
+        t.equal(root.runCalls.length, 0, 'bounded: a busy client sends no check')
+        actions.pending = false
+        actions.submissionUncertain = false
+        surfaceCase('project')
+      })
+    })
+  }
+  // Two projects with two checkouts each, to switch between.
+  function surfaceState(project: string, checkout: string): var {
+    var checkouts = [
+      {
+        id: 'c-1',
+        path: '/one',
+        branch: 'main'
+      },
+      {
+        id: 'c-2',
+        path: '/two',
+        branch: 'fix'
+      }
+    ]
+    return {
+      roots: [],
+      ignored: [],
+      projects: [
+        {
+          id: 'p-a',
+          name: 'A',
+          tools: {},
+          workspaceMode: 'dedicated',
+          lastCheckoutId: project === 'p-a' ? checkout : 'c-1',
+          checkouts: checkouts
+        },
+        {
+          id: 'p-b',
+          name: 'B',
+          tools: {},
+          workspaceMode: 'dedicated',
+          lastCheckoutId: 'c-1',
+          checkouts: checkouts
+        }
+      ]
+    }
+  }
+  // Switching project or checkout, or closing the window, stops both clients through the real surface.
+  function surfaceCase(kind: string): void {
+    var presentation = entry
+    presentation.projectController.captureActive = true
+    presentation.projectController.state = surfaceState('p-a', 'c-1')
+    presentation.projectId = 'p-a'
+    presentation.opened = true
+    var client = presentation.projectClient, run = presentation.actionClient
+    client.captureActive = false
+    run.captureActive = false
+    client.autoCheckDelays = [50, 100, 150]
+    run.autoCheckDelays = [50, 100, 150]
+    client.acceptanceUnknown = false
+    run.submissionUncertain = false
+    var held = []
+    var reads = []
+    client.runner = function (argv, done) {
+      held.push({
+        method: argv[2],
+        done: done
+      })
+    }
+    run.runner = function (argv, input, done) {
+      reads.push(argv[1])
+    }
+    client.startEnvironment({
+      projectId: 'p-a',
+      checkoutId: 'c-1',
+      profileId: 'f-one',
+      profileRevision: 1,
+      activationId: activation
+    })
+    held[0].done(1, '', 'acknowledgement lost')
+    run.submissionTarget = {
+      projectId: 'p-a',
+      checkoutId: 'c-1',
+      actionId: 'a-00000000-0000-4000-8000-000000000001'
+    }
+    run.requestId = 'req-00000000-0000-4000-8000-000000000001'
+    run.submissionUncertain = true
+    root.accepted = 0
+    t.waitFor(function () {
+      return held.length === 2 && reads.length >= 1
+    }, 2000, kind + ': first checks arrive', function () {
+      var lookups = held.length, snapshots = run.autoChecksDone
+      if (kind === 'project')
+        presentation.projectId = 'p-b'
+      else if (kind === 'checkout')
+        presentation.projectController.state = surfaceState('p-a', 'c-2')
+      else
+        presentation.opened = false
+      t.check(!client.autoChecking, kind + ': surface stops the lookups')
+      t.check(!run.autoChecking, kind + ': surface stops the run checks')
+      held[1].done(0, found(), '')
+      t.equal(root.accepted, 0, kind + ': a late answer acknowledges nothing')
+      t.step(300, function () {
+        t.equal(held.length, lookups, kind + ': no further lookups')
+        t.equal(run.autoChecksDone, snapshots, kind + ': no further run checks')
+        if (kind === 'project')
+          surfaceCase('checkout')
+        else if (kind === 'checkout')
+          surfaceCase('close')
+        else
+          t.done()
+      })
+    })
+  }
+  Projects.ProjectsPresentation {
+    id: entry
+    windowEnabled: false
+  }
+  FloatingWindow {
+    visible: true
+    implicitWidth: 1080
+    implicitHeight: 720
+    Projects.ProjectsSurface {
+      id: surface
+      anchors.fill: parent
+      root: entry
+    }
+  }
+  Component.onCompleted: {
+    entry.gitClient.captureActive = true
+    entry.activityClient.captureActive = true
+    entry.projectController.captureActive = true
+    startCase()
+  }
 }

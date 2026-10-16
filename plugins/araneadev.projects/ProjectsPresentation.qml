@@ -19,6 +19,11 @@ Item {
   readonly property bool inert: captureActive || !!captureSaved
   // Whether the host should display the Projects window.
   property bool opened: false
+  // Closing the window ends every automatic check; they only ever read.
+  onOpenedChanged: if (!opened) {
+    projectClient.stopAutoCheck()
+    actionClient.stopAutoCheck()
+  }
   // Current Projects destination retained for typed capture fixtures.
   property string section: 'projects'
   // Optional opaque details destination, empty for the Projects overview.

@@ -262,10 +262,10 @@ ColumnLayout {
   property var autoRoleQueue: []
   // Queue the roles whose one automatic re-check is now allowed.
   function scanAutoReobserve(): void {
-    if (displayOnly || !windowOpen || !operation)
+    if (displayOnly || !windowOpen || !operation || !operation.id)
       return
     ['editor', 'terminal', 'agent'].forEach(function (role) {
-      var key = (operation.id || '') + ':' + role
+      var key = operation.id + ':' + role
       if (autoReobserved[key] || !recoveryAllowed(role, 'reobserve'))
         return
       autoReobserved[key] = true
@@ -291,7 +291,7 @@ ColumnLayout {
       var next = details.autoRoleQueue[0]
       details.autoRoleQueue = details.autoRoleQueue.slice(1)
       // A reobserve only reads; it never launches a window.
-      if (next && !details.displayOnly && details.windowOpen && !details.pending && next.key === (details.operation && (details.operation.id || '') + ':' + next.role))
+      if (next && !details.displayOnly && details.windowOpen && !details.pending && !!details.operation && !!details.operation.id && next.key === details.operation.id + ':' + next.role)
         details.recover(next.role, 'reobserve')
       if (details.autoRoleQueue.length) {
         roleAutoTimer.interval = details.roleAutoDelay
@@ -303,7 +303,13 @@ ColumnLayout {
   onWindowOpenChanged: if (!windowOpen) {
     roleAutoTimer.stop()
     autoRoleQueue = []
-  }
+  } else
+    scanAutoReobserve()
+  onDisplayOnlyChanged: if (displayOnly) {
+    roleAutoTimer.stop()
+    autoRoleQueue = []
+  } else
+    scanAutoReobserve()
   // Explicit recovery requests do not retry ordinary Open automatically.
   function recover(role: string, kind: string): void {
     if (displayOnly || pending || !openAvailable || !project || !recoveryAllowed(role, kind))

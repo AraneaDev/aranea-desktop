@@ -182,10 +182,10 @@ Item {
       if (client.captureActive || !client.submissionUncertain || client.autoChecksDone >= 3 || client.autoChecksDone >= client.autoCheckDelays.length)
         return
       // Reading the snapshot is the receipt recovery path; a run id may not exist yet.
-      if (!client.pending && !client.submitting) {
-        client.autoChecksDone++
+      // A busy client still uses up this check, so the schedule always ends.
+      client.autoChecksDone++
+      if (!client.pending && !client.submitting)
         client.refresh()
-      }
       if (client.autoChecksDone < 3 && client.autoChecksDone < client.autoCheckDelays.length) {
         autoTimer.interval = client.autoInterval()
         autoTimer.start()

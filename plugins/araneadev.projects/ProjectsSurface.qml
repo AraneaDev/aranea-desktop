@@ -705,6 +705,13 @@ Item {
     }
   }
   Connections {
+    target: panel.root
+    function onSelectedCheckoutIdChanged() {
+      panel.root.projectClient.stopAutoCheck()
+      panel.root.actionClient.stopAutoCheck()
+    }
+  }
+  Connections {
     target: projectsPage
     function onSelectedProjectChanged() {
       panel.root.projectClient.stopAutoCheck()
