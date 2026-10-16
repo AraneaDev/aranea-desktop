@@ -480,7 +480,34 @@ ShellRoot {
       return !field.visible && host.registryReads > reads
     }, 3000, 'the form closes and the registry refreshes', function () {
       t.equal(host.starts.length, 0, 'creating never launches')
-      removeFlow()
+      createFromLinkedFlow()
+    })
+  }
+  // Catch a new task being proved against the selected linked checkout, which may be gone, instead of the main one.
+  function createFromLinkedFlow() {
+    var header = t.findChild(surface, 'projectHeader')
+    host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 2)
+    host.gitCalls = []
+    var newTask = t.findChild(header, 'headerNewTask')
+    t.waitFor(function () {
+      return newTask.visible
+    }, 3000, 'New task is offered on a linked checkout', function () {
+      newTask.clicked()
+      var field = t.findChild(surface, 'projectTaskBranch')
+      field.text = 'feat/second'
+      t.findChild(surface, 'projectTaskCreate').clicked()
+      t.equal(host.gitCalls.length, 1, 'Create sends one command from a linked checkout')
+      t.equal(host.gitCalls[0].argv.slice(1), ['task-create', '--project', 'p-a', '--checkout', 'c-p', '--branch', 'feat/second', '--json'], 'Create names the main checkout, not the selected one')
+      host.answer(0, {
+        ok: true,
+        data: {
+          checkoutId: 'c-new2'
+        },
+        error: null
+      })
+      t.waitFor(function () {
+        return !field.visible
+      }, 3000, 'the form closes', removeFlow)
     })
   }
   // Catch removal that skips the check, the focused card or the unpushed confirmation flag.
@@ -561,7 +588,35 @@ ShellRoot {
         })
         t.waitFor(function () {
           return surface.removeTarget === null
-        }, 3000, 'the card closes again', inertChecks)
+        }, 3000, 'the card closes again', captureMidRunFlow)
+      })
+    })
+  }
+  // Catch a capture that drops a running removal check and leaves the card stuck checking.
+  function captureMidRunFlow() {
+    var header = t.findChild(surface, 'projectHeader')
+    host.show([host.project('p-a', 'c-l'), host.project('p-b', 'c-p')], 'p-a', 5)
+    host.gitCalls = []
+    var remove = t.findChild(header, 'headerRemoveTask')
+    t.waitFor(function () {
+      return remove.visible
+    }, 3000, 'Remove is offered before the capture', function () {
+      remove.clicked()
+      t.check(surface.removeChecking && !!surface.removeTarget, 'the check is running')
+      var reads = host.registryReads
+      entry.captureActive = true
+      entry.captureActive = false
+      t.check(!surface.removeChecking && surface.removeTarget === null && surface.removeFacts === null, 'a capture clears the removal card state')
+      t.waitFor(function () {
+        return host.registryReads > reads
+      }, 3000, 'the registry refreshes after the capture', function () {
+        host.answer(0, {
+          ok: true,
+          data: {},
+          error: null
+        })
+        t.check(surface.removeTarget === null, 'the dropped completion changes nothing')
+        inertChecks()
       })
     })
   }

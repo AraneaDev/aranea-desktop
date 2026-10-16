@@ -18,6 +18,10 @@ Item {
   property var slot: null
   // The one accepted run, or null: {operation, projectId, checkoutId, token}.
   readonly property var pending: slot
+  // Milliseconds a helper may stay silent before the run is reported as timed out.
+  property int watchdogInterval: 150000
+  // Settles the accepted run as timed out; set per run, null when idle.
+  property var expire: null
   // Latest envelope per [operation, project, checkout]: {ok, data, error}.
   property var results: ({})
   // Emitted once per accepted run with the parsed envelope.
@@ -66,9 +70,19 @@ Item {
       // qmllint enable signal-handler-parameters
     }
   }
+  // One watchdog covers the accepted run so a silent helper cannot hold the slot forever.
+  Timer {
+    id: watchdog
+    interval: commands.watchdogInterval
+    repeat: false
+    onTriggered: if (commands.expire)
+      commands.expire()
+  }
   onCaptureActiveChanged: {
     epoch++
     slot = null
+    expire = null
+    watchdog.stop()
   }
   // JSON tuples avoid ambiguous separator collisions in exact opaque IDs.
   function resultKey(operation, projectId, checkoutId) {
@@ -96,10 +110,18 @@ Item {
     }
     var runEpoch = epoch
     slot = run
-    var complete = function (code, text, diagnostics) {
+    var settle = function (response) {
       if (commands.slot !== run || commands.epoch !== runEpoch || commands.captureActive)
         return
+      watchdog.stop()
+      commands.expire = null
       commands.slot = null
+      commands.results = Object.assign({}, commands.results, {
+        [commands.resultKey(operation, projectId, checkoutId)]: response
+      })
+      commands.finished(operation, projectId, checkoutId, response)
+    }
+    var complete = function (code, text, diagnostics) {
       var response = null
       try {
         response = JSON.parse(text)
@@ -115,11 +137,20 @@ Item {
             recovery: 'Retry.'
           }
         }
-      commands.results = Object.assign({}, commands.results, {
-        [commands.resultKey(operation, projectId, checkoutId)]: response
-      })
-      commands.finished(operation, projectId, checkoutId, response)
+      settle(response)
     }
+    expire = function () {
+      settle({
+        ok: false,
+        data: null,
+        error: {
+          code: 'GIT_TIMEOUT',
+          message: 'The Git helper did not answer in time.',
+          recovery: 'Retry.'
+        }
+      })
+    }
+    watchdog.restart()
     var argv = [backendPath, operation, '--project', projectId, '--checkout', checkoutId].concat(extra || [], ['--json'])
     try {
       runner(argv, complete)

@@ -578,6 +578,16 @@ Item {
       return false
     return root.gitCommands.run(operation, project.id, checkoutId, extra || [])
   }
+  // Start a new task from the selected project's main checkout, never the selected one.
+  function runTaskCreate(branch) {
+    var project = projectsPage.selectedProject
+    if (root.inert || !project)
+      return false
+    var primary = (project.checkouts || []).find(function (c) {
+      return c.primary
+    })
+    return !!primary && root.gitCommands.run('task-create', project.id, primary.id, ['--branch', branch])
+  }
   // Open the removal card and run the dry-run check for one linked checkout.
   function requestTaskRemove(projectId, checkoutId) {
     if (root.inert)
@@ -610,6 +620,16 @@ Item {
   }
   Connections {
     target: panel.root.gitCommands
+    // A capture drops running Git work without a completion, so forget what waited on it.
+    function onEpochChanged() {
+      panel.taskFormError = null
+      panel.removeTarget = null
+      panel.removeFacts = null
+      panel.removeError = null
+      panel.removeChecking = false
+      if (!panel.root.inert)
+        panel.root.projectController.refresh()
+    }
     function onFinished(operation, projectId, checkoutId, response) {
       var project = projectsPage.selectedProject
       if (operation === 'fetch' || operation === 'pull') {
@@ -913,7 +933,7 @@ Item {
                   pointerGate: pointerGate
                   onCreateRequested: function (branch) {
                     panel.taskFormError = null
-                    panel.runGit('task-create', ['--branch', branch])
+                    panel.runTaskCreate(branch)
                   }
                   onCancelled: {
                     panel.taskFormProjectId = ''
