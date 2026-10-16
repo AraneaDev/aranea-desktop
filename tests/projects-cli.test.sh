@@ -45,6 +45,7 @@ case "$1 $2" in
     [[ "$CLI_MODE" != wrongtarget ]] || checkout=another-checkout
     jq -cn --arg project "$project" --arg checkout "$checkout" --arg state "$state" --arg outcome "$outcome" '{id:"op-123-1",projectId:$project,checkoutId:$checkout,sessionId:"s1",generation:1,state:$state,outcome:(if $outcome=="null" then null else $outcome end),steps:[{id:"editor",status:"observed"},(if $outcome=="observed" then {id:"terminal",status:"observed"} else {id:"terminal",status:"failed",code:"TOOL_MISSING"} end)],error:null}' ;;
   'shell summon') echo ok ;;
+  'shell toggle') [[ "$CLI_MODE" != noswitch ]] || exit 1; echo ok ;;
   'aranea.projects.capture captureSnapshot')
     if [[ "$CLI_MODE" == details ]]; then
       jq -cn --arg id "$CLI_PROJECT" '{opened:true,projectId:$id,ui:null}'
@@ -122,6 +123,15 @@ run_cli 1 projects details "$project"
 jq -se 'last.code=="DETAILS_UNCONFIRMED" and last.data.accepted' "$events" >/dev/null
 CLI_MODE=details run_cli 0 projects details "$project"
 jq -se --arg id "$project" 'any(.[]; .[0:3]==["shell","summon","araneadev.projects"] and (.[3]|fromjson).projectId==$id)' "$CLI_CALLS" >/dev/null
+# Quick switcher: toggles the shell component with the switcher payload.
+run_cli 0 projects switch
+jq -se 'any(.[]; . == ["shell","toggle","araneadev.projects","{\"mode\":\"switcher\"}"])' "$CLI_CALLS" >/dev/null
+jq -se 'last.operation=="projects.switch" and last.status=="observed" and last.message=="Quick switcher opened." and last.data=={}' "$events" >/dev/null
+run_cli 0 capabilities
+jq -se 'last.data.operations | any(.[]; .name=="projects.switch" and .arguments=={})' "$events" >/dev/null
+CLI_MODE=noswitch run_cli 1 projects switch
+jq -se 'last.code=="OWNER_UNAVAILABLE"' "$events" >/dev/null
+run_cli 2 projects switch extra
 CLI_MODE=compositor run_cli 1 projects open "$project"
 jq -se 'last.code=="COMPOSITOR_UNAVAILABLE"' "$events" >/dev/null
 CLI_MODE=choice run_cli 3 projects open "$project"

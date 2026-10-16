@@ -204,6 +204,7 @@ projects_cli_capabilities() {
 {"name":"projects.configure","arguments":{"projectId":{"type":"string","required":true},"name":{"type":"string"},"editor":{"type":"string","enum":["code","nvim"]},"terminal":{"type":"string","enum":["alacritty","kitty","foot","ghostty"]},"workspace":{"type":"string","enum":["dedicated","current"]},"open-roles":{"type":"string","description":"Nonempty distinct comma-separated subset of editor,terminal,agent; normalized to canonical order"}}},
 {"name":"projects.relocate","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string","required":true},"path":{"type":"string","required":true}}},
 {"name":"projects.remove","arguments":{"projectId":{"type":"string","required":true}}},
+{"name":"projects.switch","arguments":{}},
 {"name":"projects.open","arguments":{"projectId":{"type":"string","required":true},"checkout":{"type":"string"},"separate":{"type":"boolean"},"use-current-workspace":{"type":"boolean"},"roles":{"type":"string","description":"Nonempty distinct comma-separated subset of editor,terminal,agent; normalized to canonical order"},"agent":{"type":"string","enum":["claude","codex"],"description":"Choose a provider for agent launches; requires requested agent. Retry/reobserve must target agent; reobserve retains the prior launch provider"},"new-window":{"type":"string","enum":["editor","terminal","agent"],"description":"Includes the target role; agent defaults to agent-only unless roles is explicit"},"retry-role":{"type":"string","enum":["editor","terminal","agent"]},"reobserve-role":{"type":"string","enum":["editor","terminal","agent"]}}},
 {"name":"projects.profiles.list","arguments":{"projectId":{"type":"string","required":true}},"readOnly":true},
 {"name":"projects.profiles.save","arguments":{"projectId":{"type":"string","required":true},"definition":{"type":"object","required":true,"description":"JSON profile with name, canonical roles, tools; existing profiles include id and require expected-profile-revision. No checkout override."},"expected-profile-revision":{"type":"integer","description":"Positive saved revision; omit for a new draft"}}},
@@ -309,7 +310,7 @@ projects_cli_main() {
       esac
       shift
       ;;
-    list | ignored | discover | register | ignore | unignore | desktop) ;;
+    list | ignored | discover | register | ignore | unignore | desktop | switch) ;;
     *) projects_cli_usage ;;
   esac
   while (($#)); do
@@ -398,6 +399,11 @@ projects_cli_main() {
     projects_cli_snapshot
     [[ "$command" != operation ]] || projects_cli_observe
     projects_cli_finish observed '' 'Current owner observations.' "$cli_snapshot"
+  fi
+  if [[ "$command" == switch ]]; then
+    projects_cli_require omarchy-shell timeout
+    projects_cli_ipc shell toggle araneadev.projects '{"mode":"switcher"}' >/dev/null || projects_cli_fail OWNER_UNAVAILABLE 'The quick switcher could not be opened.' 'Activate Aranea and retry.'
+    projects_cli_finish observed '' 'Quick switcher opened.' '{}'
   fi
   projects_cli_require flock realpath
   case "$command" in register | ignore | relocate | open | discover) projects_cli_require git ;;
