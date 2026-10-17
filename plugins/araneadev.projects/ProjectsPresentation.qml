@@ -251,6 +251,7 @@ Item {
   ProjectReviewClient {
     id: reviewClient
     active: root.opened
+    timed: root.opened && !!root.view && root.view.section === 'overview'
     captureActive: root.inert
     projectId: gitClient.projectId
     checkoutId: gitClient.checkoutId

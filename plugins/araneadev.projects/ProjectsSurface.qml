@@ -660,7 +660,8 @@ Item {
     var snapshot = root.activityClient.snapshot || {}
     var tasks = Review.tasksFor(snapshot.tasks || [], project.id, checkout.id)
     var entry = root.reviewClient.reviews[checkout.id] || {}
-    var data = entry.data && entry.data.projectId === project.id ? entry.data : null
+    var mine = entry.projectId === project.id
+    var data = mine && entry.data && entry.data.projectId === project.id ? entry.data : null
     var state = Review.reviewState(checkout, tasks, data)
     if (state !== 'ready')
       return {
@@ -673,7 +674,7 @@ Item {
     var client = root.actionClient
     var running = root.gitCommands.pending
     var stored = reviewActionError
-    var mine = !!stored && stored.projectId === project.id && stored.checkoutId === checkout.id
+    var storedMine = !!stored && stored.projectId === project.id && stored.checkoutId === checkout.id
     var terminal = (project.tools || {}).terminalId || (root.projectController.tools.defaults || {}).terminalId || ''
     return {
       state: state,
@@ -687,7 +688,7 @@ Item {
       pushPending: !!running && running.operation === 'push' && running.projectId === project.id && running.checkoutId === checkout.id,
       pushBlocked: !!running,
       markPending: root.projectController.pending,
-      error: (mine ? stored.error : null) || entry.error || root.reviewClient.diffError || null
+      error: (storedMine ? stored.error : null) || (mine ? entry.error : null) || root.reviewClient.diffError || null
     }
   }
   // Run the project's check action in the selected checkout; one press, one run.
@@ -711,8 +712,8 @@ Item {
   function pushReviewBranch() {
     if (reviewModel.state !== 'ready')
       return
-    reviewActionError = null
-    runGit('push')
+    if (runGit('push'))
+      reviewActionError = null
   }
   // Record that this head and this task time were reviewed.
   function markReviewed() {

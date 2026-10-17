@@ -390,14 +390,33 @@ ShellRoot {
       var item = t.findChild(host.card(), name)
       t.check(!!item && !Problems.bannedIn(item.text) && item.text.indexOf(String.fromCharCode(8212)) < 0, name + ' has no banned word or em dash')
     })
-    successFlow()
+    refusedPushFlow()
+  }
+  // A push that cannot start leaves the earlier failure on screen.
+  function refusedPushFlow() {
+    host.answerReviews(null)
+    var before = host.gitCalls.length
+    t.check(surface.runGit('fetch'), 'a fetch starts')
+    host.button('reviewPush').clicked()
+    t.equal(host.gitCalls.length, before + 1, 'the refused push sent nothing')
+    t.equal(t.findChild(host.card(), 'reviewProblem').problem.details.code, 'PUSH_REJECTED', 'a refused push keeps the earlier push failure')
+    host.gitCalls[before].done(0, JSON.stringify({
+      ok: true,
+      data: {},
+      error: null
+    }), '')
+    t.waitFor(function () {
+      return host.reviewCalls.some(function (c) {
+        return !c.answered
+      })
+    }, 3000, 'the fetch re-reads the review', successFlow)
   }
   // A successful push re-reads the review.
   function successFlow() {
     host.answerReviews(null)
     host.reviewCalls = []
     host.button('reviewPush').clicked()
-    host.gitCalls[1].done(0, JSON.stringify({
+    host.gitCalls[host.gitCalls.length - 1].done(0, JSON.stringify({
       ok: true,
       data: {
         projectId: 'p-a',
@@ -508,8 +527,25 @@ ShellRoot {
       return problem.visible && problem.problem.details.code === 'NO_DEFAULT_BRANCH'
     }, 3000, 'the read failure shows', function () {
       t.check(host.button('reviewRemove').visible && host.button('reviewRemove').enabled, 'Remove stays available')
-      workingFlow()
+      otherProjectFlow()
     })
+  }
+  // Review state saved for another project's checkout of the same id is never shown here.
+  function otherProjectFlow() {
+    entry.reviewClient.diffError = null
+    entry.reviewClient.reviews = {
+      'c-l': {
+        projectId: 'p-other',
+        data: null,
+        error: {
+          code: 'NO_DEFAULT_BRANCH',
+          message: 'No default branch to compare with.',
+          recovery: ''
+        }
+      }
+    }
+    t.check(!t.findChild(host.card(), 'reviewProblem').visible, "another project's read failure is not shown")
+    workingFlow()
   }
   // Working and needs-input show a line instead of the card.
   function workingFlow() {
@@ -526,7 +562,25 @@ ShellRoot {
         host.setTasks([host.task('ready-for-review', 400)])
         t.waitFor(function () {
           return host.card().visible
-        }, 3000, 'the card returns when the agent finishes', longFlow)
+        }, 3000, 'the card returns when the agent finishes', timerFlow)
+      })
+    })
+  }
+  // The timed re-read runs on Overview only.
+  function timerFlow() {
+    host.answerReviews(null)
+    entry.reviewClient.refreshInterval = 100
+    surface.section = 'agents'
+    host.reviewCalls = []
+    t.step(500, function () {
+      t.equal(host.reviewCalls.length, 0, 'no timed re-read away from Overview')
+      surface.section = 'overview'
+      t.waitFor(function () {
+        return host.reviewCalls.length > 0
+      }, 3000, 'the timed re-read runs on Overview', function () {
+        host.answerReviews(null)
+        entry.reviewClient.refreshInterval = 600000
+        longFlow()
       })
     })
   }

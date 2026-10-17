@@ -222,8 +222,8 @@ for terminal in kitty alacritty foot ghostty; do
     [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
     sleep .02
   done
-  tail_actual=$(jq -Rsc 'split("\n")[:-1][-5:]' "$ARANEA_TEST_SANDBOX/argv")
-  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-C",$cwd,"diff",$r]')
+  tail_actual=$(jq -Rsc 'split("\n")[:-1][-9:]' "$ARANEA_TEST_SANDBOX/argv")
+  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-c","core.pager=less","-C",$cwd,"diff","--no-ext-diff","--no-textconv",$r]')
   [[ "$tail_actual" == "$tail_expected" ]] || {
     echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
     exit 1
@@ -250,5 +250,48 @@ refuse_raw "$(diff_request "$checkout/nested")" CHECKOUT_INVALID
 refuse_raw "$(diff_request | jq -c '.extra="x"')" INVALID_LAUNCH
 refuse_raw "$(diff_request | jq -c '.argv=["kitty","x","y"]')" INVALID_LAUNCH
 refuse_raw "$(diff_request | jq -c 'del(.terminalId)')" INVALID_LAUNCH
+# Repository config never runs: a diff.external marker script is not executed by the real git.
+real_bin="$ARANEA_TEST_SANDBOX/realbin"
+mkdir -p "$real_bin"
+ln -s /bin/bash "$real_bin/bash"
+ln -s "$(command -v git)" "$real_bin/git"
+cat >"$real_bin/kitty" <<'APP'
+#!/bin/bash
+shift 4
+exec "$@"
+APP
+chmod +x "$real_bin/kitty"
+repo="$ARANEA_TEST_SANDBOX/repo"
+mkdir -p "$repo"
+git_env=(GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t)
+env "${git_env[@]}" git -C "$repo" init -q
+echo one >"$repo/f"
+env "${git_env[@]}" git -C "$repo" add f
+env "${git_env[@]}" git -C "$repo" commit -q -m one
+echo two >"$repo/f"
+env "${git_env[@]}" git -C "$repo" commit -q -am two
+base=$(git -C "$repo" rev-parse HEAD~1)
+printf '#!/bin/sh\n: > "%s/external-ran"\n' "$ARANEA_TEST_SANDBOX" >"$ARANEA_TEST_SANDBOX/external.sh"
+chmod +x "$ARANEA_TEST_SANDBOX/external.sh"
+git -C "$repo" config diff.external "$ARANEA_TEST_SANDBOX/external.sh"
+# Control: without the guard flags the same config does run the marker script.
+git -C "$repo" --no-pager diff "$base...HEAD" >/dev/null 2>&1 || true
+[[ -f "$ARANEA_TEST_SANDBOX/external-ran" ]] || {
+  echo "Control failed: the marker script should run without --no-ext-diff"
+  exit 1
+}
+rm -f "$ARANEA_TEST_SANDBOX/external-ran"
+jq -cn --arg p "$repo" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+result=$(diff_request "$repo" "$base" kitty | PATH="$real_bin" "$launcher") || {
+  echo "Expected real diff acceptance, got: $result"
+  exit 1
+}
+sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+sleep 1
+[[ ! -f "$ARANEA_TEST_SANDBOX/external-ran" ]] || {
+  echo "diff.external ran from repository config"
+  exit 1
+}
+accepted=$((accepted + 1))
 echo "PASS Open diff: four terminals accepted, malformed mergeBase, unregistered path, unknown terminal and extra fields refused"
 echo "PASS $accepted accepted launches, $refused refusals: all terminal/provider shapes, basename-sensitive shims, editor/resume shapes and canonical safe PATH"

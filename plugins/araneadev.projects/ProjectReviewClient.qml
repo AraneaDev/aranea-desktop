@@ -9,6 +9,10 @@ Item {
   id: client
   // Visibility permits reads, never accepted work.
   property bool active: false
+  // The timed re-read runs only while the Overview is showing.
+  property bool timed: false
+  // Milliseconds between timed re-reads.
+  property int refreshInterval: 10000
   // Capture invalidates callbacks as well as refusing new native work.
   property bool captureActive: false
   // Selected project and checkout, bound by the owner.
@@ -19,7 +23,7 @@ Item {
   property var tasks: []
   // The shared Git command client; a finished fetch, pull or push re-reads the review.
   property var commands: null
-  // checkoutId to {data, error}; a failed read keeps the last good data.
+  // checkoutId to {projectId, data, error}; a failed read keeps the last good data.
   property var reviews: ({})
   // Fixed deployed helper paths; values never pass through a shell.
   property string backendPath: Aranea.RuntimePaths.projectGitPath
@@ -131,9 +135,9 @@ Item {
     }
   }
   Timer {
-    interval: 10000
+    interval: client.refreshInterval
     repeat: true
-    running: client.active && !client.captureActive
+    running: client.active && client.timed && !client.captureActive
     onTriggered: client.refreshSelected()
   }
   Connections {
@@ -198,6 +202,8 @@ Item {
         } catch (e) {}
         var valid = response && response.ok === true && response.data && response.data.projectId === read.projectId && response.data.checkoutId === read.checkoutId
         var previous = client.reviews[read.checkoutId] || {}
+        if (previous.projectId !== read.projectId)
+          previous = {}
         var failure = response && response.ok === false && response.error && typeof response.error.code === 'string' ? response.error : {
           code: 'READ_FAILED',
           message: diagnostics || 'The review could not be read.',
@@ -205,6 +211,7 @@ Item {
         }
         client.reviews = Object.assign({}, client.reviews, {
           [read.checkoutId]: {
+            projectId: read.projectId,
             data: valid ? response.data : previous.data || null,
             error: valid ? null : failure
           }
