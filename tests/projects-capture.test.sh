@@ -18,6 +18,8 @@ printf '%s\n' "$*" >>"$ARANEA_TEST_SANDBOX/calls"
   echo 'omarchy-shell is not running' >&2
   exit 1
 }
+# Closing an open panel before the capture is the only other shell call.
+[[ "$1 $2" != "shell hide" ]] || exit 0
 [[ "$1" == aranea.projects.capture ]] || exit 1
 snapshot='{"opened":false,"mode":"","section":"projects","projectId":"p-real"}'
 ready='{"ready":true,"readOnly":true}'
@@ -78,8 +80,11 @@ for surface in projects project-overview project-problem project-switcher projec
   grep -Fxq "aranea.projects.capture captureRestore $snapshot" "$log"
   grep -Fq 'workspace = "7"' "$log"
   grep -Fq 'window = "address:0xabc"' "$log"
+  # Open panels (the notification center, the menu) are closed before the window is shown.
+  (($(line '^shell hide araneadev.notifications$') < $(line captureBegin)))
+  (($(line '^shell hide araneadev.menu$') < $(line captureBegin)))
   # Only the capture transaction: no open, refresh, summon or settings call.
-  [[ "$(grep -cv '^hyprctl \|^grim$\|^aranea.projects.capture capture' "$log")" == 0 ]]
+  [[ "$(grep -cv '^hyprctl \|^grim$\|^aranea.projects.capture capture\|^shell hide araneadev\.\(notifications\|menu\)$' "$log")" == 0 ]]
   rm "$out/$surface.png"
 done
 [[ "$(node "$repo_root/tools/project-capture-fixture.mjs" project-overview | jq -r .mode)" == "" ]]

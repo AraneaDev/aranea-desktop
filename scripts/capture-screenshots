@@ -526,6 +526,11 @@ capture_inert_surface() (
     return "$failed"
   }
   trap 'restore_inert_capture || exit 3' EXIT
+  # A panel left open (for example the notification center) would show behind the window.
+  local panel
+  for panel in araneadev.notifications araneadev.menu; do
+    omarchy-shell shell hide "$panel" >/dev/null 2>&1 || true
+  done
   answer="$(omarchy-shell "$target" captureBegin "$fixture" 2>/dev/null || true)"
   if [[ "$answer" != ok ]]; then
     printf '%s capture fixture refused: %s\n' "$label" "$answer" >&2
