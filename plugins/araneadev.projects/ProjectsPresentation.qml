@@ -277,6 +277,21 @@ Item {
     repeat: true
     onTriggered: root.refreshActions()
   }
+  // A selection switch clears the snapshot; read the new one once both identities settle.
+  Connections {
+    target: actionClient
+    function onProjectIdChanged() {
+      root.refreshActionsSoon()
+    }
+    function onCheckoutIdChanged() {
+      root.refreshActionsSoon()
+    }
+  }
+  // Coalesces the project and checkout changes of one switch into one read.
+  function refreshActionsSoon() {
+    if (actionClient.observationActive)
+      Qt.callLater(root.refreshActions)
+  }
   // Explicit snapshot/capability refresh never starts a saved command.
   function refreshActions() {
     if (inert || !opened || !actionClient.projectId)

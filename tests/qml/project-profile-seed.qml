@@ -174,6 +174,8 @@ ShellRoot {
         }), '')
         t.step(80, function () {
           t.equal(host.only('profiles-seed').length, 1, 'a seeded project is not requested again')
+          t.equal(t.findChild(header, 'projectBlockedReason').text, 'No default profile could be made. Add a profile to start.', 'a seed that made nothing says why')
+          t.check(!t.findChild(header, 'projectRefreshTools').visible, 'no Refresh for a seed that made nothing')
           failure()
         })
       })
@@ -197,20 +199,55 @@ ShellRoot {
         return t.findChild(header, 'projectRetrySeed').visible
       }, 3000, 'retry offered', function () {
         t.check(!t.findChild(header, 'projectPrimaryStart').enabled, 'Start stays disabled after a failed seed')
+        t.equal(t.findChild(header, 'projectSeedError').text, "Couldn't prepare a default profile.", 'a failed seed says so plainly')
+        t.equal(t.findChild(header, 'projectRetrySeed').text, 'Retry', 'a failed seed offers Retry')
         t.findChild(header, 'projectRetrySeed').clicked()
         t.waitFor(function () {
           return host.only('profiles-seed').length === 3
         }, 3000, 'retry sends one more request', function () {
+          // A probe that could not run is not the same as "no tools installed".
           host.callbacks.shift()(1, JSON.stringify({
             ok: false,
             error: {
-              code: 'INTERNAL',
-              message: 'seed boom'
+              code: 'PROBE_FAILED',
+              message: "Couldn't check which tools are installed.",
+              recovery: 'Check again.'
             }
           }), '')
           t.waitFor(function () {
             return t.findChild(header, 'projectRetrySeed').visible
-          }, 3000, 'retry offered again', fallback)
+          }, 3000, 'retry offered again', function () {
+            t.equal(t.findChild(header, 'projectSeedError').text, "Couldn't check which tools are installed.", 'a failed probe says so plainly')
+            t.equal(t.findChild(header, 'projectRetrySeed').text, 'Check again', 'a failed probe offers Check again')
+            t.equal(t.findChild(header, 'projectBlockedReason').text, '', 'no install hint after a failed probe')
+            var problem = t.findChild(surface, 'projectsPageProblem')
+            t.check(!!problem, 'page problem block exists')
+            t.equal(problem.problem, null, 'a seed failure shows in the header only, not the page box')
+            t.check(!t.findChild(surface, 'projectsPageNote').visible, 'nor as a plain page note')
+            var switcher = t.findChild(surface, 'projectSwitcher')
+            t.equal(switcher.loadProblem, null, 'nor in the quick switcher')
+            // Another project selected: the seed failure still belongs to its own header only.
+            var failedRecord = projectsPageProject('p-fail')
+            host.show([failedRecord, host.project('p-b', [host.editor('f-b', 'VS Code', 'code')])], 'p-b', 4)
+            t.step(60, function () {
+              t.equal(surface.selectedSeedFailure, null, 'project B has no seed failure of its own')
+              t.check(!!surface.seedFailures['p-fail'], 'project A keeps its seed failure')
+              t.equal(problem.problem, null, 'no page box for another project\'s seed failure')
+              t.check(!t.findChild(surface, 'projectsPageNote').visible, 'no page note for another project\'s seed failure')
+              t.equal(switcher.loadProblem, null, 'no switcher problem for another project\'s seed failure')
+              // Any other registry error still uses the page box and the switcher.
+              entry.projectController.error = 'The registry changed since the supplied revision.'
+              entry.projectController.errorObject = {
+                code: 'REGISTRY_CONFLICT',
+                message: 'The registry changed since the supplied revision.'
+              }
+              t.check(!!problem.problem && problem.problem.kind === 'changed', 'other registry errors still show the page box')
+              t.check(!!switcher.loadProblem && switcher.loadProblem.kind === 'changed', 'other registry errors still show in the switcher')
+              entry.projectController.error = ''
+              entry.projectController.errorObject = null
+              fallback()
+            })
+          })
         })
       })
     })
@@ -293,6 +330,41 @@ ShellRoot {
       })
     })
   }
+  // A seed that made a profile the user later removed gives no "could not be made" reason.
+  function removedAfterSeed() {
+    var header = t.findChild(surface, 'projectHeader')
+    entry.projectController.tools = host.codeOnly
+    host.show([host.project('p-rm', [])], 'p-rm', 11)
+    t.waitFor(function () {
+      return surface.seedingProjectId === 'p-rm'
+    }, 3000, 'removal project seeds', function () {
+      host.callbacks.shift()(0, JSON.stringify({
+        ok: true,
+        state: {
+          revision: 12,
+          projects: [host.project('p-rm', [host.editor('f-rm', 'VS Code', 'code')])],
+          roots: [],
+          ignored: []
+        }
+      }), '')
+      t.waitFor(function () {
+        return surface.seedingProjectId === '' && !!projectsPageProject('p-rm') && (projectsPageProject('p-rm').profiles || []).length === 1
+      }, 3000, 'seed made a profile', function () {
+        // The user removes every profile afterwards.
+        host.show([host.project('p-rm', [])], 'p-rm', 13)
+        t.step(60, function () {
+          t.equal(t.findChild(header, 'projectBlockedReason').text, '', 'no "could not be made" reason after removing a seeded profile')
+          t.done()
+        })
+      })
+    })
+  }
+  // The registry's current record of one project.
+  function projectsPageProject(id) {
+    return (entry.projectController.state.projects || []).find(function (p) {
+      return p.id === id
+    })
+  }
   // Refresh in the no-tools state seeds again once tools appear.
   function refreshReseeds() {
     var header = t.findChild(surface, 'projectHeader')
@@ -319,7 +391,16 @@ ShellRoot {
         t.waitFor(function () {
           return host.only('profiles-seed').length === before + 1
         }, 3000, 'Refresh seeds again', function () {
-          t.done()
+          host.callbacks.shift()(0, JSON.stringify({
+            ok: true,
+            state: {
+              revision: 10,
+              projects: [host.project('p-nt', [host.editor('f-nt', 'VS Code', 'code')])],
+              roots: [],
+              ignored: []
+            }
+          }), '')
+          removedAfterSeed()
         })
       })
     })

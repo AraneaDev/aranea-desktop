@@ -573,17 +573,30 @@ Item {
   readonly property bool startOwnsError: panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError
   // Project the automatic checks belong to; only a different project ends them.
   property string autoCheckProjectId: ''
-  // Projects whose last seed request failed (id → true).
+  // Projects whose last seed request failed (id → the store's {code, message} or {}).
   property var seedFailures: ({})
-  // Record or clear one project's seed failure.
-  function setSeedFailure(projectId, failed) {
+  // Record (an error object, or {} when nothing came back) or clear (null) one project's seed failure.
+  function setSeedFailure(projectId, failure) {
     var next = Object.assign({}, seedFailures)
-    if (failed)
-      next[projectId] = true
+    if (failure)
+      next[projectId] = failure
     else
       delete next[projectId]
     seedFailures = next
   }
+  // The selected project's seed failure, or null.
+  readonly property var selectedSeedFailure: projectsPage.selectedProject ? seedFailures[projectsPage.selectedProject.id] || null : null
+  // A probe that could not run differs from "no tools installed"; say which.
+  readonly property bool seedProbeFailed: !!selectedSeedFailure && selectedSeedFailure.code === 'PROBE_FAILED'
+  // The registry error is a stored seed failure of any project; only that project's header shows it.
+  readonly property bool seedOwnsRegistryError: {
+    var current = root.projectController.errorObject, failures = seedFailures
+    return !!current && Object.keys(failures).some(function (id) {
+      return failures[id] === current
+    })
+  }
+  // Registry error text for the page box, without one the header already shows.
+  readonly property string pageRegistryError: seedOwnsRegistryError ? '' : root.projectController.error
   // Ask the backend once per session to save defaults for a project without profiles.
   function requestSeed(projectId) {
     var client = root.projectController
@@ -597,13 +610,13 @@ Item {
     var next = Object.assign({}, seededProjects)
     next[projectId] = true
     seededProjects = next
-    setSeedFailure(projectId, false)
+    setSeedFailure(projectId, null)
     seedingProjectId = projectId
     if (!client.request('profiles-seed', {
       projectId: projectId
     })) {
       seedingProjectId = ''
-      setSeedFailure(projectId, true)
+      setSeedFailure(projectId, {})
     }
   }
   // Seed the selected project when it has no profiles and was not asked yet.
@@ -614,8 +627,20 @@ Item {
         panel.requestSeed(project.id)
       })
   }
+  // Projects whose finished seed still left them with no profile (id → true).
+  property var seedsMadeNothing: ({})
+  // Record or clear one project's "seed made nothing" result.
+  function setSeedMadeNothing(projectId, empty) {
+    var next = Object.assign({}, seedsMadeNothing)
+    if (empty)
+      next[projectId] = true
+    else
+      delete next[projectId]
+    seedsMadeNothing = next
+  }
   // Forget a failed seed so the next request is allowed, then ask again.
   function retrySeed(projectId) {
+    setSeedMadeNothing(projectId, false)
     var next = Object.assign({}, seededProjects)
     delete next[projectId]
     seededProjects = next
@@ -628,7 +653,8 @@ Item {
       var next = Object.assign({}, seededProjects)
       delete next[project.id]
       seededProjects = next
-      setSeedFailure(project.id, false)
+      setSeedFailure(project.id, null)
+      setSeedMadeNothing(project.id, false)
     }
     root.projectController.refresh()
   }
@@ -947,12 +973,21 @@ Item {
       projectsPage.registryMutationCompleted(action, args, state)
       if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId)
         panel.seedingProjectId = ''
+      // Record what the seed made, not that it was asked for.
+      if (action === 'profiles-seed') {
+        var seeded = ((state || {}).projects || []).find(function (p) {
+          return p.id === args.projectId
+        })
+        panel.setSeedMadeNothing(args.projectId, !!seeded && !(seeded.profiles || []).length)
+      } else if (action === 'profile-save') {
+        panel.setSeedMadeNothing(args.projectId, false)
+      }
       panel.maybeSeedSelected()
     }
     function onMutationFailed(action, args) {
       if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId) {
         panel.seedingProjectId = ''
-        panel.setSeedFailure(args.projectId, true)
+        panel.setSeedFailure(args.projectId, panel.root.projectController.errorObject || {})
       }
     }
     function onPendingChanged() {
@@ -1025,7 +1060,7 @@ Item {
       displayOnly: panel.root.inert
       pointerGate: pointerGate
       systemBusy: panel.switcherPending
-      loadProblem: panel.root.projectController.error || panel.root.projectController.errorObject ? Problems.problem(panel.root.projectController.errorObject || {
+      loadProblem: !panel.seedOwnsRegistryError && (panel.root.projectController.error || panel.root.projectController.errorObject) ? Problems.problem(panel.root.projectController.errorObject || {
         message: panel.root.projectController.error
       }, {
         surface: 'switcher',
@@ -1197,7 +1232,9 @@ Item {
                     panel.root.startProfile(id, revision, false)
                   }
                   seeding: panel.seedingProjectId !== '' && !!projectsPage.selectedProject && panel.seedingProjectId === projectsPage.selectedProject.id
-                  seedError: projectsPage.selectedProject && panel.seedFailures[projectsPage.selectedProject.id] ? "Couldn't prepare a default profile." : ''
+                  seedError: !panel.selectedSeedFailure ? '' : panel.seedProbeFailed ? "Couldn't check which tools are installed." : "Couldn't prepare a default profile."
+                  seedRetryLabel: panel.seedProbeFailed ? 'Check again' : 'Retry'
+                  seedMadeNothing: !!projectsPage.selectedProject && !!panel.seedsMadeNothing[projectsPage.selectedProject.id]
                   onRefreshToolsRequested: panel.refreshTools()
                   onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')
@@ -1337,9 +1374,9 @@ Item {
                   windowOpen: !!panel.root.opened
                   metadataPending: panel.root.navigationSaving
                   pending: panel.root.projectController.pending || panel.root.projectController.reading
-                  error: panel.root.projectController.error || (panel.startOwnsError ? '' : panel.root.projectClient.error)
+                  error: panel.pageRegistryError || (panel.startOwnsError ? '' : panel.root.projectClient.error)
                   extraErrorObject: panel.root.projectController.extraErrorObject
-                  errorObject: panel.root.projectController.errorObject || (!panel.root.projectController.error && !panel.startOwnsError && panel.root.projectClient.error ? {
+                  errorObject: (panel.seedOwnsRegistryError ? null : panel.root.projectController.errorObject) || (!panel.pageRegistryError && !panel.startOwnsError && panel.root.projectClient.error ? {
                       message: panel.root.projectClient.error
                     } : null)
                   pointerGate: pointerGate

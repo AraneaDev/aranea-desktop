@@ -74,6 +74,25 @@ test("overview picks prefer root test, dev and build", () => {
   assert.deepEqual(plain(S.overviewPicks([])), [])
 })
 
+test("overview falls back to the first two detected rows when none is a test, dev or build", () => {
+  const rows = [
+    row("package.json", ".", "lint", ["npm", "run", "lint"]),
+    row("package.json", ".", "format", ["npm", "run", "format"]),
+    row("package.json", ".", "typecheck", ["npm", "run", "typecheck"])
+  ]
+  assert.deepEqual(plain(S.overviewPicks(rows).map((r) => r.entry)), ["lint", "format"])
+  assert.deepEqual(plain(S.overviewPicks(rows.slice(0, 1)).map((r) => r.entry)), ["lint"])
+  // A matching pick keeps the narrow choice; other scripts are not added.
+  assert.deepEqual(
+    plain(
+      S.overviewPicks([rows[0], row("package.json", ".", "test", ["npm", "run", "test"])]).map(
+        (r) => r.entry
+      )
+    ),
+    ["test"]
+  )
+})
+
 test("add plan respects the per-project limit", () => {
   const rows = [1, 2, 3].map((n) => row("makefile", ".", `t${n}`, ["make", `t${n}`]))
   assert.deepEqual(plain(S.addPlan(rows, 0)).capacity, 50)

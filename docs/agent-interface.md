@@ -320,8 +320,9 @@ Registration saves default profiles (VS Code, Terminal + Agent, Neovim and
 Terminal, each only when its tools are installed). `profiles seed` saves them
 for a project that has none; it never changes a project that already has
 profiles. Its result reports `seeded` and, when 0, `reason`
-(`HAS_PROFILES` or `NO_SUPPORTED_TOOLS`). Saving a profile never launches
-anything. To save a custom profile:
+(`HAS_PROFILES` or `NO_SUPPORTED_TOOLS`). When the check for installed tools
+itself fails or times out, the seed fails with `PROBE_FAILED` and saves
+nothing. Saving a profile never launches anything. To save a custom profile:
 
 ```bash
 aranea projects profiles save PROJECT_ID --definition '{"name":"Focus","roles":["editor","terminal"],"tools":{"editorId":"code","terminalId":"kitty","agentId":null}}' --json

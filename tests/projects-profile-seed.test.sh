@@ -53,6 +53,29 @@ expect "$TMPDIR/presets" '' '. == [{name:"VS Code",roles:["editor"],tools:{edito
 jq -n --argjson tools '{"editors":[],"terminals":[],"agents":[]}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
 expect "$TMPDIR/presets" '' '. == []' 'no tools, no presets'
 
+# One tool-ID list: the shared jq module names exactly what aranea-project-tools probes, per group.
+ids_module="$repo_root/scripts/lib/project-tool-ids.jq"
+[[ -f $ids_module ]] || {
+  echo 'FAIL: scripts/lib/project-tool-ids.jq is missing' >&2
+  exit 1
+}
+module_ids=$(jq -nr 'include "project-tool-ids" {search: "'"$repo_root/scripts/lib"'"}; tool_ids | [.[][]] | sort | join(" ")')
+probed_ids=$(sed -nE 's/^for id in (.*); do$/\1/p' "$repo_root/scripts/aranea-project-tools" | tr ' ' '\n' | sort | paste -sd' ')
+[[ -n $probed_ids && $module_ids == "$probed_ids" ]] || {
+  echo "FAIL: tool IDs drifted: module [$module_ids] probe [$probed_ids]" >&2
+  exit 1
+}
+for id in $probed_ids; do fake_tool "$id"; done
+PATH="$tools:$minbin" "$repo_root/scripts/aranea-project-tools" --json >"$TMPDIR/probe"
+jq -e --argjson ids "$(jq -nc 'include "project-tool-ids" {search: "'"$repo_root/scripts/lib"'"}; tool_ids')" \
+  '(.editors|map(.id)|sort) == ($ids.editors|sort) and (.terminals|map(.id)|sort) == ($ids.terminals|sort) and (.agents|map(.id)|sort) == ($ids.agents|sort)' "$TMPDIR/probe" >/dev/null ||
+  {
+    echo 'FAIL: probe groups differ from the shared tool IDs' >&2
+    jq . "$TMPDIR/probe" >&2
+    exit 1
+  }
+rm -f "$tools"/*
+
 # Bad probe IDs never become drafts the store would refuse.
 jq -n --argjson tools '{"editors":[{"id":"code;rm","available":true,"supported":true},{"id":7,"available":true,"supported":true}],"terminals":[{"id":7,"available":true,"supported":true},{"id":null,"available":true,"supported":true},"junk"],"agents":[{"id":["claude"],"available":true,"supported":true}],"defaults":{"terminalId":7}}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
 expect "$TMPDIR/presets" '' '. == []' 'bad probe IDs yield no drafts'
@@ -111,7 +134,38 @@ for f in "$minbin"/*; do [[ $(basename "$f") == timeout ]] || ln -sf "$(readlink
 three=$(repo three)
 jq -cn --arg p "$three" '{action:"register",args:{paths:[$p]}}' | PATH="$tools:$nobin" "$store" mutate >"$TMPDIR/out"
 expect "$TMPDIR/out" '' '.ok==true' 'probe failure tolerated'
-expect "$TMPDIR/out" "$(project_of "$three")" '.state.projects[]|select(.id==$p)|.profiles==[]' 'probe failure seeds nothing'
+p3=$(project_of "$three")
+expect "$TMPDIR/out" "$p3" '.state.projects[]|select(.id==$p)|.profiles==[]' 'probe failure seeds nothing'
+
+# An explicit seed whose probe fails says so instead of looking like "no tools", and changes nothing.
+registry_before=$(cat "$ARANEA_STATE_ROOT/projects.json")
+status=0
+jq -cn --arg p "$p3" '{action:"profiles-seed",args:{projectId:$p}}' | PATH="$tools:$nobin" "$store" mutate >"$TMPDIR/out" || status=$?
+[[ $status != 0 ]] || {
+  echo 'FAIL: a failed probe must fail the seed' >&2
+  exit 1
+}
+expect "$TMPDIR/out" "Couldn't check which tools are installed." '.ok==false and .error.code=="PROBE_FAILED" and .error.message==$p and .error.recovery=="Check again."' 'failed probe refuses the seed'
+[[ $(cat "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]] || {
+  echo 'FAIL: a failed probe changed the registry' >&2
+  exit 1
+}
+# The public CLI passes the failed tool check through unchanged.
+status=0
+PATH="$tools:$nobin" "$cli" projects profiles seed "$p3" --json >"$TMPDIR/cli" || status=$?
+[[ $status != 0 ]] || {
+  echo 'FAIL: the CLI must fail a seed whose tool check failed' >&2
+  exit 1
+}
+jq -es --arg m "Couldn't check which tools are installed." '.[-1].status=="failed" and .[-1].code=="PROBE_FAILED" and .[-1].message==$m and .[-1].data.recovery=="Check again."' "$TMPDIR/cli" >/dev/null || {
+  echo 'FAIL: the CLI hides PROBE_FAILED' >&2
+  cat "$TMPDIR/cli" >&2
+  exit 1
+}
+[[ $(cat "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]] || {
+  echo 'FAIL: a failed probe through the CLI changed the registry' >&2
+  exit 1
+}
 
 # Backfill through the public CLI once tools exist.
 PATH="$tools:$minbin" "$cli" projects profiles seed "$p2" --json >"$TMPDIR/cli"
