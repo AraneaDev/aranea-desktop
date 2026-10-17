@@ -10,6 +10,9 @@ store="$repo_root/scripts/aranea-project-store"
 export ARANEA_STATE_ROOT="$ARANEA_TEST_SANDBOX/state"
 result="$TMPDIR/result.json"
 failures=0
+# Lock holders started by cases; killed at exit even when a case fails early.
+lock_holder_pids="$TMPDIR/lock-holders"
+sandbox_on_exit 'while read -r pid; do kill "$pid" 2>/dev/null || true; done <"$lock_holder_pids" 2>/dev/null || true'
 # A bare "remote", a clone registered as the project, and a second clone that pushes.
 setup() {
   rm -rf "$ARANEA_STATE_ROOT" "$ARANEA_TEST_SANDBOX/w" "${TMPDIR:?}/bin"
@@ -250,8 +253,7 @@ review_ignores_repository_lock() {
   mkdir -p "$ARANEA_STATE_ROOT/git-locks"
   flock "$ARANEA_STATE_ROOT/git-locks/$key.lock" sleep 12 &
   local holder=$!
-  # shellcheck disable=SC2064
-  trap "kill $holder 2>/dev/null || true" EXIT
+  printf '%s\n' "$holder" >"$lock_holder_pids"
   sleep 0.5
   start=$SECONDS
   ARANEA_GIT_LOCK_SECONDS=2 timeout 8 "$helper" review --project "$project_id" --checkout "$task_id" --json >"$result" || true
