@@ -573,17 +573,21 @@ Item {
   readonly property bool startOwnsError: panel.root.projectClient.acceptanceUnknown || !!panel.root.projectClient.requestError
   // Project the automatic checks belong to; only a different project ends them.
   property string autoCheckProjectId: ''
-  // Projects whose last seed request failed (id → true).
+  // Projects whose last seed request failed (id → the store's {code, message} or {}).
   property var seedFailures: ({})
-  // Record or clear one project's seed failure.
-  function setSeedFailure(projectId, failed) {
+  // Record (an error object, or {} when nothing came back) or clear (null) one project's seed failure.
+  function setSeedFailure(projectId, failure) {
     var next = Object.assign({}, seedFailures)
-    if (failed)
-      next[projectId] = true
+    if (failure)
+      next[projectId] = failure
     else
       delete next[projectId]
     seedFailures = next
   }
+  // The selected project's seed failure, or null.
+  readonly property var selectedSeedFailure: projectsPage.selectedProject ? seedFailures[projectsPage.selectedProject.id] || null : null
+  // A probe that could not run differs from "no tools installed"; say which.
+  readonly property bool seedProbeFailed: !!selectedSeedFailure && selectedSeedFailure.code === 'PROBE_FAILED'
   // Ask the backend once per session to save defaults for a project without profiles.
   function requestSeed(projectId) {
     var client = root.projectController
@@ -597,13 +601,13 @@ Item {
     var next = Object.assign({}, seededProjects)
     next[projectId] = true
     seededProjects = next
-    setSeedFailure(projectId, false)
+    setSeedFailure(projectId, null)
     seedingProjectId = projectId
     if (!client.request('profiles-seed', {
       projectId: projectId
     })) {
       seedingProjectId = ''
-      setSeedFailure(projectId, true)
+      setSeedFailure(projectId, {})
     }
   }
   // Seed the selected project when it has no profiles and was not asked yet.
@@ -628,7 +632,7 @@ Item {
       var next = Object.assign({}, seededProjects)
       delete next[project.id]
       seededProjects = next
-      setSeedFailure(project.id, false)
+      setSeedFailure(project.id, null)
     }
     root.projectController.refresh()
   }
@@ -952,7 +956,7 @@ Item {
     function onMutationFailed(action, args) {
       if (action === 'profiles-seed' && args.projectId === panel.seedingProjectId) {
         panel.seedingProjectId = ''
-        panel.setSeedFailure(args.projectId, true)
+        panel.setSeedFailure(args.projectId, panel.root.projectController.errorObject || {})
       }
     }
     function onPendingChanged() {
@@ -1197,7 +1201,8 @@ Item {
                     panel.root.startProfile(id, revision, false)
                   }
                   seeding: panel.seedingProjectId !== '' && !!projectsPage.selectedProject && panel.seedingProjectId === projectsPage.selectedProject.id
-                  seedError: projectsPage.selectedProject && panel.seedFailures[projectsPage.selectedProject.id] ? "Couldn't prepare a default profile." : ''
+                  seedError: !panel.selectedSeedFailure ? '' : panel.seedProbeFailed ? 'Could not check which tools are installed.' : "Couldn't prepare a default profile."
+                  seedRetryLabel: panel.seedProbeFailed ? 'Check again' : 'Retry'
                   onRefreshToolsRequested: panel.refreshTools()
                   onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')

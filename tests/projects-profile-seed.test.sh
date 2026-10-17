@@ -111,7 +111,22 @@ for f in "$minbin"/*; do [[ $(basename "$f") == timeout ]] || ln -sf "$(readlink
 three=$(repo three)
 jq -cn --arg p "$three" '{action:"register",args:{paths:[$p]}}' | PATH="$tools:$nobin" "$store" mutate >"$TMPDIR/out"
 expect "$TMPDIR/out" '' '.ok==true' 'probe failure tolerated'
-expect "$TMPDIR/out" "$(project_of "$three")" '.state.projects[]|select(.id==$p)|.profiles==[]' 'probe failure seeds nothing'
+p3=$(project_of "$three")
+expect "$TMPDIR/out" "$p3" '.state.projects[]|select(.id==$p)|.profiles==[]' 'probe failure seeds nothing'
+
+# An explicit seed whose probe fails says so instead of looking like "no tools", and changes nothing.
+registry_before=$(cat "$ARANEA_STATE_ROOT/projects.json")
+status=0
+jq -cn --arg p "$p3" '{action:"profiles-seed",args:{projectId:$p}}' | PATH="$tools:$nobin" "$store" mutate >"$TMPDIR/out" || status=$?
+[[ $status != 0 ]] || {
+  echo 'FAIL: a failed probe must fail the seed' >&2
+  exit 1
+}
+expect "$TMPDIR/out" '' '.ok==false and .error.code=="PROBE_FAILED" and .error.message=="Could not check which tools are installed." and .error.recovery=="Check again."' 'failed probe refuses the seed'
+[[ $(cat "$ARANEA_STATE_ROOT/projects.json") == "$registry_before" ]] || {
+  echo 'FAIL: a failed probe changed the registry' >&2
+  exit 1
+}
 
 # Backfill through the public CLI once tools exist.
 PATH="$tools:$minbin" "$cli" projects profiles seed "$p2" --json >"$TMPDIR/cli"

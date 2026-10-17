@@ -141,12 +141,14 @@ projects_registry_relocation_valid() {
   done < <(jq -c --argjson request "$request" '.projects[] | select(.id == $request.args.projectId) | .checkouts[] | select(.id != $request.args.checkoutId) | .path' <<<"$state")
 }
 
-# Default profile drafts from the read-only tool probe; empty on any probe failure.
+# Default profile drafts from the read-only tool probe. A probe that fails,
+# times out or answers with a non-object returns 4; a probe that finds no
+# supported tools prints [].
 projects_registry_presets() {
   local probe
   # shellcheck disable=SC2154 # script_dir is the scripts/ directory set by every sourcing caller
-  probe=$(timeout -k 0.2s 5s "$script_dir/aranea-project-tools" --json </dev/null 2>/dev/null) || probe=''
-  jq -e 'type=="object"' <<<"$probe" >/dev/null 2>&1 || probe='{}'
+  probe=$(timeout -k 0.2s 5s "$script_dir/aranea-project-tools" --json </dev/null 2>/dev/null) || return 4
+  jq -e 'type=="object"' <<<"$probe" >/dev/null 2>&1 || return 4
   jq -cn --argjson tools "$probe" -f "$script_dir/lib/project-presets.jq" 2>/dev/null || printf '[]\n'
 }
 
@@ -160,9 +162,10 @@ projects_registry_preset_ids() {
 }
 
 # Enrich a validated raw request with canonical metadata under the store lock.
-# Return 1 for invalid checkout, 2 for unsafe path, 3 for incompatible grouping.
+# Return 1 for invalid checkout, 2 for unsafe path, 3 for incompatible grouping,
+# 4 when seeding could not check which tools are installed.
 projects_registry_prepare_request() {
-  local request=$1 state=${2:-null} action path metadata checkouts='[]'
+  local request=$1 state=${2:-null} action path metadata checkouts='[]' seed_drafts
   action=$(jq -r '.action' <<<"$request")
   case "$action" in
     environment-register)
@@ -177,7 +180,8 @@ projects_registry_prepare_request() {
       if ! jq -e --argjson state "$state" '.args.projectId as $id | any(($state.projects // [])[]; .id == $id and (.profiles|length) == 0)' <<<"$request" >/dev/null; then
         jq -c '.args.profiles=[]' <<<"$request"
       else
-        jq -c --argjson profiles "$(projects_registry_preset_ids "$(projects_registry_presets)")" '.args.profiles=$profiles' <<<"$request"
+        seed_drafts=$(projects_registry_presets) || return 4
+        jq -c --argjson profiles "$(projects_registry_preset_ids "$seed_drafts")" '.args.profiles=$profiles' <<<"$request"
       fi
       ;;
     profile-save)

@@ -197,20 +197,31 @@ ShellRoot {
         return t.findChild(header, 'projectRetrySeed').visible
       }, 3000, 'retry offered', function () {
         t.check(!t.findChild(header, 'projectPrimaryStart').enabled, 'Start stays disabled after a failed seed')
+        t.equal(t.findChild(header, 'projectSeedError').text, "Couldn't prepare a default profile.", 'a failed seed says so plainly')
+        t.equal(t.findChild(header, 'projectRetrySeed').text, 'Retry', 'a failed seed offers Retry')
         t.findChild(header, 'projectRetrySeed').clicked()
         t.waitFor(function () {
           return host.only('profiles-seed').length === 3
         }, 3000, 'retry sends one more request', function () {
+          // A probe that could not run is not the same as "no tools installed".
           host.callbacks.shift()(1, JSON.stringify({
             ok: false,
             error: {
-              code: 'INTERNAL',
-              message: 'seed boom'
+              code: 'PROBE_FAILED',
+              message: 'Could not check which tools are installed.',
+              recovery: 'Check again.'
             }
           }), '')
           t.waitFor(function () {
             return t.findChild(header, 'projectRetrySeed').visible
-          }, 3000, 'retry offered again', fallback)
+          }, 3000, 'retry offered again', function () {
+            t.equal(t.findChild(header, 'projectSeedError').text, 'Could not check which tools are installed.', 'a failed probe says so plainly')
+            t.equal(t.findChild(header, 'projectRetrySeed').text, 'Check again', 'a failed probe offers Check again')
+            t.equal(t.findChild(header, 'projectBlockedReason').text, '', 'no install hint after a failed probe')
+            var problem = t.findChild(surface, 'projectsPageProblem')
+            t.check(!!problem && problem.problem && problem.problem.body === 'Could not check which tools are installed.', 'the page problem keeps the plain message')
+            fallback()
+          })
         })
       })
     })

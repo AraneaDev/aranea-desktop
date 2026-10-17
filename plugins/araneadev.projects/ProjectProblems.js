@@ -173,9 +173,9 @@ var BODIES = {
 /** @type {{[key:string]:boolean}} */
 var KEEP_MESSAGE = { git: true, notAllowed: true }
 
-/** Codes whose plain backend message names the tool and is kept as the body. */
+/** Codes whose plain backend message is kept as the body: it names the tool, or says the tool check failed. */
 /** @type {{[key:string]:boolean}} */
-var KEEP_CODE_MESSAGE = { AGENT_MISSING: true }
+var KEEP_CODE_MESSAGE = { AGENT_MISSING: true, PROBE_FAILED: true }
 
 /** Git codes worth retrying as they are. */
 /** @type {{[key:string]:boolean}} */

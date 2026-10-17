@@ -61,8 +61,10 @@ ColumnLayout {
   readonly property var profile: Profiles.primary(project, tools)
   // A default-profile seed for this project is in flight.
   property bool seeding: false
-  // Last seed failure for this project, or ''.
+  // Last seed failure for this project in plain words, or ''.
   property string seedError: ''
+  // What the seed retry button says.
+  property string seedRetryLabel: 'Retry'
   // Re-probe installed tools.
   signal refreshToolsRequested
   // Retry saving default profiles.
@@ -245,14 +247,15 @@ ColumnLayout {
     Layout.fillWidth: true
     visible: header.seedError !== '' && !header.displayOnly
     Aranea.UiLabel {
+      objectName: 'projectSeedError'
       Layout.fillWidth: true
-      text: "Couldn't prepare a default profile."
+      text: header.seedError
       color: Aranea.DesignTokens.attention
       wrapMode: Text.WrapAtWordBoundaryOrAnywhere
     }
     Aranea.ActionButton {
       objectName: 'projectRetrySeed'
-      text: 'Retry'
+      text: header.seedRetryLabel
       pointerGate: header.pointerGate
       onClicked: header.retrySeedRequested()
     }
