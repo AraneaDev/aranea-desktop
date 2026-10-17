@@ -8,7 +8,8 @@ connection receipts, retention, association and dismissal.
 ## IPC and clients
 
 `aranea.activity` exposes `snapshot()`, `snapshotPage(token, offset)`,
-`request(json)`, `operation(id)`, `reobserve(id)` and `dismiss(taskId)`. Requests contain exactly `action` and
+`request(json)`, `operation(id)`, `reobserve(id)`, `dismiss(taskId)` and
+`dismissMany(json)`. Requests contain exactly `action` and
 `taskId`; actions are `focus`, `reopen` and `open-checkout`. Acceptance returns
 `{ok,operationId,ownerId,error}`. Read an accepted ID to observe its outcome:
 `observed`, `partial` or `failed`. An owner restart returns `OPERATION_LOST`;
@@ -40,9 +41,16 @@ preparing, moving or focusing anything.
 
 Dismissal also accepts completed review/failure records in connected sessions
 when no unresolved blocker remains. Working tasks and live input requests stay
-protected. Explicit store-lock refusals retry up to three times before a
-mutation; once accepted, only the confirmation read may retry. Transport
-uncertainty never repeats a mutation.
+protected. Explicit store-lock refusals retry three times, after 250, 500 and
+1000 ms, before a mutation; once accepted, only the confirmation read may retry.
+Transport uncertainty never repeats a mutation.
+
+`dismissMany(json)` takes a JSON array of 1 to 700 unique task IDs and removes
+them in one store write (the store's `dismiss-many` action). IDs the store no
+longer has are skipped. Live tasks are kept, by the same rule as `dismiss`.
+The completed operation's `result` has the `removed`, `missing` and `refused`
+counts. Clear inactive in the Tasks panel sends its frozen IDs this way, split
+into sets of at most 16 KB, and reports any kept tasks after the last set.
 
 A launch submission outlives the observation deadline. `submissionPending`
 protects its operation from eviction and repeat submission; unrelated actions

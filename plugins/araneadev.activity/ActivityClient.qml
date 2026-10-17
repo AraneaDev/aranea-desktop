@@ -177,6 +177,14 @@ Item {
   }
   // Explicit dismissal uses the owner's serialized store mutation and ordinary observation.
   function dismiss(taskId: string): bool {
+    return submitDismissal('dismiss', taskId)
+  }
+  // A set of task IDs removed in one store write, observed as one operation.
+  function dismissMany(taskIds: var): bool {
+    return Array.isArray(taskIds) && submitDismissal('dismissMany', JSON.stringify(taskIds))
+  }
+  // Shared submission for one task or a set; the owner validates the argument.
+  function submitDismissal(method: string, argument: string): bool {
     if (captureActive || pending)
       return false
     generation++
@@ -184,7 +192,7 @@ Item {
     ownerId = ''
     currentOperation = null
     pending = true
-    invoke('dismiss', [taskId], function (response) {
+    invoke(method, [argument], function (response) {
       if (!response.ok || !response.operationId) {
         pending = false
         error = response.error

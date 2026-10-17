@@ -59,6 +59,7 @@ ShellRoot {
       sessionId: 'fixture-desktop',
       readStore: storeRuntime.readStore,
       dismiss: storeRuntime.dismiss,
+      dismissMany: storeRuntime.dismissMany,
       readNotificationPolicy: function (done) {
         done({
           available: true,

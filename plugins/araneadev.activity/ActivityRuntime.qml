@@ -125,26 +125,62 @@ Item {
   function readStore(done: var): void {
     json([scriptsPath + '/aranea-agent-store', 'snapshot'], '', done)
   }
+  // Waits before a busy store is tried again, in milliseconds; one entry per retry.
+  readonly property var busyBackoff: [250, 500, 1000]
+  // Runs fn after ms; fixtures replace it to run retries without waiting.
+  property var schedule: function (ms, fn) {
+    var timer = retryTimer.createObject(runtime, {
+      interval: ms
+    })
+    timer.triggered.connect(function () {
+      timer.destroy()
+      if (!runtime.captureActive)
+        fn()
+    })
+    timer.start()
+  }
+  Component {
+    id: retryTimer
+    Timer {}
+  }
   // Confirm successful dismissal using a fresh store read; no provider process is signalled.
   function dismiss(taskId: string, done: var): void {
-    var request = JSON.stringify({
+    mutateVerified({
       action: 'dismiss',
       args: {
         taskId: taskId
       }
-    })
-    // A structured lock refusal occurs before mutation. Transport ambiguity
-    // never retries; after success only readback may be repeated.
+    }, done)
+  }
+  // Remove a whole set in one store write; the reply keeps the store's
+  // per-ID result (removed, missing, refused) next to the confirmation read.
+  function dismissMany(taskIds: var, done: var): void {
+    mutateVerified({
+      action: 'dismiss-many',
+      args: {
+        taskIds: taskIds
+      }
+    }, done)
+  }
+  // One store mutation, then a fresh read. A busy store (a structured lock
+  // refusal, before any write) is retried after busyBackoff waits. Transport
+  // ambiguity never retries; after success only the readback may be repeated.
+  function mutateVerified(payload: var, done: var): void {
+    var request = JSON.stringify(payload)
     function busy(response) {
       return response && !response.ok && response.transportUnconfirmed !== true && response.error && response.error.code === 'ACTIVITY_LOCK_FAILED'
     }
     // Read contention never replays the already acknowledged deletion.
-    function verify(attempt) {
+    function verify(attempt, mutated) {
       readStore(function (response) {
-        if (busy(response) && attempt < 3)
-          Qt.callLater(function () {
-            verify(attempt + 1)
+        if (busy(response) && attempt < runtime.busyBackoff.length)
+          runtime.schedule(runtime.busyBackoff[attempt], function () {
+            verify(attempt + 1, mutated)
           })
+        else if (response && response.ok && mutated.result !== undefined)
+          done(Object.assign({}, response, {
+            result: mutated.result
+          }))
         else
           done(response)
       })
@@ -152,14 +188,14 @@ Item {
     // Repeat only a guaranteed pre-write refusal, with a fixed attempt limit.
     function remove(attempt) {
       json([scriptsPath + '/aranea-agent-store', 'mutate'], request, function (response) {
-        if (busy(response) && attempt < 3)
-          Qt.callLater(function () {
+        if (busy(response) && attempt < runtime.busyBackoff.length)
+          runtime.schedule(runtime.busyBackoff[attempt], function () {
             remove(attempt + 1)
           })
         else if (!response.ok)
           done(response)
         else
-          verify(0)
+          verify(0, response)
       })
     }
     remove(0)

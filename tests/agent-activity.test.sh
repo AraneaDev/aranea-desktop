@@ -271,6 +271,29 @@ completed_history_dismissal() {
   report failure 4 failed >/dev/null
   mutate dismiss '{"taskId":"turn"}' | jq -e '.state.tasks == [] and .state.sessions[0].connection.connected' >/dev/null
 }
+# Clearing many tasks is one locked write; missing IDs are done, live ones refused.
+dismiss_many_one_write() {
+  register >/dev/null
+  begin >/dev/null
+  jq '.tasks[0] as $task | .tasks += [range(141) as $i|$task+{taskId:("done-"+($i|tostring)),reportedState:"finished"}]' "$registry" >"$TMPDIR/fixture"
+  mv "$TMPDIR/fixture" "$registry"
+  local before ids
+  before=$(jq .revision "$registry")
+  ids=$(jq -cn '[range(140) as $i|"done-"+($i|tostring)] + [range(5) as $i|"gone-"+($i|tostring)] + ["turn"]')
+  [[ $(jq length <<<"$ids") == 146 ]]
+  mutate dismiss-many "$(jq -cn --argjson ids "$ids" '{taskIds:$ids}')" >"$TMPDIR/many"
+  jq -e --argjson before "$before" '.ok and .state.revision == $before + 1
+    and (.result.removed|length == 140) and .result.missing == ["gone-0","gone-1","gone-2","gone-3","gone-4"] and .result.refused == ["turn"]
+    and ([.state.tasks[].taskId]|sort) == ["done-140","turn"]' "$TMPDIR/many" >/dev/null
+  jq -e --argjson before "$before" '.revision == $before + 1 and (.tasks|length == 2)' "$registry" >/dev/null
+  cp "$registry" "$TMPDIR/before"
+  mutate dismiss-many '{"taskIds":["gone-0","turn"]}' | jq -e '.ok and .result.removed == [] and .result.missing == ["gone-0"] and .result.refused == ["turn"]' >/dev/null
+  cmp "$registry" "$TMPDIR/before"
+  reject dismiss-many '{"taskIds":[]}' INVALID_REQUEST
+  reject dismiss-many '{"taskIds":["done-140","done-140"]}' INVALID_REQUEST
+  reject dismiss-many '{"taskIds":["done-140"],"extra":1}' INVALID_REQUEST
+  mutate dismiss '{"taskId":"done-140"}' | jq -e '[.state.tasks[].taskId] == ["turn"]' >/dev/null
+}
 # A sandbox provider mapper exercises the production serialization boundary.
 copy_store_without_mapper() {
   local fixture="$TMPDIR/store-copy"
@@ -406,5 +429,5 @@ native_callback_ownership_schema_and_pruning() {
   "$store" snapshot | jq -e '.ok' >/dev/null
   report evict 4 heartbeat | jq -e '.state.sessions[0].nativeMetadata.callbackOwners == [] and (.state.sessions[0].receipts|length == 512)' >/dev/null
 }
-for name in snapshot_contract ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection completed_history_dismissal native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
+for name in snapshot_contract dismiss_many_one_write ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection completed_history_dismissal native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
 ((failures == 0))

@@ -469,7 +469,11 @@ hosting terminal; reopen requires a native UUID and current provider evidence.
 The observer polls for up to 30 seconds. Disconnection, timeout, or interruption
 does not cancel accepted work. Reconnect by operation ID; `--reobserve` checks
 that same operation without submitting another action. Dismissal is serialized
-through the desktop owner where required.
+through the desktop owner where required. The store's `dismiss-many` mutation
+(`{"action":"dismiss-many","args":{"taskIds":[...]}}`) removes a set in one
+write. It skips IDs it no longer has, keeps live tasks, and reports
+`result.removed`, `result.missing` and `result.refused`. The Tasks panel's Clear
+inactive uses it.
 
 Register reads one producer-epoch object on stdin; report reads one event.
 For example, after assigning an absolute checkout path to `checkout_path`:

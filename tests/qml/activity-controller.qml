@@ -18,6 +18,8 @@ ShellRoot {
   property bool loseTerminal: false
   // Store refusal and success exercise serialized dismissal without process effects.
   property bool allowDismiss: false
+  // ID sets the owner sent to the store for a set dismissal.
+  property var manyRequests: []
   // Injected wall time independent of real heartbeat clocks.
   property double now: 2000
   // Retained task fixture has one exact registered checkout.
@@ -134,6 +136,23 @@ ShellRoot {
             }
           })
         },
+        dismissMany: function (ids, done) {
+          root.manyRequests = root.manyRequests.concat([ids])
+          done({
+            ok: true,
+            state: {
+              schemaVersion: 1,
+              revision: 3,
+              tasks: [owner.storeState.tasks[1]],
+              sessions: []
+            },
+            result: {
+              removed: ['t1'],
+              missing: ['gone'],
+              refused: []
+            }
+          })
+        },
         validateReobserve: function (op, done) {
           done(true)
         }
@@ -212,11 +231,46 @@ ShellRoot {
               t.equal(owner.operation(dismissed.operationId).outcome, 'observed', 'stale dismissal observes store removal')
               t.equal(owner.snapshot().tasks.length, 0, 'successful dismissal publishes fresh store snapshot')
               t.equal(launched, 1, 'dismissal never terminates or launches a provider')
-              finishCapture()
+              dismissMany()
             })
           })
         })
       })
+    })
+  }
+  // A set of tasks is cleared in one store mutation and one operation.
+  function dismissMany() {
+    owner.storeState = {
+      schemaVersion: 1,
+      revision: 2,
+      tasks: [Object.assign({}, state.tasks[0], {
+          taskId: 't1'
+        }), Object.assign({}, state.tasks[0], {
+          taskId: 't2'
+        })],
+      sessions: []
+    }
+    t.equal(owner.dismissMany([]).error.code, 'INVALID_REQUEST', 'empty set refused')
+    t.equal(owner.dismissMany(['t1', 't1']).error.code, 'INVALID_REQUEST', 'duplicate IDs refused')
+    t.equal(owner.requestJSON('{"action":"dismiss-many","taskIds":["t1"]}').error.code, 'INVALID_REQUEST', 'generic request cannot dismiss')
+    var accepted = owner.dismissMany(['t1', 'gone'])
+    t.check(accepted.ok && !!accepted.operationId, 'set dismissal accepted although one ID is gone')
+    t.step(20, function () {
+      var op = owner.operation(accepted.operationId)
+      t.equal(root.manyRequests, [['t1', 'gone']], 'one store mutation for the whole set')
+      t.equal(op.outcome, 'observed', 'set dismissal observed')
+      t.equal(op.result, {
+        removed: 1,
+        missing: 1,
+        refused: 0
+      }, 'operation reports counts')
+      t.equal(owner.snapshot().tasks.map(function (task) {
+        return task.taskId
+      }), ['t2'], 'store state after the set dismissal published')
+      t.check(owner.ipcSnapshot().operations.every(function (row) {
+        return row.taskIds === undefined && row.task === undefined
+      }), 'IPC snapshot leaves out operation ID lists and task copies')
+      finishCapture()
     })
   }
   // Capture safety is checked after both store-authoritative dismissal outcomes.

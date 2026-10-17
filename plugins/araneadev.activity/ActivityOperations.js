@@ -2,26 +2,44 @@
 
 /** Accept a strict action and coalesce pending requests for the same native session.
  * @param {Array<ActivityOperation>} operations - owner records
- * @param {ActivityOperation} payload - action and taskId only
+ * @param {ActivityOperation} payload - action and taskId only, or
+ *   dismiss-many with taskIds (1 to 700 unique IDs)
  * @param {string} id - new operation identifier
  * @param {string} ownerId - owner lifetime
- * @param {string} sessionKey - provider plus native session identity
+ * @param {string} sessionKey - provider plus native session identity (a set
+ *   dismissal passes its own operation ID, so sets never merge)
  * @returns {ActivityOperation} acceptance with retained operation
  */
 function request(operations, payload, id, ownerId, sessionKey) {
-  if (
-    !payload ||
-    Object.keys(payload).sort().join(",") !== "action,taskId" ||
-    ["focus", "reopen", "open-checkout", "dismiss"].indexOf(payload.action) < 0 ||
-    typeof payload.taskId !== "string" ||
-    !payload.taskId ||
-    payload.taskId.length > 256 ||
-    /^[\s-]/.test(payload.taskId) ||
-    String(payload.taskId)
-      .split("")
-      .some(function (character) {
+  /** Refuse an empty, oversized, option-shaped or control-character task ID.
+   * @param {any} value - candidate task ID
+   * @returns {boolean} true when the ID is not acceptable
+   */
+  var badId = function (value) {
+    return (
+      typeof value !== "string" ||
+      !value ||
+      value.length > 256 ||
+      /^[\s-]/.test(value) ||
+      value.split("").some(function (character) {
         return character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127
       })
+    )
+  }
+  var many = !!payload && payload.action === "dismiss-many"
+  if (
+    !payload ||
+    (many
+      ? Object.keys(payload).sort().join(",") !== "action,taskIds" ||
+        !Array.isArray(payload.taskIds) ||
+        !payload.taskIds.length ||
+        payload.taskIds.length > 700 ||
+        payload.taskIds.some(function (/** @type {any} */ value, /** @type {number} */ index) {
+          return badId(value) || payload.taskIds.indexOf(value) !== index
+        })
+      : Object.keys(payload).sort().join(",") !== "action,taskId" ||
+        ["focus", "reopen", "open-checkout", "dismiss"].indexOf(payload.action) < 0 ||
+        badId(payload.taskId))
   )
     return {
       ok: false,

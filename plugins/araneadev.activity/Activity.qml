@@ -44,6 +44,14 @@ Item {
     function dismiss(taskId: string): string {
       return JSON.stringify(controller.dismiss(taskId))
     }
+    // JSON array of task IDs, removed in one store write.
+    function dismissMany(json: string): string {
+      var ids = null
+      try {
+        ids = JSON.parse(json)
+      } catch (e) {}
+      return JSON.stringify(controller.dismissMany(ids))
+    }
     function reobserve(id: string): string {
       return JSON.stringify(controller.reobserve(id))
     }
