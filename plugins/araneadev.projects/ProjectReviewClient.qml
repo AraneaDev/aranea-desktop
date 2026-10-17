@@ -39,6 +39,16 @@ Item {
   property var inFlight: null
   // Newest read waiting for the slot.
   property var wanted: null
+  // Registry projects; marked task checkouts with a finished task are kept current in the background.
+  property var projects: []
+  // Milliseconds before a checkout is read again in the background.
+  property int backgroundInterval: 60000
+  // Milliseconds between looks for a background read that is due.
+  property int backgroundTick: 5000
+  // Most checkouts the background list holds.
+  property int backgroundLimit: 12
+  // checkoutId to the time its last read started.
+  property var readAt: ({})
   // Changes whenever the selected checkout's task report changes.
   readonly property string signature: JSON.stringify(Review.tasksFor(tasks, projectId, checkoutId).map(function (t) {
     return [t.id, t.reportedState, t.lastReceivedAt]
@@ -140,6 +150,12 @@ Item {
     running: client.active && client.timed && !client.captureActive
     onTriggered: client.refreshSelected()
   }
+  Timer {
+    interval: client.backgroundTick
+    repeat: true
+    running: client.active && !client.captureActive && client.projects.length > 0
+    onTriggered: client.drain()
+  }
   Connections {
     target: client.commands
     function onFinished(operation, project, checkout) {
@@ -182,14 +198,45 @@ Item {
     drain()
     return true
   }
-  // Start the waiting read when the slot is free.
+  // Marked task checkouts with a finished task, other than the selected one, as read targets.
+  function backgroundList(): var {
+    var out = [];
+    (projects || []).forEach(function (project) {
+      ((project && project.checkouts) || []).forEach(function (checkout) {
+        if (out.length >= backgroundLimit || !checkout || checkout.primary || !checkout.review)
+          return
+        if (project.id === projectId && checkout.id === checkoutId)
+          return
+        if (eligible(project.id, checkout.id))
+          out.push({
+            projectId: project.id,
+            checkoutId: checkout.id
+          })
+      })
+    })
+    return out
+  }
+  // The first background checkout not read within the interval, or null.
+  function dueBackground(): var {
+    var now = Date.now()
+    return backgroundList().filter(function (read) {
+      return !(now - (readAt[read.checkoutId] || 0) < backgroundInterval)
+    })[0] || null
+  }
+  // Start the waiting read when the slot is free; a selected read always goes before a background one.
   function drain() {
-    if (inFlight || !wanted || captureActive || !active)
+    if (inFlight || captureActive || !active)
+      return
+    var next = wanted || dueBackground()
+    if (!next)
       return
     var read = Object.assign({
       epoch: epoch
-    }, wanted)
+    }, next)
     wanted = null
+    readAt = Object.assign({}, readAt, {
+      [read.checkoutId]: Date.now()
+    })
     inFlight = read
     var complete = function (code, text, diagnostics) {
       if (client.inFlight !== read)

@@ -256,6 +256,7 @@ Item {
     projectId: gitClient.projectId
     checkoutId: gitClient.checkoutId
     tasks: (activityClient.snapshot || {}).tasks || []
+    projects: (projectController.state || {}).projects || []
     commands: gitCommands
   }
   // One action observer shared by Overview and full Actions, including receipts.
