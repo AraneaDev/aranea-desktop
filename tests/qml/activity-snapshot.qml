@@ -21,7 +21,7 @@ ShellRoot {
     id: client
     pollInterval: 60000
     runner: function (argv, done) {
-      var reply = argv[2] === 'snapshot' ? JSON.stringify(owner.ipcSnapshot()) : argv[2] === 'snapshotPage' ? JSON.stringify(owner.ipcSnapshotPage(argv[3], Number(argv[4]))) : ''
+      var reply = argv[2] === 'snapshot' ? JSON.stringify(owner.ipcSnapshot()) : argv[2] === 'snapshotPage' ? JSON.stringify(owner.ipcSnapshotPage(argv[3], Number(argv[4]))) : argv[2] === 'task' ? JSON.stringify(owner.ipcTask(argv[3])) : ''
       host.replies.push(reply)
       done(reply ? 0 : 1, reply, '')
     }
@@ -31,6 +31,10 @@ ShellRoot {
     width: 320
     maxHeight: 500
     snapshot: client.snapshot
+    detailTask: client.taskDetails
+    onDetailsNeeded: function (taskId) {
+      client.readTask(taskId)
+    }
   }
   Activity.ActivityController {
     id: owner
@@ -187,9 +191,90 @@ ShellRoot {
     t.equal(client.snapshot.tasks.length, 300, 'client assembles every retained task')
     t.equal(client.snapshot.revision, 11, 'assembled snapshot keeps owner metadata')
     t.check(!client.snapshot.taskPage, 'paging bookkeeping is not part of the snapshot')
-    t.equal(client.snapshot.tasks[299].result, long, 'full result kept for details')
+    var listed = client.snapshot.tasks[299]
+    t.check(listed.preview && listed.result.length === 101 && /…$/.test(listed.result), 'list rows carry a short marked preview')
+    t.equal(listed.diagnostics, [], 'list rows leave diagnostics to details')
     t.equal(view.taskRows.length, 300, 'panel lists every task')
+    t.check(view.openDetails(listed.taskId), 'details open for a listed task')
+    t.equal(view.selectedRow.result, long, 'details read and show the full result')
+    t.equal(view.selectedRow.diagnostics.length, 4096, 'details show the diagnostics')
+    t.equal(host.replies[host.replies.length - 1].indexOf('"ok":true'), 1, 'details read is one small reply')
+    t.check(bytes(host.replies[host.replies.length - 1]) < 64000, 'details reply stays under 64 KB')
+    view.selectedId = ''
+    retentionCap()
+  }
+  // The store's retention cap (700 tasks, 4 KB texts) loads in a few pages.
+  function retentionCap() {
+    var long = 'Long reported result with words. '.repeat(124).slice(0, 4096)
+    var uuid = '12345678-1234-1234-1234-123456789abc'
+    var tasks = []
+    for (var i = 0; i < 700; i++) {
+      var diagnostics = []
+      for (var d = 0; d < 20; d++)
+        diagnostics.push({
+          summary: long,
+          receivedAt: 900
+        })
+      tasks.push({
+        taskId: 'claude:' + uuid.slice(0, 32) + (1000 + i),
+        provider: 'claude',
+        providerSessionId: uuid,
+        producerEpoch: uuid,
+        reportedState: 'ready-for-review',
+        description: long,
+        result: long,
+        question: '',
+        blockers: [],
+        diagnostics: diagnostics,
+        verification: {
+          status: 'unknown',
+          summary: '',
+          commands: []
+        },
+        association: {
+          status: 'registered',
+          projectId: 'project-' + uuid,
+          checkoutId: 'checkout-' + uuid,
+          cwd: '/home/user/work/some-project/checkout-' + i
+        },
+        lastReceivedAt: 900,
+        source: 'native'
+      })
+    }
+    owner.storeState = {
+      schemaVersion: 1,
+      revision: 13,
+      tasks: tasks,
+      sessions: [
+        {
+          provider: 'claude',
+          providerSessionId: uuid,
+          producerEpoch: uuid,
+          connection: {
+            connected: false,
+            receivedAt: 900
+          },
+          provenance: null,
+          nativeMetadata: {
+            currentTaskId: null,
+            turns: []
+          }
+        }
+      ]
+    }
+    host.replies = []
+    client.refresh()
+    t.equal(client.snapshot.tasks.length, 700, 'every task at the retention cap loads')
+    t.check(host.replies.length <= 10, 'retention cap loads in at most 10 replies (' + host.replies.length + ')')
+    t.check(host.replies.every(function (reply) {
+      return bytes(reply) < 64000
+    }), 'every reply at the retention cap stays under 64 KB')
+    boundedHeaderAfterCap()
+  }
+  // Unknown page tokens and task IDs are refused, then the header bound runs.
+  function boundedHeaderAfterCap() {
     t.equal(owner.ipcSnapshotPage('stale-token', 1).error.code, 'SNAPSHOT_EXPIRED', 'unknown page token refused')
+    t.equal(owner.ipcTask('missing').error.code, 'TASK_NOT_FOUND', 'details of an unknown task refused')
     boundedHeader()
   }
   // Many retained operations and a largest-size row still fit the first reply.

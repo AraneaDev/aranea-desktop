@@ -35,6 +35,10 @@ Item {
     function snapshotPage(token: string, offset: int): string {
       return JSON.stringify(controller.ipcSnapshotPage(token, offset))
     }
+    // One task in full; snapshot rows are previews.
+    function task(taskId: string): string {
+      return JSON.stringify(controller.ipcTask(taskId))
+    }
     function request(json: string): string {
       return JSON.stringify(controller.requestJSON(json))
     }

@@ -8,7 +8,7 @@ connection receipts, retention, association and dismissal.
 ## IPC and clients
 
 `aranea.activity` exposes `snapshot()`, `snapshotPage(token, offset)`,
-`request(json)`, `operation(id)`, `reobserve(id)`, `dismiss(taskId)` and
+`task(taskId)`, `request(json)`, `operation(id)`, `reobserve(id)`, `dismiss(taskId)` and
 `dismissMany(json)`. Requests contain exactly `action` and
 `taskId`; actions are `focus`, `reopen` and `open-checkout`. Acceptance returns
 `{ok,operationId,ownerId,error}`. Read an accepted ID to observe its outcome:
@@ -24,14 +24,22 @@ Quickshell drops IPC replies above about 110 KB, so a snapshot is paged. Each
 reply stays under 60 KB. `snapshot()` returns the owner fields, the first task
 rows and `taskPage: {token, total}`. `snapshotPage(token, offset)` returns the
 next rows of the same read, or `SNAPSHOT_EXPIRED` once the owner has dropped
-that read (it keeps the last four). Task rows keep what the Tasks views show:
-the first 4096 characters of each text and of the joined diagnostics and
-blocker questions. A row with long multibyte text everywhere is cut shorter to
-stay under 32 KB. IPC snapshots leave out sessions. Their `operations` are
+that read (it keeps the last four). Task rows are short previews marked
+`preview: true`: the first 100 characters of the description, result and
+question (a cut ends with "…"), blocker IDs, the verification status and no
+diagnostics. So even the retention cap of 700 tasks loads in about ten
+replies. `task(taskId)` returns one task in full for the details view: the
+first 4096 characters of each text and of the joined diagnostics and blocker
+questions, cut shorter to stay under 32 KB when the text is long multibyte
+text everywhere. IPC snapshots leave out sessions. Their `operations` are
 the open and protected ones plus each task's latest outcome, cut to the fields
 the Tasks views read, in at most 16 KB; `operation(id)` returns a full record.
-`ActivityClient.refresh()` reads every page before it replaces `snapshot`. A
-failed page keeps the last snapshot.
+`ActivityClient.refresh()` reads every page before it replaces `snapshot`, and
+fills preview rows back to the usual shape. A refresh asked for while pages are
+loading runs once after them instead of starting over. A failed page keeps the
+last snapshot. `readTask(taskId)` fills `taskDetails`; `AgentTasks` asks its
+host for it (`detailsNeeded`) when a preview row is opened, and again after
+each new report.
 
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,

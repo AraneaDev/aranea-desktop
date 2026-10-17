@@ -375,3 +375,40 @@ test("last report age and received time stay independent from freshness, lifecyc
     /clock ahead/
   )
 })
+test("details use the full task text only while it matches the listed report", () => {
+  assert.equal(typeof logic.withDetails, "function", "details merge exists")
+  const listed = task("t", "failed", {
+    preview: true,
+    result: "short…",
+    diagnostics: [],
+    lastReceivedAt: 5
+  })
+  const detail = {
+    ...listed,
+    preview: undefined,
+    reportedState: "working",
+    result: "full result",
+    diagnostics: [{ summary: "full diagnostics" }],
+    question: "q",
+    blockers: [],
+    verification: { status: "reported-fail", summary: "tests", commands: ["make"] }
+  }
+  const merged = logic.withDetails(listed, detail)
+  assert.equal(merged.result, "full result")
+  assert.equal(merged.reportedState, "failed", "state comes from the list")
+  assert.equal(merged.preview, undefined, "merged row no longer asks for details")
+  const row = logic.rows({ tasks: [merged] }, registry)[0]
+  assert.equal(row.diagnostics, "full diagnostics")
+  assert.equal(row.verificationSummary, "tests")
+  assert.equal(
+    logic.withDetails(listed, { ...detail, lastReceivedAt: 4 }),
+    listed,
+    "older details ignored"
+  )
+  assert.equal(
+    logic.withDetails(listed, { ...detail, taskId: "other" }),
+    listed,
+    "other task ignored"
+  )
+  assert.equal(logic.withDetails(listed, null), listed)
+})

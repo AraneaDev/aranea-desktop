@@ -260,3 +260,47 @@ test("IPC operations keep open, protected and each task's latest outcome within 
   )
   assert.equal(logic.ipcOperations(ops, 300).length >= 1, true, "open work is never dropped")
 })
+
+test("list rows are short previews that expand to the shape every consumer reads", () => {
+  assert.equal(typeof logic.previewTask, "function", "preview rows exist")
+  const long = "word ".repeat(1000)
+  const full = logic.project(
+    {
+      tasks: [
+        {
+          ...task,
+          description: long,
+          result: long,
+          question: "",
+          blockers: [{ blockerId: "b", question: long }],
+          diagnostics: [{ summary: long, receivedAt: 1 }],
+          verification: { status: "reported-pass", summary: long, commands: ["make"] },
+          lastReceivedAt: 1,
+          source: "native"
+        }
+      ],
+      sessions: [session]
+    },
+    2000,
+    registry
+  ).tasks[0]
+  const preview = logic.previewTask(full)
+  assert.equal(preview.preview, true)
+  assert.equal(preview.description.length, 101)
+  assert.ok(preview.description.endsWith("…") && preview.result.endsWith("…"), "cut marked")
+  assert.ok(logic.utf8Length(JSON.stringify(preview)) < 900, "preview row is small")
+  const row = logic.expandPreview(preview)
+  assert.equal(row.question, "")
+  assert.deepEqual(row.diagnostics, [])
+  assert.deepEqual(row.blockers, [{ blockerId: "b", question: "" }])
+  assert.deepEqual(row.verification, { status: "reported-pass", summary: "", commands: [] })
+  assert.equal(row.resumeCommand, full.resumeCommand, "resume command derived again")
+  for (const key of ["taskId", "displayState", "freshness", "association", "lastReceivedAt"])
+    assert.deepEqual(row[key], full[key], key + " kept")
+  const plain = logic.expandPreview(
+    logic.previewTask({ ...full, blockers: [], verification: null })
+  )
+  assert.deepEqual(plain.blockers, [])
+  assert.equal(plain.verification.status, "unknown")
+  assert.equal(logic.expandPreview(full), full, "full rows unchanged")
+})

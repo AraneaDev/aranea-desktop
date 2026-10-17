@@ -53,14 +53,79 @@ ShellRoot {
     calls[8].done(0, '{"ok":true,"operationId":"dismiss-op","ownerId":"o"}', '')
     calls[9].done(0, '{"id":"dismiss-op","ownerId":"o","state":"completed","outcome":"observed"}', '')
     t.equal(client.operationId, 'dismiss-op', 'dismiss acceptance observed by stable ID')
+    // A refresh while later pages load waits for them instead of starting over.
+    client.refresh()
+    var first = calls.length - 1
+    calls[first].done(0, JSON.stringify({
+      ownerId: 'o',
+      revision: 5,
+      tasks: [
+        {
+          taskId: 'a',
+          preview: true
+        }
+      ],
+      operations: [],
+      taskPage: {
+        token: 'read-5',
+        total: 2
+      }
+    }), '')
+    t.equal(calls[first + 1].argv.slice(2), ['snapshotPage', 'read-5', '1'], 'next page requested')
+    client.refresh()
+    client.refresh()
+    t.equal(calls.length, first + 2, 'refresh during paging does not abandon the read')
+    calls[first + 1].done(0, JSON.stringify({
+      ok: true,
+      token: 'read-5',
+      offset: 1,
+      total: 2,
+      tasks: [
+        {
+          taskId: 'b',
+          preview: true
+        }
+      ]
+    }), '')
+    t.equal(client.snapshot.tasks.map(function (task) {
+      return task.taskId
+    }), ['a', 'b'], 'paged read completes')
+    t.equal(client.snapshot.tasks[0].diagnostics, [], 'preview rows expanded to the full shape')
+    t.equal(client.snapshot.tasks[0].verification.status, 'unknown', 'preview verification restored')
+    t.step(30, function () {
+      t.equal(calls.length, first + 3, 'one queued refresh runs after the read')
+      t.equal(calls[first + 2].argv[2], 'snapshot', 'queued refresh reads again')
+      calls[first + 2].done(0, JSON.stringify({
+        ownerId: 'o',
+        revision: 6,
+        tasks: [],
+        operations: []
+      }), '')
+      client.readTask('a')
+      t.equal(calls[first + 3].argv.slice(2), ['task', 'a'], 'details read the task by ID')
+      calls[first + 3].done(0, JSON.stringify({
+        ok: true,
+        task: {
+          taskId: 'a',
+          result: 'full'
+        }
+      }), '')
+      t.equal(client.taskDetails.result, 'full', 'details task kept')
+      finishCapture()
+    })
+  }
+  // Capture refuses every later read and action.
+  function finishCapture() {
+    var before = calls.length
     client.captureActive = true
     client.refresh()
     client.reconnect()
+    client.readTask('a')
     client.request({
       action: 'focus',
       taskId: 't'
     })
-    t.equal(calls.length, 10, 'capture refuses all client I/O')
+    t.equal(calls.length, before, 'capture refuses all client I/O')
     t.done()
   }
 }

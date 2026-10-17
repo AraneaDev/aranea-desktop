@@ -325,6 +325,59 @@ function boundTask(task) {
   return copy
 }
 
+/** Characters of description, result and question a list row carries. Lists
+ * show two elided lines; the details view reads the full task (task(id)). */
+var previewChars = 100
+
+/** A list row for an IPC snapshot page, kept small so the retention cap fits
+ * in a few pages: short description, result and question (a cut ends with
+ * "…"), blocker IDs without questions, verification status only, and no
+ * diagnostics. Empty text, empty lists, unknown verification and fields the
+ * client can derive (resumeCommand) or never reads are left out; expandPreview
+ * restores them. preview tells the details view to read the full task.
+ * @param {ActivityData} task - projected task
+ * @returns {ActivityData} preview copy
+ */
+function previewTask(task) {
+  var copy = Object.assign({}, task, { preview: true })
+  ;["focusScope", "ownership", "source", "resumeCommand", "diagnostics"].forEach(function (key) {
+    delete copy[key]
+  })
+  ;["description", "result", "question"].forEach(function (key) {
+    if (typeof task[key] !== "string" || !task[key]) delete copy[key]
+    else copy[key] = cut(task[key], previewChars + 1)
+  })
+  if (Array.isArray(task.blockers) && task.blockers.length)
+    copy.blockers = task.blockers.map(function (/** @type {ActivityData} */ b) {
+      return { blockerId: b.blockerId }
+    })
+  else delete copy.blockers
+  var status = task.verification && task.verification.status
+  if (status && status !== "unknown") copy.verification = { status: status }
+  else delete copy.verification
+  return copy
+}
+
+/** Client side of previewTask: the same fields every consumer expects, with
+ * empty defaults and the derived resume command.
+ * @param {ActivityData} row - preview row
+ * @returns {ActivityData} expanded copy (rows without preview unchanged)
+ */
+function expandPreview(row) {
+  if (!row || row.preview !== true) return row
+  var copy = Object.assign({ description: "", result: "", question: "", diagnostics: [] }, row)
+  copy.blockers = (row.blockers || []).map(function (/** @type {ActivityData} */ b) {
+    return { blockerId: b.blockerId, question: "" }
+  })
+  copy.verification = {
+    status: (row.verification && row.verification.status) || "unknown",
+    summary: "",
+    commands: []
+  }
+  copy.resumeCommand = resumeCommand(row)
+  return copy
+}
+
 /** Rows from OFFSET that fit in BUDGET bytes; at least one row while any remain.
  * @param {Array<ActivityData>} rows - bounded task rows
  * @param {number} offset - first row
@@ -423,6 +476,8 @@ function ipcOperations(operations, budget) {
 if (typeof module !== "undefined")
   module.exports = {
     ipcOperations,
+    previewTask,
+    expandPreview,
     utf8Length,
     boundTask,
     taskPage,

@@ -1250,6 +1250,11 @@ Panel {
           clearing: taskClear.pending
           operation: root.taskOperation
           uncertainOperations: root.uncertainOperations
+          detailTask: root.activity.taskDetails || null
+          onDetailsNeeded: function (taskId) {
+            if (typeof root.activity.readTask === 'function')
+              root.activity.readTask(taskId)
+          }
           maxHeight: panel.availableCardHeight > 0 ? Math.max(Style.space(80), Math.min(Style.space(640), panel.availableCardHeight - panel.verticalContentInset) - navigation.height - content.spacing) : Style.space(580)
           onAction: function (kind, taskId) {
             root.handleTaskAction(kind, taskId)

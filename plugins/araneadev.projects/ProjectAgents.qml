@@ -229,6 +229,11 @@ ColumnLayout {
     pending: !!view.client && view.client.pending
     operation: view.taskOperation
     uncertainOperations: view.uncertainOperations
+    detailTask: view.client ? view.client.taskDetails || null : null
+    onDetailsNeeded: function (taskId) {
+      if (view.client && typeof view.client.readTask === 'function')
+        view.client.readTask(taskId)
+    }
     onAction: function (kind, id) {
       if (kind === 'setup') {
         view.setupRequested()

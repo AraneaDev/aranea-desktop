@@ -116,14 +116,15 @@ Item {
   property int ipcPageBytes: 60000
   // Share of the first reply for retained operation outcomes.
   property int ipcOperationBytes: 16000
-  // First page of an IPC snapshot: owner fields plus as many bounded task rows
-  // as fit. Sessions stay in the owner (no client reads them). Operations are
+  // First page of an IPC snapshot: owner fields plus as many task rows as fit.
+  // Rows are short previews (Logic.previewTask), so even the retention cap
+  // takes only a few pages; ipcTask(id) returns one task in full. Sessions stay in the owner (no client reads them). Operations are
   // the open ones plus each task's latest outcome, compact and bounded
   // (operation(id) still has the full record). taskPage tells the client how
   // to read the rest.
   function ipcSnapshot(): var {
     var view = snapshot()
-    var tasks = (view.tasks || []).map(Logic.boundTask)
+    var tasks = (view.tasks || []).map(Logic.previewTask)
     var token = ownerId + '-snapshot-' + (++ipcSerial)
     ipcViews = ipcViews.concat([
       {
@@ -160,6 +161,21 @@ Item {
       offset: offset,
       total: cached.tasks.length,
       tasks: Logic.taskPage(cached.tasks, offset, ipcPageBytes - 512)
+    }
+  }
+  // One task in full for the details view, bounded to what details show.
+  function ipcTask(taskId: string): var {
+    var task = (snapshot().tasks || []).filter(function (row) {
+      return row.taskId === taskId
+    })[0]
+    if (!task)
+      return {
+        ok: false,
+        error: failure('TASK_NOT_FOUND', 'The task is no longer tracked.')
+      }
+    return {
+      ok: true,
+      task: Logic.boundTask(task)
     }
   }
   // New reads supersede old results but do not invalidate operation observers.

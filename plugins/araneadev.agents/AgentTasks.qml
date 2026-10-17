@@ -33,6 +33,8 @@ Item {
   property bool clearing: false
   // Retained client operation, independent of current selection.
   property var operation: null
+  // Full task the host read for the selected preview row (detailsNeeded).
+  property var detailTask: null
   // Exact accepted owner-loss records retained by the presentation host.
   property var uncertainOperations: []
   // Available list/details height.
@@ -65,10 +67,25 @@ Item {
   }).map(function (row) {
     return row.key
   })
-  // Selection is resolved by identity after every sort/refresh.
-  readonly property var selectedRow: taskRows.filter(function (r) {
-    return r.key === selectedId
-  })[0] || null
+  // Listed task behind the selection, still a preview until details are read.
+  readonly property var selectedTask: selectedId ? (snapshot.tasks || []).filter(function (task) {
+    return task.taskId === selectedId
+  })[0] || null : null
+  // A preview selection asks its host for the full task again after each report.
+  readonly property string detailKey: selectedTask && selectedTask.preview === true ? selectedId + '\n' + selectedTask.lastReceivedAt : ''
+  // Selection is resolved by identity after every sort/refresh; details show
+  // the full text once the host has read it for this report.
+  readonly property var selectedRow: {
+    var listed = taskRows.filter(function (r) {
+      return r.key === selectedId
+    })[0] || null
+    var merged = listed && selectedTask ? Logic.withDetails(selectedTask, detailTask) : null
+    if (!merged || merged === selectedTask)
+      return listed
+    return Logic.rows({
+      tasks: [merged]
+    }, projectSnapshot, nowMs)[0] || listed
+  }
   // Relevant operation only; another task never inherits controls.
   readonly property var selectedOperation: operationFor(selectedId)
   // Row identity or content changes stamp pointer settling.
@@ -79,6 +96,12 @@ Item {
   readonly property alias scroll: listScroll
   // Fixed action kinds and stable task IDs, never shell command text.
   signal action(string kind, string taskId)
+  // The selected row is a preview; the host reads the full task into detailTask.
+  signal detailsNeeded(string taskId)
+  onDetailKeyChanged: {
+    if (detailKey && !captureActive)
+      detailsNeeded(selectedId)
+  }
   onLayoutSignatureChanged: {
     layoutChangedAt = Date.now()
     if (!Logic.reconcileSelection(cursorId, taskRows).key) {

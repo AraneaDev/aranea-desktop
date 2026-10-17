@@ -1,5 +1,6 @@
 // Independent IPC observer; accepted owner work never belongs to this item.
 import QtQuick
+import "ActivityLogic.js" as Logic
 import "../araneadev.projects" as Projects
 
 Item {
@@ -29,6 +30,18 @@ Item {
   property int generation: 0
   // Later reads supersede earlier reads without cancelling operation observation.
   property int snapshotGeneration: 0
+  // The read whose later pages are still being fetched (0 when none). Another
+  // refresh meanwhile waits for it instead of starting over, so a large list
+  // always finishes loading.
+  property int pagingRead: 0
+  // When pagingRead began; a read stuck longer than 15 s no longer blocks.
+  property double pagingSince: 0
+  // A refresh asked for while pages were loading runs once they are done.
+  property bool refreshQueued: false
+  // Full task for the details view (snapshot rows are previews), from readTask.
+  property var taskDetails: null
+  // Later details reads supersede earlier ones.
+  property int detailGeneration: 0
   // Only an explicit OWNER_NOT_READY refusal may reuse this payload.
   property string submissionJson: ''
   // Bounded initial readiness retries stop before any acceptance.
@@ -56,14 +69,18 @@ Item {
     submissionJson = ''
   }
   // IPC decoding rejects stale callbacks and surfaces uncertain transport results.
-  function invoke(method: string, args: var, done: var): void {
+  // failed (optional) runs when the transport or reply is unusable.
+  function invoke(method: string, args: var, done: var, failed: var): void {
     if (captureActive)
       return
     var revision = generation, read = snapshotGeneration
     var complete = function (code, output, diagnostics) {
       var listRead = method === 'snapshot' || method === 'snapshotPage'
-      if (client.captureActive || revision !== client.generation || listRead && read !== client.snapshotGeneration)
+      if (client.captureActive || revision !== client.generation || listRead && read !== client.snapshotGeneration) {
+        if (failed)
+          failed()
         return
+      }
       var result = null
       try {
         result = JSON.parse(output)
@@ -82,6 +99,8 @@ Item {
           poll.stop()
           retry.stop()
         }
+        if (failed)
+          failed()
         return
       }
       client.available = true
@@ -98,37 +117,69 @@ Item {
   function refresh(): bool {
     if (captureActive)
       return false
+    if (pagingRead && pagingRead === snapshotGeneration && Date.now() - pagingSince < 15000) {
+      refreshQueued = true
+      return true
+    }
     var read = ++snapshotGeneration
+    pagingRead = 0
+    var finished = function () {
+      if (client.pagingRead !== read)
+        return
+      client.pagingRead = 0
+      if (client.refreshQueued) {
+        client.refreshQueued = false
+        Qt.callLater(client.refresh)
+      }
+    }
     invoke('snapshot', [], function (first) {
       var page = first.taskPage
       var tasks = Array.isArray(first.tasks) ? first.tasks.slice() : []
       var complete = function () {
         var view = Object.assign({}, first, {
-          tasks: tasks
+          tasks: tasks.map(Logic.expandPreview)
         })
         delete view.taskPage
         snapshot = view
+        finished()
       }
       if (!page || typeof page.token !== 'string' || typeof page.total !== 'number' || tasks.length >= page.total) {
         complete()
         return
       }
+      client.pagingRead = read
+      client.pagingSince = Date.now()
       // Each page carries at least one row, so this ends after total pages at most.
       // A refused or short page keeps the last snapshot until the next read.
       var more = function () {
-        if (read !== client.snapshotGeneration)
+        if (read !== client.snapshotGeneration) {
+          finished()
           return
+        }
         invoke('snapshotPage', [page.token, String(tasks.length)], function (response) {
-          if (read !== client.snapshotGeneration || !response.ok || response.offset !== tasks.length || !Array.isArray(response.tasks) || !response.tasks.length)
+          if (read !== client.snapshotGeneration || !response.ok || response.offset !== tasks.length || !Array.isArray(response.tasks) || !response.tasks.length) {
+            finished()
             return
+          }
           tasks = tasks.concat(response.tasks)
           if (tasks.length >= page.total)
             complete()
           else
             more()
-        })
+        }, finished)
       }
       more()
+    })
+    return true
+  }
+  // Read one task in full for the details view; failures keep the last one.
+  function readTask(taskId: string): bool {
+    if (captureActive || !Logic.validId(taskId))
+      return false
+    var read = ++detailGeneration
+    invoke('task', [taskId], function (response) {
+      if (read === client.detailGeneration && response.ok && response.task && response.task.taskId === taskId)
+        client.taskDetails = response.task
     })
     return true
   }

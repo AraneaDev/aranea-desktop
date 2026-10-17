@@ -234,6 +234,32 @@ function rows(snapshot, registry, now) {
     })
 }
 
+/** A listed preview row with the full text of its details read, when that
+ * read is of the same task and the same last report; otherwise the row as is.
+ * State, connection and identity always come from the list.
+ * @param {TaskData} task - listed task (may be a preview)
+ * @param {?TaskData} detail - full task from the details read
+ * @returns {TaskData} row to show in details
+ */
+function withDetails(task, detail) {
+  if (
+    !task ||
+    !detail ||
+    detail.taskId !== task.taskId ||
+    detail.lastReceivedAt !== task.lastReceivedAt
+  )
+    return task
+  /** @type {TaskData} */
+  var merged = Object.assign({}, task)
+  delete merged.preview
+  ;["description", "result", "question", "diagnostics", "blockers", "verification"].forEach(
+    function (key) {
+      if (detail[key] !== undefined) merged[key] = detail[key]
+    }
+  )
+  return merged
+}
+
 /** Preserve an identity only while that task remains present.
  * @param {string} key - retained task key
  * @param {Array<TaskData>} list - current rows
@@ -367,6 +393,7 @@ if (typeof module !== "undefined")
     text,
     reportTime,
     rows,
+    withDetails,
     reconcileSelection,
     step,
     destination,
