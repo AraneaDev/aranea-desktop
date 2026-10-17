@@ -9,6 +9,8 @@ ShellRoot {
   id: host
   // Held review reads: {argv, done, answered}.
   property var calls: []
+  // Project ids read during the cap check.
+  property var seen: ({})
   QmlTest {
     id: t
   }
@@ -214,6 +216,38 @@ ShellRoot {
     client.projects = projects
     client.backgroundInterval = 600000
     t.equal(client.backgroundList().length, 12, 'the background list holds twelve checkouts')
+    client.backgroundInterval = 100
+    host.seen = {}
+    host.pump(0)
+  }
+  // Checkouts already read go to the back, so all fifteen are read over time.
+  function pump(round) {
+    host.calls.forEach(function (call) {
+      if (call.answered)
+        return
+      var id = host.target(call)
+      if (id.charAt(0) === 'q')
+        host.seen[id] = true
+      host.answer(call, 'd'.repeat(40))
+    })
+    if (Object.keys(host.seen).length >= 15 || round > 200) {
+      t.equal(Object.keys(host.seen).length, 15, 'every marked checkout is read over time')
+      pruneFlow()
+      return
+    }
+    t.step(40, function () {
+      host.pump(round + 1)
+    })
+  }
+  // Read times of checkouts that no longer exist are dropped.
+  function pruneFlow() {
+    t.check(Object.keys(client.readAt).some(function (id) {
+      return id.indexOf('x-q') === 0
+    }), 'read times are kept for existing checkouts')
+    client.projects = [host.project('p-a', false)]
+    t.check(!Object.keys(client.readAt).some(function (id) {
+      return id.indexOf('x-q') === 0
+    }), 'read times of removed checkouts are dropped')
     t.done()
   }
 }

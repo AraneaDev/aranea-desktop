@@ -174,6 +174,22 @@ Item {
   onActiveChanged: if (active)
     Qt.callLater(refreshSelected)
   onSignatureChanged: Qt.callLater(refreshSelected)
+  // Forget read times of checkouts that are no longer registered.
+  onProjectsChanged: {
+    var live = {};
+    (projects || []).forEach(function (project) {
+      ((project && project.checkouts) || []).forEach(function (checkout) {
+        if (checkout)
+          live[checkout.id] = true
+      })
+    })
+    var kept = {}
+    Object.keys(readAt).forEach(function (id) {
+      if (live[id])
+        kept[id] = readAt[id]
+    })
+    readAt = kept
+  }
   onCaptureActiveChanged: {
     epoch++
     wanted = null
@@ -198,23 +214,32 @@ Item {
     drain()
     return true
   }
-  // Marked task checkouts with a finished task, other than the selected one, as read targets.
+  // The least recently read marked task checkouts with a finished task, other than the selected one.
   function backgroundList(): var {
     var out = [];
     (projects || []).forEach(function (project) {
       ((project && project.checkouts) || []).forEach(function (checkout) {
-        if (out.length >= backgroundLimit || !checkout || checkout.primary || !checkout.review)
+        if (!checkout || checkout.primary || !checkout.review)
           return
         if (project.id === projectId && checkout.id === checkoutId)
           return
         if (eligible(project.id, checkout.id))
           out.push({
             projectId: project.id,
-            checkoutId: checkout.id
+            checkoutId: checkout.id,
+            order: out.length
           })
       })
     })
-    return out
+    out.sort(function (a, b) {
+      return (readAt[a.checkoutId] || 0) - (readAt[b.checkoutId] || 0) || a.order - b.order
+    })
+    return out.slice(0, backgroundLimit).map(function (read) {
+      return {
+        projectId: read.projectId,
+        checkoutId: read.checkoutId
+      }
+    })
   }
   // The first background checkout not read within the interval, or null.
   function dueBackground(): var {

@@ -250,6 +250,8 @@ review_ignores_repository_lock() {
   mkdir -p "$ARANEA_STATE_ROOT/git-locks"
   flock "$ARANEA_STATE_ROOT/git-locks/$key.lock" sleep 12 &
   local holder=$!
+  # shellcheck disable=SC2064
+  trap "kill $holder 2>/dev/null || true" EXIT
   sleep 0.5
   start=$SECONDS
   ARANEA_GIT_LOCK_SECONDS=2 timeout 8 "$helper" review --project "$project_id" --checkout "$task_id" --json >"$result" || true
@@ -266,7 +268,49 @@ review_ignores_repository_lock() {
   jq -e '.ok == false and .error.code == "GIT_BUSY"' "$result" >/dev/null
   ((SECONDS - start >= 2 && SECONDS - start <= 6))
 }
-cases=(review_ignores_repository_lock review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
+# Catch the lock wait taking junk, zero or negative values instead of falling back to the default.
+lock_seconds_are_validated() {
+  setup
+  make_task validated
+  local value
+  for value in abc 0 -1 1.5 ''; do
+    ARANEA_GIT_LOCK_SECONDS=$value timeout 20 "$helper" fetch --project "$project_id" --checkout "$task_id" --json >"$result" || true
+    jq -e '.error.code != "GIT_BUSY"' "$result" >/dev/null || {
+      echo "ARANEA_GIT_LOCK_SECONDS='$value' gave a false GIT_BUSY"
+      return 1
+    }
+  done
+}
+# Catch a review mixing values read at different moments: every later command gets SHAs, not names.
+review_reads_one_snapshot() {
+  setup
+  make_task snap
+  commit_file "$task_path" s.txt 'x\n' 'add s'
+  local real log="$TMPDIR/git-argv"
+  real=$(command -v git)
+  : >"$log"
+  printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s"\nexec "%s" "$@"\n' "$log" "$real" >"$TMPDIR/bin/git"
+  chmod +x "$TMPDIR/bin/git"
+  PATH="$TMPDIR/bin:$PATH" task_run review
+  jq -e '.ok and .data.ahead == 1' "$result" >/dev/null
+  local head base_sha
+  head=$(jq -r .data.head "$result")
+  base_sha=$(git -C "$task_path" rev-parse origin/main)
+  local pattern
+  for pattern in ' merge-base ' ' rev-list ' ' log ' ' diff '; do
+    grep -F -- "$pattern" "$log" >/dev/null || {
+      echo "no git call matching $pattern"
+      return 1
+    }
+  done
+  # None of the range, merge-base, count, log or diff reads names HEAD or the base branch.
+  if grep -E ' (merge-base|rev-list|log|diff) ' "$log" | grep -E 'HEAD|origin/main'; then
+    echo "a snapshot read still names HEAD or the base branch"
+    return 1
+  fi
+  grep -E ' rev-list --count .*'"$head" "$log" >/dev/null && grep -E "$base_sha" "$log" >/dev/null
+}
+cases=(review_reads_one_snapshot lock_seconds_are_validated review_ignores_repository_lock review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

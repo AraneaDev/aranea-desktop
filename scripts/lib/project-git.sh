@@ -137,7 +137,9 @@ project_git_lock() {
   mkdir -p -- "$dir" || project_git_fail GIT_ERROR 'Cannot create the Git lock directory.' 'Check state-directory permissions and retry.'
   key=$(printf '%s' "$common" | sha256sum | cut -c1-32)
   exec {project_git_lock_fd}>"$dir/$key.lock"
-  flock -w "${ARANEA_GIT_LOCK_SECONDS:-75}" "$project_git_lock_fd" || project_git_fail GIT_BUSY 'Another Git operation on this repository is still running.' 'Wait for it to finish, then retry.'
+  local seconds=${ARANEA_GIT_LOCK_SECONDS:-75}
+  [[ $seconds =~ ^[0-9]{1,3}$ ]] && ((10#$seconds >= 1)) || seconds=75
+  flock -w "$((10#$seconds))" "$project_git_lock_fd" || project_git_fail GIT_BUSY 'Another Git operation on this repository is still running.' 'Wait for it to finish, then retry.'
 }
 
 # Call the registry store; prints the new state or returns 1.
@@ -347,22 +349,24 @@ project_git_remove_missing() {
 
 # Report a task checkout's commits and files against where its branch started; reads only.
 project_git_review() {
-  local remote base merge_base head current excludes record ahead behind dirty=false untracked=false
+  local remote base base_sha merge_base='' head current excludes record ahead behind dirty=false untracked=false
   # Reads here never fetch a missing object, so repository transport settings cannot run.
   local -x ARANEA_GIT_NO_LAZY_FETCH=1
   [[ $primary != true ]] || project_git_fail PRIMARY_CHECKOUT 'The main checkout has nothing to review.' 'Choose a task checkout.'
   remote=$(project_git_remote)
   base=$(project_git_default_base "$remote")
   [[ -n $base ]] || project_git_fail NO_DEFAULT_BRANCH 'Cannot find the default branch to review against.' 'Create a main or master branch, or run git remote set-head origin --auto.'
-  merge_base=$(project_git_read -C "$path" merge-base "$base" HEAD 2>/dev/null || true)
+  # Without the repository lock a fetch can land mid-read, so every value derives from these two SHAs.
   head=$(project_git_read -C "$path" rev-parse --verify HEAD 2>/dev/null || true)
+  base_sha=$(project_git_read -C "$path" rev-parse --verify "$base^{commit}" 2>/dev/null || true)
+  [[ $base_sha =~ ^[0-9a-f]{40}$ ]] && merge_base=$(project_git_read -C "$path" merge-base "$base_sha" "$head" 2>/dev/null || true)
   [[ $merge_base =~ ^[0-9a-f]{40}$ && $head =~ ^[0-9a-f]{40}$ ]] || project_git_fail GIT_ERROR 'Git could not find where this branch started.' 'Inspect this checkout in a terminal, then refresh.'
   current=$(project_git_read -C "$path" symbolic-ref --quiet HEAD 2>/dev/null || true)
   current=${current#refs/heads/}
-  if ! { ahead=$(project_git_read -C "$path" rev-list --count "$merge_base..HEAD" 2>/dev/null) &&
-    behind=$(project_git_read -C "$path" rev-list --count "HEAD..$base" 2>/dev/null) &&
-    project_git_read -C "$path" log --format=%H%x00%s -z -n 51 "$merge_base..HEAD" >"$git_tmp/review-log" 2>/dev/null &&
-    project_git_read -C "$path" diff --numstat -z "$merge_base...HEAD" >"$git_tmp/review-files" 2>/dev/null; }; then
+  if ! { ahead=$(project_git_read -C "$path" rev-list --count "$merge_base..$head" 2>/dev/null) &&
+    behind=$(project_git_read -C "$path" rev-list --count "$head..$base_sha" 2>/dev/null) &&
+    project_git_read -C "$path" log --format=%H%x00%s -z -n 51 "$merge_base..$head" >"$git_tmp/review-log" 2>/dev/null &&
+    project_git_read -C "$path" diff --numstat -z "$merge_base...$head" >"$git_tmp/review-files" 2>/dev/null; }; then
     project_git_fail GIT_ERROR 'Git could not read this branch.' 'Inspect this checkout in a terminal, then refresh.'
   fi
   excludes=$(project_git_user_excludes)
