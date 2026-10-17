@@ -178,10 +178,32 @@ push_never_forces() {
   PATH="$TMPDIR/bin:$PATH" task_run push
   jq -e '.ok' "$result" >/dev/null
   grep -q ' push ' "$TMPDIR/git.log"
-  ! grep -qE -- '--force|(^| )-f( |$)|\+refs' "$TMPDIR/git.log"
+  if grep -qE -- '--force|(^| )-f( |$)|\+refs' "$TMPDIR/git.log"; then exit 1; fi
+  grep ' push ' "$TMPDIR/git.log" | grep -q -- '--no-follow-tags --recurse-submodules=no'
+}
+# Catch a server-side refusal being reported as the remote being ahead.
+push_hook_decline_is_not_rejected() {
+  setup
+  make_task hook
+  commit_in "$task_path" work
+  printf '#!/bin/sh\necho "remote: policy says no" >&2\nexit 1\n' >"$remote/hooks/pre-receive"
+  chmod +x "$remote/hooks/pre-receive"
+  task_expect GIT_ERROR push
+  jq -e '.error.message | contains("pre-receive hook declined")' "$result" >/dev/null
+}
+# Catch a tag named like the branch changing the branch name or breaking the push.
+tag_named_like_branch() {
+  setup
+  make_task foo
+  commit_in "$task_path" work
+  git -C "$task_path" tag foo
+  task_run review
+  jq -e '.data.branch == "foo"' "$result" >/dev/null
+  task_run push
+  jq -e '.ok and .data.branch == "foo" and .data.upstream == "origin/foo"' "$result" >/dev/null
 }
 
-cases=(review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly push_sets_upstream push_rejected push_detached push_auth_required push_never_forces)
+cases=(review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e

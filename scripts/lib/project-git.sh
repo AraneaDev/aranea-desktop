@@ -69,7 +69,7 @@ project_git_classify() {
   if grep -qiE 'terminal prompts disabled|could not read (username|password)|authentication failed|permission denied \(|host key verification failed' "$git_tmp/err"; then
     project_git_fail AUTH_REQUIRED 'Git needs credentials for this remote.' 'Run git fetch once in a terminal to sign in.'
   fi
-  first=$(grep -m1 -E '^(fatal|error): ' "$git_tmp/err" | cut -c1-300 || true)
+  first=$(grep -m1 -E '^ ! \[|^(fatal|error): ' "$git_tmp/err" | cut -c1-300 || true)
   project_git_fail GIT_ERROR "${first:-Git failed.}" 'Inspect this checkout in a terminal, then refresh.'
 }
 
@@ -355,7 +355,8 @@ project_git_review() {
   merge_base=$(project_git_read -C "$path" merge-base "$base" HEAD 2>/dev/null || true)
   head=$(project_git_read -C "$path" rev-parse --verify HEAD 2>/dev/null || true)
   [[ $merge_base =~ ^[0-9a-f]{40}$ && $head =~ ^[0-9a-f]{40}$ ]] || project_git_fail GIT_ERROR 'Git could not find where this branch started.' 'Inspect this checkout in a terminal, then refresh.'
-  current=$(project_git_read -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  current=$(project_git_read -C "$path" symbolic-ref --quiet HEAD 2>/dev/null || true)
+  current=${current#refs/heads/}
   if ! { ahead=$(project_git_read -C "$path" rev-list --count "$merge_base..HEAD" 2>/dev/null) &&
     behind=$(project_git_read -C "$path" rev-list --count "HEAD..$base" 2>/dev/null) &&
     project_git_read -C "$path" log --format=%H%x00%s -z -n 51 "$merge_base..HEAD" >"$git_tmp/review-log" 2>/dev/null &&
@@ -386,14 +387,15 @@ project_git_review() {
 # Push the current branch to its remote with an upstream; never forces, never pushes other branches.
 project_git_push() {
   local current remote status=0
-  current=$(project_git_read -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  current=$(project_git_read -C "$path" symbolic-ref --quiet HEAD 2>/dev/null || true)
+  current=${current#refs/heads/}
   [[ -n $current ]] || project_git_fail NO_BRANCH 'This checkout is not on a branch.' 'Switch to a branch in a terminal, then retry.'
   remote=$(project_git_remote)
   [[ -n $remote ]] || project_git_fail NO_REMOTE 'This repository has no remote to push to.' 'Add a remote in a terminal, then retry.'
   project_git_alive
-  project_git_user "$project_git_network_seconds" -C "$path" push --set-upstream -- "$remote" "refs/heads/$current:refs/heads/$current" || status=$?
+  project_git_user "$project_git_network_seconds" -C "$path" push --set-upstream --no-follow-tags --recurse-submodules=no -- "$remote" "refs/heads/$current:refs/heads/$current" || status=$?
   if ((status != 0)); then
-    if grep -qiE 'rejected|non-fast-forward|fetch first' "$git_tmp/err"; then
+    if ((status != 124 && status != 137)) && grep -qE '^ ! \[rejected\].*\((fetch first|non-fast-forward)\)' "$git_tmp/err"; then
       project_git_fail PUSH_REJECTED 'The remote has newer commits; fetch and update first.' 'Pull or merge in a terminal, then push again.'
     fi
     project_git_classify "$status"
