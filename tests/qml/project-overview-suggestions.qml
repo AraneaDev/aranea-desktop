@@ -158,6 +158,26 @@ ShellRoot {
           t.check(root.actionClient.suggestionsReady, 'suggestions stay ready for this project')
           t.equal(surface.selectedDefinitions.length, 1, 'the saved definition is this project\'s own')
           t.equal(surface.overviewSuggestions.length, 0, 'saved actions hide Overview suggestions')
+          // Only other scripts detected: the first two still show, not the save hint.
+          root.actionClient.refresh()
+          answerSnapshot([])
+          var others = {}
+          others['p|c'] = {
+            projectId: 'p',
+            checkoutId: 'c',
+            suggestions: [row('lint', 'command'), row('format', 'command'), row('typecheck', 'command')],
+            sources: [],
+            error: null
+          }
+          root.actionClient.detections = others
+          t.equal(surface.overviewSuggestions.map(function (r) {
+            return r.entry
+          }).join(','), 'lint,format', 'other scripts fall back to the first two')
+          var commands = t.findChild(t.findChild(surface, 'projectOverview'), 'overviewCommands')
+          t.check(!!t.findChild(surface, 'overviewSuggestionAdd:package.json:.:lint'), 'Overview renders the fallback pick')
+          t.equal(commands.emptyHint, '', 'no save hint while picks show')
+          root.actionClient.detections = {}
+          t.check(commands.emptyHint !== '', 'the save hint returns when nothing was detected')
           t.done()
         })
       })

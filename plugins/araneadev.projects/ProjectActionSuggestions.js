@@ -16,6 +16,8 @@ var PICKS = [
   ["build"]
 ]
 var PROJECT_LIMIT = 50
+// Overview rows shown when no test, dev or build was detected.
+var FALLBACK_PICKS = 2
 
 /**
  * Readable source name.
@@ -87,7 +89,8 @@ function groups(rows) {
 }
 
 /**
- * At most one test, dev and build suggestion for the empty Overview.
+ * At most one test, dev and build suggestion for the empty Overview; when
+ * none of those exists, the first two suggestions in detection order.
  * @param {Array<SuggestionData>} rows - unsaved suggestions
  * @returns {Array<SuggestionData>} up to three picks
  */
@@ -105,7 +108,7 @@ function overviewPicks(rows) {
       })[0] || matches[0]
     if (pick) picks.push(pick)
   })
-  return picks
+  return picks.length ? picks : list.slice(0, FALLBACK_PICKS)
 }
 
 /**
