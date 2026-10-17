@@ -1203,6 +1203,7 @@ Item {
                   seeding: panel.seedingProjectId !== '' && !!projectsPage.selectedProject && panel.seedingProjectId === projectsPage.selectedProject.id
                   seedError: !panel.selectedSeedFailure ? '' : panel.seedProbeFailed ? 'Could not check which tools are installed.' : "Couldn't prepare a default profile."
                   seedRetryLabel: panel.seedProbeFailed ? 'Check again' : 'Retry'
+                  seedDone: !!projectsPage.selectedProject && !!panel.seededProjects[projectsPage.selectedProject.id] && panel.seedingProjectId !== projectsPage.selectedProject.id
                   onRefreshToolsRequested: panel.refreshTools()
                   onRetrySeedRequested: panel.retrySeed(projectsPage.selectedProject.id)
                   onManageProfilesRequested: panel.chooseSection('profiles')

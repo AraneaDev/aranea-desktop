@@ -174,6 +174,8 @@ ShellRoot {
         }), '')
         t.step(80, function () {
           t.equal(host.only('profiles-seed').length, 1, 'a seeded project is not requested again')
+          t.equal(t.findChild(header, 'projectBlockedReason').text, 'No default profile could be made. Add a profile to start.', 'a seed that made nothing says why')
+          t.check(!t.findChild(header, 'projectRefreshTools').visible, 'no Refresh for a seed that made nothing')
           failure()
         })
       })
