@@ -58,6 +58,25 @@ helper_pid=$(cat "$ARANEA_STATE_ROOT/pids")
 kill -0 "$helper_pid"
 [[ $(awk '{print $3}' "/proc/$helper_pid/stat") != Z ]]
 echo 'PASS successful worker receives native stdin and detached helper survives'
+# Worst case: the worker ignores TERM and exits on its own just before the
+# KILL, leaving a TERM-resistant child. The wrapper still ends by 1.9 s.
+cat >"$fixture/aranea-agent-hook-worker" <<'WORKER'
+#!/bin/bash
+trap '' TERM
+start=${EPOCHREALTIME//[!0-9]/}
+/bin/bash -c 'trap "" TERM; printf "%s\n" "$$" >>"$ARANEA_STATE_ROOT/pids"; exec /bin/sleep 30' &
+while ((${EPOCHREALTIME//[!0-9]/} - start < 1650000)); do :; done
+exit 1
+WORKER
+: >"$ARANEA_STATE_ROOT/pids"
+started=$(date +%s%N)
+/usr/bin/timeout 2 "$fixture/aranea-agent-hook" claude </dev/null >"$TMPDIR/out" 2>"$TMPDIR/err"
+elapsed_ms=$((($(date +%s%N) - started) / 1000000))
+((elapsed_ms < 1900)) || {
+  echo "FAIL wrapper took ${elapsed_ms} ms, over the 1.9 s bound"
+  exit 1
+}
+echo "PASS late worker exit still ends within 1.9 s (${elapsed_ms} ms)"
 # Failure and missing-worker exits must still leave the provider with no output.
 for mode in failed missing; do
   if [[ $mode == failed ]]; then

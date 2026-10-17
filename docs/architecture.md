@@ -163,8 +163,9 @@ separate from usage limits and from action execution: neither a reported finish
 nor a successful command supplies independent verification of a task.
 
 Native activity hooks keep the provider's two-second advisory timeout. Their
-synchronous worker has a 1.4-second deadline and a 0.3-second termination grace.
-That gives a store cut off by the deadline time to remove its scratch files; a
+synchronous worker has a 1.4-second deadline and a 0.3-second termination grace,
+and the wrapper stops waiting at 1.75 seconds, so a hook ends within about
+1.8 seconds. That gives a store cut off by the deadline time to remove its scratch files; a
 second signal cannot interrupt that cleanup. Under the lock, the store also
 removes scratch files more than ten minutes old, which only a run that died
 can leave. The locked store validates the loaded state and the complete
