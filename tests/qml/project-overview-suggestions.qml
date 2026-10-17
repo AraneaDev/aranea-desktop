@@ -42,6 +42,21 @@ ShellRoot {
       alreadySaved: false
     }
   }
+  // Answers the latest held snapshot read with these definitions.
+  function answerSnapshot(definitions) {
+    host.calls.filter(function (c) {
+      return c.method === 'snapshot'
+    }).pop().done(0, JSON.stringify({
+      ok: true,
+      state: {
+        revision: 1,
+        definitions: definitions,
+        runs: [],
+        requests: []
+      },
+      error: null
+    }), '')
+  }
   Component.onCompleted: t.step(80, function () {
     root.view = surface
     root.projectController.state = {
@@ -106,18 +121,7 @@ ShellRoot {
     t.step(30, function () {
       t.equal(surface.overviewSuggestions.length, 0, 'no picks before a snapshot answers for this project')
       root.actionClient.refresh()
-      host.calls.filter(function (c) {
-        return c.method === 'snapshot'
-      }).pop().done(0, JSON.stringify({
-        ok: true,
-        state: {
-          revision: 1,
-          definitions: [],
-          runs: [],
-          requests: []
-        },
-        error: null
-      }), '')
+      answerSnapshot([])
       t.equal(surface.overviewSuggestions.map(function (r) {
         return r.entry
       }).join(','), 'test,dev', 'picks test and dev, not lint')
@@ -140,17 +144,19 @@ ShellRoot {
         t.equal(surface.overviewSuggestions.length, 0, 'no picks against the previous project\'s snapshot')
         root.projectId = 'p'
         t.step(30, function () {
+          // The switch cleared the snapshot owner; answer a read for this project first.
+          root.actionClient.refresh()
+          answerSnapshot([])
+          t.check(surface.overviewSuggestions.length > 0, 'picks return once this project\'s snapshot answers')
           // Once a definition exists the Overview stops offering suggestions.
-          root.actionClient.snapshot = {
-            revision: 2,
-            definitions: [Object.assign({
-                id: 'a',
-                projectId: 'p',
-                revision: 2
-              }, row('test', 'command').definition)],
-            runs: [],
-            requests: []
-          }
+          root.actionClient.refresh()
+          answerSnapshot([Object.assign({
+              id: 'a',
+              projectId: 'p',
+              revision: 1
+            }, row('test', 'command').definition)])
+          t.check(root.actionClient.suggestionsReady, 'suggestions stay ready for this project')
+          t.equal(surface.selectedDefinitions.length, 1, 'the saved definition is this project\'s own')
           t.equal(surface.overviewSuggestions.length, 0, 'saved actions hide Overview suggestions')
           t.done()
         })
