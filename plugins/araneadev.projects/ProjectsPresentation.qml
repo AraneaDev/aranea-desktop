@@ -476,7 +476,7 @@ Item {
     } catch (e) {
       return 'invalid'
     }
-    if (!payload || payload.snapshot !== captureSnapshot() || !payload.fixture || !payload.fixture.projectsState || !Array.isArray(payload.fixture.projectsState.roots) || !Array.isArray(payload.fixture.projectsState.ignored) || !Array.isArray(payload.fixture.projectsState.projects) || (payload.section !== undefined && payload.section !== 'projects') || (payload.projectId !== undefined && payload.projectId !== '' && Logic.normalizeProjectId(payload.projectId) !== payload.projectId) || (payload.fixture.projectCandidates !== undefined && !Array.isArray(payload.fixture.projectCandidates)))
+    if (!payload || payload.snapshot !== captureSnapshot() || !payload.fixture || !payload.fixture.projectsState || !Array.isArray(payload.fixture.projectsState.roots) || !Array.isArray(payload.fixture.projectsState.ignored) || !Array.isArray(payload.fixture.projectsState.projects) || (payload.section !== undefined && payload.section !== 'projects') || (payload.mode !== undefined && payload.mode !== '' && payload.mode !== 'switcher') || (payload.projectId !== undefined && payload.projectId !== '' && Logic.normalizeProjectId(payload.projectId) !== payload.projectId) || (payload.fixture.projectCandidates !== undefined && !Array.isArray(payload.fixture.projectCandidates)))
       return 'invalid'
     captureSaved = {
       json: payload.snapshot,
@@ -484,7 +484,8 @@ Item {
     }
     inspectionCheckoutId = ''
     inspectionError = ''
-    mode = ''
+    // The compact quick switcher is presentation only: the same inert fixture, another layout.
+    mode = payload.mode === 'switcher' ? 'switcher' : ''
     projectId = Logic.normalizeProjectId(payload.projectId)
     var f = payload.fixture
     restoreActions(f.projectActions || {})

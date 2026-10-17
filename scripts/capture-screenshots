@@ -49,6 +49,12 @@ set -euo pipefail
 # menu-search-no-compositor and menu-search-vanished render production MenuSurface
 # offscreen with inert sources and dispatch.
 # Appearance, Display, and Schedule use the normal Settings window in full-desktop frames.
+# The Projects README views (projects, project-overview, project-problem,
+# project-switcher, project-review, project-actions) use the normal Projects
+# window, or its quick switcher, over the desktop the same way, with stand-in
+# projects from tools/project-capture-fixture.mjs (the offscreen renderers'
+# fixtures) and every owner read, launch and write refused while shown; no
+# capture IPC or an unready window fails the surface with no screenshot.
 # Diagnostic variants settings-narrow, settings-dirty, settings-unavailable,
 # settings-integration-failed and settings-notifications use offscreen fixtures.
 # All fixture mutation controls and controller requests refuse changes.
@@ -438,31 +444,6 @@ case "$surface" in
     "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture "$surface"
     exit 0
     ;;
-  # Projects README views: inert fixtures from the offscreen renderers, 16:9 like the hero.
-  projects)
-    "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture project-details --project-count 6 --width 1440 --height 810
-    exit 0
-    ;;
-  project-overview)
-    ARANEA_PROJECT_RENDER_STATE=daily-task "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture project-details --width 1440 --height 810
-    exit 0
-    ;;
-  project-problem)
-    ARANEA_PROJECT_RENDER_STATE=problem "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture project-details --width 1440 --height 810
-    exit 0
-    ;;
-  project-switcher)
-    ARANEA_PROJECT_RENDER_STATE=switcher "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture projects-grouped --width 1440 --height 810
-    exit 0
-    ;;
-  project-review)
-    ARANEA_PROJECT_RENDER_STATE=review "$repo_root/tools/render-settings-preview" --output "$output/$surface.png" --fixture project-details --width 1440 --height 810
-    exit 0
-    ;;
-  project-actions)
-    "$repo_root/tools/render-project-actions-preview" --output "$output/$surface.png" --scene passed --size showcase
-    exit 0
-    ;;
   project-search | menu-search-project-search)
     "$repo_root/tools/render-menu-preview" --output "$output/$surface.png" --fixture project-search
     exit 0
@@ -483,61 +464,52 @@ case "$surface" in
     ;;
 esac
 
-# Capture the normal production Settings layer with acknowledged inert owner state.
-# The private transaction restores UI/showcase; the shell restores workspace/focus.
-capture_settings_surface() (
+# Captures a production window over the desktop with acknowledged inert owner
+# state: snapshot, begin with the fixture PAYLOAD (a JSON object; the snapshot
+# is added here), wait for read-only readiness, grab, restore. TARGET is the
+# owner's capture IPC (aranea.settings.capture, aranea.projects.capture) and
+# LABEL names it in messages. The private transaction restores UI/showcase;
+# the shell restores workspace/focus. Any failure exits 3 after restoring, and
+# the previous screenshot is kept.
+capture_inert_surface() (
+  local target="$1" label="$2" payload="$3"
   command -v omarchy-shell >/dev/null && command -v grim >/dev/null && command -v jq >/dev/null || exit 3
+  jq -e 'type == "object" and (has("snapshot") | not)' <<<"$payload" >/dev/null 2>&1 || exit 3
   local snapshot fixture answer previous_workspace previous_focus staged restore_needed=0
-  snapshot="$(omarchy-shell aranea.settings.capture captureSnapshot 2>/dev/null)" || exit 3
-  jq -e 'type == "object" and (.opened | type == "boolean") and (.section | type == "string")' <<<"$snapshot" >/dev/null || exit 3
+  snapshot="$(omarchy-shell "$target" captureSnapshot 2>/dev/null)" || exit 3
+  jq -e 'type == "object" and (.opened | type == "boolean") and (.section | type == "string")' <<<"$snapshot" >/dev/null 2>&1 || exit 3
   local workspace_snapshot focus_snapshot
   workspace_snapshot="$(hyprctl activeworkspace -j 2>/dev/null)" || {
-    echo 'Unable to read Settings capture workspace' >&2
+    echo "Unable to read $label capture workspace" >&2
     exit 3
   }
   previous_workspace="$(jq -er -s '
     if length == 1 and (.[0] | type == "object") and (.[0].id | type == "number")
       and (.[0].id | . > 0 and . <= 2147483647 and floor == .)
     then .[0].id else error("invalid workspace snapshot") end' <<<"$workspace_snapshot" 2>/dev/null)" || {
-    echo 'Invalid Settings capture workspace snapshot' >&2
+    echo "Invalid $label capture workspace snapshot" >&2
     exit 3
   }
   focus_snapshot="$(hyprctl activewindow -j 2>/dev/null)" || {
-    echo 'Unable to read Settings capture focus' >&2
+    echo "Unable to read $label capture focus" >&2
     exit 3
   }
   previous_focus="$(jq -er -s '
     if length == 1 and (.[0] | type == "object") and
       (.[0] == {} or ((.[0].address | type == "string") and (.[0].address | test("^0x[0-9a-fA-F]+$"))))
     then .[0].address // "" else error("invalid focus snapshot") end' <<<"$focus_snapshot" 2>/dev/null)" || {
-    echo 'Invalid Settings capture focus snapshot' >&2
+    echo "Invalid $label capture focus snapshot" >&2
     exit 3
   }
-  local settings_capture_section
-  case "$surface" in
-    settings-scaling) settings_capture_section=display ;;
-    settings-schedule) settings_capture_section=schedule ;;
-    *) settings_capture_section=appearance ;;
-  esac
-  fixture="$(jq -cn --arg section "$settings_capture_section" --argjson catalog "$("$repo_root/scripts/aranea-wallpaper" list --json)" --arg artwork "$repo_root/backgrounds/" --arg snapshot "$snapshot" '
-    {section: $section, snapshot: $snapshot, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
-      display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
-      fonts:{uiFamily:"Inter",technicalFamily:"JetBrains Mono",families:["Inter","IBM Plex Sans","Source Sans 3","JetBrains Mono"],monospaceFamilies:["JetBrains Mono","JetBrains Mono NL"],availability:"available"},
-      motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
-      wallpaper:{activeId:"signal-shrine",availability:"available"},
-      wallpapers:$catalog,wallpapersAvailability:"available",
-      schedule:{enabled:true,applied:true,availability:"available",entries:[{time:"07:00",wallpaper:"day"},{time:"12:30",wallpaper:"aranea-core"},{time:"18:00",wallpaper:"deep-current"},{time:"21:00",wallpaper:"signal-shrine"}],dawn:null,day:"07:00",dusk:null,night:null},
-      integrations:[{id:"session",status:"inactive",availability:"available"},{id:"terminal",status:"active",availability:"available"}],integrationsAvailability:"available"},
-      notifications:{dnd:"off",dndAvailability:"available",quiet:"scheduled",quietAvailability:"available",window:"22:00-07:00",windowAvailability:"available"},
-      results:(if $section == "display" then {"display-scale":"Applied · 2.666667 · saved"} else {} end), itemErrors:{}}}')"
-  staged="$(mktemp "$output/.settings-capture.XXXXXX.png")"
-  # Restore only Settings by identity, then the previously focused workspace/client.
-  restore_settings_capture() {
+  fixture="$(jq -c --arg snapshot "$snapshot" '. + {snapshot: $snapshot}' <<<"$payload")" || exit 3
+  staged="$(mktemp "$output/.$surface-capture.XXXXXX.png")"
+  # Restore only the captured window by identity, then the previously focused workspace/client.
+  restore_inert_capture() {
     local failed=0
     if ((restore_needed)); then
-      answer="$(omarchy-shell aranea.settings.capture captureRestore "$snapshot" 2>/dev/null || true)"
+      answer="$(omarchy-shell "$target" captureRestore "$snapshot" 2>/dev/null || true)"
       [[ "$answer" == ok ]] || {
-        echo 'Settings capture restoration failed' >&2
+        echo "$label capture restoration failed" >&2
         failed=1
       }
       if [[ "${ARANEA_CAPTURE_WORKSPACE:-}" == 2 ]]; then
@@ -553,17 +525,17 @@ capture_settings_surface() (
     rm -f -- "$staged"
     return "$failed"
   }
-  trap 'restore_settings_capture || exit 3' EXIT
-  answer="$(omarchy-shell aranea.settings.capture captureBegin "$fixture" 2>/dev/null || true)"
+  trap 'restore_inert_capture || exit 3' EXIT
+  answer="$(omarchy-shell "$target" captureBegin "$fixture" 2>/dev/null || true)"
   if [[ "$answer" != ok ]]; then
-    printf 'Settings capture fixture refused: %s\n' "$answer" >&2
+    printf '%s capture fixture refused: %s\n' "$label" "$answer" >&2
     exit 3
   fi
   restore_needed=1
   hyprctl dispatch 'hl.dsp.focus({ workspace = "2" })' >/dev/null 2>&1 || exit 3
   local attempt ready=0
   for ((attempt = 0; attempt < 30; attempt++)); do
-    answer="$(omarchy-shell aranea.settings.capture captureState 2>/dev/null || true)"
+    answer="$(omarchy-shell "$target" captureState 2>/dev/null || true)"
     jq -e '.readOnly == true' <<<"$answer" >/dev/null 2>&1 || exit 3
     if jq -e '.ready == true' <<<"$answer" >/dev/null 2>&1; then
       ready=1
@@ -572,16 +544,16 @@ capture_settings_surface() (
     sleep 0.1
   done
   ((ready)) || {
-    echo 'Settings capture never became ready' >&2
+    echo "$label capture never became ready" >&2
     exit 3
   }
   sleep "${ARANEA_SCREENSHOT_DELAY:-1}"
   capture_frame "$staged" && [[ -s "$staged" ]] || exit 3
   # Restoration failure keeps the old output, just like failed screenshot capture.
   local completed
-  completed="$(mktemp "$output/.settings-complete.XXXXXX.png")"
+  completed="$(mktemp "$output/.$surface-complete.XXXXXX.png")"
   mv -- "$staged" "$completed"
-  restore_settings_capture || {
+  restore_inert_capture || {
     rm -f -- "$completed"
     exit 3
   }
@@ -589,6 +561,41 @@ capture_settings_surface() (
   mv -f -- "$completed" "$output/$surface.png"
   printf 'captured: %s\n' "$output/$surface.png"
 )
+
+# Capture the normal production Settings window with inert owner state.
+capture_settings_surface() {
+  local settings_capture_section payload
+  case "$surface" in
+    settings-scaling) settings_capture_section=display ;;
+    settings-schedule) settings_capture_section=schedule ;;
+    *) settings_capture_section=appearance ;;
+  esac
+  payload="$(jq -cn --arg section "$settings_capture_section" --argjson catalog "$("$repo_root/scripts/aranea-wallpaper" list --json)" --arg artwork "$repo_root/backgrounds/" '
+    {section: $section, fixture: {displayDraft: (if $section == "display" then "2.667" else "" end), state: {
+      display: {monitor:"eDP-1",scale: (if $section == "display" then 2.666667 else 2 end),width:3840,height:2160,availability:"available",persistenceSupport:"supported",configuredScale: (if $section == "display" then 2.66667 else 2 end)},
+      fonts:{uiFamily:"Inter",technicalFamily:"JetBrains Mono",families:["Inter","IBM Plex Sans","Source Sans 3","JetBrains Mono"],monospaceFamilies:["JetBrains Mono","JetBrains Mono NL"],availability:"available"},
+      motion:{configured:"on",applied:"on",application:"applied",availability:"available"},
+      wallpaper:{activeId:"signal-shrine",availability:"available"},
+      wallpapers:$catalog,wallpapersAvailability:"available",
+      schedule:{enabled:true,applied:true,availability:"available",entries:[{time:"07:00",wallpaper:"day"},{time:"12:30",wallpaper:"aranea-core"},{time:"18:00",wallpaper:"deep-current"},{time:"21:00",wallpaper:"signal-shrine"}],dawn:null,day:"07:00",dusk:null,night:null},
+      integrations:[{id:"session",status:"inactive",availability:"available"},{id:"terminal",status:"active",availability:"available"}],integrationsAvailability:"available"},
+      notifications:{dnd:"off",dndAvailability:"available",quiet:"scheduled",quietAvailability:"available",window:"22:00-07:00",windowAvailability:"available"},
+      results:(if $section == "display" then {"display-scale":"Applied · 2.666667 · saved"} else {} end), itemErrors:{}}}')" || exit 3
+  capture_inert_surface aranea.settings.capture Settings "$payload"
+}
+
+# Capture the production Projects window (or its quick switcher) with inert
+# fixture projects from tools/project-capture-fixture.mjs: never the user's
+# registry, no launch, no Git read, nothing written.
+capture_projects_surface() {
+  local payload
+  command -v node >/dev/null 2>&1 || {
+    echo "node is required to build the $surface capture fixture" >&2
+    exit 3
+  }
+  payload="$(node "$repo_root/tools/project-capture-fixture.mjs" "$surface")" || exit 3
+  capture_inert_surface aranea.projects.capture Projects "$payload"
+}
 
 # Opens the Aranea menu page for $surface and grabs the screen with grim.
 capture_menu_surface() {
@@ -1099,6 +1106,11 @@ capture_osd_surface() {
 case "$surface" in
   settings | settings-scaling | settings-schedule)
     capture_settings_surface
+    exit 0
+    ;;
+  # Projects README views: the production window over the desktop, inert fixtures only.
+  projects | project-overview | project-problem | project-switcher | project-review | project-actions)
+    capture_projects_surface
     exit 0
     ;;
   menu | menu-submenu | menu-search | menu-input | apps | favorites | recent)

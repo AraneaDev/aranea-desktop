@@ -121,6 +121,15 @@ audio labels, provider details, and notification contents are staged for the
 showcase. Audio transport and agent refresh/selection are refused while their
 showcase fixtures are active. Wi-Fi QR codes are excluded.
 
+The six Projects README views (`projects`, `project-overview`,
+`project-problem`, `project-switcher`, `project-review`, `project-actions`) are
+grabbed live like Settings: the real Projects window, or its quick switcher,
+over the desktop through `aranea.projects.capture`. The stand-in projects come
+from `tools/project-capture-fixture.mjs`, which reuses the offscreen renderers'
+fixtures; registry reads, Git, launches and writes are refused while shown, and
+everything is restored afterwards. Without a running shell or that capture IPC
+the surface fails with no screenshot.
+
 A failed surface restores its previous PNG, fails the batch, and prevents a new
 GIF. Rebuild only the GIF from existing stills with:
 

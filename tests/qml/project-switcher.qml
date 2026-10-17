@@ -590,6 +590,35 @@ ShellRoot {
       t.equal(entry.captureRestore(snapshot), 'ok', 'capture restores')
       t.equal(entry.mode, 'switcher', 'the switcher mode comes back')
       t.check(entry.opened, 'still open')
+      // A desktop capture can ask for the compact switcher over the same inert fixture.
+      var before = entry.captureSnapshot()
+      var fixture = {
+        projectsState: {
+          revision: 1,
+          roots: [],
+          ignored: [],
+          projects: [host.project('p-fixture', 'Fixture', true)]
+        }
+      }
+      t.equal(entry.captureBegin(JSON.stringify({
+        snapshot: before,
+        mode: 'grid',
+        fixture: fixture
+      })), 'invalid', 'an unknown capture mode is refused')
+      t.check(!entry.inert, 'a refused capture changes nothing')
+      host.calls = []
+      var selected = host.selects.length
+      t.equal(entry.captureBegin(JSON.stringify({
+        snapshot: before,
+        mode: 'switcher',
+        fixture: fixture
+      })), 'ok', 'a switcher capture begins')
+      t.equal(entry.mode, 'switcher', 'the capture shows the compact switcher')
+      t.check(entry.inert, 'the switcher capture is inert')
+      t.equal(host.rowIds().join(','), 'p-fixture', 'the switcher lists only the fixture projects')
+      t.equal(host.calls.length + host.selects.length - selected, 0, 'the switcher capture asks the owner nothing')
+      t.equal(entry.captureRestore(before), 'ok', 'the switcher capture restores')
+      t.check(!entry.inert && entry.mode === 'switcher', 'the earlier presentation comes back')
       entry.captureActive = true
       var inertSwitcher = t.findChild(surface, 'projectSwitcher')
       inertSwitcher.forceActiveFocus()

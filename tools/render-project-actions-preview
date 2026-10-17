@@ -70,6 +70,7 @@ ln -s "$shell_dir/Commons" "$work/cfg/Commons"
 ln -s "$shell_dir/Ui" "$work/cfg/Ui"
 for plugin in "$repo_root"/plugins/araneadev.*; do ln -s "$plugin" "$work/cfg/plugins/${plugin##*/}"; done
 cp "$repo_root/tests/qml/fixtures/project-actions-preview.qml" "$work/cfg/shell.qml"
+cp "$repo_root/tests/qml/fixtures/ProjectActionsPreview.js" "$work/cfg/ProjectActionsPreview.js"
 # Hash all isolated state/config payload bytes and link targets before/after capture.
 state_hash() {
   python3 - "$work" <<'PY'
