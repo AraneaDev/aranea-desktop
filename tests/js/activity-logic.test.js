@@ -189,14 +189,28 @@ test("IPC task rows keep what the panel shows and stay within a byte bound", () 
   assert.ok(logic.utf8Length(JSON.stringify(bounded)) <= logic.maxTaskBytes)
   assert.equal(bounded.blockers.length, 32, "blocker count and ids kept")
   assert.equal(bounded.blockers[31].blockerId, "b31")
+  for (const key of ["description", "result", "question"])
+    assert.ok(bounded[key].length < long.length && bounded[key].endsWith("…"), key + " marked cut")
+  assert.ok(bounded.verification.summary.endsWith("…"), "verification summary marked cut")
+  assert.ok(bounded.blockers[0].question.endsWith("…"), "cut blocker question marked")
   const small = { ...task, result: "done", diagnostics: [{ summary: "d", receivedAt: 1 }] }
   assert.deepEqual(logic.boundTask(small), small, "ordinary rows are unchanged")
   const joined = {
     ...task,
     diagnostics: Array.from({ length: 20 }, () => ({ summary: "x".repeat(4096), receivedAt: 1 }))
   }
-  const kept = logic.boundTask(joined).diagnostics
-  assert.equal(kept.map((d) => d.summary).join("\n").length, 4096, "first 4096 shown chars kept")
+  const shown = logic
+    .boundTask(joined)
+    .diagnostics.map((d) => d.summary)
+    .join("\n")
+  assert.equal(shown.length, 4096, "first 4096 shown chars kept")
+  assert.ok(shown.endsWith("…"), "cut list ends with the marker")
+  const exact = { ...task, description: "y".repeat(4096) }
+  assert.equal(
+    logic.boundTask(exact).description,
+    exact.description,
+    "text at the limit is not cut"
+  )
 })
 
 test("task pages fill up to the byte budget and always make progress", () => {

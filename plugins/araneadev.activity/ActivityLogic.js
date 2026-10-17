@@ -242,6 +242,16 @@ function utf8Length(value) {
   return n
 }
 
+/** At most LIMIT characters of VALUE; a cut ends with "…" (counted in LIMIT),
+ * so the Tasks views show that more text exists.
+ * @param {string} value - text
+ * @param {number} limit - characters kept, marker included
+ * @returns {string} bounded text
+ */
+function cut(value, limit) {
+  return value.length > limit ? value.slice(0, Math.max(0, limit - 1)) + "…" : value
+}
+
 /** Keep the first LIMIT characters of a list's joined text, one entry per line.
  * @param {any} list - entries
  * @param {string} field - text field of each entry
@@ -254,15 +264,23 @@ function boundList(list, field, limit, keepAll) {
   var room = limit
   /** @type {Array<ActivityData>} */
   var kept = []
+  /** @type {?ActivityData} */
+  var last = null
+  var lost = false
   list.forEach(function (/** @type {ActivityData} */ entry) {
+    var text = typeof entry[field] === "string" ? entry[field] : ""
+    if (room <= 0 && text) lost = true
     if (room <= 0 && !keepAll) return
     var copy = Object.assign({}, entry)
     if (typeof entry[field] === "string") {
-      copy[field] = room > 0 ? entry[field].slice(0, room) : ""
+      copy[field] = room > 0 ? cut(text, room) : ""
       room -= copy[field].length + 1
+      if (copy[field]) last = copy
     }
     kept.push(copy)
   })
+  // Whole entries left out also leave the last shown text marked.
+  if (lost && last && !/…$/.test(last[field])) last[field] = last[field].slice(0, -1) + "…"
   return kept
 }
 
@@ -280,14 +298,14 @@ function boundTask(task) {
     var limit = limits[i]
     copy = Object.assign({}, task)
     ;["description", "result", "question"].forEach(function (key) {
-      if (typeof task[key] === "string") copy[key] = task[key].slice(0, limit)
+      if (typeof task[key] === "string") copy[key] = cut(task[key], limit)
     })
     copy.diagnostics = boundList(task.diagnostics, "summary", limit, false)
     copy.blockers = boundList(task.blockers, "question", limit, true)
     if (task.verification && typeof task.verification === "object") {
       copy.verification = Object.assign({}, task.verification)
       if (typeof task.verification.summary === "string")
-        copy.verification.summary = task.verification.summary.slice(0, limit)
+        copy.verification.summary = cut(task.verification.summary, limit)
       if (limit < shownChars && Array.isArray(task.verification.commands))
         copy.verification.commands = boundList(
           task.verification.commands.map(function (/** @type {any} */ c) {
