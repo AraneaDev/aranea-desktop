@@ -224,12 +224,11 @@ ShellRoot {
         snapshot: entry.captureSnapshot(),
         section: 'projects',
         projectId: detailsId,
+        // The quick switcher capture opens the real compact switcher over the same inert fixture.
+        mode: Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'switcher' ? 'switcher' : '',
         fixture: sample
       })) !== 'ok')
         finish(false, 'project fixture refused')
-      // The quick switcher capture opens the real compact switcher over the same inert fixture.
-      if (Quickshell.env('ARANEA_PROJECT_RENDER_STATE') === 'switcher')
-        entry.mode = 'switcher'
 
       return
     }
