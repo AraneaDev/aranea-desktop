@@ -653,7 +653,7 @@ ShellRoot {
     t.step(100, function () {
       var row = t.findChild(surface, 'projectSwitcherRow:p-start')
       t.equal(t.findChild(surface, 'projectSwitcherAction:p-start').text, 'Review · feat/x', 'the review label names the branch')
-      t.check(t.findChild(surface, 'projectSwitcherReviewChip:p-start').visible, 'the row shows the Review chip')
+      t.check(!t.findChild(surface, 'projectSwitcherReviewChip:p-start').visible, 'a review row hides the chip, the action already says Review')
       t.check(!t.findChild(surface, 'projectSwitcherReviewChip:p-ret').visible, 'other rows show no chip')
       t.check(row.hasCursor, 'the review row holds the outline Enter acts on')
       host.note()

@@ -284,7 +284,7 @@ ColumnLayout {
         anchors.right: action.left
         anchors.rightMargin: Style.space(8)
         anchors.verticalCenter: parent.verticalCenter
-        visible: row.modelData.review
+        visible: row.modelData.review && row.modelData.action.kind !== 'review'
         text: 'Review'
         font.bold: true
         color: Aranea.DesignTokens.accent
