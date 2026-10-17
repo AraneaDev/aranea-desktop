@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.31.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.30.0...v2.31.0) (2026-10-17)
+
+
+### Features
+
+* **projects:** create, remove and update task checkouts ([#169](https://github.com/AraneaDev/aranea-desktop/issues/169)) ([48a4406](https://github.com/AraneaDev/aranea-desktop/commit/48a440680429bd86a1dc121062da3a3a164f9bae))
+* **projects:** give every registered project a working default profile ([#168](https://github.com/AraneaDev/aranea-desktop/issues/168)) ([0e6355b](https://github.com/AraneaDev/aranea-desktop/commit/0e6355ba4e53410a237f220aa5d48f5d463a96a4))
+* **projects:** plain problems instead of recovery jargon ([#170](https://github.com/AraneaDev/aranea-desktop/issues/170)) ([7511a6e](https://github.com/AraneaDev/aranea-desktop/commit/7511a6ec0905400c58532806054e2338a356ec0b))
+* **projects:** quick switcher with a safely managed key binding ([#172](https://github.com/AraneaDev/aranea-desktop/issues/172)) ([49e1ebd](https://github.com/AraneaDev/aranea-desktop/commit/49e1ebd0517449f45bb49baebc2c9d23fae9851e))
+* **projects:** review agent work in task checkouts ([#173](https://github.com/AraneaDev/aranea-desktop/issues/173)) ([221877d](https://github.com/AraneaDev/aranea-desktop/commit/221877ddf1c5e2667c6853800ff8394667d86081))
+* **projects:** suggest detected repository commands as actions ([#167](https://github.com/AraneaDev/aranea-desktop/issues/167)) ([45e6991](https://github.com/AraneaDev/aranea-desktop/commit/45e6991b56c6cce38629ceeb515ca4504b193cd2))
+
+
+### Fixes
+
+* plain words in the activity panel and workspace tooltip ([#171](https://github.com/AraneaDev/aranea-desktop/issues/171)) ([0365c67](https://github.com/AraneaDev/aranea-desktop/commit/0365c67d7150c5a2d379f3f1f85dd1486513ea69))
+* **projects:** close the follow-ups from detection and first-run ([#174](https://github.com/AraneaDev/aranea-desktop/issues/174)) ([3b13e60](https://github.com/AraneaDev/aranea-desktop/commit/3b13e6065f477867f272e26e33f3e301fbe2d541))
+* **projects:** place environments by workspace mode and free stale workspaces ([#163](https://github.com/AraneaDev/aranea-desktop/issues/163)) ([9d5abd9](https://github.com/AraneaDev/aranea-desktop/commit/9d5abd9dcf3115ad2dfca62204366b744ef2be8f))
+* **projects:** resolve workspace placement review minors ([#166](https://github.com/AraneaDev/aranea-desktop/issues/166)) ([55f3d59](https://github.com/AraneaDev/aranea-desktop/commit/55f3d59d5082aedbf58f2144f5e7be6233cff9ca))
+* **shell:** stop retargeting Connections at recreated shell windows ([#164](https://github.com/AraneaDev/aranea-desktop/issues/164)) ([84e96e9](https://github.com/AraneaDev/aranea-desktop/commit/84e96e9777fc60355391d42efcbc58fae103f355))
+
 ## [2.30.0](https://github.com/AraneaDev/aranea-desktop/compare/v2.29.0...v2.30.0) (2026-10-14)
 
 
