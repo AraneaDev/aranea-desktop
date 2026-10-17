@@ -111,6 +111,24 @@ nothing and tells you to merge, rebase or commit in a terminal. Git never asks
 for passwords here; if a remote needs credentials, run `git fetch` once in a
 terminal. Your own `core.sshCommand` is honoured.
 
+## Quick switcher
+
+Press your quick switcher key, type part of a project name and press **Enter**.
+If the project has open windows, Aranea takes you back to its workspace; if not,
+it starts your remembered profile there, with the same checks as **Start working**.
+**Alt+Enter** opens the full Projects window on that project without starting
+anything. Each row shows what Enter will do before you press it.
+
+Set the key in **Settings → Integrations → Quick switcher**: type the key you
+want, then press **Add to bindings**. Aranea adds one marked line to your
+`~/.config/hypr/bindings.lua`, checks that the key is free, keeps a backup
+beside it as `bindings.lua.aranea.bak` and reloads Hyprland. If Hyprland reports
+a new configuration error, Aranea puts your file back exactly as it was and
+reloads again; errors that were already there do not stop the change. If another
+change is still running, Aranea asks you to wait a moment and try again.
+**Remove** takes the line out again. Aranea never changes your other bindings.
+From a terminal, `aranea projects switch` opens the switcher.
+
 ## When something goes wrong
 
 Projects explains problems in plain words with at most two actions. **Starting…**

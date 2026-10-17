@@ -14,3 +14,4 @@ plugins/araneadev.notifications/ServiceBridge.js
 plugins/araneadev.projects/AgentSuggestion.js
 plugins/araneadev.projects/ProjectOverview.js
 plugins/araneadev.projects/ProjectRoleEvidence.js
+plugins/araneadev.projects/ProjectSwitcher.js

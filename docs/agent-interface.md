@@ -193,6 +193,7 @@ aranea projects open PROJECT_ID [--checkout CHECKOUT_ID] [--separate]
     [--use-current-workspace] [--roles editor,terminal,agent] [--agent claude|codex]
     [--new-window editor|terminal|agent] [--retry-role editor|terminal|agent]
     [--reobserve-role editor|terminal|agent]
+aranea projects switch
 aranea projects operation OPERATION_ID
 aranea projects details PROJECT_ID
 aranea desktop status
@@ -208,6 +209,14 @@ scripts/aranea projects list --json
 scripts/aranea projects open p-REPLACE-WITH-REGISTERED-ID --json
 scripts/aranea projects operation op-REPLACE-WITH-RETURNED-ID --json
 ```
+
+`projects switch` (`projects.switch`, no arguments) opens the compact quick
+switcher and launches nothing. It opens the switcher even when it is already
+open, never closes it, and reports `Quick switcher opened.` only after reading
+back that the switcher is showing. When Projects keeps its full layout because
+of unsaved changes or a running setup, it exits 1 with `partial` and
+`SWITCHER_BLOCKED`. Without a running Aranea shell it fails with
+`OWNER_UNAVAILABLE`.
 
 IDs come from registry responses; names and paths are never IDs. `inspect`
 returns the registered record, and `desktop status` returns the timestamped

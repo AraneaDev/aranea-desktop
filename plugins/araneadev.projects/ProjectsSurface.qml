@@ -15,6 +15,7 @@ import "ProjectActionRecords.js" as Records
 import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
 import "ProjectProblems.js" as Problems
+import "ProjectsLogic.js" as Logic
 
 Item {
   id: panel
@@ -316,12 +317,63 @@ Item {
       section: 'overview'
     }))
       return false
+    return selectProject(id)
+  }
+  // Make a known project the selection, recording the visit.
+  function selectProject(id) {
     root.projectId = id
     root.flushNavigation()
     section = 'overview'
     scrollTo(0)
     stampLayout()
     return true
+  }
+  // The compact quick switcher replaces the full layout while this mode is set.
+  readonly property bool switcherMode: root.mode === 'switcher'
+  // The switcher never hides a setup wizard or an unsaved draft; a running operation does not stop it.
+  readonly property bool switcherBlocked: projectsPage.setupActive || hasUnsavedDraft
+  // Registry, discovery, action or activity work that navigation also waits for; a watched start is not one.
+  readonly property bool switcherPending: (root.projectController.pending || root.projectController.reading) && !root.navigationSaving || root.discoveryClient.pending || projectsPage.details.actions.pending || root.activityClient.pending
+  // Select a known project for the switcher; an operation that is only being watched does not block this.
+  function switcherSelect(id) {
+    if (!(root.projectController.state.projects || []).some(function (p) {
+      return p.id === id
+    }))
+      return false
+    if (root.inert || switcherPending)
+      return false
+    if (id === root.projectId)
+      return true
+    if (switcherBlocked)
+      return false
+    return selectProject(id)
+  }
+  // Enter on a switcher row: select its project first, then use the ordinary start or return path.
+  function switcherGo(row) {
+    if (root.inert || !root.opened || !row || switcher.busy || !switcherSelect(row.id))
+      return false
+    if (row.action.kind === 'return')
+      return root.returnEnvironment(row.action.target)
+    if (row.action.kind === 'start')
+      return root.startProfile(row.action.target.profileId, row.action.target.profileRevision, false)
+    return false
+  }
+  // The explicit Start after a failed return uses the row's remembered profile.
+  function switcherStart(row) {
+    if (root.inert || !root.opened || !row || !row.startTarget || switcher.busy || !switcherSelect(row.id))
+      return false
+    return root.startProfile(row.startTarget.profileId, row.startTarget.profileRevision, false)
+  }
+  // Open the full layout on a project, or on setup when no project is given.
+  function switcherExpand(id) {
+    if (root.inert)
+      return
+    if (id && !switcherSelect(id))
+      return
+    root.mode = ''
+    if (!id)
+      addProject()
+    Qt.callLater(focusKeys)
   }
   // Ctrl+K is deliberate navigation and does not consume ordinary field text.
   function focusProjectSearch() {
@@ -337,7 +389,7 @@ Item {
   Shortcut {
     sequence: 'Ctrl+K'
     context: Qt.ApplicationShortcut
-    enabled: panel.root.opened && panel.visible && !panel.root.inert && !panel.navigationBlocked
+    enabled: panel.root.opened && panel.visible && !panel.root.inert && !panel.navigationBlocked && !panel.switcherMode
     onActivated: panel.focusProjectSearch()
   }
   ProjectPicker {
@@ -438,7 +490,11 @@ Item {
   }
   // Focus a predictable keyboard target when the window is summoned.
   function focusKeys() {
-    closeButton.forceActiveFocus()
+    if (switcherMode) {
+      switcher.reset()
+      switcher.focusSearch()
+    } else
+      closeButton.forceActiveFocus()
   }
   // Invalidate pointer movement accepted before content moved.
   function stampLayout() {
@@ -785,15 +841,67 @@ Item {
     referenceItem: card
     property real layoutChangedAt: panel.layoutChangedAt
   }
+  // Transparent catcher around the compact card; a click outside the card closes the switcher.
+  MouseArea {
+    objectName: 'projectSwitcherBackdrop'
+    anchors.fill: parent
+    enabled: panel.switcherMode && !panel.root.inert
+    onClicked: function (mouse) {
+      var inside = card.x <= mouse.x && mouse.x <= card.x + card.width && card.y <= mouse.y && mouse.y <= card.y + card.height
+      if (!inside)
+        panel.root.close()
+    }
+  }
+  // Size of the compact card, capped to the surface.
+  readonly property var switcherSize: Logic.switcherGeometry(width, height, Style.spaceReal(1))
   Aranea.SurfaceCard {
     id: card
-    anchors.fill: parent
+    objectName: 'projectSwitcherCard'
+    x: panel.switcherMode ? (panel.width - width) / 2 : 0
+    y: panel.switcherMode ? (panel.height - height) / 2 : 0
+    width: panel.switcherMode ? panel.switcherSize.width : panel.width
+    height: panel.switcherMode ? panel.switcherSize.height : panel.height
     contentPadding: Style.space(16)
     fillColor: Qt.rgba(Color.background.r, Color.background.g, Color.background.b, 1)
     borderSpecOverride: Border.flat(Util.alpha(Color.foreground, 0.16), 1)
+    ProjectSwitcher {
+      id: switcher
+      anchors.fill: parent
+      anchors.margins: Style.space(panel.shortScreen ? 12 : 16)
+      visible: panel.switcherMode
+      projects: panel.root.projectController.state.projects || []
+      navigation: panel.root.projectController.state.navigation || {}
+      runtime: panel.root.projectClient.snapshot
+      tools: panel.root.projectController.tools
+      gitCache: panel.root.gitClient.cache
+      client: panel.root.projectClient
+      launching: !!panel.root.inspectionLaunchIntent
+      displayOnly: panel.root.inert
+      pointerGate: pointerGate
+      systemBusy: panel.switcherPending
+      loadProblem: panel.root.projectController.error || panel.root.projectController.errorObject ? Problems.problem(panel.root.projectController.errorObject || {
+        message: panel.root.projectController.error
+      }, {
+        surface: 'switcher',
+        actions: []
+      }) : null
+      onGoRequested: function (row) {
+        panel.switcherGo(row)
+      }
+      onStartRequested: function (row) {
+        panel.switcherStart(row)
+      }
+      onExpandRequested: function (id) {
+        panel.switcherExpand(id)
+      }
+      onCloseRequested: panel.root.close()
+      onVisibleChanged: if (visible)
+        Qt.callLater(panel.focusKeys)
+    }
     FocusScope {
       anchors.fill: parent
       anchors.margins: Style.space(panel.shortScreen ? 12 : 16)
+      visible: !panel.switcherMode
       focus: true
       Keys.onPressed: function (event) {
         if (event.key === Qt.Key_Escape) {

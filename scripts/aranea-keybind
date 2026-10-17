@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+# Adds, removes or reports the one marked quick switcher key binding in the
+# user's Hyprland bindings.lua. Only the line ending in
+# "-- aranea:projects-switcher" is ever touched; every other byte is kept.
+# The file is never created, every write is atomic and followed by
+# `hyprctl reload`, and a failed reload puts the previous bytes back.
+# Usage: aranea-keybind status|remove [--json]
+#        aranea-keybind add --key "SUPER + ALT + P" [--json]
+# Output is always the JSON envelope {ok,data,error:{code,message,recovery}}
+# and the exit status is 1 on failure.
+# Errors: INVALID_KEY INVALID_REQUEST KEY_TAKEN NO_BINDINGS_FILE RELOAD_FAILED
+#         WRITE_FAILED BUSY HYPRCTL_UNAVAILABLE
+set -euo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/paths.sh
+source "$script_dir/lib/paths.sh"
+baseline='[]'
+preexisting=0
+
+marker='-- aranea:projects-switcher'
+bindings="$(xdg_config_home)/hypr/bindings.lua"
+# The backup sits beside the path as given; a symlinked file (stow, chezmoi)
+# is edited where it really lives.
+backup="$bindings.aranea.bak"
+bindings=$(readlink -f -- "$bindings" 2>/dev/null || printf '%s' "$bindings")
+
+# Print a success envelope around the given JSON data.
+ok() { jq -cn --argjson data "$1" '{ok:true,data:$data,error:null}'; }
+# Print a failure envelope for CODE, MESSAGE, RECOVERY and exit 1.
+fail() {
+  jq -cn --arg code "$1" --arg message "$2" --arg recovery "$3" '{ok:false,data:null,error:{code:$code,message:$message,recovery:$recovery}}'
+  exit 1
+}
+
+# Set canon to the canonical "SUPER + ALT + P" form of a typed key, or fail INVALID_KEY.
+canonical_key() {
+  local raw="$1" part mods="" key="" i count
+  local -a parts=()
+  local bad="Use modifiers from SUPER, CTRL, ALT and SHIFT plus one key, for example SUPER + ALT + P."
+  if [[ ! $raw =~ ^[A-Za-z0-9\ +]+$ || $raw =~ ^[[:space:]]*\+ || $raw =~ \+[[:space:]]*$ || $raw == *++* ]]; then
+    fail INVALID_KEY "That is not a usable key combination." "$bad"
+  fi
+  IFS=+ read -ra parts <<<"$raw"
+  count=${#parts[@]}
+  ((count >= 2)) || fail INVALID_KEY "A key combination needs at least one modifier." "$bad"
+  for ((i = 0; i < count; i++)); do
+    part="${parts[i]//[[:space:]]/}"
+    part="${part^^}"
+    [[ -n $part ]] || fail INVALID_KEY "That is not a usable key combination." "$bad"
+    if ((i == count - 1)); then
+      [[ $part =~ ^([A-Z0-9]|F([1-9]|1[0-2])|PERIOD|COMMA|SPACE|RETURN|SLASH)$ ]] || fail INVALID_KEY "That key is not supported." "$bad"
+      key="$part"
+    else
+      case "$part" in
+        SUPER | CTRL | ALT | SHIFT) ;;
+        *) fail INVALID_KEY "$part is not a modifier." "$bad" ;;
+      esac
+      [[ $mods != *" $part "* ]] || fail INVALID_KEY "A modifier is repeated." "$bad"
+      mods+=" $part "
+    fi
+  done
+  local out="" m
+  for m in SUPER CTRL ALT SHIFT; do
+    [[ $mods == *" $m "* ]] && out+="$m + "
+  done
+  canon="$out$key"
+}
+
+# Print the Hyprland modifier mask (SHIFT 1, CTRL 4, ALT 8, SUPER 64) of a canonical key.
+mask_of() {
+  local mask=0 p
+  for p in ${1//+/ }; do
+    case "$p" in SHIFT) mask=$((mask + 1)) ;; CTRL) mask=$((mask + 4)) ;; ALT) mask=$((mask + 8)) ;; SUPER) mask=$((mask + 64)) ;; esac
+  done
+  printf '%s' "$mask"
+}
+
+# Print the description of another bind already using this canonical key, if any.
+taken_by() {
+  local key="$1" mask last binds
+  mask=$(mask_of "$key")
+  last="${key##* + }"
+  binds=$(hyprctl -j binds 2>/dev/null) || return 2
+  jq -r --argjson mask "$mask" --arg key "$last" '
+    .[] | . as $b
+      | ([1, 4, 8, 64] | map(select((($b.modmask // 0) / . | floor) % 2 == 1)) | add // 0) as $mods
+      | select(($b.key | ascii_upcase) == $key and $mods == $mask)
+      | select(($b.submap // "") == "")
+      | select($b.description != "Aranea project switcher")
+      | (if ($b.description // "") != "" then $b.description elif ($b.arg // "") != "" then $b.arg else "another binding" end)' <<<"$binds" | head -n 1
+}
+
+# Rewrite the bindings file text on stdout: MODE add (with LINE) or remove, or find.
+rewrite() {
+  local mode="$1" line="${2:-}" final_nl=1
+  [[ -s $bindings && $(tail -c1 "$bindings" | od -An -c | tr -d ' ') != '\n' ]] && final_nl=0
+  NEWLINE="$line" awk -v mode="$mode" -v marker="$marker" -v final_nl="$final_nl" '
+    { body[NR] = $0; cr[NR] = 0; term[NR] = 1
+      if (body[NR] ~ /\r$/) { sub(/\r$/, "", body[NR]); cr[NR] = 1 } }
+    END {
+      if (NR > 0 && !final_nl) term[NR] = 0
+      first = 0
+      for (i = 1; i <= NR; i++) {
+        t = body[i]; sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+        if (t !~ /^--/ && t ~ /^o\.bind\(/ && substr(t, length(t) - length(marker) - 1) == ") " marker) {
+          man[i] = 1
+          if (!first) first = i
+        }
+      }
+      if (mode == "find") { if (first) { print body[first]; exit 0 } exit 3 }
+      if (mode == "remove") {
+        if (!first) exit 3
+        for (i = 1; i <= NR; i++) if (!man[i]) { keep[++k] = i }
+        if (man[NR] && !term[NR] && k > 0) { term[keep[k]] = 0; cr[keep[k]] = 0 }
+        for (j = 1; j <= k; j++) emit(keep[j])
+        exit 0
+      }
+      if (first) {
+        body[first] = ENVIRON["NEWLINE"]
+        for (i = 1; i <= NR; i++) if (!man[i] || i == first) emit(i)
+        exit 0
+      }
+      eolcr = (NR > 0 && cr[1]) ? 1 : 0
+      if (NR > 0 && !term[NR]) { if (!cr[NR]) cr[NR] = eolcr; term[NR] = 1; lastend = 0 } else lastend = 1
+      for (i = 1; i <= NR; i++) emit(i)
+      printf "%s", ENVIRON["NEWLINE"]
+      if (lastend) printf "%s\n", eolcr ? "\r" : ""
+    }
+    function emit(i) { printf "%s%s%s", body[i], cr[i] ? "\r" : "", term[i] ? "\n" : "" }
+  ' "$bindings"
+}
+
+# Rewrite the bindings file with MODE (and LINE) into a temp file, then install it atomically.
+install_rewrite() {
+  local tmp
+  tmp=$(mktemp "$bindings.XXXXXX") || fail WRITE_FAILED "The bindings file could not be written." "Check that its folder is writable, then try again."
+  if ! rewrite "$@" >"$tmp" || ! chmod --reference="$bindings" "$tmp" || ! mv "$tmp" "$bindings"; then
+    rm -f "$tmp"
+    fail WRITE_FAILED "The bindings file could not be written, so it was left as it was." "Check that its folder is writable, then try again."
+  fi
+}
+
+# Put the backed up bytes back; fails (leaving no temp file) if any step fails.
+restore_backup() {
+  local tmp
+  tmp=$(mktemp "$bindings.XXXXXX") || return 1
+  if ! cp -p "$backup" "$tmp" || ! mv "$tmp" "$bindings"; then
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+# Print the non-empty Hyprland config errors as a JSON array; fail if unreadable.
+config_errors() {
+  local raw
+  raw=$(hyprctl -j configerrors 2>/dev/null) || return 1
+  jq -c '[.[] | strings | select(length > 0)]' <<<"$raw" 2>/dev/null
+}
+
+# Undo a change for REASON: restore, reload again, then fail RELOAD_FAILED.
+undo_and_fail() {
+  local restored=1
+  restore_backup || restored=0
+  hyprctl reload >/dev/null 2>&1 || true
+  if ((restored)); then
+    fail RELOAD_FAILED "$1" "Your bindings file is as it was. Check it for mistakes, then try again."
+  fi
+  fail RELOAD_FAILED "$1 The old file could not be put back; it is saved at $backup." "Copy $backup over your bindings file, then reload Hyprland."
+}
+
+# Reload Hyprland and undo the change on a reload error or any new config error; sets preexisting.
+reload_or_restore() {
+  local out rc=0 after="" fresh
+  out=$(hyprctl reload 2>&1) || rc=$?
+  if ((rc != 0)) || [[ ${out,,} == *error* ]]; then
+    undo_and_fail "Hyprland did not accept the change, so it was undone."
+  fi
+  after=$(config_errors) || undo_and_fail "Hyprland could not read config errors after the change, so it was undone (could not read config errors)."
+  fresh=$(jq -r --argjson before "$baseline" '. - $before | .[0] // empty' <<<"$after")
+  [[ -z $fresh ]] || undo_and_fail "Hyprland found a problem, so the change was undone: $fresh"
+  preexisting=$(jq -r 'length' <<<"$baseline")
+}
+
+# Back up the bindings file and note the config errors that already exist.
+begin_change() {
+  cp -p "$bindings" "$backup" || fail WRITE_FAILED "The backup could not be written, so nothing was changed." "Check that the hypr folder is writable, then try again."
+  baseline=$(config_errors) || baseline='[]'
+}
+
+# Take the exclusive lock for add and remove, or fail BUSY.
+take_lock() {
+  local lock dir
+  if [[ -n ${XDG_RUNTIME_DIR:-} ]]; then
+    lock="$XDG_RUNTIME_DIR/aranea-keybind.lock"
+  else
+    dir="$(xdg_state_home)/aranea"
+    { mkdir -p "$dir" && chmod 700 "$dir"; } 2>/dev/null || fail BUSY "The change lock could not be created." "Check that your state folder is writable, then try again."
+    lock="$dir/aranea-keybind.lock"
+  fi
+  { exec 9>>"$lock"; } 2>/dev/null || fail BUSY "The change lock could not be opened." "Check that your runtime folder is writable, then try again."
+  flock -w "${ARANEA_KEYBIND_LOCK_WAIT:-10}" 9 || fail BUSY "Another key binding change is running." "Wait a moment, then try again."
+}
+
+# Require the bindings file to exist; never create it.
+need_file() { [[ -f $bindings ]] || fail NO_BINDINGS_FILE "No Hyprland bindings file was found." "Create ~/.config/hypr/bindings.lua first, then try again."; }
+
+# Report whether the marked binding exists and which key it uses.
+cmd_status() {
+  local found key=""
+  if [[ -f $bindings ]] && found=$(rewrite find); then
+    key="${found#*\"}"
+    key="${key%%\"*}"
+    ok "$(jq -cn --arg k "$key" '{bound:true,key:$k}')"
+  else
+    ok '{"bound":false,"key":null}'
+  fi
+}
+
+# Add or move the marked binding to the given key.
+cmd_add() {
+  local key="" taken line canon=""
+  while (($#)); do
+    case "$1" in
+      --key)
+        key="${2:-}"
+        shift 2 || true
+        ;;
+      --json) shift ;;
+      *) fail INVALID_REQUEST "Unknown option $1." "Use add --key \"SUPER + ALT + P\"." ;;
+    esac
+  done
+  canonical_key "$key"
+  key="$canon"
+  take_lock
+  need_file
+  command -v hyprctl >/dev/null 2>&1 || fail HYPRCTL_UNAVAILABLE "Hyprland could not be reached." "Run this from your Hyprland session."
+  taken=$(taken_by "$key") || fail HYPRCTL_UNAVAILABLE "Hyprland could not list its key bindings." "Run this from your Hyprland session."
+  [[ -z $taken ]] || fail KEY_TAKEN "That key is already used by $taken." "Choose another key."
+  line="o.bind(\"$key\", \"Aranea project switcher\", \"omarchy-shell shell toggle araneadev.projects '{\\\"mode\\\":\\\"switcher\\\"}'\") $marker"
+  begin_change
+  install_rewrite add "$line"
+  reload_or_restore
+  ok "$(jq -cn --arg k "$key" --argjson n "$preexisting" '{bound:true,key:$k,preexistingErrors:$n}')"
+}
+
+# Remove the marked binding, if there is one.
+cmd_remove() {
+  take_lock
+  need_file
+  if ! rewrite find >/dev/null; then
+    ok '{"removed":false}'
+    return
+  fi
+  command -v hyprctl >/dev/null 2>&1 || fail HYPRCTL_UNAVAILABLE "Hyprland could not be reached." "Run this from your Hyprland session."
+  begin_change
+  install_rewrite remove
+  reload_or_restore
+  ok "$(jq -cn --argjson n "$preexisting" '{removed:true,preexistingErrors:$n}')"
+}
+
+# Dispatch the subcommand.
+main() {
+  local cmd="${1:-}"
+  shift || true
+  case "$cmd" in
+    status) cmd_status ;;
+    add) cmd_add "$@" ;;
+    remove) cmd_remove ;;
+    *) fail INVALID_REQUEST "Usage: aranea-keybind status|add|remove." "Use status, add --key KEY or remove." ;;
+  esac
+}
+main "$@"

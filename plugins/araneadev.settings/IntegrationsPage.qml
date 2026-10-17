@@ -75,6 +75,103 @@ ColumnLayout {
       }
     }
   }
+  // The quick-switcher key is already bound, so Add is hidden.
+  readonly property bool boundNow: !!page.backendState.keybind && page.backendState.keybind.bound === true
+  SettingsSection {
+    Layout.fillWidth: true
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Quick switcher'
+      font.bold: true
+    }
+    SettingsLabel {
+      Layout.fillWidth: true
+      text: 'Open the project switcher with one key from anywhere.'
+      opacity: 0.65
+    }
+    GridLayout {
+      Layout.fillWidth: true
+      columns: page.width < Style.space(300) ? 1 : 2
+      rowSpacing: Style.space(8)
+      ColumnLayout {
+        Layout.fillWidth: true
+        SettingsLabel {
+          objectName: 'quickSwitcherState'
+          Layout.fillWidth: true
+          text: page.backendState.keybind && page.backendState.keybind.bound ? page.backendState.keybind.key || '' : 'Not set'
+        }
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: Style.space(28)
+          radius: Style.space(3)
+          color: Util.alpha(Color.foreground, 0.04)
+          border.width: 1
+          border.color: Util.alpha(Color.foreground, 0.15)
+          Aranea.FocusFrame {
+            anchors.fill: parent
+            focused: keyField.activeFocus
+          }
+          TextInput {
+            id: keyField
+            objectName: 'quickSwitcherKey'
+            anchors.fill: parent
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(8)
+            verticalAlignment: TextInput.AlignVCenter
+            text: 'SUPER + ALT + P'
+            // When a key is bound the field shows it, so Remove and Add agree.
+            readonly property string boundKey: page.backendState.keybind && page.backendState.keybind.bound ? page.backendState.keybind.key || '' : ''
+            onBoundKeyChanged: if (boundKey !== '')
+              text = boundKey
+            Component.onCompleted: if (boundKey !== '')
+              text = boundKey
+            onAccepted: if (!page.displayOnly && !page.pending && text.trim() !== '' && !page.boundNow)
+              page.request('keybind-add', {
+                key: text.trim()
+              })
+            color: Color.foreground
+            font.family: Aranea.Typography.technicalFamily
+            font.pixelSize: Style.font.body
+            enabled: !page.displayOnly && !page.pending
+            activeFocusOnTab: true
+            selectByMouse: true
+            Accessible.name: 'Quick switcher key'
+          }
+        }
+      }
+      RowLayout {
+        SettingsButton {
+          objectName: 'quickSwitcherAdd'
+          text: 'Add to bindings'
+          visible: !page.backendState.keybind || !page.backendState.keybind.bound
+          enabled: !page.displayOnly && !page.pending && keyField.text.trim() !== ''
+          busy: page.pendingKey === 'keybind'
+          pointerGate: page.pointerGate
+          onClicked: if (!page.displayOnly && !page.pending && keyField.text.trim() !== '')
+            page.request('keybind-add', {
+              key: keyField.text.trim()
+            })
+        }
+        SettingsButton {
+          objectName: 'quickSwitcherRemove'
+          text: 'Remove'
+          visible: !!page.backendState.keybind && page.backendState.keybind.bound === true
+          enabled: !page.displayOnly && !page.pending
+          busy: page.pendingKey === 'keybind'
+          pointerGate: page.pointerGate
+          onClicked: if (!page.displayOnly && !page.pending)
+            page.request('keybind-remove', {})
+        }
+      }
+    }
+    SettingsLabel {
+      objectName: 'quickSwitcherError'
+      Layout.fillWidth: true
+      visible: !!page.errors.keybind
+      text: page.errors.keybind ? page.errors.keybind.message + ' ' + page.errors.keybind.recovery : ''
+      color: Aranea.DesignTokens.attention
+    }
+  }
   SettingsButton {
     text: 'Retry'
     enabled: !page.displayOnly && !page.pending
