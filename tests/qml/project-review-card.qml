@@ -166,27 +166,33 @@ ShellRoot {
       truncated: false
     }
     if (host.manyFiles)
-      data.files = data.files.concat([{
-        path: 'd.js',
-        added: 4,
-        removed: 0
-      }, {
-        path: 'e.js',
-        added: 5,
-        removed: 0
-      }, {
-        path: 'f.js',
-        added: 6,
-        removed: 0
-      }, {
-        path: 'g.js',
-        added: 7,
-        removed: 0
-      }, {
-        path: 'img.png',
-        added: null,
-        removed: null
-      }])
+      data.files = data.files.concat([
+        {
+          path: 'd.js',
+          added: 4,
+          removed: 0
+        },
+        {
+          path: 'e.js',
+          added: 5,
+          removed: 0
+        },
+        {
+          path: 'f.js',
+          added: 6,
+          removed: 0
+        },
+        {
+          path: 'g.js',
+          added: 7,
+          removed: 0
+        },
+        {
+          path: 'img.png',
+          added: null,
+          removed: null
+        }
+      ])
     return data
   }
   // Answer every held review read with data or an error.
