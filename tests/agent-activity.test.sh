@@ -276,7 +276,7 @@ copy_store_without_mapper() {
   local fixture="$TMPDIR/store-copy"
   mkdir -p "$fixture/lib"
   cp "$repo_root/scripts/aranea-agent-store" "$fixture/"
-  cp "$repo_root/scripts/lib/"{paths.sh,agent-activity.sh,agent-activity.jq,projects-registry.jq} "$fixture/lib/"
+  cp "$repo_root/scripts/lib/"{paths.sh,agent-activity.sh,agent-activity.jq,projects-registry.jq,project-tool-ids.jq} "$fixture/lib/"
   store="$fixture/aranea-agent-store"
 }
 # Catch split native allocation and duplicate metadata changes.

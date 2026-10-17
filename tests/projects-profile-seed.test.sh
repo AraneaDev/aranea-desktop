@@ -53,6 +53,29 @@ expect "$TMPDIR/presets" '' '. == [{name:"VS Code",roles:["editor"],tools:{edito
 jq -n --argjson tools '{"editors":[],"terminals":[],"agents":[]}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
 expect "$TMPDIR/presets" '' '. == []' 'no tools, no presets'
 
+# One tool-ID list: the shared jq module names exactly what aranea-project-tools probes, per group.
+ids_module="$repo_root/scripts/lib/project-tool-ids.jq"
+[[ -f $ids_module ]] || {
+  echo 'FAIL: scripts/lib/project-tool-ids.jq is missing' >&2
+  exit 1
+}
+module_ids=$(jq -nr 'include "project-tool-ids" {search: "'"$repo_root/scripts/lib"'"}; tool_ids | [.[][]] | sort | join(" ")')
+probed_ids=$(sed -nE 's/^for id in (.*); do$/\1/p' "$repo_root/scripts/aranea-project-tools" | tr ' ' '\n' | sort | paste -sd' ')
+[[ -n $probed_ids && $module_ids == "$probed_ids" ]] || {
+  echo "FAIL: tool IDs drifted: module [$module_ids] probe [$probed_ids]" >&2
+  exit 1
+}
+for id in $probed_ids; do fake_tool "$id"; done
+PATH="$tools:$minbin" "$repo_root/scripts/aranea-project-tools" --json >"$TMPDIR/probe"
+jq -e --argjson ids "$(jq -nc 'include "project-tool-ids" {search: "'"$repo_root/scripts/lib"'"}; tool_ids')" \
+  '(.editors|map(.id)|sort) == ($ids.editors|sort) and (.terminals|map(.id)|sort) == ($ids.terminals|sort) and (.agents|map(.id)|sort) == ($ids.agents|sort)' "$TMPDIR/probe" >/dev/null ||
+  {
+    echo 'FAIL: probe groups differ from the shared tool IDs' >&2
+    jq . "$TMPDIR/probe" >&2
+    exit 1
+  }
+rm -f "$tools"/*
+
 # Bad probe IDs never become drafts the store would refuse.
 jq -n --argjson tools '{"editors":[{"id":"code;rm","available":true,"supported":true},{"id":7,"available":true,"supported":true}],"terminals":[{"id":7,"available":true,"supported":true},{"id":null,"available":true,"supported":true},"junk"],"agents":[{"id":["claude"],"available":true,"supported":true}],"defaults":{"terminalId":7}}' -f "$repo_root/scripts/lib/project-presets.jq" >"$TMPDIR/presets"
 expect "$TMPDIR/presets" '' '. == []' 'bad probe IDs yield no drafts'

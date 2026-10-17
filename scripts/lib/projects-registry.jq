@@ -1,13 +1,15 @@
 # Registry schema, request validation, and pure mutations. Filesystem/Git reads
 # and opaque ID generation belong to the shell boundary, never this filter.
+# Supported editor, terminal and agent IDs come from the one shared list.
+include "project-tool-ids" {search: "./"};
 def text: type == "string" and length > 0 and (contains("\u0000")|not);
 def path: text and startswith("/") and (test("[\\x00-\\x1f\\x7f]")|not);
 def integer: type == "number" and . == floor;
 def opaque($prefix): text and test("^" + $prefix + "-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 def mode: . == "dedicated" or . == "current";
-def editor: . == null or . == "code" or . == "nvim";
-def terminal: . == null or . == "alacritty" or . == "kitty" or . == "foot" or . == "ghostty";
-def agent: . == null or . == "claude" or . == "codex";
+def editor: . == null or tool_id("editors");
+def terminal: . == null or tool_id("terminals");
+def agent: . == null or tool_id("agents");
 def roles: type == "array" and length > 0 and all(.[]; . == "editor" or . == "terminal" or . == "agent")
   and (. as $r | ["editor","terminal","agent"] | map(select(. as $x | $r | index($x))) == $r);
 def distinct: length == (unique|length);
