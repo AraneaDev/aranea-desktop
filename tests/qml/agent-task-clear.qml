@@ -83,6 +83,40 @@ ShellRoot {
       outcome: 'observed'
     }), '')
   }
+  // A task that is already gone counts as cleared, and a failed list read
+  // while the batch runs does not cancel it.
+  function resilientBatch() {
+    t.check(queue.start(['already-gone', 'still-here']), 'new batch starts')
+    var first = calls.length - 1
+    t.equal(calls[first].argv.slice(2), ['dismiss', 'already-gone'], 'first identity submitted')
+    calls[first].done(0, JSON.stringify({
+      ok: false,
+      operationId: null,
+      error: {
+        code: 'TASK_NOT_FOUND',
+        message: 'The task is no longer tracked.'
+      }
+    }), '')
+    t.waitFor(function () {
+      return calls.some(function (c, i) {
+        return i > first && c.argv[2] === 'dismiss' && c.argv[3] === 'still-here'
+      })
+    }, 1500, 'missing task moves on to the next identity', function () {
+      var index = calls.length - 1
+      t.check(queue.pending && !queue.error, 'missing task is not a batch failure')
+      client.refresh()
+      calls[calls.length - 1].done(0, '', 'Socket Error QLocalSocket::PeerClosedError')
+      t.check(queue.pending, 'failed list read does not cancel the batch')
+      accept(index, 'still-here')
+      complete(calls.length - 1, 'still-here')
+      t.waitFor(function () {
+        return !queue.pending
+      }, 1500, 'batch completes after the failed read', function () {
+        t.check(!queue.error, 'batch finished without error')
+        t.done()
+      })
+    })
+  }
   Component.onCompleted: {
     client.snapshot = {
       tasks: [task('live', 'working', 'connected'), task('done', 'finished', 'connected'), task('lost', 'working', 'connection-lost'), task('uncertain', 'finished', 'connected')],
@@ -180,7 +214,8 @@ ShellRoot {
               t.step(60, function () {
                 t.check(!queue.pending, 'capture cancels queued work without resubmitting accepted dismissal')
                 t.equal(client.operationId, 'op-keyboard', 'capture does not discard accepted owner identity')
-                t.done()
+                queue.captureActive = false
+                resilientBatch()
               })
             })
           })

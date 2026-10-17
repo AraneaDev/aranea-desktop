@@ -28,8 +28,12 @@ Item {
   }
   IpcHandler {
     target: 'aranea.activity'
+    // First page; read the rest with snapshotPage(taskPage.token, offset).
     function snapshot(): string {
-      return JSON.stringify(controller.snapshot())
+      return JSON.stringify(controller.ipcSnapshot())
+    }
+    function snapshotPage(token: string, offset: int): string {
+      return JSON.stringify(controller.ipcSnapshotPage(token, offset))
     }
     function request(json: string): string {
       return JSON.stringify(controller.requestJSON(json))

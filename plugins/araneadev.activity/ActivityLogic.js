@@ -194,8 +194,121 @@ function notificationTransitions(previous, current, suppressed) {
       }
     })
 }
+/** Characters a panel shows of one text or one joined list (AgentTasksLogic.text). */
+var shownChars = 4096
+
+/** Largest single task row sent in an IPC snapshot page. */
+var maxTaskBytes = 32000
+
+/** UTF-8 size of a string, the unit the Quickshell IPC reply limit counts.
+ * @param {string} value - text
+ * @returns {number} bytes
+ */
+function utf8Length(value) {
+  var s = String(value),
+    n = 0
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i)
+    if (c < 0x80) n += 1
+    else if (c < 0x800) n += 2
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < s.length) {
+      n += 4
+      i++
+    } else n += 3
+  }
+  return n
+}
+
+/** Keep the first LIMIT characters of a list's joined text, one entry per line.
+ * @param {any} list - entries
+ * @param {string} field - text field of each entry
+ * @param {number} limit - joined characters kept
+ * @param {boolean} keepAll - keep every entry (with empty text past the limit)
+ * @returns {any} bounded copy, or the input when it is not a list
+ */
+function boundList(list, field, limit, keepAll) {
+  if (!Array.isArray(list)) return list
+  var room = limit
+  /** @type {Array<ActivityData>} */
+  var kept = []
+  list.forEach(function (/** @type {ActivityData} */ entry) {
+    if (room <= 0 && !keepAll) return
+    var copy = Object.assign({}, entry)
+    if (typeof entry[field] === "string") {
+      copy[field] = room > 0 ? entry[field].slice(0, room) : ""
+      room -= copy[field].length + 1
+    }
+    kept.push(copy)
+  })
+  return kept
+}
+
+/** Bound one task row to what the Tasks views display, then to a byte size.
+ * Lists keep the first shown characters; a row that is still too large (long
+ * multibyte text everywhere) keeps shorter text. Identity fields never change.
+ * @param {ActivityData} task - projected task
+ * @returns {ActivityData} bounded copy
+ */
+function boundTask(task) {
+  var limits = [shownChars, 1024, 256]
+  /** @type {ActivityData} */
+  var copy = task
+  for (var i = 0; i < limits.length; i++) {
+    var limit = limits[i]
+    copy = Object.assign({}, task)
+    ;["description", "result", "question"].forEach(function (key) {
+      if (typeof task[key] === "string") copy[key] = task[key].slice(0, limit)
+    })
+    copy.diagnostics = boundList(task.diagnostics, "summary", limit, false)
+    copy.blockers = boundList(task.blockers, "question", limit, true)
+    if (task.verification && typeof task.verification === "object") {
+      copy.verification = Object.assign({}, task.verification)
+      if (typeof task.verification.summary === "string")
+        copy.verification.summary = task.verification.summary.slice(0, limit)
+      if (limit < shownChars && Array.isArray(task.verification.commands))
+        copy.verification.commands = boundList(
+          task.verification.commands.map(function (/** @type {any} */ c) {
+            return { c: String(c) }
+          }),
+          "c",
+          limit,
+          false
+        ).map(function (/** @type {ActivityData} */ c) {
+          return c.c
+        })
+    }
+    if (task.diagnostics === undefined) delete copy.diagnostics
+    if (task.blockers === undefined) delete copy.blockers
+    if (utf8Length(JSON.stringify(copy)) <= maxTaskBytes) return copy
+  }
+  return copy
+}
+
+/** Rows from OFFSET that fit in BUDGET bytes; at least one row while any remain.
+ * @param {Array<ActivityData>} rows - bounded task rows
+ * @param {number} offset - first row
+ * @param {number} budget - bytes for the serialized rows
+ * @returns {Array<ActivityData>} page
+ */
+function taskPage(rows, offset, budget) {
+  /** @type {Array<ActivityData>} */
+  var page = []
+  var used = 2
+  for (var i = offset; i < rows.length; i++) {
+    var size = utf8Length(JSON.stringify(rows[i])) + 1
+    if (page.length && used + size > budget) break
+    page.push(rows[i])
+    used += size
+  }
+  return page
+}
+
 if (typeof module !== "undefined")
   module.exports = {
+    utf8Length,
+    boundTask,
+    taskPage,
+    maxTaskBytes,
     validId,
     resumeCommand,
     sessionFor,

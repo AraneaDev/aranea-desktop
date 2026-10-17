@@ -15,6 +15,8 @@ Item {
   property bool available: false
   // Structured errors retain actionable domain codes.
   property var error: null
+  // IPC method whose reply last set or cleared error ('snapshot' for list reads).
+  property string errorMethod: ''
   // True only while submitting or observing accepted work.
   property bool pending: false
   // Accepted ID survives disconnect, closure and explicit reconnection.
@@ -59,12 +61,14 @@ Item {
       return
     var revision = generation, read = snapshotGeneration
     var complete = function (code, output, diagnostics) {
-      if (client.captureActive || revision !== client.generation || method === 'snapshot' && read !== client.snapshotGeneration)
+      var listRead = method === 'snapshot' || method === 'snapshotPage'
+      if (client.captureActive || revision !== client.generation || listRead && read !== client.snapshotGeneration)
         return
       var result = null
       try {
         result = JSON.parse(output)
       } catch (e) {}
+      client.errorMethod = method
       if (code !== 0 || !result || typeof result !== 'object') {
         client.available = false
         client.error = {
@@ -72,7 +76,7 @@ Item {
           message: diagnostics || 'Activity is not available. Reconnect to the running operation.',
           recovery: 'Reconnect without starting the work again.'
         }
-        if (method !== 'snapshot') {
+        if (!listRead) {
           client.pending = false
           client.submissionJson = ''
           poll.stop()
@@ -94,9 +98,37 @@ Item {
   function refresh(): bool {
     if (captureActive)
       return false
-    snapshotGeneration++
-    invoke('snapshot', [], function (response) {
-      snapshot = response
+    var read = ++snapshotGeneration
+    invoke('snapshot', [], function (first) {
+      var page = first.taskPage
+      var tasks = Array.isArray(first.tasks) ? first.tasks.slice() : []
+      var complete = function () {
+        var view = Object.assign({}, first, {
+          tasks: tasks
+        })
+        delete view.taskPage
+        snapshot = view
+      }
+      if (!page || typeof page.token !== 'string' || typeof page.total !== 'number' || tasks.length >= page.total) {
+        complete()
+        return
+      }
+      // Each page carries at least one row, so this ends after total pages at most.
+      // A refused or short page keeps the last snapshot until the next read.
+      var more = function () {
+        if (read !== client.snapshotGeneration)
+          return
+        invoke('snapshotPage', [page.token, String(tasks.length)], function (response) {
+          if (read !== client.snapshotGeneration || !response.ok || response.offset !== tasks.length || !Array.isArray(response.tasks) || !response.tasks.length)
+            return
+          tasks = tasks.concat(response.tasks)
+          if (tasks.length >= page.total)
+            complete()
+          else
+            more()
+        })
+      }
+      more()
     })
     return true
   }

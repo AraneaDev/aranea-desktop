@@ -7,8 +7,8 @@ connection receipts, retention, association and dismissal.
 
 ## IPC and clients
 
-`aranea.activity` exposes `snapshot()`, `request(json)`, `operation(id)`,
-`reobserve(id)` and `dismiss(taskId)`. Requests contain exactly `action` and
+`aranea.activity` exposes `snapshot()`, `snapshotPage(token, offset)`,
+`request(json)`, `operation(id)`, `reobserve(id)` and `dismiss(taskId)`. Requests contain exactly `action` and
 `taskId`; actions are `focus`, `reopen` and `open-checkout`. Acceptance returns
 `{ok,operationId,ownerId,error}`. Read an accepted ID to observe its outcome:
 `observed`, `partial` or `failed`. An owner restart returns `OPERATION_LOST`;
@@ -18,6 +18,17 @@ IPC snapshots retain task history and projected eligibility but omit private
 replay receipts, registration hashes, retired epochs, and callback correlation
 records. Those remain in the authoritative store; sending them to the panel can
 exceed the IPC transport's payload limit and leave its displayed count stale.
+
+Quickshell drops IPC replies above about 110 KB, so a snapshot is paged. Each
+reply stays under 60 KB. `snapshot()` returns the owner fields, the first task
+rows and `taskPage: {token, total}`. `snapshotPage(token, offset)` returns the
+next rows of the same read, or `SNAPSHOT_EXPIRED` once the owner has dropped
+that read (it keeps the last four). Task rows keep what the Tasks views show:
+the first 4096 characters of each text and of the joined diagnostics and
+blocker questions. A row with long multibyte text everywhere is cut shorter to
+stay under 32 KB. IPC snapshots leave out sessions and the task copy kept in
+each operation. `ActivityClient.refresh()` reads every page before it replaces
+`snapshot`. A failed page keeps the last snapshot.
 
 `ActivityClient` exposes `snapshot`, `available`, structured `error`, `pending`,
 `operationId`, `currentOperation`, `request(payload)`, `refresh()`,

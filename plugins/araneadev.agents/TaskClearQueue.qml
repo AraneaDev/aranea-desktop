@@ -62,6 +62,15 @@ Item {
         message: 'Task clearing could not start. Refresh activity and try again.'
       })
   }
+  // The current task is gone from the store; move on to the next one.
+  function advance(): void {
+    currentId = ''
+    var token = generation
+    Qt.callLater(function () {
+      if (queue.pending && token === queue.generation)
+        queue.next()
+    })
+  }
   // Partial progress is retained; uncertain work is never automatically repeated.
   function fail(reason: var): void {
     cancel()
@@ -72,9 +81,15 @@ Item {
   Connections {
     target: queue.client
     ignoreUnknownSignals: true
+    // A failed list read leaves the batch running; the next read retries it.
     function onErrorChanged() {
-      if (queue.pending && queue.client.error)
-        queue.fail(queue.client.error)
+      var error = queue.client.error
+      if (!queue.pending || !error || ['snapshot', 'snapshotPage'].indexOf(queue.client.errorMethod) >= 0)
+        return
+      if (error.code === 'TASK_NOT_FOUND' && queue.currentId)
+        queue.advance()
+      else
+        queue.fail(error)
     }
     function onPendingChanged() {
       if (!queue.pending || queue.client.pending)
@@ -91,19 +106,15 @@ Item {
     function onOperationChanged(op) {
       if (!queue.pending || op.action !== 'dismiss' || op.taskId !== queue.currentId || op.id !== queue.client.operationId || op.ownerId !== queue.client.ownerId || op.state !== 'completed')
         return
-      if (op.outcome !== 'observed') {
+      // A task that is already gone is as cleared as one just removed.
+      if (op.outcome !== 'observed' && !(op.error && op.error.code === 'TASK_NOT_FOUND')) {
         queue.fail(op.error || {
           code: 'CLEAR_UNCONFIRMED',
           message: 'Task clearing was not confirmed. Refresh activity before trying again.'
         })
         return
       }
-      queue.currentId = ''
-      var token = queue.generation
-      Qt.callLater(function () {
-        if (queue.pending && token === queue.generation)
-          queue.next()
-      })
+      queue.advance()
     }
   }
 }

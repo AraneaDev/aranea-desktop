@@ -108,6 +108,60 @@ Item {
       operations: operations
     })
   }
+  // Paged IPC reads, newest last; every page of one read comes from one view.
+  property var ipcViews: []
+  // Unique page tokens within this owner.
+  property int ipcSerial: 0
+  // One IPC reply stays well under Quickshell's ~110 KB reply limit.
+  property int ipcPageBytes: 60000
+  // First page of an IPC snapshot: owner fields plus as many bounded task rows
+  // as fit. Sessions stay in the owner (no client reads them) and operations
+  // drop their copied task. taskPage tells the client how to read the rest.
+  function ipcSnapshot(): var {
+    var view = snapshot()
+    var tasks = (view.tasks || []).map(Logic.boundTask)
+    var token = ownerId + '-snapshot-' + (++ipcSerial)
+    ipcViews = ipcViews.concat([
+      {
+        token: token,
+        tasks: tasks
+      }
+    ]).slice(-4)
+    var header = Object.assign({}, view, {
+      tasks: [],
+      operations: (view.operations || []).map(function (op) {
+        var copy = Object.assign({}, op)
+        delete copy.task
+        return copy
+      }),
+      taskPage: {
+        token: token,
+        total: tasks.length
+      }
+    })
+    delete header.sessions
+    var room = Math.max(8000, ipcPageBytes - Logic.utf8Length(JSON.stringify(header)))
+    header.tasks = Logic.taskPage(tasks, 0, room)
+    return header
+  }
+  // A later page of one IPC snapshot read, by its token and first row.
+  function ipcSnapshotPage(token: string, offset: int): var {
+    var cached = ipcViews.filter(function (view) {
+      return view.token === token
+    })[0]
+    if (!cached || offset < 0 || offset > cached.tasks.length)
+      return {
+        ok: false,
+        error: failure('SNAPSHOT_EXPIRED', 'Activity changed while it was being read. Refresh activity.')
+      }
+    return {
+      ok: true,
+      token: token,
+      offset: offset,
+      total: cached.tasks.length,
+      tasks: Logic.taskPage(cached.tasks, offset, ipcPageBytes - 512)
+    }
+  }
   // New reads supersede old results but do not invalidate operation observers.
   function refresh(): bool {
     if (captureActive || !runtime)

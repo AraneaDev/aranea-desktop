@@ -141,3 +141,40 @@ test("native capability uses exact private session evidence independent of lates
     }
   }
 })
+
+test("IPC task rows keep what the panel shows and stay within a byte bound", () => {
+  assert.equal(typeof logic.boundTask, "function", "task bounding exists")
+  assert.equal(logic.utf8Length("aé€😀"), 1 + 2 + 3 + 4)
+  const long = "é".repeat(4096)
+  const full = {
+    ...task,
+    description: long,
+    result: long,
+    question: long,
+    diagnostics: Array.from({ length: 20 }, (_, i) => ({ summary: i + long, receivedAt: i })),
+    blockers: Array.from({ length: 32 }, (_, i) => ({ blockerId: "b" + i, question: long })),
+    verification: { status: "reported-pass", summary: long, commands: ["x".repeat(512)] }
+  }
+  const bounded = logic.boundTask(full)
+  assert.equal(full.diagnostics.length, 20, "source row unchanged")
+  assert.ok(logic.utf8Length(JSON.stringify(bounded)) <= logic.maxTaskBytes)
+  assert.equal(bounded.blockers.length, 32, "blocker count and ids kept")
+  assert.equal(bounded.blockers[31].blockerId, "b31")
+  const small = { ...task, result: "done", diagnostics: [{ summary: "d", receivedAt: 1 }] }
+  assert.deepEqual(logic.boundTask(small), small, "ordinary rows are unchanged")
+  const joined = {
+    ...task,
+    diagnostics: Array.from({ length: 20 }, () => ({ summary: "x".repeat(4096), receivedAt: 1 }))
+  }
+  const kept = logic.boundTask(joined).diagnostics
+  assert.equal(kept.map((d) => d.summary).join("\n").length, 4096, "first 4096 shown chars kept")
+})
+
+test("task pages fill up to the byte budget and always make progress", () => {
+  assert.equal(typeof logic.taskPage, "function", "task paging exists")
+  const rows = Array.from({ length: 10 }, (_, i) => ({ taskId: "t" + i, result: "x".repeat(1000) }))
+  assert.equal(logic.taskPage(rows, 0, 3500).length, 3)
+  assert.equal(logic.taskPage(rows, 9, 3500).length, 1)
+  assert.equal(logic.taskPage(rows, 0, 10).length, 1, "one oversized row still advances")
+  assert.equal(logic.taskPage(rows, 10, 3500).length, 0)
+})
