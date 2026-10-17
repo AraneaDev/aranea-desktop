@@ -137,7 +137,7 @@ project_git_lock() {
   mkdir -p -- "$dir" || project_git_fail GIT_ERROR 'Cannot create the Git lock directory.' 'Check state-directory permissions and retry.'
   key=$(printf '%s' "$common" | sha256sum | cut -c1-32)
   exec {project_git_lock_fd}>"$dir/$key.lock"
-  flock -w 75 "$project_git_lock_fd" || project_git_fail GIT_BUSY 'Another Git operation on this repository is still running.' 'Wait for it to finish, then retry.'
+  flock -w "${ARANEA_GIT_LOCK_SECONDS:-75}" "$project_git_lock_fd" || project_git_fail GIT_BUSY 'Another Git operation on this repository is still running.' 'Wait for it to finish, then retry.'
 }
 
 # Call the registry store; prints the new state or returns 1.
@@ -450,7 +450,8 @@ project_git_main() {
     cat "$git_tmp/proof"
     exit 1
   fi
-  project_git_lock
+  # Review only reads, with optional locks off, so it never queues behind a fetch or push.
+  [[ $operation == review ]] || project_git_lock
   case "$operation" in
     fetch) project_git_fetch ;;
     pull) project_git_pull ;;

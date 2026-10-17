@@ -241,7 +241,32 @@ review_never_lazy_fetches() {
   }
   rm -f "$marker"
 }
-cases=(review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
+# Catch a read-only review queueing behind a held repository lock, and a fetch skipping the lock.
+review_ignores_repository_lock() {
+  setup
+  make_task locked
+  local key start
+  key=$(printf '%s' "$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)" | sha256sum | cut -c1-32)
+  mkdir -p "$ARANEA_STATE_ROOT/git-locks"
+  flock "$ARANEA_STATE_ROOT/git-locks/$key.lock" sleep 12 &
+  local holder=$!
+  sleep 0.5
+  start=$SECONDS
+  ARANEA_GIT_LOCK_SECONDS=2 timeout 8 "$helper" review --project "$project_id" --checkout "$task_id" --json >"$result" || true
+  ((SECONDS - start <= 4)) || {
+    echo "review waited for the lock"
+    kill "$holder" 2>/dev/null || true
+    return 1
+  }
+  jq -e '.ok and .data.checkoutId != null' "$result" >/dev/null
+  start=$SECONDS
+  ARANEA_GIT_LOCK_SECONDS=2 timeout 8 "$helper" fetch --project "$project_id" --checkout "$task_id" --json >"$result" || true
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  jq -e '.ok == false and .error.code == "GIT_BUSY"' "$result" >/dev/null
+  ((SECONDS - start >= 2 && SECONDS - start <= 6))
+}
+cases=(review_ignores_repository_lock review_reports_changes review_refuses_primary review_no_default_branch review_caps review_hostile_names_inert rebased_branch_reviews_cleanly review_never_lazy_fetches push_sets_upstream push_rejected push_detached push_auth_required push_never_forces push_hook_decline_is_not_rejected tag_named_like_branch)
 if (($#)); then cases=("$@"); fi
 for case_name in "${cases[@]}"; do
   set +e
