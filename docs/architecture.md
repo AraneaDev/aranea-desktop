@@ -163,9 +163,12 @@ separate from usage limits and from action execution: neither a reported finish
 nor a successful command supplies independent verification of a task.
 
 Native activity hooks keep the provider's two-second advisory timeout. Their
-synchronous worker has a 1.5-second deadline and a 0.1-second termination grace.
-The locked store validates the loaded state and the complete reduced result,
-then atomically publishes it. Exact serialized session identities and retained
+synchronous worker has a 1.4-second deadline and a 0.3-second termination grace.
+That gives a store cut off by the deadline time to remove its scratch files; a
+second signal cannot interrupt that cleanup. Under the lock, the store also
+removes scratch files more than ten minutes old, which only a run that died
+can leave. The locked store validates the loaded state and the complete
+reduced result, then atomically publishes it. Exact serialized session identities and retained
 task/receipt indexes bound history lookups without changing replay or retention
 rules. Mutation, final validation, and response projection share one in-memory
 reducer result; raw native prompts remain outside scratch storage.

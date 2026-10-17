@@ -11,7 +11,14 @@ activity_generation=${ARANEA_ACTIVITY_GENERATION:-$(agent_activity_generation)}
 state=null
 activity_tmp=''
 activity_scratch=''
-trap '[[ -z "$activity_tmp" ]] || rm -f -- "$activity_tmp" "${activity_tmp}.error"; [[ -z "$activity_scratch" ]] || rm -rf -- "$activity_scratch"' EXIT
+# Remove this run's scratch files. A deadline signal starts this; a second
+# signal must not cut it short, or the files outlive the run.
+cleanup_activity_scratch() {
+  trap '' TERM INT HUP
+  [[ -z "$activity_tmp" ]] || rm -f -- "$activity_tmp" "${activity_tmp}.error"
+  [[ -z "$activity_scratch" ]] || rm -rf -- "$activity_scratch"
+}
+trap cleanup_activity_scratch EXIT
 # Emit one structured failure without changing durable state.
 respond_error() {
   jq -c --arg code "$1" --arg message "$2" \
@@ -42,6 +49,9 @@ if [[ "$1" == deactivate || "$1" == activate ]]; then
 fi
 agent_activity_lock 1 || respond_error "$activity_lock_error" 'Activity store is busy, removed or belongs to a retired ingress lifetime.'
 [[ ! -L "$registry" ]] || respond_error UNSAFE_STATE_PATH 'Activity state must not be a symlink.'
+# Every run makes its scratch files after taking the lock, so any found now
+# belong to a run that died. Only ones older than ten minutes are removed.
+find "$(dirname "$registry")" -mindepth 1 -maxdepth 1 -mmin +10 \( \( -type d -name '.activity.??????' \) -o \( -type f \( -name 'agent-activity.json.??????' -o -name 'agent-activity.json.??????.error' \) \) \) -exec rm -rf -- {} + 2>/dev/null || true
 context=$(jq -cn --argjson receivedAt "$(date +%s)" --argjson monotonic "$(cut -d. -f1 /proc/uptime)" --arg bootId "$(cat /proc/sys/kernel/random/boot_id)" --arg generatedId "$(cat /proc/sys/kernel/random/uuid)" '{receivedAt:$receivedAt,monotonic:$monotonic,bootId:$bootId,generatedId:$generatedId}')
 projects='{"schemaVersion":1,"revision":0,"roots":[],"ignored":[],"projects":[]}'
 project_path="$(aranea_state_root)/projects.json"

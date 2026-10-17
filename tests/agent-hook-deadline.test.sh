@@ -88,3 +88,26 @@ printf '{"session_id":"contended","hook_event_name":"SessionStart"}\n' | /usr/bi
 cmp "$TMPDIR/before" "$ARANEA_STATE_ROOT/agent-activity.json"
 wait "$locker"
 echo 'PASS real contended transaction returns within provider deadline without changing state'
+# A store cut off by the deadline still removes its own scratch files.
+slow="$TMPDIR/slow-scripts"
+cp -r "$repo_root/scripts" "$slow"
+# The mapper spins inside the store's own shell until the deadline signal.
+printf '%s\n' '#!/usr/bin/env bash' 'agent_hooks_prepare_request() { while :; do :; done; }' >"$slow/lib/agent-hooks.sh"
+rm -rf "$ARANEA_STATE_ROOT"
+mkdir -p "$ARANEA_STATE_ROOT"
+for _ in 1 2 3 4 5 6; do
+  printf '{"session_id":"slow","hook_event_name":"Stop","cwd":"/"}\n' | /usr/bin/timeout 2 "$slow/aranea-agent-hook" claude >"$TMPDIR/out" 2>"$TMPDIR/err"
+  [[ ! -s "$TMPDIR/out" && ! -s "$TMPDIR/err" ]]
+done
+leftovers=0
+for _ in {1..50}; do
+  leftovers=$(find "$ARANEA_STATE_ROOT" -mindepth 1 -maxdepth 1 \( -name '.activity.*' -o -name 'agent-activity.json.??????*' \) | wc -l)
+  ((leftovers == 0)) && break
+  sleep .02
+done
+((leftovers == 0)) || {
+  echo "FAIL store cut off by the deadline left $leftovers scratch files"
+  ls -a "$ARANEA_STATE_ROOT"
+  exit 1
+}
+echo 'PASS store cut off by the deadline removes its scratch files'

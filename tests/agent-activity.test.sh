@@ -271,6 +271,27 @@ completed_history_dismissal() {
   report failure 4 failed >/dev/null
   mutate dismiss '{"taskId":"turn"}' | jq -e '.state.tasks == [] and .state.sessions[0].connection.connected' >/dev/null
 }
+# Scratch files of a run that died are swept under the lock; nothing else is.
+stale_scratch_is_swept() {
+  register >/dev/null
+  local dir
+  dir=$(dirname "$registry")
+  mkdir -p "$dir/.activity.Ab12Cd" "$dir/.activity.Fresh1"
+  printf 'x\n' >"$dir/.activity.Ab12Cd/request"
+  printf 'x\n' >"$dir/agent-activity.json.Xy34Zw"
+  printf 'x\n' >"$dir/agent-activity.json.Xy34Zw.error"
+  printf 'x\n' >"$dir/agent-activity.json.Fresh2"
+  printf 'x\n' >"$dir/notes.txt"
+  touch -d '20 minutes ago' "$dir/.activity.Ab12Cd/request" "$dir/.activity.Ab12Cd" "$dir/agent-activity.json.Xy34Zw" "$dir/agent-activity.json.Xy34Zw.error" "$dir/notes.txt" "$dir/agent-activity.json.lock"
+  "$store" snapshot >/dev/null
+  [[ ! -e "$dir/.activity.Ab12Cd" && ! -e "$dir/agent-activity.json.Xy34Zw" && ! -e "$dir/agent-activity.json.Xy34Zw.error" ]]
+  [[ -d "$dir/.activity.Fresh1" && -f "$dir/agent-activity.json.Fresh2" && -f "$dir/notes.txt" && -f "$dir/agent-activity.json.lock" && -f "$registry" ]]
+  mkdir -p "$dir/.activity.Old999"
+  touch -d '20 minutes ago' "$dir/.activity.Old999"
+  mutate prune '{}' >/dev/null
+  [[ ! -e "$dir/.activity.Old999" && -d "$dir/.activity.Fresh1" ]]
+  [[ -z $(find "$dir" -maxdepth 1 -name '.activity.*' ! -name '.activity.Fresh1') ]]
+}
 # Clearing many tasks is one locked write; missing IDs are done, live ones refused.
 dismiss_many_one_write() {
   register >/dev/null
@@ -429,5 +450,5 @@ native_callback_ownership_schema_and_pruning() {
   "$store" snapshot | jq -e '.ok' >/dev/null
   report evict 4 heartbeat | jq -e '.state.sessions[0].nativeMetadata.callbackOwners == [] and (.state.sessions[0].receipts|length == 512)' >/dev/null
 }
-for name in snapshot_contract dismiss_many_one_write ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection completed_history_dismissal native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
+for name in snapshot_contract stale_scratch_is_swept dismiss_many_one_write ordered_reports blockers_diagnostics_and_verification invalid_inputs_preserve_bytes corrupt_state_is_preserved association_and_registry_errors concurrency_conflict_and_no_implicit_session freshness_dismissal_and_symlinks capacity_retention_and_receipt_bounds nested_records_and_history_bounds missing_native_adapter_is_structured prompt_minimization_and_duplicate_replay attention_retention_respects_connection completed_history_dismissal native_mapping_is_one_atomic_transaction write_failure_lock_timeout_and_clock_regression epoch_history_never_revives_a_retained_producer native_inactivity_and_resolution_summary native_callback_ownership_schema_and_pruning; do run_case "$name"; done
 ((failures == 0))
