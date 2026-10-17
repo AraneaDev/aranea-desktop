@@ -246,6 +246,17 @@ Item {
     id: gitCommands
     captureActive: root.inert
   }
+  // Reads of how task checkouts differ from their base, and the Open diff launch.
+  property alias reviewClient: reviewClient
+  ProjectReviewClient {
+    id: reviewClient
+    active: root.opened
+    captureActive: root.inert
+    projectId: gitClient.projectId
+    checkoutId: gitClient.checkoutId
+    tasks: (activityClient.snapshot || {}).tasks || []
+    commands: gitCommands
+  }
   // One action observer shared by Overview and full Actions, including receipts.
   property alias actionClient: actionClient
   ProjectActionsClient {

@@ -201,4 +201,54 @@ for provider in claude codex; do
   mv "$checkout/nested/$provider" "$tool_bin/$provider"
   launch_path="$tool_bin"
 done
+# Open diff: the saved terminal runs `git -C <registered checkout> diff <mergeBase>...HEAD`, nothing else.
+cp "$tool_bin/kitty" "$tool_bin/git"
+mkdir -p "$ARANEA_TEST_SANDBOX/home/.local/state/aranea" "$ARANEA_TEST_SANDBOX/other"
+jq -cn --arg p "$checkout" '{projects:[{id:"p",checkouts:[{id:"c",path:$p,primary:false}]}]}' >"$ARANEA_TEST_SANDBOX/home/.local/state/aranea/projects.json"
+merge_base=0123456789abcdef0123456789abcdef01234567
+# Open diff request for a folder, merge base and terminal; defaults are valid.
+diff_request() {
+  jq -cn --arg cwd "${1:-$checkout}" --arg mb "${2:-$merge_base}" --arg t "${3:-kitty}" '{kind:"diff",cwd:$cwd,mergeBase:$mb,terminalId:$t}'
+}
+for terminal in kitty alacritty foot ghostty; do
+  rm -f "$ARANEA_TEST_SANDBOX/argv" "$ARANEA_TEST_SANDBOX/cwd"
+  result=$(diff_request "$checkout" "$merge_base" "$terminal" | PATH="$launch_path" "$launcher") || {
+    echo "Expected diff acceptance for $terminal, got: $result"
+    exit 1
+  }
+  jq -e '.ok and .status=="accepted"' <<<"$result" >/dev/null
+  sandbox_on_exit "kill -- -$(jq -r .identity.pid <<<"$result") 2>/dev/null || true"
+  for ((i = 0; i < 50; i++)); do
+    [[ ! -f "$ARANEA_TEST_SANDBOX/cwd" ]] || break
+    sleep .02
+  done
+  tail_actual=$(jq -Rsc 'split("\n")[:-1][-5:]' "$ARANEA_TEST_SANDBOX/argv")
+  tail_expected=$(jq -cn --arg g "$tool_bin/git" --arg cwd "$checkout" --arg r "$merge_base...HEAD" '[$g,"-C",$cwd,"diff",$r]')
+  [[ "$tail_actual" == "$tail_expected" ]] || {
+    echo "Expected diff tail $tail_expected for $terminal, got: $tail_actual"
+    exit 1
+  }
+  accepted=$((accepted + 1))
+done
+# Refuse a raw launcher request with the given code and no terminal started.
+refuse_raw() {
+  local request=$1 code=$2 rc=0 out
+  rm -f "$ARANEA_TEST_SANDBOX/argv"
+  out=$(PATH="$launch_path" "$launcher" <<<"$request") || rc=$?
+  [[ $rc != 0 ]] && jq -e --arg code "$code" '.ok==false and .code==$code' <<<"$out" >/dev/null && [[ ! -f "$ARANEA_TEST_SANDBOX/argv" ]] || {
+    echo "Expected $code without launch for $request, got: $out"
+    exit 1
+  }
+  refused=$((refused + 1))
+}
+refuse_raw "$(diff_request "$checkout" 'HEAD;id')" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "${merge_base^^}")" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "${merge_base}0")" INVALID_LAUNCH
+refuse_raw "$(diff_request "$checkout" "$merge_base" xterm)" INVALID_LAUNCH
+refuse_raw "$(diff_request "$ARANEA_TEST_SANDBOX/other")" CHECKOUT_INVALID
+refuse_raw "$(diff_request "$checkout/nested")" CHECKOUT_INVALID
+refuse_raw "$(diff_request | jq -c '.extra="x"')" INVALID_LAUNCH
+refuse_raw "$(diff_request | jq -c '.argv=["kitty","x","y"]')" INVALID_LAUNCH
+refuse_raw "$(diff_request | jq -c 'del(.terminalId)')" INVALID_LAUNCH
+echo "PASS Open diff: four terminals accepted, malformed mergeBase, unregistered path, unknown terminal and extra fields refused"
 echo "PASS $accepted accepted launches, $refused refusals: all terminal/provider shapes, basename-sensitive shims, editor/resume shapes and canonical safe PATH"

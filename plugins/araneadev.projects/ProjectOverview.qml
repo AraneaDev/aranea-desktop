@@ -87,7 +87,40 @@ ColumnLayout {
   signal fetchRequested
   // Explicit fast-forward pull request.
   signal pullRequested
+  // Review model for the selected task checkout: {state, ...}; state 'none' shows nothing.
+  property var review: ({
+      state: 'none'
+    })
+  // The review card's explicit actions; none of them ever fires without a press.
+  signal reviewRunChecksRequested
+  // Open diff was pressed.
+  signal reviewOpenDiffRequested
+  // Push branch was pressed.
+  signal reviewPushRequested
+  // Mark reviewed was pressed.
+  signal reviewMarkRequested
+  // Remove task checkout was pressed.
+  signal reviewRemoveRequested
   spacing: Style.space(20)
+  ProjectReviewCard {
+    Layout.fillWidth: true
+    visible: view.review.state === 'ready'
+    review: view.review
+    displayOnly: view.displayOnly
+    pointerGate: view.pointerGate
+    onRunChecksRequested: view.reviewRunChecksRequested()
+    onOpenDiffRequested: view.reviewOpenDiffRequested()
+    onPushRequested: view.reviewPushRequested()
+    onMarkRequested: view.reviewMarkRequested()
+    onRemoveRequested: view.reviewRemoveRequested()
+  }
+  Aranea.UiLabel {
+    objectName: 'reviewWorking'
+    Layout.fillWidth: true
+    visible: view.review.state === 'working' || view.review.state === 'needsInput'
+    text: view.review.state === 'needsInput' ? 'Agent needs input' : 'Agent working'
+    font.bold: true
+  }
   ColumnLayout {
     Layout.fillWidth: true
     visible: view.activitySummary.length > 0

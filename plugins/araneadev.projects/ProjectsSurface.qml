@@ -15,6 +15,7 @@ import "ProjectActionRecords.js" as Records
 import "ProjectActionSuggestions.js" as Suggestions
 import "ProjectProfiles.js" as Profiles
 import "ProjectProblems.js" as Problems
+import "ProjectReview.js" as Review
 import "ProjectsLogic.js" as Logic
 
 Item {
@@ -110,6 +111,21 @@ Item {
   function redetectOverview() {
     if (overviewWantsSuggestions)
       root.actionClient.detect(false)
+  }
+  Connections {
+    target: panel.root.projectController
+    function onMutationFailed(action, args, message) {
+      if (action === 'review-mark')
+        panel.reviewActionError = {
+          projectId: args.projectId,
+          checkoutId: args.checkoutId,
+          error: {
+            code: 'REGISTRY_WRITE_FAILED',
+            message: message,
+            recovery: ''
+          }
+        }
+    }
   }
   Connections {
     target: panel.root.actionClient
@@ -632,6 +648,87 @@ Item {
       return c.id === project.lastCheckoutId
     }) || null : null
   }
+  // Last push or review-mark failure as {projectId, checkoutId, error}; shown only for that pair.
+  property var reviewActionError: null
+  // Review card model for the selected task checkout; state 'none' shows nothing.
+  readonly property var reviewModel: {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (!project || !checkout || checkout.primary)
+      return {
+        state: 'none'
+      }
+    var snapshot = root.activityClient.snapshot || {}
+    var tasks = Review.tasksFor(snapshot.tasks || [], project.id, checkout.id)
+    var entry = root.reviewClient.reviews[checkout.id] || {}
+    var data = entry.data && entry.data.projectId === project.id ? entry.data : null
+    var state = Review.reviewState(checkout, tasks, data)
+    if (state !== 'ready')
+      return {
+        state: state
+      }
+    var definition = Review.checksAction(selectedDefinitions, project.id)
+    var runs = definition ? Records.runs(root.actionClient.snapshot, project.id, checkout.id).filter(function (r) {
+      return r.actionId === definition.id
+    }) : []
+    var client = root.actionClient
+    var running = root.gitCommands.pending
+    var stored = reviewActionError
+    var mine = !!stored && stored.projectId === project.id && stored.checkoutId === checkout.id
+    var terminal = (project.tools || {}).terminalId || (root.projectController.tools.defaults || {}).terminalId || ''
+    return {
+      state: state,
+      branch: checkout.branch || '',
+      data: data,
+      agentReport: Review.agentReportLabel(Review.latestFinished(tasks)),
+      checksText: definition ? Review.checksLabel(runs[0] || null) : 'no check action saved',
+      hasChecks: !!definition,
+      canRunChecks: !!definition && !client.pending && !client.submissionUncertain && client.availability.execution === true && !Records.activeRun(client.snapshot, project.id, checkout.id, definition.id),
+      canOpenDiff: !!data && !!data.mergeBase && !!terminal && !root.reviewClient.diffPending,
+      pushPending: !!running && running.operation === 'push' && running.projectId === project.id && running.checkoutId === checkout.id,
+      pushBlocked: !!running,
+      markPending: root.projectController.pending,
+      error: (mine ? stored.error : null) || entry.error || root.reviewClient.diffError || null
+    }
+  }
+  // Run the project's check action in the selected checkout; one press, one run.
+  function runReviewChecks() {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (root.inert || !project || !checkout || !reviewModel.canRunChecks)
+      return
+    var definition = Review.checksAction(selectedDefinitions, project.id)
+    if (definition)
+      root.actionClient.start(definition.id, definition.revision)
+  }
+  // Open the saved terminal on the diff against the merge base.
+  function openReviewDiff() {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (root.inert || !project || !checkout || !reviewModel.canOpenDiff)
+      return
+    var terminal = (project.tools || {}).terminalId || (root.projectController.tools.defaults || {}).terminalId || ''
+    root.reviewClient.openDiff(checkout.path, reviewModel.data.mergeBase, terminal)
+  }
+  // Push the task branch; the helper never forces and never pushes another branch.
+  function pushReviewBranch() {
+    if (reviewModel.state !== 'ready')
+      return
+    reviewActionError = null
+    runGit('push')
+  }
+  // Record that this head and this task time were reviewed.
+  function markReviewed() {
+    var project = projectsPage.selectedProject, checkout = selectedCheckout
+    if (root.inert || !project || !checkout || !reviewModel.data || reviewModel.markPending)
+      return
+    var tasks = Review.tasksFor((root.activityClient.snapshot || {}).tasks || [], project.id, checkout.id)
+    var latest = Review.latestFinished(tasks)
+    reviewActionError = null
+    root.projectController.request('review-mark', {
+      projectId: project.id,
+      checkoutId: checkout.id,
+      head: reviewModel.data.head,
+      taskFinishedAt: latest && typeof latest.lastReceivedAt === 'number' ? latest.lastReceivedAt : null
+    })
+  }
   // Start one Git command for the selected pair; false means nothing started.
   function runGit(operation, extra) {
     var project = projectsPage.selectedProject, checkoutId = root.gitClient.checkoutId
@@ -718,6 +815,14 @@ Item {
           }
         else if (stored && stored.projectId === projectId && stored.checkoutId === checkoutId)
           panel.gitCommandError = null
+        if (project && project.id === projectId && panel.root.gitClient.checkoutId === checkoutId)
+          panel.root.gitClient.refresh()
+      } else if (operation === 'push') {
+        panel.reviewActionError = response.ok ? null : {
+          projectId: projectId,
+          checkoutId: checkoutId,
+          error: response.error
+        }
         if (project && project.id === projectId && panel.root.gitClient.checkoutId === checkoutId)
           panel.root.gitClient.refresh()
       } else if (operation === 'task-create') {
@@ -1392,6 +1497,16 @@ Item {
                   gitCommandError: panel.selectedGitCommandError
                   gitCommandOperation: panel.selectedGitCommandOperation
                   gitCommandBusy: !!panel.root.gitCommands.pending
+                  review: panel.reviewModel
+                  onReviewRunChecksRequested: panel.runReviewChecks()
+                  onReviewOpenDiffRequested: panel.openReviewDiff()
+                  onReviewPushRequested: panel.pushReviewBranch()
+                  onReviewMarkRequested: panel.markReviewed()
+                  onReviewRemoveRequested: {
+                    var project = projectsPage.selectedProject
+                    if (project && panel.selectedCheckout)
+                      panel.requestTaskRemove(project.id, panel.selectedCheckout.id)
+                  }
                   onRefreshRequested: panel.refreshOverview()
                   onFetchRequested: panel.runGit('fetch')
                   onPullRequested: panel.runGit('pull')
